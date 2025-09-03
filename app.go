@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct
@@ -41,4 +43,14 @@ func (a *App) shutdown(ctx context.Context) {
 // Greet returns a greeting for the given name
 func (a *App) Greet(name string) string {
 	return fmt.Sprintf("Hello %s, It's show time!", name)
+}
+
+// ShowWindow shows the application window
+func (a *App) ShowWindow() {
+	runtime.WindowShow(a.ctx)
+}
+
+// QuitApp quits the application
+func (a *App) QuitApp() {
+	runtime.Quit(a.ctx)
 }
