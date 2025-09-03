@@ -21,6 +21,8 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	// Perform your setup here
 	a.ctx = ctx
+	// Store context globally for systray access
+	appContext = ctx
 }
 
 // domReady is called after front-end resources have been loaded
@@ -32,7 +34,8 @@ func (a App) domReady(ctx context.Context) {
 // either by clicking the window close button or calling runtime.Quit.
 // Returning true will cause the application to continue, false will continue shutdown as normal.
 func (a *App) beforeClose(ctx context.Context) (prevent bool) {
-	return false
+	runtime.WindowHide(ctx)
+	return true
 }
 
 // shutdown is called at application termination
