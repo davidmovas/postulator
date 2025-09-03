@@ -118,9 +118,7 @@ func main() {
 			WebviewIsTransparent: false,
 			WindowIsTranslucent:  false,
 			DisableWindowIcon:    false,
-			// DisableFramelessWindowDecorations: false,
-			WebviewUserDataPath: "",
-			ZoomFactor:          1.0,
+			ZoomFactor:           1.0,
 		},
 		// Mac platform specific options
 		Mac: &mac.Options{

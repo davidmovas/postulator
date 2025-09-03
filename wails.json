@@ -9,5 +9,8 @@
     "author": {
         "name": "Nofre",
         "email": "davidprogram417@gmail.com"
-    }
+    },
+    "debounceMS": 100,
+    "wailsjsdir": "./frontend/src/wailsjs",
+    "platform": "windows/amd64"
 }
