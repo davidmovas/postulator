@@ -1,36 +1,22 @@
-import type { Metadata } from "next";
-import localFont from "next/font/local";
+import { Inter } from "next/font/google";
+
 import "./globals.css";
-import React from "react";
 
-const geistSans = localFont({
-    src: "./fonts/GeistVF.woff",
-    variable: "--font-geist-sans",
-    weight: "100 900",
+const fontSans = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
 });
-const geistMono = localFont({
-    src: "./fonts/GeistMonoVF.woff",
-    variable: "--font-geist-mono",
-    weight: "100 900",
-});
-
-export const metadata: Metadata = {
-    title: "Postulator",
-    description: "Post creator app",
-};
 
 export default function RootLayout({
-    children,
+  children,
 }: Readonly<{
-    children: React.ReactNode;
+  children: React.ReactNode;
 }>) {
-    return (
-        <html lang="en">
-            <body
-                className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-            >
-                {children}
-            </body>
-        </html>
-    );
+  return (
+    <html lang="en" className="dark scheme-only-dark">
+      <body className={`${fontSans.variable} font-sans antialiased`}>
+        {children}
+      </body>
+    </html>
+  );
 }
