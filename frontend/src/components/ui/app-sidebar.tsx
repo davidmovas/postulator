@@ -1,7 +1,7 @@
 import * as React from "react";
 
-import { SearchForm } from "@/components/search-form";
-import { TeamSwitcher } from "@/components/team-switcher";
+import { SearchForm } from "@/components/ui/search-form";
+import { TeamSwitcher } from "@/components/ui/team-switcher";
 import {
   Sidebar,
   SidebarContent,
@@ -14,7 +14,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-} from "@/components/sidebar";
+} from "@/components/ui/sidebar";
 import {
   RiScanLine,
   RiBardLine,

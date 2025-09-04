@@ -15,7 +15,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/sidebar";
+} from "@/components/ui/sidebar";
 import { RiExpandUpDownLine, RiAddLine } from "@remixicon/react";
 
 export function TeamSwitcher({

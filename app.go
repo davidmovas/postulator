@@ -7,11 +7,13 @@ import (
 	"time"
 
 	"Postulator/internal/config"
+	"Postulator/internal/dto"
 	"Postulator/internal/handlers"
 	"Postulator/internal/repository"
 	"Postulator/internal/services/gpt"
 	"Postulator/internal/services/pipeline"
 	"Postulator/internal/services/wordpress"
+
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -51,7 +53,7 @@ func (a *App) startup(ctx context.Context) {
 	}
 
 	// Initialize database
-	if err := repository.InitDatabase(); err != nil {
+	if err = repository.InitDatabase(); err != nil {
 		log.Printf("Error initializing database: %v", err)
 		return
 	} else {
@@ -173,4 +175,146 @@ func (a *App) GetSetting(key string) (string, error) {
 // SetSetting sets a setting value
 func (a *App) SetSetting(key, value string) error {
 	return repository.SetSetting(key, value)
+}
+
+// Site Management Methods - Wails API bindings
+
+// CreateSite creates a new WordPress site
+func (a *App) CreateSite(req dto.CreateSiteRequest) *dto.BaseResponse {
+	if a.handlers == nil {
+		return dto.ErrorResponse(fmt.Errorf("handlers not initialized"))
+	}
+	return a.handlers.CreateSite(req)
+}
+
+// GetSites retrieves all sites with pagination
+func (a *App) GetSites(pagination dto.PaginationRequest) *dto.BaseResponse {
+	if a.handlers == nil {
+		return dto.ErrorResponse(fmt.Errorf("handlers not initialized"))
+	}
+	return a.handlers.GetSites(pagination)
+}
+
+// UpdateSite updates an existing site
+func (a *App) UpdateSite(req dto.UpdateSiteRequest) *dto.BaseResponse {
+	if a.handlers == nil {
+		return dto.ErrorResponse(fmt.Errorf("handlers not initialized"))
+	}
+	return a.handlers.UpdateSite(req)
+}
+
+// DeleteSite deletes a site
+func (a *App) DeleteSite(siteID int64) *dto.BaseResponse {
+	if a.handlers == nil {
+		return dto.ErrorResponse(fmt.Errorf("handlers not initialized"))
+	}
+	return a.handlers.DeleteSite(siteID)
+}
+
+// TestSiteConnection tests connection to a WordPress site
+func (a *App) TestSiteConnection(req dto.TestSiteConnectionRequest) *dto.BaseResponse {
+	if a.handlers == nil {
+		return dto.ErrorResponse(fmt.Errorf("handlers not initialized"))
+	}
+	return a.handlers.TestSiteConnection(req)
+}
+
+// Topic Management Methods
+
+// CreateTopic creates a new topic
+func (a *App) CreateTopic(req dto.CreateTopicRequest) *dto.BaseResponse {
+	if a.handlers == nil {
+		return dto.ErrorResponse(fmt.Errorf("handlers not initialized"))
+	}
+	return a.handlers.CreateTopic(req)
+}
+
+// GetTopics retrieves all topics with pagination
+func (a *App) GetTopics(pagination dto.PaginationRequest) *dto.BaseResponse {
+	if a.handlers == nil {
+		return dto.ErrorResponse(fmt.Errorf("handlers not initialized"))
+	}
+	return a.handlers.GetTopics(pagination)
+}
+
+// Schedule Management Methods
+
+// CreateSchedule creates a new posting schedule
+func (a *App) CreateSchedule(req dto.CreateScheduleRequest) *dto.BaseResponse {
+	if a.handlers == nil {
+		return dto.ErrorResponse(fmt.Errorf("handlers not initialized"))
+	}
+	return a.handlers.CreateSchedule(req)
+}
+
+// GetSchedules retrieves all schedules with pagination
+func (a *App) GetSchedules(pagination dto.PaginationRequest) *dto.BaseResponse {
+	if a.handlers == nil {
+		return dto.ErrorResponse(fmt.Errorf("handlers not initialized"))
+	}
+	return a.handlers.GetSchedules(pagination)
+}
+
+// Article Management Methods
+
+// CreateArticle creates a new article manually
+func (a *App) CreateArticle(req dto.CreateArticleManualRequest) *dto.BaseResponse {
+	if a.handlers == nil {
+		return dto.ErrorResponse(fmt.Errorf("handlers not initialized"))
+	}
+	return a.handlers.CreateArticle(req)
+}
+
+// GetArticles retrieves all articles with pagination
+func (a *App) GetArticles(pagination dto.PaginationRequest) *dto.BaseResponse {
+	if a.handlers == nil {
+		return dto.ErrorResponse(fmt.Errorf("handlers not initialized"))
+	}
+	return a.handlers.GetArticles(pagination)
+}
+
+// PreviewArticle generates a preview of an article without saving
+func (a *App) PreviewArticle(req dto.PreviewArticleRequest) *dto.BaseResponse {
+	if a.handlers == nil {
+		return dto.ErrorResponse(fmt.Errorf("handlers not initialized"))
+	}
+	return a.handlers.PreviewArticle(req)
+}
+
+// PostingJob Management Methods
+
+// GetPostingJobs retrieves all posting jobs with pagination
+func (a *App) GetPostingJobs(pagination dto.PaginationRequest) *dto.BaseResponse {
+	if a.handlers == nil {
+		return dto.ErrorResponse(fmt.Errorf("handlers not initialized"))
+	}
+	return a.handlers.GetPostingJobs(pagination)
+}
+
+// Dashboard Methods
+
+// GetDashboard retrieves dashboard data
+func (a *App) GetDashboard() *dto.BaseResponse {
+	if a.handlers == nil {
+		return dto.ErrorResponse(fmt.Errorf("handlers not initialized"))
+	}
+	return a.handlers.GetDashboard()
+}
+
+// Settings Management Methods
+
+// GetSettings retrieves all settings
+func (a *App) GetSettings() *dto.BaseResponse {
+	if a.handlers == nil {
+		return dto.ErrorResponse(fmt.Errorf("handlers not initialized"))
+	}
+	return a.handlers.GetSettings()
+}
+
+// UpdateSetting updates a setting
+func (a *App) UpdateSetting(req dto.SettingRequest) *dto.BaseResponse {
+	if a.handlers == nil {
+		return dto.ErrorResponse(fmt.Errorf("handlers not initialized"))
+	}
+	return a.handlers.UpdateSetting(req)
 }

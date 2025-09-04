@@ -25,7 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/label";
+import { Label } from "@/components/ui/label";
 import {
   Pagination,
   PaginationContent,
@@ -85,7 +85,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/tooltip";
+} from "@/components/ui/tooltip";
 
 type Item = {
   id: string;

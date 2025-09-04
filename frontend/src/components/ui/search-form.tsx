@@ -1,6 +1,6 @@
 import { useId } from "react";
-import { SidebarInput } from "@/components/sidebar";
-import { SidebarGroup, SidebarGroupContent } from "@/components/sidebar";
+import { SidebarInput } from "@/components/ui/sidebar";
+import { SidebarGroup, SidebarGroupContent } from "@/components/ui/sidebar";
 import { RiSearch2Line } from "@remixicon/react";
 
 export function SearchForm({ ...props }: React.ComponentProps<"form">) {
