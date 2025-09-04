@@ -1,8 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/ui/app-sidebar";
+import AppShell from "@/components/layout/AppShell";
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -12,7 +11,9 @@ import {
     BreadcrumbSeparator
 } from "@/components/ui/breadcrumb";
 import { RiScanLine } from "@remixicon/react";
-import { Separator } from "@/components/ui/separator";
+import SitesPanel from "@/components/dashboard/SitesPanel";
+import { NavigationProvider, useNavigation } from "@/context/navigation";
+import { RiBardLine, RiCodeSSlashLine, RiSettings3Line, RiUserFollowLine } from "@remixicon/react";
 
 function SplashScreen() {
     return (
@@ -25,49 +26,104 @@ function SplashScreen() {
     );
 }
 
+function HeaderCrumbs() {
+    const { section, setSection } = useNavigation();
+    const icon = section === "dashboard" ? <RiScanLine size={22} aria-hidden="true" />
+        : section === "jobs" ? <RiBardLine size={22} aria-hidden="true" />
+        : section === "sites" ? <RiUserFollowLine size={22} aria-hidden="true" />
+        : section === "titles" ? <RiCodeSSlashLine size={22} aria-hidden="true" />
+        : <RiSettings3Line size={22} aria-hidden="true" />;
+    const title = section.charAt(0).toUpperCase() + section.slice(1);
+    return (
+        <Breadcrumb>
+            <BreadcrumbList>
+                <BreadcrumbItem className="hidden md:block">
+                    <BreadcrumbLink href="#" onClick={(e)=>{e.preventDefault(); setSection("dashboard");}}>
+                        {icon}
+                        <span className="sr-only">{title}</span>
+                    </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator className="hidden md:block" />
+                <BreadcrumbItem>
+                    <BreadcrumbPage>{title}</BreadcrumbPage>
+                </BreadcrumbItem>
+            </BreadcrumbList>
+        </Breadcrumb>
+    );
+}
+
+function SectionContent() {
+    const { section } = useNavigation();
+    if (section === "dashboard") {
+        return (
+            <>
+                <div className="p-4 md:p-6 lg:p-8">
+                    <div className="text-sm text-muted-foreground">Welcome back 👋</div>
+                    <h2 className="mt-1 text-2xl font-semibold tracking-tight">Dashboard</h2>
+                    <p className="mt-2 text-muted-foreground">Use the sidebar to navigate between sections.</p>
+                </div>
+                <SitesPanel />
+            </>
+        );
+    }
+    if (section === "sites") {
+        return <SitesPanel />;
+    }
+    if (section === "jobs") {
+        return (
+            <div className="p-4 md:p-6 lg:p-8">
+                <div className="text-sm text-muted-foreground">Schedule and monitor publishing jobs.</div>
+                <h2 className="mt-1 text-2xl font-semibold tracking-tight">Jobs</h2>
+                <p className="mt-2 text-muted-foreground">Cron builder and job list will appear here.</p>
+            </div>
+        );
+    }
+    if (section === "titles") {
+        return (
+            <div className="p-4 md:p-6 lg:p-8">
+                <div className="text-sm text-muted-foreground">Browse and manage generated titles.</div>
+                <h2 className="mt-1 text-2xl font-semibold tracking-tight">Titles</h2>
+                <p className="mt-2 text-muted-foreground">Large, scalable list/grid will be placed here.</p>
+            </div>
+        );
+    }
+    // settings
+    return (
+        <div className="p-4 md:p-6 lg:p-8">
+            <div className="text-sm text-muted-foreground">Application configuration.</div>
+            <h2 className="mt-1 text-2xl font-semibold tracking-tight">Settings</h2>
+            <p className="mt-2 text-muted-foreground">Settings forms will appear here.</p>
+        </div>
+    );
+}
+
 export default function Home() {
-    const [showSplash, setShowSplash] = useState(true);
+    const [showSplash, setShowSplash] = useState(false);
 
     useEffect(() => {
-        // Keep splash for a short moment; respect reduced motion by shortening
+        // Play splash only once per app session
+        const shown = typeof window !== "undefined" ? sessionStorage.getItem("splashShown") : "1";
+        if (shown === "1") {
+            setShowSplash(false);
+            return;
+        }
+        setShowSplash(true);
         const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        const timeout = setTimeout(() => setShowSplash(false), prefersReduced ? 600 : 1700);
+        const timeout = setTimeout(() => {
+            setShowSplash(false);
+            sessionStorage.setItem("splashShown", "1");
+        }, prefersReduced ? 600 : 1700);
         return () => clearTimeout(timeout);
     }, []);
 
     return (
-        <div className="relative min-h-screen grid grid-rows-[20px_1fr_20px] items-center justify-items-center p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
+        <>
             {showSplash && <SplashScreen />}
-            <main className={`flex flex-col gap-8 row-start-2 items-center sm:items-start transition-opacity duration-500 ${showSplash ? "opacity-0" : "opacity-100"}`}>
-                <SidebarProvider>
-                    <AppSidebar />
-                    <SidebarInset className="overflow-hidden px-4 md:px-6 lg:px-8">
-                        <header className="flex h-16 shrink-0 items-center gap-2 border-b">
-                            <div className="flex flex-1 items-center gap-2 px-3">
-                                <SidebarTrigger className="-ms-4" />
-                                <Separator
-                                    orientation="vertical"
-                                    className="mr-2 data-[orientation=vertical]:h-4"
-                                />
-                                <Breadcrumb>
-                                    <BreadcrumbList>
-                                        <BreadcrumbItem className="hidden md:block">
-                                            <BreadcrumbLink href="#">
-                                                <RiScanLine size={22} aria-hidden="true" />
-                                                <span className="sr-only">Dashboard</span>
-                                            </BreadcrumbLink>
-                                        </BreadcrumbItem>
-                                        <BreadcrumbSeparator className="hidden md:block" />
-                                        <BreadcrumbItem>
-                                            <BreadcrumbPage>Dashboard</BreadcrumbPage>
-                                        </BreadcrumbItem>
-                                    </BreadcrumbList>
-                                </Breadcrumb>
-                            </div>
-                        </header>
-                    </SidebarInset>
-                </SidebarProvider>
-            </main>
-        </div>
+            <NavigationProvider>
+                <AppShell header={<HeaderCrumbs />}>
+                    <SectionContent />
+                </AppShell>
+            </NavigationProvider>
+        </>
     );
 }

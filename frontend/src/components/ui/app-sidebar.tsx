@@ -22,42 +22,46 @@ import {
     RiLogoutBoxLine, RemixiconComponentType,
 } from "@remixicon/react";
 
-interface NavItem {
-    title: string;
-    url: string;
-    icon?: RemixiconComponentType;
-    isActive?: boolean;
-    items?: NavItem[];
-}
+import { useNavigation, type Section } from "@/context/navigation";
 
-const navItems: NavItem[] = [
+type LeafItem = {
+    title: string;
+    key: Section;
+    icon?: RemixiconComponentType;
+};
+
+type NavGroup = {
+    title: string;
+    items: LeafItem[];
+};
+
+const navItems: NavGroup[] = [
     {
         title: "Sections",
-        url: "#",
         items: [
             {
                 title: "Dashboard",
-                url: "/",
+                key: "dashboard",
                 icon: RiScanLine,
             },
             {
                 title: "Jobs",
-                url: "#",
+                key: "jobs",
                 icon: RiBardLine,
             },
             {
                 title: "Sites",
-                url: "#",
+                key: "sites",
                 icon: RiUserFollowLine,
             },
             {
                 title: "Titles",
-                url: "#",
+                key: "titles",
                 icon: RiCodeSSlashLine,
             },
             {
                 title: "Settings",
-                url: "#",
+                key: "settings",
                 icon: RiSettings3Line,
             },
         ],
@@ -65,6 +69,7 @@ const navItems: NavItem[] = [
 ];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { section, setSection } = useNavigation();
   return (
     <Sidebar {...props}>
       <SidebarHeader>
@@ -74,21 +79,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         {/* We create a SidebarGroup for each parent. */}
-        {navItems.map((item) => (
-          <SidebarGroup key={item.title}>
+        {navItems.map((group) => (
+          <SidebarGroup key={group.title}>
             <SidebarGroupLabel className="uppercase text-muted-foreground/60">
-              {item.title}
+              {group.title}
             </SidebarGroupLabel>
             <SidebarGroupContent className="px-2">
               <SidebarMenu>
-                {item.items && item.items.map((item) => (
+                {group.items && group.items.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
-                      asChild
                       className="group/menu-button font-medium gap-3 h-9 rounded-md bg-gradient-to-r hover:bg-transparent hover:from-sidebar-accent hover:to-sidebar-accent/40 data-[active=true]:from-primary/20 data-[active=true]:to-primary/5 [&>svg]:size-auto"
-                      isActive={item.isActive}
+                      isActive={section === item.key}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setSection(item.key);
+                      }}
                     >
-                      <a href={item.url}>
+                      <span className="inline-flex items-center gap-3">
                         {item.icon && (
                           <item.icon
                             className="text-muted-foreground/60 group-data-[active=true]/menu-button:text-primary"
@@ -97,7 +105,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                           />
                         )}
                         <span>{item.title}</span>
-                      </a>
+                      </span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
