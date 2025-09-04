@@ -54,10 +54,6 @@ export function GetTopics(arg1) {
   return window['go']['main']['App']['GetTopics'](arg1);
 }
 
-export function Greet(arg1) {
-  return window['go']['main']['App']['Greet'](arg1);
-}
-
 export function PreviewArticle(arg1) {
   return window['go']['main']['App']['PreviewArticle'](arg1);
 }

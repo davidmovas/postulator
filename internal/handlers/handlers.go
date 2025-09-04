@@ -11,6 +11,7 @@ import (
 	"Postulator/internal/services/gpt"
 	"Postulator/internal/services/pipeline"
 	"Postulator/internal/services/wordpress"
+
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -496,10 +497,10 @@ func (h *Handler) GetDashboard() *dto.BaseResponse {
 	}
 
 	// Get recent activities (simplified)
-	recentActivities := []*dto.RecentActivity{}
+	var recentActivities []*dto.RecentActivity
 
 	// Get upcoming schedules
-	upcomingSchedules := []*dto.ScheduleResponse{}
+	var upcomingSchedules []*dto.ScheduleResponse
 	if schedules, err := h.repos.Schedule.GetActive(ctx); err == nil && len(schedules) > 0 {
 		for _, schedule := range schedules[:min(5, len(schedules))] {
 			upcomingSchedules = append(upcomingSchedules, dto.ScheduleToResponse(schedule))

@@ -1,8 +1,18 @@
 "use client";
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/ui/app-sidebar";
+import {
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbList,
+    BreadcrumbPage,
+    BreadcrumbSeparator
+} from "@/components/ui/breadcrumb";
+import { RiScanLine } from "@remixicon/react";
+import { Separator } from "@/components/ui/separator";
 
 function SplashScreen() {
     return (
@@ -32,7 +42,29 @@ export default function Home() {
                 <SidebarProvider>
                     <AppSidebar />
                     <SidebarInset className="overflow-hidden px-4 md:px-6 lg:px-8">
-                        <p>CONTENT HERE</p>
+                        <header className="flex h-16 shrink-0 items-center gap-2 border-b">
+                            <div className="flex flex-1 items-center gap-2 px-3">
+                                <SidebarTrigger className="-ms-4" />
+                                <Separator
+                                    orientation="vertical"
+                                    className="mr-2 data-[orientation=vertical]:h-4"
+                                />
+                                <Breadcrumb>
+                                    <BreadcrumbList>
+                                        <BreadcrumbItem className="hidden md:block">
+                                            <BreadcrumbLink href="#">
+                                                <RiScanLine size={22} aria-hidden="true" />
+                                                <span className="sr-only">Dashboard</span>
+                                            </BreadcrumbLink>
+                                        </BreadcrumbItem>
+                                        <BreadcrumbSeparator className="hidden md:block" />
+                                        <BreadcrumbItem>
+                                            <BreadcrumbPage>Dashboard</BreadcrumbPage>
+                                        </BreadcrumbItem>
+                                    </BreadcrumbList>
+                                </Breadcrumb>
+                            </div>
+                        </header>
                     </SidebarInset>
                 </SidebarProvider>
             </main>

@@ -28,8 +28,6 @@ export function GetSites(arg1:dto.PaginationRequest):Promise<dto.BaseResponse>;
 
 export function GetTopics(arg1:dto.PaginationRequest):Promise<dto.BaseResponse>;
 
-export function Greet(arg1:string):Promise<string>;
-
 export function PreviewArticle(arg1:dto.PreviewArticleRequest):Promise<dto.BaseResponse>;
 
 export function QuitApp():Promise<void>;
