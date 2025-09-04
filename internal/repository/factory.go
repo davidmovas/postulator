@@ -19,7 +19,7 @@ func NewFactory(db *sql.DB) *Factory {
 }
 
 // NewRepositoryContainer creates a new container with all repositories
-func NewRepositoryContainer() (*RepositoryContainer, error) {
+func NewRepositoryContainer() (*Container, error) {
 	db := GetDB()
 	if db == nil {
 		return nil, fmt.Errorf("database connection not initialized")
@@ -30,8 +30,8 @@ func NewRepositoryContainer() (*RepositoryContainer, error) {
 }
 
 // CreateAll creates all repository instances
-func (f *Factory) CreateAll() *RepositoryContainer {
-	return &RepositoryContainer{
+func (f *Factory) CreateAll() *Container {
+	return &Container{
 		Site:       NewSiteRepository(f.db),
 		Topic:      NewTopicRepository(f.db),
 		SiteTopic:  NewSiteTopicRepository(f.db),
@@ -39,6 +39,7 @@ func (f *Factory) CreateAll() *RepositoryContainer {
 		Article:    NewArticleRepository(f.db),
 		PostingJob: NewPostingJobRepository(f.db),
 		Setting:    NewSettingRepository(f.db),
+		Prompt:     NewPromptRepository(f.db),
 	}
 }
 
@@ -284,6 +285,54 @@ func NewSiteRepository(db *sql.DB) SiteRepository {
 	return &stubSiteRepository{db: db}
 }
 
+// Stub SettingRepository implementation
+type stubSettingRepository struct{ db *sql.DB }
+
+func (r *stubSettingRepository) Get(ctx context.Context, key string) (*models.Setting, error) {
+	return nil, nil
+}
+func (r *stubSettingRepository) Set(ctx context.Context, key, value string) error { return nil }
+func (r *stubSettingRepository) GetAll(ctx context.Context) ([]*models.Setting, error) {
+	return nil, nil
+}
+func (r *stubSettingRepository) Delete(ctx context.Context, key string) error { return nil }
+func (r *stubSettingRepository) GetByPrefix(ctx context.Context, prefix string) ([]*models.Setting, error) {
+	return nil, nil
+}
+
 func NewSettingRepository(db *sql.DB) SettingRepository {
-	return &settingRepository{db: db}
+	return &stubSettingRepository{db: db}
+}
+
+// Stub PromptRepository implementation
+type stubPromptRepository struct{ db *sql.DB }
+
+func (r *stubPromptRepository) Create(ctx context.Context, entity *models.Prompt) error { return nil }
+func (r *stubPromptRepository) GetByID(ctx context.Context, id int64) (*models.Prompt, error) {
+	return nil, nil
+}
+func (r *stubPromptRepository) Update(ctx context.Context, entity *models.Prompt) error { return nil }
+func (r *stubPromptRepository) Delete(ctx context.Context, id int64) error              { return nil }
+func (r *stubPromptRepository) List(ctx context.Context, limit, offset int) ([]*models.Prompt, error) {
+	return nil, nil
+}
+func (r *stubPromptRepository) Count(ctx context.Context) (int64, error) { return 0, nil }
+func (r *stubPromptRepository) GetByType(ctx context.Context, promptType string) ([]*models.Prompt, error) {
+	return nil, nil
+}
+func (r *stubPromptRepository) GetDefaultByType(ctx context.Context, promptType string) (*models.Prompt, error) {
+	return nil, nil
+}
+func (r *stubPromptRepository) SetDefault(ctx context.Context, id int64, promptType string) error {
+	return nil
+}
+func (r *stubPromptRepository) GetActive(ctx context.Context) ([]*models.Prompt, error) {
+	return nil, nil
+}
+func (r *stubPromptRepository) GetByName(ctx context.Context, name string) (*models.Prompt, error) {
+	return nil, nil
+}
+
+func NewPromptRepository(db *sql.DB) PromptRepository {
+	return &stubPromptRepository{db: db}
 }

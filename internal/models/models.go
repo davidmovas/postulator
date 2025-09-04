@@ -79,3 +79,25 @@ type PostingJob struct {
 	CompletedAt time.Time `json:"completed_at" db:"completed_at"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 }
+
+type Prompt struct {
+	ID          int64     `json:"id" db:"id"`
+	Name        string    `json:"name" db:"name"`               // User-friendly name for the prompt
+	Type        string    `json:"type" db:"type"`               // "system" or "user"
+	Content     string    `json:"content" db:"content"`         // The prompt content with placeholders
+	IsDefault   bool      `json:"is_default" db:"is_default"`   // Whether this is the default prompt for the type
+	Description string    `json:"description" db:"description"` // Description of the prompt's purpose
+	IsActive    bool      `json:"is_active" db:"is_active"`     // Whether the prompt is active
+	CreatedAt   time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
+}
+
+type Setting struct {
+	ID        int64     `json:"id" db:"id"`
+	Key       string    `json:"key" db:"key"`           // Setting key (unique)
+	Value     string    `json:"value" db:"value"`       // Setting value
+	Type      string    `json:"type" db:"type"`         // "string", "int", "bool", "json"
+	Category  string    `json:"category" db:"category"` // Category for grouping settings
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+}

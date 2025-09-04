@@ -1,323 +1,343 @@
 package gpt
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
 	"Postulator/internal/models"
+	"Postulator/internal/repository"
+
+	"github.com/invopop/jsonschema"
+	"github.com/openai/openai-go/v2"
+	"github.com/openai/openai-go/v2/option"
 )
+
+var GTPModels = []string{
+	"GPT-5",
+	"GPT-5-Mini",
+	"GPT-4",
+	"GPT-4o",
+	"GPT-4o-Mini",
+}
 
 // Service handles GPT API interactions
 type Service struct {
-	apiKey     string
-	apiURL     string
-	model      string
-	maxTokens  int
-	timeout    time.Duration
-	httpClient *http.Client
+	client   *openai.Client
+	defaults ServiceDefaults
+	repos    *repository.Container
 }
 
-// Config holds GPT service configuration
+// ServiceDefaults contains default configuration
+type ServiceDefaults struct {
+	Model       string
+	MaxTokens   int
+	Temperature float64
+	Timeout     time.Duration
+}
+
+// Config contains service configuration
 type Config struct {
-	APIKey    string
-	Model     string
-	MaxTokens int
-	Timeout   time.Duration
-}
-
-// NewService creates a new GPT service instance
-func NewService(config Config) *Service {
-	if config.Model == "" {
-		config.Model = "gpt-3.5-turbo"
-	}
-	if config.MaxTokens == 0 {
-		config.MaxTokens = 4000
-	}
-	if config.Timeout == 0 {
-		config.Timeout = 60 * time.Second
-	}
-
-	return &Service{
-		apiKey:    config.APIKey,
-		apiURL:    "https://api.openai.com/v1/chat/completions",
-		model:     config.Model,
-		maxTokens: config.MaxTokens,
-		timeout:   config.Timeout,
-		httpClient: &http.Client{
-			Timeout: config.Timeout,
-		},
-	}
-}
-
-// ChatCompletionRequest represents the request to ChatGPT API
-type ChatCompletionRequest struct {
-	Model       string    `json:"model"`
-	Messages    []Message `json:"messages"`
-	MaxTokens   int       `json:"max_tokens"`
-	Temperature float64   `json:"temperature,omitempty"`
-}
-
-// Message represents a chat message
-type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-// ChatCompletionResponse represents the response from ChatGPT API
-type ChatCompletionResponse struct {
-	ID      string    `json:"id"`
-	Object  string    `json:"object"`
-	Created int64     `json:"created"`
-	Model   string    `json:"model"`
-	Choices []Choice  `json:"choices"`
-	Usage   Usage     `json:"usage"`
-	Error   *APIError `json:"error,omitempty"`
-}
-
-// Choice represents a completion choice
-type Choice struct {
-	Index        int     `json:"index"`
-	Message      Message `json:"message"`
-	FinishReason string  `json:"finish_reason"`
-}
-
-// Usage represents token usage information
-type Usage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
-}
-
-// APIError represents an API error
-type APIError struct {
-	Message string `json:"message"`
-	Type    string `json:"type"`
-	Code    string `json:"code"`
+	APIKey      string
+	Model       string
+	MaxTokens   int
+	Temperature float64
+	Timeout     time.Duration
 }
 
 // GenerateArticleRequest contains parameters for article generation
 type GenerateArticleRequest struct {
-	Topic        *models.Topic `json:"topic"`
-	Site         *models.Site  `json:"site"`
-	CustomPrompt string        `json:"custom_prompt,omitempty"`
-	Temperature  float64       `json:"temperature,omitempty"`
+	Title       string  `json:"title"`
+	Prompt      string  `json:"prompt"`
+	Model       string  `json:"model,omitempty"`
+	MaxTokens   int     `json:"max_tokens,omitempty"`
+	Temperature float64 `json:"temperature,omitempty"`
 }
 
-// GenerateArticleResponse contains the generated article data
+// ArticleResponse represents the structured response for article generation
+type ArticleResponse struct {
+	Title    string   `json:"title" jsonschema_description:"SEO-optimized article title"`
+	Content  string   `json:"content" jsonschema_description:"Full HTML article content (minimum 800 words)"`
+	Excerpt  string   `json:"excerpt" jsonschema_description:"Brief summary (150-200 characters)"`
+	Keywords []string `json:"keywords" jsonschema_description:"SEO keywords array"`
+	Tags     []string `json:"tags" jsonschema_description:"WordPress tags array"`
+	Category string   `json:"category" jsonschema_description:"WordPress category name"`
+}
+
+// GenerateArticleResponse contains the complete response with metadata
 type GenerateArticleResponse struct {
-	Title      string `json:"title"`
-	Content    string `json:"content"`
-	Excerpt    string `json:"excerpt"`
-	Keywords   string `json:"keywords"`
-	Tags       string `json:"tags"`
-	Category   string `json:"category"`
-	TokensUsed int    `json:"tokens_used"`
-	Model      string `json:"model"`
+	Article    ArticleResponse `json:"article"`
+	TokensUsed int             `json:"tokens_used"`
+	Model      string          `json:"model"`
 }
 
-// GenerateArticle generates an article based on the given topic and site
-func (s *Service) GenerateArticle(ctx context.Context, req GenerateArticleRequest) (*GenerateArticleResponse, error) {
-	if req.Topic == nil {
-		return nil, fmt.Errorf("topic is required")
+// NewService creates a new GPT service instance
+func NewService(config Config, repos *repository.Container) *Service {
+	// Set defaults
+	if config.Model == "" {
+		config.Model = "gpt-4o-mini"
 	}
-	if req.Site == nil {
-		return nil, fmt.Errorf("site is required")
+	if config.MaxTokens == 0 {
+		config.MaxTokens = 4000
+	}
+	if config.Temperature == 0 {
+		config.Temperature = 0.7
+	}
+	if config.Timeout == 0 {
+		config.Timeout = 2 * time.Minute
 	}
 
-	// Build the prompt
-	prompt := s.buildArticlePrompt(req)
+	// Create OpenAI client
+	client := openai.NewClient(
+		option.WithAPIKey(config.APIKey),
+	)
 
-	// Create chat completion request
-	chatReq := ChatCompletionRequest{
-		Model:       s.model,
-		MaxTokens:   s.maxTokens,
-		Temperature: req.Temperature,
-		Messages: []Message{
-			{
-				Role:    "system",
-				Content: "You are a professional content writer who creates high-quality, SEO-optimized articles for WordPress websites. Your responses should be in JSON format with the specified structure.",
-			},
-			{
-				Role:    "user",
-				Content: prompt,
-			},
+	return &Service{
+		client: &client,
+		repos:  repos,
+		defaults: ServiceDefaults{
+			Model:       config.Model,
+			MaxTokens:   config.MaxTokens,
+			Temperature: config.Temperature,
+			Timeout:     config.Timeout,
 		},
 	}
-
-	// Make API call
-	response, err := s.makeAPICall(ctx, chatReq)
-	if err != nil {
-		return nil, fmt.Errorf("API call failed: %w", err)
-	}
-
-	// Parse the response
-	articleResponse, err := s.parseArticleResponse(response)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	return articleResponse, nil
 }
 
-// buildArticlePrompt constructs the prompt for article generation
-func (s *Service) buildArticlePrompt(req GenerateArticleRequest) string {
-	var prompt strings.Builder
-
-	if req.CustomPrompt != "" {
-		prompt.WriteString(req.CustomPrompt)
-		prompt.WriteString("\n\n")
-	} else {
-		prompt.WriteString(req.Topic.Prompt)
-		prompt.WriteString("\n\n")
+// GenerateArticle generates an article with structured JSON output
+func (s *Service) GenerateArticle(ctx context.Context, req GenerateArticleRequest) (*GenerateArticleResponse, error) {
+	if req.Title == "" {
+		return nil, fmt.Errorf("title is required")
+	}
+	if req.Prompt == "" {
+		return nil, fmt.Errorf("prompt is required")
 	}
 
-	prompt.WriteString(fmt.Sprintf("Topic: %s\n", req.Topic.Title))
-	prompt.WriteString(fmt.Sprintf("Description: %s\n", req.Topic.Description))
-	prompt.WriteString(fmt.Sprintf("Keywords: %s\n", req.Topic.Keywords))
-	prompt.WriteString(fmt.Sprintf("Category: %s\n", req.Topic.Category))
-	prompt.WriteString(fmt.Sprintf("Target Tags: %s\n", req.Topic.Tags))
-	prompt.WriteString(fmt.Sprintf("Website: %s\n\n", req.Site.URL))
+	// Set defaults if not provided
+	model := req.Model
+	if model == "" {
+		model = s.defaults.Model
+	}
 
-	prompt.WriteString("Please generate a comprehensive article and respond with a JSON object containing:\n")
-	prompt.WriteString("- title: SEO-optimized article title\n")
-	prompt.WriteString("- content: Full HTML article content (minimum 800 words)\n")
-	prompt.WriteString("- excerpt: Brief summary (150-200 characters)\n")
-	prompt.WriteString("- keywords: SEO keywords (comma-separated)\n")
-	prompt.WriteString("- tags: WordPress tags (comma-separated)\n")
-	prompt.WriteString("- category: WordPress category name\n")
+	maxTokens := req.MaxTokens
+	if maxTokens == 0 {
+		maxTokens = s.defaults.MaxTokens
+	}
+
+	temperature := req.Temperature
+	if temperature == 0 {
+		temperature = s.defaults.Temperature
+	}
+
+	// Convert model string to OpenAI model type
+	openaiModel := s.parseModelType(model)
+
+	// Generate JSON schema for structured output
+	schema := GenerateSchema[ArticleResponse]()
+
+	// Create schema parameter
+	schemaParam := openai.ResponseFormatJSONSchemaJSONSchemaParam{
+		Name:        "article_response",
+		Description: openai.String("Generated article with structured metadata"),
+		Schema:      schema,
+		Strict:      openai.Bool(true),
+	}
+
+	// Build complete prompt using database prompts
+	placeholders := map[string]string{
+		"title":  req.Title,
+		"prompt": req.Prompt,
+	}
+
+	systemPrompt, userPrompt, err := s.loadPrompts(ctx, placeholders)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load prompts: %w", err)
+	}
+
+	// Create chat completion
+	chat, err := s.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model:       openaiModel,
+		MaxTokens:   openai.Int(int64(maxTokens)),
+		Temperature: openai.Float(temperature),
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.SystemMessage(systemPrompt),
+			openai.UserMessage(userPrompt),
+		},
+		ResponseFormat: openai.ChatCompletionNewParamsResponseFormatUnion{
+			OfJSONSchema: &openai.ResponseFormatJSONSchemaParam{
+				JSONSchema: schemaParam,
+			},
+		},
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("OpenAI API call failed: %w", err)
+	}
+
+	// Parse the structured response
+	if len(chat.Choices) == 0 {
+		return nil, fmt.Errorf("no response choices received")
+	}
+
+	var article ArticleResponse
+	if err = json.Unmarshal([]byte(chat.Choices[0].Message.Content), &article); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON response: %w", err)
+	}
+
+	response := &GenerateArticleResponse{
+		Article:    article,
+		TokensUsed: int(chat.Usage.TotalTokens),
+		Model:      chat.Model,
+	}
+
+	return response, nil
+}
+
+// loadPrompts loads system and user prompts from database with placeholders replaced
+func (s *Service) loadPrompts(ctx context.Context, placeholders map[string]string) (systemPrompt, userPrompt string, err error) {
+	// Load default system prompt
+	systemPromptModel, err := s.repos.Prompt.GetDefaultByType(ctx, "system")
+	if err != nil || systemPromptModel == nil {
+		// Fallback to hardcoded system prompt
+		systemPrompt = "You are a professional content writer who creates high-quality, SEO-optimized articles for WordPress websites. You must respond with valid JSON matching the provided schema."
+	} else {
+		systemPrompt = s.replacePlaceholders(systemPromptModel.Content, placeholders)
+	}
+
+	// Load default user prompt
+	userPromptModel, err := s.repos.Prompt.GetDefaultByType(ctx, "user")
+	if err != nil || userPromptModel == nil {
+		// Fallback to buildPrompt method
+		userPrompt = s.buildFallbackPrompt(placeholders)
+	} else {
+		userPrompt = s.replacePlaceholders(userPromptModel.Content, placeholders)
+	}
+
+	return systemPrompt, userPrompt, nil
+}
+
+// replacePlaceholders replaces placeholders in prompt content
+func (s *Service) replacePlaceholders(content string, placeholders map[string]string) string {
+	result := content
+	placeholderRegex := regexp.MustCompile(`\{\{(\w+)\}\}`)
+
+	result = placeholderRegex.ReplaceAllStringFunc(result, func(match string) string {
+		// Extract placeholder name (remove {{ and }})
+		key := placeholderRegex.FindStringSubmatch(match)[1]
+		if value, exists := placeholders[key]; exists {
+			return value
+		}
+		// Return placeholder as-is if no replacement found
+		return match
+	})
+
+	return result
+}
+
+// buildFallbackPrompt constructs a fallback prompt when database prompt is not available
+func (s *Service) buildFallbackPrompt(placeholders map[string]string) string {
+	var prompt strings.Builder
+
+	if userPrompt, exists := placeholders["prompt"]; exists {
+		prompt.WriteString(userPrompt)
+	}
+	prompt.WriteString("\n\n")
+
+	if title, exists := placeholders["title"]; exists {
+		prompt.WriteString(fmt.Sprintf("Article Title: %s\n", title))
+	}
+
+	prompt.WriteString("\nPlease generate a comprehensive article following these requirements:\n")
+	prompt.WriteString("- Write a complete HTML article with minimum 800 words\n")
+	prompt.WriteString("- Create an SEO-optimized title\n")
+	prompt.WriteString("- Include a brief excerpt (150-200 characters)\n")
+	prompt.WriteString("- Provide relevant SEO keywords\n")
+	prompt.WriteString("- Suggest appropriate WordPress tags\n")
+	prompt.WriteString("- Assign a suitable category\n")
+	prompt.WriteString("\nRespond with valid JSON matching the provided schema.")
 
 	return prompt.String()
 }
 
-// makeAPICall performs the HTTP request to GPT API
-func (s *Service) makeAPICall(ctx context.Context, req ChatCompletionRequest) (*ChatCompletionResponse, error) {
-	// Marshal request
-	jsonData, err := json.Marshal(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
+// buildPrompt constructs the complete prompt for article generation
+func (s *Service) buildPrompt(req GenerateArticleRequest) string {
+	var prompt strings.Builder
 
-	// Create HTTP request
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", s.apiURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
+	prompt.WriteString(req.Prompt)
+	prompt.WriteString("\n\n")
+	prompt.WriteString(fmt.Sprintf("Article Title: %s\n", req.Title))
+	prompt.WriteString("\nPlease generate a comprehensive article following these requirements:\n")
+	prompt.WriteString("- Write a complete HTML article with minimum 800 words\n")
+	prompt.WriteString("- Create an SEO-optimized title\n")
+	prompt.WriteString("- Include a brief excerpt (150-200 characters)\n")
+	prompt.WriteString("- Provide relevant SEO keywords\n")
+	prompt.WriteString("- Suggest appropriate WordPress tags\n")
+	prompt.WriteString("- Assign a suitable category\n")
+	prompt.WriteString("\nRespond with valid JSON matching the provided schema.")
 
-	// Set headers
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+s.apiKey)
-
-	// Make the request
-	resp, err := s.httpClient.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Read response
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	// Parse response
-	var response ChatCompletionResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	// Check for API errors
-	if response.Error != nil {
-		return nil, fmt.Errorf("API error: %s", response.Error.Message)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	return &response, nil
+	return prompt.String()
 }
 
-// parseArticleResponse extracts article data from GPT response
-func (s *Service) parseArticleResponse(response *ChatCompletionResponse) (*GenerateArticleResponse, error) {
-	if len(response.Choices) == 0 {
-		return nil, fmt.Errorf("no choices in response")
+// parseModelType converts string model name to OpenAI model type
+func (s *Service) parseModelType(model string) openai.ChatModel {
+	switch strings.ToLower(model) {
+	case "gpt-5":
+		return openai.ChatModelGPT5
+	case "gpt-5-mini":
+		return openai.ChatModelGPT5Mini
+	case "gpt-4o", "gpt-4-turbo":
+		return openai.ChatModelGPT4o
+	case "gpt-4o-mini":
+		return openai.ChatModelGPT4oMini
+	case "gpt-4":
+		return openai.ChatModelGPT4
+	default:
+		return openai.ChatModelGPT4oMini
 	}
-
-	content := response.Choices[0].Message.Content
-
-	// Try to parse as JSON
-	var articleData map[string]interface{}
-	if err := json.Unmarshal([]byte(content), &articleData); err != nil {
-		// If JSON parsing fails, create a basic response
-		return &GenerateArticleResponse{
-			Title:      "Generated Article",
-			Content:    content,
-			Excerpt:    "Generated content excerpt",
-			Keywords:   "",
-			Tags:       "",
-			Category:   "General",
-			TokensUsed: response.Usage.TotalTokens,
-			Model:      response.Model,
-		}, nil
-	}
-
-	// Extract fields from JSON
-	return &GenerateArticleResponse{
-		Title:      getStringField(articleData, "title"),
-		Content:    getStringField(articleData, "content"),
-		Excerpt:    getStringField(articleData, "excerpt"),
-		Keywords:   getStringField(articleData, "keywords"),
-		Tags:       getStringField(articleData, "tags"),
-		Category:   getStringField(articleData, "category"),
-		TokensUsed: response.Usage.TotalTokens,
-		Model:      response.Model,
-	}, nil
 }
 
-// getStringField safely extracts a string field from a map
-func getStringField(data map[string]interface{}, field string) string {
-	if value, exists := data[field]; exists {
-		if str, ok := value.(string); ok {
-			return str
-		}
+// GenerateSchema creates a JSON schema for the given type T
+func GenerateSchema[T any]() interface{} {
+	// Structured Outputs uses a subset of JSON schema
+	// These flags are necessary to comply with the subset
+	reflector := jsonschema.Reflector{
+		AllowAdditionalProperties: false,
+		DoNotReference:            true,
 	}
-	return ""
+	var v T
+	schema := reflector.Reflect(v)
+	return schema
 }
 
-// ValidateConfig validates the service configuration
-func (s *Service) ValidateConfig() error {
-	if s.apiKey == "" {
-		return fmt.Errorf("API key is required")
-	}
-	if s.model == "" {
-		return fmt.Errorf("model is required")
-	}
-	if s.maxTokens <= 0 {
-		return fmt.Errorf("max tokens must be positive")
-	}
-	return nil
-}
+// Legacy methods for backward compatibility (kept for now)
 
-// TestConnection tests the connection to GPT API
-func (s *Service) TestConnection(ctx context.Context) error {
-	req := ChatCompletionRequest{
-		Model:     s.model,
-		MaxTokens: 10,
-		Messages: []Message{
-			{
-				Role:    "user",
-				Content: "Hello",
-			},
-		},
+// GenerateArticleFromTopic generates an article based on topic and site (legacy method)
+func (s *Service) GenerateArticleFromTopic(ctx context.Context, topic *models.Topic, site *models.Site, customPrompt string) (*GenerateArticleResponse, error) {
+	if topic == nil {
+		return nil, fmt.Errorf("topic is required")
+	}
+	if site == nil {
+		return nil, fmt.Errorf("site is required")
 	}
 
-	_, err := s.makeAPICall(ctx, req)
-	return err
+	// Build prompt from topic
+	prompt := customPrompt
+	if prompt == "" {
+		prompt = topic.Prompt
+	}
+
+	// Add topic context
+	fullPrompt := fmt.Sprintf("%s\n\nTopic: %s\nDescription: %s\nKeywords: %s\nCategory: %s\nTarget Tags: %s\nWebsite: %s",
+		prompt, topic.Title, topic.Description, topic.Keywords, topic.Category, topic.Tags, site.URL)
+
+	req := GenerateArticleRequest{
+		Title:  topic.Title,
+		Prompt: fullPrompt,
+		Model:  s.defaults.Model,
+	}
+
+	return s.GenerateArticle(ctx, req)
 }

@@ -19,7 +19,7 @@ import (
 type App struct {
 	ctx      context.Context
 	handlers *handlers.Handler
-	repos    *repository.RepositoryContainer
+	repos    *repository.Container
 	services *ServiceContainer
 }
 
@@ -90,7 +90,7 @@ func (a *App) initializeServices(cfg *config.AppConfig) *ServiceContainer {
 		MaxTokens: 4000,
 		Timeout:   60 * time.Second,
 	}
-	gptService := gpt.NewService(gptConfig)
+	gptService := gpt.NewService(gptConfig, a.repos)
 
 	// Initialize WordPress service
 	wpConfig := wordpress.Config{

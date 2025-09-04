@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { RiScanLine } from "@remixicon/react";
 import SitesPanel from "@/components/dashboard/SitesPanel";
+import DashboardOverview from "@/components/dashboard/DashboardOverview";
 import { NavigationProvider, useNavigation } from "@/context/navigation";
 import { RiBardLine, RiCodeSSlashLine, RiSettings3Line, RiUserFollowLine } from "@remixicon/react";
 
@@ -57,11 +58,7 @@ function SectionContent() {
     if (section === "dashboard") {
         return (
             <>
-                <div className="p-4 md:p-6 lg:p-8">
-                    <div className="text-sm text-muted-foreground">Welcome back 👋</div>
-                    <h2 className="mt-1 text-2xl font-semibold tracking-tight">Dashboard</h2>
-                    <p className="mt-2 text-muted-foreground">Use the sidebar to navigate between sections.</p>
-                </div>
+                <DashboardOverview />
                 <SitesPanel />
             </>
         );

@@ -313,6 +313,48 @@ type PreviewArticleResponse struct {
 	Model      string `json:"model"`
 }
 
+// Prompt DTOs
+type CreatePromptRequest struct {
+	Name        string `json:"name" validate:"required,min=1,max=100"`
+	Type        string `json:"type" validate:"required,oneof=system user"`
+	Content     string `json:"content" validate:"required,min=1"`
+	Description string `json:"description,omitempty"`
+	IsDefault   bool   `json:"is_default"`
+	IsActive    bool   `json:"is_active"`
+}
+
+type UpdatePromptRequest struct {
+	ID          int64  `json:"id" validate:"required,min=1"`
+	Name        string `json:"name" validate:"required,min=1,max=100"`
+	Type        string `json:"type" validate:"required,oneof=system user"`
+	Content     string `json:"content" validate:"required,min=1"`
+	Description string `json:"description,omitempty"`
+	IsDefault   bool   `json:"is_default"`
+	IsActive    bool   `json:"is_active"`
+}
+
+type PromptResponse struct {
+	ID          int64     `json:"id"`
+	Name        string    `json:"name"`
+	Type        string    `json:"type"`
+	Content     string    `json:"content"`
+	Description string    `json:"description"`
+	IsDefault   bool      `json:"is_default"`
+	IsActive    bool      `json:"is_active"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type PromptListResponse struct {
+	Prompts    []*PromptResponse   `json:"prompts"`
+	Pagination *PaginationResponse `json:"pagination"`
+}
+
+type SetDefaultPromptRequest struct {
+	ID   int64  `json:"id" validate:"required,min=1"`
+	Type string `json:"type" validate:"required,oneof=system user"`
+}
+
 // Conversion utilities
 func (r *CreateSiteRequest) ToModel() *models.Site {
 	return &models.Site{
@@ -454,6 +496,46 @@ func PostingJobToResponse(job *models.PostingJob) *PostingJobResponse {
 		StartedAt:   job.StartedAt,
 		CompletedAt: job.CompletedAt,
 		CreatedAt:   job.CreatedAt,
+	}
+}
+
+func (r *CreatePromptRequest) ToModel() *models.Prompt {
+	return &models.Prompt{
+		Name:        r.Name,
+		Type:        r.Type,
+		Content:     r.Content,
+		Description: r.Description,
+		IsDefault:   r.IsDefault,
+		IsActive:    r.IsActive,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+}
+
+func (r *UpdatePromptRequest) ToModel() *models.Prompt {
+	return &models.Prompt{
+		ID:          r.ID,
+		Name:        r.Name,
+		Type:        r.Type,
+		Content:     r.Content,
+		Description: r.Description,
+		IsDefault:   r.IsDefault,
+		IsActive:    r.IsActive,
+		UpdatedAt:   time.Now(),
+	}
+}
+
+func PromptToResponse(prompt *models.Prompt) *PromptResponse {
+	return &PromptResponse{
+		ID:          prompt.ID,
+		Name:        prompt.Name,
+		Type:        prompt.Type,
+		Content:     prompt.Content,
+		Description: prompt.Description,
+		IsDefault:   prompt.IsDefault,
+		IsActive:    prompt.IsActive,
+		CreatedAt:   prompt.CreatedAt,
+		UpdatedAt:   prompt.UpdatedAt,
 	}
 }
 

@@ -28,6 +28,12 @@ export function SitesPanel() {
         <h3 className="text-xl font-semibold">Sites</h3>
         <p className="text-sm text-muted-foreground">Manage your WordPress sites.</p>
       </div>
+      <div className="mb-4 grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+        <div className="rounded-md border p-3"><div className="text-muted-foreground">Total</div><div className="text-lg font-semibold">{sites.length}</div></div>
+        <div className="rounded-md border p-3"><div className="text-muted-foreground">Active</div><div className="text-lg font-semibold">{sites.filter(s=>s.is_active).length}</div></div>
+        <div className="rounded-md border p-3"><div className="text-muted-foreground">Connected</div><div className="text-lg font-semibold">{sites.filter(s=>s.status==="connected").length}</div></div>
+        <div className="rounded-md border p-3"><div className="text-muted-foreground">Pending</div><div className="text-lg font-semibold">{sites.filter(s=>s.status==="pending").length}</div></div>
+      </div>
       <SitesTable
         sites={sites}
         page={page}
@@ -35,6 +41,7 @@ export function SitesPanel() {
         total={total}
         onPageChange={setPage}
         onRefresh={() => setSites([...sites])}
+        onMutateSites={(updater) => setSites((prev) => updater(prev))}
       />
     </div>
   );

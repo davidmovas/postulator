@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"Postulator/internal/dto"
@@ -17,7 +18,7 @@ import (
 
 // Handler contains all Wails API handlers
 type Handler struct {
-	repos      *repository.RepositoryContainer
+	repos      *repository.Container
 	gptService *gpt.Service
 	wpService  *wordpress.Service
 	pipeline   *pipeline.Service
@@ -25,7 +26,7 @@ type Handler struct {
 }
 
 // NewHandler creates a new handler instance
-func NewHandler(repos *repository.RepositoryContainer, gptService *gpt.Service, wpService *wordpress.Service, pipeline *pipeline.Service, appContext context.Context) *Handler {
+func NewHandler(repos *repository.Container, gptService *gpt.Service, wpService *wordpress.Service, pipeline *pipeline.Service, appContext context.Context) *Handler {
 	return &Handler{
 		repos:      repos,
 		gptService: gptService,
@@ -400,12 +401,12 @@ func (h *Handler) PreviewArticle(req dto.PreviewArticleRequest) *dto.BaseRespons
 	}
 
 	response := &dto.PreviewArticleResponse{
-		Title:      gptResponse.Title,
-		Content:    gptResponse.Content,
-		Excerpt:    gptResponse.Excerpt,
-		Keywords:   gptResponse.Keywords,
-		Tags:       gptResponse.Tags,
-		Category:   gptResponse.Category,
+		Title:      gptResponse.Article.Title,
+		Content:    gptResponse.Article.Content,
+		Excerpt:    gptResponse.Article.Excerpt,
+		Keywords:   strings.Join(gptResponse.Article.Keywords, ", "),
+		Tags:       strings.Join(gptResponse.Article.Tags, ", "),
+		Category:   gptResponse.Article.Category,
 		TokensUsed: gptResponse.TokensUsed,
 		Model:      gptResponse.Model,
 	}
@@ -580,6 +581,160 @@ func (h *Handler) validateSiteRequest(name, url, username, password string) erro
 		return err
 	}
 	return nil
+}
+
+// Prompt Handlers
+
+// CreatePrompt creates a new prompt
+func (h *Handler) CreatePrompt(req dto.CreatePromptRequest) *dto.BaseResponse {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Convert to model and create
+	prompt := req.ToModel()
+	if err := h.repos.Prompt.Create(ctx, prompt); err != nil {
+		return dto.ErrorMessageResponse("Failed to create prompt", err)
+	}
+
+	// If this is set as default, update other prompts of the same type
+	if req.IsDefault {
+		if err := h.repos.Prompt.SetDefault(ctx, prompt.ID, req.Type); err != nil {
+			log.Printf("Warning: failed to set prompt as default: %v", err)
+		}
+	}
+
+	response := dto.PromptToResponse(prompt)
+	h.emitEvent("prompt:created", response)
+
+	return dto.SuccessMessageResponse("Prompt created successfully", response)
+}
+
+// GetPrompts retrieves all prompts with pagination
+func (h *Handler) GetPrompts(pagination dto.PaginationRequest) *dto.BaseResponse {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Set defaults
+	if pagination.Page <= 0 {
+		pagination.Page = 1
+	}
+	if pagination.Limit <= 0 {
+		pagination.Limit = 10
+	}
+
+	offset := (pagination.Page - 1) * pagination.Limit
+
+	prompts, err := h.repos.Prompt.List(ctx, pagination.Limit, offset)
+	if err != nil {
+		return dto.ErrorMessageResponse("Failed to retrieve prompts", err)
+	}
+
+	total, err := h.repos.Prompt.Count(ctx)
+	if err != nil {
+		return dto.ErrorMessageResponse("Failed to count prompts", err)
+	}
+
+	// Convert to response DTOs
+	promptResponses := make([]*dto.PromptResponse, len(prompts))
+	for i, prompt := range prompts {
+		promptResponses[i] = dto.PromptToResponse(prompt)
+	}
+
+	response := &dto.PromptListResponse{
+		Prompts: promptResponses,
+		Pagination: &dto.PaginationResponse{
+			Page:       pagination.Page,
+			Limit:      pagination.Limit,
+			Total:      total,
+			TotalPages: int((total + int64(pagination.Limit) - 1) / int64(pagination.Limit)),
+		},
+	}
+
+	return dto.SuccessResponse(response)
+}
+
+// GetPromptsByType retrieves prompts by type
+func (h *Handler) GetPromptsByType(promptType string) *dto.BaseResponse {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	prompts, err := h.repos.Prompt.GetByType(ctx, promptType)
+	if err != nil {
+		return dto.ErrorMessageResponse("Failed to retrieve prompts by type", err)
+	}
+
+	// Convert to response DTOs
+	promptResponses := make([]*dto.PromptResponse, len(prompts))
+	for i, prompt := range prompts {
+		promptResponses[i] = dto.PromptToResponse(prompt)
+	}
+
+	return dto.SuccessResponse(promptResponses)
+}
+
+// UpdatePrompt updates an existing prompt
+func (h *Handler) UpdatePrompt(req dto.UpdatePromptRequest) *dto.BaseResponse {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Convert to model and update
+	prompt := req.ToModel()
+	if err := h.repos.Prompt.Update(ctx, prompt); err != nil {
+		return dto.ErrorMessageResponse("Failed to update prompt", err)
+	}
+
+	// If this is set as default, update other prompts of the same type
+	if req.IsDefault {
+		if err := h.repos.Prompt.SetDefault(ctx, req.ID, req.Type); err != nil {
+			log.Printf("Warning: failed to set prompt as default: %v", err)
+		}
+	}
+
+	response := dto.PromptToResponse(prompt)
+	h.emitEvent("prompt:updated", response)
+
+	return dto.SuccessMessageResponse("Prompt updated successfully", response)
+}
+
+// DeletePrompt deletes a prompt
+func (h *Handler) DeletePrompt(id int64) *dto.BaseResponse {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Check if prompt exists and get its details for the event
+	existingPrompt, err := h.repos.Prompt.GetByID(ctx, id)
+	if err != nil {
+		return dto.ErrorMessageResponse("Prompt not found", err)
+	}
+
+	if err := h.repos.Prompt.Delete(ctx, id); err != nil {
+		return dto.ErrorMessageResponse("Failed to delete prompt", err)
+	}
+
+	h.emitEvent("prompt:deleted", map[string]interface{}{
+		"id":   id,
+		"name": existingPrompt.Name,
+		"type": existingPrompt.Type,
+	})
+
+	return dto.SuccessMessageResponse("Prompt deleted successfully", nil)
+}
+
+// SetDefaultPrompt sets a prompt as the default for its type
+func (h *Handler) SetDefaultPrompt(req dto.SetDefaultPromptRequest) *dto.BaseResponse {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := h.repos.Prompt.SetDefault(ctx, req.ID, req.Type); err != nil {
+		return dto.ErrorMessageResponse("Failed to set prompt as default", err)
+	}
+
+	h.emitEvent("prompt:default_set", map[string]interface{}{
+		"id":   req.ID,
+		"type": req.Type,
+	})
+
+	return dto.SuccessMessageResponse("Prompt set as default successfully", nil)
 }
 
 func (h *Handler) emitEvent(eventName string, data interface{}) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -11,12 +12,13 @@ import (
 	"Postulator/internal/repository"
 	"Postulator/internal/services/gpt"
 	"Postulator/internal/services/wordpress"
+
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // Service orchestrates the article generation and publishing pipeline
 type Service struct {
-	repos      *repository.RepositoryContainer
+	repos      *repository.Container
 	gptService *gpt.Service
 	wpService  *wordpress.Service
 	appContext context.Context
@@ -40,7 +42,7 @@ type Config struct {
 }
 
 // NewService creates a new pipeline service
-func NewService(config Config, repos *repository.RepositoryContainer, gptService *gpt.Service, wpService *wordpress.Service, appContext context.Context) *Service {
+func NewService(config Config, repos *repository.Container, gptService *gpt.Service, wpService *wordpress.Service, appContext context.Context) *Service {
 	if config.MaxWorkers == 0 {
 		config.MaxWorkers = 5
 	}
@@ -263,9 +265,16 @@ func (s *Service) executeArticlePipeline(ctx context.Context, req CreateArticleR
 	// Step 2: Generate article content using GPT
 	s.updateJobProgress(status.ID, 25, "Generating article content")
 
+	// Build prompt from topic and site
+	prompt := topic.Prompt
+	if prompt == "" {
+		prompt = fmt.Sprintf("Write an article about: %s\n\nDescription: %s\nKeywords: %s\nCategory: %s\nTarget Tags: %s\nWebsite: %s",
+			topic.Title, topic.Description, topic.Keywords, topic.Category, topic.Tags, site.URL)
+	}
+
 	gptReq := gpt.GenerateArticleRequest{
-		Topic: topic,
-		Site:  site,
+		Title:  topic.Title,
+		Prompt: prompt,
 	}
 
 	gptCtx, cancel := context.WithTimeout(ctx, s.config.GPTTimeout)
@@ -282,12 +291,12 @@ func (s *Service) executeArticlePipeline(ctx context.Context, req CreateArticleR
 	article := &models.Article{
 		SiteID:    req.SiteID,
 		TopicID:   req.TopicID,
-		Title:     gptResponse.Title,
-		Content:   s.truncateContent(gptResponse.Content),
-		Excerpt:   gptResponse.Excerpt,
-		Keywords:  gptResponse.Keywords,
-		Tags:      gptResponse.Tags,
-		Category:  gptResponse.Category,
+		Title:     gptResponse.Article.Title,
+		Content:   s.truncateContent(gptResponse.Article.Content),
+		Excerpt:   gptResponse.Article.Excerpt,
+		Keywords:  strings.Join(gptResponse.Article.Keywords, ", "),
+		Tags:      strings.Join(gptResponse.Article.Tags, ", "),
+		Category:  gptResponse.Article.Category,
 		Status:    "generated",
 		GPTModel:  gptResponse.Model,
 		Tokens:    gptResponse.TokensUsed,
@@ -313,7 +322,7 @@ func (s *Service) executeArticlePipeline(ctx context.Context, req CreateArticleR
 
 		// Use full content for WordPress
 		fullArticle := *article
-		fullArticle.Content = gptResponse.Content
+		fullArticle.Content = gptResponse.Article.Content
 
 		wpReq := wordpress.CreatePostRequest{
 			Site:    site,
@@ -482,9 +491,16 @@ func (s *Service) GeneratePreviewArticle(ctx context.Context, siteID, topicID in
 		return nil, fmt.Errorf("failed to get topic: %w", err)
 	}
 
+	// Build prompt from topic and site
+	prompt := topic.Prompt
+	if prompt == "" {
+		prompt = fmt.Sprintf("Write an article about: %s\n\nDescription: %s\nKeywords: %s\nCategory: %s\nTarget Tags: %s\nWebsite: %s",
+			topic.Title, topic.Description, topic.Keywords, topic.Category, topic.Tags, site.URL)
+	}
+
 	req := gpt.GenerateArticleRequest{
-		Topic: topic,
-		Site:  site,
+		Title:  topic.Title,
+		Prompt: prompt,
 	}
 
 	return s.gptService.GenerateArticle(ctx, req)

@@ -80,15 +80,25 @@ type PostingJobRepository interface {
 
 // SettingRepository defines operations for Setting entity
 type SettingRepository interface {
-	Get(ctx context.Context, key string) (*Setting, error)
+	Get(ctx context.Context, key string) (*models.Setting, error)
 	Set(ctx context.Context, key, value string) error
-	GetAll(ctx context.Context) ([]*Setting, error)
+	GetAll(ctx context.Context) ([]*models.Setting, error)
 	Delete(ctx context.Context, key string) error
-	GetByPrefix(ctx context.Context, prefix string) ([]*Setting, error)
+	GetByPrefix(ctx context.Context, prefix string) ([]*models.Setting, error)
 }
 
-// RepositoryContainer holds all repositories
-type RepositoryContainer struct {
+// PromptRepository defines operations for Prompt entity
+type PromptRepository interface {
+	BaseRepository[models.Prompt]
+	GetByType(ctx context.Context, promptType string) ([]*models.Prompt, error)
+	GetDefaultByType(ctx context.Context, promptType string) (*models.Prompt, error)
+	SetDefault(ctx context.Context, id int64, promptType string) error
+	GetActive(ctx context.Context) ([]*models.Prompt, error)
+	GetByName(ctx context.Context, name string) (*models.Prompt, error)
+}
+
+// Container holds all repositories
+type Container struct {
 	Site       SiteRepository
 	Topic      TopicRepository
 	SiteTopic  SiteTopicRepository
@@ -96,4 +106,5 @@ type RepositoryContainer struct {
 	Article    ArticleRepository
 	PostingJob PostingJobRepository
 	Setting    SettingRepository
+	Prompt     PromptRepository
 }

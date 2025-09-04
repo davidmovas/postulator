@@ -7,4 +7,7 @@ export interface Site {
   is_active: boolean;
   status: SiteStatus;
   last_check_at?: string; // ISO string
+  username?: string;
+  password?: string;
+  api_key?: string;
 }

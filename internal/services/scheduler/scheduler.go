@@ -16,7 +16,7 @@ import (
 // Service manages scheduled tasks for automated posting
 type Service struct {
 	scheduler   *gocron.Scheduler
-	repos       *repository.RepositoryContainer
+	repos       *repository.Container
 	jobRegistry map[int64]*gocron.Job // Maps schedule ID to job
 	mutex       sync.RWMutex
 	appContext  context.Context
@@ -36,7 +36,7 @@ type Config struct {
 type JobCallback func(ctx context.Context, schedule *models.Schedule) error
 
 // NewService creates a new scheduler service
-func NewService(config Config, repos *repository.RepositoryContainer, appContext context.Context) *Service {
+func NewService(config Config, repos *repository.Container, appContext context.Context) *Service {
 	if config.Location == nil {
 		config.Location = time.UTC
 	}
