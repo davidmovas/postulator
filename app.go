@@ -3,7 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 
+	"Postulator/internal/config"
+	"Postulator/internal/repository"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -23,6 +26,18 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	// Store context globally for systray access
 	appContext = ctx
+
+	// Initialize configuration
+	if _, err := config.LoadConfig(); err != nil {
+		log.Printf("Error loading configuration: %v", err)
+	}
+
+	// Initialize database
+	if err := repository.InitDatabase(); err != nil {
+		log.Printf("Error initializing database: %v", err)
+	} else {
+		log.Println("Database initialized successfully")
+	}
 }
 
 // domReady is called after front-end resources have been loaded
@@ -41,6 +56,14 @@ func (a *App) beforeClose(ctx context.Context) (prevent bool) {
 // shutdown is called at application termination
 func (a *App) shutdown(ctx context.Context) {
 	// Perform your teardown here
+	log.Println("Shutting down application...")
+
+	// Close database connection
+	if err := repository.CloseDatabase(); err != nil {
+		log.Printf("Error closing database: %v", err)
+	} else {
+		log.Println("Database closed successfully")
+	}
 }
 
 // Greet returns a greeting for the given name
@@ -56,4 +79,20 @@ func (a *App) ShowWindow() {
 // QuitApp quits the application
 func (a *App) QuitApp() {
 	runtime.Quit(a.ctx)
+}
+
+// Database-related methods for frontend access
+
+// GetSetting retrieves a setting value
+func (a *App) GetSetting(key string) (string, error) {
+	setting, err := repository.GetSetting(key)
+	if err != nil {
+		return "", err
+	}
+	return setting.Value, nil
+}
+
+// SetSetting sets a setting value
+func (a *App) SetSetting(key, value string) error {
+	return repository.SetSetting(key, value)
 }
