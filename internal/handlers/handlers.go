@@ -21,7 +21,14 @@ type Handler struct {
 }
 
 // NewHandler creates a new Handler instance
-func NewHandler(appContext context.Context, gptService *gpt.Service, wpService *wordpress.Service, pipeline *pipeline.Service, repo *repository.Repository, topicStrategyService *topic_strategy.TopicStrategyService) *Handler {
+func NewHandler(
+	appContext context.Context,
+	gptService *gpt.Service,
+	wpService *wordpress.Service,
+	pipeline *pipeline.Service,
+	topicStrategyService *topic_strategy.TopicStrategyService,
+	repo *repository.Repository,
+) *Handler {
 	return &Handler{
 		ctx:                  appContext,
 		gptService:           gptService,

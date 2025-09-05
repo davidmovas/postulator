@@ -1,6 +1,7 @@
 package topic_strategy
 
 import (
+	"Postulator/internal/repository"
 	"context"
 	"crypto/rand"
 	"fmt"
@@ -16,26 +17,14 @@ type TopicSelectorInterface interface {
 	CanContinue(ctx context.Context, siteID int64, availableTopics []*models.SiteTopic) bool
 }
 
-// Repository interface for topic selection strategies
-type Repository interface {
-	GetSite(ctx context.Context, id int64) (*models.Site, error)
-	GetSiteTopicsForSelection(ctx context.Context, siteID int64, strategy string) ([]*models.SiteTopic, error)
-	GetTopicByID(ctx context.Context, topicID int64) (*models.Topic, error)
-	GetActiveTopics(ctx context.Context) ([]*models.Topic, error)
-	GetSiteTopic(ctx context.Context, siteID int64, topicID int64) (*models.SiteTopic, error)
-	UpdateSiteTopicUsage(ctx context.Context, siteTopicID int64, strategy string) error
-	RecordTopicUsage(ctx context.Context, siteID, topicID, articleID int64, strategy string) error
-	GetTopicStats(ctx context.Context, siteID int64) (*models.TopicStats, error)
-}
-
 // TopicStrategyService manages topic selection strategies
 type TopicStrategyService struct {
-	repo       Repository
+	repo       *repository.Repository
 	strategies map[string]TopicSelectorInterface
 }
 
 // NewTopicStrategyService creates a new topic strategy service
-func NewTopicStrategyService(repo Repository) *TopicStrategyService {
+func NewTopicStrategyService(repo *repository.Repository) *TopicStrategyService {
 	service := &TopicStrategyService{
 		repo:       repo,
 		strategies: make(map[string]TopicSelectorInterface),
@@ -114,7 +103,7 @@ func (s *TopicStrategyService) CanContinueWithStrategy(ctx context.Context, site
 
 // UniqueStrategy selects topics that haven't been used before
 type UniqueStrategy struct {
-	repo Repository
+	repo *repository.Repository
 }
 
 func (s *UniqueStrategy) GetStrategyName() string {
@@ -138,13 +127,13 @@ func (s *UniqueStrategy) SelectTopic(ctx context.Context, siteID int64, availabl
 	selectedSiteTopic := unusedTopics[0]
 
 	// Get the topic details
-	topic, err := s.repo.GetTopicByID(ctx, selectedSiteTopic.TopicID)
+	topic, err := s.repo.GetTopic(ctx, selectedSiteTopic.TopicID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get topic details: %w", err)
 	}
 
 	// Update usage
-	if err := s.repo.UpdateSiteTopicUsage(ctx, selectedSiteTopic.ID, s.GetStrategyName()); err != nil {
+	if err = s.repo.UpdateSiteTopicUsage(ctx, selectedSiteTopic.ID, s.GetStrategyName()); err != nil {
 		return nil, fmt.Errorf("failed to update topic usage: %w", err)
 	}
 
@@ -170,7 +159,7 @@ func (s *UniqueStrategy) CanContinue(ctx context.Context, siteID int64, availabl
 
 // RoundRobinStrategy cycles through topics in order
 type RoundRobinStrategy struct {
-	repo Repository
+	repo *repository.Repository
 }
 
 func (s *RoundRobinStrategy) GetStrategyName() string {
@@ -210,13 +199,13 @@ func (s *RoundRobinStrategy) SelectTopic(ctx context.Context, siteID int64, avai
 	}
 
 	// Get the topic details
-	topic, err := s.repo.GetTopicByID(ctx, selectedSiteTopic.TopicID)
+	topic, err := s.repo.GetTopic(ctx, selectedSiteTopic.TopicID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get topic details: %w", err)
 	}
 
 	// Update usage and round-robin position
-	if err := s.repo.UpdateSiteTopicUsage(ctx, selectedSiteTopic.ID, s.GetStrategyName()); err != nil {
+	if err = s.repo.UpdateSiteTopicUsage(ctx, selectedSiteTopic.ID, s.GetStrategyName()); err != nil {
 		return nil, fmt.Errorf("failed to update topic usage: %w", err)
 	}
 
@@ -237,14 +226,14 @@ func (s *RoundRobinStrategy) CanContinue(ctx context.Context, siteID int64, avai
 
 // RandomStrategy selects a random topic from available ones
 type RandomStrategy struct {
-	repo Repository
+	repo *repository.Repository
 }
 
 func (s *RandomStrategy) GetStrategyName() string {
 	return string(models.StrategyRandom)
 }
 
-func (s *RandomStrategy) SelectTopic(ctx context.Context, siteID int64, availableTopics []*models.SiteTopic) (*models.TopicSelectionResult, error) {
+func (s *RandomStrategy) SelectTopic(ctx context.Context, _ int64, availableTopics []*models.SiteTopic) (*models.TopicSelectionResult, error) {
 	if len(availableTopics) == 0 {
 		return nil, fmt.Errorf("no topics available for random strategy")
 	}
@@ -258,7 +247,7 @@ func (s *RandomStrategy) SelectTopic(ctx context.Context, siteID int64, availabl
 	selectedSiteTopic := availableTopics[randomIndex.Int64()]
 
 	// Get the topic details
-	topic, err := s.repo.GetTopicByID(ctx, selectedSiteTopic.TopicID)
+	topic, err := s.repo.GetTopic(ctx, selectedSiteTopic.TopicID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get topic details: %w", err)
 	}
@@ -285,7 +274,7 @@ func (s *RandomStrategy) CanContinue(ctx context.Context, siteID int64, availabl
 
 // RandomAllStrategy selects a random topic from all available topics in the system (not just site-specific)
 type RandomAllStrategy struct {
-	repo Repository
+	repo *repository.Repository
 }
 
 func (s *RandomAllStrategy) GetStrategyName() string {

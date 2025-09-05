@@ -1,6 +1,7 @@
 package main
 
 import (
+	"Postulator/internal/services/topic_strategy"
 	"context"
 	"log"
 	"time"
@@ -19,15 +20,16 @@ import (
 type App struct {
 	ctx      context.Context
 	handlers *handlers.Handler
-	repos    *repository.Container
+	repo     *repository.Repository
 	services *ServiceContainer
 }
 
 // ServiceContainer holds all application services
 type ServiceContainer struct {
-	GPT       *gpt.Service
-	WordPress *wordpress.Service
-	Pipeline  *pipeline.Service
+	TopicStrategyService *topic_strategy.TopicStrategyService
+	GPT                  *gpt.Service
+	WordPress            *wordpress.Service
+	Pipeline             *pipeline.Service
 }
 
 // NewApp creates a new App application struct
@@ -59,12 +61,7 @@ func (a *App) startup(ctx context.Context) {
 	}
 
 	// Initialize repositories
-	repos, err := repository.NewRepositoryContainer()
-	if err != nil {
-		log.Printf("Error initializing repositories: %v", err)
-		return
-	}
-	a.repos = repos
+	a.repo = repository.NewRepository(repository.GetDB())
 
 	// Initialize services
 	a.services = a.initializeServices(cfg)
@@ -75,7 +72,8 @@ func (a *App) startup(ctx context.Context) {
 		a.services.GPT,
 		a.services.WordPress,
 		a.services.Pipeline,
-		a.repos,
+		a.services.TopicStrategyService,
+		a.repo,
 	)
 
 	log.Println("Application initialized successfully")
@@ -90,12 +88,14 @@ func (a *App) initializeServices(cfg *config.AppConfig) *ServiceContainer {
 		MaxTokens: 4000,
 		Timeout:   60 * time.Second,
 	}
-	gptService := gpt.NewService(gptConfig, a.repos)
+	gptService := gpt.NewService(gptConfig, a.repo)
 
 	// Initialize WordPress service
 	wpConfig := wordpress.Config{
 		Timeout: 30 * time.Second,
 	}
+
+	topicStrategyService := topic_strategy.NewTopicStrategyService(a.repo)
 
 	wpService := wordpress.NewService(wpConfig)
 
@@ -110,12 +110,13 @@ func (a *App) initializeServices(cfg *config.AppConfig) *ServiceContainer {
 		WordPressTimeout: 30 * time.Second,
 		GPTTimeout:       60 * time.Second,
 	}
-	pipelineService := pipeline.NewService(pipelineConfig, a.repos, gptService, wpService, a.ctx)
+	pipelineService := pipeline.NewService(pipelineConfig, a.repo, gptService, wpService, a.ctx)
 
 	return &ServiceContainer{
-		GPT:       gptService,
-		WordPress: wpService,
-		Pipeline:  pipelineService,
+		GPT:                  gptService,
+		WordPress:            wpService,
+		Pipeline:             pipelineService,
+		TopicStrategyService: topicStrategyService,
 	}
 }
 

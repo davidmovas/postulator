@@ -171,7 +171,8 @@ func TestHandler_GetPrompt(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			response, err := handler.GetPrompt(tt.promptID)
+			var response *dto.PromptResponse
+			response, err = handler.GetPrompt(tt.promptID)
 
 			if tt.wantErr {
 				if err == nil {
@@ -335,7 +336,8 @@ func TestHandler_UpdatePrompt(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			response, err := handler.UpdatePrompt(tt.request)
+			var response *dto.PromptResponse
+			response, err = handler.UpdatePrompt(tt.request)
 
 			if tt.wantErr {
 				if err == nil {
