@@ -492,7 +492,6 @@ func (h *Handler) SelectTopicForSite(req dto.TopicSelectionRequest) (*dto.TopicS
 			TopicID:    result.SiteTopic.TopicID,
 			Priority:   result.SiteTopic.Priority,
 			IsActive:   result.SiteTopic.IsActive,
-			Strategy:   result.SiteTopic.Strategy,
 			UsageCount: result.SiteTopic.UsageCount,
 			LastUsedAt: result.SiteTopic.LastUsedAt,
 		},

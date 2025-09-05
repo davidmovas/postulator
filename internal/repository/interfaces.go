@@ -53,3 +53,24 @@ type TopicUsageRepository interface {
 	GetSiteUsageHistory(ctx context.Context, siteID int64, limit int, offset int) (*models.PaginationResult[*models.TopicUsage], error)
 	RecordTopicUsage(ctx context.Context, siteID, topicID, articleID int64, strategy string) error
 }
+
+type PromptRepository interface {
+	GetPrompts(ctx context.Context, limit int, offset int) (*models.PaginationResult[*models.Prompt], error)
+	GetPrompt(ctx context.Context, id int64) (*models.Prompt, error)
+	CreatePrompt(ctx context.Context, prompt *models.Prompt) (*models.Prompt, error)
+	UpdatePrompt(ctx context.Context, prompt *models.Prompt) (*models.Prompt, error)
+	DeletePrompt(ctx context.Context, id int64) error
+	GetDefaultPrompt(ctx context.Context) (*models.Prompt, error)
+	SetDefaultPrompt(ctx context.Context, id int64) error
+}
+
+type SitePromptRepository interface {
+	CreateSitePrompt(ctx context.Context, sitePrompt *models.SitePrompt) (*models.SitePrompt, error)
+	GetSitePrompt(ctx context.Context, siteID int64) (*models.SitePrompt, error)
+	UpdateSitePrompt(ctx context.Context, sitePrompt *models.SitePrompt) (*models.SitePrompt, error)
+	DeleteSitePrompt(ctx context.Context, id int64) error
+	DeleteSitePromptBySite(ctx context.Context, siteID int64) error
+	ActivateSitePrompt(ctx context.Context, id int64) error
+	DeactivateSitePrompt(ctx context.Context, id int64) error
+	GetPromptSites(ctx context.Context, promptID int64, limit int, offset int) (*models.PaginationResult[*models.SitePrompt], error)
+}

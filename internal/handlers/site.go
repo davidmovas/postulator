@@ -85,6 +85,11 @@ func (h *Handler) CreateSite(req dto.CreateSiteRequest) (*dto.SiteResponse, erro
 func (h *Handler) UpdateSite(req dto.UpdateSiteRequest) (*dto.SiteResponse, error) {
 	ctx := h.fastCtx()
 
+	// Validate ID
+	if req.ID <= 0 {
+		return nil, fmt.Errorf("invalid site ID")
+	}
+
 	// Validate request
 	if err := h.validateSiteRequest(req.Name, req.URL, req.Username, req.Password); err != nil {
 		return nil, err

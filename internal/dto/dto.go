@@ -349,6 +349,36 @@ type SetDefaultPromptRequest struct {
 	Type string `json:"type" validate:"required,oneof=system user"`
 }
 
+// SitePrompt DTOs
+type CreateSitePromptRequest struct {
+	SiteID   int64 `json:"site_id" validate:"required,min=1"`
+	PromptID int64 `json:"prompt_id" validate:"required,min=1"`
+	IsActive bool  `json:"is_active"`
+}
+
+type UpdateSitePromptRequest struct {
+	ID       int64 `json:"id" validate:"required,min=1"`
+	SiteID   int64 `json:"site_id" validate:"required,min=1"`
+	PromptID int64 `json:"prompt_id" validate:"required,min=1"`
+	IsActive bool  `json:"is_active"`
+}
+
+type SitePromptResponse struct {
+	ID         int64     `json:"id"`
+	SiteID     int64     `json:"site_id"`
+	SiteName   string    `json:"site_name,omitempty"`
+	PromptID   int64     `json:"prompt_id"`
+	PromptName string    `json:"prompt_name,omitempty"`
+	IsActive   bool      `json:"is_active"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+type SitePromptListResponse struct {
+	SitePrompts []*SitePromptResponse `json:"site_prompts"`
+	Pagination  *PaginationResponse   `json:"pagination"`
+}
+
 // Topic Strategy and Selection DTOs
 type TopicSelectionRequest struct {
 	SiteID   int64  `json:"site_id" validate:"required,min=1"`
@@ -541,38 +571,100 @@ func PostingJobToResponse(job *models.PostingJob) *PostingJobResponse {
 }
 
 func (r *CreatePromptRequest) ToModel() *models.Prompt {
-	return &models.Prompt{
-		Name:         r.Name,
-		SystemPrompt: r.Content, // Map content to SystemPrompt for now
-		UserPrompt:   "",        // Empty UserPrompt for now
-		IsDefault:    r.IsDefault,
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+	prompt := &models.Prompt{
+		Name:      r.Name,
+		IsDefault: r.IsDefault,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
+
+	// Map content based on type
+	if r.Type == "system" {
+		prompt.SystemPrompt = r.Content
+		prompt.UserPrompt = ""
+	} else {
+		prompt.SystemPrompt = ""
+		prompt.UserPrompt = r.Content
+	}
+
+	return prompt
 }
 
 func (r *UpdatePromptRequest) ToModel() *models.Prompt {
-	return &models.Prompt{
-		ID:           r.ID,
-		Name:         r.Name,
-		SystemPrompt: r.Content, // Map content to SystemPrompt for now
-		UserPrompt:   "",        // Empty UserPrompt for now
-		IsDefault:    r.IsDefault,
-		UpdatedAt:    time.Now(),
+	prompt := &models.Prompt{
+		ID:        r.ID,
+		Name:      r.Name,
+		IsDefault: r.IsDefault,
+		UpdatedAt: time.Now(),
 	}
+
+	// Map content based on type
+	if r.Type == "system" {
+		prompt.SystemPrompt = r.Content
+		prompt.UserPrompt = ""
+	} else {
+		prompt.SystemPrompt = ""
+		prompt.UserPrompt = r.Content
+	}
+
+	return prompt
 }
 
 func PromptToResponse(prompt *models.Prompt) *PromptResponse {
+	var promptType, content string
+
+	// Determine type and content based on which field has data
+	if prompt.SystemPrompt != "" {
+		promptType = "system"
+		content = prompt.SystemPrompt
+	} else {
+		promptType = "user"
+		content = prompt.UserPrompt
+	}
+
 	return &PromptResponse{
 		ID:          prompt.ID,
 		Name:        prompt.Name,
-		Type:        "system",            // Default type since model has separate fields
-		Content:     prompt.SystemPrompt, // Map SystemPrompt to Content for now
-		Description: "",                  // Not in model, set empty
+		Type:        promptType,
+		Content:     content,
+		Description: "", // Not in model, set empty
 		IsDefault:   prompt.IsDefault,
 		IsActive:    true, // Not in model, set default
 		CreatedAt:   prompt.CreatedAt,
 		UpdatedAt:   prompt.UpdatedAt,
+	}
+}
+
+func (r *CreateSitePromptRequest) ToModel() *models.SitePrompt {
+	return &models.SitePrompt{
+		SiteID:    r.SiteID,
+		PromptID:  r.PromptID,
+		IsActive:  r.IsActive,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+}
+
+func (r *UpdateSitePromptRequest) ToModel() *models.SitePrompt {
+	return &models.SitePrompt{
+		ID:        r.ID,
+		SiteID:    r.SiteID,
+		PromptID:  r.PromptID,
+		IsActive:  r.IsActive,
+		UpdatedAt: time.Now(),
+	}
+}
+
+func SitePromptToResponse(sitePrompt *models.SitePrompt) *SitePromptResponse {
+	return &SitePromptResponse{
+		ID:         sitePrompt.ID,
+		SiteID:     sitePrompt.SiteID,
+		SiteName:   "", // Not in model, will be populated by handler if needed
+		PromptID:   sitePrompt.PromptID,
+		PromptName: "", // Not in model, will be populated by handler if needed
+		IsActive:   sitePrompt.IsActive,
+		CreatedAt:  sitePrompt.CreatedAt,
+		UpdatedAt:  sitePrompt.UpdatedAt,
 	}
 }
 
