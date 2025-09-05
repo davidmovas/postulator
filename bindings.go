@@ -59,9 +59,113 @@ func (a *App) CreateTopic(req dto.CreateTopicRequest) (*dto.TopicResponse, error
 	return a.handlers.CreateTopic(req)
 }
 
+// GetTopic retrieves a single topic by ID
+func (a *App) GetTopic(topicID int64) (*dto.TopicResponse, error) {
+	return a.handlers.GetTopic(topicID)
+}
+
 // GetTopics retrieves all topics with pagination
 func (a *App) GetTopics(pagination dto.PaginationRequest) (*dto.TopicListResponse, error) {
 	return a.handlers.GetTopics(pagination)
+}
+
+// GetTopicsBySiteID retrieves topics associated with a specific site
+func (a *App) GetTopicsBySiteID(siteID int64, pagination dto.PaginationRequest) (*dto.TopicListResponse, error) {
+	return a.handlers.GetTopicsBySiteID(siteID, pagination)
+}
+
+// UpdateTopic updates an existing topic
+func (a *App) UpdateTopic(req dto.UpdateTopicRequest) (*dto.TopicResponse, error) {
+	return a.handlers.UpdateTopic(req)
+}
+
+// DeleteTopic deletes a topic
+func (a *App) DeleteTopic(topicID int64) error {
+	return a.handlers.DeleteTopic(topicID)
+}
+
+// ActivateTopic activates a topic
+func (a *App) ActivateTopic(topicID int64) error {
+	return a.handlers.ActivateTopic(topicID)
+}
+
+// DeactivateTopic deactivates a topic
+func (a *App) DeactivateTopic(topicID int64) error {
+	return a.handlers.DeactivateTopic(topicID)
+}
+
+// GetActiveTopics retrieves all active topics
+func (a *App) GetActiveTopics() ([]*dto.TopicResponse, error) {
+	return a.handlers.GetActiveTopics()
+}
+
+// SiteTopic Management Methods
+
+// CreateSiteTopic creates a new site-topic association
+func (a *App) CreateSiteTopic(req dto.CreateSiteTopicRequest) (*dto.SiteTopicResponse, error) {
+	return a.handlers.CreateSiteTopic(req)
+}
+
+// GetSiteTopics retrieves all topics for a specific site
+func (a *App) GetSiteTopics(siteID int64, pagination dto.PaginationRequest) (*dto.SiteTopicListResponse, error) {
+	return a.handlers.GetSiteTopics(siteID, pagination)
+}
+
+// GetTopicSites retrieves all sites for a specific topic
+func (a *App) GetTopicSites(topicID int64, pagination dto.PaginationRequest) (*dto.SiteTopicListResponse, error) {
+	return a.handlers.GetTopicSites(topicID, pagination)
+}
+
+// UpdateSiteTopic updates a site-topic association
+func (a *App) UpdateSiteTopic(req dto.UpdateSiteTopicRequest) (*dto.SiteTopicResponse, error) {
+	return a.handlers.UpdateSiteTopic(req)
+}
+
+// DeleteSiteTopic deletes a site-topic association
+func (a *App) DeleteSiteTopic(siteTopicID int64) error {
+	return a.handlers.DeleteSiteTopic(siteTopicID)
+}
+
+// DeleteSiteTopicBySiteAndTopic deletes site-topic association by site and topic IDs
+func (a *App) DeleteSiteTopicBySiteAndTopic(siteID int64, topicID int64) error {
+	return a.handlers.DeleteSiteTopicBySiteAndTopic(siteID, topicID)
+}
+
+// ActivateSiteTopic activates a site-topic association
+func (a *App) ActivateSiteTopic(siteTopicID int64) error {
+	return a.handlers.ActivateSiteTopic(siteTopicID)
+}
+
+// DeactivateSiteTopic deactivates a site-topic association
+func (a *App) DeactivateSiteTopic(siteTopicID int64) error {
+	return a.handlers.DeactivateSiteTopic(siteTopicID)
+}
+
+// Topic Strategy and Selection Methods
+
+// SelectTopicForSite selects a topic for article generation using the specified strategy
+func (a *App) SelectTopicForSite(req dto.TopicSelectionRequest) (*dto.TopicSelectionResponse, error) {
+	return a.handlers.SelectTopicForSite(req)
+}
+
+// GetTopicStats retrieves topic statistics for a site
+func (a *App) GetTopicStats(siteID int64) (*dto.TopicStatsResponse, error) {
+	return a.handlers.GetTopicStats(siteID)
+}
+
+// GetTopicUsageHistory retrieves usage history for a specific topic on a site
+func (a *App) GetTopicUsageHistory(siteID int64, topicID int64, pagination dto.PaginationRequest) (*dto.TopicUsageListResponse, error) {
+	return a.handlers.GetTopicUsageHistory(siteID, topicID, pagination)
+}
+
+// GetSiteUsageHistory retrieves all topic usage history for a site
+func (a *App) GetSiteUsageHistory(siteID int64, pagination dto.PaginationRequest) (*dto.TopicUsageListResponse, error) {
+	return a.handlers.GetSiteUsageHistory(siteID, pagination)
+}
+
+// CheckStrategyAvailability checks if more topics are available for a strategy
+func (a *App) CheckStrategyAvailability(siteID int64, strategy string) (*dto.StrategyAvailabilityResponse, error) {
+	return a.handlers.CheckStrategyAvailability(siteID, strategy)
 }
 
 // Schedule Management Methods

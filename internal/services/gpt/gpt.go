@@ -28,7 +28,7 @@ var GTPModels = []string{
 type Service struct {
 	client   *openai.Client
 	defaults ServiceDefaults
-	repos    *repository.Container
+	repos    *repository.Repository
 }
 
 // ServiceDefaults contains default configuration
@@ -75,7 +75,7 @@ type GenerateArticleResponse struct {
 }
 
 // NewService creates a new GPT service instance
-func NewService(config Config, repos *repository.Container) *Service {
+func NewService(config Config, repos *repository.Repository) *Service {
 	// Set defaults
 	if config.Model == "" {
 		config.Model = "gpt-4o-mini"
@@ -198,23 +198,11 @@ func (s *Service) GenerateArticle(ctx context.Context, req GenerateArticleReques
 
 // loadPrompts loads system and user prompts from database with placeholders replaced
 func (s *Service) loadPrompts(ctx context.Context, placeholders map[string]string) (systemPrompt, userPrompt string, err error) {
-	// Load default system prompt
-	systemPromptModel, err := s.repos.Prompt.GetDefaultByType(ctx, "system")
-	if err != nil || systemPromptModel == nil {
-		// Fallback to hardcoded system prompt
-		systemPrompt = "You are a professional content writer who creates high-quality, SEO-optimized articles for WordPress websites. You must respond with valid JSON matching the provided schema."
-	} else {
-		systemPrompt = s.replacePlaceholders(systemPromptModel.Content, placeholders)
-	}
+	// Use hardcoded system prompt for now
+	systemPrompt = "You are a professional content writer who creates high-quality, SEO-optimized articles for WordPress websites. You must respond with valid JSON matching the provided schema."
 
-	// Load default user prompt
-	userPromptModel, err := s.repos.Prompt.GetDefaultByType(ctx, "user")
-	if err != nil || userPromptModel == nil {
-		// Fallback to buildPrompt method
-		userPrompt = s.buildFallbackPrompt(placeholders)
-	} else {
-		userPrompt = s.replacePlaceholders(userPromptModel.Content, placeholders)
-	}
+	// Use fallback user prompt
+	userPrompt = s.buildFallbackPrompt(placeholders)
 
 	return systemPrompt, userPrompt, nil
 }

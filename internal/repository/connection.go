@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS sites (
     is_active BOOLEAN DEFAULT TRUE,
     last_check DATETIME,
     status TEXT DEFAULT 'pending',
+    strategy TEXT DEFAULT 'random',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -101,6 +102,11 @@ CREATE TABLE IF NOT EXISTS site_topics (
     topic_id INTEGER NOT NULL,
     priority INTEGER DEFAULT 1,
     is_active BOOLEAN DEFAULT TRUE,
+    last_used_at DATETIME,
+    usage_count INTEGER DEFAULT 0,
+    round_robin_pos INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
     FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
     UNIQUE(site_id, topic_id)
@@ -164,6 +170,19 @@ CREATE TABLE IF NOT EXISTS prompts (
     is_active BOOLEAN DEFAULT TRUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS topic_usage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    site_id INTEGER NOT NULL,
+    topic_id INTEGER NOT NULL,
+    article_id INTEGER NOT NULL,
+    strategy TEXT NOT NULL,
+    used_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
+    FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
+    FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE
 );
 
 -- Create indexes for better performance

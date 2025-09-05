@@ -18,7 +18,7 @@ import (
 
 // Service orchestrates the article generation and publishing pipeline
 type Service struct {
-	repos      *repository.Container
+	repos      *repository.Repository
 	gptService *gpt.Service
 	wpService  *wordpress.Service
 	appContext context.Context

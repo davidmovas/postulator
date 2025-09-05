@@ -20,6 +20,7 @@ func (r *Repository) GetSites(ctx context.Context, limit int, offset int) (*mode
 			"is_active",
 			"last_check",
 			"status",
+			"strategy",
 			"created_at",
 			"updated_at",
 		).
@@ -50,6 +51,7 @@ func (r *Repository) GetSites(ctx context.Context, limit int, offset int) (*mode
 			&site.IsActive,
 			&site.LastCheck,
 			&site.Status,
+			&site.Strategy,
 			&site.CreatedAt,
 			&site.UpdatedAt,
 		); err != nil {
@@ -89,6 +91,7 @@ func (r *Repository) GetSite(ctx context.Context, id int64) (*models.Site, error
 			"is_active",
 			"last_check",
 			"status",
+			"strategy",
 			"created_at",
 			"updated_at",
 		).
@@ -107,6 +110,7 @@ func (r *Repository) GetSite(ctx context.Context, id int64) (*models.Site, error
 			&site.IsActive,
 			&site.LastCheck,
 			&site.Status,
+			&site.Strategy,
 			&site.CreatedAt,
 			&site.UpdatedAt,
 		); err != nil {
@@ -126,6 +130,7 @@ func (r *Repository) CreateSite(ctx context.Context, site *models.Site) (*models
 			"password",
 			"is_active",
 			"status",
+			"strategy",
 			"created_at",
 			"updated_at",
 		).
@@ -136,6 +141,7 @@ func (r *Repository) CreateSite(ctx context.Context, site *models.Site) (*models
 			site.Password,
 			site.IsActive,
 			site.Status,
+			site.Strategy,
 			site.CreatedAt,
 			site.UpdatedAt,
 		).
@@ -164,6 +170,7 @@ func (r *Repository) UpdateSite(ctx context.Context, site *models.Site) (*models
 		Set("password", site.Password).
 		Set("is_active", site.IsActive).
 		Set("status", site.Status).
+		Set("strategy", site.Strategy).
 		Set("updated_at", site.UpdatedAt).
 		Where(squirrel.Eq{"id": site.ID}).
 		MustSql()

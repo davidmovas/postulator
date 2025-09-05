@@ -8,29 +8,39 @@ type Site struct {
 	URL       string    `json:"url" db:"url"`               // https://example.com
 	Username  string    `json:"username" db:"username"`     // WP логин
 	Password  string    `json:"password" db:"password"`     // Зашифрованный пароль/app password
+	APIKey    string    `json:"api_key" db:"api_key"`       // API ключ для аутентификации
 	IsActive  bool      `json:"is_active" db:"is_active"`   // Включен ли сайт
 	LastCheck time.Time `json:"last_check" db:"last_check"` // Последняя проверка доступности
 	Status    string    `json:"status" db:"status"`         // "connected", "error", "pending"
+	Strategy  string    `json:"strategy" db:"strategy"`     // Topic selection strategy: "unique", "round_robin", "random"
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type Topic struct {
-	ID        int64     `json:"id" db:"id"`
-	Title     string    `json:"title" db:"title"`       // Название темы
-	Keywords  string    `json:"keywords" db:"keywords"` // Ключевые слова через запятую
-	Category  string    `json:"category" db:"category"` // Категория на WP
-	Tags      string    `json:"tags" db:"tags"`         // Теги через запятую
-	IsActive  bool      `json:"is_active" db:"is_active"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+	ID          int64     `json:"id" db:"id"`
+	Title       string    `json:"title" db:"title"`             // Название темы
+	Description string    `json:"description" db:"description"` // Описание темы
+	Keywords    string    `json:"keywords" db:"keywords"`       // Ключевые слова через запятую
+	Prompt      string    `json:"prompt" db:"prompt"`           // Промпт для генерации
+	Category    string    `json:"category" db:"category"`       // Категория на WP
+	Tags        string    `json:"tags" db:"tags"`               // Теги через запятую
+	IsActive    bool      `json:"is_active" db:"is_active"`
+	CreatedAt   time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type SiteTopic struct {
-	ID       int64 `json:"id" db:"id"`
-	SiteID   int64 `json:"site_id" db:"site_id"`
-	TopicID  int64 `json:"topic_id" db:"topic_id"`
-	IsActive bool  `json:"is_active" db:"is_active"`
+	ID            int64     `json:"id" db:"id"`
+	SiteID        int64     `json:"site_id" db:"site_id"`
+	TopicID       int64     `json:"topic_id" db:"topic_id"`
+	IsActive      bool      `json:"is_active" db:"is_active"`
+	Priority      int       `json:"priority" db:"priority"`               // Priority for topic selection (1-10)
+	LastUsedAt    time.Time `json:"last_used_at" db:"last_used_at"`       // When this topic was last used for this site
+	UsageCount    int       `json:"usage_count" db:"usage_count"`         // How many times this topic was used
+	RoundRobinPos int       `json:"round_robin_pos" db:"round_robin_pos"` // Position in round-robin cycle
+	CreatedAt     time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type Schedule struct {
@@ -50,6 +60,7 @@ type Article struct {
 	TopicID     int64     `json:"topic_id" db:"topic_id"`
 	Title       string    `json:"title" db:"title"`
 	Content     string    `json:"content" db:"content"`
+	Excerpt     string    `json:"excerpt" db:"excerpt"` // Краткое описание статьи
 	Keywords    string    `json:"keywords" db:"keywords"`
 	Tags        string    `json:"tags" db:"tags"`
 	Category    string    `json:"category" db:"category"`
@@ -92,6 +103,57 @@ type Setting struct {
 	Category  string    `json:"category" db:"category"` // Category for grouping settings
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+}
+
+// TopicUsage tracks when and how topics are used for article generation
+type TopicUsage struct {
+	ID        int64     `json:"id" db:"id"`
+	SiteID    int64     `json:"site_id" db:"site_id"`
+	TopicID   int64     `json:"topic_id" db:"topic_id"`
+	ArticleID int64     `json:"article_id" db:"article_id"`
+	Strategy  string    `json:"strategy" db:"strategy"` // Strategy used when selecting this topic
+	UsedAt    time.Time `json:"used_at" db:"used_at"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+}
+
+// TopicStats provides statistics about topic usage for a site
+type TopicStats struct {
+	SiteID             int64     `json:"site_id"`
+	TotalTopics        int       `json:"total_topics"`         // Total topics assigned to site
+	ActiveTopics       int       `json:"active_topics"`        // Active topics assigned to site
+	UsedTopics         int       `json:"used_topics"`          // Topics that have been used at least once
+	UnusedTopics       int       `json:"unused_topics"`        // Topics never used
+	UniqueTopicsLeft   int       `json:"unique_topics_left"`   // For unique strategy: topics not yet used
+	RoundRobinPosition int       `json:"round_robin_position"` // Current position in round-robin cycle
+	MostUsedTopicID    int64     `json:"most_used_topic_id"`
+	MostUsedTopicCount int       `json:"most_used_topic_count"`
+	LastUsedTopicID    int64     `json:"last_used_topic_id"`
+	LastUsedAt         time.Time `json:"last_used_at"`
+}
+
+// TopicSelectionStrategy defines strategy constants
+type TopicSelectionStrategy string
+
+const (
+	StrategyUnique     TopicSelectionStrategy = "unique"
+	StrategyRoundRobin TopicSelectionStrategy = "round_robin"
+	StrategyRandom     TopicSelectionStrategy = "random"
+	StrategyRandomAll  TopicSelectionStrategy = "random_all"
+)
+
+// TopicSelectionRequest represents a request to select a topic for article generation
+type TopicSelectionRequest struct {
+	SiteID   int64                  `json:"site_id"`
+	Strategy TopicSelectionStrategy `json:"strategy,omitempty"` // If empty, use site default or global default
+}
+
+// TopicSelectionResult represents the result of topic selection
+type TopicSelectionResult struct {
+	Topic          *Topic     `json:"topic"`
+	SiteTopic      *SiteTopic `json:"site_topic"`
+	Strategy       string     `json:"strategy"`
+	CanContinue    bool       `json:"can_continue"`    // For unique strategy: are there more unused topics?
+	RemainingCount int        `json:"remaining_count"` // For unique strategy: how many unused topics remain
 }
 
 type PaginationResult[T any] struct {

@@ -16,3 +16,40 @@ type SiteRepository interface {
 	SetCheckStatus(ctx context.Context, id int64, checkTime time.Time, status string) error
 	DeleteSite(ctx context.Context, id int64) error
 }
+
+type TopicRepository interface {
+	GetTopics(ctx context.Context, limit int, offset int) (*models.PaginationResult[*models.Topic], error)
+	GetTopic(ctx context.Context, id int64) (*models.Topic, error)
+	GetTopicsBySiteID(ctx context.Context, siteID int64, limit int, offset int) (*models.PaginationResult[*models.Topic], error)
+	CreateTopic(ctx context.Context, topic *models.Topic) (*models.Topic, error)
+	UpdateTopic(ctx context.Context, topic *models.Topic) (*models.Topic, error)
+	DeleteTopic(ctx context.Context, id int64) error
+	ActivateTopic(ctx context.Context, id int64) error
+	DeactivateTopic(ctx context.Context, id int64) error
+	GetActiveTopics(ctx context.Context) ([]*models.Topic, error)
+}
+
+type SiteTopicRepository interface {
+	CreateSiteTopic(ctx context.Context, siteTopic *models.SiteTopic) (*models.SiteTopic, error)
+	GetSiteTopics(ctx context.Context, siteID int64, limit int, offset int) (*models.PaginationResult[*models.SiteTopic], error)
+	GetTopicSites(ctx context.Context, topicID int64, limit int, offset int) (*models.PaginationResult[*models.SiteTopic], error)
+	GetSiteTopic(ctx context.Context, siteID int64, topicID int64) (*models.SiteTopic, error)
+	UpdateSiteTopic(ctx context.Context, siteTopic *models.SiteTopic) (*models.SiteTopic, error)
+	DeleteSiteTopic(ctx context.Context, id int64) error
+	DeleteSiteTopicBySiteAndTopic(ctx context.Context, siteID int64, topicID int64) error
+	ActivateSiteTopic(ctx context.Context, id int64) error
+	DeactivateSiteTopic(ctx context.Context, id int64) error
+
+	// Topic Selection Strategy Methods
+
+	GetSiteTopicsForSelection(ctx context.Context, siteID int64, strategy string) ([]*models.SiteTopic, error)
+	UpdateSiteTopicUsage(ctx context.Context, siteTopicID int64, strategy string) error
+	GetTopicStats(ctx context.Context, siteID int64) (*models.TopicStats, error)
+}
+
+type TopicUsageRepository interface {
+	CreateTopicUsage(ctx context.Context, usage *models.TopicUsage) (*models.TopicUsage, error)
+	GetTopicUsageHistory(ctx context.Context, siteID int64, topicID int64, limit int, offset int) (*models.PaginationResult[*models.TopicUsage], error)
+	GetSiteUsageHistory(ctx context.Context, siteID int64, limit int, offset int) (*models.PaginationResult[*models.TopicUsage], error)
+	RecordTopicUsage(ctx context.Context, siteID, topicID, articleID int64, strategy string) error
+}

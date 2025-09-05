@@ -35,6 +35,7 @@ type CreateSiteRequest struct {
 	Username string `json:"username" validate:"required,min=1,max=100"`
 	Password string `json:"password" validate:"required,min=1"`
 	IsActive bool   `json:"is_active"`
+	Strategy string `json:"strategy,omitempty"`
 }
 
 type UpdateSiteRequest struct {
@@ -44,6 +45,7 @@ type UpdateSiteRequest struct {
 	Username string `json:"username" validate:"required,min=1,max=100"`
 	Password string `json:"password" validate:"required,min=1"`
 	IsActive bool   `json:"is_active"`
+	Strategy string `json:"strategy,omitempty"`
 }
 
 type SiteResponse struct {
@@ -54,6 +56,7 @@ type SiteResponse struct {
 	IsActive  bool      `json:"is_active"`
 	LastCheck time.Time `json:"last_check"`
 	Status    string    `json:"status"`
+	Strategy  string    `json:"strategy"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -207,13 +210,16 @@ type UpdateSiteTopicRequest struct {
 }
 
 type SiteTopicResponse struct {
-	ID         int64  `json:"id"`
-	SiteID     int64  `json:"site_id"`
-	SiteName   string `json:"site_name,omitempty"`
-	TopicID    int64  `json:"topic_id"`
-	TopicTitle string `json:"topic_title,omitempty"`
-	Priority   int    `json:"priority"`
-	IsActive   bool   `json:"is_active"`
+	ID            int64     `json:"id"`
+	SiteID        int64     `json:"site_id"`
+	SiteName      string    `json:"site_name,omitempty"`
+	TopicID       int64     `json:"topic_id"`
+	TopicTitle    string    `json:"topic_title,omitempty"`
+	Priority      int       `json:"priority"`
+	IsActive      bool      `json:"is_active"`
+	UsageCount    int       `json:"usage_count"`
+	LastUsedAt    time.Time `json:"last_used_at,omitempty"`
+	RoundRobinPos int       `json:"round_robin_pos"`
 }
 
 type SiteTopicListResponse struct {
@@ -351,6 +357,59 @@ type SetDefaultPromptRequest struct {
 	Type string `json:"type" validate:"required,oneof=system user"`
 }
 
+// Topic Strategy and Selection DTOs
+type TopicSelectionRequest struct {
+	SiteID   int64  `json:"site_id" validate:"required,min=1"`
+	Strategy string `json:"strategy,omitempty"` // "unique", "round_robin", "random"
+}
+
+type TopicSelectionResponse struct {
+	Topic          *TopicResponse     `json:"topic"`
+	SiteTopic      *SiteTopicResponse `json:"site_topic"`
+	Strategy       string             `json:"strategy"`
+	CanContinue    bool               `json:"can_continue"`
+	RemainingCount int                `json:"remaining_count"`
+}
+
+type TopicStatsResponse struct {
+	SiteID             int64     `json:"site_id"`
+	TotalTopics        int       `json:"total_topics"`
+	ActiveTopics       int       `json:"active_topics"`
+	UsedTopics         int       `json:"used_topics"`
+	UnusedTopics       int       `json:"unused_topics"`
+	UniqueTopicsLeft   int       `json:"unique_topics_left"`
+	RoundRobinPosition int       `json:"round_robin_position"`
+	MostUsedTopicID    int64     `json:"most_used_topic_id"`
+	MostUsedTopicCount int       `json:"most_used_topic_count"`
+	LastUsedTopicID    int64     `json:"last_used_topic_id"`
+	LastUsedAt         time.Time `json:"last_used_at"`
+}
+
+type TopicUsageResponse struct {
+	ID        int64     `json:"id"`
+	SiteID    int64     `json:"site_id"`
+	TopicID   int64     `json:"topic_id"`
+	ArticleID int64     `json:"article_id"`
+	Strategy  string    `json:"strategy"`
+	UsedAt    time.Time `json:"used_at"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type TopicUsageListResponse struct {
+	UsageHistory []*TopicUsageResponse `json:"usage_history"`
+	Pagination   *PaginationResponse   `json:"pagination"`
+}
+
+type StrategyAvailabilityResponse struct {
+	SiteID         int64  `json:"site_id"`
+	Strategy       string `json:"strategy"`
+	CanContinue    bool   `json:"can_continue"`
+	TotalTopics    int    `json:"total_topics"`
+	ActiveTopics   int    `json:"active_topics"`
+	UnusedTopics   int    `json:"unused_topics"`
+	RemainingCount int    `json:"remaining_count"`
+}
+
 // Conversion utilities
 func (r *CreateSiteRequest) ToModel() *models.Site {
 	return &models.Site{
@@ -360,6 +419,7 @@ func (r *CreateSiteRequest) ToModel() *models.Site {
 		Password:  r.Password,
 		IsActive:  r.IsActive,
 		Status:    "pending",
+		Strategy:  r.Strategy,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -373,6 +433,7 @@ func (r *UpdateSiteRequest) ToModel() *models.Site {
 		Username:  r.Username,
 		Password:  r.Password,
 		IsActive:  r.IsActive,
+		Strategy:  r.Strategy,
 		UpdatedAt: time.Now(),
 	}
 }
@@ -386,6 +447,7 @@ func SiteToResponse(site *models.Site) *SiteResponse {
 		IsActive:  site.IsActive,
 		LastCheck: site.LastCheck,
 		Status:    site.Status,
+		Strategy:  site.Strategy,
 		CreatedAt: site.CreatedAt,
 		UpdatedAt: site.UpdatedAt,
 	}
