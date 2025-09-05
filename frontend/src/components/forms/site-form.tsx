@@ -5,9 +5,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import type { Site } from "@/types/site";
 
-export type SiteFormValues = Pick<Site, "name" | "url" | "username" | "password" | "api_key" | "is_active">;
+import type { Strategy } from "@/types/site";
+
+export type SiteFormValues = {
+  name: string;
+  url: string;
+  username: string;
+  password: string;
+  strategy: Strategy;
+  is_active: boolean;
+};
 
 export function SiteForm({
   open,
@@ -21,11 +29,11 @@ export function SiteForm({
   onSubmit: (values: SiteFormValues) => void;
 }) {
   const [values, setValues] = React.useState<SiteFormValues>(
-    initial ?? { name: "", url: "", username: "", password: "", api_key: "", is_active: true }
+    initial ?? { name: "", url: "", username: "", password: "", strategy: "round_robin", is_active: true }
   );
 
   React.useEffect(() => {
-    setValues(initial ?? { name: "", url: "", username: "", password: "", api_key: "", is_active: true });
+    setValues(initial ?? { name: "", url: "", username: "", password: "", strategy: "round_robin", is_active: true });
   }, [initial]);
 
   const submit = () => {
@@ -59,13 +67,23 @@ export function SiteForm({
             </div>
           </div>
           <div className="grid gap-1">
-            <Label htmlFor="api_key">API Key (optional)</Label>
-            <Input id="api_key" value={values.api_key ?? ""} onChange={(e) => setValues({ ...values, api_key: e.target.value })} />
+            <Label htmlFor="strategy">Strategy</Label>
+            <select
+              id="strategy"
+              className="h-9 w-full rounded-md border bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              value={values.strategy}
+              onChange={(e) => setValues({ ...values, strategy: e.target.value as Strategy })}
+            >
+              <option value="unique">Unique</option>
+              <option value="round_robin">Round robin</option>
+              <option value="random">Random</option>
+              <option value="random-all">Random All</option>
+            </select>
           </div>
           <div className="flex items-center justify-between border-t pt-3 mt-1">
             <div className="flex flex-col gap-0.5">
               <Label htmlFor="is_active">Active</Label>
-              <span className="text-xs text-muted-foreground">If disabled, site won't be used by schedules.</span>
+              <span className="text-xs text-muted-foreground">If disabled, site won&apos;t be used by schedules.</span>
             </div>
             <Switch id="is_active" checked={values.is_active} onCheckedChange={(c: boolean) => setValues({ ...values, is_active: c })} />
           </div>
@@ -78,5 +96,3 @@ export function SiteForm({
     </Dialog>
   );
 }
-
-export default SiteForm;

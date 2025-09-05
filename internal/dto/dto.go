@@ -53,6 +53,7 @@ type SiteResponse struct {
 	Name      string    `json:"name"`
 	URL       string    `json:"url"`
 	Username  string    `json:"username"`
+	Password  string    `json:"password"`
 	IsActive  bool      `json:"is_active"`
 	LastCheck time.Time `json:"last_check"`
 	Status    string    `json:"status"`
@@ -464,6 +465,7 @@ func SiteToResponse(site *models.Site) *SiteResponse {
 		Name:      site.Name,
 		URL:       site.URL,
 		Username:  site.Username,
+		Password:  site.Password,
 		IsActive:  site.IsActive,
 		LastCheck: site.LastCheck,
 		Status:    site.Status,

@@ -29,18 +29,12 @@ function SplashScreen() {
 
 function HeaderCrumbs() {
     const { section, setSection } = useNavigation();
-    const icon = section === "dashboard" ? <RiScanLine size={22} aria-hidden="true" />
-        : section === "jobs" ? <RiBardLine size={22} aria-hidden="true" />
-        : section === "sites" ? <RiUserFollowLine size={22} aria-hidden="true" />
-        : section === "titles" ? <RiCodeSSlashLine size={22} aria-hidden="true" />
-        : <RiSettings3Line size={22} aria-hidden="true" />;
     const title = section.charAt(0).toUpperCase() + section.slice(1);
     return (
         <Breadcrumb>
             <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
                     <BreadcrumbLink href="#" onClick={(e)=>{e.preventDefault(); setSection("dashboard");}}>
-                        {icon}
                         <span className="sr-only">{title}</span>
                     </BreadcrumbLink>
                 </BreadcrumbItem>
@@ -59,7 +53,6 @@ function SectionContent() {
         return (
             <>
                 <DashboardOverview />
-                <SitesPanel />
             </>
         );
     }

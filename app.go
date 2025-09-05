@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"Postulator/internal/bindings"
 	"Postulator/internal/config"
 	"Postulator/internal/handlers"
 	"Postulator/internal/repository"
@@ -22,6 +23,7 @@ type App struct {
 	handlers *handlers.Handler
 	repo     *repository.Repository
 	services *ServiceContainer
+	binder   *bindings.Binder
 }
 
 // ServiceContainer holds all application services
@@ -34,7 +36,10 @@ type ServiceContainer struct {
 
 // NewApp creates a new App application struct
 func NewApp() *App {
-	return &App{}
+	app := &App{
+		binder: &bindings.Binder{},
+	}
+	return app
 }
 
 // startup is called at application startup
@@ -75,6 +80,9 @@ func (a *App) startup(ctx context.Context) {
 		a.services.TopicStrategyService,
 		a.repo,
 	)
+
+	// Initialize binders for Wails frontend - set the handler
+	a.binder.SetHandler(a.handlers)
 
 	log.Println("Application initialized successfully")
 }

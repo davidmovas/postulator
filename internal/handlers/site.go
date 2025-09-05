@@ -15,7 +15,7 @@ func (h *Handler) GetSites(pagination dto.PaginationRequest) (*dto.SiteListRespo
 		pagination.Page = 1
 	}
 	if pagination.Limit <= 0 {
-		pagination.Limit = 10
+		pagination.Limit = 100
 	}
 
 	offset := (pagination.Page - 1) * pagination.Limit
@@ -51,12 +51,12 @@ func (h *Handler) GetSite(siteID int64) (*dto.SiteResponse, error) {
 	ctx := h.fastCtx()
 
 	if siteID <= 0 {
-		return nil, fmt.Errorf("invalid site ID")
+		return nil, dto.NewValidationError("Invalid site ID", map[string]string{"id": "ID must be greater than 0"})
 	}
 
 	site, err := h.repo.GetSite(ctx, siteID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve site: %w", err)
+		return nil, dto.WrapError(err, "Failed to retrieve site information")
 	}
 
 	return dto.SiteToResponse(site), nil
@@ -68,14 +68,14 @@ func (h *Handler) CreateSite(req dto.CreateSiteRequest) (*dto.SiteResponse, erro
 
 	// Validate request
 	if err := h.validateSiteRequest(req.Name, req.URL, req.Username, req.Password); err != nil {
-		return nil, err
+		return nil, dto.TranslateError(err)
 	}
 
 	// Convert to model and create
 	site := req.ToModel()
 	createdSite, err := h.repo.CreateSite(ctx, site)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create site: %w", err)
+		return nil, dto.TranslateError(err)
 	}
 
 	return dto.SiteToResponse(createdSite), nil
@@ -87,19 +87,19 @@ func (h *Handler) UpdateSite(req dto.UpdateSiteRequest) (*dto.SiteResponse, erro
 
 	// Validate ID
 	if req.ID <= 0 {
-		return nil, fmt.Errorf("invalid site ID")
+		return nil, dto.NewValidationError("Invalid site ID", map[string]string{"id": "ID must be greater than 0"})
 	}
 
 	// Validate request
 	if err := h.validateSiteRequest(req.Name, req.URL, req.Username, req.Password); err != nil {
-		return nil, err
+		return nil, dto.TranslateError(err)
 	}
 
 	// Convert to model and update
 	site := req.ToModel()
 	updatedSite, err := h.repo.UpdateSite(ctx, site)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update site: %w", err)
+		return nil, dto.WrapError(err, "Failed to update site")
 	}
 
 	return dto.SiteToResponse(updatedSite), nil
@@ -110,12 +110,12 @@ func (h *Handler) ActivateSite(siteID int64) error {
 	ctx := h.fastCtx()
 
 	if siteID <= 0 {
-		return fmt.Errorf("invalid site ID")
+		return dto.NewValidationError("Invalid site ID", map[string]string{"id": "ID must be greater than 0"})
 	}
 
 	err := h.repo.ActivateSite(ctx, siteID)
 	if err != nil {
-		return fmt.Errorf("failed to activate site: %w", err)
+		return dto.WrapError(err, "Failed to activate site")
 	}
 
 	return nil
@@ -126,12 +126,12 @@ func (h *Handler) DeactivateSite(siteID int64) error {
 	ctx := h.fastCtx()
 
 	if siteID <= 0 {
-		return fmt.Errorf("invalid site ID")
+		return dto.NewValidationError("Invalid site ID", map[string]string{"id": "ID must be greater than 0"})
 	}
 
 	err := h.repo.DeactivateSite(ctx, siteID)
 	if err != nil {
-		return fmt.Errorf("failed to deactivate site: %w", err)
+		return dto.WrapError(err, "Failed to deactivate site")
 	}
 
 	return nil
@@ -162,12 +162,12 @@ func (h *Handler) DeleteSite(siteID int64) error {
 	ctx := h.fastCtx()
 
 	if siteID <= 0 {
-		return fmt.Errorf("invalid site ID")
+		return dto.NewValidationError("Invalid site ID", map[string]string{"id": "ID must be greater than 0"})
 	}
 
 	err := h.repo.DeleteSite(ctx, siteID)
 	if err != nil {
-		return fmt.Errorf("failed to delete site: %w", err)
+		return dto.WrapError(err, "Failed to delete site")
 	}
 
 	return nil

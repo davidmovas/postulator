@@ -12,6 +12,7 @@ import { RiAddLine, RiDeleteBinLine, RiEdit2Line, RiMoreLine, RiPlayLine, RiRefr
 import SiteStatusBadge from "@/components/ui/site-status-badge";
 import { Site } from "@/types/site";
 import { SiteForm, SiteFormValues } from "@/components/forms/site-form";
+import { useToast } from "@/components/ui/use-toast";
 
 export type SitesTableProps = {
   sites: Site[];
@@ -21,14 +22,25 @@ export type SitesTableProps = {
   onPageChange: (page: number) => void;
   onRefresh: () => void;
   onMutateSites?: (updater: (prev: Site[]) => Site[]) => void; // optional state lifter
+  // Optional backend handlers; if provided, component will call them and then onRefresh()
+  onCreate?: (values: SiteFormValues) => Promise<void> | void;
+  onUpdate?: (id: number, values: SiteFormValues) => Promise<void> | void;
+  onDelete?: (id: number) => Promise<void> | void;
+  onToggleActive?: (id: number, active: boolean) => Promise<void> | void;
+  onBulkToggle?: (ids: number[], active: boolean) => Promise<void> | void;
+  onBulkDelete?: (ids: number[]) => Promise<void> | void;
+  onTestConnection?: (id: number) => Promise<void> | void;
 };
 
-export default function SitesTable({ sites, page, pageSize, total, onPageChange, onRefresh, onMutateSites }: SitesTableProps) {
+export default function SitesTable({ sites, page, pageSize, total, onPageChange, onRefresh, onMutateSites, onCreate, onUpdate, onDelete, onToggleActive, onBulkToggle, onBulkDelete, onTestConnection }: SitesTableProps) {
   const [selected, setSelected] = React.useState<Set<number>>(new Set());
   const [query, setQuery] = React.useState<string>("");
   const [addOpen, setAddOpen] = React.useState<boolean>(false);
   const [editOpen, setEditOpen] = React.useState<boolean>(false);
   const [editing, setEditing] = React.useState<Site | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState<boolean>(false);
+  const { toast } = useToast();
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -56,7 +68,25 @@ export default function SitesTable({ sites, page, pageSize, total, onPageChange,
     });
   };
 
-  const handleAdd = (values: SiteFormValues) => {
+  const handleAdd = async (values: SiteFormValues) => {
+    if (onCreate) {
+      try {
+        setLoading(true);
+        setError(null);
+        await onCreate(values);
+        setAddOpen(false);
+        onRefresh();
+        toast({ title: "Site created", description: `${values.name} has been created successfully.` });
+        return;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Failed to create site";
+        setError(msg);
+        toast({ title: "Create failed", description: msg, variant: "destructive" });
+        return;
+      } finally {
+        setLoading(false);
+      }
+    }
     const id = Math.max(0, ...sites.map((s) => s.id)) + 1;
     const newSite: Site = {
       id,
@@ -64,20 +94,39 @@ export default function SitesTable({ sites, page, pageSize, total, onPageChange,
       url: values.url,
       username: values.username,
       password: values.password,
-      api_key: values.api_key,
       is_active: values.is_active,
       status: values.is_active ? "pending" : "disabled",
+      strategy: values.strategy,
     };
     apply((prev) => [newSite, ...prev]);
     setAddOpen(false);
   };
 
-  const handleEdit = (values: SiteFormValues) => {
+  const handleEdit = async (values: SiteFormValues) => {
     if (!editing) return;
+    if (onUpdate) {
+      try {
+        setLoading(true);
+        setError(null);
+        await onUpdate(editing.id, values);
+        setEditOpen(false);
+        setEditing(null);
+        onRefresh();
+        toast({ title: "Site updated", description: `${values.name} has been updated.` });
+        return;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Failed to update site";
+        setError(msg);
+        toast({ title: "Update failed", description: msg, variant: "destructive" });
+        return;
+      } finally {
+        setLoading(false);
+      }
+    }
     apply((prev) =>
       prev.map((s) =>
         s.id === editing.id
-          ? { ...s, name: values.name, url: values.url, username: values.username, password: values.password, api_key: values.api_key, is_active: values.is_active, status: values.is_active ? s.status === "disabled" ? "pending" : s.status : "disabled" }
+          ? { ...s, name: values.name, url: values.url, username: values.username, password: values.password, strategy: values.strategy, is_active: values.is_active, status: values.is_active ? s.status === "disabled" ? "pending" : s.status : "disabled" }
           : s
       )
     );
@@ -85,39 +134,124 @@ export default function SitesTable({ sites, page, pageSize, total, onPageChange,
     setEditing(null);
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
+    if (onDelete) {
+      try {
+        setLoading(true);
+        setError(null);
+        await onDelete(id);
+        onRefresh();
+        toast({ title: "Site deleted", description: `Site has been deleted.` });
+        return;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Failed to delete site";
+        setError(msg);
+        toast({ title: "Delete failed", description: msg, variant: "destructive" });
+        return;
+      } finally {
+        setLoading(false);
+      }
+    }
     apply((prev) => prev.filter((s) => s.id !== id));
   };
 
-  const handleBulkDelete = () => {
+  const handleBulkDelete = async () => {
     const ids = Array.from(selected);
+    if (onBulkDelete) {
+      try {
+        await onBulkDelete(ids);
+        setSelected(new Set());
+        onRefresh();
+        toast({ title: "Deleted", description: `Deleted ${ids.length} site(s).` });
+        return;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Failed to delete selected sites";
+        toast({ title: "Bulk delete failed", description: msg, variant: "destructive" });
+        return;
+      }
+    }
     apply((prev) => prev.filter((s) => !ids.includes(s.id)));
     setSelected(new Set());
   };
 
-  const handleBulkToggle = (active: boolean) => {
+  const handleBulkToggle = async (active: boolean) => {
+    const idsArr = Array.from(selected);
+    if (onBulkToggle) {
+      try {
+        await onBulkToggle(idsArr, active);
+        setSelected(new Set());
+        onRefresh();
+        toast({ title: active ? "Enabled" : "Disabled", description: `${idsArr.length} site(s) ${active ? "enabled" : "disabled"}.` });
+        return;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Failed to update selected sites";
+        toast({ title: "Bulk toggle failed", description: msg, variant: "destructive" });
+        return;
+      }
+    }
     const ids = new Set(selected);
     apply((prev) => prev.map((s) => (ids.has(s.id) ? { ...s, is_active: active, status: active ? (s.status === "disabled" ? "pending" : s.status) : "disabled" } : s)));
     setSelected(new Set());
   };
 
-  const handleToggleActive = (id: number) => {
+  const handleToggleActive = async (id: number) => {
+    if (onToggleActive) {
+      const site = sites.find((s) => s.id === id);
+      if (site) {
+        try {
+          await onToggleActive(id, !site.is_active);
+          onRefresh();
+          toast({ title: !site.is_active ? "Site enabled" : "Site disabled", description: site.name });
+          return;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "Failed to toggle site";
+          toast({ title: "Toggle failed", description: msg, variant: "destructive" });
+          return;
+        }
+      }
+    }
     apply((prev) =>
       prev.map((s) => (s.id === id ? { ...s, is_active: !s.is_active, status: !s.is_active ? (s.status === "disabled" ? "pending" : s.status) : "disabled" } : s))
     );
   };
 
-  const handleTestConnection = (id: number) => {
-    // Placeholder: wire to Wails TestSiteConnection in the future
-    // TestSiteConnection({ site_id: id })
+  const handleTestConnection = async (id: number) => {
+    if (onTestConnection) {
+      try {
+        await onTestConnection(id);
+        onRefresh();
+        toast({ title: "Connection test", description: "Test initiated. Check status shortly." });
+        return;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Failed to test connection";
+        toast({ title: "Test failed", description: msg, variant: "destructive" });
+        return;
+      }
+    }
     onRefresh();
   };
 
   const currentPageItems = React.useMemo(() => {
-    // For demo: paginate filtered array locally
-    const start = (page - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, page, pageSize]);
+    // Use server-side pagination: `sites` already represents the current page.
+    // We only apply client-side filtering to the current page items.
+    return filtered;
+  }, [filtered]);
+
+  function formatDateTimeEU(iso: string): string {
+    try {
+      const d = new Date(iso);
+      // en-GB => DD/MM/YYYY and 24h time
+      return new Intl.DateTimeFormat("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(d);
+    } catch {
+      return iso;
+    }
+  }
 
   return (
     <TooltipProvider>
@@ -141,9 +275,23 @@ export default function SitesTable({ sites, page, pageSize, total, onPageChange,
                 <Button size="sm" variant="outline" onClick={() => handleBulkToggle(false)}>
                   <RiToggleLine size={16} /> Disable
                 </Button>
-                <Button size="sm" variant="destructive" onClick={handleBulkDelete}>
-                  <RiDeleteBinLine size={16} /> Delete
-                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button size="sm" variant="destructive">
+                      <RiDeleteBinLine size={16} /> Delete
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete {selected.size} selected site(s)?</AlertDialogTitle>
+                      <AlertDialogDescription>This action cannot be undone. This will permanently delete the selected sites.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleBulkDelete}>Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             )}
           </div>
@@ -173,6 +321,8 @@ export default function SitesTable({ sites, page, pageSize, total, onPageChange,
                 <TableHead>Name</TableHead>
                 <TableHead>URL</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-center">Active</TableHead>
+                <TableHead>Strategy</TableHead>
                 <TableHead>Last check</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -190,7 +340,15 @@ export default function SitesTable({ sites, page, pageSize, total, onPageChange,
                     </a>
                   </TableCell>
                   <TableCell><SiteStatusBadge status={s.status} /></TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{s.last_check_at ? new Date(s.last_check_at).toLocaleString() : "—"}</TableCell>
+                  <TableCell className="align-middle">
+                    <span
+                      className={`block mx-auto h-2.5 w-2.5 rounded-full ${s.is_active ? "bg-green-500" : "bg-red-500"}`}
+                      aria-label={s.is_active ? "Active" : "Inactive"}
+                      title={s.is_active ? "Active" : "Inactive"}
+                    />
+                  </TableCell>
+                  <TableCell className="text-xs uppercase text-muted-foreground">{s.strategy.replace("_", " ")}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm">{s.last_check_at ? formatDateTimeEU(s.last_check_at) : "—"}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -233,7 +391,7 @@ export default function SitesTable({ sites, page, pageSize, total, onPageChange,
               ))}
               {currentPageItems.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">No sites found.</TableCell>
+                  <TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">No sites found.</TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -242,7 +400,7 @@ export default function SitesTable({ sites, page, pageSize, total, onPageChange,
 
         {/* Pagination */}
         <div className="flex items-center justify-between">
-          <div className="text-xs text-muted-foreground">Page {page} of {pageCount}</div>
+          <div className="text-xs text-muted-foreground whitespace-nowrap">Page {page} of {pageCount}</div>
           <Pagination>
             <PaginationContent>
               <PaginationItem>
@@ -267,7 +425,7 @@ export default function SitesTable({ sites, page, pageSize, total, onPageChange,
         url: editing.url,
         username: editing.username ?? "",
         password: editing.password ?? "",
-        api_key: editing.api_key ?? "",
+        strategy: editing.strategy,
         is_active: editing.is_active,
       } : undefined} onSubmit={handleEdit} />
     </TooltipProvider>

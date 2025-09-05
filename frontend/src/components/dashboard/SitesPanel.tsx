@@ -2,25 +2,39 @@
 import * as React from "react";
 import SitesTable from "@/components/tables/sites-table";
 import type { Site } from "@/types/site";
+import { useToast } from "@/components/ui/use-toast";
 
 export function SitesPanel() {
   const [page, setPage] = React.useState<number>(1);
-  const pageSize = 10;
+  const pageSize = 100;
+  const [sites, setSites] = React.useState<Site[]>([]);
+  const [total, setTotal] = React.useState<number>(0);
+  const [loading, setLoading] = React.useState<boolean>(false);
+  const [error, setError] = React.useState<string | undefined>(undefined);
+  const { toast } = useToast();
 
-  // Placeholder data: replace with Wails call later
-  // Avoid generating dates during initial render to prevent SSR/CSR mismatches.
-  const [sites, setSites] = React.useState<Site[]>(() => [
-    { id: 1, name: "Example Blog", url: "https://example.com", is_active: true, status: "connected" },
-    { id: 2, name: "Dev Notes", url: "https://dev.local", is_active: false, status: "disabled" },
-    { id: 3, name: "WP Site", url: "https://wp.site", is_active: true, status: "pending" },
-  ]);
+  async function load() {
+    try {
+      setLoading(true);
+      setError(undefined);
+      const { items, total } = await import("@/services/sites").then(m => m.getSites(page, pageSize));
+      setSites(items);
+      setTotal(total);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load sites");
+      setSites([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  }
 
-  // Set demo last_check_at after mount (client-only) to avoid SSR hydration mismatch.
   React.useEffect(() => {
-    setSites((prev) => prev.map((s) => s.id === 1 ? { ...s, last_check_at: new Date().toISOString() } : s));
-  }, []);
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
-  const total = sites.length; // demo only
+  const refresh = () => void load();
 
   return (
     <div className="p-4 md:p-6 lg:p-8">
@@ -28,8 +42,9 @@ export function SitesPanel() {
         <h3 className="text-xl font-semibold">Sites</h3>
         <p className="text-sm text-muted-foreground">Manage your WordPress sites.</p>
       </div>
+      {error && <div className="mb-3 text-sm text-destructive">{error}</div>}
       <div className="mb-4 grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-        <div className="rounded-md border p-3"><div className="text-muted-foreground">Total</div><div className="text-lg font-semibold">{sites.length}</div></div>
+        <div className="rounded-md border p-3"><div className="text-muted-foreground">Total</div><div className="text-lg font-semibold">{total}</div></div>
         <div className="rounded-md border p-3"><div className="text-muted-foreground">Active</div><div className="text-lg font-semibold">{sites.filter(s=>s.is_active).length}</div></div>
         <div className="rounded-md border p-3"><div className="text-muted-foreground">Connected</div><div className="text-lg font-semibold">{sites.filter(s=>s.status==="connected").length}</div></div>
         <div className="rounded-md border p-3"><div className="text-muted-foreground">Pending</div><div className="text-lg font-semibold">{sites.filter(s=>s.status==="pending").length}</div></div>
@@ -40,9 +55,48 @@ export function SitesPanel() {
         pageSize={pageSize}
         total={total}
         onPageChange={setPage}
-        onRefresh={() => setSites([...sites])}
+        onRefresh={refresh}
+        onCreate={async (v) => {
+          const svc = await import("@/services/sites");
+          await svc.createSite({ name: v.name, url: v.url, username: v.username, password: v.password, is_active: v.is_active, strategy: v.strategy });
+        }}
+        onUpdate={async (id, v) => {
+          const svc = await import("@/services/sites");
+          await svc.updateSite(id, { name: v.name, url: v.url, username: v.username, password: v.password, is_active: v.is_active, strategy: v.strategy });
+        }}
+        onDelete={async (id) => {
+          const svc = await import("@/services/sites");
+          await svc.deleteSite(id);
+        }}
+        onToggleActive={async (id, active) => {
+          const svc = await import("@/services/sites");
+          await svc.setSiteActive(id, active);
+        }}
+        onBulkToggle={async (ids, active) => {
+          const svc = await import("@/services/sites");
+          await Promise.all(ids.map((id) => svc.setSiteActive(id, active)));
+        }}
+        onBulkDelete={async (ids) => {
+          const svc = await import("@/services/sites");
+          await Promise.all(ids.map((id) => svc.deleteSite(id)));
+        }}
+        onTestConnection={async (id) => {
+          const svc = await import("@/services/sites");
+          try {
+            const res = await svc.testConnection(id);
+            toast({
+              title: res.success ? "Connection successful" : `Connection ${res.status}`,
+              description: res.details ? `${res.message}\n${res.details}` : res.message,
+              variant: res.success ? "success" : "destructive",
+            });
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : "Failed to test connection";
+            toast({ title: "Test failed", description: msg, variant: "destructive" });
+          }
+        }}
         onMutateSites={(updater) => setSites((prev) => updater(prev))}
       />
+      {loading && <div className="mt-3 text-sm text-muted-foreground">Loading...</div>}
     </div>
   );
 }

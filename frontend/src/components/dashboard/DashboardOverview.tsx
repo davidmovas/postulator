@@ -40,7 +40,6 @@ export function DashboardOverview() {
   return (
     <div className="p-4 md:p-6 lg:p-8">
       <div className="mb-4">
-        <div className="text-sm text-muted-foreground">Welcome back 👋</div>
         <h2 className="mt-1 text-2xl font-semibold tracking-tight">Dashboard</h2>
         <p className="mt-2 text-muted-foreground">Overview of your content system.</p>
       </div>

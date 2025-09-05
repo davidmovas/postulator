@@ -112,6 +112,7 @@ func main() {
 		WindowStartState: options.Normal,
 		Bind: []interface{}{
 			app,
+			app.binder,
 		},
 		// Windows platform specific options
 		Windows: &windows.Options{
