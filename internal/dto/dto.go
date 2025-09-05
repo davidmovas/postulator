@@ -8,14 +8,6 @@ import (
 	"Postulator/internal/models"
 )
 
-// Base response structure
-type BaseResponse struct {
-	Success bool        `json:"success"`
-	Message string      `json:"message,omitempty"`
-	Error   string      `json:"error,omitempty"`
-	Data    interface{} `json:"data,omitempty"`
-}
-
 // Pagination request
 type PaginationRequest struct {
 	Page  int `json:"page"`
@@ -30,13 +22,18 @@ type PaginationResponse struct {
 	TotalPages int   `json:"total_pages"`
 }
 
+// Generic paginated response wrapper
+type PaginatedResponse[T any] struct {
+	Data       []T                 `json:"data"`
+	Pagination *PaginationResponse `json:"pagination"`
+}
+
 // Site DTOs
 type CreateSiteRequest struct {
 	Name     string `json:"name" validate:"required,min=1,max=100"`
 	URL      string `json:"url" validate:"required,url"`
 	Username string `json:"username" validate:"required,min=1,max=100"`
 	Password string `json:"password" validate:"required,min=1"`
-	APIKey   string `json:"api_key,omitempty"`
 	IsActive bool   `json:"is_active"`
 }
 
@@ -46,7 +43,6 @@ type UpdateSiteRequest struct {
 	URL      string `json:"url" validate:"required,url"`
 	Username string `json:"username" validate:"required,min=1,max=100"`
 	Password string `json:"password" validate:"required,min=1"`
-	APIKey   string `json:"api_key,omitempty"`
 	IsActive bool   `json:"is_active"`
 }
 
@@ -362,7 +358,6 @@ func (r *CreateSiteRequest) ToModel() *models.Site {
 		URL:       r.URL,
 		Username:  r.Username,
 		Password:  r.Password,
-		APIKey:    r.APIKey,
 		IsActive:  r.IsActive,
 		Status:    "pending",
 		CreatedAt: time.Now(),
@@ -377,7 +372,6 @@ func (r *UpdateSiteRequest) ToModel() *models.Site {
 		URL:       r.URL,
 		Username:  r.Username,
 		Password:  r.Password,
-		APIKey:    r.APIKey,
 		IsActive:  r.IsActive,
 		UpdatedAt: time.Now(),
 	}
@@ -399,29 +393,25 @@ func SiteToResponse(site *models.Site) *SiteResponse {
 
 func (r *CreateTopicRequest) ToModel() *models.Topic {
 	return &models.Topic{
-		Title:       r.Title,
-		Description: r.Description,
-		Keywords:    r.Keywords,
-		Prompt:      r.Prompt,
-		Category:    r.Category,
-		Tags:        r.Tags,
-		IsActive:    r.IsActive,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		Title:     r.Title,
+		Keywords:  r.Keywords,
+		Category:  r.Category,
+		Tags:      r.Tags,
+		IsActive:  r.IsActive,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 }
 
 func (r *UpdateTopicRequest) ToModel() *models.Topic {
 	return &models.Topic{
-		ID:          r.ID,
-		Title:       r.Title,
-		Description: r.Description,
-		Keywords:    r.Keywords,
-		Prompt:      r.Prompt,
-		Category:    r.Category,
-		Tags:        r.Tags,
-		IsActive:    r.IsActive,
-		UpdatedAt:   time.Now(),
+		ID:        r.ID,
+		Title:     r.Title,
+		Keywords:  r.Keywords,
+		Category:  r.Category,
+		Tags:      r.Tags,
+		IsActive:  r.IsActive,
+		UpdatedAt: time.Now(),
 	}
 }
 
@@ -429,9 +419,9 @@ func TopicToResponse(topic *models.Topic) *TopicResponse {
 	return &TopicResponse{
 		ID:          topic.ID,
 		Title:       topic.Title,
-		Description: topic.Description,
+		Description: "", // Not in model, set empty
 		Keywords:    topic.Keywords,
-		Prompt:      topic.Prompt,
+		Prompt:      "", // Not in model, set empty
 		Category:    topic.Category,
 		Tags:        topic.Tags,
 		IsActive:    topic.IsActive,
@@ -442,12 +432,11 @@ func TopicToResponse(topic *models.Topic) *TopicResponse {
 
 func (r *CreateScheduleRequest) ToModel() *models.Schedule {
 	return &models.Schedule{
-		SiteID:      r.SiteID,
-		CronExpr:    r.CronExpr,
-		PostsPerDay: r.PostsPerDay,
-		IsActive:    r.IsActive,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		SiteID:    r.SiteID,
+		CronExpr:  r.CronExpr,
+		IsActive:  r.IsActive,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 }
 
@@ -456,7 +445,7 @@ func ScheduleToResponse(schedule *models.Schedule) *ScheduleResponse {
 		ID:          schedule.ID,
 		SiteID:      schedule.SiteID,
 		CronExpr:    schedule.CronExpr,
-		PostsPerDay: schedule.PostsPerDay,
+		PostsPerDay: 0, // Not in model, set default
 		IsActive:    schedule.IsActive,
 		LastRun:     schedule.LastRun,
 		NextRun:     schedule.NextRun,
@@ -471,7 +460,7 @@ func ArticleToResponse(article *models.Article) *ArticleResponse {
 		SiteID:      article.SiteID,
 		TopicID:     article.TopicID,
 		Title:       article.Title,
-		Excerpt:     article.Excerpt,
+		Excerpt:     "", // Not in model, set empty
 		Keywords:    article.Keywords,
 		Tags:        article.Tags,
 		Category:    article.Category,
@@ -501,27 +490,23 @@ func PostingJobToResponse(job *models.PostingJob) *PostingJobResponse {
 
 func (r *CreatePromptRequest) ToModel() *models.Prompt {
 	return &models.Prompt{
-		Name:        r.Name,
-		Type:        r.Type,
-		Content:     r.Content,
-		Description: r.Description,
-		IsDefault:   r.IsDefault,
-		IsActive:    r.IsActive,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		Name:      r.Name,
+		Type:      r.Type,
+		Content:   r.Content,
+		IsDefault: r.IsDefault,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 }
 
 func (r *UpdatePromptRequest) ToModel() *models.Prompt {
 	return &models.Prompt{
-		ID:          r.ID,
-		Name:        r.Name,
-		Type:        r.Type,
-		Content:     r.Content,
-		Description: r.Description,
-		IsDefault:   r.IsDefault,
-		IsActive:    r.IsActive,
-		UpdatedAt:   time.Now(),
+		ID:        r.ID,
+		Name:      r.Name,
+		Type:      r.Type,
+		Content:   r.Content,
+		IsDefault: r.IsDefault,
+		UpdatedAt: time.Now(),
 	}
 }
 
@@ -531,9 +516,9 @@ func PromptToResponse(prompt *models.Prompt) *PromptResponse {
 		Name:        prompt.Name,
 		Type:        prompt.Type,
 		Content:     prompt.Content,
-		Description: prompt.Description,
+		Description: "", // Not in model, set empty
 		IsDefault:   prompt.IsDefault,
-		IsActive:    prompt.IsActive,
+		IsActive:    true, // Not in model, set default
 		CreatedAt:   prompt.CreatedAt,
 		UpdatedAt:   prompt.UpdatedAt,
 	}
@@ -568,35 +553,4 @@ func ValidateCronExpression(expr string) error {
 		return fmt.Errorf("cron expression must have 5 parts")
 	}
 	return nil
-}
-
-// Success response helpers
-func SuccessResponse(data interface{}) *BaseResponse {
-	return &BaseResponse{
-		Success: true,
-		Data:    data,
-	}
-}
-
-func SuccessMessageResponse(message string, data interface{}) *BaseResponse {
-	return &BaseResponse{
-		Success: true,
-		Message: message,
-		Data:    data,
-	}
-}
-
-func ErrorResponse(err error) *BaseResponse {
-	return &BaseResponse{
-		Success: false,
-		Error:   err.Error(),
-	}
-}
-
-func ErrorMessageResponse(message string, err error) *BaseResponse {
-	return &BaseResponse{
-		Success: false,
-		Message: message,
-		Error:   err.Error(),
-	}
 }

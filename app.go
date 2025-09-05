@@ -71,11 +71,11 @@ func (a *App) startup(ctx context.Context) {
 
 	// Initialize handlers
 	a.handlers = handlers.NewHandler(
-		a.repos,
+		ctx,
 		a.services.GPT,
 		a.services.WordPress,
 		a.services.Pipeline,
-		ctx,
+		a.repos,
 	)
 
 	log.Println("Application initialized successfully")
@@ -133,7 +133,7 @@ func (a *App) beforeClose(ctx context.Context) (prevent bool) {
 }
 
 // shutdown is called at application termination
-func (a *App) shutdown(ctx context.Context) {
+func (a *App) shutdown(_ context.Context) {
 	// Perform your teardown here
 	log.Println("Shutting down application...")
 
