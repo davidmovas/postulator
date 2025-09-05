@@ -68,37 +68,31 @@ type SiteListResponse struct {
 
 // Topic DTOs
 type CreateTopicRequest struct {
-	Title       string `json:"title" validate:"required,min=1,max=200"`
-	Description string `json:"description,omitempty"`
-	Keywords    string `json:"keywords,omitempty"`
-	Prompt      string `json:"prompt,omitempty"`
-	Category    string `json:"category,omitempty"`
-	Tags        string `json:"tags,omitempty"`
-	IsActive    bool   `json:"is_active"`
+	Title    string `json:"title" validate:"required,min=1,max=200"`
+	Keywords string `json:"keywords,omitempty"`
+	Category string `json:"category,omitempty"`
+	Tags     string `json:"tags,omitempty"`
+	IsActive bool   `json:"is_active"`
 }
 
 type UpdateTopicRequest struct {
-	ID          int64  `json:"id" validate:"required,min=1"`
-	Title       string `json:"title" validate:"required,min=1,max=200"`
-	Description string `json:"description,omitempty"`
-	Keywords    string `json:"keywords,omitempty"`
-	Prompt      string `json:"prompt,omitempty"`
-	Category    string `json:"category,omitempty"`
-	Tags        string `json:"tags,omitempty"`
-	IsActive    bool   `json:"is_active"`
+	ID       int64  `json:"id" validate:"required,min=1"`
+	Title    string `json:"title" validate:"required,min=1,max=200"`
+	Keywords string `json:"keywords,omitempty"`
+	Category string `json:"category,omitempty"`
+	Tags     string `json:"tags,omitempty"`
+	IsActive bool   `json:"is_active"`
 }
 
 type TopicResponse struct {
-	ID          int64     `json:"id"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	Keywords    string    `json:"keywords"`
-	Prompt      string    `json:"prompt"`
-	Category    string    `json:"category"`
-	Tags        string    `json:"tags"`
-	IsActive    bool      `json:"is_active"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID        int64     `json:"id"`
+	Title     string    `json:"title"`
+	Keywords  string    `json:"keywords"`
+	Category  string    `json:"category"`
+	Tags      string    `json:"tags"`
+	IsActive  bool      `json:"is_active"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type TopicListResponse struct {
@@ -273,7 +267,6 @@ type SettingsResponse struct {
 
 // GPT Configuration DTOs
 type GPTConfigRequest struct {
-	APIKey    string `json:"api_key" validate:"required"`
 	Model     string `json:"model"`
 	MaxTokens int    `json:"max_tokens" validate:"min=100,max=8000"`
 }
@@ -281,7 +274,6 @@ type GPTConfigRequest struct {
 type GPTConfigResponse struct {
 	Model     string `json:"model"`
 	MaxTokens int    `json:"max_tokens"`
-	HasAPIKey bool   `json:"has_api_key"`
 }
 
 // Test Connection DTOs
@@ -479,16 +471,14 @@ func (r *UpdateTopicRequest) ToModel() *models.Topic {
 
 func TopicToResponse(topic *models.Topic) *TopicResponse {
 	return &TopicResponse{
-		ID:          topic.ID,
-		Title:       topic.Title,
-		Description: "", // Not in model, set empty
-		Keywords:    topic.Keywords,
-		Prompt:      "", // Not in model, set empty
-		Category:    topic.Category,
-		Tags:        topic.Tags,
-		IsActive:    topic.IsActive,
-		CreatedAt:   topic.CreatedAt,
-		UpdatedAt:   topic.UpdatedAt,
+		ID:        topic.ID,
+		Title:     topic.Title,
+		Keywords:  topic.Keywords,
+		Category:  topic.Category,
+		Tags:      topic.Tags,
+		IsActive:  topic.IsActive,
+		CreatedAt: topic.CreatedAt,
+		UpdatedAt: topic.UpdatedAt,
 	}
 }
 
@@ -552,23 +542,23 @@ func PostingJobToResponse(job *models.PostingJob) *PostingJobResponse {
 
 func (r *CreatePromptRequest) ToModel() *models.Prompt {
 	return &models.Prompt{
-		Name:      r.Name,
-		Type:      r.Type,
-		Content:   r.Content,
-		IsDefault: r.IsDefault,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		Name:         r.Name,
+		SystemPrompt: r.Content, // Map content to SystemPrompt for now
+		UserPrompt:   "",        // Empty UserPrompt for now
+		IsDefault:    r.IsDefault,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
 	}
 }
 
 func (r *UpdatePromptRequest) ToModel() *models.Prompt {
 	return &models.Prompt{
-		ID:        r.ID,
-		Name:      r.Name,
-		Type:      r.Type,
-		Content:   r.Content,
-		IsDefault: r.IsDefault,
-		UpdatedAt: time.Now(),
+		ID:           r.ID,
+		Name:         r.Name,
+		SystemPrompt: r.Content, // Map content to SystemPrompt for now
+		UserPrompt:   "",        // Empty UserPrompt for now
+		IsDefault:    r.IsDefault,
+		UpdatedAt:    time.Now(),
 	}
 }
 
@@ -576,9 +566,9 @@ func PromptToResponse(prompt *models.Prompt) *PromptResponse {
 	return &PromptResponse{
 		ID:          prompt.ID,
 		Name:        prompt.Name,
-		Type:        prompt.Type,
-		Content:     prompt.Content,
-		Description: "", // Not in model, set empty
+		Type:        "system",            // Default type since model has separate fields
+		Content:     prompt.SystemPrompt, // Map SystemPrompt to Content for now
+		Description: "",                  // Not in model, set empty
 		IsDefault:   prompt.IsDefault,
 		IsActive:    true, // Not in model, set default
 		CreatedAt:   prompt.CreatedAt,

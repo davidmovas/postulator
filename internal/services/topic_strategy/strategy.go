@@ -326,7 +326,7 @@ func (s *RandomAllStrategy) SelectTopic(ctx context.Context, siteID int64, avail
 	}
 
 	// Record usage in topic_usage table without updating SiteTopic
-	if err := s.repo.RecordTopicUsage(ctx, siteID, selectedTopic.ID, 0, s.GetStrategyName()); err != nil {
+	if err = s.repo.RecordTopicUsage(ctx, siteID, selectedTopic.ID, 0, s.GetStrategyName()); err != nil {
 		// Log error but don't fail the selection
 		// Article ID is 0 since we don't have it at selection time
 	}

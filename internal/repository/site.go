@@ -121,6 +121,11 @@ func (r *Repository) GetSite(ctx context.Context, id int64) (*models.Site, error
 }
 
 func (r *Repository) CreateSite(ctx context.Context, site *models.Site) (*models.Site, error) {
+	// Set default last_check if not provided
+	if site.LastCheck.IsZero() {
+		site.LastCheck = time.Now()
+	}
+
 	query, args := builder.
 		Insert("sites").
 		Columns(
@@ -129,6 +134,7 @@ func (r *Repository) CreateSite(ctx context.Context, site *models.Site) (*models
 			"username",
 			"password",
 			"is_active",
+			"last_check",
 			"status",
 			"strategy",
 			"created_at",
@@ -140,6 +146,7 @@ func (r *Repository) CreateSite(ctx context.Context, site *models.Site) (*models
 			site.Username,
 			site.Password,
 			site.IsActive,
+			site.LastCheck,
 			site.Status,
 			site.Strategy,
 			site.CreatedAt,

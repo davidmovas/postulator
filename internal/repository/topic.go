@@ -478,6 +478,12 @@ func (r *Repository) GetSiteTopic(ctx context.Context, siteID int64, topicID int
 			"site_id",
 			"topic_id",
 			"is_active",
+			"priority",
+			"last_used_at",
+			"usage_count",
+			"round_robin_pos",
+			"created_at",
+			"updated_at",
 		).
 		From("site_topics").
 		Where(squirrel.Eq{"site_id": siteID, "topic_id": topicID}).
@@ -490,6 +496,12 @@ func (r *Repository) GetSiteTopic(ctx context.Context, siteID int64, topicID int
 			&siteTopic.SiteID,
 			&siteTopic.TopicID,
 			&siteTopic.IsActive,
+			&siteTopic.Priority,
+			&siteTopic.LastUsedAt,
+			&siteTopic.UsageCount,
+			&siteTopic.RoundRobinPos,
+			&siteTopic.CreatedAt,
+			&siteTopic.UpdatedAt,
 		); err != nil {
 		return nil, fmt.Errorf("failed to query site topic: %w", err)
 	}
@@ -623,23 +635,38 @@ func (r *Repository) GetSiteTopicsForSelection(ctx context.Context, siteID int64
 }
 
 func (r *Repository) UpdateSiteTopicUsage(ctx context.Context, siteTopicID int64, strategy string) error {
-	// Update usage count, last used time, and round-robin position if needed
-	updateQuery := builder.
-		Update("site_topics").
-		Set("usage_count", squirrel.Expr("usage_count + 1")).
-		Set("last_used_at", time.Now()).
-		Set("updated_at", time.Now())
-
-	// For round-robin strategy, update the position
-	if strategy == string(models.StrategyRoundRobin) {
-		updateQuery = updateQuery.Set("round_robin_pos", squirrel.Expr("round_robin_pos + 1"))
+	// First get the current values
+	var currentUsageCount, currentRoundRobinPos int
+	err := r.db.QueryRowContext(ctx, "SELECT usage_count, round_robin_pos FROM site_topics WHERE id = ?", siteTopicID).
+		Scan(&currentUsageCount, &currentRoundRobinPos)
+	if err != nil {
+		return fmt.Errorf("failed to get current site topic values: %w", err)
 	}
 
-	query, args := updateQuery.Where(squirrel.Eq{"id": siteTopicID}).MustSql()
+	// Calculate new values
+	newUsageCount := currentUsageCount + 1
+	newRoundRobinPos := currentRoundRobinPos
+	if strategy == string(models.StrategyRoundRobin) {
+		newRoundRobinPos = currentRoundRobinPos + 1
+	}
 
-	_, err := r.db.ExecContext(ctx, query, args...)
+	// Update with calculated values
+	updateQuery := `UPDATE site_topics 
+		SET usage_count = ?, round_robin_pos = ?, last_used_at = ?, updated_at = ? 
+		WHERE id = ?`
+
+	result, err := r.db.ExecContext(ctx, updateQuery, newUsageCount, newRoundRobinPos, time.Now(), time.Now(), siteTopicID)
 	if err != nil {
 		return fmt.Errorf("failed to update site topic usage: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no site topic found with id %d", siteTopicID)
 	}
 
 	return nil
@@ -650,7 +677,7 @@ func (r *Repository) GetTopicStats(ctx context.Context, siteID int64) (*models.T
 
 	// Get total and active topics count
 	totalQuery, totalArgs := builder.
-		Select("COUNT(*) as total, SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active").
+		Select("COUNT(*) as total, COALESCE(SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END), 0) as active").
 		From("site_topics").
 		Where(squirrel.Eq{"site_id": siteID}).
 		MustSql()
@@ -662,7 +689,7 @@ func (r *Repository) GetTopicStats(ctx context.Context, siteID int64) (*models.T
 
 	// Get used and unused topics count
 	usageQuery, usageArgs := builder.
-		Select("SUM(CASE WHEN usage_count > 0 THEN 1 ELSE 0 END) as used, SUM(CASE WHEN usage_count = 0 THEN 1 ELSE 0 END) as unused").
+		Select("COALESCE(SUM(CASE WHEN usage_count > 0 THEN 1 ELSE 0 END), 0) as used, COALESCE(SUM(CASE WHEN usage_count = 0 THEN 1 ELSE 0 END), 0) as unused").
 		From("site_topics").
 		Where(squirrel.Eq{"site_id": siteID, "is_active": true}).
 		MustSql()

@@ -8,7 +8,6 @@ type Site struct {
 	URL       string    `json:"url" db:"url"`               // https://example.com
 	Username  string    `json:"username" db:"username"`     // WP логин
 	Password  string    `json:"password" db:"password"`     // Зашифрованный пароль/app password
-	APIKey    string    `json:"api_key" db:"api_key"`       // API ключ для аутентификации
 	IsActive  bool      `json:"is_active" db:"is_active"`   // Включен ли сайт
 	LastCheck time.Time `json:"last_check" db:"last_check"` // Последняя проверка доступности
 	Status    string    `json:"status" db:"status"`         // "connected", "error", "pending"
@@ -18,16 +17,14 @@ type Site struct {
 }
 
 type Topic struct {
-	ID          int64     `json:"id" db:"id"`
-	Title       string    `json:"title" db:"title"`             // Название темы
-	Description string    `json:"description" db:"description"` // Описание темы
-	Keywords    string    `json:"keywords" db:"keywords"`       // Ключевые слова через запятую
-	Prompt      string    `json:"prompt" db:"prompt"`           // Промпт для генерации
-	Category    string    `json:"category" db:"category"`       // Категория на WP
-	Tags        string    `json:"tags" db:"tags"`               // Теги через запятую
-	IsActive    bool      `json:"is_active" db:"is_active"`
-	CreatedAt   time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
+	ID        int64     `json:"id" db:"id"`
+	Title     string    `json:"title" db:"title"`       // Название темы
+	Keywords  string    `json:"keywords" db:"keywords"` // Ключевые слова через запятую
+	Category  string    `json:"category" db:"category"` // Категория на WP
+	Tags      string    `json:"tags" db:"tags"`         // Теги через запятую
+	IsActive  bool      `json:"is_active" db:"is_active"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type SiteTopic struct {
@@ -86,11 +83,20 @@ type PostingJob struct {
 }
 
 type Prompt struct {
+	ID           int64     `json:"id" db:"id"`
+	Name         string    `json:"name" db:"name"`                   // User-friendly name for the prompt
+	SystemPrompt string    `json:"system_prompt" db:"system_prompt"` // System prompt content with placeholders
+	UserPrompt   string    `json:"user_prompt" db:"user_prompt"`     // User prompt content with placeholders
+	IsDefault    bool      `json:"is_default" db:"is_default"`       // Whether this is the default prompt
+	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
+}
+
+type SitePrompt struct {
 	ID        int64     `json:"id" db:"id"`
-	Name      string    `json:"name" db:"name"`             // User-friendly name for the prompt
-	Type      string    `json:"type" db:"type"`             // "system" or "user"
-	Content   string    `json:"content" db:"content"`       // The prompt content with placeholders
-	IsDefault bool      `json:"is_default" db:"is_default"` // Whether this is the default prompt for the type
+	SiteID    int64     `json:"site_id" db:"site_id"`
+	PromptID  int64     `json:"prompt_id" db:"prompt_id"`
+	IsActive  bool      `json:"is_active" db:"is_active"`
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }

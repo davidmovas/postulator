@@ -314,12 +314,12 @@ func (s *Service) GenerateArticleFromTopic(ctx context.Context, topic *models.To
 	// Build prompt from topic
 	prompt := customPrompt
 	if prompt == "" {
-		prompt = topic.Prompt
+		prompt = "" // Topics no longer have individual prompts
 	}
 
 	// Add topic context
-	fullPrompt := fmt.Sprintf("%s\n\nTopic: %s\nDescription: %s\nKeywords: %s\nCategory: %s\nTarget Tags: %s\nWebsite: %s",
-		prompt, topic.Title, topic.Description, topic.Keywords, topic.Category, topic.Tags, site.URL)
+	fullPrompt := fmt.Sprintf("%s\n\nTopic: %s\nKeywords: %s\nCategory: %s\nTarget Tags: %s\nWebsite: %s",
+		prompt, topic.Title, topic.Keywords, topic.Category, topic.Tags, site.URL)
 
 	req := GenerateArticleRequest{
 		Title:  topic.Title,

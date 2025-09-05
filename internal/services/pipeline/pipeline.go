@@ -268,8 +268,8 @@ func (s *Service) executeArticlePipeline(ctx context.Context, req CreateArticleR
 	// Build prompt from topic and site
 	prompt := topic.Prompt
 	if prompt == "" {
-		prompt = fmt.Sprintf("Write an article about: %s\n\nDescription: %s\nKeywords: %s\nCategory: %s\nTarget Tags: %s\nWebsite: %s",
-			topic.Title, topic.Description, topic.Keywords, topic.Category, topic.Tags, site.URL)
+		prompt = fmt.Sprintf("Write an article about: %s\n\nKeywords: %s\nCategory: %s\nTarget Tags: %s\nWebsite: %s",
+			topic.Title, topic.Keywords, topic.Category, topic.Tags, site.URL)
 	}
 
 	gptReq := gpt.GenerateArticleRequest{
@@ -494,8 +494,8 @@ func (s *Service) GeneratePreviewArticle(ctx context.Context, siteID, topicID in
 	// Build prompt from topic and site
 	prompt := topic.Prompt
 	if prompt == "" {
-		prompt = fmt.Sprintf("Write an article about: %s\n\nDescription: %s\nKeywords: %s\nCategory: %s\nTarget Tags: %s\nWebsite: %s",
-			topic.Title, topic.Description, topic.Keywords, topic.Category, topic.Tags, site.URL)
+		prompt = fmt.Sprintf("Write an article about: %s\n\nKeywords: %s\nCategory: %s\nTarget Tags: %s\nWebsite: %s",
+			topic.Title, topic.Keywords, topic.Category, topic.Tags, site.URL)
 	}
 
 	req := gpt.GenerateArticleRequest{
