@@ -205,16 +205,16 @@ type UpdateSiteTopicRequest struct {
 }
 
 type SiteTopicResponse struct {
-	ID            int64     `json:"id"`
-	SiteID        int64     `json:"site_id"`
-	SiteName      string    `json:"site_name,omitempty"`
-	TopicID       int64     `json:"topic_id"`
-	TopicTitle    string    `json:"topic_title,omitempty"`
-	Priority      int       `json:"priority"`
-	IsActive      bool      `json:"is_active"`
-	UsageCount    int       `json:"usage_count"`
-	LastUsedAt    time.Time `json:"last_used_at,omitempty"`
-	RoundRobinPos int       `json:"round_robin_pos"`
+	ID            int64      `json:"id"`
+	SiteID        int64      `json:"site_id"`
+	SiteName      string     `json:"site_name,omitempty"`
+	TopicID       int64      `json:"topic_id"`
+	TopicTitle    string     `json:"topic_title,omitempty"`
+	Priority      int        `json:"priority"`
+	IsActive      bool       `json:"is_active"`
+	UsageCount    int        `json:"usage_count"`
+	LastUsedAt    *time.Time `json:"last_used_at,omitempty"`
+	RoundRobinPos int        `json:"round_robin_pos"`
 }
 
 type SiteTopicListResponse struct {
@@ -393,17 +393,17 @@ type TopicSelectionResponse struct {
 }
 
 type TopicStatsResponse struct {
-	SiteID             int64     `json:"site_id"`
-	TotalTopics        int       `json:"total_topics"`
-	ActiveTopics       int       `json:"active_topics"`
-	UsedTopics         int       `json:"used_topics"`
-	UnusedTopics       int       `json:"unused_topics"`
-	UniqueTopicsLeft   int       `json:"unique_topics_left"`
-	RoundRobinPosition int       `json:"round_robin_position"`
-	MostUsedTopicID    int64     `json:"most_used_topic_id"`
-	MostUsedTopicCount int       `json:"most_used_topic_count"`
-	LastUsedTopicID    int64     `json:"last_used_topic_id"`
-	LastUsedAt         time.Time `json:"last_used_at"`
+	SiteID             int64      `json:"site_id"`
+	TotalTopics        int        `json:"total_topics"`
+	ActiveTopics       int        `json:"active_topics"`
+	UsedTopics         int        `json:"used_topics"`
+	UnusedTopics       int        `json:"unused_topics"`
+	UniqueTopicsLeft   int        `json:"unique_topics_left"`
+	RoundRobinPosition int        `json:"round_robin_position"`
+	MostUsedTopicID    int64      `json:"most_used_topic_id"`
+	MostUsedTopicCount int        `json:"most_used_topic_count"`
+	LastUsedTopicID    int64      `json:"last_used_topic_id"`
+	LastUsedAt         *time.Time `json:"last_used_at"`
 }
 
 type TopicUsageResponse struct {

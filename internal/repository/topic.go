@@ -636,23 +636,47 @@ func (r *Repository) GetSiteTopicsForSelection(ctx context.Context, siteID int64
 }
 
 func (r *Repository) UpdateSiteTopicUsage(ctx context.Context, siteTopicID int64, strategy string) error {
-	usageQuery, usageArgs := builder.
-		Select("usage_count", "round_robin_pos").
+	// Get the site ID for this topic to calculate proper round-robin position
+	siteQuery, siteArgs := builder.
+		Select("site_id", "usage_count", "round_robin_pos").
 		From("site_topics").
 		Where(squirrel.Eq{"id": siteTopicID}).
 		MustSql()
 
+	var siteID int64
 	var currentUsageCount, currentRoundRobinPos int
-	err := r.db.QueryRowContext(ctx, usageQuery, usageArgs...).
-		Scan(&currentUsageCount, &currentRoundRobinPos)
+	err := r.db.QueryRowContext(ctx, siteQuery, siteArgs...).
+		Scan(&siteID, &currentUsageCount, &currentRoundRobinPos)
 	if err != nil {
 		return fmt.Errorf("failed to get current site topic values: %w", err)
 	}
 
 	newUsageCount := currentUsageCount + 1
 	newRoundRobinPos := currentRoundRobinPos
+
 	if strategy == string(models.StrategyRoundRobin) {
-		newRoundRobinPos = currentRoundRobinPos + 1
+		// Get total count of active topics for this site to calculate proper round-robin position
+		countQuery, countArgs := builder.
+			Select("COUNT(*)").
+			From("site_topics").
+			Where(squirrel.Eq{"site_id": siteID, "is_active": true}).
+			MustSql()
+
+		var totalTopics int
+		err = r.db.QueryRowContext(ctx, countQuery, countArgs...).Scan(&totalTopics)
+		if err != nil {
+			return fmt.Errorf("failed to get total topics count: %w", err)
+		}
+
+		if totalTopics > 0 {
+			// For round-robin, we want to cycle from 1 to totalTopics, then back to 1
+			// Start at 1 if never used (pos 0), otherwise cycle
+			if currentRoundRobinPos == 0 {
+				newRoundRobinPos = 1
+			} else {
+				newRoundRobinPos = (currentRoundRobinPos % totalTopics) + 1
+			}
+		}
 	}
 
 	now := time.Now()

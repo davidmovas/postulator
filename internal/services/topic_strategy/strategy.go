@@ -171,26 +171,43 @@ func (s *RoundRobinStrategy) SelectTopic(ctx context.Context, siteID int64, avai
 		return nil, fmt.Errorf("no topics available for round-robin strategy")
 	}
 
-	// Find the topic with the lowest RoundRobinPos, or if all are 0, the one used longest ago
 	var selectedSiteTopic *models.SiteTopic
 
-	// First, try to find topics that haven't been used in round-robin yet
+	// First, try to find topics that haven't been used in round-robin yet (position 0)
 	for _, siteTopic := range availableTopics {
 		if siteTopic.RoundRobinPos == 0 {
-			if selectedSiteTopic == nil || siteTopic.LastUsedAt.Before(selectedSiteTopic.LastUsedAt) {
+			if selectedSiteTopic == nil {
 				selectedSiteTopic = siteTopic
+			} else {
+				// Among unused topics, prefer the one that was used longest ago (or never used)
+				if siteTopic.LastUsedAt == nil {
+					// If current topic has never been used, prefer it
+					if selectedSiteTopic.LastUsedAt != nil {
+						selectedSiteTopic = siteTopic
+					}
+				} else if selectedSiteTopic.LastUsedAt == nil {
+					// Keep the current selection (never used is preferred)
+				} else if siteTopic.LastUsedAt.Before(*selectedSiteTopic.LastUsedAt) {
+					selectedSiteTopic = siteTopic
+				}
 			}
 		}
 	}
 
-	// If all topics have been used, find the one with the lowest position
+	// If all topics have been used, find the next one in round-robin order
 	if selectedSiteTopic == nil {
+		// Find the topic with the lowest non-zero position (next in cycle)
 		minPos := int(^uint(0) >> 1) // Max int
 		for _, siteTopic := range availableTopics {
-			if siteTopic.RoundRobinPos < minPos {
+			if siteTopic.RoundRobinPos > 0 && siteTopic.RoundRobinPos < minPos {
 				minPos = siteTopic.RoundRobinPos
 				selectedSiteTopic = siteTopic
 			}
+		}
+
+		// If still no selection (shouldn't happen), fall back to first available
+		if selectedSiteTopic == nil {
+			selectedSiteTopic = availableTopics[0]
 		}
 	}
 

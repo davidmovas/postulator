@@ -15,11 +15,12 @@ import {
 } from "@/components/ui/sidebar";
 import {
     RiScanLine,
+    RiTimerLine,
+    RiGlobalLine,
+    RiArticleLine,
     RiBardLine,
-    RiUserFollowLine,
-    RiCodeSSlashLine,
     RiSettings3Line,
-    RiLogoutBoxLine, RemixiconComponentType,
+    RemixiconComponentType,
 } from "@remixicon/react";
 
 import { useNavigation, type Section } from "@/context/navigation";
@@ -47,17 +48,22 @@ const navItems: NavGroup[] = [
             {
                 title: "Jobs",
                 key: "jobs",
-                icon: RiBardLine,
+                icon: RiTimerLine,
             },
             {
                 title: "Sites",
                 key: "sites",
-                icon: RiUserFollowLine,
+                icon: RiGlobalLine,
             },
             {
-                title: "Titles",
-                key: "titles",
-                icon: RiCodeSSlashLine,
+                title: "Topics",
+                key: "topics",
+                icon: RiArticleLine,
+            },
+            {
+                title: "Prompts",
+                key: "prompts",
+                icon: RiBardLine,
             },
             {
                 title: "Settings",

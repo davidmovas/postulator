@@ -13,6 +13,8 @@ import {
 import { RiScanLine } from "@remixicon/react";
 import SitesPanel from "@/components/dashboard/SitesPanel";
 import DashboardOverview from "@/components/dashboard/DashboardOverview";
+import TopicsPanel from "@/components/dashboard/TopicsPanel";
+import PromptsPanel from "@/components/dashboard/PromptsPanel";
 import { NavigationProvider, useNavigation } from "@/context/navigation";
 import { RiBardLine, RiCodeSSlashLine, RiSettings3Line, RiUserFollowLine } from "@remixicon/react";
 
@@ -50,11 +52,7 @@ function HeaderCrumbs() {
 function SectionContent() {
     const { section } = useNavigation();
     if (section === "dashboard") {
-        return (
-            <>
-                <DashboardOverview />
-            </>
-        );
+        return <DashboardOverview />;
     }
     if (section === "sites") {
         return <SitesPanel />;
@@ -62,26 +60,21 @@ function SectionContent() {
     if (section === "jobs") {
         return (
             <div className="p-4 md:p-6 lg:p-8">
-                <div className="text-sm text-muted-foreground">Schedule and monitor publishing jobs.</div>
-                <h2 className="mt-1 text-2xl font-semibold tracking-tight">Jobs</h2>
+                <h1 className="mt-1 text-2xl font-semibold tracking-tight">Jobs</h1>
                 <p className="mt-2 text-muted-foreground">Cron builder and job list will appear here.</p>
             </div>
         );
     }
-    if (section === "titles") {
-        return (
-            <div className="p-4 md:p-6 lg:p-8">
-                <div className="text-sm text-muted-foreground">Browse and manage generated titles.</div>
-                <h2 className="mt-1 text-2xl font-semibold tracking-tight">Titles</h2>
-                <p className="mt-2 text-muted-foreground">Large, scalable list/grid will be placed here.</p>
-            </div>
-        );
+    if (section === "topics") {
+        return <TopicsPanel />;
+    }
+    if (section === "prompts") {
+        return <PromptsPanel />;
     }
     // settings
     return (
         <div className="p-4 md:p-6 lg:p-8">
-            <div className="text-sm text-muted-foreground">Application configuration.</div>
-            <h2 className="mt-1 text-2xl font-semibold tracking-tight">Settings</h2>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Settings</h1>
             <p className="mt-2 text-muted-foreground">Settings forms will appear here.</p>
         </div>
     );

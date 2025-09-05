@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 
-export type Section = "dashboard" | "jobs" | "sites" | "titles" | "settings";
+export type Section = "dashboard" | "jobs" | "sites" | "topics" | "prompts" | "settings";
 
 export interface NavigationState {
   section: Section;

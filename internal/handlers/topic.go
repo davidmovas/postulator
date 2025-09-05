@@ -284,11 +284,14 @@ func (h *Handler) GetSiteTopics(siteID int64, pagination dto.PaginationRequest) 
 	siteTopicResponses := make([]*dto.SiteTopicResponse, len(result.Data))
 	for i, siteTopic := range result.Data {
 		siteTopicResponses[i] = &dto.SiteTopicResponse{
-			ID:       siteTopic.ID,
-			SiteID:   siteTopic.SiteID,
-			TopicID:  siteTopic.TopicID,
-			Priority: 1, // Default priority as it's not in the model
-			IsActive: siteTopic.IsActive,
+			ID:            siteTopic.ID,
+			SiteID:        siteTopic.SiteID,
+			TopicID:       siteTopic.TopicID,
+			Priority:      siteTopic.Priority,
+			IsActive:      siteTopic.IsActive,
+			UsageCount:    siteTopic.UsageCount,
+			LastUsedAt:    siteTopic.LastUsedAt,
+			RoundRobinPos: siteTopic.RoundRobinPos,
 		}
 	}
 

@@ -28,16 +28,16 @@ type Topic struct {
 }
 
 type SiteTopic struct {
-	ID            int64     `json:"id" db:"id"`
-	SiteID        int64     `json:"site_id" db:"site_id"`
-	TopicID       int64     `json:"topic_id" db:"topic_id"`
-	IsActive      bool      `json:"is_active" db:"is_active"`
-	Priority      int       `json:"priority" db:"priority"`               // Priority for topic selection (1-10)
-	LastUsedAt    time.Time `json:"last_used_at" db:"last_used_at"`       // When this topic was last used for this site
-	UsageCount    int       `json:"usage_count" db:"usage_count"`         // How many times this topic was used
-	RoundRobinPos int       `json:"round_robin_pos" db:"round_robin_pos"` // Position in round-robin cycle
-	CreatedAt     time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
+	ID            int64      `json:"id" db:"id"`
+	SiteID        int64      `json:"site_id" db:"site_id"`
+	TopicID       int64      `json:"topic_id" db:"topic_id"`
+	IsActive      bool       `json:"is_active" db:"is_active"`
+	Priority      int        `json:"priority" db:"priority"`               // Priority for topic selection (1-10)
+	LastUsedAt    *time.Time `json:"last_used_at" db:"last_used_at"`       // When this topic was last used for this site
+	UsageCount    int        `json:"usage_count" db:"usage_count"`         // How many times this topic was used
+	RoundRobinPos int        `json:"round_robin_pos" db:"round_robin_pos"` // Position in round-robin cycle
+	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 type Schedule struct {
@@ -124,17 +124,17 @@ type TopicUsage struct {
 
 // TopicStats provides statistics about topic usage for a site
 type TopicStats struct {
-	SiteID             int64     `json:"site_id"`
-	TotalTopics        int       `json:"total_topics"`         // Total topics assigned to site
-	ActiveTopics       int       `json:"active_topics"`        // Active topics assigned to site
-	UsedTopics         int       `json:"used_topics"`          // Topics that have been used at least once
-	UnusedTopics       int       `json:"unused_topics"`        // Topics never used
-	UniqueTopicsLeft   int       `json:"unique_topics_left"`   // For unique strategy: topics not yet used
-	RoundRobinPosition int       `json:"round_robin_position"` // Current position in round-robin cycle
-	MostUsedTopicID    int64     `json:"most_used_topic_id"`
-	MostUsedTopicCount int       `json:"most_used_topic_count"`
-	LastUsedTopicID    int64     `json:"last_used_topic_id"`
-	LastUsedAt         time.Time `json:"last_used_at"`
+	SiteID             int64      `json:"site_id"`
+	TotalTopics        int        `json:"total_topics"`         // Total topics assigned to site
+	ActiveTopics       int        `json:"active_topics"`        // Active topics assigned to site
+	UsedTopics         int        `json:"used_topics"`          // Topics that have been used at least once
+	UnusedTopics       int        `json:"unused_topics"`        // Topics never used
+	UniqueTopicsLeft   int        `json:"unique_topics_left"`   // For unique strategy: topics not yet used
+	RoundRobinPosition int        `json:"round_robin_position"` // Current position in round-robin cycle
+	MostUsedTopicID    int64      `json:"most_used_topic_id"`
+	MostUsedTopicCount int        `json:"most_used_topic_count"`
+	LastUsedTopicID    int64      `json:"last_used_topic_id"`
+	LastUsedAt         *time.Time `json:"last_used_at"`
 }
 
 // TopicSelectionStrategy defines strategy constants

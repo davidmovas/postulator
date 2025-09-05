@@ -39,7 +39,7 @@ export function SitesPanel() {
   return (
     <div className="p-4 md:p-6 lg:p-8">
       <div className="mb-3">
-        <h3 className="text-xl font-semibold">Sites</h3>
+        <h1 className="text-xl font-semibold">Sites</h1>
         <p className="text-sm text-muted-foreground">Manage your WordPress sites.</p>
       </div>
       {error && <div className="mb-3 text-sm text-destructive">{error}</div>}

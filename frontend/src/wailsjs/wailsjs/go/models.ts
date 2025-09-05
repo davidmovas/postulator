@@ -686,7 +686,7 @@ export namespace dto {
 	    most_used_topic_count: number;
 	    last_used_topic_id: number;
 	    // Go type: time
-	    last_used_at: any;
+	    last_used_at?: any;
 	
 	    static createFrom(source: any = {}) {
 	        return new TopicStatsResponse(source);
