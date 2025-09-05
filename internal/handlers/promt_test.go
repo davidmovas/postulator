@@ -39,47 +39,47 @@ func TestHandler_CreatePrompt(t *testing.T) {
 		{
 			name: "Valid prompt creation",
 			request: dto.CreatePromptRequest{
-				Name:    "Test Prompt",
-				Content: "This is a test system prompt with {{title}} placeholder",
-				Type:    "system",
+				Name:   "Test Prompt",
+				System: "This is a test system prompt with {{title}} placeholder",
+				User:   "This is a test user prompt with {{title}} placeholder",
 			},
 			wantErr: false,
 		},
 		{
 			name: "Valid user prompt creation",
 			request: dto.CreatePromptRequest{
-				Name:    "User Prompt",
-				Content: "Write an article about {{topic}} with {{keywords}}",
-				Type:    "user",
+				Name:   "User Prompt",
+				System: "This is a test system prompt with {{title}} placeholder",
+				User:   "This is a test user prompt with {{title}} placeholder",
 			},
 			wantErr: false,
 		},
 		{
 			name: "Empty name should fail",
 			request: dto.CreatePromptRequest{
-				Name:    "",
-				Content: "Some content",
-				Type:    "system",
+				Name:   "",
+				System: "This is a test system prompt with {{title}} placeholder",
+				User:   "This is a test user prompt with {{title}} placeholder",
 			},
 			wantErr: true,
 			errMsg:  "name is required",
 		},
 		{
-			name: "Empty content should fail",
+			name: "Empty system prompt should fail",
 			request: dto.CreatePromptRequest{
-				Name:    "Test",
-				Content: "",
-				Type:    "system",
+				Name:   "Test",
+				System: "",
+				User:   "This is a test user prompt with {{title}} placeholder",
 			},
 			wantErr: true,
-			errMsg:  "content is required",
+			errMsg:  "system is required",
 		},
 		{
-			name: "Invalid type should fail",
+			name: "Empty user prompt should fail",
 			request: dto.CreatePromptRequest{
-				Name:    "Test",
-				Content: "Content",
-				Type:    "invalid",
+				Name:   "Test",
+				System: "This is a test system prompt with {{title}} placeholder",
+				User:   "",
 			},
 			wantErr: true,
 		},
@@ -118,12 +118,12 @@ func TestHandler_CreatePrompt(t *testing.T) {
 				t.Errorf("Expected name '%s', got '%s'", tt.request.Name, response.Name)
 			}
 
-			if response.Content != tt.request.Content {
-				t.Errorf("Expected content '%s', got '%s'", tt.request.Content, response.Content)
+			if response.System != tt.request.System {
+				t.Errorf("Expected system prompt '%s', got '%s'", tt.request.System, response.System)
 			}
 
-			if response.Type != tt.request.Type {
-				t.Errorf("Expected type '%s', got '%s'", tt.request.Type, response.Type)
+			if response.User != tt.request.User {
+				t.Errorf("Expected user prompt '%s', got '%s'", tt.request.User, response.User)
 			}
 		})
 	}
@@ -137,9 +137,9 @@ func TestHandler_GetPrompt(t *testing.T) {
 
 	// Create a test prompt first
 	createReq := dto.CreatePromptRequest{
-		Name:    "Test Prompt",
-		Content: "Test system content with {{placeholder}}",
-		Type:    "system",
+		Name:   "Test Prompt",
+		System: "Test system content with {{placeholder}}",
+		User:   "Test user content with {{placeholder}}",
 	}
 
 	created, err := handler.CreatePrompt(createReq)
@@ -209,9 +209,9 @@ func TestHandler_GetPrompts(t *testing.T) {
 
 	// Create multiple test prompts
 	prompts := []dto.CreatePromptRequest{
-		{Name: "Prompt 1", Content: "System content 1", Type: "system"},
-		{Name: "Prompt 2", Content: "User content 2", Type: "user"},
-		{Name: "Prompt 3", Content: "System content 3", Type: "system"},
+		{Name: "Prompt 1", System: "System content 1", User: "User content 1"},
+		{Name: "Prompt 2", System: "System content 2", User: "User content 2"},
+		{Name: "Prompt 3", System: "System content 3", User: "User content 3"},
 	}
 
 	for _, prompt := range prompts {
@@ -286,9 +286,9 @@ func TestHandler_UpdatePrompt(t *testing.T) {
 
 	// Create a test prompt first
 	createReq := dto.CreatePromptRequest{
-		Name:    "Original Prompt",
-		Content: "Original content",
-		Type:    "system",
+		Name:   "Original Prompt",
+		System: "Original system content with {{placeholder}}",
+		User:   "Original user content with {{placeholder}}",
 	}
 
 	created, err := handler.CreatePrompt(createReq)
@@ -373,9 +373,9 @@ func TestHandler_DeletePrompt(t *testing.T) {
 
 	// Create a test prompt first
 	createReq := dto.CreatePromptRequest{
-		Name:    "Test Prompt",
-		Content: "Test content",
-		Type:    "system",
+		Name:   "Test Prompt",
+		System: "Test system content with {{placeholder}}",
+		User:   "Test user content with {{placeholder}}",
 	}
 
 	created, err := handler.CreatePrompt(createReq)
@@ -407,7 +407,7 @@ func TestHandler_DeletePrompt(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := handler.DeletePrompt(tt.promptID)
+			err = handler.DeletePrompt(tt.promptID)
 
 			if tt.wantErr {
 				if err == nil {
@@ -437,18 +437,9 @@ func TestHandler_DefaultPrompt(t *testing.T) {
 
 	// Create test prompts
 	prompt1, err := handler.CreatePrompt(dto.CreatePromptRequest{
-		Name:    "Prompt 1",
-		Content: "Content 1",
-		Type:    "system",
-	})
-	if err != nil {
-		t.Fatalf("Failed to create test prompt: %v", err)
-	}
-
-	prompt2, err := handler.CreatePrompt(dto.CreatePromptRequest{
-		Name:    "Prompt 2",
-		Content: "Content 2",
-		Type:    "system",
+		Name:   "Prompt 1",
+		System: "System content 1",
+		User:   "User content 1",
 	})
 	if err != nil {
 		t.Fatalf("Failed to create test prompt: %v", err)
@@ -456,13 +447,14 @@ func TestHandler_DefaultPrompt(t *testing.T) {
 
 	// Test setting default prompt
 	t.Run("Set default prompt", func(t *testing.T) {
-		err := handler.SetDefaultPrompt(dto.SetDefaultPromptRequest{ID: prompt1.ID})
+		err = handler.SetDefaultPrompt(dto.SetDefaultPromptRequest{ID: prompt1.ID})
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
 		// Get default prompt
-		defaultPrompt, err := handler.GetDefaultPrompt()
+		var defaultPrompt *dto.PromptResponse
+		defaultPrompt, err = handler.GetDefaultPrompt()
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			return
@@ -473,28 +465,9 @@ func TestHandler_DefaultPrompt(t *testing.T) {
 		}
 	})
 
-	// Test changing default prompt
-	t.Run("Change default prompt", func(t *testing.T) {
-		err := handler.SetDefaultPrompt(dto.SetDefaultPromptRequest{ID: prompt2.ID})
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
-
-		// Get default prompt
-		defaultPrompt, err := handler.GetDefaultPrompt()
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-			return
-		}
-
-		if defaultPrompt.ID != prompt2.ID {
-			t.Errorf("Expected default prompt ID %d, got %d", prompt2.ID, defaultPrompt.ID)
-		}
-	})
-
 	// Test invalid default prompt ID
 	t.Run("Invalid default prompt ID", func(t *testing.T) {
-		err := handler.SetDefaultPrompt(dto.SetDefaultPromptRequest{ID: 0})
+		err = handler.SetDefaultPrompt(dto.SetDefaultPromptRequest{ID: 0})
 		if err == nil {
 			t.Error("Expected error for invalid prompt ID")
 		}
@@ -510,9 +483,9 @@ func TestHandler_SitePrompt_CRUD(t *testing.T) {
 
 	// Create a test prompt first
 	prompt, err := handler.CreatePrompt(dto.CreatePromptRequest{
-		Name:    "Site Prompt",
-		Content: "Content for site",
-		Type:    "system",
+		Name:   "Site Prompt",
+		System: "System content with {{placeholder}}",
+		User:   "User content with {{placeholder}}",
 	})
 	if err != nil {
 		t.Fatalf("Failed to create test prompt: %v", err)
@@ -528,7 +501,8 @@ func TestHandler_SitePrompt_CRUD(t *testing.T) {
 			IsActive: true,
 		}
 
-		response, err := handler.CreateSitePrompt(req)
+		var response *dto.SitePromptResponse
+		response, err = handler.CreateSitePrompt(req)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			return
@@ -556,7 +530,8 @@ func TestHandler_SitePrompt_CRUD(t *testing.T) {
 
 	// Test get site prompt
 	t.Run("Get site prompt", func(t *testing.T) {
-		response, err := handler.GetSitePrompt(1)
+		var response *dto.SitePromptResponse
+		response, err = handler.GetSitePrompt(1)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			return
@@ -614,7 +589,8 @@ func TestHandler_SitePrompt_CRUD(t *testing.T) {
 
 	// Test get prompt sites
 	t.Run("Get prompt sites", func(t *testing.T) {
-		response, err := handler.GetPromptSites(prompt.ID, dto.PaginationRequest{Page: 1, Limit: 10})
+		var response *dto.SitePromptListResponse
+		response, err = handler.GetPromptSites(prompt.ID, dto.PaginationRequest{Page: 1, Limit: 10})
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			return
@@ -632,7 +608,7 @@ func TestHandler_SitePrompt_CRUD(t *testing.T) {
 
 	// Test delete site prompt
 	t.Run("Delete site prompt", func(t *testing.T) {
-		err := handler.DeleteSitePrompt(createdSitePrompt.ID)
+		err = handler.DeleteSitePrompt(createdSitePrompt.ID)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}

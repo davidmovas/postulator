@@ -309,12 +309,11 @@ type PreviewArticleResponse struct {
 
 // Prompt DTOs
 type CreatePromptRequest struct {
-	Name        string `json:"name" validate:"required,min=1,max=100"`
-	Type        string `json:"type" validate:"required,oneof=system user"`
-	Content     string `json:"content" validate:"required,min=1"`
-	Description string `json:"description,omitempty"`
-	IsDefault   bool   `json:"is_default"`
-	IsActive    bool   `json:"is_active"`
+	Name      string `json:"name" validate:"required,min=1,max=100"`
+	System    string `json:"system" validate:"required,min=1,max=500"`
+	User      string `json:"user"  validate:"required,min=1,max=1000"`
+	IsDefault bool   `json:"is_default"`
+	IsActive  bool   `json:"is_active"`
 }
 
 type UpdatePromptRequest struct {
@@ -328,15 +327,14 @@ type UpdatePromptRequest struct {
 }
 
 type PromptResponse struct {
-	ID          int64     `json:"id"`
-	Name        string    `json:"name"`
-	Type        string    `json:"type"`
-	Content     string    `json:"content"`
-	Description string    `json:"description"`
-	IsDefault   bool      `json:"is_default"`
-	IsActive    bool      `json:"is_active"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID        int64     `json:"id"`
+	Name      string    `json:"name"`
+	System    string    `json:"system"`
+	User      string    `json:"user"`
+	IsDefault bool      `json:"is_default"`
+	IsActive  bool      `json:"is_active"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type PromptListResponse struct {
@@ -572,19 +570,12 @@ func PostingJobToResponse(job *models.PostingJob) *PostingJobResponse {
 
 func (r *CreatePromptRequest) ToModel() *models.Prompt {
 	prompt := &models.Prompt{
-		Name:      r.Name,
-		IsDefault: r.IsDefault,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-
-	// Map content based on type
-	if r.Type == "system" {
-		prompt.SystemPrompt = r.Content
-		prompt.UserPrompt = ""
-	} else {
-		prompt.SystemPrompt = ""
-		prompt.UserPrompt = r.Content
+		Name:         r.Name,
+		SystemPrompt: r.System,
+		UserPrompt:   r.User,
+		IsDefault:    r.IsDefault,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
 	}
 
 	return prompt
@@ -611,27 +602,15 @@ func (r *UpdatePromptRequest) ToModel() *models.Prompt {
 }
 
 func PromptToResponse(prompt *models.Prompt) *PromptResponse {
-	var promptType, content string
-
-	// Determine type and content based on which field has data
-	if prompt.SystemPrompt != "" {
-		promptType = "system"
-		content = prompt.SystemPrompt
-	} else {
-		promptType = "user"
-		content = prompt.UserPrompt
-	}
-
 	return &PromptResponse{
-		ID:          prompt.ID,
-		Name:        prompt.Name,
-		Type:        promptType,
-		Content:     content,
-		Description: "", // Not in model, set empty
-		IsDefault:   prompt.IsDefault,
-		IsActive:    true, // Not in model, set default
-		CreatedAt:   prompt.CreatedAt,
-		UpdatedAt:   prompt.UpdatedAt,
+		ID:        prompt.ID,
+		Name:      prompt.Name,
+		System:    prompt.SystemPrompt,
+		User:      prompt.UserPrompt,
+		IsDefault: prompt.IsDefault,
+		IsActive:  true, // Not in model, set default
+		CreatedAt: prompt.CreatedAt,
+		UpdatedAt: prompt.UpdatedAt,
 	}
 }
 

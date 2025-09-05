@@ -40,8 +40,6 @@ type SiteTopicRepository interface {
 	ActivateSiteTopic(ctx context.Context, id int64) error
 	DeactivateSiteTopic(ctx context.Context, id int64) error
 
-	// Topic Selection Strategy Methods
-
 	GetSiteTopicsForSelection(ctx context.Context, siteID int64, strategy string) ([]*models.SiteTopic, error)
 	UpdateSiteTopicUsage(ctx context.Context, siteTopicID int64, strategy string) error
 	GetTopicStats(ctx context.Context, siteID int64) (*models.TopicStats, error)

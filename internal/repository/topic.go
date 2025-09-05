@@ -9,8 +9,6 @@ import (
 	"github.com/Masterminds/squirrel"
 )
 
-// Topic Repository Methods
-
 func (r *Repository) GetTopics(ctx context.Context, limit int, offset int) (*models.PaginationResult[*models.Topic], error) {
 	// Get topics
 	query, args := builder.
@@ -111,7 +109,6 @@ func (r *Repository) GetTopic(ctx context.Context, id int64) (*models.Topic, err
 }
 
 func (r *Repository) GetTopicsBySiteID(ctx context.Context, siteID int64, limit int, offset int) (*models.PaginationResult[*models.Topic], error) {
-	// Get topics associated with a site through site_topics table
 	query, args := builder.
 		Select(
 			"t.id",
@@ -136,7 +133,9 @@ func (r *Repository) GetTopicsBySiteID(ctx context.Context, siteID int64, limit 
 	if err != nil {
 		return nil, fmt.Errorf("failed to query topics by site: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	var topics []*models.Topic
 	for rows.Next() {
@@ -158,7 +157,7 @@ func (r *Repository) GetTopicsBySiteID(ctx context.Context, siteID int64, limit 
 
 	// Get total count
 	countQuery, countArgs := builder.
-		Select("COUNT(*)").
+		Select("COUNT(id)").
 		From("topics t").
 		Join("site_topics st ON t.id = st.topic_id").
 		Where(squirrel.Eq{"st.site_id": siteID}).
@@ -303,7 +302,9 @@ func (r *Repository) GetActiveTopics(ctx context.Context) ([]*models.Topic, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to query active topics: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	var topics []*models.Topic
 	for rows.Next() {
@@ -325,8 +326,6 @@ func (r *Repository) GetActiveTopics(ctx context.Context) ([]*models.Topic, erro
 
 	return topics, nil
 }
-
-// SiteTopic Repository Methods
 
 func (r *Repository) CreateSiteTopic(ctx context.Context, siteTopic *models.SiteTopic) (*models.SiteTopic, error) {
 	query, args := builder.
@@ -358,7 +357,6 @@ func (r *Repository) CreateSiteTopic(ctx context.Context, siteTopic *models.Site
 }
 
 func (r *Repository) GetSiteTopics(ctx context.Context, siteID int64, limit int, offset int) (*models.PaginationResult[*models.SiteTopic], error) {
-	// Get site topics with topic details
 	query, args := builder.
 		Select(
 			"st.id",
@@ -377,7 +375,9 @@ func (r *Repository) GetSiteTopics(ctx context.Context, siteID int64, limit int,
 	if err != nil {
 		return nil, fmt.Errorf("failed to query site topics: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	var siteTopics []*models.SiteTopic
 	for rows.Next() {
@@ -395,7 +395,7 @@ func (r *Repository) GetSiteTopics(ctx context.Context, siteID int64, limit int,
 
 	// Get total count
 	countQuery, countArgs := builder.
-		Select("COUNT(*)").
+		Select("COUNT(id)").
 		From("site_topics st").
 		Where(squirrel.Eq{"st.site_id": siteID}).
 		MustSql()
@@ -415,7 +415,6 @@ func (r *Repository) GetSiteTopics(ctx context.Context, siteID int64, limit int,
 }
 
 func (r *Repository) GetTopicSites(ctx context.Context, topicID int64, limit int, offset int) (*models.PaginationResult[*models.SiteTopic], error) {
-	// Get sites associated with a topic
 	query, args := builder.
 		Select(
 			"st.id",
@@ -434,7 +433,9 @@ func (r *Repository) GetTopicSites(ctx context.Context, topicID int64, limit int
 	if err != nil {
 		return nil, fmt.Errorf("failed to query topic sites: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	var siteTopics []*models.SiteTopic
 	for rows.Next() {
@@ -452,7 +453,7 @@ func (r *Repository) GetTopicSites(ctx context.Context, topicID int64, limit int
 
 	// Get total count
 	countQuery, countArgs := builder.
-		Select("COUNT(*)").
+		Select("COUNT(id)").
 		From("site_topics st").
 		Where(squirrel.Eq{"st.topic_id": topicID}).
 		MustSql()
@@ -584,9 +585,7 @@ func (r *Repository) DeactivateSiteTopic(ctx context.Context, id int64) error {
 	return nil
 }
 
-// Topic Selection Strategy Methods
-
-func (r *Repository) GetSiteTopicsForSelection(ctx context.Context, siteID int64, strategy string) ([]*models.SiteTopic, error) {
+func (r *Repository) GetSiteTopicsForSelection(ctx context.Context, siteID int64, _ string) ([]*models.SiteTopic, error) {
 	query, args := builder.
 		Select(
 			"id",
@@ -609,7 +608,9 @@ func (r *Repository) GetSiteTopicsForSelection(ctx context.Context, siteID int64
 	if err != nil {
 		return nil, fmt.Errorf("failed to query site topics for selection: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	var siteTopics []*models.SiteTopic
 	for rows.Next() {
@@ -635,27 +636,36 @@ func (r *Repository) GetSiteTopicsForSelection(ctx context.Context, siteID int64
 }
 
 func (r *Repository) UpdateSiteTopicUsage(ctx context.Context, siteTopicID int64, strategy string) error {
-	// First get the current values
+	usageQuery, usageArgs := builder.
+		Select("usage_count", "round_robin_pos").
+		From("site_topics").
+		Where(squirrel.Eq{"id": siteTopicID}).
+		MustSql()
+
 	var currentUsageCount, currentRoundRobinPos int
-	err := r.db.QueryRowContext(ctx, "SELECT usage_count, round_robin_pos FROM site_topics WHERE id = ?", siteTopicID).
+	err := r.db.QueryRowContext(ctx, usageQuery, usageArgs...).
 		Scan(&currentUsageCount, &currentRoundRobinPos)
 	if err != nil {
 		return fmt.Errorf("failed to get current site topic values: %w", err)
 	}
 
-	// Calculate new values
 	newUsageCount := currentUsageCount + 1
 	newRoundRobinPos := currentRoundRobinPos
 	if strategy == string(models.StrategyRoundRobin) {
 		newRoundRobinPos = currentRoundRobinPos + 1
 	}
 
-	// Update with calculated values
-	updateQuery := `UPDATE site_topics 
-		SET usage_count = ?, round_robin_pos = ?, last_used_at = ?, updated_at = ? 
-		WHERE id = ?`
+	now := time.Now()
+	updateQuery, updateArgs := builder.
+		Update("site_topics").
+		Set("usage_count", newUsageCount).
+		Set("round_robin_pos", newRoundRobinPos).
+		Set("last_used_at", now).
+		Set("updated_at", now).
+		Where(squirrel.Eq{"id": siteTopicID}).
+		MustSql()
 
-	result, err := r.db.ExecContext(ctx, updateQuery, newUsageCount, newRoundRobinPos, time.Now(), time.Now(), siteTopicID)
+	result, err := r.db.ExecContext(ctx, updateQuery, updateArgs...)
 	if err != nil {
 		return fmt.Errorf("failed to update site topic usage: %w", err)
 	}
@@ -677,7 +687,7 @@ func (r *Repository) GetTopicStats(ctx context.Context, siteID int64) (*models.T
 
 	// Get total and active topics count
 	totalQuery, totalArgs := builder.
-		Select("COUNT(*) as total, COALESCE(SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END), 0) as active").
+		Select("COUNT(id) as total, COALESCE(SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END), 0) as active").
 		From("site_topics").
 		Where(squirrel.Eq{"site_id": siteID}).
 		MustSql()
@@ -747,8 +757,6 @@ func (r *Repository) GetTopicStats(ctx context.Context, siteID int64) (*models.T
 	return stats, nil
 }
 
-// Topic Usage Repository Methods
-
 func (r *Repository) CreateTopicUsage(ctx context.Context, usage *models.TopicUsage) (*models.TopicUsage, error) {
 	query, args := builder.
 		Insert("topic_usage").
@@ -806,7 +814,9 @@ func (r *Repository) GetTopicUsageHistory(ctx context.Context, siteID int64, top
 	if err != nil {
 		return nil, fmt.Errorf("failed to query topic usage history: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	var usages []*models.TopicUsage
 	for rows.Next() {
@@ -827,7 +837,7 @@ func (r *Repository) GetTopicUsageHistory(ctx context.Context, siteID int64, top
 
 	// Get total count
 	countQuery, countArgs := builder.
-		Select("COUNT(*)").
+		Select("COUNT(id)").
 		From("topic_usage").
 		Where(squirrel.Eq{"site_id": siteID, "topic_id": topicID}).
 		MustSql()
@@ -868,7 +878,9 @@ func (r *Repository) GetSiteUsageHistory(ctx context.Context, siteID int64, limi
 	if err != nil {
 		return nil, fmt.Errorf("failed to query site usage history: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	var usages []*models.TopicUsage
 	for rows.Next() {
@@ -889,7 +901,7 @@ func (r *Repository) GetSiteUsageHistory(ctx context.Context, siteID int64, limi
 
 	// Get total count
 	countQuery, countArgs := builder.
-		Select("COUNT(*)").
+		Select("COUNT(id)").
 		From("topic_usage").
 		Where(squirrel.Eq{"site_id": siteID}).
 		MustSql()

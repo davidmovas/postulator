@@ -386,7 +386,7 @@ func TestHandler_DeleteTopic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := handler.DeleteTopic(tt.topicID)
+			err = handler.DeleteTopic(tt.topicID)
 
 			if tt.wantErr {
 				if err == nil {
@@ -522,131 +522,551 @@ func TestHandler_GetActiveTopics(t *testing.T) {
 	})
 }
 
-func TestHandler_SiteTopic_CRUD(t *testing.T) {
+func TestHandler_CreateSiteTopic(t *testing.T) {
+	handler, testDB, cleanup := setupHandlerTest(t)
+	defer cleanup()
+
+	tests := []struct {
+		name    string
+		request dto.CreateSiteTopicRequest
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "Valid site topic creation",
+			request: dto.CreateSiteTopicRequest{
+				SiteID:   1, // From test data
+				TopicID:  3, // Use topic 3 which isn't associated with site 1
+				IsActive: true,
+				Priority: 5,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Create site topic with minimal data",
+			request: dto.CreateSiteTopicRequest{
+				SiteID:   2, // From test data
+				TopicID:  3, // Use topic 3 which isn't associated with site 2
+				IsActive: false,
+				Priority: 1,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Invalid site ID should fail",
+			request: dto.CreateSiteTopicRequest{
+				SiteID:   0,
+				TopicID:  3,
+				IsActive: true,
+				Priority: 5,
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid topic ID should fail",
+			request: dto.CreateSiteTopicRequest{
+				SiteID:   1,
+				TopicID:  0,
+				IsActive: true,
+				Priority: 5,
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testDB.ClearAllTables(t)
+			testDB.InsertTestData(t)
+
+			response, err := handler.CreateSiteTopic(tt.request)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+				} else if tt.errMsg != "" && err.Error() != tt.errMsg {
+					t.Errorf("Expected error message '%s', got '%s'", tt.errMsg, err.Error())
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			if response == nil {
+				t.Error("Response should not be nil")
+				return
+			}
+
+			if response.ID <= 0 {
+				t.Error("Response ID should be positive")
+			}
+
+			if response.SiteID != tt.request.SiteID {
+				t.Errorf("Expected site ID %d, got %d", tt.request.SiteID, response.SiteID)
+			}
+
+			if response.TopicID != tt.request.TopicID {
+				t.Errorf("Expected topic ID %d, got %d", tt.request.TopicID, response.TopicID)
+			}
+
+			if response.Priority != tt.request.Priority {
+				t.Errorf("Expected priority %d, got %d", tt.request.Priority, response.Priority)
+			}
+
+			if response.IsActive != tt.request.IsActive {
+				t.Errorf("Expected IsActive %v, got %v", tt.request.IsActive, response.IsActive)
+			}
+		})
+	}
+}
+
+func TestHandler_GetSiteTopics(t *testing.T) {
 	handler, testDB, cleanup := setupHandlerTest(t)
 	defer cleanup()
 
 	testDB.ClearAllTables(t)
 	testDB.InsertTestData(t)
 
-	// Create a test topic first
-	topic, err := handler.CreateTopic(dto.CreateTopicRequest{
-		Title:    "Site Topic Test",
-		Keywords: "site,topic",
-		Category: "Test",
-		Tags:     "test",
-		IsActive: true,
-	})
-	if err != nil {
-		t.Fatalf("Failed to create test topic: %v", err)
+	tests := []struct {
+		name       string
+		siteID     int64
+		pagination dto.PaginationRequest
+		wantErr    bool
+		wantCount  int
+	}{
+		{
+			name:       "Get site topics for existing site",
+			siteID:     1, // From test data
+			pagination: dto.PaginationRequest{Page: 1, Limit: 10},
+			wantErr:    false,
+			wantCount:  2, // From test data site 1 has 2 topic associations
+		},
+		{
+			name:       "Get site topics with pagination",
+			siteID:     1,
+			pagination: dto.PaginationRequest{Page: 1, Limit: 1},
+			wantErr:    false,
+			wantCount:  1,
+		},
+		{
+			name:       "Get site topics with offset",
+			siteID:     1,
+			pagination: dto.PaginationRequest{Page: 2, Limit: 1},
+			wantErr:    false,
+			wantCount:  1,
+		},
+		{
+			name:       "Get site topics for non-existing site",
+			siteID:     999,
+			pagination: dto.PaginationRequest{Page: 1, Limit: 10},
+			wantErr:    false,
+			wantCount:  0,
+		},
+		{
+			name:       "Invalid site ID should fail",
+			siteID:     0,
+			pagination: dto.PaginationRequest{Page: 1, Limit: 10},
+			wantErr:    true,
+		},
+		{
+			name:       "Default pagination",
+			siteID:     1,
+			pagination: dto.PaginationRequest{},
+			wantErr:    false,
+			wantCount:  2,
+		},
 	}
 
-	var createdSiteTopic *dto.SiteTopicResponse
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			response, err := handler.GetSiteTopics(tt.siteID, tt.pagination)
 
-	// Test create site topic
-	t.Run("Create site topic", func(t *testing.T) {
-		req := dto.CreateSiteTopicRequest{
-			SiteID:   1, // From test data
-			TopicID:  topic.ID,
-			IsActive: true,
-			Priority: 5,
-		}
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error but got none")
+				}
+				return
+			}
 
-		response, err := handler.CreateSiteTopic(req)
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-			return
-		}
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
 
-		if response == nil {
-			t.Error("Response should not be nil")
-			return
-		}
+			if response == nil {
+				t.Error("Response should not be nil")
+				return
+			}
 
-		createdSiteTopic = response
+			if len(response.SiteTopics) != tt.wantCount {
+				t.Errorf("Expected %d site topics, got %d", tt.wantCount, len(response.SiteTopics))
+			}
 
-		if response.SiteID != req.SiteID {
-			t.Errorf("Expected site ID %d, got %d", req.SiteID, response.SiteID)
-		}
+			if response.Pagination == nil {
+				t.Error("Pagination should not be nil")
+				return
+			}
 
-		if response.TopicID != req.TopicID {
-			t.Errorf("Expected topic ID %d, got %d", req.TopicID, response.TopicID)
-		}
+			// Verify all returned site topics belong to the requested site
+			for _, st := range response.SiteTopics {
+				if st.SiteID != tt.siteID {
+					t.Errorf("Expected site ID %d, got %d", tt.siteID, st.SiteID)
+				}
+			}
+		})
+	}
+}
 
-		if response.Priority != req.Priority {
-			t.Errorf("Expected priority %d, got %d", req.Priority, response.Priority)
-		}
-	})
+func TestHandler_GetTopicSites(t *testing.T) {
+	handler, testDB, cleanup := setupHandlerTest(t)
+	defer cleanup()
 
-	// Test get site topics
-	t.Run("Get site topics", func(t *testing.T) {
-		response, err := handler.GetSiteTopics(1, dto.PaginationRequest{Page: 1, Limit: 10})
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-			return
-		}
+	testDB.ClearAllTables(t)
+	testDB.InsertTestData(t)
 
-		if response == nil {
-			t.Error("Response should not be nil")
-			return
-		}
+	tests := []struct {
+		name       string
+		topicID    int64
+		pagination dto.PaginationRequest
+		wantErr    bool
+		wantCount  int
+	}{
+		{
+			name:       "Get topic sites for existing topic",
+			topicID:    1, // From test data
+			pagination: dto.PaginationRequest{Page: 1, Limit: 10},
+			wantErr:    false,
+			wantCount:  2, // From test data topic 1 is associated with sites 1 and 2
+		},
+		{
+			name:       "Get topic sites with pagination",
+			topicID:    1,
+			pagination: dto.PaginationRequest{Page: 1, Limit: 1},
+			wantErr:    false,
+			wantCount:  1,
+		},
+		{
+			name:       "Get topic sites for non-existing topic",
+			topicID:    999,
+			pagination: dto.PaginationRequest{Page: 1, Limit: 10},
+			wantErr:    false,
+			wantCount:  0,
+		},
+		{
+			name:       "Invalid topic ID should fail",
+			topicID:    0,
+			pagination: dto.PaginationRequest{Page: 1, Limit: 10},
+			wantErr:    true,
+		},
+	}
 
-		// Should have at least the one we created plus any from test data
-		if len(response.SiteTopics) == 0 {
-			t.Error("Expected at least 1 site topic")
-		}
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			response, err := handler.GetTopicSites(tt.topicID, tt.pagination)
 
-	// Test update site topic
-	t.Run("Update site topic", func(t *testing.T) {
-		req := dto.UpdateSiteTopicRequest{
-			ID:       createdSiteTopic.ID,
-			SiteID:   1,
-			TopicID:  topic.ID,
-			IsActive: false,
-			Priority: 8,
-		}
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error but got none")
+				}
+				return
+			}
 
-		response, err := handler.UpdateSiteTopic(req)
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-			return
-		}
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
 
-		if response == nil {
-			t.Error("Response should not be nil")
-			return
-		}
+			if response == nil {
+				t.Error("Response should not be nil")
+				return
+			}
 
-		if response.IsActive != false {
-			t.Error("Expected IsActive to be false")
-		}
+			if len(response.SiteTopics) != tt.wantCount {
+				t.Errorf("Expected %d topic sites, got %d", tt.wantCount, len(response.SiteTopics))
+			}
 
-		if response.Priority != 8 {
-			t.Errorf("Expected priority 8, got %d", response.Priority)
-		}
-	})
+			// Verify all returned site topics belong to the requested topic
+			for _, st := range response.SiteTopics {
+				if st.TopicID != tt.topicID {
+					t.Errorf("Expected topic ID %d, got %d", tt.topicID, st.TopicID)
+				}
+			}
+		})
+	}
+}
 
-	// Test activate/deactivate site topic
+func TestHandler_UpdateSiteTopic(t *testing.T) {
+	handler, testDB, cleanup := setupHandlerTest(t)
+	defer cleanup()
+
+	testDB.ClearAllTables(t)
+	testDB.InsertTestData(t)
+
+	// Create a test site topic first using unique combination
+	createReq := dto.CreateSiteTopicRequest{
+		SiteID:   1,
+		TopicID:  3, // Use topic 3 which isn't associated with site 1
+		IsActive: true,
+		Priority: 5,
+	}
+
+	created, err := handler.CreateSiteTopic(createReq)
+	if err != nil {
+		t.Fatalf("Failed to create test site topic: %v", err)
+	}
+
+	tests := []struct {
+		name    string
+		request dto.UpdateSiteTopicRequest
+		wantErr bool
+	}{
+		{
+			name: "Valid update",
+			request: dto.UpdateSiteTopicRequest{
+				ID:       created.ID,
+				SiteID:   1,
+				TopicID:  3,
+				IsActive: false,
+				Priority: 8,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Invalid ID should fail",
+			request: dto.UpdateSiteTopicRequest{
+				ID:       0,
+				SiteID:   1,
+				TopicID:  3,
+				IsActive: true,
+				Priority: 5,
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid site ID should fail",
+			request: dto.UpdateSiteTopicRequest{
+				ID:       created.ID,
+				SiteID:   0,
+				TopicID:  3,
+				IsActive: true,
+				Priority: 5,
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid topic ID should fail",
+			request: dto.UpdateSiteTopicRequest{
+				ID:       created.ID,
+				SiteID:   1,
+				TopicID:  0,
+				IsActive: true,
+				Priority: 5,
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			response, err := handler.UpdateSiteTopic(tt.request)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			if response == nil {
+				t.Error("Response should not be nil")
+				return
+			}
+
+			if response.ID != tt.request.ID {
+				t.Errorf("Expected ID %d, got %d", tt.request.ID, response.ID)
+			}
+
+			if response.Priority != tt.request.Priority {
+				t.Errorf("Expected priority %d, got %d", tt.request.Priority, response.Priority)
+			}
+
+			if response.IsActive != tt.request.IsActive {
+				t.Errorf("Expected IsActive %v, got %v", tt.request.IsActive, response.IsActive)
+			}
+		})
+	}
+}
+
+func TestHandler_DeleteSiteTopic(t *testing.T) {
+	handler, testDB, cleanup := setupHandlerTest(t)
+	defer cleanup()
+
+	testDB.ClearAllTables(t)
+	testDB.InsertTestData(t)
+
+	// Create a test site topic first using unique combination
+	createReq := dto.CreateSiteTopicRequest{
+		SiteID:   1,
+		TopicID:  3, // Use topic 3 which isn't associated with site 1
+		IsActive: true,
+		Priority: 5,
+	}
+
+	created, err := handler.CreateSiteTopic(createReq)
+	if err != nil {
+		t.Fatalf("Failed to create test site topic: %v", err)
+	}
+
+	tests := []struct {
+		name        string
+		siteTopicID int64
+		wantErr     bool
+	}{
+		{
+			name:        "Valid deletion",
+			siteTopicID: created.ID,
+			wantErr:     false,
+		},
+		{
+			name:        "Invalid ID should fail",
+			siteTopicID: 0,
+			wantErr:     true,
+		},
+		{
+			name:        "Non-existent ID should not fail",
+			siteTopicID: 999,
+			wantErr:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := handler.DeleteSiteTopic(tt.siteTopicID)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestHandler_DeleteSiteTopicBySiteAndTopic(t *testing.T) {
+	handler, testDB, cleanup := setupHandlerTest(t)
+	defer cleanup()
+
+	testDB.ClearAllTables(t)
+	testDB.InsertTestData(t)
+
+	tests := []struct {
+		name    string
+		siteID  int64
+		topicID int64
+		wantErr bool
+	}{
+		{
+			name:    "Valid deletion by site and topic",
+			siteID:  1, // From test data
+			topicID: 1, // From test data
+			wantErr: false,
+		},
+		{
+			name:    "Invalid site ID should fail",
+			siteID:  0,
+			topicID: 1,
+			wantErr: true,
+		},
+		{
+			name:    "Invalid topic ID should fail",
+			siteID:  1,
+			topicID: 0,
+			wantErr: true,
+		},
+		{
+			name:    "Non-existent association should not fail",
+			siteID:  999,
+			topicID: 999,
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := handler.DeleteSiteTopicBySiteAndTopic(tt.siteID, tt.topicID)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestHandler_ActivateDeactivateSiteTopic(t *testing.T) {
+	handler, testDB, cleanup := setupHandlerTest(t)
+	defer cleanup()
+
+	testDB.ClearAllTables(t)
+	testDB.InsertTestData(t)
+
+	// Create a test site topic first using unique combination
+	createReq := dto.CreateSiteTopicRequest{
+		SiteID:   1,
+		TopicID:  3, // Use topic 3 which isn't associated with site 1
+		IsActive: false,
+		Priority: 5,
+	}
+
+	created, err := handler.CreateSiteTopic(createReq)
+	if err != nil {
+		t.Fatalf("Failed to create test site topic: %v", err)
+	}
+
 	t.Run("Activate site topic", func(t *testing.T) {
-		err := handler.ActivateSiteTopic(createdSiteTopic.ID)
+		err := handler.ActivateSiteTopic(created.ID)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 	})
 
 	t.Run("Deactivate site topic", func(t *testing.T) {
-		err := handler.DeactivateSiteTopic(createdSiteTopic.ID)
+		err := handler.DeactivateSiteTopic(created.ID)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 	})
 
-	// Test delete site topic
-	t.Run("Delete site topic", func(t *testing.T) {
-		err := handler.DeleteSiteTopic(createdSiteTopic.ID)
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
+	t.Run("Invalid site topic ID should fail for activation", func(t *testing.T) {
+		err := handler.ActivateSiteTopic(0)
+		if err == nil {
+			t.Error("Expected error for invalid site topic ID")
+		}
+	})
+
+	t.Run("Invalid site topic ID should fail for deactivation", func(t *testing.T) {
+		err := handler.DeactivateSiteTopic(0)
+		if err == nil {
+			t.Error("Expected error for invalid site topic ID")
 		}
 	})
 }

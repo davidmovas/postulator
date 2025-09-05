@@ -9,8 +9,6 @@ import (
 	"github.com/Masterminds/squirrel"
 )
 
-// PromptRepository methods
-
 func (r *Repository) GetPrompts(ctx context.Context, limit int, offset int) (*models.PaginationResult[*models.Prompt], error) {
 	query, args := builder.
 		Select(
@@ -199,6 +197,8 @@ func (r *Repository) SetDefaultPrompt(ctx context.Context, id int64) error {
 		Update("prompts").
 		Set("is_default", false).
 		Set("updated_at", time.Now()).
+		Where(squirrel.Eq{"is_default": true}).
+		Where(squirrel.NotEq{"id": id}).
 		MustSql()
 
 	_, err := r.db.ExecContext(ctx, unsetQuery, unsetArgs...)
@@ -221,8 +221,6 @@ func (r *Repository) SetDefaultPrompt(ctx context.Context, id int64) error {
 
 	return nil
 }
-
-// SitePromptRepository methods
 
 func (r *Repository) CreateSitePrompt(ctx context.Context, sitePrompt *models.SitePrompt) (*models.SitePrompt, error) {
 	now := time.Now()

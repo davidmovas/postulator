@@ -15,11 +15,11 @@ func (h *Handler) CreatePrompt(req dto.CreatePromptRequest) (*dto.PromptResponse
 	if err := dto.ValidateRequired(req.Name, "name"); err != nil {
 		return nil, err
 	}
-	if err := dto.ValidateRequired(req.Content, "content"); err != nil {
+	if err := dto.ValidateRequired(req.System, "system"); err != nil {
 		return nil, err
 	}
-	if req.Type != "system" && req.Type != "user" {
-		return nil, fmt.Errorf("type must be either 'system' or 'user'")
+	if err := dto.ValidateRequired(req.User, "user"); err != nil {
+		return nil, err
 	}
 
 	// Convert to model and create
