@@ -191,8 +191,6 @@ func (h *Handler) TestSiteConnection(req dto.TestSiteConnectionRequest) (*dto.Te
 	return response, nil
 }
 
-// Helper methods
-
 func (h *Handler) validateSiteRequest(name, url, username, password string) error {
 	if err := dto.ValidateRequired(name, "name"); err != nil {
 		return err
