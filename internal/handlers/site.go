@@ -181,7 +181,6 @@ func (h *Handler) TestSiteConnection(req dto.TestSiteConnectionRequest) (*dto.Te
 
 	// For now, return a successful connection test
 	// TODO: Implement actual WordPress connection testing with site data
-
 	response := &dto.TestConnectionResponse{
 		Success:   true,
 		Status:    "connected",
