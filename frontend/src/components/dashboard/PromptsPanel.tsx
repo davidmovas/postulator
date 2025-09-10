@@ -117,9 +117,9 @@ function PromptFormDialog({
                   </div>
                 </PopoverContent>
               </Popover>
-            </div>
+            </div>{/*
             <Textarea ref={sysIns.setRef} value={system} onChange={(e)=>setSystem(e.target.value)} rows={6} placeholder="System prompt text with {{placeholders}}" />
-          </div>
+          */}</div>
           <div className="grid gap-1">
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium">User</label>
@@ -137,9 +137,9 @@ function PromptFormDialog({
                   </div>
                 </PopoverContent>
               </Popover>
-            </div>
+            </div>{/*
             <Textarea ref={usrIns.setRef} value={user} onChange={(e)=>setUser(e.target.value)} rows={12} placeholder="User prompt text with {{placeholders}}" />
-          </div>
+          */}</div>
         </div>
         <DialogFooter>
           <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
@@ -200,11 +200,11 @@ function AssignSitesDialog({
     async function loadAssigned() {
       if (!open || !prompt) { setAssigned(new Set()); return; }
       try {
-        const sp = await import("@/services/sitePrompts");
+        /*const sp = await import("@/services/sitePrompts");
         const res = await sp.getPromptSites(prompt.id, 1, 10000);
         const list: any[] = (res as any)?.site_prompts ?? [];
         const ids = new Set<number>(list.map((x: any) => x.site_id));
-        if (!cancelled) setAssigned(ids);
+        if (!cancelled) setAssigned(ids);*/
       } catch {
         if (!cancelled) setAssigned(new Set());
       }
@@ -391,7 +391,7 @@ export default function PromptsPanel() {
 
   const filtered = React.useMemo(() => {
     const qq = q.trim().toLowerCase();
-    let arr = items.filter((p) => {
+    const arr = items.filter((p) => {
       const hay = `${p.name} ${p.system} ${p.user}`.toLowerCase();
       const matchQ = qq ? hay.includes(qq) : true;
       const matchActive = activeFilter === "all" ? true : activeFilter === "active" ? p.is_active : !p.is_active;
@@ -429,7 +429,7 @@ export default function PromptsPanel() {
             aria-label="Active filter"
             className="h-9 rounded-md border bg-background px-2 text-sm"
             value={activeFilter}
-            onChange={(e) => setActiveFilter(e.target.value as any)}
+            onChange={(e) => setActiveFilter('all')}
           >
             <option value="all">All</option>
             <option value="active">Active</option>

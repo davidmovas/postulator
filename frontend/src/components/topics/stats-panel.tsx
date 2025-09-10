@@ -9,7 +9,11 @@ import type { Site } from "@/types/site";
 import type { Topic } from "@/types/topic";
 
 export default function StatsPanel() {
-  const { toast } = useToast();
+    return (
+        <div>CCC</div>
+    );
+
+  /*const { toast } = useToast();
 
   // Data sources
   const [sites, setSites] = React.useState<Site[]>([]);
@@ -238,7 +242,7 @@ export default function StatsPanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Site selector */}
+      {/!* Site selector *!/}
       <div className="rounded-md border p-3 flex items-center justify-between gap-2">
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
           <div className="text-sm">
@@ -262,7 +266,7 @@ export default function StatsPanel() {
         </div>
       </div>
 
-      {/* Metrics & availability */}
+      {/!* Metrics & availability *!/}
       {currentSite && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
           <div className="rounded-md border p-3"><div className="text-xs text-muted-foreground">Total</div><div className="text-lg font-semibold">{isRandomAll ? activeAll : totalCount}</div></div>
@@ -322,7 +326,7 @@ export default function StatsPanel() {
         </div>
       )}
 
-      {/* Preview card */}
+      {/!* Preview card *!/}
       {currentSite && preview && (
         <div className="rounded-md border p-3 text-sm">
           <div className="text-muted-foreground">Next topic preview</div>
@@ -330,7 +334,7 @@ export default function StatsPanel() {
         </div>
       )}
 
-      {/* History controls */}
+      {/!* History controls *!/}
       {currentSite && (
         <div className="rounded-md border p-3 flex flex-col md:flex-row md:items-end gap-3">
           <div className="text-sm">
@@ -357,7 +361,7 @@ export default function StatsPanel() {
         </div>
       )}
 
-      {/* History table */}
+      {/!* History table *!/}
       {currentSite && (
         <div className="rounded-md border">
           <div className="p-3 border-b flex items-center justify-between">
@@ -405,7 +409,7 @@ export default function StatsPanel() {
         </div>
       )}
 
-      {/* Top used topics */}
+      {/!* Top used topics *!/}
       {currentSite && (
         <div className="rounded-md border">
           <div className="p-3 border-b flex items-center justify-between">
@@ -442,5 +446,5 @@ export default function StatsPanel() {
 
       {(loadingSites || loadingAll) && <div className="text-sm text-muted-foreground">Loading…</div>}
     </div>
-  );
+  );*/
 }

@@ -95,7 +95,7 @@ export default function TopicsPanel() {
         </TabsContent>
 
         <TabsContent value="stats" className="mt-0">
-          <StatsPanel />
+            {/*<StatsPanel />*/}
         </TabsContent>
       </Tabs>
     </div>
