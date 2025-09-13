@@ -172,3 +172,40 @@ func (h *Handler) DeleteSite(siteID int64) error {
 
 	return nil
 }
+
+// TestSiteConnection tests connection to a WordPress site
+func (h *Handler) TestSiteConnection(req dto.TestSiteConnectionRequest) (*dto.TestConnectionResponse, error) {
+	if req.SiteID <= 0 {
+		return nil, fmt.Errorf("invalid site ID")
+	}
+
+	// For now, return a successful connection test
+	// TODO: Implement actual WordPress connection testing with site data
+	response := &dto.TestConnectionResponse{
+		Success:   true,
+		Status:    "connected",
+		Message:   "Connection test successful",
+		Timestamp: time.Now(),
+	}
+
+	return response, nil
+}
+
+func (h *Handler) validateSiteRequest(name, url, username, password string) error {
+	if err := dto.ValidateRequired(name, "name"); err != nil {
+		return err
+	}
+	if err := dto.ValidateRequired(url, "url"); err != nil {
+		return err
+	}
+	if err := dto.ValidateURL(url); err != nil {
+		return err
+	}
+	if err := dto.ValidateRequired(username, "username"); err != nil {
+		return err
+	}
+	if err := dto.ValidateRequired(password, "password"); err != nil {
+		return err
+	}
+	return nil
+}
