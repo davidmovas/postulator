@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"embed"
 	"log"
 	"os"
@@ -25,10 +24,7 @@ var icon []byte
 //go:embed build/icon.ico
 var icoIcon []byte
 
-var appInstance *App
-var appContext context.Context
-
-func onReady() {
+func (a *App) onReady() {
 	systray.SetIcon(icoIcon)
 	systray.SetTitle("Postulator")
 	systray.SetTooltip("Postulator - Post Creator App")
@@ -44,16 +40,16 @@ func onReady() {
 		for {
 			select {
 			case <-mShow.ClickedCh:
-				if appContext != nil {
-					runtime.WindowShow(appContext)
+				if a.ctx != nil {
+					runtime.WindowShow(a.ctx)
 				}
 			case <-mHide.ClickedCh:
-				if appContext != nil {
-					runtime.WindowHide(appContext)
+				if a.ctx != nil {
+					runtime.WindowHide(a.ctx)
 				}
 			case <-mQuit.ClickedCh:
-				if appContext != nil {
-					runtime.Quit(appContext)
+				if a.ctx != nil {
+					runtime.Quit(a.ctx)
 				}
 				systray.Quit()
 				os.Exit(0)
@@ -63,17 +59,15 @@ func onReady() {
 	}()
 }
 
-func onExit() {
+func (a *App) onExit() {
 	// Clean up here
 }
 
 func main() {
-	// Create an instance of the app structure
 	app := NewApp()
-	appInstance = app
 
 	// Initialize systray in a goroutine
-	go systray.Run(onReady, onExit)
+	go systray.Run(app.onReady, app.onExit)
 
 	// Create application with options
 	err := wails.Run(&options.App{
@@ -90,11 +84,11 @@ func main() {
 		SingleInstanceLock: &options.SingleInstanceLock{
 			UniqueId: "com.mycompany.postulator",
 			OnSecondInstanceLaunch: func(secondInstanceData options.SecondInstanceData) {
-				if appContext != nil {
-					runtime.WindowShow(appContext)                  // Показываем окно, если оно было скрыто
-					runtime.WindowUnminimise(appContext)            // Восстанавливаем из свернутого состояния
-					runtime.WindowSetAlwaysOnTop(appContext, true)  // Временно делаем поверх всех окон
-					runtime.WindowSetAlwaysOnTop(appContext, false) // Убираем флаг поверх всех окон
+				if app.CTX() != nil {
+					runtime.WindowShow(app.CTX())                  // Показываем окно, если оно было скрыто
+					runtime.WindowUnminimise(app.CTX())            // Восстанавливаем из свернутого состояния
+					runtime.WindowSetAlwaysOnTop(app.CTX(), true)  // Временно делаем поверх всех окон
+					runtime.WindowSetAlwaysOnTop(app.CTX(), false) // Убираем флаг поверх всех окон
 				}
 			},
 		},

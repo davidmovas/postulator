@@ -3,6 +3,7 @@ package main
 import (
 	"Postulator/internal/services/topic_strategy"
 	"context"
+	"database/sql"
 	"log"
 	"time"
 
@@ -20,9 +21,10 @@ import (
 // App struct
 type App struct {
 	ctx      context.Context
-	handlers *handlers.Handler
-	repo     *repository.Repository
+	cancel   context.CancelFunc
+	handler  *handlers.Handler
 	services *ServiceContainer
+	repo     *repository.Repository
 	binder   *bindings.Binder
 }
 
@@ -42,37 +44,33 @@ func NewApp() *App {
 	return app
 }
 
+func (a *App) CTX() context.Context {
+	return a.ctx
+}
+
 // startup is called at application startup
 func (a *App) startup(ctx context.Context) {
-	// Perform your setup here
-	a.ctx = ctx
-	// Store context globally for systray access
-	appContext = ctx
+	appCtx, cancel := context.WithCancel(ctx)
+	a.ctx = appCtx
+	a.cancel = cancel
 
-	// Initialize configuration
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Printf("Error loading configuration: %v", err)
-		// Use default config
 		cfg = &config.AppConfig{}
 	}
 
-	// Initialize database
-	if err = repository.InitDatabase(); err != nil {
+	var db *sql.DB
+	if db, err = repository.InitDatabase(); err != nil {
 		log.Printf("Error initializing database: %v", err)
 		return
 	} else {
 		log.Println("Database initialized successfully")
 	}
 
-	// Initialize repositories
-	a.repo = repository.NewRepository(repository.GetDB())
-
-	// Initialize services
+	a.repo = repository.NewRepository(db)
 	a.services = a.initializeServices(cfg)
-
-	// Initialize handlers
-	a.handlers = handlers.NewHandler(
+	a.handler = handlers.NewHandler(
 		ctx,
 		a.services.GPT,
 		a.services.WordPress,
@@ -82,13 +80,13 @@ func (a *App) startup(ctx context.Context) {
 	)
 
 	// Initialize binders for Wails frontend - set the handler
-	a.binder.SetHandler(a.handlers)
+	a.binder.SetHandler(a.handler)
 
 	log.Println("Application initialized successfully")
 }
 
 // initializeServices initializes all application services
-func (a *App) initializeServices(cfg *config.AppConfig) *ServiceContainer {
+func (a *App) initializeServices(_ *config.AppConfig) *ServiceContainer {
 	// Initialize GPT service with default values (will be configurable later)
 	gptConfig := gpt.Config{
 		APIKey:    "", // To be set through settings
@@ -147,7 +145,7 @@ func (a *App) shutdown(_ context.Context) {
 	log.Println("Shutting down application...")
 
 	// Close database connection
-	if err := repository.CloseDatabase(); err != nil {
+	if err := a.repo.Close(); err != nil {
 		log.Printf("Error closing database: %v", err)
 	} else {
 		log.Println("Database closed successfully")

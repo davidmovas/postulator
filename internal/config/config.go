@@ -45,7 +45,7 @@ func LoadConfig() (*AppConfig, error) {
 	}
 
 	var config AppConfig
-	if err := json.Unmarshal(data, &config); err != nil {
+	if err = json.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
@@ -86,10 +86,4 @@ func getDefaultConfig() *AppConfig {
 		DatabasePath: "", // Will be set by database package
 		LogLevel:     "info",
 	}
-}
-
-// UpdateWindowConfig updates the window configuration
-func UpdateWindowConfig(width, height int) error {
-	config := GetConfig()
-	return SaveConfig(config)
 }

@@ -210,7 +210,7 @@ func (s *Service) loadPrompts(ctx context.Context, placeholders map[string]strin
 // replacePlaceholders replaces placeholders in prompt content
 func (s *Service) replacePlaceholders(content string, placeholders map[string]string) string {
 	result := content
-	placeholderRegex := regexp.MustCompile(`\{\{(\w+)\}\}`)
+	placeholderRegex := regexp.MustCompile(`\{\{(\w+)}}`)
 
 	result = placeholderRegex.ReplaceAllStringFunc(result, func(match string) string {
 		// Extract placeholder name (remove {{ and }})
