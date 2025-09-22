@@ -7,8 +7,6 @@ import {
   CreateTopic,
   UpdateTopic,
   DeleteTopic,
-  ActivateTopic,
-  DeactivateTopic,
   GetTopicSites,
 } from "@/wailsjs/wailsjs/go/bindings/Binder";
 
@@ -55,7 +53,6 @@ function mapTopic(r: dto.TopicResponse): Topic {
     keywords: r.keywords,
     category: r.category,
     tags: r.tags,
-    is_active: r.is_active,
     created_at: typeof r.created_at === "string" ? (r.created_at as unknown as string) : undefined,
     updated_at: typeof r.updated_at === "string" ? (r.updated_at as unknown as string) : undefined,
   };
@@ -88,7 +85,6 @@ export type UpsertTopicValues = {
   keywords?: string;
   category?: string;
   tags?: string;
-  is_active: boolean;
 };
 
 export async function createTopic(values: UpsertTopicValues): Promise<Topic> {
@@ -97,7 +93,6 @@ export async function createTopic(values: UpsertTopicValues): Promise<Topic> {
     keywords: values.keywords,
     category: values.category,
     tags: values.tags,
-    is_active: values.is_active,
   });
   try {
     const res = await CreateTopic(req);
@@ -114,7 +109,6 @@ export async function updateTopic(id: number, values: UpsertTopicValues): Promis
     keywords: values.keywords,
     category: values.category,
     tags: values.tags,
-    is_active: values.is_active,
   });
   try {
     const res = await UpdateTopic(req);
@@ -132,14 +126,6 @@ export async function deleteTopic(id: number): Promise<void> {
   }
 }
 
-export async function setTopicActive(id: number, active: boolean): Promise<void> {
-  try {
-    if (active) await ActivateTopic(id);
-    else await DeactivateTopic(id);
-  } catch (e) {
-    throw parseError(e);
-  }
-}
 
 // Extra helper for future: get sites by topic (for Topic -> Sites tab)
 export async function getTopicSites(topicId: number, page: number, limit: number) {

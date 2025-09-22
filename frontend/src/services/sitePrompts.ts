@@ -7,8 +7,6 @@ import {
   UpdateSitePrompt,
   DeleteSitePrompt,
   DeleteSitePromptBySite,
-  ActivateSitePrompt,
-  DeactivateSitePrompt,
 } from "@/wailsjs/wailsjs/go/bindings/Binder";
 
 interface ErrorResponse {
@@ -62,8 +60,8 @@ export async function getSitePrompt(site_id: number) {
   }
 }
 
-export async function createSitePrompt(site_id: number, prompt_id: number, is_active: boolean) {
-  const req = new dto.CreateSitePromptRequest({ site_id, prompt_id, is_active });
+export async function createSitePrompt(site_id: number, prompt_id: number) {
+  const req = new dto.CreateSitePromptRequest({ site_id, prompt_id });
   try {
     return await CreateSitePrompt(req);
   } catch (e) {
@@ -71,8 +69,8 @@ export async function createSitePrompt(site_id: number, prompt_id: number, is_ac
   }
 }
 
-export async function updateSitePrompt(id: number, site_id: number, prompt_id: number, is_active: boolean) {
-  const req = new dto.UpdateSitePromptRequest({ id, site_id, prompt_id, is_active });
+export async function updateSitePrompt(id: number, site_id: number, prompt_id: number) {
+  const req = new dto.UpdateSitePromptRequest({ id, site_id, prompt_id });
   try {
     return await UpdateSitePrompt(req);
   } catch (e) {
@@ -96,11 +94,3 @@ export async function deleteSitePromptBySite(site_id: number) {
   }
 }
 
-export async function setSitePromptActive(id: number, active: boolean) {
-  try {
-    if (active) await ActivateSitePrompt(id);
-    else await DeactivateSitePrompt(id);
-  } catch (e) {
-    throw parseError(e);
-  }
-}

@@ -22,7 +22,6 @@ type Topic struct {
 	Keywords  string    `json:"keywords" db:"keywords"` // Ключевые слова через запятую
 	Category  string    `json:"category" db:"category"` // Категория на WP
 	Tags      string    `json:"tags" db:"tags"`         // Теги через запятую
-	IsActive  bool      `json:"is_active" db:"is_active"`
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
@@ -31,7 +30,6 @@ type SiteTopic struct {
 	ID            int64      `json:"id" db:"id"`
 	SiteID        int64      `json:"site_id" db:"site_id"`
 	TopicID       int64      `json:"topic_id" db:"topic_id"`
-	IsActive      bool       `json:"is_active" db:"is_active"`
 	Priority      int        `json:"priority" db:"priority"`               // Priority for topic selection (1-10)
 	LastUsedAt    *time.Time `json:"last_used_at" db:"last_used_at"`       // When this topic was last used for this site
 	UsageCount    int        `json:"usage_count" db:"usage_count"`         // How many times this topic was used
@@ -65,6 +63,9 @@ type Article struct {
 	WordPressID int64     `json:"wordpress_id" db:"wordpress_id"` // ID в WordPress после публикации
 	GPTModel    string    `json:"gpt_model" db:"gpt_model"`       // Какая модель использовалась
 	Tokens      int       `json:"tokens" db:"tokens"`             // Потрачено токенов
+	Slug        string    `json:"slug" db:"slug"`                 // URL-friendly slug, unique per site
+	Outline     string    `json:"outline" db:"outline"`           // JSON outline structure
+	ErrorMsg    string    `json:"error_msg" db:"error_msg"`       // Last error during generation/publishing
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 	PublishedAt time.Time `json:"published_at" db:"published_at"`
 }
@@ -96,7 +97,6 @@ type SitePrompt struct {
 	ID        int64     `json:"id" db:"id"`
 	SiteID    int64     `json:"site_id" db:"site_id"`
 	PromptID  int64     `json:"prompt_id" db:"prompt_id"`
-	IsActive  bool      `json:"is_active" db:"is_active"`
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }

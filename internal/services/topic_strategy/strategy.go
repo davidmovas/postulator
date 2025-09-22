@@ -299,23 +299,24 @@ func (s *RandomAllStrategy) GetStrategyName() string {
 }
 
 func (s *RandomAllStrategy) SelectTopic(ctx context.Context, siteID int64, availableTopics []*models.SiteTopic) (*models.TopicSelectionResult, error) {
-	// Get all active topics from the system, not just site-specific ones
-	allActiveTopics, err := s.repo.GetActiveTopics(ctx)
+	// Get all topics from the system, not just site-specific ones
+	allTopicsResult, err := s.repo.GetTopics(ctx, 1000, 0) // Get a large number of topics
 	if err != nil {
-		return nil, fmt.Errorf("failed to get all active topics: %w", err)
+		return nil, fmt.Errorf("failed to get all topics: %w", err)
 	}
 
-	if len(allActiveTopics) == 0 {
-		return nil, fmt.Errorf("no active topics available for random_all strategy")
+	if len(allTopicsResult.Data) == 0 {
+		return nil, fmt.Errorf("no topics available for random_all strategy")
 	}
 
-	// Select a random topic from all active topics
-	randomIndex, err := rand.Int(rand.Reader, big.NewInt(int64(len(allActiveTopics))))
+	// Select a random topic from all topics
+	allTopics := allTopicsResult.Data
+	randomIndex, err := rand.Int(rand.Reader, big.NewInt(int64(len(allTopics))))
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate random number: %w", err)
 	}
 
-	selectedTopic := allActiveTopics[randomIndex.Int64()]
+	selectedTopic := allTopics[randomIndex.Int64()]
 
 	// Check if this topic is already associated with the site, if not create a SiteTopic entry
 	siteTopic, err := s.repo.GetSiteTopic(ctx, siteID, selectedTopic.ID)
@@ -324,7 +325,6 @@ func (s *RandomAllStrategy) SelectTopic(ctx context.Context, siteID int64, avail
 		siteTopic = &models.SiteTopic{
 			SiteID:   siteID,
 			TopicID:  selectedTopic.ID,
-			IsActive: true,
 			Priority: 1,
 		}
 		// We don't actually save this to the database since it's a random_all selection
@@ -341,18 +341,18 @@ func (s *RandomAllStrategy) SelectTopic(ctx context.Context, siteID int64, avail
 		Topic:          selectedTopic,
 		SiteTopic:      siteTopic,
 		Strategy:       s.GetStrategyName(),
-		CanContinue:    true, // Random_all can always continue if there are active topics
-		RemainingCount: len(allActiveTopics),
+		CanContinue:    true, // Random_all can always continue if there are topics
+		RemainingCount: len(allTopics),
 	}
 
 	return result, nil
 }
 
 func (s *RandomAllStrategy) CanContinue(ctx context.Context, siteID int64, availableTopics []*models.SiteTopic) bool {
-	// For random_all, we need to check if there are any active topics in the system
-	allActiveTopics, err := s.repo.GetActiveTopics(ctx)
+	// For random_all, we need to check if there are any topics in the system
+	allTopicsResult, err := s.repo.GetTopics(ctx, 1, 0) // Just check if there's at least one topic
 	if err != nil {
 		return false
 	}
-	return len(allActiveTopics) > 0
+	return len(allTopicsResult.Data) > 0
 }

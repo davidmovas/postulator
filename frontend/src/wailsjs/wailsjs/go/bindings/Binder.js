@@ -6,18 +6,6 @@ export function ActivateSite(arg1) {
   return window['go']['bindings']['Binder']['ActivateSite'](arg1);
 }
 
-export function ActivateSitePrompt(arg1) {
-  return window['go']['bindings']['Binder']['ActivateSitePrompt'](arg1);
-}
-
-export function ActivateSiteTopic(arg1) {
-  return window['go']['bindings']['Binder']['ActivateSiteTopic'](arg1);
-}
-
-export function ActivateTopic(arg1) {
-  return window['go']['bindings']['Binder']['ActivateTopic'](arg1);
-}
-
 export function CheckStrategyAvailability(arg1, arg2) {
   return window['go']['bindings']['Binder']['CheckStrategyAvailability'](arg1, arg2);
 }
@@ -46,18 +34,6 @@ export function DeactivateSite(arg1) {
   return window['go']['bindings']['Binder']['DeactivateSite'](arg1);
 }
 
-export function DeactivateSitePrompt(arg1) {
-  return window['go']['bindings']['Binder']['DeactivateSitePrompt'](arg1);
-}
-
-export function DeactivateSiteTopic(arg1) {
-  return window['go']['bindings']['Binder']['DeactivateSiteTopic'](arg1);
-}
-
-export function DeactivateTopic(arg1) {
-  return window['go']['bindings']['Binder']['DeactivateTopic'](arg1);
-}
-
 export function DeletePrompt(arg1) {
   return window['go']['bindings']['Binder']['DeletePrompt'](arg1);
 }
@@ -84,10 +60,6 @@ export function DeleteSiteTopicBySiteAndTopic(arg1, arg2) {
 
 export function DeleteTopic(arg1) {
   return window['go']['bindings']['Binder']['DeleteTopic'](arg1);
-}
-
-export function GetActiveTopics() {
-  return window['go']['bindings']['Binder']['GetActiveTopics']();
 }
 
 export function GetDefaultPrompt() {

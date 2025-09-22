@@ -23,7 +23,6 @@ export namespace dto {
 	export class CreateSitePromptRequest {
 	    site_id: number;
 	    prompt_id: number;
-	    is_active: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new CreateSitePromptRequest(source);
@@ -33,7 +32,6 @@ export namespace dto {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.site_id = source["site_id"];
 	        this.prompt_id = source["prompt_id"];
-	        this.is_active = source["is_active"];
 	    }
 	}
 	export class CreateSiteRequest {
@@ -81,7 +79,6 @@ export namespace dto {
 	    keywords?: string;
 	    category?: string;
 	    tags?: string;
-	    is_active: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new CreateTopicRequest(source);
@@ -93,7 +90,6 @@ export namespace dto {
 	        this.keywords = source["keywords"];
 	        this.category = source["category"];
 	        this.tags = source["tags"];
-	        this.is_active = source["is_active"];
 	    }
 	}
 	export class PaginationRequest {
@@ -312,7 +308,6 @@ export namespace dto {
 	    site_name?: string;
 	    prompt_id: number;
 	    prompt_name?: string;
-	    is_active: boolean;
 	    // Go type: time
 	    created_at: any;
 	    // Go type: time
@@ -329,7 +324,6 @@ export namespace dto {
 	        this.site_name = source["site_name"];
 	        this.prompt_id = source["prompt_id"];
 	        this.prompt_name = source["prompt_name"];
-	        this.is_active = source["is_active"];
 	        this.created_at = this.convertValues(source["created_at"], null);
 	        this.updated_at = this.convertValues(source["updated_at"], null);
 	    }
@@ -549,7 +543,6 @@ export namespace dto {
 	    keywords: string;
 	    category: string;
 	    tags: string;
-	    is_active: boolean;
 	    // Go type: time
 	    created_at: any;
 	    // Go type: time
@@ -566,7 +559,6 @@ export namespace dto {
 	        this.keywords = source["keywords"];
 	        this.category = source["category"];
 	        this.tags = source["tags"];
-	        this.is_active = source["is_active"];
 	        this.created_at = this.convertValues(source["created_at"], null);
 	        this.updated_at = this.convertValues(source["updated_at"], null);
 	    }
@@ -830,7 +822,6 @@ export namespace dto {
 	    id: number;
 	    site_id: number;
 	    prompt_id: number;
-	    is_active: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new UpdateSitePromptRequest(source);
@@ -841,7 +832,6 @@ export namespace dto {
 	        this.id = source["id"];
 	        this.site_id = source["site_id"];
 	        this.prompt_id = source["prompt_id"];
-	        this.is_active = source["is_active"];
 	    }
 	}
 	export class UpdateSiteRequest {
@@ -894,7 +884,6 @@ export namespace dto {
 	    keywords?: string;
 	    category?: string;
 	    tags?: string;
-	    is_active: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new UpdateTopicRequest(source);
@@ -907,7 +896,6 @@ export namespace dto {
 	        this.keywords = source["keywords"];
 	        this.category = source["category"];
 	        this.tags = source["tags"];
-	        this.is_active = source["is_active"];
 	    }
 	}
 

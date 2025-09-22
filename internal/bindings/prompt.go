@@ -66,16 +66,6 @@ func (b *Binder) DeleteSitePromptBySite(siteID int64) error {
 	return b.handler.DeleteSitePromptBySite(siteID)
 }
 
-// ActivateSitePrompt activates a site-prompt relationship
-func (b *Binder) ActivateSitePrompt(sitePromptID int64) error {
-	return b.handler.ActivateSitePrompt(sitePromptID)
-}
-
-// DeactivateSitePrompt deactivates a site-prompt relationship
-func (b *Binder) DeactivateSitePrompt(sitePromptID int64) error {
-	return b.handler.DeactivateSitePrompt(sitePromptID)
-}
-
 // GetPromptSites retrieves all sites associated with a specific prompt
 func (b *Binder) GetPromptSites(promptID int64, pagination dto.PaginationRequest) (*dto.SitePromptListResponse, error) {
 	return b.handler.GetPromptSites(promptID, pagination)

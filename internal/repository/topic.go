@@ -18,7 +18,6 @@ func (r *Repository) GetTopics(ctx context.Context, limit int, offset int) (*mod
 			"keywords",
 			"category",
 			"tags",
-			"is_active",
 			"created_at",
 			"updated_at",
 		).
@@ -45,7 +44,6 @@ func (r *Repository) GetTopics(ctx context.Context, limit int, offset int) (*mod
 			&topic.Keywords,
 			&topic.Category,
 			&topic.Tags,
-			&topic.IsActive,
 			&topic.CreatedAt,
 			&topic.UpdatedAt,
 		); err != nil {
@@ -82,7 +80,6 @@ func (r *Repository) GetTopic(ctx context.Context, id int64) (*models.Topic, err
 			"keywords",
 			"category",
 			"tags",
-			"is_active",
 			"created_at",
 			"updated_at",
 		).
@@ -98,7 +95,6 @@ func (r *Repository) GetTopic(ctx context.Context, id int64) (*models.Topic, err
 			&topic.Keywords,
 			&topic.Category,
 			&topic.Tags,
-			&topic.IsActive,
 			&topic.CreatedAt,
 			&topic.UpdatedAt,
 		); err != nil {
@@ -116,14 +112,12 @@ func (r *Repository) GetTopicsBySiteID(ctx context.Context, siteID int64, limit 
 			"t.keywords",
 			"t.category",
 			"t.tags",
-			"t.is_active",
 			"t.created_at",
 			"t.updated_at",
 		).
 		From("topics t").
 		Join("site_topics st ON t.id = st.topic_id").
 		Where(squirrel.Eq{"st.site_id": siteID}).
-		Where(squirrel.Eq{"st.is_active": true}).
 		OrderBy("t.created_at DESC").
 		Limit(uint64(limit)).
 		Offset(uint64(offset)).
@@ -146,7 +140,6 @@ func (r *Repository) GetTopicsBySiteID(ctx context.Context, siteID int64, limit 
 			&topic.Keywords,
 			&topic.Category,
 			&topic.Tags,
-			&topic.IsActive,
 			&topic.CreatedAt,
 			&topic.UpdatedAt,
 		); err != nil {
@@ -161,7 +154,6 @@ func (r *Repository) GetTopicsBySiteID(ctx context.Context, siteID int64, limit 
 		From("topics t").
 		Join("site_topics st ON t.id = st.topic_id").
 		Where(squirrel.Eq{"st.site_id": siteID}).
-		Where(squirrel.Eq{"st.is_active": true}).
 		MustSql()
 
 	var total int
@@ -186,7 +178,6 @@ func (r *Repository) CreateTopic(ctx context.Context, topic *models.Topic) (*mod
 			"keywords",
 			"category",
 			"tags",
-			"is_active",
 			"created_at",
 			"updated_at",
 		).
@@ -195,7 +186,6 @@ func (r *Repository) CreateTopic(ctx context.Context, topic *models.Topic) (*mod
 			topic.Keywords,
 			topic.Category,
 			topic.Tags,
-			topic.IsActive,
 			topic.CreatedAt,
 			topic.UpdatedAt,
 		).
@@ -222,7 +212,6 @@ func (r *Repository) UpdateTopic(ctx context.Context, topic *models.Topic) (*mod
 		Set("keywords", topic.Keywords).
 		Set("category", topic.Category).
 		Set("tags", topic.Tags).
-		Set("is_active", topic.IsActive).
 		Set("updated_at", topic.UpdatedAt).
 		Where(squirrel.Eq{"id": topic.ID}).
 		MustSql()
@@ -249,38 +238,6 @@ func (r *Repository) DeleteTopic(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (r *Repository) ActivateTopic(ctx context.Context, id int64) error {
-	query, args := builder.
-		Update("topics").
-		Set("is_active", true).
-		Set("updated_at", time.Now()).
-		Where(squirrel.Eq{"id": id}).
-		MustSql()
-
-	_, err := r.db.ExecContext(ctx, query, args...)
-	if err != nil {
-		return fmt.Errorf("failed to activate topic: %w", err)
-	}
-
-	return nil
-}
-
-func (r *Repository) DeactivateTopic(ctx context.Context, id int64) error {
-	query, args := builder.
-		Update("topics").
-		Set("is_active", false).
-		Set("updated_at", time.Now()).
-		Where(squirrel.Eq{"id": id}).
-		MustSql()
-
-	_, err := r.db.ExecContext(ctx, query, args...)
-	if err != nil {
-		return fmt.Errorf("failed to deactivate topic: %w", err)
-	}
-
-	return nil
-}
-
 func (r *Repository) GetActiveTopics(ctx context.Context) ([]*models.Topic, error) {
 	query, args := builder.
 		Select(
@@ -289,18 +246,16 @@ func (r *Repository) GetActiveTopics(ctx context.Context) ([]*models.Topic, erro
 			"keywords",
 			"category",
 			"tags",
-			"is_active",
 			"created_at",
 			"updated_at",
 		).
 		From("topics").
-		Where(squirrel.Eq{"is_active": true}).
 		OrderBy("title").
 		MustSql()
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query active topics: %w", err)
+		return nil, fmt.Errorf("failed to query topics: %w", err)
 	}
 	defer func() {
 		_ = rows.Close()
@@ -315,7 +270,6 @@ func (r *Repository) GetActiveTopics(ctx context.Context) ([]*models.Topic, erro
 			&topic.Keywords,
 			&topic.Category,
 			&topic.Tags,
-			&topic.IsActive,
 			&topic.CreatedAt,
 			&topic.UpdatedAt,
 		); err != nil {
@@ -333,12 +287,16 @@ func (r *Repository) CreateSiteTopic(ctx context.Context, siteTopic *models.Site
 		Columns(
 			"site_id",
 			"topic_id",
-			"is_active",
+			"priority",
+			"usage_count",
+			"round_robin_pos",
 		).
 		Values(
 			siteTopic.SiteID,
 			siteTopic.TopicID,
-			siteTopic.IsActive,
+			siteTopic.Priority,
+			siteTopic.UsageCount,
+			siteTopic.RoundRobinPos,
 		).
 		MustSql()
 
@@ -362,7 +320,12 @@ func (r *Repository) GetSiteTopics(ctx context.Context, siteID int64, limit int,
 			"st.id",
 			"st.site_id",
 			"st.topic_id",
-			"st.is_active",
+			"st.priority",
+			"st.last_used_at",
+			"st.usage_count",
+			"st.round_robin_pos",
+			"st.created_at",
+			"st.updated_at",
 		).
 		From("site_topics st").
 		Where(squirrel.Eq{"st.site_id": siteID}).
@@ -386,7 +349,12 @@ func (r *Repository) GetSiteTopics(ctx context.Context, siteID int64, limit int,
 			&siteTopic.ID,
 			&siteTopic.SiteID,
 			&siteTopic.TopicID,
-			&siteTopic.IsActive,
+			&siteTopic.Priority,
+			&siteTopic.LastUsedAt,
+			&siteTopic.UsageCount,
+			&siteTopic.RoundRobinPos,
+			&siteTopic.CreatedAt,
+			&siteTopic.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan site topic: %w", err)
 		}
@@ -420,7 +388,12 @@ func (r *Repository) GetTopicSites(ctx context.Context, topicID int64, limit int
 			"st.id",
 			"st.site_id",
 			"st.topic_id",
-			"st.is_active",
+			"st.priority",
+			"st.last_used_at",
+			"st.usage_count",
+			"st.round_robin_pos",
+			"st.created_at",
+			"st.updated_at",
 		).
 		From("site_topics st").
 		Where(squirrel.Eq{"st.topic_id": topicID}).
@@ -444,7 +417,12 @@ func (r *Repository) GetTopicSites(ctx context.Context, topicID int64, limit int
 			&siteTopic.ID,
 			&siteTopic.SiteID,
 			&siteTopic.TopicID,
-			&siteTopic.IsActive,
+			&siteTopic.Priority,
+			&siteTopic.LastUsedAt,
+			&siteTopic.UsageCount,
+			&siteTopic.RoundRobinPos,
+			&siteTopic.CreatedAt,
+			&siteTopic.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan site topic: %w", err)
 		}
@@ -478,7 +456,6 @@ func (r *Repository) GetSiteTopic(ctx context.Context, siteID int64, topicID int
 			"id",
 			"site_id",
 			"topic_id",
-			"is_active",
 			"priority",
 			"last_used_at",
 			"usage_count",
@@ -496,7 +473,6 @@ func (r *Repository) GetSiteTopic(ctx context.Context, siteID int64, topicID int
 			&siteTopic.ID,
 			&siteTopic.SiteID,
 			&siteTopic.TopicID,
-			&siteTopic.IsActive,
 			&siteTopic.Priority,
 			&siteTopic.LastUsedAt,
 			&siteTopic.UsageCount,
@@ -515,7 +491,11 @@ func (r *Repository) UpdateSiteTopic(ctx context.Context, siteTopic *models.Site
 		Update("site_topics").
 		Set("site_id", siteTopic.SiteID).
 		Set("topic_id", siteTopic.TopicID).
-		Set("is_active", siteTopic.IsActive).
+		Set("priority", siteTopic.Priority).
+		Set("usage_count", siteTopic.UsageCount).
+		Set("round_robin_pos", siteTopic.RoundRobinPos).
+		Set("last_used_at", siteTopic.LastUsedAt).
+		Set("updated_at", siteTopic.UpdatedAt).
 		Where(squirrel.Eq{"id": siteTopic.ID}).
 		MustSql()
 
@@ -555,43 +535,12 @@ func (r *Repository) DeleteSiteTopicBySiteAndTopic(ctx context.Context, siteID i
 	return nil
 }
 
-func (r *Repository) ActivateSiteTopic(ctx context.Context, id int64) error {
-	query, args := builder.
-		Update("site_topics").
-		Set("is_active", true).
-		Where(squirrel.Eq{"id": id}).
-		MustSql()
-
-	_, err := r.db.ExecContext(ctx, query, args...)
-	if err != nil {
-		return fmt.Errorf("failed to activate site topic: %w", err)
-	}
-
-	return nil
-}
-
-func (r *Repository) DeactivateSiteTopic(ctx context.Context, id int64) error {
-	query, args := builder.
-		Update("site_topics").
-		Set("is_active", false).
-		Where(squirrel.Eq{"id": id}).
-		MustSql()
-
-	_, err := r.db.ExecContext(ctx, query, args...)
-	if err != nil {
-		return fmt.Errorf("failed to deactivate site topic: %w", err)
-	}
-
-	return nil
-}
-
 func (r *Repository) GetSiteTopicsForSelection(ctx context.Context, siteID int64, _ string) ([]*models.SiteTopic, error) {
 	query, args := builder.
 		Select(
 			"id",
 			"site_id",
 			"topic_id",
-			"is_active",
 			"priority",
 			"last_used_at",
 			"usage_count",
@@ -600,7 +549,7 @@ func (r *Repository) GetSiteTopicsForSelection(ctx context.Context, siteID int64
 			"updated_at",
 		).
 		From("site_topics").
-		Where(squirrel.Eq{"site_id": siteID, "is_active": true}).
+		Where(squirrel.Eq{"site_id": siteID}).
 		OrderBy("priority DESC, created_at ASC"). // Higher priority first, then by creation time
 		MustSql()
 
@@ -619,7 +568,6 @@ func (r *Repository) GetSiteTopicsForSelection(ctx context.Context, siteID int64
 			&siteTopic.ID,
 			&siteTopic.SiteID,
 			&siteTopic.TopicID,
-			&siteTopic.IsActive,
 			&siteTopic.Priority,
 			&siteTopic.LastUsedAt,
 			&siteTopic.UsageCount,

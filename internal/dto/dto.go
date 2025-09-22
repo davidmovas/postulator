@@ -73,7 +73,6 @@ type CreateTopicRequest struct {
 	Keywords string `json:"keywords,omitempty"`
 	Category string `json:"category,omitempty"`
 	Tags     string `json:"tags,omitempty"`
-	IsActive bool   `json:"is_active"`
 }
 
 type UpdateTopicRequest struct {
@@ -82,7 +81,6 @@ type UpdateTopicRequest struct {
 	Keywords string `json:"keywords,omitempty"`
 	Category string `json:"category,omitempty"`
 	Tags     string `json:"tags,omitempty"`
-	IsActive bool   `json:"is_active"`
 }
 
 type TopicResponse struct {
@@ -91,7 +89,6 @@ type TopicResponse struct {
 	Keywords  string    `json:"keywords"`
 	Category  string    `json:"category"`
 	Tags      string    `json:"tags"`
-	IsActive  bool      `json:"is_active"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -352,14 +349,12 @@ type SetDefaultPromptRequest struct {
 type CreateSitePromptRequest struct {
 	SiteID   int64 `json:"site_id" validate:"required,min=1"`
 	PromptID int64 `json:"prompt_id" validate:"required,min=1"`
-	IsActive bool  `json:"is_active"`
 }
 
 type UpdateSitePromptRequest struct {
 	ID       int64 `json:"id" validate:"required,min=1"`
 	SiteID   int64 `json:"site_id" validate:"required,min=1"`
 	PromptID int64 `json:"prompt_id" validate:"required,min=1"`
-	IsActive bool  `json:"is_active"`
 }
 
 type SitePromptResponse struct {
@@ -368,7 +363,6 @@ type SitePromptResponse struct {
 	SiteName   string    `json:"site_name,omitempty"`
 	PromptID   int64     `json:"prompt_id"`
 	PromptName string    `json:"prompt_name,omitempty"`
-	IsActive   bool      `json:"is_active"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }
@@ -481,7 +475,6 @@ func (r *CreateTopicRequest) ToModel() *models.Topic {
 		Keywords:  r.Keywords,
 		Category:  r.Category,
 		Tags:      r.Tags,
-		IsActive:  r.IsActive,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -494,7 +487,6 @@ func (r *UpdateTopicRequest) ToModel() *models.Topic {
 		Keywords:  r.Keywords,
 		Category:  r.Category,
 		Tags:      r.Tags,
-		IsActive:  r.IsActive,
 		UpdatedAt: time.Now(),
 	}
 }
@@ -506,7 +498,6 @@ func TopicToResponse(topic *models.Topic) *TopicResponse {
 		Keywords:  topic.Keywords,
 		Category:  topic.Category,
 		Tags:      topic.Tags,
-		IsActive:  topic.IsActive,
 		CreatedAt: topic.CreatedAt,
 		UpdatedAt: topic.UpdatedAt,
 	}
@@ -620,7 +611,6 @@ func (r *CreateSitePromptRequest) ToModel() *models.SitePrompt {
 	return &models.SitePrompt{
 		SiteID:    r.SiteID,
 		PromptID:  r.PromptID,
-		IsActive:  r.IsActive,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -631,7 +621,6 @@ func (r *UpdateSitePromptRequest) ToModel() *models.SitePrompt {
 		ID:        r.ID,
 		SiteID:    r.SiteID,
 		PromptID:  r.PromptID,
-		IsActive:  r.IsActive,
 		UpdatedAt: time.Now(),
 	}
 }
@@ -643,7 +632,6 @@ func SitePromptToResponse(sitePrompt *models.SitePrompt) *SitePromptResponse {
 		SiteName:   "", // Not in model, will be populated by handler if needed
 		PromptID:   sitePrompt.PromptID,
 		PromptName: "", // Not in model, will be populated by handler if needed
-		IsActive:   sitePrompt.IsActive,
 		CreatedAt:  sitePrompt.CreatedAt,
 		UpdatedAt:  sitePrompt.UpdatedAt,
 	}

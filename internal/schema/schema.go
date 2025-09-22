@@ -35,7 +35,6 @@ CREATE TABLE IF NOT EXISTS topics (
     keywords VARCHAR(128),
     category VARCHAR(64),
     tags VARCHAR(128),
-    is_active BOOLEAN DEFAULT TRUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -45,7 +44,6 @@ CREATE TABLE IF NOT EXISTS site_topics (
     site_id INTEGER NOT NULL,
     topic_id INTEGER NOT NULL,
     priority INTEGER DEFAULT 1,
-    is_active BOOLEAN DEFAULT TRUE,
     last_used_at DATETIME,
     usage_count INTEGER DEFAULT 0,
     round_robin_pos INTEGER DEFAULT 0,
@@ -83,6 +81,9 @@ CREATE TABLE IF NOT EXISTS articles (
     wordpress_id INTEGER,
     gpt_model VARCHAR(24),
     tokens INTEGER DEFAULT 0,
+    slug VARCHAR(255),
+    outline TEXT,
+    error_msg TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     published_at DATETIME,
     FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
@@ -142,14 +143,17 @@ CREATE TABLE IF NOT EXISTS topic_usage (
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_sites_status ON sites(status);
 CREATE INDEX IF NOT EXISTS idx_sites_is_active ON sites(is_active);
-CREATE INDEX IF NOT EXISTS idx_topics_is_active ON topics(is_active);
 CREATE INDEX IF NOT EXISTS idx_site_topics_site_id ON site_topics(site_id);
 CREATE INDEX IF NOT EXISTS idx_site_topics_topic_id ON site_topics(topic_id);
+CREATE INDEX IF NOT EXISTS idx_site_topics_usage_count ON site_topics(site_id, usage_count);
+CREATE INDEX IF NOT EXISTS idx_site_topics_last_used ON site_topics(site_id, last_used_at);
+CREATE INDEX IF NOT EXISTS idx_site_topics_round_robin ON site_topics(site_id, round_robin_pos);
 CREATE INDEX IF NOT EXISTS idx_schedules_site_id ON schedules(site_id);
 CREATE INDEX IF NOT EXISTS idx_schedules_is_active ON schedules(is_active);
 CREATE INDEX IF NOT EXISTS idx_articles_site_id ON articles(site_id);
 CREATE INDEX IF NOT EXISTS idx_articles_topic_id ON articles(topic_id);
 CREATE INDEX IF NOT EXISTS idx_articles_status ON articles(status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_articles_site_slug ON articles(site_id, slug);
 CREATE INDEX IF NOT EXISTS idx_posting_jobs_status ON posting_jobs(status);
 CREATE INDEX IF NOT EXISTS idx_posting_jobs_site_id ON posting_jobs(site_id);
 CREATE INDEX IF NOT EXISTS idx_prompts_is_default ON prompts(is_default);

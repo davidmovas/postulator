@@ -6,8 +6,6 @@ import {
   UpdateSiteTopic,
   DeleteSiteTopic,
   DeleteSiteTopicBySiteAndTopic,
-  ActivateSiteTopic,
-  DeactivateSiteTopic,
 } from "@/wailsjs/wailsjs/go/bindings/Binder";
 
 // Minimal types for site-topic row
@@ -18,7 +16,6 @@ export interface SiteTopicLink {
   topic_id: number;
   topic_title?: string;
   priority: number;
-  is_active: boolean;
   usage_count: number;
   last_used_at?: string;
   round_robin_pos: number;
@@ -32,7 +29,6 @@ function mapLink(r: dto.SiteTopicResponse): SiteTopicLink {
     topic_id: r.topic_id,
     topic_title: r.topic_title,
     priority: r.priority,
-    is_active: r.is_active,
     usage_count: r.usage_count,
     last_used_at: typeof r.last_used_at === "string" ? (r.last_used_at as unknown as string) : undefined,
     round_robin_pos: r.round_robin_pos,
@@ -48,13 +44,13 @@ export async function getSiteTopics(siteId: number, page: number, limit: number)
   };
 }
 
-export async function createSiteTopic(values: { site_id: number; topic_id: number; priority: number; is_active: boolean; }) {
+export async function createSiteTopic(values: { site_id: number; topic_id: number; priority: number; }) {
   const req = new dto.CreateSiteTopicRequest(values);
   const res = await CreateSiteTopic(req);
   return mapLink(res);
 }
 
-export async function updateSiteTopic(values: { id: number; site_id: number; topic_id: number; priority: number; is_active: boolean; }) {
+export async function updateSiteTopic(values: { id: number; site_id: number; topic_id: number; priority: number; }) {
   const req = new dto.UpdateSiteTopicRequest(values);
   const res = await UpdateSiteTopic(req);
   return mapLink(res);
@@ -68,7 +64,3 @@ export async function deleteSiteTopicBySiteAndTopic(site_id: number, topic_id: n
   await DeleteSiteTopicBySiteAndTopic(site_id, topic_id);
 }
 
-export async function setSiteTopicActive(id: number, active: boolean) {
-  if (active) await ActivateSiteTopic(id);
-  else await DeactivateSiteTopic(id);
-}

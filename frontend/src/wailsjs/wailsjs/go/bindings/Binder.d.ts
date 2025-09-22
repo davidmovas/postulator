@@ -5,12 +5,6 @@ import {handlers} from '../models';
 
 export function ActivateSite(arg1:number):Promise<void>;
 
-export function ActivateSitePrompt(arg1:number):Promise<void>;
-
-export function ActivateSiteTopic(arg1:number):Promise<void>;
-
-export function ActivateTopic(arg1:number):Promise<void>;
-
 export function CheckStrategyAvailability(arg1:number,arg2:string):Promise<dto.StrategyAvailabilityResponse>;
 
 export function CreatePrompt(arg1:dto.CreatePromptRequest):Promise<dto.PromptResponse>;
@@ -25,12 +19,6 @@ export function CreateTopic(arg1:dto.CreateTopicRequest):Promise<dto.TopicRespon
 
 export function DeactivateSite(arg1:number):Promise<void>;
 
-export function DeactivateSitePrompt(arg1:number):Promise<void>;
-
-export function DeactivateSiteTopic(arg1:number):Promise<void>;
-
-export function DeactivateTopic(arg1:number):Promise<void>;
-
 export function DeletePrompt(arg1:number):Promise<void>;
 
 export function DeleteSite(arg1:number):Promise<void>;
@@ -44,8 +32,6 @@ export function DeleteSiteTopic(arg1:number):Promise<void>;
 export function DeleteSiteTopicBySiteAndTopic(arg1:number,arg2:number):Promise<void>;
 
 export function DeleteTopic(arg1:number):Promise<void>;
-
-export function GetActiveTopics():Promise<Array<dto.TopicResponse>>;
 
 export function GetDefaultPrompt():Promise<dto.PromptResponse>;
 

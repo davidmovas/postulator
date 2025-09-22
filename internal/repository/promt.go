@@ -229,8 +229,8 @@ func (r *Repository) CreateSitePrompt(ctx context.Context, sitePrompt *models.Si
 
 	query, args := builder.
 		Insert("site_prompts").
-		Columns("site_id", "prompt_id", "is_active", "created_at", "updated_at").
-		Values(sitePrompt.SiteID, sitePrompt.PromptID, sitePrompt.IsActive, sitePrompt.CreatedAt, sitePrompt.UpdatedAt).
+		Columns("site_id", "prompt_id", "created_at", "updated_at").
+		Values(sitePrompt.SiteID, sitePrompt.PromptID, sitePrompt.CreatedAt, sitePrompt.UpdatedAt).
 		Suffix("RETURNING id").
 		MustSql()
 
@@ -248,7 +248,6 @@ func (r *Repository) GetSitePrompt(ctx context.Context, siteID int64) (*models.S
 			"id",
 			"site_id",
 			"prompt_id",
-			"is_active",
 			"created_at",
 			"updated_at",
 		).
@@ -262,7 +261,6 @@ func (r *Repository) GetSitePrompt(ctx context.Context, siteID int64) (*models.S
 			&sitePrompt.ID,
 			&sitePrompt.SiteID,
 			&sitePrompt.PromptID,
-			&sitePrompt.IsActive,
 			&sitePrompt.CreatedAt,
 			&sitePrompt.UpdatedAt,
 		); err != nil {
@@ -278,7 +276,6 @@ func (r *Repository) UpdateSitePrompt(ctx context.Context, sitePrompt *models.Si
 	query, args := builder.
 		Update("site_prompts").
 		Set("prompt_id", sitePrompt.PromptID).
-		Set("is_active", sitePrompt.IsActive).
 		Set("updated_at", sitePrompt.UpdatedAt).
 		Where(squirrel.Eq{"id": sitePrompt.ID}).
 		MustSql()
@@ -319,45 +316,12 @@ func (r *Repository) DeleteSitePromptBySite(ctx context.Context, siteID int64) e
 	return nil
 }
 
-func (r *Repository) ActivateSitePrompt(ctx context.Context, id int64) error {
-	query, args := builder.
-		Update("site_prompts").
-		Set("is_active", true).
-		Set("updated_at", time.Now()).
-		Where(squirrel.Eq{"id": id}).
-		MustSql()
-
-	_, err := r.db.ExecContext(ctx, query, args...)
-	if err != nil {
-		return fmt.Errorf("failed to activate site prompt: %w", err)
-	}
-
-	return nil
-}
-
-func (r *Repository) DeactivateSitePrompt(ctx context.Context, id int64) error {
-	query, args := builder.
-		Update("site_prompts").
-		Set("is_active", false).
-		Set("updated_at", time.Now()).
-		Where(squirrel.Eq{"id": id}).
-		MustSql()
-
-	_, err := r.db.ExecContext(ctx, query, args...)
-	if err != nil {
-		return fmt.Errorf("failed to deactivate site prompt: %w", err)
-	}
-
-	return nil
-}
-
 func (r *Repository) GetPromptSites(ctx context.Context, promptID int64, limit int, offset int) (*models.PaginationResult[*models.SitePrompt], error) {
 	query, args := builder.
 		Select(
 			"id",
 			"site_id",
 			"prompt_id",
-			"is_active",
 			"created_at",
 			"updated_at",
 		).
@@ -384,7 +348,6 @@ func (r *Repository) GetPromptSites(ctx context.Context, promptID int64, limit i
 			&sitePrompt.ID,
 			&sitePrompt.SiteID,
 			&sitePrompt.PromptID,
-			&sitePrompt.IsActive,
 			&sitePrompt.CreatedAt,
 			&sitePrompt.UpdatedAt,
 		); err != nil {

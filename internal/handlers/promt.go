@@ -251,38 +251,6 @@ func (h *Handler) DeleteSitePromptBySite(siteID int64) error {
 	return nil
 }
 
-// ActivateSitePrompt activates a site-prompt relationship
-func (h *Handler) ActivateSitePrompt(sitePromptID int64) error {
-	ctx := h.fastCtx()
-
-	if sitePromptID <= 0 {
-		return fmt.Errorf("invalid site prompt ID")
-	}
-
-	err := h.repo.ActivateSitePrompt(ctx, sitePromptID)
-	if err != nil {
-		return fmt.Errorf("failed to activate site prompt: %w", err)
-	}
-
-	return nil
-}
-
-// DeactivateSitePrompt deactivates a site-prompt relationship
-func (h *Handler) DeactivateSitePrompt(sitePromptID int64) error {
-	ctx := h.fastCtx()
-
-	if sitePromptID <= 0 {
-		return fmt.Errorf("invalid site prompt ID")
-	}
-
-	err := h.repo.DeactivateSitePrompt(ctx, sitePromptID)
-	if err != nil {
-		return fmt.Errorf("failed to deactivate site prompt: %w", err)
-	}
-
-	return nil
-}
-
 // GetPromptSites retrieves all sites associated with a specific prompt
 func (h *Handler) GetPromptSites(promptID int64, pagination dto.PaginationRequest) (*dto.SitePromptListResponse, error) {
 	ctx := h.fastCtx()

@@ -24,9 +24,6 @@ type TopicRepository interface {
 	CreateTopic(ctx context.Context, topic *models.Topic) (*models.Topic, error)
 	UpdateTopic(ctx context.Context, topic *models.Topic) (*models.Topic, error)
 	DeleteTopic(ctx context.Context, id int64) error
-	ActivateTopic(ctx context.Context, id int64) error
-	DeactivateTopic(ctx context.Context, id int64) error
-	GetActiveTopics(ctx context.Context) ([]*models.Topic, error)
 }
 
 type SiteTopicRepository interface {
@@ -37,8 +34,6 @@ type SiteTopicRepository interface {
 	UpdateSiteTopic(ctx context.Context, siteTopic *models.SiteTopic) (*models.SiteTopic, error)
 	DeleteSiteTopic(ctx context.Context, id int64) error
 	DeleteSiteTopicBySiteAndTopic(ctx context.Context, siteID int64, topicID int64) error
-	ActivateSiteTopic(ctx context.Context, id int64) error
-	DeactivateSiteTopic(ctx context.Context, id int64) error
 
 	GetSiteTopicsForSelection(ctx context.Context, siteID int64, strategy string) ([]*models.SiteTopic, error)
 	UpdateSiteTopicUsage(ctx context.Context, siteTopicID int64, strategy string) error
@@ -68,7 +63,5 @@ type SitePromptRepository interface {
 	UpdateSitePrompt(ctx context.Context, sitePrompt *models.SitePrompt) (*models.SitePrompt, error)
 	DeleteSitePrompt(ctx context.Context, id int64) error
 	DeleteSitePromptBySite(ctx context.Context, siteID int64) error
-	ActivateSitePrompt(ctx context.Context, id int64) error
-	DeactivateSitePrompt(ctx context.Context, id int64) error
 	GetPromptSites(ctx context.Context, promptID int64, limit int, offset int) (*models.PaginationResult[*models.SitePrompt], error)
 }

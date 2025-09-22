@@ -165,56 +165,6 @@ func (h *Handler) DeleteTopic(topicID int64) error {
 	return nil
 }
 
-// ActivateTopic activates a topic
-func (h *Handler) ActivateTopic(topicID int64) error {
-	ctx := h.fastCtx()
-
-	if topicID <= 0 {
-		return fmt.Errorf("invalid topic ID")
-	}
-
-	err := h.repo.ActivateTopic(ctx, topicID)
-	if err != nil {
-		return fmt.Errorf("failed to activate topic: %w", err)
-	}
-
-	return nil
-}
-
-// DeactivateTopic deactivates a topic
-func (h *Handler) DeactivateTopic(topicID int64) error {
-	ctx := h.fastCtx()
-
-	if topicID <= 0 {
-		return fmt.Errorf("invalid topic ID")
-	}
-
-	err := h.repo.DeactivateTopic(ctx, topicID)
-	if err != nil {
-		return fmt.Errorf("failed to deactivate topic: %w", err)
-	}
-
-	return nil
-}
-
-// GetActiveTopics retrieves all active topics
-func (h *Handler) GetActiveTopics() ([]*dto.TopicResponse, error) {
-	ctx := h.fastCtx()
-
-	topics, err := h.repo.GetActiveTopics(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve active topics: %w", err)
-	}
-
-	// Convert to response DTOs
-	topicResponses := make([]*dto.TopicResponse, len(topics))
-	for i, topic := range topics {
-		topicResponses[i] = dto.TopicToResponse(topic)
-	}
-
-	return topicResponses, nil
-}
-
 // SiteTopic Handlers
 
 // CreateSiteTopic creates a new site-topic association
@@ -230,17 +180,10 @@ func (h *Handler) CreateSiteTopic(req dto.CreateSiteTopicRequest) (*dto.SiteTopi
 	}
 
 	// Convert to model and create
-	siteTopic := &dto.CreateSiteTopicRequest{
+	siteTopicModel := &models.SiteTopic{
 		SiteID:   req.SiteID,
 		TopicID:  req.TopicID,
 		Priority: req.Priority,
-		IsActive: req.IsActive,
-	}
-
-	siteTopicModel := &models.SiteTopic{
-		SiteID:   siteTopic.SiteID,
-		TopicID:  siteTopic.TopicID,
-		IsActive: siteTopic.IsActive,
 	}
 
 	createdSiteTopic, err := h.repo.CreateSiteTopic(ctx, siteTopicModel)
@@ -249,11 +192,13 @@ func (h *Handler) CreateSiteTopic(req dto.CreateSiteTopicRequest) (*dto.SiteTopi
 	}
 
 	return &dto.SiteTopicResponse{
-		ID:       createdSiteTopic.ID,
-		SiteID:   createdSiteTopic.SiteID,
-		TopicID:  createdSiteTopic.TopicID,
-		Priority: req.Priority,
-		IsActive: createdSiteTopic.IsActive,
+		ID:            createdSiteTopic.ID,
+		SiteID:        createdSiteTopic.SiteID,
+		TopicID:       createdSiteTopic.TopicID,
+		Priority:      createdSiteTopic.Priority,
+		UsageCount:    createdSiteTopic.UsageCount,
+		LastUsedAt:    createdSiteTopic.LastUsedAt,
+		RoundRobinPos: createdSiteTopic.RoundRobinPos,
 	}, nil
 }
 
@@ -288,7 +233,6 @@ func (h *Handler) GetSiteTopics(siteID int64, pagination dto.PaginationRequest) 
 			SiteID:        siteTopic.SiteID,
 			TopicID:       siteTopic.TopicID,
 			Priority:      siteTopic.Priority,
-			IsActive:      siteTopic.IsActive,
 			UsageCount:    siteTopic.UsageCount,
 			LastUsedAt:    siteTopic.LastUsedAt,
 			RoundRobinPos: siteTopic.RoundRobinPos,
@@ -337,11 +281,13 @@ func (h *Handler) GetTopicSites(topicID int64, pagination dto.PaginationRequest)
 	siteTopicResponses := make([]*dto.SiteTopicResponse, len(result.Data))
 	for i, siteTopic := range result.Data {
 		siteTopicResponses[i] = &dto.SiteTopicResponse{
-			ID:       siteTopic.ID,
-			SiteID:   siteTopic.SiteID,
-			TopicID:  siteTopic.TopicID,
-			Priority: 1, // Default priority as it's not in the model
-			IsActive: siteTopic.IsActive,
+			ID:            siteTopic.ID,
+			SiteID:        siteTopic.SiteID,
+			TopicID:       siteTopic.TopicID,
+			Priority:      siteTopic.Priority,
+			UsageCount:    siteTopic.UsageCount,
+			LastUsedAt:    siteTopic.LastUsedAt,
+			RoundRobinPos: siteTopic.RoundRobinPos,
 		}
 	}
 
@@ -380,7 +326,7 @@ func (h *Handler) UpdateSiteTopic(req dto.UpdateSiteTopicRequest) (*dto.SiteTopi
 		ID:       req.ID,
 		SiteID:   req.SiteID,
 		TopicID:  req.TopicID,
-		IsActive: req.IsActive,
+		Priority: req.Priority,
 	}
 
 	updatedSiteTopic, err := h.repo.UpdateSiteTopic(ctx, siteTopicModel)
@@ -389,11 +335,13 @@ func (h *Handler) UpdateSiteTopic(req dto.UpdateSiteTopicRequest) (*dto.SiteTopi
 	}
 
 	return &dto.SiteTopicResponse{
-		ID:       updatedSiteTopic.ID,
-		SiteID:   updatedSiteTopic.SiteID,
-		TopicID:  updatedSiteTopic.TopicID,
-		Priority: req.Priority,
-		IsActive: updatedSiteTopic.IsActive,
+		ID:            updatedSiteTopic.ID,
+		SiteID:        updatedSiteTopic.SiteID,
+		TopicID:       updatedSiteTopic.TopicID,
+		Priority:      updatedSiteTopic.Priority,
+		UsageCount:    updatedSiteTopic.UsageCount,
+		LastUsedAt:    updatedSiteTopic.LastUsedAt,
+		RoundRobinPos: updatedSiteTopic.RoundRobinPos,
 	}, nil
 }
 
@@ -432,38 +380,6 @@ func (h *Handler) DeleteSiteTopicBySiteAndTopic(siteID int64, topicID int64) err
 	return nil
 }
 
-// ActivateSiteTopic activates a site-topic association
-func (h *Handler) ActivateSiteTopic(siteTopicID int64) error {
-	ctx := h.fastCtx()
-
-	if siteTopicID <= 0 {
-		return fmt.Errorf("invalid site topic ID")
-	}
-
-	err := h.repo.ActivateSiteTopic(ctx, siteTopicID)
-	if err != nil {
-		return fmt.Errorf("failed to activate site topic: %w", err)
-	}
-
-	return nil
-}
-
-// DeactivateSiteTopic deactivates a site-topic association
-func (h *Handler) DeactivateSiteTopic(siteTopicID int64) error {
-	ctx := h.fastCtx()
-
-	if siteTopicID <= 0 {
-		return fmt.Errorf("invalid site topic ID")
-	}
-
-	err := h.repo.DeactivateSiteTopic(ctx, siteTopicID)
-	if err != nil {
-		return fmt.Errorf("failed to deactivate site topic: %w", err)
-	}
-
-	return nil
-}
-
 // Topic Strategy and Selection Handlers
 
 // SelectTopicForSite selects a topic for article generation using the specified strategy
@@ -490,13 +406,13 @@ func (h *Handler) SelectTopicForSite(req dto.TopicSelectionRequest) (*dto.TopicS
 	response := &dto.TopicSelectionResponse{
 		Topic: dto.TopicToResponse(result.Topic),
 		SiteTopic: &dto.SiteTopicResponse{
-			ID:         result.SiteTopic.ID,
-			SiteID:     result.SiteTopic.SiteID,
-			TopicID:    result.SiteTopic.TopicID,
-			Priority:   result.SiteTopic.Priority,
-			IsActive:   result.SiteTopic.IsActive,
-			UsageCount: result.SiteTopic.UsageCount,
-			LastUsedAt: result.SiteTopic.LastUsedAt,
+			ID:            result.SiteTopic.ID,
+			SiteID:        result.SiteTopic.SiteID,
+			TopicID:       result.SiteTopic.TopicID,
+			Priority:      result.SiteTopic.Priority,
+			UsageCount:    result.SiteTopic.UsageCount,
+			LastUsedAt:    result.SiteTopic.LastUsedAt,
+			RoundRobinPos: result.SiteTopic.RoundRobinPos,
 		},
 		Strategy:       result.Strategy,
 		CanContinue:    result.CanContinue,

@@ -34,21 +34,6 @@ func (b *Binder) DeleteTopic(topicID int64) error {
 	return b.handler.DeleteTopic(topicID)
 }
 
-// ActivateTopic activates a topic
-func (b *Binder) ActivateTopic(topicID int64) error {
-	return b.handler.ActivateTopic(topicID)
-}
-
-// DeactivateTopic deactivates a topic
-func (b *Binder) DeactivateTopic(topicID int64) error {
-	return b.handler.DeactivateTopic(topicID)
-}
-
-// GetActiveTopics retrieves all active topics
-func (b *Binder) GetActiveTopics() ([]*dto.TopicResponse, error) {
-	return b.handler.GetActiveTopics()
-}
-
 // SiteTopic operations
 
 // CreateSiteTopic creates a new site-topic relationship
@@ -79,16 +64,6 @@ func (b *Binder) DeleteSiteTopic(siteTopicID int64) error {
 // DeleteSiteTopicBySiteAndTopic deletes a site-topic relationship by site and topic IDs
 func (b *Binder) DeleteSiteTopicBySiteAndTopic(siteID int64, topicID int64) error {
 	return b.handler.DeleteSiteTopicBySiteAndTopic(siteID, topicID)
-}
-
-// ActivateSiteTopic activates a site-topic relationship
-func (b *Binder) ActivateSiteTopic(siteTopicID int64) error {
-	return b.handler.ActivateSiteTopic(siteTopicID)
-}
-
-// DeactivateSiteTopic deactivates a site-topic relationship
-func (b *Binder) DeactivateSiteTopic(siteTopicID int64) error {
-	return b.handler.DeactivateSiteTopic(siteTopicID)
 }
 
 // Topic Selection and Statistics
