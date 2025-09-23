@@ -603,11 +603,11 @@ func (r *Repository) UpdateSiteTopicUsage(ctx context.Context, siteTopicID int64
 	newRoundRobinPos := currentRoundRobinPos
 
 	if strategy == string(models.StrategyRoundRobin) {
-		// Get total count of active topics for this site to calculate proper round-robin position
+		// Get total count of topics for this site to calculate proper round-robin position
 		countQuery, countArgs := builder.
 			Select("COUNT(*)").
 			From("site_topics").
-			Where(squirrel.Eq{"site_id": siteID, "is_active": true}).
+			Where(squirrel.Eq{"site_id": siteID}).
 			MustSql()
 
 		var totalTopics int
@@ -657,14 +657,15 @@ func (r *Repository) UpdateSiteTopicUsage(ctx context.Context, siteTopicID int64
 func (r *Repository) GetTopicStats(ctx context.Context, siteID int64) (*models.TopicStats, error) {
 	stats := &models.TopicStats{SiteID: siteID}
 
-	// Get total and active topics count
+	// Get total topics count
 	totalQuery, totalArgs := builder.
-		Select("COUNT(id) as total, COALESCE(SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END), 0) as active").
+		Select("COUNT(id) as total").
 		From("site_topics").
 		Where(squirrel.Eq{"site_id": siteID}).
 		MustSql()
 
-	err := r.db.QueryRowContext(ctx, totalQuery, totalArgs...).Scan(&stats.TotalTopics, &stats.ActiveTopics)
+	err := r.db.QueryRowContext(ctx, totalQuery, totalArgs...).Scan(&stats.TotalTopics)
+	stats.ActiveTopics = stats.TotalTopics // All topics are now considered active
 	if err != nil {
 		return nil, fmt.Errorf("failed to get topic counts: %w", err)
 	}
@@ -673,7 +674,7 @@ func (r *Repository) GetTopicStats(ctx context.Context, siteID int64) (*models.T
 	usageQuery, usageArgs := builder.
 		Select("COALESCE(SUM(CASE WHEN usage_count > 0 THEN 1 ELSE 0 END), 0) as used, COALESCE(SUM(CASE WHEN usage_count = 0 THEN 1 ELSE 0 END), 0) as unused").
 		From("site_topics").
-		Where(squirrel.Eq{"site_id": siteID, "is_active": true}).
+		Where(squirrel.Eq{"site_id": siteID}).
 		MustSql()
 
 	err = r.db.QueryRowContext(ctx, usageQuery, usageArgs...).Scan(&stats.UsedTopics, &stats.UnusedTopics)
@@ -687,7 +688,7 @@ func (r *Repository) GetTopicStats(ctx context.Context, siteID int64) (*models.T
 	mostUsedQuery, mostUsedArgs := builder.
 		Select("id", "usage_count").
 		From("site_topics").
-		Where(squirrel.Eq{"site_id": siteID, "is_active": true}).
+		Where(squirrel.Eq{"site_id": siteID}).
 		OrderBy("usage_count DESC").
 		Limit(1).
 		MustSql()
@@ -701,7 +702,7 @@ func (r *Repository) GetTopicStats(ctx context.Context, siteID int64) (*models.T
 	lastUsedQuery, lastUsedArgs := builder.
 		Select("id", "last_used_at").
 		From("site_topics").
-		Where(squirrel.Eq{"site_id": siteID, "is_active": true}).
+		Where(squirrel.Eq{"site_id": siteID}).
 		Where(squirrel.Gt{"usage_count": 0}).
 		OrderBy("last_used_at DESC").
 		Limit(1).
@@ -716,7 +717,7 @@ func (r *Repository) GetTopicStats(ctx context.Context, siteID int64) (*models.T
 	rrQuery, rrArgs := builder.
 		Select("COALESCE(AVG(round_robin_pos), 0)").
 		From("site_topics").
-		Where(squirrel.Eq{"site_id": siteID, "is_active": true}).
+		Where(squirrel.Eq{"site_id": siteID}).
 		MustSql()
 
 	var avgPos float64

@@ -106,11 +106,11 @@ func (tdb *TestDB) InsertTestData(t *testing.T) {
 
 	// Insert test topics
 	_, err = tdb.DB.Exec(`
-		INSERT INTO topics (id, title, keywords, category, tags, is_active, created_at, updated_at)
+		INSERT INTO topics (id, title, keywords, category, tags, created_at, updated_at)
 		VALUES 
-		(1, 'AI Technology', 'ai,ml,tech', 'Technology', 'ai,tech', 1, datetime('now'), datetime('now')),
-		(2, 'Web Development', 'web,dev,js', 'Programming', 'web,dev', 1, datetime('now'), datetime('now')),
-		(3, 'Inactive Topic', 'inactive', 'Test', 'test', 0, datetime('now'), datetime('now'))
+		(1, 'AI Technology', 'ai,ml,tech', 'Technology', 'ai,tech', datetime('now'), datetime('now')),
+		(2, 'Web Development', 'web,dev,js', 'Programming', 'web,dev', datetime('now'), datetime('now')),
+		(3, 'Test Topic', 'test', 'Test', 'test', datetime('now'), datetime('now'))
 	`)
 	if err != nil {
 		t.Fatalf("Failed to insert test topics: %v", err)
@@ -118,12 +118,12 @@ func (tdb *TestDB) InsertTestData(t *testing.T) {
 
 	// Insert test site_topics associations
 	_, err = tdb.DB.Exec(`
-		INSERT INTO site_topics (site_id, topic_id, priority, is_active, last_used_at, usage_count, round_robin_pos, created_at, updated_at)
+		INSERT INTO site_topics (site_id, topic_id, priority, last_used_at, usage_count, round_robin_pos, created_at, updated_at)
 		VALUES 
-		(1, 1, 1, 1, datetime('now'), 1, 0, datetime('now'), datetime('now')),
-		(1, 2, 2, 1, datetime('now'), 1, 0, datetime('now'), datetime('now')),
-		(2, 1, 1, 1, datetime('now'), 2, 1, datetime('now'), datetime('now')),
-		(2, 2, 1, 1, datetime('now'), 1, 0, datetime('now'), datetime('now'))
+		(1, 1, 1, datetime('now'), 1, 0, datetime('now'), datetime('now')),
+		(1, 2, 2, datetime('now'), 1, 0, datetime('now'), datetime('now')),
+		(2, 1, 1, datetime('now'), 2, 1, datetime('now'), datetime('now')),
+		(2, 2, 1, datetime('now'), 1, 0, datetime('now'), datetime('now'))
 	`)
 	if err != nil {
 		t.Fatalf("Failed to insert test site_topics: %v", err)

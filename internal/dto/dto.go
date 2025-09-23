@@ -190,7 +190,6 @@ type CreateSiteTopicRequest struct {
 	SiteID   int64 `json:"site_id" validate:"required,min=1"`
 	TopicID  int64 `json:"topic_id" validate:"required,min=1"`
 	Priority int   `json:"priority" validate:"min=1,max=10"`
-	IsActive bool  `json:"is_active"`
 }
 
 type UpdateSiteTopicRequest struct {
@@ -198,7 +197,6 @@ type UpdateSiteTopicRequest struct {
 	SiteID   int64 `json:"site_id" validate:"required,min=1"`
 	TopicID  int64 `json:"topic_id" validate:"required,min=1"`
 	Priority int   `json:"priority" validate:"min=1,max=10"`
-	IsActive bool  `json:"is_active"`
 }
 
 type SiteTopicResponse struct {
@@ -208,7 +206,6 @@ type SiteTopicResponse struct {
 	TopicID       int64      `json:"topic_id"`
 	TopicTitle    string     `json:"topic_title,omitempty"`
 	Priority      int        `json:"priority"`
-	IsActive      bool       `json:"is_active"`
 	UsageCount    int        `json:"usage_count"`
 	LastUsedAt    *time.Time `json:"last_used_at,omitempty"`
 	RoundRobinPos int        `json:"round_robin_pos"`
