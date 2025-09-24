@@ -116,7 +116,7 @@ func (a *App) initializeServices(_ *config.AppConfig) *ServiceContainer {
 		WordPressTimeout: 30 * time.Second,
 		GPTTimeout:       60 * time.Second,
 	}
-	pipelineService := pipeline.NewService(pipelineConfig, a.repo, gptService, wpService, a.ctx)
+	pipelineService := pipeline.NewService(pipelineConfig, a.repo, gptService, wpService, topicStrategyService, a.ctx)
 
 	return &ServiceContainer{
 		GPT:                  gptService,

@@ -3,7 +3,13 @@ package handlers
 import (
 	"Postulator/internal/dto"
 	"Postulator/internal/models"
+	"context"
+	"database/sql"
+	"encoding/csv"
+	"encoding/json"
 	"fmt"
+	"io"
+	"strings"
 )
 
 // Topic Handlers
@@ -592,4 +598,387 @@ func (h *Handler) CheckStrategyAvailability(siteID int64, strategy string) (*dto
 	}
 
 	return response, nil
+}
+
+// TopicsImport imports topics from file content with support for txt, csv, jsonl formats
+func (h *Handler) TopicsImport(siteID int64, req dto.TopicsImportRequest) (interface{}, error) {
+	ctx := h.fastCtx()
+
+	if siteID <= 0 {
+		return nil, fmt.Errorf("invalid site ID")
+	}
+
+	if req.FileContent == "" {
+		return nil, fmt.Errorf("file content is required")
+	}
+
+	if req.FileFormat == "" {
+		return nil, fmt.Errorf("file format is required")
+	}
+
+	// Parse topics from file content
+	topics, parseErrors := h.parseTopicsFromContent(req.FileContent, req.FileFormat)
+
+	if req.PreviewOnly {
+		return h.generateImportPreview(ctx, siteID, topics, parseErrors)
+	}
+
+	return h.executeImport(ctx, siteID, topics, parseErrors)
+}
+
+// TopicsReassign reassigns topics from one site to another
+func (h *Handler) TopicsReassign(req dto.TopicsReassignRequest) (*dto.ReassignResult, error) {
+	ctx := h.fastCtx()
+
+	if req.FromSiteID <= 0 {
+		return nil, fmt.Errorf("invalid from site ID")
+	}
+
+	if req.ToSiteID <= 0 {
+		return nil, fmt.Errorf("invalid to site ID")
+	}
+
+	if req.FromSiteID == req.ToSiteID {
+		return nil, fmt.Errorf("from and to site IDs cannot be the same")
+	}
+
+	// Validate that both sites exist
+	_, err := h.repo.GetSite(ctx, req.FromSiteID)
+	if err != nil {
+		return nil, fmt.Errorf("from site not found: %w", err)
+	}
+
+	_, err = h.repo.GetSite(ctx, req.ToSiteID)
+	if err != nil {
+		return nil, fmt.Errorf("to site not found: %w", err)
+	}
+
+	// Get topics to reassign for counting
+	var totalTopics int
+	if len(req.TopicIDs) > 0 {
+		totalTopics = len(req.TopicIDs)
+	} else {
+		// Count all topics for the site
+		result, err := h.repo.GetSiteTopics(ctx, req.FromSiteID, 1000, 0) // Large limit to get all
+		if err != nil {
+			return nil, fmt.Errorf("failed to get site topics count: %w", err)
+		}
+		totalTopics = result.Total
+	}
+
+	// Perform reassignment
+	err = h.repo.ReassignTopicsToSite(ctx, req.FromSiteID, req.ToSiteID, req.TopicIDs)
+	if err != nil {
+		return &dto.ReassignResult{
+			FromSiteID:       req.FromSiteID,
+			ToSiteID:         req.ToSiteID,
+			ProcessedTopics:  totalTopics,
+			ReassignedTopics: 0,
+			SkippedTopics:    totalTopics,
+			ErrorCount:       1,
+			ErrorMessages:    []string{err.Error()},
+		}, nil
+	}
+
+	return &dto.ReassignResult{
+		FromSiteID:       req.FromSiteID,
+		ToSiteID:         req.ToSiteID,
+		ProcessedTopics:  totalTopics,
+		ReassignedTopics: totalTopics,
+		SkippedTopics:    0,
+		ErrorCount:       0,
+		ErrorMessages:    []string{},
+	}, nil
+}
+
+// parseTopicsFromContent parses topics from different file formats
+func (h *Handler) parseTopicsFromContent(content, format string) ([]dto.ImportTopicItem, []string) {
+	var topics []dto.ImportTopicItem
+	var errors []string
+
+	content = strings.TrimSpace(content)
+	if content == "" {
+		errors = append(errors, "file content is empty")
+		return topics, errors
+	}
+
+	switch strings.ToLower(format) {
+	case "txt":
+		topics, errors = h.parseTxtContent(content)
+	case "csv":
+		topics, errors = h.parseCsvContent(content)
+	case "jsonl":
+		topics, errors = h.parseJsonlContent(content)
+	default:
+		errors = append(errors, fmt.Sprintf("unsupported file format: %s", format))
+	}
+
+	return topics, errors
+}
+
+// parseTxtContent parses plain text format (one title per line)
+func (h *Handler) parseTxtContent(content string) ([]dto.ImportTopicItem, []string) {
+	var topics []dto.ImportTopicItem
+	var errors []string
+
+	lines := strings.Split(content, "\n")
+	for i, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		if len(line) > 255 {
+			errors = append(errors, fmt.Sprintf("line %d: title too long (max 255 characters)", i+1))
+			continue
+		}
+
+		topics = append(topics, dto.ImportTopicItem{
+			Title:  line,
+			Status: "new",
+		})
+	}
+
+	return topics, errors
+}
+
+// parseCsvContent parses CSV format (title, keywords, category, tags)
+func (h *Handler) parseCsvContent(content string) ([]dto.ImportTopicItem, []string) {
+	var topics []dto.ImportTopicItem
+	var errors []string
+
+	reader := csv.NewReader(strings.NewReader(content))
+	reader.TrimLeadingSpace = true
+
+	lineNum := 0
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("CSV parsing error at line %d: %s", lineNum+1, err.Error()))
+			lineNum++
+			continue
+		}
+
+		lineNum++
+
+		if len(record) == 0 || (len(record) == 1 && strings.TrimSpace(record[0]) == "") {
+			continue
+		}
+
+		if len(record) < 1 {
+			errors = append(errors, fmt.Sprintf("line %d: missing title", lineNum))
+			continue
+		}
+
+		title := strings.TrimSpace(record[0])
+		if title == "" {
+			errors = append(errors, fmt.Sprintf("line %d: title cannot be empty", lineNum))
+			continue
+		}
+
+		if len(title) > 255 {
+			errors = append(errors, fmt.Sprintf("line %d: title too long (max 255 characters)", lineNum))
+			continue
+		}
+
+		topic := dto.ImportTopicItem{
+			Title:  title,
+			Status: "new",
+		}
+
+		if len(record) > 1 {
+			topic.Keywords = strings.TrimSpace(record[1])
+		}
+		if len(record) > 2 {
+			topic.Category = strings.TrimSpace(record[2])
+		}
+		if len(record) > 3 {
+			topic.Tags = strings.TrimSpace(record[3])
+		}
+
+		topics = append(topics, topic)
+	}
+
+	return topics, errors
+}
+
+// parseJsonlContent parses JSONL format (one JSON object per line)
+func (h *Handler) parseJsonlContent(content string) ([]dto.ImportTopicItem, []string) {
+	var topics []dto.ImportTopicItem
+	var errors []string
+
+	lines := strings.Split(content, "\n")
+	for i, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		var jsonTopic struct {
+			Title    string `json:"title"`
+			Keywords string `json:"keywords,omitempty"`
+			Category string `json:"category,omitempty"`
+			Tags     string `json:"tags,omitempty"`
+		}
+
+		err := json.Unmarshal([]byte(line), &jsonTopic)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("line %d: invalid JSON: %s", i+1, err.Error()))
+			continue
+		}
+
+		if jsonTopic.Title == "" {
+			errors = append(errors, fmt.Sprintf("line %d: title cannot be empty", i+1))
+			continue
+		}
+
+		if len(jsonTopic.Title) > 255 {
+			errors = append(errors, fmt.Sprintf("line %d: title too long (max 255 characters)", i+1))
+			continue
+		}
+
+		topics = append(topics, dto.ImportTopicItem{
+			Title:    jsonTopic.Title,
+			Keywords: jsonTopic.Keywords,
+			Category: jsonTopic.Category,
+			Tags:     jsonTopic.Tags,
+			Status:   "new",
+		})
+	}
+
+	return topics, errors
+}
+
+// generateImportPreview generates preview of import without creating topics
+func (h *Handler) generateImportPreview(ctx context.Context, siteID int64, topics []dto.ImportTopicItem, parseErrors []string) (*dto.TopicsImportPreview, error) {
+	preview := &dto.TopicsImportPreview{
+		SiteID:        siteID,
+		TotalLines:    len(topics) + len(parseErrors),
+		ValidTopics:   0,
+		Duplicates:    0,
+		Errors:        len(parseErrors),
+		Topics:        make([]dto.ImportTopicItem, 0),
+		ErrorMessages: parseErrors,
+	}
+
+	// Check for duplicates within file and against database
+	titleMap := make(map[string]bool)
+	for _, topic := range topics {
+		// Check for duplicates within the file
+		if titleMap[topic.Title] {
+			topic.Status = "duplicate"
+			topic.Error = "duplicate within file"
+		} else {
+			titleMap[topic.Title] = true
+
+			// Check against database
+			existingTopic, err := h.repo.GetTopicByTitle(ctx, topic.Title)
+			if err != nil && err != sql.ErrNoRows {
+				topic.Status = "error"
+				topic.Error = fmt.Sprintf("database check failed: %s", err.Error())
+				preview.Errors++
+			} else if existingTopic != nil {
+				topic.Status = "exists"
+				topic.Error = "topic already exists in database"
+			} else {
+				topic.Status = "new"
+				preview.ValidTopics++
+			}
+		}
+
+		if topic.Status == "duplicate" {
+			preview.Duplicates++
+		}
+
+		preview.Topics = append(preview.Topics, topic)
+	}
+
+	return preview, nil
+}
+
+// executeImport performs the actual import of topics
+func (h *Handler) executeImport(ctx context.Context, siteID int64, topics []dto.ImportTopicItem, parseErrors []string) (*dto.TopicsImportResult, error) {
+	result := &dto.TopicsImportResult{
+		SiteID:         siteID,
+		TotalProcessed: len(topics),
+		CreatedTopics:  0,
+		ReusedTopics:   0,
+		SkippedTopics:  0,
+		ErrorCount:     len(parseErrors),
+		Topics:         make([]dto.ImportTopicItem, 0),
+		ErrorMessages:  parseErrors,
+	}
+
+	// Check for duplicates and prepare topics for creation
+	titleMap := make(map[string]bool)
+	var topicsToCreate []*models.Topic
+	var topicsToReuse []*models.Topic
+
+	for _, topic := range topics {
+		// Skip duplicates within file
+		if titleMap[topic.Title] {
+			topic.Status = "duplicate"
+			topic.Error = "duplicate within file"
+			result.SkippedTopics++
+		} else {
+			titleMap[topic.Title] = true
+
+			// Check if topic exists in database
+			existingTopic, err := h.repo.GetTopicByTitle(ctx, topic.Title)
+			if err != nil && err != sql.ErrNoRows {
+				topic.Status = "error"
+				topic.Error = fmt.Sprintf("database check failed: %s", err.Error())
+				result.ErrorCount++
+			} else if existingTopic != nil {
+				// Topic exists, reuse it
+				topic.Status = "exists"
+				topicsToReuse = append(topicsToReuse, existingTopic)
+				result.ReusedTopics++
+			} else {
+				// New topic to create
+				topicsToCreate = append(topicsToCreate, &models.Topic{
+					Title:    topic.Title,
+					Keywords: topic.Keywords,
+					Category: topic.Category,
+					Tags:     topic.Tags,
+				})
+				topic.Status = "new"
+			}
+		}
+
+		result.Topics = append(result.Topics, topic)
+	}
+
+	// Create new topics with site binding
+	if len(topicsToCreate) > 0 {
+		createdTopics, err := h.repo.BulkCreateTopicsWithSiteBinding(ctx, siteID, topicsToCreate)
+		if err != nil {
+			result.ErrorMessages = append(result.ErrorMessages, fmt.Sprintf("bulk create failed: %s", err.Error()))
+			result.ErrorCount++
+			result.SkippedTopics += len(topicsToCreate)
+		} else {
+			result.CreatedTopics = len(createdTopics)
+		}
+	}
+
+	// Create site bindings for existing topics (reused ones)
+	for _, existingTopic := range topicsToReuse {
+		_, err := h.repo.CreateSiteTopic(ctx, &models.SiteTopic{
+			SiteID:   siteID,
+			TopicID:  existingTopic.ID,
+			Priority: 1,
+		})
+		if err != nil {
+			// If binding already exists, that's ok
+			if !strings.Contains(err.Error(), "UNIQUE constraint") {
+				result.ErrorMessages = append(result.ErrorMessages, fmt.Sprintf("failed to bind topic '%s': %s", existingTopic.Title, err.Error()))
+				result.ErrorCount++
+			}
+		}
+	}
+
+	return result, nil
 }

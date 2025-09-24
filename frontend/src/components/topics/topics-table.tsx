@@ -20,7 +20,6 @@ export type UpsertTopicValues = {
   keywords?: string;
   category?: string;
   tags?: string;
-  is_active: boolean;
 };
 
 export type TopicsTableProps = {
@@ -46,7 +45,6 @@ export default function TopicsTable({ topics, page, pageSize, total, onPageChang
   const [addOpen, setAddOpen] = React.useState<boolean>(false);
   const [editOpen, setEditOpen] = React.useState<boolean>(false);
   const [editing, setEditing] = React.useState<Topic | null>(null);
-  const [loading, setLoading] = React.useState<boolean>(false);
   const { toast } = useToast();
 
   const filtered = React.useMemo(() => {
@@ -59,18 +57,16 @@ export default function TopicsTable({ topics, page, pageSize, total, onPageChang
         (t.tags ?? "").toLowerCase().includes(q)
       );
     }
-    if (filterActive !== "all") {
-      const wantActive = filterActive === "active";
-      items = items.filter((t) => t.is_active === wantActive);
-    }
+    // Active filtering disabled - Topic type doesn't have is_active property
+    // if (filterActive !== "all") {
+    //   const wantActive = filterActive === "active";
+    //   items = items.filter((t) => t.is_active === wantActive);
+    // }
     return items;
   }, [topics, query, filterActive]);
 
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
 
-  const apply = (fn: (prev: Topic[]) => Topic[]) => {
-    if (onMutateTopics) onMutateTopics(fn);
-  };
 
   const toggleSelectAll = (checked: boolean) => {
     if (checked) setSelected(new Set(filtered.map((t) => t.id)));
@@ -89,7 +85,6 @@ export default function TopicsTable({ topics, page, pageSize, total, onPageChang
   const handleAdd = async (values: UpsertTopicValues) => {
     if (onCreate) {
       try {
-        setLoading(true);
         await onCreate(values);
         setAddOpen(false);
         onRefresh();
@@ -98,8 +93,6 @@ export default function TopicsTable({ topics, page, pageSize, total, onPageChang
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Failed to create topic";
         toast({ title: "Create failed", description: msg, variant: "destructive" });
-      } finally {
-        setLoading(false);
       }
     }
   };
@@ -108,7 +101,6 @@ export default function TopicsTable({ topics, page, pageSize, total, onPageChang
     if (!editing) return;
     if (onUpdate) {
       try {
-        setLoading(true);
         await onUpdate(editing.id, values);
         setEditOpen(false);
         setEditing(null);
@@ -118,8 +110,6 @@ export default function TopicsTable({ topics, page, pageSize, total, onPageChang
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Failed to update topic";
         toast({ title: "Update failed", description: msg, variant: "destructive" });
-      } finally {
-        setLoading(false);
       }
     }
   };
@@ -127,7 +117,6 @@ export default function TopicsTable({ topics, page, pageSize, total, onPageChang
   const handleDelete = async (id: number) => {
     if (onDelete) {
       try {
-        setLoading(true);
         await onDelete(id);
         onRefresh();
         toast({ title: "Topic deleted", description: `Topic has been deleted.` });
@@ -135,8 +124,6 @@ export default function TopicsTable({ topics, page, pageSize, total, onPageChang
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Failed to delete topic";
         toast({ title: "Delete failed", description: msg, variant: "destructive" });
-      } finally {
-        setLoading(false);
       }
     }
   };
@@ -175,23 +162,24 @@ export default function TopicsTable({ topics, page, pageSize, total, onPageChang
     }
   };
 
-  const handleToggleActive = async (id: number) => {
-    if (onToggleActive) {
-      const topic = topics.find((t) => t.id === id);
-      if (topic) {
-        try {
-          await onToggleActive(id, !topic.is_active);
-          onRefresh();
-          toast({ title: !topic.is_active ? "Topic enabled" : "Topic disabled", description: topic.title });
-          return;
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : "Failed to toggle topic";
-          toast({ title: "Toggle failed", description: msg, variant: "destructive" });
-          return;
-        }
-      }
-    }
-  };
+  // handleToggleActive disabled - Topic type doesn't have is_active property
+  // const handleToggleActive = async (id: number) => {
+  //   if (onToggleActive) {
+  //     const topic = topics.find((t) => t.id === id);
+  //     if (topic) {
+  //       try {
+  //         await onToggleActive(id, !topic.is_active);
+  //         onRefresh();
+  //         toast({ title: !topic.is_active ? "Topic enabled" : "Topic disabled", description: topic.title });
+  //         return;
+  //       } catch (e) {
+  //         const msg = e instanceof Error ? e.message : "Failed to toggle topic";
+  //         toast({ title: "Toggle failed", description: msg, variant: "destructive" });
+  //         return;
+  //       }
+  //     }
+  //   }
+  // };
 
   function formatDateTimeEU(iso?: string): string {
     if (!iso) return "—";
@@ -289,7 +277,7 @@ export default function TopicsTable({ topics, page, pageSize, total, onPageChang
                   <TableCell className="text-sm">{t.category || "—"}</TableCell>
                   <TableCell className="text-sm truncate max-w-[240px]" title={t.tags}>{t.tags || "—"}</TableCell>
                   <TableCell className="align-middle">
-                    <span className={`block mx-auto h-2.5 w-2.5 rounded-full ${t.is_active ? "bg-green-500" : "bg-red-500"}`} aria-label={t.is_active ? "Active" : "Inactive"} title={t.is_active ? "Active" : "Inactive"} />
+                    <span className={`block mx-auto h-2.5 w-2.5 rounded-full bg-green-500`} aria-label="Active" title="Active" />
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">{formatDateTimeEU(t.created_at)}</TableCell>
                   <TableCell className="text-right">
@@ -303,9 +291,11 @@ export default function TopicsTable({ topics, page, pageSize, total, onPageChang
                         <DropdownMenuItem onClick={() => { setEditing(t); setEditOpen(true); }}>
                           <RiEdit2Line size={16} className="mr-2" /> Edit
                         </DropdownMenuItem>
+                        {/* Toggle disabled - handleToggleActive function commented out
                         <DropdownMenuItem onClick={() => handleToggleActive(t.id)}>
                           <RiToggleLine size={16} className="mr-2" /> {t.is_active ? "Disable" : "Enable"}
                         </DropdownMenuItem>
+                        */}
                         <DropdownMenuSeparator />
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
@@ -361,7 +351,6 @@ export default function TopicsTable({ topics, page, pageSize, total, onPageChang
         keywords: editing.keywords,
         category: editing.category,
         tags: editing.tags,
-        is_active: editing.is_active,
       } : undefined} onSubmit={handleEdit} />
     </TooltipProvider>
   );
@@ -369,9 +358,9 @@ export default function TopicsTable({ topics, page, pageSize, total, onPageChang
 
 // Inline form component using shadcn Dialog & basic inputs
 function TopicForm({ open, onOpenChange, initial, onSubmit }: { open: boolean; onOpenChange: (o: boolean) => void; initial?: UpsertTopicValues; onSubmit: (values: UpsertTopicValues) => void | Promise<void>; }) {
-  const [values, setValues] = React.useState<UpsertTopicValues>(initial ?? { title: "", keywords: "", category: "", tags: "", is_active: true });
+  const [values, setValues] = React.useState<UpsertTopicValues>(initial ?? { title: "", keywords: "", category: "", tags: "" });
   React.useEffect(() => {
-    setValues(initial ?? { title: "", keywords: "", category: "", tags: "", is_active: true });
+    setValues(initial ?? { title: "", keywords: "", category: "", tags: "" });
   }, [initial]);
 
   const [submitting, setSubmitting] = React.useState(false);
@@ -410,10 +399,12 @@ function TopicForm({ open, onOpenChange, initial, onSubmit }: { open: boolean; o
             <Label htmlFor="tags">Tags</Label>
             <Input id="tags" value={values.tags ?? ""} onChange={(e) => setValues((v) => ({ ...v, tags: e.target.value }))} />
           </div>
+          {/* Active switch disabled - is_active property removed from UpsertTopicValues type
           <div className="flex items-center justify-between py-2">
             <Label htmlFor="is_active">Active</Label>
             <Switch id="is_active" checked={values.is_active} onCheckedChange={(c) => setValues((v) => ({ ...v, is_active: Boolean(c) }))} />
           </div>
+          */}
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button type="submit" disabled={submitting}>{initial ? "Save" : "Create"}</Button>

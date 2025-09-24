@@ -92,3 +92,15 @@ func (b *Binder) GetSiteUsageHistory(siteID int64, pagination dto.PaginationRequ
 func (b *Binder) CheckStrategyAvailability(siteID int64, strategy string) (*dto.StrategyAvailabilityResponse, error) {
 	return b.handler.CheckStrategyAvailability(siteID, strategy)
 }
+
+// Bulk Operations
+
+// TopicsImport imports topics from file content with support for txt, csv, jsonl formats
+func (b *Binder) TopicsImport(siteID int64, req dto.TopicsImportRequest) (interface{}, error) {
+	return b.handler.TopicsImport(siteID, req)
+}
+
+// TopicsReassign reassigns topics from one site to another
+func (b *Binder) TopicsReassign(req dto.TopicsReassignRequest) (*dto.ReassignResult, error) {
+	return b.handler.TopicsReassign(req)
+}

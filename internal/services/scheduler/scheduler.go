@@ -7,8 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"Postulator/internal/dto"
 	"Postulator/internal/models"
 	"Postulator/internal/repository"
+	"Postulator/internal/services/pipeline"
 	"github.com/go-co-op/gocron"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -16,7 +18,8 @@ import (
 // Service manages scheduled tasks for automated posting
 type Service struct {
 	scheduler   *gocron.Scheduler
-	repos       *repository.Container
+	repos       *repository.Repository
+	pipeline    *pipeline.Service
 	jobRegistry map[int64]*gocron.Job // Maps schedule ID to job
 	mutex       sync.RWMutex
 	appContext  context.Context
@@ -36,7 +39,7 @@ type Config struct {
 type JobCallback func(ctx context.Context, schedule *models.Schedule) error
 
 // NewService creates a new scheduler service
-func NewService(config Config, repos *repository.Container, appContext context.Context) *Service {
+func NewService(config Config, repos *repository.Repository, pipeline *pipeline.Service, appContext context.Context) *Service {
 	if config.Location == nil {
 		config.Location = time.UTC
 	}
@@ -56,13 +59,19 @@ func NewService(config Config, repos *repository.Container, appContext context.C
 	scheduler := gocron.NewScheduler(config.Location)
 	scheduler.SetMaxConcurrentJobs(config.MaxJobs, gocron.RescheduleMode)
 
-	return &Service{
+	service := &Service{
 		scheduler:   scheduler,
 		repos:       repos,
+		pipeline:    pipeline,
 		jobRegistry: make(map[int64]*gocron.Job),
 		appContext:  appContext,
 		isRunning:   false,
 	}
+
+	// Start background job worker
+	go service.startJobWorker()
+
+	return service
 }
 
 // Start starts the scheduler
@@ -185,7 +194,7 @@ func (s *Service) GetActiveJobs() map[int64]JobInfo {
 			ScheduleID: scheduleID,
 			NextRun:    job.NextRun(),
 			LastRun:    job.LastRun(),
-			RunCount:   job.RunCount(),
+			RunCount:   uint64(job.RunCount()),
 		}
 	}
 
@@ -205,7 +214,7 @@ func (s *Service) loadSchedules() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	schedules, err := s.repos.Schedule.GetActive(ctx)
+	schedules, err := s.repos.GetActive(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get active schedules: %w", err)
 	}
@@ -236,30 +245,37 @@ func (s *Service) createDefaultCallback() JobCallback {
 		})
 
 		// Update last run time
-		if err := s.repos.Schedule.UpdateLastRun(ctx, schedule.ID); err != nil {
+		if err := s.repos.UpdateLastRun(ctx, schedule.ID); err != nil {
 			log.Printf("Failed to update last run time for schedule %d: %v", schedule.ID, err)
 		}
 
 		// Calculate next run time
 		nextRun := s.calculateNextRun(schedule.CronExpr)
 		if nextRun > 0 {
-			if err := s.repos.Schedule.UpdateNextRun(ctx, schedule.ID, nextRun); err != nil {
+			if err := s.repos.UpdateNextRun(ctx, schedule.ID, nextRun); err != nil {
 				log.Printf("Failed to update next run time for schedule %d: %v", schedule.ID, err)
 			}
 		}
 
-		// Here you would typically trigger the article generation and posting pipeline
-		// This would involve:
-		// 1. Get site topics for this site
-		// 2. Generate articles based on posting frequency
-		// 3. Create posting jobs
-		// 4. Execute posting jobs
+		// Create publishing job using pipeline service
+		publishReq := dto.GeneratePublishRequest{
+			SiteID: schedule.SiteID,
+		}
 
-		// For now, we'll emit an event that other services can listen to
+		_, err := s.pipeline.CreatePublishJob(ctx, publishReq)
+		if err != nil {
+			log.Printf("Failed to create publish job for schedule %d: %v", schedule.ID, err)
+			s.emitEvent("job:failed", map[string]interface{}{
+				"schedule_id": schedule.ID,
+				"site_id":     schedule.SiteID,
+				"error":       err.Error(),
+			})
+			return err
+		}
+
 		s.emitEvent("job:trigger_posting", map[string]interface{}{
-			"schedule_id":   schedule.ID,
-			"site_id":       schedule.SiteID,
-			"posts_per_day": schedule.PostsPerDay,
+			"schedule_id": schedule.ID,
+			"site_id":     schedule.SiteID,
 		})
 
 		s.emitEvent("job:completed", map[string]interface{}{
@@ -277,7 +293,7 @@ func (s *Service) executeScheduledJob(scheduleID int64, callback JobCallback) {
 	defer cancel()
 
 	// Get schedule from database
-	schedule, err := s.repos.Schedule.GetByID(ctx, scheduleID)
+	schedule, err := s.repos.GetByID(ctx, scheduleID)
 	if err != nil {
 		log.Printf("Failed to get schedule %d: %v", scheduleID, err)
 		return
@@ -369,7 +385,7 @@ func (s *Service) GetScheduleInfo(scheduleID int64) (*JobInfo, error) {
 		ScheduleID: scheduleID,
 		NextRun:    job.NextRun(),
 		LastRun:    job.LastRun(),
-		RunCount:   job.RunCount(),
+		RunCount:   uint64(job.RunCount()),
 	}, nil
 }
 
@@ -378,7 +394,7 @@ func (s *Service) RunScheduleNow(scheduleID int64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	schedule, err := s.repos.Schedule.GetByID(ctx, scheduleID)
+	schedule, err := s.repos.GetByID(ctx, scheduleID)
 	if err != nil {
 		return fmt.Errorf("failed to get schedule: %w", err)
 	}
@@ -403,6 +419,93 @@ func (s *Service) RunScheduleNow(scheduleID int64) error {
 }
 
 // emitEvent emits an event to the frontend
+// startJobWorker processes pending PostingJobs in background
+func (s *Service) startJobWorker() {
+	ticker := time.NewTicker(30 * time.Second) // Check for jobs every 30 seconds
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			s.processPendingJobs()
+		case <-s.appContext.Done():
+			log.Println("Job worker shutting down...")
+			return
+		}
+	}
+}
+
+// processPendingJobs processes all pending jobs in the queue
+func (s *Service) processPendingJobs() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	// Get pending jobs from database
+	pendingJobs, err := s.repos.GetJobsByStatus(ctx, "pending", 10, 0)
+	if err != nil {
+		log.Printf("Failed to get pending jobs: %v", err)
+		return
+	}
+
+	for _, job := range pendingJobs.Data {
+		// Process job in separate goroutine to avoid blocking
+		go s.processJob(job)
+	}
+}
+
+// processJob processes a single PostingJob
+func (s *Service) processJob(job *models.PostingJob) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	// Update job status to running
+	job.Status = "running"
+	job.Progress = 10
+	job.StartedAt = time.Now()
+	_, err := s.repos.UpdateJob(ctx, job)
+	if err != nil {
+		log.Printf("Failed to update job %d status to running: %v", job.ID, err)
+		return
+	}
+
+	// Create GeneratePublishRequest from job
+	publishReq := dto.GeneratePublishRequest{
+		SiteID: job.SiteID,
+	}
+
+	// Update progress
+	job.Progress = 50
+	s.repos.UpdateJob(ctx, job)
+
+	// Call pipeline to generate and publish article
+	article, err := s.pipeline.GenerateAndPublish(ctx, publishReq)
+	if err != nil {
+		// Mark job as failed
+		job.Status = "failed"
+		job.Progress = 0
+		job.ErrorMsg = err.Error()
+		job.CompletedAt = time.Now()
+		s.repos.UpdateJob(ctx, job)
+		log.Printf("Job %d failed: %v", job.ID, err)
+		return
+	}
+
+	// Update job with article ID and mark as completed
+	job.Status = "completed"
+	job.Progress = 100
+	job.ArticleID = article.ID
+	job.CompletedAt = time.Now()
+	job.ErrorMsg = ""
+
+	_, err = s.repos.UpdateJob(ctx, job)
+	if err != nil {
+		log.Printf("Failed to update job %d completion status: %v", job.ID, err)
+		return
+	}
+
+	log.Printf("Job %d completed successfully, created article %d", job.ID, article.ID)
+}
+
 func (s *Service) emitEvent(eventName string, data interface{}) {
 	if s.appContext != nil {
 		runtime.EventsEmit(s.appContext, eventName, data)

@@ -142,6 +142,14 @@ export function TestSiteConnection(arg1) {
   return window['go']['bindings']['Binder']['TestSiteConnection'](arg1);
 }
 
+export function TopicsImport(arg1, arg2) {
+  return window['go']['bindings']['Binder']['TopicsImport'](arg1, arg2);
+}
+
+export function TopicsReassign(arg1) {
+  return window['go']['bindings']['Binder']['TopicsReassign'](arg1);
+}
+
 export function UpdatePrompt(arg1) {
   return window['go']['bindings']['Binder']['UpdatePrompt'](arg1);
 }

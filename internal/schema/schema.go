@@ -164,24 +164,28 @@ CREATE INDEX IF NOT EXISTS idx_site_prompts_prompt_id ON site_prompts(prompt_id)
 INSERT OR IGNORE INTO prompts (name, system_prompt, user_prompt, is_default) VALUES
 (
     'Default Prompt',
-    'You are a professional content writer who creates high-quality, SEO-optimized articles for WordPress websites. You must respond with valid JSON matching the provided schema. Focus on creating engaging, informative content that provides value to readers while following SEO best practices.',
-    'Please write a comprehensive article about: {{title}}
+    'Пиши структурированный текст с подзаголовками, без лишней воды. Минимум {min_words} слов. Язык сайта.',
+    'Создай статью на тему: {topic_title}
 
-Topic details:
-{{description}}
+Параметры сайта:
+- Название сайта: {site_name}
+- URL: {site_url}
+- Категория: {category}
+- Ключевые слова: {keywords}
+- Теги: {tags}
+- Тон: {tone}
+- Стиль: {style}
+- Минимум слов: {min_words}
 
-Requirements:
-- Write a complete HTML article with minimum 800 words
-- Create an SEO-optimized title based on: {{title}}
-- Include a brief excerpt (150-200 characters) 
-- Provide relevant SEO keywords
-- Suggest appropriate WordPress tags
-- Assign a suitable category
-- Use proper HTML formatting with headings, paragraphs, and lists where appropriate
-- Make the content engaging and informative
-- Ensure the article provides genuine value to readers
-
-Please respond with valid JSON matching the provided schema.',
+Верни результат в формате JSON:
+{
+  "title": "заголовок статьи",
+  "outline": ["раздел 1", "раздел 2", "раздел 3"],
+  "content_html": "полный HTML контент статьи с подзаголовками",
+  "excerpt": "краткое описание",
+  "keywords": ["ключевое1", "ключевое2"],
+  "tags": ["тег1", "тег2"]
+}',
     TRUE
 );
 `

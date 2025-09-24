@@ -10,13 +10,13 @@ import {
     BreadcrumbPage,
     BreadcrumbSeparator
 } from "@/components/ui/breadcrumb";
-import { RiScanLine } from "@remixicon/react";
 import SitesPanel from "@/components/dashboard/SitesPanel";
 import DashboardOverview from "@/components/dashboard/DashboardOverview";
 import TopicsPanel from "@/components/dashboard/TopicsPanel";
 import PromptsPanel from "@/components/dashboard/PromptsPanel";
+import SiteTopicsPanel from "@/components/dashboard/SiteTopicsPanel";
+import JobsPanel from "@/components/dashboard/JobsPanel";
 import { NavigationProvider, useNavigation } from "@/context/navigation";
-import { RiBardLine, RiCodeSSlashLine, RiSettings3Line, RiUserFollowLine } from "@remixicon/react";
 
 function SplashScreen() {
     return (
@@ -57,13 +57,11 @@ function SectionContent() {
     if (section === "sites") {
         return <SitesPanel />;
     }
+    if (section === "site-topics") {
+        return <SiteTopicsPanel />;
+    }
     if (section === "jobs") {
-        return (
-            <div className="p-4 md:p-6 lg:p-8">
-                <h1 className="mt-1 text-2xl font-semibold tracking-tight">Jobs</h1>
-                <p className="mt-2 text-muted-foreground">Cron builder and job list will appear here.</p>
-            </div>
-        );
+        return <JobsPanel />;
     }
     if (section === "topics") {
         return <TopicsPanel />;

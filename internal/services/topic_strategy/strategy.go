@@ -300,17 +300,16 @@ func (s *RandomAllStrategy) GetStrategyName() string {
 
 func (s *RandomAllStrategy) SelectTopic(ctx context.Context, siteID int64, availableTopics []*models.SiteTopic) (*models.TopicSelectionResult, error) {
 	// Get all topics from the system, not just site-specific ones
-	allTopicsResult, err := s.repo.GetTopics(ctx, 1000, 0) // Get a large number of topics
+	allTopics, err := s.repo.GetAllTopicsForRandomSelection(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all topics: %w", err)
 	}
 
-	if len(allTopicsResult.Data) == 0 {
+	if len(allTopics) == 0 {
 		return nil, fmt.Errorf("no topics available for random_all strategy")
 	}
 
 	// Select a random topic from all topics
-	allTopics := allTopicsResult.Data
 	randomIndex, err := rand.Int(rand.Reader, big.NewInt(int64(len(allTopics))))
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate random number: %w", err)
@@ -350,9 +349,9 @@ func (s *RandomAllStrategy) SelectTopic(ctx context.Context, siteID int64, avail
 
 func (s *RandomAllStrategy) CanContinue(ctx context.Context, siteID int64, availableTopics []*models.SiteTopic) bool {
 	// For random_all, we need to check if there are any topics in the system
-	allTopicsResult, err := s.repo.GetTopics(ctx, 1, 0) // Just check if there's at least one topic
+	allTopics, err := s.repo.GetAllTopicsForRandomSelection(ctx)
 	if err != nil {
 		return false
 	}
-	return len(allTopicsResult.Data) > 0
+	return len(allTopics) > 0
 }

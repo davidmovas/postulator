@@ -1,12 +1,5 @@
 "use client";
 import * as React from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { Pagination, PaginationContent, PaginationItem } from "@/components/ui/pagination";
-import { useToast } from "@/components/ui/use-toast";
-import type { Site } from "@/types/site";
-import type { Topic } from "@/types/topic";
 
 export default function StatsPanel() {
     return (

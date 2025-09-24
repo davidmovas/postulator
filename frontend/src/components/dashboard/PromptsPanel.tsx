@@ -9,7 +9,6 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogD
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -219,7 +218,7 @@ function AssignSitesDialog({
       setAssigning(siteId);
       const sp = await import("@/services/sitePrompts");
       await sp.deleteSitePromptBySite(siteId).catch(()=>{});
-      await sp.createSitePrompt(siteId, prompt.id, isActive);
+      await sp.createSitePrompt(siteId, prompt.id);
       setAssigned((prev) => {
         const next = new Set(prev);
         next.add(siteId);
@@ -429,7 +428,7 @@ export default function PromptsPanel() {
             aria-label="Active filter"
             className="h-9 rounded-md border bg-background px-2 text-sm"
             value={activeFilter}
-            onChange={(e) => setActiveFilter('all')}
+            onChange={(e) => setActiveFilter(e.target.value as 'all' | 'active' | 'inactive')}
           >
             <option value="all">All</option>
             <option value="active">Active</option>

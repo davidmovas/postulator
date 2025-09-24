@@ -422,6 +422,90 @@ type StrategyAvailabilityResponse struct {
 	RemainingCount int    `json:"remaining_count"`
 }
 
+// Topics Import structures
+type TopicsImportRequest struct {
+	SiteID      int64  `json:"site_id"`
+	FileContent string `json:"file_content"`
+	FileFormat  string `json:"file_format"` // txt, csv, jsonl
+	PreviewOnly bool   `json:"preview_only"`
+}
+
+type ImportTopicItem struct {
+	Title    string `json:"title"`
+	Keywords string `json:"keywords,omitempty"`
+	Category string `json:"category,omitempty"`
+	Tags     string `json:"tags,omitempty"`
+	Status   string `json:"status"` // new, duplicate, exists
+	Error    string `json:"error,omitempty"`
+}
+
+type TopicsImportPreview struct {
+	SiteID        int64             `json:"site_id"`
+	TotalLines    int               `json:"total_lines"`
+	ValidTopics   int               `json:"valid_topics"`
+	Duplicates    int               `json:"duplicates"`
+	Errors        int               `json:"errors"`
+	Topics        []ImportTopicItem `json:"topics"`
+	ErrorMessages []string          `json:"error_messages,omitempty"`
+}
+
+type TopicsImportResult struct {
+	SiteID         int64             `json:"site_id"`
+	TotalProcessed int               `json:"total_processed"`
+	CreatedTopics  int               `json:"created_topics"`
+	ReusedTopics   int               `json:"reused_topics"`
+	SkippedTopics  int               `json:"skipped_topics"`
+	ErrorCount     int               `json:"error_count"`
+	Topics         []ImportTopicItem `json:"topics"`
+	ErrorMessages  []string          `json:"error_messages,omitempty"`
+}
+
+// Topics Reassign structures
+type TopicsReassignRequest struct {
+	FromSiteID int64   `json:"from_site_id"`
+	ToSiteID   int64   `json:"to_site_id"`
+	TopicIDs   []int64 `json:"topic_ids,omitempty"` // empty means all topics
+}
+
+type ReassignResult struct {
+	FromSiteID       int64    `json:"from_site_id"`
+	ToSiteID         int64    `json:"to_site_id"`
+	ProcessedTopics  int      `json:"processed_topics"`
+	ReassignedTopics int      `json:"reassigned_topics"`
+	SkippedTopics    int      `json:"skipped_topics"`
+	ErrorCount       int      `json:"error_count"`
+	ErrorMessages    []string `json:"error_messages,omitempty"`
+}
+
+// Pipeline and Job Management structures
+type GeneratePublishRequest struct {
+	SiteID   int64  `json:"site_id"`
+	TopicID  *int64 `json:"topic_id,omitempty"`  // Optional: if not provided, will use site strategy
+	Strategy string `json:"strategy,omitempty"`  // Optional: override site default strategy
+	Title    string `json:"title,omitempty"`     // Optional: override topic title
+	Tone     string `json:"tone,omitempty"`      // Optional: content tone
+	Style    string `json:"style,omitempty"`     // Optional: content style
+	MinWords int    `json:"min_words,omitempty"` // Optional: minimum word count
+}
+
+type JobResponse struct {
+	ID          int64      `json:"id"`
+	Type        string     `json:"type"`
+	SiteID      int64      `json:"site_id"`
+	ArticleID   *int64     `json:"article_id,omitempty"`
+	Status      string     `json:"status"`
+	Progress    int        `json:"progress"`
+	ErrorMsg    string     `json:"error_msg,omitempty"`
+	StartedAt   *time.Time `json:"started_at,omitempty"`
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+}
+
+type JobListResponse struct {
+	Jobs       []*JobResponse      `json:"jobs"`
+	Pagination *PaginationResponse `json:"pagination"`
+}
+
 // Conversion utilities
 func (r *CreateSiteRequest) ToModel() *models.Site {
 	return &models.Site{
@@ -631,6 +715,36 @@ func SitePromptToResponse(sitePrompt *models.SitePrompt) *SitePromptResponse {
 		PromptName: "", // Not in model, will be populated by handler if needed
 		CreatedAt:  sitePrompt.CreatedAt,
 		UpdatedAt:  sitePrompt.UpdatedAt,
+	}
+}
+
+func JobToResponse(job *models.PostingJob) *JobResponse {
+	var articleID *int64
+	if job.ArticleID != 0 {
+		articleID = &job.ArticleID
+	}
+
+	var startedAt *time.Time
+	if !job.StartedAt.IsZero() {
+		startedAt = &job.StartedAt
+	}
+
+	var completedAt *time.Time
+	if !job.CompletedAt.IsZero() {
+		completedAt = &job.CompletedAt
+	}
+
+	return &JobResponse{
+		ID:          job.ID,
+		Type:        job.Type,
+		SiteID:      job.SiteID,
+		ArticleID:   articleID,
+		Status:      job.Status,
+		Progress:    job.Progress,
+		ErrorMsg:    job.ErrorMsg,
+		StartedAt:   startedAt,
+		CompletedAt: completedAt,
+		CreatedAt:   job.CreatedAt,
 	}
 }
 

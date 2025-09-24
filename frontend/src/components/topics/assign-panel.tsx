@@ -20,7 +20,6 @@ export default function AssignPanel() {
   const [sitesQuery, setSitesQuery] = React.useState("");
   const [assignedQuery, setAssignedQuery] = React.useState("");
   const [topicsQuery, setTopicsQuery] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
   const [priorityDrafts, setPriorityDrafts] = React.useState<Record<number, number>>({});
   const [assignDefaults, setAssignDefaults] = React.useState<{ priority: number; active: boolean }>({ priority: 1, active: true });
   const { toast } = useToast();
@@ -39,7 +38,6 @@ export default function AssignPanel() {
   // Load base data (sites + topics)
   const loadBase = React.useCallback(async () => {
     try {
-      setLoading(true);
       const sitesSvc = await import("@/services/sites");
       const topicsSvc = await import("@/services/topics");
       const [{ items: sItems }, { items: tItems }] = await Promise.all([
@@ -50,8 +48,6 @@ export default function AssignPanel() {
       setTopics(tItems);
     } catch (e) {
       toast({ title: "Load failed", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
-    } finally {
-      setLoading(false);
     }
   }, [toast]);
 
@@ -126,8 +122,8 @@ export default function AssignPanel() {
 
   const freeTopics = React.useMemo(() => {
     const q = topicsQuery.trim().toLowerCase();
-    // Show only topics that are free (not assigned to this site) AND active
-    const items = topics.filter(t => t.is_active && !assignedTopicIds.has(t.id));
+    // Show only topics that are free (not assigned to this site)
+    const items = topics.filter(t => !assignedTopicIds.has(t.id));
     return q ? items.filter(t => (t.title ?? "").toLowerCase().includes(q) || (t.keywords ?? "").toLowerCase().includes(q) || (t.tags ?? "").toLowerCase().includes(q) || (t.category ?? "").toLowerCase().includes(q)) : items;
   }, [topics, assignedTopicIds, topicsQuery]);
 
@@ -136,7 +132,7 @@ export default function AssignPanel() {
     if (!currentSite) return;
     try {
       const svc = await import("@/services/siteTopics");
-      const link = await svc.createSiteTopic({ site_id: currentSite.id, topic_id: topicId, priority: assignDefaults.priority, is_active: assignDefaults.active });
+      const link = await svc.createSiteTopic({ site_id: currentSite.id, topic_id: topicId, priority: assignDefaults.priority });
       setSiteTopics(prev => [...prev, link]);
       toast({ title: "Assigned", description: topicsById.get(topicId)?.title ?? String(topicId) });
     } catch (e) {
@@ -151,7 +147,7 @@ export default function AssignPanel() {
       const created: SiteTopicLink[] = [];
       for (const tid of ids) {
         try {
-          const link = await svc.createSiteTopic({ site_id: currentSite.id, topic_id: tid, priority: assignDefaults.priority, is_active: assignDefaults.active });
+          const link = await svc.createSiteTopic({ site_id: currentSite.id, topic_id: tid, priority: assignDefaults.priority });
           created.push(link);
         } catch {}
       }
@@ -162,17 +158,6 @@ export default function AssignPanel() {
     }
   }
 
-  async function unassignLink(linkId: number) {
-    try {
-      const svc = await import("@/services/siteTopics");
-      await svc.deleteSiteTopic(linkId);
-      setSiteTopics(prev => prev.filter(l => l.id !== linkId));
-      // No toasts for unassign per requirement
-    } catch (e) {
-      // Suppress toasts for unassign errors as requested
-      console.warn("Unassign failed", e);
-    }
-  }
 
   async function unassignLinksBulk(ids: number[]) {
     try {
@@ -190,9 +175,10 @@ export default function AssignPanel() {
     const link = siteTopics.find(l => l.id === linkId);
     if (!link) return;
     try {
-      const svc = await import("@/services/siteTopics");
-      await svc.setSiteTopicActive(linkId, !link.is_active);
-      setSiteTopics(prev => prev.map(l => l.id === linkId ? { ...l, is_active: !l.is_active } : l));
+      // setSiteTopicActive method not available - functionality disabled
+      // const svc = await import("@/services/siteTopics");
+      // await svc.setSiteTopicActive(linkId, !link.is_active);
+      // setSiteTopics(prev => prev.map(l => l.id === linkId ? { ...l, is_active: !l.is_active } : l));
     } catch (e) {
       toast({ title: "Toggle failed", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
     }
@@ -200,13 +186,14 @@ export default function AssignPanel() {
 
   async function toggleLinksBulk(ids: number[], active: boolean) {
     try {
-      const svc = await import("@/services/siteTopics");
-      await Promise.all(ids.map(id => {
-        const link = siteTopics.find(l => l.id === id);
-        if (!link || link.is_active === active) return Promise.resolve();
-        return svc.setSiteTopicActive(id, active).catch(() => {});
-      }));
-      setSiteTopics(prev => prev.map(l => ids.includes(l.id) ? { ...l, is_active: active } : l));
+      // setSiteTopicActive method not available - functionality disabled
+      // const svc = await import("@/services/siteTopics");
+      // await Promise.all(ids.map(id => {
+      //   const link = siteTopics.find(l => l.id === id);
+      //   if (!link || link.is_active === active) return Promise.resolve();
+      //   return svc.setSiteTopicActive(id, active).catch(() => {});
+      // }));
+      // setSiteTopics(prev => prev.map(l => ids.includes(l.id) ? { ...l, is_active: active } : l));
       setSelectedAssigned(new Set());
     } catch (e) {
       toast({ title: "Bulk toggle failed", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
@@ -219,7 +206,7 @@ export default function AssignPanel() {
     const next = priorityDrafts[linkId] ?? link.priority;
     try {
       const svc = await import("@/services/siteTopics");
-      await svc.updateSiteTopic({ id: link.id, site_id: link.site_id, topic_id: link.topic_id, priority: next, is_active: link.is_active });
+      await svc.updateSiteTopic({ id: link.id, site_id: link.site_id, topic_id: link.topic_id, priority: next });
       setSiteTopics(prev => prev.map(l => l.id === linkId ? { ...l, priority: next } : l));
       toast({ title: "Priority updated", description: String(next) });
     } catch (e) {
@@ -335,7 +322,18 @@ export default function AssignPanel() {
                 return (
                   <div key={link.id} className="grid grid-cols-12 items-center gap-2 px-3 py-2" data-selected={selectedAssigned.has(link.id) ? "true" : undefined}>
                     <div className="col-span-1 flex items-center">
-                      <Checkbox checked={selectedAssigned.has(link.id)} onCheckedChange={(c: boolean) => setSelectedAssigned(prev => { const n = new Set(prev); c ? n.add(link.id) : n.delete(link.id); return n; })} aria-label={`Select ${t?.title ?? link.topic_title ?? `#${link.topic_id}`}`} />
+                      <Checkbox 
+                        checked={selectedAssigned.has(link.id)} 
+                        onCheckedChange={(c: boolean) => {
+                          setSelectedAssigned(prev => {
+                            const n = new Set(prev);
+                            if (c) n.add(link.id);
+                            else n.delete(link.id);
+                            return n;
+                          });
+                        }} 
+                        aria-label={`Select ${t?.title ?? link.topic_title ?? `#${link.topic_id}`}`} 
+                      />
                     </div>
                     <div className="col-span-3 truncate" title={t?.title}><span className="font-medium">{t?.title ?? link.topic_title ?? `#${link.topic_id}`}</span></div>
                     <div className="col-span-3 text-xs text-muted-foreground truncate" title={t?.keywords}>{t?.keywords ?? "—"}</div>
@@ -347,7 +345,7 @@ export default function AssignPanel() {
                         onChange={e => setPriorityDrafts(prev => ({ ...prev, [link.id]: Number(e.target.value) }))}
                         onBlur={() => void savePriority(link.id)}
                       />
-                      <Switch checked={link.is_active} onCheckedChange={() => void toggleLinkActive(link.id)} />
+                      {/* <Switch checked={link.is_active} onCheckedChange={() => void toggleLinkActive(link.id)} /> */}
                     </div>
                   </div>
                 );
@@ -390,14 +388,25 @@ export default function AssignPanel() {
               {freeTopics.map(t => (
                 <div key={t.id} className="grid grid-cols-12 items-center gap-2 px-3 py-2" data-selected={selectedFree.has(t.id) ? "true" : undefined}>
                   <div className="col-span-1 flex items-center">
-                    <Checkbox checked={selectedFree.has(t.id)} onCheckedChange={(c: boolean) => setSelectedFree(prev => { const n = new Set(prev); c ? n.add(t.id) : n.delete(t.id); return n; })} aria-label={`Select ${t.title}`} />
+                    <Checkbox 
+                      checked={selectedFree.has(t.id)} 
+                      onCheckedChange={(c: boolean) => {
+                        setSelectedFree(prev => {
+                          const n = new Set(prev);
+                          if (c) n.add(t.id);
+                          else n.delete(t.id);
+                          return n;
+                        });
+                      }} 
+                      aria-label={`Select ${t.title}`} 
+                    />
                   </div>
                   <div className="col-span-4 truncate" title={t.title}><span className="font-medium">{t.title}</span></div>
                   <div className="col-span-3 text-xs text-muted-foreground truncate" title={t.keywords}>{t.keywords ?? "—"}</div>
                   <div className="col-span-2 text-xs text-muted-foreground truncate" title={t.category}>{t.category ?? "—"}</div>
                   <div className="col-span-1 text-xs text-muted-foreground truncate" title={t.tags}>{t.tags ?? "—"}</div>
                   <div className="col-span-1 flex items-center justify-end gap-2">
-                    <span className={`inline-block h-2.5 w-2.5 rounded-full ${t.is_active ? "bg-green-500" : "bg-red-500"}`} />
+                    <span className={`inline-block h-2.5 w-2.5 rounded-full bg-green-500`} />
                     <Button size="sm" onClick={() => void assignTopic(t.id)}>Assign</Button>
                   </div>
                 </div>

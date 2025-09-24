@@ -24,6 +24,11 @@ type TopicRepository interface {
 	CreateTopic(ctx context.Context, topic *models.Topic) (*models.Topic, error)
 	UpdateTopic(ctx context.Context, topic *models.Topic) (*models.Topic, error)
 	DeleteTopic(ctx context.Context, id int64) error
+	GetAllTopicsForRandomSelection(ctx context.Context) ([]*models.Topic, error)
+
+	// Bulk operations
+	GetTopicByTitle(ctx context.Context, title string) (*models.Topic, error)
+	BulkCreateTopicsWithSiteBinding(ctx context.Context, siteID int64, topics []*models.Topic) ([]*models.Topic, error)
 }
 
 type SiteTopicRepository interface {
@@ -38,6 +43,9 @@ type SiteTopicRepository interface {
 	GetSiteTopicsForSelection(ctx context.Context, siteID int64, strategy string) ([]*models.SiteTopic, error)
 	UpdateSiteTopicUsage(ctx context.Context, siteTopicID int64, strategy string) error
 	GetTopicStats(ctx context.Context, siteID int64) (*models.TopicStats, error)
+
+	// Bulk operations
+	ReassignTopicsToSite(ctx context.Context, fromSiteID, toSiteID int64, topicIDs []int64) error
 }
 
 type TopicUsageRepository interface {
@@ -64,4 +72,38 @@ type SitePromptRepository interface {
 	DeleteSitePrompt(ctx context.Context, id int64) error
 	DeleteSitePromptBySite(ctx context.Context, siteID int64) error
 	GetPromptSites(ctx context.Context, promptID int64, limit int, offset int) (*models.PaginationResult[*models.SitePrompt], error)
+}
+
+type ArticleRepository interface {
+	GetArticles(ctx context.Context, limit int, offset int) (*models.PaginationResult[*models.Article], error)
+	GetArticle(ctx context.Context, id int64) (*models.Article, error)
+	GetArticlesBySiteID(ctx context.Context, siteID int64, limit int, offset int) (*models.PaginationResult[*models.Article], error)
+	CreateArticle(ctx context.Context, article *models.Article) (*models.Article, error)
+	UpdateArticle(ctx context.Context, article *models.Article) (*models.Article, error)
+	DeleteArticle(ctx context.Context, id int64) error
+	GetArticleByHash(ctx context.Context, hash string) (*models.Article, error)
+	GetArticleBySlug(ctx context.Context, siteID int64, slug string) (*models.Article, error)
+}
+
+type PostingJobRepository interface {
+	GetJobs(ctx context.Context, limit int, offset int) (*models.PaginationResult[*models.PostingJob], error)
+	GetJob(ctx context.Context, id int64) (*models.PostingJob, error)
+	GetJobsBySiteID(ctx context.Context, siteID int64, limit int, offset int) (*models.PaginationResult[*models.PostingJob], error)
+	CreateJob(ctx context.Context, job *models.PostingJob) (*models.PostingJob, error)
+	UpdateJob(ctx context.Context, job *models.PostingJob) (*models.PostingJob, error)
+	DeleteJob(ctx context.Context, id int64) error
+	GetJobsByStatus(ctx context.Context, status string, limit int, offset int) (*models.PaginationResult[*models.PostingJob], error)
+}
+
+type ScheduleRepository interface {
+	GetSchedules(ctx context.Context, limit int, offset int) (*models.PaginationResult[*models.Schedule], error)
+	GetSchedule(ctx context.Context, id int64) (*models.Schedule, error)
+	GetSchedulesBySiteID(ctx context.Context, siteID int64, limit int, offset int) (*models.PaginationResult[*models.Schedule], error)
+	CreateSchedule(ctx context.Context, schedule *models.Schedule) (*models.Schedule, error)
+	UpdateSchedule(ctx context.Context, schedule *models.Schedule) (*models.Schedule, error)
+	DeleteSchedule(ctx context.Context, id int64) error
+	GetActive(ctx context.Context) ([]*models.Schedule, error)
+	GetByID(ctx context.Context, id int64) (*models.Schedule, error)
+	UpdateLastRun(ctx context.Context, id int64) error
+	UpdateNextRun(ctx context.Context, id int64, nextRun int64) error
 }

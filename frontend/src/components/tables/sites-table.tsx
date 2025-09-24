@@ -38,8 +38,6 @@ export default function SitesTable({ sites, page, pageSize, total, onPageChange,
   const [addOpen, setAddOpen] = React.useState<boolean>(false);
   const [editOpen, setEditOpen] = React.useState<boolean>(false);
   const [editing, setEditing] = React.useState<Site | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
-  const [loading, setLoading] = React.useState<boolean>(false);
   const { toast } = useToast();
 
   const filtered = React.useMemo(() => {
@@ -71,8 +69,6 @@ export default function SitesTable({ sites, page, pageSize, total, onPageChange,
   const handleAdd = async (values: SiteFormValues) => {
     if (onCreate) {
       try {
-        setLoading(true);
-        setError(null);
         await onCreate(values);
         setAddOpen(false);
         onRefresh();
@@ -80,11 +76,8 @@ export default function SitesTable({ sites, page, pageSize, total, onPageChange,
         return;
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Failed to create site";
-        setError(msg);
         toast({ title: "Create failed", description: msg, variant: "destructive" });
         return;
-      } finally {
-        setLoading(false);
       }
     }
     const id = Math.max(0, ...sites.map((s) => s.id)) + 1;
@@ -106,8 +99,6 @@ export default function SitesTable({ sites, page, pageSize, total, onPageChange,
     if (!editing) return;
     if (onUpdate) {
       try {
-        setLoading(true);
-        setError(null);
         await onUpdate(editing.id, values);
         setEditOpen(false);
         setEditing(null);
@@ -116,11 +107,8 @@ export default function SitesTable({ sites, page, pageSize, total, onPageChange,
         return;
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Failed to update site";
-        setError(msg);
         toast({ title: "Update failed", description: msg, variant: "destructive" });
         return;
-      } finally {
-        setLoading(false);
       }
     }
     apply((prev) =>
@@ -137,19 +125,14 @@ export default function SitesTable({ sites, page, pageSize, total, onPageChange,
   const handleDelete = async (id: number) => {
     if (onDelete) {
       try {
-        setLoading(true);
-        setError(null);
         await onDelete(id);
         onRefresh();
         toast({ title: "Site deleted", description: `Site has been deleted.` });
         return;
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Failed to delete site";
-        setError(msg);
         toast({ title: "Delete failed", description: msg, variant: "destructive" });
         return;
-      } finally {
-        setLoading(false);
       }
     }
     apply((prev) => prev.filter((s) => s.id !== id));

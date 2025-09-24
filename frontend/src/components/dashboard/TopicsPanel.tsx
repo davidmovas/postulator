@@ -4,7 +4,6 @@ import TopicsTable from "@/components/topics/topics-table";
 import type { Topic } from "@/types/topic";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import AssignPanel from "@/components/topics/assign-panel";
-import StatsPanel from "@/components/topics/stats-panel";
 
 export default function TopicsPanel() {
   const [page, setPage] = React.useState<number>(1);
@@ -73,14 +72,15 @@ export default function TopicsPanel() {
               const svc = await import("@/services/topics");
               await svc.deleteTopic(id);
             }}
-            onToggleActive={async (id, active) => {
-              const svc = await import("@/services/topics");
-              await svc.setTopicActive(id, active);
-            }}
-            onBulkToggle={async (ids, active) => {
-              const svc = await import("@/services/topics");
-              await Promise.all(ids.map((id) => svc.setTopicActive(id, active)));
-            }}
+            // onToggleActive and onBulkToggle disabled - setTopicActive method not available
+            // onToggleActive={async (id, active) => {
+            //   const svc = await import("@/services/topics");
+            //   await svc.setTopicActive(id, active);
+            // }}
+            // onBulkToggle={async (ids, active) => {
+            //   const svc = await import("@/services/topics");
+            //   await Promise.all(ids.map((id) => svc.setTopicActive(id, active)));
+            // }}
             onBulkDelete={async (ids) => {
               const svc = await import("@/services/topics");
               await Promise.all(ids.map((id) => svc.deleteTopic(id)));

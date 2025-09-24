@@ -281,6 +281,48 @@ func (r *Repository) GetActiveTopics(ctx context.Context) ([]*models.Topic, erro
 	return topics, nil
 }
 
+func (r *Repository) GetAllTopicsForRandomSelection(ctx context.Context) ([]*models.Topic, error) {
+	query, args := builder.
+		Select(
+			"id",
+			"title",
+			"keywords",
+			"category",
+			"tags",
+			"created_at",
+			"updated_at",
+		).
+		From("topics").
+		MustSql()
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query all topics for random selection: %w", err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	var topics []*models.Topic
+	for rows.Next() {
+		var topic models.Topic
+		if err = rows.Scan(
+			&topic.ID,
+			&topic.Title,
+			&topic.Keywords,
+			&topic.Category,
+			&topic.Tags,
+			&topic.CreatedAt,
+			&topic.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan topic: %w", err)
+		}
+		topics = append(topics, &topic)
+	}
+
+	return topics, nil
+}
+
 func (r *Repository) CreateSiteTopic(ctx context.Context, siteTopic *models.SiteTopic) (*models.SiteTopic, error) {
 	query, args := builder.
 		Insert("site_topics").
@@ -535,23 +577,94 @@ func (r *Repository) DeleteSiteTopicBySiteAndTopic(ctx context.Context, siteID i
 	return nil
 }
 
-func (r *Repository) GetSiteTopicsForSelection(ctx context.Context, siteID int64, _ string) ([]*models.SiteTopic, error) {
-	query, args := builder.
-		Select(
-			"id",
-			"site_id",
-			"topic_id",
-			"priority",
-			"last_used_at",
-			"usage_count",
-			"round_robin_pos",
-			"created_at",
-			"updated_at",
-		).
-		From("site_topics").
-		Where(squirrel.Eq{"site_id": siteID}).
-		OrderBy("priority DESC, created_at ASC"). // Higher priority first, then by creation time
-		MustSql()
+func (r *Repository) GetSiteTopicsForSelection(ctx context.Context, siteID int64, strategy string) ([]*models.SiteTopic, error) {
+	var query string
+	var args []interface{}
+
+	switch strategy {
+	case "unique":
+		// Get SiteTopics with UsageCount=0
+		query, args = builder.
+			Select(
+				"id",
+				"site_id",
+				"topic_id",
+				"priority",
+				"last_used_at",
+				"usage_count",
+				"round_robin_pos",
+				"created_at",
+				"updated_at",
+			).
+			From("site_topics").
+			Where(squirrel.And{
+				squirrel.Eq{"site_id": siteID},
+				squirrel.Eq{"usage_count": 0},
+			}).
+			OrderBy("priority DESC, created_at ASC").
+			MustSql()
+
+	case "round_robin":
+		// Get all site topics ordered by RoundRobinPos, then by LastUsedAt as tie-breaker
+		query, args = builder.
+			Select(
+				"id",
+				"site_id",
+				"topic_id",
+				"priority",
+				"last_used_at",
+				"usage_count",
+				"round_robin_pos",
+				"created_at",
+				"updated_at",
+			).
+			From("site_topics").
+			Where(squirrel.Eq{"site_id": siteID}).
+			OrderBy("round_robin_pos ASC, last_used_at ASC NULLS FIRST").
+			MustSql()
+
+	case "random":
+		// Get all site topics for random selection
+		query, args = builder.
+			Select(
+				"id",
+				"site_id",
+				"topic_id",
+				"priority",
+				"last_used_at",
+				"usage_count",
+				"round_robin_pos",
+				"created_at",
+				"updated_at",
+			).
+			From("site_topics").
+			Where(squirrel.Eq{"site_id": siteID}).
+			MustSql()
+
+	case "random_all":
+		// This strategy will be handled differently - we need all topics in the system
+		// Return empty slice for now, will be handled in the handler layer
+		return []*models.SiteTopic{}, nil
+
+	default:
+		// Default behavior - return all site topics
+		query, args = builder.
+			Select(
+				"id",
+				"site_id",
+				"topic_id",
+				"priority",
+				"last_used_at",
+				"usage_count",
+				"round_robin_pos",
+				"created_at",
+				"updated_at",
+			).
+			From("site_topics").
+			Where(squirrel.Eq{"site_id": siteID}).
+			OrderBy("priority DESC, created_at ASC").
+			MustSql()
+	}
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -601,8 +714,15 @@ func (r *Repository) UpdateSiteTopicUsage(ctx context.Context, siteTopicID int64
 
 	newUsageCount := currentUsageCount + 1
 	newRoundRobinPos := currentRoundRobinPos
+	now := time.Now()
 
-	if strategy == string(models.StrategyRoundRobin) {
+	switch strategy {
+	case "unique":
+		// For unique strategy, just increment usage count and update last_used_at
+		// Round robin position doesn't matter for unique strategy
+		break
+
+	case "round_robin":
 		// Get total count of topics for this site to calculate proper round-robin position
 		countQuery, countArgs := builder.
 			Select("COUNT(*)").
@@ -625,9 +745,22 @@ func (r *Repository) UpdateSiteTopicUsage(ctx context.Context, siteTopicID int64
 				newRoundRobinPos = (currentRoundRobinPos % totalTopics) + 1
 			}
 		}
+
+	case "random":
+		// For random strategy, just increment usage count and update last_used_at
+		// Round robin position doesn't matter for random strategy
+		break
+
+	case "random_all":
+		// For random_all strategy, just increment usage count and update last_used_at
+		// Round robin position doesn't matter for random_all strategy
+		break
+
+	default:
+		// Default behavior - just increment usage count
+		break
 	}
 
-	now := time.Now()
 	updateQuery, updateArgs := builder.
 		Update("site_topics").
 		Set("usage_count", newUsageCount).
@@ -905,4 +1038,177 @@ func (r *Repository) RecordTopicUsage(ctx context.Context, siteID, topicID, arti
 
 	_, err := r.CreateTopicUsage(ctx, usage)
 	return err
+}
+
+// Bulk operations for topics import and reassign
+
+// GetTopicByTitle retrieves a topic by its title (for import deduplication)
+func (r *Repository) GetTopicByTitle(ctx context.Context, title string) (*models.Topic, error) {
+	query, args := builder.
+		Select("id", "title", "keywords", "category", "tags", "created_at", "updated_at").
+		From("topics").
+		Where(squirrel.Eq{"title": title}).
+		Limit(1).
+		MustSql()
+
+	var topic models.Topic
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(
+		&topic.ID,
+		&topic.Title,
+		&topic.Keywords,
+		&topic.Category,
+		&topic.Tags,
+		&topic.CreatedAt,
+		&topic.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get topic by title: %w", err)
+	}
+
+	return &topic, nil
+}
+
+// BulkCreateTopicsWithSiteBinding creates multiple topics and binds them to a site in a single transaction
+func (r *Repository) BulkCreateTopicsWithSiteBinding(ctx context.Context, siteID int64, topics []*models.Topic) ([]*models.Topic, error) {
+	if len(topics) == 0 {
+		return nil, nil
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		} else {
+			_ = tx.Commit()
+		}
+	}()
+
+	createdTopics := make([]*models.Topic, 0, len(topics))
+
+	for _, topic := range topics {
+		// Insert topic
+		query, args := builder.
+			Insert("topics").
+			Columns("title", "keywords", "category", "tags", "created_at", "updated_at").
+			Values(topic.Title, topic.Keywords, topic.Category, topic.Tags, time.Now(), time.Now()).
+			Suffix("RETURNING id, title, keywords, category, tags, created_at, updated_at").
+			MustSql()
+
+		var createdTopic models.Topic
+		err = tx.QueryRowContext(ctx, query, args...).Scan(
+			&createdTopic.ID,
+			&createdTopic.Title,
+			&createdTopic.Keywords,
+			&createdTopic.Category,
+			&createdTopic.Tags,
+			&createdTopic.CreatedAt,
+			&createdTopic.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create topic '%s': %w", topic.Title, err)
+		}
+
+		// Create site-topic binding
+		siteTopicQuery, siteTopicArgs := builder.
+			Insert("site_topics").
+			Columns("site_id", "topic_id", "priority", "created_at", "updated_at").
+			Values(siteID, createdTopic.ID, 1, time.Now(), time.Now()).
+			MustSql()
+
+		_, err = tx.ExecContext(ctx, siteTopicQuery, siteTopicArgs...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create site-topic binding for topic '%s': %w", createdTopic.Title, err)
+		}
+
+		createdTopics = append(createdTopics, &createdTopic)
+	}
+
+	return createdTopics, nil
+}
+
+// ReassignTopicsToSite moves topic assignments from one site to another
+func (r *Repository) ReassignTopicsToSite(ctx context.Context, fromSiteID, toSiteID int64, topicIDs []int64) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		} else {
+			_ = tx.Commit()
+		}
+	}()
+
+	var whereClause squirrel.Sqlizer = squirrel.Eq{"site_id": fromSiteID}
+	if len(topicIDs) > 0 {
+		whereClause = squirrel.And{
+			squirrel.Eq{"site_id": fromSiteID},
+			squirrel.Eq{"topic_id": topicIDs},
+		}
+	}
+
+	// Get existing site-topic relationships to reassign
+	selectQuery, selectArgs := builder.
+		Select("topic_id", "priority").
+		From("site_topics").
+		Where(whereClause).
+		MustSql()
+
+	rows, err := tx.QueryContext(ctx, selectQuery, selectArgs...)
+	if err != nil {
+		return fmt.Errorf("failed to query existing site topics: %w", err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	type topicAssignment struct {
+		TopicID  int64
+		Priority int
+	}
+
+	var assignments []topicAssignment
+	for rows.Next() {
+		var assignment topicAssignment
+		if err = rows.Scan(&assignment.TopicID, &assignment.Priority); err != nil {
+			return fmt.Errorf("failed to scan topic assignment: %w", err)
+		}
+		assignments = append(assignments, assignment)
+	}
+
+	if len(assignments) == 0 {
+		return nil // Nothing to reassign
+	}
+
+	// Delete existing assignments from source site
+	deleteQuery, deleteArgs := builder.
+		Delete("site_topics").
+		Where(whereClause).
+		MustSql()
+
+	_, err = tx.ExecContext(ctx, deleteQuery, deleteArgs...)
+	if err != nil {
+		return fmt.Errorf("failed to delete existing site topics: %w", err)
+	}
+
+	// Create new assignments for target site
+	insertBuilder := builder.Insert("site_topics").
+		Columns("site_id", "topic_id", "priority", "created_at", "updated_at")
+
+	for _, assignment := range assignments {
+		insertBuilder = insertBuilder.Values(toSiteID, assignment.TopicID, assignment.Priority, time.Now(), time.Now())
+	}
+
+	insertQuery, insertArgs := insertBuilder.MustSql()
+	_, err = tx.ExecContext(ctx, insertQuery, insertArgs...)
+	if err != nil {
+		return fmt.Errorf("failed to create new site topic assignments: %w", err)
+	}
+
+	return nil
 }

@@ -60,7 +60,6 @@ export namespace dto {
 	    site_id: number;
 	    topic_id: number;
 	    priority: number;
-	    is_active: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new CreateSiteTopicRequest(source);
@@ -71,7 +70,6 @@ export namespace dto {
 	        this.site_id = source["site_id"];
 	        this.topic_id = source["topic_id"];
 	        this.priority = source["priority"];
-	        this.is_active = source["is_active"];
 	    }
 	}
 	export class CreateTopicRequest {
@@ -203,6 +201,30 @@ export namespace dto {
 		}
 	}
 	
+	export class ReassignResult {
+	    from_site_id: number;
+	    to_site_id: number;
+	    processed_topics: number;
+	    reassigned_topics: number;
+	    skipped_topics: number;
+	    error_count: number;
+	    error_messages?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ReassignResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.from_site_id = source["from_site_id"];
+	        this.to_site_id = source["to_site_id"];
+	        this.processed_topics = source["processed_topics"];
+	        this.reassigned_topics = source["reassigned_topics"];
+	        this.skipped_topics = source["skipped_topics"];
+	        this.error_count = source["error_count"];
+	        this.error_messages = source["error_messages"];
+	    }
+	}
 	export class SetDefaultPromptRequest {
 	    id: number;
 	    type: string;
@@ -387,7 +409,6 @@ export namespace dto {
 	    topic_id: number;
 	    topic_title?: string;
 	    priority: number;
-	    is_active: boolean;
 	    usage_count: number;
 	    // Go type: time
 	    last_used_at?: any;
@@ -405,7 +426,6 @@ export namespace dto {
 	        this.topic_id = source["topic_id"];
 	        this.topic_title = source["topic_title"];
 	        this.priority = source["priority"];
-	        this.is_active = source["is_active"];
 	        this.usage_count = source["usage_count"];
 	        this.last_used_at = this.convertValues(source["last_used_at"], null);
 	        this.round_robin_pos = source["round_robin_pos"];
@@ -794,6 +814,40 @@ export namespace dto {
 		}
 	}
 	
+	export class TopicsImportRequest {
+	    site_id: number;
+	    file_content: string;
+	    file_format: string;
+	    preview_only: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new TopicsImportRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.site_id = source["site_id"];
+	        this.file_content = source["file_content"];
+	        this.file_format = source["file_format"];
+	        this.preview_only = source["preview_only"];
+	    }
+	}
+	export class TopicsReassignRequest {
+	    from_site_id: number;
+	    to_site_id: number;
+	    topic_ids?: number[];
+	
+	    static createFrom(source: any = {}) {
+	        return new TopicsReassignRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.from_site_id = source["from_site_id"];
+	        this.to_site_id = source["to_site_id"];
+	        this.topic_ids = source["topic_ids"];
+	    }
+	}
 	export class UpdatePromptRequest {
 	    id: number;
 	    name: string;
@@ -863,7 +917,6 @@ export namespace dto {
 	    site_id: number;
 	    topic_id: number;
 	    priority: number;
-	    is_active: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new UpdateSiteTopicRequest(source);
@@ -875,7 +928,6 @@ export namespace dto {
 	        this.site_id = source["site_id"];
 	        this.topic_id = source["topic_id"];
 	        this.priority = source["priority"];
-	        this.is_active = source["is_active"];
 	    }
 	}
 	export class UpdateTopicRequest {

@@ -73,6 +73,10 @@ export function SetSiteCheckStatus(arg1:number,arg2:string):Promise<void>;
 
 export function TestSiteConnection(arg1:dto.TestSiteConnectionRequest):Promise<dto.TestConnectionResponse>;
 
+export function TopicsImport(arg1:number,arg2:dto.TopicsImportRequest):Promise<any>;
+
+export function TopicsReassign(arg1:dto.TopicsReassignRequest):Promise<dto.ReassignResult>;
+
 export function UpdatePrompt(arg1:dto.UpdatePromptRequest):Promise<dto.PromptResponse>;
 
 export function UpdateSite(arg1:dto.UpdateSiteRequest):Promise<dto.SiteResponse>;

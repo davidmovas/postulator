@@ -4,10 +4,11 @@ import (
 	"testing"
 
 	"Postulator/internal/dto"
+	"Postulator/internal/testutil"
 )
 
 func TestHandler_CreateTopic(t *testing.T) {
-	handler, testDB, cleanup := setupHandlerTest(t)
+	handler, db, cleanup := testutil.setupHandlerTest(t)
 	defer cleanup()
 
 	tests := []struct {
@@ -39,8 +40,7 @@ func TestHandler_CreateTopic(t *testing.T) {
 		{
 			name: "Valid topic with minimal data",
 			request: dto.CreateTopicRequest{
-				Title:    "Minimal Topic",
-				IsActive: false,
+				Title: "Minimal Topic",
 			},
 			wantErr: false,
 		},
@@ -102,7 +102,6 @@ func TestHandler_GetTopic(t *testing.T) {
 		Keywords: "test,topic",
 		Category: "Technology",
 		Tags:     "test",
-		IsActive: true,
 	}
 
 	created, err := handler.CreateTopic(createReq)
@@ -172,9 +171,9 @@ func TestHandler_GetTopics(t *testing.T) {
 
 	// Create multiple test topics
 	topics := []dto.CreateTopicRequest{
-		{Title: "Topic 1", Keywords: "key1", Category: "Cat1", Tags: "tag1", IsActive: true},
-		{Title: "Topic 2", Keywords: "key2", Category: "Cat2", Tags: "tag2", IsActive: true},
-		{Title: "Topic 3", Keywords: "key3", Category: "Cat3", Tags: "tag3", IsActive: false},
+		{Title: "Topic 1", Keywords: "key1", Category: "Cat1", Tags: "tag1"},
+		{Title: "Topic 2", Keywords: "key2", Category: "Cat2", Tags: "tag2"},
+		{Title: "Topic 3", Keywords: "key3", Category: "Cat3", Tags: "tag3"},
 	}
 
 	for _, topic := range topics {
@@ -253,7 +252,6 @@ func TestHandler_UpdateTopic(t *testing.T) {
 		Keywords: "original",
 		Category: "Original",
 		Tags:     "original",
-		IsActive: true,
 	}
 
 	created, err := handler.CreateTopic(createReq)
@@ -274,7 +272,6 @@ func TestHandler_UpdateTopic(t *testing.T) {
 				Keywords: "updated,keywords",
 				Category: "Updated",
 				Tags:     "updated,tags",
-				IsActive: false,
 			},
 			wantErr: false,
 		},
@@ -286,7 +283,6 @@ func TestHandler_UpdateTopic(t *testing.T) {
 				Keywords: "test",
 				Category: "Test",
 				Tags:     "test",
-				IsActive: true,
 			},
 			wantErr: true,
 		},
@@ -298,7 +294,6 @@ func TestHandler_UpdateTopic(t *testing.T) {
 				Keywords: "test",
 				Category: "Test",
 				Tags:     "test",
-				IsActive: true,
 			},
 			wantErr: true,
 		},
@@ -352,7 +347,6 @@ func TestHandler_DeleteTopic(t *testing.T) {
 		Keywords: "test",
 		Category: "Test",
 		Tags:     "test",
-		IsActive: true,
 	}
 
 	created, err := handler.CreateTopic(createReq)
@@ -406,120 +400,6 @@ func TestHandler_DeleteTopic(t *testing.T) {
 	}
 }
 
-func TestHandler_ActivateDeactivateTopic(t *testing.T) {
-	handler, testDB, cleanup := setupHandlerTest(t)
-	defer cleanup()
-
-	testDB.ClearAllTables(t)
-
-	// Create a test topic first
-	createReq := dto.CreateTopicRequest{
-		Title:    "Test Topic",
-		Keywords: "test",
-		Category: "Test",
-		Tags:     "test",
-		IsActive: false,
-	}
-
-	created, err := handler.CreateTopic(createReq)
-	if err != nil {
-		t.Fatalf("Failed to create test topic: %v", err)
-	}
-
-	t.Run("Activate topic", func(t *testing.T) {
-		err := handler.ActivateTopic(created.ID)
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
-
-		// Verify activation by getting the topic
-		response, err := handler.GetTopic(created.ID)
-		if err != nil {
-			t.Errorf("Failed to get topic after activation: %v", err)
-			return
-		}
-
-		if !response.IsActive {
-			t.Error("Expected topic to be active after activation")
-		}
-	})
-
-	t.Run("Deactivate topic", func(t *testing.T) {
-		err := handler.DeactivateTopic(created.ID)
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
-
-		// Verify deactivation by getting the topic
-		response, err := handler.GetTopic(created.ID)
-		if err != nil {
-			t.Errorf("Failed to get topic after deactivation: %v", err)
-			return
-		}
-
-		if response.IsActive {
-			t.Error("Expected topic to be inactive after deactivation")
-		}
-	})
-
-	t.Run("Invalid topic ID should fail", func(t *testing.T) {
-		err := handler.ActivateTopic(0)
-		if err == nil {
-			t.Error("Expected error for invalid topic ID")
-		}
-
-		err = handler.DeactivateTopic(0)
-		if err == nil {
-			t.Error("Expected error for invalid topic ID")
-		}
-	})
-}
-
-func TestHandler_GetActiveTopics(t *testing.T) {
-	handler, testDB, cleanup := setupHandlerTest(t)
-	defer cleanup()
-
-	testDB.ClearAllTables(t)
-
-	// Create multiple topics with different active status
-	topics := []dto.CreateTopicRequest{
-		{Title: "Active Topic 1", IsActive: true},
-		{Title: "Active Topic 2", IsActive: true},
-		{Title: "Inactive Topic", IsActive: false},
-	}
-
-	var activeCount int
-	for _, topic := range topics {
-		_, err := handler.CreateTopic(topic)
-		if err != nil {
-			t.Fatalf("Failed to create test topic: %v", err)
-		}
-		if topic.IsActive {
-			activeCount++
-		}
-	}
-
-	t.Run("Get active topics", func(t *testing.T) {
-		response, err := handler.GetActiveTopics()
-
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-			return
-		}
-
-		if len(response) != activeCount {
-			t.Errorf("Expected %d active topics, got %d", activeCount, len(response))
-		}
-
-		// Verify all returned topics are active
-		for _, topic := range response {
-			if !topic.IsActive {
-				t.Errorf("Expected all topics to be active, but topic %d is inactive", topic.ID)
-			}
-		}
-	})
-}
-
 func TestHandler_CreateSiteTopic(t *testing.T) {
 	handler, testDB, cleanup := setupHandlerTest(t)
 	defer cleanup()
@@ -535,7 +415,6 @@ func TestHandler_CreateSiteTopic(t *testing.T) {
 			request: dto.CreateSiteTopicRequest{
 				SiteID:   1, // From test data
 				TopicID:  3, // Use topic 3 which isn't associated with site 1
-				IsActive: true,
 				Priority: 5,
 			},
 			wantErr: false,
@@ -545,7 +424,6 @@ func TestHandler_CreateSiteTopic(t *testing.T) {
 			request: dto.CreateSiteTopicRequest{
 				SiteID:   2, // From test data
 				TopicID:  3, // Use topic 3 which isn't associated with site 2
-				IsActive: false,
 				Priority: 1,
 			},
 			wantErr: false,
@@ -555,7 +433,6 @@ func TestHandler_CreateSiteTopic(t *testing.T) {
 			request: dto.CreateSiteTopicRequest{
 				SiteID:   0,
 				TopicID:  3,
-				IsActive: true,
 				Priority: 5,
 			},
 			wantErr: true,
@@ -565,7 +442,6 @@ func TestHandler_CreateSiteTopic(t *testing.T) {
 			request: dto.CreateSiteTopicRequest{
 				SiteID:   1,
 				TopicID:  0,
-				IsActive: true,
 				Priority: 5,
 			},
 			wantErr: true,
@@ -612,10 +488,6 @@ func TestHandler_CreateSiteTopic(t *testing.T) {
 
 			if response.Priority != tt.request.Priority {
 				t.Errorf("Expected priority %d, got %d", tt.request.Priority, response.Priority)
-			}
-
-			if response.IsActive != tt.request.IsActive {
-				t.Errorf("Expected IsActive %v, got %v", tt.request.IsActive, response.IsActive)
 			}
 		})
 	}
@@ -807,7 +679,6 @@ func TestHandler_UpdateSiteTopic(t *testing.T) {
 	createReq := dto.CreateSiteTopicRequest{
 		SiteID:   1,
 		TopicID:  3, // Use topic 3 which isn't associated with site 1
-		IsActive: true,
 		Priority: 5,
 	}
 
@@ -827,7 +698,6 @@ func TestHandler_UpdateSiteTopic(t *testing.T) {
 				ID:       created.ID,
 				SiteID:   1,
 				TopicID:  3,
-				IsActive: false,
 				Priority: 8,
 			},
 			wantErr: false,
@@ -838,7 +708,6 @@ func TestHandler_UpdateSiteTopic(t *testing.T) {
 				ID:       0,
 				SiteID:   1,
 				TopicID:  3,
-				IsActive: true,
 				Priority: 5,
 			},
 			wantErr: true,
@@ -849,7 +718,6 @@ func TestHandler_UpdateSiteTopic(t *testing.T) {
 				ID:       created.ID,
 				SiteID:   0,
 				TopicID:  3,
-				IsActive: true,
 				Priority: 5,
 			},
 			wantErr: true,
@@ -860,7 +728,6 @@ func TestHandler_UpdateSiteTopic(t *testing.T) {
 				ID:       created.ID,
 				SiteID:   1,
 				TopicID:  0,
-				IsActive: true,
 				Priority: 5,
 			},
 			wantErr: true,
@@ -895,10 +762,6 @@ func TestHandler_UpdateSiteTopic(t *testing.T) {
 			if response.Priority != tt.request.Priority {
 				t.Errorf("Expected priority %d, got %d", tt.request.Priority, response.Priority)
 			}
-
-			if response.IsActive != tt.request.IsActive {
-				t.Errorf("Expected IsActive %v, got %v", tt.request.IsActive, response.IsActive)
-			}
 		})
 	}
 }
@@ -914,7 +777,6 @@ func TestHandler_DeleteSiteTopic(t *testing.T) {
 	createReq := dto.CreateSiteTopicRequest{
 		SiteID:   1,
 		TopicID:  3, // Use topic 3 which isn't associated with site 1
-		IsActive: true,
 		Priority: 5,
 	}
 
@@ -1020,55 +882,6 @@ func TestHandler_DeleteSiteTopicBySiteAndTopic(t *testing.T) {
 	}
 }
 
-func TestHandler_ActivateDeactivateSiteTopic(t *testing.T) {
-	handler, testDB, cleanup := setupHandlerTest(t)
-	defer cleanup()
-
-	testDB.ClearAllTables(t)
-	testDB.InsertTestData(t)
-
-	// Create a test site topic first using unique combination
-	createReq := dto.CreateSiteTopicRequest{
-		SiteID:   1,
-		TopicID:  3, // Use topic 3 which isn't associated with site 1
-		IsActive: false,
-		Priority: 5,
-	}
-
-	created, err := handler.CreateSiteTopic(createReq)
-	if err != nil {
-		t.Fatalf("Failed to create test site topic: %v", err)
-	}
-
-	t.Run("Activate site topic", func(t *testing.T) {
-		err := handler.ActivateSiteTopic(created.ID)
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
-	})
-
-	t.Run("Deactivate site topic", func(t *testing.T) {
-		err := handler.DeactivateSiteTopic(created.ID)
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
-	})
-
-	t.Run("Invalid site topic ID should fail for activation", func(t *testing.T) {
-		err := handler.ActivateSiteTopic(0)
-		if err == nil {
-			t.Error("Expected error for invalid site topic ID")
-		}
-	})
-
-	t.Run("Invalid site topic ID should fail for deactivation", func(t *testing.T) {
-		err := handler.DeactivateSiteTopic(0)
-		if err == nil {
-			t.Error("Expected error for invalid site topic ID")
-		}
-	})
-}
-
 func TestHandler_TopicStats(t *testing.T) {
 	handler, testDB, cleanup := setupHandlerTest(t)
 	defer cleanup()
@@ -1126,7 +939,6 @@ func TestHandler_EdgeCases(t *testing.T) {
 				req := dto.CreateSiteTopicRequest{
 					SiteID:   0,
 					TopicID:  1,
-					IsActive: true,
 					Priority: 5,
 				}
 
@@ -1142,7 +954,6 @@ func TestHandler_EdgeCases(t *testing.T) {
 				req := dto.CreateSiteTopicRequest{
 					SiteID:   1,
 					TopicID:  0,
-					IsActive: true,
 					Priority: 5,
 				}
 
@@ -1174,5 +985,594 @@ func TestHandler_EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, tt.test)
+	}
+}
+
+// Tests for TopicsImport functionality
+
+func TestHandler_TopicsImport_TXT_Format(t *testing.T) {
+	handler, testDB, cleanup := setupHandlerTest(t)
+	defer cleanup()
+
+	tests := []struct {
+		name        string
+		siteID      int64
+		fileContent string
+		previewOnly bool
+		wantErr     bool
+		expectedNew int
+		expectedDup int
+		expectedErr int
+	}{
+		{
+			name:   "Valid TXT import preview",
+			siteID: 1,
+			fileContent: `New Topic 1
+New Topic 2
+Another Topic
+Programming Guide`,
+			previewOnly: true,
+			wantErr:     false,
+			expectedNew: 4,
+			expectedDup: 0,
+			expectedErr: 0,
+		},
+		{
+			name:   "TXT import with duplicates within file",
+			siteID: 1,
+			fileContent: `Unique Topic
+Duplicate Topic
+Unique Topic 2
+Duplicate Topic`,
+			previewOnly: true,
+			wantErr:     false,
+			expectedNew: 2,
+			expectedDup: 1,
+			expectedErr: 0,
+		},
+		{
+			name:   "TXT import with existing topics in DB",
+			siteID: 1,
+			fileContent: `AI Technology
+New Unique Topic
+Web Development`,
+			previewOnly: true,
+			wantErr:     false,
+			expectedNew: 1,
+			expectedDup: 0,
+			expectedErr: 0,
+		},
+		{
+			name:   "TXT import with empty lines",
+			siteID: 1,
+			fileContent: `Topic 1
+
+Topic 2
+
+Topic 3
+`,
+			previewOnly: true,
+			wantErr:     false,
+			expectedNew: 3,
+			expectedDup: 0,
+			expectedErr: 0,
+		},
+		{
+			name:   "Actual TXT import",
+			siteID: 1,
+			fileContent: `Import Topic 1
+Import Topic 2`,
+			previewOnly: false,
+			wantErr:     false,
+			expectedNew: 2,
+			expectedDup: 0,
+			expectedErr: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testDB.ClearAllTables(t)
+			testDB.InsertTestData(t)
+
+			req := dto.TopicsImportRequest{
+				SiteID:      tt.siteID,
+				FileContent: tt.fileContent,
+				FileFormat:  "txt",
+				PreviewOnly: tt.previewOnly,
+			}
+
+			result, err := handler.TopicsImport(tt.siteID, req)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			if result == nil {
+				t.Error("Result should not be nil")
+				return
+			}
+
+			if tt.previewOnly {
+				preview, ok := result.(*dto.TopicsImportPreview)
+				if !ok {
+					t.Error("Expected TopicsImportPreview for preview mode")
+					return
+				}
+
+				if preview.ValidTopics != tt.expectedNew {
+					t.Errorf("Expected %d new topics, got %d", tt.expectedNew, preview.ValidTopics)
+				}
+
+				if preview.Duplicates != tt.expectedDup {
+					t.Errorf("Expected %d duplicates, got %d", tt.expectedDup, preview.Duplicates)
+				}
+
+				if preview.Errors != tt.expectedErr {
+					t.Errorf("Expected %d errors, got %d", tt.expectedErr, preview.Errors)
+				}
+			} else {
+				importResult, ok := result.(*dto.TopicsImportResult)
+				if !ok {
+					t.Error("Expected TopicsImportResult for import mode")
+					return
+				}
+
+				if importResult.CreatedTopics != tt.expectedNew {
+					t.Errorf("Expected %d created topics, got %d", tt.expectedNew, importResult.CreatedTopics)
+				}
+			}
+		})
+	}
+}
+
+func TestHandler_TopicsImport_CSV_Format(t *testing.T) {
+	handler, testDB, cleanup := setupHandlerTest(t)
+	defer cleanup()
+
+	tests := []struct {
+		name        string
+		siteID      int64
+		fileContent string
+		previewOnly bool
+		wantErr     bool
+		expectedNew int
+		expectedErr int
+	}{
+		{
+			name:   "Valid CSV import preview",
+			siteID: 1,
+			fileContent: `"Machine Learning Basics","ml,ai,basics","Technology","ml,tech"
+"React Development","react,js,frontend","Programming","react,web"
+"Python Guide","python,programming","Development","python,code"`,
+			previewOnly: true,
+			wantErr:     false,
+			expectedNew: 3,
+			expectedErr: 0,
+		},
+		{
+			name:   "CSV with minimal columns",
+			siteID: 1,
+			fileContent: `"Topic 1"
+"Topic 2"
+"Topic 3"`,
+			previewOnly: true,
+			wantErr:     false,
+			expectedNew: 3,
+			expectedErr: 0,
+		},
+		{
+			name:   "CSV with empty title",
+			siteID: 1,
+			fileContent: `"Valid Topic","keywords","category","tags"
+"","invalid","invalid","invalid"
+"Another Valid Topic","more","keywords","tags"`,
+			previewOnly: true,
+			wantErr:     false,
+			expectedNew: 2,
+			expectedErr: 1,
+		},
+		{
+			name:   "Actual CSV import",
+			siteID: 1,
+			fileContent: `"CSV Topic 1","csv,keywords","CSV Category","csv,tags"
+"CSV Topic 2","more,csv","Another Category","more,tags"`,
+			previewOnly: false,
+			wantErr:     false,
+			expectedNew: 2,
+			expectedErr: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testDB.ClearAllTables(t)
+			testDB.InsertTestData(t)
+
+			req := dto.TopicsImportRequest{
+				SiteID:      tt.siteID,
+				FileContent: tt.fileContent,
+				FileFormat:  "csv",
+				PreviewOnly: tt.previewOnly,
+			}
+
+			result, err := handler.TopicsImport(tt.siteID, req)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			if result == nil {
+				t.Error("Result should not be nil")
+				return
+			}
+
+			if tt.previewOnly {
+				preview, ok := result.(*dto.TopicsImportPreview)
+				if !ok {
+					t.Error("Expected TopicsImportPreview for preview mode")
+					return
+				}
+
+				if preview.ValidTopics != tt.expectedNew {
+					t.Errorf("Expected %d new topics, got %d", tt.expectedNew, preview.ValidTopics)
+				}
+
+				if preview.Errors != tt.expectedErr {
+					t.Errorf("Expected %d errors, got %d", tt.expectedErr, preview.Errors)
+				}
+			} else {
+				importResult, ok := result.(*dto.TopicsImportResult)
+				if !ok {
+					t.Error("Expected TopicsImportResult for import mode")
+					return
+				}
+
+				if importResult.CreatedTopics != tt.expectedNew {
+					t.Errorf("Expected %d created topics, got %d", tt.expectedNew, importResult.CreatedTopics)
+				}
+			}
+		})
+	}
+}
+
+func TestHandler_TopicsImport_JSONL_Format(t *testing.T) {
+	handler, testDB, cleanup := setupHandlerTest(t)
+	defer cleanup()
+
+	tests := []struct {
+		name        string
+		siteID      int64
+		fileContent string
+		previewOnly bool
+		wantErr     bool
+		expectedNew int
+		expectedErr int
+	}{
+		{
+			name:   "Valid JSONL import preview",
+			siteID: 1,
+			fileContent: `{"title":"Docker Containers","keywords":"docker,containers,devops","category":"DevOps","tags":"docker,containers"}
+{"title":"Kubernetes Guide","keywords":"k8s,kubernetes,orchestration","category":"DevOps","tags":"k8s,devops"}
+{"title":"Minimal Topic"}`,
+			previewOnly: true,
+			wantErr:     false,
+			expectedNew: 3,
+			expectedErr: 0,
+		},
+		{
+			name:   "JSONL with invalid JSON",
+			siteID: 1,
+			fileContent: `{"title":"Valid Topic","keywords":"valid"}
+{invalid json}
+{"title":"Another Valid Topic"}`,
+			previewOnly: true,
+			wantErr:     false,
+			expectedNew: 2,
+			expectedErr: 1,
+		},
+		{
+			name:   "JSONL with empty title",
+			siteID: 1,
+			fileContent: `{"title":"","keywords":"invalid"}
+{"title":"Valid Topic","keywords":"valid"}`,
+			previewOnly: true,
+			wantErr:     false,
+			expectedNew: 1,
+			expectedErr: 1,
+		},
+		{
+			name:   "Actual JSONL import",
+			siteID: 1,
+			fileContent: `{"title":"JSONL Topic 1","keywords":"jsonl,test","category":"Test","tags":"jsonl"}
+{"title":"JSONL Topic 2","keywords":"more,jsonl","category":"Test","tags":"test"}`,
+			previewOnly: false,
+			wantErr:     false,
+			expectedNew: 2,
+			expectedErr: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testDB.ClearAllTables(t)
+			testDB.InsertTestData(t)
+
+			req := dto.TopicsImportRequest{
+				SiteID:      tt.siteID,
+				FileContent: tt.fileContent,
+				FileFormat:  "jsonl",
+				PreviewOnly: tt.previewOnly,
+			}
+
+			result, err := handler.TopicsImport(tt.siteID, req)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			if result == nil {
+				t.Error("Result should not be nil")
+				return
+			}
+
+			if tt.previewOnly {
+				preview, ok := result.(*dto.TopicsImportPreview)
+				if !ok {
+					t.Error("Expected TopicsImportPreview for preview mode")
+					return
+				}
+
+				if preview.ValidTopics != tt.expectedNew {
+					t.Errorf("Expected %d new topics, got %d", tt.expectedNew, preview.ValidTopics)
+				}
+
+				if preview.Errors != tt.expectedErr {
+					t.Errorf("Expected %d errors, got %d", tt.expectedErr, preview.Errors)
+				}
+			} else {
+				importResult, ok := result.(*dto.TopicsImportResult)
+				if !ok {
+					t.Error("Expected TopicsImportResult for import mode")
+					return
+				}
+
+				if importResult.CreatedTopics != tt.expectedNew {
+					t.Errorf("Expected %d created topics, got %d", tt.expectedNew, importResult.CreatedTopics)
+				}
+			}
+		})
+	}
+}
+
+func TestHandler_TopicsImport_ErrorCases(t *testing.T) {
+	handler, testDB, cleanup := setupHandlerTest(t)
+	defer cleanup()
+
+	tests := []struct {
+		name    string
+		siteID  int64
+		request dto.TopicsImportRequest
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:   "Invalid site ID",
+			siteID: 0,
+			request: dto.TopicsImportRequest{
+				SiteID:      0,
+				FileContent: "Test Topic",
+				FileFormat:  "txt",
+				PreviewOnly: true,
+			},
+			wantErr: true,
+			errMsg:  "invalid site ID",
+		},
+		{
+			name:   "Empty file content",
+			siteID: 1,
+			request: dto.TopicsImportRequest{
+				SiteID:      1,
+				FileContent: "",
+				FileFormat:  "txt",
+				PreviewOnly: true,
+			},
+			wantErr: true,
+			errMsg:  "file content is required",
+		},
+		{
+			name:   "Empty file format",
+			siteID: 1,
+			request: dto.TopicsImportRequest{
+				SiteID:      1,
+				FileContent: "Test Topic",
+				FileFormat:  "",
+				PreviewOnly: true,
+			},
+			wantErr: true,
+			errMsg:  "file format is required",
+		},
+		{
+			name:   "Unsupported file format",
+			siteID: 1,
+			request: dto.TopicsImportRequest{
+				SiteID:      1,
+				FileContent: "Test Topic",
+				FileFormat:  "xml",
+				PreviewOnly: true,
+			},
+			wantErr: false, // Should return result with errors, not fail completely
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testDB.ClearAllTables(t)
+			testDB.InsertTestData(t)
+
+			result, err := handler.TopicsImport(tt.siteID, tt.request)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error but got none")
+				} else if tt.errMsg != "" && err.Error() != tt.errMsg {
+					t.Errorf("Expected error message '%s', got '%s'", tt.errMsg, err.Error())
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			if result == nil {
+				t.Error("Result should not be nil")
+			}
+		})
+	}
+}
+
+func TestHandler_TopicsReassign(t *testing.T) {
+	handler, testDB, cleanup := setupHandlerTest(t)
+	defer cleanup()
+
+	tests := []struct {
+		name               string
+		request            dto.TopicsReassignRequest
+		wantErr            bool
+		expectedReassigned int
+	}{
+		{
+			name: "Valid reassignment all topics",
+			request: dto.TopicsReassignRequest{
+				FromSiteID: 1,
+				ToSiteID:   2,
+				TopicIDs:   nil, // All topics
+			},
+			wantErr:            false,
+			expectedReassigned: 2, // Site 1 has 2 topics from test data
+		},
+		{
+			name: "Valid reassignment specific topics",
+			request: dto.TopicsReassignRequest{
+				FromSiteID: 1,
+				ToSiteID:   3,
+				TopicIDs:   []int64{1}, // Only topic 1
+			},
+			wantErr:            false,
+			expectedReassigned: 1,
+		},
+		{
+			name: "Invalid from site ID",
+			request: dto.TopicsReassignRequest{
+				FromSiteID: 0,
+				ToSiteID:   2,
+				TopicIDs:   nil,
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid to site ID",
+			request: dto.TopicsReassignRequest{
+				FromSiteID: 1,
+				ToSiteID:   0,
+				TopicIDs:   nil,
+			},
+			wantErr: true,
+		},
+		{
+			name: "Same from and to site ID",
+			request: dto.TopicsReassignRequest{
+				FromSiteID: 1,
+				ToSiteID:   1,
+				TopicIDs:   nil,
+			},
+			wantErr: true,
+		},
+		{
+			name: "Non-existent from site",
+			request: dto.TopicsReassignRequest{
+				FromSiteID: 999,
+				ToSiteID:   1,
+				TopicIDs:   nil,
+			},
+			wantErr: true,
+		},
+		{
+			name: "Non-existent to site",
+			request: dto.TopicsReassignRequest{
+				FromSiteID: 1,
+				ToSiteID:   999,
+				TopicIDs:   nil,
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testDB.ClearAllTables(t)
+			testDB.InsertTestData(t)
+
+			result, err := handler.TopicsReassign(tt.request)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			if result == nil {
+				t.Error("Result should not be nil")
+				return
+			}
+
+			if result.FromSiteID != tt.request.FromSiteID {
+				t.Errorf("Expected FromSiteID %d, got %d", tt.request.FromSiteID, result.FromSiteID)
+			}
+
+			if result.ToSiteID != tt.request.ToSiteID {
+				t.Errorf("Expected ToSiteID %d, got %d", tt.request.ToSiteID, result.ToSiteID)
+			}
+
+			if result.ReassignedTopics != tt.expectedReassigned {
+				t.Errorf("Expected %d reassigned topics, got %d", tt.expectedReassigned, result.ReassignedTopics)
+			}
+
+			if result.ErrorCount > 0 {
+				t.Errorf("Expected no errors, got %d errors: %v", result.ErrorCount, result.ErrorMessages)
+			}
+		})
 	}
 }
