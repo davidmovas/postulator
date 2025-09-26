@@ -55,7 +55,7 @@ func (r *Repository) GetSchedules(ctx context.Context, limit int, offset int) (*
 
 	// Get total count
 	countQuery, countArgs := builder.
-		Select("COUNT(*)").
+		Select("COUNT(id)").
 		From("schedules").
 		MustSql()
 
@@ -154,7 +154,7 @@ func (r *Repository) GetSchedulesBySiteID(ctx context.Context, siteID int64, lim
 
 	// Get total count
 	countQuery, countArgs := builder.
-		Select("COUNT(*)").
+		Select("COUNT(id)").
 		From("schedules").
 		Where(squirrel.Eq{"site_id": siteID}).
 		MustSql()

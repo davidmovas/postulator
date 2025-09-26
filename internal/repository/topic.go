@@ -238,49 +238,6 @@ func (r *Repository) DeleteTopic(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (r *Repository) GetActiveTopics(ctx context.Context) ([]*models.Topic, error) {
-	query, args := builder.
-		Select(
-			"id",
-			"title",
-			"keywords",
-			"category",
-			"tags",
-			"created_at",
-			"updated_at",
-		).
-		From("topics").
-		OrderBy("title").
-		MustSql()
-
-	rows, err := r.db.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query topics: %w", err)
-	}
-	defer func() {
-		_ = rows.Close()
-	}()
-
-	var topics []*models.Topic
-	for rows.Next() {
-		var topic models.Topic
-		if err = rows.Scan(
-			&topic.ID,
-			&topic.Title,
-			&topic.Keywords,
-			&topic.Category,
-			&topic.Tags,
-			&topic.CreatedAt,
-			&topic.UpdatedAt,
-		); err != nil {
-			return nil, fmt.Errorf("failed to scan topic: %w", err)
-		}
-		topics = append(topics, &topic)
-	}
-
-	return topics, nil
-}
-
 func (r *Repository) GetAllTopicsForRandomSelection(ctx context.Context) ([]*models.Topic, error) {
 	query, args := builder.
 		Select(
@@ -1040,9 +997,6 @@ func (r *Repository) RecordTopicUsage(ctx context.Context, siteID, topicID, arti
 	return err
 }
 
-// Bulk operations for topics import and reassign
-
-// GetTopicByTitle retrieves a topic by its title (for import deduplication)
 func (r *Repository) GetTopicByTitle(ctx context.Context, title string) (*models.Topic, error) {
 	query, args := builder.
 		Select("id", "title", "keywords", "category", "tags", "created_at", "updated_at").
@@ -1052,15 +1006,16 @@ func (r *Repository) GetTopicByTitle(ctx context.Context, title string) (*models
 		MustSql()
 
 	var topic models.Topic
-	err := r.db.QueryRowContext(ctx, query, args...).Scan(
-		&topic.ID,
-		&topic.Title,
-		&topic.Keywords,
-		&topic.Category,
-		&topic.Tags,
-		&topic.CreatedAt,
-		&topic.UpdatedAt,
-	)
+	err := r.db.QueryRowContext(ctx, query, args...).
+		Scan(
+			&topic.ID,
+			&topic.Title,
+			&topic.Keywords,
+			&topic.Category,
+			&topic.Tags,
+			&topic.CreatedAt,
+			&topic.UpdatedAt,
+		)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get topic by title: %w", err)
@@ -1069,7 +1024,6 @@ func (r *Repository) GetTopicByTitle(ctx context.Context, title string) (*models
 	return &topic, nil
 }
 
-// BulkCreateTopicsWithSiteBinding creates multiple topics and binds them to a site in a single transaction
 func (r *Repository) BulkCreateTopicsWithSiteBinding(ctx context.Context, siteID int64, topics []*models.Topic) ([]*models.Topic, error) {
 	if len(topics) == 0 {
 		return nil, nil
@@ -1130,7 +1084,6 @@ func (r *Repository) BulkCreateTopicsWithSiteBinding(ctx context.Context, siteID
 	return createdTopics, nil
 }
 
-// ReassignTopicsToSite moves topic assignments from one site to another
 func (r *Repository) ReassignTopicsToSite(ctx context.Context, fromSiteID, toSiteID int64, topicIDs []int64) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -1185,7 +1138,7 @@ func (r *Repository) ReassignTopicsToSite(ctx context.Context, fromSiteID, toSit
 		return nil // Nothing to reassign
 	}
 
-	// Delete existing assignments from source site
+	// Delete existing assignments from the source site
 	deleteQuery, deleteArgs := builder.
 		Delete("site_topics").
 		Where(whereClause).
@@ -1196,7 +1149,7 @@ func (r *Repository) ReassignTopicsToSite(ctx context.Context, fromSiteID, toSit
 		return fmt.Errorf("failed to delete existing site topics: %w", err)
 	}
 
-	// Create new assignments for target site
+	// Create new assignments for the target site
 	insertBuilder := builder.Insert("site_topics").
 		Columns("site_id", "topic_id", "priority", "created_at", "updated_at")
 
