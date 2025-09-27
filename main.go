@@ -82,7 +82,7 @@ func main() {
 		StartHidden:       false,
 		HideWindowOnClose: true,
 		SingleInstanceLock: &options.SingleInstanceLock{
-			UniqueId: "com.mycompany.postulator",
+			UniqueId: "com.postulator.app",
 			OnSecondInstanceLaunch: func(secondInstanceData options.SecondInstanceData) {
 				if app.CTX() != nil {
 					runtime.WindowShow(app.CTX())                  // Показываем окно, если оно было скрыто
@@ -107,6 +107,9 @@ func main() {
 		Bind: []interface{}{
 			app,
 			app.binder,
+		},
+		DragAndDrop: &options.DragAndDrop{
+			EnableFileDrop: true,
 		},
 		// Windows platform specific options
 		Windows: &windows.Options{

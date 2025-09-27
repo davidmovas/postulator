@@ -7,12 +7,11 @@ import (
 	"database/sql"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
 )
-
-// Topic Handlers
 
 // CreateTopic creates a new topic
 func (h *Handler) CreateTopic(req dto.CreateTopicRequest) (*dto.TopicResponse, error) {
@@ -170,8 +169,6 @@ func (h *Handler) DeleteTopic(topicID int64) error {
 
 	return nil
 }
-
-// SiteTopic Handlers
 
 // CreateSiteTopic creates a new site-topic association
 func (h *Handler) CreateSiteTopic(req dto.CreateSiteTopicRequest) (*dto.SiteTopicResponse, error) {
@@ -386,8 +383,6 @@ func (h *Handler) DeleteSiteTopicBySiteAndTopic(siteID int64, topicID int64) err
 	return nil
 }
 
-// Topic Strategy and Selection Handlers
-
 // SelectTopicForSite selects a topic for article generation using the specified strategy
 func (h *Handler) SelectTopicForSite(req dto.TopicSelectionRequest) (*dto.TopicSelectionResponse, error) {
 	ctx := h.fastCtx()
@@ -601,7 +596,7 @@ func (h *Handler) CheckStrategyAvailability(siteID int64, strategy string) (*dto
 }
 
 // TopicsImport imports topics from file content with support for txt, csv, jsonl formats
-func (h *Handler) TopicsImport(siteID int64, req dto.TopicsImportRequest) (interface{}, error) {
+func (h *Handler) TopicsImport(siteID int64, req dto.TopicsImportRequest) (any, error) {
 	ctx := h.fastCtx()
 
 	if siteID <= 0 {
@@ -659,7 +654,8 @@ func (h *Handler) TopicsReassign(req dto.TopicsReassignRequest) (*dto.ReassignRe
 		totalTopics = len(req.TopicIDs)
 	} else {
 		// Count all topics for the site
-		result, err := h.repo.GetSiteTopics(ctx, req.FromSiteID, 1000, 0) // Large limit to get all
+		var result *models.PaginationResult[*models.SiteTopic]
+		result, err = h.repo.GetSiteTopics(ctx, req.FromSiteID, 1000, 0) // Large limit to get all
 		if err != nil {
 			return nil, fmt.Errorf("failed to get site topics count: %w", err)
 		}
@@ -694,32 +690,32 @@ func (h *Handler) TopicsReassign(req dto.TopicsReassignRequest) (*dto.ReassignRe
 // parseTopicsFromContent parses topics from different file formats
 func (h *Handler) parseTopicsFromContent(content, format string) ([]dto.ImportTopicItem, []string) {
 	var topics []dto.ImportTopicItem
-	var errors []string
+	var errs []string
 
 	content = strings.TrimSpace(content)
 	if content == "" {
-		errors = append(errors, "file content is empty")
-		return topics, errors
+		errs = append(errs, "file content is empty")
+		return topics, errs
 	}
 
 	switch strings.ToLower(format) {
 	case "txt":
-		topics, errors = h.parseTxtContent(content)
+		topics, errs = h.parseTxtContent(content)
 	case "csv":
-		topics, errors = h.parseCsvContent(content)
-	case "jsonl":
-		topics, errors = h.parseJsonlContent(content)
+		topics, errs = h.parseCsvContent(content)
+	case "json":
+		topics, errs = h.parseJsonlContent(content)
 	default:
-		errors = append(errors, fmt.Sprintf("unsupported file format: %s", format))
+		errs = append(errs, fmt.Sprintf("unsupported file format: %s", format))
 	}
 
-	return topics, errors
+	return topics, errs
 }
 
 // parseTxtContent parses plain text format (one title per line)
 func (h *Handler) parseTxtContent(content string) ([]dto.ImportTopicItem, []string) {
 	var topics []dto.ImportTopicItem
-	var errors []string
+	var errs []string
 
 	lines := strings.Split(content, "\n")
 	for i, line := range lines {
@@ -729,7 +725,7 @@ func (h *Handler) parseTxtContent(content string) ([]dto.ImportTopicItem, []stri
 		}
 
 		if len(line) > 255 {
-			errors = append(errors, fmt.Sprintf("line %d: title too long (max 255 characters)", i+1))
+			errs = append(errs, fmt.Sprintf("line %d: title too long (max 255 characters)", i+1))
 			continue
 		}
 
@@ -739,13 +735,13 @@ func (h *Handler) parseTxtContent(content string) ([]dto.ImportTopicItem, []stri
 		})
 	}
 
-	return topics, errors
+	return topics, errs
 }
 
 // parseCsvContent parses CSV format (title, keywords, category, tags)
 func (h *Handler) parseCsvContent(content string) ([]dto.ImportTopicItem, []string) {
 	var topics []dto.ImportTopicItem
-	var errors []string
+	var errs []string
 
 	reader := csv.NewReader(strings.NewReader(content))
 	reader.TrimLeadingSpace = true
@@ -757,7 +753,7 @@ func (h *Handler) parseCsvContent(content string) ([]dto.ImportTopicItem, []stri
 			break
 		}
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("CSV parsing error at line %d: %s", lineNum+1, err.Error()))
+			errs = append(errs, fmt.Sprintf("CSV parsing error at line %d: %s", lineNum+1, err.Error()))
 			lineNum++
 			continue
 		}
@@ -769,18 +765,18 @@ func (h *Handler) parseCsvContent(content string) ([]dto.ImportTopicItem, []stri
 		}
 
 		if len(record) < 1 {
-			errors = append(errors, fmt.Sprintf("line %d: missing title", lineNum))
+			errs = append(errs, fmt.Sprintf("line %d: missing title", lineNum))
 			continue
 		}
 
 		title := strings.TrimSpace(record[0])
 		if title == "" {
-			errors = append(errors, fmt.Sprintf("line %d: title cannot be empty", lineNum))
+			errs = append(errs, fmt.Sprintf("line %d: title cannot be empty", lineNum))
 			continue
 		}
 
 		if len(title) > 255 {
-			errors = append(errors, fmt.Sprintf("line %d: title too long (max 255 characters)", lineNum))
+			errs = append(errs, fmt.Sprintf("line %d: title too long (max 255 characters)", lineNum))
 			continue
 		}
 
@@ -802,13 +798,13 @@ func (h *Handler) parseCsvContent(content string) ([]dto.ImportTopicItem, []stri
 		topics = append(topics, topic)
 	}
 
-	return topics, errors
+	return topics, errs
 }
 
 // parseJsonlContent parses JSONL format (one JSON object per line)
 func (h *Handler) parseJsonlContent(content string) ([]dto.ImportTopicItem, []string) {
 	var topics []dto.ImportTopicItem
-	var errors []string
+	var errs []string
 
 	lines := strings.Split(content, "\n")
 	for i, line := range lines {
@@ -826,17 +822,17 @@ func (h *Handler) parseJsonlContent(content string) ([]dto.ImportTopicItem, []st
 
 		err := json.Unmarshal([]byte(line), &jsonTopic)
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("line %d: invalid JSON: %s", i+1, err.Error()))
+			errs = append(errs, fmt.Sprintf("line %d: invalid JSON: %s", i+1, err.Error()))
 			continue
 		}
 
 		if jsonTopic.Title == "" {
-			errors = append(errors, fmt.Sprintf("line %d: title cannot be empty", i+1))
+			errs = append(errs, fmt.Sprintf("line %d: title cannot be empty", i+1))
 			continue
 		}
 
 		if len(jsonTopic.Title) > 255 {
-			errors = append(errors, fmt.Sprintf("line %d: title too long (max 255 characters)", i+1))
+			errs = append(errs, fmt.Sprintf("line %d: title too long (max 255 characters)", i+1))
 			continue
 		}
 
@@ -849,7 +845,7 @@ func (h *Handler) parseJsonlContent(content string) ([]dto.ImportTopicItem, []st
 		})
 	}
 
-	return topics, errors
+	return topics, errs
 }
 
 // generateImportPreview generates preview of import without creating topics
@@ -876,7 +872,7 @@ func (h *Handler) generateImportPreview(ctx context.Context, siteID int64, topic
 
 			// Check against database
 			existingTopic, err := h.repo.GetTopicByTitle(ctx, topic.Title)
-			if err != nil && err != sql.ErrNoRows {
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
 				topic.Status = "error"
 				topic.Error = fmt.Sprintf("database check failed: %s", err.Error())
 				preview.Errors++
@@ -928,7 +924,7 @@ func (h *Handler) executeImport(ctx context.Context, siteID int64, topics []dto.
 
 			// Check if topic exists in database
 			existingTopic, err := h.repo.GetTopicByTitle(ctx, topic.Title)
-			if err != nil && err != sql.ErrNoRows {
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
 				topic.Status = "error"
 				topic.Error = fmt.Sprintf("database check failed: %s", err.Error())
 				result.ErrorCount++

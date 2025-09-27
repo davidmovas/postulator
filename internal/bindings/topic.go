@@ -93,10 +93,8 @@ func (b *Binder) CheckStrategyAvailability(siteID int64, strategy string) (*dto.
 	return b.handler.CheckStrategyAvailability(siteID, strategy)
 }
 
-// Bulk Operations
-
-// TopicsImport imports topics from file content with support for txt, csv, jsonl formats
-func (b *Binder) TopicsImport(siteID int64, req dto.TopicsImportRequest) (interface{}, error) {
+// TopicsImport imports topics from file content with support for TXT, CSV, JSON, EXEL formats
+func (b *Binder) TopicsImport(siteID int64, req dto.TopicsImportRequest) (any, error) {
 	return b.handler.TopicsImport(siteID, req)
 }
 
