@@ -8,12 +8,13 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Pagination, PaginationContent, PaginationItem } from "@/components/ui/pagination";
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { RiAddLine, RiDeleteBinLine, RiEdit2Line, RiMoreLine, RiRefreshLine, RiSearch2Line, RiToggleLine } from "@remixicon/react";
+import { RiAddLine, RiDeleteBinLine, RiEdit2Line, RiMoreLine, RiRefreshLine, RiSearch2Line } from "@remixicon/react";
 import type { Topic } from "@/types/topic";
+import type { Site } from "@/types/site";
 import { useToast } from "@/components/ui/use-toast";
-import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import FileUpload from "@/components/ui/file-upload";
 
 export type UpsertTopicValues = {
   title: string;
@@ -41,11 +42,32 @@ export type TopicsTableProps = {
 export default function TopicsTable({ topics, page, pageSize, total, onPageChange, onRefresh, onMutateTopics, onCreate, onUpdate, onDelete, onToggleActive, onBulkToggle, onBulkDelete }: TopicsTableProps) {
   const [selected, setSelected] = React.useState<Set<number>>(new Set());
   const [query, setQuery] = React.useState<string>("");
-  const [filterActive, setFilterActive] = React.useState<"all" | "active" | "inactive">("all");
   const [addOpen, setAddOpen] = React.useState<boolean>(false);
   const [editOpen, setEditOpen] = React.useState<boolean>(false);
   const [editing, setEditing] = React.useState<Topic | null>(null);
   const { toast } = useToast();
+
+  // Import dialog state
+  const [importOpen, setImportOpen] = React.useState<boolean>(false);
+  const [sites, setSites] = React.useState<Site[]>([]);
+  const [importSiteId, setImportSiteId] = React.useState<number | "">("");
+  const [importFile, setImportFile] = React.useState<File | null>(null);
+  const [importing, setImporting] = React.useState<boolean>(false);
+  const [importError, setImportError] = React.useState<string>("");
+
+  React.useEffect(() => {
+    if (!importOpen) return;
+    // Load sites on open
+    (async () => {
+      try {
+        const svc = await import("@/services/sites");
+        const { items } = await svc.getSites(1, 1000);
+        setSites(items);
+      } catch (e) {
+        // silent error in dialog
+      }
+    })();
+  }, [importOpen]);
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -63,7 +85,7 @@ export default function TopicsTable({ topics, page, pageSize, total, onPageChang
     //   items = items.filter((t) => t.is_active === wantActive);
     // }
     return items;
-  }, [topics, query, filterActive]);
+  }, [topics, query]);
 
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
 
@@ -201,18 +223,16 @@ export default function TopicsTable({ topics, page, pageSize, total, onPageChang
               <RiAddLine size={16} />
               <span className="ml-1">Add Topic</span>
             </Button>
+            <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+              <RiAddLine size={16} />
+              <span className="ml-1">Import</span>
+            </Button>
             <Button size="sm" variant="secondary" onClick={() => onRefresh()}>
               <RiRefreshLine size={16} />
               <span className="ml-1">Refresh</span>
             </Button>
             {selected.size > 0 && (
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" onClick={() => handleBulkToggle(true)}>
-                  <RiToggleLine size={16} /> Enable
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => handleBulkToggle(false)}>
-                  <RiToggleLine size={16} /> Disable
-                </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button size="sm" variant="destructive">
@@ -238,14 +258,6 @@ export default function TopicsTable({ topics, page, pageSize, total, onPageChang
               <RiSearch2Line className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
               <Input placeholder="Search title, keywords, tags..." className="pl-7" value={query} onChange={(e) => setQuery(e.target.value)} />
             </div>
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Status:</span>
-              <select className="h-9 border rounded-md px-2 bg-background" value={filterActive} onChange={(e) => setFilterActive(e.target.value as "all" | "active" | "inactive")}>
-                <option value="all">All</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
           </div>
         </div>
 
@@ -261,7 +273,6 @@ export default function TopicsTable({ topics, page, pageSize, total, onPageChang
                 <TableHead>Keywords</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Tags</TableHead>
-                <TableHead className="text-center">Active</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -276,9 +287,6 @@ export default function TopicsTable({ topics, page, pageSize, total, onPageChang
                   <TableCell className="text-muted-foreground text-sm truncate max-w-[240px]" title={t.keywords}>{t.keywords || "—"}</TableCell>
                   <TableCell className="text-sm">{t.category || "—"}</TableCell>
                   <TableCell className="text-sm truncate max-w-[240px]" title={t.tags}>{t.tags || "—"}</TableCell>
-                  <TableCell className="align-middle">
-                    <span className={`block mx-auto h-2.5 w-2.5 rounded-full bg-green-500`} aria-label="Active" title="Active" />
-                  </TableCell>
                   <TableCell className="text-muted-foreground text-sm">{formatDateTimeEU(t.created_at)}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
@@ -321,7 +329,7 @@ export default function TopicsTable({ topics, page, pageSize, total, onPageChang
               ))}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">No topics found.</TableCell>
+                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">No topics found.</TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -352,6 +360,75 @@ export default function TopicsTable({ topics, page, pageSize, total, onPageChang
         category: editing.category,
         tags: editing.tags,
       } : undefined} onSubmit={handleEdit} />
+
+      {/* Import Dialog */}
+      <Dialog open={importOpen} onOpenChange={(o) => { setImportError(""); if (!o) { setImportFile(null); setImportSiteId(""); } setImportOpen(o); }}>
+        <DialogContent className="sm:max-w-[560px]">
+          <DialogHeader>
+            <DialogTitle>Import topics from file</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setImportError("");
+              if (!importSiteId) { setImportError("Please select a site"); return; }
+              if (!importFile) { setImportError("Please choose a file"); return; }
+              setImporting(true);
+              try {
+                const ext = (importFile.name.split('.').pop() || '').toLowerCase();
+                const textTypes = ["txt","csv","json"]; 
+                let content = "";
+                if (textTypes.includes(ext)) {
+                  content = await importFile.text();
+                } else {
+                  const buf = await importFile.arrayBuffer();
+                  // convert to base64
+                  let binary = "";
+                  const bytes = new Uint8Array(buf);
+                  const chunk = 0x8000;
+                  for (let i=0; i<bytes.length; i+=chunk) {
+                    binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i+chunk)) as any);
+                  }
+                  content = btoa(binary);
+                }
+                const format = ext || "txt";
+                const svc = await import("@/services/topics");
+                await svc.importTopics(Number(importSiteId), content, format, false);
+                toast({ title: "Import completed", description: `${importFile.name}` });
+                setImportOpen(false);
+                setImportFile(null);
+                setImportSiteId("");
+                onRefresh();
+              } catch (e) {
+                const msg = e instanceof Error ? e.message : "Failed to import";
+                setImportError(msg);
+              } finally {
+                setImporting(false);
+              }
+            }}
+            className="space-y-3"
+          >
+            <div className="grid gap-1.5">
+              <Label htmlFor="site">Site</Label>
+              <select id="site" className="h-9 border rounded-md px-2 bg-background" value={importSiteId} onChange={(e) => setImportSiteId(e.target.value ? Number(e.target.value) : "")} required>
+                <option value="">Select site…</option>
+                {sites.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>File</Label>
+              <FileUpload accept="txt,csv,json,xls,xlsx" onFileSelected={setImportFile} />
+            </div>
+            {importError && <div className="text-sm text-destructive">{importError}</div>}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setImportOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={importing || !importSiteId || !importFile}>{importing ? "Import..." : "Import"}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   );
 }

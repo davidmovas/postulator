@@ -2,12 +2,12 @@
 import type { Topic } from "@/types/topic";
 import { dto } from "@/wailsjs/wailsjs/go/models";
 import {
-  GetTopics,
-  GetTopic,
-  CreateTopic,
-  UpdateTopic,
-  DeleteTopic,
-  GetTopicSites,
+    CreateTopic,
+    DeleteTopic,
+    GetTopics,
+    GetTopicSites,
+    TopicsImport,
+    UpdateTopic,
 } from "@/wailsjs/wailsjs/go/bindings/Binder";
 
 // Error helpers (reuse pattern from services/sites.ts)
@@ -130,6 +130,21 @@ export async function deleteTopic(id: number): Promise<void> {
 // Extra helper for future: get sites by topic (for Topic -> Sites tab)
 export async function getTopicSites(topicId: number, page: number, limit: number) {
   const req = new dto.PaginationRequest({ page, limit });
-  const res = await GetTopicSites(topicId, req);
-  return res;
+    return await GetTopicSites(topicId, req);
+}
+
+// Import topics from file and assign to site
+export async function importTopics(siteId: number, fileContent: string, fileFormat: string, previewOnly: boolean = false): Promise<any> {
+  const req = new dto.TopicsImportRequest({
+    site_id: siteId,
+    file_content: fileContent,
+    file_format: fileFormat,
+    preview_only: previewOnly,
+  });
+  try {
+    // Some backends may require the siteId as first arg and also inside the request
+      return await TopicsImport(siteId, req);
+  } catch (e) {
+    throw parseError(e);
+  }
 }
