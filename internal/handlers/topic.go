@@ -960,5 +960,21 @@ func (h *Handler) executeImport(ctx context.Context, siteID int64, topics []dto.
 		}
 	}
 
+	// Create site bindings for existing topics (reused ones)
+	for _, existingTopic := range topicsToReuse {
+		_, err := h.repo.CreateSiteTopic(ctx, &models.SiteTopic{
+			SiteID:   siteID,
+			TopicID:  existingTopic.ID,
+			Priority: 1,
+		})
+		if err != nil {
+			// If binding already exists, that's ok
+			if !strings.Contains(err.Error(), "UNIQUE constraint") {
+				result.ErrorMessages = append(result.ErrorMessages, fmt.Sprintf("failed to bind topic '%s': %s", existingTopic.Title, err.Error()))
+				result.ErrorCount++
+			}
+		}
+	}
+
 	return result, nil
 }
