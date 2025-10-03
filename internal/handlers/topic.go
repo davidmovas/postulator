@@ -948,18 +948,6 @@ func (h *Handler) executeImport(ctx context.Context, siteID int64, topics []dto.
 		result.Topics = append(result.Topics, topic)
 	}
 
-	// Create new topics with site binding
-	if len(topicsToCreate) > 0 {
-		createdTopics, err := h.repo.BulkCreateTopicsWithSiteBinding(ctx, siteID, topicsToCreate)
-		if err != nil {
-			result.ErrorMessages = append(result.ErrorMessages, fmt.Sprintf("bulk create failed: %s", err.Error()))
-			result.ErrorCount++
-			result.SkippedTopics += len(topicsToCreate)
-		} else {
-			result.CreatedTopics = len(createdTopics)
-		}
-	}
-
 	// Create site bindings for existing topics (reused ones)
 	for _, existingTopic := range topicsToReuse {
 		_, err := h.repo.CreateSiteTopic(ctx, &models.SiteTopic{
