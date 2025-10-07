@@ -57,7 +57,7 @@ func (a *App) startup(ctx context.Context) {
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Printf("Error loading configuration: %v", err)
-		cfg = &config.AppConfig{}
+		cfg = &config.Config{}
 	}
 
 	var db *sql.DB
@@ -86,7 +86,7 @@ func (a *App) startup(ctx context.Context) {
 }
 
 // initializeServices initializes all application services
-func (a *App) initializeServices(_ *config.AppConfig) *ServiceContainer {
+func (a *App) initializeServices(_ *config.Config) *ServiceContainer {
 	// Initialize GPT service with default values (will be configurable later)
 	gptConfig := gpt.Config{
 		APIKey:    "", // To be set through settings

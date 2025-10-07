@@ -1,0 +1,52 @@
+package main
+
+import "context"
+
+type TopicRepository interface {
+	Create(ctx context.Context, topic *Topic) error
+	GetByID(ctx context.Context, id int64) (*Topic, error)
+	GetAll(ctx context.Context) ([]*Topic, error)
+	Update(ctx context.Context, topic *Topic) error
+	Delete(ctx context.Context, id int64) error
+}
+
+type TitleRepository interface {
+	CreateBatch(ctx context.Context, titles []*Title) error
+	GetByTopicID(ctx context.Context, topicID int64) ([]*Title, error)
+	GetByID(ctx context.Context, id int64) (*Title, error)
+	Delete(ctx context.Context, id int64) error
+	CountByTopicID(ctx context.Context, topicID int64) (int, error)
+}
+
+type SiteTopicRepository interface {
+	Assign(ctx context.Context, st *SiteTopic) error
+	GetBySiteID(ctx context.Context, siteID int64) ([]*SiteTopic, error)
+	GetByTopicID(ctx context.Context, topicID int64) ([]*SiteTopic, error)
+	Update(ctx context.Context, st *SiteTopic) error
+	Unassign(ctx context.Context, siteID, topicID int64) error
+}
+
+type UsedTitleRepository interface {
+	MarkAsUsed(ctx context.Context, siteID, titleID int64) error
+	IsUsed(ctx context.Context, siteID, titleID int64) (bool, error)
+	GetUnusedTitles(ctx context.Context, siteID, topicID int64) ([]*Title, error)
+	CountUnused(ctx context.Context, siteID, topicID int64) (int, error)
+}
+
+type TopicService interface {
+	CreateTopic(ctx context.Context, topic *Topic) error
+	GetTopic(ctx context.Context, id int64) (*Topic, error)
+	ListTopics(ctx context.Context) ([]*Topic, error)
+	UpdateTopic(ctx context.Context, topic *Topic) error
+	DeleteTopic(ctx context.Context, id int64) error
+
+	ImportTitles(ctx context.Context, topicID int64, filePath string, format string) error
+	AddTitles(ctx context.Context, topicID int64, titles []string) error
+	GetTitles(ctx context.Context, topicID int64) ([]*Title, error)
+
+	AssignToSite(ctx context.Context, siteID, topicID int64, categoryID *int64, strategy TopicStrategy) error
+	UnassignFromSite(ctx context.Context, siteID, topicID int64) error
+	GetSiteTopics(ctx context.Context, siteID int64) ([]*SiteTopic, error)
+
+	GetAvailableTitle(ctx context.Context, siteID, topicID int64, strategy TopicStrategy) (*Title, error)
+}
