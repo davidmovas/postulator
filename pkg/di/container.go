@@ -24,6 +24,17 @@ type entry struct {
 	mu           sync.Mutex
 }
 
+// New creates a new root dependency injection Container.
+//
+// The root container stores registrations and singleton instances.
+// Use Scope() to create a child container for per-request/per-operation lifetimes.
+//
+// Example:
+//
+//	c := di.New()
+//	// register providers, then resolve dependencies
+//	var svc MyService
+//	if err := c.Resolve(&svc); err != nil { /* handle */ }
 func New() Container {
 	return &container{
 		registrations:   &sync.Map{},
@@ -32,6 +43,14 @@ func New() Container {
 	}
 }
 
+// Typed returns a helper wrapper that enables type-safe operations
+// for a specific generic type without repeatedly passing type info.
+//
+// Example:
+//
+//	c := di.New()
+//	t := di.Typed[MyService](c)
+//	// now you can use t with generic helpers defined elsewhere
 func Typed[T any](container Container) TypedContainer[T] {
 	return TypedContainer[T]{container: container}
 }
@@ -61,6 +80,8 @@ func (c *container) MustRegister(registrations ...any) {
 	}
 }
 
+// registerSingle stores a single registration entry into the container.
+// Expects a pointer to a Registration value created by registration helpers.
 func (c *container) registerSingle(registration any) error {
 	regValue := reflect.ValueOf(registration)
 	if regValue.Kind() != reflect.Ptr || regValue.IsNil() {
@@ -148,6 +169,8 @@ func (c *container) Close() {
 	}
 }
 
+// resolveType finds or creates an instance for the requested type.
+// Applies caching rules based on lifecycle and scope.
 func (c *container) resolveType(targetType reflect.Type) (any, error) {
 	if instance, ok := c.getInstanceFromCache(targetType); ok {
 		return instance, nil
@@ -161,6 +184,8 @@ func (c *container) resolveType(targetType reflect.Type) (any, error) {
 	return c.createInstance(e)
 }
 
+// getInstanceFromCache returns a cached instance for the given type from
+// the scoped cache (if in a scope) or the root singleton cache.
 func (c *container) getInstanceFromCache(targetType reflect.Type) (any, bool) {
 	if c.isScoped {
 		if instance, ok := c.scopedInstances.Load(targetType); ok {
@@ -175,6 +200,8 @@ func (c *container) getInstanceFromCache(targetType reflect.Type) (any, bool) {
 	return nil, false
 }
 
+// getRegistrationEntry finds a registration entry for the given type.
+// Searches current container then ascends to parent containers if needed.
 func (c *container) getRegistrationEntry(targetType reflect.Type) (*entry, error) {
 	if e, ok := c.registrations.Load(targetType); ok {
 		return e.(*entry), nil
@@ -187,6 +214,8 @@ func (c *container) getRegistrationEntry(targetType reflect.Type) (*entry, error
 	return nil, fmt.Errorf("di: no registration found for type %v", targetType)
 }
 
+// createInstance invokes the provider to construct the service instance.
+// It validates the (T, error) return values and caches according to lifecycle.
 func (c *container) createInstance(entry *entry) (any, error) {
 	if entry.lifecycle == Singleton || entry.lifecycle == Scoped {
 		entry.mu.Lock()
