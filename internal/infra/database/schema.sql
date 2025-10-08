@@ -19,6 +19,7 @@ CREATE TABLE site_categories (
     wp_category_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     slug TEXT,
+    count INTEGER,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
     UNIQUE(site_id, wp_category_id)

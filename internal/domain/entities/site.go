@@ -1,4 +1,4 @@
-package site
+package entities
 
 import "time"
 
@@ -36,6 +36,7 @@ type Category struct {
 	SiteID       int64
 	WPCategoryID int
 	Name         string
-	Slug         string
+	Slug         *string
+	Count        int
 	CreatedAt    time.Time
 }

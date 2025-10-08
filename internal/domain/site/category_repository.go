@@ -1,7 +1,8 @@
 package site
 
 import (
-	"Postulator/internal/infrastructure/database"
+	"Postulator/internal/domain/entities"
+	"Postulator/internal/infra/database"
 	"Postulator/pkg/dbx"
 	"Postulator/pkg/di"
 	"Postulator/pkg/errors"
@@ -36,11 +37,11 @@ func NewCategoryRepository(c di.Container) (*CategoryRepository, error) {
 	}, nil
 }
 
-func (c *CategoryRepository) Create(ctx context.Context, category *Category) error {
+func (c *CategoryRepository) Create(ctx context.Context, category *entities.Category) error {
 	query, args := dbx.ST.
 		Insert("site_categories").
-		Columns("site_id", "wp_category_id", "name", "slug").
-		Values(category.SiteID, category.WPCategoryID, category.Name, category.Slug).
+		Columns("site_id", "wp_category_id", "name", "slug", "count").
+		Values(category.SiteID, category.WPCategoryID, category.Name, category.Slug, category.Count).
 		Suffix("ON CONFLICT DO NOTHING").
 		MustSql()
 
@@ -56,9 +57,9 @@ func (c *CategoryRepository) Create(ctx context.Context, category *Category) err
 	return nil
 }
 
-func (c *CategoryRepository) GetBySiteID(ctx context.Context, siteID int64) ([]*Category, error) {
+func (c *CategoryRepository) GetBySiteID(ctx context.Context, siteID int64) ([]*entities.Category, error) {
 	query, args := dbx.ST.
-		Select("id", "site_id", "wp_category_id", "name", "slug", "created_at").
+		Select("id", "site_id", "wp_category_id", "name", "slug", "count", "created_at").
 		Where(squirrel.Eq{"site_id": siteID}).
 		MustSql()
 
@@ -67,15 +68,16 @@ func (c *CategoryRepository) GetBySiteID(ctx context.Context, siteID int64) ([]*
 		return nil, errors.Internal(err)
 	}
 
-	var categories []*Category
+	var categories []*entities.Category
 	for rows.Next() {
-		var category Category
+		var category entities.Category
 		if err = rows.Scan(
 			&category.ID,
 			&category.SiteID,
 			&category.WPCategoryID,
 			&category.Name,
 			&category.Slug,
+			&category.Count,
 			&category.CreatedAt,
 		); err != nil {
 			return nil, errors.Internal(err)

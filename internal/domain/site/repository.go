@@ -1,7 +1,8 @@
 package site
 
 import (
-	"Postulator/internal/infrastructure/database"
+	"Postulator/internal/domain/entities"
+	"Postulator/internal/infra/database"
 	"Postulator/pkg/dbx"
 	"Postulator/pkg/di"
 	"Postulator/pkg/errors"
@@ -13,7 +14,7 @@ import (
 )
 
 var (
-	_ IRepository = (*Repository)(nil)
+	_ ISiteRepository = (*Repository)(nil)
 )
 
 type Repository struct {
@@ -21,7 +22,7 @@ type Repository struct {
 	logger *logger.Logger
 }
 
-func NewRepository(c di.Container) (*Repository, error) {
+func NewSiteRepository(c di.Container) (*Repository, error) {
 	var db *database.DB
 
 	if err := c.Resolve(&db); err != nil {
@@ -39,7 +40,7 @@ func NewRepository(c di.Container) (*Repository, error) {
 	}, nil
 }
 
-func (r *Repository) Create(ctx context.Context, site *Site) error {
+func (r *Repository) Create(ctx context.Context, site *entities.Site) error {
 	query, args := dbx.ST.
 		Insert("sites").
 		Columns("name", "url", "wp_username", "wp_password", "status", "health_status").
@@ -57,7 +58,7 @@ func (r *Repository) Create(ctx context.Context, site *Site) error {
 	return err
 }
 
-func (r *Repository) GetByID(ctx context.Context, id int64) (*Site, error) {
+func (r *Repository) GetByID(ctx context.Context, id int64) (*entities.Site, error) {
 	query, args := dbx.ST.
 		Select(
 			"id",
@@ -75,7 +76,7 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (*Site, error) {
 		Where(squirrel.Eq{"id": id}).
 		MustSql()
 
-	var site Site
+	var site entities.Site
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(
 		&site.ID,
 		&site.Name,
@@ -99,7 +100,7 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (*Site, error) {
 	return &site, nil
 }
 
-func (r *Repository) GetAll(ctx context.Context) ([]*Site, error) {
+func (r *Repository) GetAll(ctx context.Context) ([]*entities.Site, error) {
 	query, args := dbx.ST.
 		Select(
 			"id",
@@ -125,9 +126,9 @@ func (r *Repository) GetAll(ctx context.Context) ([]*Site, error) {
 		_ = rows.Close()
 	}()
 
-	var sites []*Site
+	var sites []*entities.Site
 	for rows.Next() {
-		var site Site
+		var site entities.Site
 		if err = rows.Scan(
 			&site.ID,
 			&site.Name,
@@ -149,7 +150,7 @@ func (r *Repository) GetAll(ctx context.Context) ([]*Site, error) {
 	return sites, nil
 }
 
-func (r *Repository) Update(ctx context.Context, site *Site) error {
+func (r *Repository) Update(ctx context.Context, site *entities.Site) error {
 	query, args := dbx.ST.
 		Update("sites").
 		Set("name", site.Name).
@@ -193,7 +194,7 @@ func (r *Repository) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (r *Repository) UpdateHealthStatus(ctx context.Context, id int64, status HealthStatus) error {
+func (r *Repository) UpdateHealthStatus(ctx context.Context, id int64, status entities.HealthStatus) error {
 	query, args := dbx.ST.
 		Update("sites").
 		Set("health_status", status).

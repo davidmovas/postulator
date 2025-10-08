@@ -2,7 +2,7 @@ package app
 
 import (
 	"Postulator/internal/config"
-	"Postulator/internal/infrastructure/database"
+	"Postulator/internal/infra/database"
 	"Postulator/pkg/di"
 	"Postulator/pkg/logger"
 	"fmt"
