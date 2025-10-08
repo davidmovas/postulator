@@ -10,8 +10,13 @@ import (
 )
 
 type Config struct {
-	DatabasePath string `json:"database_path"`
-	LogLevel     string `json:"log_level"`
+	DatabasePath string `json:"databasePath"`
+	LogLevel     string `json:"logLevel"`
+	LogDir       string `json:"logDir"`
+	ConsoleOut   bool   `json:"consoleOut"`
+	PrettyPrint  bool   `json:"prettyPrint"`
+	AppLogFile   string `json:"appLogFile"`
+	ErrLogFile   string `json:"errLogFile"`
 }
 
 func LoadConfig() (*Config, error) {
