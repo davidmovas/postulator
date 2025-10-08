@@ -2,7 +2,7 @@ package site
 
 import "context"
 
-type Repository interface {
+type IRepository interface {
 	Create(ctx context.Context, site *Site) error
 	GetByID(ctx context.Context, id int64) (*Site, error)
 	GetAll(ctx context.Context) ([]*Site, error)
@@ -11,13 +11,13 @@ type Repository interface {
 	UpdateHealthStatus(ctx context.Context, id int64, status HealthStatus) error
 }
 
-type CategoryRepository interface {
+type ICategoryRepository interface {
 	Create(ctx context.Context, category *Category) error
 	GetBySiteID(ctx context.Context, siteID int64) ([]*Category, error)
 	DeleteBySiteID(ctx context.Context, siteID int64) error
 }
 
-type Service interface {
+type IService interface {
 	CreateSite(ctx context.Context, site *Site) error
 	GetSite(ctx context.Context, id int64) (*Site, error)
 	ListSites(ctx context.Context) ([]*Site, error)

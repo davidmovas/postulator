@@ -78,15 +78,15 @@ func (e *AppError) WithContext(key string, value any) *AppError {
 }
 
 func Internal(err error) *AppError {
-	return Wrap(ErrCodeInternal, "Внутренняя ошибка сервера", err)
+	return Wrap(ErrCodeInternal, "Внутренняя ошибка приложения", err)
 }
 
 func Validation(message string) *AppError {
 	return New(ErrCodeValidation, message)
 }
 
-func NotFound(entity string) *AppError {
-	return New(ErrCodeNotFound, fmt.Sprintf("%s не найден", entity))
+func NotFound(entity string, identifier any) *AppError {
+	return New(ErrCodeNotFound, fmt.Sprintf("%s по идентификтору %v не найден", entity, identifier))
 }
 
 func AlreadyExists(entity string) *AppError {

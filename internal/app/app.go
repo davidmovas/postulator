@@ -37,11 +37,7 @@ func New(cfg *config.Config) (*App, error) {
 
 			return l, nil
 		}).AsSingleton(),
-	); err != nil {
-		return nil, err
-	}
 
-	if err := c.Register(
 		di.For[*database.DB](func(c di.Container) (*database.DB, error) {
 			path := filepath.Join(xdg.ConfigHome, "Postulator", "data.db")
 
