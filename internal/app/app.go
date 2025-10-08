@@ -2,9 +2,13 @@ package app
 
 import (
 	"Postulator/internal/config"
+	"Postulator/internal/infrastructure/database"
 	"Postulator/pkg/di"
 	"Postulator/pkg/logger"
 	"fmt"
+	"path/filepath"
+
+	"github.com/adrg/xdg"
 )
 
 type App struct {
@@ -20,12 +24,7 @@ func New(cfg *config.Config) (*App, error) {
 
 	if err := c.Register(
 		di.For[*logger.Logger](func(c di.Container) (*logger.Logger, error) {
-			var appCfg *config.Config
-			if err := c.Resolve(&appCfg); err != nil {
-				return nil, err
-			}
-
-			l, err := logger.New(appCfg)
+			l, err := logger.New(cfg)
 			if err != nil {
 				return nil, err
 			}
@@ -37,6 +36,22 @@ func New(cfg *config.Config) (*App, error) {
 			})
 
 			return l, nil
+		}).AsSingleton(),
+	); err != nil {
+		return nil, err
+	}
+
+	if err := c.Register(
+		di.For[*database.DB](func(c di.Container) (*database.DB, error) {
+			path := filepath.Join(xdg.ConfigHome, "Postulator", "data.db")
+
+			db, err := database.NewDB(path)
+			if err != nil {
+				return nil, err
+			}
+
+			c.AddCloseFunc(func() { db.Close() })
+			return db, nil
 		}).AsSingleton(),
 	); err != nil {
 		return nil, err
