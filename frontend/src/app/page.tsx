@@ -10,13 +10,13 @@ import {
     BreadcrumbPage,
     BreadcrumbSeparator
 } from "@/components/ui/breadcrumb";
-import SitesPanel from "@/components/dashboard/SitesPanel";
-import DashboardOverview from "@/components/dashboard/DashboardOverview";
-import TopicsPanel from "@/components/dashboard/TopicsPanel";
-import PromptsPanel from "@/components/dashboard/PromptsPanel";
-import SiteTopicsPanel from "@/components/dashboard/SiteTopicsPanel";
-import JobsPanel from "@/components/dashboard/JobsPanel";
 import { NavigationProvider, useNavigation } from "@/context/navigation";
+import JobsPage from "@/app/jobs/page";
+import SitesPage from "@/app/sites/page";
+import DashboardPage from "@/app/dashboard/page";
+import SettingsPage from "@/app/settings/page";
+import TopicsPage from "@/app/topics/page";
+import PromptsPage from "@/app/prompts/page";
 
 function SplashScreen() {
     return (
@@ -51,31 +51,22 @@ function HeaderCrumbs() {
 
 function SectionContent() {
     const { section } = useNavigation();
-    if (section === "dashboard") {
-        return <DashboardOverview />;
-    }
     if (section === "sites") {
-        return <SitesPanel />;
-    }
-    if (section === "site-topics") {
-        return <SiteTopicsPanel />;
+        return <SitesPage />;
     }
     if (section === "jobs") {
-        return <JobsPanel />;
+        return <JobsPage />;
     }
     if (section === "topics") {
-        return <TopicsPanel />;
+        return <TopicsPage />;
     }
     if (section === "prompts") {
-        return <PromptsPanel />;
+        return <PromptsPage />;
     }
-    // settings
-    return (
-        <div className="p-4 md:p-6 lg:p-8">
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Settings</h1>
-            <p className="mt-2 text-muted-foreground">Settings forms will appear here.</p>
-        </div>
-    );
+    if (section === "settings") {
+        return <SettingsPage />;
+    }
+    return <DashboardPage />;
 }
 
 export default function Home() {
