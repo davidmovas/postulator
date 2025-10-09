@@ -87,6 +87,7 @@ CREATE TABLE jobs (
     category_id INTEGER NOT NULL, -- в какую категорию публиковать
     prompt_id INTEGER NOT NULL,
     ai_provider_id INTEGER NOT NULL,
+    ai_model TEXT NOT NULL, -- модель AI для использования (gpt-4, gpt-3.5-turbo, claude-3-opus, etc)
     requires_validation BOOLEAN NOT NULL DEFAULT 0,
     schedule_type TEXT NOT NULL, -- manual, once, daily, weekly, monthly
     schedule_time TIME, -- время для daily (например 09:00:00)
