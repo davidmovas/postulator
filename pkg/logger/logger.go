@@ -55,6 +55,10 @@ func New(cfg *config.Config) (*Logger, error) {
 	return globalLogger, nil
 }
 
+func NewForTest(cfg *config.Config) (*Logger, error) {
+	return createLogger(cfg)
+}
+
 func createLogger(cfg *config.Config) (*Logger, error) {
 	zerolog.TimeFieldFormat = time.RFC3339
 

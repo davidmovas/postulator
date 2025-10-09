@@ -24,7 +24,7 @@ func setupTestService(t *testing.T) (*Service, func()) {
 
 	container := di.New()
 
-	testLogger, err := logger.New(&config.Config{
+	testLogger, err := logger.NewForTest(&config.Config{
 		LogDir:      tempLogDir,
 		AppLogFile:  "test.log",
 		ErrLogFile:  "test_error.log",

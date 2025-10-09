@@ -15,10 +15,6 @@ type DB struct {
 	*sql.DB
 }
 
-// NewDB opens (and if necessary creates) an on-disk SQLite database at the given filename.
-// It never deletes or overwrites existing data. If the file does not exist, it creates
-// the parent directory and an empty file. After opening, it checks whether the schema
-// is present (by probing for a well-known table) and initializes it if missing.
 func NewDB(filename string) (*DB, error) {
 	if filename == "" {
 		return nil, errors.New("empty database filename")

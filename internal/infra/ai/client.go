@@ -1,1 +1,7 @@
 package ai
+
+import "context"
+
+type Client interface {
+	GenerateArticle(ctx context.Context, systemPrompt, userPrompt string) (string, error)
+}
