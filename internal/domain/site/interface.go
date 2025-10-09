@@ -23,8 +23,12 @@ type ICategoryRepository interface {
 type IService interface {
 	CreateSite(ctx context.Context, site *entities.Site) error
 	GetSite(ctx context.Context, id int64) (*entities.Site, error)
+	// GetSiteWithPassword returns a site with decrypted WP password for internal use only
+	GetSiteWithPassword(ctx context.Context, id int64) (*entities.Site, error)
 	ListSites(ctx context.Context) ([]*entities.Site, error)
 	UpdateSite(ctx context.Context, site *entities.Site) error
+	// UpdateSitePassword securely updates the site's WordPress password
+	UpdateSitePassword(ctx context.Context, id int64, password string) error
 	DeleteSite(ctx context.Context, id int64) error
 	CheckHealth(ctx context.Context, siteID int64) error
 	SyncCategories(ctx context.Context, siteID int64) error

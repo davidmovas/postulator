@@ -118,7 +118,7 @@ func (e *Executor) Execute(ctx context.Context, job *Job) error {
 
 func (e *Executor) executePipeline(ctx context.Context, job *Job, exec *Execution) error {
 	// Step 1: Get site information
-	siteInfo, err := e.siteService.GetSite(ctx, job.SiteID)
+	siteInfo, err := e.siteService.GetSiteWithPassword(ctx, job.SiteID)
 	if err != nil {
 		return fmt.Errorf("failed to get site: %w", err)
 	}

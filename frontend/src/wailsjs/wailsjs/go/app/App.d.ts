@@ -105,6 +105,8 @@ export function ResumeJob(arg1:number):Promise<dto.Response_string_>;
 
 export function SetAIProviderStatus(arg1:number,arg2:boolean):Promise<dto.Response_string_>;
 
+export function SetSitePassword(arg1:number,arg2:string):Promise<dto.Response_string_>;
+
 export function SiteService():Promise<site.IService>;
 
 export function Start(arg1:context.Context):Promise<void>;
