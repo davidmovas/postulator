@@ -130,7 +130,7 @@ func (s *ImportService) ImportAndAssignToSite(ctx context.Context, filePath stri
 		topicID, ok := titleToID[title]
 		if !ok {
 			errMsg := "topic not found after creation: " + title
-			s.logger.Warnf(errMsg)
+			s.logger.Warnf("%s", errMsg)
 			assignmentErrors = append(assignmentErrors, errMsg)
 			continue
 		}
@@ -138,7 +138,7 @@ func (s *ImportService) ImportAndAssignToSite(ctx context.Context, filePath stri
 		err = s.topicService.AssignToSite(ctx, siteID, topicID, categoryID, strategy)
 		if err != nil {
 			errMsg := "failed to assign topic '" + title + "' to site: " + err.Error()
-			s.logger.Warnf(errMsg)
+			s.logger.Warnf("%s", errMsg)
 			assignmentErrors = append(assignmentErrors, errMsg)
 			continue
 		}

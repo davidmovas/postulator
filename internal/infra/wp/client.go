@@ -18,6 +18,7 @@ import (
 const (
 	requestTimeout = time.Second * 30
 	userAgent      = "WordPress-Go-Client/1.0"
+	apiPath        = "/wp-json/wp/v2/"
 )
 
 type Client struct {
@@ -164,24 +165,12 @@ func (c *Client) setAppPasswordAuth(req *http.Request, username, appPassword str
 	req.Header.Set("User-Agent", c.userAgent)
 }
 
-// getAPIURL формирует URL для WordPress REST API
 func (c *Client) getAPIURL(siteURL, endpoint string) string {
-	baseURL := strings.TrimSuffix(siteURL, "/")
-	apiPath := "/wp-json/wp/v2/"
-
-	if endpoint != "" {
-		apiPath = path.Join(apiPath, endpoint)
-	}
-
-	return baseURL + apiPath
+	return strings.TrimSuffix(siteURL, "/") + path.Join(apiPath, endpoint)
 }
 
-// CreateApplicationPassword создает Application Password через API (если есть права)
 func (c *Client) CreateApplicationPassword(ctx context.Context, site *entities.Site, appName string) (string, error) {
 	endpoint := c.getAPIURL(site.URL, "users/me/application-passwords")
-
-	// Для этого метода нужна аутентификация основным паролем
-	// или права администратора
 
 	passwordData := map[string]string{
 		"name": appName,
@@ -197,7 +186,6 @@ func (c *Client) CreateApplicationPassword(ctx context.Context, site *entities.S
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Временная аутентификация основным паролем
 	c.setAppPasswordAuth(req, site.WPUsername, site.WPPassword)
 	req.Header.Set("Content-Type", "application/json")
 

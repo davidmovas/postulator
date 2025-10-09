@@ -89,7 +89,9 @@ func (c *container) registerSingle(registration any) error {
 	}
 
 	regElem := regValue.Elem()
-	if regElem.Type().Name() != "Registration" {
+	typeName := regElem.Type().Name()
+	// Support both "Registration" and generic "Registration[...]" types
+	if typeName != "Registration" && len(typeName) > 12 && typeName[:12] != "Registration" {
 		return fmt.Errorf("di: expected *Registration, got %T", registration)
 	}
 
@@ -100,7 +102,7 @@ func (c *container) registerSingle(registration any) error {
 
 	resolvedType := interfaceField.Interface().(reflect.Type)
 	providerField := regElem.FieldByName("Provider")
-	lifecycle := Lifecycle(regElem.FieldByName("Lifecycle").Int())
+	lifecycle := Lifecycle(regElem.FieldByName("Lifecycle").Uint())
 
 	c.registrations.Store(resolvedType, &entry{
 		provider:     providerField,
