@@ -1,6 +1,9 @@
 package main
 
 import (
+	"Postulator/internal/app"
+	"Postulator/internal/config"
+	"context"
 	"embed"
 	"log"
 	"os"
@@ -24,7 +27,9 @@ var icon []byte
 //go:embed build/icon.ico
 var icoIcon []byte
 
-func (a *App) onReady() {
+var wailsCtx context.Context
+
+func onReady() {
 	systray.SetIcon(icoIcon)
 	systray.SetTitle("Postulator")
 	systray.SetTooltip("Postulator - Post Creator App")
@@ -40,16 +45,16 @@ func (a *App) onReady() {
 		for {
 			select {
 			case <-mShow.ClickedCh:
-				if a.ctx != nil {
-					runtime.WindowShow(a.ctx)
+				if wailsCtx != nil {
+					runtime.WindowShow(wailsCtx)
 				}
 			case <-mHide.ClickedCh:
-				if a.ctx != nil {
-					runtime.WindowHide(a.ctx)
+				if wailsCtx != nil {
+					runtime.WindowHide(wailsCtx)
 				}
 			case <-mQuit.ClickedCh:
-				if a.ctx != nil {
-					runtime.Quit(a.ctx)
+				if wailsCtx != nil {
+					runtime.Quit(wailsCtx)
 				}
 				systray.Quit()
 				os.Exit(0)
@@ -59,18 +64,25 @@ func (a *App) onReady() {
 	}()
 }
 
-func (a *App) onExit() {
+func onExit() {
 	// Clean up here
 }
 
 func main() {
-	app := NewApp()
+	// Load or create default config
+	cfg := &config.Config{LogLevel: "info", ConsoleOut: true, PrettyPrint: false}
+
+	// Init internal app
+	appInst, err := app.New(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Initialize systray in a goroutine
-	go systray.Run(app.onReady, app.onExit)
+	go systray.Run(onReady, onExit)
 
 	// Create application with options
-	err := wails.Run(&options.App{
+	err = wails.Run(&options.App{
 		Title:             "Postulator",
 		Width:             1024,
 		Height:            768,
@@ -84,11 +96,11 @@ func main() {
 		SingleInstanceLock: &options.SingleInstanceLock{
 			UniqueId: "com.postulator.app",
 			OnSecondInstanceLaunch: func(secondInstanceData options.SecondInstanceData) {
-				if app.CTX() != nil {
-					runtime.WindowShow(app.CTX())                  // Показываем окно, если оно было скрыто
-					runtime.WindowUnminimise(app.CTX())            // Восстанавливаем из свернутого состояния
-					runtime.WindowSetAlwaysOnTop(app.CTX(), true)  // Временно делаем поверх всех окон
-					runtime.WindowSetAlwaysOnTop(app.CTX(), false) // Убираем флаг поверх всех окон
+				if wailsCtx != nil {
+					runtime.WindowShow(wailsCtx)
+					runtime.WindowUnminimise(wailsCtx)
+					runtime.WindowSetAlwaysOnTop(wailsCtx, true)
+					runtime.WindowSetAlwaysOnTop(wailsCtx, false)
 				}
 			},
 		},
@@ -99,14 +111,11 @@ func main() {
 		Menu:             nil,
 		Logger:           nil,
 		LogLevel:         logger.DEBUG,
-		OnStartup:        app.startup,
-		OnDomReady:       app.domReady,
-		OnBeforeClose:    app.beforeClose,
-		OnShutdown:       app.shutdown,
+		OnStartup:        func(ctx context.Context) { wailsCtx = ctx },
+		OnShutdown:       func(ctx context.Context) { appInst.Stop() },
 		WindowStartState: options.Normal,
 		Bind: []interface{}{
-			app,
-			app.binder,
+			appInst,
 		},
 		DragAndDrop: &options.DragAndDrop{
 			EnableFileDrop: true,

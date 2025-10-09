@@ -1,0 +1,135 @@
+package app
+
+import (
+	"Postulator/internal/domain/entities"
+	"Postulator/internal/dto"
+	"Postulator/pkg/errors"
+	"context"
+)
+
+// CreateSite creates a new site using provided DTO fields
+func (a *App) CreateSite(site *dto.Site) *dto.Response[string] {
+	if a.siteSvc == nil {
+		if err := a.BuildServices(); err != nil {
+			return dtoErr[string](errors.Internal(err))
+		}
+	}
+	if site == nil {
+		return dtoErr[string](errors.Validation("site payload is required"))
+	}
+	e := &entities.Site{
+		Name:       site.Name,
+		URL:        site.URL,
+		WPUsername: site.WPUsername,
+		WPPassword: "", // password should be provided separately in secure flows
+		Status:     entities.Status(site.Status),
+	}
+	if err := a.siteSvc.CreateSite(context.Background(), e); err != nil {
+		return dtoErr[string](asAppErr(err))
+	}
+	return &dto.Response[string]{Success: true, Data: "created"}
+}
+
+// GetSite returns site by ID
+func (a *App) GetSite(id int64) *dto.Response[*dto.Site] {
+	if a.siteSvc == nil {
+		if err := a.BuildServices(); err != nil {
+			return dtoErr[*dto.Site](errors.Internal(err))
+		}
+	}
+	s, err := a.siteSvc.GetSite(context.Background(), id)
+	if err != nil {
+		return dtoErr[*dto.Site](asAppErr(err))
+	}
+	return &dto.Response[*dto.Site]{Success: true, Data: dto.FromSite(s)}
+}
+
+// ListSites lists all sites
+func (a *App) ListSites() *dto.Response[[]*dto.Site] {
+	if a.siteSvc == nil {
+		if err := a.BuildServices(); err != nil {
+			return dtoErr[[]*dto.Site](errors.Internal(err))
+		}
+	}
+	sites, err := a.siteSvc.ListSites(context.Background())
+	if err != nil {
+		return dtoErr[[]*dto.Site](asAppErr(err))
+	}
+	return &dto.Response[[]*dto.Site]{Success: true, Data: dto.FromSites(sites)}
+}
+
+// UpdateSite updates a site
+func (a *App) UpdateSite(site *dto.Site) *dto.Response[string] {
+	if a.siteSvc == nil {
+		if err := a.BuildServices(); err != nil {
+			return dtoErr[string](errors.Internal(err))
+		}
+	}
+	if site == nil {
+		return dtoErr[string](errors.Validation("site payload is required"))
+	}
+	e := &entities.Site{
+		ID:         site.ID,
+		Name:       site.Name,
+		URL:        site.URL,
+		WPUsername: site.WPUsername,
+		Status:     entities.Status(site.Status),
+	}
+	if err := a.siteSvc.UpdateSite(context.Background(), e); err != nil {
+		return dtoErr[string](asAppErr(err))
+	}
+	return &dto.Response[string]{Success: true, Data: "updated"}
+}
+
+// DeleteSite removes a site by ID
+func (a *App) DeleteSite(id int64) *dto.Response[string] {
+	if a.siteSvc == nil {
+		if err := a.BuildServices(); err != nil {
+			return dtoErr[string](errors.Internal(err))
+		}
+	}
+	if err := a.siteSvc.DeleteSite(context.Background(), id); err != nil {
+		return dtoErr[string](asAppErr(err))
+	}
+	return &dto.Response[string]{Success: true, Data: "deleted"}
+}
+
+// CheckHealth performs a WordPress health check and updates status
+func (a *App) CheckHealth(siteID int64) *dto.Response[string] {
+	if a.siteSvc == nil {
+		if err := a.BuildServices(); err != nil {
+			return dtoErr[string](errors.Internal(err))
+		}
+	}
+	if err := a.siteSvc.CheckHealth(context.Background(), siteID); err != nil {
+		return dtoErr[string](asAppErr(err))
+	}
+	return &dto.Response[string]{Success: true, Data: "checked"}
+}
+
+// SyncCategories fetches categories from WP and stores them
+func (a *App) SyncCategories(siteID int64) *dto.Response[string] {
+	if a.siteSvc == nil {
+		if err := a.BuildServices(); err != nil {
+			return dtoErr[string](errors.Internal(err))
+		}
+	}
+	if err := a.siteSvc.SyncCategories(context.Background(), siteID); err != nil {
+		return dtoErr[string](asAppErr(err))
+	}
+	return &dto.Response[string]{Success: true, Data: "synced"}
+}
+
+// GetSiteCategories returns categories of a site
+func (a *App) GetSiteCategories(siteID int64) *dto.Response[[]*dto.Category] {
+	if a.siteSvc == nil {
+		if err := a.BuildServices(); err != nil {
+			return dtoErr[[]*dto.Category](errors.Internal(err))
+		}
+	}
+	cats, err := a.siteSvc.GetSiteCategories(context.Background(), siteID)
+	if err != nil {
+		return dtoErr[[]*dto.Category](asAppErr(err))
+	}
+	return &dto.Response[[]*dto.Category]{Success: true, Data: dto.FromCategories(cats)}
+}

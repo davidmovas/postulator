@@ -2,6 +2,8 @@ package dto
 
 import "time"
 
+const timeLayout = "2006-01-02T15:04:05Z07:00"
+
 func Success[T any](data T) Response[T] {
 	return Response[T]{
 		Success: true,

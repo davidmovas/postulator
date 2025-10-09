@@ -1,530 +1,275 @@
 export namespace dto {
 	
-	export class CreatePromptRequest {
-	    name: string;
-	    system: string;
-	    user: string;
-	    is_default: boolean;
-	    is_active: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new CreatePromptRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.system = source["system"];
-	        this.user = source["user"];
-	        this.is_default = source["is_default"];
-	        this.is_active = source["is_active"];
-	    }
-	}
-	export class CreateSitePromptRequest {
-	    site_id: number;
-	    prompt_id: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new CreateSitePromptRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.site_id = source["site_id"];
-	        this.prompt_id = source["prompt_id"];
-	    }
-	}
-	export class CreateSiteRequest {
-	    name: string;
-	    url: string;
-	    username: string;
-	    password: string;
-	    is_active: boolean;
-	    strategy?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new CreateSiteRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.url = source["url"];
-	        this.username = source["username"];
-	        this.password = source["password"];
-	        this.is_active = source["is_active"];
-	        this.strategy = source["strategy"];
-	    }
-	}
-	export class CreateSiteTopicRequest {
-	    site_id: number;
-	    topic_id: number;
-	    priority: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new CreateSiteTopicRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.site_id = source["site_id"];
-	        this.topic_id = source["topic_id"];
-	        this.priority = source["priority"];
-	    }
-	}
-	export class CreateTopicRequest {
-	    title: string;
-	    keywords?: string;
-	    category?: string;
-	    tags?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new CreateTopicRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.title = source["title"];
-	        this.keywords = source["keywords"];
-	        this.category = source["category"];
-	        this.tags = source["tags"];
-	    }
-	}
-	export class PaginationRequest {
-	    page: number;
-	    limit: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new PaginationRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.page = source["page"];
-	        this.limit = source["limit"];
-	    }
-	}
-	export class PaginationResponse {
-	    page: number;
-	    limit: number;
-	    total: number;
-	    total_pages: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new PaginationResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.page = source["page"];
-	        this.limit = source["limit"];
-	        this.total = source["total"];
-	        this.total_pages = source["total_pages"];
-	    }
-	}
-	export class PromptResponse {
+	export class AIProvider {
 	    id: number;
 	    name: string;
-	    system: string;
-	    user: string;
-	    is_default: boolean;
-	    is_active: boolean;
-	    // Go type: time
-	    created_at: any;
-	    // Go type: time
-	    updated_at: any;
+	    model: string;
+	    isActive: boolean;
+	    createdAt: string;
+	    updatedAt: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new PromptResponse(source);
+	        return new AIProvider(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.name = source["name"];
-	        this.system = source["system"];
-	        this.user = source["user"];
-	        this.is_default = source["is_default"];
-	        this.is_active = source["is_active"];
-	        this.created_at = this.convertValues(source["created_at"], null);
-	        this.updated_at = this.convertValues(source["updated_at"], null);
+	        this.model = source["model"];
+	        this.isActive = source["isActive"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
 	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
 	}
-	export class PromptListResponse {
-	    prompts: PromptResponse[];
-	    pagination?: PaginationResponse;
+	export class AIProviderCreate {
+	    name: string;
+	    apiKey: string;
+	    model: string;
+	    isActive: boolean;
 	
 	    static createFrom(source: any = {}) {
-	        return new PromptListResponse(source);
+	        return new AIProviderCreate(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.prompts = this.convertValues(source["prompts"], PromptResponse);
-	        this.pagination = this.convertValues(source["pagination"], PaginationResponse);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class ReassignResult {
-	    from_site_id: number;
-	    to_site_id: number;
-	    processed_topics: number;
-	    reassigned_topics: number;
-	    skipped_topics: number;
-	    error_count: number;
-	    error_messages?: string[];
-	
-	    static createFrom(source: any = {}) {
-	        return new ReassignResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.from_site_id = source["from_site_id"];
-	        this.to_site_id = source["to_site_id"];
-	        this.processed_topics = source["processed_topics"];
-	        this.reassigned_topics = source["reassigned_topics"];
-	        this.skipped_topics = source["skipped_topics"];
-	        this.error_count = source["error_count"];
-	        this.error_messages = source["error_messages"];
+	        this.name = source["name"];
+	        this.apiKey = source["apiKey"];
+	        this.model = source["model"];
+	        this.isActive = source["isActive"];
 	    }
 	}
-	export class SetDefaultPromptRequest {
-	    id: number;
-	    type: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new SetDefaultPromptRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.type = source["type"];
-	    }
-	}
-	export class SiteResponse {
+	export class AIProviderUpdate {
 	    id: number;
 	    name: string;
-	    url: string;
-	    username: string;
-	    password: string;
-	    is_active: boolean;
-	    // Go type: time
-	    last_check: any;
-	    status: string;
-	    strategy: string;
-	    // Go type: time
-	    created_at: any;
-	    // Go type: time
-	    updated_at: any;
+	    apiKey?: string;
+	    model: string;
+	    isActive: boolean;
 	
 	    static createFrom(source: any = {}) {
-	        return new SiteResponse(source);
+	        return new AIProviderUpdate(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.name = source["name"];
-	        this.url = source["url"];
-	        this.username = source["username"];
-	        this.password = source["password"];
-	        this.is_active = source["is_active"];
-	        this.last_check = this.convertValues(source["last_check"], null);
-	        this.status = source["status"];
-	        this.strategy = source["strategy"];
-	        this.created_at = this.convertValues(source["created_at"], null);
-	        this.updated_at = this.convertValues(source["updated_at"], null);
+	        this.apiKey = source["apiKey"];
+	        this.model = source["model"];
+	        this.isActive = source["isActive"];
 	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
 	}
-	export class SiteListResponse {
-	    sites: SiteResponse[];
-	    pagination?: PaginationResponse;
-	
-	    static createFrom(source: any = {}) {
-	        return new SiteListResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.sites = this.convertValues(source["sites"], SiteResponse);
-	        this.pagination = this.convertValues(source["pagination"], PaginationResponse);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class SitePromptResponse {
+	export class Category {
 	    id: number;
-	    site_id: number;
-	    site_name?: string;
-	    prompt_id: number;
-	    prompt_name?: string;
-	    // Go type: time
-	    created_at: any;
-	    // Go type: time
-	    updated_at: any;
+	    siteId: number;
+	    wpCategoryId: number;
+	    name: string;
+	    slug?: string;
+	    count: number;
+	    createdAt: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new SitePromptResponse(source);
+	        return new Category(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
-	        this.site_id = source["site_id"];
-	        this.site_name = source["site_name"];
-	        this.prompt_id = source["prompt_id"];
-	        this.prompt_name = source["prompt_name"];
-	        this.created_at = this.convertValues(source["created_at"], null);
-	        this.updated_at = this.convertValues(source["updated_at"], null);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class SitePromptListResponse {
-	    site_prompts: SitePromptResponse[];
-	    pagination?: PaginationResponse;
-	
-	    static createFrom(source: any = {}) {
-	        return new SitePromptListResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.site_prompts = this.convertValues(source["site_prompts"], SitePromptResponse);
-	        this.pagination = this.convertValues(source["pagination"], PaginationResponse);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	
-	export class SiteTopicResponse {
-	    id: number;
-	    site_id: number;
-	    site_name?: string;
-	    topic_id: number;
-	    topic_title?: string;
-	    priority: number;
-	    usage_count: number;
-	    // Go type: time
-	    last_used_at?: any;
-	    round_robin_pos: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new SiteTopicResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.site_id = source["site_id"];
-	        this.site_name = source["site_name"];
-	        this.topic_id = source["topic_id"];
-	        this.topic_title = source["topic_title"];
-	        this.priority = source["priority"];
-	        this.usage_count = source["usage_count"];
-	        this.last_used_at = this.convertValues(source["last_used_at"], null);
-	        this.round_robin_pos = source["round_robin_pos"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class SiteTopicListResponse {
-	    site_topics: SiteTopicResponse[];
-	    pagination?: PaginationResponse;
-	
-	    static createFrom(source: any = {}) {
-	        return new SiteTopicListResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.site_topics = this.convertValues(source["site_topics"], SiteTopicResponse);
-	        this.pagination = this.convertValues(source["pagination"], PaginationResponse);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class StrategyAvailabilityResponse {
-	    site_id: number;
-	    strategy: string;
-	    can_continue: boolean;
-	    total_topics: number;
-	    active_topics: number;
-	    unused_topics: number;
-	    remaining_count: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new StrategyAvailabilityResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.site_id = source["site_id"];
-	        this.strategy = source["strategy"];
-	        this.can_continue = source["can_continue"];
-	        this.total_topics = source["total_topics"];
-	        this.active_topics = source["active_topics"];
-	        this.unused_topics = source["unused_topics"];
-	        this.remaining_count = source["remaining_count"];
+	        this.siteId = source["siteId"];
+	        this.wpCategoryId = source["wpCategoryId"];
+	        this.name = source["name"];
+	        this.slug = source["slug"];
+	        this.count = source["count"];
+	        this.createdAt = source["createdAt"];
 	    }
 	}
-	export class TestConnectionResponse {
-	    success: boolean;
-	    status: string;
+	export class Error {
+	    code: string;
 	    message: string;
-	    details?: string;
-	    // Go type: time
-	    timestamp: any;
+	    context?: Record<string, any>;
 	
 	    static createFrom(source: any = {}) {
-	        return new TestConnectionResponse(source);
+	        return new Error(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.code = source["code"];
+	        this.message = source["message"];
+	        this.context = source["context"];
+	    }
+	}
+	export class Execution {
+	    id: number;
+	    jobId: number;
+	    topicId: number;
+	    generatedTitle?: string;
+	    generatedContent?: string;
+	    status: string;
+	    errorMessage?: string;
+	    articleId?: number;
+	    startedAt: string;
+	    generatedAt?: string;
+	    validatedAt?: string;
+	    publishedAt?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Execution(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.jobId = source["jobId"];
+	        this.topicId = source["topicId"];
+	        this.generatedTitle = source["generatedTitle"];
+	        this.generatedContent = source["generatedContent"];
+	        this.status = source["status"];
+	        this.errorMessage = source["errorMessage"];
+	        this.articleId = source["articleId"];
+	        this.startedAt = source["startedAt"];
+	        this.generatedAt = source["generatedAt"];
+	        this.validatedAt = source["validatedAt"];
+	        this.publishedAt = source["publishedAt"];
+	    }
+	}
+	export class ImportResult {
+	    totalRead: number;
+	    totalAdded: number;
+	    totalSkipped: number;
+	    added: string[];
+	    skipped: string[];
+	    errors: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.totalRead = source["totalRead"];
+	        this.totalAdded = source["totalAdded"];
+	        this.totalSkipped = source["totalSkipped"];
+	        this.added = source["added"];
+	        this.skipped = source["skipped"];
+	        this.errors = source["errors"];
+	    }
+	}
+	export class Job {
+	    id: number;
+	    name: string;
+	    siteId: number;
+	    categoryId: number;
+	    promptId: number;
+	    aiProviderId: number;
+	    aiModel: string;
+	    requiresValidation: boolean;
+	    scheduleType: string;
+	    scheduleTime?: string;
+	    scheduleDay?: number;
+	    jitterEnabled: boolean;
+	    jitterMinutes: number;
+	    status: string;
+	    lastRunAt?: string;
+	    nextRunAt?: string;
+	    createdAt: string;
+	    updatedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Job(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.siteId = source["siteId"];
+	        this.categoryId = source["categoryId"];
+	        this.promptId = source["promptId"];
+	        this.aiProviderId = source["aiProviderId"];
+	        this.aiModel = source["aiModel"];
+	        this.requiresValidation = source["requiresValidation"];
+	        this.scheduleType = source["scheduleType"];
+	        this.scheduleTime = source["scheduleTime"];
+	        this.scheduleDay = source["scheduleDay"];
+	        this.jitterEnabled = source["jitterEnabled"];
+	        this.jitterMinutes = source["jitterMinutes"];
+	        this.status = source["status"];
+	        this.lastRunAt = source["lastRunAt"];
+	        this.nextRunAt = source["nextRunAt"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	}
+	export class ModelsByProvider {
+	    openai: string[];
+	    anthropic: string[];
+	    google: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ModelsByProvider(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.openai = source["openai"];
+	        this.anthropic = source["anthropic"];
+	        this.google = source["google"];
+	    }
+	}
+	export class Prompt {
+	    id: number;
+	    name: string;
+	    systemPrompt: string;
+	    userPrompt: string;
+	    placeholders: string[];
+	    createdAt: string;
+	    updatedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Prompt(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.systemPrompt = source["systemPrompt"];
+	        this.userPrompt = source["userPrompt"];
+	        this.placeholders = source["placeholders"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	}
+	export class PromptRenderResult {
+	    system: string;
+	    user: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PromptRenderResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.system = source["system"];
+	        this.user = source["user"];
+	    }
+	}
+	export class Response__Postulator_internal_dto_AIProvider_ {
+	    success: boolean;
+	    data?: AIProvider;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__Postulator_internal_dto_AIProvider_(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
-	        this.status = source["status"];
-	        this.message = source["message"];
-	        this.details = source["details"];
-	        this.timestamp = this.convertValues(source["timestamp"], null);
+	        this.data = this.convertValues(source["data"], AIProvider);
+	        this.error = this.convertValues(source["error"], Error);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -545,42 +290,20 @@ export namespace dto {
 		    return a;
 		}
 	}
-	export class TestSiteConnectionRequest {
-	    site_id: number;
+	export class Response__Postulator_internal_dto_ImportResult_ {
+	    success: boolean;
+	    data?: ImportResult;
+	    error?: Error;
 	
 	    static createFrom(source: any = {}) {
-	        return new TestSiteConnectionRequest(source);
+	        return new Response__Postulator_internal_dto_ImportResult_(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.site_id = source["site_id"];
-	    }
-	}
-	export class TopicResponse {
-	    id: number;
-	    title: string;
-	    keywords: string;
-	    category: string;
-	    tags: string;
-	    // Go type: time
-	    created_at: any;
-	    // Go type: time
-	    updated_at: any;
-	
-	    static createFrom(source: any = {}) {
-	        return new TopicResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.title = source["title"];
-	        this.keywords = source["keywords"];
-	        this.category = source["category"];
-	        this.tags = source["tags"];
-	        this.created_at = this.convertValues(source["created_at"], null);
-	        this.updated_at = this.convertValues(source["updated_at"], null);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], ImportResult);
+	        this.error = this.convertValues(source["error"], Error);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -601,18 +324,20 @@ export namespace dto {
 		    return a;
 		}
 	}
-	export class TopicListResponse {
-	    topics: TopicResponse[];
-	    pagination?: PaginationResponse;
+	export class Response__Postulator_internal_dto_Job_ {
+	    success: boolean;
+	    data?: Job;
+	    error?: Error;
 	
 	    static createFrom(source: any = {}) {
-	        return new TopicListResponse(source);
+	        return new Response__Postulator_internal_dto_Job_(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.topics = this.convertValues(source["topics"], TopicResponse);
-	        this.pagination = this.convertValues(source["pagination"], PaginationResponse);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], Job);
+	        this.error = this.convertValues(source["error"], Error);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -633,39 +358,20 @@ export namespace dto {
 		    return a;
 		}
 	}
-	
-	export class TopicSelectionRequest {
-	    site_id: number;
-	    strategy?: string;
+	export class Response__Postulator_internal_dto_ModelsByProvider_ {
+	    success: boolean;
+	    data?: ModelsByProvider;
+	    error?: Error;
 	
 	    static createFrom(source: any = {}) {
-	        return new TopicSelectionRequest(source);
+	        return new Response__Postulator_internal_dto_ModelsByProvider_(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.site_id = source["site_id"];
-	        this.strategy = source["strategy"];
-	    }
-	}
-	export class TopicSelectionResponse {
-	    topic?: TopicResponse;
-	    site_topic?: SiteTopicResponse;
-	    strategy: string;
-	    can_continue: boolean;
-	    remaining_count: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new TopicSelectionResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.topic = this.convertValues(source["topic"], TopicResponse);
-	        this.site_topic = this.convertValues(source["site_topic"], SiteTopicResponse);
-	        this.strategy = source["strategy"];
-	        this.can_continue = source["can_continue"];
-	        this.remaining_count = source["remaining_count"];
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], ModelsByProvider);
+	        this.error = this.convertValues(source["error"], Error);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -686,37 +392,20 @@ export namespace dto {
 		    return a;
 		}
 	}
-	export class TopicStatsResponse {
-	    site_id: number;
-	    total_topics: number;
-	    active_topics: number;
-	    used_topics: number;
-	    unused_topics: number;
-	    unique_topics_left: number;
-	    round_robin_position: number;
-	    most_used_topic_id: number;
-	    most_used_topic_count: number;
-	    last_used_topic_id: number;
-	    // Go type: time
-	    last_used_at?: any;
+	export class Response__Postulator_internal_dto_PromptRenderResult_ {
+	    success: boolean;
+	    data?: PromptRenderResult;
+	    error?: Error;
 	
 	    static createFrom(source: any = {}) {
-	        return new TopicStatsResponse(source);
+	        return new Response__Postulator_internal_dto_PromptRenderResult_(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.site_id = source["site_id"];
-	        this.total_topics = source["total_topics"];
-	        this.active_topics = source["active_topics"];
-	        this.used_topics = source["used_topics"];
-	        this.unused_topics = source["unused_topics"];
-	        this.unique_topics_left = source["unique_topics_left"];
-	        this.round_robin_position = source["round_robin_position"];
-	        this.most_used_topic_id = source["most_used_topic_id"];
-	        this.most_used_topic_count = source["most_used_topic_count"];
-	        this.last_used_topic_id = source["last_used_topic_id"];
-	        this.last_used_at = this.convertValues(source["last_used_at"], null);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], PromptRenderResult);
+	        this.error = this.convertValues(source["error"], Error);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -737,30 +426,20 @@ export namespace dto {
 		    return a;
 		}
 	}
-	export class TopicUsageResponse {
-	    id: number;
-	    site_id: number;
-	    topic_id: number;
-	    article_id: number;
-	    strategy: string;
-	    // Go type: time
-	    used_at: any;
-	    // Go type: time
-	    created_at: any;
+	export class Response__Postulator_internal_dto_Prompt_ {
+	    success: boolean;
+	    data?: Prompt;
+	    error?: Error;
 	
 	    static createFrom(source: any = {}) {
-	        return new TopicUsageResponse(source);
+	        return new Response__Postulator_internal_dto_Prompt_(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.site_id = source["site_id"];
-	        this.topic_id = source["topic_id"];
-	        this.article_id = source["article_id"];
-	        this.strategy = source["strategy"];
-	        this.used_at = this.convertValues(source["used_at"], null);
-	        this.created_at = this.convertValues(source["created_at"], null);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], Prompt);
+	        this.error = this.convertValues(source["error"], Error);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -781,124 +460,19 @@ export namespace dto {
 		    return a;
 		}
 	}
-	export class TopicUsageListResponse {
-	    usage_history: TopicUsageResponse[];
-	    pagination?: PaginationResponse;
-	
-	    static createFrom(source: any = {}) {
-	        return new TopicUsageListResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.usage_history = this.convertValues(source["usage_history"], TopicUsageResponse);
-	        this.pagination = this.convertValues(source["pagination"], PaginationResponse);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class TopicsImportRequest {
-	    site_id: number;
-	    file_content: string;
-	    file_format: string;
-	    preview_only: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new TopicsImportRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.site_id = source["site_id"];
-	        this.file_content = source["file_content"];
-	        this.file_format = source["file_format"];
-	        this.preview_only = source["preview_only"];
-	    }
-	}
-	export class TopicsReassignRequest {
-	    from_site_id: number;
-	    to_site_id: number;
-	    topic_ids?: number[];
-	
-	    static createFrom(source: any = {}) {
-	        return new TopicsReassignRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.from_site_id = source["from_site_id"];
-	        this.to_site_id = source["to_site_id"];
-	        this.topic_ids = source["topic_ids"];
-	    }
-	}
-	export class UpdatePromptRequest {
-	    id: number;
-	    name: string;
-	    type: string;
-	    content: string;
-	    description?: string;
-	    is_default: boolean;
-	    is_active: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new UpdatePromptRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.name = source["name"];
-	        this.type = source["type"];
-	        this.content = source["content"];
-	        this.description = source["description"];
-	        this.is_default = source["is_default"];
-	        this.is_active = source["is_active"];
-	    }
-	}
-	export class UpdateSitePromptRequest {
-	    id: number;
-	    site_id: number;
-	    prompt_id: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new UpdateSitePromptRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.site_id = source["site_id"];
-	        this.prompt_id = source["prompt_id"];
-	    }
-	}
-	export class UpdateSiteRequest {
+	export class Site {
 	    id: number;
 	    name: string;
 	    url: string;
-	    username: string;
-	    password: string;
-	    is_active: boolean;
-	    strategy?: string;
+	    wpUsername: string;
+	    status: string;
+	    lastHealthCheck?: string;
+	    healthStatus: string;
+	    createdAt: string;
+	    updatedAt: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new UpdateSiteRequest(source);
+	        return new Site(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -906,67 +480,496 @@ export namespace dto {
 	        this.id = source["id"];
 	        this.name = source["name"];
 	        this.url = source["url"];
-	        this.username = source["username"];
-	        this.password = source["password"];
-	        this.is_active = source["is_active"];
-	        this.strategy = source["strategy"];
+	        this.wpUsername = source["wpUsername"];
+	        this.status = source["status"];
+	        this.lastHealthCheck = source["lastHealthCheck"];
+	        this.healthStatus = source["healthStatus"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
 	    }
 	}
-	export class UpdateSiteTopicRequest {
-	    id: number;
-	    site_id: number;
-	    topic_id: number;
-	    priority: number;
+	export class Response__Postulator_internal_dto_Site_ {
+	    success: boolean;
+	    data?: Site;
+	    error?: Error;
 	
 	    static createFrom(source: any = {}) {
-	        return new UpdateSiteTopicRequest(source);
+	        return new Response__Postulator_internal_dto_Site_(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.site_id = source["site_id"];
-	        this.topic_id = source["topic_id"];
-	        this.priority = source["priority"];
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], Site);
+	        this.error = this.convertValues(source["error"], Error);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
-	export class UpdateTopicRequest {
+	export class Topic {
 	    id: number;
 	    title: string;
-	    keywords?: string;
-	    category?: string;
-	    tags?: string;
+	    createdAt: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new UpdateTopicRequest(source);
+	        return new Topic(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.title = source["title"];
-	        this.keywords = source["keywords"];
-	        this.category = source["category"];
-	        this.tags = source["tags"];
+	        this.createdAt = source["createdAt"];
 	    }
 	}
-
-}
-
-export namespace handlers {
-	
-	export class Handler {
-	
+	export class Response__Postulator_internal_dto_Topic_ {
+	    success: boolean;
+	    data?: Topic;
+	    error?: Error;
 	
 	    static createFrom(source: any = {}) {
-	        return new Handler(source);
+	        return new Response__Postulator_internal_dto_Topic_(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], Topic);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
 	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response____Postulator_internal_dto_AIProvider_ {
+	    success: boolean;
+	    data?: AIProvider[];
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response____Postulator_internal_dto_AIProvider_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], AIProvider);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response____Postulator_internal_dto_Category_ {
+	    success: boolean;
+	    data?: Category[];
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response____Postulator_internal_dto_Category_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], Category);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response____Postulator_internal_dto_Execution_ {
+	    success: boolean;
+	    data?: Execution[];
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response____Postulator_internal_dto_Execution_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], Execution);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response____Postulator_internal_dto_Job_ {
+	    success: boolean;
+	    data?: Job[];
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response____Postulator_internal_dto_Job_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], Job);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response____Postulator_internal_dto_Prompt_ {
+	    success: boolean;
+	    data?: Prompt[];
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response____Postulator_internal_dto_Prompt_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], Prompt);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SiteTopic {
+	    id: number;
+	    siteId: number;
+	    topicId: number;
+	    categoryId: number;
+	    strategy: string;
+	    createdAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SiteTopic(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.siteId = source["siteId"];
+	        this.topicId = source["topicId"];
+	        this.categoryId = source["categoryId"];
+	        this.strategy = source["strategy"];
+	        this.createdAt = source["createdAt"];
 	    }
 	}
+	export class Response____Postulator_internal_dto_SiteTopic_ {
+	    success: boolean;
+	    data?: SiteTopic[];
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response____Postulator_internal_dto_SiteTopic_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], SiteTopic);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response____Postulator_internal_dto_Site_ {
+	    success: boolean;
+	    data?: Site[];
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response____Postulator_internal_dto_Site_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], Site);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response____Postulator_internal_dto_Topic_ {
+	    success: boolean;
+	    data?: Topic[];
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response____Postulator_internal_dto_Topic_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], Topic);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response___string_ {
+	    success: boolean;
+	    data?: string[];
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response___string_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = source["data"];
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response_int_ {
+	    success: boolean;
+	    data?: number;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response_int_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = source["data"];
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response_string_ {
+	    success: boolean;
+	    data?: string;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response_string_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = source["data"];
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
 
 }
 
