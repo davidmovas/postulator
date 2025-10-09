@@ -105,3 +105,7 @@ func (s *Service) SyncCategories(ctx context.Context, siteID int64) error {
 
 	return nil
 }
+
+func (s *Service) GetSiteCategories(ctx context.Context, siteID int64) ([]*entities.Category, error) {
+	return s.categoryRepo.GetBySiteID(ctx, siteID)
+}

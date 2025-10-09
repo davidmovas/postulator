@@ -28,7 +28,7 @@ CREATE TABLE site_categories (
 -- Топики (тайтлы для генерации статей)
 CREATE TABLE topics (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
+    title TEXT NOT NULL UNIQUE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

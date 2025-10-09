@@ -28,4 +28,5 @@ type IService interface {
 	DeleteSite(ctx context.Context, id int64) error
 	CheckHealth(ctx context.Context, siteID int64) error
 	SyncCategories(ctx context.Context, siteID int64) error
+	GetSiteCategories(ctx context.Context, siteID int64) ([]*entities.Category, error)
 }
