@@ -1,11 +1,11 @@
 package entities
 
-// AIModel represents available AI model identifiers
 type AIModel string
 
 // OpenAI Models
 const (
 	// GPT-4 Models
+
 	ModelGPT4       AIModel = "gpt-4"
 	ModelGPT4Turbo  AIModel = "gpt-4-turbo"
 	ModelGPT4TurboP AIModel = "gpt-4-turbo-preview"
@@ -13,10 +13,12 @@ const (
 	ModelGPT4OMini  AIModel = "gpt-4o-mini"
 
 	// GPT-3.5 Models
+
 	ModelGPT35Turbo   AIModel = "gpt-3.5-turbo"
 	ModelGPT35Turbo16 AIModel = "gpt-3.5-turbo-16k"
 
 	// O1 Models
+
 	ModelO1Preview AIModel = "o1-preview"
 	ModelO1Mini    AIModel = "o1-mini"
 )
@@ -37,6 +39,7 @@ const (
 )
 
 // Provider type
+
 type AIProviderType string
 
 const (
@@ -78,7 +81,6 @@ func GetModelsByProvider(provider AIProviderType) []AIModel {
 	}
 }
 
-// IsValidModel checks if a model is valid for a given provider
 func IsValidModel(provider AIProviderType, model AIModel) bool {
 	models := GetModelsByProvider(provider)
 	for _, m := range models {
@@ -89,7 +91,6 @@ func IsValidModel(provider AIProviderType, model AIModel) bool {
 	return false
 }
 
-// GetProviderType converts provider name string to AIProviderType
 func GetProviderType(name string) AIProviderType {
 	switch name {
 	case "openai":

@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-type Repository interface {
+type IRepository interface {
 	Create(ctx context.Context, job *Job) error
 	GetByID(ctx context.Context, id int64) (*Job, error)
 	GetAll(ctx context.Context) ([]*Job, error)
@@ -16,7 +16,7 @@ type Repository interface {
 	GetDueJobs(ctx context.Context, now time.Time) ([]*Job, error)
 }
 
-type ExecutionRepository interface {
+type IExecutionRepository interface {
 	Create(ctx context.Context, exec *Execution) error
 	GetByID(ctx context.Context, id int64) (*Execution, error)
 	GetByJobID(ctx context.Context, jobID int64) ([]*Execution, error)
@@ -25,7 +25,7 @@ type ExecutionRepository interface {
 	Delete(ctx context.Context, id int64) error
 }
 
-type Service interface {
+type IService interface {
 	CreateJob(ctx context.Context, job *Job) error
 	GetJob(ctx context.Context, id int64) (*Job, error)
 	ListJobs(ctx context.Context) ([]*Job, error)
@@ -39,13 +39,13 @@ type Service interface {
 	GetPendingValidations(ctx context.Context) ([]*Execution, error)
 }
 
-type Scheduler interface {
+type IScheduler interface {
 	Start(ctx context.Context) error
 	Stop() error
 	RestoreState(ctx context.Context) error
 	CalculateNextRun(job *Job, now time.Time) time.Time
 }
 
-type Executor interface {
+type IExecutor interface {
 	Execute(ctx context.Context, job *Job) error
 }
