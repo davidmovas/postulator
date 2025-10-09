@@ -2,6 +2,7 @@ package job
 
 import (
 	"Postulator/internal/config"
+	"Postulator/internal/infra/ai"
 	"Postulator/internal/infra/database"
 	"Postulator/internal/infra/wp"
 	"Postulator/pkg/di"
@@ -9,11 +10,19 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
+
+// mockAIClient is a mock implementation of ai.Client for testing
+type mockAIClientScheduler struct{}
+
+func (m *mockAIClientScheduler) GenerateArticle(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+	return "Mock generated article content", nil
+}
 
 func setupTestScheduler(t *testing.T) (*Scheduler, *JobRepository, func()) {
 	t.Helper()
@@ -43,6 +52,11 @@ func setupTestScheduler(t *testing.T) (*Scheduler, *JobRepository, func()) {
 	container.MustRegister(di.Instance[*database.DB](db))
 	container.MustRegister(di.Instance[*logger.Logger](testLogger))
 	container.MustRegister(di.Instance[*wp.Client](wp.NewClient()))
+	container.MustRegister(&di.Registration[ai.Client]{
+		Provider:      func(di.Container) (ai.Client, error) { return &mockAIClientScheduler{}, nil },
+		Lifecycle:     di.Singleton,
+		InterfaceType: reflect.TypeOf((*ai.Client)(nil)).Elem(),
+	})
 
 	scheduler, err := NewScheduler(container)
 	require.NoError(t, err)
@@ -119,7 +133,6 @@ func TestScheduler_CalculateNextRun_Daily(t *testing.T) {
 		nextRun := scheduler.CalculateNextRun(job, now)
 		require.False(t, nextRun.IsZero())
 
-		// Should be tomorrow at 9:00 AM (since current time is 14:30, past 9:00)
 		expectedDate := time.Date(2024, 1, 16, 9, 0, 0, 0, time.UTC)
 		require.Equal(t, expectedDate.Year(), nextRun.Year())
 		require.Equal(t, expectedDate.Month(), nextRun.Month())
@@ -140,7 +153,6 @@ func TestScheduler_CalculateNextRun_Daily(t *testing.T) {
 		nextRun := scheduler.CalculateNextRun(job, now)
 		require.False(t, nextRun.IsZero())
 
-		// Should be today at 9:00 AM (since current time is 8:00, before 9:00)
 		require.Equal(t, now.Year(), nextRun.Year())
 		require.Equal(t, now.Month(), nextRun.Month())
 		require.Equal(t, now.Day(), nextRun.Day())
@@ -158,7 +170,6 @@ func TestScheduler_CalculateNextRun_Daily(t *testing.T) {
 		nextRun := scheduler.CalculateNextRun(job, now)
 		require.False(t, nextRun.IsZero())
 
-		// Should be tomorrow at current time
 		require.True(t, nextRun.After(now))
 	})
 }
@@ -168,11 +179,9 @@ func TestScheduler_CalculateNextRun_Weekly(t *testing.T) {
 	defer cleanup()
 
 	t.Run("weekly schedule on specific weekday", func(t *testing.T) {
-		// Monday, January 15, 2024
 		now := time.Date(2024, 1, 15, 14, 30, 0, 0, time.UTC)
 		require.Equal(t, time.Monday, now.Weekday())
 
-		// Schedule for Friday (5)
 		friday := 5
 		scheduleTime := time.Date(2024, 1, 1, 9, 0, 0, 0, time.UTC)
 
@@ -185,18 +194,15 @@ func TestScheduler_CalculateNextRun_Weekly(t *testing.T) {
 		nextRun := scheduler.CalculateNextRun(job, now)
 		require.False(t, nextRun.IsZero())
 
-		// Should be this Friday (4 days later)
 		require.Equal(t, time.Friday, nextRun.Weekday())
 		require.Equal(t, 9, nextRun.Hour())
 		require.Equal(t, 0, nextRun.Minute())
 	})
 
 	t.Run("weekly schedule on today but time passed", func(t *testing.T) {
-		// Monday, January 15, 2024 at 14:30
 		now := time.Date(2024, 1, 15, 14, 30, 0, 0, time.UTC)
 		require.Equal(t, time.Monday, now.Weekday())
 
-		// Schedule for Monday at 9:00 (already passed today)
 		monday := 1
 		scheduleTime := time.Date(2024, 1, 1, 9, 0, 0, 0, time.UTC)
 
@@ -209,7 +215,6 @@ func TestScheduler_CalculateNextRun_Weekly(t *testing.T) {
 		nextRun := scheduler.CalculateNextRun(job, now)
 		require.False(t, nextRun.IsZero())
 
-		// Should be next Monday (7 days later)
 		require.Equal(t, time.Monday, nextRun.Weekday())
 		require.True(t, nextRun.After(now.Add(6*24*time.Hour)))
 	})
@@ -220,10 +225,8 @@ func TestScheduler_CalculateNextRun_Monthly(t *testing.T) {
 	defer cleanup()
 
 	t.Run("monthly schedule on specific day", func(t *testing.T) {
-		// January 5, 2024
 		now := time.Date(2024, 1, 5, 14, 30, 0, 0, time.UTC)
 
-		// Schedule for 15th of month
 		day := 15
 		scheduleTime := time.Date(2024, 1, 1, 9, 0, 0, 0, time.UTC)
 
@@ -236,7 +239,6 @@ func TestScheduler_CalculateNextRun_Monthly(t *testing.T) {
 		nextRun := scheduler.CalculateNextRun(job, now)
 		require.False(t, nextRun.IsZero())
 
-		// Should be January 15
 		require.Equal(t, 2024, nextRun.Year())
 		require.Equal(t, time.January, nextRun.Month())
 		require.Equal(t, 15, nextRun.Day())
@@ -244,10 +246,8 @@ func TestScheduler_CalculateNextRun_Monthly(t *testing.T) {
 	})
 
 	t.Run("monthly schedule day already passed this month", func(t *testing.T) {
-		// January 20, 2024
 		now := time.Date(2024, 1, 20, 14, 30, 0, 0, time.UTC)
 
-		// Schedule for 15th of month (already passed)
 		day := 15
 		scheduleTime := time.Date(2024, 1, 1, 9, 0, 0, 0, time.UTC)
 
@@ -260,17 +260,14 @@ func TestScheduler_CalculateNextRun_Monthly(t *testing.T) {
 		nextRun := scheduler.CalculateNextRun(job, now)
 		require.False(t, nextRun.IsZero())
 
-		// Should be February 15
 		require.Equal(t, 2024, nextRun.Year())
 		require.Equal(t, time.February, nextRun.Month())
 		require.Equal(t, 15, nextRun.Day())
 	})
 
 	t.Run("monthly schedule handles February correctly", func(t *testing.T) {
-		// January 15, 2024
 		now := time.Date(2024, 1, 15, 14, 30, 0, 0, time.UTC)
 
-		// Schedule for 31st of month (doesn't exist in February)
 		day := 31
 		scheduleTime := time.Date(2024, 1, 1, 9, 0, 0, 0, time.UTC)
 
@@ -283,7 +280,6 @@ func TestScheduler_CalculateNextRun_Monthly(t *testing.T) {
 		nextRun := scheduler.CalculateNextRun(job, now)
 		require.False(t, nextRun.IsZero())
 
-		// Should be January 31
 		require.Equal(t, time.January, nextRun.Month())
 		require.Equal(t, 31, nextRun.Day())
 	})
@@ -307,10 +303,8 @@ func TestScheduler_CalculateNextRun_WithJitter(t *testing.T) {
 		nextRun := scheduler.CalculateNextRun(job, now)
 		require.False(t, nextRun.IsZero())
 
-		// Base time should be tomorrow at 9:00
 		baseTime := time.Date(2024, 1, 16, 9, 0, 0, 0, time.UTC)
 
-		// With jitter, should be within +/- 30 minutes of base time
 		minTime := baseTime.Add(-30 * time.Minute)
 		maxTime := baseTime.Add(30 * time.Minute)
 
@@ -329,15 +323,12 @@ func TestScheduler_CalculateNextRun_WithJitter(t *testing.T) {
 			JitterMinutes: 30,
 		}
 
-		// Calculate multiple times - should get different results (statistically)
 		results := make(map[time.Time]bool)
 		for i := 0; i < 10; i++ {
 			nextRun := scheduler.CalculateNextRun(job, now)
 			results[nextRun] = true
 		}
 
-		// With jitter, we should get at least 2 different values
-		// (could be 1 in rare cases due to randomness, but very unlikely)
 		require.GreaterOrEqual(t, len(results), 1)
 	})
 }
@@ -349,7 +340,6 @@ func TestScheduler_RestoreState(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("restore state for jobs with no next run", func(t *testing.T) {
-		// Create job with no next run time
 		job := &Job{
 			Name:         "No Next Run Job",
 			SiteID:       1,
@@ -368,7 +358,6 @@ func TestScheduler_RestoreState(t *testing.T) {
 		err = scheduler.RestoreState(ctx)
 		require.NoError(t, err)
 
-		// Verify next run was calculated
 		jobs, err := repo.GetActive(ctx)
 		require.NoError(t, err)
 		require.Greater(t, len(jobs), 0)
@@ -385,7 +374,6 @@ func TestScheduler_RestoreState(t *testing.T) {
 	})
 
 	t.Run("restore state for missed executions", func(t *testing.T) {
-		// Create job with past next run time (missed execution)
 		pastTime := time.Now().Add(-2 * time.Hour)
 		job := &Job{
 			Name:         "Missed Execution Job",
@@ -405,7 +393,6 @@ func TestScheduler_RestoreState(t *testing.T) {
 		err = scheduler.RestoreState(ctx)
 		require.NoError(t, err)
 
-		// Verify next run was rescheduled with delay
 		jobs, err := repo.GetActive(ctx)
 		require.NoError(t, err)
 
@@ -413,7 +400,6 @@ func TestScheduler_RestoreState(t *testing.T) {
 		for _, j := range jobs {
 			if j.Name == "Missed Execution Job" {
 				require.NotNil(t, j.NextRunAt)
-				// Should be scheduled for near future (within 5 minutes)
 				require.True(t, j.NextRunAt.After(time.Now().Add(-1*time.Minute)))
 				require.True(t, j.NextRunAt.Before(time.Now().Add(6*time.Minute)))
 				found = true
@@ -424,7 +410,6 @@ func TestScheduler_RestoreState(t *testing.T) {
 	})
 
 	t.Run("restore state ignores manual jobs", func(t *testing.T) {
-		// Create manual job with no next run
 		job := &Job{
 			Name:         "Manual Job",
 			SiteID:       3,
@@ -443,14 +428,12 @@ func TestScheduler_RestoreState(t *testing.T) {
 		err = scheduler.RestoreState(ctx)
 		require.NoError(t, err)
 
-		// Verify manual job still has no next run
 		jobs, err := repo.GetActive(ctx)
 		require.NoError(t, err)
 
 		found := false
 		for _, j := range jobs {
 			if j.Name == "Manual Job" {
-				// Manual jobs can have nil NextRunAt
 				found = true
 				break
 			}
@@ -478,8 +461,6 @@ func TestScheduler_RestoreState(t *testing.T) {
 		err = scheduler.RestoreState(ctx)
 		require.NoError(t, err)
 
-		// Verify paused job was not rescheduled
-		// Get all jobs and find the paused one
 		allJobs, err := repo.GetAll(ctx)
 		require.NoError(t, err)
 
@@ -492,7 +473,6 @@ func TestScheduler_RestoreState(t *testing.T) {
 		}
 		require.NotNil(t, retrievedJob)
 		require.Equal(t, StatusPaused, retrievedJob.Status)
-		// NextRunAt should remain the same (past time)
 		require.True(t, retrievedJob.NextRunAt.Before(time.Now()))
 	})
 }
@@ -508,7 +488,6 @@ func TestScheduler_StartStop(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, scheduler.running)
 
-		// Let it run briefly
 		time.Sleep(100 * time.Millisecond)
 
 		err = scheduler.Stop()

@@ -48,4 +48,5 @@ type IScheduler interface {
 
 type IExecutor interface {
 	Execute(ctx context.Context, job *Job) error
+	PublishValidatedArticle(ctx context.Context, job *Job, exec *Execution) error
 }

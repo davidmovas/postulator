@@ -2,6 +2,7 @@ package job
 
 import (
 	"Postulator/internal/config"
+	"Postulator/internal/infra/ai"
 	"Postulator/internal/infra/database"
 	"Postulator/internal/infra/wp"
 	"Postulator/pkg/di"
@@ -9,11 +10,19 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
+
+// mockAIClient is a mock implementation of ai.Client for testing
+type mockAIClient struct{}
+
+func (m *mockAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+	return "Mock generated article content", nil
+}
 
 func setupTestService(t *testing.T) (*Service, *JobRepository, *ExecRepository, func()) {
 	t.Helper()
@@ -43,6 +52,11 @@ func setupTestService(t *testing.T) (*Service, *JobRepository, *ExecRepository, 
 	container.MustRegister(di.Instance[*database.DB](db))
 	container.MustRegister(di.Instance[*logger.Logger](testLogger))
 	container.MustRegister(di.Instance[*wp.Client](wp.NewClient()))
+	container.MustRegister(&di.Registration[ai.Client]{
+		Provider:      func(di.Container) (ai.Client, error) { return &mockAIClient{}, nil },
+		Lifecycle:     di.Singleton,
+		InterfaceType: reflect.TypeOf((*ai.Client)(nil)).Elem(),
+	})
 
 	service, err := NewService(container)
 	require.NoError(t, err)

@@ -1,6 +1,7 @@
 package job
 
 import (
+	"Postulator/internal/domain/article"
 	"Postulator/internal/domain/entities"
 	"Postulator/internal/domain/prompt"
 	"Postulator/internal/domain/site"
@@ -12,6 +13,7 @@ import (
 	"Postulator/pkg/logger"
 	"context"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -19,6 +21,7 @@ var _ IExecutor = (*Executor)(nil)
 
 type Executor struct {
 	execRepo      IExecutionRepository
+	articleRepo   article.IRepository
 	topicService  topic.IService
 	promptService prompt.IService
 	siteService   site.IService
@@ -34,6 +37,11 @@ func NewExecutor(c di.Container) (*Executor, error) {
 	}
 
 	execRepo, err := NewExecutionRepository(c)
+	if err != nil {
+		return nil, err
+	}
+
+	articleRepo, err := article.NewRepository(c)
 	if err != nil {
 		return nil, err
 	}
@@ -60,12 +68,12 @@ func NewExecutor(c di.Container) (*Executor, error) {
 
 	var aiClient ai.Client
 	if err = c.Resolve(&aiClient); err != nil {
-		// AI client is optional for now (stub)
-		l.Warn("AI client not registered, article generation will fail")
+		return nil, fmt.Errorf("AI client is required for job execution: %w", err)
 	}
 
 	return &Executor{
 		execRepo:      execRepo,
+		articleRepo:   articleRepo,
 		topicService:  topicService,
 		promptService: promptService,
 		siteService:   siteService,
@@ -142,7 +150,7 @@ func (e *Executor) executePipeline(ctx context.Context, job *Job, exec *Executio
 	e.logger.Infof("Job %d: Using topic %d (%s)", job.ID, availableTopic.ID, availableTopic.Title)
 
 	// Step 3: Get category info for placeholder
-	category, err := e.getCategoryInfo(ctx, job.CategoryID)
+	category, err := e.getCategoryInfo(ctx, job.CategoryID, job.SiteID)
 	if err != nil {
 		return fmt.Errorf("failed to get category: %w", err)
 	}
@@ -179,13 +187,11 @@ func (e *Executor) executePipeline(ctx context.Context, job *Job, exec *Executio
 		return fmt.Errorf("failed to generate article: %w", err)
 	}
 
-	// For variation strategy, AI might generate a new title; for unique strategy, use original
+	// For variation strategy, use the topic title as-is
+	// The AI should be prompted to generate variations in the content itself
+	// Title variations can be added by using specific prompts that instruct the AI
+	// to create unique angles or perspectives on the topic
 	generatedTitle := availableTopic.Title
-	if strategy == entities.StrategyVariation {
-		// For variation strategy, we could extract title from content or generate one
-		// For now, we'll use the original title with a suffix
-		generatedTitle = availableTopic.Title + " (Variation)"
-	}
 
 	exec.GeneratedTitle = &generatedTitle
 	exec.GeneratedContent = &generatedContent
@@ -258,13 +264,46 @@ func (e *Executor) publishArticle(ctx context.Context, job *Job, exec *Execution
 
 	e.logger.Infof("Job %d: Article published successfully (post ID: %d, URL: %s)", job.ID, postID, postURL)
 
+	// Get original topic title for article record
+	topic, err := e.topicService.GetTopic(ctx, exec.TopicID)
+	if err != nil {
+		return fmt.Errorf("failed to get topic for article record: %w", err)
+	}
+
+	// Calculate word count
+	wordCount := len(strings.Fields(content))
+
+	// Create article record in database
+	now := time.Now()
+	articleRecord := &entities.Article{
+		SiteID:        job.SiteID,
+		JobID:         &job.ID,
+		TopicID:       exec.TopicID,
+		Title:         title,
+		OriginalTitle: topic.Title,
+		Content:       content,
+		WPPostID:      postID,
+		WPPostURL:     postURL,
+		WPCategoryID:  wpCategoryID,
+		Status:        entities.ArticleStatusPublished,
+		WordCount:     &wordCount,
+		PublishedAt:   &now,
+	}
+
+	if err := e.articleRepo.Create(ctx, articleRecord); err != nil {
+		e.logger.Errorf("Failed to create article record: %v", err)
+		// Don't fail the job - article is already published to WordPress
+	} else {
+		e.logger.Infof("Job %d: Article record created with ID %d", job.ID, articleRecord.ID)
+
+		// Update execution with article ID
+		exec.ArticleID = &articleRecord.ID
+	}
+
 	// Update execution with publication details
 	exec.Status = ExecutionPublished
-	now := time.Now()
 	exec.PublishedAt = &now
 
-	// Store article ID (we'd need to create article record in articles table)
-	// For now, just mark as published
 	if err := e.execRepo.Update(ctx, exec); err != nil {
 		return fmt.Errorf("failed to update execution after publication: %w", err)
 	}
@@ -272,15 +311,35 @@ func (e *Executor) publishArticle(ctx context.Context, job *Job, exec *Execution
 	return nil
 }
 
-func (e *Executor) getCategoryInfo(ctx context.Context, categoryID int64) (*entities.Category, error) {
-	// We need to get category by ID - this requires adding a method to site service
-	// For now, we'll need to iterate through site categories
-	// This is a simplification - in production, add GetCategoryByID method
+func (e *Executor) PublishValidatedArticle(ctx context.Context, job *Job, exec *Execution) error {
+	if exec.GeneratedTitle == nil || exec.GeneratedContent == nil {
+		return fmt.Errorf("execution missing generated title or content")
+	}
 
-	// Since we don't have category repository method, return a placeholder
-	// This will be improved when we add proper category lookup
-	return &entities.Category{
-		ID:   categoryID,
-		Name: "General",
-	}, nil
+	// Get site information
+	siteInfo, err := e.siteService.GetSite(ctx, job.SiteID)
+	if err != nil {
+		return fmt.Errorf("failed to get site: %w", err)
+	}
+
+	e.logger.Infof("Publishing validated article for execution %d (job %d)", exec.ID, job.ID)
+
+	// Call the existing publish logic
+	return e.publishArticle(ctx, job, exec, siteInfo, *exec.GeneratedTitle, *exec.GeneratedContent)
+}
+
+func (e *Executor) getCategoryInfo(ctx context.Context, categoryID int64, siteID int64) (*entities.Category, error) {
+	// Get all categories for the site and find the matching one
+	categories, err := e.siteService.GetSiteCategories(ctx, siteID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get site categories: %w", err)
+	}
+
+	for _, cat := range categories {
+		if cat.ID == categoryID {
+			return cat, nil
+		}
+	}
+
+	return nil, fmt.Errorf("category %d not found for site %d", categoryID, siteID)
 }
