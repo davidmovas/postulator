@@ -21,13 +21,35 @@ func (a *App) CreateSite(site *dto.Site) *dto.Response[string] {
 		Name:       site.Name,
 		URL:        site.URL,
 		WPUsername: site.WPUsername,
-		WPPassword: "", // password should be provided separately in secure flows
+		WPPassword: "", // password handled via SetSitePassword for secure storage
 		Status:     entities.Status(site.Status),
 	}
 	if err := a.siteSvc.CreateSite(context.Background(), e); err != nil {
 		return dtoErr[string](asAppErr(err))
 	}
 	return &dto.Response[string]{Success: true, Data: "created"}
+}
+
+// SetSitePassword securely sets/updates the WordPress password for the site
+func (a *App) SetSitePassword(siteID int64, password string) *dto.Response[string] {
+	if a.siteSvc == nil {
+		if err := a.BuildServices(); err != nil {
+			return dtoErr[string](errors.Internal(err))
+		}
+	}
+
+	if siteID == 0 {
+		return dtoErr[string](errors.Validation("invalid site id"))
+	}
+	if password == "" {
+		return dtoErr[string](errors.Validation("password cannot be empty"))
+	}
+
+	if err := a.siteSvc.UpdateSitePassword(context.Background(), siteID, password); err != nil {
+		return dtoErr[string](asAppErr(err))
+	}
+
+	return &dto.Response[string]{Success: true, Data: "password updated"}
 }
 
 // GetSite returns site by ID
