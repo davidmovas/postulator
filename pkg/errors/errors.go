@@ -78,60 +78,60 @@ func (e *AppError) WithContext(key string, value any) *AppError {
 }
 
 func Internal(err error) *AppError {
-	return Wrap(ErrCodeInternal, "Внутренняя ошибка сервера", err)
+	return Wrap(ErrCodeInternal, "Internal application error", err)
 }
 
 func Validation(message string) *AppError {
 	return New(ErrCodeValidation, message)
 }
 
-func NotFound(entity string) *AppError {
-	return New(ErrCodeNotFound, fmt.Sprintf("%s не найден", entity))
+func NotFound(entity string, identifier any) *AppError {
+	return New(ErrCodeNotFound, fmt.Sprintf("%s with identifier %v not found", entity, identifier))
 }
 
 func AlreadyExists(entity string) *AppError {
-	return New(ErrCodeAlreadyExists, fmt.Sprintf("%s уже существует", entity))
+	return New(ErrCodeAlreadyExists, fmt.Sprintf("%s already exists", entity))
 }
 
 func Database(err error) *AppError {
-	return Wrap(ErrCodeDatabase, "Ошибка базы данных", err)
+	return Wrap(ErrCodeDatabase, "Database error", err)
 }
 
 func SiteUnreachable(siteURL string, err error) *AppError {
-	return Wrap(ErrCodeSiteUnreachable, fmt.Sprintf("Сайт %s недоступен", siteURL), err).
+	return Wrap(ErrCodeSiteUnreachable, fmt.Sprintf("Site %s is unreachable", siteURL), err).
 		WithContext("url", siteURL)
 }
 
 func SiteAuth(siteURL string) *AppError {
-	return New(ErrCodeSiteAuth, fmt.Sprintf("Ошибка авторизации на сайте %s", siteURL)).
+	return New(ErrCodeSiteAuth, fmt.Sprintf("Authentication failed for site %s", siteURL)).
 		WithContext("url", siteURL)
 }
 
 func WordPress(operation string, err error) *AppError {
-	return Wrap(ErrCodeWordPress, fmt.Sprintf("Ошибка WordPress: %s", operation), err).
+	return Wrap(ErrCodeWordPress, fmt.Sprintf("WordPress error: %s", operation), err).
 		WithContext("operation", operation)
 }
 
 func AI(provider string, err error) *AppError {
-	return Wrap(ErrCodeAI, fmt.Sprintf("Ошибка AI провайдера %s", provider), err).
+	return Wrap(ErrCodeAI, fmt.Sprintf("AI provider %s error", provider), err).
 		WithContext("provider", provider)
 }
 
 func AIRateLimit(provider string) *AppError {
-	return New(ErrCodeAIRateLimit, fmt.Sprintf("Превышен лимит запросов к %s", provider)).
+	return New(ErrCodeAIRateLimit, fmt.Sprintf("Rate limit exceeded for %s", provider)).
 		WithContext("provider", provider)
 }
 
 func Import(format string, err error) *AppError {
-	return Wrap(ErrCodeImport, fmt.Sprintf("Ошибка импорта из формата %s", format), err).
+	return Wrap(ErrCodeImport, fmt.Sprintf("Import error from format %s", format), err).
 		WithContext("format", format)
 }
 
 func JobExecution(jobID int64, err error) *AppError {
-	return Wrap(ErrCodeJobExecution, "Ошибка выполнения задачи", err).
+	return Wrap(ErrCodeJobExecution, "Job execution error", err).
 		WithContext("job_id", jobID)
 }
 
 func Scheduler(err error) *AppError {
-	return Wrap(ErrCodeScheduler, "Ошибка планировщика задач", err)
+	return Wrap(ErrCodeScheduler, "Task scheduler error", err)
 }
