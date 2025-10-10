@@ -150,8 +150,8 @@ export function ListSites() {
   return window['go']['app']['App']['ListSites']();
 }
 
-export function ListTopics() {
-  return window['go']['app']['App']['ListTopics']();
+export function ListTopics(arg1, arg2) {
+  return window['go']['app']['App']['ListTopics'](arg1, arg2);
 }
 
 export function MarkTopicAsUsed(arg1, arg2) {

@@ -12,7 +12,7 @@ import {
   UpdateTopic,
 } from "@/wailsjs/wailsjs/go/app/App";
 import { dto } from "@/wailsjs/wailsjs/go/models";
-import { unwrapMany, unwrapOne, unwrapString } from "./utils";
+import { unwrapOne, unwrapString, unwrapMany } from "./utils";
 
 // UI types
 export interface Topic {
@@ -45,9 +45,29 @@ export function mapImportResult(x: dto.ImportResult): ImportResult {
   };
 }
 
-export async function listTopics(): Promise<Topic[]> {
-  const res = await ListTopics();
-  return unwrapMany<dto.Topic>(res).map(mapTopic);
+export interface PaginatedTopics {
+  success: boolean;
+  items: Topic[];
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+  error?: { code: string; message: string; context?: Record<string, any> };
+}
+
+export async function listTopics(limit: number, offset: number): Promise<PaginatedTopics> {
+  const res = await ListTopics(limit, offset);
+  // res is expected to be dto.PaginatedResponse__Postulator_internal_dto_Topic_
+  const pr = dto.PaginatedResponse__Postulator_internal_dto_Topic_.createFrom(res as any);
+  return {
+    success: pr.success,
+    items: (pr.items || []).map(mapTopic),
+    total: pr.total,
+    limit: pr.limit,
+    offset: pr.offset,
+    hasMore: pr.hasMore,
+    error: pr.error ? { code: pr.error.code, message: pr.error.message, context: pr.error.context } : undefined,
+  };
 }
 
 export async function getTopic(id: number): Promise<Topic> {
@@ -82,19 +102,19 @@ export async function getAvailableTopic(siteId: number, search: string): Promise
   return mapTopic(unwrapOne<dto.Topic>(res));
 }
 
-export async function importTopics(csvContent: string): Promise<ImportResult> {
-  const res = await ImportTopics(csvContent);
+export async function importTopics(filePath: string): Promise<ImportResult> {
+  const res = await ImportTopics(filePath);
   const dtoRes = unwrapOne<dto.ImportResult>(res as any); // generated type is Response__ImportResult_
   return mapImportResult(dtoRes);
 }
 
 export async function importAndAssignToSite(
-  csvContent: string,
-  siteId: number,
-  priority: number,
-  note: string
+    filePath: string,
+    siteId: number,
+    categoryID: number,
+    strategy: string
 ): Promise<ImportResult> {
-  const res = await ImportAndAssignToSite(csvContent, siteId, priority, note);
+  const res = await ImportAndAssignToSite(filePath, siteId, categoryID, strategy);
   const dtoRes = unwrapOne<dto.ImportResult>(res as any);
   return mapImportResult(dtoRes);
 }

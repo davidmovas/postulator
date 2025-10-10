@@ -16,6 +16,16 @@ func dtoErr[T any](err *appErrors.AppError) *dto.Response[T] {
 	}
 }
 
+func dtoPagErr[T any](err *appErrors.AppError) *dto.PaginatedResponse[T] {
+	if err == nil {
+		return &dto.PaginatedResponse[T]{Success: true}
+	}
+	return &dto.PaginatedResponse[T]{
+		Success: false,
+		Error:   &dto.Error{Code: string(err.Code), Message: err.Message, Context: err.Context},
+	}
+}
+
 func asAppErr(err error) *appErrors.AppError {
 	if err == nil {
 		return nil

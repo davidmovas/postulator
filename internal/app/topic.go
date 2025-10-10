@@ -5,6 +5,7 @@ import (
 	"Postulator/internal/dto"
 	"Postulator/pkg/ctx"
 	"Postulator/pkg/errors"
+	"fmt"
 )
 
 func (a *App) CreateTopic(topic *dto.Topic) *dto.Response[string] {
@@ -33,13 +34,47 @@ func (a *App) GetTopic(id int64) *dto.Response[*dto.Topic] {
 	return &dto.Response[*dto.Topic]{Success: true, Data: dto.FromTopic(t)}
 }
 
-func (a *App) ListTopics() *dto.Response[[]*dto.Topic] {
+func (a *App) ListTopics(limit, offset int) *dto.PaginatedResponse[*dto.Topic] {
 	items, err := a.topicSvc.ListTopics(ctx.FastCtx())
 	if err != nil {
-		return dtoErr[[]*dto.Topic](asAppErr(err))
+		return dtoPagErr[*dto.Topic](asAppErr(err))
 	}
 
-	return &dto.Response[[]*dto.Topic]{Success: true, Data: dto.FromTopics(items)}
+	// Normalize pagination parameters
+	if limit <= 0 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	total := len(items)
+	start := offset
+	if start > total {
+		start = total
+	}
+	end := start + limit
+	if end > total {
+		end = total
+	}
+
+	paged := items[start:end]
+	dtos := dto.FromTopics(paged)
+
+	hasMore := end < total
+
+	res := &dto.PaginatedResponse[*dto.Topic]{
+		Success: true,
+		Items:   dtos,
+		Total:   total,
+		Limit:   limit,
+		Offset:  offset,
+		HasMore: hasMore,
+	}
+
+	fmt.Println("RESULT: ", res)
+
+	return res
 }
 
 func (a *App) UpdateTopic(topic *dto.Topic) *dto.Response[string] {

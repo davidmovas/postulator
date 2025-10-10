@@ -10,32 +10,16 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
     RefreshCw,
     Plus,
-    MoreVertical,
-    Pencil,
-    Trash2,
-    Activity,
     ArrowUpDown,
-    Search,
     Database,
-    ExternalLink,
-    Copy as CopyIcon,
-    Lock,
 } from 'lucide-react';
 import { Site } from "@/services/site";
-import { BrowserOpenURL } from '@/wailsjs/wailsjs/runtime/runtime';
+import { BrowserOpenURL } from '@/wailsjs/wailsjs/runtime';
 import { useToast } from '@/components/ui/use-toast';
 import { useErrorHandling } from '@/lib/error-handling';
 import { setSitePassword } from '@/services/site';
@@ -82,7 +66,6 @@ export function SitesTable({
     const [isDeleting, setIsDeleting] = useState(false);
 
     const [passwordTarget, setPasswordTarget] = useState<Site | null>(null);
-    const [passwordValue, setPasswordValue] = useState("");
     const [isSettingPassword, setIsSettingPassword] = useState(false);
 
     const openInDefault = (url: string) => {

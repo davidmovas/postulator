@@ -13,9 +13,11 @@ type Error struct {
 }
 
 type PaginatedResponse[T any] struct {
-	Items   []T  `json:"items"`
-	Total   int  `json:"total"`
-	Limit   int  `json:"limit"`
-	Offset  int  `json:"offset"`
-	HasMore bool `json:"hasMore"`
+	Success bool   `json:"success"`
+	Items   []T    `json:"items"`
+	Total   int    `json:"total"`
+	Limit   int    `json:"limit"`
+	Offset  int    `json:"offset"`
+	HasMore bool   `json:"hasMore"`
+	Error   *Error `json:"error,omitempty"`
 }

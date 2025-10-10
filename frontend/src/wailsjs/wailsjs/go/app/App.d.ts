@@ -77,7 +77,7 @@ export function ListPrompts():Promise<dto.Response___Postulator_internal_dto_Pro
 
 export function ListSites():Promise<dto.Response___Postulator_internal_dto_Site_>;
 
-export function ListTopics():Promise<dto.Response___Postulator_internal_dto_Topic_>;
+export function ListTopics(arg1:number,arg2:number):Promise<dto.PaginatedResponse_Postulator_internal_dto_Topic_>;
 
 export function MarkTopicAsUsed(arg1:number,arg2:number):Promise<dto.Response_string_>;
 
