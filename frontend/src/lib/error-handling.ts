@@ -76,6 +76,7 @@ export function useErrorHandling() {
         toast({
             title,
             description: message,
+            variant: 'success',
         });
     };
 

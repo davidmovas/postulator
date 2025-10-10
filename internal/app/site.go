@@ -52,10 +52,6 @@ func (a *App) GetSite(id int64) *dto.Response[*dto.Site] {
 
 // ListSites lists all sites
 func (a *App) ListSites() *dto.Response[[]*dto.Site] {
-	if a.siteSvc == nil {
-		panic("site service is nil")
-	}
-
 	sites, err := a.siteSvc.ListSites(context.Background())
 	if err != nil {
 		return dtoErr[[]*dto.Site](asAppErr(err))

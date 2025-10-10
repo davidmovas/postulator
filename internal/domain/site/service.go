@@ -72,10 +72,6 @@ func (s *Service) GetSite(ctx context.Context, id int64) (*entities.Site, error)
 }
 
 func (s *Service) ListSites(ctx context.Context) ([]*entities.Site, error) {
-	if s.siteRepo == nil {
-		panic("siteRepo is nil")
-	}
-
 	return s.siteRepo.GetAll(ctx)
 }
 

@@ -101,10 +101,6 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (*entities.Site, err
 }
 
 func (r *Repository) GetAll(ctx context.Context) ([]*entities.Site, error) {
-	if r.db == nil {
-		panic("db is nil")
-	}
-
 	query, args := dbx.ST.
 		Select(
 			"id",

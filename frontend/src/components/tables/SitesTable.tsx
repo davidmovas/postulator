@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -18,6 +19,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
     RefreshCw,
     Plus,
@@ -28,8 +30,15 @@ import {
     ArrowUpDown,
     Search,
     Database,
+    ExternalLink,
+    Copy as CopyIcon,
+    Lock,
 } from 'lucide-react';
 import { Site } from "@/services/site";
+import { BrowserOpenURL } from '@/wailsjs/wailsjs/runtime/runtime';
+import { useToast } from '@/components/ui/use-toast';
+import { useErrorHandling } from '@/lib/error-handling';
+import { setSitePassword } from '@/services/site';
 
 // Types for sorting
 type SortField = keyof Site;
@@ -62,6 +71,45 @@ export function SitesTable({
     const [sortDirection, setSortDirection] = useState<SortDirection>(null);
     const [loadingActions, setLoadingActions] = useState<Record<number, boolean>>({});
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const { toast } = useToast();
+    const { withErrorHandling } = useErrorHandling();
+
+    // Modals state
+    const [deleteTarget, setDeleteTarget] = useState<Site | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const [passwordTarget, setPasswordTarget] = useState<Site | null>(null);
+    const [passwordValue, setPasswordValue] = useState("");
+    const [isSettingPassword, setIsSettingPassword] = useState(false);
+
+    const openInDefault = (url: string) => {
+        try {
+            BrowserOpenURL(url);
+        } catch (e) {
+            console.error('Failed to open URL in default browser', e);
+        }
+    };
+
+    const openInTor = (url: string) => {
+        try {
+            // Attempt Tor Browser custom protocol if registered
+            // Tor Browser sometimes registers "torbrowser://" scheme on Windows installations
+            BrowserOpenURL(`torbrowser:${url}`);
+        } catch (e) {
+            console.error('Failed to open URL in Tor', e);
+            // Fallback to default
+            try { BrowserOpenURL(url); } catch {}
+        }
+    };
+
+    const copyLink = async (url: string) => {
+        try {
+            await navigator.clipboard.writeText(url);
+            toast({ title: 'Copied', description: 'URL copied to clipboard' });
+        } catch (e) {
+            console.error('Failed to copy URL', e);
+        }
+    };
 
     // Format date helper
     const formatDate = (dateString: string) => {
@@ -178,13 +226,21 @@ export function SitesTable({
     };
 
     const handleDelete = async (siteId: number) => {
-        if (confirm('Are you sure you want to delete this site?')) {
-            setLoadingActions((prev) => ({ ...prev, [siteId]: true }));
-            try {
-                await onDelete(siteId);
-            } finally {
-                setLoadingActions((prev) => ({ ...prev, [siteId]: false }));
-            }
+        const target = sites.find(s => s.id === siteId) || null;
+        setDeleteTarget(target);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteTarget) return;
+        const siteId = deleteTarget.id;
+        setIsDeleting(true);
+        setLoadingActions((prev) => ({ ...prev, [siteId]: true }));
+        try {
+            await onDelete(siteId);
+            setDeleteTarget(null);
+        } finally {
+            setIsDeleting(false);
+            setLoadingActions((prev) => ({ ...prev, [siteId]: false }));
         }
     };
 
@@ -255,14 +311,12 @@ export function SitesTable({
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <SortableHeader field="id">ID</SortableHeader>
                             <SortableHeader field="name">Name</SortableHeader>
                             <SortableHeader field="url">URL</SortableHeader>
-                            <SortableHeader field="wpUsername">WP User</SortableHeader>
+                            <SortableHeader field="wpUsername">User</SortableHeader>
                             <SortableHeader field="status">Status</SortableHeader>
                             <SortableHeader field="healthStatus">Health</SortableHeader>
                             <SortableHeader field="lastHealthCheck">Last Check</SortableHeader>
-                            <SortableHeader field="createdAt">Created</SortableHeader>
                             <TableHead className="w-[70px]">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -295,17 +349,15 @@ export function SitesTable({
                         ) : (
                             filteredAndSortedSites.map((site) => (
                                 <TableRow key={site.id}>
-                                    <TableCell className="font-medium">{site.id}</TableCell>
                                     <TableCell className="font-medium">{site.name}</TableCell>
                                     <TableCell>
-                                        <a
-                                            href={site.url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-primary hover:underline"
+                                        <button
+                                            onClick={() => BrowserOpenURL(site.url)}
+                                            className="text-primary hover:underline text-left"
+                                            title="Open in default browser"
                                         >
                                             {site.url}
-                                        </a>
+                                        </button>
                                     </TableCell>
                                     <TableCell>{site.wpUsername}</TableCell>
                                     <TableCell>
@@ -319,9 +371,6 @@ export function SitesTable({
                                     <TableCell className="text-muted-foreground text-sm">
                                         {site.lastHealthCheck ? formatDate(site.lastHealthCheck) : 'Never checked'}
                                     </TableCell>
-                                    <TableCell className="text-muted-foreground text-sm">
-                                        {formatDate(site.createdAt)}
-                                    </TableCell>
                                     <TableCell>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
@@ -334,9 +383,25 @@ export function SitesTable({
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
+                                                <DropdownMenuItem onClick={() => openInDefault(site.url)}>
+                                                    <ExternalLink className="h-4 w-4 mr-2" />
+                                                    Open (Default Browser)
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => openInTor(site.url)}>
+                                                    <ExternalLink className="h-4 w-4 mr-2" />
+                                                    Open in Tor
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => copyLink(site.url)}>
+                                                    <CopyIcon className="h-4 w-4 mr-2" />
+                                                    Copy URL
+                                                </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => handleHealthCheck(site.id)}>
                                                     <Activity className="h-4 w-4 mr-2" />
                                                     Check Health
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => setPasswordTarget(site)}>
+                                                    <Lock className="h-4 w-4 mr-2" />
+                                                    Set Password
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => onEdit(site)}>
                                                     <Pencil className="h-4 w-4 mr-2" />
@@ -358,6 +423,65 @@ export function SitesTable({
                     </TableBody>
                 </Table>
             </div>
+
+            {/* Delete confirmation */}
+            <ConfirmDialog
+                open={!!deleteTarget}
+                onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+                title="Delete site?"
+                description={deleteTarget ? (
+                  <span>Are you sure you want to delete <b>{deleteTarget.name}</b>? This action cannot be undone.</span>
+                ) : undefined}
+                confirmText="Delete"
+                cancelText="Cancel"
+                variant="destructive"
+                onConfirm={confirmDelete}
+                loading={isDeleting}
+            />
+
+            {/* Set password modal */}
+            <Dialog open={!!passwordTarget} onOpenChange={(open) => { if (!open) { setPasswordTarget(null); setPasswordValue(""); } }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Set password {passwordTarget ? `for ${passwordTarget.name}` : ''}</DialogTitle>
+                        <DialogDescription>
+                            For security, password is managed separately. Enter a new password for this site.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3 pt-1">
+                        <div className="space-y-2">
+                            <label htmlFor="pw-input" className="text-sm font-medium">Password</label>
+                            <Input
+                                id="pw-input"
+                                type="password"
+                                placeholder="Enter password"
+                                value={passwordValue}
+                                onChange={(e) => setPasswordValue(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => { setPasswordTarget(null); setPasswordValue(""); }} disabled={isSettingPassword}>Cancel</Button>
+                        <Button
+                            onClick={async () => {
+                                if (!passwordTarget) return;
+                                const pw = passwordValue.trim();
+                                if (!pw) return;
+                                setIsSettingPassword(true);
+                                await withErrorHandling(async () => {
+                                    await setSitePassword(passwordTarget.id, pw);
+                                }, { successMessage: 'Password updated', showSuccess: true });
+                                setIsSettingPassword(false);
+                                setPasswordTarget(null);
+                                setPasswordValue('');
+                            }}
+                            disabled={!passwordValue.trim() || !passwordTarget || isSettingPassword}
+                        >
+                            Set Password
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
