@@ -1,7 +1,5 @@
-// Service layer for Sites: thin wrappers over Wails-generated API with light mapping
-
 import {
-    AssignTopicToSite,
+    AssignTopicToSite, CheckHealth,
     CreateSite,
     DeleteSite,
     GetSite,
@@ -15,9 +13,10 @@ import {
     UpdateSite,
 } from "@/wailsjs/wailsjs/go/app/App";
 import { dto } from "@/wailsjs/wailsjs/go/models";
-import { ServiceError, unwrapMany, unwrapOne, unwrapString } from "./utils";
+import { unwrapMany, unwrapString } from "./utils";
+import { Topic } from "@/services/topic";
+import { unwrapArrayResponse, unwrapResponse } from "@/lib/error-handling";
 
-// UI-facing types (decoupled from generated dto classes)
 export interface Site {
   id: number;
   name: string;
@@ -37,12 +36,6 @@ export interface Category {
   name: string;
   slug?: string;
   count: number;
-  createdAt: string;
-}
-
-export interface Topic {
-  id: number;
-  title: string;
   createdAt: string;
 }
 
@@ -105,44 +98,48 @@ function mapSiteTopic(x: dto.SiteTopic): SiteTopic {
   };
 }
 
-
-
 export async function listSites(): Promise<Site[]> {
-  const res = await ListSites();
-    return unwrapMany<dto.Site>(res).map(mapSite);
+    const response = await ListSites();
+    const sites = unwrapArrayResponse<dto.Site>(response);
+    return sites.map(mapSite);
 }
 
 export async function getSite(id: number): Promise<Site> {
-  const res = await GetSite(id);
-    return mapSite(unwrapOne<dto.Site>(res));
+    const response = await GetSite(id);
+    const site = unwrapResponse<dto.Site>(response);
+    return mapSite(site);
 }
 
-export async function createSite(input: SiteCreateInput): Promise<string> {
-  const payload = new dto.Site({ name: input.name, url: input.url, wpUsername: input.wpUsername });
-  const res = await CreateSite(payload);
-  return unwrapString(res);
+export async function createSite(input: SiteCreateInput): Promise<void> {
+    const payload = new dto.Site({
+        name: input.name,
+        url: input.url,
+        wpUsername: input.wpUsername,
+    });
+    const response = await CreateSite(payload);
+    unwrapResponse<string>(response);
 }
 
-export async function updateSite(input: SiteUpdateInput): Promise<string> {
-  const payload = new dto.Site({
-    id: input.id,
-    name: input.name,
-    url: input.url,
-    wpUsername: input.wpUsername,
-    status: input.status,
-  });
-  const res = await UpdateSite(payload);
-  return unwrapString(res);
+export async function updateSite(input: SiteUpdateInput): Promise<void> {
+    const payload = new dto.Site({
+        id: input.id,
+        name: input.name,
+        url: input.url,
+        wpUsername: input.wpUsername,
+        status: input.status,
+    });
+    const response = await UpdateSite(payload);
+    unwrapResponse<string>(response);
 }
 
-export async function deleteSite(id: number): Promise<string> {
-  const res = await DeleteSite(id);
-  return unwrapString(res);
+export async function deleteSite(id: number): Promise<void> {
+    const response = await DeleteSite(id);
+    unwrapResponse<string>(response);
 }
 
-export async function setSitePassword(siteId: number, password: string): Promise<string> {
-  const res = await SetSitePassword(siteId, password);
-  return unwrapString(res);
+export async function setSitePassword(siteId: number, password: string): Promise<void> {
+    const response = await SetSitePassword(siteId, password);
+    unwrapResponse<string>(response);
 }
 
 export async function syncCategories(siteId: number): Promise<string> {
@@ -163,6 +160,11 @@ export async function getSiteTopics(siteId: number): Promise<SiteTopic[]> {
 export async function getTopicsBySite(siteId: number): Promise<Topic[]> {
   const res = await GetTopicsBySite(siteId);
   return unwrapMany<dto.Topic>(res).map(mapTopic);
+}
+
+export async function checkSiteHealth(siteId: number): Promise<string> {
+    const res = await CheckHealth(siteId);
+    return unwrapString(res);
 }
 
 export async function assignTopicToSite(

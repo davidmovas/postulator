@@ -16,17 +16,15 @@ type DB struct {
 }
 
 func NewDB(filename string) (*DB, error) {
-	if filename == "" {
-		return nil, errors.New("empty database filename")
-	}
+	dir := filepath.Dir(filename)
 
-	if err := os.MkdirAll(filepath.Dir(filename), 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("create db dir: %w", err)
 	}
 
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
 		var f *os.File
-		f, err = os.OpenFile(filename, os.O_CREATE|os.O_EXCL, 0o644)
+		f, err = os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0o644)
 		if err != nil {
 			return nil, fmt.Errorf("create db file: %w", err)
 		}

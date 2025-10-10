@@ -3,6 +3,7 @@ package app
 import (
 	"Postulator/internal/config"
 	"Postulator/internal/domain/aiprovider"
+	"Postulator/internal/domain/article"
 	"Postulator/internal/domain/job"
 	"Postulator/internal/domain/prompt"
 	"Postulator/internal/domain/site"
@@ -14,7 +15,10 @@ import (
 	"Postulator/pkg/di"
 	"Postulator/pkg/logger"
 	"context"
+	"path/filepath"
 	"reflect"
+
+	"github.com/adrg/xdg"
 )
 
 type App struct {
@@ -51,26 +55,38 @@ func New(cfg *config.Config) (*App, error) {
 	// Ensure logger files closed on shutdown
 	c.AddCloseFunc(func() { _ = l.Close() })
 
-	return &App{
+	a := &App{
 		container: c,
 		logger:    l,
 		cfg:       cfg,
-	}, nil
+	}
+
+	if err = a.InitDB(); err != nil {
+		return nil, err
+	}
+
+	a.InitWP()
+	a.InitAI()
+
+	if err = a.BuildServices(); err != nil {
+		return nil, err
+	}
+
+	return a, nil
 }
 
-// InitDB opens/creates DB and registers it in DI.
-func (a *App) InitDB(dbPath string) error {
-	db, err := database.NewDB(dbPath)
+func (a *App) InitDB() error {
+	db, err := database.NewDB(filepath.Join(xdg.ConfigHome, "Postulator", "database.db"))
 	if err != nil {
 		return err
 	}
+
 	a.container.MustRegister(di.Instance[*database.DB](db))
 	a.container.AddCloseFunc(func() { db.Close() })
 	a.db = db
 	return nil
 }
 
-// InitWP registers a WordPress client.
 func (a *App) InitWP() {
 	if a.wpClient == nil {
 		a.wpClient = wp.NewClient()
@@ -78,99 +94,136 @@ func (a *App) InitWP() {
 	}
 }
 
-// InitAI allows the host to inject an AI client implementation.
-func (a *App) InitAI(client ai.Client) {
-	if client == nil {
-		return
-	}
-	a.container.MustRegister(&di.Registration[ai.Client]{
-		Provider:      di.Must[ai.Client](client),
+func (a *App) InitAI() {
+	client := ai.NewClient()
+
+	a.container.MustRegister(&di.Registration[ai.IClient]{
+		Provider:      di.Must[ai.IClient](client),
 		Lifecycle:     di.Singleton,
-		InterfaceType: reflect.TypeOf((*ai.Client)(nil)).Elem(),
+		InterfaceType: reflect.TypeOf((*ai.IClient)(nil)).Elem(),
 	})
 }
 
-// BuildServices resolves and caches domain services & scheduler.
 func (a *App) BuildServices() error {
-	// Site/Topic/Prompt/AIProvider services
 	var err error
-	if a.siteSvc == nil {
-		a.siteSvc, err = site.NewService(a.container)
-		if err != nil {
-			return err
-		}
+
+	// Register repositories needed by services and executor
+	execRepo, err := job.NewExecutionRepository(a.container)
+	if err != nil {
+		return err
 	}
-	if a.topicSvc == nil {
-		a.topicSvc, err = topic.NewService(a.container)
-		if err != nil {
-			return err
-		}
+	a.container.MustRegister(&di.Registration[job.IExecutionRepository]{
+		Provider:      di.Must[job.IExecutionRepository](execRepo),
+		Lifecycle:     di.Singleton,
+		InterfaceType: reflect.TypeOf((*job.IExecutionRepository)(nil)).Elem(),
+	})
+
+	articleRepo, err := article.NewRepository(a.container)
+	if err != nil {
+		return err
 	}
-	if a.promptSvc == nil {
-		a.promptSvc, err = prompt.NewService(a.container)
-		if err != nil {
-			return err
-		}
+	a.container.MustRegister(&di.Registration[article.IRepository]{
+		Provider:      di.Must[article.IRepository](articleRepo),
+		Lifecycle:     di.Singleton,
+		InterfaceType: reflect.TypeOf((*article.IRepository)(nil)).Elem(),
+	})
+
+	// Build and register services
+	a.siteSvc, err = site.NewService(a.container)
+	if err != nil {
+		return err
 	}
-	if a.aiProvSvc == nil {
-		a.aiProvSvc, err = aiprovider.NewService(a.container)
-		if err != nil {
-			return err
-		}
+
+	a.container.MustRegister(&di.Registration[site.IService]{
+		Provider:      di.Must[site.IService](a.siteSvc),
+		Lifecycle:     di.Singleton,
+		InterfaceType: reflect.TypeOf((*site.IService)(nil)).Elem(),
+	})
+
+	a.topicSvc, err = topic.NewService(a.container)
+	if err != nil {
+		return err
 	}
-	if a.jobSvc == nil {
-		a.jobSvc, err = job.NewService(a.container)
-		if err != nil {
-			return err
-		}
+	a.container.MustRegister(&di.Registration[topic.IService]{
+		Provider:      di.Must[topic.IService](a.topicSvc),
+		Lifecycle:     di.Singleton,
+		InterfaceType: reflect.TypeOf((*topic.IService)(nil)).Elem(),
+	})
+
+	a.promptSvc, err = prompt.NewService(a.container)
+	if err != nil {
+		return err
 	}
-	if a.importerSvc == nil {
-		if svc, ierr := importer.NewImportService(a.container); ierr != nil {
-			return ierr
-		} else {
-			a.importerSvc = svc
-		}
+	a.container.MustRegister(&di.Registration[prompt.IService]{
+		Provider:      di.Must[prompt.IService](a.promptSvc),
+		Lifecycle:     di.Singleton,
+		InterfaceType: reflect.TypeOf((*prompt.IService)(nil)).Elem(),
+	})
+
+	a.aiProvSvc, err = aiprovider.NewService(a.container)
+	if err != nil {
+		return err
 	}
-	if a.scheduler == nil {
-		a.scheduler, err = job.NewScheduler(a.container)
-		if err != nil {
-			return err
-		}
+	a.container.MustRegister(&di.Registration[aiprovider.IService]{
+		Provider:      di.Must[aiprovider.IService](a.aiProvSvc),
+		Lifecycle:     di.Singleton,
+		InterfaceType: reflect.TypeOf((*aiprovider.IService)(nil)).Elem(),
+	})
+
+	a.jobSvc, err = job.NewService(a.container)
+	if err != nil {
+		return err
 	}
+	a.container.MustRegister(&di.Registration[job.IService]{
+		Provider:      di.Must[job.IService](a.jobSvc),
+		Lifecycle:     di.Singleton,
+		InterfaceType: reflect.TypeOf((*job.IService)(nil)).Elem(),
+	})
+
+	if svc, ierr := importer.NewImportService(a.container); ierr != nil {
+		return ierr
+	} else {
+		a.importerSvc = svc
+		a.container.MustRegister(&di.Registration[importer.IImportService]{
+			Provider:      di.Must[importer.IImportService](a.importerSvc),
+			Lifecycle:     di.Singleton,
+			InterfaceType: reflect.TypeOf((*importer.IImportService)(nil)).Elem(),
+		})
+	}
+
+	a.scheduler, err = job.NewScheduler(a.container)
+	if err != nil {
+		return err
+	}
+	a.container.MustRegister(&di.Registration[job.IScheduler]{
+		Provider:      di.Must[job.IScheduler](a.scheduler),
+		Lifecycle:     di.Singleton,
+		InterfaceType: reflect.TypeOf((*job.IScheduler)(nil)).Elem(),
+	})
+
 	return nil
 }
 
 // Start application subsystems (scheduler) and restore state.
 func (a *App) Start(ctx context.Context) error {
-	a.InitWP() // ensure WP client present
-	if err := a.BuildServices(); err != nil {
-		return err
-	}
 	if err := a.scheduler.RestoreState(ctx); err != nil {
 		return err
 	}
+
 	return a.scheduler.Start(ctx)
 }
 
 func (a *App) RestoreState(ctx context.Context) error {
-	if err := a.BuildServices(); err != nil {
-		return err
-	}
 	return a.scheduler.RestoreState(ctx)
 }
 
 func (a *App) Stop() {
 	if a.scheduler != nil {
-		_ = a.scheduler.Stop()
+		if err := a.scheduler.Stop(); err != nil {
+			a.logger.ErrorWithErr(err, "Error while stopping scheduler")
+		}
 	}
-	if a.logger != nil {
-		a.logger.Info("Stopping app")
-	}
+
+	a.logger.Info("Stopping app")
 	a.container.Close()
 }
-
-func (a *App) SiteService() site.IService             { return a.siteSvc }
-func (a *App) TopicService() topic.IService           { return a.topicSvc }
-func (a *App) PromptService() prompt.IService         { return a.promptSvc }
-func (a *App) AIProviderService() aiprovider.IService { return a.aiProvSvc }
-func (a *App) JobService() job.IService               { return a.jobSvc }
