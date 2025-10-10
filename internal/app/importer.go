@@ -3,17 +3,16 @@ package app
 import (
 	"Postulator/internal/domain/entities"
 	"Postulator/internal/dto"
+	"Postulator/pkg/ctx"
 	"Postulator/pkg/errors"
-	"context"
 )
 
-// Importer bindings
-
 func (a *App) ImportTopics(filePath string) *dto.Response[*dto.ImportResult] {
-	res, err := a.importerSvc.ImportTopics(context.Background(), filePath)
+	res, err := a.importerSvc.ImportTopics(ctx.FastCtx(), filePath)
 	if err != nil {
 		return dtoErr[*dto.ImportResult](asAppErr(err))
 	}
+
 	return &dto.Response[*dto.ImportResult]{Success: true, Data: dto.FromImportResult(res)}
 }
 
@@ -22,9 +21,11 @@ func (a *App) ImportAndAssignToSite(filePath string, siteID int64, categoryID in
 	if strat != entities.StrategyUnique && strat != entities.StrategyVariation {
 		return dtoErr[*dto.ImportResult](errors.Validation("invalid topic strategy"))
 	}
-	res, err := a.importerSvc.ImportAndAssignToSite(context.Background(), filePath, siteID, categoryID, strat)
+
+	res, err := a.importerSvc.ImportAndAssignToSite(ctx.FastCtx(), filePath, siteID, categoryID, strat)
 	if err != nil {
 		return dtoErr[*dto.ImportResult](asAppErr(err))
 	}
+
 	return &dto.Response[*dto.ImportResult]{Success: true, Data: dto.FromImportResult(res)}
 }
