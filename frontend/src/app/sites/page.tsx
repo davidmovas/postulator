@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { checkSiteHealth, deleteSite, listSites, Site } from "@/services/site";
-import { SitesTable } from "@/components/tables/SitesTable";
+import { SitesTable } from "@/components/sites/SitesTable";
 import { useErrorHandling } from "@/lib/error-handling";
 import { EditSiteModal } from "@/components/modals/EditSiteModal";
 import { CreateSiteModal } from "@/components/sites/CreateSiteModal";
