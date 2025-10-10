@@ -39,6 +39,9 @@ import { BrowserOpenURL } from '@/wailsjs/wailsjs/runtime/runtime';
 import { useToast } from '@/components/ui/use-toast';
 import { useErrorHandling } from '@/lib/error-handling';
 import { setSitePassword } from '@/services/site';
+import { SitesToolbar } from '@/components/sites/SitesToolbar';
+import { SiteRowActions } from '@/components/sites/SiteRowActions';
+import { SetSitePasswordDialog } from '@/components/sites/SetSitePasswordDialog';
 
 // Types for sorting
 type SortField = keyof Site;
@@ -260,44 +263,16 @@ export function SitesTable({
     return (
         <div className="space-y-4">
             {/* Control panel */}
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                {/* Search */}
-                <div className="relative w-full sm:w-96">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Search by name, URL or username..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9"
-                    />
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-2 w-full sm:w-auto">
-                    <Button
-                        variant="outline"
-                        onClick={onHealthCheckAll}
-                        disabled={isLoading || sites.length === 0}
-                        className="flex-1 sm:flex-initial"
-                    >
-                        <Activity className="h-4 w-4 mr-2" />
-                        Check All
-                    </Button>
-                    <Button
-                        variant="outline"
-                        onClick={handleRefresh}
-                        disabled={isRefreshing}
-                        className="flex-1 sm:flex-initial"
-                    >
-                        <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                        Refresh
-                    </Button>
-                    <Button onClick={onCreate} className="flex-1 sm:flex-initial">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Site
-                    </Button>
-                </div>
-            </div>
+            <SitesToolbar
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                isLoading={isLoading}
+                totalSites={sites.length}
+                onCreate={onCreate}
+                onRefresh={handleRefresh}
+                isRefreshing={isRefreshing}
+                onHealthCheckAll={onHealthCheckAll}
+            />
 
             {/* Results info */}
             {sites.length > 0 && (
@@ -372,50 +347,17 @@ export function SitesTable({
                                         {site.lastHealthCheck ? formatDate(site.lastHealthCheck) : 'Never checked'}
                                     </TableCell>
                                     <TableCell>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    disabled={loadingActions[site.id]}
-                                                >
-                                                    <MoreVertical className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onClick={() => openInDefault(site.url)}>
-                                                    <ExternalLink className="h-4 w-4 mr-2" />
-                                                    Open (Default Browser)
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => openInTor(site.url)}>
-                                                    <ExternalLink className="h-4 w-4 mr-2" />
-                                                    Open in Tor
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => copyLink(site.url)}>
-                                                    <CopyIcon className="h-4 w-4 mr-2" />
-                                                    Copy URL
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => handleHealthCheck(site.id)}>
-                                                    <Activity className="h-4 w-4 mr-2" />
-                                                    Check Health
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => setPasswordTarget(site)}>
-                                                    <Lock className="h-4 w-4 mr-2" />
-                                                    Set Password
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => onEdit(site)}>
-                                                    <Pencil className="h-4 w-4 mr-2" />
-                                                    Edit
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    onClick={() => handleDelete(site.id)}
-                                                    className="text-destructive focus:text-destructive"
-                                                >
-                                                    <Trash2 className="h-4 w-4 mr-2" />
-                                                    Delete
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                        <SiteRowActions
+                                            site={site}
+                                            disabled={loadingActions[site.id]}
+                                            onOpenDefault={openInDefault}
+                                            onOpenTor={openInTor}
+                                            onCopyUrl={copyLink}
+                                            onCheckHealth={handleHealthCheck}
+                                            onEdit={onEdit}
+                                            onRequestPassword={(s) => setPasswordTarget(s)}
+                                            onRequestDelete={(id) => handleDelete(id)}
+                                        />
                                     </TableCell>
                                 </TableRow>
                             ))
@@ -440,48 +382,21 @@ export function SitesTable({
             />
 
             {/* Set password modal */}
-            <Dialog open={!!passwordTarget} onOpenChange={(open) => { if (!open) { setPasswordTarget(null); setPasswordValue(""); } }}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Set password {passwordTarget ? `for ${passwordTarget.name}` : ''}</DialogTitle>
-                        <DialogDescription>
-                            For security, password is managed separately. Enter a new password for this site.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-3 pt-1">
-                        <div className="space-y-2">
-                            <label htmlFor="pw-input" className="text-sm font-medium">Password</label>
-                            <Input
-                                id="pw-input"
-                                type="password"
-                                placeholder="Enter password"
-                                value={passwordValue}
-                                onChange={(e) => setPasswordValue(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="ghost" onClick={() => { setPasswordTarget(null); setPasswordValue(""); }} disabled={isSettingPassword}>Cancel</Button>
-                        <Button
-                            onClick={async () => {
-                                if (!passwordTarget) return;
-                                const pw = passwordValue.trim();
-                                if (!pw) return;
-                                setIsSettingPassword(true);
-                                await withErrorHandling(async () => {
-                                    await setSitePassword(passwordTarget.id, pw);
-                                }, { successMessage: 'Password updated', showSuccess: true });
-                                setIsSettingPassword(false);
-                                setPasswordTarget(null);
-                                setPasswordValue('');
-                            }}
-                            disabled={!passwordValue.trim() || !passwordTarget || isSettingPassword}
-                        >
-                            Set Password
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <SetSitePasswordDialog
+                open={!!passwordTarget}
+                site={passwordTarget}
+                onOpenChange={(open) => { if (!open) { setPasswordTarget(null); } }}
+                loading={isSettingPassword}
+                onSubmit={async (pw) => {
+                    if (!passwordTarget) return;
+                    setIsSettingPassword(true);
+                    await withErrorHandling(async () => {
+                        await setSitePassword(passwordTarget.id, pw);
+                    }, { successMessage: 'Password updated', showSuccess: true });
+                    setIsSettingPassword(false);
+                    setPasswordTarget(null);
+                }}
+            />
         </div>
     );
 }
