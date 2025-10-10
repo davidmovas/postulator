@@ -9,11 +9,6 @@ import (
 
 // CreateSite creates a new site using provided DTO fields
 func (a *App) CreateSite(site *dto.Site) *dto.Response[string] {
-	if a.siteSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	if site == nil {
 		return dtoErr[string](errors.Validation("site payload is required"))
 	}
@@ -32,12 +27,6 @@ func (a *App) CreateSite(site *dto.Site) *dto.Response[string] {
 
 // SetSitePassword securely sets/updates the WordPress password for the site
 func (a *App) SetSitePassword(siteID int64, password string) *dto.Response[string] {
-	if a.siteSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
-
 	if siteID == 0 {
 		return dtoErr[string](errors.Validation("invalid site id"))
 	}
@@ -54,11 +43,6 @@ func (a *App) SetSitePassword(siteID int64, password string) *dto.Response[strin
 
 // GetSite returns site by ID
 func (a *App) GetSite(id int64) *dto.Response[*dto.Site] {
-	if a.siteSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[*dto.Site](errors.Internal(err))
-		}
-	}
 	s, err := a.siteSvc.GetSite(context.Background(), id)
 	if err != nil {
 		return dtoErr[*dto.Site](asAppErr(err))
@@ -69,10 +53,9 @@ func (a *App) GetSite(id int64) *dto.Response[*dto.Site] {
 // ListSites lists all sites
 func (a *App) ListSites() *dto.Response[[]*dto.Site] {
 	if a.siteSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[[]*dto.Site](errors.Internal(err))
-		}
+		panic("site service is nil")
 	}
+
 	sites, err := a.siteSvc.ListSites(context.Background())
 	if err != nil {
 		return dtoErr[[]*dto.Site](asAppErr(err))
@@ -82,11 +65,6 @@ func (a *App) ListSites() *dto.Response[[]*dto.Site] {
 
 // UpdateSite updates a site
 func (a *App) UpdateSite(site *dto.Site) *dto.Response[string] {
-	if a.siteSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	if site == nil {
 		return dtoErr[string](errors.Validation("site payload is required"))
 	}
@@ -105,11 +83,6 @@ func (a *App) UpdateSite(site *dto.Site) *dto.Response[string] {
 
 // DeleteSite removes a site by ID
 func (a *App) DeleteSite(id int64) *dto.Response[string] {
-	if a.siteSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	if err := a.siteSvc.DeleteSite(context.Background(), id); err != nil {
 		return dtoErr[string](asAppErr(err))
 	}
@@ -118,11 +91,6 @@ func (a *App) DeleteSite(id int64) *dto.Response[string] {
 
 // CheckHealth performs a WordPress health check and updates status
 func (a *App) CheckHealth(siteID int64) *dto.Response[string] {
-	if a.siteSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	if err := a.siteSvc.CheckHealth(context.Background(), siteID); err != nil {
 		return dtoErr[string](asAppErr(err))
 	}
@@ -131,11 +99,6 @@ func (a *App) CheckHealth(siteID int64) *dto.Response[string] {
 
 // SyncCategories fetches categories from WP and stores them
 func (a *App) SyncCategories(siteID int64) *dto.Response[string] {
-	if a.siteSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	if err := a.siteSvc.SyncCategories(context.Background(), siteID); err != nil {
 		return dtoErr[string](asAppErr(err))
 	}
@@ -144,11 +107,6 @@ func (a *App) SyncCategories(siteID int64) *dto.Response[string] {
 
 // GetSiteCategories returns categories of a site
 func (a *App) GetSiteCategories(siteID int64) *dto.Response[[]*dto.Category] {
-	if a.siteSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[[]*dto.Category](errors.Internal(err))
-		}
-	}
 	cats, err := a.siteSvc.GetSiteCategories(context.Background(), siteID)
 	if err != nil {
 		return dtoErr[[]*dto.Category](asAppErr(err))

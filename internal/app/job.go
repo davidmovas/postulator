@@ -11,11 +11,6 @@ import (
 // Job bindings
 
 func (a *App) CreateJob(j *dto.Job) *dto.Response[string] {
-	if a.jobSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	if j == nil {
 		return dtoErr[string](errors.Validation("job payload is required"))
 	}
@@ -30,11 +25,6 @@ func (a *App) CreateJob(j *dto.Job) *dto.Response[string] {
 }
 
 func (a *App) GetJob(id int64) *dto.Response[*dto.Job] {
-	if a.jobSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[*dto.Job](errors.Internal(err))
-		}
-	}
 	res, err := a.jobSvc.GetJob(context.Background(), id)
 	if err != nil {
 		return dtoErr[*dto.Job](asAppErr(err))
@@ -43,11 +33,6 @@ func (a *App) GetJob(id int64) *dto.Response[*dto.Job] {
 }
 
 func (a *App) ListJobs() *dto.Response[[]*dto.Job] {
-	if a.jobSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[[]*dto.Job](errors.Internal(err))
-		}
-	}
 	items, err := a.jobSvc.ListJobs(context.Background())
 	if err != nil {
 		return dtoErr[[]*dto.Job](asAppErr(err))
@@ -56,11 +41,6 @@ func (a *App) ListJobs() *dto.Response[[]*dto.Job] {
 }
 
 func (a *App) UpdateJob(j *dto.Job) *dto.Response[string] {
-	if a.jobSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	if j == nil {
 		return dtoErr[string](errors.Validation("job payload is required"))
 	}
@@ -76,11 +56,6 @@ func (a *App) UpdateJob(j *dto.Job) *dto.Response[string] {
 }
 
 func (a *App) DeleteJob(id int64) *dto.Response[string] {
-	if a.jobSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	if err := a.jobSvc.DeleteJob(context.Background(), id); err != nil {
 		return dtoErr[string](asAppErr(err))
 	}
@@ -88,11 +63,6 @@ func (a *App) DeleteJob(id int64) *dto.Response[string] {
 }
 
 func (a *App) PauseJob(id int64) *dto.Response[string] {
-	if a.jobSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	if err := a.jobSvc.PauseJob(context.Background(), id); err != nil {
 		return dtoErr[string](asAppErr(err))
 	}
@@ -100,11 +70,6 @@ func (a *App) PauseJob(id int64) *dto.Response[string] {
 }
 
 func (a *App) ResumeJob(id int64) *dto.Response[string] {
-	if a.jobSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	if err := a.jobSvc.ResumeJob(context.Background(), id); err != nil {
 		return dtoErr[string](asAppErr(err))
 	}
@@ -112,11 +77,6 @@ func (a *App) ResumeJob(id int64) *dto.Response[string] {
 }
 
 func (a *App) ExecuteJobManually(id int64) *dto.Response[string] {
-	if a.jobSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	if err := a.jobSvc.ExecuteJobManually(context.Background(), id); err != nil {
 		return dtoErr[string](asAppErr(err))
 	}
@@ -124,11 +84,6 @@ func (a *App) ExecuteJobManually(id int64) *dto.Response[string] {
 }
 
 func (a *App) GetPendingValidations() *dto.Response[[]*dto.Execution] {
-	if a.jobSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[[]*dto.Execution](errors.Internal(err))
-		}
-	}
 	items, err := a.jobSvc.GetPendingValidations(context.Background())
 	if err != nil {
 		return dtoErr[[]*dto.Execution](asAppErr(err))
@@ -137,18 +92,11 @@ func (a *App) GetPendingValidations() *dto.Response[[]*dto.Execution] {
 }
 
 func (a *App) ValidateExecution(execID int64, approved bool) *dto.Response[string] {
-	if a.jobSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	if err := a.jobSvc.ValidateExecution(context.Background(), execID, approved); err != nil {
 		return dtoErr[string](asAppErr(err))
 	}
 	return &dto.Response[string]{Success: true, Data: "validated"}
 }
-
-// Helpers
 
 func toJobEntity(d *dto.Job) (*job.Job, error) {
 	var scheduleTime *time.Time

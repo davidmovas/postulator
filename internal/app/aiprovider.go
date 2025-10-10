@@ -10,11 +10,6 @@ import (
 // AI Provider bindings
 
 func (a *App) CreateAIProvider(req *dto.AIProviderCreate) *dto.Response[string] {
-	if a.aiProvSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	if req == nil {
 		return dtoErr[string](errors.Validation("provider payload is required"))
 	}
@@ -26,11 +21,6 @@ func (a *App) CreateAIProvider(req *dto.AIProviderCreate) *dto.Response[string] 
 }
 
 func (a *App) GetAIProvider(id int64) *dto.Response[*dto.AIProvider] {
-	if a.aiProvSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[*dto.AIProvider](errors.Internal(err))
-		}
-	}
 	p, err := a.aiProvSvc.GetProvider(context.Background(), id)
 	if err != nil {
 		return dtoErr[*dto.AIProvider](asAppErr(err))
@@ -39,11 +29,6 @@ func (a *App) GetAIProvider(id int64) *dto.Response[*dto.AIProvider] {
 }
 
 func (a *App) ListAIProviders() *dto.Response[[]*dto.AIProvider] {
-	if a.aiProvSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[[]*dto.AIProvider](errors.Internal(err))
-		}
-	}
 	items, err := a.aiProvSvc.ListProviders(context.Background())
 	if err != nil {
 		return dtoErr[[]*dto.AIProvider](asAppErr(err))
@@ -52,11 +37,6 @@ func (a *App) ListAIProviders() *dto.Response[[]*dto.AIProvider] {
 }
 
 func (a *App) ListActiveAIProviders() *dto.Response[[]*dto.AIProvider] {
-	if a.aiProvSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[[]*dto.AIProvider](errors.Internal(err))
-		}
-	}
 	items, err := a.aiProvSvc.ListActiveProviders(context.Background())
 	if err != nil {
 		return dtoErr[[]*dto.AIProvider](asAppErr(err))
@@ -65,11 +45,6 @@ func (a *App) ListActiveAIProviders() *dto.Response[[]*dto.AIProvider] {
 }
 
 func (a *App) UpdateAIProvider(req *dto.AIProviderUpdate) *dto.Response[string] {
-	if a.aiProvSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	if req == nil {
 		return dtoErr[string](errors.Validation("provider payload is required"))
 	}
@@ -81,11 +56,6 @@ func (a *App) UpdateAIProvider(req *dto.AIProviderUpdate) *dto.Response[string] 
 }
 
 func (a *App) DeleteAIProvider(id int64) *dto.Response[string] {
-	if a.aiProvSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	if err := a.aiProvSvc.DeleteProvider(context.Background(), id); err != nil {
 		return dtoErr[string](asAppErr(err))
 	}
@@ -93,11 +63,6 @@ func (a *App) DeleteAIProvider(id int64) *dto.Response[string] {
 }
 
 func (a *App) SetAIProviderStatus(id int64, active bool) *dto.Response[string] {
-	if a.aiProvSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	if err := a.aiProvSvc.SetProviderStatus(context.Background(), id, active); err != nil {
 		return dtoErr[string](asAppErr(err))
 	}
@@ -105,11 +70,6 @@ func (a *App) SetAIProviderStatus(id int64, active bool) *dto.Response[string] {
 }
 
 func (a *App) GetAvailableModels(providerName string) *dto.Response[[]string] {
-	if a.aiProvSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[[]string](errors.Internal(err))
-		}
-	}
 	models := a.aiProvSvc.GetAvailableModels(providerName)
 	out := make([]string, 0, len(models))
 	for _, m := range models {
@@ -119,11 +79,6 @@ func (a *App) GetAvailableModels(providerName string) *dto.Response[[]string] {
 }
 
 func (a *App) ValidateModel(providerName, model string) *dto.Response[string] {
-	if a.aiProvSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	if err := a.aiProvSvc.ValidateModel(providerName, model); err != nil {
 		return dtoErr[string](asAppErr(err))
 	}

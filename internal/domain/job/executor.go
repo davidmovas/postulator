@@ -26,7 +26,7 @@ type Executor struct {
 	promptService prompt.IService
 	siteService   site.IService
 	wpClient      *wp.Client
-	aiClient      ai.Client
+	aiClient      ai.IClient
 	logger        *logger.Logger
 }
 
@@ -36,38 +36,38 @@ func NewExecutor(c di.Container) (*Executor, error) {
 		return nil, err
 	}
 
-	execRepo, err := NewExecutionRepository(c)
-	if err != nil {
+	var execRepo IExecutionRepository
+	if err := c.Resolve(&execRepo); err != nil {
 		return nil, err
 	}
 
-	articleRepo, err := article.NewRepository(c)
-	if err != nil {
+	var articleRepo article.IRepository
+	if err := c.Resolve(&articleRepo); err != nil {
 		return nil, err
 	}
 
-	topicService, err := topic.NewService(c)
-	if err != nil {
+	var topicService topic.IService
+	if err := c.Resolve(&topicService); err != nil {
 		return nil, err
 	}
 
-	promptService, err := prompt.NewService(c)
-	if err != nil {
+	var promptService prompt.IService
+	if err := c.Resolve(&promptService); err != nil {
 		return nil, err
 	}
 
-	siteService, err := site.NewService(c)
-	if err != nil {
+	var siteService site.IService
+	if err := c.Resolve(&siteService); err != nil {
 		return nil, err
 	}
 
 	var wpClient *wp.Client
-	if err = c.Resolve(&wpClient); err != nil {
+	if err := c.Resolve(&wpClient); err != nil {
 		return nil, err
 	}
 
-	var aiClient ai.Client
-	if err = c.Resolve(&aiClient); err != nil {
+	var aiClient ai.IClient
+	if err := c.Resolve(&aiClient); err != nil {
 		return nil, fmt.Errorf("AI client is required for job execution: %w", err)
 	}
 
@@ -86,7 +86,7 @@ func NewExecutor(c di.Container) (*Executor, error) {
 func (e *Executor) Execute(ctx context.Context, job *Job) error {
 	e.logger.Infof("Starting execution of job %d (%s)", job.ID, job.Name)
 
-	// Create execution record
+	// Create an execution record
 	exec := &Execution{
 		JobID:     job.ID,
 		Status:    ExecutionPending,
@@ -166,7 +166,7 @@ func (e *Executor) executePipeline(ctx context.Context, job *Job, exec *Executio
 	exec.Status = ExecutionGenerating
 	now := time.Now()
 	exec.GeneratedAt = &now
-	if err := e.execRepo.Update(ctx, exec); err != nil {
+	if err = e.execRepo.Update(ctx, exec); err != nil {
 		return fmt.Errorf("failed to update execution status: %w", err)
 	}
 
@@ -195,7 +195,7 @@ func (e *Executor) executePipeline(ctx context.Context, job *Job, exec *Executio
 
 	exec.GeneratedTitle = &generatedTitle
 	exec.GeneratedContent = &generatedContent
-	if err := e.execRepo.Update(ctx, exec); err != nil {
+	if err = e.execRepo.Update(ctx, exec); err != nil {
 		return fmt.Errorf("failed to update execution with generated content: %w", err)
 	}
 
@@ -204,7 +204,7 @@ func (e *Executor) executePipeline(ctx context.Context, job *Job, exec *Executio
 	// Step 8: Check if validation is required
 	if job.RequiresValidation {
 		exec.Status = ExecutionPendingValidation
-		if err := e.execRepo.Update(ctx, exec); err != nil {
+		if err = e.execRepo.Update(ctx, exec); err != nil {
 			return fmt.Errorf("failed to update execution for validation: %w", err)
 		}
 
@@ -213,13 +213,13 @@ func (e *Executor) executePipeline(ctx context.Context, job *Job, exec *Executio
 	}
 
 	// Step 9: Publish to WordPress
-	if err := e.publishArticle(ctx, job, exec, siteInfo, generatedTitle, generatedContent); err != nil {
+	if err = e.publishArticle(ctx, job, exec, siteInfo, generatedTitle, generatedContent); err != nil {
 		return err
 	}
 
 	// Step 10: Mark topic as used (only for unique strategy)
 	if strategy == entities.StrategyUnique {
-		if err := e.topicService.MarkTopicAsUsed(ctx, job.SiteID, availableTopic.ID); err != nil {
+		if err = e.topicService.MarkTopicAsUsed(ctx, job.SiteID, availableTopic.ID); err != nil {
 			e.logger.Errorf("Failed to mark topic as used: %v", err)
 			// Don't fail the job - article is already published
 		} else {
@@ -265,7 +265,7 @@ func (e *Executor) publishArticle(ctx context.Context, job *Job, exec *Execution
 	e.logger.Infof("Job %d: Article published successfully (post ID: %d, URL: %s)", job.ID, postID, postURL)
 
 	// Get original topic title for article record
-	topic, err := e.topicService.GetTopic(ctx, exec.TopicID)
+	t, err := e.topicService.GetTopic(ctx, exec.TopicID)
 	if err != nil {
 		return fmt.Errorf("failed to get topic for article record: %w", err)
 	}
@@ -280,7 +280,7 @@ func (e *Executor) publishArticle(ctx context.Context, job *Job, exec *Execution
 		JobID:         &job.ID,
 		TopicID:       exec.TopicID,
 		Title:         title,
-		OriginalTitle: topic.Title,
+		OriginalTitle: t.Title,
 		Content:       content,
 		WPPostID:      postID,
 		WPPostURL:     postURL,
@@ -290,7 +290,7 @@ func (e *Executor) publishArticle(ctx context.Context, job *Job, exec *Execution
 		PublishedAt:   &now,
 	}
 
-	if err := e.articleRepo.Create(ctx, articleRecord); err != nil {
+	if err = e.articleRepo.Create(ctx, articleRecord); err != nil {
 		e.logger.Errorf("Failed to create article record: %v", err)
 		// Don't fail the job - article is already published to WordPress
 	} else {
@@ -304,7 +304,7 @@ func (e *Executor) publishArticle(ctx context.Context, job *Job, exec *Execution
 	exec.Status = ExecutionPublished
 	exec.PublishedAt = &now
 
-	if err := e.execRepo.Update(ctx, exec); err != nil {
+	if err = e.execRepo.Update(ctx, exec); err != nil {
 		return fmt.Errorf("failed to update execution after publication: %w", err)
 	}
 

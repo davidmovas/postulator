@@ -10,11 +10,6 @@ import (
 // Topic bindings
 
 func (a *App) CreateTopic(topic *dto.Topic) *dto.Response[string] {
-	if a.topicSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	if topic == nil {
 		return dtoErr[string](errors.Validation("topic payload is required"))
 	}
@@ -26,11 +21,6 @@ func (a *App) CreateTopic(topic *dto.Topic) *dto.Response[string] {
 }
 
 func (a *App) GetTopic(id int64) *dto.Response[*dto.Topic] {
-	if a.topicSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[*dto.Topic](errors.Internal(err))
-		}
-	}
 	t, err := a.topicSvc.GetTopic(context.Background(), id)
 	if err != nil {
 		return dtoErr[*dto.Topic](asAppErr(err))
@@ -39,11 +29,6 @@ func (a *App) GetTopic(id int64) *dto.Response[*dto.Topic] {
 }
 
 func (a *App) ListTopics() *dto.Response[[]*dto.Topic] {
-	if a.topicSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[[]*dto.Topic](errors.Internal(err))
-		}
-	}
 	items, err := a.topicSvc.ListTopics(context.Background())
 	if err != nil {
 		return dtoErr[[]*dto.Topic](asAppErr(err))
@@ -52,11 +37,6 @@ func (a *App) ListTopics() *dto.Response[[]*dto.Topic] {
 }
 
 func (a *App) UpdateTopic(topic *dto.Topic) *dto.Response[string] {
-	if a.topicSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	if topic == nil {
 		return dtoErr[string](errors.Validation("topic payload is required"))
 	}
@@ -68,11 +48,6 @@ func (a *App) UpdateTopic(topic *dto.Topic) *dto.Response[string] {
 }
 
 func (a *App) DeleteTopic(id int64) *dto.Response[string] {
-	if a.topicSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	if err := a.topicSvc.DeleteTopic(context.Background(), id); err != nil {
 		return dtoErr[string](asAppErr(err))
 	}
@@ -82,11 +57,6 @@ func (a *App) DeleteTopic(id int64) *dto.Response[string] {
 // Assignment bindings
 
 func (a *App) AssignTopicToSite(siteID, topicID, categoryID int64, strategy string) *dto.Response[string] {
-	if a.topicSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	strat := entities.TopicStrategy(strategy)
 	if strat != entities.StrategyUnique && strat != entities.StrategyVariation {
 		return dtoErr[string](errors.Validation("invalid topic strategy"))
@@ -98,11 +68,6 @@ func (a *App) AssignTopicToSite(siteID, topicID, categoryID int64, strategy stri
 }
 
 func (a *App) UnassignTopicFromSite(siteID, topicID int64) *dto.Response[string] {
-	if a.topicSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	if err := a.topicSvc.UnassignFromSite(context.Background(), siteID, topicID); err != nil {
 		return dtoErr[string](asAppErr(err))
 	}
@@ -110,11 +75,6 @@ func (a *App) UnassignTopicFromSite(siteID, topicID int64) *dto.Response[string]
 }
 
 func (a *App) GetSiteTopics(siteID int64) *dto.Response[[]*dto.SiteTopic] {
-	if a.topicSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[[]*dto.SiteTopic](errors.Internal(err))
-		}
-	}
 	items, err := a.topicSvc.GetSiteTopics(context.Background(), siteID)
 	if err != nil {
 		return dtoErr[[]*dto.SiteTopic](asAppErr(err))
@@ -123,11 +83,6 @@ func (a *App) GetSiteTopics(siteID int64) *dto.Response[[]*dto.SiteTopic] {
 }
 
 func (a *App) GetTopicsBySite(siteID int64) *dto.Response[[]*dto.Topic] {
-	if a.topicSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[[]*dto.Topic](errors.Internal(err))
-		}
-	}
 	items, err := a.topicSvc.GetTopicsBySite(context.Background(), siteID)
 	if err != nil {
 		return dtoErr[[]*dto.Topic](asAppErr(err))
@@ -136,11 +91,6 @@ func (a *App) GetTopicsBySite(siteID int64) *dto.Response[[]*dto.Topic] {
 }
 
 func (a *App) GetAvailableTopic(siteID int64, strategy string) *dto.Response[*dto.Topic] {
-	if a.topicSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[*dto.Topic](errors.Internal(err))
-		}
-	}
 	strat := entities.TopicStrategy(strategy)
 	if strat != entities.StrategyUnique && strat != entities.StrategyVariation {
 		return dtoErr[*dto.Topic](errors.Validation("invalid topic strategy"))
@@ -153,11 +103,6 @@ func (a *App) GetAvailableTopic(siteID int64, strategy string) *dto.Response[*dt
 }
 
 func (a *App) MarkTopicAsUsed(siteID, topicID int64) *dto.Response[string] {
-	if a.topicSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
 	if err := a.topicSvc.MarkTopicAsUsed(context.Background(), siteID, topicID); err != nil {
 		return dtoErr[string](asAppErr(err))
 	}
@@ -165,11 +110,6 @@ func (a *App) MarkTopicAsUsed(siteID, topicID int64) *dto.Response[string] {
 }
 
 func (a *App) CountUnusedTopics(siteID int64) *dto.Response[int] {
-	if a.topicSvc == nil {
-		if err := a.BuildServices(); err != nil {
-			return dtoErr[int](errors.Internal(err))
-		}
-	}
 	cnt, err := a.topicSvc.CountUnusedTopics(context.Background(), siteID)
 	if err != nil {
 		return dtoErr[int](asAppErr(err))

@@ -2,38 +2,15 @@ package app
 
 import (
 	"Postulator/internal/dto"
-	"Postulator/pkg/errors"
+	appErrors "Postulator/pkg/errors"
 	"context"
+	"errors"
 )
-
-// StartApp initializes services and starts the scheduler.
-func (a *App) StartApp(dbPath string) *dto.Response[string] {
-	ctx := context.Background()
-	if dbPath != "" {
-		if err := a.InitDB(dbPath); err != nil {
-			return dtoErr[string](errors.Internal(err))
-		}
-	}
-	a.InitWP()
-	if err := a.BuildServices(); err != nil {
-		return dtoErr[string](errors.Internal(err))
-	}
-	if err := a.Start(ctx); err != nil {
-		return dtoErr[string](errors.Scheduler(err))
-	}
-	return &dto.Response[string]{Success: true, Data: "started"}
-}
-
-// StopApp stops the scheduler and disposes resources.
-func (a *App) StopApp() *dto.Response[string] {
-	a.Stop()
-	return &dto.Response[string]{Success: true, Data: "stopped"}
-}
 
 // RestoreScheduler recalculates and restores scheduler state.
 func (a *App) RestoreScheduler() *dto.Response[string] {
 	if err := a.RestoreState(context.Background()); err != nil {
-		return dtoErr[string](errors.Scheduler(err))
+		return dtoErr[string](appErrors.Scheduler(err))
 	}
 	return &dto.Response[string]{Success: true, Data: "restored"}
 }
@@ -45,7 +22,7 @@ func (a *App) GetAIModels() *dto.Response[*dto.ModelsByProvider] {
 }
 
 // helper to convert errors to dto.Response
-func dtoErr[T any](err *errors.AppError) *dto.Response[T] {
+func dtoErr[T any](err *appErrors.AppError) *dto.Response[T] {
 	if err == nil {
 		return &dto.Response[T]{Success: true}
 	}
@@ -56,12 +33,13 @@ func dtoErr[T any](err *errors.AppError) *dto.Response[T] {
 }
 
 // asAppErr converts a generic error to *errors.AppError
-func asAppErr(err error) *errors.AppError {
+func asAppErr(err error) *appErrors.AppError {
 	if err == nil {
 		return nil
 	}
-	if ae, ok := err.(*errors.AppError); ok {
+	var ae *appErrors.AppError
+	if errors.As(err, &ae) {
 		return ae
 	}
-	return errors.Internal(err)
+	return appErrors.Internal(err)
 }
