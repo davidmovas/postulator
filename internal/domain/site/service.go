@@ -103,9 +103,10 @@ func (s *Service) GetSiteWithPassword(ctx context.Context, id int64) (*entities.
 	if err != nil {
 		return nil, errors.Internal(err)
 	}
-	copy := *siteEnt
-	copy.WPPassword = plain
-	return &copy, nil
+
+	cp := *siteEnt
+	cp.WPPassword = plain
+	return &cp, nil
 }
 
 func (s *Service) UpdateSitePassword(ctx context.Context, id int64, password string) error {

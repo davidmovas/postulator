@@ -26,12 +26,15 @@ export interface TopicsSitesTableProps {
   onManage: (siteId: number) => void;
   onImport: (siteId: number) => void;
   onSyncCategories: (siteId: number) => void | Promise<void>;
+  onRefresh?: () => void | Promise<void>;
+  onOpenImportDialog?: () => void;
+  isRefreshing?: boolean;
 }
 
 type SortField = "name" | "url" | "total" | "unused";
 type SortDirection = "asc" | "desc" | null;
 
-export function TopicsSitesTable({ sites, isLoading = false, stats, onManage, onImport, onSyncCategories }: TopicsSitesTableProps) {
+export function TopicsSitesTable({ sites, isLoading = false, stats, onManage, onImport, onSyncCategories, onRefresh, onOpenImportDialog, isRefreshing }: TopicsSitesTableProps) {
   const rows = useMemo(() => {
     return sites.map((s) => ({
       site: s,
@@ -95,12 +98,29 @@ export function TopicsSitesTable({ sites, isLoading = false, stats, onManage, on
             className="pl-3"
           />
         </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => onRefresh && onRefresh()}
+            disabled={isLoading || !!isRefreshing}
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+
+            {/*
+             <Button onClick={() => onOpenImportDialog && onOpenImportDialog()} className="bg-purple-600 hover:bg-purple-700 text-white">
+                <Upload className="h-4 w-4 mr-2" />
+                Import Topics
+             </Button>
+            */}
+        </div>
       </div>
 
-      <div className="border rounded-lg">
-        <Table>
+      <div className="w-full overflow-x-auto rounded-lg border">
+        <Table className="min-w-[800px] text-sm">
           <TableHeader>
-            <TableRow>
+            <TableRow className="[&>th]:py-2">
               <TableHead>
                 <button className="hover:text-foreground" onClick={() => toggleSort("name")}>Site</button>
               </TableHead>
@@ -134,7 +154,7 @@ export function TopicsSitesTable({ sites, isLoading = false, stats, onManage, on
               </TableRow>
             ) : (
               sorted.map(({ site, stats }) => (
-                <TableRow key={site.id} className="cursor-pointer" onClick={() => onManage(site.id)}>
+                <TableRow key={site.id} className="cursor-pointer [&>td]:py-2" onClick={() => onManage(site.id)}>
                   <TableCell className="font-medium">{site.name}</TableCell>
                   <TableCell className="text-muted-foreground">{site.url}</TableCell>
                   <TableCell>{stats.total}</TableCell>

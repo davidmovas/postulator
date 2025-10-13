@@ -5,6 +5,7 @@ import "Postulator/internal/domain/entities"
 type AIProvider struct {
 	ID        int64  `json:"id"`
 	Name      string `json:"name"`
+	Provider  string `json:"provider"`
 	Model     string `json:"model"`
 	IsActive  bool   `json:"isActive"`
 	CreatedAt string `json:"createdAt"`
@@ -18,6 +19,7 @@ func FromAIProvider(e *entities.AIProvider) *AIProvider {
 	return &AIProvider{
 		ID:        e.ID,
 		Name:      e.Name,
+		Provider:  e.Provider,
 		Model:     e.Model,
 		IsActive:  e.IsActive,
 		CreatedAt: e.CreatedAt.UTC().Format(timeLayout),

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CreateEditTopicModal } from "@/components/topics/CreateEditTopicModal";
-import { ImportTopicsDialog } from "@/components/topics/ImportTopicsDialog";
+import { ImportAndAssignTopicsDialog, ImportTopicsDialog } from "@/components/topics/ImportTopicsDialog";
 import { getSite, Site, unassignTopicFromSite } from "@/services/site";
 import { Topic, deleteTopic } from "@/services/topic";
 import { getTopicsBySite } from "@/services/site";
@@ -172,12 +172,12 @@ export function SiteTopicsManager({ siteId, onBack }: SiteTopicsManagerProps) {
       </div>
 
       <div className="border rounded-lg">
-        <Table>
+        <Table className="text-sm">
           <TableHeader>
-            <TableRow>
+            <TableRow className="[&>th]:py-2">
               <TableHead className="w-[40px]"><input type="checkbox" checked={allSelected} onChange={toggleSelectAll} /></TableHead>
               <TableHead>Title</TableHead>
-              <TableHead className="w-[160px]">Actions</TableHead>
+              <TableHead className="w-[160px] text-right pr-2">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -198,11 +198,11 @@ export function SiteTopicsManager({ siteId, onBack }: SiteTopicsManagerProps) {
               </TableRow>
             ) : (
               filtered.map((t) => (
-                <TableRow key={t.id}>
+                <TableRow key={t.id} className="[&>td]:py-2">
                   <TableCell><input type="checkbox" checked={selectedIds.has(t.id)} onChange={() => toggleSelect(t.id)} /></TableCell>
                   <TableCell className="font-medium">{t.title}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
+                  <TableCell className="pr-2">
+                    <div className="flex gap-2 justify-end">
                       <TopicRowActions
                         topic={t}
                         onEdit={(topic) => openEdit(topic)}
@@ -236,7 +236,7 @@ export function SiteTopicsManager({ siteId, onBack }: SiteTopicsManagerProps) {
         onConfirm={performConfirm}
       />
 
-      <ImportTopicsDialog
+      <ImportAndAssignTopicsDialog
         open={importOpen}
         onOpenChange={setImportOpen}
         siteId={siteId}

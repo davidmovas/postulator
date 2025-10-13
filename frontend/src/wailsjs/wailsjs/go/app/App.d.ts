@@ -19,7 +19,7 @@ export function CreatePrompt(arg1:dto.Prompt):Promise<dto.Response_string_>;
 
 export function CreateSite(arg1:dto.Site):Promise<dto.Response_string_>;
 
-export function CreateTopic(arg1:dto.Topic):Promise<dto.Response_string_>;
+export function CreateTopic(arg1:dto.Topic):Promise<dto.Response_int_>;
 
 export function DeleteAIProvider(arg1:number):Promise<dto.Response_string_>;
 

@@ -71,8 +71,9 @@ CREATE TABLE prompts (
 -- AI провайдеры и их конфигурация
 CREATE TABLE ai_providers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE, -- openai, anthropic, etc
+    name TEXT NOT NULL UNIQUE,
     api_key TEXT NOT NULL,
+    provider TEXT NOT NULL, -- openai, anthropic, etc
     model TEXT NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT 1,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

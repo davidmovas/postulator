@@ -16,6 +16,7 @@ import { unwrapMany, unwrapOne, unwrapString } from "./utils";
 export interface AIProvider {
   id: number;
   name: string;
+  provider: string;
   model: string;
   isActive: boolean;
   createdAt: string;
@@ -30,12 +31,13 @@ export interface ModelsByProvider {
 
 function mapAIProvider(x: dto.AIProvider): AIProvider {
   return {
-    id: x.id,
-    name: x.name,
-    model: x.model,
-    isActive: x.isActive,
-    createdAt: x.createdAt,
-    updatedAt: x.updatedAt,
+      id: x.id,
+      name: x.name,
+      provider: x.provider,
+      model: x.model,
+      isActive: x.isActive,
+      createdAt: x.createdAt,
+      updatedAt: x.updatedAt,
   };
 }
 
@@ -58,24 +60,26 @@ export async function getAIProvider(id: number): Promise<AIProvider> {
   return mapAIProvider(unwrapOne<dto.AIProvider>(res));
 }
 
-export async function createAIProvider(input: { name: string; apiKey: string; model: string; isActive: boolean }): Promise<string> {
+export async function createAIProvider(input: { name: string; apiKey: string; provider: string, model: string; isActive: boolean }): Promise<string> {
   const payload = new dto.AIProviderCreate({
-    name: input.name,
-    apiKey: input.apiKey,
-    model: input.model,
-    isActive: input.isActive,
+      name: input.name,
+      apiKey: input.apiKey,
+      provider: input.provider,
+      model: input.model,
+      isActive: input.isActive,
   });
   const res = await CreateAIProvider(payload);
   return unwrapString(res);
 }
 
-export async function updateAIProvider(input: { id: number; name: string; apiKey?: string; model: string; isActive: boolean }): Promise<string> {
+export async function updateAIProvider(input: { id: number; name: string; apiKey?: string;  provider: string, model: string; isActive: boolean }): Promise<string> {
   const payload = new dto.AIProviderUpdate({
-    id: input.id,
-    name: input.name,
-    apiKey: input.apiKey,
-    model: input.model,
-    isActive: input.isActive,
+      id: input.id,
+      name: input.name,
+      apiKey: input.apiKey,
+      provider: input.provider,
+      model: input.model,
+      isActive: input.isActive,
   });
   const res = await UpdateAIProvider(payload);
   return unwrapString(res);

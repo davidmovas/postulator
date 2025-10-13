@@ -16,6 +16,7 @@ import { dto } from "@/wailsjs/wailsjs/go/models";
 import { unwrapMany, unwrapString } from "./utils";
 import { Topic } from "@/services/topic";
 import { unwrapArrayResponse, unwrapResponse } from "@/lib/error-handling";
+import { TopicStrategy } from "@/constants/topics";
 
 export interface Site {
   id: number;
@@ -170,10 +171,10 @@ export async function checkSiteHealth(siteId: number): Promise<string> {
 export async function assignTopicToSite(
   siteId: number,
   topicId: number,
-  priority: number,
-  note: string
+  categoryId: number,
+  strategy: TopicStrategy
 ): Promise<string> {
-  const res = await AssignTopicToSite(siteId, topicId, priority, note);
+  const res = await AssignTopicToSite(siteId, topicId, categoryId, strategy);
   return unwrapString(res);
 }
 

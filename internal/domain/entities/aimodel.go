@@ -53,29 +53,29 @@ func GetModelsByProvider(provider AIProviderType) []AIModel {
 	switch provider {
 	case ProviderOpenAI:
 		return []AIModel{
-			ModelGPT4,
-			ModelGPT4Turbo,
-			ModelGPT4TurboP,
-			ModelGPT4O,
 			ModelGPT4OMini,
-			ModelGPT35Turbo,
-			ModelGPT35Turbo16,
-			ModelO1Preview,
-			ModelO1Mini,
+			/*	ModelGPT4O,
+				ModelGPT4,
+				ModelGPT4Turbo,
+				ModelGPT4TurboP,
+				ModelGPT35Turbo,
+				ModelGPT35Turbo16,
+				ModelO1Preview,
+				ModelO1Mini,*/
 		}
-	case ProviderAnthropic:
-		return []AIModel{
-			ModelClaude3Opus,
-			ModelClaude3Sonnet,
-			ModelClaude3Haiku,
-			ModelClaude35Sonnet,
-		}
-	case ProviderGoogle:
-		return []AIModel{
-			ModelGeminiPro,
-			ModelGemini15Pro,
-			ModelGemini15Flash,
-		}
+		/*	case ProviderAnthropic:
+				return []AIModel{
+					ModelClaude3Opus,
+					ModelClaude3Sonnet,
+					ModelClaude3Haiku,
+					ModelClaude35Sonnet,
+				}
+			case ProviderGoogle:
+				return []AIModel{
+					ModelGeminiPro,
+					ModelGemini15Pro,
+					ModelGemini15Flash,
+				}*/
 	default:
 		return []AIModel{}
 	}

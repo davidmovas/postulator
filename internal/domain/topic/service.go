@@ -46,7 +46,7 @@ func NewService(c di.Container) (*Service, error) {
 	}, nil
 }
 
-func (s *Service) CreateTopic(ctx context.Context, topic *entities.Topic) error {
+func (s *Service) CreateTopic(ctx context.Context, topic *entities.Topic) (int, error) {
 	return s.topicRepo.Create(ctx, topic)
 }
 

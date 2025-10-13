@@ -16,7 +16,7 @@ export default function SitesPage() {
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [editingSite, setEditingSite] = useState<Site | null>(null);
 
-    const { withErrorHandling, showSuccess } = useErrorHandling();
+    const { withErrorHandling, showSuccess, showError } = useErrorHandling();
 
     const loadSites = async () => {
         setIsLoading(true);
@@ -50,8 +50,12 @@ export default function SitesPage() {
     const handleHealthCheck = async (siteId: number) => {
         await withErrorHandling(
             async () => {
-                await checkSiteHealth(siteId);
-                await loadSites();
+                try {
+                    await checkSiteHealth(siteId);
+                } finally {
+                    // Always refresh the list regardless of the check result
+                    await loadSites();
+                }
             },
             {
                 successMessage: `Site health checked successfully`,
@@ -62,16 +66,45 @@ export default function SitesPage() {
 
     // Health check all sites
     const handleHealthCheckAll = async () => {
+        // We handle all errors internally to avoid bubbling to Next.js overlay.
         await withErrorHandling(
             async () => {
-                for (const site of sites) {
-                    await checkSiteHealth(site.id);
-                }
+                let successCount = 0;
+                let failCount = 0;
+
+                const tasks = sites.map(async (site) => {
+                    try {
+                        await checkSiteHealth(site.id);
+                        successCount += 1;
+                    } catch (_) {
+                        // Swallow per-site error to prevent Next.js error overlay.
+                        // We'll show a friendly summary toast after processing all sites.
+                        failCount += 1;
+                    } finally {
+                        // Refresh after each site's response (success or error)
+                        await loadSites();
+                    }
+                });
+
+                // Wait for all to settle without throwing
+                await Promise.all(tasks);
+
+                // Final refresh to ensure consistency
                 await loadSites();
+
+                // Show a single user-friendly toast instead of console errors
+                if (failCount === 0) {
+                    showSuccess(`Checked ${successCount} site(s) successfully`);
+                } else if (successCount === 0) {
+                    // All failed
+                    showError(`Failed to check ${failCount} site(s)`);
+                } else {
+                    showError(`Checked ${successCount} succeeded, ${failCount} failed`);
+                }
             },
             {
-                successMessage: 'All sites checked successfully',
-                showSuccess: true,
+                // Disable automatic success toast here since we show a custom summary toast above
+                showSuccess: false,
             }
         );
     };
@@ -107,7 +140,7 @@ export default function SitesPage() {
     };
 
     return (
-        <div className="p-4 md:p-6 lg:p-8">
+        <div className="p-4 md:p-6 lg:p-8 space-y-6">
             <div className="mb-6">
                 <h1 className="text-2xl font-semibold tracking-tight">Sites Management</h1>
                 <p className="mt-2 text-muted-foreground">

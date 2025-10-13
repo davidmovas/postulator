@@ -2,11 +2,11 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { listSites, Site, syncCategories } from "@/services/site";
-import { getTopicsBySite } from "@/services/site";
+import { getTopicsBySite } from "@/services/topic";
 import { countUnusedTopics } from "@/services/topic";
 import { useErrorHandling } from "@/lib/error-handling";
 import { TopicsSitesTable } from "@/components/topics/TopicsSitesTable";
-import { ImportTopicsDialog } from "@/components/topics/ImportTopicsDialog";
+import { ImportAndAssignTopicsDialog, ImportTopicsDialog } from "@/components/topics/ImportTopicsDialog";
 import { SiteTopicsManager } from "@/components/topics/SiteTopicsManager";
 
 export default function TopicsPage() {
@@ -18,6 +18,9 @@ export default function TopicsPage() {
 
   const [importForSiteId, setImportForSiteId] = useState<number | null>(null);
   const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null);
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isGlobalImportOpen, setIsGlobalImportOpen] = useState(false);
 
   const loadSites = async () => {
     setIsLoading(true);
@@ -69,6 +72,16 @@ export default function TopicsPage() {
     }, { successMessage: "Categories synchronized", showSuccess: true });
   };
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      const data = await loadSites();
+      await loadStatsForSites(data || []);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   return (
     <div className="p-4 md:p-6 lg:p-8 space-y-6">
       {selectedSiteId ? (
@@ -87,15 +100,26 @@ export default function TopicsPage() {
             onManage={handleManage}
             onImport={handleImport}
             onSyncCategories={handleSyncCategories}
+            onRefresh={handleRefresh}
+            onOpenImportDialog={() => setIsGlobalImportOpen(true)}
+            isRefreshing={isRefreshing}
           />
 
-          <ImportTopicsDialog
+          <ImportAndAssignTopicsDialog
             open={importForSiteId !== null}
             onOpenChange={(o) => { if (!o) setImportForSiteId(null); }}
             siteId={importForSiteId}
             onImported={async () => {
               const data = await loadSites();
               await loadStatsForSites(data || []);
+            }}
+          />
+
+          <ImportTopicsDialog
+            open={isGlobalImportOpen}
+            onOpenChange={setIsGlobalImportOpen}
+            onImported={async () => {
+              await handleRefresh();
             }}
           />
         </>

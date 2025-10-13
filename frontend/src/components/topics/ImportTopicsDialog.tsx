@@ -1,205 +1,391 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-// Note: Using native select here to avoid hydration issues with different Select implementations
 import { useErrorHandling } from "@/lib/error-handling";
-import { importAndAssignToSite } from "@/services/topic";
-import { syncCategories } from "@/services/site";
-import { ALLOWED_IMPORT_EXTENSIONS, DEFAULT_TOPIC_STRATEGY, TOPIC_STRATEGIES } from "@/constants/topics";
-import { RefreshCw, FolderOpen } from "lucide-react";
-import { CanResolveFilePaths, ResolveFilePaths } from "@/wailsjs/wailsjs/runtime";
+import { importAndAssignToSite, importTopics, ImportResult } from "@/services/topic";
+import { ALLOWED_IMPORT_EXTENSIONS, DEFAULT_TOPIC_STRATEGY } from "@/constants/topics";
+import { Upload, FileCheck, X } from "lucide-react";
+import { TopicStrategySelect } from "@/components/topics/fields/TopicStrategySelect";
+import type { TopicStrategy } from "@/constants/topics";
+import { CategorySelectWithSync } from "@/components/topics/fields/CategorySelectWithSync";
+import type { Category } from "@/services/site";
+import { OnFileDrop, OnFileDropOff } from "@/wailsjs/wailsjs/runtime/runtime";
 
-export interface ImportTopicsDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  siteId: number | null;
-  onImported?: () => void | Promise<void>;
-}
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit
 
-export function ImportTopicsDialog({ open, onOpenChange, siteId, onImported }: ImportTopicsDialogProps) {
-  const { withErrorHandling, showError } = useErrorHandling();
+const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / 1024 / 1024).toFixed(1) + " MB";
+};
 
-  const [filePath, setFilePath] = useState<string>("");
+const validateFileExtension = (path: string): boolean => {
+    const ext = path.split('.').pop()?.toLowerCase();
+    return ext ? (ALLOWED_IMPORT_EXTENSIONS as readonly string[]).includes(ext) : false;
+};
 
-  // Try to resolve a native system path from a File object.
-  // Wails exposes ResolveFilePaths that mutates the File with a .path/nativePath.
-  // In some environments this can be async. We poll briefly to detect it.
-  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  const resolvePathFromFile = async (f: File): Promise<string> => {
-    let p = (f as any).path || (f as any).nativePath || "";
-    if (p) return p as string;
-    try {
-      if (CanResolveFilePaths()) {
-        ResolveFilePaths([f]);
-        // Poll up to ~1s in 50ms steps
-        for (let i = 0; i < 20; i++) {
-          await sleep(50);
-          p = (f as any).path || (f as any).nativePath || "";
-          if (p) return p as string;
-        }
-      }
-    } catch {}
-    return "";
-  };
-  // TEMP: category will be 1 until categories are wired; TODO note for future implementation
-  const [categoryId, setCategoryId] = useState<string>("1");
-  const [strategy, setStrategy] = useState<string>(DEFAULT_TOPIC_STRATEGY);
-  const [isImporting, setIsImporting] = useState(false);
+const getFileSizeFromPath = async (path: string): Promise<number> => {
+    // In a real implementation, you might want to call a backend method to get file size
+    // For now, returning 0 as placeholder
+    return 0;
+};
 
-  // Selected file name for display
-  const [fileName, setFileName] = useState<string>("");
+const formatImportResult = (result: ImportResult): string => {
+    const parts = [
+        `Total read: ${result.totalRead}`,
+        `Added: ${result.totalAdded}`,
+        `Skipped: ${result.totalSkipped}`
+    ];
 
-  const reset = () => {
-    setFilePath("");
-    setFileName("");
-    setCategoryId("1");
-    setStrategy(DEFAULT_TOPIC_STRATEGY);
-  };
-
-  const handleImport = async () => {
-    if (!siteId || !filePath.trim()) return;
-    setIsImporting(true);
-    const ok = await withErrorHandling(async () => {
-      await importAndAssignToSite(filePath.trim(), siteId, parseInt(categoryId, 10) || 1, strategy);
-    }, { successMessage: "Topics imported and assigned", showSuccess: true });
-    setIsImporting(false);
-    if (ok !== null) {
-      onOpenChange(false);
-      reset();
-      if (onImported) await onImported();
+    if (result.errors && result.errors.length > 0) {
+        parts.push(`Errors: ${result.errors.join(", ")}`);
     }
-  };
 
-  const handleSyncCategories = async () => {
-    if (!siteId) return;
-    await withErrorHandling(async () => {
-      // We expose syncCategories via topic service? Currently in site service; fallback to site service if needed.
-      // Placeholder call; if not available here, the page should call site.syncCategories.
-      await syncCategories(siteId);
-    }, { successMessage: "Categories sync requested", showSuccess: true });
-  };
+    return parts.join(" | ");
+};
 
-  return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) { onOpenChange(false); reset(); } else { onOpenChange(true); } }}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Import topics</DialogTitle>
-          <DialogDescription>
-            Choose a file to import topics and assign them to this site. Supported: {ALLOWED_IMPORT_EXTENSIONS.join(", ")}. 
-            NOTE: Category selection is temporary and defaults to 1 until categories are implemented.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 pt-2">
-          {/* File picker with drag & drop */}
-          <div className="space-y-2">
-            <Label>File</Label>
-            <div
-              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-              onDrop={async (e) => {
-                e.preventDefault();
-                const f = e.dataTransfer.files?.[0];
-                if (f) {
-                  const p = await resolvePathFromFile(f);
-                  setFileName(f.name);
-                  if (p) {
-                    setFilePath(p);
-                  } else {
-                    setFilePath("");
-                    showError("Не удалось получить путь к файлу. Перетащите файл из проводника в окно приложения или попробуйте ещё раз.");
-                  }
-                }
-              }}
-              className="border border-dashed rounded-md p-4 text-sm text-muted-foreground hover:bg-accent/40 cursor-pointer"
-              onClick={() => {
-                const input = document.getElementById("import-file-input") as HTMLInputElement | null;
-                input?.click();
-              }}
-            >
-              {filePath ? (
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-foreground font-medium">{fileName || filePath}</div>
-                    {filePath && <div className="text-xs text-muted-foreground">{filePath}</div>}
-                  </div>
-                  <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setFilePath(""); setFileName(""); }}>Clear</Button>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div>Drag & drop the file here</div>
-                    <div className="text-xs">Supported: {ALLOWED_IMPORT_EXTENSIONS.join(", ")}</div>
-                  </div>
-                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); const input = document.getElementById("import-file-input") as HTMLInputElement | null; input?.click(); }}>
-                    <FolderOpen className="h-4 w-4 mr-2" /> Browse...
-                  </Button>
-                </div>
-              )}
-            </div>
-            <input
-              id="import-file-input"
-              type="file"
-              className="hidden"
-              accept={ALLOWED_IMPORT_EXTENSIONS.map((ext) => `.${ext}`).join(",")}
-              onChange={async (e) => {
-                const f = e.target.files?.[0];
-                if (f) {
-                  const p = await resolvePathFromFile(f);
-                  setFileName(f.name);
-                  if (p) {
-                    setFilePath(p);
-                  } else {
-                    setFilePath("");
-                    showError("Не удалось получить путь к файлу. Перетащите файл из проводника в окно приложения или попробуйте ещё раз.");
-                  }
-                }
-              }}
-            />
-          </div>
-
-
-          {/* Category + Sync in one row */}
-          <div className="flex items-end gap-3">
-            <div className="flex-1 space-y-2">
-              <Label htmlFor="category">Category (temporary)</Label>
-              <Input id="category" type="number" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} />
-            </div>
-            <div className="pb-0">
-              <Button variant="secondary" onClick={handleSyncCategories} disabled={!siteId || isImporting}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Sync Categories
-              </Button>
-            </div>
-          </div>
-
-          {/* Strategy */}
-          <div className="space-y-2">
-            <Label htmlFor="strategy">Strategy</Label>
-            <select
-              id="strategy"
-              value={strategy}
-              onChange={(e) => setStrategy(e.target.value)}
-              className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <option value="" disabled hidden>Select strategy</option>
-              {TOPIC_STRATEGIES.map((s) => (
-                <option key={s} value={s} className="capitalize">{s}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <DialogFooter className="pt-4">
-          <Button variant="ghost" onClick={() => { onOpenChange(false); reset(); }} disabled={isImporting}>Cancel</Button>
-          <Button onClick={handleImport} disabled={!filePath.trim() || !siteId || isImporting}>Import</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+interface FileDropZoneProps {
+    filePath: string;
+    fileName: string;
+    fileSize: number;
+    onFileSelect: (path: string) => void;
+    onClear: () => void;
+    isDisabled?: boolean;
 }
 
-export default ImportTopicsDialog;
+function FileDropZone({ filePath, fileName, fileSize, onFileSelect, onClear, isDisabled }: FileDropZoneProps) {
+    useEffect(() => {
+        if (isDisabled) return;
+
+        let isActive = true;
+
+        const dropHandler = (x: number, y: number, paths: string[]) => {
+            if (!isActive || !paths || paths.length === 0) return;
+            onFileSelect(paths[0]);
+        };
+
+        try {
+            OnFileDrop(dropHandler, false);
+        } catch (error) {
+            console.error("Failed to setup OnFileDrop:", error);
+        }
+
+        return () => {
+            isActive = false;
+            try {
+                OnFileDropOff();
+            } catch (error) {
+                console.error("Failed to cleanup OnFileDrop:", error);
+            }
+        };
+    }, [isDisabled, onFileSelect]);
+
+    return (
+        <div className="space-y-2">
+            <Label>File</Label>
+            <div className="border-2 border-dashed rounded-lg p-6 text-sm transition-colors hover:border-primary/50 hover:bg-accent/20">
+                {filePath ? (
+                    <div className="flex items-start gap-3">
+                        <FileCheck className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                            <div className="text-foreground font-medium truncate">{fileName}</div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                                {fileSize > 0 ? formatFileSize(fileSize) : ""}
+                            </div>
+                        </div>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={onClear}
+                            className="flex-shrink-0"
+                            disabled={isDisabled}
+                        >
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </div>
+                ) : (
+                    <div className="flex flex-col items-center justify-center py-4 text-center space-y-2">
+                        <Upload className="h-10 w-10 text-muted-foreground/50" />
+                        <div>
+                            <div className="text-foreground font-medium mb-1">
+                                Drag and drop a file anywhere in the app
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                Supported: {ALLOWED_IMPORT_EXTENSIONS.join(", ")}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                                Maximum size: {MAX_FILE_SIZE / 1024 / 1024}MB
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// Component for importing topics and assigning to a site
+export interface ImportAndAssignTopicsDialogProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    siteId: number | null;
+    onImported?: () => void | Promise<void>;
+}
+
+export function ImportAndAssignTopicsDialog({ open, onOpenChange, siteId, onImported }: ImportAndAssignTopicsDialogProps) {
+    const { showError, showSuccess } = useErrorHandling();
+
+    const [filePath, setFilePath] = useState<string>("");
+    const [fileName, setFileName] = useState<string>("");
+    const [fileSize, setFileSize] = useState<number>(0);
+
+    // Category selection via reusable component
+    const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+    const [strategy, setStrategy] = useState<TopicStrategy>(DEFAULT_TOPIC_STRATEGY);
+    const [isImporting, setIsImporting] = useState(false);
+
+    const reset = () => {
+        setFilePath("");
+        setFileName("");
+        setFileSize(0);
+        setSelectedCategory(null);
+        setStrategy(DEFAULT_TOPIC_STRATEGY);
+    };
+
+    const handleFileSelect = async (path: string) => {
+        if (!validateFileExtension(path)) {
+            showError(`Invalid file type. Allowed: ${ALLOWED_IMPORT_EXTENSIONS.join(", ")}`);
+            return;
+        }
+
+        const name = path.split(/[\\/]/).pop() || path;
+        const size = await getFileSizeFromPath(path);
+
+        setFilePath(path);
+        setFileName(name);
+        setFileSize(size);
+    };
+
+    const handleImport = async () => {
+        if (!siteId || !filePath.trim()) {
+            showError("Please select a file and ensure site is selected");
+            return;
+        }
+
+        setIsImporting(true);
+
+        try {
+            const result = await importAndAssignToSite(
+                filePath.trim(),
+                siteId,
+                (selectedCategory?.wpCategoryId ?? 1),
+                strategy
+            );
+
+            if (result.errors && result.errors.length > 0) {
+                showError(`Import completed with errors: ${formatImportResult(result)}`);
+            } else {
+                showSuccess(`Topics imported successfully! ${formatImportResult(result)}`);
+            }
+
+            onOpenChange(false);
+            reset();
+            if (onImported) await onImported();
+        } catch (error) {
+            showError(`Import failed: ${error}`);
+        } finally {
+            setIsImporting(false);
+        }
+    };
+
+    return (
+        <Dialog
+            open={open}
+            onOpenChange={(o) => {
+                if (!o) {
+                    onOpenChange(false);
+                    reset();
+                } else {
+                    onOpenChange(true);
+                }
+            }}
+        >
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Import and Assign Topics</DialogTitle>
+                    <DialogDescription>
+                        Import topics from a file and assign them to this site.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 pt-2">
+                    <FileDropZone
+                        filePath={filePath}
+                        fileName={fileName}
+                        fileSize={fileSize}
+                        onFileSelect={handleFileSelect}
+                        onClear={reset}
+                        isDisabled={isImporting}
+                    />
+
+                    {/* Category selection with internal Sync */}
+                    {siteId && (
+                      <CategorySelectWithSync
+                        siteId={siteId}
+                        selectedCategory={selectedCategory}
+                        onChange={(c) => setSelectedCategory(c)}
+                      />
+                    )}
+
+                    {/* Strategy */}
+                    <TopicStrategySelect
+                        value={strategy}
+                        onChange={setStrategy}
+                        disabled={isImporting}
+                        label="Import Strategy"
+                    />
+                </div>
+
+                <DialogFooter className="pt-4">
+                    <Button
+                        variant="ghost"
+                        onClick={() => {
+                            onOpenChange(false);
+                            reset();
+                        }}
+                        disabled={isImporting}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleImport}
+                        disabled={!filePath.trim() || !siteId || isImporting}
+                    >
+                        {isImporting ? "Importing..." : "Import & Assign"}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+// Component for just importing topics (without site assignment)
+export interface ImportTopicsDialogProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onImported?: () => void | Promise<void>;
+}
+
+export function ImportTopicsDialog({ open, onOpenChange, onImported }: ImportTopicsDialogProps) {
+    const { showError, showSuccess } = useErrorHandling();
+
+    const [filePath, setFilePath] = useState<string>("");
+    const [fileName, setFileName] = useState<string>("");
+    const [fileSize, setFileSize] = useState<number>(0);
+    const [isImporting, setIsImporting] = useState(false);
+
+    const reset = () => {
+        setFilePath("");
+        setFileName("");
+        setFileSize(0);
+    };
+
+    const handleFileSelect = async (path: string) => {
+        if (!validateFileExtension(path)) {
+            showError(`Invalid file type. Allowed: ${ALLOWED_IMPORT_EXTENSIONS.join(", ")}`);
+            return;
+        }
+
+        const name = path.split(/[\\/]/).pop() || path;
+        const size = await getFileSizeFromPath(path);
+
+        setFilePath(path);
+        setFileName(name);
+        setFileSize(size);
+    };
+
+    const handleImport = async () => {
+        if (!filePath.trim()) {
+            showError("Please select a file");
+            return;
+        }
+
+        setIsImporting(true);
+
+        try {
+            const result = await importTopics(filePath.trim());
+
+            if (result.errors && result.errors.length > 0) {
+                showError(`Import completed with errors: ${formatImportResult(result)}`);
+            } else {
+                showSuccess(`Topics imported successfully! ${formatImportResult(result)}`);
+            }
+
+            onOpenChange(false);
+            reset();
+            if (onImported) await onImported();
+        } catch (error) {
+            showError(`Import failed: ${error}`);
+        } finally {
+            setIsImporting(false);
+        }
+    };
+
+    return (
+        <Dialog
+            open={open}
+            onOpenChange={(o) => {
+                if (!o) {
+                    onOpenChange(false);
+                    reset();
+                } else {
+                    onOpenChange(true);
+                }
+            }}
+        >
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Import Topics</DialogTitle>
+                    <DialogDescription>
+                        Import topics from a file to add them to your topics library.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 pt-2">
+                    <FileDropZone
+                        filePath={filePath}
+                        fileName={fileName}
+                        fileSize={fileSize}
+                        onFileSelect={handleFileSelect}
+                        onClear={reset}
+                        isDisabled={isImporting}
+                    />
+                </div>
+
+                <DialogFooter className="pt-4">
+                    <Button
+                        variant="ghost"
+                        onClick={() => {
+                            onOpenChange(false);
+                            reset();
+                        }}
+                        disabled={isImporting}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleImport}
+                        disabled={!filePath.trim() || isImporting}
+                    >
+                        {isImporting ? "Importing..." : "Import Topics"}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+export default ImportAndAssignTopicsDialog;
