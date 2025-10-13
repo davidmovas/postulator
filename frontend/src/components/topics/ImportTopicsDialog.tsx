@@ -201,20 +201,6 @@ export function ImportAndAssignTopicsDialog({ open, onOpenChange, siteId, onImpo
         }
     };
 
-    const handleSyncCategories = async () => {
-        if (!siteId) return;
-
-        await withErrorHandling(
-            async () => {
-                await syncCategories(siteId);
-            },
-            {
-                successMessage: "Categories synced successfully",
-                showSuccess: true
-            }
-        );
-    };
-
     return (
         <Dialog
             open={open}
