@@ -24,6 +24,7 @@ type IService interface {
 	SetProviderStatus(ctx context.Context, id int64, isActive bool) error
 
 	// Model-related methods
+
 	GetAvailableModels(providerName string) []entities.AIModel
 	ValidateModel(providerName string, model string) error
 }

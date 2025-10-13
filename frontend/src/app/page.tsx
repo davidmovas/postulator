@@ -17,6 +17,7 @@ import DashboardPage from "@/app/dashboard/page";
 import SettingsPage from "@/app/settings/page";
 import TopicsPage from "@/app/topics/page";
 import PromptsPage from "@/app/prompts/page";
+import AIProvidersPage from "@/app/ai-providers/page";
 
 function SplashScreen() {
     return (
@@ -62,6 +63,9 @@ function SectionContent() {
     }
     if (section === "prompts") {
         return <PromptsPage />;
+    }
+    if (section === "ai-providers") {
+        return <AIProvidersPage />;
     }
     if (section === "settings") {
         return <SettingsPage />;

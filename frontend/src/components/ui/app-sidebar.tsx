@@ -20,7 +20,7 @@ import {
     RiArticleLine,
     RiBardLine,
     RiSettings3Line,
-    RemixiconComponentType,
+    RemixiconComponentType, RiChatAiLine, RiDashboard2Line, RiLightbulbLine,
 } from "@remixicon/react";
 
 import { useNavigation, type Section } from "@/context/navigation";
@@ -43,7 +43,7 @@ const navItems: NavGroup[] = [
             {
                 title: "Dashboard",
                 key: "dashboard",
-                icon: RiScanLine,
+                icon: RiDashboard2Line,
             },
             {
                 title: "Jobs",
@@ -58,11 +58,16 @@ const navItems: NavGroup[] = [
             {
                 title: "Topics",
                 key: "topics",
-                icon: RiArticleLine,
+                icon: RiLightbulbLine,
             },
             {
                 title: "Prompts",
                 key: "prompts",
+                icon: RiChatAiLine,
+            },
+            {
+                title: "AI Providers",
+                key: "ai-providers",
                 icon: RiBardLine,
             },
             {
