@@ -107,10 +107,13 @@ export function TopicsSitesTable({ sites, isLoading = false, stats, onManage, on
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Button onClick={() => onOpenImportDialog && onOpenImportDialog()} className="bg-purple-600 hover:bg-purple-700 text-white">
-            <Upload className="h-4 w-4 mr-2" />
-            Import Topics
-          </Button>
+
+            {/*
+             <Button onClick={() => onOpenImportDialog && onOpenImportDialog()} className="bg-purple-600 hover:bg-purple-700 text-white">
+                <Upload className="h-4 w-4 mr-2" />
+                Import Topics
+             </Button>
+            */}
         </div>
       </div>
 
