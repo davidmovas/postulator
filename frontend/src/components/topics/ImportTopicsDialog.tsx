@@ -90,9 +90,6 @@ function FileDropZone({ filePath, fileName, fileSize, onFileSelect, onClear, isD
                         <FileCheck className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
                         <div className="flex-1 min-w-0">
                             <div className="text-foreground font-medium truncate">{fileName}</div>
-                            <div className="text-xs text-muted-foreground mt-1">
-                                {fileSize > 0 ? formatFileSize(fileSize) : "Size unknown"}
-                            </div>
                         </div>
                         <Button
                             size="sm"

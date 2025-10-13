@@ -19,6 +19,9 @@ export default function TopicsPage() {
   const [importForSiteId, setImportForSiteId] = useState<number | null>(null);
   const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null);
 
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isGlobalImportOpen, setIsGlobalImportOpen] = useState(false);
+
   const loadSites = async () => {
     setIsLoading(true);
     try {
@@ -69,6 +72,16 @@ export default function TopicsPage() {
     }, { successMessage: "Categories synchronized", showSuccess: true });
   };
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      const data = await loadSites();
+      await loadStatsForSites(data || []);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   return (
     <div className="p-4 md:p-6 lg:p-8 space-y-6">
       {selectedSiteId ? (
@@ -87,6 +100,9 @@ export default function TopicsPage() {
             onManage={handleManage}
             onImport={handleImport}
             onSyncCategories={handleSyncCategories}
+            onRefresh={handleRefresh}
+            onOpenImportDialog={() => setIsGlobalImportOpen(true)}
+            isRefreshing={isRefreshing}
           />
 
           <ImportAndAssignTopicsDialog
@@ -96,6 +112,14 @@ export default function TopicsPage() {
             onImported={async () => {
               const data = await loadSites();
               await loadStatsForSites(data || []);
+            }}
+          />
+
+          <ImportTopicsDialog
+            open={isGlobalImportOpen}
+            onOpenChange={setIsGlobalImportOpen}
+            onImported={async () => {
+              await handleRefresh();
             }}
           />
         </>

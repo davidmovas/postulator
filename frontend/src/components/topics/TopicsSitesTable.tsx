@@ -26,12 +26,15 @@ export interface TopicsSitesTableProps {
   onManage: (siteId: number) => void;
   onImport: (siteId: number) => void;
   onSyncCategories: (siteId: number) => void | Promise<void>;
+  onRefresh?: () => void | Promise<void>;
+  onOpenImportDialog?: () => void;
+  isRefreshing?: boolean;
 }
 
 type SortField = "name" | "url" | "total" | "unused";
 type SortDirection = "asc" | "desc" | null;
 
-export function TopicsSitesTable({ sites, isLoading = false, stats, onManage, onImport, onSyncCategories }: TopicsSitesTableProps) {
+export function TopicsSitesTable({ sites, isLoading = false, stats, onManage, onImport, onSyncCategories, onRefresh, onOpenImportDialog, isRefreshing }: TopicsSitesTableProps) {
   const rows = useMemo(() => {
     return sites.map((s) => ({
       site: s,
@@ -95,10 +98,24 @@ export function TopicsSitesTable({ sites, isLoading = false, stats, onManage, on
             className="pl-3"
           />
         </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => onRefresh && onRefresh()}
+            disabled={isLoading || !!isRefreshing}
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          <Button onClick={() => onOpenImportDialog && onOpenImportDialog()} className="bg-purple-600 hover:bg-purple-700 text-white">
+            <Upload className="h-4 w-4 mr-2" />
+            Import Topics
+          </Button>
+        </div>
       </div>
 
-      <div className="border rounded-lg">
-        <Table>
+      <div className="w-full overflow-x-auto rounded-lg border">
+        <Table className="min-w-[800px]">
           <TableHeader>
             <TableRow>
               <TableHead>
