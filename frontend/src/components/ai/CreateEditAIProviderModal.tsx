@@ -50,8 +50,8 @@ export function CreateEditAIProviderModal({ open, onOpenChange, provider, onSave
   useEffect(() => {
     if (provider && open) {
       setName(provider.name);
-      // Try to infer provider name by matching model presence
-      setProviderName(prev => prev); // keep until models are loaded; adjust below
+      // Use provider value coming from backend directly
+      setProviderName(provider.provider || "");
       setModel(provider.model);
       setCustomModel("");
       setApiKey(""); // optional on edit; empty means unchanged
@@ -126,18 +126,20 @@ export function CreateEditAIProviderModal({ open, onOpenChange, provider, onSave
       await withErrorHandling(async () => {
         if (isEdit && provider) {
           await updateAIProvider({
-            id: provider.id,
-            name: name.trim(),
-            model: selectedModel,
-            isActive,
-            apiKey: apiKey.trim() ? apiKey.trim() : undefined,
+              id: provider.id,
+              name: name.trim(),
+              provider: providerName,
+              model: selectedModel,
+              isActive: isActive,
+              apiKey: apiKey.trim() ? apiKey.trim() : undefined,
           });
         } else {
           await createAIProvider({
-            name: name.trim(),
-            apiKey: apiKey.trim(),
-            model: selectedModel,
-            isActive,
+              name: name.trim(),
+              apiKey: apiKey.trim(),
+              provider: providerName,
+              model: selectedModel,
+              isActive: isActive,
           });
         }
         if (onSaved) await onSaved();

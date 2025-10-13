@@ -16,7 +16,7 @@ export default function SitesPage() {
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [editingSite, setEditingSite] = useState<Site | null>(null);
 
-    const { withErrorHandling, showSuccess } = useErrorHandling();
+    const { withErrorHandling, showSuccess, showError } = useErrorHandling();
 
     const loadSites = async () => {
         setIsLoading(true);

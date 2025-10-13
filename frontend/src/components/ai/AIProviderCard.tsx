@@ -56,13 +56,19 @@ export function AIProviderCard({ provider, onEdit, onRequestDelete, onToggleActi
           </DropdownMenu>
         </div>
       </CardHeader>
-      <CardContent className="space-y-3 text-sm overflow-hidden">
-        <div>
-          <div className="text-xs font-medium text-muted-foreground mb-1">Model</div>
-          <div className="rounded-md border bg-muted/40 p-2 text-[13px] break-words">
-            {provider.model || "—"}
+      <CardContent className="space-y-3 text-sm overflow-hidden grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div>
+              <div className="text-xs font-medium text-muted-foreground mb-1">Provider</div>
+              <div className="rounded-md border bg-muted/40 p-2 text-[13px] break-words">
+                  {provider.provider || "—"}
+              </div>
           </div>
-        </div>
+          <div>
+            <div className="text-xs font-medium text-muted-foreground mb-1">Model</div>
+            <div className="rounded-md border bg-muted/40 p-2 text-[13px] break-words">
+              {provider.model || "—"}
+            </div>
+          </div>
       </CardContent>
       <CardFooter className="pt-0 mt-auto">
         <div className="w-full flex items-center justify-between gap-2 text-xs text-muted-foreground">

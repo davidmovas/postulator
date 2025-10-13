@@ -125,6 +125,11 @@ func (s *Service) validateProvider(provider *entities.AIProvider) error {
 		return errors.Validation("AI provider API key cannot be empty")
 	}
 
+	provider.Provider = strings.TrimSpace(strings.ToLower(provider.Provider))
+	if provider.Provider == "" {
+		return errors.Validation("AI provider name cannot be empty")
+	}
+
 	provider.Model = strings.TrimSpace(provider.Model)
 
 	if provider.Model == "" {
@@ -132,7 +137,7 @@ func (s *Service) validateProvider(provider *entities.AIProvider) error {
 	}
 
 	// Validate that the model is valid for this provider
-	if err := s.ValidateModel(provider.Name, provider.Model); err != nil {
+	if err := s.ValidateModel(provider.Provider, provider.Model); err != nil {
 		return err
 	}
 

@@ -3,6 +3,7 @@ export namespace dto {
 	export class AIProvider {
 	    id: number;
 	    name: string;
+	    provider: string;
 	    model: string;
 	    isActive: boolean;
 	    createdAt: string;
@@ -16,6 +17,7 @@ export namespace dto {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.name = source["name"];
+	        this.provider = source["provider"];
 	        this.model = source["model"];
 	        this.isActive = source["isActive"];
 	        this.createdAt = source["createdAt"];
@@ -25,6 +27,7 @@ export namespace dto {
 	export class AIProviderCreate {
 	    name: string;
 	    apiKey: string;
+	    provider: string;
 	    model: string;
 	    isActive: boolean;
 	
@@ -36,6 +39,7 @@ export namespace dto {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
 	        this.apiKey = source["apiKey"];
+	        this.provider = source["provider"];
 	        this.model = source["model"];
 	        this.isActive = source["isActive"];
 	    }
@@ -44,6 +48,7 @@ export namespace dto {
 	    id: number;
 	    name: string;
 	    apiKey?: string;
+	    provider: string;
 	    model: string;
 	    isActive: boolean;
 	
@@ -56,6 +61,7 @@ export namespace dto {
 	        this.id = source["id"];
 	        this.name = source["name"];
 	        this.apiKey = source["apiKey"];
+	        this.provider = source["provider"];
 	        this.model = source["model"];
 	        this.isActive = source["isActive"];
 	    }

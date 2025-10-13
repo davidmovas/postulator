@@ -17,6 +17,7 @@ func (a *App) CreateAIProvider(req *dto.AIProviderCreate) *dto.Response[string] 
 	entity := &entities.AIProvider{
 		Name:     req.Name,
 		APIKey:   req.APIKey,
+		Provider: req.Provider,
 		Model:    req.Model,
 		IsActive: req.IsActive,
 	}
@@ -63,6 +64,7 @@ func (a *App) UpdateAIProvider(req *dto.AIProviderUpdate) *dto.Response[string] 
 		ID:       req.ID,
 		Name:     req.Name,
 		APIKey:   req.APIKey,
+		Provider: req.Provider,
 		Model:    req.Model,
 		IsActive: req.IsActive,
 	}

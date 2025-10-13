@@ -40,8 +40,8 @@ func NewRepository(c di.Container) (*Repository, error) {
 func (r *Repository) Create(ctx context.Context, provider *entities.AIProvider) error {
 	query, args := dbx.ST.
 		Insert("ai_providers").
-		Columns("name", "api_key", "model", "is_active").
-		Values(provider.Name, provider.APIKey, provider.Model, provider.IsActive).
+		Columns("name", "api_key", "provider", "model", "is_active").
+		Values(provider.Name, provider.APIKey, provider.Provider, provider.Model, provider.IsActive).
 		MustSql()
 
 	_, err := r.db.ExecContext(ctx, query, args...)
@@ -57,7 +57,7 @@ func (r *Repository) Create(ctx context.Context, provider *entities.AIProvider) 
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (*entities.AIProvider, error) {
 	query, args := dbx.ST.
-		Select("id", "name", "api_key", "model", "is_active", "created_at", "updated_at").
+		Select("id", "name", "api_key", "provider", "model", "is_active", "created_at", "updated_at").
 		From("ai_providers").
 		Where(squirrel.Eq{"id": id}).
 		MustSql()
@@ -67,6 +67,7 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (*entities.AIProvide
 		&provider.ID,
 		&provider.Name,
 		&provider.APIKey,
+		&provider.Provider,
 		&provider.Model,
 		&provider.IsActive,
 		&provider.CreatedAt,
@@ -85,7 +86,7 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (*entities.AIProvide
 
 func (r *Repository) GetAll(ctx context.Context) ([]*entities.AIProvider, error) {
 	query, args := dbx.ST.
-		Select("id", "name", "api_key", "model", "is_active", "created_at", "updated_at").
+		Select("id", "name", "api_key", "provider", "model", "is_active", "created_at", "updated_at").
 		From("ai_providers").
 		OrderBy("created_at DESC").
 		MustSql()
@@ -106,6 +107,7 @@ func (r *Repository) GetAll(ctx context.Context) ([]*entities.AIProvider, error)
 			&provider.ID,
 			&provider.Name,
 			&provider.APIKey,
+			&provider.Provider,
 			&provider.Model,
 			&provider.IsActive,
 			&provider.CreatedAt,
@@ -126,7 +128,7 @@ func (r *Repository) GetAll(ctx context.Context) ([]*entities.AIProvider, error)
 
 func (r *Repository) GetActive(ctx context.Context) ([]*entities.AIProvider, error) {
 	query, args := dbx.ST.
-		Select("id", "name", "api_key", "model", "is_active", "created_at", "updated_at").
+		Select("id", "name", "api_key", "provider", "model", "is_active", "created_at", "updated_at").
 		From("ai_providers").
 		Where(squirrel.Eq{"is_active": true}).
 		OrderBy("created_at DESC").
@@ -148,6 +150,7 @@ func (r *Repository) GetActive(ctx context.Context) ([]*entities.AIProvider, err
 			&provider.ID,
 			&provider.Name,
 			&provider.APIKey,
+			&provider.Provider,
 			&provider.Model,
 			&provider.IsActive,
 			&provider.CreatedAt,
@@ -171,6 +174,7 @@ func (r *Repository) Update(ctx context.Context, provider *entities.AIProvider) 
 		Update("ai_providers").
 		Set("name", provider.Name).
 		Set("api_key", provider.APIKey).
+		Set("provider", provider.Provider).
 		Set("model", provider.Model).
 		Set("is_active", provider.IsActive).
 		Set("updated_at", time.Now()).
