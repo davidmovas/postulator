@@ -104,7 +104,7 @@ export async function getAvailableTopic(siteId: number, strategy: TopicStrategy)
 
 export async function importTopics(filePath: string): Promise<ImportResult> {
   const res = await ImportTopics(filePath);
-  const dtoRes = unwrapOne<dto.ImportResult>(res as any); // generated type is Response__ImportResult_
+  const dtoRes = unwrapOne<dto.ImportResult>(res as any);
   return mapImportResult(dtoRes);
 }
 

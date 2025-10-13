@@ -6,7 +6,7 @@ import { getTopicsBySite } from "@/services/topic";
 import { countUnusedTopics } from "@/services/topic";
 import { useErrorHandling } from "@/lib/error-handling";
 import { TopicsSitesTable } from "@/components/topics/TopicsSitesTable";
-import { ImportTopicsDialog } from "@/components/topics/ImportTopicsDialog";
+import { ImportAndAssignTopicsDialog, ImportTopicsDialog } from "@/components/topics/ImportTopicsDialog";
 import { SiteTopicsManager } from "@/components/topics/SiteTopicsManager";
 
 export default function TopicsPage() {
@@ -89,7 +89,7 @@ export default function TopicsPage() {
             onSyncCategories={handleSyncCategories}
           />
 
-          <ImportTopicsDialog
+          <ImportAndAssignTopicsDialog
             open={importForSiteId !== null}
             onOpenChange={(o) => { if (!o) setImportForSiteId(null); }}
             siteId={importForSiteId}

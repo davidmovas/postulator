@@ -5,7 +5,6 @@ import (
 	"Postulator/internal/dto"
 	"Postulator/pkg/ctx"
 	"Postulator/pkg/errors"
-	"fmt"
 )
 
 func (a *App) CreateTopic(topic *dto.Topic) *dto.Response[string] {
@@ -71,9 +70,6 @@ func (a *App) ListTopics(limit, offset int) *dto.PaginatedResponse[*dto.Topic] {
 		Offset:  offset,
 		HasMore: hasMore,
 	}
-
-	//TODO: TEMPORAL LOGGING
-	fmt.Println("RESULT: ", res)
 
 	return res
 }
