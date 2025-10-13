@@ -115,9 +115,9 @@ export function TopicsSitesTable({ sites, isLoading = false, stats, onManage, on
       </div>
 
       <div className="w-full overflow-x-auto rounded-lg border">
-        <Table className="min-w-[800px]">
+        <Table className="min-w-[800px] text-sm">
           <TableHeader>
-            <TableRow>
+            <TableRow className="[&>th]:py-2">
               <TableHead>
                 <button className="hover:text-foreground" onClick={() => toggleSort("name")}>Site</button>
               </TableHead>
@@ -151,7 +151,7 @@ export function TopicsSitesTable({ sites, isLoading = false, stats, onManage, on
               </TableRow>
             ) : (
               sorted.map(({ site, stats }) => (
-                <TableRow key={site.id} className="cursor-pointer" onClick={() => onManage(site.id)}>
+                <TableRow key={site.id} className="cursor-pointer [&>td]:py-2" onClick={() => onManage(site.id)}>
                   <TableCell className="font-medium">{site.name}</TableCell>
                   <TableCell className="text-muted-foreground">{site.url}</TableCell>
                   <TableCell>{stats.total}</TableCell>

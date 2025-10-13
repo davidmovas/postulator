@@ -266,16 +266,16 @@ export function SitesTable({
 
             {/* Table */}
             <div className="w-full overflow-x-auto rounded-lg border">
-                <Table className="min-w-[800px]">
+                <Table className="min-w-[800px] text-sm">
                     <TableHeader>
-                        <TableRow>
+                        <TableRow className="[&>th]:py-2">
                             <SortableHeader field="name">Name</SortableHeader>
                             <SortableHeader field="url">URL</SortableHeader>
                             <SortableHeader field="wpUsername">User</SortableHeader>
                             <SortableHeader field="status">Status</SortableHeader>
                             <SortableHeader field="healthStatus">Health</SortableHeader>
                             <SortableHeader field="lastHealthCheck">Last Check</SortableHeader>
-                            <TableHead className="w-[70px]">Actions</TableHead>
+                            <TableHead className="w-[70px] text-right pr-2">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -306,7 +306,7 @@ export function SitesTable({
                             </TableRow>
                         ) : (
                             filteredAndSortedSites.map((site) => (
-                                <TableRow key={site.id}>
+                                <TableRow key={site.id} className="[&>td]:py-2">
                                     <TableCell className="font-medium">{site.name}</TableCell>
                                     <TableCell className="max-w-[260px] sm:max-w-none break-words">
                                         <button
@@ -329,18 +329,20 @@ export function SitesTable({
                                     <TableCell className="text-muted-foreground text-sm">
                                         {site.lastHealthCheck ? formatDate(site.lastHealthCheck) : 'Never checked'}
                                     </TableCell>
-                                    <TableCell>
-                                        <SiteRowActions
-                                            site={site}
-                                            disabled={loadingActions[site.id]}
-                                            onOpenDefault={openInDefault}
-                                            onOpenTor={openInTor}
-                                            onCopyUrl={copyLink}
-                                            onCheckHealth={handleHealthCheck}
-                                            onEdit={onEdit}
-                                            onRequestPassword={(s) => setPasswordTarget(s)}
-                                            onRequestDelete={(id) => handleDelete(id)}
-                                        />
+                                    <TableCell className="pr-2">
+                                        <div className="flex justify-end">
+                                            <SiteRowActions
+                                                site={site}
+                                                disabled={loadingActions[site.id]}
+                                                onOpenDefault={openInDefault}
+                                                onOpenTor={openInTor}
+                                                onCopyUrl={copyLink}
+                                                onCheckHealth={handleHealthCheck}
+                                                onEdit={onEdit}
+                                                onRequestPassword={(s) => setPasswordTarget(s)}
+                                                onRequestDelete={(id) => handleDelete(id)}
+                                            />
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             ))
