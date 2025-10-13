@@ -5,10 +5,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Topic, createTopic, updateTopic, getAvailableTopic } from "@/services/topic";
+import { Topic, createTopic, updateTopic } from "@/services/topic";
 import { DEFAULT_TOPIC_STRATEGY } from "@/constants/topics";
+import type { TopicStrategy } from "@/constants/topics";
 import { useErrorHandling } from "@/lib/error-handling";
-import { assignTopicToSite } from "@/services/site";
+import { assignTopicToSite, type Category } from "@/services/site";
+import { CategorySelectWithSync } from "@/components/topics/fields/CategorySelectWithSync";
+import { TopicStrategySelect } from "@/components/topics/fields/TopicStrategySelect";
 
 export interface CreateEditTopicModalProps {
   open: boolean;
@@ -24,10 +27,14 @@ export function CreateEditTopicModal({ open, onOpenChange, topic, siteId, onSave
   const isEdit = !!topic;
   const [title, setTitle] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  // Category/Strategy (only used when creating within a site context)
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [strategy, setStrategy] = useState<TopicStrategy>(DEFAULT_TOPIC_STRATEGY);
 
   useEffect(() => {
     setTitle(topic?.title ?? "");
   }, [topic, open]);
+
 
   const handleSave = async () => {
     const trimmed = title.trim();
@@ -38,16 +45,11 @@ export function CreateEditTopicModal({ open, onOpenChange, topic, siteId, onSave
         await updateTopic(topic.id, trimmed);
       } else {
         // Create the topic first
-        await createTopic(trimmed);
+        const createdId = await createTopic(trimmed);
         // If we are in a site context, try to auto-assign the newly created topic to this site
-        if (siteId) {
+        if (createdId != 0 && siteId) {
           try {
-            // Attempt to resolve the created topic by exact title for this site context
-            const created = await getAvailableTopic(siteId, DEFAULT_TOPIC_STRATEGY);
-            if (created?.id) {
-              // Default priority and note for now
-              await assignTopicToSite(siteId, created.id, 0, "");
-            }
+              await assignTopicToSite(siteId, createdId, (selectedCategory?.wpCategoryId ?? 1), strategy);
           } catch (e) {
             // Silently ignore assignment errors; the topic is still created and can be assigned later
             console.warn("Auto-assign topic failed", e);
@@ -76,6 +78,23 @@ export function CreateEditTopicModal({ open, onOpenChange, topic, siteId, onSave
             <Label htmlFor="title">Title</Label>
             <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Enter topic title" />
           </div>
+
+          {/* Category and strategy selection when creating within a site context */}
+          {!isEdit && !!siteId && (
+            <>
+              <CategorySelectWithSync
+                siteId={siteId}
+                selectedCategory={selectedCategory}
+                onChange={(c) => setSelectedCategory(c)}
+              />
+
+              <TopicStrategySelect
+                value={strategy}
+                onChange={setStrategy}
+                disabled={isSaving}
+              />
+            </>
+          )}
         </div>
         <DialogFooter className="pt-4">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSaving}>Cancel</Button>

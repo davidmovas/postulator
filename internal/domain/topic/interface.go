@@ -13,7 +13,7 @@ type BatchCreateResult struct {
 }
 
 type ITopicRepository interface {
-	Create(ctx context.Context, topic *entities.Topic) error
+	Create(ctx context.Context, topic *entities.Topic) (int, error)
 	CreateBatch(ctx context.Context, topics []*entities.Topic) (*BatchCreateResult, error)
 	GetByID(ctx context.Context, id int64) (*entities.Topic, error)
 	GetAll(ctx context.Context) ([]*entities.Topic, error)
@@ -37,7 +37,7 @@ type IUsedTopicRepository interface {
 }
 
 type IService interface {
-	CreateTopic(ctx context.Context, topic *entities.Topic) error
+	CreateTopic(ctx context.Context, topic *entities.Topic) (int, error)
 	CreateTopicBatch(ctx context.Context, topics []*entities.Topic) (*BatchCreateResult, error)
 	GetTopic(ctx context.Context, id int64) (*entities.Topic, error)
 	ListTopics(ctx context.Context) ([]*entities.Topic, error)

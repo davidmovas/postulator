@@ -7,9 +7,9 @@ import (
 	"Postulator/pkg/errors"
 )
 
-func (a *App) CreateTopic(topic *dto.Topic) *dto.Response[string] {
+func (a *App) CreateTopic(topic *dto.Topic) *dto.Response[int] {
 	if topic == nil {
-		return dtoErr[string](errors.Validation("topic payload is required"))
+		return dtoErr[int](errors.Validation("topic payload is required"))
 	}
 
 	entity := &entities.Topic{
@@ -17,11 +17,12 @@ func (a *App) CreateTopic(topic *dto.Topic) *dto.Response[string] {
 		Title: topic.Title,
 	}
 
-	if err := a.topicSvc.CreateTopic(ctx.FastCtx(), entity); err != nil {
-		return dtoErr[string](asAppErr(err))
+	id, err := a.topicSvc.CreateTopic(ctx.FastCtx(), entity)
+	if err != nil {
+		return dtoErr[int](asAppErr(err))
 	}
 
-	return &dto.Response[string]{Success: true, Data: "created"}
+	return &dto.Response[int]{Success: true, Data: id}
 }
 
 func (a *App) GetTopic(id int64) *dto.Response[*dto.Topic] {

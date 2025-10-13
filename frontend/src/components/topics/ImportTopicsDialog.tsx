@@ -3,13 +3,15 @@
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useErrorHandling } from "@/lib/error-handling";
 import { importAndAssignToSite, importTopics, ImportResult } from "@/services/topic";
-import { syncCategories } from "@/services/site";
-import { ALLOWED_IMPORT_EXTENSIONS, DEFAULT_TOPIC_STRATEGY, TOPIC_STRATEGIES } from "@/constants/topics";
-import { RefreshCw, Upload, FileCheck, X } from "lucide-react";
+import { ALLOWED_IMPORT_EXTENSIONS, DEFAULT_TOPIC_STRATEGY } from "@/constants/topics";
+import { Upload, FileCheck, X } from "lucide-react";
+import { TopicStrategySelect } from "@/components/topics/fields/TopicStrategySelect";
+import type { TopicStrategy } from "@/constants/topics";
+import { CategorySelectWithSync } from "@/components/topics/fields/CategorySelectWithSync";
+import type { Category } from "@/services/site";
 import { OnFileDrop, OnFileDropOff } from "@/wailsjs/wailsjs/runtime/runtime";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit
@@ -90,6 +92,9 @@ function FileDropZone({ filePath, fileName, fileSize, onFileSelect, onClear, isD
                         <FileCheck className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
                         <div className="flex-1 min-w-0">
                             <div className="text-foreground font-medium truncate">{fileName}</div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                                {fileSize > 0 ? formatFileSize(fileSize) : ""}
+                            </div>
                         </div>
                         <Button
                             size="sm"
@@ -131,22 +136,22 @@ export interface ImportAndAssignTopicsDialogProps {
 }
 
 export function ImportAndAssignTopicsDialog({ open, onOpenChange, siteId, onImported }: ImportAndAssignTopicsDialogProps) {
-    const { withErrorHandling, showError, showSuccess } = useErrorHandling();
+    const { showError, showSuccess } = useErrorHandling();
 
     const [filePath, setFilePath] = useState<string>("");
     const [fileName, setFileName] = useState<string>("");
     const [fileSize, setFileSize] = useState<number>(0);
 
-    // TODO: Category selection is temporary - defaults to 1 until full category implementation
-    const [categoryId, setCategoryId] = useState<string>("1");
-    const [strategy, setStrategy] = useState<string>(DEFAULT_TOPIC_STRATEGY);
+    // Category selection via reusable component
+    const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+    const [strategy, setStrategy] = useState<TopicStrategy>(DEFAULT_TOPIC_STRATEGY);
     const [isImporting, setIsImporting] = useState(false);
 
     const reset = () => {
         setFilePath("");
         setFileName("");
         setFileSize(0);
-        setCategoryId("1");
+        setSelectedCategory(null);
         setStrategy(DEFAULT_TOPIC_STRATEGY);
     };
 
@@ -176,7 +181,7 @@ export function ImportAndAssignTopicsDialog({ open, onOpenChange, siteId, onImpo
             const result = await importAndAssignToSite(
                 filePath.trim(),
                 siteId,
-                parseInt(categoryId, 10) || 1,
+                (selectedCategory?.wpCategoryId ?? 1),
                 strategy
             );
 
@@ -240,49 +245,22 @@ export function ImportAndAssignTopicsDialog({ open, onOpenChange, siteId, onImpo
                         isDisabled={isImporting}
                     />
 
-                    {/* Category + Sync in one row */}
-                    <div className="flex items-end gap-3">
-                        <div className="flex-1 space-y-2">
-                            <Label htmlFor="category">
-                                Category
-                                <span className="text-xs text-muted-foreground ml-2">(temporary - defaults to 1)</span>
-                            </Label>
-                            <Input
-                                id="category"
-                                type="number"
-                                min="1"
-                                value={categoryId}
-                                onChange={(e) => setCategoryId(e.target.value)}
-                                disabled={isImporting}
-                            />
-                        </div>
-                        <Button
-                            variant="secondary"
-                            onClick={handleSyncCategories}
-                            disabled={!siteId || isImporting}
-                        >
-                            <RefreshCw className="h-4 w-4 mr-2" />
-                            Sync Categories
-                        </Button>
-                    </div>
+                    {/* Category selection with internal Sync */}
+                    {siteId && (
+                      <CategorySelectWithSync
+                        siteId={siteId}
+                        selectedCategory={selectedCategory}
+                        onChange={(c) => setSelectedCategory(c)}
+                      />
+                    )}
 
                     {/* Strategy */}
-                    <div className="space-y-2">
-                        <Label htmlFor="strategy">Import Strategy</Label>
-                        <select
-                            id="strategy"
-                            value={strategy}
-                            onChange={(e) => setStrategy(e.target.value)}
-                            disabled={isImporting}
-                            className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            {TOPIC_STRATEGIES.map((s) => (
-                                <option key={s} value={s} className="capitalize">
-                                    {s}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                    <TopicStrategySelect
+                        value={strategy}
+                        onChange={setStrategy}
+                        disabled={isImporting}
+                        label="Import Strategy"
+                    />
                 </div>
 
                 <DialogFooter className="pt-4">

@@ -36,22 +36,25 @@ func NewTopicRepository(c di.Container) (*Repository, error) {
 	}, nil
 }
 
-func (r *Repository) Create(ctx context.Context, topic *entities.Topic) error {
+func (r *Repository) Create(ctx context.Context, topic *entities.Topic) (int, error) {
 	query, args := dbx.ST.
 		Insert("topics").
 		Columns("title").
 		Values(topic.Title).
+		Suffix("RETURNING id").
 		MustSql()
 
-	_, err := r.db.ExecContext(ctx, query, args...)
+	var id int
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(&id)
+
 	switch {
 	case dbx.IsUniqueViolation(err):
-		return errors.AlreadyExists(topic.Title)
+		return 0, errors.AlreadyExists(topic.Title)
 	case err != nil:
-		return errors.Internal(err)
+		return 0, errors.Internal(err)
 	}
 
-	return nil
+	return id, nil
 }
 
 func (r *Repository) CreateBatch(ctx context.Context, topics []*entities.Topic) (*BatchCreateResult, error) {

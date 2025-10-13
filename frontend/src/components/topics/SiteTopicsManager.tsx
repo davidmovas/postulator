@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CreateEditTopicModal } from "@/components/topics/CreateEditTopicModal";
-import { ImportTopicsDialog } from "@/components/topics/ImportTopicsDialog";
+import { ImportAndAssignTopicsDialog, ImportTopicsDialog } from "@/components/topics/ImportTopicsDialog";
 import { getSite, Site, unassignTopicFromSite } from "@/services/site";
 import { Topic, deleteTopic } from "@/services/topic";
 import { getTopicsBySite } from "@/services/site";
@@ -236,7 +236,7 @@ export function SiteTopicsManager({ siteId, onBack }: SiteTopicsManagerProps) {
         onConfirm={performConfirm}
       />
 
-      <ImportTopicsDialog
+      <ImportAndAssignTopicsDialog
         open={importOpen}
         onOpenChange={setImportOpen}
         siteId={siteId}

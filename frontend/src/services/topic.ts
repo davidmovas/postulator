@@ -75,10 +75,10 @@ export async function getTopic(id: number): Promise<Topic> {
   return mapTopic(unwrapOne<dto.Topic>(res));
 }
 
-export async function createTopic(title: string): Promise<string> {
+export async function createTopic(title: string): Promise<number> {
   const payload = new dto.Topic({ title });
   const res = await CreateTopic(payload);
-  return unwrapString(res);
+  return unwrapOne<number>(res);
 }
 
 export async function updateTopic(id: number, title: string): Promise<string> {

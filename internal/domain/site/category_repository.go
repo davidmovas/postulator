@@ -60,6 +60,7 @@ func (c *CategoryRepository) Create(ctx context.Context, category *entities.Cate
 func (c *CategoryRepository) GetBySiteID(ctx context.Context, siteID int64) ([]*entities.Category, error) {
 	query, args := dbx.ST.
 		Select("id", "site_id", "wp_category_id", "name", "slug", "count", "created_at").
+		From("site_categories").
 		Where(squirrel.Eq{"site_id": siteID}).
 		MustSql()
 
