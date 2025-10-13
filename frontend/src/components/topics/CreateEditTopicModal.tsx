@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Topic, createTopic, updateTopic, getAvailableTopic } from "@/services/topic";
+import { DEFAULT_TOPIC_STRATEGY } from "@/constants/topics";
 import { useErrorHandling } from "@/lib/error-handling";
 import { assignTopicToSite } from "@/services/site";
 
@@ -42,7 +43,7 @@ export function CreateEditTopicModal({ open, onOpenChange, topic, siteId, onSave
         if (siteId) {
           try {
             // Attempt to resolve the created topic by exact title for this site context
-            const created = await getAvailableTopic(siteId, trimmed);
+            const created = await getAvailableTopic(siteId, DEFAULT_TOPIC_STRATEGY);
             if (created?.id) {
               // Default priority and note for now
               await assignTopicToSite(siteId, created.id, 0, "");

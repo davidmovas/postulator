@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { listSites, Site, syncCategories } from "@/services/site";
-import { getTopicsBySite } from "@/services/site";
+import { getTopicsBySite } from "@/services/topic";
 import { countUnusedTopics } from "@/services/topic";
 import { useErrorHandling } from "@/lib/error-handling";
 import { TopicsSitesTable } from "@/components/topics/TopicsSitesTable";

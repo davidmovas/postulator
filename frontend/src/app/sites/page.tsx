@@ -107,7 +107,7 @@ export default function SitesPage() {
     };
 
     return (
-        <div className="p-4 md:p-6 lg:p-8">
+        <div className="p-4 md:p-6 lg:p-8 space-y-6">
             <div className="mb-6">
                 <h1 className="text-2xl font-semibold tracking-tight">Sites Management</h1>
                 <p className="mt-2 text-muted-foreground">

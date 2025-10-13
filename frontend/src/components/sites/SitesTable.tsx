@@ -265,8 +265,8 @@ export function SitesTable({
             )}
 
             {/* Table */}
-            <div className="border rounded-lg">
-                <Table>
+            <div className="w-full overflow-x-auto rounded-lg border">
+                <Table className="min-w-[800px]">
                     <TableHeader>
                         <TableRow>
                             <SortableHeader field="name">Name</SortableHeader>
@@ -308,10 +308,10 @@ export function SitesTable({
                             filteredAndSortedSites.map((site) => (
                                 <TableRow key={site.id}>
                                     <TableCell className="font-medium">{site.name}</TableCell>
-                                    <TableCell>
+                                    <TableCell className="max-w-[260px] sm:max-w-none break-words">
                                         <button
                                             onClick={() => BrowserOpenURL(site.url)}
-                                            className="text-primary hover:underline text-left"
+                                            className="text-primary hover:underline text-left break-all"
                                             title="Open in default browser"
                                         >
                                             {site.url}

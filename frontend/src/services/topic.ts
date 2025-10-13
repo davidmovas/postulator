@@ -13,6 +13,7 @@ import {
 } from "@/wailsjs/wailsjs/go/app/App";
 import { dto } from "@/wailsjs/wailsjs/go/models";
 import { unwrapOne, unwrapString, unwrapMany } from "./utils";
+import type { TopicStrategy } from "@/constants/topics";
 
 // UI types
 export interface Topic {
@@ -57,7 +58,6 @@ export interface PaginatedTopics {
 
 export async function listTopics(limit: number, offset: number): Promise<PaginatedTopics> {
   const res = await ListTopics(limit, offset);
-  // res is expected to be dto.PaginatedResponse__Postulator_internal_dto_Topic_
   const pr = dto.PaginatedResponse__Postulator_internal_dto_Topic_.createFrom(res as any);
   return {
     success: pr.success,
@@ -97,8 +97,8 @@ export async function getTopicsBySite(siteId: number): Promise<Topic[]> {
   return unwrapMany<dto.Topic>(res).map(mapTopic);
 }
 
-export async function getAvailableTopic(siteId: number, search: string): Promise<Topic> {
-  const res = await GetAvailableTopic(siteId, search);
+export async function getAvailableTopic(siteId: number, strategy: TopicStrategy): Promise<Topic> {
+  const res = await GetAvailableTopic(siteId, strategy);
   return mapTopic(unwrapOne<dto.Topic>(res));
 }
 
