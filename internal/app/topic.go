@@ -72,7 +72,7 @@ func (a *App) ListTopics(limit, offset int) *dto.PaginatedResponse[*dto.Topic] {
 		HasMore: hasMore,
 	}
 
-	//TODO: TEMP LOG
+	//TODO: TEMPORAL LOGGING
 	fmt.Println("RESULT: ", res)
 
 	return res
