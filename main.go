@@ -69,19 +69,15 @@ func onExit() {
 }
 
 func main() {
-	// Load or create default config
 	cfg := &config.Config{LogLevel: "info", ConsoleOut: true, PrettyPrint: false}
 
-	// Init internal app
 	appInst, err := app.New(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Initialize systray in a goroutine
 	go systray.Run(onReady, onExit)
 
-	// Create application with options
 	err = wails.Run(&options.App{
 		Title:             "Postulator",
 		Width:             1024,
@@ -120,14 +116,12 @@ func main() {
 		DragAndDrop: &options.DragAndDrop{
 			EnableFileDrop: true,
 		},
-		// Windows platform specific options
 		Windows: &windows.Options{
 			WebviewIsTransparent: false,
 			WindowIsTranslucent:  false,
 			DisableWindowIcon:    false,
 			ZoomFactor:           1.0,
 		},
-		// Mac platform specific options
 		Mac: &mac.Options{
 			TitleBar: &mac.TitleBar{
 				TitlebarAppearsTransparent: true,
