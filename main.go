@@ -34,13 +34,11 @@ func onReady() {
 	systray.SetTitle("Postulator")
 	systray.SetTooltip("Postulator - Post Creator App")
 
-	// Menu items
 	mShow := systray.AddMenuItem("Show", "Show the application")
 	mHide := systray.AddMenuItem("Hide", "Hide the application")
 	systray.AddSeparator()
 	mQuit := systray.AddMenuItem("Quit", "Quit the whole app")
 
-	// Handle menu clicks
 	go func() {
 		for {
 			select {
