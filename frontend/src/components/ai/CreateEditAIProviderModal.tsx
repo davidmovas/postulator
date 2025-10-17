@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useErrorHandling } from "@/lib/error-handling";
 import { AIProvider, createAIProvider, getAIModels, getAvailableModels, updateAIProvider, validateModel } from "@/services/aiProvider";
-import { Select } from "@/components/ui/select";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
 export interface CreateEditAIProviderModalProps {
   open: boolean;
@@ -177,21 +177,33 @@ export function CreateEditAIProviderModal({ open, onOpenChange, provider, onSave
           <div className="grid gap-3">
             <div className="grid gap-2">
               <Label>Provider</Label>
-              <Select value={providerName} onChange={(e) => setProviderName(e.target.value)} disabled={providersList.length === 0}>
-                <option value="" disabled>Select provider</option>
-                {providersList.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
+              <Select value={providerName || undefined} onValueChange={(v) => setProviderName(v)} disabled={providersList.length === 0}>
+                <SelectTrigger>
+                  <SelectValue placeholder={providersList.length === 0 ? "No providers" : "Select provider"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {providersList.map((p) => (
+                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
 
             <div className="grid gap-2">
               <Label>Model</Label>
-              <Select value={model} onChange={(e) => setModel(e.target.value)} disabled={!providerName || loadingModels || modelOptions.length === 0}>
-                {(!providerName || modelOptions.length === 0) && <option value="">{loadingModels ? "Loading..." : "Select provider first"}</option>}
-                {modelOptions.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
+              <Select
+                value={model || undefined}
+                onValueChange={(v) => setModel(v)}
+                disabled={!providerName || loadingModels || modelOptions.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={!providerName ? "Select provider first" : (loadingModels ? "Loading..." : (modelOptions.length ? "Select model" : "No models"))} />
+                </SelectTrigger>
+                <SelectContent>
+                  {modelOptions.map((m) => (
+                    <SelectItem key={m} value={m}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
               <div className="text-[11px] text-muted-foreground">Or type a custom model and validate it.</div>
               <div className="flex items-center gap-2">

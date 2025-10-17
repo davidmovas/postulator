@@ -14,6 +14,8 @@ import {
 import { dto } from "@/wailsjs/wailsjs/go/models";
 import { unwrapMany, unwrapOne, unwrapString } from "./utils";
 
+import type { ScheduleType, JobStatus, ExecutionStatus } from "@/constants/jobs";
+
 export interface Job {
   id: number;
   name: string;
@@ -23,12 +25,12 @@ export interface Job {
   aiProviderId: number;
   aiModel: string;
   requiresValidation: boolean;
-  scheduleType: string;
+  scheduleType: ScheduleType;
   scheduleTime?: string;
   scheduleDay?: number;
   jitterEnabled: boolean;
   jitterMinutes: number;
-  status: string;
+  status: JobStatus;
   lastRunAt?: string;
   nextRunAt?: string;
   createdAt: string;
@@ -41,7 +43,7 @@ export interface Execution {
   topicId: number;
   generatedTitle?: string;
   generatedContent?: string;
-  status: string;
+  status: ExecutionStatus;
   errorMessage?: string;
   articleId?: number;
   startedAt: string;
@@ -60,12 +62,12 @@ function mapJob(x: dto.Job): Job {
     aiProviderId: x.aiProviderId,
     aiModel: x.aiModel,
     requiresValidation: x.requiresValidation,
-    scheduleType: x.scheduleType,
+    scheduleType: x.scheduleType as ScheduleType,
     scheduleTime: x.scheduleTime,
     scheduleDay: x.scheduleDay,
     jitterEnabled: x.jitterEnabled,
     jitterMinutes: x.jitterMinutes,
-    status: x.status,
+    status: x.status as JobStatus,
     lastRunAt: x.lastRunAt,
     nextRunAt: x.nextRunAt,
     createdAt: x.createdAt,
@@ -80,7 +82,7 @@ function mapExecution(x: dto.Execution): Execution {
     topicId: x.topicId,
     generatedTitle: x.generatedTitle,
     generatedContent: x.generatedContent,
-    status: x.status,
+    status: x.status as ExecutionStatus,
     errorMessage: x.errorMessage,
     articleId: x.articleId,
     startedAt: x.startedAt,
