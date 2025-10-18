@@ -23,9 +23,16 @@ export default function JobsPage() {
   const loadJobs = async () => {
     setIsLoading(true);
     try {
-      const data = await listJobs();
-      setJobs(data);
-      return data;
+      const data = await withErrorHandling(async () => {
+        return await listJobs();
+      }, { showSuccess: false });
+      if (data) {
+        setJobs(data as Job[]);
+        return data as Job[];
+      } else {
+        setJobs([]);
+        return [] as Job[];
+      }
     } finally {
       setIsLoading(false);
     }

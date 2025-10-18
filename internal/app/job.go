@@ -5,7 +5,6 @@ import (
 	"Postulator/internal/dto"
 	"Postulator/pkg/ctx"
 	"Postulator/pkg/errors"
-	"time"
 )
 
 func (a *App) CreateJob(j *dto.Job) *dto.Response[string] {
@@ -111,17 +110,6 @@ func (a *App) ValidateExecution(execID int64, approved bool) *dto.Response[strin
 }
 
 func toJobEntity(d *dto.Job) (*job.Job, error) {
-	var scheduleTime *time.Time
-	if d.ScheduleTime != nil && *d.ScheduleTime != "" {
-		parsed, err := time.Parse("15:04:05", *d.ScheduleTime)
-		if err != nil {
-			return nil, err
-		}
-		now := time.Now()
-		st := time.Date(now.Year(), now.Month(), now.Day(), parsed.Hour(), parsed.Minute(), parsed.Second(), 0, now.Location())
-		scheduleTime = &st
-	}
-
 	return &job.Job{
 		ID:                 d.ID,
 		Name:               d.Name,
@@ -132,8 +120,12 @@ func toJobEntity(d *dto.Job) (*job.Job, error) {
 		AIModel:            d.AIModel,
 		RequiresValidation: d.RequiresValidation,
 		ScheduleType:       job.ScheduleType(d.ScheduleType),
-		ScheduleTime:       scheduleTime,
-		ScheduleDay:        d.ScheduleDay,
+		IntervalValue:      d.IntervalValue,
+		IntervalUnit:       d.IntervalUnit,
+		ScheduleHour:       d.ScheduleHour,
+		ScheduleMinute:     d.ScheduleMinute,
+		Weekdays:           d.Weekdays,
+		Monthdays:          d.Monthdays,
 		JitterEnabled:      d.JitterEnabled,
 		JitterMinutes:      d.JitterMinutes,
 		Status:             job.Status(d.Status),

@@ -5,23 +5,17 @@
 // const (
 //   ScheduleManual  ScheduleType = "manual"
 //   ScheduleOnce    ScheduleType = "once"
-//   ScheduleDaily   ScheduleType = "daily"
-//   ScheduleWeekly  ScheduleType = "weekly"
-//   ScheduleMonthly ScheduleType = "monthly"
+//   ScheduleInterval ScheduleType = "interval"
 // )
 export type ScheduleType =
   | "manual"
   | "once"
-  | "daily"
-  | "weekly"
-  | "monthly";
+  | "interval";
 
 export const ScheduleTypeConst = {
   Manual: "manual" as ScheduleType,
   Once: "once" as ScheduleType,
-  Daily: "daily" as ScheduleType,
-  Weekly: "weekly" as ScheduleType,
-  Monthly: "monthly" as ScheduleType,
+  Interval: "interval" as ScheduleType,
 } as const;
 
 // Job Status mirrors Go:

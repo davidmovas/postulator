@@ -80,23 +80,30 @@ export function JobsTable({
     });
   };
 
-  const toHHMM = (v?: string) => {
-    if (!v) return '';
-    const parts = String(v).split(':');
-    const hh = (parts[0] || '00').padStart(2, '0');
-    const mm = (parts[1] || '00').padStart(2, '0');
+  const toHHMMFromNumbers = (h?: number, m?: number) => {
+    if (h === undefined || m === undefined || h === null || m === null) return '';
+    const hh = String(h).padStart(2, '0');
+    const mm = String(m).padStart(2, '0');
     return `${hh}:${mm}`;
   };
 
   const getScheduleText = (j: Job) => {
     const type = (j.scheduleType || '').toLowerCase();
-    const t = toHHMM(j.scheduleTime);
-    if (type === 'daily' && t) return `Daily @ ${t}`;
-    if (type === 'weekly' && j.scheduleDay !== undefined && t) return `Weekly (D${j.scheduleDay}) @ ${t}`;
-    if (type === 'monthly' && j.scheduleDay !== undefined && t) return `Monthly (D${j.scheduleDay}) @ ${t}`;
-    if (type === 'once' && t) return `Once @ ${t}`;
     if (type === 'manual') return 'Manual';
-    return type ? type[0].toUpperCase() + type.slice(1) : '—';
+    if (type === 'once') {
+      const t = toHHMMFromNumbers(j.scheduleHour, j.scheduleMinute);
+      return t ? `Once @ ${t}` : 'Once';
+    }
+    if (type === 'interval') {
+      const val = j.intervalValue;
+      const unit = j.intervalUnit || '';
+      if (val && unit) {
+        const t = toHHMMFromNumbers(j.scheduleHour, j.scheduleMinute);
+        return t ? `Every ${val} ${unit} @ ${t}` : `Every ${val} ${unit}`;
+      }
+      return 'Interval';
+    }
+    return '—';
   };
 
   const handleSort = (field: JobSortField) => {

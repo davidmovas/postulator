@@ -16,8 +16,12 @@ type Job struct {
 
 	RequiresValidation bool    `json:"requiresValidation"`
 	ScheduleType       string  `json:"scheduleType"`
-	ScheduleTime       *string `json:"scheduleTime,omitempty"`
-	ScheduleDay        *int    `json:"scheduleDay,omitempty"`
+	IntervalValue      *int    `json:"intervalValue,omitempty"`
+	IntervalUnit       *string `json:"intervalUnit,omitempty"`
+	ScheduleHour       *int    `json:"scheduleHour,omitempty"`
+	ScheduleMinute     *int    `json:"scheduleMinute,omitempty"`
+	Weekdays           []int   `json:"weekdays,omitempty"`
+	Monthdays          []int   `json:"monthdays,omitempty"`
 	JitterEnabled      bool    `json:"jitterEnabled"`
 	JitterMinutes      int     `json:"jitterMinutes"`
 	Status             string  `json:"status"`
@@ -53,11 +57,6 @@ func FromJob(e *job.Job) *Job {
 		v := t.UTC().Format(timeLayout)
 		return &v
 	}
-	var scheduleTime *string
-	if e.ScheduleTime != nil {
-		v := e.ScheduleTime.UTC().Format("15:04:05")
-		scheduleTime = &v
-	}
 	return &Job{
 		ID:                 e.ID,
 		Name:               e.Name,
@@ -68,8 +67,12 @@ func FromJob(e *job.Job) *Job {
 		AIModel:            e.AIModel,
 		RequiresValidation: e.RequiresValidation,
 		ScheduleType:       string(e.ScheduleType),
-		ScheduleTime:       scheduleTime,
-		ScheduleDay:        e.ScheduleDay,
+		IntervalValue:      e.IntervalValue,
+		IntervalUnit:       e.IntervalUnit,
+		ScheduleHour:       e.ScheduleHour,
+		ScheduleMinute:     e.ScheduleMinute,
+		Weekdays:           e.Weekdays,
+		Monthdays:          e.Monthdays,
 		JitterEnabled:      e.JitterEnabled,
 		JitterMinutes:      e.JitterMinutes,
 		Status:             string(e.Status),

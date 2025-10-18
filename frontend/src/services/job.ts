@@ -26,8 +26,12 @@ export interface Job {
   aiModel: string;
   requiresValidation: boolean;
   scheduleType: ScheduleType;
-  scheduleTime?: string;
-  scheduleDay?: number;
+  intervalValue?: number;
+  intervalUnit?: string;
+  scheduleHour?: number;
+  scheduleMinute?: number;
+  weekdays?: number[];
+  monthdays?: number[];
   jitterEnabled: boolean;
   jitterMinutes: number;
   status: JobStatus;
@@ -63,8 +67,12 @@ function mapJob(x: dto.Job): Job {
     aiModel: x.aiModel,
     requiresValidation: x.requiresValidation,
     scheduleType: x.scheduleType as ScheduleType,
-    scheduleTime: x.scheduleTime,
-    scheduleDay: x.scheduleDay,
+    intervalValue: x.intervalValue,
+    intervalUnit: x.intervalUnit,
+    scheduleHour: x.scheduleHour,
+    scheduleMinute: x.scheduleMinute,
+    weekdays: x.weekdays,
+    monthdays: x.monthdays,
     jitterEnabled: x.jitterEnabled,
     jitterMinutes: x.jitterMinutes,
     status: x.status as JobStatus,

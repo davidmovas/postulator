@@ -107,6 +107,8 @@ export function useErrorHandling() {
 
             return result;
         } catch (error) {
+            console.error('Error handling:', error);
+
             if (error instanceof AppError) {
                 showError(error.message, options?.errorMessage || 'Error');
             } else if (error instanceof Error) {

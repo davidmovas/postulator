@@ -85,16 +85,20 @@ CREATE TABLE jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     site_id INTEGER NOT NULL,
-    category_id INTEGER NOT NULL, -- в какую категорию публиковать
+    category_id INTEGER NOT NULL,
     prompt_id INTEGER NOT NULL,
     ai_provider_id INTEGER NOT NULL,
-    ai_model TEXT NOT NULL, -- модель AI для использования (gpt-4, gpt-3.5-turbo, claude-3-opus, etc)
+    ai_model TEXT NOT NULL,
     requires_validation BOOLEAN NOT NULL DEFAULT 0,
-    schedule_type TEXT NOT NULL, -- manual, once, daily, weekly, monthly
-    schedule_time TIME, -- время для daily (например 09:00:00)
-    schedule_day INTEGER, -- день недели для weekly (1-7) или день месяца для monthly (1-31)
+    schedule_type TEXT NOT NULL, -- manual, once, interval
+    interval_value INTEGER, -- например: 3 (дня), 2 (недели)
+    interval_unit TEXT, -- days, weeks, months
+    schedule_hour INTEGER, -- 0-23
+    schedule_minute INTEGER, -- 0-59
+    weekdays TEXT, -- JSON массив: [1,2,3,4,5] для пн-пт, [6,7] для выходных
+    monthdays TEXT, -- JSON массив: [1,15] для 1-го и 15-го числа
     jitter_enabled BOOLEAN NOT NULL DEFAULT 0,
-    jitter_minutes INTEGER DEFAULT 30, -- +- минуты
+    jitter_minutes INTEGER DEFAULT 30, -- +- минуты от установленного времени
     status TEXT NOT NULL DEFAULT 'active', -- active, paused, completed, error
     last_run_at DATETIME,
     next_run_at DATETIME,
@@ -115,6 +119,7 @@ CREATE TABLE job_topics (
     FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
     UNIQUE(job_id, topic_id)
 );
+
 
 -- Опубликованные статьи
 CREATE TABLE articles (
@@ -159,7 +164,7 @@ CREATE TABLE job_executions (
     topic_id INTEGER NOT NULL,
     generated_title TEXT,
     generated_content TEXT,
-    status TEXT NOT NULL, -- pending, generating, pending_validation, validated, publishing, published, failed
+    status TEXT NOT NULL,
     error_message TEXT,
     article_id INTEGER,
     started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

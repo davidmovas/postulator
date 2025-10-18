@@ -17,6 +17,10 @@ import (
 	"time"
 )
 
+type wpPublisher interface {
+	PublishPost(ctx context.Context, site *entities.Site, title, content string, categoryID int) (postID int, postURL string, err error)
+}
+
 var _ IExecutor = (*Executor)(nil)
 
 type Executor struct {
@@ -25,7 +29,7 @@ type Executor struct {
 	topicService  topic.IService
 	promptService prompt.IService
 	siteService   site.IService
-	wpClient      *wp.Client
+	wpClient      wpPublisher
 	aiClient      ai.IClient
 	logger        *logger.Logger
 }

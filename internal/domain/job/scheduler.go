@@ -11,11 +11,9 @@ import (
 type ScheduleType string
 
 const (
-	ScheduleManual  ScheduleType = "manual"
-	ScheduleOnce    ScheduleType = "once"
-	ScheduleDaily   ScheduleType = "daily"
-	ScheduleWeekly  ScheduleType = "weekly"
-	ScheduleMonthly ScheduleType = "monthly"
+	ScheduleManual   ScheduleType = "manual"
+	ScheduleOnce     ScheduleType = "once"
+	ScheduleInterval ScheduleType = "interval"
 )
 
 type Status string
@@ -38,9 +36,13 @@ type Job struct {
 
 	RequiresValidation bool
 
-	ScheduleType ScheduleType
-	ScheduleTime *time.Time // time for daily (HH:MM:SS)
-	ScheduleDay  *int       // day of week (1-7) for weekly or day of month (1-31) for monthly
+	ScheduleType   ScheduleType
+	IntervalValue  *int    // e.g., 3 (days), 2 (weeks), 1 (months)
+	IntervalUnit   *string // days, weeks, months
+	ScheduleHour   *int    // 0-23
+	ScheduleMinute *int    // 0-59
+	Weekdays       []int   // 1-7 (Mon=1..Sun=7)
+	Monthdays      []int   // 1-31
 
 	JitterEnabled bool
 	JitterMinutes int
@@ -262,113 +264,153 @@ func (s *Scheduler) CalculateNextRun(job *Job, now time.Time) time.Time {
 
 	switch job.ScheduleType {
 	case ScheduleManual:
-		// Manual jobs have no automatic next run
 		return time.Time{}
-
 	case ScheduleOnce:
-		// One-time jobs: run immediately if not yet executed
-		if job.LastRunAt == nil {
-			nextRun = now
-		} else {
-			return time.Time{}
-		}
-
-	case ScheduleDaily:
-		nextRun = s.calculateDailyNextRun(job, now)
-
-	case ScheduleWeekly:
-		nextRun = s.calculateWeeklyNextRun(job, now)
-
-	case ScheduleMonthly:
-		nextRun = s.calculateMonthlyNextRun(job, now)
-
+		nextRun = s.calculateOnceNextRun(job, now)
+	case ScheduleInterval:
+		nextRun = s.calculateIntervalNextRun(job, now)
 	default:
 		s.logger.Errorf("Unknown schedule type: %s", job.ScheduleType)
-		return now.Add(24 * time.Hour) // Default to 24 hours
+		return now.Add(24 * time.Hour)
 	}
 
-	// Apply jitter if enabled
 	if job.JitterEnabled && job.JitterMinutes > 0 {
 		jitter := rand.Intn(job.JitterMinutes*2+1) - job.JitterMinutes
 		nextRun = nextRun.Add(time.Duration(jitter) * time.Minute)
 	}
-
 	return nextRun
 }
 
-func (s *Scheduler) calculateDailyNextRun(job *Job, now time.Time) time.Time {
-	var targetTime time.Time
-
-	if job.ScheduleTime != nil {
-		// Use specified time
-		hour, min, sec := job.ScheduleTime.Clock()
-		targetTime = time.Date(now.Year(), now.Month(), now.Day(), hour, min, sec, 0, now.Location())
-	} else {
-		// Default to current time
-		targetTime = time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), 0, 0, now.Location())
+func (s *Scheduler) calculateOnceNextRun(job *Job, now time.Time) time.Time {
+	hour := 0
+	minute := 0
+	if job.ScheduleHour != nil {
+		hour = *job.ScheduleHour
 	}
-
-	// If target time today has passed, schedule for tomorrow
-	if targetTime.Before(now) || targetTime.Equal(now) {
-		targetTime = targetTime.Add(24 * time.Hour)
+	if job.ScheduleMinute != nil {
+		minute = *job.ScheduleMinute
 	}
-
-	return targetTime
+	target := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
+	if !target.After(now) {
+		target = target.Add(24 * time.Hour)
+	}
+	// Only schedule once if never run before
+	if job.LastRunAt != nil {
+		return time.Time{}
+	}
+	return target
 }
 
-func (s *Scheduler) calculateWeeklyNextRun(job *Job, now time.Time) time.Time {
-	targetWeekday := time.Monday // Default to Monday
-	if job.ScheduleDay != nil && *job.ScheduleDay >= 1 && *job.ScheduleDay <= 7 {
-		targetWeekday = time.Weekday(*job.ScheduleDay % 7)
+func (s *Scheduler) calculateIntervalNextRun(job *Job, now time.Time) time.Time {
+	// Defaults
+	interval := 1
+	unit := "days"
+	if job.IntervalValue != nil && *job.IntervalValue > 0 {
+		interval = *job.IntervalValue
+	}
+	if job.IntervalUnit != nil && *job.IntervalUnit != "" {
+		unit = *job.IntervalUnit
+	}
+	hour := 0
+	minute := 0
+	if job.ScheduleHour != nil {
+		hour = *job.ScheduleHour
+	}
+	if job.ScheduleMinute != nil {
+		minute = *job.ScheduleMinute
 	}
 
-	var targetTime time.Time
-	if job.ScheduleTime != nil {
-		hour, min, sec := job.ScheduleTime.Clock()
-		targetTime = time.Date(now.Year(), now.Month(), now.Day(), hour, min, sec, 0, now.Location())
-	} else {
-		targetTime = time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), 0, 0, now.Location())
+	// Base starting point: today at specified time, or now advanced as needed
+	start := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
+	if job.LastRunAt != nil && job.LastRunAt.After(start) {
+		start = time.Date(job.LastRunAt.Year(), job.LastRunAt.Month(), job.LastRunAt.Day(), hour, minute, 0, 0, now.Location())
 	}
 
-	// Find next occurrence of target weekday
-	daysUntilTarget := int(targetWeekday - now.Weekday())
-	if daysUntilTarget <= 0 {
-		daysUntilTarget += 7
+	switch unit {
+	case "days":
+		if !start.After(now) {
+			// align to next multiple of interval from start
+			daysSince := int(now.Sub(start).Hours() / 24)
+			nextDays := (daysSince/interval + 1) * interval
+			return start.AddDate(0, 0, nextDays)
+		}
+		return start
+	case "weeks":
+		// Weekdays expected as 1..7 (Mon..Sun). If empty, any day of week.
+		allowed := map[time.Weekday]bool{}
+		if len(job.Weekdays) > 0 {
+			for _, d := range job.Weekdays {
+				if d >= 1 && d <= 7 {
+					allowed[time.Weekday(d%7)] = true
+				}
+			}
+		} else {
+			for d := time.Weekday(0); d < 7; d++ {
+				allowed[d] = true
+			}
+		}
+		// Find next day matching allowed within rolling N-week cadence.
+		// Determine the start of the current week (Monday-based)
+		weekday := int(now.Weekday())
+		mondayOffset := (weekday + 6) % 7 // days since Monday
+		weekStart := time.Date(now.Year(), now.Month(), now.Day()-mondayOffset, hour, minute, 0, 0, now.Location())
+		// If time has passed today, advance base to now
+		if start.Before(now) {
+			start = now
+		}
+		maxDays := interval*7 + 14 // safety window
+		candidate := time.Date(start.Year(), start.Month(), start.Day(), hour, minute, 0, 0, start.Location())
+		for i := 0; i <= maxDays; i++ {
+			wd := candidate.Weekday()
+			// Check interval weeks cadence relative to weekStart
+			weeksDiff := int(candidate.Sub(weekStart).Hours()) / (24 * 7)
+			if weeksDiff%interval == 0 && allowed[wd] && candidate.After(now) {
+				return candidate
+			}
+			candidate = candidate.Add(24 * time.Hour)
+		}
+		return now.Add(7 * 24 * time.Hour)
+	case "months":
+		days := job.Monthdays
+		if len(days) == 0 {
+			days = []int{1}
+		}
+		// sort days ascending
+		for i := 0; i < len(days)-1; i++ {
+			for j := i + 1; j < len(days); j++ {
+				if days[j] < days[i] {
+					days[i], days[j] = days[j], days[i]
+				}
+			}
+		}
+		// Start from current month, iterate months by interval to find next valid date
+		baseMonth := time.Date(now.Year(), now.Month(), 1, hour, minute, 0, 0, now.Location())
+		if job.LastRunAt != nil && job.LastRunAt.After(baseMonth) {
+			baseMonth = time.Date(job.LastRunAt.Year(), job.LastRunAt.Month(), 1, hour, minute, 0, 0, now.Location())
+		}
+		for mOffset := 0; mOffset <= 24; mOffset += interval {
+			monthBase := baseMonth.AddDate(0, mOffset, 0)
+			for _, d := range days {
+				// clamp day to last day of month
+				lastDay := lastDayOfMonth(monthBase)
+				day := d
+				if day > lastDay {
+					day = lastDay
+				}
+				cand := time.Date(monthBase.Year(), monthBase.Month(), day, hour, minute, 0, 0, monthBase.Location())
+				if cand.After(now) {
+					return cand
+				}
+			}
+		}
+		return now.AddDate(0, interval, 0)
+	default:
+		return now.Add(24 * time.Hour)
 	}
-
-	// If it's today but time has passed, move to next week
-	if daysUntilTarget == 0 && targetTime.Before(now) {
-		daysUntilTarget = 7
-	}
-
-	targetTime = targetTime.Add(time.Duration(daysUntilTarget) * 24 * time.Hour)
-
-	return targetTime
 }
 
-func (s *Scheduler) calculateMonthlyNextRun(job *Job, now time.Time) time.Time {
-	targetDay := 1 // Default to 1st of month
-	if job.ScheduleDay != nil && *job.ScheduleDay >= 1 && *job.ScheduleDay <= 31 {
-		targetDay = *job.ScheduleDay
-	}
-
-	var targetTime time.Time
-	if job.ScheduleTime != nil {
-		hour, min, sec := job.ScheduleTime.Clock()
-		targetTime = time.Date(now.Year(), now.Month(), targetDay, hour, min, sec, 0, now.Location())
-	} else {
-		targetTime = time.Date(now.Year(), now.Month(), targetDay, now.Hour(), now.Minute(), 0, 0, now.Location())
-	}
-
-	// If target day this month has passed, move to next month
-	if targetTime.Before(now) || targetTime.Equal(now) {
-		targetTime = targetTime.AddDate(0, 1, 0)
-	}
-
-	// Handle months with fewer days (e.g., February 31 -> February 28/29)
-	for targetTime.Day() != targetDay && targetDay > 28 {
-		targetTime = targetTime.AddDate(0, 0, -1)
-	}
-
-	return targetTime
+func lastDayOfMonth(t time.Time) int {
+	firstNext := time.Date(t.Year(), t.Month()+1, 1, 0, 0, 0, 0, t.Location())
+	last := firstNext.AddDate(0, 0, -1)
+	return last.Day()
 }

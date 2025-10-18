@@ -59,8 +59,9 @@ export function CreateEditJobModal({ open, onOpenChange, job, onSaved }: CreateE
   const [aiModel, setAIModel] = useState("");
   const [requiresValidation, setRequiresValidation] = useState<boolean>(false);
   const [scheduleType, setScheduleType] = useState<ScheduleType>(ScheduleTypeConst.Manual);
-  const [scheduleTime, setScheduleTime] = useState<string>("");
-  const [scheduleDay, setScheduleDay] = useState<number | undefined>(undefined);
+  const [scheduleTime, setScheduleTime] = useState<string>(""); // used for "once" HH:MM
+  const [intervalValue, setIntervalValue] = useState<number | undefined>(undefined);
+  const [intervalUnit, setIntervalUnit] = useState<string | undefined>(undefined);
   const [jitterEnabled, setJitterEnabled] = useState<boolean>(false);
   const [jitterMinutes, setJitterMinutes] = useState<number>(0);
   const [status, setStatus] = useState<JobStatus>(JobStatusConst.Active);
@@ -102,13 +103,16 @@ export function CreateEditJobModal({ open, onOpenChange, job, onSaved }: CreateE
       setPromptId(job.promptId || 0);
       setAIProviderId(job.aiProviderId || 0);
       setAIModel(job.aiModel || "");
-      setRequiresValidation(job.requiresValidation);
+      setRequiresValidation(!!job.requiresValidation);
       setScheduleType(job.scheduleType || ScheduleTypeConst.Manual);
-      setScheduleTime(toHHMM(job.scheduleTime));
-      setScheduleDay(job.scheduleDay);
-      setJitterEnabled(job.jitterEnabled);
+      const hh = job.scheduleHour ?? undefined;
+      const mm = job.scheduleMinute ?? undefined;
+      setScheduleTime(hh !== undefined && mm !== undefined ? `${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}` : "");
+      setIntervalValue(job.intervalValue ?? undefined);
+      setIntervalUnit(job.intervalUnit ?? undefined);
+      setJitterEnabled(!!job.jitterEnabled);
       setJitterMinutes(job.jitterMinutes || 30);
-      setStatus(job.status || "active");
+      setStatus((job.status as JobStatus) || JobStatusConst.Active);
     } else {
       setName("");
       setSiteId(0);
@@ -118,8 +122,9 @@ export function CreateEditJobModal({ open, onOpenChange, job, onSaved }: CreateE
       setAIModel("");
       setRequiresValidation(false);
       setScheduleType(ScheduleTypeConst.Manual);
-      setScheduleTime("10:00");
-      setScheduleDay(undefined);
+      setScheduleTime("10:00"); // used if/when switching to Once
+      setIntervalValue(undefined);
+      setIntervalUnit(undefined);
       setJitterEnabled(false);
       setJitterMinutes(30);
       setStatus(JobStatusConst.Active);
@@ -172,7 +177,7 @@ export function CreateEditJobModal({ open, onOpenChange, job, onSaved }: CreateE
     return hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59;
   };
 
-  const needsTime = useMemo(() => scheduleType !== ScheduleTypeConst.Manual, [scheduleType]);
+  const needsTime = useMemo(() => scheduleType === ScheduleTypeConst.Once, [scheduleType]);
 
   const canSave = useMemo(() => {
     const baseOk = (
@@ -186,13 +191,24 @@ export function CreateEditJobModal({ open, onOpenChange, job, onSaved }: CreateE
       aiProviderId > 0 &&
       aiModel.trim().length > 0
     );
-    const timeOk = needsTime ? isValidTime(scheduleTime) : true;
-    return baseOk && timeOk;
-  }, [name, siteId, categories.length, categoryId, prompts.length, promptId, providers.length, aiProviderId, aiModel, needsTime, scheduleTime]);
+    const timeOk = scheduleType === ScheduleTypeConst.Once ? isValidTime(scheduleTime) : true;
+    const intervalOk = scheduleType === ScheduleTypeConst.Interval ? !!intervalValue && (intervalValue as number) >= 1 && !!intervalUnit : true;
+    return baseOk && timeOk && intervalOk;
+  }, [name, siteId, categories.length, categoryId, prompts.length, promptId, providers.length, aiProviderId, aiModel, scheduleType, scheduleTime, intervalValue, intervalUnit]);
 
   const normalizePayload = () => {
     const jm = Math.max(0, Math.min(180, jitterMinutes || 0));
-    return {
+
+    // derive hour/minute from scheduleTime if present
+    let scheduleHour: number | undefined = undefined;
+    let scheduleMinute: number | undefined = undefined;
+    if (scheduleType === ScheduleTypeConst.Once && isValidTime(scheduleTime)) {
+      const [h, m] = scheduleTime.split(":");
+      scheduleHour = parseInt(h, 10);
+      scheduleMinute = parseInt(m, 10);
+    }
+
+    const base: any = {
       name: name.trim(),
       siteId,
       categoryId,
@@ -201,11 +217,40 @@ export function CreateEditJobModal({ open, onOpenChange, job, onSaved }: CreateE
       aiModel: aiModel.trim(),
       requiresValidation,
       scheduleType: scheduleType,
-      scheduleTime: toHHMMSS(scheduleTime),
-      scheduleDay: scheduleDay,
       jitterEnabled,
       jitterMinutes: jm,
       status: status || "active",
+    };
+
+    if (scheduleType === ScheduleTypeConst.Manual) {
+      return {
+        ...base,
+        intervalValue: undefined,
+        intervalUnit: undefined,
+        scheduleHour: undefined,
+        scheduleMinute: undefined,
+      };
+    }
+
+    if (scheduleType === ScheduleTypeConst.Once) {
+      return {
+        ...base,
+        scheduleHour,
+        scheduleMinute,
+        intervalValue: undefined,
+        intervalUnit: undefined,
+      };
+    }
+
+    // Interval
+    const val = Math.max(1, parseInt(String(intervalValue || 0), 10));
+    const unit = (intervalUnit || "minutes").toLowerCase();
+    return {
+      ...base,
+      intervalValue: val,
+      intervalUnit: unit,
+      scheduleHour: undefined,
+      scheduleMinute: undefined,
     };
   };
 
@@ -386,41 +431,58 @@ export function CreateEditJobModal({ open, onOpenChange, job, onSaved }: CreateE
                     <SelectContent>
                       <SelectItem value={ScheduleTypeConst.Manual}>Manual</SelectItem>
                       <SelectItem value={ScheduleTypeConst.Once}>Once</SelectItem>
-                      <SelectItem value={ScheduleTypeConst.Daily}>Daily</SelectItem>
-                      <SelectItem value={ScheduleTypeConst.Weekly}>Weekly</SelectItem>
-                      <SelectItem value={ScheduleTypeConst.Monthly}>Monthly</SelectItem>
+                      <SelectItem value={ScheduleTypeConst.Interval}>Interval</SelectItem>
                     </SelectContent>
                   </Select>
                 </FieldContent>
               </Field>
-              <Field>
-                <FieldContent>
-                  <Label>Time</Label>
-                  <TimeField
-                    value={scheduleTime}
-                    onChange={(v) => setScheduleTime(v)}
-                    disabled={!needsTime}
-                  />
-                </FieldContent>
-              </Field>
-              <Field>
-                <FieldContent>
-                  <Label>Day</Label>
-                  <Input
-                    type="number"
-                    placeholder="1-31"
-                    min={1}
-                    max={31}
-                    value={scheduleDay ?? ""}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (v === "") { setScheduleDay(undefined); return; }
-                      const n = Math.max(1, Math.min(31, parseInt(v, 10) || 1));
-                      setScheduleDay(n);
-                    }}
-                  />
-                </FieldContent>
-              </Field>
+              {scheduleType === ScheduleTypeConst.Once && (
+                <Field>
+                  <FieldContent>
+                    <Label>Time</Label>
+                    <TimeField
+                      value={scheduleTime}
+                      onChange={(v) => setScheduleTime(v)}
+                      disabled={false}
+                    />
+                  </FieldContent>
+                </Field>
+              )}
+
+              {scheduleType === ScheduleTypeConst.Interval && (
+                <Field>
+                  <FieldContent>
+                    <Label>Interval</Label>
+                    <div className="grid grid-cols-2 gap-2 items-center">
+                      <Input
+                        type="number"
+                        min={1}
+                        value={intervalValue ?? ''}
+                        onChange={(e) => {
+                          const n = Math.max(1, parseInt(e.target.value || '1', 10));
+                          setIntervalValue(Number.isFinite(n) ? n : 1);
+                        }}
+                        placeholder="Value"
+                      />
+                      <Select
+                        value={intervalUnit}
+                        onValueChange={(v) => setIntervalUnit(v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="minutes">minutes</SelectItem>
+                          <SelectItem value="hours">hours</SelectItem>
+                          <SelectItem value="days">days</SelectItem>
+                          <SelectItem value="weeks">weeks</SelectItem>
+                          <SelectItem value="months">months</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </FieldContent>
+                </Field>
+              )}
             </FieldGroup>
           </FieldSet>
 

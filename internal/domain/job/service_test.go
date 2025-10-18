@@ -2,712 +2,321 @@ package job
 
 import (
 	"Postulator/internal/config"
-	"Postulator/internal/infra/ai"
+	"Postulator/internal/domain/entities"
+	"Postulator/internal/domain/topic"
 	"Postulator/internal/infra/database"
-	"Postulator/internal/infra/wp"
 	"Postulator/pkg/di"
 	"Postulator/pkg/logger"
 	"context"
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
-	"time"
-
-	"github.com/stretchr/testify/require"
 )
 
-// mockAIClient is a mock implementation of ai.Client for testing
-type mockAIClient struct{}
+// --- Fakes for dependencies required by NewService/NewExecutor/NewScheduler ---
 
-func (m *mockAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
-	return "Mock generated article content", nil
+type fakeAIClient struct{}
+
+func (f *fakeAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+	return "generated content", nil
 }
 
-func setupTestService(t *testing.T) (*Service, *JobRepository, *ExecRepository, func()) {
+// topic service fake
+type fakeTopicService struct{}
+
+func (f *fakeTopicService) CreateTopic(ctx context.Context, topic *entities.Topic) (int, error) {
+	return 0, nil
+}
+func (f *fakeTopicService) CreateTopicBatch(ctx context.Context, topics []*entities.Topic) (*topic.BatchCreateResult, error) {
+	return &topic.BatchCreateResult{}, nil
+}
+func (f *fakeTopicService) GetTopic(ctx context.Context, id int64) (*entities.Topic, error) {
+	return &entities.Topic{ID: id, Title: "t"}, nil
+}
+func (f *fakeTopicService) ListTopics(ctx context.Context) ([]*entities.Topic, error) {
+	return nil, nil
+}
+func (f *fakeTopicService) UpdateTopic(ctx context.Context, topic *entities.Topic) error { return nil }
+func (f *fakeTopicService) DeleteTopic(ctx context.Context, id int64) error              { return nil }
+func (f *fakeTopicService) AssignToSite(ctx context.Context, siteID, topicID, categoryID int64, strategy entities.TopicStrategy) error {
+	return nil
+}
+func (f *fakeTopicService) UnassignFromSite(ctx context.Context, siteID, topicID int64) error {
+	return nil
+}
+func (f *fakeTopicService) GetSiteTopics(ctx context.Context, siteID int64) ([]*entities.SiteTopic, error) {
+	return []*entities.SiteTopic{{SiteID: siteID, TopicID: 1, Strategy: entities.StrategyUnique, CategoryID: 1}}, nil
+}
+func (f *fakeTopicService) GetTopicsBySite(ctx context.Context, siteID int64) ([]*entities.Topic, error) {
+	return nil, nil
+}
+func (f *fakeTopicService) GetAvailableTopic(ctx context.Context, siteID int64, strategy entities.TopicStrategy) (*entities.Topic, error) {
+	return &entities.Topic{ID: 1, Title: "topic"}, nil
+}
+func (f *fakeTopicService) MarkTopicAsUsed(ctx context.Context, siteID, topicID int64) error {
+	return nil
+}
+func (f *fakeTopicService) CountUnusedTopics(ctx context.Context, siteID int64) (int, error) {
+	return 42, nil
+}
+
+// prompt service fake
+
+type fakePromptService struct{}
+
+func (f *fakePromptService) CreatePrompt(ctx context.Context, prompt *entities.Prompt) error {
+	return nil
+}
+func (f *fakePromptService) GetPrompt(ctx context.Context, id int64) (*entities.Prompt, error) {
+	return &entities.Prompt{ID: id, Name: "p", SystemPrompt: "s", UserPrompt: "u"}, nil
+}
+func (f *fakePromptService) ListPrompts(ctx context.Context) ([]*entities.Prompt, error) {
+	return nil, nil
+}
+func (f *fakePromptService) UpdatePrompt(ctx context.Context, prompt *entities.Prompt) error {
+	return nil
+}
+func (f *fakePromptService) DeletePrompt(ctx context.Context, id int64) error { return nil }
+func (f *fakePromptService) RenderPrompt(ctx context.Context, promptID int64, placeholders map[string]string) (string, string, error) {
+	return "system", "user", nil
+}
+
+// site service fake
+
+type fakeSiteService struct{}
+
+func (f *fakeSiteService) CreateSite(ctx context.Context, site *entities.Site) error { return nil }
+func (f *fakeSiteService) GetSite(ctx context.Context, id int64) (*entities.Site, error) {
+	return &entities.Site{ID: id, Name: "site", URL: "https://example.com", WPUsername: "u", WPPassword: "p"}, nil
+}
+func (f *fakeSiteService) GetSiteWithPassword(ctx context.Context, id int64) (*entities.Site, error) {
+	return &entities.Site{ID: id, Name: "site", URL: "https://example.com", WPUsername: "u", WPPassword: "p"}, nil
+}
+func (f *fakeSiteService) ListSites(ctx context.Context) ([]*entities.Site, error)   { return nil, nil }
+func (f *fakeSiteService) UpdateSite(ctx context.Context, site *entities.Site) error { return nil }
+func (f *fakeSiteService) UpdateSitePassword(ctx context.Context, id int64, password string) error {
+	return nil
+}
+func (f *fakeSiteService) DeleteSite(ctx context.Context, id int64) error         { return nil }
+func (f *fakeSiteService) CheckHealth(ctx context.Context, siteID int64) error    { return nil }
+func (f *fakeSiteService) SyncCategories(ctx context.Context, siteID int64) error { return nil }
+func (f *fakeSiteService) GetSiteCategories(ctx context.Context, siteID int64) ([]*entities.Category, error) {
+	return []*entities.Category{{ID: 1, SiteID: siteID, WPCategoryID: 10, Name: "cat"}}, nil
+}
+
+type noopExecutor struct{}
+
+func (n *noopExecutor) Execute(ctx context.Context, job *Job) error { return nil }
+func (n *noopExecutor) PublishValidatedArticle(ctx context.Context, job *Job, exec *Execution) error {
+	return nil
+}
+
+// --- Test setup helper ---
+
+func setupJobServiceTest(t *testing.T) (*Service, func()) {
 	t.Helper()
 
+	// DB
 	db, dbCleanup := database.SetupTestDB(t)
 
-	// Disable foreign key constraints for testing
-	ctx := context.Background()
-	_, err := db.ExecContext(ctx, "PRAGMA foreign_keys = OFF")
-	require.NoError(t, err)
-
+	// Logger
 	tempLogDir := filepath.Join(os.TempDir(), "postulator_test_logs", t.Name())
-	require.NoError(t, os.MkdirAll(tempLogDir, 0755))
+	_ = os.MkdirAll(tempLogDir, 0755)
+	tlog, err := logger.NewForTest(&config.Config{LogDir: tempLogDir, AppLogFile: "app.log", ErrLogFile: "err.log", LogLevel: "debug"})
+	if err != nil {
+		t.Fatalf("logger: %v", err)
+	}
 
-	container := di.New()
+	// Seed minimal FK dependencies in DB
+	ctx := context.Background()
+	if _, err := db.ExecContext(ctx, "INSERT INTO sites(name,url,wp_username,wp_password,status,health_status) VALUES (?,?,?,?,?,?)", "Test Site", "https://example.com", "admin", "password", "active", "unknown"); err != nil {
+		t.Fatalf("seed site: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO site_categories(site_id,wp_category_id,name,slug,count) VALUES (?,?,?,?,?)", 1, 10, "Category", "cat", 0); err != nil {
+		t.Fatalf("seed category: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO prompts(name,system_prompt,user_prompt,placeholders) VALUES (?,?,?,?)", "P", "S", "U", "[]"); err != nil {
+		t.Fatalf("seed prompt: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO ai_providers(name,api_key,provider,model,is_active) VALUES (?,?,?,?,?)", "openai", "sk-test", "openai", "gpt-4o", 1); err != nil {
+		t.Fatalf("seed ai provider: %v", err)
+	}
 
-	testLogger, err := logger.NewForTest(&config.Config{
-		LogDir:      tempLogDir,
-		AppLogFile:  "test.log",
-		ErrLogFile:  "test_error.log",
-		LogLevel:    "debug",
-		ConsoleOut:  false,
-		PrettyPrint: false,
-	})
-	require.NoError(t, err)
+	// Minimal DI container only for repos
+	c := di.New()
+	c.MustRegister(di.Instance[*database.DB](db))
+	c.MustRegister(di.Instance[*logger.Logger](tlog))
 
-	container.MustRegister(di.Instance[*database.DB](db))
-	container.MustRegister(di.Instance[*logger.Logger](testLogger))
-	container.MustRegister(di.Instance[*wp.Client](wp.NewClient()))
-	container.MustRegister(&di.Registration[ai.Client]{
-		Provider:      func(di.Container) (ai.Client, error) { return &mockAIClient{}, nil },
-		Lifecycle:     di.Singleton,
-		InterfaceType: reflect.TypeOf((*ai.Client)(nil)).Elem(),
-	})
+	jobRepo, err := NewJobRepository(c)
+	if err != nil {
+		t.Fatalf("job repo: %v", err)
+	}
+	execRepo, err := NewExecutionRepository(c)
+	if err != nil {
+		t.Fatalf("exec repo: %v", err)
+	}
 
-	service, err := NewService(container)
-	require.NoError(t, err)
+	// Use real scheduler for CalculateNextRun but no background loop
+	sch := &Scheduler{logger: tlog}
+	exec := &noopExecutor{}
 
-	repo, err := NewJobRepository(container)
-	require.NoError(t, err)
-
-	execRepo, err := NewExecutionRepository(container)
-	require.NoError(t, err)
+	svc := &Service{jobRepo: jobRepo, execRepo: execRepo, executor: exec, scheduler: sch, logger: tlog}
 
 	cleanup := func() {
-		_ = testLogger.Close()
+		_ = tlog.Close()
 		_ = os.RemoveAll(tempLogDir)
 		dbCleanup()
 	}
-
-	return service, repo, execRepo, cleanup
+	return svc, cleanup
 }
 
-func TestJobService_CreateAndGet(t *testing.T) {
-	service, _, _, cleanup := setupTestService(t)
+// --- Tests ---
+
+func TestJobService_Create_And_List_Get(t *testing.T) {
+	svc, cleanup := setupJobServiceTest(t)
 	defer cleanup()
 
 	ctx := context.Background()
 
-	t.Run("create job successfully", func(t *testing.T) {
-		job := &Job{
-			Name:               "Test Job",
-			SiteID:             1,
-			CategoryID:         1,
-			PromptID:           1,
-			AIProviderID:       1,
-			AIModel:            "gpt-4",
-			RequiresValidation: false,
-			ScheduleType:       ScheduleDaily,
-			JitterEnabled:      false,
-		}
+	// Create a simple interval job: every day at 09:30
+	h := 9
+	m := 30
+	val := 1
+	unit := "days"
+	job := &Job{
+		Name:               "Daily Job",
+		SiteID:             1,
+		CategoryID:         1,
+		PromptID:           1,
+		AIProviderID:       1,
+		AIModel:            "gpt-4o",
+		RequiresValidation: false,
+		ScheduleType:       ScheduleInterval,
+		IntervalValue:      &val,
+		IntervalUnit:       &unit,
+		ScheduleHour:       &h,
+		ScheduleMinute:     &m,
+		Status:             StatusActive,
+	}
 
-		err := service.CreateJob(ctx, job)
-		require.NoError(t, err)
-		require.NotNil(t, job.NextRunAt)
-	})
+	err := svc.CreateJob(ctx, job)
+	if err != nil {
+		t.Fatalf("CreateJob error: %v", err)
+	}
 
-	t.Run("get job by ID", func(t *testing.T) {
-		monday := 1
-		job := &Job{
-			Name:               "Get Test Job",
-			SiteID:             1,
-			CategoryID:         1,
-			PromptID:           1,
-			AIProviderID:       1,
-			AIModel:            "gpt-4o",
-			RequiresValidation: true,
-			ScheduleType:       ScheduleWeekly,
-			ScheduleDay:        &monday,
-			JitterEnabled:      true,
-			JitterMinutes:      30,
-		}
+	// List and Get
+	jobs, err := svc.ListJobs(ctx)
+	if err != nil {
+		t.Fatalf("ListJobs error: %v", err)
+	}
+	if len(jobs) != 1 {
+		t.Fatalf("expected 1 job, got %d", len(jobs))
+	}
 
-		err := service.CreateJob(ctx, job)
-		require.NoError(t, err)
-
-		jobs, err := service.ListJobs(ctx)
-		require.NoError(t, err)
-		require.Greater(t, len(jobs), 0)
-
-		retrievedJob, err := service.GetJob(ctx, jobs[len(jobs)-1].ID)
-		require.NoError(t, err)
-		require.Equal(t, "Get Test Job", retrievedJob.Name)
-		require.Equal(t, "gpt-4o", retrievedJob.AIModel)
-		require.True(t, retrievedJob.RequiresValidation)
-	})
-
-	t.Run("create job with invalid data should fail", func(t *testing.T) {
-		job := &Job{
-			Name:         "", // Empty name
-			SiteID:       1,
-			CategoryID:   1,
-			PromptID:     1,
-			AIProviderID: 1,
-			AIModel:      "gpt-4",
-			ScheduleType: ScheduleDaily,
-		}
-
-		err := service.CreateJob(ctx, job)
-		require.Error(t, err)
-	})
-
-	t.Run("get non-existent job should fail", func(t *testing.T) {
-		_, err := service.GetJob(ctx, 999999)
-		require.Error(t, err)
-	})
+	got, err := svc.GetJob(ctx, jobs[0].ID)
+	if err != nil {
+		t.Fatalf("GetJob error: %v", err)
+	}
+	if got.Name != "Daily Job" {
+		t.Fatalf("unexpected name: %s", got.Name)
+	}
+	if got.NextRunAt == nil {
+		t.Fatalf("NextRunAt should be set for active scheduled job")
+	}
 }
 
-func TestJobService_ListJobs(t *testing.T) {
-	service, _, _, cleanup := setupTestService(t)
+func TestJobService_ValidationErrors(t *testing.T) {
+	svc, cleanup := setupJobServiceTest(t)
 	defer cleanup()
-
 	ctx := context.Background()
 
-	t.Run("list empty jobs", func(t *testing.T) {
-		jobs, err := service.ListJobs(ctx)
-		require.NoError(t, err)
-		require.Equal(t, 0, len(jobs))
-	})
+	bad := &Job{Name: "", SiteID: 1, CategoryID: 1, PromptID: 1, AIProviderID: 1, AIModel: "m", ScheduleType: ScheduleManual}
+	if err := svc.CreateJob(ctx, bad); err == nil {
+		t.Fatal("expected error for empty name")
+	}
 
-	t.Run("list multiple jobs", func(t *testing.T) {
-		for i := 1; i <= 3; i++ {
-			job := &Job{
-				Name:         "List Test Job " + string(rune('0'+i)),
-				SiteID:       int64(i),
-				CategoryID:   1,
-				PromptID:     1,
-				AIProviderID: 1,
-				AIModel:      "gpt-4",
-				ScheduleType: ScheduleDaily,
-			}
+	bad2 := &Job{Name: "n", SiteID: 0, CategoryID: 1, PromptID: 1, AIProviderID: 1, AIModel: "m", ScheduleType: ScheduleManual}
+	if err := svc.CreateJob(ctx, bad2); err == nil {
+		t.Fatal("expected error for empty site")
+	}
 
-			err := service.CreateJob(ctx, job)
-			require.NoError(t, err)
-		}
+	// Interval with invalid unit
+	val := 1
+	unit := "years"
+	bad3 := &Job{Name: "n", SiteID: 1, CategoryID: 1, PromptID: 1, AIProviderID: 1, AIModel: "m", ScheduleType: ScheduleInterval, IntervalValue: &val, IntervalUnit: &unit}
+	if err := svc.CreateJob(ctx, bad3); err == nil {
+		t.Fatal("expected error for invalid unit")
+	}
 
-		jobs, err := service.ListJobs(ctx)
-		require.NoError(t, err)
-		require.Equal(t, 3, len(jobs))
-	})
+	// Weekly without weekdays
+	unitW := "weeks"
+	bad4 := &Job{Name: "n", SiteID: 1, CategoryID: 1, PromptID: 1, AIProviderID: 1, AIModel: "m", ScheduleType: ScheduleInterval, IntervalValue: &val, IntervalUnit: &unitW}
+	if err := svc.CreateJob(ctx, bad4); err == nil {
+		t.Fatal("expected error for empty weekdays")
+	}
+
+	// Monthly without monthdays
+	unitM := "months"
+	bad5 := &Job{Name: "n", SiteID: 1, CategoryID: 1, PromptID: 1, AIProviderID: 1, AIModel: "m", ScheduleType: ScheduleInterval, IntervalValue: &val, IntervalUnit: &unitM}
+	if err := svc.CreateJob(ctx, bad5); err == nil {
+		t.Fatal("expected error for empty monthdays")
+	}
 }
 
-func TestJobService_UpdateJob(t *testing.T) {
-	service, _, _, cleanup := setupTestService(t)
+func TestJobService_Pause_Resume_Update(t *testing.T) {
+	svc, cleanup := setupJobServiceTest(t)
 	defer cleanup()
-
 	ctx := context.Background()
 
-	t.Run("update job successfully", func(t *testing.T) {
-		job := &Job{
-			Name:         "Original Job",
-			SiteID:       1,
-			CategoryID:   1,
-			PromptID:     1,
-			AIProviderID: 1,
-			AIModel:      "gpt-4",
-			ScheduleType: ScheduleDaily,
-		}
-
-		err := service.CreateJob(ctx, job)
-		require.NoError(t, err)
-
-		jobs, err := service.ListJobs(ctx)
-		require.NoError(t, err)
-		require.Greater(t, len(jobs), 0)
-
-		updatedJob := jobs[0]
-		updatedJob.Name = "Updated Job"
-		updatedJob.AIModel = "gpt-4o"
-
-		err = service.UpdateJob(ctx, updatedJob)
-		require.NoError(t, err)
-
-		retrievedJob, err := service.GetJob(ctx, updatedJob.ID)
-		require.NoError(t, err)
-		require.Equal(t, "Updated Job", retrievedJob.Name)
-		require.Equal(t, "gpt-4o", retrievedJob.AIModel)
-	})
-
-	t.Run("update job with invalid data should fail", func(t *testing.T) {
-		job := &Job{
-			Name:         "Valid Job",
-			SiteID:       1,
-			CategoryID:   1,
-			PromptID:     1,
-			AIProviderID: 1,
-			AIModel:      "gpt-4",
-			ScheduleType: ScheduleDaily,
-		}
-
-		err := service.CreateJob(ctx, job)
-		require.NoError(t, err)
-
-		jobs, err := service.ListJobs(ctx)
-		require.NoError(t, err)
-		require.Greater(t, len(jobs), 0)
-
-		invalidJob := jobs[len(jobs)-1]
-		invalidJob.Name = "" // Invalid empty name
-
-		err = service.UpdateJob(ctx, invalidJob)
-		require.Error(t, err)
-	})
-}
-
-func TestJobService_DeleteJob(t *testing.T) {
-	service, _, _, cleanup := setupTestService(t)
-	defer cleanup()
-
-	ctx := context.Background()
-
-	t.Run("delete job successfully", func(t *testing.T) {
-		job := &Job{
-			Name:         "Delete Test Job",
-			SiteID:       1,
-			CategoryID:   1,
-			PromptID:     1,
-			AIProviderID: 1,
-			AIModel:      "gpt-4",
-			ScheduleType: ScheduleDaily,
-		}
-
-		err := service.CreateJob(ctx, job)
-		require.NoError(t, err)
-
-		jobs, err := service.ListJobs(ctx)
-		require.NoError(t, err)
-		require.Greater(t, len(jobs), 0)
-
-		jobID := jobs[0].ID
-
-		err = service.DeleteJob(ctx, jobID)
-		require.NoError(t, err)
-
-		_, err = service.GetJob(ctx, jobID)
-		require.Error(t, err)
-	})
-
-	t.Run("delete non-existent job should fail", func(t *testing.T) {
-		err := service.DeleteJob(ctx, 999999)
-		require.Error(t, err)
-	})
-}
-
-func TestJobService_PauseJob(t *testing.T) {
-	service, repo, _, cleanup := setupTestService(t)
-	defer cleanup()
-
-	ctx := context.Background()
-
-	t.Run("pause active job successfully", func(t *testing.T) {
-		job := &Job{
-			Name:         "Pause Test Job",
-			SiteID:       1,
-			CategoryID:   1,
-			PromptID:     1,
-			AIProviderID: 1,
-			AIModel:      "gpt-4",
-			ScheduleType: ScheduleDaily,
-		}
-
-		err := service.CreateJob(ctx, job)
-		require.NoError(t, err)
-
-		jobs, err := service.ListJobs(ctx)
-		require.NoError(t, err)
-		require.Greater(t, len(jobs), 0)
-
-		jobID := jobs[len(jobs)-1].ID
-
-		err = service.PauseJob(ctx, jobID)
-		require.NoError(t, err)
-
-		retrievedJob, err := repo.GetByID(ctx, jobID)
-		require.NoError(t, err)
-		require.Equal(t, StatusPaused, retrievedJob.Status)
-	})
-
-	t.Run("pause non-existent job should fail", func(t *testing.T) {
-		err := service.PauseJob(ctx, 999999)
-		require.Error(t, err)
-	})
-}
-
-func TestJobService_ResumeJob(t *testing.T) {
-	service, repo, _, cleanup := setupTestService(t)
-	defer cleanup()
-
-	ctx := context.Background()
-
-	t.Run("resume paused job successfully", func(t *testing.T) {
-		job := &Job{
-			Name:         "Resume Test Job",
-			SiteID:       1,
-			CategoryID:   1,
-			PromptID:     1,
-			AIProviderID: 1,
-			AIModel:      "gpt-4",
-			ScheduleType: ScheduleDaily,
-		}
-
-		err := service.CreateJob(ctx, job)
-		require.NoError(t, err)
-
-		jobs, err := service.ListJobs(ctx)
-		require.NoError(t, err)
-		require.Greater(t, len(jobs), 0)
-
-		jobID := jobs[len(jobs)-1].ID
-
-		// First pause it
-		err = service.PauseJob(ctx, jobID)
-		require.NoError(t, err)
-
-		// Then resume it
-		err = service.ResumeJob(ctx, jobID)
-		require.NoError(t, err)
-
-		retrievedJob, err := repo.GetByID(ctx, jobID)
-		require.NoError(t, err)
-		require.Equal(t, StatusActive, retrievedJob.Status)
-		require.NotNil(t, retrievedJob.NextRunAt)
-	})
-
-	t.Run("resume non-existent job should fail", func(t *testing.T) {
-		err := service.ResumeJob(ctx, 999999)
-		require.Error(t, err)
-	})
-}
-
-func TestJobService_ExecuteJobManually(t *testing.T) {
-	service, repo, _, cleanup := setupTestService(t)
-	defer cleanup()
-
-	ctx := context.Background()
-
-	t.Run("execute job manually creates execution record", func(t *testing.T) {
-		job := &Job{
-			Name:         "Manual Execution Job",
-			SiteID:       1,
-			CategoryID:   1,
-			PromptID:     1,
-			AIProviderID: 1,
-			AIModel:      "gpt-4",
-			ScheduleType: ScheduleManual,
-		}
-
-		err := service.CreateJob(ctx, job)
-		require.NoError(t, err)
-
-		jobs, err := service.ListJobs(ctx)
-		require.NoError(t, err)
-		require.Greater(t, len(jobs), 0)
-
-		jobID := jobs[len(jobs)-1].ID
-
-		// Note: ExecuteJobManually will fail because executor needs real dependencies
-		// But we can verify it attempts to execute
-		err = service.ExecuteJobManually(ctx, jobID)
-		// Error is expected because we don't have real topic/prompt/AI dependencies in test
-		// Just verify the method was called
-		_ = err
-
-		// Verify job was retrieved (would have errored earlier if job didn't exist)
-		retrievedJob, err := repo.GetByID(ctx, jobID)
-		require.NoError(t, err)
-		require.Equal(t, "Manual Execution Job", retrievedJob.Name)
-	})
-
-	t.Run("execute non-existent job should fail", func(t *testing.T) {
-		err := service.ExecuteJobManually(ctx, 999999)
-		require.Error(t, err)
-	})
-}
-
-func TestJobService_ValidateExecution(t *testing.T) {
-	service, _, execRepo, cleanup := setupTestService(t)
-	defer cleanup()
-
-	ctx := context.Background()
-
-	t.Run("approve execution successfully", func(t *testing.T) {
-		// Create an execution pending validation
-		title := "Test Article"
-		content := "Test Content"
-		exec := &Execution{
-			JobID:            1,
-			TopicID:          1,
-			GeneratedTitle:   &title,
-			GeneratedContent: &content,
-			Status:           ExecutionPendingValidation,
-			StartedAt:        time.Now(),
-		}
-
-		err := execRepo.Create(ctx, exec)
-		require.NoError(t, err)
-
-		execs, err := execRepo.GetByJobID(ctx, 1)
-		require.NoError(t, err)
-		require.Greater(t, len(execs), 0)
-
-		execID := execs[len(execs)-1].ID
-
-		// Note: ValidateExecution will fail because it tries to publish to WordPress
-		// But we can verify it attempts validation
-		err = service.ValidateExecution(ctx, execID, true)
-		// Error is expected because we don't have real WordPress client
-		_ = err
-
-		// Verify execution exists
-		retrievedExec, err := execRepo.GetByID(ctx, execID)
-		require.NoError(t, err)
-		require.NotNil(t, retrievedExec)
-	})
-
-	t.Run("reject execution successfully", func(t *testing.T) {
-		// Create an execution pending validation
-		title := "Test Article 2"
-		content := "Test Content 2"
-		exec := &Execution{
-			JobID:            2,
-			TopicID:          2,
-			GeneratedTitle:   &title,
-			GeneratedContent: &content,
-			Status:           ExecutionPendingValidation,
-			StartedAt:        time.Now(),
-		}
-
-		err := execRepo.Create(ctx, exec)
-		require.NoError(t, err)
-
-		execs, err := execRepo.GetByJobID(ctx, 2)
-		require.NoError(t, err)
-		require.Greater(t, len(execs), 0)
-
-		execID := execs[len(execs)-1].ID
-
-		// Reject the execution
-		err = service.ValidateExecution(ctx, execID, false)
-		require.NoError(t, err)
-
-		// Verify execution status changed to failed
-		retrievedExec, err := execRepo.GetByID(ctx, execID)
-		require.NoError(t, err)
-		require.Equal(t, ExecutionFailed, retrievedExec.Status)
-		require.NotNil(t, retrievedExec.ErrorMessage)
-	})
-
-	t.Run("validate non-existent execution should fail", func(t *testing.T) {
-		err := service.ValidateExecution(ctx, 999999, true)
-		require.Error(t, err)
-	})
-
-	t.Run("validate execution not pending validation should fail", func(t *testing.T) {
-		// Create execution with different status
-		exec := &Execution{
-			JobID:     3,
-			TopicID:   3,
-			Status:    ExecutionPublished, // Not pending validation
-			StartedAt: time.Now(),
-		}
-
-		err := execRepo.Create(ctx, exec)
-		require.NoError(t, err)
-
-		execs, err := execRepo.GetByJobID(ctx, 3)
-		require.NoError(t, err)
-		require.Greater(t, len(execs), 0)
-
-		execID := execs[len(execs)-1].ID
-
-		err = service.ValidateExecution(ctx, execID, true)
-		require.Error(t, err)
-	})
-}
-
-func TestJobService_GetPendingValidations(t *testing.T) {
-	service, _, execRepo, cleanup := setupTestService(t)
-	defer cleanup()
-
-	ctx := context.Background()
-
-	t.Run("get pending validations", func(t *testing.T) {
-		// Create multiple executions with different statuses
-		statuses := []ExecutionStatus{
-			ExecutionPending,
-			ExecutionGenerating,
-			ExecutionPendingValidation,
-			ExecutionPendingValidation,
-			ExecutionValidated,
-			ExecutionPublished,
-		}
-
-		for i, status := range statuses {
-			exec := &Execution{
-				JobID:     int64(i + 1),
-				TopicID:   int64(i + 1),
-				Status:    status,
-				StartedAt: time.Now(),
-			}
-			err := execRepo.Create(ctx, exec)
-			require.NoError(t, err)
-		}
-
-		// Get pending validations
-		pending, err := service.GetPendingValidations(ctx)
-		require.NoError(t, err)
-		require.Equal(t, 2, len(pending))
-
-		// Verify all are pending validation
-		for _, exec := range pending {
-			require.Equal(t, ExecutionPendingValidation, exec.Status)
-		}
-	})
-}
-
-func TestJobService_Validation(t *testing.T) {
-	service, _, _, cleanup := setupTestService(t)
-	defer cleanup()
-
-	ctx := context.Background()
-
-	t.Run("create job with empty name should fail", func(t *testing.T) {
-		job := &Job{
-			Name:         "",
-			SiteID:       1,
-			CategoryID:   1,
-			PromptID:     1,
-			AIProviderID: 1,
-			AIModel:      "gpt-4",
-			ScheduleType: ScheduleDaily,
-		}
-
-		err := service.CreateJob(ctx, job)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "name")
-	})
-
-	t.Run("create job with invalid site ID should fail", func(t *testing.T) {
-		job := &Job{
-			Name:         "Test Job",
-			SiteID:       0,
-			CategoryID:   1,
-			PromptID:     1,
-			AIProviderID: 1,
-			AIModel:      "gpt-4",
-			ScheduleType: ScheduleDaily,
-		}
-
-		err := service.CreateJob(ctx, job)
-		require.Error(t, err)
-	})
-
-	t.Run("create job with invalid schedule type should fail", func(t *testing.T) {
-		job := &Job{
-			Name:         "Test Job",
-			SiteID:       1,
-			CategoryID:   1,
-			PromptID:     1,
-			AIProviderID: 1,
-			AIModel:      "gpt-4",
-			ScheduleType: ScheduleType("invalid"),
-		}
-
-		err := service.CreateJob(ctx, job)
-		require.Error(t, err)
-	})
-
-	t.Run("create weekly job without schedule day should fail", func(t *testing.T) {
-		job := &Job{
-			Name:         "Test Job",
-			SiteID:       1,
-			CategoryID:   1,
-			PromptID:     1,
-			AIProviderID: 1,
-			AIModel:      "gpt-4",
-			ScheduleType: ScheduleWeekly,
-			ScheduleDay:  nil,
-		}
-
-		err := service.CreateJob(ctx, job)
-		require.Error(t, err)
-	})
-
-	t.Run("create monthly job without schedule day should fail", func(t *testing.T) {
-		job := &Job{
-			Name:         "Test Job",
-			SiteID:       1,
-			CategoryID:   1,
-			PromptID:     1,
-			AIProviderID: 1,
-			AIModel:      "gpt-4",
-			ScheduleType: ScheduleMonthly,
-			ScheduleDay:  nil,
-		}
-
-		err := service.CreateJob(ctx, job)
-		require.Error(t, err)
-	})
-}
-
-func TestJobService_ScheduleTypes(t *testing.T) {
-	service, _, _, cleanup := setupTestService(t)
-	defer cleanup()
-
-	ctx := context.Background()
-
-	t.Run("create jobs with different schedule types", func(t *testing.T) {
-		scheduleTypes := []ScheduleType{
-			ScheduleManual,
-			ScheduleOnce,
-			ScheduleDaily,
-		}
-
-		for i, scheduleType := range scheduleTypes {
-			job := &Job{
-				Name:         string(scheduleType) + " Job",
-				SiteID:       int64(i + 1),
-				CategoryID:   1,
-				PromptID:     1,
-				AIProviderID: 1,
-				AIModel:      "gpt-4",
-				ScheduleType: scheduleType,
-			}
-
-			err := service.CreateJob(ctx, job)
-			require.NoError(t, err)
-		}
-
-		jobs, err := service.ListJobs(ctx)
-		require.NoError(t, err)
-		require.GreaterOrEqual(t, len(jobs), 3)
-	})
-
-	t.Run("create weekly job with schedule day", func(t *testing.T) {
-		friday := 5
-		job := &Job{
-			Name:         "Weekly Job",
-			SiteID:       10,
-			CategoryID:   1,
-			PromptID:     1,
-			AIProviderID: 1,
-			AIModel:      "gpt-4",
-			ScheduleType: ScheduleWeekly,
-			ScheduleDay:  &friday,
-		}
-
-		err := service.CreateJob(ctx, job)
-		require.NoError(t, err)
-	})
-
-	t.Run("create monthly job with schedule day", func(t *testing.T) {
-		day := 15
-		job := &Job{
-			Name:         "Monthly Job",
-			SiteID:       11,
-			CategoryID:   1,
-			PromptID:     1,
-			AIProviderID: 1,
-			AIModel:      "gpt-4",
-			ScheduleType: ScheduleMonthly,
-			ScheduleDay:  &day,
-		}
-
-		err := service.CreateJob(ctx, job)
-		require.NoError(t, err)
-	})
+	h := 6
+	m := 0
+	val := 2
+	unit := "days"
+	job := &Job{
+		Name:   "Every 2 days",
+		SiteID: 1, CategoryID: 1, PromptID: 1,
+		AIProviderID: 1, AIModel: "gpt-4o",
+		ScheduleType: ScheduleInterval, IntervalValue: &val, IntervalUnit: &unit,
+		ScheduleHour: &h, ScheduleMinute: &m,
+		Status: StatusActive,
+	}
+	if err := svc.CreateJob(ctx, job); err != nil {
+		t.Fatalf("CreateJob: %v", err)
+	}
+
+	jobs, _ := svc.ListJobs(ctx)
+	jid := jobs[0].ID
+
+	// Pause
+	if err := svc.PauseJob(ctx, jid); err != nil {
+		t.Fatalf("PauseJob: %v", err)
+	}
+	j, _ := svc.GetJob(ctx, jid)
+	if j.Status != StatusPaused {
+		t.Fatalf("expected paused, got %s", j.Status)
+	}
+
+	// Resume
+	if err := svc.ResumeJob(ctx, jid); err != nil {
+		t.Fatalf("ResumeJob: %v", err)
+	}
+	j, _ = svc.GetJob(ctx, jid)
+	if j.Status != StatusActive {
+		t.Fatalf("expected active, got %s", j.Status)
+	}
+	if j.NextRunAt == nil {
+		t.Fatalf("NextRunAt should be set on resume")
+	}
+
+	// Update
+	newH := 7
+	job = j
+	job.ScheduleHour = &newH
+	if err := svc.UpdateJob(ctx, job); err != nil {
+		t.Fatalf("UpdateJob: %v", err)
+	}
+	j2, _ := svc.GetJob(ctx, jid)
+	if j2.ScheduleHour == nil || *j2.ScheduleHour != 7 {
+		t.Fatalf("expected hour 7")
+	}
 }

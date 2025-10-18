@@ -289,22 +289,53 @@ func (s *Service) validateJob(job *Job) error {
 	}
 
 	switch job.ScheduleType {
-	case ScheduleDaily:
-	case ScheduleWeekly:
-		if job.ScheduleDay == nil {
-			return errors.Validation("weekly schedule requires a day of week (1-7)")
+	case ScheduleManual:
+		// no constraints
+	case ScheduleOnce:
+		// require valid time if provided
+		if job.ScheduleHour != nil && (*job.ScheduleHour < 0 || *job.ScheduleHour > 23) {
+			return errors.Validation("schedule hour must be between 0 and 23")
 		}
-		if *job.ScheduleDay < 1 || *job.ScheduleDay > 7 {
-			return errors.Validation("weekly schedule day must be between 1 and 7")
+		if job.ScheduleMinute != nil && (*job.ScheduleMinute < 0 || *job.ScheduleMinute > 59) {
+			return errors.Validation("schedule minute must be between 0 and 59")
 		}
-	case ScheduleMonthly:
-		if job.ScheduleDay == nil {
-			return errors.Validation("monthly schedule requires a day of month (1-31)")
+	case ScheduleInterval:
+		if job.IntervalValue == nil || *job.IntervalValue <= 0 {
+			return errors.Validation("interval value must be >= 1")
 		}
-		if *job.ScheduleDay < 1 || *job.ScheduleDay > 31 {
-			return errors.Validation("monthly schedule day must be between 1 and 31")
+		if job.IntervalUnit == nil {
+			return errors.Validation("interval unit is required")
 		}
-	case ScheduleManual, ScheduleOnce:
+		unit := *job.IntervalUnit
+		if unit != "days" && unit != "weeks" && unit != "months" {
+			return errors.Validation("interval unit must be one of: days, weeks, months")
+		}
+		if job.ScheduleHour != nil && (*job.ScheduleHour < 0 || *job.ScheduleHour > 23) {
+			return errors.Validation("schedule hour must be between 0 and 23")
+		}
+		if job.ScheduleMinute != nil && (*job.ScheduleMinute < 0 || *job.ScheduleMinute > 59) {
+			return errors.Validation("schedule minute must be between 0 and 59")
+		}
+		if unit == "weeks" {
+			if len(job.Weekdays) == 0 {
+				return errors.Validation("for weekly intervals please select at least one weekday (1-7)")
+			}
+			for _, d := range job.Weekdays {
+				if d < 1 || d > 7 {
+					return errors.Validation("weekday must be between 1 and 7")
+				}
+			}
+		}
+		if unit == "months" {
+			if len(job.Monthdays) == 0 {
+				return errors.Validation("for monthly intervals please specify at least one day of month (1-31)")
+			}
+			for _, d := range job.Monthdays {
+				if d < 1 || d > 31 {
+					return errors.Validation("month day must be between 1 and 31")
+				}
+			}
+		}
 	default:
 		return errors.Validation(fmt.Sprintf("unknown schedule type: %s", job.ScheduleType))
 	}

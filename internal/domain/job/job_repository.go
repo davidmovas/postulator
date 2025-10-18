@@ -7,6 +7,8 @@ import (
 	"Postulator/pkg/errors"
 	"Postulator/pkg/logger"
 	"context"
+	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/Masterminds/squirrel"
@@ -37,6 +39,21 @@ func NewJobRepository(c di.Container) (*JobRepository, error) {
 }
 
 func (r *JobRepository) Create(ctx context.Context, job *Job) error {
+	// prepare JSON fields
+	var weekdaysStr, monthdaysStr *string
+	if len(job.Weekdays) > 0 {
+		if b, err := json.Marshal(job.Weekdays); err == nil {
+			s := string(b)
+			weekdaysStr = &s
+		}
+	}
+	if len(job.Monthdays) > 0 {
+		if b, err := json.Marshal(job.Monthdays); err == nil {
+			s := string(b)
+			monthdaysStr = &s
+		}
+	}
+
 	query, args := dbx.ST.
 		Insert("jobs").
 		Columns(
@@ -48,8 +65,12 @@ func (r *JobRepository) Create(ctx context.Context, job *Job) error {
 			"ai_model",
 			"requires_validation",
 			"schedule_type",
-			"schedule_time",
-			"schedule_day",
+			"interval_value",
+			"interval_unit",
+			"schedule_hour",
+			"schedule_minute",
+			"weekdays",
+			"monthdays",
 			"jitter_enabled",
 			"jitter_minutes",
 			"status",
@@ -64,8 +85,12 @@ func (r *JobRepository) Create(ctx context.Context, job *Job) error {
 			job.AIModel,
 			job.RequiresValidation,
 			job.ScheduleType,
-			job.ScheduleTime,
-			job.ScheduleDay,
+			job.IntervalValue,
+			job.IntervalUnit,
+			job.ScheduleHour,
+			job.ScheduleMinute,
+			weekdaysStr,
+			monthdaysStr,
 			job.JitterEnabled,
 			job.JitterMinutes,
 			job.Status,
@@ -93,8 +118,12 @@ func (r *JobRepository) GetByID(ctx context.Context, id int64) (*Job, error) {
 			"ai_model",
 			"requires_validation",
 			"schedule_type",
-			"schedule_time",
-			"schedule_day",
+			"interval_value",
+			"interval_unit",
+			"schedule_hour",
+			"schedule_minute",
+			"weekdays",
+			"monthdays",
 			"jitter_enabled",
 			"jitter_minutes",
 			"status",
@@ -108,6 +137,13 @@ func (r *JobRepository) GetByID(ctx context.Context, id int64) (*Job, error) {
 		MustSql()
 
 	var job Job
+	var intervalValue sql.NullInt64
+	var intervalUnit sql.NullString
+	var scheduleHour sql.NullInt64
+	var scheduleMinute sql.NullInt64
+	var weekdaysStr sql.NullString
+	var monthdaysStr sql.NullString
+
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(
 		&job.ID,
 		&job.Name,
@@ -118,8 +154,12 @@ func (r *JobRepository) GetByID(ctx context.Context, id int64) (*Job, error) {
 		&job.AIModel,
 		&job.RequiresValidation,
 		&job.ScheduleType,
-		&job.ScheduleTime,
-		&job.ScheduleDay,
+		&intervalValue,
+		&intervalUnit,
+		&scheduleHour,
+		&scheduleMinute,
+		&weekdaysStr,
+		&monthdaysStr,
 		&job.JitterEnabled,
 		&job.JitterMinutes,
 		&job.Status,
@@ -134,6 +174,33 @@ func (r *JobRepository) GetByID(ctx context.Context, id int64) (*Job, error) {
 		return nil, errors.NotFound("job", id)
 	case err != nil:
 		return nil, errors.Internal(err)
+	}
+
+	if intervalValue.Valid {
+		v := int(intervalValue.Int64)
+		job.IntervalValue = &v
+	}
+	if intervalUnit.Valid {
+		v := intervalUnit.String
+		job.IntervalUnit = &v
+	}
+	if scheduleHour.Valid {
+		v := int(scheduleHour.Int64)
+		job.ScheduleHour = &v
+	}
+	if scheduleMinute.Valid {
+		v := int(scheduleMinute.Int64)
+		job.ScheduleMinute = &v
+	}
+	if weekdaysStr.Valid {
+		var arr []int
+		_ = json.Unmarshal([]byte(weekdaysStr.String), &arr)
+		job.Weekdays = arr
+	}
+	if monthdaysStr.Valid {
+		var arr []int
+		_ = json.Unmarshal([]byte(monthdaysStr.String), &arr)
+		job.Monthdays = arr
 	}
 
 	return &job, nil
@@ -151,8 +218,12 @@ func (r *JobRepository) GetAll(ctx context.Context) ([]*Job, error) {
 			"ai_model",
 			"requires_validation",
 			"schedule_type",
-			"schedule_time",
-			"schedule_day",
+			"interval_value",
+			"interval_unit",
+			"schedule_hour",
+			"schedule_minute",
+			"weekdays",
+			"monthdays",
 			"jitter_enabled",
 			"jitter_minutes",
 			"status",
@@ -176,6 +247,12 @@ func (r *JobRepository) GetAll(ctx context.Context) ([]*Job, error) {
 	var jobs []*Job
 	for rows.Next() {
 		var job Job
+		var intervalValue sql.NullInt64
+		var intervalUnit sql.NullString
+		var scheduleHour sql.NullInt64
+		var scheduleMinute sql.NullInt64
+		var weekdaysStr sql.NullString
+		var monthdaysStr sql.NullString
 		if err = rows.Scan(
 			&job.ID,
 			&job.Name,
@@ -186,8 +263,12 @@ func (r *JobRepository) GetAll(ctx context.Context) ([]*Job, error) {
 			&job.AIModel,
 			&job.RequiresValidation,
 			&job.ScheduleType,
-			&job.ScheduleTime,
-			&job.ScheduleDay,
+			&intervalValue,
+			&intervalUnit,
+			&scheduleHour,
+			&scheduleMinute,
+			&weekdaysStr,
+			&monthdaysStr,
 			&job.JitterEnabled,
 			&job.JitterMinutes,
 			&job.Status,
@@ -197,6 +278,32 @@ func (r *JobRepository) GetAll(ctx context.Context) ([]*Job, error) {
 			&job.UpdatedAt,
 		); err != nil {
 			return nil, errors.Internal(err)
+		}
+		if intervalValue.Valid {
+			v := int(intervalValue.Int64)
+			job.IntervalValue = &v
+		}
+		if intervalUnit.Valid {
+			v := intervalUnit.String
+			job.IntervalUnit = &v
+		}
+		if scheduleHour.Valid {
+			v := int(scheduleHour.Int64)
+			job.ScheduleHour = &v
+		}
+		if scheduleMinute.Valid {
+			v := int(scheduleMinute.Int64)
+			job.ScheduleMinute = &v
+		}
+		if weekdaysStr.Valid {
+			var arr []int
+			_ = json.Unmarshal([]byte(weekdaysStr.String), &arr)
+			job.Weekdays = arr
+		}
+		if monthdaysStr.Valid {
+			var arr []int
+			_ = json.Unmarshal([]byte(monthdaysStr.String), &arr)
+			job.Monthdays = arr
 		}
 
 		jobs = append(jobs, &job)
@@ -221,8 +328,12 @@ func (r *JobRepository) GetActive(ctx context.Context) ([]*Job, error) {
 			"ai_model",
 			"requires_validation",
 			"schedule_type",
-			"schedule_time",
-			"schedule_day",
+			"interval_value",
+			"interval_unit",
+			"schedule_hour",
+			"schedule_minute",
+			"weekdays",
+			"monthdays",
 			"jitter_enabled",
 			"jitter_minutes",
 			"status",
@@ -247,6 +358,12 @@ func (r *JobRepository) GetActive(ctx context.Context) ([]*Job, error) {
 	var jobs []*Job
 	for rows.Next() {
 		var job Job
+		var intervalValue sql.NullInt64
+		var intervalUnit sql.NullString
+		var scheduleHour sql.NullInt64
+		var scheduleMinute sql.NullInt64
+		var weekdaysStr sql.NullString
+		var monthdaysStr sql.NullString
 		if err = rows.Scan(
 			&job.ID,
 			&job.Name,
@@ -257,8 +374,12 @@ func (r *JobRepository) GetActive(ctx context.Context) ([]*Job, error) {
 			&job.AIModel,
 			&job.RequiresValidation,
 			&job.ScheduleType,
-			&job.ScheduleTime,
-			&job.ScheduleDay,
+			&intervalValue,
+			&intervalUnit,
+			&scheduleHour,
+			&scheduleMinute,
+			&weekdaysStr,
+			&monthdaysStr,
 			&job.JitterEnabled,
 			&job.JitterMinutes,
 			&job.Status,
@@ -268,6 +389,32 @@ func (r *JobRepository) GetActive(ctx context.Context) ([]*Job, error) {
 			&job.UpdatedAt,
 		); err != nil {
 			return nil, errors.Internal(err)
+		}
+		if intervalValue.Valid {
+			v := int(intervalValue.Int64)
+			job.IntervalValue = &v
+		}
+		if intervalUnit.Valid {
+			v := intervalUnit.String
+			job.IntervalUnit = &v
+		}
+		if scheduleHour.Valid {
+			v := int(scheduleHour.Int64)
+			job.ScheduleHour = &v
+		}
+		if scheduleMinute.Valid {
+			v := int(scheduleMinute.Int64)
+			job.ScheduleMinute = &v
+		}
+		if weekdaysStr.Valid {
+			var arr []int
+			_ = json.Unmarshal([]byte(weekdaysStr.String), &arr)
+			job.Weekdays = arr
+		}
+		if monthdaysStr.Valid {
+			var arr []int
+			_ = json.Unmarshal([]byte(monthdaysStr.String), &arr)
+			job.Monthdays = arr
 		}
 
 		jobs = append(jobs, &job)
@@ -281,6 +428,20 @@ func (r *JobRepository) GetActive(ctx context.Context) ([]*Job, error) {
 }
 
 func (r *JobRepository) Update(ctx context.Context, job *Job) error {
+	var weekdaysStr, monthdaysStr *string
+	if len(job.Weekdays) > 0 {
+		if b, err := json.Marshal(job.Weekdays); err == nil {
+			s := string(b)
+			weekdaysStr = &s
+		}
+	}
+	if len(job.Monthdays) > 0 {
+		if b, err := json.Marshal(job.Monthdays); err == nil {
+			s := string(b)
+			monthdaysStr = &s
+		}
+	}
+
 	query, args := dbx.ST.
 		Update("jobs").
 		Set("name", job.Name).
@@ -291,8 +452,12 @@ func (r *JobRepository) Update(ctx context.Context, job *Job) error {
 		Set("ai_model", job.AIModel).
 		Set("requires_validation", job.RequiresValidation).
 		Set("schedule_type", job.ScheduleType).
-		Set("schedule_time", job.ScheduleTime).
-		Set("schedule_day", job.ScheduleDay).
+		Set("interval_value", job.IntervalValue).
+		Set("interval_unit", job.IntervalUnit).
+		Set("schedule_hour", job.ScheduleHour).
+		Set("schedule_minute", job.ScheduleMinute).
+		Set("weekdays", weekdaysStr).
+		Set("monthdays", monthdaysStr).
 		Set("jitter_enabled", job.JitterEnabled).
 		Set("jitter_minutes", job.JitterMinutes).
 		Set("status", job.Status).
@@ -348,8 +513,12 @@ func (r *JobRepository) GetDueJobs(ctx context.Context, now time.Time) ([]*Job, 
 			"ai_model",
 			"requires_validation",
 			"schedule_type",
-			"schedule_time",
-			"schedule_day",
+			"interval_value",
+			"interval_unit",
+			"schedule_hour",
+			"schedule_minute",
+			"weekdays",
+			"monthdays",
 			"jitter_enabled",
 			"jitter_minutes",
 			"status",
@@ -375,6 +544,12 @@ func (r *JobRepository) GetDueJobs(ctx context.Context, now time.Time) ([]*Job, 
 	var jobs []*Job
 	for rows.Next() {
 		var job Job
+		var intervalValue sql.NullInt64
+		var intervalUnit sql.NullString
+		var scheduleHour sql.NullInt64
+		var scheduleMinute sql.NullInt64
+		var weekdaysStr sql.NullString
+		var monthdaysStr sql.NullString
 		if err = rows.Scan(
 			&job.ID,
 			&job.Name,
@@ -385,8 +560,12 @@ func (r *JobRepository) GetDueJobs(ctx context.Context, now time.Time) ([]*Job, 
 			&job.AIModel,
 			&job.RequiresValidation,
 			&job.ScheduleType,
-			&job.ScheduleTime,
-			&job.ScheduleDay,
+			&intervalValue,
+			&intervalUnit,
+			&scheduleHour,
+			&scheduleMinute,
+			&weekdaysStr,
+			&monthdaysStr,
 			&job.JitterEnabled,
 			&job.JitterMinutes,
 			&job.Status,
@@ -396,6 +575,32 @@ func (r *JobRepository) GetDueJobs(ctx context.Context, now time.Time) ([]*Job, 
 			&job.UpdatedAt,
 		); err != nil {
 			return nil, errors.Internal(err)
+		}
+		if intervalValue.Valid {
+			v := int(intervalValue.Int64)
+			job.IntervalValue = &v
+		}
+		if intervalUnit.Valid {
+			v := intervalUnit.String
+			job.IntervalUnit = &v
+		}
+		if scheduleHour.Valid {
+			v := int(scheduleHour.Int64)
+			job.ScheduleHour = &v
+		}
+		if scheduleMinute.Valid {
+			v := int(scheduleMinute.Int64)
+			job.ScheduleMinute = &v
+		}
+		if weekdaysStr.Valid {
+			var arr []int
+			_ = json.Unmarshal([]byte(weekdaysStr.String), &arr)
+			job.Weekdays = arr
+		}
+		if monthdaysStr.Valid {
+			var arr []int
+			_ = json.Unmarshal([]byte(monthdaysStr.String), &arr)
+			job.Monthdays = arr
 		}
 
 		jobs = append(jobs, &job)
