@@ -143,7 +143,7 @@ func (e *Executor) executePipeline(ctx context.Context, job *Job, exec *Executio
 	}
 
 	exec.TopicID = availableTopic.ID
-	if err := e.execRepo.Update(ctx, exec); err != nil {
+	if err = e.execRepo.Update(ctx, exec); err != nil {
 		return fmt.Errorf("failed to update execution with topic: %w", err)
 	}
 
