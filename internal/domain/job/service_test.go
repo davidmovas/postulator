@@ -129,16 +129,16 @@ func setupJobServiceTest(t *testing.T) (*Service, func()) {
 
 	// Seed minimal FK dependencies in DB
 	ctx := context.Background()
-	if _, err := db.ExecContext(ctx, "INSERT INTO sites(name,url,wp_username,wp_password,status,health_status) VALUES (?,?,?,?,?,?)", "Test Site", "https://example.com", "admin", "password", "active", "unknown"); err != nil {
+	if _, err = db.ExecContext(ctx, "INSERT INTO sites(name,url,wp_username,wp_password,status,health_status) VALUES (?,?,?,?,?,?)", "Test Site", "https://example.com", "admin", "password", "active", "unknown"); err != nil {
 		t.Fatalf("seed site: %v", err)
 	}
-	if _, err := db.ExecContext(ctx, "INSERT INTO site_categories(site_id,wp_category_id,name,slug,count) VALUES (?,?,?,?,?)", 1, 10, "Category", "cat", 0); err != nil {
+	if _, err = db.ExecContext(ctx, "INSERT INTO site_categories(site_id,wp_category_id,name,slug,count) VALUES (?,?,?,?,?)", 1, 10, "Category", "cat", 0); err != nil {
 		t.Fatalf("seed category: %v", err)
 	}
-	if _, err := db.ExecContext(ctx, "INSERT INTO prompts(name,system_prompt,user_prompt,placeholders) VALUES (?,?,?,?)", "P", "S", "U", "[]"); err != nil {
+	if _, err = db.ExecContext(ctx, "INSERT INTO prompts(name,system_prompt,user_prompt,placeholders) VALUES (?,?,?,?)", "P", "S", "U", "[]"); err != nil {
 		t.Fatalf("seed prompt: %v", err)
 	}
-	if _, err := db.ExecContext(ctx, "INSERT INTO ai_providers(name,api_key,provider,model,is_active) VALUES (?,?,?,?,?)", "openai", "sk-test", "openai", "gpt-4o", 1); err != nil {
+	if _, err = db.ExecContext(ctx, "INSERT INTO ai_providers(name,api_key,provider,model,is_active) VALUES (?,?,?,?,?)", "openai", "sk-test", "openai", "gpt-4o", 1); err != nil {
 		t.Fatalf("seed ai provider: %v", err)
 	}
 
