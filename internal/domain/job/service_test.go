@@ -111,15 +111,11 @@ func (n *noopExecutor) PublishValidatedArticle(ctx context.Context, job *Job, ex
 	return nil
 }
 
-// --- Test setup helper ---
-
 func setupJobServiceTest(t *testing.T) (*Service, func()) {
 	t.Helper()
 
-	// DB
 	db, dbCleanup := database.SetupTestDB(t)
 
-	// Logger
 	tempLogDir := filepath.Join(os.TempDir(), "postulator_test_logs", t.Name())
 	_ = os.MkdirAll(tempLogDir, 0755)
 	tlog, err := logger.NewForTest(&config.Config{LogDir: tempLogDir, AppLogFile: "app.log", ErrLogFile: "err.log", LogLevel: "debug"})
@@ -127,7 +123,6 @@ func setupJobServiceTest(t *testing.T) (*Service, func()) {
 		t.Fatalf("logger: %v", err)
 	}
 
-	// Seed minimal FK dependencies in DB
 	ctx := context.Background()
 	if _, err = db.ExecContext(ctx, "INSERT INTO sites(name,url,wp_username,wp_password,status,health_status) VALUES (?,?,?,?,?,?)", "Test Site", "https://example.com", "admin", "password", "active", "unknown"); err != nil {
 		t.Fatalf("seed site: %v", err)
@@ -142,7 +137,6 @@ func setupJobServiceTest(t *testing.T) (*Service, func()) {
 		t.Fatalf("seed ai provider: %v", err)
 	}
 
-	// Minimal DI container only for repos
 	c := di.New()
 	c.MustRegister(di.Instance[*database.DB](db))
 	c.MustRegister(di.Instance[*logger.Logger](tlog))
@@ -156,7 +150,6 @@ func setupJobServiceTest(t *testing.T) (*Service, func()) {
 		t.Fatalf("exec repo: %v", err)
 	}
 
-	// Use real scheduler for CalculateNextRun but no background loop
 	sch := &Scheduler{logger: tlog}
 	exec := &noopExecutor{}
 
@@ -170,15 +163,12 @@ func setupJobServiceTest(t *testing.T) (*Service, func()) {
 	return svc, cleanup
 }
 
-// --- Tests ---
-
 func TestJobService_Create_And_List_Get(t *testing.T) {
 	svc, cleanup := setupJobServiceTest(t)
 	defer cleanup()
 
 	ctx := context.Background()
 
-	// Create a simple interval job: every day at 09:30
 	h := 9
 	m := 30
 	val := 1
@@ -240,7 +230,6 @@ func TestJobService_ValidationErrors(t *testing.T) {
 		t.Fatal("expected error for empty site")
 	}
 
-	// Interval with invalid unit
 	val := 1
 	unit := "years"
 	bad3 := &Job{Name: "n", SiteID: 1, CategoryID: 1, PromptID: 1, AIProviderID: 1, AIModel: "m", ScheduleType: ScheduleInterval, IntervalValue: &val, IntervalUnit: &unit}
@@ -248,14 +237,12 @@ func TestJobService_ValidationErrors(t *testing.T) {
 		t.Fatal("expected error for invalid unit")
 	}
 
-	// Weekly without weekdays
 	unitW := "weeks"
 	bad4 := &Job{Name: "n", SiteID: 1, CategoryID: 1, PromptID: 1, AIProviderID: 1, AIModel: "m", ScheduleType: ScheduleInterval, IntervalValue: &val, IntervalUnit: &unitW}
 	if err := svc.CreateJob(ctx, bad4); err == nil {
 		t.Fatal("expected error for empty weekdays")
 	}
 
-	// Monthly without monthdays
 	unitM := "months"
 	bad5 := &Job{Name: "n", SiteID: 1, CategoryID: 1, PromptID: 1, AIProviderID: 1, AIModel: "m", ScheduleType: ScheduleInterval, IntervalValue: &val, IntervalUnit: &unitM}
 	if err := svc.CreateJob(ctx, bad5); err == nil {
@@ -287,7 +274,6 @@ func TestJobService_Pause_Resume_Update(t *testing.T) {
 	jobs, _ := svc.ListJobs(ctx)
 	jid := jobs[0].ID
 
-	// Pause
 	if err := svc.PauseJob(ctx, jid); err != nil {
 		t.Fatalf("PauseJob: %v", err)
 	}
@@ -296,7 +282,6 @@ func TestJobService_Pause_Resume_Update(t *testing.T) {
 		t.Fatalf("expected paused, got %s", j.Status)
 	}
 
-	// Resume
 	if err := svc.ResumeJob(ctx, jid); err != nil {
 		t.Fatalf("ResumeJob: %v", err)
 	}
@@ -308,7 +293,6 @@ func TestJobService_Pause_Resume_Update(t *testing.T) {
 		t.Fatalf("NextRunAt should be set on resume")
 	}
 
-	// Update
 	newH := 7
 	job = j
 	job.ScheduleHour = &newH
