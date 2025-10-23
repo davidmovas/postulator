@@ -102,6 +102,7 @@ func FromExecution(e *job.Execution) *Execution {
 		v := t.UTC().Format(timeLayout)
 		return &v
 	}
+
 	return &Execution{
 		ID:               e.ID,
 		JobID:            e.JobID,
