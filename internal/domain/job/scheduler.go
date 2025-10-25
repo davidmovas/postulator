@@ -185,26 +185,21 @@ func (s *Scheduler) checkAndExecuteDueJobs(ctx context.Context) {
 func (s *Scheduler) executeAndReschedule(ctx context.Context, job *Job) error {
 	s.logger.Infof("Executing job %d (%s)", job.ID, job.Name)
 
-	// Execute the job
 	if err := s.executor.Execute(ctx, job); err != nil {
 		s.logger.Errorf("Job %d execution failed: %v", job.ID, err)
 		// Don't return error - still need to reschedule
 	}
 
-	// Update last run time
 	now := time.Now()
 	job.LastRunAt = &now
 
-	// Calculate and set next run time
 	if job.ScheduleType != ScheduleOnce && job.ScheduleType != ScheduleManual {
 		nextRun := s.CalculateNextRun(job, now)
 		job.NextRunAt = &nextRun
 	} else if job.ScheduleType == ScheduleOnce {
-		// Mark as completed after one-time execution
 		job.Status = StatusCompleted
 	}
 
-	// Update job in database
 	if err := s.jobRepo.Update(ctx, job); err != nil {
 		return err
 	}
