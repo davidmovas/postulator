@@ -219,16 +219,13 @@ func (s *Scheduler) RestoreState(ctx context.Context) error {
 	missedJobsCount := 0
 
 	for _, job := range activeJobs {
-		// If job has no next run time or it's in the past, recalculate
 		if job.NextRunAt == nil || job.NextRunAt.Before(now) {
 			if job.ScheduleType == ScheduleManual {
-				continue // Manual jobs don't need rescheduling
+				continue
 			}
 
-			// Check if this is a missed execution
 			if job.NextRunAt != nil && job.NextRunAt.Before(now) {
 				missedJobsCount++
-				// Add random delay to spread out missed executions
 				delay := time.Duration(rand.Intn(300)) * time.Second
 				nextRun := now.Add(delay)
 				job.NextRunAt = &nextRun
@@ -236,12 +233,11 @@ func (s *Scheduler) RestoreState(ctx context.Context) error {
 				s.logger.Warnf("Job %d (%s) missed execution, rescheduling with %v delay",
 					job.ID, job.Name, delay)
 			} else {
-				// Calculate next run normally
 				nextRun := s.CalculateNextRun(job, now)
 				job.NextRunAt = &nextRun
 			}
 
-			if err := s.jobRepo.Update(ctx, job); err != nil {
+			if err = s.jobRepo.Update(ctx, job); err != nil {
 				s.logger.Errorf("Failed to update job %d during state restore: %v", job.ID, err)
 				continue
 			}
