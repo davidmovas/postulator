@@ -285,7 +285,6 @@ func (s *Scheduler) calculateOnceNextRun(job *Job, now time.Time) time.Time {
 	if !target.After(now) {
 		target = target.Add(24 * time.Hour)
 	}
-	// Only schedule once if never run before
 	if job.LastRunAt != nil {
 		return time.Time{}
 	}
@@ -311,7 +310,6 @@ func (s *Scheduler) calculateIntervalNextRun(job *Job, now time.Time) time.Time 
 		minute = *job.ScheduleMinute
 	}
 
-	// Base starting point: today at specified time, or now advanced as needed
 	start := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
 	if job.LastRunAt != nil && job.LastRunAt.After(start) {
 		start = time.Date(job.LastRunAt.Year(), job.LastRunAt.Month(), job.LastRunAt.Day(), hour, minute, 0, 0, now.Location())
@@ -320,14 +318,12 @@ func (s *Scheduler) calculateIntervalNextRun(job *Job, now time.Time) time.Time 
 	switch unit {
 	case "days":
 		if !start.After(now) {
-			// align to next multiple of interval from start
 			daysSince := int(now.Sub(start).Hours() / 24)
 			nextDays := (daysSince/interval + 1) * interval
 			return start.AddDate(0, 0, nextDays)
 		}
 		return start
 	case "weeks":
-		// Weekdays expected as 1..7 (Mon..Sun). If empty, any day of week.
 		allowed := map[time.Weekday]bool{}
 		if len(job.Weekdays) > 0 {
 			for _, d := range job.Weekdays {
@@ -340,16 +336,15 @@ func (s *Scheduler) calculateIntervalNextRun(job *Job, now time.Time) time.Time 
 				allowed[d] = true
 			}
 		}
-		// Find next day matching allowed within rolling N-week cadence.
-		// Determine the start of the current week (Monday-based)
 		weekday := int(now.Weekday())
-		mondayOffset := (weekday + 6) % 7 // days since Monday
+		mondayOffset := (weekday + 6) % 7
 		weekStart := time.Date(now.Year(), now.Month(), now.Day()-mondayOffset, hour, minute, 0, 0, now.Location())
-		// If time has passed today, advance base to now
+
 		if start.Before(now) {
 			start = now
 		}
-		maxDays := interval*7 + 14 // safety window
+
+		maxDays := interval*7 + 14
 		candidate := time.Date(start.Year(), start.Month(), start.Day(), hour, minute, 0, 0, start.Location())
 		for i := 0; i <= maxDays; i++ {
 			wd := candidate.Weekday()
