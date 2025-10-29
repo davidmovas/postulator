@@ -23,7 +23,6 @@ export class AppError extends Error {
     }
 }
 
-// Кастомный хук для работы с ошибками
 export function useErrorHandling() {
     const { toast } = useToast();
 

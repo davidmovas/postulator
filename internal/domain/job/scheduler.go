@@ -16,6 +16,10 @@ const (
 	ScheduleInterval ScheduleType = "interval"
 )
 
+const (
+	SchedulerTickersInterval = 1 * time.Minute
+)
+
 type Status string
 
 const (
@@ -124,13 +128,11 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	s.logger.Info("Starting job scheduler")
 	s.running = true
 
-	// Restore state on startup
 	if err := s.RestoreState(ctx); err != nil {
 		s.logger.Errorf("Failed to restore scheduler state: %v", err)
 		return err
 	}
 
-	// Start scheduler loop
 	go s.run(ctx)
 
 	return nil
@@ -144,7 +146,7 @@ func (s *Scheduler) Stop() error {
 }
 
 func (s *Scheduler) run(ctx context.Context) {
-	ticker := time.NewTicker(1 * time.Minute)
+	ticker := time.NewTicker(SchedulerTickersInterval)
 	defer ticker.Stop()
 
 	for {
@@ -173,7 +175,6 @@ func (s *Scheduler) checkAndExecuteDueJobs(ctx context.Context) {
 	s.logger.Infof("Found %d due jobs to execute", len(dueJobs))
 
 	for _, job := range dueJobs {
-		// Execute job in separate goroutine to avoid blocking
 		go func(j *Job) {
 			if err = s.executeAndReschedule(ctx, j); err != nil {
 				s.logger.Errorf("Failed to execute job %d (%s): %v", j.ID, j.Name, err)
@@ -187,7 +188,6 @@ func (s *Scheduler) executeAndReschedule(ctx context.Context, job *Job) error {
 
 	if err := s.executor.Execute(ctx, job); err != nil {
 		s.logger.Errorf("Job %d execution failed: %v", job.ID, err)
-		// Don't return error - still need to reschedule
 	}
 
 	now := time.Now()

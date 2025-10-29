@@ -101,7 +101,6 @@ func (e *Executor) Execute(ctx context.Context, job *Job) error {
 		return errors.JobExecution(job.ID, err)
 	}
 
-	// Execute pipeline
 	if err := e.executePipeline(ctx, job, exec); err != nil {
 		e.logger.Errorf("Job %d execution failed: %v", job.ID, err)
 
@@ -333,7 +332,6 @@ func (e *Executor) PublishValidatedArticle(ctx context.Context, job *Job, exec *
 }
 
 func (e *Executor) getCategoryInfo(ctx context.Context, categoryID int64, siteID int64) (*entities.Category, error) {
-	// Get all categories for the site and find the matching one
 	categories, err := e.siteService.GetSiteCategories(ctx, siteID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get site categories: %w", err)
