@@ -70,6 +70,7 @@ function SectionContent() {
     if (section === "settings") {
         return <SettingsPage />;
     }
+
     return <DashboardPage />;
 }
 

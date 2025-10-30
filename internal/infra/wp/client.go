@@ -43,21 +43,21 @@ func (c *Client) CheckHealth(ctx context.Context, site *entities.Site) error {
 
 	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	if err != nil {
-		return errors.WordPress("ошибка при создании запрос", err)
+		return errors.WordPress("error while requesting", err)
 	}
 
 	c.setAppPasswordAuth(req, site.WPUsername, site.WPPassword)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return errors.WordPress("ошибка при запросе", err)
+		return errors.WordPress("error while requesting", err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return errors.WordPress(fmt.Sprintf("WordPress API вернул код: %d", resp.StatusCode), nil)
+		return errors.WordPress(fmt.Sprintf("WordPress API respond with code: %d", resp.StatusCode), nil)
 	}
 
 	return nil
