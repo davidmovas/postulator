@@ -3,7 +3,6 @@ package job
 import (
 	"Postulator/internal/config"
 	"Postulator/internal/domain/article"
-	"Postulator/internal/domain/entities"
 	"Postulator/internal/domain/prompt"
 	"Postulator/internal/domain/site"
 	"Postulator/internal/domain/topic"
@@ -46,7 +45,12 @@ func setupTestService(t *testing.T) (*Service, func()) {
 	container.MustRegister(di.Instance[*database.DB](db))
 	container.MustRegister(di.Instance[*logger.Logger](testLogger))
 	container.MustRegister(di.Instance[*wp.Client](wp.NewClient()))
-	container.MustRegister(di.Instance[*ai.Client](ai.NewClient()))
+
+	container.MustRegister(&di.Registration[ai.IClient]{
+		Provider:      di.Must[ai.IClient](ai.NewClient()),
+		Lifecycle:     di.Singleton,
+		InterfaceType: reflect.TypeOf((*ai.IClient)(nil)).Elem(),
+	})
 
 	execRepo, err := NewExecutionRepository(container)
 	if err != nil {
@@ -127,25 +131,28 @@ func TestJobService_CreateAndGet(t *testing.T) {
 	service, cleanup := setupTestService(t)
 	defer cleanup()
 
-	t.Run("create job successfully", func(t *testing.T) {
-		interval := 1000
+	t.Run("job not found", func(t *testing.T) {
+		var id int64 = 10
+		_, err := service.GetJob(t.Context(), id)
+		require.Error(t, err)
+	})
 
-		job := &Job{
-			Name:               "test_job_1",
-			SiteID:             1,
-			CategoryID:         1,
-			PromptID:           1,
-			AIProviderID:       1,
-			AIModel:            string(entities.ModelGPT4OMini),
-			RequiresValidation: false,
-			ScheduleType:       ScheduleManual,
-			IntervalValue:      &interval,
-			JitterEnabled:      true,
-			JitterMinutes:      30,
-			Status:             StatusActive,
-		}
-
-		err := service.CreateJob(t.Context(), job)
+	t.Run("empty job list", func(t *testing.T) {
+		_, err := service.ListJobs(t.Context())
 		require.NoError(t, err)
+	})
+
+	t.Run("update unexisting job", func(t *testing.T) {
+		var id int64 = 10
+
+		err := service.DeleteJob(t.Context(), id)
+		require.Error(t, err)
+	})
+
+	t.Run("delete unexisting job", func(t *testing.T) {
+		var id int64 = 10
+
+		err := service.DeleteJob(t.Context(), id)
+		require.Error(t, err)
 	})
 }

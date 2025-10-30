@@ -62,6 +62,8 @@ export function CreateEditJobModal({ open, onOpenChange, job, onSaved }: CreateE
   const [scheduleTime, setScheduleTime] = useState<string>(""); // used for "once" HH:MM
   const [intervalValue, setIntervalValue] = useState<number | undefined>(undefined);
   const [intervalUnit, setIntervalUnit] = useState<string | undefined>(undefined);
+  const [weekdays, setWeekdays] = useState<number[]>([]);
+  const [monthdays, setMonthdays] = useState<number[]>([]);
   const [jitterEnabled, setJitterEnabled] = useState<boolean>(false);
   const [jitterMinutes, setJitterMinutes] = useState<number>(0);
   const [status, setStatus] = useState<JobStatus>(JobStatusConst.Active);
@@ -110,6 +112,8 @@ export function CreateEditJobModal({ open, onOpenChange, job, onSaved }: CreateE
       setScheduleTime(hh !== undefined && mm !== undefined ? `${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}` : "");
       setIntervalValue(job.intervalValue ?? undefined);
       setIntervalUnit(job.intervalUnit ?? undefined);
+      setWeekdays(job.weekdays ?? []);
+      setMonthdays(job.monthdays ?? []);
       setJitterEnabled(!!job.jitterEnabled);
       setJitterMinutes(job.jitterMinutes || 30);
       setStatus((job.status as JobStatus) || JobStatusConst.Active);
@@ -125,6 +129,8 @@ export function CreateEditJobModal({ open, onOpenChange, job, onSaved }: CreateE
       setScheduleTime("10:00"); // used if/when switching to Once
       setIntervalValue(undefined);
       setIntervalUnit(undefined);
+      setWeekdays([]);
+      setMonthdays([]);
       setJitterEnabled(false);
       setJitterMinutes(30);
       setStatus(JobStatusConst.Active);
@@ -177,7 +183,13 @@ export function CreateEditJobModal({ open, onOpenChange, job, onSaved }: CreateE
     return hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59;
   };
 
-  const needsTime = useMemo(() => scheduleType === ScheduleTypeConst.Once, [scheduleType]);
+  const needsTime = useMemo(() => 
+    scheduleType === ScheduleTypeConst.Once || 
+    scheduleType === ScheduleTypeConst.Daily ||
+    scheduleType === ScheduleTypeConst.Weekly ||
+    scheduleType === ScheduleTypeConst.Monthly, 
+    [scheduleType]
+  );
 
   const canSave = useMemo(() => {
     const baseOk = (
@@ -191,10 +203,14 @@ export function CreateEditJobModal({ open, onOpenChange, job, onSaved }: CreateE
       aiProviderId > 0 &&
       aiModel.trim().length > 0
     );
-    const timeOk = scheduleType === ScheduleTypeConst.Once ? isValidTime(scheduleTime) : true;
+    
+    const timeOk = needsTime ? isValidTime(scheduleTime) : true;
     const intervalOk = scheduleType === ScheduleTypeConst.Interval ? !!intervalValue && (intervalValue as number) >= 1 && !!intervalUnit : true;
-    return baseOk && timeOk && intervalOk;
-  }, [name, siteId, categories.length, categoryId, prompts.length, promptId, providers.length, aiProviderId, aiModel, scheduleType, scheduleTime, intervalValue, intervalUnit]);
+    const weekdaysOk = scheduleType === ScheduleTypeConst.Weekly ? weekdays.length > 0 : true;
+    const monthdaysOk = scheduleType === ScheduleTypeConst.Monthly ? monthdays.length > 0 : true;
+    
+    return baseOk && timeOk && intervalOk && weekdaysOk && monthdaysOk;
+  }, [name, siteId, categories.length, categoryId, prompts.length, promptId, providers.length, aiProviderId, aiModel, scheduleType, scheduleTime, intervalValue, intervalUnit, needsTime, weekdays.length, monthdays.length]);
 
   const normalizePayload = () => {
     const jm = Math.max(0, Math.min(180, jitterMinutes || 0));
@@ -202,7 +218,7 @@ export function CreateEditJobModal({ open, onOpenChange, job, onSaved }: CreateE
     // derive hour/minute from scheduleTime if present
     let scheduleHour: number | undefined = undefined;
     let scheduleMinute: number | undefined = undefined;
-    if (scheduleType === ScheduleTypeConst.Once && isValidTime(scheduleTime)) {
+    if (needsTime && isValidTime(scheduleTime)) {
       const [h, m] = scheduleTime.split(":");
       scheduleHour = parseInt(h, 10);
       scheduleMinute = parseInt(m, 10);
@@ -229,6 +245,8 @@ export function CreateEditJobModal({ open, onOpenChange, job, onSaved }: CreateE
         intervalUnit: undefined,
         scheduleHour: undefined,
         scheduleMinute: undefined,
+        weekdays: undefined,
+        monthdays: undefined,
       };
     }
 
@@ -239,18 +257,70 @@ export function CreateEditJobModal({ open, onOpenChange, job, onSaved }: CreateE
         scheduleMinute,
         intervalValue: undefined,
         intervalUnit: undefined,
+        weekdays: undefined,
+        monthdays: undefined,
       };
     }
 
-    // Interval
-    const val = Math.max(1, parseInt(String(intervalValue || 0), 10));
-    const unit = (intervalUnit || "minutes").toLowerCase();
+    if (scheduleType === ScheduleTypeConst.Interval) {
+      const val = Math.max(1, parseInt(String(intervalValue || 0), 10));
+      const unit = (intervalUnit || "minutes").toLowerCase();
+      return {
+        ...base,
+        intervalValue: val,
+        intervalUnit: unit,
+        scheduleHour: undefined,
+        scheduleMinute: undefined,
+        weekdays: undefined,
+        monthdays: undefined,
+      };
+    }
+
+    if (scheduleType === ScheduleTypeConst.Daily) {
+      return {
+        ...base,
+        scheduleHour,
+        scheduleMinute,
+        intervalValue: undefined,
+        intervalUnit: undefined,
+        weekdays: undefined,
+        monthdays: undefined,
+      };
+    }
+
+    if (scheduleType === ScheduleTypeConst.Weekly) {
+      return {
+        ...base,
+        scheduleHour,
+        scheduleMinute,
+        intervalValue: undefined,
+        intervalUnit: undefined,
+        weekdays: weekdays.length > 0 ? weekdays : undefined,
+        monthdays: undefined,
+      };
+    }
+
+    if (scheduleType === ScheduleTypeConst.Monthly) {
+      return {
+        ...base,
+        scheduleHour,
+        scheduleMinute,
+        intervalValue: undefined,
+        intervalUnit: undefined,
+        weekdays: undefined,
+        monthdays: monthdays.length > 0 ? monthdays : undefined,
+      };
+    }
+
+    // Default fallback
     return {
       ...base,
-      intervalValue: val,
-      intervalUnit: unit,
+      intervalValue: undefined,
+      intervalUnit: undefined,
       scheduleHour: undefined,
       scheduleMinute: undefined,
+      weekdays: undefined,
+      monthdays: undefined,
     };
   };
 
@@ -286,7 +356,7 @@ export function CreateEditJobModal({ open, onOpenChange, job, onSaved }: CreateE
 
   return (
     <Dialog open={open} onOpenChange={(o) => !saving && onOpenChange(o)}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="w-[95vw] max-w-7xl">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Job" : "Create Job"}</DialogTitle>
           <DialogDescription>
@@ -432,6 +502,9 @@ export function CreateEditJobModal({ open, onOpenChange, job, onSaved }: CreateE
                       <SelectItem value={ScheduleTypeConst.Manual}>Manual</SelectItem>
                       <SelectItem value={ScheduleTypeConst.Once}>Once</SelectItem>
                       <SelectItem value={ScheduleTypeConst.Interval}>Interval</SelectItem>
+                      <SelectItem value={ScheduleTypeConst.Daily}>Daily</SelectItem>
+                      <SelectItem value={ScheduleTypeConst.Weekly}>Weekly</SelectItem>
+                      <SelectItem value={ScheduleTypeConst.Monthly}>Monthly</SelectItem>
                     </SelectContent>
                   </Select>
                 </FieldContent>
@@ -482,6 +555,103 @@ export function CreateEditJobModal({ open, onOpenChange, job, onSaved }: CreateE
                     </div>
                   </FieldContent>
                 </Field>
+              )}
+
+              {scheduleType === ScheduleTypeConst.Daily && (
+                <Field>
+                  <FieldContent>
+                    <Label>Time</Label>
+                    <TimeField
+                      value={scheduleTime}
+                      onChange={(v) => setScheduleTime(v)}
+                      disabled={false}
+                    />
+                  </FieldContent>
+                </Field>
+              )}
+
+              {scheduleType === ScheduleTypeConst.Weekly && (
+                <>
+                  <Field>
+                    <FieldContent>
+                      <Label>Time</Label>
+                      <TimeField
+                        value={scheduleTime}
+                        onChange={(v) => setScheduleTime(v)}
+                        disabled={false}
+                      />
+                    </FieldContent>
+                  </Field>
+                  <Field>
+                    <FieldContent>
+                      <Label>Weekdays</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { value: 0, label: 'Sun' },
+                          { value: 1, label: 'Mon' },
+                          { value: 2, label: 'Tue' },
+                          { value: 3, label: 'Wed' },
+                          { value: 4, label: 'Thu' },
+                          { value: 5, label: 'Fri' },
+                          { value: 6, label: 'Sat' }
+                        ].map(day => (
+                          <div key={day.value} className="flex items-center gap-2">
+                            <Checkbox
+                              id={`weekday-${day.value}`}
+                              checked={weekdays.includes(day.value)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setWeekdays([...weekdays, day.value].sort());
+                                } else {
+                                  setWeekdays(weekdays.filter(d => d !== day.value));
+                                }
+                              }}
+                            />
+                            <label htmlFor={`weekday-${day.value}`} className="text-sm">{day.label}</label>
+                          </div>
+                        ))}
+                      </div>
+                    </FieldContent>
+                  </Field>
+                </>
+              )}
+
+              {scheduleType === ScheduleTypeConst.Monthly && (
+                <>
+                  <Field>
+                    <FieldContent>
+                      <Label>Time</Label>
+                      <TimeField
+                        value={scheduleTime}
+                        onChange={(v) => setScheduleTime(v)}
+                        disabled={false}
+                      />
+                    </FieldContent>
+                  </Field>
+                  <Field>
+                    <FieldContent>
+                      <Label>Days of Month</Label>
+                      <div className="grid grid-cols-7 gap-2 max-w-md">
+                        {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                          <div key={day} className="flex items-center gap-1">
+                            <Checkbox
+                              id={`monthday-${day}`}
+                              checked={monthdays.includes(day)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setMonthdays([...monthdays, day].sort((a, b) => a - b));
+                                } else {
+                                  setMonthdays(monthdays.filter(d => d !== day));
+                                }
+                              }}
+                            />
+                            <label htmlFor={`monthday-${day}`} className="text-xs">{day}</label>
+                          </div>
+                        ))}
+                      </div>
+                    </FieldContent>
+                  </Field>
+                </>
               )}
             </FieldGroup>
           </FieldSet>

@@ -172,7 +172,6 @@ CREATE TABLE job_executions (
     validated_at DATETIME,
     published_at DATETIME,
     FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE,
-    FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
     FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE SET NULL
 );
 

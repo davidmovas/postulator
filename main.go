@@ -78,10 +78,10 @@ func main() {
 
 	err = wails.Run(&options.App{
 		Title:             "Postulator",
-		Width:             1920,
-		Height:            1080,
+		Width:             1280,
+		Height:            720,
 		MinWidth:          1024,
-		MinHeight:         768,
+		MinHeight:         480,
 		DisableResize:     false,
 		Fullscreen:        false,
 		Frameless:         false,
