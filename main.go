@@ -29,7 +29,11 @@ var icoIcon []byte
 
 var wailsCtx context.Context
 
-func onReady() {
+func onReady(ctx context.Context, app *app.App) {
+	if err := app.Start(ctx); err != nil {
+		log.Fatal(err)
+	}
+
 	systray.SetIcon(icoIcon)
 	systray.SetTitle("Postulator")
 	systray.SetTooltip("Postulator - Post Creator App")
@@ -62,19 +66,29 @@ func onReady() {
 	}()
 }
 
-func onExit() {
-	// Clean up here
+func onExit(ctx context.Context, app *app.App) {
+	app.Stop()
 }
 
 func main() {
 	cfg := &config.Config{LogLevel: "info", ConsoleOut: true, PrettyPrint: false}
+
+	ctx, cancel := context.WithCancel(context.Background())
 
 	appInst, err := app.New(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	go systray.Run(onReady, onExit)
+	go systray.Run(
+		func() {
+			onReady(ctx, appInst)
+		},
+		func() {
+			cancel()
+			onExit(ctx, appInst)
+		},
+	)
 
 	err = wails.Run(&options.App{
 		Title:             "Postulator",

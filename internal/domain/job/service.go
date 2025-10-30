@@ -63,7 +63,6 @@ func (s *Service) CreateJob(ctx context.Context, job *Job) error {
 		job.Status = StatusActive
 	}
 
-	// Используем scheduler для расчета следующего запуска
 	if job.Status == StatusActive && job.ScheduleType != ScheduleManual {
 		now := time.Now()
 		nextRun := s.scheduler.CalculateNextRun(job, now)
@@ -92,13 +91,11 @@ func (s *Service) UpdateJob(ctx context.Context, job *Job) error {
 		return err
 	}
 
-	// Пересчитываем следующий запуск только для активных заданий
 	if job.Status == StatusActive && job.ScheduleType != ScheduleManual {
 		now := time.Now()
 		nextRun := s.scheduler.CalculateNextRun(job, now)
 		job.NextRunAt = &nextRun
 	} else {
-		// Для неактивных или manual заданий очищаем nextRunAt
 		job.NextRunAt = nil
 	}
 
@@ -126,7 +123,7 @@ func (s *Service) PauseJob(ctx context.Context, id int64) error {
 	s.logger.Infof("Pausing job %d (%s)", id, job.Name)
 
 	job.Status = StatusPaused
-	job.NextRunAt = nil // Очищаем следующий запуск при паузе
+	job.NextRunAt = nil
 
 	return s.jobRepo.Update(ctx, job)
 }
@@ -145,7 +142,6 @@ func (s *Service) ResumeJob(ctx context.Context, id int64) error {
 
 	job.Status = StatusActive
 
-	// Пересчитываем следующий запуск только для не-manual заданий
 	if job.ScheduleType != ScheduleManual {
 		now := time.Now()
 		nextRun := s.scheduler.CalculateNextRun(job, now)
@@ -171,12 +167,10 @@ func (s *Service) ExecuteJobManually(ctx context.Context, jobID int64) error {
 	now := time.Now()
 	job.LastRunAt = &now
 
-	// Для once заданий после выполнения меняем статус
 	if job.ScheduleType == ScheduleOnce {
 		job.Status = StatusCompleted
 		job.NextRunAt = nil
 	} else if job.ScheduleType != ScheduleManual && job.Status == StatusActive {
-		// Пересчитываем следующий запуск для активных interval/daily заданий
 		nextRun := s.scheduler.CalculateNextRun(job, now)
 		job.NextRunAt = &nextRun
 	}
@@ -307,11 +301,17 @@ func (s *Service) validateJob(job *Job) error {
 	case ScheduleManual:
 		return nil
 	case ScheduleOnce:
-		if job.RunAt == nil {
-			return errors.Validation("run time is required for once schedule")
+		if job.ScheduleHour == nil {
+			return errors.Validation("schedule hour is required for once schedule")
 		}
-		if job.RunAt.Before(time.Now()) {
-			return errors.Validation("run time must be in the future for once schedule")
+		if *job.ScheduleHour < 0 || *job.ScheduleHour > 23 {
+			return errors.Validation("schedule hour must be between 0 and 23")
+		}
+		if job.ScheduleMinute == nil {
+			return errors.Validation("schedule minute is required for once schedule")
+		}
+		if *job.ScheduleMinute < 0 || *job.ScheduleMinute > 59 {
+			return errors.Validation("schedule minute must be between 0 and 59")
 		}
 	case ScheduleInterval:
 		if job.IntervalValue == nil || *job.IntervalValue <= 0 {

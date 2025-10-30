@@ -54,9 +54,6 @@ type Job struct {
 
 	ScheduleType ScheduleType
 
-	// For ScheduleOnce
-	RunAt *time.Time
-
 	// For ScheduleInterval
 	IntervalValue *int
 	IntervalUnit  *IntervalUnit
@@ -83,9 +80,7 @@ func (j *Job) Validate() error {
 	case ScheduleManual:
 		// No validation needed
 	case ScheduleOnce:
-		if j.RunAt == nil {
-			return errors.Validation("RunAt is required for once schedule")
-		}
+		return nil
 	case ScheduleInterval:
 		if j.IntervalValue == nil || *j.IntervalValue <= 0 {
 			return errors.Validation("IntervalValue must be positive for interval schedule")
@@ -224,6 +219,7 @@ func (s *Scheduler) run(ctx context.Context) {
 }
 
 func (s *Scheduler) checkAndExecuteDueJobs(ctx context.Context) {
+	//TODO: CLEAR TEMP LOGS
 	fmt.Println("CHECKING JOBS...")
 
 	now := time.Now()
@@ -256,7 +252,6 @@ func (s *Scheduler) executeAndReschedule(ctx context.Context, job *Job) error {
 
 	if err := s.executor.Execute(ctx, job); err != nil {
 		s.logger.Errorf("Job %d execution failed: %v", job.ID, err)
-		// Don't update status to error here - let the execution handle it
 	}
 
 	now := time.Now()
@@ -273,6 +268,12 @@ func (s *Scheduler) executeAndReschedule(ctx context.Context, job *Job) error {
 		}
 
 		if err := s.jobRepo.Update(ctx, job); err != nil {
+			return errors.Scheduler(err)
+		}
+	}
+
+	if job.ScheduleType == ScheduleOnce {
+		if err := s.jobRepo.Delete(ctx, job.ID); err != nil {
 			return errors.Scheduler(err)
 		}
 	}
@@ -355,16 +356,20 @@ func (s *Scheduler) CalculateNextRun(job *Job, now time.Time) time.Time {
 }
 
 func (s *Scheduler) calculateOnceNextRun(job *Job, now time.Time) time.Time {
-	if job.RunAt == nil {
+	if job.ScheduleHour == nil || job.ScheduleMinute == nil {
 		return time.Time{}
 	}
 
-	// For once jobs, next run is the scheduled time if it's in the future
-	if job.RunAt.After(now) {
-		return *job.RunAt
+	hour := *job.ScheduleHour
+	minute := *job.ScheduleMinute
+
+	candidate := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
+
+	if candidate.Before(now) {
+		candidate = candidate.Add(24 * time.Hour)
 	}
 
-	return time.Time{}
+	return candidate
 }
 
 func (s *Scheduler) calculateIntervalNextRun(job *Job, now time.Time) time.Time {
@@ -461,56 +466,11 @@ func (s *Scheduler) TriggerJob(ctx context.Context, jobID int64) error {
 		return errors.Validation("Job is not active")
 	}
 
-	// Execute immediately
 	go func() {
-		if err := s.executeAndReschedule(ctx, job); err != nil {
+		if err = s.executeAndReschedule(ctx, job); err != nil {
 			s.logger.Errorf("Failed to trigger job %d: %v", jobID, err)
 		}
 	}()
 
 	return nil
-}
-
-// Helper function to create job with different schedule types
-func CreateJobWithSchedule(name string, scheduleType ScheduleType, options map[string]interface{}) *Job {
-	job := &Job{
-		Name:         name,
-		ScheduleType: scheduleType,
-		Status:       StatusActive,
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
-	}
-
-	switch scheduleType {
-	case ScheduleOnce:
-		if runAt, ok := options["run_at"].(time.Time); ok {
-			job.RunAt = &runAt
-		}
-	case ScheduleInterval:
-		if value, ok := options["interval_value"].(int); ok {
-			job.IntervalValue = &value
-		}
-		if unit, ok := options["interval_unit"].(IntervalUnit); ok {
-			job.IntervalUnit = &unit
-		}
-	case ScheduleDaily:
-		if hour, ok := options["hour"].(int); ok {
-			job.ScheduleHour = &hour
-		}
-		if minute, ok := options["minute"].(int); ok {
-			job.ScheduleMinute = &minute
-		}
-		if weekdays, ok := options["weekdays"].([]int); ok {
-			job.Weekdays = weekdays
-		}
-	}
-
-	if jitterEnabled, ok := options["jitter_enabled"].(bool); ok {
-		job.JitterEnabled = jitterEnabled
-	}
-	if jitterMinutes, ok := options["jitter_minutes"].(int); ok {
-		job.JitterMinutes = jitterMinutes
-	}
-
-	return job
 }

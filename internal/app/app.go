@@ -204,12 +204,7 @@ func (a *App) BuildServices() error {
 	return nil
 }
 
-// Start application subsystems (scheduler) and restore state.
 func (a *App) Start(ctx context.Context) error {
-	if err := a.scheduler.RestoreState(ctx); err != nil {
-		return err
-	}
-
 	return a.scheduler.Start(ctx)
 }
 

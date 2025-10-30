@@ -96,24 +96,34 @@ export function JobsTable({
     return `${hh}:${mm}`;
   };
 
-  const getScheduleText = (j: Job) => {
-    const type = (j.scheduleType || '').toLowerCase();
-    if (type === 'manual') return 'Manual';
-    if (type === 'once') {
-      const t = toHHMMFromNumbers(j.scheduleHour, j.scheduleMinute);
-      return t ? `Once @ ${t}` : 'Once';
-    }
-    if (type === 'interval') {
-      const val = j.intervalValue;
-      const unit = j.intervalUnit || '';
-      if (val && unit) {
-        const t = toHHMMFromNumbers(j.scheduleHour, j.scheduleMinute);
-        return t ? `Every ${val} ${unit} @ ${t}` : `Every ${val} ${unit}`;
-      }
-      return 'Interval';
-    }
-    return '—';
-  };
+    const getScheduleText = (j: Job) => {
+        const type = (j.scheduleType || '').toLowerCase();
+        if (type === 'manual') return 'Manual';
+        if (type === 'once') {
+            const t = toHHMMFromNumbers(j.scheduleHour, j.scheduleMinute);
+            return t ? `Once @ ${t}` : 'Once';
+        }
+        if (type === 'interval') {
+            const val = j.intervalValue;
+            const unit = j.intervalUnit || '';
+            if (val && unit) {
+                const t = toHHMMFromNumbers(j.scheduleHour, j.scheduleMinute);
+                return t ? `Every ${val} ${unit} @ ${t}` : `Every ${val} ${unit}`;
+            }
+            return 'Interval';
+        }
+        if (type === 'daily') {
+            const t = toHHMMFromNumbers(j.scheduleHour, j.scheduleMinute);
+            const days = j.weekdays || [];
+            if (t && days.length > 0) {
+                const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                const selectedDays = days.map(d => dayNames[d - 1]).join(', ');
+                return `Daily @ ${t} on ${selectedDays}`;
+            }
+            return 'Daily';
+        }
+        return '—';
+    };
 
   const handleSort = (field: JobSortField) => {
     if (sortField === field) {

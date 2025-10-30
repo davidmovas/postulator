@@ -110,6 +110,11 @@ func (a *App) ValidateExecution(execID int64, approved bool) *dto.Response[strin
 }
 
 func toJobEntity(d *dto.Job) (*job.Job, error) {
+	var unit job.IntervalUnit
+	if d.IntervalUnit != nil {
+		unit = job.IntervalUnit(*d.IntervalUnit)
+	}
+
 	return &job.Job{
 		ID:                 d.ID,
 		Name:               d.Name,
@@ -121,11 +126,10 @@ func toJobEntity(d *dto.Job) (*job.Job, error) {
 		RequiresValidation: d.RequiresValidation,
 		ScheduleType:       job.ScheduleType(d.ScheduleType),
 		IntervalValue:      d.IntervalValue,
-		IntervalUnit:       d.IntervalUnit,
+		IntervalUnit:       &unit,
 		ScheduleHour:       d.ScheduleHour,
 		ScheduleMinute:     d.ScheduleMinute,
 		Weekdays:           d.Weekdays,
-		Monthdays:          d.Monthdays,
 		JitterEnabled:      d.JitterEnabled,
 		JitterMinutes:      d.JitterMinutes,
 		Status:             job.Status(d.Status),
