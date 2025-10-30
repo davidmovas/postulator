@@ -63,6 +63,7 @@ func (s *Service) CreateJob(ctx context.Context, job *Job) error {
 		job.Status = StatusActive
 	}
 
+	// Используем scheduler для расчета следующего запуска
 	if job.Status == StatusActive && job.ScheduleType != ScheduleManual {
 		now := time.Now()
 		nextRun := s.scheduler.CalculateNextRun(job, now)
@@ -91,10 +92,14 @@ func (s *Service) UpdateJob(ctx context.Context, job *Job) error {
 		return err
 	}
 
+	// Пересчитываем следующий запуск только для активных заданий
 	if job.Status == StatusActive && job.ScheduleType != ScheduleManual {
 		now := time.Now()
 		nextRun := s.scheduler.CalculateNextRun(job, now)
 		job.NextRunAt = &nextRun
+	} else {
+		// Для неактивных или manual заданий очищаем nextRunAt
+		job.NextRunAt = nil
 	}
 
 	s.logger.Infof("Updating job %d: %s", job.ID, job.Name)
@@ -121,6 +126,8 @@ func (s *Service) PauseJob(ctx context.Context, id int64) error {
 	s.logger.Infof("Pausing job %d (%s)", id, job.Name)
 
 	job.Status = StatusPaused
+	job.NextRunAt = nil // Очищаем следующий запуск при паузе
+
 	return s.jobRepo.Update(ctx, job)
 }
 
@@ -138,7 +145,7 @@ func (s *Service) ResumeJob(ctx context.Context, id int64) error {
 
 	job.Status = StatusActive
 
-	// Recalculate next run time
+	// Пересчитываем следующий запуск только для не-manual заданий
 	if job.ScheduleType != ScheduleManual {
 		now := time.Now()
 		nextRun := s.scheduler.CalculateNextRun(job, now)
@@ -158,13 +165,18 @@ func (s *Service) ExecuteJobManually(ctx context.Context, jobID int64) error {
 
 	if err = s.executor.Execute(ctx, job); err != nil {
 		s.logger.Errorf("Manual execution of job %d failed: %v", jobID, err)
-		return errors.JobExecution(jobID, err)
+		return err
 	}
 
 	now := time.Now()
 	job.LastRunAt = &now
 
-	if job.ScheduleType != ScheduleManual && job.Status == StatusActive {
+	// Для once заданий после выполнения меняем статус
+	if job.ScheduleType == ScheduleOnce {
+		job.Status = StatusCompleted
+		job.NextRunAt = nil
+	} else if job.ScheduleType != ScheduleManual && job.Status == StatusActive {
+		// Пересчитываем следующий запуск для активных interval/daily заданий
 		nextRun := s.scheduler.CalculateNextRun(job, now)
 		job.NextRunAt = &nextRun
 	}
@@ -222,7 +234,7 @@ func (s *Service) ValidateExecution(ctx context.Context, execID int64, approved 
 	s.logger.Infof("Publishing validated content for execution %d", execID)
 
 	// Use executor to properly publish the article to WordPress and create article record
-	if err := s.executor.PublishValidatedArticle(ctx, job, exec); err != nil {
+	if err = s.executor.PublishValidatedArticle(ctx, job, exec); err != nil {
 		s.logger.Errorf("Failed to publish validated article: %v", err)
 
 		// Mark execution as failed
@@ -238,14 +250,17 @@ func (s *Service) ValidateExecution(ctx context.Context, execID int64, approved 
 
 	s.logger.Infof("Execution %d published successfully", execID)
 
+	// Обновляем задание после успешной публикации
 	lastRun := time.Now()
 	job.LastRunAt = &lastRun
 
-	if job.ScheduleType != ScheduleManual && job.ScheduleType != ScheduleOnce && job.Status == StatusActive {
+	// Логика обновления следующего запуска
+	if job.ScheduleType == ScheduleOnce {
+		job.Status = StatusCompleted
+		job.NextRunAt = nil
+	} else if job.ScheduleType != ScheduleManual && job.Status == StatusActive {
 		nextRun := s.scheduler.CalculateNextRun(job, lastRun)
 		job.NextRunAt = &nextRun
-	} else if job.ScheduleType == ScheduleOnce {
-		job.Status = StatusCompleted
 	}
 
 	if err = s.jobRepo.Update(ctx, job); err != nil {
@@ -290,50 +305,47 @@ func (s *Service) validateJob(job *Job) error {
 
 	switch job.ScheduleType {
 	case ScheduleManual:
-		// no constraints
+		return nil
 	case ScheduleOnce:
-		// require valid time if provided
-		if job.ScheduleHour != nil && (*job.ScheduleHour < 0 || *job.ScheduleHour > 23) {
-			return errors.Validation("schedule hour must be between 0 and 23")
+		if job.RunAt == nil {
+			return errors.Validation("run time is required for once schedule")
 		}
-		if job.ScheduleMinute != nil && (*job.ScheduleMinute < 0 || *job.ScheduleMinute > 59) {
-			return errors.Validation("schedule minute must be between 0 and 59")
+		if job.RunAt.Before(time.Now()) {
+			return errors.Validation("run time must be in the future for once schedule")
 		}
 	case ScheduleInterval:
 		if job.IntervalValue == nil || *job.IntervalValue <= 0 {
-			return errors.Validation("interval value must be >= 1")
+			return errors.Validation("interval value must be positive")
 		}
 		if job.IntervalUnit == nil {
 			return errors.Validation("interval unit is required")
 		}
 		unit := *job.IntervalUnit
-		if unit != "days" && unit != "weeks" && unit != "months" {
-			return errors.Validation("interval unit must be one of: days, weeks, months")
+		if unit != UnitHours && unit != UnitDays && unit != UnitWeeks && unit != UnitMonths {
+			return errors.Validation("interval unit must be one of: hours, days, weeks, months")
 		}
-		if job.ScheduleHour != nil && (*job.ScheduleHour < 0 || *job.ScheduleHour > 23) {
+		if unit == UnitHours && *job.IntervalValue > 24 {
+			return errors.Validation("interval cannot exceed 24 hours for hourly schedule")
+		}
+	case ScheduleDaily:
+		if job.ScheduleHour == nil {
+			return errors.Validation("schedule hour is required for daily schedule")
+		}
+		if *job.ScheduleHour < 0 || *job.ScheduleHour > 23 {
 			return errors.Validation("schedule hour must be between 0 and 23")
 		}
-		if job.ScheduleMinute != nil && (*job.ScheduleMinute < 0 || *job.ScheduleMinute > 59) {
+		if job.ScheduleMinute == nil {
+			return errors.Validation("schedule minute is required for daily schedule")
+		}
+		if *job.ScheduleMinute < 0 || *job.ScheduleMinute > 59 {
 			return errors.Validation("schedule minute must be between 0 and 59")
 		}
-		if unit == "weeks" {
-			if len(job.Weekdays) == 0 {
-				return errors.Validation("for weekly intervals please select at least one weekday (1-7)")
-			}
-			for _, d := range job.Weekdays {
-				if d < 1 || d > 7 {
-					return errors.Validation("weekday must be between 1 and 7")
-				}
-			}
+		if len(job.Weekdays) == 0 {
+			return errors.Validation("at least one weekday must be specified for daily schedule")
 		}
-		if unit == "months" {
-			if len(job.Monthdays) == 0 {
-				return errors.Validation("for monthly intervals please specify at least one day of month (1-31)")
-			}
-			for _, d := range job.Monthdays {
-				if d < 1 || d > 31 {
-					return errors.Validation("month day must be between 1 and 31")
-				}
+		for _, day := range job.Weekdays {
+			if day < 1 || day > 7 {
+				return errors.Validation("weekday must be between 1 and 7")
 			}
 		}
 	default:
@@ -342,6 +354,10 @@ func (s *Service) validateJob(job *Job) error {
 
 	if job.JitterEnabled && job.JitterMinutes < 0 {
 		return errors.Validation("jitter minutes cannot be negative")
+	}
+
+	if job.JitterMinutes > 180 {
+		return errors.Validation("jitter minutes cannot exceed 180 minutes")
 	}
 
 	return nil

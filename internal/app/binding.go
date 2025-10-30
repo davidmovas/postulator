@@ -6,7 +6,6 @@ import (
 	"Postulator/pkg/errors"
 )
 
-// RestoreScheduler recalculates and restores scheduler state.
 func (a *App) RestoreScheduler() *dto.Response[string] {
 	if err := a.RestoreState(ctx.LongCtx()); err != nil {
 		return dtoErr[string](errors.Scheduler(err))

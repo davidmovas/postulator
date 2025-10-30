@@ -1,4 +1,3 @@
-// Shared utilities for service layers
 import { dto } from "@/wailsjs/wailsjs/go/models";
 
 export class ServiceError extends Error {

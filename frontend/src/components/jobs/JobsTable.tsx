@@ -70,15 +70,24 @@ export function JobsTable({
     }
   };
 
-  const formatDateTime = (value?: string) => {
-    if (!value) return '—';
-    const d = new Date(value);
-    if (isNaN(d.getTime())) return value;
-    return d.toLocaleString('en-US', {
-      day: '2-digit', month: 'short', year: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    });
-  };
+    const formatDateTime = (value?: string) => {
+        if (!value) return '—';
+        const d = new Date(value);
+        if (isNaN(d.getTime())) return value;
+
+        const date = d.toLocaleDateString('en-US', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+        });
+        const time = d.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        });
+
+        return `${date} ${time}`;
+    };
 
   const toHHMMFromNumbers = (h?: number, m?: number) => {
     if (h === undefined || m === undefined || h === null || m === null) return '';
@@ -256,7 +265,7 @@ export function JobsTable({
                     <div className="flex justify-end">
                       <JobRowActions
                         job={j}
-                        disabled={!!loadingActions[j.id]}
+                        disabled={loadingActions[j.id]}
                         onEdit={onEdit}
                         onRun={async (id) => {
                           setLoadingActions(prev => ({ ...prev, [id]: true }));

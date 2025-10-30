@@ -2,8 +2,10 @@ package job
 
 import (
 	"Postulator/pkg/di"
+	"Postulator/pkg/errors"
 	"Postulator/pkg/logger"
 	"context"
+	"fmt"
 	"math/rand"
 	"time"
 )
@@ -14,6 +16,7 @@ const (
 	ScheduleManual   ScheduleType = "manual"
 	ScheduleOnce     ScheduleType = "once"
 	ScheduleInterval ScheduleType = "interval"
+	ScheduleDaily    ScheduleType = "daily"
 )
 
 const (
@@ -29,6 +32,15 @@ const (
 	StatusError     Status = "error"
 )
 
+type IntervalUnit string
+
+const (
+	UnitHours  IntervalUnit = "hours"
+	UnitDays   IntervalUnit = "days"
+	UnitWeeks  IntervalUnit = "weeks"
+	UnitMonths IntervalUnit = "months"
+)
+
 type Job struct {
 	ID           int64
 	Name         string
@@ -40,13 +52,19 @@ type Job struct {
 
 	RequiresValidation bool
 
-	ScheduleType   ScheduleType
-	IntervalValue  *int    // e.g., 3 (days), 2 (weeks), 1 (months)
-	IntervalUnit   *string // days, weeks, months
-	ScheduleHour   *int    // 0-23
-	ScheduleMinute *int    // 0-59
-	Weekdays       []int   // 1-7 (Mon=1..Sun=7)
-	Monthdays      []int   // 1-31
+	ScheduleType ScheduleType
+
+	// For ScheduleOnce
+	RunAt *time.Time
+
+	// For ScheduleInterval
+	IntervalValue *int
+	IntervalUnit  *IntervalUnit
+
+	// For ScheduleDaily
+	ScheduleHour   *int
+	ScheduleMinute *int
+	Weekdays       []int // 1-7 (Mon=1..Sun=7)
 
 	JitterEnabled bool
 	JitterMinutes int
@@ -57,6 +75,51 @@ type Job struct {
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+// Validate проверяет корректность настроек планирования
+func (j *Job) Validate() error {
+	switch j.ScheduleType {
+	case ScheduleManual:
+		// No validation needed
+	case ScheduleOnce:
+		if j.RunAt == nil {
+			return errors.Validation("RunAt is required for once schedule")
+		}
+	case ScheduleInterval:
+		if j.IntervalValue == nil || *j.IntervalValue <= 0 {
+			return errors.Validation("IntervalValue must be positive for interval schedule")
+		}
+		if j.IntervalUnit == nil {
+			return errors.Validation("IntervalUnit is required for interval schedule")
+		}
+		if *j.IntervalUnit == UnitHours && *j.IntervalValue > 24 {
+			return errors.Validation("Interval cannot exceed 24 hours for hourly schedule")
+		}
+	case ScheduleDaily:
+		if j.ScheduleHour == nil || *j.ScheduleHour < 0 || *j.ScheduleHour > 23 {
+			return errors.Validation("ScheduleHour must be between 0 and 23 for daily schedule")
+		}
+		if j.ScheduleMinute == nil || *j.ScheduleMinute < 0 || *j.ScheduleMinute > 59 {
+			return errors.Validation("ScheduleMinute must be between 0 and 59 for daily schedule")
+		}
+		if len(j.Weekdays) == 0 {
+			return errors.Validation("At least one weekday must be specified for daily schedule")
+		}
+		for _, day := range j.Weekdays {
+			if day < 1 || day > 7 {
+				return errors.Validation("Weekdays must be between 1 and 7")
+			}
+		}
+	default:
+		return errors.Validation("Invalid schedule type")
+	}
+
+	if j.JitterEnabled && j.JitterMinutes < 0 {
+		return errors.Validation("JitterMinutes cannot be negative")
+	}
+
+	return nil
 }
 
 type ExecutionStatus string
@@ -130,7 +193,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 
 	if err := s.RestoreState(ctx); err != nil {
 		s.logger.Errorf("Failed to restore scheduler state: %v", err)
-		return err
+		return errors.Scheduler(err)
 	}
 
 	go s.run(ctx)
@@ -152,7 +215,7 @@ func (s *Scheduler) run(ctx context.Context) {
 	for {
 		select {
 		case <-s.stopChan:
-			s.logger.Info("IScheduler stopped")
+			s.logger.Info("Scheduler stopped")
 			return
 		case <-ticker.C:
 			s.checkAndExecuteDueJobs(ctx)
@@ -161,12 +224,17 @@ func (s *Scheduler) run(ctx context.Context) {
 }
 
 func (s *Scheduler) checkAndExecuteDueJobs(ctx context.Context) {
+	fmt.Println("CHECKING JOBS...")
+
 	now := time.Now()
 	dueJobs, err := s.jobRepo.GetDueJobs(ctx, now)
 	if err != nil {
+		fmt.Println("FAILED TO GET DUE JOBS: ", err)
 		s.logger.Errorf("Failed to get due jobs: %v", err)
 		return
 	}
+
+	fmt.Printf("DUE JOBS FOUND: %v\n", len(dueJobs))
 
 	if len(dueJobs) == 0 {
 		return
@@ -188,20 +256,25 @@ func (s *Scheduler) executeAndReschedule(ctx context.Context, job *Job) error {
 
 	if err := s.executor.Execute(ctx, job); err != nil {
 		s.logger.Errorf("Job %d execution failed: %v", job.ID, err)
+		// Don't update status to error here - let the execution handle it
 	}
 
 	now := time.Now()
 	job.LastRunAt = &now
 
-	if job.ScheduleType != ScheduleOnce && job.ScheduleType != ScheduleManual {
-		nextRun := s.CalculateNextRun(job, now)
-		job.NextRunAt = &nextRun
-	} else if job.ScheduleType == ScheduleOnce {
-		job.Status = StatusCompleted
-	}
+	// Reschedule only if the job is still active and not manual/once
+	if job.Status == StatusActive && job.ScheduleType != ScheduleManual {
+		if job.ScheduleType == ScheduleOnce {
+			job.Status = StatusCompleted
+			job.NextRunAt = nil
+		} else {
+			nextRun := s.CalculateNextRun(job, now)
+			job.NextRunAt = &nextRun
+		}
 
-	if err := s.jobRepo.Update(ctx, job); err != nil {
-		return err
+		if err := s.jobRepo.Update(ctx, job); err != nil {
+			return errors.Scheduler(err)
+		}
 	}
 
 	return nil
@@ -212,7 +285,7 @@ func (s *Scheduler) RestoreState(ctx context.Context) error {
 
 	activeJobs, err := s.jobRepo.GetActive(ctx)
 	if err != nil {
-		return err
+		return errors.Scheduler(err)
 	}
 
 	now := time.Now()
@@ -226,6 +299,7 @@ func (s *Scheduler) RestoreState(ctx context.Context) error {
 
 			if job.NextRunAt != nil && job.NextRunAt.Before(now) {
 				missedJobsCount++
+				// Add random delay to avoid thundering herd
 				delay := time.Duration(rand.Intn(300)) * time.Second
 				nextRun := now.Add(delay)
 				job.NextRunAt = &nextRun
@@ -251,6 +325,10 @@ func (s *Scheduler) RestoreState(ctx context.Context) error {
 }
 
 func (s *Scheduler) CalculateNextRun(job *Job, now time.Time) time.Time {
+	if job.Status != StatusActive {
+		return time.Time{}
+	}
+
 	var nextRun time.Time
 
 	switch job.ScheduleType {
@@ -260,143 +338,179 @@ func (s *Scheduler) CalculateNextRun(job *Job, now time.Time) time.Time {
 		nextRun = s.calculateOnceNextRun(job, now)
 	case ScheduleInterval:
 		nextRun = s.calculateIntervalNextRun(job, now)
+	case ScheduleDaily:
+		nextRun = s.calculateDailyNextRun(job, now)
 	default:
 		s.logger.Errorf("Unknown schedule type: %s", job.ScheduleType)
 		return now.Add(24 * time.Hour)
 	}
 
+	// Apply jitter if enabled
 	if job.JitterEnabled && job.JitterMinutes > 0 {
 		jitter := rand.Intn(job.JitterMinutes*2+1) - job.JitterMinutes
 		nextRun = nextRun.Add(time.Duration(jitter) * time.Minute)
 	}
+
 	return nextRun
 }
 
 func (s *Scheduler) calculateOnceNextRun(job *Job, now time.Time) time.Time {
-	hour := 0
-	minute := 0
-	if job.ScheduleHour != nil {
-		hour = *job.ScheduleHour
-	}
-	if job.ScheduleMinute != nil {
-		minute = *job.ScheduleMinute
-	}
-	target := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
-	if !target.After(now) {
-		target = target.Add(24 * time.Hour)
-	}
-	if job.LastRunAt != nil {
+	if job.RunAt == nil {
 		return time.Time{}
 	}
-	return target
+
+	// For once jobs, next run is the scheduled time if it's in the future
+	if job.RunAt.After(now) {
+		return *job.RunAt
+	}
+
+	return time.Time{}
 }
 
 func (s *Scheduler) calculateIntervalNextRun(job *Job, now time.Time) time.Time {
-	// Defaults
-	interval := 1
-	unit := "days"
-	if job.IntervalValue != nil && *job.IntervalValue > 0 {
-		interval = *job.IntervalValue
-	}
-	if job.IntervalUnit != nil && *job.IntervalUnit != "" {
-		unit = *job.IntervalUnit
-	}
-	hour := 0
-	minute := 0
-	if job.ScheduleHour != nil {
-		hour = *job.ScheduleHour
-	}
-	if job.ScheduleMinute != nil {
-		minute = *job.ScheduleMinute
+	if job.IntervalValue == nil || job.IntervalUnit == nil {
+		return now.Add(24 * time.Hour)
 	}
 
-	start := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
-	if job.LastRunAt != nil && job.LastRunAt.After(start) {
-		start = time.Date(job.LastRunAt.Year(), job.LastRunAt.Month(), job.LastRunAt.Day(), hour, minute, 0, 0, now.Location())
+	interval := *job.IntervalValue
+	unit := *job.IntervalUnit
+
+	// Calculate base time (last run or now if first run)
+	baseTime := now
+	if job.LastRunAt != nil {
+		baseTime = *job.LastRunAt
 	}
 
 	switch unit {
-	case "days":
-		if !start.After(now) {
-			daysSince := int(now.Sub(start).Hours() / 24)
-			nextDays := (daysSince/interval + 1) * interval
-			return start.AddDate(0, 0, nextDays)
-		}
-		return start
-	case "weeks":
-		allowed := map[time.Weekday]bool{}
-		if len(job.Weekdays) > 0 {
-			for _, d := range job.Weekdays {
-				if d >= 1 && d <= 7 {
-					allowed[time.Weekday(d%7)] = true
-				}
-			}
-		} else {
-			for d := time.Weekday(0); d < 7; d++ {
-				allowed[d] = true
-			}
-		}
-		weekday := int(now.Weekday())
-		mondayOffset := (weekday + 6) % 7
-		weekStart := time.Date(now.Year(), now.Month(), now.Day()-mondayOffset, hour, minute, 0, 0, now.Location())
-
-		if start.Before(now) {
-			start = now
-		}
-
-		maxDays := interval*7 + 14
-		candidate := time.Date(start.Year(), start.Month(), start.Day(), hour, minute, 0, 0, start.Location())
-		for i := 0; i <= maxDays; i++ {
-			wd := candidate.Weekday()
-			// Check interval weeks cadence relative to weekStart
-			weeksDiff := int(candidate.Sub(weekStart).Hours()) / (24 * 7)
-			if weeksDiff%interval == 0 && allowed[wd] && candidate.After(now) {
-				return candidate
-			}
-			candidate = candidate.Add(24 * time.Hour)
-		}
-		return now.Add(7 * 24 * time.Hour)
-	case "months":
-		days := job.Monthdays
-		if len(days) == 0 {
-			days = []int{1}
-		}
-		// sort days ascending
-		for i := 0; i < len(days)-1; i++ {
-			for j := i + 1; j < len(days); j++ {
-				if days[j] < days[i] {
-					days[i], days[j] = days[j], days[i]
-				}
-			}
-		}
-		// Start from current month, iterate months by interval to find next valid date
-		baseMonth := time.Date(now.Year(), now.Month(), 1, hour, minute, 0, 0, now.Location())
-		if job.LastRunAt != nil && job.LastRunAt.After(baseMonth) {
-			baseMonth = time.Date(job.LastRunAt.Year(), job.LastRunAt.Month(), 1, hour, minute, 0, 0, now.Location())
-		}
-		for mOffset := 0; mOffset <= 24; mOffset += interval {
-			monthBase := baseMonth.AddDate(0, mOffset, 0)
-			for _, d := range days {
-				// clamp day to last day of month
-				lastDay := lastDayOfMonth(monthBase)
-				day := d
-				if day > lastDay {
-					day = lastDay
-				}
-				cand := time.Date(monthBase.Year(), monthBase.Month(), day, hour, minute, 0, 0, monthBase.Location())
-				if cand.After(now) {
-					return cand
-				}
-			}
-		}
-		return now.AddDate(0, interval, 0)
+	case UnitHours:
+		return baseTime.Add(time.Duration(interval) * time.Hour)
+	case UnitDays:
+		return baseTime.AddDate(0, 0, interval)
+	case UnitWeeks:
+		return baseTime.AddDate(0, 0, interval*7)
+	case UnitMonths:
+		return baseTime.AddDate(0, interval, 0)
 	default:
-		return now.Add(24 * time.Hour)
+		return baseTime.Add(24 * time.Hour)
 	}
 }
 
-func lastDayOfMonth(t time.Time) int {
-	firstNext := time.Date(t.Year(), t.Month()+1, 1, 0, 0, 0, 0, t.Location())
-	last := firstNext.AddDate(0, 0, -1)
-	return last.Day()
+func (s *Scheduler) calculateDailyNextRun(job *Job, now time.Time) time.Time {
+	if job.ScheduleHour == nil || job.ScheduleMinute == nil || len(job.Weekdays) == 0 {
+		return now.Add(24 * time.Hour)
+	}
+
+	hour := *job.ScheduleHour
+	minute := *job.ScheduleMinute
+
+	// Convert weekdays to time.Weekday (0=Sunday, 6=Saturday)
+	allowedDays := make(map[time.Weekday]bool)
+	for _, day := range job.Weekdays {
+		// Convert from 1-7 (Mon-Sun) to 0-6 (Sun-Sat)
+		weekday := time.Weekday((day) % 7)
+		allowedDays[weekday] = true
+	}
+
+	// Start from today
+	candidate := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
+
+	// If the time for today has already passed, start from tomorrow
+	if candidate.Before(now) {
+		candidate = candidate.Add(24 * time.Hour)
+	}
+
+	// Find the next allowed day
+	for i := 0; i < 8; i++ { // Check up to 7 days ahead
+		if allowedDays[candidate.Weekday()] {
+			return candidate
+		}
+		candidate = candidate.Add(24 * time.Hour)
+	}
+
+	// Fallback - should never happen
+	return now.Add(24 * time.Hour)
+}
+
+func (s *Scheduler) ScheduleJob(ctx context.Context, job *Job) error {
+	if err := job.Validate(); err != nil {
+		return err
+	}
+
+	// Calculate initial next run time
+	if job.ScheduleType != ScheduleManual {
+		now := time.Now()
+		nextRun := s.CalculateNextRun(job, now)
+		job.NextRunAt = &nextRun
+	}
+
+	job.Status = StatusActive
+
+	if job.ID == 0 {
+		return s.jobRepo.Create(ctx, job)
+	}
+	return s.jobRepo.Update(ctx, job)
+}
+
+func (s *Scheduler) TriggerJob(ctx context.Context, jobID int64) error {
+	job, err := s.jobRepo.GetByID(ctx, jobID)
+	if err != nil {
+		return err
+	}
+
+	if job.Status != StatusActive {
+		return errors.Validation("Job is not active")
+	}
+
+	// Execute immediately
+	go func() {
+		if err := s.executeAndReschedule(ctx, job); err != nil {
+			s.logger.Errorf("Failed to trigger job %d: %v", jobID, err)
+		}
+	}()
+
+	return nil
+}
+
+// Helper function to create job with different schedule types
+func CreateJobWithSchedule(name string, scheduleType ScheduleType, options map[string]interface{}) *Job {
+	job := &Job{
+		Name:         name,
+		ScheduleType: scheduleType,
+		Status:       StatusActive,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+	}
+
+	switch scheduleType {
+	case ScheduleOnce:
+		if runAt, ok := options["run_at"].(time.Time); ok {
+			job.RunAt = &runAt
+		}
+	case ScheduleInterval:
+		if value, ok := options["interval_value"].(int); ok {
+			job.IntervalValue = &value
+		}
+		if unit, ok := options["interval_unit"].(IntervalUnit); ok {
+			job.IntervalUnit = &unit
+		}
+	case ScheduleDaily:
+		if hour, ok := options["hour"].(int); ok {
+			job.ScheduleHour = &hour
+		}
+		if minute, ok := options["minute"].(int); ok {
+			job.ScheduleMinute = &minute
+		}
+		if weekdays, ok := options["weekdays"].([]int); ok {
+			job.Weekdays = weekdays
+		}
+	}
+
+	if jitterEnabled, ok := options["jitter_enabled"].(bool); ok {
+		job.JitterEnabled = jitterEnabled
+	}
+	if jitterMinutes, ok := options["jitter_minutes"].(int); ok {
+		job.JitterMinutes = jitterMinutes
+	}
+
+	return job
 }

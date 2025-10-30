@@ -47,12 +47,6 @@ func (r *JobRepository) Create(ctx context.Context, job *Job) error {
 			weekdaysStr = &s
 		}
 	}
-	if len(job.Monthdays) > 0 {
-		if b, err := json.Marshal(job.Monthdays); err == nil {
-			s := string(b)
-			monthdaysStr = &s
-		}
-	}
 
 	query, args := dbx.ST.
 		Insert("jobs").
@@ -182,7 +176,8 @@ func (r *JobRepository) GetByID(ctx context.Context, id int64) (*Job, error) {
 	}
 	if intervalUnit.Valid {
 		v := intervalUnit.String
-		job.IntervalUnit = &v
+		unit := IntervalUnit(v)
+		job.IntervalUnit = &unit
 	}
 	if scheduleHour.Valid {
 		v := int(scheduleHour.Int64)
@@ -196,11 +191,6 @@ func (r *JobRepository) GetByID(ctx context.Context, id int64) (*Job, error) {
 		var arr []int
 		_ = json.Unmarshal([]byte(weekdaysStr.String), &arr)
 		job.Weekdays = arr
-	}
-	if monthdaysStr.Valid {
-		var arr []int
-		_ = json.Unmarshal([]byte(monthdaysStr.String), &arr)
-		job.Monthdays = arr
 	}
 
 	return &job, nil
@@ -284,8 +274,8 @@ func (r *JobRepository) GetAll(ctx context.Context) ([]*Job, error) {
 			job.IntervalValue = &v
 		}
 		if intervalUnit.Valid {
-			v := intervalUnit.String
-			job.IntervalUnit = &v
+			unit := IntervalUnit(intervalUnit.String)
+			job.IntervalUnit = &unit
 		}
 		if scheduleHour.Valid {
 			v := int(scheduleHour.Int64)
@@ -299,11 +289,6 @@ func (r *JobRepository) GetAll(ctx context.Context) ([]*Job, error) {
 			var arr []int
 			_ = json.Unmarshal([]byte(weekdaysStr.String), &arr)
 			job.Weekdays = arr
-		}
-		if monthdaysStr.Valid {
-			var arr []int
-			_ = json.Unmarshal([]byte(monthdaysStr.String), &arr)
-			job.Monthdays = arr
 		}
 
 		jobs = append(jobs, &job)
@@ -395,8 +380,8 @@ func (r *JobRepository) GetActive(ctx context.Context) ([]*Job, error) {
 			job.IntervalValue = &v
 		}
 		if intervalUnit.Valid {
-			v := intervalUnit.String
-			job.IntervalUnit = &v
+			unit := IntervalUnit(intervalUnit.String)
+			job.IntervalUnit = &unit
 		}
 		if scheduleHour.Valid {
 			v := int(scheduleHour.Int64)
@@ -410,11 +395,6 @@ func (r *JobRepository) GetActive(ctx context.Context) ([]*Job, error) {
 			var arr []int
 			_ = json.Unmarshal([]byte(weekdaysStr.String), &arr)
 			job.Weekdays = arr
-		}
-		if monthdaysStr.Valid {
-			var arr []int
-			_ = json.Unmarshal([]byte(monthdaysStr.String), &arr)
-			job.Monthdays = arr
 		}
 
 		jobs = append(jobs, &job)
@@ -433,12 +413,6 @@ func (r *JobRepository) Update(ctx context.Context, job *Job) error {
 		if b, err := json.Marshal(job.Weekdays); err == nil {
 			s := string(b)
 			weekdaysStr = &s
-		}
-	}
-	if len(job.Monthdays) > 0 {
-		if b, err := json.Marshal(job.Monthdays); err == nil {
-			s := string(b)
-			monthdaysStr = &s
 		}
 	}
 
@@ -581,8 +555,8 @@ func (r *JobRepository) GetDueJobs(ctx context.Context, now time.Time) ([]*Job, 
 			job.IntervalValue = &v
 		}
 		if intervalUnit.Valid {
-			v := intervalUnit.String
-			job.IntervalUnit = &v
+			unit := IntervalUnit(intervalUnit.String)
+			job.IntervalUnit = &unit
 		}
 		if scheduleHour.Valid {
 			v := int(scheduleHour.Int64)
@@ -596,11 +570,6 @@ func (r *JobRepository) GetDueJobs(ctx context.Context, now time.Time) ([]*Job, 
 			var arr []int
 			_ = json.Unmarshal([]byte(weekdaysStr.String), &arr)
 			job.Weekdays = arr
-		}
-		if monthdaysStr.Valid {
-			var arr []int
-			_ = json.Unmarshal([]byte(monthdaysStr.String), &arr)
-			job.Monthdays = arr
 		}
 
 		jobs = append(jobs, &job)
