@@ -15,7 +15,7 @@ type ISiteRepository interface {
 }
 
 type ICategoryRepository interface {
-	Create(ctx context.Context, category *entities.Category) error
+	Create(ctx context.Context, siteId int64, category *entities.Category) error
 	GetBySiteID(ctx context.Context, siteID int64) ([]*entities.Category, error)
 	DeleteBySiteID(ctx context.Context, siteID int64) error
 }

@@ -157,7 +157,7 @@ func (s *Service) SyncCategories(ctx context.Context, siteID int64) error {
 	}
 
 	for _, category := range categories {
-		if err = s.categoryRepo.Create(ctx, category); err != nil {
+		if err = s.categoryRepo.Create(ctx, siteID, category); err != nil {
 			return err
 		}
 	}

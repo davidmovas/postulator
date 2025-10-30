@@ -37,11 +37,11 @@ func NewCategoryRepository(c di.Container) (*CategoryRepository, error) {
 	}, nil
 }
 
-func (c *CategoryRepository) Create(ctx context.Context, category *entities.Category) error {
+func (c *CategoryRepository) Create(ctx context.Context, siteId int64, category *entities.Category) error {
 	query, args := dbx.ST.
 		Insert("site_categories").
 		Columns("site_id", "wp_category_id", "name", "slug", "count").
-		Values(category.SiteID, category.WPCategoryID, category.Name, category.Slug, category.Count).
+		Values(siteId, category.WPCategoryID, category.Name, category.Slug, category.Count).
 		Suffix("ON CONFLICT DO NOTHING").
 		MustSql()
 

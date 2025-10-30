@@ -124,10 +124,10 @@ export function SitesTable({
         }
     };
 
-    const getHealthStatusVariant = (status: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
+    const getHealthStatusVariant = (status: string): 'default'| 'success' | 'secondary' | 'destructive' | 'outline' => {
         switch (status.toLowerCase()) {
             case 'healthy':
-                return 'default';
+                return 'success';
             case 'warning':
                 return 'secondary';
             case 'unhealthy':

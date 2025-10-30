@@ -47,9 +47,9 @@ export function CreateEditTopicModal({ open, onOpenChange, topic, siteId, onSave
         // Create the topic first
         const createdId = await createTopic(trimmed);
         // If we are in a site context, try to auto-assign the newly created topic to this site
-        if (createdId != 0 && siteId) {
+        if (createdId != 0 && siteId && selectedCategory) {
           try {
-              await assignTopicToSite(siteId, createdId, (selectedCategory?.wpCategoryId ?? 1), strategy);
+              await assignTopicToSite(siteId, createdId, (selectedCategory.id), strategy);
           } catch (e) {
             // Silently ignore assignment errors; the topic is still created and can be assigned later
             console.warn("Auto-assign topic failed", e);

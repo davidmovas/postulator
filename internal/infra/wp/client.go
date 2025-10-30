@@ -3,6 +3,7 @@ package wp
 import (
 	"Postulator/internal/domain/entities"
 	"Postulator/pkg/errors"
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -10,7 +11,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"path"
 	"strings"
 	"time"
 )
@@ -68,23 +68,24 @@ func (c *Client) GetCategories(ctx context.Context, s *entities.Site) ([]*entiti
 
 	u, err := url.Parse(endpoint)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse URL: %w", err)
+		return nil, errors.WordPress("failed to parse URL", err)
 	}
 
 	q := u.Query()
 	q.Set("per_page", "100")
+	q.Set("orderby", "name")
 	u.RawQuery = q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errors.WordPress("failed to create request", err)
 	}
 
 	c.setAppPasswordAuth(req, s.WPUsername, s.WPPassword)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, errors.WordPress("failed to make request", err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
@@ -92,21 +93,20 @@ func (c *Client) GetCategories(ctx context.Context, s *entities.Site) ([]*entiti
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("wordpress API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, errors.WordPress(fmt.Sprintf("wordpress API returned status %d: %s", resp.StatusCode, string(body)), nil)
 	}
 
 	var wpCategories []wpCategory
 	if err = json.NewDecoder(resp.Body).Decode(&wpCategories); err != nil {
-		return nil, fmt.Errorf("failed to decode categories: %w", err)
+		return nil, errors.WordPress("failed to decode categories", err)
 	}
 
 	categories := make([]*entities.Category, 0, len(wpCategories))
 	for _, wpCat := range wpCategories {
-		slug := wpCat.Slug
 		categories = append(categories, &entities.Category{
 			WPCategoryID: wpCat.ID,
 			Name:         wpCat.Name,
-			Slug:         &slug,
+			Slug:         &wpCat.Slug,
 			Count:        wpCat.Count,
 		})
 	}
@@ -126,12 +126,12 @@ func (c *Client) PublishPost(ctx context.Context, site *entities.Site, title, co
 
 	jsonData, err := json.Marshal(postData)
 	if err != nil {
-		return 0, "", fmt.Errorf("failed to marshal post data: %w", err)
+		return 0, "", errors.WordPress("failed to marshal post data", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, strings.NewReader(string(jsonData)))
+	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonData))
 	if err != nil {
-		return 0, "", fmt.Errorf("failed to create request: %w", err)
+		return 0, "", errors.WordPress("failed to create request", err)
 	}
 
 	c.setAppPasswordAuth(req, site.WPUsername, site.WPPassword)
@@ -139,7 +139,7 @@ func (c *Client) PublishPost(ctx context.Context, site *entities.Site, title, co
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return 0, "", fmt.Errorf("failed to make request: %w", err)
+		return 0, "", errors.WordPress("failed to make request", err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
@@ -147,15 +147,24 @@ func (c *Client) PublishPost(ctx context.Context, site *entities.Site, title, co
 
 	if resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
-		return 0, "", fmt.Errorf("wordpress API returned status %d: %s", resp.StatusCode, string(body))
+		return 0, "", errors.WordPress(fmt.Sprintf("wordpress API returned status %d: %s", resp.StatusCode, string(body)), nil)
 	}
 
 	var createdPost wpPost
 	if err = json.NewDecoder(resp.Body).Decode(&createdPost); err != nil {
-		return 0, "", fmt.Errorf("failed to decode post response: %w", err)
+		return 0, "", errors.WordPress("failed to decode post response", err)
 	}
 
 	return createdPost.ID, createdPost.Link, nil
+}
+func (c *Client) getAPIURL(siteURL, endpoint string) string {
+	baseURL := strings.TrimSuffix(siteURL, "/")
+
+	if strings.HasPrefix(endpoint, "/") {
+		return baseURL + endpoint
+	}
+
+	return baseURL + apiPath + endpoint
 }
 
 func (c *Client) setAppPasswordAuth(req *http.Request, username, appPassword string) {
@@ -163,10 +172,6 @@ func (c *Client) setAppPasswordAuth(req *http.Request, username, appPassword str
 	basicAuth := "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
 	req.Header.Set("Authorization", basicAuth)
 	req.Header.Set("User-Agent", c.userAgent)
-}
-
-func (c *Client) getAPIURL(siteURL, endpoint string) string {
-	return strings.TrimSuffix(siteURL, "/") + path.Join(apiPath, endpoint)
 }
 
 func (c *Client) CreateApplicationPassword(ctx context.Context, site *entities.Site, appName string) (string, error) {

@@ -16,9 +16,14 @@ type wpCategory struct {
 }
 
 type wpPost struct {
-	ID      int    `json:"id"`
-	Title   string `json:"title"`
-	Content string `json:"content"`
-	Status  string `json:"status"`
-	Link    string `json:"link"`
+	ID    int    `json:"id"`
+	Link  string `json:"link"`
+	Title struct {
+		Rendered string `json:"rendered"`
+	} `json:"title"`
+	Content struct {
+		Rendered string `json:"rendered"`
+	} `json:"content"`
+	Status     string `json:"status"`
+	Categories []int  `json:"categories"`
 }

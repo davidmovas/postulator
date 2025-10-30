@@ -158,7 +158,7 @@ export function TopicsSitesTable({ sites, isLoading = false, stats, onManage, on
                   <TableCell className="font-medium">{site.name}</TableCell>
                   <TableCell className="text-muted-foreground">{site.url}</TableCell>
                   <TableCell>{stats.total}</TableCell>
-                  <TableCell>{stats.unused}</TableCell>
+                  <TableCell className={stats.unused === 0 ? "text-red-600" : ""}>{stats.unused}</TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

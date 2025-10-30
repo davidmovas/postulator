@@ -170,7 +170,7 @@ export function ImportAndAssignTopicsDialog({ open, onOpenChange, siteId, onImpo
     };
 
     const handleImport = async () => {
-        if (!siteId || !filePath.trim()) {
+        if (!siteId || !filePath.trim() || !selectedCategory) {
             showError("Please select a file and ensure site is selected");
             return;
         }
@@ -181,7 +181,7 @@ export function ImportAndAssignTopicsDialog({ open, onOpenChange, siteId, onImpo
             const result = await importAndAssignToSite(
                 filePath.trim(),
                 siteId,
-                (selectedCategory?.wpCategoryId ?? 1),
+                (selectedCategory?.id),
                 strategy
             );
 

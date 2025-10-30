@@ -132,6 +132,11 @@ func JobExecution(jobID int64, err error) *AppError {
 		WithContext("job_id", jobID)
 }
 
+func JobExecutionWithNote(jobID int64, note string, err error) *AppError {
+	return Wrap(ErrCodeJobExecution, fmt.Sprintf("Job execution error: %s", note), err).
+		WithContext("job_id", jobID)
+}
+
 func Scheduler(err error) *AppError {
 	return Wrap(ErrCodeScheduler, "Task scheduler error", err)
 }
