@@ -4,13 +4,17 @@ import (
 	"Postulator/internal/config"
 	"Postulator/internal/domain/article"
 	"Postulator/internal/domain/entities"
+	"Postulator/internal/domain/prompt"
+	"Postulator/internal/domain/site"
+	"Postulator/internal/domain/topic"
+	"Postulator/internal/infra/ai"
 	"Postulator/internal/infra/database"
 	"Postulator/internal/infra/wp"
 	"Postulator/pkg/di"
 	"Postulator/pkg/logger"
-	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -42,18 +46,67 @@ func setupTestService(t *testing.T) (*Service, func()) {
 	container.MustRegister(di.Instance[*database.DB](db))
 	container.MustRegister(di.Instance[*logger.Logger](testLogger))
 	container.MustRegister(di.Instance[*wp.Client](wp.NewClient()))
+	container.MustRegister(di.Instance[*ai.Client](ai.NewClient()))
 
 	execRepo, err := NewExecutionRepository(container)
 	if err != nil {
 		dbCleanup()
 		t.Fatalf("failed to create service: %v", err)
 	}
-	container.MustRegister(di.Instance[IExecutionRepository](execRepo))
+
+	container.MustRegister(&di.Registration[IExecutionRepository]{
+		Provider:      di.Must[IExecutionRepository](execRepo),
+		Lifecycle:     di.Singleton,
+		InterfaceType: reflect.TypeOf((*IExecutionRepository)(nil)).Elem(),
+	})
 
 	articleRepo, err := article.NewRepository(container)
 	if err != nil {
-		return nil,
+		dbCleanup()
+		t.Fatalf("failed to create service: %v", err)
 	}
+
+	container.MustRegister(&di.Registration[article.IRepository]{
+		Provider:      di.Must[article.IRepository](articleRepo),
+		Lifecycle:     di.Singleton,
+		InterfaceType: reflect.TypeOf((*article.IRepository)(nil)).Elem(),
+	})
+
+	topicService, err := topic.NewService(container)
+	if err != nil {
+		dbCleanup()
+		t.Fatalf("failed to create service: %v", err)
+	}
+
+	container.MustRegister(&di.Registration[topic.IService]{
+		Provider:      di.Must[topic.IService](topicService),
+		Lifecycle:     di.Singleton,
+		InterfaceType: reflect.TypeOf((*topic.IService)(nil)).Elem(),
+	})
+
+	promptService, err := prompt.NewService(container)
+	if err != nil {
+		dbCleanup()
+		t.Fatalf("failed to create service: %v", err)
+	}
+
+	container.MustRegister(&di.Registration[prompt.IService]{
+		Provider:      di.Must[prompt.IService](promptService),
+		Lifecycle:     di.Singleton,
+		InterfaceType: reflect.TypeOf((*prompt.IService)(nil)).Elem(),
+	})
+
+	siteService, err := site.NewService(container)
+	if err != nil {
+		dbCleanup()
+		t.Fatalf("failed to create service: %v", err)
+	}
+
+	container.MustRegister(&di.Registration[site.IService]{
+		Provider:      di.Must[site.IService](siteService),
+		Lifecycle:     di.Singleton,
+		InterfaceType: reflect.TypeOf((*site.IService)(nil)).Elem(),
+	})
 
 	service, err := NewService(container)
 	if err != nil {
