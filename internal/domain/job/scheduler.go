@@ -5,7 +5,6 @@ import (
 	"Postulator/pkg/errors"
 	"Postulator/pkg/logger"
 	"context"
-	"fmt"
 	"math/rand"
 	"time"
 )
@@ -74,11 +73,10 @@ type Job struct {
 	UpdatedAt time.Time
 }
 
-// Validate проверяет корректность настроек планирования
 func (j *Job) Validate() error {
 	switch j.ScheduleType {
 	case ScheduleManual:
-		// No validation needed
+		return nil
 	case ScheduleOnce:
 		return nil
 	case ScheduleInterval:
@@ -219,18 +217,12 @@ func (s *Scheduler) run(ctx context.Context) {
 }
 
 func (s *Scheduler) checkAndExecuteDueJobs(ctx context.Context) {
-	//TODO: CLEAR TEMP LOGS
-	fmt.Println("CHECKING JOBS...")
-
 	now := time.Now()
 	dueJobs, err := s.jobRepo.GetDueJobs(ctx, now)
 	if err != nil {
-		fmt.Println("FAILED TO GET DUE JOBS: ", err)
 		s.logger.Errorf("Failed to get due jobs: %v", err)
 		return
 	}
-
-	fmt.Printf("DUE JOBS FOUND: %v\n", len(dueJobs))
 
 	if len(dueJobs) == 0 {
 		return
@@ -257,7 +249,6 @@ func (s *Scheduler) executeAndReschedule(ctx context.Context, job *Job) error {
 	now := time.Now()
 	job.LastRunAt = &now
 
-	// Reschedule only if the job is still active and not manual/once
 	if job.Status == StatusActive && job.ScheduleType != ScheduleManual {
 		if job.ScheduleType == ScheduleOnce {
 			job.Status = StatusCompleted
@@ -346,7 +337,6 @@ func (s *Scheduler) CalculateNextRun(job *Job, now time.Time) time.Time {
 		return now.Add(24 * time.Hour)
 	}
 
-	// Apply jitter if enabled
 	if job.JitterEnabled && job.JitterMinutes > 0 {
 		jitter := rand.Intn(job.JitterMinutes*2+1) - job.JitterMinutes
 		nextRun = nextRun.Add(time.Duration(jitter) * time.Minute)
@@ -380,24 +370,26 @@ func (s *Scheduler) calculateIntervalNextRun(job *Job, now time.Time) time.Time 
 	interval := *job.IntervalValue
 	unit := *job.IntervalUnit
 
-	// Calculate base time (last run or now if first run)
 	baseTime := now
 	if job.LastRunAt != nil {
 		baseTime = *job.LastRunAt
 	}
 
+	var idealNextRun time.Time
 	switch unit {
 	case UnitHours:
-		return baseTime.Add(time.Duration(interval) * time.Hour)
+		idealNextRun = baseTime.Add(time.Duration(interval) * time.Hour)
 	case UnitDays:
-		return baseTime.AddDate(0, 0, interval)
+		idealNextRun = baseTime.AddDate(0, 0, interval)
 	case UnitWeeks:
-		return baseTime.AddDate(0, 0, interval*7)
+		idealNextRun = baseTime.AddDate(0, 0, interval*7)
 	case UnitMonths:
-		return baseTime.AddDate(0, interval, 0)
+		idealNextRun = baseTime.AddDate(0, interval, 0)
 	default:
-		return baseTime.Add(24 * time.Hour)
+		idealNextRun = baseTime.Add(24 * time.Hour)
 	}
+
+	return idealNextRun
 }
 
 func (s *Scheduler) calculateDailyNextRun(job *Job, now time.Time) time.Time {
@@ -408,7 +400,6 @@ func (s *Scheduler) calculateDailyNextRun(job *Job, now time.Time) time.Time {
 	hour := *job.ScheduleHour
 	minute := *job.ScheduleMinute
 
-	// Convert weekdays to time.Weekday (0=Sunday, 6=Saturday)
 	allowedDays := make(map[time.Weekday]bool)
 	for _, day := range job.Weekdays {
 		// Convert from 1-7 (Mon-Sun) to 0-6 (Sun-Sat)
@@ -416,23 +407,19 @@ func (s *Scheduler) calculateDailyNextRun(job *Job, now time.Time) time.Time {
 		allowedDays[weekday] = true
 	}
 
-	// Start from today
 	candidate := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
 
-	// If the time for today has already passed, start from tomorrow
 	if candidate.Before(now) {
 		candidate = candidate.Add(24 * time.Hour)
 	}
 
-	// Find the next allowed day
-	for i := 0; i < 8; i++ { // Check up to 7 days ahead
+	for i := 0; i < 8; i++ {
 		if allowedDays[candidate.Weekday()] {
 			return candidate
 		}
 		candidate = candidate.Add(24 * time.Hour)
 	}
 
-	// Fallback - should never happen
 	return now.Add(24 * time.Hour)
 }
 
@@ -441,7 +428,6 @@ func (s *Scheduler) ScheduleJob(ctx context.Context, job *Job) error {
 		return err
 	}
 
-	// Calculate initial next run time
 	if job.ScheduleType != ScheduleManual {
 		now := time.Now()
 		nextRun := s.CalculateNextRun(job, now)
