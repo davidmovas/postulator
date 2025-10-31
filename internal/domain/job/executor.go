@@ -162,7 +162,6 @@ func (e *Executor) executePipeline(ctx context.Context, job *Job, exec *Executio
 
 	e.logger.Infof("Job %d: Using topic %d (%s)", job.ID, availableTopic.ID, availableTopic.Title)
 
-	// Остальной код без изменений...
 	// Step 3: Get category info for placeholder
 	category, err := e.getCategoryInfo(ctx, job.CategoryID, job.SiteID)
 	if err != nil {
@@ -223,7 +222,6 @@ func (e *Executor) executePipeline(ctx context.Context, job *Job, exec *Executio
 		}
 
 		e.logger.Infof("Job %d: Article awaiting validation", job.ID)
-		return nil // Stop here, wait for manual validation
 	}
 
 	// Step 9: Publish to WordPress

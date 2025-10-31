@@ -276,8 +276,16 @@ func (s *Scheduler) executeAndReschedule(ctx context.Context, job *Job) error {
 			job.NextRunAt = &nextRun
 		}
 
-		if err := s.jobRepo.Update(ctx, job); err != nil {
+		if err = s.jobRepo.Update(ctx, job); err != nil {
 			return errors.Scheduler(err)
+		}
+	}
+
+	if job.Status == StatusCompleted && job.ScheduleType == ScheduleOnce {
+		err = s.jobRepo.Delete(ctx, job.ID)
+		if err != nil {
+			s.logger.Errorf("Failed to delete job %d: %v", job.ID, err)
+			return errors.JobExecutionWithNote(job.ID, "Fail while deleting completed job", err)
 		}
 	}
 

@@ -272,7 +272,6 @@ export function SitesTable({
                             <SortableHeader field="name">Name</SortableHeader>
                             <SortableHeader field="url">URL</SortableHeader>
                             <SortableHeader field="wpUsername">User</SortableHeader>
-                            <SortableHeader field="status">Status</SortableHeader>
                             <SortableHeader field="healthStatus">Health</SortableHeader>
                             <SortableHeader field="lastHealthCheck">Last Check</SortableHeader>
                             <TableHead className="w-[70px] text-right pr-2">Actions</TableHead>
@@ -318,9 +317,6 @@ export function SitesTable({
                                         </button>
                                     </TableCell>
                                     <TableCell>{site.wpUsername}</TableCell>
-                                    <TableCell>
-                                        <Badge variant={getStatusVariant(site.status)}>{site.status}</Badge>
-                                    </TableCell>
                                     <TableCell>
                                         <Badge variant={getHealthStatusVariant(site.healthStatus)}>
                                             {site.healthStatus}

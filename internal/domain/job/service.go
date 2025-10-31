@@ -106,7 +106,6 @@ func (s *Service) UpdateJob(ctx context.Context, job *Job) error {
 
 func (s *Service) DeleteJob(ctx context.Context, id int64) error {
 	s.logger.Infof("Deleting job %d", id)
-
 	return s.jobRepo.Delete(ctx, id)
 }
 
