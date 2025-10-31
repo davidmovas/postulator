@@ -25,7 +25,7 @@ import {
 
 import { useNavigation, type Section } from "@/context/navigation";
 
-const APP_VERSION = "v1.0.0";
+const APP_VERSION = "v0.1.0";
 
 type LeafItem = {
     title: string;

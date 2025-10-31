@@ -31,6 +31,7 @@ var wailsCtx context.Context
 
 func onReady(ctx context.Context, app *app.App) {
 	if err := app.Start(ctx); err != nil {
+		log.Printf("Failed to start app: %v", err)
 		log.Fatal(err)
 	}
 
@@ -71,7 +72,10 @@ func onExit(_ context.Context, app *app.App) {
 }
 
 func main() {
-	cfg := &config.Config{LogLevel: "info", ConsoleOut: true, PrettyPrint: false}
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -147,9 +151,8 @@ func main() {
 			WebviewIsTransparent: true,
 			WindowIsTranslucent:  true,
 			About: &mac.AboutInfo{
-				Title:   "Postulator",
-				Message: "",
-				Icon:    icon,
+				Title: "Postulator",
+				Icon:  icon,
 			},
 		},
 	})

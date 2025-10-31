@@ -20,10 +20,11 @@ type Config struct {
 
 func LoadConfig() (*Config, error) {
 	configPath := getHomePath()
-	var cfg *Config
+	var cfg = &Config{}
 
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		cfg = getDefaultConfig()
+
 		if err = SaveConfig(cfg); err != nil {
 			return nil, fmt.Errorf("failed to save default config: %w", err)
 		}
@@ -68,5 +69,6 @@ func getHomePath() string {
 func getDefaultConfig() *Config {
 	return &Config{
 		LogLevel: "info",
+		LogDir:   filepath.Join(xdg.ConfigHome, "Postulator", "logs"),
 	}
 }
