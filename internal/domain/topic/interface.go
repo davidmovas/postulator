@@ -49,6 +49,7 @@ type IService interface {
 	GetSiteTopics(ctx context.Context, siteID int64) ([]*entities.SiteTopic, error)
 	GetTopicsBySite(ctx context.Context, siteID int64) ([]*entities.Topic, error)
 
+	HasAvailableTopics(ctx context.Context, siteID int64, strategy entities.TopicStrategy) (bool, error)
 	GetAvailableTopic(ctx context.Context, siteID int64, strategy entities.TopicStrategy) (*entities.Topic, error)
 	MarkTopicAsUsed(ctx context.Context, siteID, topicID int64) error
 	CountUnusedTopics(ctx context.Context, siteID int64) (int, error)

@@ -128,6 +128,30 @@ func (s *Service) GetTopicsBySite(ctx context.Context, siteID int64) ([]*entitie
 	return topics, nil
 }
 
+func (s *Service) HasAvailableTopics(ctx context.Context, siteID int64, strategy entities.TopicStrategy) (bool, error) {
+	switch strategy {
+	case entities.StrategyUnique:
+		topic, err := s.getUniqueTopic(ctx, siteID)
+		if err != nil {
+			return false, err
+		}
+		if topic != nil {
+			return true, nil
+		}
+	case entities.StrategyVariation:
+		topic, err := s.getTopicForReuse(ctx, siteID)
+		if err != nil {
+			return false, err
+		}
+		if topic != nil {
+			return true, nil
+		}
+	default:
+		return false, errors.Validation("invalid topic strategy: " + string(strategy))
+	}
+	return false, nil
+}
+
 func (s *Service) GetAvailableTopic(ctx context.Context, siteID int64, strategy entities.TopicStrategy) (*entities.Topic, error) {
 	switch strategy {
 	case entities.StrategyUnique:

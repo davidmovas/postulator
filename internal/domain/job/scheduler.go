@@ -6,6 +6,7 @@ import (
 	"Postulator/pkg/logger"
 	"context"
 	"math/rand"
+	"strings"
 	"time"
 )
 
@@ -242,7 +243,24 @@ func (s *Scheduler) checkAndExecuteDueJobs(ctx context.Context) {
 func (s *Scheduler) executeAndReschedule(ctx context.Context, job *Job) error {
 	s.logger.Infof("Executing job %d (%s)", job.ID, job.Name)
 
-	if err := s.executor.Execute(ctx, job); err != nil {
+	err := s.executor.Execute(ctx, job)
+
+	if IsNoTopicsError(err) {
+		s.logger.Warnf("No available topics for job %d, pausing job", job.ID)
+
+		job.Status = StatusPaused
+		job.NextRunAt = nil
+
+		if updateErr := s.jobRepo.Update(ctx, job); updateErr != nil {
+			s.logger.Errorf("Failed to pause job %d: %v", job.ID, updateErr)
+			return errors.Scheduler(updateErr)
+		}
+
+		s.logger.Infof("Job %d paused successfully due to no available topics", job.ID)
+		return nil
+	}
+
+	if err != nil {
 		s.logger.Errorf("Job %d execution failed: %v", job.ID, err)
 	}
 
@@ -259,12 +277,6 @@ func (s *Scheduler) executeAndReschedule(ctx context.Context, job *Job) error {
 		}
 
 		if err := s.jobRepo.Update(ctx, job); err != nil {
-			return errors.Scheduler(err)
-		}
-	}
-
-	if job.ScheduleType == ScheduleOnce {
-		if err := s.jobRepo.Delete(ctx, job.ID); err != nil {
 			return errors.Scheduler(err)
 		}
 	}
@@ -459,4 +471,11 @@ func (s *Scheduler) TriggerJob(ctx context.Context, jobID int64) error {
 	}()
 
 	return nil
+}
+
+func IsNoTopicsError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "no available topics for site")
 }

@@ -140,6 +140,16 @@ func (e *Executor) executePipeline(ctx context.Context, job *Job, exec *Executio
 	// Use the strategy from first site topic (assuming all topics for a site use same strategy)
 	strategy := siteTopics[0].Strategy
 
+	// Проверяем доступность топиков перед выполнением
+	hasTopics, err := e.topicService.HasAvailableTopics(ctx, job.SiteID, strategy)
+	if err != nil {
+		return errors.JobExecution(job.ID, fmt.Errorf("failed to check topic availability: %w", err))
+	}
+
+	if !hasTopics {
+		return errors.JobExecution(job.ID, fmt.Errorf("no available topics for site %d", job.SiteID))
+	}
+
 	availableTopic, err := e.topicService.GetAvailableTopic(ctx, job.SiteID, strategy)
 	if err != nil {
 		return errors.JobExecutionWithNote(job.ID, "there is no available topic", fmt.Errorf("failed to get available topic: %w", err))
@@ -152,6 +162,7 @@ func (e *Executor) executePipeline(ctx context.Context, job *Job, exec *Executio
 
 	e.logger.Infof("Job %d: Using topic %d (%s)", job.ID, availableTopic.ID, availableTopic.Title)
 
+	// Остальной код без изменений...
 	// Step 3: Get category info for placeholder
 	category, err := e.getCategoryInfo(ctx, job.CategoryID, job.SiteID)
 	if err != nil {
