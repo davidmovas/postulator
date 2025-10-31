@@ -42,9 +42,6 @@ export default function TopicsPage() {
             // unused count via API
             const unused = await countUnusedTopics(s.id);
 
-           // TODO: TEMP CONSOLE LOG
-            console.log("Site ID: ", s.id, "Total Topics: ", t.length, "Unused Topics: ", unused);
-
           return [s.id, { siteId: s.id, total: t.length, unused }] as const;
         } catch (e) {
           return [s.id, { siteId: s.id, total: 0, unused: 0 }] as const;

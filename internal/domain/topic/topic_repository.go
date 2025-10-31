@@ -8,6 +8,7 @@ import (
 	"Postulator/pkg/errors"
 	"Postulator/pkg/logger"
 	"context"
+	"fmt"
 
 	"github.com/Masterminds/squirrel"
 )
@@ -49,7 +50,7 @@ func (r *Repository) Create(ctx context.Context, topic *entities.Topic) (int, er
 
 	switch {
 	case dbx.IsUniqueViolation(err):
-		return 0, errors.AlreadyExists(topic.Title)
+		return 0, errors.AlreadyExists(fmt.Sprintf("Topic with title '%s'", topic.Title))
 	case err != nil:
 		return 0, errors.Internal(err)
 	}

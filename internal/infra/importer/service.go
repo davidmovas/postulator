@@ -91,11 +91,14 @@ func (s *ImportService) ImportAndAssignToSite(ctx context.Context, filePath stri
 		return nil, err
 	}
 
-	if result.TotalAdded == 0 {
-		s.logger.Infof("No new topics to assign to site %d", siteID)
+	if result.TotalAdded == 0 && result.TotalSkipped == 0 {
+		s.logger.Infof("No topics to assign to site %d", siteID)
 		return result, nil
 	}
 
+	allTitlesFromFile := append(result.Added, result.Skipped...)
+
+	// Получаем все топики из базы для маппинга названий к ID
 	allTopics, err := s.topicService.ListTopics(ctx)
 	if err != nil {
 		s.logger.Errorf("Failed to retrieve topics: %v", err)
@@ -126,10 +129,10 @@ func (s *ImportService) ImportAndAssignToSite(ctx context.Context, filePath stri
 	assignmentErrors := make([]string, 0)
 	successfulAssignments := 0
 
-	for _, title := range result.Added {
+	for _, title := range allTitlesFromFile {
 		topicID, ok := titleToID[title]
 		if !ok {
-			errMsg := "topic not found after creation: " + title
+			errMsg := "topic not found in database: " + title
 			s.logger.Warnf("%s", errMsg)
 			assignmentErrors = append(assignmentErrors, errMsg)
 			continue
