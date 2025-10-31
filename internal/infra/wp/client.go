@@ -114,13 +114,13 @@ func (c *Client) GetCategories(ctx context.Context, s *entities.Site) ([]*entiti
 	return categories, nil
 }
 
-func (c *Client) PublishPost(ctx context.Context, site *entities.Site, title, content string, categoryID int) (postID int, postURL string, err error) {
+func (c *Client) PublishPost(ctx context.Context, site *entities.Site, title, content, status string, categoryID int) (postID int, postURL string, err error) {
 	endpoint := c.getAPIURL(site.URL, "posts")
 
 	postData := map[string]any{
 		"title":      title,
 		"content":    content,
-		"status":     "publish",
+		"status":     status,
 		"categories": []int{categoryID},
 	}
 
