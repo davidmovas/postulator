@@ -144,8 +144,6 @@ export function unwrapArrayResponse<T>(response: ApiResponse<T[]>): T[] {
         if (response.error) {
             throw new AppError(response.error.code, response.error.message, response.error.context);
         }
-        //TODO: TEMP LOG
-        console.log(response);
 
         throw new AppError('UNKNOWN_ERROR', 'An unknown error occurred');
     }

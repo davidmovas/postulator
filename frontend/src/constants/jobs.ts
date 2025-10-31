@@ -1,15 +1,3 @@
-// Shared job-related constants and types aligned with Go backend enums
-
-// ScheduleType mirrors Go:
-// type ScheduleType string
-// const (
-//   ScheduleManual  ScheduleType = "manual"
-//   ScheduleOnce    ScheduleType = "once"
-//   ScheduleInterval ScheduleType = "interval"
-//   ScheduleDaily   ScheduleType = "daily"
-//   ScheduleWeekly  ScheduleType = "weekly"
-//   ScheduleMonthly ScheduleType = "monthly"
-// )
 export type ScheduleType =
   | "manual"
   | "once"
@@ -27,14 +15,6 @@ export const ScheduleTypeConst = {
   Monthly: "monthly" as ScheduleType,
 } as const;
 
-// Job Status mirrors Go:
-// type Status string
-// const (
-//   StatusActive    Status = "active"
-//   StatusPaused    Status = "paused"
-//   StatusCompleted Status = "completed"
-//   StatusError     Status = "error"
-// )
 export type JobStatus = "active" | "paused" | "completed" | "error";
 
 export const JobStatusConst = {
@@ -44,17 +24,7 @@ export const JobStatusConst = {
   Error: "error" as JobStatus,
 } as const;
 
-// ExecutionStatus mirrors Go:
-// type ExecutionStatus string
-// const (
-//   ExecutionPending           ExecutionStatus = "pending"
-//   ExecutionGenerating        ExecutionStatus = "generating"
-//   ExecutionPendingValidation ExecutionStatus = "pending_validation"
-//   ExecutionValidated         ExecutionStatus = "validated"
-//   ExecutionPublishing        ExecutionStatus = "publishing"
-//   ExecutionPublished         ExecutionStatus = "published"
-//   ExecutionFailed            ExecutionStatus = "failed"
-// )
+
 export type ExecutionStatus =
   | "pending"
   | "generating"

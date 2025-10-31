@@ -66,7 +66,7 @@ func onReady(ctx context.Context, app *app.App) {
 	}()
 }
 
-func onExit(ctx context.Context, app *app.App) {
+func onExit(_ context.Context, app *app.App) {
 	app.Stop()
 }
 
