@@ -1,6 +1,7 @@
 package job
 
 import (
+	"Postulator/internal/domain/aiprovider"
 	"Postulator/internal/domain/article"
 	"Postulator/internal/domain/entities"
 	"Postulator/internal/domain/prompt"
@@ -24,14 +25,15 @@ type wpPublisher interface {
 var _ IExecutor = (*Executor)(nil)
 
 type Executor struct {
-	execRepo      IExecutionRepository
-	articleRepo   article.IRepository
-	topicService  topic.IService
-	promptService prompt.IService
-	siteService   site.IService
-	wpClient      wpPublisher
-	aiClient      ai.IClient
-	logger        *logger.Logger
+	execRepo          IExecutionRepository
+	articleRepo       article.IRepository
+	topicService      topic.IService
+	promptService     prompt.IService
+	siteService       site.IService
+	aiProviderService aiprovider.IService
+	wpClient          wpPublisher
+	aiClient          ai.IClient
+	logger            *logger.Logger
 }
 
 func NewExecutor(c di.Container) (*Executor, error) {
@@ -62,6 +64,11 @@ func NewExecutor(c di.Container) (*Executor, error) {
 
 	var siteService site.IService
 	if err := c.Resolve(&siteService); err != nil {
+		return nil, err
+	}
+
+	var aiProviderService aiprovider.IService
+	if err := c.Resolve(&aiProviderService); err != nil {
 		return nil, err
 	}
 
@@ -191,8 +198,17 @@ func (e *Executor) executePipeline(ctx context.Context, job *Job, exec *Executio
 	e.logger.Debugf("Job %d: Rendered prompts for AI generation", job.ID)
 
 	// Step 7: Generate article content using AI
-	if e.aiClient == nil {
-		return fmt.Errorf("AI client not available")
+	provider, err := e.aiProviderService.GetProvider(ctx, job.AIProviderID)
+	if err != nil {
+		return fmt.Errorf("failed to get AI provider: %w", err)
+	}
+
+	e.aiClient, err = ai.NewOpenAIClient(ai.OpenAIConfig{
+		APIKey: provider.APIKey,
+		Model:  provider.Model,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create AI client: %w", err)
 	}
 
 	generatedContent, err := e.aiClient.GenerateArticle(ctx, systemPrompt, userPrompt)

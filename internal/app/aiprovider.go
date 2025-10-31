@@ -7,8 +7,6 @@ import (
 	"Postulator/pkg/errors"
 )
 
-// AI Provider bindings
-
 func (a *App) CreateAIProvider(req *dto.AIProviderCreate) *dto.Response[string] {
 	if req == nil {
 		return dtoErr[string](errors.Validation("provider payload is required"))
