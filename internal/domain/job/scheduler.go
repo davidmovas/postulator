@@ -212,7 +212,9 @@ func (s *Scheduler) run(ctx context.Context) {
 			s.logger.Info("Scheduler stopped")
 			return
 		case <-ticker.C:
-			s.checkAndExecuteDueJobs(ctx)
+			executionCtx, cancel := context.WithTimeout(ctx, time.Minute)
+			time.AfterFunc(time.Minute, cancel)
+			s.checkAndExecuteDueJobs(executionCtx)
 		}
 	}
 }

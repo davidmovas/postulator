@@ -32,7 +32,6 @@ type Executor struct {
 	siteService       site.IService
 	aiProviderService aiprovider.IService
 	wpClient          wpPublisher
-	aiClient          ai.IClient
 	logger            *logger.Logger
 }
 
@@ -83,14 +82,14 @@ func NewExecutor(c di.Container) (*Executor, error) {
 	}
 
 	return &Executor{
-		execRepo:      execRepo,
-		articleRepo:   articleRepo,
-		topicService:  topicService,
-		promptService: promptService,
-		siteService:   siteService,
-		wpClient:      wpClient,
-		aiClient:      aiClient,
-		logger:        l,
+		execRepo:          execRepo,
+		articleRepo:       articleRepo,
+		topicService:      topicService,
+		promptService:     promptService,
+		siteService:       siteService,
+		aiProviderService: aiProviderService,
+		wpClient:          wpClient,
+		logger:            l,
 	}, nil
 }
 
@@ -203,7 +202,7 @@ func (e *Executor) executePipeline(ctx context.Context, job *Job, exec *Executio
 		return fmt.Errorf("failed to get AI provider: %w", err)
 	}
 
-	e.aiClient, err = ai.NewOpenAIClient(ai.OpenAIConfig{
+	aiClient, err := ai.NewOpenAIClient(ai.OpenAIConfig{
 		APIKey: provider.APIKey,
 		Model:  provider.Model,
 	})
@@ -211,7 +210,7 @@ func (e *Executor) executePipeline(ctx context.Context, job *Job, exec *Executio
 		return fmt.Errorf("failed to create AI client: %w", err)
 	}
 
-	generatedContent, err := e.aiClient.GenerateArticle(ctx, systemPrompt, userPrompt)
+	generatedContent, err := aiClient.GenerateArticle(ctx, systemPrompt, userPrompt)
 	if err != nil {
 		return fmt.Errorf("failed to generate article: %w", err)
 	}
@@ -238,6 +237,7 @@ func (e *Executor) executePipeline(ctx context.Context, job *Job, exec *Executio
 		}
 
 		e.logger.Infof("Job %d: Article awaiting validation", job.ID)
+		return nil
 	}
 
 	// Step 9: Publish to WordPress

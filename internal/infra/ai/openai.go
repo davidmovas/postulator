@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/invopop/jsonschema"
 	"github.com/openai/openai-go/v3"
@@ -105,13 +104,7 @@ func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPr
 }
 
 func (c *OpenAIClient) formatArticle(article ArticleContent) string {
-	var sb strings.Builder
-
-	sb.WriteString(fmt.Sprintf("<!-- wp:heading -->\n<h1>%s</h1>\n<!-- /wp:heading -->\n\n", article.Title))
-
-	sb.WriteString(article.Content)
-
-	return sb.String()
+	return article.Content
 }
 
 type ArticleRequest struct {

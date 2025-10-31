@@ -85,7 +85,7 @@ func (a *App) ResumeJob(id int64) *dto.Response[string] {
 }
 
 func (a *App) ExecuteJobManually(id int64) *dto.Response[string] {
-	if err := a.jobSvc.ExecuteJobManually(ctx.FastCtx(), id); err != nil {
+	if err := a.jobSvc.ExecuteJobManually(ctx.LongCtx(), id); err != nil {
 		return dtoErr[string](asAppErr(err))
 	}
 
