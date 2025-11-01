@@ -2,8 +2,9 @@ package schedule
 
 import (
 	"context"
-	"github.com/davidmovas/postulator/internal/domain/jobs"
 	"time"
+
+	"github.com/davidmovas/postulator/internal/domain/jobs"
 )
 
 type Scheduler struct{}
