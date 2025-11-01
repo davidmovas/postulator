@@ -45,6 +45,42 @@ type Article struct {
 	LastSyncedAt  *time.Time
 }
 
+type WPInfoUpdate struct {
+	ID          int64
+	WPPostID    int
+	WPPostURL   string
+	Status      Status
+	PublishedAt *time.Time
+}
+
+type Repository interface {
+	Create(ctx context.Context, article *Article) error
+	GetByID(ctx context.Context, id int64) (*Article, error)
+	GetByWPPostID(ctx context.Context, siteID int64, wpPostID int) (*Article, error)
+	Update(ctx context.Context, article *Article) error
+	Delete(ctx context.Context, id int64) error
+
+	ListBySite(ctx context.Context, siteID int64, limit, offset int) ([]*Article, error)
+	ListByJob(ctx context.Context, jobID int64) ([]*Article, error)
+	ListByTopic(ctx context.Context, topicID int64) ([]*Article, error)
+
+	GetByStatus(ctx context.Context, siteID int64, status Status) ([]*Article, error)
+	GetBySource(ctx context.Context, siteID int64, source Source) ([]*Article, error)
+	GetEdited(ctx context.Context, siteID int64) ([]*Article, error)
+
+	CountBySite(ctx context.Context, siteID int64) (int, error)
+	CountByStatus(ctx context.Context, siteID int64, status Status) (int, error)
+	CountByJob(ctx context.Context, jobID int64) (int, error)
+
+	GetByWPPostIDs(ctx context.Context, siteID int64, wpPostIDs []int) ([]*Article, error)
+	GetUnsynced(ctx context.Context, siteID int64, since time.Time) ([]*Article, error)
+	UpdateSyncStatus(ctx context.Context, id int64, lastSyncedAt time.Time) error
+	UpdatePublishStatus(ctx context.Context, id int64, status Status, publishedAt *time.Time) error
+
+	BulkCreate(ctx context.Context, articles []*Article) error
+	BulkUpdateWPInfo(ctx context.Context, updates []*WPInfoUpdate) error
+}
+
 type Service interface {
 	CreateArticle(ctx context.Context, article *Article) error
 	GetArticle(ctx context.Context, id int64) (*Article, error)
