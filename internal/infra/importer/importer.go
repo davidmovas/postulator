@@ -1,8 +1,8 @@
 package importer
 
 import (
-	"Postulator/internal/domain/entities"
 	"context"
+	"github.com/davidmovas/postulator/internal/domain/entities"
 )
 
 // ImportResult contains statistics about the import operation

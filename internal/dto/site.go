@@ -1,7 +1,7 @@
 package dto
 
 import (
-	"Postulator/internal/domain/entities"
+	"github.com/davidmovas/postulator/internal/domain/entities"
 )
 
 type Site struct {

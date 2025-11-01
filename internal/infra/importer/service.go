@@ -3,12 +3,12 @@ package importer
 import (
 	"context"
 
-	"Postulator/internal/domain/entities"
-	"Postulator/internal/domain/sites"
-	"Postulator/internal/domain/topic"
-	"Postulator/pkg/di"
-	"Postulator/pkg/errors"
-	"Postulator/pkg/logger"
+	"github.com/davidmovas/postulator/internal/domain/entities"
+	"github.com/davidmovas/postulator/internal/domain/sites"
+	"github.com/davidmovas/postulator/internal/domain/topic"
+	"github.com/davidmovas/postulator/pkg/di"
+	"github.com/davidmovas/postulator/pkg/errors"
+	"github.com/davidmovas/postulator/pkg/logger"
 )
 
 var _ IImportService = (*ImportService)(nil)

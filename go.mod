@@ -1,4 +1,4 @@
-module Postulator
+module github.com/davidmovas/postulator
 
 go 1.25.0
 

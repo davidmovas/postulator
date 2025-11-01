@@ -3,7 +3,7 @@ package importer
 import (
 	"strings"
 
-	"Postulator/pkg/errors"
+	"github.com/davidmovas/postulator/pkg/errors"
 
 	"github.com/xuri/excelize/v2"
 )

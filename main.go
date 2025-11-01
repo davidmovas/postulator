@@ -1,10 +1,10 @@
 package main
 
 import (
-	"Postulator/internal/app"
-	"Postulator/internal/config"
 	"context"
 	"embed"
+	"github.com/davidmovas/postulator/internal/app"
+	"github.com/davidmovas/postulator/internal/config"
 	"log"
 	"os"
 

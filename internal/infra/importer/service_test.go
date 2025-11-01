@@ -1,13 +1,13 @@
 package importer
 
 import (
-	"Postulator/internal/config"
-	"Postulator/internal/domain/entities"
-	"Postulator/internal/infra/database"
-	"Postulator/internal/infra/wp"
-	"Postulator/pkg/di"
-	"Postulator/pkg/logger"
 	"context"
+	"github.com/davidmovas/postulator/internal/config"
+	"github.com/davidmovas/postulator/internal/domain/entities"
+	"github.com/davidmovas/postulator/internal/infra/database"
+	"github.com/davidmovas/postulator/internal/infra/wp"
+	"github.com/davidmovas/postulator/pkg/di"
+	"github.com/davidmovas/postulator/pkg/logger"
 	"os"
 	"path/filepath"
 	"testing"

@@ -1,7 +1,7 @@
 package dto
 
 import (
-	"Postulator/internal/domain/jobs"
+	"github.com/davidmovas/postulator/internal/domain/jobs"
 	"time"
 )
 

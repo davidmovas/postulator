@@ -1,6 +1,6 @@
 package dto
 
-import "Postulator/internal/domain/entities"
+import "github.com/davidmovas/postulator/internal/domain/entities"
 
 type Prompt struct {
 	ID           int64    `json:"id"`

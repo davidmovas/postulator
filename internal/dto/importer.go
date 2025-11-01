@@ -1,7 +1,7 @@
 package dto
 
 import (
-	"Postulator/internal/infra/importer"
+	"github.com/davidmovas/postulator/internal/infra/importer"
 )
 
 type ImportResult struct {

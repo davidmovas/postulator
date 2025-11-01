@@ -1,8 +1,8 @@
 package dto
 
 import (
-	appErrors "Postulator/pkg/errors"
 	"errors"
+	appErrors "github.com/davidmovas/postulator/pkg/errors"
 )
 
 type Response[T any] struct {

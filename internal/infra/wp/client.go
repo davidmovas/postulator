@@ -1,13 +1,13 @@
 package wp
 
 import (
-	"Postulator/internal/domain/entities"
-	"Postulator/pkg/errors"
 	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/davidmovas/postulator/internal/domain/entities"
+	"github.com/davidmovas/postulator/pkg/errors"
 	"io"
 	"net/http"
 	"net/url"

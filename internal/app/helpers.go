@@ -1,9 +1,9 @@
 package app
 
 import (
-	"Postulator/internal/dto"
-	appErrors "Postulator/pkg/errors"
 	"errors"
+	"github.com/davidmovas/postulator/internal/dto"
+	appErrors "github.com/davidmovas/postulator/pkg/errors"
 )
 
 func dtoErr[T any](err *appErrors.AppError) *dto.Response[T] {

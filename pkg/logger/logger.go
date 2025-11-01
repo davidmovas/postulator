@@ -1,10 +1,10 @@
 package logger
 
 import (
-	"Postulator/internal/config"
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"github.com/davidmovas/postulator/internal/config"
 	"io"
 	"os"
 	"path/filepath"

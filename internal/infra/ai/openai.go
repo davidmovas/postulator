@@ -1,11 +1,11 @@
 package ai
 
 import (
-	"Postulator/internal/domain/entities"
-	"Postulator/pkg/errors"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/davidmovas/postulator/internal/domain/entities"
+	"github.com/davidmovas/postulator/pkg/errors"
 
 	"github.com/invopop/jsonschema"
 	"github.com/openai/openai-go/v3"

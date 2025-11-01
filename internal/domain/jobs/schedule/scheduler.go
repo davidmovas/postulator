@@ -1,8 +1,8 @@
 package schedule
 
 import (
-	"Postulator/internal/domain/jobs"
 	"context"
+	"github.com/davidmovas/postulator/internal/domain/jobs"
 	"time"
 )
 

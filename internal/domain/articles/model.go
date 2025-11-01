@@ -1,9 +1,10 @@
 package articles
 
 import (
-	"Postulator/internal/domain/jobs/execution"
 	"context"
 	"time"
+
+	"github.com/davidmovas/postulator/internal/domain/jobs/execution"
 )
 
 type (

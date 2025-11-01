@@ -1,14 +1,15 @@
 package articles
 
 import (
-	"Postulator/internal/infra/database"
-	"Postulator/pkg/dbx"
-	"Postulator/pkg/errors"
-	"Postulator/pkg/logger"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"time"
+
+	"github.com/davidmovas/postulator/internal/infra/database"
+	"github.com/davidmovas/postulator/pkg/dbx"
+	"github.com/davidmovas/postulator/pkg/errors"
+	"github.com/davidmovas/postulator/pkg/logger"
 
 	"github.com/Masterminds/squirrel"
 )

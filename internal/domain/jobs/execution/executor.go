@@ -1,8 +1,8 @@
 package execution
 
 import (
-	"Postulator/internal/domain/jobs"
 	"context"
+	"github.com/davidmovas/postulator/internal/domain/jobs"
 )
 
 type Executor struct{}

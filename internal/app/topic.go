@@ -1,10 +1,10 @@
 package app
 
 import (
-	"Postulator/internal/domain/entities"
-	"Postulator/internal/dto"
-	"Postulator/pkg/ctx"
-	"Postulator/pkg/errors"
+	"github.com/davidmovas/postulator/internal/domain/entities"
+	"github.com/davidmovas/postulator/internal/dto"
+	"github.com/davidmovas/postulator/pkg/ctx"
+	"github.com/davidmovas/postulator/pkg/errors"
 )
 
 func (a *App) CreateTopic(topic *dto.Topic) *dto.Response[int] {
