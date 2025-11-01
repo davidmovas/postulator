@@ -222,7 +222,7 @@ CREATE TABLE job_executions (
     FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE SET NULL,
     FOREIGN KEY (prompt_id) REFERENCES prompts(id) ON DELETE RESTRICT,
     FOREIGN KEY (ai_provider_id) REFERENCES ai_providers(id) ON DELETE RESTRICT,
-    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT,
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT
 );
 
 CREATE INDEX idx_job_executions_job ON job_executions(job_id);
@@ -260,7 +260,7 @@ CREATE TABLE articles (
 
     FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
     FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE SET NULL,
-    FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
+    FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_articles_site ON articles(site_id);
@@ -323,7 +323,7 @@ CREATE TABLE interlinking_tasks (
     applied_at DATETIME,
 
     FOREIGN KEY (prompt_id) REFERENCES prompts(id) ON DELETE SET NULL,
-    FOREIGN KEY (ai_provider_id) REFERENCES ai_providers(id) ON DELETE RESTRICT,
+    FOREIGN KEY (ai_provider_id) REFERENCES ai_providers(id) ON DELETE RESTRICT
 );
 
 CREATE INDEX idx_interlinking_tasks_status ON interlinking_tasks(status);
@@ -341,7 +341,7 @@ CREATE TABLE interlinking_proposals (
 
     FOREIGN KEY (task_id) REFERENCES interlinking_tasks(id) ON DELETE CASCADE,
     FOREIGN KEY (source_article_id) REFERENCES articles(id) ON DELETE CASCADE,
-    FOREIGN KEY (target_article_id) REFERENCES articles(id) ON DELETE CASCADE,
+    FOREIGN KEY (target_article_id) REFERENCES articles(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_interlinking_proposals_task ON interlinking_proposals(task_id);
