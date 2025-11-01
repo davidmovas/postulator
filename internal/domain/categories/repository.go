@@ -3,11 +3,12 @@ package categories
 import (
 	"context"
 	"database/sql"
+	"time"
+
 	"github.com/davidmovas/postulator/internal/infra/database"
 	"github.com/davidmovas/postulator/pkg/dbx"
 	"github.com/davidmovas/postulator/pkg/errors"
 	"github.com/davidmovas/postulator/pkg/logger"
-	"time"
 
 	"github.com/Masterminds/squirrel"
 )

@@ -2,6 +2,7 @@ package topic
 
 import (
 	"context"
+
 	"github.com/davidmovas/postulator/internal/infra/database"
 	"github.com/davidmovas/postulator/pkg/dbx"
 	"github.com/davidmovas/postulator/pkg/errors"
