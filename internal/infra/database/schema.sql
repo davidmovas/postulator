@@ -288,7 +288,7 @@ CREATE TABLE article_links (
 
     FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE,
     FOREIGN KEY (target_article_id) REFERENCES articles(id) ON DELETE SET NULL,
-    FOREIGN KEY (task_id) REFERENCES interlinking_tasks(id) ON DELETE SET NULL,
+    FOREIGN KEY (task_id) REFERENCES linking_tasks(id) ON DELETE SET NULL,
 
     CHECK (link_type IN ('internal', 'external'))
 );
@@ -299,10 +299,10 @@ CREATE INDEX idx_article_links_type ON article_links(link_type);
 CREATE INDEX idx_article_links_task ON article_links(task_id);
 
 -- ============================================================================
--- INTERLINKING
+-- LINKING
 -- ============================================================================
 
-CREATE TABLE interlinking_tasks (
+CREATE TABLE linking_tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     site_ids TEXT NOT NULL,
@@ -326,9 +326,9 @@ CREATE TABLE interlinking_tasks (
     FOREIGN KEY (ai_provider_id) REFERENCES ai_providers(id) ON DELETE RESTRICT
 );
 
-CREATE INDEX idx_interlinking_tasks_status ON interlinking_tasks(status);
+CREATE INDEX idx_linking_tasks_status ON linking_tasks(status);
 
-CREATE TABLE interlinking_proposals (
+CREATE TABLE linking_proposals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     task_id INTEGER NOT NULL,
     source_article_id INTEGER NOT NULL,
@@ -339,14 +339,14 @@ CREATE TABLE interlinking_proposals (
     status TEXT NOT NULL DEFAULT 'pending',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (task_id) REFERENCES interlinking_tasks(id) ON DELETE CASCADE,
+    FOREIGN KEY (task_id) REFERENCES linking_tasks(id) ON DELETE CASCADE,
     FOREIGN KEY (source_article_id) REFERENCES articles(id) ON DELETE CASCADE,
     FOREIGN KEY (target_article_id) REFERENCES articles(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_interlinking_proposals_task ON interlinking_proposals(task_id);
-CREATE INDEX idx_interlinking_proposals_source ON interlinking_proposals(source_article_id);
-CREATE INDEX idx_interlinking_proposals_target ON interlinking_proposals(target_article_id);
+CREATE INDEX idx_interlinking_proposals_task ON linking_proposals(task_id);
+CREATE INDEX idx_interlinking_proposals_source ON linking_proposals(source_article_id);
+CREATE INDEX idx_interlinking_proposals_target ON linking_proposals(target_article_id);
 
 -- ============================================================================
 -- STATISTICS
