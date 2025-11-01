@@ -2,6 +2,7 @@ package importer
 
 import (
 	"context"
+
 	"github.com/davidmovas/postulator/internal/domain/entities"
 )
 

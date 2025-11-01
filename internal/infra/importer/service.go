@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
-	"github.com/davidmovas/postulator/internal/domain/sites"
 	"github.com/davidmovas/postulator/internal/domain/topic"
 	"github.com/davidmovas/postulator/pkg/di"
 	"github.com/davidmovas/postulator/pkg/errors"
