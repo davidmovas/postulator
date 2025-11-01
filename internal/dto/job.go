@@ -1,7 +1,7 @@
 package dto
 
 import (
-	"Postulator/internal/domain/job"
+	"Postulator/internal/domain/jobs"
 	"time"
 )
 
@@ -46,7 +46,7 @@ type Execution struct {
 	PublishedAt      *string `json:"publishedAt,omitempty"`
 }
 
-func FromJob(e *job.Job) *Job {
+func FromJob(e *jobs.Job) *Job {
 	if e == nil {
 		return nil
 	}
@@ -82,7 +82,7 @@ func FromJob(e *job.Job) *Job {
 	}
 }
 
-func FromJobs(items []*job.Job) []*Job {
+func FromJobs(items []*jobs.Job) []*Job {
 	out := make([]*Job, 0, len(items))
 	for _, it := range items {
 		out = append(out, FromJob(it))
@@ -90,7 +90,7 @@ func FromJobs(items []*job.Job) []*Job {
 	return out
 }
 
-func FromExecution(e *job.Execution) *Execution {
+func FromExecution(e *jobs.Execution) *Execution {
 	if e == nil {
 		return nil
 	}
@@ -118,7 +118,7 @@ func FromExecution(e *job.Execution) *Execution {
 	}
 }
 
-func FromExecutions(items []*job.Execution) []*Execution {
+func FromExecutions(items []*jobs.Execution) []*Execution {
 	out := make([]*Execution, 0, len(items))
 	for _, it := range items {
 		out = append(out, FromExecution(it))

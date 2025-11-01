@@ -1,50 +1,93 @@
 package dto
 
-import "time"
+import (
+	appErrors "Postulator/pkg/errors"
+	"errors"
+)
 
-const timeLayout = "2006-01-02T15:04:05Z07:00"
+type Response[T any] struct {
+	Success bool   `json:"success"`
+	Data    T      `json:"data,omitempty"`
+	Error   *Error `json:"error,omitempty"`
+}
 
-func Success[T any](data T) Response[T] {
-	return Response[T]{
+type PaginatedResponse[T any] struct {
+	Success bool   `json:"success"`
+	Items   []T    `json:"items"`
+	Total   int    `json:"total"`
+	Limit   int    `json:"limit"`
+	Offset  int    `json:"offset"`
+	HasMore bool   `json:"hasMore"`
+	Error   *Error `json:"error,omitempty"`
+}
+
+type Error struct {
+	Code         string         `json:"code"`
+	Message      string         `json:"message"`
+	UserMessage  string         `json:"userMessage,omitempty"`
+	Context      map[string]any `json:"context,omitempty"`
+	IsUserFacing bool           `json:"isUserFacing"`
+}
+
+func NewResponse[T any](data T) *Response[T] {
+	return &Response[T]{
 		Success: true,
 		Data:    data,
 	}
 }
 
-func Failure[T any](code, message string, context map[string]any) Response[T] {
-	return Response[T]{
+func NewErrorResponse[T any](err error) *Response[T] {
+	return &Response[T]{
 		Success: false,
-		Error: &Error{
-			Code:    code,
-			Message: message,
-			Context: context,
-		},
+		Error:   toError(err),
 	}
 }
 
-func FormatTime(t time.Time) string {
-	return t.Format(time.RFC3339)
+func NewPaginatedResponse[T any](items []T, total, limit, offset int) *PaginatedResponse[T] {
+	return &PaginatedResponse[T]{
+		Success: true,
+		Items:   items,
+		Total:   total,
+		Limit:   limit,
+		Offset:  offset,
+		HasMore: offset+len(items) < total,
+	}
 }
 
-func FormatTimePtr(t *time.Time) *string {
-	if t == nil {
+func NewPaginatedError[T any](err error) *PaginatedResponse[T] {
+	return &PaginatedResponse[T]{
+		Success: false,
+		Error:   toError(err),
+	}
+}
+
+func toError(err error) *Error {
+	if err == nil {
 		return nil
 	}
-	formatted := t.Format(time.RFC3339)
-	return &formatted
+
+	var appErr *appErrors.AppError
+	if errors.As(err, &appErr) {
+		return &Error{
+			Code:         string(appErr.Code),
+			Message:      appErr.Error(),
+			UserMessage:  getUserMessage(appErr),
+			Context:      appErr.Context,
+			IsUserFacing: appErr.IsUserFacing(),
+		}
+	}
+
+	return &Error{
+		Code:         string(appErrors.ErrCodeInternal),
+		Message:      err.Error(),
+		UserMessage:  "An unexpected error occurred",
+		IsUserFacing: false,
+	}
 }
 
-func ParseTime(s string) (time.Time, error) {
-	return time.Parse(time.RFC3339, s)
-}
-
-func ParseTimePtr(s *string) (*time.Time, error) {
-	if s == nil {
-		return nil, nil
+func getUserMessage(err *appErrors.AppError) string {
+	if !err.IsUserFacing() {
+		return "An unexpected error occurred. Please try again later."
 	}
-	t, err := time.Parse(time.RFC3339, *s)
-	if err != nil {
-		return nil, err
-	}
-	return &t, nil
+	return err.Message
 }

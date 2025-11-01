@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"Postulator/internal/domain/entities"
-	"Postulator/internal/domain/site"
+	"Postulator/internal/domain/sites"
 	"Postulator/internal/domain/topic"
 	"Postulator/pkg/di"
 	"Postulator/pkg/errors"

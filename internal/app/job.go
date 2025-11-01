@@ -1,7 +1,7 @@
 package app
 
 import (
-	"Postulator/internal/domain/job"
+	"Postulator/internal/domain/jobs"
 	"Postulator/internal/dto"
 	"Postulator/pkg/ctx"
 	"Postulator/pkg/errors"
@@ -109,13 +109,13 @@ func (a *App) ValidateExecution(execID int64, approved bool) *dto.Response[strin
 	return &dto.Response[string]{Success: true, Data: "validated"}
 }
 
-func toJobEntity(d *dto.Job) (*job.Job, error) {
-	var unit job.IntervalUnit
+func toJobEntity(d *dto.Job) (*jobs.Job, error) {
+	var unit jobs.IntervalUnit
 	if d.IntervalUnit != nil {
-		unit = job.IntervalUnit(*d.IntervalUnit)
+		unit = jobs.IntervalUnit(*d.IntervalUnit)
 	}
 
-	return &job.Job{
+	return &jobs.Job{
 		ID:                 d.ID,
 		Name:               d.Name,
 		SiteID:             d.SiteID,
@@ -124,7 +124,7 @@ func toJobEntity(d *dto.Job) (*job.Job, error) {
 		AIProviderID:       d.AIProviderID,
 		AIModel:            d.AIModel,
 		RequiresValidation: d.RequiresValidation,
-		ScheduleType:       job.ScheduleType(d.ScheduleType),
+		ScheduleType:       jobs.ScheduleType(d.ScheduleType),
 		IntervalValue:      d.IntervalValue,
 		IntervalUnit:       &unit,
 		ScheduleHour:       d.ScheduleHour,
@@ -132,6 +132,6 @@ func toJobEntity(d *dto.Job) (*job.Job, error) {
 		Weekdays:           d.Weekdays,
 		JitterEnabled:      d.JitterEnabled,
 		JitterMinutes:      d.JitterMinutes,
-		Status:             job.Status(d.Status),
+		Status:             jobs.Status(d.Status),
 	}, nil
 }

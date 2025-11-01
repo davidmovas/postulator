@@ -2,11 +2,11 @@ package app
 
 import (
 	"Postulator/internal/config"
-	"Postulator/internal/domain/aiprovider"
-	"Postulator/internal/domain/article"
-	"Postulator/internal/domain/job"
-	"Postulator/internal/domain/prompt"
-	"Postulator/internal/domain/site"
+	"Postulator/internal/domain/articles"
+	"Postulator/internal/domain/jobs"
+	"Postulator/internal/domain/prompts"
+	"Postulator/internal/domain/providers"
+	"Postulator/internal/domain/sites"
 	"Postulator/internal/domain/topic"
 	"Postulator/internal/infra/ai"
 	"Postulator/internal/infra/database"
@@ -33,11 +33,11 @@ type App struct {
 	// Services
 	siteSvc     site.IService
 	topicSvc    topic.IService
-	promptSvc   prompt.IService
+	promptSvc   prompts.IService
 	aiProvSvc   aiprovider.IService
 	importerSvc importer.IImportService
-	jobSvc      job.IService
-	scheduler   job.IScheduler
+	jobSvc      jobs.IService
+	scheduler   jobs.IScheduler
 }
 
 func New(cfg *config.Config) (*App, error) {
@@ -108,24 +108,24 @@ func (a *App) BuildServices() error {
 	var err error
 
 	// Register repositories needed by services and executor
-	execRepo, err := job.NewExecutionRepository(a.container)
+	execRepo, err := jobs.NewExecutionRepository(a.container)
 	if err != nil {
 		return err
 	}
-	a.container.MustRegister(&di.Registration[job.IExecutionRepository]{
-		Provider:      di.Must[job.IExecutionRepository](execRepo),
+	a.container.MustRegister(&di.Registration[jobs.IExecutionRepository]{
+		Provider:      di.Must[jobs.IExecutionRepository](execRepo),
 		Lifecycle:     di.Singleton,
-		InterfaceType: reflect.TypeOf((*job.IExecutionRepository)(nil)).Elem(),
+		InterfaceType: reflect.TypeOf((*jobs.IExecutionRepository)(nil)).Elem(),
 	})
 
-	articleRepo, err := article.NewRepository(a.container)
+	articleRepo, err := articles.NewRepository(a.container)
 	if err != nil {
 		return err
 	}
-	a.container.MustRegister(&di.Registration[article.IRepository]{
-		Provider:      di.Must[article.IRepository](articleRepo),
+	a.container.MustRegister(&di.Registration[articles.IRepository]{
+		Provider:      di.Must[articles.IRepository](articleRepo),
 		Lifecycle:     di.Singleton,
-		InterfaceType: reflect.TypeOf((*article.IRepository)(nil)).Elem(),
+		InterfaceType: reflect.TypeOf((*articles.IRepository)(nil)).Elem(),
 	})
 
 	// Build and register services
@@ -150,14 +150,14 @@ func (a *App) BuildServices() error {
 		InterfaceType: reflect.TypeOf((*topic.IService)(nil)).Elem(),
 	})
 
-	a.promptSvc, err = prompt.NewService(a.container)
+	a.promptSvc, err = prompts.NewService(a.container)
 	if err != nil {
 		return err
 	}
-	a.container.MustRegister(&di.Registration[prompt.IService]{
-		Provider:      di.Must[prompt.IService](a.promptSvc),
+	a.container.MustRegister(&di.Registration[prompts.IService]{
+		Provider:      di.Must[prompts.IService](a.promptSvc),
 		Lifecycle:     di.Singleton,
-		InterfaceType: reflect.TypeOf((*prompt.IService)(nil)).Elem(),
+		InterfaceType: reflect.TypeOf((*prompts.IService)(nil)).Elem(),
 	})
 
 	a.aiProvSvc, err = aiprovider.NewService(a.container)
@@ -170,14 +170,14 @@ func (a *App) BuildServices() error {
 		InterfaceType: reflect.TypeOf((*aiprovider.IService)(nil)).Elem(),
 	})
 
-	a.jobSvc, err = job.NewService(a.container)
+	a.jobSvc, err = jobs.NewService(a.container)
 	if err != nil {
 		return err
 	}
-	a.container.MustRegister(&di.Registration[job.IService]{
-		Provider:      di.Must[job.IService](a.jobSvc),
+	a.container.MustRegister(&di.Registration[jobs.IService]{
+		Provider:      di.Must[jobs.IService](a.jobSvc),
 		Lifecycle:     di.Singleton,
-		InterfaceType: reflect.TypeOf((*job.IService)(nil)).Elem(),
+		InterfaceType: reflect.TypeOf((*jobs.IService)(nil)).Elem(),
 	})
 
 	if svc, ierr := importer.NewImportService(a.container); ierr != nil {
@@ -191,14 +191,14 @@ func (a *App) BuildServices() error {
 		})
 	}
 
-	a.scheduler, err = job.NewScheduler(a.container)
+	a.scheduler, err = jobs.NewScheduler(a.container)
 	if err != nil {
 		return err
 	}
-	a.container.MustRegister(&di.Registration[job.IScheduler]{
-		Provider:      di.Must[job.IScheduler](a.scheduler),
+	a.container.MustRegister(&di.Registration[jobs.IScheduler]{
+		Provider:      di.Must[jobs.IScheduler](a.scheduler),
 		Lifecycle:     di.Singleton,
-		InterfaceType: reflect.TypeOf((*job.IScheduler)(nil)).Elem(),
+		InterfaceType: reflect.TypeOf((*jobs.IScheduler)(nil)).Elem(),
 	})
 
 	return nil
