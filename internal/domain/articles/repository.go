@@ -455,7 +455,8 @@ func (r *repository) BulkCreate(ctx context.Context, articles []*Article) error 
 	}()
 
 	for _, article := range articles {
-		categoryIDsJSON, err := json.Marshal(article.WPCategoryIDs)
+		var categoryIDsJSON []byte
+		categoryIDsJSON, err = json.Marshal(article.WPCategoryIDs)
 		if err != nil {
 			return errors.Validation("Invalid category IDs format")
 		}
@@ -484,7 +485,7 @@ func (r *repository) BulkCreate(ctx context.Context, articles []*Article) error 
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
+	if err = tx.Commit(); err != nil {
 		return errors.Database(err)
 	}
 
@@ -519,13 +520,13 @@ func (r *repository) BulkUpdateWPInfo(ctx context.Context, updates []*WPInfoUpda
 
 		query, args := builder.MustSql()
 
-		_, err := tx.ExecContext(ctx, query, args...)
+		_, err = tx.ExecContext(ctx, query, args...)
 		if err != nil {
 			return errors.Database(err)
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
+	if err = tx.Commit(); err != nil {
 		return errors.Database(err)
 	}
 
@@ -587,7 +588,7 @@ func (r *repository) scanArticle(query string, args []interface{}, ctx context.C
 	// Parse category IDs JSON
 	if categoryIDsJSON.Valid {
 		var categoryIDs []int
-		if err := json.Unmarshal([]byte(categoryIDsJSON.String), &categoryIDs); err != nil {
+		if err = json.Unmarshal([]byte(categoryIDsJSON.String), &categoryIDs); err != nil {
 			return nil, errors.Database(err)
 		}
 		article.WPCategoryIDs = categoryIDs
@@ -609,7 +610,8 @@ func (r *repository) scanArticles(query string, args []interface{}, ctx context.
 
 	var articles []*Article
 	for rows.Next() {
-		article, err := r.scanArticleFromRow(rows)
+		var article *Article
+		article, err = r.scanArticleFromRow(rows)
 		if err != nil {
 			return nil, errors.Database(err)
 		}
@@ -680,7 +682,7 @@ func (r *repository) scanArticleFromRow(rows *sql.Rows) (*Article, error) {
 	// Parse category IDs JSON
 	if categoryIDsJSON.Valid {
 		var categoryIDs []int
-		if err := json.Unmarshal([]byte(categoryIDsJSON.String), &categoryIDs); err != nil {
+		if err = json.Unmarshal([]byte(categoryIDsJSON.String), &categoryIDs); err != nil {
 			return nil, errors.Database(err)
 		}
 		article.WPCategoryIDs = categoryIDs
