@@ -27,7 +27,7 @@ type Execution struct {
 	AIModel      string
 	CategoryID   int64
 
-	Status           Status
+	Status           ExecutionStatus
 	ErrorMessage     *string
 	GenerationTimeMs *int
 	TokensUsed       *int

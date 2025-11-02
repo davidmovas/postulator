@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
-	"github.com/davidmovas/postulator/internal/domain/jobs/execution"
 )
 
 type Repository interface {
@@ -51,6 +50,6 @@ type Service interface {
 	UpdateInWordPress(ctx context.Context, article *entities.Article) error
 	DeleteFromWordPress(ctx context.Context, id int64) error
 
-	CreateDraft(ctx context.Context, exec *execution.Execution, title, content string) (*entities.Article, error)
+	CreateDraft(ctx context.Context, exec *entities.Execution, title, content string) (*entities.Article, error)
 	PublishDraft(ctx context.Context, id int64) error
 }

@@ -95,7 +95,7 @@ func (a *App) InitWP() {
 }
 
 func (a *App) InitAI() {
-	client := ai.NewClient()
+	client := ai.NewOpenAIClient()
 
 	a.container.MustRegister(&di.Registration[ai.IClient]{
 		Provider:      di.Must[ai.IClient](client),

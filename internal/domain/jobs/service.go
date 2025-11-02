@@ -9,8 +9,6 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/articles"
 	"github.com/davidmovas/postulator/internal/domain/categories"
 	"github.com/davidmovas/postulator/internal/domain/entities"
-	"github.com/davidmovas/postulator/internal/domain/jobs/execution"
-	"github.com/davidmovas/postulator/internal/domain/jobs/schedule"
 	"github.com/davidmovas/postulator/internal/domain/prompts"
 	"github.com/davidmovas/postulator/internal/domain/providers"
 	"github.com/davidmovas/postulator/internal/domain/sites"
@@ -22,47 +20,32 @@ import (
 var _ Service = (*service)(nil)
 
 type service struct {
-	scheduler        schedule.Scheduler
-	executor         execution.Executor
-	siteService      sites.Service
-	topicService     topics.Service
-	promptService    prompts.Service
-	providerService  providers.Service
-	categoryService  categories.Service
-	articleService   articles.Service
-	executionService execution.Service
-	repo             Repository
-	stateRepo        StateRepository
-	logger           *logger.Logger
+	scheduler       Scheduler
+	executor        Executor
+	siteService     sites.Service
+	topicService    topics.Service
+	promptService   prompts.Service
+	providerService providers.Service
+	categoryService categories.Service
+	articleService  articles.Service
+	repo            Repository
+	stateRepo       StateRepository
+	logger          *logger.Logger
 }
 
 func NewService(
+	scheduler Scheduler,
+	executor Executor,
 	repo Repository,
 	stateRepo StateRepository,
-	siteService sites.Service,
-	topicService topics.Service,
-	promptService prompts.Service,
-	providerService providers.Service,
-	categoryService categories.Service,
-	articleService articles.Service,
-	executionService execution.Service,
-	scheduler schedule.Scheduler,
-	executor execution.Executor,
 	logger *logger.Logger,
 ) Service {
 	return &service{
-		repo:             repo,
-		stateRepo:        stateRepo,
-		siteService:      siteService,
-		topicService:     topicService,
-		promptService:    promptService,
-		providerService:  providerService,
-		categoryService:  categoryService,
-		articleService:   articleService,
-		executionService: executionService,
-		scheduler:        scheduler,
-		executor:         executor,
-		logger:           logger.WithScope("service").WithScope("jobs"),
+		repo:      repo,
+		stateRepo: stateRepo,
+		scheduler: scheduler,
+		executor:  executor,
+		logger:    logger.WithScope("service").WithScope("jobs"),
 	}
 }
 

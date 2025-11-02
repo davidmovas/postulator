@@ -43,3 +43,17 @@ type Service interface {
 
 	ExecuteManually(ctx context.Context, jobID int64) error
 }
+
+type Scheduler interface {
+	Start(ctx context.Context) error
+	Stop() error
+	RestoreState(ctx context.Context) error
+	CalculateNextRun(job *entities.Job, lastRun *time.Time) (time.Time, error)
+	ScheduleJob(ctx context.Context, job *entities.Job) error
+	TriggerJob(ctx context.Context, jobID int64) error
+}
+
+type Executor interface {
+	Execute(ctx context.Context, job *entities.Job) error
+	PublishValidatedArticle(ctx context.Context, exec *entities.Execution) error
+}

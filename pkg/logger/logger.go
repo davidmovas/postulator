@@ -4,13 +4,14 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"github.com/davidmovas/postulator/internal/config"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/davidmovas/postulator/internal/config"
 
 	"github.com/rs/zerolog"
 )
