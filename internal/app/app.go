@@ -8,7 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/prompts"
 	"github.com/davidmovas/postulator/internal/domain/providers"
 	"github.com/davidmovas/postulator/internal/domain/sites"
-	"github.com/davidmovas/postulator/internal/domain/topic"
+	"github.com/davidmovas/postulator/internal/domain/topics"
 	"github.com/davidmovas/postulator/internal/infra/ai"
 	"github.com/davidmovas/postulator/internal/infra/database"
 	"github.com/davidmovas/postulator/internal/infra/importer"
@@ -32,7 +32,7 @@ type App struct {
 
 	// Services
 	siteSvc     site.IService
-	topicSvc    topic.IService
+	topicSvc    topics.IService
 	promptSvc   prompts.IService
 	aiProvSvc   aiprovider.IService
 	importerSvc importer.IImportService
@@ -140,14 +140,14 @@ func (a *App) BuildServices() error {
 		InterfaceType: reflect.TypeOf((*site.IService)(nil)).Elem(),
 	})
 
-	a.topicSvc, err = topic.NewService(a.container)
+	a.topicSvc, err = topics.NewService(a.container)
 	if err != nil {
 		return err
 	}
-	a.container.MustRegister(&di.Registration[topic.IService]{
-		Provider:      di.Must[topic.IService](a.topicSvc),
+	a.container.MustRegister(&di.Registration[topics.IService]{
+		Provider:      di.Must[topics.IService](a.topicSvc),
 		Lifecycle:     di.Singleton,
-		InterfaceType: reflect.TypeOf((*topic.IService)(nil)).Elem(),
+		InterfaceType: reflect.TypeOf((*topics.IService)(nil)).Elem(),
 	})
 
 	a.promptSvc, err = prompts.NewService(a.container)

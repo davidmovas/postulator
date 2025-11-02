@@ -1,4 +1,4 @@
-package topic
+package topics
 
 import (
 	"context"
@@ -47,6 +47,6 @@ type Service interface {
 	GenerateVariations(ctx context.Context, topicID int64, count int) ([]*entities.Topic, error)
 	GetOrGenerateVariation(ctx context.Context, siteID, originalID int64) (*entities.Topic, error)
 
-	GetNextTopicForJob(ctx context.Context, jobID int64) (*entities.Topic, error)
+	GetNextTopicForJob(ctx context.Context, job *entities.Job) (*entities.Topic, error)
 	MarkTopicUsed(ctx context.Context, siteID, topicID int64) error
 }

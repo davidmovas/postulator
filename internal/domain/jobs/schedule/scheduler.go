@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/davidmovas/postulator/internal/domain/jobs"
+	"github.com/davidmovas/postulator/internal/domain/entities"
 )
 
 type Scheduler struct{}
@@ -21,11 +21,11 @@ func (s *Scheduler) RestoreState(ctx context.Context) error {
 	return nil
 }
 
-func (s *Scheduler) CalculateNextRun(job *jobs.Job, lastRun *time.Time) (time.Time, error) {
+func (s *Scheduler) CalculateNextRun(job *entities.Job, lastRun *time.Time) (time.Time, error) {
 	return time.Time{}, nil
 }
 
-func (s *Scheduler) ScheduleJob(ctx context.Context, job *jobs.Job) error {
+func (s *Scheduler) ScheduleJob(ctx context.Context, job *entities.Job) error {
 	return nil
 }
 

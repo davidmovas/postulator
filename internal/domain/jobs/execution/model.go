@@ -3,53 +3,17 @@ package execution
 import (
 	"context"
 	"time"
+
+	"github.com/davidmovas/postulator/internal/domain/entities"
 )
-
-type Status string
-
-const (
-	StatusPending           Status = "pending"
-	StatusGenerating        Status = "generating"
-	StatusPendingValidation Status = "pending_validation"
-	StatusValidated         Status = "validated"
-	StatusPublishing        Status = "publishing"
-	StatusPublished         Status = "published"
-	StatusRejected          Status = "rejected"
-	StatusFailed            Status = "failed"
-)
-
-type Execution struct {
-	ID        int64
-	JobID     int64
-	SiteID    int64
-	TopicID   int64
-	ArticleID *int64
-
-	PromptID     int64
-	AIProviderID int64
-	AIModel      string
-	CategoryID   int64
-
-	Status           Status
-	ErrorMessage     *string
-	GenerationTimeMs *int
-	TokensUsed       *int
-	CostUSD          *float64
-
-	StartedAt   time.Time
-	GeneratedAt *time.Time
-	ValidatedAt *time.Time
-	PublishedAt *time.Time
-	CompletedAt *time.Time
-}
 
 type Repository interface {
-	Create(ctx context.Context, exec *Execution) error
-	GetByID(ctx context.Context, id int64) (*Execution, error)
-	GetByJobID(ctx context.Context, jobID int64, limit, offset int) ([]*Execution, int, error)
-	GetPendingValidation(ctx context.Context) ([]*Execution, error)
-	GetByStatus(ctx context.Context, status Status) ([]*Execution, error)
-	Update(ctx context.Context, exec *Execution) error
+	Create(ctx context.Context, exec *entities.Execution) error
+	GetByID(ctx context.Context, id int64) (*entities.Execution, error)
+	GetByJobID(ctx context.Context, jobID int64, limit, offset int) ([]*entities.Execution, int, error)
+	GetPendingValidation(ctx context.Context) ([]*entities.Execution, error)
+	GetByStatus(ctx context.Context, status entities.Status) ([]*entities.Execution, error)
+	Update(ctx context.Context, exec *entities.Execution) error
 	Delete(ctx context.Context, id int64) error
 
 	CountByJob(ctx context.Context, jobID int64) (int, error)
@@ -59,25 +23,15 @@ type Repository interface {
 }
 
 type Service interface {
-	CreateExecution(ctx context.Context, exec *Execution) error
-	GetExecution(ctx context.Context, id int64) (*Execution, error)
-	ListExecutions(ctx context.Context, jobID int64, limit, offset int) ([]*Execution, int, error)
-	GetPendingValidations(ctx context.Context) ([]*Execution, error)
+	CreateExecution(ctx context.Context, exec *entities.Execution) error
+	GetExecution(ctx context.Context, id int64) (*entities.Execution, error)
+	ListExecutions(ctx context.Context, jobID int64, limit, offset int) ([]*entities.Execution, int, error)
+	GetPendingValidations(ctx context.Context) ([]*entities.Execution, error)
 
-	UpdateStatus(ctx context.Context, id int64, status Status) error
+	UpdateStatus(ctx context.Context, id int64, status entities.Status) error
 
 	ApproveExecution(ctx context.Context, id int64) error
 	RejectExecution(ctx context.Context, id int64) error
 
-	GetJobMetrics(ctx context.Context, jobID int64) (*Metrics, error)
-}
-
-type Metrics struct {
-	TotalExecutions      int
-	SuccessfulExecutions int
-	FailedExecutions     int
-	RejectedExecutions   int
-	AverageTimeMs        int
-	TotalTokens          int
-	TotalCost            float64
+	GetJobMetrics(ctx context.Context, jobID int64) (*entities.Metrics, error)
 }

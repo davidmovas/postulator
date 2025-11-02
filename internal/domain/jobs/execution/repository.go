@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/squirrel"
+	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/infra/database"
 	"github.com/davidmovas/postulator/pkg/dbx"
 	"github.com/davidmovas/postulator/pkg/errors"
@@ -28,7 +29,7 @@ func NewRepository(db *database.DB, logger *logger.Logger) Repository {
 	}
 }
 
-func (r *repository) Create(ctx context.Context, exec *Execution) error {
+func (r *repository) Create(ctx context.Context, exec *entities.Execution) error {
 	query, args := dbx.ST.
 		Insert("job_executions").
 		Columns(
@@ -64,7 +65,7 @@ func (r *repository) Create(ctx context.Context, exec *Execution) error {
 	return nil
 }
 
-func (r *repository) GetByID(ctx context.Context, id int64) (*Execution, error) {
+func (r *repository) GetByID(ctx context.Context, id int64) (*entities.Execution, error) {
 	query, args := dbx.ST.
 		Select(
 			"id", "job_id", "site_id", "topic_id", "article_id",
@@ -88,7 +89,7 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*Execution, error) 
 	return exec, nil
 }
 
-func (r *repository) GetByJobID(ctx context.Context, jobID int64, limit, offset int) ([]*Execution, int, error) {
+func (r *repository) GetByJobID(ctx context.Context, jobID int64, limit, offset int) ([]*entities.Execution, int, error) {
 	query, args := dbx.ST.
 		Select(
 			"id", "job_id", "site_id", "topic_id", "article_id",
@@ -127,7 +128,7 @@ func (r *repository) GetByJobID(ctx context.Context, jobID int64, limit, offset 
 	return executions, total, nil
 }
 
-func (r *repository) GetPendingValidation(ctx context.Context) ([]*Execution, error) {
+func (r *repository) GetPendingValidation(ctx context.Context) ([]*entities.Execution, error) {
 	query, args := dbx.ST.
 		Select(
 			"id", "job_id", "site_id", "topic_id", "article_id",
@@ -137,14 +138,14 @@ func (r *repository) GetPendingValidation(ctx context.Context) ([]*Execution, er
 			"started_at", "generated_at", "validated_at", "published_at", "completed_at",
 		).
 		From("job_executions").
-		Where(squirrel.Eq{"status": StatusPendingValidation}).
+		Where(squirrel.Eq{"status": entities.ExecutionStatusPendingValidation}).
 		OrderBy("generated_at ASC").
 		MustSql()
 
 	return r.scanExecutions(query, args, ctx)
 }
 
-func (r *repository) GetByStatus(ctx context.Context, status Status) ([]*Execution, error) {
+func (r *repository) GetByStatus(ctx context.Context, status entities.Status) ([]*entities.Execution, error) {
 	query, args := dbx.ST.
 		Select(
 			"id", "job_id", "site_id", "topic_id", "article_id",
@@ -161,7 +162,7 @@ func (r *repository) GetByStatus(ctx context.Context, status Status) ([]*Executi
 	return r.scanExecutions(query, args, ctx)
 }
 
-func (r *repository) Update(ctx context.Context, exec *Execution) error {
+func (r *repository) Update(ctx context.Context, exec *entities.Execution) error {
 	query, args := dbx.ST.
 		Update("job_executions").
 		Set("job_id", exec.JobID).
@@ -292,8 +293,8 @@ func (r *repository) GetAverageGenerationTime(ctx context.Context, jobID int64) 
 	return avgTime, nil
 }
 
-func (r *repository) scanExecution(query string, args []interface{}, ctx context.Context) (*Execution, error) {
-	var exec Execution
+func (r *repository) scanExecution(query string, args []interface{}, ctx context.Context) (*entities.Execution, error) {
+	var exec entities.Execution
 	var articleID sql.NullInt64
 	var errorMessage sql.NullString
 	var generationTimeMs, tokensUsed sql.NullInt32
@@ -354,7 +355,7 @@ func (r *repository) scanExecution(query string, args []interface{}, ctx context
 	return &exec, nil
 }
 
-func (r *repository) scanExecutions(query string, args []interface{}, ctx context.Context) ([]*Execution, error) {
+func (r *repository) scanExecutions(query string, args []interface{}, ctx context.Context) ([]*entities.Execution, error) {
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, errors.Database(err)
@@ -363,9 +364,9 @@ func (r *repository) scanExecutions(query string, args []interface{}, ctx contex
 		_ = rows.Close()
 	}()
 
-	var executions []*Execution
+	var executions []*entities.Execution
 	for rows.Next() {
-		var exec *Execution
+		var exec *entities.Execution
 		exec, err = r.scanExecutionFromRow(rows)
 		if err != nil {
 			return nil, errors.Database(err)
@@ -383,8 +384,8 @@ func (r *repository) scanExecutions(query string, args []interface{}, ctx contex
 	return executions, nil
 }
 
-func (r *repository) scanExecutionFromRow(rows *sql.Rows) (*Execution, error) {
-	var exec Execution
+func (r *repository) scanExecutionFromRow(rows *sql.Rows) (*entities.Execution, error) {
+	var exec entities.Execution
 	var articleID sql.NullInt64
 	var errorMessage sql.NullString
 	var generationTimeMs, tokensUsed sql.NullInt32

@@ -5,7 +5,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/sites"
-	"github.com/davidmovas/postulator/internal/domain/topic"
+	"github.com/davidmovas/postulator/internal/domain/topics"
 	"github.com/davidmovas/postulator/pkg/di"
 	"github.com/davidmovas/postulator/pkg/errors"
 	"github.com/davidmovas/postulator/pkg/logger"
@@ -14,7 +14,7 @@ import (
 var _ IImportService = (*ImportService)(nil)
 
 type ImportService struct {
-	topicService topic.Service
+	topicService topics.Service
 	siteService  sites.Service
 	logger       *logger.Logger
 }
@@ -25,7 +25,7 @@ func NewImportService(c di.Container) (*ImportService, error) {
 		return nil, err
 	}
 
-	topicService, err := topic.NewService(c)
+	topicService, err := topics.NewService(c)
 	if err != nil {
 		return nil, err
 	}

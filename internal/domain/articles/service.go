@@ -6,9 +6,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
-	"github.com/davidmovas/postulator/internal/domain/jobs/execution"
 	"github.com/davidmovas/postulator/internal/domain/sites"
-	"github.com/davidmovas/postulator/internal/domain/stats"
 	"github.com/davidmovas/postulator/internal/infra/wp"
 	"github.com/davidmovas/postulator/pkg/errors"
 	"github.com/davidmovas/postulator/pkg/logger"
@@ -17,26 +15,23 @@ import (
 var _ Service = (*service)(nil)
 
 type service struct {
-	repo         Repository
-	siteService  sites.Service
-	wp           wp.Client
-	statsService stats.Service
-	logger       *logger.Logger
+	wp          wp.Client
+	repo        Repository
+	siteService sites.Service
+	logger      *logger.Logger
 }
 
 func NewService(
 	repo Repository,
 	siteService sites.Service,
 	wp wp.Client,
-	statsService stats.Service,
 	logger *logger.Logger,
 ) Service {
 	return &service{
-		repo:         repo,
-		siteService:  siteService,
-		wp:           wp,
-		statsService: statsService,
-		logger:       logger.WithScope("service").WithScope("articles"),
+		repo:        repo,
+		siteService: siteService,
+		wp:          wp,
+		logger:      logger.WithScope("service").WithScope("articles"),
 	}
 }
 
@@ -302,10 +297,6 @@ func (s *service) PublishToWordPress(ctx context.Context, article *entities.Arti
 		return err
 	}
 
-	if err = s.statsService.RecordArticlePublished(ctx, article.SiteID, *article.WordCount); err != nil {
-		s.logger.ErrorWithErr(err, "Failed to record article statistics")
-	}
-
 	s.logger.Info("Article published to WordPress successfully")
 	return nil
 }
@@ -367,7 +358,7 @@ func (s *service) DeleteFromWordPress(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (s *service) CreateDraft(ctx context.Context, exec *execution.Execution, title, content string) (*entities.Article, error) {
+func (s *service) CreateDraft(ctx context.Context, exec *entities.Execution, title, content string) (*entities.Article, error) {
 	wordCount := s.calculateWordCount(content)
 
 	article := &entities.Article{

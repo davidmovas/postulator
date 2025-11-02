@@ -1,4 +1,4 @@
-package topic
+package topics
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
-	"github.com/davidmovas/postulator/internal/domain/jobs"
 	"github.com/davidmovas/postulator/internal/infra/ai"
 	"github.com/davidmovas/postulator/pkg/errors"
 	"github.com/davidmovas/postulator/pkg/logger"
@@ -18,7 +17,6 @@ var _ Service = (*service)(nil)
 
 type service struct {
 	ai            ai.Client
-	jobService    jobs.Service
 	repo          Repository
 	siteTopicRepo SiteTopicRepository
 	usageRepo     UsageRepository
@@ -27,7 +25,6 @@ type service struct {
 
 func NewService(
 	ai ai.Client,
-	jobService jobs.Service,
 	repo Repository,
 	siteTopicRepo SiteTopicRepository,
 	usageRepo UsageRepository,
@@ -35,7 +32,6 @@ func NewService(
 ) Service {
 	return &service{
 		ai:            ai,
-		jobService:    jobService,
 		repo:          repo,
 		siteTopicRepo: siteTopicRepo,
 		usageRepo:     usageRepo,
@@ -219,21 +215,15 @@ func (s *service) GenerateVariations(ctx context.Context, topicID int64, count i
 	return topics, nil
 }
 
-func (s *service) GetNextTopicForJob(ctx context.Context, jobID int64) (*entities.Topic, error) {
-	job, err := s.jobService.GetJob(ctx, jobID)
-	if err != nil {
-		s.logger.ErrorWithErr(err, "Failed to get job")
-		return nil, err
-	}
-
+func (s *service) GetNextTopicForJob(ctx context.Context, job *entities.Job) (*entities.Topic, error) {
 	switch job.TopicStrategy {
 	case entities.StrategyUnique:
+		return s.getNextUniqueTopic(ctx, job)
 	case entities.StrategyVariation:
+		return s.getNextVariationTopic(ctx, job)
 	default:
 		return nil, errors.Validation("Unknown topic strategy")
 	}
-
-	return nil, errors.New(errors.ErrCodeInternal, "Not implemented")
 }
 
 func (s *service) MarkTopicUsed(ctx context.Context, siteID, topicID int64) error {
