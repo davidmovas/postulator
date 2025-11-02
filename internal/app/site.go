@@ -18,7 +18,7 @@ func (a *App) CreateSite(site *dto.Site) *dto.Response[string] {
 		URL:        site.URL,
 		WPUsername: site.WPUsername,
 		WPPassword: "", // password handled via SetSitePassword for secure storage
-		Status:     entities.Status(site.Status),
+		Status:     entities.JobStatus(site.Status),
 	}
 
 	if err := a.siteSvc.CreateSite(ctx.FastCtx(), e); err != nil {
@@ -72,7 +72,7 @@ func (a *App) UpdateSite(site *dto.Site) *dto.Response[string] {
 		Name:       site.Name,
 		URL:        site.URL,
 		WPUsername: site.WPUsername,
-		Status:     entities.Status(site.Status),
+		Status:     entities.JobStatus(site.Status),
 	}
 	if err := a.siteSvc.UpdateSite(ctx.FastCtx(), e); err != nil {
 		return dtoErr[string](asAppErr(err))

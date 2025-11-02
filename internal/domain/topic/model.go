@@ -34,7 +34,7 @@ type UsageRepository interface {
 
 type Service interface {
 	CreateTopic(ctx context.Context, topic *entities.Topic) error
-	CreateTopics(ctx context.Context, topics []*entities.Topic) (*entities.BatchResult, error)
+	CreateTopics(ctx context.Context, topics ...*entities.Topic) (*entities.BatchResult, error)
 	GetTopic(ctx context.Context, id int64) (*entities.Topic, error)
 	ListTopics(ctx context.Context) ([]*entities.Topic, error)
 	UpdateTopic(ctx context.Context, topic *entities.Topic) error
@@ -45,7 +45,6 @@ type Service interface {
 	GetSiteTopics(ctx context.Context, siteID int64) ([]*entities.Topic, error)
 
 	GenerateVariations(ctx context.Context, topicID int64, count int) ([]*entities.Topic, error)
-	GetOrGenerateVariation(ctx context.Context, originalID int64) (*entities.Topic, error)
 
 	GetNextTopicForJob(ctx context.Context, jobID int64) (*entities.Topic, error)
 	MarkTopicUsed(ctx context.Context, siteID, topicID int64) error

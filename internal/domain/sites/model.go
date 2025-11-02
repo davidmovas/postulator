@@ -11,7 +11,7 @@ type Repository interface {
 	Create(ctx context.Context, site *entities.Site) error
 	GetByID(ctx context.Context, id int64) (*entities.Site, error)
 	GetAll(ctx context.Context) ([]*entities.Site, error)
-	GetByStatus(ctx context.Context, status entities.Status) ([]*entities.Site, error)
+	GetByStatus(ctx context.Context, status entities.JobStatus) ([]*entities.Site, error)
 	Update(ctx context.Context, site *entities.Site) error
 	Delete(ctx context.Context, id int64) error
 	UpdateHealthStatus(ctx context.Context, id int64, status entities.HealthStatus, checkedAt time.Time) error

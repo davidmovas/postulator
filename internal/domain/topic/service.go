@@ -3,10 +3,13 @@ package topic
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
+	"github.com/davidmovas/postulator/internal/domain/jobs"
+	"github.com/davidmovas/postulator/internal/infra/wp"
 	"github.com/davidmovas/postulator/pkg/errors"
 	"github.com/davidmovas/postulator/pkg/logger"
 )
@@ -14,6 +17,8 @@ import (
 var _ Service = (*service)(nil)
 
 type service struct {
+	wp            *wp.Client
+	jobService    jobs.Service
 	repo          Repository
 	siteTopicRepo SiteTopicRepository
 	usageRepo     UsageRepository
@@ -21,12 +26,16 @@ type service struct {
 }
 
 func NewService(
+	wp *wp.Client,
+	jobService jobs.Service,
 	repo Repository,
 	siteTopicRepo SiteTopicRepository,
 	usageRepo UsageRepository,
 	logger *logger.Logger,
 ) Service {
 	return &service{
+		wp:            wp,
+		jobService:    jobService,
 		repo:          repo,
 		siteTopicRepo: siteTopicRepo,
 		usageRepo:     usageRepo,
@@ -53,7 +62,7 @@ func (s *service) CreateTopic(ctx context.Context, topic *entities.Topic) error 
 	return nil
 }
 
-func (s *service) CreateTopics(ctx context.Context, topics []*entities.Topic) (*entities.BatchResult, error) {
+func (s *service) CreateTopics(ctx context.Context, topics ...*entities.Topic) (*entities.BatchResult, error) {
 	if len(topics) == 0 {
 		return &entities.BatchResult{}, nil
 	}
@@ -182,60 +191,48 @@ func (s *service) GetSiteTopics(ctx context.Context, siteID int64) ([]*entities.
 }
 
 func (s *service) GenerateVariations(ctx context.Context, topicID int64, count int) ([]*entities.Topic, error) {
-	//TODO: Implement
 	if count <= 0 {
 		return nil, errors.Validation("Count must be positive")
 	}
 
-	originalTopic, err := s.repo.GetByID(ctx, topicID)
+	reference, err := s.repo.GetByID(ctx, topicID)
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to get original topic for variations")
 		return nil, err
 	}
 
-	variations := make([]*entities.Topic, 0, count)
-	for i := 0; i < count; i++ {
-		variationTitle := s.generateVariation(originalTopic.Title, i)
-		variation := &entities.Topic{
-			Title:     variationTitle,
-			CreatedAt: time.Now(),
-		}
-		variations = append(variations, variation)
-	}
-
-	result, err := s.repo.CreateBatch(ctx, variations...)
+	titles, err := s.wp.GenerateTopicVariation(ctx, reference.Title, count)
 	if err != nil {
-		s.logger.ErrorWithErr(err, "Failed to create topic variations")
+		s.logger.ErrorWithErr(err, "Failed to generate topic variations")
 		return nil, err
 	}
 
-	createdVariations := make([]*entities.Topic, 0, result.Created)
-	for i, topic := range variations {
-		if i < result.Created {
-			createdVariations = append(createdVariations, topic)
-		}
+	var topics []*entities.Topic
+	for _, title := range titles {
+		topics = append(topics, &entities.Topic{
+			Title:     title,
+			CreatedAt: time.Now(),
+		})
 	}
 
 	s.logger.Info("Topic variations generated successfully")
-	return createdVariations, nil
-}
-
-func (s *service) GetOrGenerateVariation(ctx context.Context, originalID int64) (*entities.Topic, error) {
-	variations, err := s.GenerateVariations(ctx, originalID, 1)
-	if err != nil {
-		s.logger.ErrorWithErr(err, "Failed to generate topic variation")
-		return nil, err
-	}
-
-	if len(variations) == 0 {
-		return nil, errors.Internal(fmt.Errorf("no variations generated"))
-	}
-
-	return variations[0], nil
+	return topics, nil
 }
 
 func (s *service) GetNextTopicForJob(ctx context.Context, jobID int64) (*entities.Topic, error) {
-	//TODO: Implement
+	job, err := s.jobService.GetJob(ctx, jobID)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get job")
+		return nil, err
+	}
+
+	switch job.TopicStrategy {
+	case entities.StrategyUnique:
+	case entities.StrategyVariation:
+	default:
+		return nil, errors.Validation("Unknown topic strategy")
+	}
+
 	return nil, errors.New(errors.ErrCodeInternal, "Not implemented")
 }
 
@@ -247,6 +244,63 @@ func (s *service) MarkTopicUsed(ctx context.Context, siteID, topicID int64) erro
 
 	s.logger.Debug("Topic marked as used")
 	return nil
+}
+
+func (s *service) GetOrGenerateVariation(ctx context.Context, siteID, originalID int64) (*entities.Topic, error) {
+	originalTopic, err := s.repo.GetByID(ctx, originalID)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get original topic")
+		return nil, err
+	}
+
+	allTopics, err := s.repo.GetAll(ctx)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get all topics")
+		return nil, err
+	}
+
+	var variationTopics []*entities.Topic
+	for _, topic := range allTopics {
+		if strings.Contains(topic.Title, originalTopic.Title) && topic.ID != originalID {
+			variationTopics = append(variationTopics, topic)
+		}
+	}
+
+	if len(variationTopics) > 0 {
+		var unusedVariations []*entities.Topic
+		unusedVariations, err = s.usageRepo.GetUnused(ctx, siteID, getTopicIDs(variationTopics))
+		if err != nil {
+			s.logger.ErrorWithErr(err, "Failed to get unused variations")
+			return nil, err
+		}
+
+		if len(unusedVariations) > 0 {
+			return unusedVariations[0], nil
+		}
+	}
+
+	newVariation, err := s.wp.GenerateTopicVariation(ctx, originalTopic.Title, 1)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to generate topic variation")
+		return nil, err
+	}
+
+	if len(newVariation) == 0 {
+		return nil, errors.Internal(fmt.Errorf("no variation generated"))
+	}
+
+	variationTopic := &entities.Topic{
+		Title:     newVariation[0],
+		CreatedAt: time.Now(),
+	}
+
+	createdTopic, err := s.repo.Create(ctx, variationTopic)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to create variation topic")
+		return nil, err
+	}
+
+	return createdTopic, nil
 }
 
 func (s *service) validateTopic(topic *entities.Topic) error {
@@ -261,22 +315,55 @@ func (s *service) validateTopic(topic *entities.Topic) error {
 	return nil
 }
 
-func (s *service) generateVariation(original string, index int) string {
-	//TODO: Implement
-	variations := []string{
-		original + " - In Depth Analysis",
-		original + " - Complete Guide",
-		original + " - Expert Insights",
-		original + " - Ultimate Guide",
-		original + " - Comprehensive Overview",
-		original + " - Detailed Explanation",
-		original + " - Practical Guide",
-		original + " - Step by Step",
+func (s *service) getNextUniqueTopic(ctx context.Context, job *entities.Job) (*entities.Topic, error) {
+	unusedTopics, err := s.usageRepo.GetUnused(ctx, job.SiteID, job.Topics)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get unused topics")
+		return nil, err
 	}
 
-	if index < len(variations) {
-		return variations[index]
+	if len(unusedTopics) == 0 {
+		return nil, errors.NotFound("unused_topic", "No unused topics available")
 	}
 
-	return original + " - Variation " + string(rune('A'+index))
+	nextTopic := unusedTopics[0]
+	return nextTopic, nil
+}
+
+func (s *service) getNextVariationTopic(ctx context.Context, job *entities.Job) (*entities.Topic, error) {
+	unusedTopics, err := s.usageRepo.GetUnused(ctx, job.SiteID, job.Topics)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get unused topics")
+		return nil, err
+	}
+
+	if len(unusedTopics) > 0 {
+		return unusedTopics[0], nil
+	}
+
+	if len(job.Topics) == 0 {
+		return nil, errors.NotFound("topic", "No topics available for job")
+	}
+
+	originalTopicID := job.Topics[rand.Intn(len(job.Topics))]
+	variation, err := s.GetOrGenerateVariation(ctx, job.SiteID, originalTopicID)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to generate topic variation")
+		return nil, err
+	}
+
+	if err = s.siteTopicRepo.Assign(ctx, job.SiteID, variation.ID); err != nil {
+		s.logger.ErrorWithErr(err, "Failed to assign variation to site")
+		return nil, err
+	}
+
+	return variation, nil
+}
+
+func getTopicIDs(topics []*entities.Topic) []int64 {
+	ids := make([]int64, len(topics))
+	for i, topic := range topics {
+		ids[i] = topic.ID
+	}
+	return ids
 }

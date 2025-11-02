@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/squirrel"
+	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/infra/database"
 	"github.com/davidmovas/postulator/pkg/dbx"
 	"github.com/davidmovas/postulator/pkg/errors"
@@ -27,7 +28,7 @@ func NewRepository(db *database.DB, logger *logger.Logger) Repository {
 	}
 }
 
-func (r *repository) Create(ctx context.Context, job *Job) error {
+func (r *repository) Create(ctx context.Context, job *entities.Job) error {
 	var scheduleConfigJSON []byte
 	var err error
 
@@ -69,7 +70,7 @@ func (r *repository) Create(ctx context.Context, job *Job) error {
 	job.ID = id
 
 	stateRepo := NewStateRepository(r.db, r.logger)
-	initialState := &State{
+	initialState := &entities.State{
 		JobID:             id,
 		TotalExecutions:   0,
 		FailedExecutions:  0,
@@ -79,14 +80,12 @@ func (r *repository) Create(ctx context.Context, job *Job) error {
 		return err
 	}
 
-	// Set categories if provided
 	if len(job.Categories) > 0 {
 		if err = r.SetCategories(ctx, id, job.Categories); err != nil {
 			return err
 		}
 	}
 
-	// Set topics if provided
 	if len(job.Topics) > 0 {
 		if err = r.SetTopics(ctx, id, job.Topics); err != nil {
 			return err
@@ -96,7 +95,7 @@ func (r *repository) Create(ctx context.Context, job *Job) error {
 	return nil
 }
 
-func (r *repository) GetByID(ctx context.Context, id int64) (*Job, error) {
+func (r *repository) GetByID(ctx context.Context, id int64) (*entities.Job, error) {
 	query, args := dbx.ST.
 		Select(
 			"id", "name", "site_id", "prompt_id", "ai_provider_id",
@@ -139,7 +138,7 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*Job, error) {
 	return job, nil
 }
 
-func (r *repository) GetAll(ctx context.Context) ([]*Job, error) {
+func (r *repository) GetAll(ctx context.Context) ([]*entities.Job, error) {
 	query, args := dbx.ST.
 		Select(
 			"id", "name", "site_id", "prompt_id", "ai_provider_id",
@@ -159,7 +158,7 @@ func (r *repository) GetAll(ctx context.Context) ([]*Job, error) {
 
 	stateRepo := NewStateRepository(r.db, r.logger)
 	for _, job := range jobs {
-		var state *State
+		var state *entities.State
 		state, err = stateRepo.Get(ctx, job.ID)
 		if err != nil && !dbx.IsNoRows(err) {
 			return nil, err
@@ -170,7 +169,7 @@ func (r *repository) GetAll(ctx context.Context) ([]*Job, error) {
 	return jobs, nil
 }
 
-func (r *repository) GetActive(ctx context.Context) ([]*Job, error) {
+func (r *repository) GetActive(ctx context.Context) ([]*entities.Job, error) {
 	query, args := dbx.ST.
 		Select(
 			"id", "name", "site_id", "prompt_id", "ai_provider_id",
@@ -180,7 +179,7 @@ func (r *repository) GetActive(ctx context.Context) ([]*Job, error) {
 			"created_at", "updated_at",
 		).
 		From("jobs").
-		Where(squirrel.Eq{"status": StatusActive}).
+		Where(squirrel.Eq{"status": entities.JobStatusActive}).
 		OrderBy("created_at DESC").
 		MustSql()
 
@@ -191,7 +190,7 @@ func (r *repository) GetActive(ctx context.Context) ([]*Job, error) {
 
 	stateRepo := NewStateRepository(r.db, r.logger)
 	for _, job := range jobs {
-		var state *State
+		var state *entities.State
 		state, err = stateRepo.Get(ctx, job.ID)
 		if err != nil && !dbx.IsNoRows(err) {
 			return nil, err
@@ -202,7 +201,7 @@ func (r *repository) GetActive(ctx context.Context) ([]*Job, error) {
 	return jobs, nil
 }
 
-func (r *repository) GetDue(ctx context.Context, before time.Time) ([]*Job, error) {
+func (r *repository) GetDue(ctx context.Context, before time.Time) ([]*entities.Job, error) {
 	query, args := dbx.ST.
 		Select(
 			"j.id", "j.name", "j.site_id", "j.prompt_id", "j.ai_provider_id",
@@ -213,7 +212,7 @@ func (r *repository) GetDue(ctx context.Context, before time.Time) ([]*Job, erro
 		).
 		From("jobs j").
 		Join("job_state js ON j.id = js.job_id").
-		Where(squirrel.Eq{"j.status": StatusActive}).
+		Where(squirrel.Eq{"j.status": entities.JobStatusActive}).
 		Where(squirrel.LtOrEq{"js.next_run_at": before}).
 		OrderBy("js.next_run_at ASC").
 		MustSql()
@@ -225,7 +224,7 @@ func (r *repository) GetDue(ctx context.Context, before time.Time) ([]*Job, erro
 
 	stateRepo := NewStateRepository(r.db, r.logger)
 	for _, job := range jobs {
-		var state *State
+		var state *entities.State
 		state, err = stateRepo.Get(ctx, job.ID)
 		if err != nil && !dbx.IsNoRows(err) {
 			return nil, err
@@ -236,7 +235,7 @@ func (r *repository) GetDue(ctx context.Context, before time.Time) ([]*Job, erro
 	return jobs, nil
 }
 
-func (r *repository) Update(ctx context.Context, job *Job) error {
+func (r *repository) Update(ctx context.Context, job *entities.Job) error {
 	var scheduleConfigJSON []byte
 	var err error
 
@@ -465,8 +464,8 @@ func (r *repository) GetTopics(ctx context.Context, jobID int64) ([]int64, error
 	return topicIDs, nil
 }
 
-func (r *repository) scanJob(query string, args []interface{}, ctx context.Context) (*Job, error) {
-	var job Job
+func (r *repository) scanJob(query string, args []interface{}, ctx context.Context) (*entities.Job, error) {
+	var job entities.Job
 	var scheduleConfigJSON []byte
 
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(
@@ -492,7 +491,7 @@ func (r *repository) scanJob(query string, args []interface{}, ctx context.Conte
 	}
 
 	if len(scheduleConfigJSON) > 0 {
-		job.Schedule = &Schedule{
+		job.Schedule = &entities.Schedule{
 			Type:   job.Schedule.Type,
 			Config: scheduleConfigJSON,
 		}
@@ -501,7 +500,7 @@ func (r *repository) scanJob(query string, args []interface{}, ctx context.Conte
 	return &job, nil
 }
 
-func (r *repository) scanJobs(query string, args []interface{}, ctx context.Context) ([]*Job, error) {
+func (r *repository) scanJobs(query string, args []interface{}, ctx context.Context) ([]*entities.Job, error) {
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, errors.Database(err)
@@ -510,9 +509,9 @@ func (r *repository) scanJobs(query string, args []interface{}, ctx context.Cont
 		_ = rows.Close()
 	}()
 
-	var jobs []*Job
+	var jobs []*entities.Job
 	for rows.Next() {
-		var job Job
+		var job entities.Job
 		var scheduleConfigJSON []byte
 
 		err = rows.Scan(
@@ -537,7 +536,7 @@ func (r *repository) scanJobs(query string, args []interface{}, ctx context.Cont
 		}
 
 		if len(scheduleConfigJSON) > 0 {
-			job.Schedule = &Schedule{
+			job.Schedule = &entities.Schedule{
 				Type:   job.Schedule.Type,
 				Config: scheduleConfigJSON,
 			}

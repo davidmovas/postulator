@@ -166,7 +166,7 @@ func (r *repository) GetAll(ctx context.Context) ([]*entities.Site, error) {
 	return sites, nil
 }
 
-func (r *repository) GetByStatus(ctx context.Context, status entities.Status) ([]*entities.Site, error) {
+func (r *repository) GetByStatus(ctx context.Context, status entities.JobStatus) ([]*entities.Site, error) {
 	query, args := dbx.ST.
 		Select(
 			"id",

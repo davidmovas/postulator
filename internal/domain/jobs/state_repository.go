@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/squirrel"
+	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/infra/database"
 	"github.com/davidmovas/postulator/pkg/dbx"
 	"github.com/davidmovas/postulator/pkg/errors"
@@ -28,7 +29,7 @@ func NewStateRepository(db *database.DB, logger *logger.Logger) StateRepository 
 	}
 }
 
-func (r *stateRepository) Get(ctx context.Context, jobID int64) (*State, error) {
+func (r *stateRepository) Get(ctx context.Context, jobID int64) (*entities.State, error) {
 	query, args := dbx.ST.
 		Select(
 			"job_id", "last_run_at", "next_run_at",
@@ -38,7 +39,7 @@ func (r *stateRepository) Get(ctx context.Context, jobID int64) (*State, error) 
 		Where(squirrel.Eq{"job_id": jobID}).
 		MustSql()
 
-	var state State
+	var state entities.State
 	var lastRunAt, nextRunAt sql.NullTime
 
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(
@@ -67,7 +68,7 @@ func (r *stateRepository) Get(ctx context.Context, jobID int64) (*State, error) 
 	return &state, nil
 }
 
-func (r *stateRepository) Update(ctx context.Context, state *State) error {
+func (r *stateRepository) Update(ctx context.Context, state *entities.State) error {
 	query, args := dbx.ST.
 		Insert("job_state").
 		Columns(

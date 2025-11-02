@@ -64,6 +64,10 @@ func (c *Client) CheckHealth(ctx context.Context, site *entities.Site) (entities
 	return entities.HealthHealthy, nil
 }
 
+func (c *Client) GenerateTopicVariation(ctx context.Context, title string, amount int) ([]string, error) {
+	return nil, nil
+}
+
 func (c *Client) GetCategories(ctx context.Context, s *entities.Site) ([]*entities.Category, error) {
 	endpoint := c.getAPIURL(s.URL, "categories")
 
