@@ -2,47 +2,39 @@ package importer
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/davidmovas/postulator/internal/domain/categories"
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/sites"
 	"github.com/davidmovas/postulator/internal/domain/topics"
-	"github.com/davidmovas/postulator/pkg/di"
-	"github.com/davidmovas/postulator/pkg/errors"
 	"github.com/davidmovas/postulator/pkg/logger"
 )
 
-var _ IImportService = (*ImportService)(nil)
+var _ Service = (*service)(nil)
 
-type ImportService struct {
-	topicService topics.Service
-	siteService  sites.Service
-	logger       *logger.Logger
+type service struct {
+	topicService      topics.Service
+	siteService       sites.Service
+	categoriesService categories.Service
+	logger            *logger.Logger
 }
 
-func NewImportService(c di.Container) (*ImportService, error) {
-	var l *logger.Logger
-	if err := c.Resolve(&l); err != nil {
-		return nil, err
-	}
-
-	topicService, err := topics.NewService(c)
-	if err != nil {
-		return nil, err
-	}
-
-	siteService, err := site.NewService(c)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ImportService{
-		topicService: topicService,
-		siteService:  siteService,
-		logger:       l,
+func NewImportService(
+	topicService topics.Service,
+	siteService sites.Service,
+	categoriesService categories.Service,
+	logger *logger.Logger,
+) (Service, error) {
+	return &service{
+		topicService:      topicService,
+		siteService:       siteService,
+		categoriesService: categoriesService,
+		logger:            logger.WithScope("importer"),
 	}, nil
 }
 
-func (s *ImportService) ImportTopics(ctx context.Context, filePath string) (*ImportResult, error) {
+func (s *service) ImportTopics(ctx context.Context, filePath string) (*ImportResult, error) {
 	s.logger.Infof("Starting topic import from file: %s", filePath)
 
 	parser, err := GetParser(filePath)
@@ -56,14 +48,12 @@ func (s *ImportService) ImportTopics(ctx context.Context, filePath string) (*Imp
 		return nil, err
 	}
 
-	s.logger.Debugf("Parsed %d titles from file", len(titles))
-
-	topics := make([]*entities.Topic, 0, len(titles))
+	tops := make([]*entities.Topic, 0, len(titles))
 	for _, title := range titles {
-		topics = append(topics, &entities.Topic{Title: title})
+		tops = append(tops, &entities.Topic{Title: title})
 	}
 
-	batchResult, err := s.topicService.CreateTopicBatch(ctx, topics)
+	batchResult, err := s.topicService.CreateTopics(ctx, tops...)
 	if err != nil {
 		s.logger.Errorf("Failed to create topics batch: %v", err)
 		return nil, err
@@ -71,11 +61,8 @@ func (s *ImportService) ImportTopics(ctx context.Context, filePath string) (*Imp
 
 	result := &ImportResult{
 		TotalRead:    len(titles),
-		TotalAdded:   batchResult.TotalAdded,
-		TotalSkipped: batchResult.TotalSkipped,
-		Added:        batchResult.Created,
-		Skipped:      batchResult.Skipped,
-		Errors:       make([]string, 0),
+		TotalAdded:   batchResult.Created,
+		TotalSkipped: batchResult.Skipped,
 	}
 
 	s.logger.Infof("Import completed: %d read, %d added, %d skipped", result.TotalRead, result.TotalAdded, result.TotalSkipped)
@@ -83,75 +70,63 @@ func (s *ImportService) ImportTopics(ctx context.Context, filePath string) (*Imp
 	return result, nil
 }
 
-func (s *ImportService) ImportAndAssignToSite(ctx context.Context, filePath string, siteID int64, categoryID int64, strategy entities.TopicStrategy) (*ImportResult, error) {
+func (s *service) ImportAndAssignToSite(ctx context.Context, filePath string, siteID int64) (*ImportResult, error) {
 	s.logger.Infof("Starting topic import and assignment to site %d from file: %s", siteID, filePath)
 
-	result, err := s.ImportTopics(ctx, filePath)
+	parser, err := GetParser(filePath)
 	if err != nil {
 		return nil, err
 	}
 
-	if result.TotalAdded == 0 && result.TotalSkipped == 0 {
-		s.logger.Infof("No topics to assign to site %d", siteID)
-		return result, nil
-	}
-
-	allTitlesFromFile := append(result.Added, result.Skipped...)
-
-	// Получаем все топики из базы для маппинга названий к ID
-	allTopics, err := s.topicService.ListTopics(ctx)
+	titles, err := parser.Parse(filePath)
 	if err != nil {
-		s.logger.Errorf("Failed to retrieve topics: %v", err)
+		s.logger.Errorf("Failed to parse file %s: %v", filePath, err)
 		return nil, err
 	}
 
-	titleToID := make(map[string]int64)
-	for _, t := range allTopics {
-		titleToID[t.Title] = t.ID
+	tops := make([]*entities.Topic, 0, len(titles))
+	for _, title := range titles {
+		tops = append(tops, &entities.Topic{Title: title})
 	}
 
-	if categoryID == 0 {
-		var siteCategories []*entities.Category
-		siteCategories, err = s.siteService.GetSiteCategories(ctx, siteID)
+	batchResult, err := s.topicService.CreateTopics(ctx, tops...)
+	if err != nil {
+		s.logger.Errorf("Failed to create topics batch: %v", err)
+		return nil, err
+	}
+
+	createdTopicIDs := make([]int64, 0, len(batchResult.CreatedTopics))
+	for _, topic := range batchResult.CreatedTopics {
+		createdTopicIDs = append(createdTopicIDs, topic.ID)
+	}
+
+	var errs []string
+	if len(createdTopicIDs) > 0 {
+		err = s.topicService.AssignToSite(ctx, siteID, createdTopicIDs...)
 		if err != nil {
-			s.logger.Errorf("Failed to get categories for site %d: %v", siteID, err)
-			return nil, err
+			s.logger.Errorf("Failed to assign topics to site %d: %v", siteID, err)
 		}
-
-		if len(siteCategories) == 0 {
-			return nil, errors.Validation("site has no categories available for topic assignment")
-		}
-
-		categoryID = siteCategories[0].ID
-		s.logger.Debugf("Using default category %d for site %d", categoryID, siteID)
 	}
 
-	assignmentErrors := make([]string, 0)
-	successfulAssignments := 0
-
-	for _, title := range allTitlesFromFile {
-		topicID, ok := titleToID[title]
-		if !ok {
-			errMsg := "topic not found in database: " + title
-			s.logger.Warnf("%s", errMsg)
-			assignmentErrors = append(assignmentErrors, errMsg)
-			continue
-		}
-
-		err = s.topicService.AssignToSite(ctx, siteID, topicID, categoryID, strategy)
-		if err != nil {
-			errMsg := "failed to assign topic '" + title + "' to site: " + err.Error()
-			s.logger.Warnf("%s", errMsg)
-			assignmentErrors = append(assignmentErrors, errMsg)
-			continue
-		}
-
-		successfulAssignments++
+	result := &ImportResult{
+		TotalRead:    len(titles),
+		TotalAdded:   batchResult.Created,
+		TotalSkipped: batchResult.Skipped,
+		Added:        make([]string, 0, len(batchResult.CreatedTopics)),
+		Skipped:      batchResult.SkippedTitles,
+		Errors:       errs,
 	}
 
-	result.Errors = assignmentErrors
+	for _, topic := range batchResult.CreatedTopics {
+		result.Added = append(result.Added, topic.Title)
+	}
 
-	s.logger.Infof("Assignment completed: %d topics assigned to site %d, %d errors", successfulAssignments, siteID, len(assignmentErrors))
+	if len(createdTopicIDs) > 0 && err != nil {
+		result.Errors = append(result.Errors, fmt.Sprintf("failed to assign %d topics to site: %v", len(createdTopicIDs), err))
+	}
+
+	s.logger.Infof("Import completed: %d read, %d added, %d skipped", result.TotalRead, result.TotalAdded, result.TotalSkipped)
+	s.logger.Infof("Assignment completed: %d topics assigned to site %d", len(createdTopicIDs), siteID)
 
 	return result, nil
 }

@@ -69,6 +69,7 @@ func (r *repository) CreateBatch(ctx context.Context, topics ...*entities.Topic)
 
 	result := &entities.BatchResult{
 		SkippedTitles: make([]string, 0),
+		CreatedTopics: make([]*entities.Topic, 0),
 	}
 
 	for _, topic := range topics {
@@ -76,9 +77,11 @@ func (r *repository) CreateBatch(ctx context.Context, topics ...*entities.Topic)
 			Insert("topics").
 			Columns("title").
 			Values(topic.Title).
+			Suffix("RETURNING id, created_at").
 			MustSql()
 
-		_, err = tx.ExecContext(ctx, query, args...)
+		var createdTopic entities.Topic
+		err = tx.QueryRowContext(ctx, query, args...).Scan(&createdTopic.ID, &createdTopic.CreatedAt)
 		switch {
 		case dbx.IsUniqueViolation(err):
 			result.Skipped++
@@ -87,6 +90,8 @@ func (r *repository) CreateBatch(ctx context.Context, topics ...*entities.Topic)
 			return nil, errors.Database(err)
 		default:
 			result.Created++
+			createdTopic.Title = topic.Title
+			result.CreatedTopics = append(result.CreatedTopics, &createdTopic)
 		}
 	}
 

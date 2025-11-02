@@ -12,4 +12,5 @@ type BatchResult struct {
 	Created       int
 	Skipped       int
 	SkippedTitles []string
+	CreatedTopics []*Topic
 }

@@ -35,7 +35,7 @@ type App struct {
 	topicSvc    topics.IService
 	promptSvc   prompts.IService
 	aiProvSvc   aiprovider.IService
-	importerSvc importer.IImportService
+	importerSvc importer.service
 	jobSvc      jobs.IService
 	scheduler   jobs.IScheduler
 }
@@ -184,10 +184,10 @@ func (a *App) BuildServices() error {
 		return ierr
 	} else {
 		a.importerSvc = svc
-		a.container.MustRegister(&di.Registration[importer.IImportService]{
-			Provider:      di.Must[importer.IImportService](a.importerSvc),
+		a.container.MustRegister(&di.Registration[importer.service]{
+			Provider:      di.Must[importer.service](a.importerSvc),
 			Lifecycle:     di.Singleton,
-			InterfaceType: reflect.TypeOf((*importer.IImportService)(nil)).Elem(),
+			InterfaceType: reflect.TypeOf((*importer.service)(nil)).Elem(),
 		})
 	}
 

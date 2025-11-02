@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestImporter(t *testing.T) (*ImportService, func()) {
+func setupTestImporter(t *testing.T) (*service, func()) {
 	t.Helper()
 
 	db, dbCleanup := database.SetupTestDB(t)
