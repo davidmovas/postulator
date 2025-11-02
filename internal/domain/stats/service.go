@@ -2,10 +2,8 @@ package stats
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	"github.com/davidmovas/postulator/internal/domain/articles"
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/jobs"
 	"github.com/davidmovas/postulator/internal/domain/jobs/execution"
@@ -18,7 +16,6 @@ var _ Service = (*service)(nil)
 
 type service struct {
 	sitesService     sites.Service
-	articlesService  articles.Service
 	jobsService      jobs.Service
 	executionService execution.Service
 	repo             Repository
@@ -27,7 +24,6 @@ type service struct {
 
 func NewService(
 	sitesService sites.Service,
-	articlesService articles.Service,
 	jobsService jobs.Service,
 	executionService execution.Service,
 	repo Repository,
@@ -35,7 +31,6 @@ func NewService(
 ) Service {
 	return &service{
 		sitesService:     sitesService,
-		articlesService:  articlesService,
 		jobsService:      jobsService,
 		executionService: executionService,
 		repo:             repo,
@@ -73,10 +68,6 @@ func (s *service) GetDashboardSummary(ctx context.Context) (*entities.DashboardS
 	summary := &entities.DashboardSummary{}
 
 	if err := s.populateSitesInfo(ctx, summary); err != nil {
-		return nil, err
-	}
-
-	if err := s.populateArticlesInfo(ctx, summary); err != nil {
 		return nil, err
 	}
 
@@ -150,47 +141,6 @@ func (s *service) populateSitesInfo(ctx context.Context, summary *entities.Dashb
 	summary.TotalSites = len(allSites)
 	summary.ActiveSites = s.countActiveSites(allSites)
 	summary.UnhealthySites = s.countUnhealthySites(allSites)
-
-	return nil
-}
-
-func (s *service) populateArticlesInfo(ctx context.Context, summary *entities.DashboardSummary) error {
-	allSites, err := s.sitesService.ListSites(ctx)
-	if err != nil {
-		return err
-	}
-
-	now := time.Now()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	tomorrow := today.Add(24 * time.Hour)
-
-	var totalArticles int
-	var totalArticlesToday int
-	var totalWordsToday int
-
-	for _, site := range allSites {
-		var listArticles []*articles.Article
-		listArticles, _, err = s.articlesService.ListArticles(ctx, site.ID, 10000, 0)
-		if err != nil {
-			s.logger.ErrorWithErr(err, fmt.Sprintf("Failed to get articles for site %d", site.ID))
-			continue
-		}
-
-		totalArticles += len(listArticles)
-
-		for _, article := range listArticles {
-			if article.CreatedAt.After(today) && article.CreatedAt.Before(tomorrow) {
-				totalArticlesToday++
-				if article.WordCount != nil {
-					totalWordsToday += *article.WordCount
-				}
-			}
-		}
-	}
-
-	summary.TotalArticles = totalArticles
-	summary.TotalArticlesToday = totalArticlesToday
-	summary.TotalWordsToday = totalWordsToday
 
 	return nil
 }

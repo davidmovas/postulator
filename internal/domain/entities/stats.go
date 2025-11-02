@@ -18,10 +18,6 @@ type DashboardSummary struct {
 	ActiveSites    int
 	UnhealthySites int
 
-	TotalArticles      int
-	TotalArticlesToday int
-	TotalWordsToday    int
-
 	TotalJobs  int
 	ActiveJobs int
 	PausedJobs int

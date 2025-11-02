@@ -21,6 +21,7 @@ const (
 type Execution struct {
 	ID        int64
 	JobID     int64
+	SiteID    int64
 	TopicID   int64
 	ArticleID *int64
 

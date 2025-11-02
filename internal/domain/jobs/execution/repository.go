@@ -32,14 +32,14 @@ func (r *repository) Create(ctx context.Context, exec *Execution) error {
 	query, args := dbx.ST.
 		Insert("job_executions").
 		Columns(
-			"job_id", "topic_id", "article_id",
+			"job_id", "site_id", "topic_id", "article_id",
 			"prompt_id", "ai_provider_id", "ai_model", "category_id",
 			"status", "error_message",
 			"generation_time_ms", "tokens_used",
 			"started_at", "generated_at", "validated_at", "published_at", "completed_at",
 		).
 		Values(
-			exec.JobID, exec.TopicID, exec.ArticleID,
+			exec.JobID, exec.SiteID, exec.TopicID, exec.ArticleID,
 			exec.PromptID, exec.AIProviderID, exec.AIModel, exec.CategoryID,
 			exec.Status, exec.ErrorMessage,
 			exec.GenerationTimeMs, exec.TokensUsed,
@@ -67,7 +67,7 @@ func (r *repository) Create(ctx context.Context, exec *Execution) error {
 func (r *repository) GetByID(ctx context.Context, id int64) (*Execution, error) {
 	query, args := dbx.ST.
 		Select(
-			"id", "job_id", "topic_id", "article_id",
+			"id", "job_id", "site_id", "topic_id", "article_id",
 			"prompt_id", "ai_provider_id", "ai_model", "category_id",
 			"status", "error_message",
 			"generation_time_ms", "tokens_used",
@@ -91,7 +91,7 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*Execution, error) 
 func (r *repository) GetByJobID(ctx context.Context, jobID int64, limit, offset int) ([]*Execution, int, error) {
 	query, args := dbx.ST.
 		Select(
-			"id", "job_id", "topic_id", "article_id",
+			"id", "job_id", "site_id", "topic_id", "article_id",
 			"prompt_id", "ai_provider_id", "ai_model", "category_id",
 			"status", "error_message",
 			"generation_time_ms", "tokens_used",
@@ -130,7 +130,7 @@ func (r *repository) GetByJobID(ctx context.Context, jobID int64, limit, offset 
 func (r *repository) GetPendingValidation(ctx context.Context) ([]*Execution, error) {
 	query, args := dbx.ST.
 		Select(
-			"id", "job_id", "topic_id", "article_id",
+			"id", "job_id", "site_id", "topic_id", "article_id",
 			"prompt_id", "ai_provider_id", "ai_model", "category_id",
 			"status", "error_message",
 			"generation_time_ms", "tokens_used",
@@ -147,7 +147,7 @@ func (r *repository) GetPendingValidation(ctx context.Context) ([]*Execution, er
 func (r *repository) GetByStatus(ctx context.Context, status Status) ([]*Execution, error) {
 	query, args := dbx.ST.
 		Select(
-			"id", "job_id", "topic_id", "article_id",
+			"id", "job_id", "site_id", "topic_id", "article_id",
 			"prompt_id", "ai_provider_id", "ai_model", "category_id",
 			"status", "error_message",
 			"generation_time_ms", "tokens_used",
@@ -165,6 +165,7 @@ func (r *repository) Update(ctx context.Context, exec *Execution) error {
 	query, args := dbx.ST.
 		Update("job_executions").
 		Set("job_id", exec.JobID).
+		Set("site_id", exec.SiteID).
 		Set("topic_id", exec.TopicID).
 		Set("article_id", exec.ArticleID).
 		Set("prompt_id", exec.PromptID).
@@ -301,6 +302,7 @@ func (r *repository) scanExecution(query string, args []interface{}, ctx context
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(
 		&exec.ID,
 		&exec.JobID,
+		&exec.SiteID,
 		&exec.TopicID,
 		&articleID,
 		&exec.PromptID,
@@ -391,6 +393,7 @@ func (r *repository) scanExecutionFromRow(rows *sql.Rows) (*Execution, error) {
 	err := rows.Scan(
 		&exec.ID,
 		&exec.JobID,
+		&exec.SiteID,
 		&exec.TopicID,
 		&articleID,
 		&exec.PromptID,

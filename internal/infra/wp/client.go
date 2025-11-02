@@ -73,3 +73,23 @@ func (c *client) UpdateCategory(ctx context.Context, s *entities.Site, category 
 func (c *client) DeleteCategory(ctx context.Context, s *entities.Site, wpCategoryID int) error {
 	return c.GetCurrentClient().DeleteCategory(ctx, s, wpCategoryID)
 }
+
+func (c *client) GetPost(ctx context.Context, s *entities.Site, postID int) (*entities.Article, error) {
+	return c.GetCurrentClient().GetPost(ctx, s, postID)
+}
+
+func (c *client) GetPosts(ctx context.Context, s *entities.Site) ([]*entities.Article, error) {
+	return c.GetCurrentClient().GetPosts(ctx, s)
+}
+
+func (c *client) CreatePost(ctx context.Context, s *entities.Site, article *entities.Article) (int, error) {
+	return c.GetCurrentClient().CreatePost(ctx, s, article)
+}
+
+func (c *client) UpdatePost(ctx context.Context, s *entities.Site, article *entities.Article) error {
+	return c.GetCurrentClient().UpdatePost(ctx, s, article)
+}
+
+func (c *client) DeletePost(ctx context.Context, s *entities.Site, postID int) error {
+	return c.GetCurrentClient().DeletePost(ctx, s, postID)
+}

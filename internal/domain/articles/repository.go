@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/infra/database"
 	"github.com/davidmovas/postulator/pkg/dbx"
 	"github.com/davidmovas/postulator/pkg/errors"
@@ -30,7 +31,7 @@ func NewRepository(db *database.DB, logger *logger.Logger) Repository {
 	}
 }
 
-func (r *repository) Create(ctx context.Context, article *Article) error {
+func (r *repository) Create(ctx context.Context, article *entities.Article) error {
 	categoryIDsJSON, err := json.Marshal(article.WPCategoryIDs)
 	if err != nil {
 		return errors.Validation("Invalid category IDs format")
@@ -52,6 +53,19 @@ func (r *repository) Create(ctx context.Context, article *Article) error {
 			article.Status, article.Source, article.IsEdited, article.WordCount,
 			article.PublishedAt, article.LastSyncedAt,
 		).
+		Suffix(`ON CONFLICT(site_id, wp_post_id) DO UPDATE SET
+        title = EXCLUDED.title,
+        content = EXCLUDED.content,
+        excerpt = EXCLUDED.excerpt,
+        wp_post_url = EXCLUDED.wp_post_url,
+        wp_category_ids = EXCLUDED.wp_category_ids,
+        status = EXCLUDED.status,
+        is_edited = EXCLUDED.is_edited,
+        word_count = EXCLUDED.word_count,
+        published_at = EXCLUDED.published_at,
+        last_synced_at = EXCLUDED.last_synced_at,
+        updated_at = CURRENT_TIMESTAMP
+		`).
 		MustSql()
 
 	result, err := r.db.ExecContext(ctx, query, args...)
@@ -68,7 +82,7 @@ func (r *repository) Create(ctx context.Context, article *Article) error {
 	return nil
 }
 
-func (r *repository) GetByID(ctx context.Context, id int64) (*Article, error) {
+func (r *repository) GetByID(ctx context.Context, id int64) (*entities.Article, error) {
 	query, args := dbx.ST.
 		Select(
 			"id", "site_id", "job_id", "topic_id",
@@ -92,7 +106,7 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*Article, error) {
 	return article, nil
 }
 
-func (r *repository) GetByWPPostID(ctx context.Context, siteID int64, wpPostID int) (*Article, error) {
+func (r *repository) GetByWPPostID(ctx context.Context, siteID int64, wpPostID int) (*entities.Article, error) {
 	query, args := dbx.ST.
 		Select(
 			"id", "site_id", "job_id", "topic_id",
@@ -116,7 +130,7 @@ func (r *repository) GetByWPPostID(ctx context.Context, siteID int64, wpPostID i
 	return article, nil
 }
 
-func (r *repository) Update(ctx context.Context, article *Article) error {
+func (r *repository) Update(ctx context.Context, article *entities.Article) error {
 	categoryIDsJSON, err := json.Marshal(article.WPCategoryIDs)
 	if err != nil {
 		return errors.Validation("Invalid category IDs format")
@@ -184,7 +198,7 @@ func (r *repository) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (r *repository) ListBySite(ctx context.Context, siteID int64, limit, offset int) ([]*Article, error) {
+func (r *repository) ListBySite(ctx context.Context, siteID int64, limit, offset int) ([]*entities.Article, error) {
 	query, args := dbx.ST.
 		Select(
 			"id", "site_id", "job_id", "topic_id",
@@ -203,7 +217,7 @@ func (r *repository) ListBySite(ctx context.Context, siteID int64, limit, offset
 	return r.scanArticles(query, args, ctx)
 }
 
-func (r *repository) ListByJob(ctx context.Context, jobID int64) ([]*Article, error) {
+func (r *repository) ListByJob(ctx context.Context, jobID int64) ([]*entities.Article, error) {
 	query, args := dbx.ST.
 		Select(
 			"id", "site_id", "job_id", "topic_id",
@@ -220,7 +234,7 @@ func (r *repository) ListByJob(ctx context.Context, jobID int64) ([]*Article, er
 	return r.scanArticles(query, args, ctx)
 }
 
-func (r *repository) ListByTopic(ctx context.Context, topicID int64) ([]*Article, error) {
+func (r *repository) ListByTopic(ctx context.Context, topicID int64) ([]*entities.Article, error) {
 	query, args := dbx.ST.
 		Select(
 			"id", "site_id", "job_id", "topic_id",
@@ -237,7 +251,7 @@ func (r *repository) ListByTopic(ctx context.Context, topicID int64) ([]*Article
 	return r.scanArticles(query, args, ctx)
 }
 
-func (r *repository) GetByStatus(ctx context.Context, siteID int64, status Status) ([]*Article, error) {
+func (r *repository) GetByStatus(ctx context.Context, siteID int64, status entities.Status) ([]*entities.Article, error) {
 	query, args := dbx.ST.
 		Select(
 			"id", "site_id", "job_id", "topic_id",
@@ -254,7 +268,7 @@ func (r *repository) GetByStatus(ctx context.Context, siteID int64, status Statu
 	return r.scanArticles(query, args, ctx)
 }
 
-func (r *repository) GetBySource(ctx context.Context, siteID int64, source Source) ([]*Article, error) {
+func (r *repository) GetBySource(ctx context.Context, siteID int64, source entities.Source) ([]*entities.Article, error) {
 	query, args := dbx.ST.
 		Select(
 			"id", "site_id", "job_id", "topic_id",
@@ -271,7 +285,7 @@ func (r *repository) GetBySource(ctx context.Context, siteID int64, source Sourc
 	return r.scanArticles(query, args, ctx)
 }
 
-func (r *repository) GetEdited(ctx context.Context, siteID int64) ([]*Article, error) {
+func (r *repository) GetEdited(ctx context.Context, siteID int64) ([]*entities.Article, error) {
 	query, args := dbx.ST.
 		Select(
 			"id", "site_id", "job_id", "topic_id",
@@ -307,7 +321,7 @@ func (r *repository) CountBySite(ctx context.Context, siteID int64) (int, error)
 	return count, nil
 }
 
-func (r *repository) CountByStatus(ctx context.Context, siteID int64, status Status) (int, error) {
+func (r *repository) CountByStatus(ctx context.Context, siteID int64, status entities.Status) (int, error) {
 	query, args := dbx.ST.
 		Select("COUNT(id)").
 		From("articles").
@@ -345,9 +359,9 @@ func (r *repository) CountByJob(ctx context.Context, jobID int64) (int, error) {
 	return count, nil
 }
 
-func (r *repository) GetByWPPostIDs(ctx context.Context, siteID int64, wpPostIDs []int) ([]*Article, error) {
+func (r *repository) GetByWPPostIDs(ctx context.Context, siteID int64, wpPostIDs []int) ([]*entities.Article, error) {
 	if len(wpPostIDs) == 0 {
-		return []*Article{}, nil
+		return []*entities.Article{}, nil
 	}
 
 	query, args := dbx.ST.
@@ -365,7 +379,7 @@ func (r *repository) GetByWPPostIDs(ctx context.Context, siteID int64, wpPostIDs
 	return r.scanArticles(query, args, ctx)
 }
 
-func (r *repository) GetUnsynced(ctx context.Context, siteID int64, since time.Time) ([]*Article, error) {
+func (r *repository) GetUnsynced(ctx context.Context, siteID int64, since time.Time) ([]*entities.Article, error) {
 	query, args := dbx.ST.
 		Select(
 			"id", "site_id", "job_id", "topic_id",
@@ -411,7 +425,7 @@ func (r *repository) UpdateSyncStatus(ctx context.Context, id int64, lastSyncedA
 	return nil
 }
 
-func (r *repository) UpdatePublishStatus(ctx context.Context, id int64, status Status, publishedAt *time.Time) error {
+func (r *repository) UpdatePublishStatus(ctx context.Context, id int64, status entities.Status, publishedAt *time.Time) error {
 	builder := dbx.ST.
 		Update("articles").
 		Set("status", status).
@@ -441,7 +455,7 @@ func (r *repository) UpdatePublishStatus(ctx context.Context, id int64, status S
 	return nil
 }
 
-func (r *repository) BulkCreate(ctx context.Context, articles []*Article) error {
+func (r *repository) BulkCreate(ctx context.Context, articles []*entities.Article) error {
 	if len(articles) == 0 {
 		return nil
 	}
@@ -492,7 +506,7 @@ func (r *repository) BulkCreate(ctx context.Context, articles []*Article) error 
 	return nil
 }
 
-func (r *repository) BulkUpdateWPInfo(ctx context.Context, updates []*WPInfoUpdate) error {
+func (r *repository) BulkUpdateWPInfo(ctx context.Context, updates []*entities.WPInfoUpdate) error {
 	if len(updates) == 0 {
 		return nil
 	}
@@ -534,8 +548,8 @@ func (r *repository) BulkUpdateWPInfo(ctx context.Context, updates []*WPInfoUpda
 }
 
 // Helper methods for scanning
-func (r *repository) scanArticle(query string, args []interface{}, ctx context.Context) (*Article, error) {
-	var article Article
+func (r *repository) scanArticle(query string, args []interface{}, ctx context.Context) (*entities.Article, error) {
+	var article entities.Article
 	var jobID sql.NullInt64
 	var excerpt, categoryIDsJSON sql.NullString
 	var wordCount sql.NullInt32
@@ -599,7 +613,7 @@ func (r *repository) scanArticle(query string, args []interface{}, ctx context.C
 	return &article, nil
 }
 
-func (r *repository) scanArticles(query string, args []interface{}, ctx context.Context) ([]*Article, error) {
+func (r *repository) scanArticles(query string, args []interface{}, ctx context.Context) ([]*entities.Article, error) {
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, errors.Database(err)
@@ -608,9 +622,9 @@ func (r *repository) scanArticles(query string, args []interface{}, ctx context.
 		_ = rows.Close()
 	}()
 
-	var articles []*Article
+	var articles []*entities.Article
 	for rows.Next() {
-		var article *Article
+		var article *entities.Article
 		article, err = r.scanArticleFromRow(rows)
 		if err != nil {
 			return nil, errors.Database(err)
@@ -628,8 +642,8 @@ func (r *repository) scanArticles(query string, args []interface{}, ctx context.
 	return articles, nil
 }
 
-func (r *repository) scanArticleFromRow(rows *sql.Rows) (*Article, error) {
-	var article Article
+func (r *repository) scanArticleFromRow(rows *sql.Rows) (*entities.Article, error) {
+	var article entities.Article
 	var jobID sql.NullInt64
 	var excerpt, categoryIDsJSON sql.NullString
 	var wordCount sql.NullInt32

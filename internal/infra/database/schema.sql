@@ -197,6 +197,7 @@ CREATE INDEX idx_job_topics_order ON job_topics(job_id, order_index);
 CREATE TABLE job_executions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_id INTEGER NOT NULL,
+    site_id INTEGER NOT NULL,
     topic_id INTEGER NOT NULL,
     article_id INTEGER,
 
@@ -218,6 +219,7 @@ CREATE TABLE job_executions (
     completed_at DATETIME,
 
     FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE,
+    FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
     FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
     FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE SET NULL,
     FOREIGN KEY (prompt_id) REFERENCES prompts(id) ON DELETE RESTRICT,
@@ -260,7 +262,8 @@ CREATE TABLE articles (
 
     FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
     FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE SET NULL,
-    FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE
+    FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
+    UNIQUE (site_id, wp_post_id)
 );
 
 CREATE INDEX idx_articles_site ON articles(site_id);
