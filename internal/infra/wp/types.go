@@ -9,10 +9,11 @@ type wpError struct {
 }
 
 type wpCategory struct {
-	ID    int    `json:"id"`
-	Name  string `json:"name"`
-	Slug  string `json:"slug"`
-	Count int    `json:"count"`
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Slug        string `json:"slug"`
+	Description string `json:"description"`
+	Count       int    `json:"count"`
 }
 
 type wpPost struct {

@@ -34,6 +34,8 @@ type Service interface {
 	SyncFromWordPress(ctx context.Context, siteID int64) error
 	CreateInWordPress(ctx context.Context, category *entities.Category) error
 	UpdateInWordPress(ctx context.Context, category *entities.Category) error
+	DeleteInWordPress(ctx context.Context, categoryID int64) error
 
 	GetStatistics(ctx context.Context, categoryID int64, from, to time.Time) ([]*entities.Statistics, error)
+	GetSiteStatistics(ctx context.Context, siteID int64, from, to time.Time) ([]*entities.Statistics, error)
 }

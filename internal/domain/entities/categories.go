@@ -9,7 +9,6 @@ type Category struct {
 	Name         string
 	Slug         *string
 	Description  *string
-	ParentID     *int64
 	Count        int
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
