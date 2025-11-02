@@ -2,9 +2,13 @@ package dto
 
 import (
 	"errors"
+	"fmt"
+	"time"
 
 	appErrors "github.com/davidmovas/postulator/pkg/errors"
 )
+
+const timeFormat = "2006-01-02 15:04:05"
 
 type Response[T any] struct {
 	Success bool   `json:"success"`
@@ -14,11 +18,11 @@ type Response[T any] struct {
 
 type PaginatedResponse[T any] struct {
 	Success bool   `json:"success"`
-	Items   []T    `json:"items"`
-	Total   int    `json:"total"`
-	Limit   int    `json:"limit"`
-	Offset  int    `json:"offset"`
-	HasMore bool   `json:"hasMore"`
+	Items   []T    `json:"items,omitempty"`
+	Total   int    `json:"total,omitempty"`
+	Limit   int    `json:"limit,omitempty"`
+	Offset  int    `json:"offset,omitempty"`
+	HasMore bool   `json:"hasMore,omitempty"`
 	Error   *Error `json:"error,omitempty"`
 }
 
@@ -30,21 +34,15 @@ type Error struct {
 	IsUserFacing bool           `json:"isUserFacing"`
 }
 
-func NewResponse[T any](data T) *Response[T] {
-	return &Response[T]{
-		Success: true,
-		Data:    data,
-	}
+func Success[T any](data T) *Response[T] {
+	return &Response[T]{Success: true, Data: data}
 }
 
-func NewErrorResponse[T any](err error) *Response[T] {
-	return &Response[T]{
-		Success: false,
-		Error:   toError(err),
-	}
+func Fail[T any](err error) *Response[T] {
+	return &Response[T]{Success: false, Error: toError(err)}
 }
 
-func NewPaginatedResponse[T any](items []T, total, limit, offset int) *PaginatedResponse[T] {
+func PaginatedSuccess[T any](items []T, total, limit, offset int) *PaginatedResponse[T] {
 	return &PaginatedResponse[T]{
 		Success: true,
 		Items:   items,
@@ -55,11 +53,8 @@ func NewPaginatedResponse[T any](items []T, total, limit, offset int) *Paginated
 	}
 }
 
-func NewPaginatedError[T any](err error) *PaginatedResponse[T] {
-	return &PaginatedResponse[T]{
-		Success: false,
-		Error:   toError(err),
-	}
+func PaginatedFail[T any](err error) *PaginatedResponse[T] {
+	return &PaginatedResponse[T]{Success: false, Error: toError(err)}
 }
 
 func toError(err error) *Error {
@@ -91,4 +86,24 @@ func getUserMessage(err *appErrors.AppError) string {
 		return "An unexpected error occurred. Please try again later."
 	}
 	return err.Message
+}
+
+func TimeToString(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format(timeFormat)
+}
+
+func StringToTime(s string) (time.Time, error) {
+	if s == "" {
+		return time.Time{}, nil
+	}
+
+	t, err := time.Parse(timeFormat, s)
+	if err != nil {
+		return time.Time{}, appErrors.Validation(fmt.Sprintf("Invalid date format: %s", s))
+	}
+
+	return t, nil
 }
