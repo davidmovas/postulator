@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
+	"github.com/davidmovas/postulator/internal/infra/ai"
 	"github.com/davidmovas/postulator/pkg/errors"
 )
 
@@ -151,7 +152,7 @@ func (e *Executor) stepSelectTopic(ctx context.Context, pctx *pipelineContext) e
 				WithContext("reason", "no_topics_available")
 		}
 
-		topic, err = e.topicService.GetOrGenerateVariation(ctx, pctx.Job.SiteID, originalTopic.ID)
+		topic, err = e.topicService.GetOrGenerateVariation(ctx, pctx.Job.AIProviderID, pctx.Job.SiteID, originalTopic.ID)
 		if err != nil {
 			return fmt.Errorf("failed to generate topic variation: %w", err)
 		}
@@ -266,7 +267,7 @@ func (e *Executor) stepGenerateAI(ctx context.Context, pctx *pipelineContext) er
 	pctx.Provider = provider
 	pctx.Execution.AIModel = provider.Model
 
-	aiClient, err := e.aiFactory.CreateClient(provider)
+	aiClient, err := ai.CreateClient(provider)
 	if err != nil {
 		return fmt.Errorf("failed to create AI client: %w", err)
 	}

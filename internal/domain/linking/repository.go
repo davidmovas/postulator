@@ -219,7 +219,6 @@ func (r *repository) scanTask(query string, args []any, ctx context.Context) (*T
 		&completedAt,
 		&appliedAt,
 	)
-
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +313,6 @@ func (r *repository) scanTaskFromRow(rows *sql.Rows) (*Task, error) {
 		&completedAt,
 		&appliedAt,
 	)
-
 	if err != nil {
 		return nil, err
 	}

@@ -68,8 +68,9 @@ type OnceSchedule struct {
 }
 
 type IntervalSchedule struct {
-	Value int    `json:"value"`
-	Unit  string `json:"unit"`
+	Value    int        `json:"value"`
+	Unit     string     `json:"unit"`
+	BaseTime *time.Time `json:"base_time,omitempty"`
 }
 
 type DailySchedule struct {

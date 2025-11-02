@@ -1,8 +1,9 @@
 package dto
 
 import (
-	"github.com/davidmovas/postulator/internal/domain/jobs"
 	"time"
+
+	"github.com/davidmovas/postulator/internal/domain/jobs"
 )
 
 type Job struct {

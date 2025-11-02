@@ -320,7 +320,6 @@ func (r *repository) scanExecution(query string, args []interface{}, ctx context
 		&publishedAt,
 		&completedAt,
 	)
-
 	if err != nil {
 		return nil, err
 	}
@@ -411,7 +410,6 @@ func (r *repository) scanExecutionFromRow(rows *sql.Rows) (*entities.Execution, 
 		&publishedAt,
 		&completedAt,
 	)
-
 	if err != nil {
 		return nil, err
 	}

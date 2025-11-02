@@ -485,7 +485,6 @@ func (r *repository) scanJob(query string, args []interface{}, ctx context.Conte
 		&job.CreatedAt,
 		&job.UpdatedAt,
 	)
-
 	if err != nil {
 		return nil, err
 	}

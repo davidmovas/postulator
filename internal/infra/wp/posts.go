@@ -16,7 +16,6 @@ func (c *restyClient) GetPost(ctx context.Context, s *entities.Site, postID int)
 		SetBasicAuth(s.WPUsername, s.WPPassword).
 		SetResult(&post).
 		Get(c.getAPIURL(s.URL, fmt.Sprintf("posts/%d", postID)))
-
 	if err != nil {
 		return nil, errors.WordPress("failed to make request", err)
 	}
@@ -41,7 +40,6 @@ func (c *restyClient) GetPosts(ctx context.Context, s *entities.Site) ([]*entiti
 		}).
 		SetResult(&wpPosts).
 		Get(c.getAPIURL(s.URL, "posts"))
-
 	if err != nil {
 		return nil, errors.WordPress("failed to make request", err)
 	}
@@ -81,7 +79,6 @@ func (c *restyClient) CreatePost(ctx context.Context, s *entities.Site, article 
 		SetBody(postData).
 		SetResult(&createdPost).
 		Post(c.getAPIURL(s.URL, "posts"))
-
 	if err != nil {
 		return 0, errors.WordPress("failed to make request", err)
 	}
@@ -123,7 +120,6 @@ func (c *restyClient) UpdatePost(ctx context.Context, s *entities.Site, article 
 		SetBody(postData).
 		SetResult(&updatedPost).
 		Post(c.getAPIURL(s.URL, fmt.Sprintf("posts/%d", article.WPPostID)))
-
 	if err != nil {
 		return errors.WordPress("failed to make request", err)
 	}
@@ -143,7 +139,6 @@ func (c *restyClient) DeletePost(ctx context.Context, s *entities.Site, postID i
 		SetBasicAuth(s.WPUsername, s.WPPassword).
 		SetQueryParam("force", "true").
 		Delete(c.getAPIURL(s.URL, fmt.Sprintf("posts/%d", postID)))
-
 	if err != nil {
 		return errors.WordPress("failed to make request", err)
 	}

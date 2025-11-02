@@ -2,6 +2,9 @@ package app
 
 import (
 	"context"
+	"path/filepath"
+	"reflect"
+
 	"github.com/davidmovas/postulator/internal/config"
 	"github.com/davidmovas/postulator/internal/domain/articles"
 	"github.com/davidmovas/postulator/internal/domain/jobs"
@@ -15,8 +18,6 @@ import (
 	"github.com/davidmovas/postulator/internal/infra/wp"
 	"github.com/davidmovas/postulator/pkg/di"
 	"github.com/davidmovas/postulator/pkg/logger"
-	"path/filepath"
-	"reflect"
 
 	"github.com/adrg/xdg"
 )

@@ -2,6 +2,7 @@ package dto
 
 import (
 	"errors"
+
 	appErrors "github.com/davidmovas/postulator/pkg/errors"
 )
 

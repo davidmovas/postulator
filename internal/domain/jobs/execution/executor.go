@@ -11,7 +11,6 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/providers"
 	"github.com/davidmovas/postulator/internal/domain/sites"
 	"github.com/davidmovas/postulator/internal/domain/topics"
-	"github.com/davidmovas/postulator/internal/infra/ai"
 	"github.com/davidmovas/postulator/internal/infra/wp"
 	"github.com/davidmovas/postulator/pkg/errors"
 	"github.com/davidmovas/postulator/pkg/logger"
@@ -28,8 +27,7 @@ type Executor struct {
 	providerService providers.Service
 	categoryService categories.Service
 
-	wpClient  wp.Client
-	aiFactory ai.Factory
+	wpClient wp.Client
 
 	logger *logger.Logger
 }
@@ -44,7 +42,6 @@ func NewExecutor(
 	providerService providers.Service,
 	categoryService categories.Service,
 	wpClient wp.Client,
-	aiFactory ai.Factory,
 	logger *logger.Logger,
 ) *Executor {
 	return &Executor{
@@ -57,7 +54,6 @@ func NewExecutor(
 		providerService: providerService,
 		categoryService: categoryService,
 		wpClient:        wpClient,
-		aiFactory:       aiFactory,
 		logger:          logger.WithScope("executor"),
 	}
 }

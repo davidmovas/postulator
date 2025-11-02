@@ -20,7 +20,6 @@ func (c *restyClient) GetCategories(ctx context.Context, s *entities.Site) ([]*e
 		}).
 		SetResult(&wpCategories).
 		Get(c.getAPIURL(s.URL, "categories"))
-
 	if err != nil {
 		return nil, errors.WordPress("failed to make request", err)
 	}
@@ -63,7 +62,6 @@ func (c *restyClient) CreateCategory(ctx context.Context, s *entities.Site, cate
 		SetBody(wpCategoryData).
 		SetResult(&createdCategory).
 		Post(c.getAPIURL(s.URL, "categories"))
-
 	if err != nil {
 		return errors.WordPress("failed to make request", err)
 	}
@@ -105,7 +103,6 @@ func (c *restyClient) UpdateCategory(ctx context.Context, s *entities.Site, cate
 		SetBody(wpCategoryData).
 		SetResult(&updatedCategory).
 		Post(c.getAPIURL(s.URL, fmt.Sprintf("categories/%d", category.WPCategoryID)))
-
 	if err != nil {
 		return errors.WordPress("failed to make request", err)
 	}
@@ -131,7 +128,6 @@ func (c *restyClient) DeleteCategory(ctx context.Context, s *entities.Site, wpCa
 		SetBasicAuth(s.WPUsername, s.WPPassword).
 		SetQueryParam("force", "true").
 		Delete(c.getAPIURL(s.URL, fmt.Sprintf("categories/%d", wpCategoryID)))
-
 	if err != nil {
 		return errors.WordPress("failed to make request", err)
 	}

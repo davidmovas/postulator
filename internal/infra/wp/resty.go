@@ -2,7 +2,6 @@ package wp
 
 import (
 	"encoding/base64"
-
 	"net/http"
 	"strings"
 	"time"

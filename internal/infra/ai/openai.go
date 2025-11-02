@@ -87,7 +87,6 @@ func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPr
 		Temperature: openaiSDK.Float(0.7),
 		MaxTokens:   openaiSDK.Int(4096),
 	})
-
 	if err != nil {
 		return nil, errors.AI(providerName, fmt.Errorf("API error: %w", err))
 	}
@@ -147,7 +146,6 @@ func (c *OpenAIClient) GenerateTopicVariations(ctx context.Context, topic string
 		Temperature: openaiSDK.Float(0.8),
 		MaxTokens:   openaiSDK.Int(1024),
 	})
-
 	if err != nil {
 		return nil, errors.AI(providerName, fmt.Errorf("API error: %w", err))
 	}

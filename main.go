@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"embed"
-	"github.com/davidmovas/postulator/internal/app"
-	"github.com/davidmovas/postulator/internal/config"
 	"log"
 	"os"
+
+	"github.com/davidmovas/postulator/internal/app"
+	"github.com/davidmovas/postulator/internal/config"
 
 	"github.com/getlantern/systray"
 	"github.com/wailsapp/wails/v2"
@@ -156,7 +157,6 @@ func main() {
 			},
 		},
 	})
-
 	if err != nil {
 		log.Fatal(err)
 	}

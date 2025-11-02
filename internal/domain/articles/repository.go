@@ -576,7 +576,6 @@ func (r *repository) scanArticle(query string, args []interface{}, ctx context.C
 		&article.UpdatedAt,
 		&lastSyncedAt,
 	)
-
 	if err != nil {
 		return nil, err
 	}
@@ -670,7 +669,6 @@ func (r *repository) scanArticleFromRow(rows *sql.Rows) (*entities.Article, erro
 		&article.UpdatedAt,
 		&lastSyncedAt,
 	)
-
 	if err != nil {
 		return nil, err
 	}

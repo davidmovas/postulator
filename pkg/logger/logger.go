@@ -66,7 +66,7 @@ func createLogger(cfg *config.Config) (*Logger, error) {
 	if cfg.LogDir == "" {
 		cfg.LogDir = "logs"
 	}
-	if err := os.MkdirAll(cfg.LogDir, 0755); err != nil {
+	if err := os.MkdirAll(cfg.LogDir, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create log directory: %w", err)
 	}
 
@@ -78,13 +78,13 @@ func createLogger(cfg *config.Config) (*Logger, error) {
 	}
 
 	appLogPath := filepath.Join(cfg.LogDir, cfg.AppLogFile)
-	appFile, err := os.OpenFile(appLogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	appFile, err := os.OpenFile(appLogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open app log file: %w", err)
 	}
 
 	errLogPath := filepath.Join(cfg.LogDir, cfg.ErrLogFile)
-	errFile, err := os.OpenFile(errLogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	errFile, err := os.OpenFile(errLogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		_ = appFile.Close()
 		return nil, fmt.Errorf("failed to open error log file: %w", err)
