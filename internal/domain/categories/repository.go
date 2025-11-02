@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/infra/database"
 	"github.com/davidmovas/postulator/pkg/dbx"
 	"github.com/davidmovas/postulator/pkg/errors"
@@ -29,7 +30,7 @@ func NewRepository(db *database.DB, logger *logger.Logger) Repository {
 	}
 }
 
-func (r *repository) Create(ctx context.Context, category *Category) error {
+func (r *repository) Create(ctx context.Context, category *entities.Category) error {
 	query, args := dbx.ST.
 		Insert("categories").
 		Columns(
@@ -62,7 +63,7 @@ func (r *repository) Create(ctx context.Context, category *Category) error {
 	return nil
 }
 
-func (r *repository) GetByID(ctx context.Context, id int64) (*Category, error) {
+func (r *repository) GetByID(ctx context.Context, id int64) (*entities.Category, error) {
 	query, args := dbx.ST.
 		Select(
 			"id",
@@ -79,7 +80,7 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*Category, error) {
 		Where(squirrel.Eq{"id": id}).
 		MustSql()
 
-	var category Category
+	var category entities.Category
 	var slug, description sql.NullString
 
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(
@@ -111,7 +112,7 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*Category, error) {
 	return &category, nil
 }
 
-func (r *repository) GetBySiteID(ctx context.Context, siteID int64) ([]*Category, error) {
+func (r *repository) GetBySiteID(ctx context.Context, siteID int64) ([]*entities.Category, error) {
 	query, args := dbx.ST.
 		Select(
 			"id",
@@ -137,9 +138,9 @@ func (r *repository) GetBySiteID(ctx context.Context, siteID int64) ([]*Category
 		_ = rows.Close()
 	}()
 
-	var categories []*Category
+	var categories []*entities.Category
 	for rows.Next() {
-		var category Category
+		var category entities.Category
 		var slug, description sql.NullString
 
 		err = rows.Scan(
@@ -177,7 +178,7 @@ func (r *repository) GetBySiteID(ctx context.Context, siteID int64) ([]*Category
 	return categories, nil
 }
 
-func (r *repository) GetByWPCategoryID(ctx context.Context, siteID int64, wpCategoryID int) (*Category, error) {
+func (r *repository) GetByWPCategoryID(ctx context.Context, siteID int64, wpCategoryID int) (*entities.Category, error) {
 	query, args := dbx.ST.
 		Select(
 			"id",
@@ -194,7 +195,7 @@ func (r *repository) GetByWPCategoryID(ctx context.Context, siteID int64, wpCate
 		Where(squirrel.Eq{"site_id": siteID, "wp_category_id": wpCategoryID}).
 		MustSql()
 
-	var category Category
+	var category entities.Category
 	var slug, description sql.NullString
 
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(
@@ -226,7 +227,7 @@ func (r *repository) GetByWPCategoryID(ctx context.Context, siteID int64, wpCate
 	return &category, nil
 }
 
-func (r *repository) Update(ctx context.Context, category *Category) error {
+func (r *repository) Update(ctx context.Context, category *entities.Category) error {
 	query, args := dbx.ST.
 		Update("categories").
 		Set("name", category.Name).
@@ -294,7 +295,7 @@ func (r *repository) DeleteBySiteID(ctx context.Context, siteID int64) error {
 	return nil
 }
 
-func (r *repository) BulkUpsert(ctx context.Context, siteID int64, categories []*Category) error {
+func (r *repository) BulkUpsert(ctx context.Context, siteID int64, categories []*entities.Category) error {
 	if len(categories) == 0 {
 		return nil
 	}

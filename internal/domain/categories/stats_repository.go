@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/infra/database"
 	"github.com/davidmovas/postulator/pkg/dbx"
 	"github.com/davidmovas/postulator/pkg/errors"
@@ -47,7 +48,7 @@ func (r *statsRepository) Increment(ctx context.Context, siteID, categoryID int6
 	return nil
 }
 
-func (r *statsRepository) GetByCategory(ctx context.Context, categoryID int64, from, to time.Time) ([]*Statistics, error) {
+func (r *statsRepository) GetByCategory(ctx context.Context, categoryID int64, from, to time.Time) ([]*entities.Statistics, error) {
 	query, args := dbx.ST.
 		Select("category_id", "date", "articles_published", "total_words").
 		From("category_statistics").
@@ -65,9 +66,9 @@ func (r *statsRepository) GetByCategory(ctx context.Context, categoryID int64, f
 		_ = rows.Close()
 	}()
 
-	var stats []*Statistics
+	var stats []*entities.Statistics
 	for rows.Next() {
-		var stat Statistics
+		var stat entities.Statistics
 		err = rows.Scan(
 			&stat.CategoryID,
 			&stat.Date,
@@ -90,7 +91,7 @@ func (r *statsRepository) GetByCategory(ctx context.Context, categoryID int64, f
 	return stats, nil
 }
 
-func (r *statsRepository) GetBySite(ctx context.Context, siteID int64, from, to time.Time) ([]*Statistics, error) {
+func (r *statsRepository) GetBySite(ctx context.Context, siteID int64, from, to time.Time) ([]*entities.Statistics, error) {
 	query, args := dbx.ST.
 		Select("category_id", "date", "articles_published", "total_words").
 		From("category_statistics").
@@ -108,9 +109,9 @@ func (r *statsRepository) GetBySite(ctx context.Context, siteID int64, from, to 
 		_ = rows.Close()
 	}()
 
-	var stats []*Statistics
+	var stats []*entities.Statistics
 	for rows.Next() {
-		var stat Statistics
+		var stat entities.Statistics
 		err = rows.Scan(
 			&stat.CategoryID,
 			&stat.Date,
