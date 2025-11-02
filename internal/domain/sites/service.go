@@ -16,13 +16,13 @@ import (
 var _ Service = (*service)(nil)
 
 type service struct {
-	wpClient *wp.Client
+	wpClient wp.Client
 	secret   *secret.Manager
 	repo     Repository
 	logger   *logger.Logger
 }
 
-func NewService(wpClient *wp.Client, secretManager *secret.Manager, repo Repository, logger *logger.Logger) Service {
+func NewService(wpClient wp.Client, secretManager *secret.Manager, repo Repository, logger *logger.Logger) Service {
 	return &service{
 		wpClient: wpClient,
 		secret:   secretManager,
@@ -57,7 +57,7 @@ func (s *service) CreateSite(ctx context.Context, site *entities.Site) error {
 		return err
 	}
 
-	s.logger.Info("Site created successfully")
+	s.logger.Infof("Site created successfully %d", site.ID)
 	return nil
 }
 
@@ -68,7 +68,6 @@ func (s *service) GetSite(ctx context.Context, id int64) (*entities.Site, error)
 		return nil, err
 	}
 
-	s.logger.Debug("Site retrieved")
 	return site, nil
 }
 
@@ -89,7 +88,6 @@ func (s *service) GetSiteWithPassword(ctx context.Context, id int64) (*entities.
 		site.WPPassword = decryptedPassword
 	}
 
-	s.logger.Debug("Site with password retrieved")
 	return site, nil
 }
 
@@ -134,7 +132,6 @@ func (s *service) UpdateSite(ctx context.Context, site *entities.Site) error {
 		return err
 	}
 
-	s.logger.Info("Site updated successfully")
 	return nil
 }
 
@@ -159,7 +156,6 @@ func (s *service) UpdateSitePassword(ctx context.Context, id int64, password str
 		return err
 	}
 
-	s.logger.Info("Site password updated successfully")
 	return nil
 }
 
@@ -188,9 +184,7 @@ func (s *service) CheckHealth(ctx context.Context, siteID int64) error {
 
 	healthStatus, err := s.performHealthCheck(ctx, site)
 	if err != nil {
-		s.logger.Warn("Health check failed")
-
-		if updateErr := s.repo.UpdateHealthStatus(ctx, siteID, entities.HealthUnhealthy, time.Now()); updateErr != nil {
+		if updateErr := s.repo.UpdateHealthStatus(ctx, siteID, healthStatus, time.Now()); updateErr != nil {
 			s.logger.ErrorWithErr(updateErr, "Failed to update health status")
 			return updateErr
 		}
@@ -203,7 +197,6 @@ func (s *service) CheckHealth(ctx context.Context, siteID int64) error {
 		return updateErr
 	}
 
-	s.logger.Info("Health check completed")
 	return nil
 }
 
@@ -230,7 +223,6 @@ func (s *service) CheckAllHealth(ctx context.Context) error {
 		return errors.New(errors.ErrCodeInternal, "Some health checks failed")
 	}
 
-	s.logger.Info("All health checks completed successfully")
 	return nil
 }
 

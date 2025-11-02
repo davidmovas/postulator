@@ -7,6 +7,10 @@ import (
 )
 
 type Client interface {
+	// Health
+
+	CheckHealth(ctx context.Context, site *entities.Site) (entities.HealthStatus, error)
+
 	// Categories
 
 	GetCategories(ctx context.Context, s *entities.Site) ([]*entities.Category, error)

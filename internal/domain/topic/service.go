@@ -9,7 +9,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/jobs"
-	"github.com/davidmovas/postulator/internal/infra/wp"
+	"github.com/davidmovas/postulator/internal/infra/ai"
 	"github.com/davidmovas/postulator/pkg/errors"
 	"github.com/davidmovas/postulator/pkg/logger"
 )
@@ -17,7 +17,7 @@ import (
 var _ Service = (*service)(nil)
 
 type service struct {
-	wp            *wp.Client
+	ai            ai.Client
 	jobService    jobs.Service
 	repo          Repository
 	siteTopicRepo SiteTopicRepository
@@ -26,7 +26,7 @@ type service struct {
 }
 
 func NewService(
-	wp *wp.Client,
+	ai ai.Client,
 	jobService jobs.Service,
 	repo Repository,
 	siteTopicRepo SiteTopicRepository,
@@ -34,7 +34,7 @@ func NewService(
 	logger *logger.Logger,
 ) Service {
 	return &service{
-		wp:            wp,
+		ai:            ai,
 		jobService:    jobService,
 		repo:          repo,
 		siteTopicRepo: siteTopicRepo,
@@ -201,7 +201,7 @@ func (s *service) GenerateVariations(ctx context.Context, topicID int64, count i
 		return nil, err
 	}
 
-	titles, err := s.wp.GenerateTopicVariation(ctx, reference.Title, count)
+	titles, err := s.ai.GenerateTopicVariation(ctx, reference.Title, count)
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to generate topic variations")
 		return nil, err
@@ -279,7 +279,7 @@ func (s *service) GetOrGenerateVariation(ctx context.Context, siteID, originalID
 		}
 	}
 
-	newVariation, err := s.wp.GenerateTopicVariation(ctx, originalTopic.Title, 1)
+	newVariation, err := s.ai.GenerateTopicVariation(ctx, originalTopic.Title, 1)
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to generate topic variation")
 		return nil, err
