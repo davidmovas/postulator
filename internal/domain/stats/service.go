@@ -17,29 +17,31 @@ import (
 var _ Service = (*service)(nil)
 
 type service struct {
-	repo             Repository
 	sitesService     sites.Service
 	articlesService  articles.Service
 	jobsService      jobs.Service
 	executionService execution.Service
+	repo             Repository
 	logger           *logger.Logger
 }
 
 func NewService(
-	repo Repository,
 	sitesService sites.Service,
 	articlesService articles.Service,
 	jobsService jobs.Service,
 	executionService execution.Service,
+	repo Repository,
 	logger *logger.Logger,
 ) Service {
 	return &service{
-		repo:             repo,
 		sitesService:     sitesService,
 		articlesService:  articlesService,
 		jobsService:      jobsService,
 		executionService: executionService,
-		logger:           logger.WithScope("service").WithScope("stats"),
+		repo:             repo,
+		logger: logger.
+			WithScope("service").
+			WithScope("stats"),
 	}
 }
 

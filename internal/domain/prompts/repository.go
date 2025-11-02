@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/infra/database"
 	"github.com/davidmovas/postulator/pkg/dbx"
 	"github.com/davidmovas/postulator/pkg/errors"
@@ -31,7 +32,7 @@ func NewRepository(db *database.DB, logger *logger.Logger) Repository {
 	}
 }
 
-func (r *repository) Create(ctx context.Context, prompt *Prompt) error {
+func (r *repository) Create(ctx context.Context, prompt *entities.Prompt) error {
 	placeholdersJSON, err := json.Marshal(prompt.Placeholders)
 	if err != nil {
 		return errors.Validation("Invalid placeholders format")
@@ -60,14 +61,14 @@ func (r *repository) Create(ctx context.Context, prompt *Prompt) error {
 	return nil
 }
 
-func (r *repository) GetByID(ctx context.Context, id int64) (*Prompt, error) {
+func (r *repository) GetByID(ctx context.Context, id int64) (*entities.Prompt, error) {
 	query, args := dbx.ST.
 		Select("id", "name", "system_prompt", "user_prompt", "placeholders", "created_at", "updated_at").
 		From("prompts").
 		Where(squirrel.Eq{"id": id}).
 		MustSql()
 
-	var prompt Prompt
+	var prompt entities.Prompt
 	var placeholdersJSON sql.NullString
 
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(
@@ -100,7 +101,7 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*Prompt, error) {
 	return &prompt, nil
 }
 
-func (r *repository) GetAll(ctx context.Context) ([]*Prompt, error) {
+func (r *repository) GetAll(ctx context.Context) ([]*entities.Prompt, error) {
 	query, args := dbx.ST.
 		Select("id", "name", "system_prompt", "user_prompt", "placeholders", "created_at", "updated_at").
 		From("prompts").
@@ -115,9 +116,9 @@ func (r *repository) GetAll(ctx context.Context) ([]*Prompt, error) {
 		_ = rows.Close()
 	}()
 
-	var prompts []*Prompt
+	var prompts []*entities.Prompt
 	for rows.Next() {
-		var prompt Prompt
+		var prompt entities.Prompt
 		var placeholdersJSON sql.NullString
 
 		err = rows.Scan(
@@ -156,7 +157,7 @@ func (r *repository) GetAll(ctx context.Context) ([]*Prompt, error) {
 	return prompts, nil
 }
 
-func (r *repository) Update(ctx context.Context, prompt *Prompt) error {
+func (r *repository) Update(ctx context.Context, prompt *entities.Prompt) error {
 	placeholdersJSON, err := json.Marshal(prompt.Placeholders)
 	if err != nil {
 		return errors.Validation("Invalid placeholders format")

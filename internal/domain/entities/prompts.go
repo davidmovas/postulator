@@ -7,7 +7,7 @@ type Prompt struct {
 	Name         string
 	SystemPrompt string
 	UserPrompt   string
-	Placeholders []string // ["title", "words", "category"]
+	Placeholders []string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }

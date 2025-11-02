@@ -2,34 +2,25 @@ package prompts
 
 import (
 	"context"
-	"time"
+
+	"github.com/davidmovas/postulator/internal/domain/entities"
 )
 
-type Prompt struct {
-	ID           int64
-	Name         string
-	SystemPrompt string
-	UserPrompt   string
-	Placeholders []string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-}
-
 type Repository interface {
-	Create(ctx context.Context, prompt *Prompt) error
-	GetByID(ctx context.Context, id int64) (*Prompt, error)
-	GetAll(ctx context.Context) ([]*Prompt, error)
-	Update(ctx context.Context, prompt *Prompt) error
+	Create(ctx context.Context, prompt *entities.Prompt) error
+	GetByID(ctx context.Context, id int64) (*entities.Prompt, error)
+	GetAll(ctx context.Context) ([]*entities.Prompt, error)
+	Update(ctx context.Context, prompt *entities.Prompt) error
 	Delete(ctx context.Context, id int64) error
 }
 
 type Service interface {
-	CreatePrompt(ctx context.Context, prompt *Prompt) error
-	GetPrompt(ctx context.Context, id int64) (*Prompt, error)
-	ListPrompts(ctx context.Context) ([]*Prompt, error)
-	UpdatePrompt(ctx context.Context, prompt *Prompt) error
+	CreatePrompt(ctx context.Context, prompt *entities.Prompt) error
+	GetPrompt(ctx context.Context, id int64) (*entities.Prompt, error)
+	ListPrompts(ctx context.Context) ([]*entities.Prompt, error)
+	UpdatePrompt(ctx context.Context, prompt *entities.Prompt) error
 	DeletePrompt(ctx context.Context, id int64) error
 
 	RenderPrompt(ctx context.Context, promptID int64, placeholders map[string]string) (system, user string, err error)
-	ValidatePlaceholders(prompt *Prompt, provided map[string]string) error
+	ValidatePlaceholders(prompt *entities.Prompt, provided map[string]string) error
 }
