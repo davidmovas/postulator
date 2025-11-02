@@ -317,7 +317,7 @@ func (s *service) UpdateInWordPress(ctx context.Context, article *entities.Artic
 		return err
 	}
 
-	if err := s.wp.UpdatePost(ctx, site, article); err != nil {
+	if err = s.wp.UpdatePost(ctx, site, article); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to update article in WordPress")
 		return err
 	}
@@ -325,7 +325,7 @@ func (s *service) UpdateInWordPress(ctx context.Context, article *entities.Artic
 	article.UpdatedAt = time.Now()
 	article.LastSyncedAt = &article.UpdatedAt
 
-	if err := s.repo.Update(ctx, article); err != nil {
+	if err = s.repo.Update(ctx, article); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to update article after WordPress update")
 		return err
 	}
@@ -347,7 +347,7 @@ func (s *service) DeleteFromWordPress(ctx context.Context, id int64) error {
 		return err
 	}
 
-	if err := s.wp.DeletePost(ctx, site, article.WPPostID); err != nil {
+	if err = s.wp.DeletePost(ctx, site, article.WPPostID); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to delete article from WordPress")
 		return err
 	}
@@ -433,39 +433,5 @@ func (s *service) calculateWordCount(content string) int {
 }
 
 func (s *service) needUpdate(local, remote *entities.Article) bool {
-	if local.Title != remote.Title {
-		return true
-	}
-	if local.Content != remote.Content {
-		return true
-	}
-	if !equalPointers(local.Excerpt, remote.Excerpt) {
-		return true
-	}
-	if !equalIntSlices(local.WPCategoryIDs, remote.WPCategoryIDs) {
-		return true
-	}
-	return false
-}
-
-func equalPointers(a, b *string) bool {
-	if a == nil && b == nil {
-		return true
-	}
-	if a == nil || b == nil {
-		return false
-	}
-	return *a == *b
-}
-
-func equalIntSlices(a, b []int) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
+	return (local.Title != remote.Title) && (local.WPPostID != remote.WPPostID)
 }
