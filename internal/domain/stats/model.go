@@ -3,36 +3,22 @@ package stats
 import (
 	"context"
 	"time"
-)
 
-type SiteStats struct {
-	ID                   int64
-	SiteID               int64
-	Date                 time.Time
-	ArticlesPublished    int
-	ArticlesFailed       int
-	TotalWords           int
-	InternalLinksCreated int
-	ExternalLinksCreated int
-}
+	"github.com/davidmovas/postulator/internal/domain/entities"
+)
 
 type Repository interface {
 	IncrementSiteStats(ctx context.Context, siteID int64, date time.Time, field string, value int) error
-	GetSiteStats(ctx context.Context, siteID int64, from, to time.Time) ([]*SiteStats, error)
-	GetTotalSiteStats(ctx context.Context, siteID int64) (*SiteStats, error)
+	GetSiteStats(ctx context.Context, siteID int64, from, to time.Time) ([]*entities.SiteStats, error)
+	GetTotalSiteStats(ctx context.Context, siteID int64) (*entities.SiteStats, error)
 }
 
 type Service interface {
-	GetSiteStatistics(ctx context.Context, siteID int64, from, to time.Time) ([]*SiteStats, error)
-	GetTotalStatistics(ctx context.Context, siteID int64) (*SiteStats, error)
-	GetDashboardSummary(ctx context.Context) (*DashboardSummary, error)
-}
+	GetSiteStatistics(ctx context.Context, siteID int64, from, to time.Time) ([]*entities.SiteStats, error)
+	GetTotalStatistics(ctx context.Context, siteID int64) (*entities.SiteStats, error)
+	GetDashboardSummary(ctx context.Context) (*entities.DashboardSummary, error)
 
-type DashboardSummary struct {
-	TotalSites         int
-	TotalArticles      int
-	TotalArticlesToday int
-	TotalWordsToday    int
-	ActiveJobs         int
-	PendingValidations int
+	RecordArticlePublished(ctx context.Context, siteID int64, wordCount int) error
+	RecordArticleFailed(ctx context.Context, siteID int64) error
+	RecordLinksCreated(ctx context.Context, siteID int64, internalLinks, externalLinks int) error
 }

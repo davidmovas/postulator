@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/squirrel"
+	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/infra/database"
 	"github.com/davidmovas/postulator/pkg/dbx"
 	"github.com/davidmovas/postulator/pkg/errors"
@@ -62,8 +63,7 @@ func (r *repository) IncrementSiteStats(ctx context.Context, siteID int64, date 
 	return nil
 }
 
-func (r *repository) GetSiteStats(ctx context.Context, siteID int64, from, to time.Time) ([]*SiteStats, error) {
-	// Normalize dates to start of day
+func (r *repository) GetSiteStats(ctx context.Context, siteID int64, from, to time.Time) ([]*entities.SiteStats, error) {
 	from = time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, from.Location())
 	to = time.Date(to.Year(), to.Month(), to.Day(), 23, 59, 59, 999999999, to.Location())
 
@@ -93,9 +93,9 @@ func (r *repository) GetSiteStats(ctx context.Context, siteID int64, from, to ti
 		_ = rows.Close()
 	}()
 
-	var stats []*SiteStats
+	var stats []*entities.SiteStats
 	for rows.Next() {
-		var stat SiteStats
+		var stat entities.SiteStats
 		err = rows.Scan(
 			&stat.ID,
 			&stat.SiteID,
@@ -122,7 +122,7 @@ func (r *repository) GetSiteStats(ctx context.Context, siteID int64, from, to ti
 	return stats, nil
 }
 
-func (r *repository) GetTotalSiteStats(ctx context.Context, siteID int64) (*SiteStats, error) {
+func (r *repository) GetTotalSiteStats(ctx context.Context, siteID int64) (*entities.SiteStats, error) {
 	query, args := dbx.ST.
 		Select(
 			"SUM(articles_published)",
@@ -135,7 +135,7 @@ func (r *repository) GetTotalSiteStats(ctx context.Context, siteID int64) (*Site
 		Where(squirrel.Eq{"site_id": siteID}).
 		MustSql()
 
-	var stat SiteStats
+	var stat entities.SiteStats
 	var articlesPublished, articlesFailed, totalWords, internalLinks, externalLinks sql.NullInt64
 
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(
@@ -148,7 +148,7 @@ func (r *repository) GetTotalSiteStats(ctx context.Context, siteID int64) (*Site
 
 	switch {
 	case dbx.IsNoRows(err):
-		return &SiteStats{
+		return &entities.SiteStats{
 			SiteID:               siteID,
 			ArticlesPublished:    0,
 			ArticlesFailed:       0,
