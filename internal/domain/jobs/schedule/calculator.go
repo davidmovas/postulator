@@ -135,7 +135,6 @@ func (c *Calculator) calculateInterval(config json.RawMessage, now time.Time, la
 		return candidate
 
 	default:
-		// default to 1 day period
 		if anchor.After(now) {
 			return anchor
 		}
