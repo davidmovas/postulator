@@ -28,7 +28,7 @@ type Service interface {
 	ListExecutions(ctx context.Context, jobID int64, limit, offset int) ([]*entities.Execution, int, error)
 	GetPendingValidations(ctx context.Context) ([]*entities.Execution, error)
 
-	UpdateStatus(ctx context.Context, id int64, status entities.Status) error
+	UpdateStatus(ctx context.Context, id int64, status entities.ExecutionStatus) error
 
 	ApproveExecution(ctx context.Context, id int64) error
 	RejectExecution(ctx context.Context, id int64) error

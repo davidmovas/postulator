@@ -2,6 +2,7 @@ package schedule
 
 import (
 	"encoding/json"
+	"math"
 	"math/rand"
 	"time"
 
@@ -15,43 +16,42 @@ func NewCalculator() *Calculator {
 }
 
 func (c *Calculator) CalculateNextRun(job *entities.Job, lastRun *time.Time) (time.Time, error) {
-	if job.Schedule == nil {
+	if job == nil || job.Schedule == nil {
 		return time.Time{}, nil
 	}
-
 	if job.Status != entities.JobStatusActive {
 		return time.Time{}, nil
 	}
+	if job.Schedule.Type == entities.ScheduleManual {
+		return time.Time{}, nil
+	}
 
-	var nextRun time.Time
 	now := time.Now()
+	var baseCandidate time.Time
 
 	switch job.Schedule.Type {
-	case entities.ScheduleManual:
-		return time.Time{}, nil
 	case entities.ScheduleOnce:
-		nextRun = c.calculateOnce(job.Schedule.Config, now)
+		baseCandidate = c.calculateOnce(job.Schedule.Config)
 	case entities.ScheduleInterval:
-		nextRun = c.calculateInterval(job.Schedule.Config, now, lastRun)
+		baseCandidate = c.calculateInterval(job.Schedule.Config, now, lastRun)
 	case entities.ScheduleDaily:
-		nextRun = c.calculateDaily(job.Schedule.Config, now)
+		baseCandidate = c.calculateDaily(job.Schedule.Config, now)
 	default:
 		return time.Time{}, nil
 	}
 
 	if job.JitterEnabled && job.JitterMinutes > 0 {
-		nextRun = c.applyJitter(nextRun, job.JitterMinutes)
+		baseCandidate = c.applyJitter(baseCandidate, job.JitterMinutes)
 	}
 
-	return nextRun, nil
+	return baseCandidate, nil
 }
 
-func (c *Calculator) calculateOnce(config json.RawMessage, now time.Time) time.Time {
+func (c *Calculator) calculateOnce(config json.RawMessage) time.Time {
 	var cfg entities.OnceSchedule
 	if err := json.Unmarshal(config, &cfg); err != nil {
 		return time.Time{}
 	}
-
 	return cfg.ExecuteAt
 }
 
@@ -61,22 +61,89 @@ func (c *Calculator) calculateInterval(config json.RawMessage, now time.Time, la
 		return time.Time{}
 	}
 
-	baseTime := now
-	if lastRun != nil && !lastRun.IsZero() {
-		baseTime = *lastRun
+	if cfg.Value <= 0 {
+		cfg.Value = 1
 	}
 
+	var anchor time.Time
+	if cfg.StartAt != nil && !cfg.StartAt.IsZero() {
+		anchor = cfg.StartAt.In(now.Location())
+	} else if lastRun != nil && !lastRun.IsZero() {
+		anchor = lastRun.In(now.Location())
+	} else {
+		anchor = now
+	}
+
+	anchor = time.Date(anchor.Year(), anchor.Month(), anchor.Day(), anchor.Hour(), anchor.Minute(), anchor.Second(), anchor.Nanosecond(), now.Location())
+
 	switch cfg.Unit {
-	case "hours":
-		return baseTime.Add(time.Duration(cfg.Value) * time.Hour)
-	case "days":
-		return baseTime.AddDate(0, 0, cfg.Value)
-	case "weeks":
-		return baseTime.AddDate(0, 0, cfg.Value*7)
-	case "months":
-		return baseTime.AddDate(0, cfg.Value, 0)
+	case "hours", "hour":
+		period := time.Duration(cfg.Value) * time.Hour
+		if anchor.After(now) {
+			return anchor
+		}
+		diff := now.Sub(anchor)
+		k := int64(diff/period) + 1
+		candidate := anchor.Add(time.Duration(k) * period)
+		if !candidate.After(now) {
+			candidate = candidate.Add(period)
+		}
+		return candidate
+
+	case "days", "day":
+		if anchor.After(now) {
+			return anchor
+		}
+		periodDays := cfg.Value
+		daysDiff := int(now.Sub(anchor) / (24 * time.Hour))
+		k := daysDiff/periodDays + 1
+		candidate := anchor.AddDate(0, 0, k*periodDays)
+		for !candidate.After(now) {
+			candidate = candidate.AddDate(0, 0, periodDays)
+		}
+		return candidate
+
+	case "weeks", "week":
+		if anchor.After(now) {
+			return anchor
+		}
+		periodDays := cfg.Value * 7
+		daysDiff := int(now.Sub(anchor) / (24 * time.Hour))
+		k := daysDiff/periodDays + 1
+		candidate := anchor.AddDate(0, 0, k*periodDays)
+		for !candidate.After(now) {
+			candidate = candidate.AddDate(0, 0, periodDays)
+		}
+		return candidate
+
+	case "months", "month":
+		if anchor.After(now) {
+			return anchor
+		}
+		candidate := anchor
+		monthsDiff := (now.Year()-anchor.Year())*12 + int(now.Month()) - int(anchor.Month())
+		approxSteps := int(math.Floor(float64(monthsDiff) / float64(cfg.Value)))
+		if approxSteps < 0 {
+			approxSteps = 0
+		}
+		if approxSteps > 0 {
+			candidate = candidate.AddDate(0, approxSteps*cfg.Value, 0)
+		}
+		for !candidate.After(now) {
+			candidate = candidate.AddDate(0, cfg.Value, 0)
+		}
+		return candidate
+
 	default:
-		return baseTime.Add(24 * time.Hour)
+		// default to 1 day period
+		if anchor.After(now) {
+			return anchor
+		}
+		candidate := anchor.Add(24 * time.Hour)
+		for !candidate.After(now) {
+			candidate = candidate.Add(24 * time.Hour)
+		}
+		return candidate
 	}
 }
 
@@ -88,27 +155,37 @@ func (c *Calculator) calculateDaily(config json.RawMessage, now time.Time) time.
 
 	allowedDays := make(map[time.Weekday]bool)
 	for _, day := range cfg.Weekdays {
-		weekday := time.Weekday((day) % 7)
+		weekday := time.Weekday(day % 7)
 		allowedDays[weekday] = true
 	}
 
 	candidate := time.Date(now.Year(), now.Month(), now.Day(), cfg.Hour, cfg.Minute, 0, 0, now.Location())
 
-	if candidate.Before(now) || candidate.Equal(now) {
+	if !candidate.After(now) {
 		candidate = candidate.Add(24 * time.Hour)
 	}
 
 	for i := 0; i < 8; i++ {
-		if allowedDays[candidate.Weekday()] {
+		if len(allowedDays) == 0 || allowedDays[candidate.Weekday()] {
 			return candidate
 		}
 		candidate = candidate.Add(24 * time.Hour)
 	}
 
-	return now.Add(24 * time.Hour)
+	return time.Date(now.Year(), now.Month(), now.Day(), cfg.Hour, cfg.Minute, 0, 0, now.Location()).Add(24 * time.Hour)
 }
 
 func (c *Calculator) applyJitter(t time.Time, jitterMinutes int) time.Time {
-	jitter := rand.Intn(jitterMinutes*2+1) - jitterMinutes
-	return t.Add(time.Duration(jitter) * time.Minute)
+	if jitterMinutes <= 0 {
+		return t
+	}
+
+	j := rand.Intn(jitterMinutes*2+1) - jitterMinutes
+	jittered := t.Add(time.Duration(j) * time.Minute)
+
+	if jittered.Before(time.Now()) {
+		jittered = time.Now().Add(time.Minute * 2)
+	}
+
+	return jittered
 }
