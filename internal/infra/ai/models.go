@@ -133,15 +133,6 @@ var availableModels = map[entities.Type][]*entities.Model{
 	},
 }
 
-func GetAvailableModels(providerType entities.Type) []*entities.Model {
-	models, exists := availableModels[providerType]
-	if !exists {
-		return nil
-	}
-
-	return models
-}
-
 func GetModelInfo(providerType entities.Type, modelID string) *entities.Model {
 	models, exists := availableModels[providerType]
 	if !exists {

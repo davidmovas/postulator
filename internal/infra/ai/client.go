@@ -2,8 +2,6 @@ package ai
 
 import (
 	"context"
-
-	"github.com/davidmovas/postulator/internal/domain/entities"
 )
 
 type Client interface {
@@ -16,11 +14,4 @@ type ArticleResult struct {
 	Content    string
 	TokensUsed int
 	Cost       float64
-}
-
-// Factory создаёт AI клиентов
-type Factory interface {
-	CreateClient(provider *entities.Provider) (Client, error)
-	GetAvailableModels(providerType entities.Type) []*entities.Model
-	ValidateModel(providerType entities.Type, model string) bool
 }

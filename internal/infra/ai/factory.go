@@ -7,15 +7,7 @@ import (
 	"github.com/davidmovas/postulator/pkg/errors"
 )
 
-var _ Factory = (*factory)(nil)
-
-type factory struct{}
-
-func NewFactory() Factory {
-	return &factory{}
-}
-
-func (f *factory) CreateClient(provider *entities.Provider) (Client, error) {
+func CreateClient(provider *entities.Provider) (Client, error) {
 	if provider == nil {
 		return nil, errors.Validation("provider is required")
 	}
@@ -28,7 +20,7 @@ func (f *factory) CreateClient(provider *entities.Provider) (Client, error) {
 		return nil, errors.Validation("API key is required")
 	}
 
-	if !f.ValidateModel(provider.Type, provider.Model) {
+	if !ValidateModel(provider.Type, provider.Model) {
 		return nil, errors.Validation(fmt.Sprintf("invalid model %s for provider %s", provider.Model, provider.Type))
 	}
 
@@ -56,7 +48,20 @@ func (f *factory) CreateClient(provider *entities.Provider) (Client, error) {
 	}
 }
 
-func (f *factory) GetAvailableModels(providerType entities.Type) []*entities.Model {
+func GetProviderModels() map[entities.Type][]*entities.Model {
+	cp := make(map[entities.Type][]*entities.Model)
+
+	for provider, models := range availableModels {
+		cpModels := make([]*entities.Model, len(models))
+		copy(cpModels, models)
+
+		cp[provider] = cpModels
+	}
+
+	return availableModels
+}
+
+func GetAvailableModels(providerType entities.Type) []*entities.Model {
 	models, exists := availableModels[providerType]
 	if !exists {
 		return nil
@@ -67,8 +72,8 @@ func (f *factory) GetAvailableModels(providerType entities.Type) []*entities.Mod
 	return result
 }
 
-func (f *factory) ValidateModel(providerType entities.Type, model string) bool {
-	models := f.GetAvailableModels(providerType)
+func ValidateModel(providerType entities.Type, model string) bool {
+	models := GetAvailableModels(providerType)
 	for _, m := range models {
 		if m.ID == model {
 			return true

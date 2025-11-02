@@ -57,7 +57,7 @@ func NewOpenAIClient(cfg Config) (*OpenAIClient, error) {
 
 	return &OpenAIClient{
 		client: &client,
-		model:  normalizeModel(cfg.Model),
+		model:  cfg.Model,
 	}, nil
 }
 
@@ -181,21 +181,4 @@ func generateSchema[T any]() interface{} {
 	var v T
 	schema := reflector.Reflect(v)
 	return schema
-}
-
-func normalizeModel(model string) openaiSDK.ChatModel {
-	switch model {
-	case "gpt-4o":
-		return openaiSDK.ChatModelGPT4o
-	case "gpt-4o-mini":
-		return openaiSDK.ChatModelGPT4oMini
-	case "gpt-4-turbo":
-		return openaiSDK.ChatModelGPT4Turbo
-	case "gpt-4":
-		return openaiSDK.ChatModelGPT4
-	case "gpt-3.5-turbo":
-		return openaiSDK.ChatModelGPT3_5Turbo
-	default:
-		return model
-	}
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
+	"github.com/davidmovas/postulator/internal/domain/providers"
 	"github.com/davidmovas/postulator/internal/infra/ai"
 	"github.com/davidmovas/postulator/pkg/errors"
 	"github.com/davidmovas/postulator/pkg/logger"
@@ -16,25 +17,25 @@ import (
 var _ Service = (*service)(nil)
 
 type service struct {
-	ai            ai.Client
-	repo          Repository
-	siteTopicRepo SiteTopicRepository
-	usageRepo     UsageRepository
-	logger        *logger.Logger
+	providerService providers.Service
+	repo            Repository
+	siteTopicRepo   SiteTopicRepository
+	usageRepo       UsageRepository
+	logger          *logger.Logger
 }
 
 func NewService(
-	ai ai.Client,
+	providerService providers.Service,
 	repo Repository,
 	siteTopicRepo SiteTopicRepository,
 	usageRepo UsageRepository,
 	logger *logger.Logger,
 ) Service {
 	return &service{
-		ai:            ai,
-		repo:          repo,
-		siteTopicRepo: siteTopicRepo,
-		usageRepo:     usageRepo,
+		providerService: providerService,
+		repo:            repo,
+		siteTopicRepo:   siteTopicRepo,
+		usageRepo:       usageRepo,
 		logger: logger.
 			WithScope("service").
 			WithScope("topics"),
@@ -186,7 +187,7 @@ func (s *service) GetSiteTopics(ctx context.Context, siteID int64) ([]*entities.
 	return topics, nil
 }
 
-func (s *service) GenerateVariations(ctx context.Context, topicID int64, count int) ([]*entities.Topic, error) {
+func (s *service) GenerateVariations(ctx context.Context, providerID, topicID int64, count int) ([]*entities.Topic, error) {
 	if count <= 0 {
 		return nil, errors.Validation("Count must be positive")
 	}
@@ -197,7 +198,19 @@ func (s *service) GenerateVariations(ctx context.Context, topicID int64, count i
 		return nil, err
 	}
 
-	titles, err := s.ai.GenerateTopicVariation(ctx, reference.Title, count)
+	provider, err := s.providerService.GetProvider(ctx, providerID)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get provider for variations")
+		return nil, err
+	}
+
+	client, err := ai.CreateClient(provider)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to create AI client for variations")
+		return nil, err
+	}
+
+	titles, err := client.GenerateTopicVariations(ctx, reference.Title, count)
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to generate topic variations")
 		return nil, err
@@ -236,10 +249,22 @@ func (s *service) MarkTopicUsed(ctx context.Context, siteID, topicID int64) erro
 	return nil
 }
 
-func (s *service) GetOrGenerateVariation(ctx context.Context, siteID, originalID int64) (*entities.Topic, error) {
+func (s *service) GetOrGenerateVariation(ctx context.Context, providerID, siteID, originalID int64) (*entities.Topic, error) {
 	originalTopic, err := s.repo.GetByID(ctx, originalID)
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to get original topic")
+		return nil, err
+	}
+
+	provider, err := s.providerService.GetProvider(ctx, providerID)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get provider for variations")
+		return nil, err
+	}
+
+	client, err := ai.CreateClient(provider)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to create AI client for variations")
 		return nil, err
 	}
 
@@ -269,7 +294,7 @@ func (s *service) GetOrGenerateVariation(ctx context.Context, siteID, originalID
 		}
 	}
 
-	newVariation, err := s.ai.GenerateTopicVariation(ctx, originalTopic.Title, 1)
+	newVariation, err := client.GenerateTopicVariations(ctx, originalTopic.Title, 1)
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to generate topic variation")
 		return nil, err
@@ -336,7 +361,7 @@ func (s *service) getNextVariationTopic(ctx context.Context, job *entities.Job) 
 	}
 
 	originalTopicID := job.Topics[rand.Intn(len(job.Topics))]
-	variation, err := s.GetOrGenerateVariation(ctx, job.SiteID, originalTopicID)
+	variation, err := s.GetOrGenerateVariation(ctx, job.AIProviderID, job.SiteID, originalTopicID)
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to generate topic variation")
 		return nil, err
