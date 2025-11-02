@@ -1,40 +1,36 @@
 package handlers
 
 import (
-	"context"
-
 	"github.com/davidmovas/postulator/internal/domain/prompts"
 	"github.com/davidmovas/postulator/internal/dto"
-	"github.com/davidmovas/postulator/pkg/logger"
+	"github.com/davidmovas/postulator/pkg/ctx"
 )
 
 type PromptsHandler struct {
-	promptsService prompts.Service
-	logger         *logger.Logger
+	service prompts.Service
 }
 
-func NewPromptsHandler(promptsService prompts.Service, logger *logger.Logger) *PromptsHandler {
+func NewPromptsHandler(service prompts.Service) *PromptsHandler {
 	return &PromptsHandler{
-		promptsService: promptsService,
-		logger:         logger,
+		service: service,
 	}
 }
 
-func (h *PromptsHandler) CreatePrompt(ctx context.Context, prompt *dto.Prompt) *dto.Response[string] {
+func (h *PromptsHandler) CreatePrompt(prompt *dto.Prompt) *dto.Response[string] {
 	entity, err := prompt.ToEntity()
 	if err != nil {
 		return fail[string](err)
 	}
 
-	if err = h.promptsService.CreatePrompt(ctx, entity); err != nil {
+	if err = h.service.CreatePrompt(ctx.FastCtx(), entity); err != nil {
 		return fail[string](err)
 	}
 
 	return ok("Prompt created successfully")
 }
 
-func (h *PromptsHandler) GetPrompt(ctx context.Context, id int64) *dto.Response[*dto.Prompt] {
-	prompt, err := h.promptsService.GetPrompt(ctx, id)
+func (h *PromptsHandler) GetPrompt(id int64) *dto.Response[*dto.Prompt] {
+	prompt, err := h.service.GetPrompt(ctx.FastCtx(), id)
 	if err != nil {
 		return fail[*dto.Prompt](err)
 	}
@@ -42,8 +38,8 @@ func (h *PromptsHandler) GetPrompt(ctx context.Context, id int64) *dto.Response[
 	return ok(dto.NewPrompt(prompt))
 }
 
-func (h *PromptsHandler) ListPrompts(ctx context.Context) *dto.Response[[]*dto.Prompt] {
-	listPrompts, err := h.promptsService.ListPrompts(ctx)
+func (h *PromptsHandler) ListPrompts() *dto.Response[[]*dto.Prompt] {
+	listPrompts, err := h.service.ListPrompts(ctx.FastCtx())
 	if err != nil {
 		return fail[[]*dto.Prompt](err)
 	}
@@ -56,21 +52,21 @@ func (h *PromptsHandler) ListPrompts(ctx context.Context) *dto.Response[[]*dto.P
 	return ok(dtoPrompts)
 }
 
-func (h *PromptsHandler) UpdatePrompt(ctx context.Context, prompt *dto.Prompt) *dto.Response[string] {
+func (h *PromptsHandler) UpdatePrompt(prompt *dto.Prompt) *dto.Response[string] {
 	entity, err := prompt.ToEntity()
 	if err != nil {
 		return fail[string](err)
 	}
 
-	if err = h.promptsService.UpdatePrompt(ctx, entity); err != nil {
+	if err = h.service.UpdatePrompt(ctx.FastCtx(), entity); err != nil {
 		return fail[string](err)
 	}
 
 	return ok("Prompt updated successfully")
 }
 
-func (h *PromptsHandler) DeletePrompt(ctx context.Context, id int64) *dto.Response[string] {
-	if err := h.promptsService.DeletePrompt(ctx, id); err != nil {
+func (h *PromptsHandler) DeletePrompt(id int64) *dto.Response[string] {
+	if err := h.service.DeletePrompt(ctx.FastCtx(), id); err != nil {
 		return fail[string](err)
 	}
 
