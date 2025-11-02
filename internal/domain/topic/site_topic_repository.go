@@ -3,6 +3,7 @@ package topic
 import (
 	"context"
 
+	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/infra/database"
 	"github.com/davidmovas/postulator/pkg/dbx"
 	"github.com/davidmovas/postulator/pkg/errors"
@@ -70,7 +71,7 @@ func (r *siteTopicRepository) Unassign(ctx context.Context, siteID, topicID int6
 	return nil
 }
 
-func (r *siteTopicRepository) GetBySiteID(ctx context.Context, siteID int64) ([]*Topic, error) {
+func (r *siteTopicRepository) GetBySiteID(ctx context.Context, siteID int64) ([]*entities.Topic, error) {
 	query, args := dbx.ST.
 		Select("t.id", "t.title", "t.created_at").
 		From("topics t").
@@ -88,9 +89,9 @@ func (r *siteTopicRepository) GetBySiteID(ctx context.Context, siteID int64) ([]
 		_ = rows.Close()
 	}()
 
-	var topics []*Topic
+	var topics []*entities.Topic
 	for rows.Next() {
-		var topic Topic
+		var topic entities.Topic
 		err = rows.Scan(
 			&topic.ID,
 			&topic.Title,

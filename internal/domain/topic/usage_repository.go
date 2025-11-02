@@ -3,6 +3,7 @@ package topic
 import (
 	"context"
 
+	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/infra/database"
 	"github.com/davidmovas/postulator/pkg/dbx"
 	"github.com/davidmovas/postulator/pkg/errors"
@@ -66,9 +67,9 @@ func (r *usageRepository) IsUsed(ctx context.Context, siteID, topicID int64) (bo
 	return count > 0, nil
 }
 
-func (r *usageRepository) GetUnused(ctx context.Context, siteID int64, topicIDs []int64) ([]*Topic, error) {
+func (r *usageRepository) GetUnused(ctx context.Context, siteID int64, topicIDs []int64) ([]*entities.Topic, error) {
 	if len(topicIDs) == 0 {
-		return []*Topic{}, nil
+		return []*entities.Topic{}, nil
 	}
 
 	query, args := dbx.ST.
@@ -89,9 +90,9 @@ func (r *usageRepository) GetUnused(ctx context.Context, siteID int64, topicIDs 
 		_ = rows.Close()
 	}()
 
-	var topics []*Topic
+	var topics []*entities.Topic
 	for rows.Next() {
-		var topic Topic
+		var topic entities.Topic
 		err = rows.Scan(
 			&topic.ID,
 			&topic.Title,
@@ -139,7 +140,7 @@ func (r *usageRepository) CountUnused(ctx context.Context, siteID int64, topicID
 	return count, nil
 }
 
-func (r *usageRepository) GetNextUnused(ctx context.Context, siteID int64, topicIDs []int64) (*Topic, error) {
+func (r *usageRepository) GetNextUnused(ctx context.Context, siteID int64, topicIDs []int64) (*entities.Topic, error) {
 	if len(topicIDs) == 0 {
 		return nil, errors.NotFound("unused_topic", nil)
 	}
@@ -155,7 +156,7 @@ func (r *usageRepository) GetNextUnused(ctx context.Context, siteID int64, topic
 		Limit(1).
 		MustSql()
 
-	var topic Topic
+	var topic entities.Topic
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(
 		&topic.ID,
 		&topic.Title,

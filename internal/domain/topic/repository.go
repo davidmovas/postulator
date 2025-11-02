@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/infra/database"
 	"github.com/davidmovas/postulator/pkg/dbx"
 	"github.com/davidmovas/postulator/pkg/errors"
@@ -28,7 +29,7 @@ func NewRepository(db *database.DB, logger *logger.Logger) Repository {
 	}
 }
 
-func (r *repository) Create(ctx context.Context, topic *Topic) (*Topic, error) {
+func (r *repository) Create(ctx context.Context, topic *entities.Topic) (*entities.Topic, error) {
 	query, args := dbx.ST.
 		Insert("topics").
 		Columns("title").
@@ -53,9 +54,9 @@ func (r *repository) Create(ctx context.Context, topic *Topic) (*Topic, error) {
 	return topic, nil
 }
 
-func (r *repository) CreateBatch(ctx context.Context, topics ...*Topic) (*BatchResult, error) {
+func (r *repository) CreateBatch(ctx context.Context, topics ...*entities.Topic) (*entities.BatchResult, error) {
 	if len(topics) == 0 {
-		return &BatchResult{}, nil
+		return &entities.BatchResult{}, nil
 	}
 
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -66,7 +67,7 @@ func (r *repository) CreateBatch(ctx context.Context, topics ...*Topic) (*BatchR
 		_ = tx.Rollback()
 	}()
 
-	result := &BatchResult{
+	result := &entities.BatchResult{
 		SkippedTitles: make([]string, 0),
 	}
 
@@ -96,7 +97,7 @@ func (r *repository) CreateBatch(ctx context.Context, topics ...*Topic) (*BatchR
 	return result, nil
 }
 
-func (r *repository) GetByID(ctx context.Context, id int64) (*Topic, error) {
+func (r *repository) GetByID(ctx context.Context, id int64) (*entities.Topic, error) {
 	query, args := dbx.ST.
 		Select("id", "title", "created_at").
 		From("topics").
@@ -104,7 +105,7 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*Topic, error) {
 		Where(squirrel.Eq{"deleted_at": nil}).
 		MustSql()
 
-	var topic Topic
+	var topic entities.Topic
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(
 		&topic.ID,
 		&topic.Title,
@@ -121,7 +122,7 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*Topic, error) {
 	return &topic, nil
 }
 
-func (r *repository) GetAll(ctx context.Context) ([]*Topic, error) {
+func (r *repository) GetAll(ctx context.Context) ([]*entities.Topic, error) {
 	query, args := dbx.ST.
 		Select("id", "title", "created_at").
 		From("topics").
@@ -137,9 +138,9 @@ func (r *repository) GetAll(ctx context.Context) ([]*Topic, error) {
 		_ = rows.Close()
 	}()
 
-	var topics []*Topic
+	var topics []*entities.Topic
 	for rows.Next() {
-		var topic Topic
+		var topic entities.Topic
 		err = rows.Scan(
 			&topic.ID,
 			&topic.Title,
@@ -161,7 +162,7 @@ func (r *repository) GetAll(ctx context.Context) ([]*Topic, error) {
 	return topics, nil
 }
 
-func (r *repository) GetByTitle(ctx context.Context, title string) (*Topic, error) {
+func (r *repository) GetByTitle(ctx context.Context, title string) (*entities.Topic, error) {
 	query, args := dbx.ST.
 		Select("id", "title", "created_at").
 		From("topics").
@@ -169,7 +170,7 @@ func (r *repository) GetByTitle(ctx context.Context, title string) (*Topic, erro
 		Where(squirrel.Eq{"deleted_at": nil}).
 		MustSql()
 
-	var topic Topic
+	var topic entities.Topic
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(
 		&topic.ID,
 		&topic.Title,
@@ -186,7 +187,7 @@ func (r *repository) GetByTitle(ctx context.Context, title string) (*Topic, erro
 	return &topic, nil
 }
 
-func (r *repository) Update(ctx context.Context, topic *Topic) error {
+func (r *repository) Update(ctx context.Context, topic *entities.Topic) error {
 	query, args := dbx.ST.
 		Update("topics").
 		Set("title", topic.Title).
