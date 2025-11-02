@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
+	"github.com/davidmovas/postulator/internal/domain/sites"
 	"github.com/davidmovas/postulator/internal/domain/topic"
 	"github.com/davidmovas/postulator/pkg/di"
 	"github.com/davidmovas/postulator/pkg/errors"
@@ -13,8 +14,8 @@ import (
 var _ IImportService = (*ImportService)(nil)
 
 type ImportService struct {
-	topicService topic.IService
-	siteService  site.IService
+	topicService topic.Service
+	siteService  sites.Service
 	logger       *logger.Logger
 }
 

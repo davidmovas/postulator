@@ -13,9 +13,9 @@ const (
 type HealthStatus string
 
 const (
-	HealthStatusHealthy   HealthStatus = "healthy"
-	HealthStatusUnhealthy HealthStatus = "unhealthy"
-	HealthStatusUnknown   HealthStatus = "unknown"
+	HealthHealthy   HealthStatus = "healthy"
+	HealthUnhealthy HealthStatus = "unhealthy"
+	HealthUnknown   HealthStatus = "unknown"
 )
 
 type Site struct {
@@ -29,14 +29,4 @@ type Site struct {
 	HealthStatus    HealthStatus
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
-}
-
-type Category struct {
-	ID           int64
-	SiteID       int64
-	WPCategoryID int
-	Name         string
-	Slug         *string
-	Count        int
-	CreatedAt    time.Time
 }

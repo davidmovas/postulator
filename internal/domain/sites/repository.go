@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/infra/database"
 	"github.com/davidmovas/postulator/pkg/dbx"
 	"github.com/davidmovas/postulator/pkg/errors"
@@ -29,7 +30,7 @@ func NewRepository(db *database.DB, logger *logger.Logger) Repository {
 	}
 }
 
-func (r *repository) Create(ctx context.Context, site *Site) error {
+func (r *repository) Create(ctx context.Context, site *entities.Site) error {
 	query, args := dbx.ST.
 		Insert("sites").
 		Columns("name", "url", "wp_username", "wp_password", "status", "health_status").
@@ -53,7 +54,7 @@ func (r *repository) Create(ctx context.Context, site *Site) error {
 	return nil
 }
 
-func (r *repository) GetByID(ctx context.Context, id int64) (*Site, error) {
+func (r *repository) GetByID(ctx context.Context, id int64) (*entities.Site, error) {
 	query, args := dbx.ST.
 		Select(
 			"id",
@@ -71,7 +72,7 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*Site, error) {
 		Where(squirrel.Eq{"id": id}).
 		MustSql()
 
-	var site Site
+	var site entities.Site
 	var lastHealthCheck sql.NullTime
 
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(
@@ -101,7 +102,7 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*Site, error) {
 	return &site, nil
 }
 
-func (r *repository) GetAll(ctx context.Context) ([]*Site, error) {
+func (r *repository) GetAll(ctx context.Context) ([]*entities.Site, error) {
 	query, args := dbx.ST.
 		Select(
 			"id",
@@ -127,9 +128,9 @@ func (r *repository) GetAll(ctx context.Context) ([]*Site, error) {
 		_ = rows.Close()
 	}()
 
-	var sites []*Site
+	var sites []*entities.Site
 	for rows.Next() {
-		var site Site
+		var site entities.Site
 		var lastHealthCheck sql.NullTime
 
 		err = rows.Scan(
@@ -165,7 +166,7 @@ func (r *repository) GetAll(ctx context.Context) ([]*Site, error) {
 	return sites, nil
 }
 
-func (r *repository) GetByStatus(ctx context.Context, status Status) ([]*Site, error) {
+func (r *repository) GetByStatus(ctx context.Context, status entities.Status) ([]*entities.Site, error) {
 	query, args := dbx.ST.
 		Select(
 			"id",
@@ -192,9 +193,9 @@ func (r *repository) GetByStatus(ctx context.Context, status Status) ([]*Site, e
 		_ = rows.Close()
 	}()
 
-	var sites []*Site
+	var sites []*entities.Site
 	for rows.Next() {
-		var site Site
+		var site entities.Site
 		var lastHealthCheck sql.NullTime
 
 		err = rows.Scan(
@@ -230,7 +231,7 @@ func (r *repository) GetByStatus(ctx context.Context, status Status) ([]*Site, e
 	return sites, nil
 }
 
-func (r *repository) Update(ctx context.Context, site *Site) error {
+func (r *repository) Update(ctx context.Context, site *entities.Site) error {
 	query, args := dbx.ST.
 		Update("sites").
 		Set("name", site.Name).
@@ -286,7 +287,7 @@ func (r *repository) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (r *repository) UpdateHealthStatus(ctx context.Context, id int64, status HealthStatus, checkedAt time.Time) error {
+func (r *repository) UpdateHealthStatus(ctx context.Context, id int64, status entities.HealthStatus, checkedAt time.Time) error {
 	query, args := dbx.ST.
 		Update("sites").
 		Set("health_status", status).
