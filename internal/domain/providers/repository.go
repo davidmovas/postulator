@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/infra/database"
 	"github.com/davidmovas/postulator/pkg/dbx"
 	"github.com/davidmovas/postulator/pkg/errors"
@@ -28,7 +29,7 @@ func NewRepository(db *database.DB, logger *logger.Logger) Repository {
 	}
 }
 
-func (r *repository) Create(ctx context.Context, provider *Provider) error {
+func (r *repository) Create(ctx context.Context, provider *entities.Provider) error {
 	query, args := dbx.ST.
 		Insert("ai_providers").
 		Columns("name", "provider", "model", "api_key", "is_active").
@@ -52,14 +53,14 @@ func (r *repository) Create(ctx context.Context, provider *Provider) error {
 	return nil
 }
 
-func (r *repository) GetByID(ctx context.Context, id int64) (*Provider, error) {
+func (r *repository) GetByID(ctx context.Context, id int64) (*entities.Provider, error) {
 	query, args := dbx.ST.
 		Select("id", "name", "provider", "model", "api_key", "is_active", "created_at", "updated_at").
 		From("ai_providers").
 		Where(squirrel.Eq{"id": id}).
 		MustSql()
 
-	var provider Provider
+	var provider entities.Provider
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(
 		&provider.ID,
 		&provider.Name,
@@ -81,7 +82,7 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*Provider, error) {
 	return &provider, nil
 }
 
-func (r *repository) GetAll(ctx context.Context) ([]*Provider, error) {
+func (r *repository) GetAll(ctx context.Context) ([]*entities.Provider, error) {
 	query, args := dbx.ST.
 		Select(
 			"id",
@@ -105,9 +106,9 @@ func (r *repository) GetAll(ctx context.Context) ([]*Provider, error) {
 		_ = rows.Close()
 	}()
 
-	var providers []*Provider
+	var providers []*entities.Provider
 	for rows.Next() {
-		var provider Provider
+		var provider entities.Provider
 		err = rows.Scan(
 			&provider.ID,
 			&provider.Name,
@@ -134,7 +135,7 @@ func (r *repository) GetAll(ctx context.Context) ([]*Provider, error) {
 	return providers, nil
 }
 
-func (r *repository) GetActive(ctx context.Context) ([]*Provider, error) {
+func (r *repository) GetActive(ctx context.Context) ([]*entities.Provider, error) {
 	query, args := dbx.ST.
 		Select(
 			"id",
@@ -159,9 +160,9 @@ func (r *repository) GetActive(ctx context.Context) ([]*Provider, error) {
 		_ = rows.Close()
 	}()
 
-	var providers []*Provider
+	var providers []*entities.Provider
 	for rows.Next() {
-		var provider Provider
+		var provider entities.Provider
 		err = rows.Scan(
 			&provider.ID,
 			&provider.Name,
@@ -188,7 +189,7 @@ func (r *repository) GetActive(ctx context.Context) ([]*Provider, error) {
 	return providers, nil
 }
 
-func (r *repository) Update(ctx context.Context, provider *Provider) error {
+func (r *repository) Update(ctx context.Context, provider *entities.Provider) error {
 	query, args := dbx.ST.
 		Update("ai_providers").
 		Set("name", provider.Name).
