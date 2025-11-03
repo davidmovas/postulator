@@ -10,17 +10,18 @@ import (
 )
 
 type Config struct {
-	LogLevel    string `json:"logLevel"`
-	LogDir      string `json:"logDir"`
-	ConsoleOut  bool   `json:"consoleOut"`
-	PrettyPrint bool   `json:"prettyPrint"`
-	AppLogFile  string `json:"appLogFile"`
-	ErrLogFile  string `json:"errLogFile"`
+	LogLevel     string `json:"logLevel"`
+	LogDir       string `json:"logDir"`
+	DatabasePath string `json:"databasePath"`
+	ConsoleOut   bool   `json:"consoleOut"`
+	PrettyPrint  bool   `json:"prettyPrint"`
+	AppLogFile   string `json:"appLogFile"`
+	ErrLogFile   string `json:"errLogFile"`
 }
 
 func LoadConfig() (*Config, error) {
 	configPath := getHomePath()
-	var cfg = &Config{}
+	cfg := &Config{}
 
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		cfg = getDefaultConfig()
@@ -46,7 +47,7 @@ func LoadConfig() (*Config, error) {
 func SaveConfig(config *Config) error {
 	configPath := getHomePath()
 
-	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -55,7 +56,7 @@ func SaveConfig(config *Config) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err = os.WriteFile(configPath, data, 0644); err != nil {
+	if err = os.WriteFile(configPath, data, 0o644); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
@@ -68,7 +69,10 @@ func getHomePath() string {
 
 func getDefaultConfig() *Config {
 	return &Config{
-		LogLevel: "info",
-		LogDir:   filepath.Join(xdg.ConfigHome, "Postulator", "logs"),
+		LogLevel:     "info",
+		LogDir:       filepath.Join(xdg.ConfigHome, "Postulator", "logs"),
+		DatabasePath: filepath.Join(xdg.ConfigHome, "Postulator", "database.db"),
+		ConsoleOut:   true,
+		PrettyPrint:  true,
 	}
 }

@@ -1,218 +1,99 @@
 package wp
 
 import (
-	"Postulator/internal/domain/entities"
-	"Postulator/pkg/errors"
-	"bytes"
 	"context"
-	"encoding/base64"
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
-	"net/url"
-	"strings"
-	"time"
+	"sync"
+
+	"github.com/davidmovas/postulator/internal/domain/entities"
 )
 
-const (
-	requestTimeout = time.Second * 30
-	userAgent      = "WordPress-Go-Client/1.0"
-	apiPath        = "/wp-json/wp/v2/"
-)
+var _ Client = (*client)(nil)
 
-type Client struct {
-	httpClient *http.Client
-	userAgent  string
+type client struct {
+	mu     sync.RWMutex
+	client Client
 }
 
-func NewClient() *Client {
-	return &Client{
-		httpClient: &http.Client{
-			Timeout: requestTimeout,
-			Transport: &http.Transport{
-				TLSHandshakeTimeout: 10 * time.Second,
-			},
-		},
-		userAgent: userAgent,
+func NewClient() Client {
+	return &client{
+		client: NewRestyClient(),
 	}
 }
 
-func (c *Client) CheckHealth(ctx context.Context, site *entities.Site) error {
-	endpoint := c.getAPIURL(site.URL, "")
-
-	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
-	if err != nil {
-		return errors.WordPress("error while requesting", err)
-	}
-
-	c.setAppPasswordAuth(req, site.WPUsername, site.WPPassword)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return errors.WordPress("error while requesting", err)
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return errors.WordPress(fmt.Sprintf("WordPress API respond with code: %d", resp.StatusCode), nil)
-	}
-
-	return nil
+func (c *client) UseRestyClient() Client {
+	resty := NewRestyClient()
+	c.mu.Lock()
+	c.client = resty
+	c.mu.Unlock()
+	return resty
 }
 
-func (c *Client) GetCategories(ctx context.Context, s *entities.Site) ([]*entities.Category, error) {
-	endpoint := c.getAPIURL(s.URL, "categories")
-
-	u, err := url.Parse(endpoint)
-	if err != nil {
-		return nil, errors.WordPress("failed to parse URL", err)
-	}
-
-	q := u.Query()
-	q.Set("per_page", "100")
-	q.Set("orderby", "name")
-	u.RawQuery = q.Encode()
-
-	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
-	if err != nil {
-		return nil, errors.WordPress("failed to create request", err)
-	}
-
-	c.setAppPasswordAuth(req, s.WPUsername, s.WPPassword)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errors.WordPress("failed to make request", err)
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, errors.WordPress(fmt.Sprintf("wordpress API returned status %d: %s", resp.StatusCode, string(body)), nil)
-	}
-
-	var wpCategories []wpCategory
-	if err = json.NewDecoder(resp.Body).Decode(&wpCategories); err != nil {
-		return nil, errors.WordPress("failed to decode categories", err)
-	}
-
-	categories := make([]*entities.Category, 0, len(wpCategories))
-	for _, wpCat := range wpCategories {
-		categories = append(categories, &entities.Category{
-			WPCategoryID: wpCat.ID,
-			Name:         wpCat.Name,
-			Slug:         &wpCat.Slug,
-			Count:        wpCat.Count,
-		})
-	}
-
-	return categories, nil
+func (c *client) UseCustomClient(client Client) {
+	c.mu.Lock()
+	c.client = client
+	c.mu.Unlock()
 }
 
-func (c *Client) PublishPost(ctx context.Context, site *entities.Site, title, content, status string, categoryID int) (postID int, postURL string, err error) {
-	endpoint := c.getAPIURL(site.URL, "posts")
-
-	postData := map[string]any{
-		"title":      title,
-		"content":    content,
-		"status":     status,
-		"categories": []int{categoryID},
-	}
-
-	jsonData, err := json.Marshal(postData)
-	if err != nil {
-		return 0, "", errors.WordPress("failed to marshal post data", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(jsonData))
-	if err != nil {
-		return 0, "", errors.WordPress("failed to create request", err)
-	}
-
-	c.setAppPasswordAuth(req, site.WPUsername, site.WPPassword)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return 0, "", errors.WordPress("failed to make request", err)
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
-		return 0, "", errors.WordPress(fmt.Sprintf("wordpress API returned status %d: %s", resp.StatusCode, string(body)), nil)
-	}
-
-	var createdPost wpPost
-	if err = json.NewDecoder(resp.Body).Decode(&createdPost); err != nil {
-		return 0, "", errors.WordPress("failed to decode post response", err)
-	}
-
-	return createdPost.ID, createdPost.Link, nil
-}
-func (c *Client) getAPIURL(siteURL, endpoint string) string {
-	baseURL := strings.TrimSuffix(siteURL, "/")
-
-	if strings.HasPrefix(endpoint, "/") {
-		return baseURL + endpoint
-	}
-
-	return baseURL + apiPath + endpoint
+func (c *client) GetCurrentClient() Client {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.client
 }
 
-func (c *Client) setAppPasswordAuth(req *http.Request, username, appPassword string) {
-	auth := username + ":" + appPassword
-	basicAuth := "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
-	req.Header.Set("Authorization", basicAuth)
-	req.Header.Set("User-Agent", c.userAgent)
+func (c *client) EnableProxy(proxyURL string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if rc, ok := c.client.(*restyClient); ok {
+		rc.WithProxy(proxyURL)
+	}
 }
 
-func (c *Client) CreateApplicationPassword(ctx context.Context, site *entities.Site, appName string) (string, error) {
-	endpoint := c.getAPIURL(site.URL, "users/me/application-passwords")
+func (c *client) DisableProxy() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	passwordData := map[string]string{
-		"name": appName,
+	if rc, ok := c.client.(*restyClient); ok {
+		rc.WithoutProxy()
 	}
+}
 
-	jsonData, err := json.Marshal(passwordData)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal password data: %w", err)
-	}
+func (c *client) CheckHealth(ctx context.Context, site *entities.Site) (entities.HealthStatus, error) {
+	return c.GetCurrentClient().CheckHealth(ctx, site)
+}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, strings.NewReader(string(jsonData)))
-	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
-	}
+func (c *client) GetCategories(ctx context.Context, s *entities.Site) ([]*entities.Category, error) {
+	return c.GetCurrentClient().GetCategories(ctx, s)
+}
 
-	c.setAppPasswordAuth(req, site.WPUsername, site.WPPassword)
-	req.Header.Set("Content-Type", "application/json")
+func (c *client) CreateCategory(ctx context.Context, s *entities.Site, category *entities.Category) error {
+	return c.GetCurrentClient().CreateCategory(ctx, s, category)
+}
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to make request: %w", err)
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
+func (c *client) UpdateCategory(ctx context.Context, s *entities.Site, category *entities.Category) error {
+	return c.GetCurrentClient().UpdateCategory(ctx, s, category)
+}
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to create application password: status %d", resp.StatusCode)
-	}
+func (c *client) DeleteCategory(ctx context.Context, s *entities.Site, wpCategoryID int) error {
+	return c.GetCurrentClient().DeleteCategory(ctx, s, wpCategoryID)
+}
 
-	var result struct {
-		Password string `json:"password"`
-	}
+func (c *client) GetPost(ctx context.Context, s *entities.Site, postID int) (*entities.Article, error) {
+	return c.GetCurrentClient().GetPost(ctx, s, postID)
+}
 
-	if err = json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("failed to decode response: %w", err)
-	}
+func (c *client) GetPosts(ctx context.Context, s *entities.Site) ([]*entities.Article, error) {
+	return c.GetCurrentClient().GetPosts(ctx, s)
+}
 
-	return result.Password, nil
+func (c *client) CreatePost(ctx context.Context, s *entities.Site, article *entities.Article) (int, error) {
+	return c.GetCurrentClient().CreatePost(ctx, s, article)
+}
+
+func (c *client) UpdatePost(ctx context.Context, s *entities.Site, article *entities.Article) error {
+	return c.GetCurrentClient().UpdatePost(ctx, s, article)
+}
+
+func (c *client) DeletePost(ctx context.Context, s *entities.Site, postID int) error {
+	return c.GetCurrentClient().DeletePost(ctx, s, postID)
 }

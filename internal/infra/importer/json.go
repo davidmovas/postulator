@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"Postulator/pkg/errors"
+	"github.com/davidmovas/postulator/pkg/errors"
 )
 
 var _ FileParser = (*JsonParser)(nil)

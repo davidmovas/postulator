@@ -1,19 +1,17 @@
 package ai
 
-import "context"
+import (
+	"context"
+)
 
-type IClient interface {
-	GenerateArticle(ctx context.Context, systemPrompt, userPrompt string) (string, error)
+type Client interface {
+	GenerateArticle(ctx context.Context, systemPrompt, userPrompt string) (*ArticleResult, error)
+	GenerateTopicVariations(ctx context.Context, topic string, amount int) ([]string, error)
 }
 
-var _ IClient = (*Client)(nil)
-
-type Client struct{}
-
-func NewClient() *Client {
-	return &Client{}
-}
-
-func (c *Client) GenerateArticle(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
-	return "", nil
+type ArticleResult struct {
+	Title      string
+	Content    string
+	TokensUsed int
+	Cost       float64
 }

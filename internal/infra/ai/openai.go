@@ -1,25 +1,177 @@
 package ai
 
 import (
-	"Postulator/internal/domain/entities"
-	"Postulator/pkg/errors"
 	"context"
 	"encoding/json"
 	"fmt"
 
+	"github.com/davidmovas/postulator/pkg/errors"
+
 	"github.com/invopop/jsonschema"
-	"github.com/openai/openai-go/v3"
+	openaiSDK "github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 )
 
-const provider = "OpenAI"
+const providerName = "OpenAI"
+
+var _ Client = (*OpenAIClient)(nil)
 
 type ArticleContent struct {
 	Title   string `json:"title" jsonschema_description:"Article title, should be engaging and SEO-friendly"`
 	Content string `json:"content" jsonschema_description:"Full article content in HTML format with proper WordPress blocks"`
 }
 
-func GenerateSchema[T any]() interface{} {
+type TopicVariations struct {
+	Variations []string `json:"variations" jsonschema_description:"List of topic variations"`
+}
+
+type Config struct {
+	APIKey  string
+	Model   string
+	BaseURL string
+}
+
+type OpenAIClient struct {
+	client *openaiSDK.Client
+	model  openaiSDK.ChatModel
+}
+
+func NewOpenAIClient(cfg Config) (*OpenAIClient, error) {
+	if cfg.APIKey == "" {
+		return nil, errors.Validation("OpenAI API key is required")
+	}
+
+	if cfg.Model == "" {
+		cfg.Model = openaiSDK.ChatModelGPT4oMini
+	}
+
+	opts := []option.RequestOption{
+		option.WithAPIKey(cfg.APIKey),
+	}
+
+	if cfg.BaseURL != "" {
+		opts = append(opts, option.WithBaseURL(cfg.BaseURL))
+	}
+
+	client := openaiSDK.NewClient(opts...)
+
+	return &OpenAIClient{
+		client: &client,
+		model:  cfg.Model,
+	}, nil
+}
+
+func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPrompt string) (*ArticleResult, error) {
+	schema := generateSchema[ArticleContent]()
+
+	schemaParam := openaiSDK.ResponseFormatJSONSchemaJSONSchemaParam{
+		Name:        "article_content",
+		Description: openaiSDK.String("Generated article with title and content in HTML format"),
+		Schema:      schema,
+		Strict:      openaiSDK.Bool(true),
+	}
+
+	messages := []openaiSDK.ChatCompletionMessageParamUnion{
+		openaiSDK.SystemMessage(systemPrompt),
+		openaiSDK.UserMessage(userPrompt),
+	}
+
+	chat, err := c.client.Chat.Completions.New(ctx, openaiSDK.ChatCompletionNewParams{
+		Messages: messages,
+		ResponseFormat: openaiSDK.ChatCompletionNewParamsResponseFormatUnion{
+			OfJSONSchema: &openaiSDK.ResponseFormatJSONSchemaParam{
+				JSONSchema: schemaParam,
+			},
+		},
+		Model:       c.model,
+		Temperature: openaiSDK.Float(0.7),
+		MaxTokens:   openaiSDK.Int(4096),
+	})
+	if err != nil {
+		return nil, errors.AI(providerName, fmt.Errorf("API error: %w", err))
+	}
+
+	if len(chat.Choices) == 0 {
+		return nil, errors.AI(providerName, fmt.Errorf("no response from API"))
+	}
+
+	content := chat.Choices[0].Message.Content
+	var article ArticleContent
+	if err = json.Unmarshal([]byte(content), &article); err != nil {
+		return nil, errors.AI(providerName, fmt.Errorf("failed to parse response: %w", err))
+	}
+
+	if article.Title == "" || article.Content == "" {
+		return nil, errors.AI(providerName, fmt.Errorf("empty title or content in response"))
+	}
+
+	inputTokens := chat.Usage.PromptTokens
+	outputTokens := chat.Usage.CompletionTokens
+	cost := CalculateCost("openai", c.model, int(inputTokens), int(outputTokens))
+
+	return &ArticleResult{
+		Title:      article.Title,
+		Content:    article.Content,
+		TokensUsed: int(chat.Usage.TotalTokens),
+		Cost:       cost,
+	}, nil
+}
+
+func (c *OpenAIClient) GenerateTopicVariations(ctx context.Context, topic string, amount int) ([]string, error) {
+	schema := generateSchema[TopicVariations]()
+
+	schemaParam := openaiSDK.ResponseFormatJSONSchemaJSONSchemaParam{
+		Name:        "topic_variations",
+		Description: openaiSDK.String("Generated topic variations"),
+		Schema:      schema,
+		Strict:      openaiSDK.Bool(true),
+	}
+
+	systemPrompt := "You are a helpful assistant that generates creative topic variations. Each variation should be unique but related to the original topic."
+	userPrompt := fmt.Sprintf("Generate %d variations of the following topic:\n\n'%s'\n\nEach variation should be:\n- Unique and interesting\n- Related to the original topic\n- Suitable for a blog article\n- SEO-friendly", amount, topic)
+
+	messages := []openaiSDK.ChatCompletionMessageParamUnion{
+		openaiSDK.SystemMessage(systemPrompt),
+		openaiSDK.UserMessage(userPrompt),
+	}
+
+	chat, err := c.client.Chat.Completions.New(ctx, openaiSDK.ChatCompletionNewParams{
+		Messages: messages,
+		ResponseFormat: openaiSDK.ChatCompletionNewParamsResponseFormatUnion{
+			OfJSONSchema: &openaiSDK.ResponseFormatJSONSchemaParam{
+				JSONSchema: schemaParam,
+			},
+		},
+		Model:       c.model,
+		Temperature: openaiSDK.Float(0.8),
+		MaxTokens:   openaiSDK.Int(1024),
+	})
+	if err != nil {
+		return nil, errors.AI(providerName, fmt.Errorf("API error: %w", err))
+	}
+
+	if len(chat.Choices) == 0 {
+		return nil, errors.AI(providerName, fmt.Errorf("no response from API"))
+	}
+
+	content := chat.Choices[0].Message.Content
+	var result TopicVariations
+	if err = json.Unmarshal([]byte(content), &result); err != nil {
+		return nil, errors.AI(providerName, fmt.Errorf("failed to parse variations: %w", err))
+	}
+
+	if len(result.Variations) == 0 {
+		return nil, errors.AI(providerName, fmt.Errorf("no variations generated"))
+	}
+
+	if len(result.Variations) > amount {
+		result.Variations = result.Variations[:amount]
+	}
+
+	return result.Variations, nil
+}
+
+func generateSchema[T any]() interface{} {
 	reflector := jsonschema.Reflector{
 		AllowAdditionalProperties: false,
 		DoNotReference:            true,
@@ -27,97 +179,4 @@ func GenerateSchema[T any]() interface{} {
 	var v T
 	schema := reflector.Reflect(v)
 	return schema
-}
-
-var ArticleResponseSchema = GenerateSchema[ArticleContent]()
-
-var _ IClient = (*OpenAIClient)(nil)
-
-type OpenAIClient struct {
-	client *openai.Client
-	model  openai.ChatModel
-}
-
-type OpenAIConfig struct {
-	APIKey  string
-	Model   string
-	BaseURL string
-}
-
-func NewOpenAIClient(config OpenAIConfig) (*OpenAIClient, error) {
-	if config.APIKey == "" {
-		return nil, fmt.Errorf("OpenAI API key is required")
-	}
-
-	if config.Model == "" {
-		config.Model = openai.ChatModelGPT4oMini
-	}
-
-	client := openai.NewClient(option.WithAPIKey(config.APIKey))
-
-	return &OpenAIClient{
-		client: &client,
-		model:  getOpenAIModel(config.Model),
-	}, nil
-}
-
-func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
-	schemaParam := openai.ResponseFormatJSONSchemaJSONSchemaParam{
-		Name:        "article_content",
-		Description: openai.String("Generated article with title, content and summary"),
-		Schema:      ArticleResponseSchema,
-		Strict:      openai.Bool(true),
-	}
-
-	messages := []openai.ChatCompletionMessageParamUnion{
-		openai.SystemMessage(systemPrompt),
-		openai.UserMessage(userPrompt),
-	}
-
-	chat, err := c.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Messages: messages,
-		ResponseFormat: openai.ChatCompletionNewParamsResponseFormatUnion{
-			OfJSONSchema: &openai.ResponseFormatJSONSchemaParam{
-				JSONSchema: schemaParam,
-			},
-		},
-		Model:       c.model,
-		Temperature: openai.Float(0.7),
-		MaxTokens:   openai.Int(4000),
-	})
-
-	if err != nil {
-		return "", errors.AI(provider, fmt.Errorf("OpenAI API error: %w", err))
-	}
-
-	if len(chat.Choices) == 0 {
-		return "", errors.AI(provider, fmt.Errorf("no response from OpenAI"))
-	}
-
-	content := chat.Choices[0].Message.Content
-	var article ArticleContent
-	if err = json.Unmarshal([]byte(content), &article); err != nil {
-		return "", errors.AI(provider, fmt.Errorf("failed to parse AI response: %w", err))
-	}
-
-	return c.formatArticle(article), nil
-}
-
-func (c *OpenAIClient) formatArticle(article ArticleContent) string {
-	return article.Content
-}
-
-type ArticleRequest struct {
-	ID           int64
-	SystemPrompt string
-	UserPrompt   string
-}
-
-func getOpenAIModel(model string) openai.ChatModel {
-	switch entities.AIModel(model) {
-	case entities.ModelGPT4OMini:
-		return openai.ChatModelGPT4oMini
-	default:
-		return model
-	}
 }

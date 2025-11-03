@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"Postulator/pkg/errors"
+	"github.com/davidmovas/postulator/pkg/errors"
 )
 
 func GetParser(filePath string) (FileParser, error) {

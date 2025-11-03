@@ -32,3 +32,9 @@ clean:
 	@go clean -testcache
 	@if exist coverage.out del /F /Q coverage.out
 	@echo "Done."
+
+go-lint:
+	golangci-lint run ./...
+
+go-fmt:
+	 gofumpt -l -w .

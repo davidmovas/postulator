@@ -1,12 +1,13 @@
 package main
 
 import (
-	"Postulator/internal/app"
-	"Postulator/internal/config"
 	"context"
 	"embed"
 	"log"
 	"os"
+
+	"github.com/davidmovas/postulator/internal/app"
+	"github.com/davidmovas/postulator/internal/config"
 
 	"github.com/getlantern/systray"
 	"github.com/wailsapp/wails/v2"
@@ -68,7 +69,7 @@ func onReady(ctx context.Context, app *app.App) {
 }
 
 func onExit(_ context.Context, app *app.App) {
-	app.Stop()
+	_ = app.Stop()
 }
 
 func main() {
@@ -124,10 +125,10 @@ func main() {
 		Logger:           nil,
 		LogLevel:         logger.DEBUG,
 		OnStartup:        func(ctx context.Context) { wailsCtx = ctx },
-		OnShutdown:       func(ctx context.Context) { appInst.Stop() },
+		OnShutdown:       func(ctx context.Context) { _ = appInst.Stop() },
 		WindowStartState: options.Normal,
 		Bind: []interface{}{
-			appInst,
+			appInst.GetBinds(),
 		},
 		DragAndDrop: &options.DragAndDrop{
 			EnableFileDrop: true,
@@ -156,7 +157,6 @@ func main() {
 			},
 		},
 	})
-
 	if err != nil {
 		log.Fatal(err)
 	}
