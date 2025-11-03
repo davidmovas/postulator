@@ -109,11 +109,17 @@ func (s *service) RenderPrompt(ctx context.Context, promptID int64, placeholders
 }
 
 func (s *service) ValidatePlaceholders(prompt *entities.Prompt, provided map[string]string) error {
+	var missingPlaceholders []string
+
 	for _, placeholder := range prompt.Placeholders {
 		value, exists := provided[placeholder]
 		if !exists || strings.TrimSpace(value) == "" {
-			return errors.Validation("Missing value for placeholder: " + placeholder)
+			missingPlaceholders = append(missingPlaceholders, placeholder)
 		}
+	}
+
+	if len(missingPlaceholders) > 0 {
+		return errors.Validation("Missing placeholders: " + strings.Join(missingPlaceholders, ", "))
 	}
 
 	return nil

@@ -218,6 +218,7 @@ export namespace dto {
 	    siteId: number;
 	    promptId: number;
 	    aiProviderId: number;
+	    placeholdersValues: Record<string, string>;
 	    topicStrategy: string;
 	    categoryStrategy: string;
 	    requiresValidation: boolean;
@@ -242,6 +243,7 @@ export namespace dto {
 	        this.siteId = source["siteId"];
 	        this.promptId = source["promptId"];
 	        this.aiProviderId = source["aiProviderId"];
+	        this.placeholdersValues = source["placeholdersValues"];
 	        this.topicStrategy = source["topicStrategy"];
 	        this.categoryStrategy = source["categoryStrategy"];
 	        this.requiresValidation = source["requiresValidation"];

@@ -6,6 +6,7 @@ export interface Job {
     siteId: number;
     promptId: number;
     aiProviderId: number;
+    placeholdersValues:  Record<string, string>;
     topicStrategy: string;
     categoryStrategy: string;
     requiresValidation: boolean;
@@ -25,6 +26,7 @@ export interface JobCreateInput {
     siteId: number;
     promptId: number;
     aiProviderId: number;
+    placeholdersValues:  Record<string, string>;
     topicStrategy: string;
     categoryStrategy: string;
     requiresValidation: boolean;
@@ -77,6 +79,7 @@ export function mapJob(x: dto.Job): Job {
         siteId: x.siteId,
         promptId: x.promptId,
         aiProviderId: x.aiProviderId,
+        placeholdersValues: x.placeholdersValues,
         topicStrategy: x.topicStrategy,
         categoryStrategy: x.categoryStrategy,
         requiresValidation: x.requiresValidation,
