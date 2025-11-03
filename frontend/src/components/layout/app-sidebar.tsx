@@ -24,10 +24,10 @@ import {
     RemixiconComponentType,
     RiChatAiLine,
     RiDashboard2Line,
-    RiLightbulbLine,
+    RiLightbulbLine, RiArticleLine, RiChatThreadLine,
 } from "@remixicon/react";
 
-const APP_VERSION = "v0.1.0";
+const APP_VERSION = "v1.0.0";
 
 type NavItem = {
     title: string;
@@ -47,9 +47,11 @@ const navItems: NavGroup[] = [
             { title: "Dashboard", href: "/dashboard", icon: RiDashboard2Line },
             { title: "Jobs", href: "/jobs", icon: RiTimerLine },
             { title: "Sites", href: "/sites", icon: RiGlobalLine },
+            { title: "Articles", href: "/articles", icon: RiArticleLine },
+            { title: "Categories", href: "/categories", icon: RiChatThreadLine },
             { title: "Topics", href: "/topics", icon: RiLightbulbLine },
             { title: "Prompts", href: "/prompts", icon: RiChatAiLine },
-            { title: "AI Providers", href: "/ai-providers", icon: RiBardLine },
+            { title: "Providers", href: "/providers", icon: RiBardLine },
             { title: "Settings", href: "/settings", icon: RiSettings3Line },
         ],
     },

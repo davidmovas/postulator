@@ -14,9 +14,11 @@ const titleMap: Record<string, string> = {
     dashboard: "Dashboard",
     jobs: "Jobs",
     sites: "Sites",
+    articles: "Articles",
+    categories: "Categories",
     topics: "Topics",
     prompts: "Prompts",
-    "ai-providers": "AI Providers",
+    providers: "Providers",
     settings: "Settings",
 };
 
