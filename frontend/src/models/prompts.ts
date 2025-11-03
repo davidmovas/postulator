@@ -17,6 +17,10 @@ export interface PromptCreateInput {
     placeholders: string[];
 }
 
+export interface PromptUpdateInput extends Partial<PromptCreateInput> {
+    id: number;
+}
+
 export function mapPrompt(x: dto.Prompt): Prompt {
     return {
         id: x.id,

@@ -39,6 +39,11 @@ export interface ArticleCreateInput {
     wpCategoryIds: number[];
 }
 
+export interface ArticleUpdateInput extends Partial<ArticleCreateInput> {
+    id: number;
+    status?: string;
+}
+
 export function mapArticle(x: dto.Article): Article {
     return {
         id: x.id,

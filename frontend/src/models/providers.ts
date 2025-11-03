@@ -19,6 +19,10 @@ export interface ProviderCreateInput {
     isActive: boolean;
 }
 
+export interface ProviderUpdateInput extends Partial<ProviderCreateInput> {
+    id: number;
+}
+
 export interface Model {
     id: string;
     name: string;

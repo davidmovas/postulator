@@ -35,6 +35,11 @@ export interface JobCreateInput {
     topics: number[];
 }
 
+export interface JobUpdateInput extends Partial<JobCreateInput> {
+    id: number;
+    status?: string;
+}
+
 export interface Schedule {
     type: string;
     config: any;

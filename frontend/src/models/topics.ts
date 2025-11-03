@@ -10,6 +10,10 @@ export interface TopicCreateInput {
     title: string;
 }
 
+export interface TopicUpdateInput extends Partial<TopicCreateInput> {
+    id: number;
+}
+
 export interface BatchResult {
     created: number;
     skipped: number;

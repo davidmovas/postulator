@@ -20,6 +20,10 @@ export interface CategoryCreateInput {
     description?: string;
 }
 
+export interface CategoryUpdateInput extends Partial<CategoryCreateInput> {
+    id: number;
+}
+
 export interface Statistics {
     categoryId: number;
     date: string;
