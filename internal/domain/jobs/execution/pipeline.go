@@ -231,19 +231,13 @@ func (e *Executor) stepRenderPrompt(ctx context.Context, pctx *pipelineContext) 
 		return fmt.Errorf("failed to get prompt: %w", err)
 	}
 
-	placeholders := map[string]string{
-		"title":     pctx.Topic.Title,
-		"site_name": pctx.Site.Name,
-		"site_url":  pctx.Site.URL,
-		"category":  pctx.Category.Name,
-	}
+	pctx.Prompt = prompt
 
-	systemPrompt, userPrompt, err := e.promptService.RenderPrompt(ctx, prompt.ID, placeholders)
+	systemPrompt, userPrompt, err := e.promptService.RenderPrompt(ctx, prompt.ID, e.buildPlaceholders(pctx))
 	if err != nil {
 		return fmt.Errorf("failed to render prompt: %w", err)
 	}
 
-	pctx.Prompt = prompt
 	pctx.SystemPrompt = systemPrompt
 	pctx.UserPrompt = userPrompt
 
@@ -251,6 +245,27 @@ func (e *Executor) stepRenderPrompt(ctx context.Context, pctx *pipelineContext) 
 		pctx.Job.ID, len(systemPrompt), len(userPrompt))
 
 	return nil
+}
+
+func (e *Executor) buildPlaceholders(pctx *pipelineContext) map[string]string {
+	placeholders := make(map[string]string)
+
+	for _, placeholder := range pctx.Prompt.Placeholders {
+		placeholders[placeholder] = ""
+	}
+
+	placeholders["title"] = pctx.Topic.Title
+	placeholders["site_name"] = pctx.Site.Name
+	placeholders["site_url"] = pctx.Site.URL
+	placeholders["category"] = pctx.Category.Name
+
+	if pctx.Job.PlaceholdersValues != nil {
+		for placeholder, value := range pctx.Job.PlaceholdersValues {
+			placeholders[placeholder] = value
+		}
+	}
+
+	return placeholders
 }
 
 func (e *Executor) stepGenerateAI(ctx context.Context, pctx *pipelineContext) error {

@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/Masterminds/squirrel"
@@ -29,7 +30,7 @@ func NewRepository(db *database.DB, logger *logger.Logger) Repository {
 }
 
 func (r *repository) Create(ctx context.Context, job *entities.Job) error {
-	var scheduleConfigJSON []byte
+	var scheduleConfigJSON, placeholdersJSON []byte
 	var err error
 
 	if job.Schedule != nil && job.Schedule.Config != nil {
@@ -38,18 +39,27 @@ func (r *repository) Create(ctx context.Context, job *entities.Job) error {
 		scheduleConfigJSON = []byte("{}")
 	}
 
+	if job.PlaceholdersValues != nil {
+		placeholdersJSON, err = json.Marshal(job.PlaceholdersValues)
+		if err != nil {
+			return errors.Database(err)
+		}
+	} else {
+		placeholdersJSON = []byte("{}")
+	}
+
 	query, args := dbx.ST.
 		Insert("jobs").
 		Columns(
 			"name", "site_id", "prompt_id", "ai_provider_id",
-			"topic_strategy", "category_strategy", "requires_validation",
-			"schedule_type", "schedule_config",
+			"placeholders_values", "topic_strategy", "category_strategy",
+			"requires_validation", "schedule_type", "schedule_config",
 			"jitter_enabled", "jitter_minutes", "status",
 		).
 		Values(
 			job.Name, job.SiteID, job.PromptID, job.AIProviderID,
-			job.TopicStrategy, job.CategoryStrategy, job.RequiresValidation,
-			job.Schedule.Type, scheduleConfigJSON,
+			placeholdersJSON, job.TopicStrategy, job.CategoryStrategy,
+			job.RequiresValidation, job.Schedule.Type, scheduleConfigJSON,
 			job.JitterEnabled, job.JitterMinutes, job.Status,
 		).
 		MustSql()
@@ -99,8 +109,8 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*entities.Job, erro
 	query, args := dbx.ST.
 		Select(
 			"id", "name", "site_id", "prompt_id", "ai_provider_id",
-			"topic_strategy", "category_strategy", "requires_validation",
-			"schedule_type", "schedule_config",
+			"placeholders_values", "topic_strategy", "category_strategy",
+			"requires_validation", "schedule_type", "schedule_config",
 			"jitter_enabled", "jitter_minutes", "status",
 			"created_at", "updated_at",
 		).
@@ -236,8 +246,17 @@ func (r *repository) GetDue(ctx context.Context, before time.Time) ([]*entities.
 }
 
 func (r *repository) Update(ctx context.Context, job *entities.Job) error {
-	var scheduleConfigJSON []byte
+	var scheduleConfigJSON, placeholdersJSON []byte
 	var err error
+
+	if job.PlaceholdersValues != nil {
+		placeholdersJSON, err = json.Marshal(job.PlaceholdersValues)
+		if err != nil {
+			return errors.Database(err)
+		}
+	} else {
+		placeholdersJSON = []byte("{}")
+	}
 
 	if job.Schedule != nil && job.Schedule.Config != nil {
 		scheduleConfigJSON = job.Schedule.Config
@@ -251,6 +270,7 @@ func (r *repository) Update(ctx context.Context, job *entities.Job) error {
 		Set("site_id", job.SiteID).
 		Set("prompt_id", job.PromptID).
 		Set("ai_provider_id", job.AIProviderID).
+		Set("placeholders_values", placeholdersJSON).
 		Set("topic_strategy", job.TopicStrategy).
 		Set("category_strategy", job.CategoryStrategy).
 		Set("requires_validation", job.RequiresValidation).
@@ -466,7 +486,7 @@ func (r *repository) GetTopics(ctx context.Context, jobID int64) ([]int64, error
 
 func (r *repository) scanJob(query string, args []interface{}, ctx context.Context) (*entities.Job, error) {
 	var job entities.Job
-	var scheduleConfigJSON []byte
+	var scheduleConfigJSON, placeholdersJSON []byte
 
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(
 		&job.ID,
@@ -474,6 +494,7 @@ func (r *repository) scanJob(query string, args []interface{}, ctx context.Conte
 		&job.SiteID,
 		&job.PromptID,
 		&job.AIProviderID,
+		&placeholdersJSON,
 		&job.TopicStrategy,
 		&job.CategoryStrategy,
 		&job.RequiresValidation,
@@ -487,6 +508,14 @@ func (r *repository) scanJob(query string, args []interface{}, ctx context.Conte
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(placeholdersJSON) > 0 {
+		placeholderValues := make(map[string]string)
+		if err = json.Unmarshal(placeholdersJSON, &placeholderValues); err != nil {
+			return nil, errors.Database(err)
+		}
+		job.PlaceholdersValues = placeholderValues
 	}
 
 	if len(scheduleConfigJSON) > 0 {
@@ -511,7 +540,7 @@ func (r *repository) scanJobs(query string, args []interface{}, ctx context.Cont
 	var jobs []*entities.Job
 	for rows.Next() {
 		var job entities.Job
-		var scheduleConfigJSON []byte
+		var scheduleConfigJSON, placeholdersJSON []byte
 
 		err = rows.Scan(
 			&job.ID,
@@ -519,6 +548,7 @@ func (r *repository) scanJobs(query string, args []interface{}, ctx context.Cont
 			&job.SiteID,
 			&job.PromptID,
 			&job.AIProviderID,
+			&placeholdersJSON,
 			&job.TopicStrategy,
 			&job.CategoryStrategy,
 			&job.RequiresValidation,
@@ -532,6 +562,14 @@ func (r *repository) scanJobs(query string, args []interface{}, ctx context.Cont
 		)
 		if err != nil {
 			return nil, errors.Database(err)
+		}
+
+		if len(placeholdersJSON) > 0 {
+			placeholderValues := make(map[string]string)
+			if err = json.Unmarshal(placeholdersJSON, &placeholderValues); err != nil {
+				return nil, errors.Database(err)
+			}
+			job.PlaceholdersValues = placeholderValues
 		}
 
 		if len(scheduleConfigJSON) > 0 {

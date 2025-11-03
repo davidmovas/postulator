@@ -34,6 +34,7 @@ type Job struct {
 	SiteID             int64
 	PromptID           int64
 	AIProviderID       int64
+	PlaceholdersValues map[string]string
 	TopicStrategy      TopicStrategy
 	CategoryStrategy   CategoryStrategy
 	RequiresValidation bool

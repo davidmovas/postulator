@@ -8,23 +8,24 @@ import (
 )
 
 type Job struct {
-	ID                 int64     `json:"id"`
-	Name               string    `json:"name"`
-	SiteID             int64     `json:"siteId"`
-	PromptID           int64     `json:"promptId"`
-	AIProviderID       int64     `json:"aiProviderId"`
-	TopicStrategy      string    `json:"topicStrategy"`
-	CategoryStrategy   string    `json:"categoryStrategy"`
-	RequiresValidation bool      `json:"requiresValidation"`
-	JitterEnabled      bool      `json:"jitterEnabled"`
-	JitterMinutes      int       `json:"jitterMinutes"`
-	Status             string    `json:"status"`
-	CreatedAt          string    `json:"createdAt"`
-	UpdatedAt          string    `json:"updatedAt"`
-	Schedule           *Schedule `json:"schedule"`
-	State              *State    `json:"state"`
-	Categories         []int64   `json:"categories"`
-	Topics             []int64   `json:"topics"`
+	ID                 int64             `json:"id"`
+	Name               string            `json:"name"`
+	SiteID             int64             `json:"siteId"`
+	PromptID           int64             `json:"promptId"`
+	AIProviderID       int64             `json:"aiProviderId"`
+	PlaceholdersValues map[string]string `json:"placeholdersValues"`
+	TopicStrategy      string            `json:"topicStrategy"`
+	CategoryStrategy   string            `json:"categoryStrategy"`
+	RequiresValidation bool              `json:"requiresValidation"`
+	JitterEnabled      bool              `json:"jitterEnabled"`
+	JitterMinutes      int               `json:"jitterMinutes"`
+	Status             string            `json:"status"`
+	CreatedAt          string            `json:"createdAt"`
+	UpdatedAt          string            `json:"updatedAt"`
+	Schedule           *Schedule         `json:"schedule"`
+	State              *State            `json:"state"`
+	Categories         []int64           `json:"categories"`
+	Topics             []int64           `json:"topics"`
 }
 
 func NewJob(entity *entities.Job) *Job {
@@ -59,6 +60,7 @@ func (d *Job) ToEntity() (*entities.Job, error) {
 		SiteID:             d.SiteID,
 		PromptID:           d.PromptID,
 		AIProviderID:       d.AIProviderID,
+		PlaceholdersValues: d.PlaceholdersValues,
 		TopicStrategy:      entities.TopicStrategy(d.TopicStrategy),
 		CategoryStrategy:   entities.CategoryStrategy(d.CategoryStrategy),
 		RequiresValidation: d.RequiresValidation,
@@ -80,6 +82,7 @@ func (d *Job) FromEntity(entity *entities.Job) *Job {
 	d.SiteID = entity.SiteID
 	d.PromptID = entity.PromptID
 	d.AIProviderID = entity.AIProviderID
+	d.PlaceholdersValues = entity.PlaceholdersValues
 	d.TopicStrategy = string(entity.TopicStrategy)
 	d.CategoryStrategy = string(entity.CategoryStrategy)
 	d.RequiresValidation = entity.RequiresValidation
