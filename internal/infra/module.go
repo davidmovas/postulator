@@ -3,6 +3,7 @@ package infra
 import (
 	"context"
 
+	"github.com/davidmovas/postulator/internal/config"
 	"github.com/davidmovas/postulator/internal/infra/database"
 	"github.com/davidmovas/postulator/internal/infra/secret"
 	"github.com/davidmovas/postulator/internal/infra/wp"
@@ -22,7 +23,9 @@ var Module = fx.Module("infra",
 	}),
 
 	// Database
-	fx.Provide(database.NewDB),
+	fx.Provide(func(cfg *config.Config) (*database.DB, error) {
+		return database.NewDB(cfg.DatabasePath)
+	}),
 	fx.Invoke(func(lc fx.Lifecycle, db *database.DB) {
 		lc.Append(fx.Hook{
 			OnStop: func(ctx context.Context) error {

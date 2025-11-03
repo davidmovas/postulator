@@ -9,7 +9,6 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/jobs"
-	"github.com/davidmovas/postulator/internal/domain/jobs/execution"
 	appErrors "github.com/davidmovas/postulator/pkg/errors"
 	"github.com/davidmovas/postulator/pkg/logger"
 )
@@ -21,7 +20,7 @@ const (
 type Scheduler struct {
 	jobRepo    jobs.Repository
 	stateRepo  jobs.StateRepository
-	executor   *execution.Executor
+	executor   jobs.Executor
 	calculator *Calculator
 	logger     *logger.Logger
 	stopChan   chan struct{}
@@ -31,7 +30,7 @@ type Scheduler struct {
 func NewScheduler(
 	jobRepo jobs.Repository,
 	stateRepo jobs.StateRepository,
-	executor *execution.Executor,
+	executor jobs.Executor,
 	logger *logger.Logger,
 ) jobs.Scheduler {
 	return &Scheduler{

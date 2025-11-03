@@ -127,9 +127,7 @@ func main() {
 		OnStartup:        func(ctx context.Context) { wailsCtx = ctx },
 		OnShutdown:       func(ctx context.Context) { _ = appInst.Stop() },
 		WindowStartState: options.Normal,
-		Bind: []interface{}{
-			appInst.GetBinds(),
-		},
+		Bind:             appInst.GetBinds(),
 		DragAndDrop: &options.DragAndDrop{
 			EnableFileDrop: true,
 		},

@@ -68,7 +68,7 @@ var Module = fx.Module("domain",
 
 	// Scheduler lifecycle
 	fx.Provide(schedule.NewCalculator, schedule.NewScheduler),
-	fx.Invoke(func(lc fx.Lifecycle, scheduler *schedule.Scheduler) {
+	fx.Invoke(func(lc fx.Lifecycle, scheduler jobs.Scheduler) {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
 				return scheduler.Start(ctx)
