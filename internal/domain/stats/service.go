@@ -224,7 +224,7 @@ func (s *service) countPausedJobs(jobs []*entities.Job) int {
 	return count
 }
 
-func (s *service) countExecutionsToday(executions []*execution.Execution, today, tomorrow time.Time) int {
+func (s *service) countExecutionsToday(executions []*entities.Execution, today, tomorrow time.Time) int {
 	count := 0
 	for _, exec := range executions {
 		if exec.StartedAt.After(today) && exec.StartedAt.Before(tomorrow) {
@@ -234,11 +234,11 @@ func (s *service) countExecutionsToday(executions []*execution.Execution, today,
 	return count
 }
 
-func (s *service) countFailedExecutionsToday(executions []*execution.Execution, today, tomorrow time.Time) int {
+func (s *service) countFailedExecutionsToday(executions []*entities.Execution, today, tomorrow time.Time) int {
 	count := 0
 	for _, exec := range executions {
 		if exec.StartedAt.After(today) && exec.StartedAt.Before(tomorrow) &&
-			exec.Status == execution.StatusFailed {
+			exec.Status == entities.ExecutionStatusFailed {
 			count++
 		}
 	}
