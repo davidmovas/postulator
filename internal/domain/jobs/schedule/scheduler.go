@@ -33,7 +33,7 @@ func NewScheduler(
 	stateRepo jobs.StateRepository,
 	executor *execution.Executor,
 	logger *logger.Logger,
-) *Scheduler {
+) jobs.Scheduler {
 	return &Scheduler{
 		jobRepo:    jobRepo,
 		stateRepo:  stateRepo,

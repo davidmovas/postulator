@@ -43,7 +43,7 @@ func NewExecutor(
 	categoryService categories.Service,
 	wpClient wp.Client,
 	logger *logger.Logger,
-) *Executor {
+) jobs.Executor {
 	return &Executor{
 		execRepo:        execRepo,
 		articleRepo:     articleRepo,
