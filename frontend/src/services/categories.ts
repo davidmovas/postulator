@@ -20,7 +20,7 @@ import {
     CategoryUpdateInput,
     Statistics
 } from "@/models/categories";
-import { unwrapResponse } from "@/lib/api-utils";
+import { unwrapArrayResponse, unwrapResponse } from "@/lib/api-utils";
 
 export const categoryService = {
     async createCategory(input: CategoryCreateInput): Promise<void> {
@@ -44,7 +44,7 @@ export const categoryService = {
 
     async listSiteCategories(siteId: number): Promise<Category[]> {
         const response = await ListSiteCategories(siteId);
-        const categories = unwrapResponse<dto.Category[]>(response);
+        const categories = unwrapArrayResponse<dto.Category>(response);
         return categories.map(mapCategory);
     },
 
@@ -106,13 +106,13 @@ export const categoryService = {
 
     async getStatistics(categoryId: number, from: string, to: string): Promise<Statistics[]> {
         const response = await GetStatistics(categoryId, from, to);
-        const stats = unwrapResponse<dto.Statistics[]>(response);
+        const stats = unwrapArrayResponse<dto.Statistics>(response);
         return stats.map(mapStatistics);
     },
 
     async getSiteStatistics(siteId: number, from: string, to: string): Promise<Statistics[]> {
         const response = await GetSiteStatistics(siteId, from, to);
-        const stats = unwrapResponse<dto.Statistics[]>(response);
+        const stats = unwrapArrayResponse<dto.Statistics>(response);
         return stats.map(mapStatistics);
     },
 };

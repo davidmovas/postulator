@@ -22,7 +22,7 @@ import {
     TopicUpdateInput,
     BatchResult
 } from "@/models/topics";
-import { unwrapResponse } from "@/lib/api-utils";
+import { unwrapArrayResponse, unwrapResponse } from "@/lib/api-utils";
 
 export const topicService = {
     async getTopic(id: number): Promise<Topic> {
@@ -33,7 +33,7 @@ export const topicService = {
 
     async listTopics(): Promise<Topic[]> {
         const response = await ListTopics();
-        const topics = unwrapResponse<dto.Topic[]>(response);
+        const topics = unwrapArrayResponse<dto.Topic>(response);
         return topics.map(mapTopic);
     },
 
@@ -83,7 +83,7 @@ export const topicService = {
 
     async getSiteTopics(siteId: number): Promise<Topic[]> {
         const response = await GetSiteTopics(siteId);
-        const topics = unwrapResponse<dto.Topic[]>(response);
+        const topics = unwrapArrayResponse<dto.Topic>(response);
         return topics.map(mapTopic);
     },
 
@@ -95,7 +95,7 @@ export const topicService = {
 
     async generateVariations(topicId: number, count: number, jobId: number): Promise<Topic[]> {
         const response = await GenerateVariations(topicId, count, jobId);
-        const topics = unwrapResponse<dto.Topic[]>(response);
+        const topics = unwrapArrayResponse<dto.Topic>(response);
         return topics.map(mapTopic);
     },
 

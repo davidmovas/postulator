@@ -12,7 +12,7 @@ import {
     PromptCreateInput,
     PromptUpdateInput
 } from "@/models/prompts";
-import { unwrapResponse } from "@/lib/api-utils";
+import { unwrapArrayResponse, unwrapResponse } from "@/lib/api-utils";
 
 export const promptService = {
     async createPrompt(input: PromptCreateInput): Promise<void> {
@@ -35,7 +35,7 @@ export const promptService = {
 
     async listPrompts(): Promise<Prompt[]> {
         const response = await ListPrompts();
-        const prompts = unwrapResponse<dto.Prompt[]>(response);
+        const prompts = unwrapArrayResponse<dto.Prompt>(response);
         return prompts.map(mapPrompt);
     },
 

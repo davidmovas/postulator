@@ -15,7 +15,7 @@ import {
     JobCreateInput,
     JobUpdateInput
 } from "@/models/jobs";
-import { unwrapResponse } from "@/lib/api-utils";
+import { unwrapArrayResponse, unwrapResponse } from "@/lib/api-utils";
 
 export const jobService = {
     async createJob(input: JobCreateInput): Promise<void> {
@@ -46,7 +46,7 @@ export const jobService = {
 
     async listJobs(): Promise<Job[]> {
         const response = await ListJobs();
-        const jobs = unwrapResponse<dto.Job[]>(response);
+        const jobs = unwrapArrayResponse<dto.Job>(response);
         return jobs.map(mapJob);
     },
 

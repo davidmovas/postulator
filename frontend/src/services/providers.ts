@@ -18,7 +18,7 @@ import {
     ProviderUpdateInput,
     Model
 } from "@/models/providers";
-import { unwrapResponse } from "@/lib/api-utils";
+import { unwrapArrayResponse, unwrapResponse } from "@/lib/api-utils";
 
 export const providerService = {
     async createProvider(input: ProviderCreateInput): Promise<void> {
@@ -42,13 +42,13 @@ export const providerService = {
 
     async listProviders(): Promise<Provider[]> {
         const response = await ListProviders();
-        const providers = unwrapResponse<dto.Provider[]>(response);
+        const providers = unwrapArrayResponse<dto.Provider>(response);
         return providers.map(mapProvider);
     },
 
     async listActiveProviders(): Promise<Provider[]> {
         const response = await ListActiveProviders();
-        const providers = unwrapResponse<dto.Provider[]>(response);
+        const providers = unwrapArrayResponse<dto.Provider>(response);
         return providers.map(mapProvider);
     },
 

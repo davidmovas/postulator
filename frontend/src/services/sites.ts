@@ -10,7 +10,7 @@ import {
     UpdateSitePassword,
 } from "@/wailsjs/wailsjs/go/handlers/SitesHandler";
 import { mapSite, Site, SiteCreateInput, SiteUpdateInput } from "@/models/sites";
-import { unwrapResponse } from "@/lib/api-utils";
+import { unwrapArrayResponse, unwrapResponse } from "@/lib/api-utils";
 
 export const siteService = {
     async createSite(input: SiteCreateInput): Promise<string> {
@@ -39,7 +39,7 @@ export const siteService = {
 
     async listSites(): Promise<Site[]> {
         const response = await ListSites();
-        const sites = unwrapResponse<dto.Site[]>(response);
+        const sites = unwrapArrayResponse<dto.Site>(response);
         return sites.map(mapSite);
     },
 

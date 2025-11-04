@@ -7,6 +7,16 @@ export class ApiException extends Error {
     }
 }
 
+export function unwrapArrayResponse<T>(wailsResponse: any): T[] {
+    const response = adaptWailsResponse<T[]>(wailsResponse);
+
+    if (!response.success || response.error) {
+        throw new ApiException(response.error!);
+    }
+
+    return response.data || [];
+}
+
 export function unwrapResponse<T>(wailsResponse: any): T {
     const response = adaptWailsResponse<T>(wailsResponse);
 
@@ -14,7 +24,7 @@ export function unwrapResponse<T>(wailsResponse: any): T {
         throw new ApiException(response.error!);
     }
 
-    if (response.data === undefined) {
+    if (response.data === undefined || response.data === null) {
         throw new ApiException({
             code: 'INTERNAL',
             message: 'No data in response',
