@@ -12,7 +12,7 @@ import (
 var _ Client = (*restyClient)(nil)
 
 const (
-	requestTimeout = time.Second * 30
+	requestTimeout = time.Second * 10
 	apiPath        = "/wp-json/wp/v2/"
 )
 

@@ -15,6 +15,7 @@ interface DataTableToolbarProps<TData> {
     searchPlaceholder?: string;
     filters?: DataTableFilterConfig[];
     toolbarActions?: React.ReactNode;
+    enableViewOptions?: boolean;
 }
 
 export function DataTableToolbar<TData>({
@@ -23,6 +24,7 @@ export function DataTableToolbar<TData>({
         searchPlaceholder = "Search...",
         filters = [],
         toolbarActions,
+        enableViewOptions = true,
     }: DataTableToolbarProps<TData>) {
     const isFiltered = table.getState().columnFilters.length > 0;
     const isSearchable = !!searchKey;
@@ -83,7 +85,7 @@ export function DataTableToolbar<TData>({
                 {toolbarActions}
 
                 {/* Column Visibility Toggle */}
-                <DataTableViewOptions table={table} />
+                {enableViewOptions && <DataTableViewOptions table={table} />}
             </div>
         </div>
     );

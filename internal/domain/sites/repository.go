@@ -3,6 +3,7 @@ package sites
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
@@ -40,7 +41,7 @@ func (r *repository) Create(ctx context.Context, site *entities.Site) error {
 	result, err := r.db.ExecContext(ctx, query, args...)
 	switch {
 	case dbx.IsUniqueViolation(err):
-		return errors.AlreadyExists("site")
+		return errors.AlreadyExists(fmt.Sprintf("Site '%s'", site.URL))
 	case err != nil:
 		return errors.Database(err)
 	}
@@ -247,7 +248,7 @@ func (r *repository) Update(ctx context.Context, site *entities.Site) error {
 	result, err := r.db.ExecContext(ctx, query, args...)
 	switch {
 	case dbx.IsUniqueViolation(err):
-		return errors.AlreadyExists("site")
+		return errors.AlreadyExists(fmt.Sprintf("Site '%s'", site.URL))
 	case err != nil:
 		return errors.Database(err)
 	}

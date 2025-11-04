@@ -6,11 +6,10 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, ExternalLink, Trash2, Wrench, RefreshCw } from "lucide-react";
+import { MoreHorizontal, ExternalLink, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { Site } from "@/models/sites";
 import SiteStatusBadge from "@/components/sites/SiteStatusBadge";
@@ -19,10 +18,12 @@ import { formatDateTime } from "@/lib/time";
 import { useApiCall } from "@/hooks/use-api-call";
 import { siteService } from "@/services/sites";
 import { Button } from "@/components/ui/button";
-import { RiPencilLine, RiPulseLine } from "@remixicon/react";
+import { RiLockPasswordLine, RiPencilLine, RiPulseLine } from "@remixicon/react";
+import { useContextModal } from "@/components/contexts/modal-context";
 
 export function useSitesTable() {
     const [sites, setSites] = useState<Site[]>([]);
+    const { editSiteModal, passwordModal } = useContextModal();
     const { execute, isLoading } = useApiCall();
 
     const updateSiteStatus = useCallback((siteId: number, newStatus: string) => {
@@ -36,9 +37,7 @@ export function useSitesTable() {
             () => siteService.checkHealth(siteId),
             {
                 onSuccess: () => {
-                    // Временно ставим healthy, в реальности нужно обновить данные
-                    updateSiteStatus(siteId, "healthy");
-                    // Через секунду обновим весь список для получения актуальных данных
+                    updateSiteStatus(siteId, "unknown");
                     setTimeout(() => {
                         loadSites();
                     }, 1000);
@@ -174,8 +173,12 @@ export function useSitesTable() {
                 const site = row.original;
 
                 const handleEdit = () => {
-                    console.log('Edit site:', site.id);
+                    editSiteModal.open(site);
                 };
+
+                const handleSetPassword = () => {
+                    passwordModal.open(site);
+                }
 
                 const handleDelete = () => {
                     console.log('Delete site:', site.id);
@@ -204,9 +207,14 @@ export function useSitesTable() {
                                      <span>Edit</span>
                             </DropdownMenuItem>
 
+                            <DropdownMenuItem onClick={handleSetPassword}>
+                                <RiLockPasswordLine className="mr-2 h-4 w-4" />
+                                <span>Set Password</span>
+                            </DropdownMenuItem>
+
                             <DropdownMenuItem onClick={openWordPress}>
                                 <ExternalLink className="mr-2 h-4 w-4" />
-                                <span>Open Admin Panel</span>
+                                <span>Admin Panel</span>
                             </DropdownMenuItem>
 
                             <DropdownMenuItem onClick={handleCheckHealthAction}>

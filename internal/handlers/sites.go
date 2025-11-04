@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"time"
+
 	"github.com/davidmovas/postulator/internal/domain/sites"
 	"github.com/davidmovas/postulator/internal/dto"
 	"github.com/davidmovas/postulator/pkg/ctx"
@@ -91,7 +93,7 @@ func (h *SitesHandler) DeleteSite(id int64) *dto.Response[string] {
 }
 
 func (h *SitesHandler) CheckHealth(siteID int64) *dto.Response[string] {
-	if err := h.service.CheckHealth(ctx.FastCtx(), siteID); err != nil {
+	if err := h.service.CheckHealth(ctx.LongCtx(), siteID); err != nil {
 		return fail[string](err)
 	}
 
@@ -99,7 +101,7 @@ func (h *SitesHandler) CheckHealth(siteID int64) *dto.Response[string] {
 }
 
 func (h *SitesHandler) CheckAllHealth() *dto.Response[string] {
-	if err := h.service.CheckAllHealth(ctx.FastCtx()); err != nil {
+	if err := h.service.CheckAllHealth(ctx.WithTimeout(time.Minute)); err != nil {
 		return fail[string](err)
 	}
 

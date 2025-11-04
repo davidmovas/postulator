@@ -113,7 +113,7 @@ func (s *service) UpdateSite(ctx context.Context, site *entities.Site) error {
 		return err
 	}
 
-	if site.WPPassword != "" && site.WPPassword != existingSite.WPPassword {
+	if site.WPPassword != "" {
 		var encryptedPassword string
 		encryptedPassword, err = s.secret.Encrypt(site.WPPassword)
 		if err != nil {
@@ -246,10 +246,6 @@ func (s *service) validateSite(site *entities.Site) error {
 
 	if strings.TrimSpace(site.WPUsername) == "" {
 		return errors.Validation("WordPress username is required")
-	}
-
-	if strings.TrimSpace(site.WPPassword) == "" {
-		return errors.Validation("WordPress password is required")
 	}
 
 	return nil

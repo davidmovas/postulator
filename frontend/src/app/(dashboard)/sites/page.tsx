@@ -1,18 +1,23 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PlusIcon } from "lucide-react";
 import { DataTable } from "@/components/table/data-table";
-import { tableFilters } from "@/components/sites/sites-filter";
-import { RiPulseLine } from "@remixicon/react";
+import { RiPulseLine, RiRefreshLine } from "@remixicon/react";
 import { useApiCall } from "@/hooks/use-api-call";
 import { useSitesTable } from "@/hooks/use-sites-table";
 import { siteService } from "@/services/sites";
+import { Site } from "@/models/sites";
+import { useContextModal } from "@/components/contexts/modal-context";
+import { CreateSiteModal } from "@/components/sites/modals/create-site-modal";
+import { EditSiteModal } from "@/components/sites/modals/edit-site-modal";
+import { ChangePasswordModal } from "@/components/sites/modals/reset-site-password-modal";
 
 export default function SitesPage() {
     const { sites, columns, isLoading, loadSites } = useSitesTable();
     const { execute } = useApiCall();
+    const { createSiteModal, editSiteModal, passwordModal } = useContextModal();
 
     useEffect(() => {
         loadSites();
@@ -23,8 +28,9 @@ export default function SitesPage() {
     };
 
     const handleAddSite = () => {
-        console.log("Open add site modal");
+        createSiteModal.open();
     };
+
 
     const handleCheckAllHealth = async () => {
         await execute<string>(
@@ -39,6 +45,10 @@ export default function SitesPage() {
                 }
             }
         );
+    };
+
+    const handleSuccess = () => {
+        loadSites();
     };
 
     const handleRowSelectionChange = (selectedSites: any[]) => {
@@ -57,6 +67,15 @@ export default function SitesPage() {
                 </div>
 
                 <div className="flex items-center gap-2 mt-4 sm:mt-0">
+                    <Button
+                        onClick={handleRefresh}
+                        variant="outline"
+                        className="flex items-center gap-2"
+                    >
+                        <RiRefreshLine className="w-4 h-4" />
+                        Refresh
+                    </Button>
+
                     <Button
                         onClick={handleCheckAllHealth}
                         variant="outline"
@@ -88,6 +107,27 @@ export default function SitesPage() {
                 onRowSelectionChange={handleRowSelectionChange}
                 showPagination={true}
                 defaultPageSize={25}
+            />
+
+            {/* Modals */}
+            <CreateSiteModal
+                open={createSiteModal.isOpen}
+                onOpenChange={createSiteModal.close}
+                onSuccess={handleSuccess}
+            />
+
+            <EditSiteModal
+                open={editSiteModal.isOpen}
+                onOpenChange={editSiteModal.close}
+                site={editSiteModal.site}
+                onSuccess={handleSuccess}
+            />
+
+            <ChangePasswordModal
+                open={passwordModal.isOpen}
+                onOpenChange={passwordModal.close}
+                siteId={passwordModal.site?.id || 0}
+                onSuccess={handleSuccess}
             />
         </div>
     );

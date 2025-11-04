@@ -53,6 +53,7 @@ export interface DataTableProps<TData, TValue> {
     emptyMessage?: string;
     onRowSelectionChange?: (selectedRows: TData[]) => void;
     defaultSorting?: SortingState;
+    enableViewOption?: boolean;
 }
 
 export function DataTable<TData, TValue>({
@@ -62,12 +63,13 @@ export function DataTable<TData, TValue>({
     searchPlaceholder = "Search...",
     filters = [],
     showPagination = true,
-    defaultPageSize = 10,
+    defaultPageSize = 25,
     toolbarActions,
     isLoading = false,
-    emptyMessage = "No results.",
+    emptyMessage = "No results",
     onRowSelectionChange,
     defaultSorting = [],
+    enableViewOption = true,
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>(defaultSorting);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -117,6 +119,7 @@ export function DataTable<TData, TValue>({
                 searchPlaceholder={searchPlaceholder}
                 filters={filters}
                 toolbarActions={toolbarActions}
+                enableViewOptions={enableViewOption}
             />
 
             <div className="overflow-hidden rounded-md border bg-background">
@@ -124,13 +127,22 @@ export function DataTable<TData, TValue>({
                     <TableHeader>
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id} className="hover:bg-transparent">
-                                {headerGroup.headers.map((header) => {
+                                {headerGroup.headers.map((header, index) => {
+                                    const isLastColumn = header.column.id === "actions";
+
                                     return (
-                                        <TableHead key={header.id} className="h-11">
+                                        <TableHead
+                                            key={header.id}
+                                            className={cn(
+                                                "h-11",
+                                                isLastColumn && "text-right"
+                                            )}
+                                        >
                                             {header.isPlaceholder ? null : header.column.getCanSort() ? (
                                                 <div
                                                     className={cn(
-                                                        "flex h-full cursor-pointer items-center justify-between gap-2 select-none"
+                                                        "flex h-full cursor-pointer items-center justify-between gap-2 select-none",
+                                                        isLastColumn && "flex-row-reverse" // Для сортировки в последней колонке
                                                     )}
                                                     onClick={header.column.getToggleSortingHandler()}
                                                     onKeyDown={(e) => {
@@ -166,10 +178,15 @@ export function DataTable<TData, TValue>({
                                                     }[header.column.getIsSorted() as string] ?? null}
                                                 </div>
                                             ) : (
-                                                flexRender(
-                                                    header.column.columnDef.header,
-                                                    header.getContext()
-                                                )
+                                                <div className={cn(
+                                                    "flex items-center",
+                                                    isLastColumn && "justify-end"
+                                                )}>
+                                                    {flexRender(
+                                                        header.column.columnDef.header,
+                                                        header.getContext()
+                                                    )}
+                                                </div>
                                             )}
                                         </TableHead>
                                     );
@@ -190,14 +207,23 @@ export function DataTable<TData, TValue>({
                                     key={row.id}
                                     data-state={row.getIsSelected() && "selected"}
                                 >
-                                    {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id}>
-                                            {flexRender(
-                                                cell.column.columnDef.cell,
-                                                cell.getContext()
-                                            )}
-                                        </TableCell>
-                                    ))}
+                                    {row.getVisibleCells().map((cell, index) => {
+                                        const isLastColumn = index === row.getVisibleCells().length - 1;
+
+                                        return (
+                                            <TableCell
+                                                key={cell.id}
+                                                className={cn(
+                                                    isLastColumn && "text-right"
+                                                )}
+                                            >
+                                                {flexRender(
+                                                    cell.column.columnDef.cell,
+                                                    cell.getContext()
+                                                )}
+                                            </TableCell>
+                                        );
+                                    })}
                                 </TableRow>
                             ))
                         ) : (

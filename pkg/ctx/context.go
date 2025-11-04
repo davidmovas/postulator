@@ -28,3 +28,9 @@ func LongCtx() context.Context {
 	time.AfterFunc(LongContextTimeout, cancel)
 	return ctx
 }
+
+func WithTimeout(timeout time.Duration) context.Context {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	time.AfterFunc(timeout, cancel)
+	return ctx
+}
