@@ -33,7 +33,6 @@ export default function SitesPage() {
                 successMessage: "All sites health checked successfully",
                 showSuccessToast: true,
                 onSuccess: () => {
-                    // Обновляем список через секунду чтобы получить обновленные статусы
                     setTimeout(() => {
                         loadSites();
                     }, 1000);
@@ -83,7 +82,6 @@ export default function SitesPage() {
                 data={sites}
                 searchKey="name"
                 searchPlaceholder="Search sites..."
-                filters={tableFilters}
                 toolbarActions={null}
                 isLoading={isLoading}
                 emptyMessage="No sites found. Create your first site to get started."
