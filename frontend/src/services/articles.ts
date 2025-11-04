@@ -1,4 +1,3 @@
-import { unwrapResponse } from "@/lib/utils/error-handling";
 import { dto } from "@/wailsjs/wailsjs/go/models";
 import {
     CreateArticle,
@@ -22,6 +21,7 @@ import {
     ArticleUpdateInput,
     WPInfoUpdate
 } from "@/models/articles";
+import { unwrapResponse } from "@/lib/api-utils";
 
 export const articleService = {
     async createArticle(input: ArticleCreateInput): Promise<void> {

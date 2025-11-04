@@ -1,4 +1,3 @@
-import { unwrapArrayResponse, unwrapResponse } from "@/lib/utils/error-handling";
 import { dto } from "@/wailsjs/wailsjs/go/models";
 import {
     CreatePrompt,
@@ -13,6 +12,7 @@ import {
     PromptCreateInput,
     PromptUpdateInput
 } from "@/models/prompts";
+import { unwrapResponse } from "@/lib/api-utils";
 
 export const promptService = {
     async createPrompt(input: PromptCreateInput): Promise<void> {
@@ -35,7 +35,7 @@ export const promptService = {
 
     async listPrompts(): Promise<Prompt[]> {
         const response = await ListPrompts();
-        const prompts = unwrapArrayResponse<dto.Prompt>(response);
+        const prompts = unwrapResponse<dto.Prompt[]>(response);
         return prompts.map(mapPrompt);
     },
 

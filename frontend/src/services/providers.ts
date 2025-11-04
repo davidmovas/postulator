@@ -1,4 +1,3 @@
-import { unwrapArrayResponse, unwrapResponse } from "@/lib/utils/error-handling";
 import { dto } from "@/wailsjs/wailsjs/go/models";
 import {
     CreateProvider,
@@ -19,6 +18,7 @@ import {
     ProviderUpdateInput,
     Model
 } from "@/models/providers";
+import { unwrapResponse } from "@/lib/api-utils";
 
 export const providerService = {
     async createProvider(input: ProviderCreateInput): Promise<void> {
@@ -42,13 +42,13 @@ export const providerService = {
 
     async listProviders(): Promise<Provider[]> {
         const response = await ListProviders();
-        const providers = unwrapArrayResponse<dto.Provider>(response);
+        const providers = unwrapResponse<dto.Provider[]>(response);
         return providers.map(mapProvider);
     },
 
     async listActiveProviders(): Promise<Provider[]> {
         const response = await ListActiveProviders();
-        const providers = unwrapArrayResponse<dto.Provider>(response);
+        const providers = unwrapResponse<dto.Provider[]>(response);
         return providers.map(mapProvider);
     },
 
@@ -78,7 +78,7 @@ export const providerService = {
 
     async getAvailableModels(providerType: string): Promise<Model[]> {
         const response = await GetAvailableModels(providerType);
-        const models = unwrapArrayResponse<dto.Model>(response);
+        const models = unwrapResponse<dto.Model[]>(response);
         return models.map(mapModel);
     },
 

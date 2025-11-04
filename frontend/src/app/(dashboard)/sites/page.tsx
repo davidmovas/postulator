@@ -4,28 +4,43 @@ import { useEffect, useState } from "react";
 import { siteService } from "@/services/sites";
 import { Site } from "@/models/sites";
 import { Button } from "@/components/ui/button";
-import { PlusIcon, RefreshCwIcon } from "lucide-react";
+import { PlusIcon } from "lucide-react";
 import { DataTable } from "@/components/table/data-table";
 import { columns } from "@/components/sites/sites-columns";
 import { tableFilters } from "@/components/sites/sites-filter";
+import { RiPulseLine } from "@remixicon/react";
+import { useApiCall } from "@/hooks/use-api-call";
 
 export default function SitesPage() {
     const [data, setData] = useState<Site[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const { execute, isLoading } = useApiCall();
 
-    // Load sites
     const loadSites = async () => {
-        try {
-            setIsLoading(true);
-            const sites = await siteService.listSites();
+        const sites = await execute<Site[]>(
+            () => siteService.listSites()
+        );
+
+        if (sites) {
             setData(sites);
-        } finally {
-            setIsLoading(false);
+        }
+    };
+
+    const handleRefresh = async () => {
+        const sites = await execute(
+            () => siteService.listSites(),
+            {
+                successMessage: "Sites refreshed successfully",
+                showSuccessToast: true,
+            }
+        );
+
+        if (sites) {
+            setData(sites);
         }
     };
 
     useEffect(() => {
-        loadSites();
+       loadSites()
     }, []);
 
     const handleAddSite = () => {
@@ -34,17 +49,19 @@ export default function SitesPage() {
     };
 
     const handleCheckAllHealth = async () => {
-        try {
-            const message = await siteService.checkAllHealth();
-
-            // Reload sites to get updated health status
-            setTimeout(() => {
-                loadSites();
-            }, 3000);
-        } finally {
-            console.log("Check all health finished");
-        }
-    }
+        await execute<string>(
+            () => siteService.checkAllHealth(),
+            {
+                successMessage: "All sites health checked successfully",
+                showSuccessToast: true,
+                onSuccess: () => {
+                    setTimeout(() => {
+                        loadSites();
+                    }, 1000);
+                }
+            }
+        );
+    };
 
     const handleRowSelectionChange = (selectedSites: Site[]) => {
         console.log("Selected sites:", selectedSites);
@@ -68,8 +85,8 @@ export default function SitesPage() {
                         variant="outline"
                         className="flex items-center gap-2"
                     >
-                        <RefreshCwIcon className="w-4 h-4" />
-                        Check All Health
+                        <RiPulseLine className="w-4 h-4" />
+                        Check All
                     </Button>
 
                     <Button
@@ -94,7 +111,7 @@ export default function SitesPage() {
                 emptyMessage="No sites found. Create your first site to get started."
                 onRowSelectionChange={handleRowSelectionChange}
                 showPagination={true}
-                defaultPageSize={10}
+                defaultPageSize={50}
             />
         </div>
     );

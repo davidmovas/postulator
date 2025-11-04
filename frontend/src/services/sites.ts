@@ -1,4 +1,3 @@
-import { unwrapArrayResponse, unwrapResponse } from "@/lib/utils/error-handling";
 import { dto } from "@/wailsjs/wailsjs/go/models";
 import {
     CheckAllHealth,
@@ -10,11 +9,11 @@ import {
     UpdateSite,
     UpdateSitePassword,
 } from "@/wailsjs/wailsjs/go/handlers/SitesHandler";
-import { mapSite, SiteCreateInput, SiteUpdateInput } from "@/models/sites";
-import Site = dto.Site;
+import { mapSite, Site, SiteCreateInput, SiteUpdateInput } from "@/models/sites";
+import { unwrapResponse } from "@/lib/api-utils";
 
 export const siteService = {
-    async createSite(input: SiteCreateInput): Promise<void> {
+    async createSite(input: SiteCreateInput): Promise<string> {
         const payload = new dto.Site({
             name: input.name,
             url: input.url,
@@ -23,7 +22,7 @@ export const siteService = {
         });
 
         const response = await CreateSite(payload);
-        unwrapResponse<string>(response);
+        return unwrapResponse<string>(response);
     },
 
     async getSite(id: number): Promise<Site> {
@@ -40,7 +39,7 @@ export const siteService = {
 
     async listSites(): Promise<Site[]> {
         const response = await ListSites();
-        const sites = unwrapArrayResponse<dto.Site>(response);
+        const sites = unwrapResponse<dto.Site[]>(response);
         return sites.map(mapSite);
     },
 

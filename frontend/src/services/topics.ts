@@ -1,4 +1,3 @@
-import { unwrapArrayResponse, unwrapResponse } from "@/lib/utils/error-handling";
 import { dto } from "@/wailsjs/wailsjs/go/models";
 import {
     AssignToSite,
@@ -23,6 +22,7 @@ import {
     TopicUpdateInput,
     BatchResult
 } from "@/models/topics";
+import { unwrapResponse } from "@/lib/api-utils";
 
 export const topicService = {
     async getTopic(id: number): Promise<Topic> {
@@ -33,7 +33,7 @@ export const topicService = {
 
     async listTopics(): Promise<Topic[]> {
         const response = await ListTopics();
-        const topics = unwrapArrayResponse<dto.Topic>(response);
+        const topics = unwrapResponse<dto.Topic[]>(response);
         return topics.map(mapTopic);
     },
 
@@ -83,7 +83,7 @@ export const topicService = {
 
     async getSiteTopics(siteId: number): Promise<Topic[]> {
         const response = await GetSiteTopics(siteId);
-        const topics = unwrapArrayResponse<dto.Topic>(response);
+        const topics = unwrapResponse<dto.Topic[]>(response);
         return topics.map(mapTopic);
     },
 
@@ -95,7 +95,7 @@ export const topicService = {
 
     async generateVariations(topicId: number, count: number, jobId: number): Promise<Topic[]> {
         const response = await GenerateVariations(topicId, count, jobId);
-        const topics = unwrapArrayResponse<dto.Topic>(response);
+        const topics = unwrapResponse<dto.Topic[]>(response);
         return topics.map(mapTopic);
     },
 
