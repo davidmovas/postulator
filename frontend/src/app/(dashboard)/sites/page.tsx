@@ -9,15 +9,16 @@ import { useApiCall } from "@/hooks/use-api-call";
 import { useSitesTable } from "@/hooks/use-sites-table";
 import { siteService } from "@/services/sites";
 import { Site } from "@/models/sites";
-import { useContextModal } from "@/components/contexts/modal-context";
+import { useContextModal } from "@/context/modal-context";
 import { CreateSiteModal } from "@/components/sites/modals/create-site-modal";
 import { EditSiteModal } from "@/components/sites/modals/edit-site-modal";
 import { ChangePasswordModal } from "@/components/sites/modals/reset-site-password-modal";
+import { ConfirmationModal } from "@/modals/confirm-modal";
 
 export default function SitesPage() {
     const { sites, columns, isLoading, loadSites } = useSitesTable();
     const { execute } = useApiCall();
-    const { createSiteModal, editSiteModal, passwordModal } = useContextModal();
+    const { createSiteModal, editSiteModal, passwordModal, confirmationModal } = useContextModal();
 
     useEffect(() => {
         loadSites();
@@ -128,6 +129,12 @@ export default function SitesPage() {
                 onOpenChange={passwordModal.close}
                 siteId={passwordModal.site?.id || 0}
                 onSuccess={handleSuccess}
+            />
+
+            <ConfirmationModal
+                open={confirmationModal.isOpen}
+                onOpenChange={confirmationModal.close}
+                data={confirmationModal.data}
             />
         </div>
     );

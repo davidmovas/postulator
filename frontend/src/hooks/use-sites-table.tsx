@@ -19,11 +19,11 @@ import { useApiCall } from "@/hooks/use-api-call";
 import { siteService } from "@/services/sites";
 import { Button } from "@/components/ui/button";
 import { RiLockPasswordLine, RiPencilLine, RiPulseLine } from "@remixicon/react";
-import { useContextModal } from "@/components/contexts/modal-context";
+import { useContextModal } from "@/context/modal-context";
 
 export function useSitesTable() {
     const [sites, setSites] = useState<Site[]>([]);
-    const { editSiteModal, passwordModal } = useContextModal();
+    const { editSiteModal, passwordModal, confirmationModal } = useContextModal();
     const { execute, isLoading } = useApiCall();
 
     const updateSiteStatus = useCallback((siteId: number, newStatus: string) => {
@@ -181,7 +181,35 @@ export function useSitesTable() {
                 }
 
                 const handleDelete = () => {
-                    console.log('Delete site:', site.id);
+                    confirmationModal.open({
+                        title: "Delete Site",
+                        description: (
+                            <div className="space-y-2">
+                                <p>Are you sure you want to delete this site?</p>
+                                <p className="text-muted-foreground font-medium bg-muted/50 px-3 py-2 rounded-md border">
+                                    {site.name}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                    This action cannot be undone.
+                                </p>
+                            </div>
+                        ),
+                        confirmText: "Delete",
+                        cancelText: "Cancel",
+                        variant: "destructive",
+                        onConfirm: async () => {
+                            await execute<void>(
+                                () => siteService.deleteSite(site.id),
+                                {
+                                    onSuccess: () => {
+                                        loadSites();
+                                    },
+                                    showSuccessToast: true,
+                                    errorTitle: "Failed to delete site"
+                                }
+                            );
+                        }
+                    });
                 };
 
                 const handleCheckHealthAction = async () => {

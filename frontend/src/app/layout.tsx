@@ -2,7 +2,7 @@ import { Inter } from "next/font/google";
 
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
-import { ModalProvider } from "@/components/contexts/modal-context";
+import { ModalProvider } from "@/context/modal-context";
 
 const fontSans = Inter({
   subsets: ["latin"],

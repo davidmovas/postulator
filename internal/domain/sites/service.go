@@ -126,6 +126,7 @@ func (s *service) UpdateSite(ctx context.Context, site *entities.Site) error {
 	}
 
 	site.UpdatedAt = time.Now()
+	site.HealthStatus = existingSite.HealthStatus
 
 	if err = s.repo.Update(ctx, site); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to update site")

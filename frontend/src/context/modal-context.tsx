@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState } from "react";
 import { Site } from "@/models/sites";
+import { ConfirmationModalData } from "@/modals/confirm-modal";
 
 interface ModalContextType {
     createSiteModal: {
@@ -21,15 +22,26 @@ interface ModalContextType {
         close: () => void;
         site: Site | null;
     };
+    confirmationModal: {
+        isOpen: boolean;
+        open: (data: ConfirmationModalData) => void;
+        close: () => void;
+        data: ConfirmationModalData | null;
+    };
 }
 
 const ModalContext = createContext<ModalContextType | undefined>(undefined);
 
 export function ModalProvider({ children }: { children: React.ReactNode }) {
+    // Sites
     const [createSiteOpen, setCreateSiteOpen] = useState(false);
     const [editSiteOpen, setEditSiteOpen] = useState(false);
     const [passwordOpen, setPasswordOpen] = useState(false);
     const [selectedSite, setSelectedSite] = useState<Site | null>(null);
+
+    // Common
+    const [confirmationOpen, setConfirmationOpen] = useState(false);
+    const [confirmationData, setConfirmationData] = useState<ConfirmationModalData | null>(null);
 
     const value: ModalContextType = {
         createSiteModal: {
@@ -60,6 +72,18 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
                 setSelectedSite(null);
             },
             site: selectedSite
+        },
+        confirmationModal: {
+            isOpen: confirmationOpen,
+            open: (data) => {
+                setConfirmationData(data);
+                setConfirmationOpen(true);
+            },
+            close: () => {
+                setConfirmationOpen(false);
+                setConfirmationData(null);
+            },
+            data: confirmationData
         }
     };
 

@@ -142,7 +142,7 @@ export function DataTable<TData, TValue>({
                                                 <div
                                                     className={cn(
                                                         "flex h-full cursor-pointer items-center justify-between gap-2 select-none",
-                                                        isLastColumn && "flex-row-reverse" // Для сортировки в последней колонке
+                                                        isLastColumn && "flex-row-reverse"
                                                     )}
                                                     onClick={header.column.getToggleSortingHandler()}
                                                     onKeyDown={(e) => {
@@ -208,7 +208,7 @@ export function DataTable<TData, TValue>({
                                     data-state={row.getIsSelected() && "selected"}
                                 >
                                     {row.getVisibleCells().map((cell, index) => {
-                                        const isLastColumn = index === row.getVisibleCells().length - 1;
+                                        const isLastColumn = cell.column.id === "actions";
 
                                         return (
                                             <TableCell
