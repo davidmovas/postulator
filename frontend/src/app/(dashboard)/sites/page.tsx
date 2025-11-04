@@ -1,50 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { siteService } from "@/services/sites";
-import { Site } from "@/models/sites";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { PlusIcon } from "lucide-react";
 import { DataTable } from "@/components/table/data-table";
-import { columns } from "@/components/sites/sites-columns";
 import { tableFilters } from "@/components/sites/sites-filter";
 import { RiPulseLine } from "@remixicon/react";
 import { useApiCall } from "@/hooks/use-api-call";
+import { useSitesTable } from "@/hooks/use-sites-table";
+import { siteService } from "@/services/sites";
 
 export default function SitesPage() {
-    const [data, setData] = useState<Site[]>([]);
-    const { execute, isLoading } = useApiCall();
-
-    const loadSites = async () => {
-        const sites = await execute<Site[]>(
-            () => siteService.listSites()
-        );
-
-        if (sites) {
-            setData(sites);
-        }
-    };
-
-    const handleRefresh = async () => {
-        const sites = await execute(
-            () => siteService.listSites(),
-            {
-                successMessage: "Sites refreshed successfully",
-                showSuccessToast: true,
-            }
-        );
-
-        if (sites) {
-            setData(sites);
-        }
-    };
+    const { sites, columns, isLoading, loadSites } = useSitesTable();
+    const { execute } = useApiCall();
 
     useEffect(() => {
-       loadSites()
-    }, []);
+        loadSites();
+    }, [loadSites]);
+
+    const handleRefresh = async () => {
+        await loadSites();
+    };
 
     const handleAddSite = () => {
-        // TODO: Open add site modal
         console.log("Open add site modal");
     };
 
@@ -55,6 +33,7 @@ export default function SitesPage() {
                 successMessage: "All sites health checked successfully",
                 showSuccessToast: true,
                 onSuccess: () => {
+                    // Обновляем список через секунду чтобы получить обновленные статусы
                     setTimeout(() => {
                         loadSites();
                     }, 1000);
@@ -63,9 +42,8 @@ export default function SitesPage() {
         );
     };
 
-    const handleRowSelectionChange = (selectedSites: Site[]) => {
+    const handleRowSelectionChange = (selectedSites: any[]) => {
         console.log("Selected sites:", selectedSites);
-        // Можно добавить bulk actions
     };
 
     return (
@@ -102,7 +80,7 @@ export default function SitesPage() {
             {/* Table */}
             <DataTable
                 columns={columns}
-                data={data}
+                data={sites}
                 searchKey="name"
                 searchPlaceholder="Search sites..."
                 filters={tableFilters}
@@ -111,7 +89,7 @@ export default function SitesPage() {
                 emptyMessage="No sites found. Create your first site to get started."
                 onRowSelectionChange={handleRowSelectionChange}
                 showPagination={true}
-                defaultPageSize={50}
+                defaultPageSize={25}
             />
         </div>
     );

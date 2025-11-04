@@ -1,7 +1,6 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -11,53 +10,29 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, ExternalLink, Play, Trash2, Wrench, RefreshCw } from "lucide-react";
+import { MoreHorizontal, ExternalLink, Trash2, Wrench, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { Site } from "@/models/sites";
+import SiteStatusBadge from "@/components/sites/SiteStatusBadge";
+import HealthIndicator from "@/components/sites/SiteHealthBadge";
+import { formatDateTime } from "@/lib/time";
+import { useApiCall } from "@/hooks/use-api-call";
+import { siteService } from "@/services/sites";
 
-// Health status indicator
-const HealthIndicator = ({ status }: { status: string }) => {
-    const getHealthConfig = (health: string) => {
-        switch (health) {
-            case "healthy":
-                return { color: "bg-green-500", label: "Healthy" };
-            case "unhealthy":
-                return { color: "bg-red-500", label: "Unhealthy" };
-            case "unknown":
-                return { color: "bg-gray-500", label: "Unknown" };
-            default:
-                return { color: "bg-gray-500", label: "Unknown" };
+const handleCheckHealth = async (siteId: number) => {
+    const { execute } = useApiCall();
+
+    await execute<string>(
+        () => siteService.checkHealth(siteId),
+        {
+            onSuccess: (data) => {
+                console.log('Health check result:', data);
+            },
+            onError: (error) => {
+                console.error('Error checking health:', error);
+            },
         }
-    };
-
-    const config = getHealthConfig(status);
-
-    return (
-        <div className="flex items-center gap-2">
-            <div className={`w-3 h-3 rounded-full ${config.color}`} />
-            <span className="text-sm">{config.label}</span>
-        </div>
     );
-};
-
-// Status badge
-const StatusBadge = ({ status }: { status: string }) => {
-    const getStatusConfig = (status: string) => {
-        switch (status) {
-            case "active":
-                return { variant: "default" as const, label: "Active" };
-            case "inactive":
-                return { variant: "secondary" as const, label: "Inactive" };
-            case "error":
-                return { variant: "destructive" as const, label: "Error" };
-            default:
-                return { variant: "outline" as const, label: status };
-        }
-    };
-
-    const config = getStatusConfig(status);
-
-    return <Badge variant={config.variant}>{config.label}</Badge>;
 };
 
 export const columns: ColumnDef<Site>[] = [
@@ -69,7 +44,7 @@ export const columns: ColumnDef<Site>[] = [
             return (
                 <Link
                     href={`/sites/${site.id}`}
-                    className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                    className="font-medium"
                 >
                     {site.name}
                 </Link>
@@ -86,7 +61,7 @@ export const columns: ColumnDef<Site>[] = [
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                    className="text-blue-500 hover:text-blue-700 flex items-center gap-1"
                 >
                     {url.replace(/^https?:\/\//, '')}
                     <ExternalLink className="w-3 h-3" />
@@ -99,7 +74,7 @@ export const columns: ColumnDef<Site>[] = [
         header: "Status",
         cell: ({ row }) => {
             const status = row.getValue("status") as string;
-            return <StatusBadge status={status} />;
+            return <SiteStatusBadge status={status} />;
         },
         filterFn: (row, id, value) => {
             return value.includes(row.getValue(id));
@@ -121,13 +96,8 @@ export const columns: ColumnDef<Site>[] = [
         header: "Last Check",
         cell: ({ row }) => {
             const date = row.getValue("lastHealthCheck") as string;
-            return new Date(date).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
+            const formattedDate = formatDateTime(date);
+            return formattedDate || 'Never';
         },
     },
     {
@@ -141,7 +111,7 @@ export const columns: ColumnDef<Site>[] = [
             return (
                 <Link
                     href={`/sites/${site.id}?tab=articles`}
-                    className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                    className="font-medium"
                 >
                     {articlesCount}
                 </Link>
@@ -159,7 +129,7 @@ export const columns: ColumnDef<Site>[] = [
             return (
                 <Link
                     href={`/sites/${site.id}?tab=jobs`}
-                    className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                    className="font-medium"
                 >
                     {jobsCount}
                 </Link>
