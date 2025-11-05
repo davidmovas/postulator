@@ -23,7 +23,8 @@ type restyClient struct {
 func NewRestyClient() Client {
 	return &restyClient{
 		resty: resty.New().
-			SetTimeout(requestTimeout),
+			SetTimeout(requestTimeout).
+			SetRedirectPolicy(resty.NoRedirectPolicy()),
 	}
 }
 

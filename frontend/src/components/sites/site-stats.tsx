@@ -64,7 +64,11 @@ export function SiteStatistics({ siteId, totalStats, dailyStats, onStatsUpdate }
     return (
         <div className="space-y-6">
             <StatsFilters
-                dateRange={dateRange}
+                dateRange={
+                    dateRange?.from && dateRange?.to
+                        ? { from: dateRange.from, to: dateRange.to }
+                        : undefined
+                }
                 onDateRangeChange={handleDateRangeChange}
             />
 
