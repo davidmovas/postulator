@@ -95,7 +95,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                                     font-medium transition-colors duration-200
                                                     ${
                                                     isActive
-                                                        ? "bg-transparent" // активный пункт не меняет фон
+                                                        ? "bg-transparent"
                                                         : "text-zinc-300 hover:bg-zinc-800 hover:text-white"
                                                 }
                                                 `}
