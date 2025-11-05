@@ -172,7 +172,7 @@ export default function DashboardPage() {
 
                         {/* Activity Section */}
                         <div>
-                            <h2 className="text-xl font-semibold mb-4">Today`&apos;`s Activity</h2>
+                            <h2 className="text-xl font-semibold mb-4">Today&apos;s Activity</h2>
                             <div className="grid gap-4 md:grid-cols-2">
                                 <StatsCard
                                     title="Executions"

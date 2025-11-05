@@ -12,7 +12,7 @@ import (
 )
 
 func (c *restyClient) CheckHealth(ctx context.Context, site *entities.Site) (entities.HealthStatus, error) {
-	url := fmt.Sprintf("%s/wp-json/", strings.TrimSuffix(site.URL, "/"))
+	url := fmt.Sprintf("%s/wp-json", strings.TrimSuffix(site.URL, "/"))
 
 	resp, err := c.resty.R().
 		SetContext(ctx).

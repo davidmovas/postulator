@@ -183,22 +183,14 @@ func (s *service) CheckHealth(ctx context.Context, siteID int64) error {
 		return err
 	}
 
-	healthStatus, err := s.performHealthCheck(ctx, site)
-	if err != nil {
-		if updateErr := s.repo.UpdateHealthStatus(ctx, siteID, healthStatus, time.Now()); updateErr != nil {
-			s.logger.ErrorWithErr(updateErr, "Failed to update health status")
-			return updateErr
-		}
-
-		return errors.SiteUnreachable(site.URL, err)
+	var healthStatus entities.HealthStatus
+	healthStatus, err = s.performHealthCheck(ctx, site)
+	if err = s.repo.UpdateHealthStatus(ctx, siteID, healthStatus, time.Now()); err != nil {
+		s.logger.ErrorWithErr(err, "Failed to update health status")
+		return err
 	}
 
-	if updateErr := s.repo.UpdateHealthStatus(ctx, siteID, healthStatus, time.Now()); updateErr != nil {
-		s.logger.ErrorWithErr(updateErr, "Failed to update health status")
-		return updateErr
-	}
-
-	return nil
+	return err
 }
 
 func (s *service) CheckAllHealth(ctx context.Context) error {

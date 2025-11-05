@@ -61,40 +61,62 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const pathname = usePathname();
 
     return (
-        <Sidebar {...props}>
+        <Sidebar
+            {...props}
+            className="bg-zinc-900 border-r border-zinc-800 shadow-md"
+        >
             <SidebarHeader>
                 <div className="flex items-center text-center pt-2 pl-4">
-                    <h1 className="text-3xl font-bold">Postulator</h1>
+                    <h1 className="text-3xl font-bold text-white">Postulator</h1>
                 </div>
             </SidebarHeader>
+
             <SidebarContent>
                 {navItems.map((group) => (
                     <SidebarGroup key={group.title}>
-                        <SidebarGroupLabel className="uppercase text-muted-foreground/60">
+                        <SidebarGroupLabel className="uppercase text-zinc-500 tracking-wide">
                             {group.title}
                         </SidebarGroupLabel>
+
                         <SidebarGroupContent className="px-2">
                             <SidebarMenu>
                                 {group.items.map((item) => {
-                                    const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                                    const isActive =
+                                        pathname === item.href ||
+                                        pathname.startsWith(item.href + "/");
+
                                     return (
                                         <SidebarMenuItem key={item.title}>
                                             <SidebarMenuButton
                                                 asChild
-                                                className="group/menu-button font-medium gap-3 h-9 rounded-md bg-gradient-to-r hover:bg-transparent hover:from-sidebar-accent hover:to-sidebar-accent/40 data-[active=true]:from-primary/20 data-[active=true]:to-primary/5 [&>svg]:size-auto"
                                                 isActive={isActive}
+                                                className={`
+                                                    group/menu-button flex items-center gap-3 h-9 rounded-md
+                                                    font-medium transition-colors duration-200
+                                                    ${
+                                                    isActive
+                                                        ? "bg-transparent" // активный пункт не меняет фон
+                                                        : "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                                                }
+                                                `}
                                             >
                                                 <Link href={item.href}>
-                          <span className="inline-flex items-center gap-3">
-                            {item.icon && (
-                                <item.icon
-                                    className="text-muted-foreground/60 group-data-[active=true]/menu-button:text-primary"
-                                    size={22}
-                                    aria-hidden="true"
-                                />
-                            )}
-                              <span>{item.title}</span>
-                          </span>
+                                                    <span className="inline-flex items-center gap-3">
+                                                        {item.icon && (
+                                                            <item.icon
+                                                                className={`
+                                                                    size-5
+                                                                    ${
+                                                                    isActive
+                                                                        ? "text-primary"
+                                                                        : "text-zinc-400 group-hover/menu-button:text-white"
+                                                                }
+                                                                `}
+                                                                aria-hidden="true"
+                                                            />
+                                                        )}
+                                                        <span>{item.title}</span>
+                                                    </span>
                                                 </Link>
                                             </SidebarMenuButton>
                                         </SidebarMenuItem>
@@ -108,7 +130,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
             <SidebarFooter>
                 <div className="flex items-center justify-start p-4">
-                    <span className="text-sm text-muted-foreground/60">{APP_VERSION}</span>
+                    <span className="text-sm text-zinc-500">{APP_VERSION}</span>
                 </div>
             </SidebarFooter>
 
