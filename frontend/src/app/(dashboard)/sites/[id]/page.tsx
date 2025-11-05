@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Site } from "@/models/sites";
 import { siteService } from "@/services/sites";
+import { statsService } from "@/services/stats";
 import { useApiCall } from "@/hooks/use-api-call";
 import { useContextModal } from "@/context/modal-context";
 import { ConfirmationModal } from "@/modals/confirm-modal";
@@ -12,6 +13,9 @@ import { ChangePasswordModal } from "@/components/sites/modals/reset-site-passwo
 import { SiteHeader } from "@/components/sites/site-header";
 import { SiteActions } from "@/components/sites/site-actions";
 import { SiteInfo } from "@/components/sites/site-info";
+import { SiteStatistics } from "@/components/sites/site-stats";
+import { SiteStats } from "@/models/stats";
+import { toGoDateFormat } from "@/lib/time";
 
 export default function SitePage() {
     const params = useParams();
@@ -20,6 +24,8 @@ export default function SitePage() {
     const { confirmationModal } = useContextModal();
 
     const [site, setSite] = useState<Site | null>(null);
+    const [totalStats, setTotalStats] = useState<SiteStats | null>(null);
+    const [dailyStats, setDailyStats] = useState<SiteStats[]>([]);
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [passwordModalOpen, setPasswordModalOpen] = useState(false);
 
@@ -38,9 +44,41 @@ export default function SitePage() {
         }
     };
 
+    const loadStatistics = async () => {
+        const totalStatsResult = await execute<SiteStats>(
+            () => statsService.getTotalStatistics(siteId),
+            {
+                errorTitle: "Failed to load statistics",
+            }
+        );
+
+        setTotalStats(totalStatsResult || null);
+
+        const to = new Date();
+        const from = new Date();
+        from.setDate(from.getDate() - 30);
+
+        const toStr = toGoDateFormat(to);
+        const fromStr = toGoDateFormat(from);
+
+        const dailyStatsResult = await execute<SiteStats[]>(
+            () => statsService.getSiteStatistics(siteId, fromStr, toStr),
+            {
+                errorTitle: "Failed to load daily statistics",
+            }
+        );
+
+        setDailyStats(dailyStatsResult || []);
+    };
+
+    const handleStatsUpdate = useCallback((newDailyStats: SiteStats[]) => {
+        setDailyStats(newDailyStats);
+    }, []);
+
     useEffect(() => {
         if (siteId) {
             loadSite();
+            loadStatistics();
         }
     }, [siteId]);
 
@@ -73,11 +111,11 @@ export default function SitePage() {
 
     const handleViewTopics = () => {
         router.push(`/sites/${siteId}/topics`);
-    }
+    };
 
     const handleViewCategories = () => {
         router.push(`/sites/${siteId}/categories`);
-    }
+    };
 
     const handleDelete = () => {
         confirmationModal.open({
@@ -111,6 +149,16 @@ export default function SitePage() {
                 );
             }
         });
+    };
+
+    const handleDateRangeChange = async (from: string, to: string) => {
+        const dailyStatsResult = await execute<SiteStats[]>(
+            () => statsService.getSiteStatistics(siteId, from, to),
+            {
+                errorTitle: "Failed to load daily statistics",
+            }
+        );
+        setDailyStats(dailyStatsResult || []);
     };
 
     const handleSuccess = () => {
@@ -155,6 +203,19 @@ export default function SitePage() {
             />
 
             <SiteInfo site={site} />
+
+            {/* Statistics Section */}
+            {totalStats && (
+                <div className="space-y-4">
+                    <h2 className="text-2xl font-bold tracking-tight">Statistics</h2>
+                    <SiteStatistics
+                        siteId={siteId}
+                        totalStats={totalStats}
+                        dailyStats={dailyStats}
+                        onStatsUpdate={handleStatsUpdate}
+                    />
+                </div>
+            )}
 
             <EditSiteModal
                 open={editModalOpen}
