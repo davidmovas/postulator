@@ -12,14 +12,14 @@ import {
 import { MoreHorizontal, ExternalLink, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { Site } from "@/models/sites";
-import SiteStatusBadge from "@/components/sites/SiteStatusBadge";
-import HealthIndicator from "@/components/sites/SiteHealthBadge";
 import { formatDateTime } from "@/lib/time";
 import { useApiCall } from "@/hooks/use-api-call";
 import { siteService } from "@/services/sites";
 import { Button } from "@/components/ui/button";
 import { RiLockPasswordLine, RiPencilLine, RiPulseLine } from "@remixicon/react";
 import { useContextModal } from "@/context/modal-context";
+import SiteStatusBadge from "@/components/sites/site-status-badge";
+import HealthIndicator from "@/components/sites/site-health-badge";
 
 export function useSitesTable() {
     const [sites, setSites] = useState<Site[]>([]);
@@ -184,12 +184,14 @@ export function useSitesTable() {
                     confirmationModal.open({
                         title: "Delete Site",
                         description: (
-                            <div className="space-y-2">
-                                <p>Are you sure you want to delete this site?</p>
-                                <p className="text-muted-foreground font-medium bg-muted/50 px-3 py-2 rounded-md border">
-                                    {site.name}
+                            <div className="space-y-3">
+                                <p className="text-sm leading-6">
+                                    Are you sure you want to delete this site?
                                 </p>
-                                <p className="text-sm text-muted-foreground">
+                                <div className="bg-muted/50 border rounded-lg p-3">
+                                    <p className="font-medium text-muted-foreground">{site?.name}</p>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
                                     This action cannot be undone.
                                 </p>
                             </div>
