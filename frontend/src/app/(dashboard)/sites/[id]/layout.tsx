@@ -15,7 +15,7 @@ export default function SiteLayout({
                         href="/sites"
                         className="text-muted-foreground hover:text-foreground flex items-center gap-2"
                     >
-                        <ArrowLeft className="h-4 w-4" /> Back to sites
+                        <ArrowLeft className="h-4 w-4" /> Back to site list
                     </Link>
                 </div>
             </div>
