@@ -24,6 +24,12 @@ interface ModalContextType {
         close: () => void;
         site: Site | null;
     };
+    deleteSiteModal: {
+        isOpen: boolean;
+        open: (site: Site) => void;
+        close: () => void;
+        site: Site | null;
+    };
 
     // Categories
     createCategoryModal: {
@@ -61,6 +67,7 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
     const [createSiteOpen, setCreateSiteOpen] = useState(false);
     const [editSiteOpen, setEditSiteOpen] = useState(false);
     const [passwordOpen, setPasswordOpen] = useState(false);
+    const [deleteSiteOpen, setDeleteSiteOpen] = useState(false);
     const [selectedSite, setSelectedSite] = useState<Site | null>(null);
     const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null);
 
@@ -101,6 +108,18 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
             },
             close: () => {
                 setPasswordOpen(false);
+                setSelectedSite(null);
+            },
+            site: selectedSite
+        },
+        deleteSiteModal: {
+            isOpen: deleteSiteOpen,
+            open: (site) => {
+                setSelectedSite(site);
+                setDeleteSiteOpen(true);
+            },
+            close: () => {
+                setDeleteSiteOpen(false);
                 setSelectedSite(null);
             },
             site: selectedSite

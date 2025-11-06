@@ -23,7 +23,7 @@ import HealthIndicator from "@/components/sites/site-health-badge";
 
 export function useSitesTable() {
     const [sites, setSites] = useState<Site[]>([]);
-    const { editSiteModal, passwordModal, confirmationModal } = useContextModal();
+    const { editSiteModal, passwordModal, deleteSiteModal } = useContextModal();
     const { execute, isLoading } = useApiCall();
 
     const updateSiteStatus = useCallback((siteId: number, newStatus: string) => {
@@ -179,37 +179,7 @@ export function useSitesTable() {
                 }
 
                 const handleDelete = () => {
-                    confirmationModal.open({
-                        title: "Delete Site",
-                        description: (
-                            <div className="space-y-3">
-                                <p className="text-sm leading-6">
-                                    Are you sure you want to delete this site?
-                                </p>
-                                <div className="bg-muted/50 border rounded-lg p-3">
-                                    <p className="font-medium text-muted-foreground">{site?.name}</p>
-                                </div>
-                                <p className="text-xs text-muted-foreground">
-                                    This action cannot be undone.
-                                </p>
-                            </div>
-                        ),
-                        confirmText: "Delete",
-                        cancelText: "Cancel",
-                        variant: "destructive",
-                        onConfirm: async () => {
-                            await execute<void>(
-                                () => siteService.deleteSite(site.id),
-                                {
-                                    onSuccess: () => {
-                                        loadSites();
-                                    },
-                                    showSuccessToast: true,
-                                    errorTitle: "Failed to delete site"
-                                }
-                            );
-                        }
-                    });
+                    deleteSiteModal.open(site);
                 };
 
                 const handleCheckHealthAction = async () => {

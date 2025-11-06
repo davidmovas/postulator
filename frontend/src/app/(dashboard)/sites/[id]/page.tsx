@@ -17,12 +17,13 @@ import { SiteStatistics } from "@/components/sites/site-stats";
 import { SiteStats } from "@/models/stats";
 import { toGoDateFormat } from "@/lib/time";
 import { SiteNavigation } from "@/components/sites/site-navigation";
+import { DeleteSiteModal } from "@/components/sites/modals/delete-site-modal";
 
 export default function SitePage() {
     const params = useParams();
     const router = useRouter();
     const { execute, isLoading } = useApiCall();
-    const { confirmationModal } = useContextModal();
+    const { deleteSiteModal } = useContextModal();
 
     const [site, setSite] = useState<Site | null>(null);
     const [totalStats, setTotalStats] = useState<SiteStats | null>(null);
@@ -89,9 +90,7 @@ export default function SitePage() {
             {
                 successMessage: "Health check completed",
                 showSuccessToast: true,
-                onSuccess: () => {
-                    setTimeout(() => loadSite(), 1000);
-                }
+                onSuccess: () => loadSite(),
             }
         );
     };
@@ -119,37 +118,9 @@ export default function SitePage() {
     };
 
     const handleDelete = () => {
-        confirmationModal.open({
-            title: "Delete Site",
-            description: (
-                <div className="space-y-3">
-                    <div className="text-sm leading-6">
-                        Are you sure you want to delete this site?
-                    </div>
-                    <div className="bg-muted/50 border rounded-lg p-3">
-                        <p className="font-medium text-muted-foreground">{site?.name}</p>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                        This action cannot be undone.
-                    </div>
-                </div>
-            ),
-            confirmText: "Delete",
-            cancelText: "Cancel",
-            variant: "destructive",
-            onConfirm: async () => {
-                await execute<void>(
-                    () => siteService.deleteSite(siteId),
-                    {
-                        successMessage: "Site deleted successfully",
-                        showSuccessToast: true,
-                        onSuccess: () => {
-                            router.push("/sites");
-                        }
-                    }
-                );
-            }
-        });
+        if (site) {
+            deleteSiteModal.open(site);
+        }
     };
 
     const handleSuccess = () => {
@@ -225,10 +196,11 @@ export default function SitePage() {
                 onSuccess={handleSuccess}
             />
 
-            <ConfirmationModal
-                open={confirmationModal.isOpen}
-                onOpenChange={confirmationModal.close}
-                data={confirmationModal.data}
+            <DeleteSiteModal
+                open={deleteSiteModal.isOpen}
+                onOpenChange={deleteSiteModal.close}
+                site={deleteSiteModal.site}
+                onSuccess={handleSuccess}
             />
         </div>
     );
