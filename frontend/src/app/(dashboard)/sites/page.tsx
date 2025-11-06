@@ -40,9 +40,7 @@ export default function SitesPage() {
                 successMessage: "All sites health checked successfully",
                 showSuccessToast: true,
                 onSuccess: () => {
-                    setTimeout(() => {
-                        loadSites();
-                    }, 1000);
+                    loadSites();
                 }
             }
         );

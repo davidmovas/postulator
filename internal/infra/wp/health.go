@@ -20,7 +20,7 @@ func (c *restyClient) CheckHealth(ctx context.Context, site *entities.Site) (ent
 		Get(url)
 
 	if err != nil {
-		return entities.HealthUnknown, errors.WordPress("error while requesting site health", err)
+		return entities.HealthUnknown, errors.SiteUnreachable(site.URL, fmt.Errorf("error while requesting"))
 	}
 
 	status := resp.StatusCode()

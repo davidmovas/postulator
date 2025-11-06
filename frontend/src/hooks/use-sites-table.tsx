@@ -37,10 +37,8 @@ export function useSitesTable() {
             () => siteService.checkHealth(siteId),
             {
                 onSuccess: () => {
-                    updateSiteStatus(siteId, "unknown");
-                    setTimeout(() => {
-                        loadSites();
-                    }, 1000);
+                    updateSiteStatus(siteId, "healthy");
+                    loadSites();
                 },
                 onError: () => {
                     updateSiteStatus(siteId, "unhealthy");
