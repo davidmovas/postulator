@@ -14,7 +14,6 @@ export interface Category {
 
 export interface CategoryCreateInput {
     siteId: number;
-    wpCategoryId: number;
     name: string;
     slug?: string;
     description?: string;
@@ -22,6 +21,7 @@ export interface CategoryCreateInput {
 
 export interface CategoryUpdateInput extends Partial<CategoryCreateInput> {
     id: number;
+    wpCategoryId: number;
 }
 
 export interface Statistics {

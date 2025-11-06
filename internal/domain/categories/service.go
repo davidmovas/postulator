@@ -24,15 +24,17 @@ type service struct {
 
 func NewService(
 	wp wp.Client,
+	siteService sites.Service,
 	repo Repository,
 	statsRepo StatisticsRepository,
 	logger *logger.Logger,
 ) Service {
 	return &service{
-		wp:        wp,
-		repo:      repo,
-		statsRepo: statsRepo,
-		logger:    logger.WithScope("service").WithScope("categories"),
+		wp:          wp,
+		siteService: siteService,
+		repo:        repo,
+		statsRepo:   statsRepo,
+		logger:      logger.WithScope("service").WithScope("categories"),
 	}
 }
 
@@ -277,10 +279,6 @@ func (s *service) validateCategory(category *entities.Category) error {
 
 	if strings.TrimSpace(category.Name) == "" {
 		return errors.Validation("Category name is required")
-	}
-
-	if category.WPCategoryID <= 0 {
-		return errors.Validation("WordPress category ID is required")
 	}
 
 	return nil

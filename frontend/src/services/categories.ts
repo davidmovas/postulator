@@ -26,7 +26,6 @@ export const categoryService = {
     async createCategory(input: CategoryCreateInput): Promise<void> {
         const payload = new dto.Category({
             siteId: input.siteId,
-            wpCategoryId: input.wpCategoryId,
             name: input.name,
             slug: input.slug,
             description: input.description,
@@ -62,9 +61,9 @@ export const categoryService = {
         unwrapResponse<string>(response);
     },
 
-    async deleteCategory(id: number): Promise<void> {
+    async deleteCategory(id: number): Promise<string> {
         const response = await DeleteCategory(id);
-        unwrapResponse<string>(response);
+        return unwrapResponse<string>(response);
     },
 
     async syncFromWordPress(siteId: number): Promise<void> {
@@ -72,20 +71,19 @@ export const categoryService = {
         unwrapResponse<string>(response);
     },
 
-    async createInWordPress(input: CategoryCreateInput): Promise<void> {
+    async createInWordPress(input: CategoryCreateInput): Promise<string> {
         const payload = new dto.Category({
             siteId: input.siteId,
-            wpCategoryId: input.wpCategoryId,
             name: input.name,
             slug: input.slug,
             description: input.description,
         });
 
         const response = await CreateInWordPress(payload);
-        unwrapResponse<string>(response);
+        return unwrapResponse<string>(response);
     },
 
-    async updateInWordPress(input: CategoryUpdateInput): Promise<void> {
+    async updateInWordPress(input: CategoryUpdateInput): Promise<string> {
         const payload = new dto.Category({
             id: input.id,
             siteId: input.siteId,
@@ -96,12 +94,12 @@ export const categoryService = {
         });
 
         const response = await UpdateInWordPress(payload);
-        unwrapResponse<string>(response);
+       return  unwrapResponse<string>(response);
     },
 
-    async deleteInWordPress(categoryId: number): Promise<void> {
+    async deleteInWordPress(categoryId: number): Promise<string> {
         const response = await DeleteInWordPress(categoryId);
-        unwrapResponse<string>(response);
+        return unwrapResponse<string>(response);
     },
 
     async getStatistics(categoryId: number, from: string, to: string): Promise<Statistics[]> {

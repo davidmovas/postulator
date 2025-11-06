@@ -83,7 +83,7 @@ func (c *restyClient) CreateCategory(ctx context.Context, s *entities.Site, cate
 }
 
 func (c *restyClient) UpdateCategory(ctx context.Context, s *entities.Site, category *entities.Category) error {
-	wpCategoryData := map[string]interface{}{}
+	wpCategoryData := map[string]any{}
 
 	if category.Name != "" {
 		wpCategoryData["name"] = category.Name
