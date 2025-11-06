@@ -16,6 +16,7 @@ import { SiteInfo } from "@/components/sites/site-info";
 import { SiteStatistics } from "@/components/sites/site-stats";
 import { SiteStats } from "@/models/stats";
 import { toGoDateFormat } from "@/lib/time";
+import { SiteNavigation } from "@/components/sites/site-navigation";
 
 export default function SitePage() {
     const params = useParams();
@@ -151,16 +152,6 @@ export default function SitePage() {
         });
     };
 
-    const handleDateRangeChange = async (from: string, to: string) => {
-        const dailyStatsResult = await execute<SiteStats[]>(
-            () => statsService.getSiteStatistics(siteId, from, to),
-            {
-                errorTitle: "Failed to load daily statistics",
-            }
-        );
-        setDailyStats(dailyStatsResult || []);
-    };
-
     const handleSuccess = () => {
         loadSite();
     };
@@ -193,13 +184,16 @@ export default function SitePage() {
                 onCheckHealth={handleCheckHealth}
                 onEdit={() => setEditModalOpen(true)}
                 onChangePassword={() => setPasswordModalOpen(true)}
+                onOpenWordPress={handleOpenWordPress}
+                onDelete={handleDelete}
+                isLoading={isLoading}
+            />
+
+            <SiteNavigation
                 onViewArticles={handleViewArticles}
                 onViewJobs={handleViewJobs}
                 onViewTopics={handleViewTopics}
                 onViewCategories={handleViewCategories}
-                onOpenWordPress={handleOpenWordPress}
-                onDelete={handleDelete}
-                isLoading={isLoading}
             />
 
             <SiteInfo site={site} />

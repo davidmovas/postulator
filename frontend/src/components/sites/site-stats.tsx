@@ -84,7 +84,11 @@ export function SiteStatistics({ siteId, totalStats, dailyStats, onStatsUpdate }
 
             {hasDailyStats && (
                 <StatsDetails
-                    dailyStats={dailyStats}
+                    dailyStats={dailyStats.sort((a, b) => {
+                        const dateA = new Date(a.date).getTime();
+                        const dateB = new Date(b.date).getTime();
+                        return dateB - dateA;
+                    })}
                     expandedSections={expandedSections}
                     onExpandedChange={setExpandedSections}
                 />

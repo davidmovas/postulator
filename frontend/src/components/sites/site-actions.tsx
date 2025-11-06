@@ -1,13 +1,9 @@
 import { Button } from "@/components/ui/button";
 import {
-    RiArticleLine,
     RiLockPasswordLine,
     RiPencilLine,
     RiPulseLine,
-    RiTimerLine,
     RiToolsLine,
-    RiLightbulbLine,
-    RiChatThreadLine,
 } from "@remixicon/react";
 import { Trash2 } from "lucide-react";
 
@@ -15,12 +11,8 @@ interface SiteActionsProps {
     onCheckHealth: () => void;
     onEdit: () => void;
     onChangePassword: () => void;
-    onViewArticles: () => void;
-    onViewJobs: () => void;
     onOpenWordPress: () => void;
     onDelete: () => void;
-    onViewTopics?: () => void;
-    onViewCategories?: () => void;
     isLoading?: boolean;
 }
 
@@ -28,12 +20,8 @@ export function SiteActions({
     onCheckHealth,
     onEdit,
     onChangePassword,
-    onViewArticles,
-    onViewJobs,
     onOpenWordPress,
     onDelete,
-    onViewTopics,
-    onViewCategories,
     isLoading
 }: SiteActionsProps) {
     const actions = [
@@ -57,30 +45,6 @@ export function SiteActions({
             variant: "outline" as const
         },
         {
-            icon: RiTimerLine,
-            label: "Jobs",
-            onClick: onViewJobs,
-            variant: "outline" as const
-        },
-        {
-            icon: RiArticleLine,
-            label: "Articles",
-            onClick: onViewArticles,
-            variant: "outline" as const
-        },
-        {
-            icon: RiChatThreadLine,
-            label: "Categories",
-            onClick: onViewCategories,
-            variant: "outline" as const
-        },
-        {
-            icon: RiLightbulbLine,
-            label: "Topics",
-            onClick: onViewTopics,
-            variant: "outline" as const
-        },
-        {
             icon: RiToolsLine,
             label: "Admin Panel",
             onClick: onOpenWordPress,
@@ -95,7 +59,7 @@ export function SiteActions({
     ];
 
     return (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
             {actions.map((action, index) => (
                 <Button
                     key={index}
