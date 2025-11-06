@@ -24,7 +24,7 @@ import {
     RemixiconComponentType,
     RiChatAiLine,
     RiDashboard2Line,
-    RiLightbulbLine, RiArticleLine, RiChatThreadLine,
+    RiLightbulbLine, RiArticleLine,
 } from "@remixicon/react";
 
 const APP_VERSION = "v1.0.0";
@@ -50,7 +50,7 @@ const navItems: NavGroup[] = [
             { title: "Articles", href: "/articles", icon: RiArticleLine },
             { title: "Topics", href: "/topics", icon: RiLightbulbLine },
             { title: "Prompts", href: "/prompts", icon: RiChatAiLine },
-            { title: "Providers", href: "/providers", icon: RiBardLine },
+            { title: "AI Providers", href: "/ai-providers", icon: RiBardLine },
             { title: "Settings", href: "/settings", icon: RiSettings3Line },
         ],
     },

@@ -8,12 +8,10 @@ import { RiPulseLine, RiRefreshLine } from "@remixicon/react";
 import { useApiCall } from "@/hooks/use-api-call";
 import { useSitesTable } from "@/hooks/use-sites-table";
 import { siteService } from "@/services/sites";
-import { Site } from "@/models/sites";
 import { useContextModal } from "@/context/modal-context";
 import { CreateSiteModal } from "@/components/sites/modals/create-site-modal";
 import { EditSiteModal } from "@/components/sites/modals/edit-site-modal";
 import { ChangePasswordModal } from "@/components/sites/modals/reset-site-password-modal";
-import { ConfirmationModal } from "@/modals/confirm-modal";
 import { DeleteSiteModal } from "@/components/sites/modals/delete-site-modal";
 
 export default function SitesPage() {

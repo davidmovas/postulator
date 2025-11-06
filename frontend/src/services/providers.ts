@@ -21,7 +21,7 @@ import {
 import { unwrapArrayResponse, unwrapResponse } from "@/lib/api-utils";
 
 export const providerService = {
-    async createProvider(input: ProviderCreateInput): Promise<void> {
+    async createProvider(input: ProviderCreateInput): Promise<string> {
         const payload = new dto.Provider({
             name: input.name,
             type: input.type,
@@ -31,7 +31,7 @@ export const providerService = {
         });
 
         const response = await CreateProvider(payload);
-        unwrapResponse<string>(response);
+        return unwrapResponse<string>(response);
     },
 
     async getProvider(id: number): Promise<Provider> {
@@ -52,7 +52,7 @@ export const providerService = {
         return providers.map(mapProvider);
     },
 
-    async updateProvider(input: ProviderUpdateInput): Promise<void> {
+    async updateProvider(input: ProviderUpdateInput): Promise<string> {
         const payload = new dto.Provider({
             id: input.id,
             name: input.name,
@@ -63,17 +63,17 @@ export const providerService = {
         });
 
         const response = await UpdateProvider(payload);
-        unwrapResponse<string>(response);
+        return unwrapResponse<string>(response);
     },
 
-    async deleteProvider(id: number): Promise<void> {
+    async deleteProvider(id: number): Promise<string> {
         const response = await DeleteProvider(id);
-        unwrapResponse<string>(response);
+        return unwrapResponse<string>(response);
     },
 
-    async setProviderStatus(id: number, isActive: boolean): Promise<void> {
+    async setProviderStatus(id: number, isActive: boolean): Promise<string> {
         const response = await SetProviderStatus(id, isActive);
-        unwrapResponse<string>(response);
+        return unwrapResponse<string>(response);
     },
 
     async getAvailableModels(providerType: string): Promise<Model[]> {
@@ -82,8 +82,8 @@ export const providerService = {
         return models.map(mapModel);
     },
 
-    async validateModel(providerType: string, model: string): Promise<void> {
+    async validateModel(providerType: string, model: string): Promise<string> {
         const response = await ValidateModel(providerType, model);
-        unwrapResponse<string>(response);
+        return unwrapResponse<string>(response);
     },
 };

@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState } from "react";
 import { Site } from "@/models/sites";
 import { Category } from "@/models/categories";
 import { ConfirmationModalData } from "@/modals/confirm-modal";
+import { Provider } from "@/models/providers";
 
 interface ModalContextType {
     // Sites
@@ -51,6 +52,25 @@ interface ModalContextType {
         category: Category | null;
     };
 
+    // AI-Providers
+    createProviderModal: {
+        isOpen: boolean;
+        open: () => void;
+        close: () => void;
+    };
+    editProviderModal: {
+        isOpen: boolean;
+        open: (provider: Provider) => void;
+        close: () => void;
+        provider: Provider | null;
+    };
+    deleteProviderModal: {
+        isOpen: boolean;
+        open: (provider: Provider) => void;
+        close: () => void;
+        provider: Provider | null;
+    };
+
     // Common
     confirmationModal: {
         isOpen: boolean;
@@ -76,6 +96,12 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
     const [editCategoryOpen, setEditCategoryOpen] = useState(false);
     const [deleteCategoryOpen, setDeleteCategoryOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+
+    // AI-Providers
+    const [createProviderOpen, setCreateProviderOpen] = useState(false);
+    const [editProviderOpen, setEditProviderOpen] = useState(false);
+    const [deleteProviderOpen, setDeleteProviderOpen] = useState(false);
+    const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
 
     // Common
     const [confirmationOpen, setConfirmationOpen] = useState(false);
@@ -161,6 +187,37 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
                 setSelectedCategory(null);
             },
             category: selectedCategory
+        },
+
+        // AI-Providers
+        createProviderModal: {
+            isOpen: createProviderOpen,
+            open: () => setCreateProviderOpen(true),
+            close: () => setCreateProviderOpen(false)
+        },
+        editProviderModal: {
+            isOpen: editProviderOpen,
+            open: (provider) => {
+                setSelectedProvider(provider);
+                setEditProviderOpen(true);
+            },
+            close: () => {
+                setEditProviderOpen(false);
+                setSelectedProvider(null);
+            },
+            provider: selectedProvider
+        },
+        deleteProviderModal: {
+            isOpen: deleteProviderOpen,
+            open: (provider) => {
+                setSelectedProvider(provider);
+                setDeleteProviderOpen(true);
+            },
+            close: () => {
+                setDeleteProviderOpen(false);
+                setSelectedProvider(null);
+            },
+            provider: selectedProvider
         },
 
         // Common

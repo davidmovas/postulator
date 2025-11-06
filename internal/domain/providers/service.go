@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
+	"github.com/davidmovas/postulator/internal/infra/ai"
 	"github.com/davidmovas/postulator/pkg/errors"
 	"github.com/davidmovas/postulator/pkg/logger"
 )
@@ -81,9 +82,20 @@ func (s *service) UpdateProvider(ctx context.Context, provider *entities.Provide
 	if err := s.validateProvider(provider); err != nil {
 		return err
 	}
+
+	localProvider, err := s.repo.GetByID(ctx, provider.ID)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get provider for update")
+		return err
+	}
+
+	if localProvider.APIKey != provider.APIKey {
+		provider.APIKey = localProvider.APIKey
+	}
+
 	provider.UpdatedAt = time.Now()
 
-	if err := s.repo.Update(ctx, provider); err != nil {
+	if err = s.repo.Update(ctx, provider); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to update provider")
 		return err
 	}
@@ -132,7 +144,7 @@ func (s *service) SetProviderStatus(ctx context.Context, id int64, isActive bool
 }
 
 func (s *service) GetAvailableModels(providerType entities.Type) ([]*entities.Model, error) {
-	models := s.getDefaultModels(providerType)
+	models := ai.GetAvailableModels(providerType)
 	if len(models) == 0 {
 		return nil, errors.Validation("Unsupported provider type")
 	}
@@ -177,10 +189,6 @@ func (s *service) validateProvider(provider *entities.Provider) error {
 		return errors.Validation("Unsupported provider type")
 	}
 
-	if strings.TrimSpace(provider.APIKey) == "" {
-		return errors.Validation("API key is required")
-	}
-
 	if strings.TrimSpace(provider.Model) == "" {
 		return errors.Validation("Model is required")
 	}
@@ -189,60 +197,4 @@ func (s *service) validateProvider(provider *entities.Provider) error {
 	}
 
 	return nil
-}
-
-func (s *service) getDefaultModels(providerType entities.Type) []*entities.Model {
-	switch providerType {
-	case entities.TypeOpenAI:
-		return []*entities.Model{
-			{
-				ID:         "gpt-4",
-				Name:       "GPT-4",
-				Provider:   entities.TypeOpenAI,
-				MaxTokens:  8192,
-				InputCost:  0.03,
-				OutputCost: 0.06,
-			},
-			{
-				ID:         "gpt-3.5-turbo",
-				Name:       "GPT-3.5 Turbo",
-				Provider:   entities.TypeOpenAI,
-				MaxTokens:  4096,
-				InputCost:  0.0015,
-				OutputCost: 0.002,
-			},
-		}
-	case entities.TypeAnthropic:
-		return []*entities.Model{
-			{
-				ID:         "claude-3-opus-20240229",
-				Name:       "Claude 3 Opus",
-				Provider:   entities.TypeAnthropic,
-				MaxTokens:  200000,
-				InputCost:  0.015,
-				OutputCost: 0.075,
-			},
-			{
-				ID:         "claude-3-sonnet-20240229",
-				Name:       "Claude 3 Sonnet",
-				Provider:   entities.TypeAnthropic,
-				MaxTokens:  200000,
-				InputCost:  0.003,
-				OutputCost: 0.015,
-			},
-		}
-	case entities.TypeGoogle:
-		return []*entities.Model{
-			{
-				ID:         "gemini-pro",
-				Name:       "Gemini Pro",
-				Provider:   entities.TypeGoogle,
-				MaxTokens:  32768,
-				InputCost:  0.000125,
-				OutputCost: 0.000375,
-			},
-		}
-	default:
-		return []*entities.Model{}
-	}
 }
