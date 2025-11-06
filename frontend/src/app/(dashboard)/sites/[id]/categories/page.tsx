@@ -10,7 +10,6 @@ import { CreateCategoryModal } from "@/components/categories/modals/create-categ
 import { EditCategoryModal } from "@/components/categories/modals/edit-category-modal";
 import { DeleteCategoryModal } from "@/components/categories/modals/delete-category-modal";
 import { RiAddLine, RiRefreshLine, RiWordpressFill } from "@remixicon/react";
-import { CategoryStats } from "@/components/categories/category-stats";
 import { Statistics } from "@/models/categories";
 import { toGoDateFormat } from "@/lib/time";
 import { categoryService } from "@/services/categories";

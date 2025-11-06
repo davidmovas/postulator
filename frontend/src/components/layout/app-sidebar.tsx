@@ -48,7 +48,6 @@ const navItems: NavGroup[] = [
             { title: "Jobs", href: "/jobs", icon: RiTimerLine },
             { title: "Sites", href: "/sites", icon: RiGlobalLine },
             { title: "Articles", href: "/articles", icon: RiArticleLine },
-            { title: "Categories", href: "/categories", icon: RiChatThreadLine },
             { title: "Topics", href: "/topics", icon: RiLightbulbLine },
             { title: "Prompts", href: "/prompts", icon: RiChatAiLine },
             { title: "Providers", href: "/providers", icon: RiBardLine },
