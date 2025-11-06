@@ -123,15 +123,15 @@ export default function SitePage() {
             title: "Delete Site",
             description: (
                 <div className="space-y-3">
-                    <p className="text-sm leading-6">
+                    <div className="text-sm leading-6">
                         Are you sure you want to delete this site?
-                    </p>
+                    </div>
                     <div className="bg-muted/50 border rounded-lg p-3">
                         <p className="font-medium text-muted-foreground">{site?.name}</p>
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <div className="text-xs text-muted-foreground">
                         This action cannot be undone.
-                    </p>
+                    </div>
                 </div>
             ),
             confirmText: "Delete",
@@ -189,14 +189,14 @@ export default function SitePage() {
                 isLoading={isLoading}
             />
 
+            <SiteInfo site={site} />
+
             <SiteNavigation
                 onViewArticles={handleViewArticles}
                 onViewJobs={handleViewJobs}
                 onViewTopics={handleViewTopics}
                 onViewCategories={handleViewCategories}
             />
-
-            <SiteInfo site={site} />
 
             {/* Statistics Section */}
             {totalStats && (
