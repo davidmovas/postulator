@@ -54,7 +54,7 @@ export function ProviderCard({ provider, onEdit, onDelete, onToggleStatus }: Pro
                             {provider.name}
                         </CardTitle>
                         <p className="text-sm text-muted-foreground">
-                            {providerConfig.description.replace('models', 'model')}
+                            {providerConfig.description}
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -81,11 +81,6 @@ export function ProviderCard({ provider, onEdit, onDelete, onToggleStatus }: Pro
                     <span className="text-muted-foreground font-mono">
                         {formatApiKey(provider.apiKey)}
                     </span>
-                </div>
-
-                <div className="text-xs text-muted-foreground space-y-1 mt-auto">
-                    <div>Created: {formatDateTime(provider.createdAt)}</div>
-                    <div>Updated: {formatDateTime(provider.updatedAt)}</div>
                 </div>
             </CardContent>
 

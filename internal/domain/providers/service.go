@@ -89,7 +89,7 @@ func (s *service) UpdateProvider(ctx context.Context, provider *entities.Provide
 		return err
 	}
 
-	if localProvider.APIKey != provider.APIKey {
+	if provider.APIKey == "" {
 		provider.APIKey = localProvider.APIKey
 	}
 
