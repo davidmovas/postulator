@@ -14,6 +14,7 @@ type Site struct {
 	WPPassword      string `json:"wpPassword"`
 	Status          string `json:"status"`
 	LastHealthCheck string `json:"lastHealthCheck"`
+	AutoHealthCheck bool   `json:"autoHealthCheck"`
 	HealthStatus    string `json:"healthStatus"`
 	CreatedAt       string `json:"createdAt"`
 	UpdatedAt       string `json:"updatedAt"`
@@ -53,6 +54,7 @@ func (d *Site) ToEntity() (*entities.Site, error) {
 		WPPassword:      d.WPPassword,
 		Status:          entities.Status(d.Status),
 		LastHealthCheck: lastHealthCheck,
+		AutoHealthCheck: d.AutoHealthCheck,
 		HealthStatus:    entities.HealthStatus(d.HealthStatus),
 		CreatedAt:       createdAt,
 		UpdatedAt:       updatedAt,
@@ -66,6 +68,7 @@ func (d *Site) FromEntity(entity *entities.Site) *Site {
 	d.WPUsername = entity.WPUsername
 	d.WPPassword = entity.WPPassword
 	d.Status = string(entity.Status)
+	d.AutoHealthCheck = entity.AutoHealthCheck
 	d.HealthStatus = string(entity.HealthStatus)
 	d.CreatedAt = TimeToString(entity.CreatedAt)
 	d.UpdatedAt = TimeToString(entity.UpdatedAt)

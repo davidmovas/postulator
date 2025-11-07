@@ -5,6 +5,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/articles"
 	"github.com/davidmovas/postulator/internal/domain/categories"
+	"github.com/davidmovas/postulator/internal/domain/healthcheck"
 	"github.com/davidmovas/postulator/internal/domain/jobs"
 	"github.com/davidmovas/postulator/internal/domain/jobs/execution"
 	"github.com/davidmovas/postulator/internal/domain/jobs/schedule"
@@ -59,6 +60,12 @@ var Module = fx.Module("domain",
 		stats.NewRepository,
 		stats.NewService,
 
+		// Healthcheck
+		healthcheck.NewRepository,
+		healthcheck.NewService,
+		healthcheck.NewScheduler,
+		healthcheck.NewNotifier,
+
 		// Topics
 		topics.NewRepository,
 		topics.NewUsageRepository,
@@ -66,9 +73,21 @@ var Module = fx.Module("domain",
 		topics.NewService,
 	),
 
-	// Scheduler lifecycle
+	// Job Scheduler lifecycle
 	fx.Provide(schedule.NewCalculator, schedule.NewScheduler),
 	fx.Invoke(func(lc fx.Lifecycle, scheduler jobs.Scheduler) {
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				return scheduler.Start(ctx)
+			},
+			OnStop: func(ctx context.Context) error {
+				return scheduler.Stop()
+			},
+		})
+	}),
+
+	// Health check lifecycle
+	fx.Invoke(func(lc fx.Lifecycle, scheduler healthcheck.Scheduler) {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
 				return scheduler.Start(ctx)

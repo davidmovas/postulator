@@ -6,12 +6,23 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/pkg/errors"
 )
 
-func (c *restyClient) CheckHealth(ctx context.Context, site *entities.Site) (entities.HealthStatus, error) {
+func (c *restyClient) CheckHealth(ctx context.Context, site *entities.Site) (*entities.HealthCheck, error) {
+	health := &entities.HealthCheck{
+		SiteID: site.ID,
+		Status: entities.HealthUnknown,
+	}
+
+	start := time.Now()
+	defer func() {
+		health.ResponseTime = time.Since(start)
+	}()
+
 	url := fmt.Sprintf("%s/wp-json", strings.TrimSuffix(site.URL, "/"))
 
 	resp, err := c.resty.R().
@@ -20,51 +31,78 @@ func (c *restyClient) CheckHealth(ctx context.Context, site *entities.Site) (ent
 		Get(url)
 
 	if err != nil {
-		return entities.HealthUnknown, errors.SiteUnreachable(site.URL, fmt.Errorf("error while requesting"))
+		err = errors.SiteUnreachable(site.URL, fmt.Errorf("request failed: %w", err))
+		health.Error = err.Error()
+		health.Status = entities.HealthError
+		return health, err
 	}
 
-	status := resp.StatusCode()
+	health.Code = resp.StatusCode()
+	health.StatusCode = resp.Status()
 
 	switch {
-	case status == http.StatusOK:
+	case resp.StatusCode() == http.StatusOK:
 		var data map[string]any
 		if err = json.Unmarshal(resp.Body(), &data); err != nil {
-			return entities.HealthUnknown, errors.WordPress("invalid JSON in /wp-json response", err)
+			err = errors.WordPress("invalid JSON in /wp-json response", err)
+			health.Error = err.Error()
+			health.Status = entities.HealthError
+			return health, err
 		}
+
 		if _, ok := data["namespaces"]; ok {
-			return entities.HealthHealthy, nil
+			health.Status = entities.HealthHealthy
+			return health, nil
 		}
-		return entities.HealthUnknown, errors.WordPress("unexpected /wp-json structure", nil)
 
-	case status >= 500:
-		return entities.HealthUnhealthy, errors.WordPress(
-			fmt.Sprintf("WordPress server error: %d", status), nil)
+		err = errors.WordPress("unexpected /wp-json structure", nil)
+		health.Error = err.Error()
+		health.Status = entities.HealthUnknown
+		return health, err
 
-	case status >= 400:
-		return entities.HealthUnhealthy, errors.WordPress(
-			fmt.Sprintf("WordPress API returned code: %d", status), nil)
+	case resp.StatusCode() >= 500:
+		err = errors.WordPress(fmt.Sprintf("WordPress server error: %d", resp.StatusCode()), nil)
+		health.Error = err.Error()
+		health.Status = entities.HealthUnhealthy
+		return health, err
 
-	case status >= 300:
+	case resp.StatusCode() >= 400:
+		err = errors.WordPress(fmt.Sprintf("WordPress API returned code: %d", resp.StatusCode()), nil)
+		health.Error = err.Error()
+		health.Status = entities.HealthError
+		return health, err
+
+	case resp.StatusCode() >= 300:
 		location := resp.Header().Get("Location")
 		if location == "" {
-			return entities.HealthUnknown, errors.WordPress(
-				fmt.Sprintf("redirect (%d) without Location header", status), nil)
+			err = errors.WordPress(fmt.Sprintf("redirect (%d) without Location header", resp.StatusCode()), nil)
+			health.Error = err.Error()
+			health.Status = entities.HealthUnknown
+			return health, err
 		}
 
 		if strings.HasPrefix(location, "https://") &&
 			strings.TrimPrefix(site.URL, "http://") == strings.TrimPrefix(location, "https://") {
-			return entities.HealthHealthy, nil
+			health.Status = entities.HealthHealthy
+			return health, nil
 		}
 
 		if strings.Contains(location, "wp-login.php") {
-			return entities.HealthUnknown, errors.WordPress("redirected to login page", nil)
+			err = errors.WordPress("redirected to login page", nil)
+			health.Error = err.Error()
+			health.Status = entities.HealthHealthy
+			return health, err
 		}
 
-		return entities.HealthUnhealthy, errors.WordPress(
-			fmt.Sprintf("unexpected redirect (%d) to: %s", status, location), nil)
+		err = errors.WordPress(fmt.Sprintf("unexpected redirect (%d) to: %s", resp.StatusCode(), location), nil)
+		health.Error = err.Error()
+		health.Status = entities.HealthUnknown
+		return health, err
 
 	default:
-		return entities.HealthUnknown, errors.WordPress(
-			fmt.Sprintf("unexpected status code: %d", status), nil)
+		err = errors.WordPress(fmt.Sprintf("unexpected status code: %d", resp.StatusCode()), nil)
+		health.Error = err.Error()
+		health.Status = entities.HealthUnknown
+		return health, err
 	}
 }

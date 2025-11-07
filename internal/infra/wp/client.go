@@ -58,7 +58,7 @@ func (c *client) DisableProxy() {
 	}
 }
 
-func (c *client) CheckHealth(ctx context.Context, site *entities.Site) (entities.HealthStatus, error) {
+func (c *client) CheckHealth(ctx context.Context, site *entities.Site) (*entities.HealthCheck, error) {
 	return c.GetCurrentClient().CheckHealth(ctx, site)
 }
 

@@ -16,6 +16,7 @@ const (
 	HealthHealthy   HealthStatus = "healthy"
 	HealthUnhealthy HealthStatus = "unhealthy"
 	HealthUnknown   HealthStatus = "unknown"
+	HealthError     HealthStatus = "error"
 )
 
 type Site struct {
@@ -26,7 +27,17 @@ type Site struct {
 	WPPassword      string
 	Status          Status
 	LastHealthCheck *time.Time
+	AutoHealthCheck bool
 	HealthStatus    HealthStatus
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+}
+
+type HealthCheck struct {
+	SiteID       int64
+	Status       HealthStatus
+	Code         int
+	StatusCode   string
+	ResponseTime time.Duration
+	Error        string
 }

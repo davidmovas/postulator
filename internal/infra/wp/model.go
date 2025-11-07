@@ -9,7 +9,7 @@ import (
 type Client interface {
 	// Health
 
-	CheckHealth(ctx context.Context, site *entities.Site) (entities.HealthStatus, error)
+	CheckHealth(ctx context.Context, site *entities.Site) (*entities.HealthCheck, error)
 
 	// Categories
 

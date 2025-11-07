@@ -34,8 +34,8 @@ func NewRepository(db *database.DB, logger *logger.Logger) Repository {
 func (r *repository) Create(ctx context.Context, site *entities.Site) error {
 	query, args := dbx.ST.
 		Insert("sites").
-		Columns("name", "url", "wp_username", "wp_password", "status", "health_status").
-		Values(site.Name, site.URL, site.WPUsername, site.WPPassword, site.Status, site.HealthStatus).
+		Columns("name", "url", "wp_username", "wp_password", "status", "auto_health_check", "health_status").
+		Values(site.Name, site.URL, site.WPUsername, site.WPPassword, site.Status, site.AutoHealthCheck, site.HealthStatus).
 		MustSql()
 
 	result, err := r.db.ExecContext(ctx, query, args...)
@@ -64,6 +64,7 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*entities.Site, err
 			"wp_username",
 			"wp_password",
 			"status",
+			"auto_health_check",
 			"last_health_check",
 			"health_status",
 			"created_at",
@@ -83,6 +84,7 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*entities.Site, err
 		&site.WPUsername,
 		&site.WPPassword,
 		&site.Status,
+		&site.AutoHealthCheck,
 		&lastHealthCheck,
 		&site.HealthStatus,
 		&site.CreatedAt,
@@ -112,6 +114,7 @@ func (r *repository) GetAll(ctx context.Context) ([]*entities.Site, error) {
 			"wp_username",
 			"wp_password",
 			"status",
+			"auto_health_check",
 			"last_health_check",
 			"health_status",
 			"created_at",
@@ -141,6 +144,7 @@ func (r *repository) GetAll(ctx context.Context) ([]*entities.Site, error) {
 			&site.WPUsername,
 			&site.WPPassword,
 			&site.Status,
+			&site.AutoHealthCheck,
 			&lastHealthCheck,
 			&site.HealthStatus,
 			&site.CreatedAt,
@@ -176,6 +180,7 @@ func (r *repository) GetByStatus(ctx context.Context, status entities.JobStatus)
 			"wp_username",
 			"wp_password",
 			"status",
+			"auto_health_check",
 			"last_health_check",
 			"health_status",
 			"created_at",
@@ -206,6 +211,7 @@ func (r *repository) GetByStatus(ctx context.Context, status entities.JobStatus)
 			&site.WPUsername,
 			&site.WPPassword,
 			&site.Status,
+			&site.AutoHealthCheck,
 			&lastHealthCheck,
 			&site.HealthStatus,
 			&site.CreatedAt,
@@ -240,6 +246,7 @@ func (r *repository) Update(ctx context.Context, site *entities.Site) error {
 		Set("wp_username", site.WPUsername).
 		Set("wp_password", site.WPPassword).
 		Set("status", site.Status).
+		Set("auto_health_check", site.AutoHealthCheck).
 		Set("health_status", site.HealthStatus).
 		Set("updated_at", time.Now()).
 		Where(squirrel.Eq{"id": site.ID}).

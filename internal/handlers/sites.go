@@ -93,7 +93,7 @@ func (h *SitesHandler) DeleteSite(id int64) *dto.Response[string] {
 }
 
 func (h *SitesHandler) CheckHealth(siteID int64) *dto.Response[string] {
-	if err := h.service.CheckHealth(ctx.LongCtx(), siteID); err != nil {
+	if _, err := h.service.CheckHealth(ctx.LongCtx(), siteID); err != nil {
 		return fail[string](err)
 	}
 

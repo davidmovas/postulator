@@ -26,6 +26,6 @@ type Service interface {
 	UpdateSitePassword(ctx context.Context, id int64, password string) error
 	DeleteSite(ctx context.Context, id int64) error
 
-	CheckHealth(ctx context.Context, siteID int64) error
+	CheckHealth(ctx context.Context, siteID int64) (*entities.HealthCheck, error)
 	CheckAllHealth(ctx context.Context) error
 }

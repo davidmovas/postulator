@@ -176,21 +176,31 @@ func (s *service) DeleteSite(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (s *service) CheckHealth(ctx context.Context, siteID int64) error {
+func (s *service) CheckHealth(ctx context.Context, siteID int64) (*entities.HealthCheck, error) {
 	site, err := s.GetSiteWithPassword(ctx, siteID)
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to get site for health check")
-		return err
+		return nil, err
 	}
 
-	var healthStatus entities.HealthStatus
-	healthStatus, err = s.performHealthCheck(ctx, site)
-	if err = s.repo.UpdateHealthStatus(ctx, siteID, healthStatus, time.Now()); err != nil {
+	var (
+		healthCheck *entities.HealthCheck
+		status      = entities.HealthUnknown
+	)
+
+	healthCheck, err = s.performHealthCheck(ctx, site)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to perform health check")
+	} else {
+		status = healthCheck.Status
+	}
+
+	if err = s.repo.UpdateHealthStatus(ctx, siteID, status, time.Now()); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to update health status")
-		return err
+		return healthCheck, err
 	}
 
-	return err
+	return healthCheck, err
 }
 
 func (s *service) CheckAllHealth(ctx context.Context) error {
@@ -206,7 +216,7 @@ func (s *service) CheckAllHealth(ctx context.Context) error {
 			continue
 		}
 
-		if err = s.CheckHealth(ctx, site.ID); err != nil {
+		if _, err = s.CheckHealth(ctx, site.ID); err != nil {
 			lastErr = err
 			s.logger.ErrorWithErr(err, "Health check failed for site")
 		}
@@ -244,6 +254,6 @@ func (s *service) validateSite(site *entities.Site) error {
 	return nil
 }
 
-func (s *service) performHealthCheck(ctx context.Context, site *entities.Site) (entities.HealthStatus, error) {
+func (s *service) performHealthCheck(ctx context.Context, site *entities.Site) (*entities.HealthCheck, error) {
 	return s.wpClient.CheckHealth(ctx, site)
 }
