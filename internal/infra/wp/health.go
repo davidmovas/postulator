@@ -28,7 +28,6 @@ func (c *restyClient) CheckHealth(ctx context.Context, site *entities.Site) (*en
 		SetContext(ctx).
 		SetBasicAuth(site.WPUsername, site.WPPassword).
 		Get(url)
-
 	if err != nil {
 		health.Error = err.Error()
 		health.Status = entities.HealthUnhealthy

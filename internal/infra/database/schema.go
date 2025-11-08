@@ -2,18 +2,10 @@ package database
 
 import (
 	"database/sql"
-	_ "embed"
-	"fmt"
 )
 
-//go:embed schema.sql
-var schemaSQL string
-
-func InitSchema(database *sql.DB) error {
-	_, err := database.Exec(schemaSQL)
-	if err != nil {
-		return fmt.Errorf("failed to execute schema: %w", err)
-	}
-
+// Deprecated: migrations are handled by pressly/goose in internal/infra/database/migrator.
+// This function is kept for backward compatibility and does nothing.
+func InitSchema(_ *sql.DB) error {
 	return nil
 }

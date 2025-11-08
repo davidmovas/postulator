@@ -42,7 +42,7 @@ export default function SiteCategoriesPage() {
         try {
             const toDate = to ? new Date(to) : new Date();
             const fromDate = from ? new Date(from) : new Date();
-            fromDate.setDate(toDate.getDate() - 30);
+            fromDate.setDate(toDate.getDate() - 7);
 
             const fromStr = from || toGoDateFormat(fromDate);
             const toStr = to || toGoDateFormat(toDate);

@@ -60,7 +60,7 @@ export default function SitePage() {
 
         const to = new Date();
         const from = new Date();
-        from.setDate(from.getDate() - 30);
+        from.setDate(from.getDate() - 7);
 
         const toStr = toGoDateFormat(to);
         const fromStr = toGoDateFormat(from);

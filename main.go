@@ -109,7 +109,7 @@ func main() {
 		Fullscreen:    false,
 		Frameless:     false,
 		StartHidden:   false,
-		//HideWindowOnClose: true,
+		// HideWindowOnClose: true,
 		SingleInstanceLock: &options.SingleInstanceLock{
 			UniqueId: "com.postulator.app",
 			OnSecondInstanceLaunch: func(secondInstanceData options.SecondInstanceData) {
