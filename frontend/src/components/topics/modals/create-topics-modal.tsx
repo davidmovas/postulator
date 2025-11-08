@@ -64,20 +64,7 @@ export function CreateTopicsModal({ open, onOpenChange, siteId, onSuccess }: Cre
                 );
             }
 
-            const MAX_LEN = 8;
-            const skippedTitles = (result.skippedTitles || []).map(t =>
-                t.length > MAX_LEN ? t.slice(0, MAX_LEN) : t
-            );
-
-            const lines: string[] = [
-                `Created: ${result.created}`,
-                `Skipped: ${result.skipped}`,
-            ];
-            if (skippedTitles.length > 0) {
-                lines.push("Skipped titles:");
-                lines.push(...skippedTitles.map(s => `- ${s}`));
-            }
-            const description = lines.join("\n");
+            const description = `Created: ${result.created} | Skipped: ${result.skipped}`;
 
             toast({
                 title: "Topics creation result",

@@ -10,7 +10,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useApiCall } from "@/hooks/use-api-call";
 import { topicService } from "@/services/topics";
@@ -73,7 +73,7 @@ export function EditTopicModal({ open, onOpenChange, topic, onSuccess }: EditTop
                 <div className="space-y-4 py-4">
                     <div className="space-y-2">
                         <Label htmlFor="topic-title">Title<span className="text-red-600">*</span></Label>
-                        <Input
+                        <Textarea
                             id="topic-title"
                             value={formData.title || ""}
                             onChange={(e) => setFormData(prev => ({
@@ -82,6 +82,7 @@ export function EditTopicModal({ open, onOpenChange, topic, onSuccess }: EditTop
                             }))}
                             disabled={isLoading}
                             placeholder="Enter topic title"
+                            rows={4}
                         />
                     </div>
                 </div>

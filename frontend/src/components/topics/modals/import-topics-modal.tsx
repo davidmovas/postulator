@@ -99,25 +99,7 @@ export function ImportTopicsModal({ open, onOpenChange, siteId, onSuccess }: Imp
         });
 
         if (result) {
-            const MAX_LEN = 8;
-            const trunc = (s: string) => (s.length > MAX_LEN ? s.slice(0, MAX_LEN) : s);
-            const skippedList = (result.skipped || []).map(trunc).map(s => `- ${s}`).join("\n");
-            const errorList = (result.errors || []).map(trunc).map(s => `- ${s}`).join("\n");
-
-            const lines: string[] = [
-                `Read: ${result.totalRead}`,
-                `Added: ${result.totalAdded}`,
-                `Skipped: ${result.totalSkipped}`,
-            ];
-            if (skippedList) {
-                lines.push("Skipped titles:");
-                lines.push(skippedList);
-            }
-            if (errorList) {
-                lines.push("Errors:");
-                lines.push(errorList);
-            }
-            const description = lines.join("\n");
+            const description = `Added: ${result.totalAdded} | Skipped: ${result.totalSkipped}`;
 
             toast({
                 title: "Import result",

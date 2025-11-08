@@ -82,12 +82,10 @@ export function DataTable<TData, TValue>({
         pageSize: defaultPageSize,
     });
 
-    // Reset row selection when external key changes
     useEffect(() => {
         if (rowSelectionResetKey !== undefined) {
             setRowSelection({});
             if (onRowSelectionChange) {
-                // notify parent that selection was cleared
                 onRowSelectionChange([] as unknown as TData[]);
             }
         }
@@ -150,7 +148,7 @@ export function DataTable<TData, TValue>({
                                             className={cn(
                                                 "h-11",
                                                 isLastColumn && "text-right",
-                                                isSelectColumn && "w-[40px] px-2 text-center"
+                                                isSelectColumn && "w-[40px] px-4 text-center"
                                             )}
                                         >
                                             {header.isPlaceholder ? null : header.column.getCanSort() ? (
