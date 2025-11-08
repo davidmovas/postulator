@@ -176,6 +176,30 @@ export namespace dto {
 	        this.isUserFacing = source["isUserFacing"];
 	    }
 	}
+	export class HealthCheckSettings {
+	    enabled: boolean;
+	    interval_minutes: number;
+	    min_interval_minutes: number;
+	    notify_when_hidden: boolean;
+	    notify_always: boolean;
+	    notify_with_sound: boolean;
+	    notify_on_recover: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new HealthCheckSettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	        this.interval_minutes = source["interval_minutes"];
+	        this.min_interval_minutes = source["min_interval_minutes"];
+	        this.notify_when_hidden = source["notify_when_hidden"];
+	        this.notify_always = source["notify_always"];
+	        this.notify_with_sound = source["notify_with_sound"];
+	        this.notify_on_recover = source["notify_on_recover"];
+	    }
+	}
 	export class State {
 	    jobId: number;
 	    lastRunAt?: string;
@@ -505,6 +529,40 @@ export namespace dto {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
 	        this.data = this.convertValues(source["data"], DashboardSummary);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_HealthCheckSettings_ {
+	    success: boolean;
+	    data?: HealthCheckSettings;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_HealthCheckSettings_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], HealthCheckSettings);
 	        this.error = this.convertValues(source["error"], Error);
 	    }
 	

@@ -28,6 +28,7 @@ func New(cfg *config.Config) (*App, error) {
 		sitesHandler      *handlers.SitesHandler
 		statsHandler      *handlers.StatsHandler
 		topicsHandler     *handlers.TopicsHandler
+		settingsHandler   *handlers.SettingsHandler
 	)
 
 	fxApp := fx.New(
@@ -46,6 +47,7 @@ func New(cfg *config.Config) (*App, error) {
 			&sitesHandler,
 			&statsHandler,
 			&topicsHandler,
+			&settingsHandler,
 		),
 	)
 
@@ -60,6 +62,7 @@ func New(cfg *config.Config) (*App, error) {
 			sitesHandler,
 			statsHandler,
 			topicsHandler,
+			settingsHandler,
 		},
 		cfg: cfg,
 	}
