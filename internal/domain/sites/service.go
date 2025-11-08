@@ -183,24 +183,20 @@ func (s *service) CheckHealth(ctx context.Context, siteID int64) (*entities.Heal
 		return nil, err
 	}
 
-	var (
-		healthCheck *entities.HealthCheck
-		status      = entities.HealthUnknown
-	)
-
-	healthCheck, err = s.performHealthCheck(ctx, site)
+	healthCheck, err := s.performHealthCheck(ctx, site)
 	if err != nil {
-		s.logger.ErrorWithErr(err, "Failed to perform health check")
-	} else {
-		status = healthCheck.Status
+		s.logger.ErrorWithErr(err, "Critical error during health check")
+		return nil, err
 	}
 
-	if err = s.repo.UpdateHealthStatus(ctx, siteID, status, time.Now()); err != nil {
-		s.logger.ErrorWithErr(err, "Failed to update health status")
-		return healthCheck, err
+	status := healthCheck.Status
+
+	if updateErr := s.repo.UpdateHealthStatus(ctx, siteID, status, time.Now()); updateErr != nil {
+		s.logger.ErrorWithErr(updateErr, "Failed to update health status in DB")
+		return healthCheck, updateErr
 	}
 
-	return healthCheck, err
+	return healthCheck, nil
 }
 
 func (s *service) CheckAllHealth(ctx context.Context) error {

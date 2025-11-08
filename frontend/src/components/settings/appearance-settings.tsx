@@ -7,7 +7,6 @@ export function AppearanceSettings() {
     return (
         <SettingsSection
             title="Appearance"
-            description="Customize the application appearance"
             icon={<RiPaletteLine className="h-5 w-5" />}
         >
             <div className="text-center py-8 text-muted-foreground">

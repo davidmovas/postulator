@@ -62,11 +62,9 @@ func (s *scheduler) Start(ctx context.Context) error {
 	}
 
 	if !settings.Enabled {
-		s.logger.Info("Health check is disabled, scheduler not started")
 		s.mu.Lock()
 		s.running = false
 		s.mu.Unlock()
-		return nil
 	}
 
 	interval := time.Duration(settings.IntervalMinutes) * time.Minute
@@ -120,25 +118,29 @@ func (s *scheduler) run(ctx context.Context) {
 	for {
 		select {
 		case <-s.stopChan:
-			s.logger.Info("Health check scheduler stopped")
 			return
 
 		case newInterval := <-s.updateIntervalChan:
-			s.logger.Infof("Received interval update: %d minutes", newInterval)
 			if s.ticker != nil {
 				s.ticker.Stop()
 			}
 			s.ticker = time.NewTicker(time.Duration(newInterval) * time.Minute)
-			s.logger.Info("Ticker updated with new interval")
 
 		case <-s.ticker.C:
-			s.logger.Info("Health check tick triggered")
 			s.performCheck(ctx)
 		}
 	}
 }
 
 func (s *scheduler) performCheck(ctx context.Context) {
+	s.mu.RLock()
+	running := s.running
+	s.mu.RUnlock()
+
+	if !running {
+		return
+	}
+
 	settings, err := s.settingsService.GetHealthCheckSettings(ctx)
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to get settings during check")
@@ -146,17 +148,7 @@ func (s *scheduler) performCheck(ctx context.Context) {
 	}
 
 	if !settings.Enabled {
-		s.logger.Info("Health check disabled, skipping check")
 		return
-	}
-
-	isWindowVisible := s.visibilityChecker()
-	s.logger.Infof("Window visible: %v", isWindowVisible)
-
-	shouldNotify := settings.NotifyAlways || (settings.NotifyWhenHidden && !isWindowVisible)
-
-	if !shouldNotify {
-		s.logger.Info("Notifications disabled for current window state, skipping notifications")
 	}
 
 	unhealthy, recovered, err := s.service.CheckAutoHealthSites(ctx)
@@ -164,6 +156,9 @@ func (s *scheduler) performCheck(ctx context.Context) {
 		s.logger.ErrorWithErr(err, "Failed to check auto health sites")
 		return
 	}
+
+	isWindowVisible := s.visibilityChecker()
+	shouldNotify := settings.NotifyAlways || (settings.NotifyWhenHidden && !isWindowVisible)
 
 	if shouldNotify {
 		if len(unhealthy) > 0 {

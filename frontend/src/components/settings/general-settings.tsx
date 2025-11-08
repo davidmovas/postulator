@@ -7,7 +7,6 @@ export function GeneralSettings() {
     return (
         <SettingsSection
             title="General"
-            description="Basic application settings"
             icon={<RiSettings3Line className="h-5 w-5" />}
         >
             <div className="text-center py-8 text-muted-foreground">

@@ -2,7 +2,9 @@ package healthcheck
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -10,6 +12,14 @@ import (
 	"github.com/davidmovas/postulator/pkg/logger"
 
 	"github.com/gen2brain/beeep"
+)
+
+//go:embed assets/icon.png
+var icon []byte
+
+const (
+	unhealthyIntensificationAmount = 3
+	recoveredIntensificationAmount = 3
 )
 
 type siteNotificationState struct {
@@ -24,6 +34,7 @@ type notifier struct {
 }
 
 func NewNotifier(logger *logger.Logger) Notifier {
+	beeep.AppName = "Postulator"
 	return &notifier{
 		states: make(map[int64]*siteNotificationState),
 		logger: logger.
@@ -32,7 +43,7 @@ func NewNotifier(logger *logger.Logger) Notifier {
 	}
 }
 
-func (n *notifier) NotifyUnhealthySites(ctx context.Context, sites []*entities.Site, withSound bool) error {
+func (n *notifier) NotifyUnhealthySites(_ context.Context, sites []*entities.Site, withSound bool) error {
 	if len(sites) == 0 {
 		return nil
 	}
@@ -40,7 +51,6 @@ func (n *notifier) NotifyUnhealthySites(ctx context.Context, sites []*entities.S
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	// Фильтруем только те сайты, которые раньше не были down или давно не уведомляли
 	var sitesToNotify []*entities.Site
 	now := time.Now()
 
@@ -54,7 +64,6 @@ func (n *notifier) NotifyUnhealthySites(ctx context.Context, sites []*entities.S
 			n.states[site.ID] = state
 		}
 
-		// Уведомляем только если сайт упал впервые (не был down)
 		if !state.wasDown {
 			sitesToNotify = append(sitesToNotify, site)
 			state.wasDown = true
@@ -66,20 +75,17 @@ func (n *notifier) NotifyUnhealthySites(ctx context.Context, sites []*entities.S
 		return nil
 	}
 
-	// Формируем сообщение
 	title := "Health Check Alert"
 	message := n.formatUnhealthyMessage(sitesToNotify)
 
-	n.logger.Warnf("Sending notification for %d unhealthy sites", len(sitesToNotify))
-
 	if withSound {
-		err := beeep.Alert(title, message, "")
+		err := beeep.Alert(title, message, icon)
 		if err != nil {
 			n.logger.ErrorWithErr(err, "Failed to send notification with sound")
 			return err
 		}
 	} else {
-		err := beeep.Notify(title, message, "")
+		err := beeep.Notify(title, message, icon)
 		if err != nil {
 			n.logger.ErrorWithErr(err, "Failed to send notification")
 			return err
@@ -89,7 +95,7 @@ func (n *notifier) NotifyUnhealthySites(ctx context.Context, sites []*entities.S
 	return nil
 }
 
-func (n *notifier) NotifyRecoveredSites(ctx context.Context, sites []*entities.Site, withSound bool) error {
+func (n *notifier) NotifyRecoveredSites(_ context.Context, sites []*entities.Site, withSound bool) error {
 	if len(sites) == 0 {
 		return nil
 	}
@@ -107,8 +113,6 @@ func (n *notifier) NotifyRecoveredSites(ctx context.Context, sites []*entities.S
 	// Формируем сообщение
 	title := "Health Check Recovery"
 	message := n.formatRecoveredMessage(sites)
-
-	n.logger.Infof("Sending recovery notification for %d sites", len(sites))
 
 	if withSound {
 		err := beeep.Alert(title, message, "")
@@ -135,32 +139,54 @@ func (n *notifier) ResetState(siteID int64) {
 
 func (n *notifier) formatUnhealthyMessage(sites []*entities.Site) string {
 	if len(sites) == 1 {
-		return fmt.Sprintf("Site '%s' is unhealthy", sites[0].Name)
+		site := sites[0]
+		return fmt.Sprintf("Site Down\n\n%s", site.Name)
 	}
 
-	if len(sites) <= 3 {
-		names := make([]string, len(sites))
+	if len(sites) <= unhealthyIntensificationAmount {
+		var msg strings.Builder
+		msg.WriteString(fmt.Sprintf("%d Sites Down\n\n", len(sites)))
 		for i, site := range sites {
-			names[i] = site.Name
+			msg.WriteString(fmt.Sprintf("%s", site.Name))
+			if i < len(sites)-1 {
+				msg.WriteString("\n")
+			}
 		}
-		return fmt.Sprintf("Sites are unhealthy: %v", names)
+		return msg.String()
 	}
 
-	return fmt.Sprintf("%d sites are unhealthy. Check the application for details.", len(sites))
+	var msg strings.Builder
+	msg.WriteString(fmt.Sprintf("%d Sites Down\n\n", len(sites)))
+	for i := 0; i < unhealthyIntensificationAmount; i++ {
+		msg.WriteString(fmt.Sprintf("%s", sites[i].Name))
+	}
+	msg.WriteString(fmt.Sprintf("\n...and %d more sites", len(sites)-unhealthyIntensificationAmount))
+	return msg.String()
 }
 
 func (n *notifier) formatRecoveredMessage(sites []*entities.Site) string {
 	if len(sites) == 1 {
-		return fmt.Sprintf("Site '%s' has recovered", sites[0].Name)
+		site := sites[0]
+		return fmt.Sprintf("Site Recovered\n\n%s", site.Name)
 	}
 
-	if len(sites) <= 3 {
-		names := make([]string, len(sites))
+	if len(sites) <= recoveredIntensificationAmount {
+		var msg strings.Builder
+		msg.WriteString(fmt.Sprintf("%d Sites Recovered\n\n", len(sites)))
 		for i, site := range sites {
-			names[i] = site.Name
+			msg.WriteString(fmt.Sprintf("%s", site.Name))
+			if i < len(sites)-1 {
+				msg.WriteString("\n")
+			}
 		}
-		return fmt.Sprintf("Sites recovered: %v", names)
+		return msg.String()
 	}
 
-	return fmt.Sprintf("%d sites have recovered", len(sites))
+	var msg strings.Builder
+	msg.WriteString(fmt.Sprintf("%d Sites Recovered\n\n", len(sites)))
+	for i := 0; i < recoveredIntensificationAmount; i++ {
+		msg.WriteString(fmt.Sprintf("%s", sites[i].Name))
+	}
+	msg.WriteString(fmt.Sprintf("\n...and %d more sites", len(sites)-recoveredIntensificationAmount))
+	return msg.String()
 }

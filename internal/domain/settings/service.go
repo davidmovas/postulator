@@ -30,7 +30,8 @@ func (s *service) GetHealthCheckSettings(ctx context.Context) (*entities.HealthC
 		var appErr *appErrors.AppError
 		if errors.As(err, &appErr) && appErr.Code == appErrors.ErrCodeNotFound {
 			s.logger.Info("Health check settings not found, returning defaults")
-			return entities.DefaultHealthCheckSettings(), nil
+			defaultHealthCheckSettings := entities.DefaultHealthCheckSettings()
+			return defaultHealthCheckSettings, s.UpdateHealthCheckSettings(ctx, defaultHealthCheckSettings)
 		}
 		s.logger.ErrorWithErr(err, "Failed to get health check settings")
 		return nil, err

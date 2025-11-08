@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
-	"github.com/davidmovas/postulator/pkg/errors"
 )
 
 func (c *restyClient) CheckHealth(ctx context.Context, site *entities.Site) (*entities.HealthCheck, error) {
@@ -31,10 +30,10 @@ func (c *restyClient) CheckHealth(ctx context.Context, site *entities.Site) (*en
 		Get(url)
 
 	if err != nil {
-		err = errors.SiteUnreachable(site.URL, fmt.Errorf("request failed: %w", err))
 		health.Error = err.Error()
-		health.Status = entities.HealthError
-		return health, err
+		health.Status = entities.HealthUnhealthy
+		health.Code = 0
+		return health, nil
 	}
 
 	health.Code = resp.StatusCode()
@@ -44,10 +43,9 @@ func (c *restyClient) CheckHealth(ctx context.Context, site *entities.Site) (*en
 	case resp.StatusCode() == http.StatusOK:
 		var data map[string]any
 		if err = json.Unmarshal(resp.Body(), &data); err != nil {
-			err = errors.WordPress("invalid JSON in /wp-json response", err)
-			health.Error = err.Error()
-			health.Status = entities.HealthError
-			return health, err
+			health.Error = fmt.Sprintf("invalid JSON in /wp-json response: %v", err)
+			health.Status = entities.HealthUnhealthy
+			return health, nil
 		}
 
 		if _, ok := data["namespaces"]; ok {
@@ -55,54 +53,57 @@ func (c *restyClient) CheckHealth(ctx context.Context, site *entities.Site) (*en
 			return health, nil
 		}
 
-		err = errors.WordPress("unexpected /wp-json structure", nil)
-		health.Error = err.Error()
-		health.Status = entities.HealthUnknown
-		return health, err
+		health.Error = "unexpected /wp-json structure - missing 'namespaces'"
+		health.Status = entities.HealthUnhealthy
+		return health, nil
 
 	case resp.StatusCode() >= 500:
-		err = errors.WordPress(fmt.Sprintf("WordPress server error: %d", resp.StatusCode()), nil)
-		health.Error = err.Error()
+		health.Error = fmt.Sprintf("WordPress server error: %d %s", resp.StatusCode(), resp.Status())
 		health.Status = entities.HealthUnhealthy
-		return health, err
+		return health, nil
+
+	case resp.StatusCode() == http.StatusUnauthorized || resp.StatusCode() == http.StatusForbidden:
+		health.Error = fmt.Sprintf("authentication failed: %d %s", resp.StatusCode(), resp.Status())
+		health.Status = entities.HealthError
+		return health, nil
 
 	case resp.StatusCode() >= 400:
-		err = errors.WordPress(fmt.Sprintf("WordPress API returned code: %d", resp.StatusCode()), nil)
-		health.Error = err.Error()
-		health.Status = entities.HealthError
-		return health, err
+		health.Error = fmt.Sprintf("WordPress API error: %d %s", resp.StatusCode(), resp.Status())
+		health.Status = entities.HealthUnhealthy
+		return health, nil
 
 	case resp.StatusCode() >= 300:
 		location := resp.Header().Get("Location")
-		if location == "" {
-			err = errors.WordPress(fmt.Sprintf("redirect (%d) without Location header", resp.StatusCode()), nil)
-			health.Error = err.Error()
-			health.Status = entities.HealthUnknown
-			return health, err
-		}
 
-		if strings.HasPrefix(location, "https://") &&
-			strings.TrimPrefix(site.URL, "http://") == strings.TrimPrefix(location, "https://") {
-			health.Status = entities.HealthHealthy
+		if location == "" {
+			health.Error = fmt.Sprintf("redirect (%d) without Location header", resp.StatusCode())
+			health.Status = entities.HealthUnhealthy
 			return health, nil
 		}
 
-		if strings.Contains(location, "wp-login.php") {
-			err = errors.WordPress("redirected to login page", nil)
-			health.Error = err.Error()
-			health.Status = entities.HealthHealthy
-			return health, err
+		if strings.HasPrefix(location, "https://") {
+			httpURL := strings.TrimPrefix(site.URL, "http://")
+			httpsURL := strings.TrimPrefix(location, "https://")
+			if httpURL == httpsURL || strings.HasPrefix(httpsURL, httpURL) {
+				health.Status = entities.HealthHealthy
+				health.Error = "site redirects to HTTPS"
+				return health, nil
+			}
 		}
 
-		err = errors.WordPress(fmt.Sprintf("unexpected redirect (%d) to: %s", resp.StatusCode(), location), nil)
-		health.Error = err.Error()
-		health.Status = entities.HealthUnknown
-		return health, err
+		if strings.Contains(location, "wp-login.php") || strings.Contains(location, "wp-admin") {
+			health.Error = "redirected to login page - authentication required"
+			health.Status = entities.HealthError
+			return health, nil
+		}
+
+		health.Error = fmt.Sprintf("unexpected redirect (%d) to: %s", resp.StatusCode(), location)
+		health.Status = entities.HealthUnhealthy
+		return health, nil
 
 	default:
-		err = errors.WordPress(fmt.Sprintf("unexpected status code: %d", resp.StatusCode()), nil)
-		health.Error = err.Error()
+		health.Error = fmt.Sprintf("unexpected status code: %d %s", resp.StatusCode(), resp.Status())
 		health.Status = entities.HealthUnknown
-		return health, err
+		return health, nil
 	}
 }

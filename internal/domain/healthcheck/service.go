@@ -32,43 +32,24 @@ func NewService(
 func (s *service) CheckSiteHealth(ctx context.Context, site *entities.Site) (*entities.HealthCheckHistory, error) {
 	s.logger.Infof("Checking health for site: %s (ID: %d)", site.Name, site.ID)
 
-	startTime := time.Now()
-
 	healthCheck, err := s.siteService.CheckHealth(ctx, site.ID)
-
-	elapsed := time.Since(startTime)
-	responseTimeMs := int(elapsed.Milliseconds())
-
-	updatedSite, getErr := s.siteService.GetSite(ctx, site.ID)
-	if getErr != nil {
-		s.logger.ErrorWithErr(getErr, "Failed to get updated site after health check")
-		return nil, getErr
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to perform health check")
+		return nil, err
 	}
 
 	history := &entities.HealthCheckHistory{
 		SiteID:         site.ID,
 		CheckedAt:      time.Now(),
-		Status:         updatedSite.HealthStatus,
-		ResponseTimeMs: responseTimeMs,
-		StatusCode:     0,
-	}
-
-	if healthCheck != nil {
-		history.StatusCode = healthCheck.Code
-		history.ErrorMessage = healthCheck.Error
-		history.ResponseTimeMs = int(healthCheck.ResponseTime.Milliseconds())
-	}
-
-	if err != nil {
-		history.Status = entities.HealthUnhealthy
-		history.ErrorMessage = err.Error()
-		s.logger.Warnf("Site %s is unhealthy: %v", site.Name, err)
-	} else {
-		s.logger.Infof("Site %s is healthy (response time: %dms)", site.Name, responseTimeMs)
+		Status:         healthCheck.Status,
+		ResponseTimeMs: int(healthCheck.ResponseTime.Milliseconds()),
+		StatusCode:     healthCheck.Code,
+		ErrorMessage:   healthCheck.Error,
 	}
 
 	if err = s.repo.SaveHistory(ctx, history); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to save health check history")
+		return history, err
 	}
 
 	return history, nil
