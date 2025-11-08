@@ -134,11 +134,11 @@ export function useSitesTable() {
                 return (
                     <div
                         className="cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={() => handleCheckHealth(site.id)}
-                title="Click to check health"
-                >
-                <HealthIndicator status={healthStatus} />
-                </div>
+                        onClick={() => handleCheckHealth(site.id)}
+                        title="Click to check health"
+                    >
+                        <HealthIndicator status={healthStatus} />
+                    </div>
             );
             },
             filterFn: (row, id, value) => {

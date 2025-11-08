@@ -20,6 +20,9 @@ var icon []byte
 const (
 	unhealthyIntensificationAmount = 3
 	recoveredIntensificationAmount = 3
+
+	unhealthNotificationTitle  = "Health Check Alert"
+	recoveredNotificationTitle = "Health Check Recovery"
 )
 
 type siteNotificationState struct {
@@ -74,18 +77,16 @@ func (n *notifier) NotifyUnhealthySites(_ context.Context, sites []*entities.Sit
 	if len(sitesToNotify) == 0 {
 		return nil
 	}
-
-	title := "Health Check Alert"
 	message := n.formatUnhealthyMessage(sitesToNotify)
 
 	if withSound {
-		err := beeep.Alert(title, message, icon)
+		err := beeep.Alert(unhealthNotificationTitle, message, icon)
 		if err != nil {
 			n.logger.ErrorWithErr(err, "Failed to send notification with sound")
 			return err
 		}
 	} else {
-		err := beeep.Notify(title, message, icon)
+		err := beeep.Notify(unhealthNotificationTitle, message, icon)
 		if err != nil {
 			n.logger.ErrorWithErr(err, "Failed to send notification")
 			return err
@@ -103,25 +104,22 @@ func (n *notifier) NotifyRecoveredSites(_ context.Context, sites []*entities.Sit
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	// Сбрасываем состояние для восстановленных сайтов
 	for _, site := range sites {
 		if state, exists := n.states[site.ID]; exists {
 			state.wasDown = false
 		}
 	}
 
-	// Формируем сообщение
-	title := "Health Check Recovery"
 	message := n.formatRecoveredMessage(sites)
 
 	if withSound {
-		err := beeep.Alert(title, message, "")
+		err := beeep.Alert(recoveredNotificationTitle, message, "")
 		if err != nil {
 			n.logger.ErrorWithErr(err, "Failed to send recovery notification with sound")
 			return err
 		}
 	} else {
-		err := beeep.Notify(title, message, "")
+		err := beeep.Notify(recoveredNotificationTitle, message, "")
 		if err != nil {
 			n.logger.ErrorWithErr(err, "Failed to send recovery notification")
 			return err
@@ -147,7 +145,7 @@ func (n *notifier) formatUnhealthyMessage(sites []*entities.Site) string {
 		var msg strings.Builder
 		msg.WriteString(fmt.Sprintf("%d Sites Down\n\n", len(sites)))
 		for i, site := range sites {
-			msg.WriteString(fmt.Sprintf("%s", site.Name))
+			msg.WriteString(site.Name)
 			if i < len(sites)-1 {
 				msg.WriteString("\n")
 			}
@@ -158,9 +156,10 @@ func (n *notifier) formatUnhealthyMessage(sites []*entities.Site) string {
 	var msg strings.Builder
 	msg.WriteString(fmt.Sprintf("%d Sites Down\n\n", len(sites)))
 	for i := 0; i < unhealthyIntensificationAmount; i++ {
-		msg.WriteString(fmt.Sprintf("%s", sites[i].Name))
+		msg.WriteString(fmt.Sprintf("%s\n", sites[i].Name))
 	}
-	msg.WriteString(fmt.Sprintf("\n...and %d more sites", len(sites)-unhealthyIntensificationAmount))
+
+	msg.WriteString(fmt.Sprintf("...and %d more sites", len(sites)-unhealthyIntensificationAmount))
 	return msg.String()
 }
 
@@ -174,7 +173,7 @@ func (n *notifier) formatRecoveredMessage(sites []*entities.Site) string {
 		var msg strings.Builder
 		msg.WriteString(fmt.Sprintf("%d Sites Recovered\n\n", len(sites)))
 		for i, site := range sites {
-			msg.WriteString(fmt.Sprintf("%s", site.Name))
+			msg.WriteString(site.Name)
 			if i < len(sites)-1 {
 				msg.WriteString("\n")
 			}
@@ -185,8 +184,9 @@ func (n *notifier) formatRecoveredMessage(sites []*entities.Site) string {
 	var msg strings.Builder
 	msg.WriteString(fmt.Sprintf("%d Sites Recovered\n\n", len(sites)))
 	for i := 0; i < recoveredIntensificationAmount; i++ {
-		msg.WriteString(fmt.Sprintf("%s", sites[i].Name))
+		msg.WriteString(fmt.Sprintf("%s\n", sites[i].Name))
 	}
-	msg.WriteString(fmt.Sprintf("\n...and %d more sites", len(sites)-recoveredIntensificationAmount))
+
+	msg.WriteString(fmt.Sprintf("...and %d more sites", len(sites)-recoveredIntensificationAmount))
 	return msg.String()
 }

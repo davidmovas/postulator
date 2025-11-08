@@ -6,22 +6,26 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/sites"
+	"github.com/davidmovas/postulator/internal/infra/wp"
 	"github.com/davidmovas/postulator/pkg/logger"
 )
 
 type service struct {
 	siteService sites.Service
+	wpClient    wp.Client
 	repo        Repository
 	logger      *logger.Logger
 }
 
 func NewService(
 	siteService sites.Service,
+	wpClient wp.Client,
 	repo Repository,
 	logger *logger.Logger,
 ) Service {
 	return &service{
 		siteService: siteService,
+		wpClient:    wpClient,
 		repo:        repo,
 		logger: logger.
 			WithScope("service").
@@ -30,9 +34,14 @@ func NewService(
 }
 
 func (s *service) CheckSiteHealth(ctx context.Context, site *entities.Site) (*entities.HealthCheckHistory, error) {
-	s.logger.Infof("Checking health for site: %s (ID: %d)", site.Name, site.ID)
+	// ensure we have credentials
+	fullSite, err := s.siteService.GetSiteWithPassword(ctx, site.ID)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to load site with password")
+		return nil, err
+	}
 
-	healthCheck, err := s.siteService.CheckHealth(ctx, site.ID)
+	healthCheck, err := s.wpClient.CheckHealth(ctx, fullSite)
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to perform health check")
 		return nil, err
@@ -51,13 +60,24 @@ func (s *service) CheckSiteHealth(ctx context.Context, site *entities.Site) (*en
 		s.logger.ErrorWithErr(err, "Failed to save health check history")
 		return history, err
 	}
+	// update site status and last check
+	if err = s.siteService.UpdateHealthStatus(ctx, site.ID, healthCheck.Status, history.CheckedAt); err != nil {
+		s.logger.ErrorWithErr(err, "Failed to update site health status")
+	}
 
 	return history, nil
 }
 
-func (s *service) CheckAutoHealthSites(ctx context.Context) (unhealthy []*entities.Site, recovered []*entities.Site, err error) {
-	s.logger.Info("Starting auto health check for all sites")
+func (s *service) CheckSiteByID(ctx context.Context, siteID int64) (*entities.HealthCheckHistory, error) {
+	site, err := s.siteService.GetSite(ctx, siteID)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get site")
+		return nil, err
+	}
+	return s.CheckSiteHealth(ctx, site)
+}
 
+func (s *service) CheckAutoHealthSites(ctx context.Context) (unhealthy []*entities.Site, recovered []*entities.Site, err error) {
 	allSites, err := s.siteService.ListSites(ctx)
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to get sites list")
@@ -75,8 +95,6 @@ func (s *service) CheckAutoHealthSites(ctx context.Context) (unhealthy []*entiti
 		s.logger.Info("No sites with auto health check enabled")
 		return nil, nil, nil
 	}
-
-	s.logger.Infof("Found %d sites for auto health check", len(sitesToCheck))
 
 	var unhealthySites []*entities.Site
 	var recoveredSites []*entities.Site
@@ -112,8 +130,6 @@ func (s *service) CheckAutoHealthSites(ctx context.Context) (unhealthy []*entiti
 		}
 	}
 
-	s.logger.Infof("Health check completed: %d unhealthy, %d recovered", len(unhealthySites), len(recoveredSites))
-
 	return unhealthySites, recoveredSites, nil
 }
 
@@ -124,5 +140,21 @@ func (s *service) GetSiteHistory(ctx context.Context, siteID int64, limit int) (
 		return nil, err
 	}
 
+	return history, nil
+}
+
+func (s *service) GetSiteHistoryByPeriod(ctx context.Context, siteID int64, from, to time.Time) ([]*entities.HealthCheckHistory, error) {
+	if to.IsZero() {
+		to = time.Now()
+	}
+	if from.After(to) {
+		// swap to be safe
+		from, to = to, from
+	}
+	history, err := s.repo.GetHistoryBySitePeriod(ctx, siteID, from, to)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get site history by period")
+		return nil, err
+	}
 	return history, nil
 }

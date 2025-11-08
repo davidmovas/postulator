@@ -3,6 +3,7 @@ package healthcheck
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/infra/database"
@@ -101,6 +102,50 @@ func (r *repository) GetHistoryBySite(ctx context.Context, siteID int64, limit i
 		return nil, errors.Database(err)
 	}
 
+	return history, nil
+}
+
+func (r *repository) GetHistoryBySitePeriod(ctx context.Context, siteID int64, from, to time.Time) ([]*entities.HealthCheckHistory, error) {
+	query, args := dbx.ST.
+		Select("id", "site_id", "checked_at", "status", "response_time_ms", "status_code", "error_message").
+		From("health_check_history").
+		Where(squirrel.Eq{"site_id": siteID}).
+		Where(squirrel.And{
+			squirrel.GtOrEq{"checked_at": from},
+			squirrel.LtOrEq{"checked_at": to},
+		}).
+		OrderBy("checked_at DESC").
+		MustSql()
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, errors.Database(err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var history []*entities.HealthCheckHistory
+	for rows.Next() {
+		var h entities.HealthCheckHistory
+		var errorMsg sql.NullString
+		if err := rows.Scan(
+			&h.ID,
+			&h.SiteID,
+			&h.CheckedAt,
+			&h.Status,
+			&h.ResponseTimeMs,
+			&h.StatusCode,
+			&errorMsg,
+		); err != nil {
+			return nil, errors.Database(err)
+		}
+		if errorMsg.Valid {
+			h.ErrorMessage = errorMsg.String
+		}
+		history = append(history, &h)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, errors.Database(err)
+	}
 	return history, nil
 }
 

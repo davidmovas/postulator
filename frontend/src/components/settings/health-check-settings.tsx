@@ -125,7 +125,7 @@ export function HealthCheckSettings({ onSave, isSaving }: HealthCheckSettingsPro
                                             Notify when app is hidden
                                         </Label>
                                         <p className="text-sm text-muted-foreground">
-                                            Show notifications even when app is minimized or in background
+                                            Show notifications even when app is in background
                                         </p>
                                     </div>
                                     <Switch
@@ -142,7 +142,7 @@ export function HealthCheckSettings({ onSave, isSaving }: HealthCheckSettingsPro
                                             Always notify
                                         </Label>
                                         <p className="text-sm text-muted-foreground">
-                                            Send notifications for every health check, not just status changes
+                                            Notify on every check, not just status changes
                                         </p>
                                     </div>
                                     <Switch
@@ -159,7 +159,7 @@ export function HealthCheckSettings({ onSave, isSaving }: HealthCheckSettingsPro
                                             Notify on recovery
                                         </Label>
                                         <p className="text-sm text-muted-foreground">
-                                            Send notification when a site recovers from unhealthy to healthy state
+                                            Notify when site becomes healthy again
                                         </p>
                                     </div>
                                     <Switch
@@ -178,7 +178,7 @@ export function HealthCheckSettings({ onSave, isSaving }: HealthCheckSettingsPro
                                             </Label>
                                         </div>
                                         <p className="text-sm text-muted-foreground">
-                                            Play sound effect with desktop notifications
+                                            Play sound with notifications
                                         </p>
                                     </div>
                                     <Switch

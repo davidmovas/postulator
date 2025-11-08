@@ -176,53 +176,9 @@ func (s *service) DeleteSite(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (s *service) CheckHealth(ctx context.Context, siteID int64) (*entities.HealthCheck, error) {
-	site, err := s.GetSiteWithPassword(ctx, siteID)
-	if err != nil {
-		s.logger.ErrorWithErr(err, "Failed to get site for health check")
-		return nil, err
-	}
-
-	healthCheck, err := s.performHealthCheck(ctx, site)
-	if err != nil {
-		s.logger.ErrorWithErr(err, "Critical error during health check")
-		return nil, err
-	}
-
-	status := healthCheck.Status
-
-	if updateErr := s.repo.UpdateHealthStatus(ctx, siteID, status, time.Now()); updateErr != nil {
-		s.logger.ErrorWithErr(updateErr, "Failed to update health status in DB")
-		return healthCheck, updateErr
-	}
-
-	return healthCheck, nil
-}
-
-func (s *service) CheckAllHealth(ctx context.Context) error {
-	sites, err := s.repo.GetAll(ctx)
-	if err != nil {
-		s.logger.ErrorWithErr(err, "Failed to get sites for health check")
-		return err
-	}
-
-	var lastErr error
-	for _, site := range sites {
-		if site.Status != entities.StatusActive {
-			continue
-		}
-
-		if _, err = s.CheckHealth(ctx, site.ID); err != nil {
-			lastErr = err
-			s.logger.ErrorWithErr(err, "Health check failed for site")
-		}
-	}
-
-	if lastErr != nil {
-		return errors.New(errors.ErrCodeInternal, "Some health checks failed")
-	}
-
-	return nil
+// UpdateHealthStatus is exposed for healthcheck service to update site health state
+func (s *service) UpdateHealthStatus(ctx context.Context, siteID int64, status entities.HealthStatus, checkedAt time.Time) error {
+	return s.repo.UpdateHealthStatus(ctx, siteID, status, checkedAt)
 }
 
 func (s *service) validateSite(site *entities.Site) error {

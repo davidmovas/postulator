@@ -167,6 +167,10 @@ func (s *scheduler) performCheck(ctx context.Context) {
 			}
 		}
 
+		if len(unhealthy) > 0 && len(recovered) > 0 && settings.NotifyOnRecover {
+			time.Sleep(2 * time.Second)
+		}
+
 		if settings.NotifyOnRecover && len(recovered) > 0 {
 			if err = s.notifier.NotifyRecoveredSites(ctx, recovered, settings.NotifyWithSound); err != nil {
 				s.logger.ErrorWithErr(err, "Failed to send recovery notification")
