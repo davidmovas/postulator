@@ -12,9 +12,11 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/linking"
 	"github.com/davidmovas/postulator/internal/domain/prompts"
 	"github.com/davidmovas/postulator/internal/domain/providers"
+	"github.com/davidmovas/postulator/internal/domain/settings"
 	"github.com/davidmovas/postulator/internal/domain/sites"
 	"github.com/davidmovas/postulator/internal/domain/stats"
 	"github.com/davidmovas/postulator/internal/domain/topics"
+	"github.com/davidmovas/postulator/internal/infra/window"
 	"go.uber.org/fx"
 )
 
@@ -63,7 +65,6 @@ var Module = fx.Module("domain",
 		// Healthcheck
 		healthcheck.NewRepository,
 		healthcheck.NewService,
-		healthcheck.NewScheduler,
 		healthcheck.NewNotifier,
 
 		// Topics
@@ -71,6 +72,10 @@ var Module = fx.Module("domain",
 		topics.NewUsageRepository,
 		topics.NewSiteTopicRepository,
 		topics.NewService,
+
+		// Settings
+		settings.NewRepository,
+		settings.NewService,
 	),
 
 	// Job Scheduler lifecycle
@@ -86,7 +91,10 @@ var Module = fx.Module("domain",
 		})
 	}),
 
-	// Health check lifecycle
+	// Health check Scheduler lifecycle
+	fx.Provide(healthcheck.NewScheduler, func() healthcheck.WindowVisibilityChecker {
+		return window.IsWindowOpen
+	}),
 	fx.Invoke(func(lc fx.Lifecycle, scheduler healthcheck.Scheduler) {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {

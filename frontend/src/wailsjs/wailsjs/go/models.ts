@@ -696,6 +696,7 @@ export namespace dto {
 	    wpPassword: string;
 	    status: string;
 	    lastHealthCheck: string;
+	    autoHealthCheck: boolean;
 	    healthStatus: string;
 	    createdAt: string;
 	    updatedAt: string;
@@ -713,6 +714,7 @@ export namespace dto {
 	        this.wpPassword = source["wpPassword"];
 	        this.status = source["status"];
 	        this.lastHealthCheck = source["lastHealthCheck"];
+	        this.autoHealthCheck = source["autoHealthCheck"];
 	        this.healthStatus = source["healthStatus"];
 	        this.createdAt = source["createdAt"];
 	        this.updatedAt = source["updatedAt"];

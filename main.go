@@ -8,6 +8,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/config"
+	"github.com/davidmovas/postulator/internal/infra/window"
 
 	"github.com/getlantern/systray"
 	"github.com/wailsapp/wails/v2"
@@ -28,7 +29,7 @@ var icon []byte
 //go:embed build/icon.ico
 var icoIcon []byte
 
-var wailsCtx context.Context
+var appCtx context.Context
 
 func onReady(ctx context.Context, app *app.App) {
 	if err := app.Start(ctx); err != nil {
@@ -49,16 +50,19 @@ func onReady(ctx context.Context, app *app.App) {
 		for {
 			select {
 			case <-mShow.ClickedCh:
-				if wailsCtx != nil {
-					runtime.WindowShow(wailsCtx)
+				if appCtx != nil {
+					runtime.WindowShow(appCtx)
+					window.SetWindowOpen(true)
 				}
 			case <-mHide.ClickedCh:
-				if wailsCtx != nil {
-					runtime.WindowHide(wailsCtx)
+				if appCtx != nil {
+					runtime.WindowHide(appCtx)
+					window.SetWindowOpen(false)
 				}
 			case <-mQuit.ClickedCh:
-				if wailsCtx != nil {
-					runtime.Quit(wailsCtx)
+				if appCtx != nil {
+					runtime.Quit(appCtx)
+					window.SetWindowOpen(false)
 				}
 				systray.Quit()
 				os.Exit(0)
@@ -96,24 +100,24 @@ func main() {
 	)
 
 	err = wails.Run(&options.App{
-		Title:             "Postulator",
-		Width:             1280,
-		Height:            720,
-		MinWidth:          1024,
-		MinHeight:         480,
-		DisableResize:     false,
-		Fullscreen:        false,
-		Frameless:         false,
-		StartHidden:       false,
-		HideWindowOnClose: true,
+		Title:         "Postulator",
+		Width:         1280,
+		Height:        720,
+		MinWidth:      1024,
+		MinHeight:     480,
+		DisableResize: false,
+		Fullscreen:    false,
+		Frameless:     false,
+		StartHidden:   false,
+		//HideWindowOnClose: true,
 		SingleInstanceLock: &options.SingleInstanceLock{
 			UniqueId: "com.postulator.app",
 			OnSecondInstanceLaunch: func(secondInstanceData options.SecondInstanceData) {
-				if wailsCtx != nil {
-					runtime.WindowShow(wailsCtx)
-					runtime.WindowUnminimise(wailsCtx)
-					runtime.WindowSetAlwaysOnTop(wailsCtx, true)
-					runtime.WindowSetAlwaysOnTop(wailsCtx, false)
+				if appCtx != nil {
+					runtime.WindowShow(appCtx)
+					runtime.WindowUnminimise(appCtx)
+					runtime.WindowSetAlwaysOnTop(appCtx, true)
+					runtime.WindowSetAlwaysOnTop(appCtx, false)
 				}
 			},
 		},
@@ -121,11 +125,24 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		Menu:             nil,
-		Logger:           nil,
-		LogLevel:         logger.DEBUG,
-		OnStartup:        func(ctx context.Context) { wailsCtx = ctx },
-		OnShutdown:       func(ctx context.Context) { _ = appInst.Stop() },
+		Menu:     nil,
+		Logger:   nil,
+		LogLevel: logger.DEBUG,
+		OnStartup: func(ctx context.Context) {
+			appCtx = ctx
+			window.SetWindowOpen(true)
+		},
+		OnBeforeClose: func(ctx context.Context) (prevent bool) {
+			if ctx != nil {
+				runtime.WindowHide(ctx)
+			}
+			window.SetWindowOpen(false)
+			return true
+		},
+		OnShutdown: func(ctx context.Context) {
+			window.SetWindowOpen(false)
+			_ = appInst.Stop()
+		},
 		WindowStartState: options.Normal,
 		Bind:             appInst.GetBinds(),
 		DragAndDrop: &options.DragAndDrop{
