@@ -176,7 +176,6 @@ func (s *service) DeleteSite(ctx context.Context, id int64) error {
 	return nil
 }
 
-// UpdateHealthStatus is exposed for healthcheck service to update site health state
 func (s *service) UpdateHealthStatus(ctx context.Context, siteID int64, status entities.HealthStatus, checkedAt time.Time) error {
 	return s.repo.UpdateHealthStatus(ctx, siteID, status, checkedAt)
 }
@@ -204,8 +203,4 @@ func (s *service) validateSite(site *entities.Site) error {
 	}
 
 	return nil
-}
-
-func (s *service) performHealthCheck(ctx context.Context, site *entities.Site) (*entities.HealthCheck, error) {
-	return s.wpClient.CheckHealth(ctx, site)
 }

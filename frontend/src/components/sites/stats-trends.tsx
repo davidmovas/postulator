@@ -69,7 +69,7 @@ export function StatsTrends({ dailyStats }: StatsTrendsProps) {
                     <CardTitle className="text-lg">Articles Published</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <ChartContainer config={publicationsChartConfig} className="min-h-[200px] w-full">
+                    <ChartContainer config={publicationsChartConfig} className="min-h-[160px] w-full">
                         <BarChart accessibilityLayer data={chartData}>
                             <CartesianGrid vertical={false} />
                             <XAxis
@@ -93,7 +93,7 @@ export function StatsTrends({ dailyStats }: StatsTrendsProps) {
                     <CardTitle className="text-lg">Content & Links</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <ChartContainer config={contentChartConfig} className="min-h-[200px] w-full">
+                    <ChartContainer config={contentChartConfig} className="min-h-[160px] w-full">
                         <BarChart accessibilityLayer data={chartData}>
                             <CartesianGrid vertical={false} />
                             <XAxis
@@ -117,7 +117,7 @@ export function StatsTrends({ dailyStats }: StatsTrendsProps) {
                     <CardTitle className="text-lg">Success Rate</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <ChartContainer config={successChartConfig} className="min-h-[200px] w-full">
+                    <ChartContainer config={successChartConfig} className="min-h-[160px] w-full">
                         <LineChart accessibilityLayer data={chartData}>
                             <CartesianGrid vertical={false} />
                             <XAxis

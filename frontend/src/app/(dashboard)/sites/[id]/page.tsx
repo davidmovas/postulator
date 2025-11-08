@@ -15,6 +15,7 @@ import { SiteHeader } from "@/components/sites/site-header";
 import { SiteActions } from "@/components/sites/site-actions";
 import { SiteInfo } from "@/components/sites/site-info";
 import { SiteStatistics } from "@/components/sites/site-stats";
+import { HealthHistory } from "@/components/sites/health-history";
 import { SiteStats } from "@/models/stats";
 import { toGoDateFormat } from "@/lib/time";
 import { SiteNavigation } from "@/components/sites/site-navigation";
@@ -182,6 +183,9 @@ export default function SitePage() {
                     />
                 </div>
             )}
+
+            {/* Health Checks Section */}
+            <HealthHistory siteId={siteId} />
 
             <EditSiteModal
                 open={editModalOpen}

@@ -43,7 +43,7 @@ func (c *restyClient) CheckHealth(ctx context.Context, site *entities.Site) (*en
 	case resp.StatusCode() == http.StatusOK:
 		var data map[string]any
 		if err = json.Unmarshal(resp.Body(), &data); err != nil {
-			health.Error = fmt.Sprintf("invalid JSON in /wp-json response: %v", err)
+			health.Error = fmt.Sprintf("Invalid JSON in /wp-json response: %v", err)
 			health.Status = entities.HealthUnhealthy
 			return health, nil
 		}
@@ -53,22 +53,22 @@ func (c *restyClient) CheckHealth(ctx context.Context, site *entities.Site) (*en
 			return health, nil
 		}
 
-		health.Error = "unexpected /wp-json structure - missing 'namespaces'"
+		health.Error = "Unexpected /wp-json structure - missing 'namespaces'"
 		health.Status = entities.HealthUnhealthy
 		return health, nil
 
 	case resp.StatusCode() >= 500:
-		health.Error = fmt.Sprintf("WordPress server error: %d %s", resp.StatusCode(), resp.Status())
+		health.Error = fmt.Sprintf("WordPress server error: %s", resp.Status())
 		health.Status = entities.HealthUnhealthy
 		return health, nil
 
 	case resp.StatusCode() == http.StatusUnauthorized || resp.StatusCode() == http.StatusForbidden:
-		health.Error = fmt.Sprintf("authentication failed: %d %s", resp.StatusCode(), resp.Status())
+		health.Error = fmt.Sprintf("Authentication failed: %s", resp.Status())
 		health.Status = entities.HealthError
 		return health, nil
 
 	case resp.StatusCode() >= 400:
-		health.Error = fmt.Sprintf("WordPress API error: %d %s", resp.StatusCode(), resp.Status())
+		health.Error = fmt.Sprintf("WordPress API error: %s", resp.Status())
 		health.Status = entities.HealthUnhealthy
 		return health, nil
 
@@ -76,7 +76,7 @@ func (c *restyClient) CheckHealth(ctx context.Context, site *entities.Site) (*en
 		location := resp.Header().Get("Location")
 
 		if location == "" {
-			health.Error = fmt.Sprintf("redirect (%d) without Location header", resp.StatusCode())
+			health.Error = fmt.Sprintf("Redirect without Location header: %s", resp.Status())
 			health.Status = entities.HealthUnhealthy
 			return health, nil
 		}
@@ -86,23 +86,23 @@ func (c *restyClient) CheckHealth(ctx context.Context, site *entities.Site) (*en
 			httpsURL := strings.TrimPrefix(location, "https://")
 			if httpURL == httpsURL || strings.HasPrefix(httpsURL, httpURL) {
 				health.Status = entities.HealthHealthy
-				health.Error = "site redirects to HTTPS"
+				health.Error = "Site redirects to HTTPS"
 				return health, nil
 			}
 		}
 
 		if strings.Contains(location, "wp-login.php") || strings.Contains(location, "wp-admin") {
-			health.Error = "redirected to login page - authentication required"
+			health.Error = "Redirected to login page - authentication required"
 			health.Status = entities.HealthError
 			return health, nil
 		}
 
-		health.Error = fmt.Sprintf("unexpected redirect (%d) to: %s", resp.StatusCode(), location)
+		health.Error = fmt.Sprintf("Unexpected redirect: %s to %s", resp.Status(), location)
 		health.Status = entities.HealthUnhealthy
 		return health, nil
 
 	default:
-		health.Error = fmt.Sprintf("unexpected status code: %d %s", resp.StatusCode(), resp.Status())
+		health.Error = fmt.Sprintf("Unexpected status code: %s", resp.Status())
 		health.Status = entities.HealthUnknown
 		return health, nil
 	}

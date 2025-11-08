@@ -18,11 +18,10 @@ import (
 var icon []byte
 
 const (
-	unhealthyIntensificationAmount = 3
-	recoveredIntensificationAmount = 3
-
 	unhealthNotificationTitle  = "Health Check Alert"
 	recoveredNotificationTitle = "Health Check Recovery"
+
+	maxDisplay = 2
 )
 
 type siteNotificationState struct {
@@ -141,7 +140,7 @@ func (n *notifier) formatUnhealthyMessage(sites []*entities.Site) string {
 		return fmt.Sprintf("Site Down\n\n%s", site.Name)
 	}
 
-	if len(sites) <= unhealthyIntensificationAmount {
+	if len(sites) <= maxDisplay {
 		var msg strings.Builder
 		msg.WriteString(fmt.Sprintf("%d Sites Down\n\n", len(sites)))
 		for i, site := range sites {
@@ -155,11 +154,10 @@ func (n *notifier) formatUnhealthyMessage(sites []*entities.Site) string {
 
 	var msg strings.Builder
 	msg.WriteString(fmt.Sprintf("%d Sites Down\n\n", len(sites)))
-	for i := 0; i < unhealthyIntensificationAmount; i++ {
+	for i := 0; i < maxDisplay; i++ {
 		msg.WriteString(fmt.Sprintf("%s\n", sites[i].Name))
 	}
-
-	msg.WriteString(fmt.Sprintf("...and %d more sites", len(sites)-unhealthyIntensificationAmount))
+	msg.WriteString(fmt.Sprintf("and %d more", len(sites)-maxDisplay))
 	return msg.String()
 }
 
@@ -169,7 +167,7 @@ func (n *notifier) formatRecoveredMessage(sites []*entities.Site) string {
 		return fmt.Sprintf("Site Recovered\n\n%s", site.Name)
 	}
 
-	if len(sites) <= recoveredIntensificationAmount {
+	if len(sites) <= maxDisplay {
 		var msg strings.Builder
 		msg.WriteString(fmt.Sprintf("%d Sites Recovered\n\n", len(sites)))
 		for i, site := range sites {
@@ -183,10 +181,9 @@ func (n *notifier) formatRecoveredMessage(sites []*entities.Site) string {
 
 	var msg strings.Builder
 	msg.WriteString(fmt.Sprintf("%d Sites Recovered\n\n", len(sites)))
-	for i := 0; i < recoveredIntensificationAmount; i++ {
+	for i := 0; i < maxDisplay; i++ {
 		msg.WriteString(fmt.Sprintf("%s\n", sites[i].Name))
 	}
-
-	msg.WriteString(fmt.Sprintf("...and %d more sites", len(sites)-recoveredIntensificationAmount))
+	msg.WriteString(fmt.Sprintf("and %d more", len(sites)-maxDisplay))
 	return msg.String()
 }

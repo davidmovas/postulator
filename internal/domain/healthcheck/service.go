@@ -34,7 +34,6 @@ func NewService(
 }
 
 func (s *service) CheckSiteHealth(ctx context.Context, site *entities.Site) (*entities.HealthCheckHistory, error) {
-	// ensure we have credentials
 	fullSite, err := s.siteService.GetSiteWithPassword(ctx, site.ID)
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to load site with password")
@@ -60,7 +59,7 @@ func (s *service) CheckSiteHealth(ctx context.Context, site *entities.Site) (*en
 		s.logger.ErrorWithErr(err, "Failed to save health check history")
 		return history, err
 	}
-	// update site status and last check
+
 	if err = s.siteService.UpdateHealthStatus(ctx, site.ID, healthCheck.Status, history.CheckedAt); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to update site health status")
 	}
