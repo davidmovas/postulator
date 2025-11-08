@@ -29,6 +29,7 @@ func New(cfg *config.Config) (*App, error) {
 		healthCheckHandler *handlers.HealthCheckHandler
 		statsHandler       *handlers.StatsHandler
 		topicsHandler      *handlers.TopicsHandler
+		importerHandler    *handlers.ImporterHandler
 		settingsHandler    *handlers.SettingsHandler
 	)
 
@@ -49,6 +50,7 @@ func New(cfg *config.Config) (*App, error) {
 			&healthCheckHandler,
 			&statsHandler,
 			&topicsHandler,
+			&importerHandler,
 			&settingsHandler,
 		),
 	)
@@ -65,6 +67,7 @@ func New(cfg *config.Config) (*App, error) {
 			healthCheckHandler,
 			statsHandler,
 			topicsHandler,
+			importerHandler,
 			settingsHandler,
 		},
 		cfg: cfg,

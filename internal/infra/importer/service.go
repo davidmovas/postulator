@@ -125,8 +125,5 @@ func (s *service) ImportAndAssignToSite(ctx context.Context, filePath string, si
 		result.Errors = append(result.Errors, fmt.Sprintf("failed to assign %d topics to site: %v", len(createdTopicIDs), err))
 	}
 
-	s.logger.Infof("Import completed: %d read, %d added, %d skipped", result.TotalRead, result.TotalAdded, result.TotalSkipped)
-	s.logger.Infof("Assignment completed: %d topics assigned to site %d", len(createdTopicIDs), siteID)
-
 	return result, nil
 }
