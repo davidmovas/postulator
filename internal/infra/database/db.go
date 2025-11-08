@@ -1,12 +1,12 @@
 package database
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/davidmovas/postulator/pkg/ctx"
 	_ "github.com/ncruces/go-sqlite3/driver"
 	_ "github.com/ncruces/go-sqlite3/embed"
 
@@ -43,7 +43,7 @@ func NewDB(filename string) (*DB, error) {
 		return nil, fmt.Errorf("ping db: %w", err)
 	}
 
-	if err = migrator.Apply(context.Background(), db); err != nil {
+	if err = migrator.Apply(ctx.MediumCtx(), db); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("migrate db: %w", err)
 	}
