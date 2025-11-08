@@ -7,6 +7,7 @@ export interface Site {
     wpUsername: string;
     wpPassword: string;
     status: string;
+    autoHealthCheck: boolean;
     lastHealthCheck: string;
     healthStatus: string;
     createdAt: string;
@@ -18,6 +19,7 @@ export interface SiteCreateInput {
     url: string;
     wpUsername: string;
     wpPassword: string;
+    autoHealthCheck: boolean;
 }
 
 export interface SiteUpdateInput extends Partial<SiteCreateInput> {
@@ -33,6 +35,7 @@ export function mapSite(x: dto.Site): Site {
         wpUsername: x.wpUsername,
         wpPassword: x.wpPassword,
         status: x.status,
+        autoHealthCheck: x.autoHealthCheck,
         lastHealthCheck: x.lastHealthCheck,
         healthStatus: x.healthStatus,
         createdAt: x.createdAt,

@@ -19,6 +19,7 @@ export const siteService = {
             url: input.url,
             wpUsername: input.wpUsername,
             wpPassword: input.wpPassword,
+            autoCheckHealth: input.autoHealthCheck,
         });
 
         const response = await CreateSite(payload);
@@ -51,6 +52,7 @@ export const siteService = {
             wpUsername: input.wpUsername,
             wpPassword: input.wpPassword,
             status: input.status,
+            autoHealthCheck: input.autoHealthCheck,
         });
 
         const response = await UpdateSite(payload);

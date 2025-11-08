@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { SiteCreateInput } from "@/models/sites";
 import { useApiCall } from "@/hooks/use-api-call";
 import { siteService } from "@/services/sites";
+import { Switch } from "@/components/ui/switch";
 
 interface CreateSiteModalProps {
     open: boolean;
@@ -22,7 +23,8 @@ export function CreateSiteModal({ open, onOpenChange, onSuccess }: CreateSiteMod
         name: "",
         url: "",
         wpUsername: "",
-        wpPassword: ""
+        wpPassword: "",
+        autoHealthCheck: false,
     });
 
     const [nameTouched, setNameTouched] = useState(false);
@@ -32,7 +34,8 @@ export function CreateSiteModal({ open, onOpenChange, onSuccess }: CreateSiteMod
             name: "",
             url: "",
             wpUsername: "",
-            wpPassword: ""
+            wpPassword: "",
+            autoHealthCheck: false,
         });
         setNameTouched(false);
     };
@@ -169,6 +172,21 @@ export function CreateSiteModal({ open, onOpenChange, onSuccess }: CreateSiteMod
                             }))}
                             disabled={isLoading}
                         />
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                        <Switch
+                            id="autoCheckHealth"
+                            checked={formData.autoHealthCheck}
+                            onCheckedChange={(checked) => setFormData(prev => ({
+                                ...prev,
+                                autoHealthCheck: checked
+                            }))}
+                            disabled={isLoading}
+                        />
+                        <Label htmlFor="autoCheckHealth" className="cursor-pointer">
+                            Enable auto health check
+                        </Label>
                     </div>
                 </div>
 

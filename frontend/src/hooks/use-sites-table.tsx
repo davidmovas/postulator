@@ -16,7 +16,13 @@ import { formatDateTime } from "@/lib/time";
 import { useApiCall } from "@/hooks/use-api-call";
 import { siteService } from "@/services/sites";
 import { Button } from "@/components/ui/button";
-import { RiLockPasswordLine, RiPencilLine, RiPulseLine } from "@remixicon/react";
+import {
+    RiCheckboxBlankCircleLine,
+    RiCheckboxCircleFill, RiCheckboxCircleLine,
+    RiLockPasswordLine,
+    RiPencilLine,
+    RiPulseLine
+} from "@remixicon/react";
 import { useContextModal } from "@/context/modal-context";
 import SiteStatusBadge from "@/components/sites/site-status-badge";
 import HealthIndicator from "@/components/sites/site-health-badge";
@@ -47,6 +53,24 @@ export function useSitesTable() {
             }
         );
     }, [execute, updateSiteStatus]);
+
+    const handleToggleAutoHealthCheck = async (site: Site) => {
+        await execute<void>(
+            () => siteService.updateSite({
+                id: site.id,
+                name: site.name,
+                url: site.url,
+                wpUsername: site.wpUsername,
+                status: site.status,
+                autoHealthCheck: !site.autoHealthCheck
+            }),
+            {
+                successMessage: `Auto health check ${!site.autoHealthCheck ? "enabled" : "disabled"} successfully`,
+                showSuccessToast: true,
+                onSuccess: loadSites
+            }
+        );
+    };
 
     const loadSites = useCallback(async () => {
         const sitesData = await execute<Site[]>(() => siteService.listSites());
@@ -119,6 +143,23 @@ export function useSitesTable() {
             },
             filterFn: (row, id, value) => {
                 return value.includes(row.getValue(id));
+            },
+        },
+        {
+            accessorKey: "autoHealthCheck",
+            header: "Auto Check",
+            cell: ({ row }) => {
+                const autoHealthCheck = row.getValue("autoHealthCheck") as boolean;
+
+                return (
+                    <div className="pl-6">
+                        {autoHealthCheck ? (
+                            <RiCheckboxCircleFill className="h-5 w-5 text-green-500" />
+                        ) : (
+                            <RiCheckboxBlankCircleLine className="h-5 w-5 text-gray-400" />
+                        )}
+                    </div>
+                );
             },
         },
         {
@@ -220,6 +261,11 @@ export function useSitesTable() {
                                 <span>Check Health</span>
                             </DropdownMenuItem>
 
+                            <DropdownMenuItem onClick={() => handleToggleAutoHealthCheck(site)}>
+                                <RiCheckboxCircleLine className="mr-2 h-4 w-4" />
+                                <span>{site.autoHealthCheck ? "Disable" : "Enable"} Auto Check</span>
+                            </DropdownMenuItem>
+
                             <DropdownMenuSeparator />
 
                             <DropdownMenuItem onClick={handleDelete} className="text-red-600">
@@ -231,7 +277,7 @@ export function useSitesTable() {
             );
             },
         },
-    ], [handleCheckHealth]);
+    ], [handleCheckHealth, handleToggleAutoHealthCheck]);
 
     return {
         sites,

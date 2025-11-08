@@ -9,6 +9,7 @@ import { Site } from "@/models/sites";
 import { useApiCall } from "@/hooks/use-api-call";
 import { siteService } from "@/services/sites";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 
 interface EditSiteModalProps {
     open: boolean;
@@ -24,6 +25,7 @@ interface EditSiteFormData {
     wpUsername: string;
     status: string;
     wpPassword?: string;
+    autoHealthCheck?: boolean;
 }
 
 export function EditSiteModal({ open, onOpenChange, site, onSuccess }: EditSiteModalProps) {
@@ -34,7 +36,8 @@ export function EditSiteModal({ open, onOpenChange, site, onSuccess }: EditSiteM
         name: "",
         url: "",
         wpUsername: "",
-        status: "active"
+        status: "active",
+        autoHealthCheck: site?.autoHealthCheck || false,
     });
 
     const resetForm = () => {
@@ -43,7 +46,8 @@ export function EditSiteModal({ open, onOpenChange, site, onSuccess }: EditSiteM
             name: "",
             url: "",
             wpUsername: "",
-            status: "active"
+            status: "active",
+            autoHealthCheck: site?.autoHealthCheck || false,
         })
     }
 
@@ -158,6 +162,21 @@ export function EditSiteModal({ open, onOpenChange, site, onSuccess }: EditSiteM
                                 <SelectItem value="inactive">Inactive</SelectItem>
                             </SelectContent>
                         </Select>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                        <Switch
+                            id="edit-autoCheckHealth"
+                            checked={formData.autoHealthCheck}
+                            onCheckedChange={(checked) => setFormData(prev => ({
+                                ...prev,
+                                autoHealthCheck: checked
+                            }))}
+                            disabled={isLoading}
+                        />
+                        <Label htmlFor="edit-autoCheckHealth" className="cursor-pointer">
+                            Enable auto health check
+                        </Label>
                     </div>
                 </div>
 
