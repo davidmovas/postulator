@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Site } from "@/models/sites";
 import { siteService } from "@/services/sites";
+import { healthcheckService } from "@/services/healthcheck";
 import { statsService } from "@/services/stats";
 import { useApiCall } from "@/hooks/use-api-call";
 import { useContextModal } from "@/context/modal-context";
@@ -86,7 +87,7 @@ export default function SitePage() {
 
     const handleCheckHealth = async () => {
         await execute<string>(
-            () => siteService.checkHealth(siteId),
+            () => healthcheckService.checkHealth(siteId),
             {
                 successMessage: "Health check completed",
                 showSuccessToast: true,

@@ -20,15 +20,16 @@ type App struct {
 
 func New(cfg *config.Config) (*App, error) {
 	var (
-		articlesHandler   *handlers.ArticlesHandler
-		categoriesHandler *handlers.CategoriesHandler
-		jobsHandler       *handlers.JobsHandler
-		promptsHandler    *handlers.PromptsHandler
-		providersHandler  *handlers.ProvidersHandler
-		sitesHandler      *handlers.SitesHandler
-		statsHandler      *handlers.StatsHandler
-		topicsHandler     *handlers.TopicsHandler
-		settingsHandler   *handlers.SettingsHandler
+		articlesHandler    *handlers.ArticlesHandler
+		categoriesHandler  *handlers.CategoriesHandler
+		jobsHandler        *handlers.JobsHandler
+		promptsHandler     *handlers.PromptsHandler
+		providersHandler   *handlers.ProvidersHandler
+		sitesHandler       *handlers.SitesHandler
+		healthCheckHandler *handlers.HealthCheckHandler
+		statsHandler       *handlers.StatsHandler
+		topicsHandler      *handlers.TopicsHandler
+		settingsHandler    *handlers.SettingsHandler
 	)
 
 	fxApp := fx.New(
@@ -45,6 +46,7 @@ func New(cfg *config.Config) (*App, error) {
 			&promptsHandler,
 			&providersHandler,
 			&sitesHandler,
+			&healthCheckHandler,
 			&statsHandler,
 			&topicsHandler,
 			&settingsHandler,
@@ -60,6 +62,7 @@ func New(cfg *config.Config) (*App, error) {
 			promptsHandler,
 			providersHandler,
 			sitesHandler,
+			healthCheckHandler,
 			statsHandler,
 			topicsHandler,
 			settingsHandler,

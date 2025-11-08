@@ -15,6 +15,7 @@ import { Site } from "@/models/sites";
 import { formatDateTime } from "@/lib/time";
 import { useApiCall } from "@/hooks/use-api-call";
 import { siteService } from "@/services/sites";
+import { healthcheckService } from "@/services/healthcheck";
 import { Button } from "@/components/ui/button";
 import {
     RiCheckboxBlankCircleLine,
@@ -40,7 +41,7 @@ export function useSitesTable() {
 
     const handleCheckHealth = useCallback(async (siteId: number) => {
         await execute<string>(
-            () => siteService.checkHealth(siteId),
+            () => healthcheckService.checkHealth(siteId),
             {
                 onSuccess: () => {
                     updateSiteStatus(siteId, "healthy");

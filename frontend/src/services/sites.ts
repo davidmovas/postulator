@@ -1,7 +1,5 @@
 import { dto } from "@/wailsjs/wailsjs/go/models";
 import {
-    CheckAllHealth,
-    CheckHealth,
     CreateSite, DeleteSite,
     GetSite,
     GetSiteWithPassword,
@@ -67,15 +65,5 @@ export const siteService = {
     async deleteSite(id: number): Promise<void> {
         const response = await DeleteSite(id);
         unwrapResponse<string>(response);
-    },
-
-    async checkHealth(siteId: number): Promise<string> {
-        const response = await CheckHealth(siteId);
-        return unwrapResponse<string>(response);
-    },
-
-    async checkAllHealth(): Promise<string> {
-        const response = await CheckAllHealth();
-        return unwrapResponse<string>(response);
     },
 };

@@ -7,7 +7,7 @@ import { DataTable } from "@/components/table/data-table";
 import { RiPulseLine, RiRefreshLine } from "@remixicon/react";
 import { useApiCall } from "@/hooks/use-api-call";
 import { useSitesTable } from "@/hooks/use-sites-table";
-import { siteService } from "@/services/sites";
+import { healthcheckService } from "@/services/healthcheck";
 import { useContextModal } from "@/context/modal-context";
 import { CreateSiteModal } from "@/components/sites/modals/create-site-modal";
 import { EditSiteModal } from "@/components/sites/modals/edit-site-modal";
@@ -34,7 +34,7 @@ export default function SitesPage() {
 
     const handleCheckAllHealth = async () => {
         await execute<string>(
-            () => siteService.checkAllHealth(),
+            () => healthcheckService.checkAllHealth(),
             {
                 successMessage: "All sites health checked successfully",
                 showSuccessToast: true,

@@ -48,6 +48,70 @@ export namespace dto {
 	        this.lastSyncedAt = source["lastSyncedAt"];
 	    }
 	}
+	export class Site {
+	    id: number;
+	    name: string;
+	    url: string;
+	    wpUsername: string;
+	    wpPassword: string;
+	    status: string;
+	    lastHealthCheck: string;
+	    autoHealthCheck: boolean;
+	    healthStatus: string;
+	    createdAt: string;
+	    updatedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Site(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.url = source["url"];
+	        this.wpUsername = source["wpUsername"];
+	        this.wpPassword = source["wpPassword"];
+	        this.status = source["status"];
+	        this.lastHealthCheck = source["lastHealthCheck"];
+	        this.autoHealthCheck = source["autoHealthCheck"];
+	        this.healthStatus = source["healthStatus"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	}
+	export class AutoCheckResult {
+	    unhealthy: Site[];
+	    recovered: Site[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AutoCheckResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.unhealthy = this.convertValues(source["unhealthy"], Site);
+	        this.recovered = this.convertValues(source["recovered"], Site);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Topic {
 	    id: number;
 	    title: string;
@@ -174,6 +238,30 @@ export namespace dto {
 	        this.userMessage = source["userMessage"];
 	        this.context = source["context"];
 	        this.isUserFacing = source["isUserFacing"];
+	    }
+	}
+	export class HealthCheckHistory {
+	    id: number;
+	    siteId: number;
+	    checkedAt: string;
+	    status: string;
+	    responseTimeMs: number;
+	    statusCode: number;
+	    errorMessage: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HealthCheckHistory(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.siteId = source["siteId"];
+	        this.checkedAt = source["checkedAt"];
+	        this.status = source["status"];
+	        this.responseTimeMs = source["responseTimeMs"];
+	        this.statusCode = source["statusCode"];
+	        this.errorMessage = source["errorMessage"];
 	    }
 	}
 	export class HealthCheckSettings {
@@ -448,6 +536,40 @@ export namespace dto {
 		    return a;
 		}
 	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_AutoCheckResult_ {
+	    success: boolean;
+	    data?: AutoCheckResult;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_AutoCheckResult_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], AutoCheckResult);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Response__github_com_davidmovas_postulator_internal_dto_BatchResult_ {
 	    success: boolean;
 	    data?: BatchResult;
@@ -529,6 +651,40 @@ export namespace dto {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
 	        this.data = this.convertValues(source["data"], DashboardSummary);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_HealthCheckHistory_ {
+	    success: boolean;
+	    data?: HealthCheckHistory;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_HealthCheckHistory_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], HealthCheckHistory);
 	        this.error = this.convertValues(source["error"], Error);
 	    }
 	
@@ -746,38 +902,6 @@ export namespace dto {
 		    return a;
 		}
 	}
-	export class Site {
-	    id: number;
-	    name: string;
-	    url: string;
-	    wpUsername: string;
-	    wpPassword: string;
-	    status: string;
-	    lastHealthCheck: string;
-	    autoHealthCheck: boolean;
-	    healthStatus: string;
-	    createdAt: string;
-	    updatedAt: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new Site(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.name = source["name"];
-	        this.url = source["url"];
-	        this.wpUsername = source["wpUsername"];
-	        this.wpPassword = source["wpPassword"];
-	        this.status = source["status"];
-	        this.lastHealthCheck = source["lastHealthCheck"];
-	        this.autoHealthCheck = source["autoHealthCheck"];
-	        this.healthStatus = source["healthStatus"];
-	        this.createdAt = source["createdAt"];
-	        this.updatedAt = source["updatedAt"];
-	    }
-	}
 	export class Response__github_com_davidmovas_postulator_internal_dto_Site_ {
 	    success: boolean;
 	    data?: Site;
@@ -859,6 +983,40 @@ export namespace dto {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
 	        this.data = this.convertValues(source["data"], Category);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response____github_com_davidmovas_postulator_internal_dto_HealthCheckHistory_ {
+	    success: boolean;
+	    data?: HealthCheckHistory[];
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response____github_com_davidmovas_postulator_internal_dto_HealthCheckHistory_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], HealthCheckHistory);
 	        this.error = this.convertValues(source["error"], Error);
 	    }
 	
