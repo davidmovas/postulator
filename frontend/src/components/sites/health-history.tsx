@@ -64,11 +64,11 @@ export function HealthHistory({ siteId }: HealthHistoryProps) {
   const [chartOpen, setChartOpen] = useState(false);
   const [tableOpen, setTableOpen] = useState(false);
 
-  // Initial range: last 30 days
+  // Initial range: last 7 days
   useEffect(() => {
     const to = new Date();
     const from = new Date();
-    from.setDate(from.getDate() - 30);
+    from.setDate(from.getDate() - 7);
     setDateRange({ from, to });
   }, []);
 
@@ -134,7 +134,6 @@ export function HealthHistory({ siteId }: HealthHistoryProps) {
       }
     });
 
-    // map avg response time to bubble size; add slight growth with density
     const sizeFromMs = (ms: number, isUnhealthy: boolean, count: number) => {
       const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
       if (!ms || ms <= 0) {
@@ -173,7 +172,6 @@ export function HealthHistory({ siteId }: HealthHistoryProps) {
   const hasHistory = history.length > 0;
   const hasUnhealthy = unhealthyRows.length > 0;
 
-  // Columns for custom DataTable (unhealthy only)
   const columns: ColumnDef<HealthCheckHistory>[] = useMemo(() => {
     return [
       {
@@ -189,7 +187,7 @@ export function HealthHistory({ siteId }: HealthHistoryProps) {
         accessorKey: "time",
         cell: ({ row }) => {
           const dt = parseISO(row.original.checkedAt);
-          return isValidDate(dt) ? format(dt, "p") : "—";
+          return isValidDate(dt) ? format(dt, "HH:mm") : "—";
         },
       },
       {
@@ -254,44 +252,44 @@ export function HealthHistory({ siteId }: HealthHistoryProps) {
             </div>
           </CardHeader>
           {chartOpen && (
-            <CardContent className="pt-0">
-                <ChartContainer config={chartConfig} className="min-h-[120px] w-full">
-                    <ResponsiveContainer width="100%" height={120}>
-                        <ScatterChart margin={{ left: 6, right: 6, top: 4, bottom: 4 }}>
-                            <CartesianGrid vertical={false} />
-                            <XAxis
-                                dataKey="x"
-                                type="number"
-                                domain={["auto", "auto"]}
-                                tickFormatter={(val) => {
-                                    const d = new Date(Number(val));
-                                    return isNaN(d.getTime()) ? "" : format(d, "MM-dd HH:mm");
-                                }}
-                                tickLine={false}
-                                axisLine={false}
-                                tickMargin={6}
-                                fontSize={11}
-                            />
-                            <YAxis
-                                dataKey="y"
-                                name="Status Class"
-                                domain={[200, 600]}
-                                ticks={[200, 300, 400, 500]}
-                                tickFormatter={(v) => `${Math.floor(Number(v) / 100)}xx`}
-                                tickLine={false}
-                                axisLine={false}
-                                tickMargin={6}
-                                fontSize={11}
-                                width={56}
-                            />
-                            <ZAxis dataKey="z" range={[20, 64]} />
-                            <ChartTooltip content={<HealthTooltip />} />
-                            <Scatter name="Healthy" data={chartData.healthy as any} fill="var(--color-healthy)" />
-                            <Scatter name="Unhealthy" data={chartData.unhealthy as any} fill="var(--color-unhealthy)" />
-                        </ScatterChart>
-                    </ResponsiveContainer>
-                </ChartContainer>
-            </CardContent>
+              <CardContent className="pt-0">
+                  <ChartContainer config={chartConfig} className="h-[260px] w-full">
+                      <ResponsiveContainer width="100%" height={260}>
+                          <ScatterChart margin={{ left: 6, right: 6, top: 4, bottom: 4 }}>
+                              <CartesianGrid vertical={false} />
+                              <XAxis
+                                  dataKey="x"
+                                  type="number"
+                                  domain={["auto", "auto"]}
+                                  tickFormatter={(val) => {
+                                      const d = new Date(Number(val));
+                                      return isNaN(d.getTime()) ? "" : format(d, "MM-dd HH:mm");
+                                  }}
+                                  tickLine={false}
+                                  axisLine={false}
+                                  tickMargin={6}
+                                  fontSize={11}
+                              />
+                              <YAxis
+                                  dataKey="y"
+                                  name="Status Class"
+                                  domain={[200, 599]}
+                                  ticks={[200, 300, 400, 500]}
+                                  tickFormatter={(v) => `${Math.floor(Number(v) / 100)}xx`}
+                                  tickLine={false}
+                                  axisLine={false}
+                                  tickMargin={6}
+                                  fontSize={11}
+                                  width={56}
+                              />
+                              <ZAxis dataKey="z" range={[24, 72]} />
+                              <ChartTooltip content={<HealthTooltip />} />
+                              <Scatter name="Healthy" data={chartData.healthy as any} fill="var(--color-healthy)" />
+                              <Scatter name="Unhealthy" data={chartData.unhealthy as any} fill="var(--color-unhealthy)" />
+                          </ScatterChart>
+                      </ResponsiveContainer>
+                  </ChartContainer>
+              </CardContent>
           )}
         </Card>
       )}

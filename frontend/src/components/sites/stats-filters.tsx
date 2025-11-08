@@ -24,17 +24,14 @@ export function StatsFilters({ dateRange, onDateRangeChange }: StatsFiltersProps
         { label: "90D", days: 90 }
     ];
 
-    // Конвертация Date в CalendarDate для React Aria
     const dateToCalendarDate = (date: Date): CalendarDate => {
         return parseDate(date.toISOString().split('T')[0]);
     };
 
-    // Конвертация CalendarDate в Date
     const calendarDateToDate = (calendarDate: CalendarDate): Date => {
         return new Date(calendarDate.year, calendarDate.month - 1, calendarDate.day);
     };
 
-    // Текущее значение в формате React Aria
     const ariaValue = dateRange ? {
         start: dateToCalendarDate(dateRange.from),
         end: dateToCalendarDate(dateRange.to)
