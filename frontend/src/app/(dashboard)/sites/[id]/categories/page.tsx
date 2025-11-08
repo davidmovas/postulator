@@ -141,7 +141,8 @@ export default function SiteCategoriesPage() {
                 toolbarActions={null}
                 isLoading={isLoading}
                 emptyMessage="No categories found. Create your first category or sync from WordPress."
-                showPagination={false}
+                showPagination={true}
+                defaultPageSize={50}
                 enableViewOption={false}
             />
 

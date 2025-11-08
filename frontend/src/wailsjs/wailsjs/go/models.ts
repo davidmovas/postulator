@@ -288,6 +288,28 @@ export namespace dto {
 	        this.notify_on_recover = source["notify_on_recover"];
 	    }
 	}
+	export class ImportResult {
+	    totalRead: number;
+	    totalAdded: number;
+	    totalSkipped: number;
+	    added?: string[];
+	    skipped?: string[];
+	    errors?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.totalRead = source["totalRead"];
+	        this.totalAdded = source["totalAdded"];
+	        this.totalSkipped = source["totalSkipped"];
+	        this.added = source["added"];
+	        this.skipped = source["skipped"];
+	        this.errors = source["errors"];
+	    }
+	}
 	export class State {
 	    jobId: number;
 	    lastRunAt?: string;
@@ -719,6 +741,40 @@ export namespace dto {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
 	        this.data = this.convertValues(source["data"], HealthCheckSettings);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_ImportResult_ {
+	    success: boolean;
+	    data?: ImportResult;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_ImportResult_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], ImportResult);
 	        this.error = this.convertValues(source["error"], Error);
 	    }
 	

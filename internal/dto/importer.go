@@ -29,9 +29,6 @@ func (d *ImportResult) FromEntity(entity *importer.ImportResult) *ImportResult {
 	return d
 }
 
-// Optional request DTOs for clarity and parity with other handlers
-// They can be used by the UI layer or RPC boundary if needed.
-
 type ImportTopicsRequest struct {
 	FilePath string `json:"filePath"`
 }

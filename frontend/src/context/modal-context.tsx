@@ -52,6 +52,14 @@ interface ModalContextType {
         category: Category | null;
     };
 
+    // Topics
+    editTopicModal: {
+        isOpen: boolean;
+        open: (topic: import("@/models/topics").Topic) => void;
+        close: () => void;
+        topic: import("@/models/topics").Topic | null;
+    };
+
     // AI-Providers
     createProviderModal: {
         isOpen: boolean;
@@ -96,6 +104,10 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
     const [editCategoryOpen, setEditCategoryOpen] = useState(false);
     const [deleteCategoryOpen, setDeleteCategoryOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+
+    // Topics
+    const [editTopicOpen, setEditTopicOpen] = useState(false);
+    const [selectedTopic, setSelectedTopic] = useState<import("@/models/topics").Topic | null>(null);
 
     // AI-Providers
     const [createProviderOpen, setCreateProviderOpen] = useState(false);
@@ -187,6 +199,20 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
                 setSelectedCategory(null);
             },
             category: selectedCategory
+        },
+
+        // Topics
+        editTopicModal: {
+            isOpen: editTopicOpen,
+            open: (topic) => {
+                setSelectedTopic(topic);
+                setEditTopicOpen(true);
+            },
+            close: () => {
+                setEditTopicOpen(false);
+                setSelectedTopic(null);
+            },
+            topic: selectedTopic
         },
 
         // AI-Providers

@@ -97,6 +97,13 @@ export default function SitePage() {
         );
     };
 
+    const handleReload = async () => {
+        await Promise.all([
+            loadSite(),
+            loadStatistics(),
+        ]);
+    };
+
     const handleOpenWordPress = () => {
         if (site) {
             window.open(site.url + '/wp-admin', '_blank');
@@ -154,6 +161,7 @@ export default function SitePage() {
             <SiteHeader site={site} />
 
             <SiteActions
+                onReload={handleReload}
                 onCheckHealth={handleCheckHealth}
                 onEdit={() => setEditModalOpen(true)}
                 onChangePassword={() => setPasswordModalOpen(true)}

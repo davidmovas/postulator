@@ -5,6 +5,7 @@ import {
   useCallback,
   useRef,
   useState,
+  useMemo,
   type ChangeEvent,
   type DragEvent,
   type InputHTMLAttributes,
@@ -24,10 +25,12 @@ export type FileWithPreview = {
   preview?: string
 }
 
+export type AcceptOption = string | string[] | Record<string, string | string[]>
+
 export type FileUploadOptions = {
   maxFiles?: number // Only used when multiple is true, defaults to Infinity
   maxSize?: number // in bytes
-  accept?: string
+  accept?: AcceptOption
   multiple?: boolean // Defaults to false
   initialFiles?: FileMetadata[]
   onFilesChange?: (files: FileWithPreview[]) => void // Callback when files change
@@ -69,7 +72,7 @@ export const useFileUpload = (
     initialFiles = [],
     onFilesChange,
     onFilesAdded,
-  } = options
+  } = options as FileUploadOptions
 
   const [state, setState] = useState<FileUploadState>({
     files: initialFiles.map((file) => ({
@@ -83,6 +86,28 @@ export const useFileUpload = (
 
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Normalize accept option into a flat list of tokens for validation and input attribute
+  const acceptTokens = useMemo(() => {
+    if (!accept || accept === "*") return ["*"]
+    if (typeof accept === "string") {
+      return accept.split(",").map((t) => t.trim()).filter(Boolean)
+    }
+    if (Array.isArray(accept)) {
+      return accept.map((t) => t.trim()).filter(Boolean)
+    }
+    // object form: { "mime/type": [".ext", ...], ".ext": [] }
+    const tokens: string[] = []
+    Object.entries(accept).forEach(([key, val]) => {
+      if (key) tokens.push(key)
+      if (typeof val === "string") {
+        tokens.push(val)
+      } else if (Array.isArray(val)) {
+        val.forEach((v) => v && tokens.push(v))
+      }
+    })
+    return tokens.map((t) => `${t}`.trim()).filter(Boolean)
+  }, [accept])
+
   const validateFile = useCallback(
     (file: File | FileMetadata): string | null => {
       if (file instanceof File) {
@@ -95,30 +120,34 @@ export const useFileUpload = (
         }
       }
 
-      if (accept !== "*") {
-        const acceptedTypes = accept.split(",").map((type) => type.trim())
-        const fileType = file instanceof File ? file.type || "" : file.type
-        const fileExtension = `.${file instanceof File ? file.name.split(".").pop() : file.name.split(".").pop()}`
+      // If accept is wildcard or not provided, allow all types
+      const tokens = acceptTokens
+      if (tokens.length === 0 || tokens[0] === "*") {
+        return null
+      }
 
-        const isAccepted = acceptedTypes.some((type) => {
-          if (type.startsWith(".")) {
-            return fileExtension.toLowerCase() === type.toLowerCase()
-          }
-          if (type.endsWith("/*")) {
-            const baseType = type.split("/")[0]
-            return fileType.startsWith(`${baseType}/`)
-          }
-          return fileType === type
-        })
+      const fileType = file instanceof File ? file.type || "" : file.type
+      const fileExtension = `.${file instanceof File ? file.name.split(".").pop() : file.name.split(".").pop()}`
 
-        if (!isAccepted) {
-          return `File "${file instanceof File ? file.name : file.name}" is not an accepted file type.`
+      const isAccepted = tokens.some((type) => {
+        if (!type) return false
+        if (type.startsWith(".")) {
+          return fileExtension.toLowerCase() === type.toLowerCase()
         }
+        if (type.endsWith("/*")) {
+          const baseType = type.split("/")[0]
+          return fileType.startsWith(`${baseType}/`)
+        }
+        return fileType === type
+      })
+
+      if (!isAccepted) {
+        return `File "${file instanceof File ? file.name : file.name}" is not an accepted file type.`
       }
 
       return null
     },
-    [accept, maxSize]
+    [acceptTokens, maxSize]
   )
 
   const createPreview = useCallback(
@@ -369,16 +398,21 @@ export const useFileUpload = (
 
   const getInputProps = useCallback(
     (props: InputHTMLAttributes<HTMLInputElement> = {}) => {
+      const acceptAttr = (() => {
+        if (props.accept) return props.accept
+        if (acceptTokens.length === 0 || acceptTokens[0] === "*") return undefined
+        return acceptTokens.join(",")
+      })()
       return {
         ...props,
         type: "file" as const,
         onChange: handleFileChange,
-        accept: props.accept || accept,
+        accept: acceptAttr,
         multiple: props.multiple !== undefined ? props.multiple : multiple,
         ref: inputRef,
       }
     },
-    [accept, multiple, handleFileChange]
+    [acceptTokens, multiple, handleFileChange]
   )
 
   return [

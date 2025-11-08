@@ -4,10 +4,12 @@ import {
     RiPencilLine,
     RiPulseLine,
     RiToolsLine,
+    RiRefreshLine,
 } from "@remixicon/react";
 import { Trash2 } from "lucide-react";
 
 interface SiteActionsProps {
+    onReload: () => void;
     onCheckHealth: () => void;
     onEdit: () => void;
     onChangePassword: () => void;
@@ -17,6 +19,7 @@ interface SiteActionsProps {
 }
 
 export function SiteActions({
+    onReload,
     onCheckHealth,
     onEdit,
     onChangePassword,
@@ -25,6 +28,13 @@ export function SiteActions({
     isLoading
 }: SiteActionsProps) {
     const actions = [
+        {
+            icon: RiRefreshLine,
+            label: "Reload",
+            onClick: onReload,
+            variant: "outline" as const,
+            disabled: isLoading
+        },
         {
             icon: RiPulseLine,
             label: "Check Health",

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
     ColumnDef,
     ColumnFiltersState,
@@ -54,6 +54,7 @@ export interface DataTableProps<TData, TValue> {
     onRowSelectionChange?: (selectedRows: TData[]) => void;
     defaultSorting?: SortingState;
     enableViewOption?: boolean;
+    rowSelectionResetKey?: number | string;
 }
 
 export function DataTable<TData, TValue>({
@@ -70,6 +71,7 @@ export function DataTable<TData, TValue>({
     onRowSelectionChange,
     defaultSorting = [],
     enableViewOption = true,
+    rowSelectionResetKey,
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>(defaultSorting);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -79,6 +81,17 @@ export function DataTable<TData, TValue>({
         pageIndex: 0,
         pageSize: defaultPageSize,
     });
+
+    // Reset row selection when external key changes
+    useEffect(() => {
+        if (rowSelectionResetKey !== undefined) {
+            setRowSelection({});
+            if (onRowSelectionChange) {
+                // notify parent that selection was cleared
+                onRowSelectionChange([] as unknown as TData[]);
+            }
+        }
+    }, [rowSelectionResetKey]);
 
     const table = useReactTable({
         data,
@@ -129,13 +142,15 @@ export function DataTable<TData, TValue>({
                             <TableRow key={headerGroup.id} className="hover:bg-transparent">
                                 {headerGroup.headers.map((header, index) => {
                                     const isLastColumn = header.column.id === "actions";
+                                    const isSelectColumn = header.column.id === "select";
 
                                     return (
                                         <TableHead
                                             key={header.id}
                                             className={cn(
                                                 "h-11",
-                                                isLastColumn && "text-right"
+                                                isLastColumn && "text-right",
+                                                isSelectColumn && "w-[40px] px-2 text-center"
                                             )}
                                         >
                                             {header.isPlaceholder ? null : header.column.getCanSort() ? (
@@ -209,12 +224,14 @@ export function DataTable<TData, TValue>({
                                 >
                                     {row.getVisibleCells().map((cell, index) => {
                                         const isLastColumn = cell.column.id === "actions";
+                                        const isSelectColumn = cell.column.id === "select";
 
                                         return (
                                             <TableCell
                                                 key={cell.id}
                                                 className={cn(
-                                                    isLastColumn && "text-right"
+                                                    isLastColumn && "text-right",
+                                                    isSelectColumn && "w-[40px] px-2 text-center"
                                                 )}
                                             >
                                                 {flexRender(
