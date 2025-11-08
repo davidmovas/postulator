@@ -37,7 +37,7 @@ export function EditSiteModal({ open, onOpenChange, site, onSuccess }: EditSiteM
         url: "",
         wpUsername: "",
         status: "active",
-        autoHealthCheck: site?.autoHealthCheck || false,
+        autoHealthCheck: site?.autoHealthCheck,
     });
 
     const resetForm = () => {
@@ -47,7 +47,7 @@ export function EditSiteModal({ open, onOpenChange, site, onSuccess }: EditSiteM
             url: "",
             wpUsername: "",
             status: "active",
-            autoHealthCheck: site?.autoHealthCheck || false,
+            autoHealthCheck: site?.autoHealthCheck,
         })
     }
 
@@ -58,7 +58,8 @@ export function EditSiteModal({ open, onOpenChange, site, onSuccess }: EditSiteM
                 name: site.name || "",
                 url: site.url || "",
                 wpUsername: site.wpUsername || "",
-                status: site.status || "active"
+                status: site.status || "active",
+                autoHealthCheck: site.autoHealthCheck,
             });
         }
     }, [site, open]);

@@ -43,7 +43,7 @@ export function CreateSiteModal({ open, onOpenChange, onSuccess }: CreateSiteMod
     const extractDomain = (url: string): string => {
         try {
             const hasProtocol = /^https?:\/\//i.test(url);
-            const u = new URL(hasProtocol ? url : `http://${url}`);
+            const u = new URL(hasProtocol ? url : `https://${url}`);
             let host = u.hostname.toLowerCase();
             if (host.startsWith("www.")) host = host.slice(4);
             return host;
@@ -56,7 +56,7 @@ export function CreateSiteModal({ open, onOpenChange, onSuccess }: CreateSiteMod
         if (!url) return url;
         try {
             const hasProtocol = /^https?:\/\//i.test(url);
-            const u = new URL(hasProtocol ? url : `http://${url}`);
+            const u = new URL(hasProtocol ? url : `https://${url}`);
             return u.toString().replace(/\/$/, "");
         } catch {
             return url;
