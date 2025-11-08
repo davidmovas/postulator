@@ -50,7 +50,6 @@ func (s *scheduler) Start(ctx context.Context) error {
 		s.logger.Warn("Scheduler already running")
 		return nil
 	}
-	s.running = true
 	s.mu.Unlock()
 
 	s.logger.Info("Starting health check scheduler")
@@ -62,13 +61,20 @@ func (s *scheduler) Start(ctx context.Context) error {
 	}
 
 	if !settings.Enabled {
-		s.mu.Lock()
-		s.running = false
-		s.mu.Unlock()
+		s.logger.Info("Health check scheduler is disabled in settings; not starting")
+		return nil
 	}
 
 	interval := time.Duration(settings.IntervalMinutes) * time.Minute
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.ticker != nil {
+		s.ticker.Stop()
+	}
 	s.ticker = time.NewTicker(interval)
+	s.stopChan = make(chan struct{})
+	s.running = true
 
 	s.logger.Infof("Health check scheduler started with interval: %v", interval)
 
@@ -104,13 +110,67 @@ func (s *scheduler) UpdateInterval(intervalMinutes int) error {
 	s.mu.RUnlock()
 
 	if !running {
-		s.logger.Info("Scheduler not running, interval will be applied on next start")
 		return nil
 	}
 
-	s.logger.Infof("Updating health check interval to %d minutes", intervalMinutes)
-	s.updateIntervalChan <- intervalMinutes
+	if intervalMinutes <= 0 {
+		intervalMinutes = 1
+	}
 
+	select {
+	case s.updateIntervalChan <- intervalMinutes:
+	default:
+		select {
+		case <-s.updateIntervalChan:
+		default:
+		}
+		s.updateIntervalChan <- intervalMinutes
+	}
+
+	return nil
+}
+
+func (s *scheduler) ApplySettings(ctx context.Context, enabled bool, intervalMinutes int) error {
+	if intervalMinutes <= 0 {
+		intervalMinutes = 1
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !enabled {
+		if s.running {
+			s.running = false
+			if s.ticker != nil {
+				s.ticker.Stop()
+				s.ticker = nil
+			}
+			if s.stopChan != nil {
+				close(s.stopChan)
+				s.stopChan = make(chan struct{})
+			}
+		}
+		return nil
+	}
+
+	if !s.running {
+		if s.ticker != nil {
+			s.ticker.Stop()
+		}
+		s.ticker = time.NewTicker(time.Duration(intervalMinutes) * time.Minute)
+		if s.stopChan == nil {
+			s.stopChan = make(chan struct{})
+		}
+		s.running = true
+		go s.run(ctx)
+		return nil
+	}
+
+	s.logger.Infof("Reapplying health check interval: %d minutes", intervalMinutes)
+	if s.ticker != nil {
+		s.ticker.Stop()
+	}
+	s.ticker = time.NewTicker(time.Duration(intervalMinutes) * time.Minute)
 	return nil
 }
 

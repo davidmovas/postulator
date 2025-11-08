@@ -1,18 +1,21 @@
 package handlers
 
 import (
+	"github.com/davidmovas/postulator/internal/domain/healthcheck"
 	"github.com/davidmovas/postulator/internal/domain/settings"
 	"github.com/davidmovas/postulator/internal/dto"
 	"github.com/davidmovas/postulator/pkg/ctx"
 )
 
 type SettingsHandler struct {
-	service settings.Service
+	service   settings.Service
+	scheduler healthcheck.Scheduler
 }
 
-func NewSettingsHandler(service settings.Service) *SettingsHandler {
+func NewSettingsHandler(service settings.Service, scheduler healthcheck.Scheduler) *SettingsHandler {
 	return &SettingsHandler{
-		service: service,
+		service:   service,
+		scheduler: scheduler,
 	}
 }
 
@@ -34,6 +37,8 @@ func (h *SettingsHandler) UpdateHealthCheckSettings(settings *dto.HealthCheckSet
 	if err = h.service.UpdateHealthCheckSettings(ctx.FastCtx(), entity); err != nil {
 		return fail[string](err)
 	}
+
+	_ = h.scheduler.ApplySettings(ctx.FastCtx(), entity.Enabled, entity.IntervalMinutes)
 
 	return ok("Settings updated successfully")
 }

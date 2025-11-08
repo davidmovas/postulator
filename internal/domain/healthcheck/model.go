@@ -34,4 +34,5 @@ type Scheduler interface {
 	Start(ctx context.Context) error
 	Stop() error
 	UpdateInterval(intervalMinutes int) error
+	ApplySettings(ctx context.Context, enabled bool, intervalMinutes int) error
 }
