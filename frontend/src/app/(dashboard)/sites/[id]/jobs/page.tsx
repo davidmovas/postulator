@@ -1,15 +1,78 @@
-export default async function SiteJobsPage({
-    params
-} : {
-    params: Promise<{ id: string }>
-}) {
-    const { id } = await params;
-    const siteId = parseInt(id);
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { JobsList } from "@/components/jobs/jobs-list";
+import { useJobs } from "@/hooks/use-jobs";
+import { Plus, ArrowLeft } from "lucide-react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { router } from "next/client";
+
+export default function SiteJobsPage() {
+    const params = useParams();
+    const siteId = parseInt(params.id as string);
+    const router = useRouter();
+
+    const {
+        jobs,
+        isLoading,
+        loadJobs,
+        handleEditJob,
+        handleDeleteJob,
+        handlePauseJob,
+        handleResumeJob,
+        handleExecuteJob
+    } = useJobs(siteId);
 
     return (
-        <div className="p-6">
-            <h1 className="text-2xl font-bold mb-4">Jobs</h1>
-            <p>Manage your site jobs here.</p>
+        <div className="p-6 space-y-6">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                    <Link href={`/sites/${siteId}`}>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <ArrowLeft className="h-4 w-4" />
+                        </Button>
+                    </Link>
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight">Site Jobs</h1>
+                        <p className="text-muted-foreground mt-2">
+                            Manage automated content generation for this site
+                        </p>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <Button
+                        variant="outline"
+                        onClick={loadJobs}
+                        disabled={isLoading}
+                    >
+                        Refresh
+                    </Button>
+
+                    <Button onClick={() => router.push(`/sites/${siteId}/jobs/new`)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create Job
+                    </Button>
+                </div>
+            </div>
+
+            <div className="flex items-center gap-4 py-4">
+                <div className="text-sm text-muted-foreground">
+                    {jobs.length} job{jobs.length !== 1 ? 's' : ''} for this site
+                </div>
+                <div className="flex-1 border-t" />
+            </div>
+
+            <JobsList
+                jobs={jobs}
+                onEdit={handleEditJob}
+                onDelete={handleDeleteJob}
+                onPause={handlePauseJob}
+                onResume={handleResumeJob}
+                onExecute={handleExecuteJob}
+                isLoading={isLoading}
+            />
         </div>
     );
 }
