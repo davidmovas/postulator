@@ -21,7 +21,7 @@ export default function SettingsPage() {
             {/* Settings Sections - Centered */}
             <div className="max-w-3xl mx-auto space-y-6">
                 {/* General Settings */}
-                <GeneralSettings />
+                {/* <GeneralSettings /> */}
 
                 {/* Health Checking Settings */}
                 <HealthCheckSettings
@@ -30,7 +30,7 @@ export default function SettingsPage() {
                 />
 
                 {/* Appearance Settings */}
-                <AppearanceSettings />
+                {/* <AppearanceSettings /> */}
             </div>
         </div>
     );

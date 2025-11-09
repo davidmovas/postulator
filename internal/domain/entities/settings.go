@@ -23,7 +23,7 @@ type HealthCheckSettings struct {
 func DefaultHealthCheckSettings() *HealthCheckSettings {
 	return &HealthCheckSettings{
 		Enabled:            false,
-		IntervalMinutes:    5,
+		IntervalMinutes:    15,
 		MinIntervalMinutes: 1,
 		NotifyWhenHidden:   true,
 		NotifyAlways:       false,

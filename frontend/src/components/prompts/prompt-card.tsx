@@ -59,7 +59,7 @@ export function PromptCard({ prompt, onEdit, onDelete }: PromptCardProps) {
                         <MessageSquare className="h-4 w-4" />
                         System Prompt
                     </div>
-                    <div className="text-sm bg-muted/50 rounded-md p-2 max-h-40 overflow-auto whitespace-pre-wrap">
+                    <div className="text-sm bg-muted/50 rounded-md p-2 max-h-40 overflow-auto whitespace-pre-wrap break-words">
                         {prompt.systemPrompt}
                     </div>
                 </div>

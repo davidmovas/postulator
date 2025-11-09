@@ -11,11 +11,9 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/pkg/logger"
 
+	"github.com/davidmovas/postulator/internal/infra/notifyicon"
 	"github.com/gen2brain/beeep"
 )
-
-//go:embed assets/icon.png
-var icon []byte
 
 const (
 	unhealthNotificationTitle  = "Health Check Alert"
@@ -79,13 +77,13 @@ func (n *notifier) NotifyUnhealthySites(_ context.Context, sites []*entities.Sit
 	message := n.formatUnhealthyMessage(sitesToNotify)
 
 	if withSound {
-		err := beeep.Alert(unhealthNotificationTitle, message, icon)
+		err := beeep.Alert(unhealthNotificationTitle, message, notifyicon.Icon())
 		if err != nil {
 			n.logger.ErrorWithErr(err, "Failed to send notification with sound")
 			return err
 		}
 	} else {
-		err := beeep.Notify(unhealthNotificationTitle, message, icon)
+		err := beeep.Notify(unhealthNotificationTitle, message, notifyicon.Icon())
 		if err != nil {
 			n.logger.ErrorWithErr(err, "Failed to send notification")
 			return err
@@ -112,13 +110,13 @@ func (n *notifier) NotifyRecoveredSites(_ context.Context, sites []*entities.Sit
 	message := n.formatRecoveredMessage(sites)
 
 	if withSound {
-		err := beeep.Alert(recoveredNotificationTitle, message, "")
+		err := beeep.Alert(recoveredNotificationTitle, message, notifyicon.Icon())
 		if err != nil {
 			n.logger.ErrorWithErr(err, "Failed to send recovery notification with sound")
 			return err
 		}
 	} else {
-		err := beeep.Notify(recoveredNotificationTitle, message, "")
+		err := beeep.Notify(recoveredNotificationTitle, message, notifyicon.Icon())
 		if err != nil {
 			n.logger.ErrorWithErr(err, "Failed to send recovery notification")
 			return err

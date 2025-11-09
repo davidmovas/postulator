@@ -8,6 +8,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/config"
+	"github.com/davidmovas/postulator/internal/infra/notifyicon"
 	"github.com/davidmovas/postulator/internal/infra/window"
 
 	"github.com/getlantern/systray"
@@ -82,6 +83,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+	notifyicon.SetTempIcons(icon)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	appInst, err := app.New(cfg)
