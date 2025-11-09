@@ -5,6 +5,7 @@ import { Site } from "@/models/sites";
 import { Category } from "@/models/categories";
 import { ConfirmationModalData } from "@/modals/confirm-modal";
 import { Provider } from "@/models/providers";
+import { Prompt } from "@/models/prompts";
 
 interface ModalContextType {
     // Sites
@@ -79,6 +80,19 @@ interface ModalContextType {
         provider: Provider | null;
     };
 
+    // Prompts
+    createPromptModal: {
+        isOpen: boolean;
+        open: () => void;
+        close: () => void;
+    };
+    editPromptModal: {
+        isOpen: boolean;
+        open: (prompt: Prompt) => void;
+        close: () => void;
+        prompt: Prompt | null;
+    };
+
     // Common
     confirmationModal: {
         isOpen: boolean;
@@ -114,6 +128,11 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
     const [editProviderOpen, setEditProviderOpen] = useState(false);
     const [deleteProviderOpen, setDeleteProviderOpen] = useState(false);
     const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
+
+    // Prompts
+    const [createPromptOpen, setCreatePromptOpen] = useState(false);
+    const [editPromptOpen, setEditPromptOpen] = useState(false);
+    const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
 
     // Common
     const [confirmationOpen, setConfirmationOpen] = useState(false);
@@ -244,6 +263,25 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
                 setSelectedProvider(null);
             },
             provider: selectedProvider
+        },
+
+        // Prompts
+        createPromptModal: {
+            isOpen: createPromptOpen,
+            open: () => setCreatePromptOpen(true),
+            close: () => setCreatePromptOpen(false)
+        },
+        editPromptModal: {
+            isOpen: editPromptOpen,
+            open: (prompt) => {
+                setSelectedPrompt(prompt);
+                setEditPromptOpen(true);
+            },
+            close: () => {
+                setEditPromptOpen(false);
+                setSelectedPrompt(null);
+            },
+            prompt: selectedPrompt
         },
 
         // Common

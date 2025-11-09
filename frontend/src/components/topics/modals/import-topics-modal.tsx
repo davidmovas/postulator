@@ -36,7 +36,6 @@ export function ImportTopicsModal({ open, onOpenChange, siteId, onSuccess }: Imp
 
     const [filePath, setFilePath] = useState("");
 
-    // Prevent browser from opening the dropped file while modal is open
     useEffect(() => {
         if (!open) return;
         const prevent = (e: DragEvent) => {
@@ -51,12 +50,10 @@ export function ImportTopicsModal({ open, onOpenChange, siteId, onSuccess }: Imp
         };
     }, [open]);
 
-    // Subscribe to Wails global desktop file drop to get a real path
     useEffect(() => {
         if (!open) return;
-        let off: (() => void) | null = null;
         try {
-            off = OnFileDrop((_, __, paths: string[]) => {
+            OnFileDrop((_, __, paths: string[]) => {
                 if (!paths || paths.length === 0) return;
                 const path = paths[0];
                 if (!validateFileExtension(path)) {
@@ -74,9 +71,6 @@ export function ImportTopicsModal({ open, onOpenChange, siteId, onSuccess }: Imp
         }
         return () => {
             try { OnFileDropOff(); } catch {}
-            if (typeof off === 'function') {
-                try { off(); } catch {}
-            }
         };
     }, [open, toast]);
 
