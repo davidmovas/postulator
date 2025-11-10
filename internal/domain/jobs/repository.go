@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/Masterminds/squirrel"
@@ -33,12 +34,14 @@ func (r *repository) Create(ctx context.Context, job *entities.Job) error {
 	var scheduleConfigJSON, placeholdersJSON []byte
 	var err error
 
+	fmt.Println("[RC] 1")
 	if job.Schedule != nil && job.Schedule.Config != nil {
 		scheduleConfigJSON = job.Schedule.Config
 	} else {
 		scheduleConfigJSON = []byte("{}")
 	}
 
+	fmt.Println("[RC] 2")
 	if job.PlaceholdersValues != nil {
 		placeholdersJSON, err = json.Marshal(job.PlaceholdersValues)
 		if err != nil {
@@ -48,6 +51,7 @@ func (r *repository) Create(ctx context.Context, job *entities.Job) error {
 		placeholdersJSON = []byte("{}")
 	}
 
+	fmt.Println("[RC] 3")
 	query, args := dbx.ST.
 		Insert("jobs").
 		Columns(
@@ -64,6 +68,7 @@ func (r *repository) Create(ctx context.Context, job *entities.Job) error {
 		).
 		MustSql()
 
+	fmt.Println("[RC] 4")
 	result, err := r.db.ExecContext(ctx, query, args...)
 	switch {
 	case dbx.IsForeignKeyViolation(err):
@@ -72,6 +77,7 @@ func (r *repository) Create(ctx context.Context, job *entities.Job) error {
 		return errors.Database(err)
 	}
 
+	fmt.Println("[RC] 5")
 	id, err := result.LastInsertId()
 	if err != nil {
 		return errors.Database(err)
@@ -79,6 +85,7 @@ func (r *repository) Create(ctx context.Context, job *entities.Job) error {
 
 	job.ID = id
 
+	fmt.Println("[RC] 6")
 	stateRepo := NewStateRepository(r.db, r.logger)
 	initialState := &entities.State{
 		JobID:             id,
@@ -86,16 +93,19 @@ func (r *repository) Create(ctx context.Context, job *entities.Job) error {
 		FailedExecutions:  0,
 		LastCategoryIndex: 0,
 	}
+	fmt.Println("[RC] 7")
 	if err = stateRepo.Update(ctx, initialState); err != nil {
 		return err
 	}
 
+	fmt.Println("[RC] 8")
 	if len(job.Categories) > 0 {
 		if err = r.SetCategories(ctx, id, job.Categories); err != nil {
 			return err
 		}
 	}
 
+	fmt.Println("[RC] 9")
 	if len(job.Topics) > 0 {
 		if err = r.SetTopics(ctx, id, job.Topics); err != nil {
 			return err

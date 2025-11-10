@@ -29,6 +29,7 @@ export const jobService = {
             requiresValidation: input.requiresValidation,
             jitterEnabled: input.jitterEnabled,
             jitterMinutes: input.jitterMinutes,
+            status: input.status || 'active',
             schedule: input.schedule,
             categories: input.categories,
             topics: input.topics,

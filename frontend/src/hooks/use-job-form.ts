@@ -20,7 +20,9 @@ export function useJobForm({ initialData, siteId }: UseJobFormProps) {
         jitterMinutes: 30,
         placeholdersValues: {},
         categories: [],
-        topics: []
+        topics: [],
+        status: 'active',
+        schedule: { type: "manual", config: {} }
     });
 
     // Инициализация формы данными при редактировании
@@ -60,7 +62,8 @@ export function useJobForm({ initialData, siteId }: UseJobFormProps) {
             jitterMinutes: 30,
             placeholdersValues: {},
             categories: [],
-            topics: []
+            topics: [],
+            schedule: { type: "manual", config: {} }
         });
     };
 

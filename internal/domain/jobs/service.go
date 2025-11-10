@@ -73,9 +73,17 @@ func (s *service) CreateJob(ctx context.Context, job *entities.Job) error {
 		return err
 	}
 
+	// Ensure default values
 	now := time.Now()
 	job.CreatedAt = now
 	job.UpdatedAt = now
+	if strings.TrimSpace(string(job.Status)) == "" {
+		job.Status = entities.JobStatusActive
+	}
+
+	if s.repo == nil {
+		panic("repo is nil")
+	}
 
 	fmt.Println("[CJ] 3")
 	if err := s.repo.Create(ctx, job); err != nil {
@@ -344,49 +352,24 @@ func (s *service) validateJob(job *entities.Job) error {
 }
 
 func (s *service) validateDependencies(ctx context.Context, job *entities.Job) error {
-	if s.siteService == nil {
-		panic("site service is not set")
-	}
-
-	if s.promptService == nil {
-		panic("prompt service is not set")
-	}
-
-	if s.providerService == nil {
-		panic("provider service is not set")
-	}
-
-	if s.categoryService == nil {
-		panic("category service is not set")
-	}
-
-	if s.topicService == nil {
-		panic("topic service is not set")
-	}
-
-	fmt.Println("[CVD] 1")
 	if _, err := s.siteService.GetSite(ctx, job.SiteID); err != nil {
 		return errors.Validation("Site does not exist")
 	}
 
-	fmt.Println("[CVD] 2")
 	if _, err := s.promptService.GetPrompt(ctx, job.PromptID); err != nil {
 		return errors.Validation("Prompt does not exist")
 	}
 
-	fmt.Println("[CVD] 3")
 	if _, err := s.providerService.GetProvider(ctx, job.AIProviderID); err != nil {
 		return errors.Validation("AI Provider does not exist")
 	}
 
-	fmt.Println("[CVD] 4")
 	for _, categoryID := range job.Categories {
 		if _, err := s.categoryService.GetCategory(ctx, categoryID); err != nil {
 			return errors.Validation("Category does not exist")
 		}
 	}
 
-	fmt.Println("[CVD] 5")
 	for _, topicID := range job.Topics {
 		if _, err := s.topicService.GetTopic(ctx, topicID); err != nil {
 			return errors.Validation("Topic does not exist")

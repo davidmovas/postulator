@@ -32,6 +32,7 @@ export interface JobCreateInput {
     requiresValidation: boolean;
     jitterEnabled: boolean;
     jitterMinutes: number;
+    status?: string;
     schedule?: Schedule;
     categories: number[];
     topics: number[];

@@ -4,6 +4,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { JobCreateInput } from "@/models/jobs";
 
 interface BasicInfoSectionProps {
@@ -45,21 +46,13 @@ export function BasicInfoSection({ formData, onUpdate, prompts, providers, site,
                 {sites && (
                     <div className="space-y-2">
                         <Label htmlFor="site">Target Site</Label>
-                        <Select
+                        <SearchableSelect
+                            options={sites.map((s) => ({ value: s.id.toString(), label: s.name }))}
                             value={formData.siteId?.toString()}
-                            onValueChange={(value) => onUpdate({ siteId: parseInt(value) })}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select a site" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {sites.map(site => (
-                                    <SelectItem key={site.id} value={site.id.toString()}>
-                                        {site.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                            onChange={(val) => onUpdate({ siteId: parseInt(val) })}
+                            placeholder="Search and select a site..."
+                            searchPlaceholder="Type to search sites..."
+                        />
                     </div>
                 )}
 

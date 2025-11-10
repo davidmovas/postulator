@@ -11,7 +11,7 @@ import { DateInput, dateInputStyle } from "@/components/ui/datefield-rac";
 import { Button as AriaButton, DatePicker, Dialog, Group, Popover, I18nProvider } from "react-aria-components";
 import { parseDate, CalendarDate } from "@internationalized/date";
 import { JobCreateInput, Schedule, OnceSchedule, IntervalSchedule, DailySchedule } from "@/models/jobs";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarIcon } from "lucide-react";
 import { TimeInput24 } from "@/components/ui/time-24";
 
@@ -129,6 +129,13 @@ export function ScheduleSection({ formData, onUpdate }: ScheduleSectionProps) {
     };
     const [scheduleType, setScheduleType] = useState<string>(formData.schedule?.type || "manual");
 
+    // Ensure schedule object exists so it gets sent to backend
+    useEffect(() => {
+        if (!formData.schedule) {
+            onUpdate({ schedule: { type: "manual", config: {} } as Schedule });
+        }
+    }, [formData.schedule]);
+
     // Helpers to parse/format local date + time to ISO and back
     const toTimeString = (date: Date | undefined) => {
         if (!date) return "12:00";
@@ -170,6 +177,12 @@ export function ScheduleSection({ formData, onUpdate }: ScheduleSectionProps) {
         let newSchedule: Schedule | undefined;
 
         switch (type) {
+            case "manual":
+                newSchedule = {
+                    type: "manual",
+                    config: {}
+                } as Schedule;
+                break;
             case "once":
                 newSchedule = {
                     type: "once",
@@ -199,7 +212,7 @@ export function ScheduleSection({ formData, onUpdate }: ScheduleSectionProps) {
                 };
                 break;
             default:
-                newSchedule = undefined;
+                newSchedule = { type: "manual", config: {} } as Schedule;
         }
 
         onUpdate({ schedule: newSchedule });

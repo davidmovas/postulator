@@ -32,7 +32,9 @@ export default function CreateGlobalJobPage() {
         jitterMinutes: 30,
         placeholdersValues: {},
         categories: [],
-        topics: []
+        topics: [],
+        status: 'active',
+        schedule: { type: "manual", config: {} }
     });
 
     const [sites, setSites] = useState<any[]>([]);
