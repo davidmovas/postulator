@@ -9,15 +9,17 @@ import { JobCreateInput } from "@/models/jobs";
 interface BasicInfoSectionProps {
     formData: Partial<JobCreateInput>;
     onUpdate: (updates: Partial<JobCreateInput>) => void;
-    prompts: any[];
-    providers: any[];
+    prompts: any[] | null;
+    providers: any[] | null;
     site?: any;
     sites?: any[];
 }
 
 export function BasicInfoSection({ formData, onUpdate, prompts, providers, site, sites }: BasicInfoSectionProps) {
-    const noPrompts = !prompts || prompts.length === 0;
-    const noProviders = !providers || providers.length === 0;
+    const promptsLoading = prompts == null;
+    const providersLoading = providers == null;
+    const noPrompts = !promptsLoading && prompts!.length === 0;
+    const noProviders = !providersLoading && providers!.length === 0;
 
     return (
         <Card>
@@ -77,13 +79,13 @@ export function BasicInfoSection({ formData, onUpdate, prompts, providers, site,
                     <Select
                         value={formData.aiProviderId?.toString()}
                         onValueChange={(value) => onUpdate({ aiProviderId: parseInt(value) })}
-                        disabled={noProviders}
+                        disabled={providersLoading || noProviders}
                     >
                         <SelectTrigger className={noProviders ? "border-destructive" : undefined}>
                             <SelectValue placeholder={noProviders ? "No providers found. Please create one first" : "Select an AI provider"} />
                         </SelectTrigger>
                         <SelectContent>
-                            {providers.map(provider => (
+                            {(providers || []).map(provider => (
                                 <SelectItem key={provider.id} value={provider.id.toString()}>
                                     {provider.name} ({provider.model})
                                 </SelectItem>
@@ -104,13 +106,13 @@ export function BasicInfoSection({ formData, onUpdate, prompts, providers, site,
                     <Select
                         value={formData.promptId?.toString()}
                         onValueChange={(value) => onUpdate({ promptId: parseInt(value) })}
-                        disabled={noPrompts}
+                        disabled={promptsLoading || noPrompts}
                     >
                         <SelectTrigger className={noPrompts ? "border-destructive" : undefined}>
                             <SelectValue placeholder={noPrompts ? "No prompts found. Please create one first" : "Select a prompt"} />
                         </SelectTrigger>
                         <SelectContent>
-                            {prompts.map(prompt => (
+                            {(prompts || []).map(prompt => (
                                 <SelectItem key={prompt.id} value={prompt.id.toString()}>
                                     {prompt.name}
                                 </SelectItem>

@@ -5,6 +5,7 @@ import { JobsList } from "@/components/jobs/jobs-list";
 import { useJobs } from "@/hooks/use-jobs";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { RiRefreshLine } from "@remixicon/react";
 
 export default function JobsPage() {
     const router = useRouter();
@@ -36,6 +37,7 @@ export default function JobsPage() {
                         onClick={loadJobs}
                         disabled={isLoading}
                     >
+                        <RiRefreshLine className="w-4 h-4" />
                         Refresh
                     </Button>
 

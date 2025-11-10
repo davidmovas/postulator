@@ -1,9 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { JobCreateInput } from "@/models/jobs";
 import { extractPlaceholdersFromPrompts } from "@/lib/prompt-utils";
 import { useMemo } from "react";
@@ -11,11 +9,11 @@ import { useMemo } from "react";
 interface PlaceholdersSectionProps {
     formData: Partial<JobCreateInput>;
     onUpdate: (updates: Partial<JobCreateInput>) => void;
-    prompts: any[];
+    prompts: any[] | null;
 }
 
 export function PlaceholdersSection({ formData, onUpdate, prompts }: PlaceholdersSectionProps) {
-    const selectedPrompt = prompts.find(p => p.id === formData.promptId);
+    const selectedPrompt = prompts?.find(p => p.id === formData.promptId);
 
     const EXCLUDED_KEYS = ["title", "topic"]; // These will be filled dynamically during execution
 
@@ -78,12 +76,9 @@ export function PlaceholdersSection({ formData, onUpdate, prompts }: Placeholder
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {placeholders.map((placeholder, index) => (
                             <div key={index} className="space-y-2">
-                                <Label htmlFor={`placeholder-${placeholder}`}>
-                                    <Badge variant="secondary" className="font-mono mr-2">
-                                        {placeholder}
-                                    </Badge>
-                                    Value
-                                </Label>
+                                <div className="text-xs font-mono inline-flex items-center px-2 py-1 rounded bg-muted text-muted-foreground/90 w-fit">
+                                    {placeholder}
+                                </div>
                                 <Input
                                     id={`placeholder-${placeholder}`}
                                     placeholder={`Enter value for ${placeholder}`}

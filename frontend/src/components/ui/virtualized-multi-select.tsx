@@ -25,6 +25,8 @@ interface VirtualizedMultiSelectProps {
     onChange: (value: string[]) => void;
     placeholder?: string;
     searchPlaceholder?: string;
+    disabled?: boolean;
+    className?: string;
 }
 
 export function VirtualizedMultiSelect({
@@ -32,7 +34,9 @@ export function VirtualizedMultiSelect({
     value,
     onChange,
     placeholder = "Select items...",
-    searchPlaceholder = "Search..."
+    searchPlaceholder = "Search...",
+    disabled = false,
+    className
 }: VirtualizedMultiSelectProps) {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState("");
@@ -62,7 +66,8 @@ export function VirtualizedMultiSelect({
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
-                    className="w-full justify-between h-auto min-h-10"
+                    className={cn("w-full justify-between h-auto min-h-10", className)}
+                    disabled={disabled}
                 >
                     <div className="flex flex-wrap gap-1 flex-1">
                         {selectedLabels.length > 0 ? (

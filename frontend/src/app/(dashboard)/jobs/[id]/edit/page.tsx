@@ -29,10 +29,10 @@ export default function EditJobPage() {
 
     const [site, setSite] = useState<any>(null);
     const [sites, setSites] = useState<any[]>([]);
-    const [prompts, setPrompts] = useState<any[]>([]);
-    const [providers, setProviders] = useState<any[]>([]);
-    const [topics, setTopics] = useState<any[]>([]);
-    const [categories, setCategories] = useState<any[]>([]);
+    const [prompts, setPrompts] = useState<any[] | null>(null);
+    const [providers, setProviders] = useState<any[] | null>(null);
+    const [topics, setTopics] = useState<any[] | null>(null);
+    const [categories, setCategories] = useState<any[] | null>(null);
 
     // Загрузка данных джобы
     useEffect(() => {

@@ -36,6 +36,7 @@ var Module = fx.Module("domain",
 		jobs.NewStateRepository,
 		jobs.NewService,
 
+
 		// Execution
 		execution.NewRepository,
 		execution.NewService,

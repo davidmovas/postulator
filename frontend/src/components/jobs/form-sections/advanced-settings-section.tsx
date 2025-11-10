@@ -85,11 +85,11 @@ export function AdvancedSettingsSection({ formData, onUpdate }: AdvancedSettings
                     <h4 className="font-medium mb-2">Job Summary</h4>
                     <div className="space-y-2 text-sm text-muted-foreground">
                         <div>• {formData.topicStrategy === 'unique' ? 'Unique topics' : 'Reused topics with variations'}</div>
-                        <div>• {formData.categoryStrategy} categories</div>
+                        <div>• {formData.categoryStrategy ? `${formData.categoryStrategy.charAt(0).toUpperCase()}${formData.categoryStrategy.slice(1)}` : 'Fixed'} categories</div>
                         <div>• {formData.requiresValidation ? 'Requires validation' : 'Auto-publish'}</div>
                         <div>• {formData.jitterEnabled ? `Jitter: ±${formData.jitterMinutes}min` : 'No jitter'}</div>
                         {formData.schedule && (
-                            <div>• {formData.schedule.type} schedule</div>
+                            <div>• {`${formData.schedule.type.charAt(0).toUpperCase()}${formData.schedule.type.slice(1)}`} schedule</div>
                         )}
                     </div>
                 </div>

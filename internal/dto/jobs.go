@@ -102,8 +102,8 @@ func (d *Job) FromEntity(entity *entities.Job) *Job {
 }
 
 type Schedule struct {
-	Type   string      `json:"type"`
-	Config interface{} `json:"config"`
+	Type   string `json:"type"`
+	Config any    `json:"config"`
 }
 
 type OnceSchedule struct {

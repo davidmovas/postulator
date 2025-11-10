@@ -26,6 +26,5 @@ type Service interface {
 	UpdateSitePassword(ctx context.Context, id int64, password string) error
 	DeleteSite(ctx context.Context, id int64) error
 
-	// Expose health status update for healthcheck service
 	UpdateHealthStatus(ctx context.Context, id int64, status entities.HealthStatus, checkedAt time.Time) error
 }

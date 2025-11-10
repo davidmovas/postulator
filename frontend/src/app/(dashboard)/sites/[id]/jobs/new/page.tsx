@@ -14,7 +14,6 @@ import { useJobForm } from "@/hooks/use-job-form";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
-// Импорты компонентов секций
 import { BasicInfoSection } from "@/components/jobs/form-sections/basic-info-section";
 import { ContentStrategySection } from "@/components/jobs/form-sections/content-strategy-section";
 import { PlaceholdersSection } from "@/components/jobs/form-sections/placeholders-section";
@@ -30,10 +29,10 @@ export default function CreateSiteJobPage() {
     const { execute } = useApiCall();
 
     const [site, setSite] = useState<any>(null);
-    const [prompts, setPrompts] = useState<any[]>([]);
-    const [providers, setProviders] = useState<any[]>([]);
-    const [topics, setTopics] = useState<any[]>([]);
-    const [categories, setCategories] = useState<any[]>([]);
+    const [prompts, setPrompts] = useState<any[] | null>(null);
+    const [providers, setProviders] = useState<any[] | null>(null);
+    const [topics, setTopics] = useState<any[] | null>(null);
+    const [categories, setCategories] = useState<any[] | null>(null);
     
     useEffect(() => {
         loadSiteData();
@@ -80,9 +79,7 @@ export default function CreateSiteJobPage() {
     };
 
     const handleSubmit = async () => {
-        // Валидация
         if (!formData.name || !formData.promptId || !formData.aiProviderId) {
-            // TODO: Показать ошибку
             console.error("Please fill all required fields");
             return;
         }
