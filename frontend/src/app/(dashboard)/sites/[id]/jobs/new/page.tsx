@@ -95,7 +95,7 @@ export default function CreateSiteJobPage() {
             }
         );
 
-        if (result !== undefined) {
+        if (result !== null) {
             router.push(`/sites/${siteId}/jobs`);
         }
     };

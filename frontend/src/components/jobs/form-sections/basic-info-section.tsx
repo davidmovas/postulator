@@ -16,6 +16,9 @@ interface BasicInfoSectionProps {
 }
 
 export function BasicInfoSection({ formData, onUpdate, prompts, providers, site, sites }: BasicInfoSectionProps) {
+    const noPrompts = !prompts || prompts.length === 0;
+    const noProviders = !providers || providers.length === 0;
+
     return (
         <Card>
             <CardHeader>
@@ -68,35 +71,16 @@ export function BasicInfoSection({ formData, onUpdate, prompts, providers, site,
                     </div>
                 )}
 
-                {/* Prompt Selection */}
+                {/* AI Provider Selection (moved above prompt) */}
                 <div className="space-y-2">
-                    <Label htmlFor="prompt">AI Prompt</Label>
-                    <Select
-                        value={formData.promptId?.toString()}
-                        onValueChange={(value) => onUpdate({ promptId: parseInt(value) })}
-                    >
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select a prompt" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {prompts.map(prompt => (
-                                <SelectItem key={prompt.id} value={prompt.id.toString()}>
-                                    {prompt.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                {/* AI Provider Selection */}
-                <div className="space-y-2">
-                    <Label htmlFor="provider">AI Provider</Label>
+                    <Label htmlFor="provider" className={noProviders ? "text-destructive" : undefined}>AI Provider</Label>
                     <Select
                         value={formData.aiProviderId?.toString()}
                         onValueChange={(value) => onUpdate({ aiProviderId: parseInt(value) })}
+                        disabled={noProviders}
                     >
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select an AI provider" />
+                        <SelectTrigger className={noProviders ? "border-destructive" : undefined}>
+                            <SelectValue placeholder={noProviders ? "No providers found. Please create one first" : "Select an AI provider"} />
                         </SelectTrigger>
                         <SelectContent>
                             {providers.map(provider => (
@@ -106,6 +90,39 @@ export function BasicInfoSection({ formData, onUpdate, prompts, providers, site,
                             ))}
                         </SelectContent>
                     </Select>
+                    {noProviders && (
+                        <div className="flex items-center gap-2 text-xs text-destructive">
+                            You need to create an AI provider first.
+                            <a href="/ai-providers" className="underline">Go to Providers</a>
+                        </div>
+                    )}
+                </div>
+
+                {/* Prompt Selection */}
+                <div className="space-y-2">
+                    <Label htmlFor="prompt" className={noPrompts ? "text-destructive" : undefined}>AI Prompt</Label>
+                    <Select
+                        value={formData.promptId?.toString()}
+                        onValueChange={(value) => onUpdate({ promptId: parseInt(value) })}
+                        disabled={noPrompts}
+                    >
+                        <SelectTrigger className={noPrompts ? "border-destructive" : undefined}>
+                            <SelectValue placeholder={noPrompts ? "No prompts found. Please create one first" : "Select a prompt"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {prompts.map(prompt => (
+                                <SelectItem key={prompt.id} value={prompt.id.toString()}>
+                                    {prompt.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    {noPrompts && (
+                        <div className="flex items-center gap-2 text-xs text-destructive">
+                            You need to create a prompt first.
+                            <a href="/prompts" className="underline">Go to Prompts</a>
+                        </div>
+                    )}
                 </div>
             </CardContent>
         </Card>

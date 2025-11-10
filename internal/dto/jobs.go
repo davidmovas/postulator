@@ -52,7 +52,10 @@ func (d *Job) ToEntity() (*entities.Job, error) {
 		}
 	}
 
-	state := d.State.ToEntity()
+	var state *entities.State
+	if d.State != nil {
+		state = d.State.ToEntity()
+	}
 
 	return &entities.Job{
 		ID:                 d.ID,

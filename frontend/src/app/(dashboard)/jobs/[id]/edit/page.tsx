@@ -119,7 +119,7 @@ export default function EditJobPage() {
             }
         );
 
-        if (result !== undefined) {
+        if (result !== null) {
             router.push("/jobs");
         }
     };

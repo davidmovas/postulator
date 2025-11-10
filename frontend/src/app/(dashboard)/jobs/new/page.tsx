@@ -113,7 +113,7 @@ export default function CreateGlobalJobPage() {
             }
         );
 
-        if (result !== undefined) {
+        if (result !== null) {
             router.push("/jobs");
         }
     };
@@ -189,7 +189,7 @@ export default function CreateGlobalJobPage() {
                 </Button>
                 <Button
                     onClick={handleSubmit}
-                    disabled={isLoading || !formData.siteId}
+                    disabled={isLoading || !formData.siteId || !formData.name || !formData.promptId || !formData.aiProviderId}
                 >
                     {isLoading ? "Creating..." : "Create Job"}
                 </Button>
