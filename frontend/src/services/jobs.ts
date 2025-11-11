@@ -1,21 +1,20 @@
 import { dto } from "@/wailsjs/wailsjs/go/models";
 import {
-    CreateJob,
-    DeleteJob,
-    ExecuteManually,
-    GetJob,
-    ListJobs,
-    PauseJob,
-    ResumeJob,
-    UpdateJob
-} from "@/wailsjs/wailsjs/go/handlers/JobsHandler";
-import {
     mapJob,
     Job,
     JobCreateInput,
     JobUpdateInput
 } from "@/models/jobs";
 import { unwrapArrayResponse, unwrapResponse } from "@/lib/api-utils";
+import {
+    CreateJob,
+    DeleteJob, ExecuteManually,
+    GetJob,
+    ListJobs,
+    PauseJob,
+    ResumeJob,
+    UpdateJob
+} from "@/wailsjs/wailsjs/go/handlers/JobsHandler";
 
 export const jobService = {
     async createJob(input: JobCreateInput): Promise<void> {

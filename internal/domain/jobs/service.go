@@ -73,17 +73,9 @@ func (s *service) CreateJob(ctx context.Context, job *entities.Job) error {
 		return err
 	}
 
-	// Ensure default values
 	now := time.Now()
 	job.CreatedAt = now
 	job.UpdatedAt = now
-	if strings.TrimSpace(string(job.Status)) == "" {
-		job.Status = entities.JobStatusActive
-	}
-
-	if s.repo == nil {
-		panic("repo is nil")
-	}
 
 	fmt.Println("[CJ] 3")
 	if err := s.repo.Create(ctx, job); err != nil {
@@ -380,6 +372,10 @@ func (s *service) validateDependencies(ctx context.Context, job *entities.Job) e
 }
 
 func (s *service) validateScheduleConfig(schedule *entities.Schedule) error {
+	if schedule == nil {
+		return errors.Validation("Schedule is required")
+	}
+
 	switch schedule.Type {
 	case entities.ScheduleOnce:
 		var config entities.OnceSchedule
