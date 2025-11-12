@@ -1,28 +1,26 @@
 "use client";
 
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { JobsList } from "@/components/jobs/jobs-list";
-import { useJobs } from "@/hooks/use-jobs";
 import { Plus, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { router } from "next/client";
+import { DataTable } from "@/components/table/data-table";
+import { useJobsTable } from "@/hooks/use-jobs-table";
+import { ConfirmationModal } from "@/modals/confirm-modal";
+import { useContextModal } from "@/context/modal-context";
 
 export default function SiteJobsPage() {
     const params = useParams();
     const siteId = parseInt(params.id as string);
     const router = useRouter();
 
-    const {
-        jobs,
-        isLoading,
-        loadJobs,
-        handleEditJob,
-        handleDeleteJob,
-        handlePauseJob,
-        handleResumeJob,
-        handleExecuteJob
-    } = useJobs(siteId);
+    const { jobs, isLoading, loadJobs, columns, renderExpandedRow } = useJobsTable(siteId);
+    const { confirmationModal } = useContextModal();
+
+    useEffect(() => {
+        loadJobs();
+    }, [siteId]);
 
     return (
         <div className="p-6 space-y-6">
@@ -64,14 +62,22 @@ export default function SiteJobsPage() {
                 <div className="flex-1 border-t" />
             </div>
 
-            <JobsList
-                jobs={jobs}
-                onEdit={handleEditJob}
-                onDelete={handleDeleteJob}
-                onPause={handlePauseJob}
-                onResume={handleResumeJob}
-                onExecute={handleExecuteJob}
+            <DataTable
+                columns={columns}
+                data={jobs}
+                searchKey="name"
+                searchPlaceholder="Search jobs..."
                 isLoading={isLoading}
+                emptyMessage="No jobs found"
+                enableRowExpand
+                expandOnRowClick
+                renderExpandedRow={(row) => renderExpandedRow(row)}
+            />
+
+            <ConfirmationModal
+                open={confirmationModal.isOpen}
+                onOpenChange={confirmationModal.close}
+                data={confirmationModal.data}
             />
         </div>
     );

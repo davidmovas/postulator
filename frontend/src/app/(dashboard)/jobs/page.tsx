@@ -1,25 +1,24 @@
 "use client";
 
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { JobsList } from "@/components/jobs/jobs-list";
-import { useJobs } from "@/hooks/use-jobs";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { RiRefreshLine } from "@remixicon/react";
+import { DataTable } from "@/components/table/data-table";
+import { useJobsTable } from "@/hooks/use-jobs-table";
+import { useContextModal } from "@/context/modal-context";
+import { ConfirmationModal } from "@/modals/confirm-modal";
 
 export default function JobsPage() {
     const router = useRouter();
 
-    const {
-        jobs,
-        isLoading,
-        loadJobs,
-        handleEditJob,
-        handleDeleteJob,
-        handlePauseJob,
-        handleResumeJob,
-        handleExecuteJob
-    } = useJobs();
+    const { jobs, isLoading, loadJobs, columns, renderExpandedRow } = useJobsTable();
+    const { confirmationModal } = useContextModal();
+
+    useEffect(() => {
+        loadJobs();
+    }, []);
 
     return (
         <div className="p-6 space-y-6">
@@ -55,14 +54,22 @@ export default function JobsPage() {
                 <div className="flex-1 border-t" />
             </div>
 
-            <JobsList
-                jobs={jobs}
-                onEdit={handleEditJob}
-                onDelete={handleDeleteJob}
-                onPause={handlePauseJob}
-                onResume={handleResumeJob}
-                onExecute={handleExecuteJob}
+            <DataTable
+                columns={columns}
+                data={jobs}
+                searchKey="name"
+                searchPlaceholder="Search jobs..."
                 isLoading={isLoading}
+                emptyMessage="No jobs found"
+                enableRowExpand
+                expandOnRowClick
+                renderExpandedRow={(row) => renderExpandedRow(row)}
+            />
+
+            <ConfirmationModal
+                open={confirmationModal.isOpen}
+                onOpenChange={confirmationModal.close}
+                data={confirmationModal.data}
             />
         </div>
     );

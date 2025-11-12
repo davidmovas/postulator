@@ -119,7 +119,7 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*entities.Job, erro
 		Where(squirrel.Eq{"id": id}).
 		MustSql()
 
-	job, err := r.scanJob(query, args, ctx)
+	job, err := r.scanJob(ctx, query, args)
 	switch {
 	case dbx.IsNoRows(err):
 		return nil, errors.NotFound("job", id)
@@ -153,6 +153,7 @@ func (r *repository) GetAll(ctx context.Context) ([]*entities.Job, error) {
 	query, args := dbx.ST.
 		Select(
 			"id", "name", "site_id", "prompt_id", "ai_provider_id",
+			"placeholders_values",
 			"topic_strategy", "category_strategy", "requires_validation",
 			"schedule_type", "schedule_config",
 			"jitter_enabled", "jitter_minutes", "status",
@@ -162,7 +163,7 @@ func (r *repository) GetAll(ctx context.Context) ([]*entities.Job, error) {
 		OrderBy("created_at DESC").
 		MustSql()
 
-	jobs, err := r.scanJobs(query, args, ctx)
+	jobs, err := r.scanJobs(ctx, query, args)
 	if err != nil {
 		return nil, err
 	}
@@ -184,6 +185,7 @@ func (r *repository) GetActive(ctx context.Context) ([]*entities.Job, error) {
 	query, args := dbx.ST.
 		Select(
 			"id", "name", "site_id", "prompt_id", "ai_provider_id",
+			"placeholders_values",
 			"topic_strategy", "category_strategy", "requires_validation",
 			"schedule_type", "schedule_config",
 			"jitter_enabled", "jitter_minutes", "status",
@@ -194,7 +196,7 @@ func (r *repository) GetActive(ctx context.Context) ([]*entities.Job, error) {
 		OrderBy("created_at DESC").
 		MustSql()
 
-	jobs, err := r.scanJobs(query, args, ctx)
+	jobs, err := r.scanJobs(ctx, query, args)
 	if err != nil {
 		return nil, err
 	}
@@ -216,6 +218,7 @@ func (r *repository) GetDue(ctx context.Context, before time.Time) ([]*entities.
 	query, args := dbx.ST.
 		Select(
 			"j.id", "j.name", "j.site_id", "j.prompt_id", "j.ai_provider_id",
+			"j.placeholders_values",
 			"j.topic_strategy", "j.category_strategy", "j.requires_validation",
 			"j.schedule_type", "j.schedule_config",
 			"j.jitter_enabled", "j.jitter_minutes", "j.status",
@@ -228,7 +231,7 @@ func (r *repository) GetDue(ctx context.Context, before time.Time) ([]*entities.
 		OrderBy("js.next_run_at ASC").
 		MustSql()
 
-	jobs, err := r.scanJobs(query, args, ctx)
+	jobs, err := r.scanJobs(ctx, query, args)
 	if err != nil {
 		return nil, err
 	}
@@ -485,11 +488,15 @@ func (r *repository) GetTopics(ctx context.Context, jobID int64) ([]int64, error
 	return topicIDs, nil
 }
 
-func (r *repository) scanJob(query string, args []interface{}, ctx context.Context) (*entities.Job, error) {
-	var job entities.Job
-	var scheduleConfigJSON, placeholdersJSON []byte
 
-	err := r.db.QueryRowContext(ctx, query, args...).Scan(
+func (r *repository) scanJobFromScanner(scn dbx.RowScanner) (*entities.Job, error) {
+	var (
+		job                                  entities.Job
+		scheduleType                         entities.ScheduleType
+		scheduleConfigJSON, placeholdersJSON []byte
+	)
+
+	if err := scn.Scan(
 		&job.ID,
 		&job.Name,
 		&job.SiteID,
@@ -499,88 +506,57 @@ func (r *repository) scanJob(query string, args []interface{}, ctx context.Conte
 		&job.TopicStrategy,
 		&job.CategoryStrategy,
 		&job.RequiresValidation,
-		&job.Schedule.Type,
+		&scheduleType,
 		&scheduleConfigJSON,
 		&job.JitterEnabled,
 		&job.JitterMinutes,
 		&job.Status,
 		&job.CreatedAt,
 		&job.UpdatedAt,
-	)
-	if err != nil {
+	); err != nil {
 		return nil, err
 	}
 
+	placeholderValues := make(map[string]string)
 	if len(placeholdersJSON) > 0 {
-		placeholderValues := make(map[string]string)
-		if err = json.Unmarshal(placeholdersJSON, &placeholderValues); err != nil {
+		if err := json.Unmarshal(placeholdersJSON, &placeholderValues); err != nil {
 			return nil, errors.Database(err)
 		}
-		job.PlaceholdersValues = placeholderValues
 	}
+	job.PlaceholdersValues = placeholderValues
 
-	if len(scheduleConfigJSON) > 0 {
-		job.Schedule = &entities.Schedule{
-			Type:   job.Schedule.Type,
-			Config: scheduleConfigJSON,
-		}
+	config := scheduleConfigJSON
+	if len(config) == 0 {
+		config = []byte("{}")
+	}
+	job.Schedule = &entities.Schedule{
+		Type:   scheduleType,
+		Config: config,
 	}
 
 	return &job, nil
 }
 
-func (r *repository) scanJobs(query string, args []interface{}, ctx context.Context) ([]*entities.Job, error) {
+func (r *repository) scanJob(ctx context.Context, query string, args []any) (*entities.Job, error) {
+	row := r.db.QueryRowContext(ctx, query, args...)
+	return r.scanJobFromScanner(row)
+}
+
+func (r *repository) scanJobs(ctx context.Context, query string, args []any) ([]*entities.Job, error) {
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, errors.Database(err)
 	}
-	defer func() {
-		_ = rows.Close()
-	}()
+	defer func() { _ = rows.Close() }()
 
 	var jobs []*entities.Job
 	for rows.Next() {
-		var job entities.Job
-		var scheduleConfigJSON, placeholdersJSON []byte
-
-		err = rows.Scan(
-			&job.ID,
-			&job.Name,
-			&job.SiteID,
-			&job.PromptID,
-			&job.AIProviderID,
-			&placeholdersJSON,
-			&job.TopicStrategy,
-			&job.CategoryStrategy,
-			&job.RequiresValidation,
-			&job.Schedule.Type,
-			&scheduleConfigJSON,
-			&job.JitterEnabled,
-			&job.JitterMinutes,
-			&job.Status,
-			&job.CreatedAt,
-			&job.UpdatedAt,
-		)
+		var job *entities.Job
+		job, err = r.scanJobFromScanner(rows)
 		if err != nil {
 			return nil, errors.Database(err)
 		}
-
-		if len(placeholdersJSON) > 0 {
-			placeholderValues := make(map[string]string)
-			if err = json.Unmarshal(placeholdersJSON, &placeholderValues); err != nil {
-				return nil, errors.Database(err)
-			}
-			job.PlaceholdersValues = placeholderValues
-		}
-
-		if len(scheduleConfigJSON) > 0 {
-			job.Schedule = &entities.Schedule{
-				Type:   job.Schedule.Type,
-				Config: scheduleConfigJSON,
-			}
-		}
-
-		jobs = append(jobs, &job)
+		jobs = append(jobs, job)
 	}
 
 	switch {

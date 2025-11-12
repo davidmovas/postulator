@@ -55,6 +55,10 @@ export interface DataTableProps<TData, TValue> {
     defaultSorting?: SortingState;
     enableViewOption?: boolean;
     rowSelectionResetKey?: number | string;
+    // Optional expandable rows support
+    enableRowExpand?: boolean;
+    expandOnRowClick?: boolean;
+    renderExpandedRow?: (data: TData) => React.ReactNode;
 }
 
 export function DataTable<TData, TValue>({
@@ -72,11 +76,15 @@ export function DataTable<TData, TValue>({
     defaultSorting = [],
     enableViewOption = true,
     rowSelectionResetKey,
+    enableRowExpand = false,
+    expandOnRowClick = false,
+    renderExpandedRow,
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>(defaultSorting);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+    const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
     const [pagination, setPagination] = useState<PaginationState>({
         pageIndex: 0,
         pageSize: defaultPageSize,
@@ -216,30 +224,48 @@ export function DataTable<TData, TValue>({
                             </TableRow>
                         ) : table.getRowModel().rows?.length ? (
                             table.getRowModel().rows.map((row) => (
-                                <TableRow
-                                    key={row.id}
-                                    data-state={row.getIsSelected() && "selected"}
-                                >
-                                    {row.getVisibleCells().map((cell, index) => {
-                                        const isLastColumn = cell.column.id === "actions";
-                                        const isSelectColumn = cell.column.id === "select";
+                                <>
+                                    <TableRow
+                                        key={row.id}
+                                        data-state={row.getIsSelected() && "selected"}
+                                        className={cn(enableRowExpand && expandOnRowClick && "cursor-pointer")}
+                                        onClick={() => {
+                                            if (enableRowExpand && expandOnRowClick && renderExpandedRow) {
+                                                setExpandedRows((prev) => ({
+                                                    ...prev,
+                                                    [row.id]: !prev[row.id],
+                                                }));
+                                            }
+                                        }}
+                                    >
+                                        {row.getVisibleCells().map((cell, index) => {
+                                            const isLastColumn = cell.column.id === "actions";
+                                            const isSelectColumn = cell.column.id === "select";
 
-                                        return (
-                                            <TableCell
-                                                key={cell.id}
-                                                className={cn(
-                                                    isLastColumn && "text-right",
-                                                    isSelectColumn && "w-[40px] px-2 text-center"
-                                                )}
-                                            >
-                                                {flexRender(
-                                                    cell.column.columnDef.cell,
-                                                    cell.getContext()
-                                                )}
+                                            return (
+                                                <TableCell
+                                                    key={cell.id}
+                                                    className={cn(
+                                                        isLastColumn && "text-right",
+                                                        isSelectColumn && "w-[40px] px-2 text-center"
+                                                    )}
+                                                >
+                                                    {flexRender(
+                                                        cell.column.columnDef.cell,
+                                                        cell.getContext()
+                                                    )}
+                                                </TableCell>
+                                            );
+                                        })}
+                                    </TableRow>
+                                    {enableRowExpand && renderExpandedRow && expandedRows[row.id] && (
+                                        <TableRow className="bg-muted/30">
+                                            <TableCell colSpan={columns.length}>
+                                                {renderExpandedRow(row.original as TData)}
                                             </TableCell>
-                                        );
-                                    })}
-                                </TableRow>
+                                        </TableRow>
+                                    )}
+                                </>
                             ))
                         ) : (
                             <TableRow>

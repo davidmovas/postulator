@@ -3,7 +3,6 @@ package jobs
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 
@@ -63,12 +62,10 @@ func NewService(
 }
 
 func (s *service) CreateJob(ctx context.Context, job *entities.Job) error {
-	fmt.Println("[CJ] 1")
 	if err := s.validateJob(job); err != nil {
 		return err
 	}
 
-	fmt.Println("[CJ] 2")
 	if err := s.validateDependencies(ctx, job); err != nil {
 		return err
 	}
@@ -77,16 +74,11 @@ func (s *service) CreateJob(ctx context.Context, job *entities.Job) error {
 	job.CreatedAt = now
 	job.UpdatedAt = now
 
-	data, _ := json.MarshalIndent(job, "", "	")
-	fmt.Println("[CJ] Data: ", string(data))
-
-	fmt.Println("[CJ] 3")
 	if err := s.repo.Create(ctx, job); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to create job")
 		return err
 	}
 
-	fmt.Println("[CJ] 4")
 	if len(job.Categories) > 0 {
 		if err := s.repo.SetCategories(ctx, job.ID, job.Categories); err != nil {
 			s.logger.ErrorWithErr(err, "Failed to set job categories")
@@ -94,7 +86,6 @@ func (s *service) CreateJob(ctx context.Context, job *entities.Job) error {
 		}
 	}
 
-	fmt.Println("[CJ] 5")
 	if len(job.Topics) > 0 {
 		if err := s.repo.SetTopics(ctx, job.ID, job.Topics); err != nil {
 			s.logger.ErrorWithErr(err, "Failed to set job topics")
@@ -102,7 +93,6 @@ func (s *service) CreateJob(ctx context.Context, job *entities.Job) error {
 		}
 	}
 
-	fmt.Println("[CJ] 6")
 	if job.Schedule != nil && job.Schedule.Type != entities.ScheduleManual {
 		nextRun, err := s.scheduler.CalculateNextRun(job, nil)
 		if err != nil {
@@ -116,7 +106,6 @@ func (s *service) CreateJob(ctx context.Context, job *entities.Job) error {
 		}
 	}
 
-	fmt.Println("[CJ] 7")
 	if err := s.scheduler.ScheduleJob(ctx, job); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to schedule job")
 		return err

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuItem,
+    DropdownMenuItem, DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -112,6 +112,9 @@ export function JobCard({ job, onEdit, onDelete, onPause, onResume, onExecute }:
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit
                             </DropdownMenuItem>
+
+                            <DropdownMenuSeparator />
+
                             <DropdownMenuItem
                                 onClick={() => onDelete(job)}
                                 className="text-destructive focus:text-destructive"
