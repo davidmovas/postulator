@@ -121,7 +121,7 @@ export function CreatePromptModal({ open, onOpenChange, onSuccess }: CreatePromp
                                 ...prev,
                                 systemPrompt: e.target.value
                             }))}
-                            rows={4}
+                            rows={8}
                             disabled={isLoading}
                             className="resize-none font-mono text-sm"
                         />
@@ -141,7 +141,7 @@ export function CreatePromptModal({ open, onOpenChange, onSuccess }: CreatePromp
                                 ...prev,
                                 userPrompt: e.target.value
                             }))}
-                            rows={4}
+                            rows={8}
                             disabled={isLoading}
                             className="resize-none font-mono text-sm"
                         />
