@@ -132,7 +132,7 @@ export function ContentStrategySection({
                         <Label className="text-base">Category Strategy</Label>
                         <div className="flex items-center gap-2">
                             <Badge variant="outline">
-                                {formData.categories?.length || 0} categories
+                                {formData.categories?.length || 0} categories selected
                             </Badge>
                             <Button
                                 variant="wordpress"

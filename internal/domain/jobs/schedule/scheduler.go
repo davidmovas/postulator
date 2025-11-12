@@ -3,6 +3,7 @@ package schedule
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"strings"
 	"time"
@@ -238,23 +239,28 @@ func (s *Scheduler) CalculateNextRun(job *entities.Job, lastRun *time.Time) (tim
 }
 
 func (s *Scheduler) ScheduleJob(ctx context.Context, job *entities.Job) error {
+	fmt.Println("[SJ] 1")
 	if job.Schedule != nil {
 		if err := ValidateSchedule(job.Schedule); err != nil {
 			return err
 		}
 	}
 
+	fmt.Println("[SJ] 2")
 	if job.Schedule != nil && job.Schedule.Type != entities.ScheduleManual {
+		fmt.Println("[SJ] 3")
 		nextRun, err := s.calculator.CalculateNextRun(job, nil)
 		if err != nil {
 			return err
 		}
 
+		fmt.Println("[SJ] 4")
 		state := &entities.State{
 			JobID:     job.ID,
 			NextRunAt: &nextRun,
 		}
 
+		fmt.Println("[SJ] 5")
 		if err = s.stateRepo.Update(ctx, state); err != nil {
 			return appErrors.Scheduler(err)
 		}
@@ -262,6 +268,7 @@ func (s *Scheduler) ScheduleJob(ctx context.Context, job *entities.Job) error {
 
 	job.Status = entities.JobStatusActive
 
+	fmt.Println("[SJ] 6")
 	if err := s.jobRepo.Update(ctx, job); err != nil {
 		return appErrors.Scheduler(err)
 	}

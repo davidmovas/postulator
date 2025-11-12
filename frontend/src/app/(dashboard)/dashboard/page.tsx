@@ -165,7 +165,7 @@ export default function DashboardPage() {
                                     value={data.pendingValidations}
                                     icon={<DashboardIcons.pending />}
                                     description="Awaiting approval"
-                                    className={borderColors.neutral}
+                                    className={borderColors.sites}
                                 />
                             </div>
                         </div>

@@ -77,6 +77,9 @@ func (s *service) CreateJob(ctx context.Context, job *entities.Job) error {
 	job.CreatedAt = now
 	job.UpdatedAt = now
 
+	data, _ := json.MarshalIndent(job, "", "	")
+	fmt.Println("[CJ] Data: ", string(data))
+
 	fmt.Println("[CJ] 3")
 	if err := s.repo.Create(ctx, job); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to create job")
@@ -338,6 +341,8 @@ func (s *service) validateJob(job *entities.Job) error {
 		if err := s.validateScheduleConfig(job.Schedule); err != nil {
 			return err
 		}
+	} else {
+		return errors.Validation("Schedule is required")
 	}
 
 	return nil
