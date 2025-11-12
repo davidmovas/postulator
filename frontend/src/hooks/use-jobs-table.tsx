@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Job } from "@/models/jobs";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,11 @@ import { jobService } from "@/services/jobs";
 import { formatDateTime } from "@/lib/time";
 import { useContextModal } from "@/context/modal-context";
 import { Edit, MoreHorizontal, Pause, Play, Trash2, Zap } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { siteService } from "@/services/sites";
+import { promptService } from "@/services/prompts";
+import { providerService } from "@/services/providers";
+import { topicService } from "@/services/topics";
 
 export function useJobsTable(siteId?: number) {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -70,8 +75,6 @@ export function useJobsTable(siteId?: number) {
     });
   };
 
-  // Status icons removed per requirement
-
   const columns: ColumnDef<Job>[] = useMemo(() => [
     {
       accessorKey: "name",
@@ -103,33 +106,16 @@ export function useJobsTable(siteId?: number) {
         const j = row.original;
         if (!j.schedule) return <span className="text-muted-foreground">Manual</span>;
         const s = j.schedule;
-        const typeLabel = s.type ? s.type.charAt(0).toUpperCase() + s.type.slice(1) : "";
         switch (s.type) {
           case "once":
-            return `${typeLabel}: ${formatDateTime(s.config?.executeAt)}`;
+            return `${formatDateTime(s.config?.executeAt)}`;
           case "interval":
-            return `${typeLabel}: Every ${s.config?.value} ${s.config?.unit}`;
+            return `Every ${s.config?.value} ${s.config?.unit}`;
           case "daily":
-            return `${typeLabel}: ${s.config?.hour}:${String(s.config?.minute).padStart(2, "0")}`;
+            return `${s.config?.hour}:${String(s.config?.minute).padStart(2, "0")}`;
           default:
-            return typeLabel;
+            return "";
         }
-      },
-    },
-    {
-      accessorKey: "topicStrategy",
-      header: "Topic Strategy",
-      cell: ({ row }) => {
-        const v = row.original.topicStrategy;
-        return <span className="font-medium">{v}</span>;
-      },
-    },
-    {
-      accessorKey: "categoryStrategy",
-      header: "Category Strategy",
-      cell: ({ row }) => {
-        const v = row.original.categoryStrategy;
-        return <span className="font-medium">{v}</span>;
       },
     },
     {
@@ -150,7 +136,7 @@ export function useJobsTable(siteId?: number) {
     },
     {
       id: "executionsTotal",
-      header: "Total Executions",
+      header: "Executions",
       cell: ({ row }) => {
         const total = row.original.state?.totalExecutions ?? 0;
         return <span className="font-semibold">{total}</span>;
@@ -158,7 +144,7 @@ export function useJobsTable(siteId?: number) {
     },
     {
       id: "executionsFailed",
-      header: "Failed Executions",
+      header: "Failed",
       cell: ({ row }) => {
         const failed = row.original.state?.failedExecutions ?? 0;
         return <span className={failed > 0 ? "font-semibold text-red-500" : "font-semibold"}>{failed}</span>;
@@ -222,56 +208,147 @@ export function useJobsTable(siteId?: number) {
     },
   ], []);
 
-  const renderExpandedRow = (job: Job) => {
-    const hasSchedule = !!job.schedule;
+  // Caches for human-readable names and next topic
+  const [siteNames, setSiteNames] = useState<Record<number, string>>({});
+  const [promptNames, setPromptNames] = useState<Record<number, string>>({});
+  const [providerNames, setProviderNames] = useState<Record<number, string>>({});
+  const [nextTopicTitles, setNextTopicTitles] = useState<Record<number, string | null>>({});
+
+  const capitalize = (s?: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : "");
+
+  const ExpandedRow = ({ job }: { job: Job }) => {
+    const [loadingRefs, setLoadingRefs] = useState({ site: false, prompt: false, provider: false, topic: false });
+
+    useEffect(() => {
+      const loadRefs = async () => {
+        try {
+          if (job.siteId && siteNames[job.siteId] === undefined && !loadingRefs.site) {
+            setLoadingRefs(prev => ({ ...prev, site: true }));
+            try {
+              const site = await siteService.getSite(job.siteId);
+              setSiteNames(prev => ({ ...prev, [job.siteId]: site.name }));
+            } catch { /* silent */ }
+            finally { setLoadingRefs(prev => ({ ...prev, site: false })); }
+          }
+          if (job.promptId && promptNames[job.promptId] === undefined && !loadingRefs.prompt) {
+            setLoadingRefs(prev => ({ ...prev, prompt: true }));
+            try {
+              const prompt = await promptService.getPrompt(job.promptId);
+              setPromptNames(prev => ({ ...prev, [job.promptId]: prompt.name }));
+            } catch { /* silent */ }
+            finally { setLoadingRefs(prev => ({ ...prev, prompt: false })); }
+          }
+          if (job.aiProviderId && providerNames[job.aiProviderId] === undefined && !loadingRefs.provider) {
+            setLoadingRefs(prev => ({ ...prev, provider: true }));
+            try {
+              const provider = await providerService.getProvider(job.aiProviderId);
+              setProviderNames(prev => ({ ...prev, [job.aiProviderId]: provider.name }));
+            } catch { /* silent */ }
+            finally { setLoadingRefs(prev => ({ ...prev, provider: false })); }
+          }
+          if (nextTopicTitles[job.id] === undefined && !loadingRefs.topic) {
+            setLoadingRefs(prev => ({ ...prev, topic: true }));
+            try {
+              const topic = await topicService.getNextTopicForJob(job.id);
+              setNextTopicTitles(prev => ({ ...prev, [job.id]: topic?.title || null }));
+            } catch {
+              setNextTopicTitles(prev => ({ ...prev, [job.id]: null }));
+            } finally { setLoadingRefs(prev => ({ ...prev, topic: false })); }
+          }
+        } catch { /* noop */ }
+      };
+      loadRefs();
+    }, [job.id, job.siteId, job.promptId, job.aiProviderId]);
+
+    const schedule = job.schedule;
+
+    const InfoItem = ({label, children}:{label:string; children: React.ReactNode}) => (
+      <div className="min-w-[180px] max-w-full">
+        <div className="text-muted-foreground text-xs">{label}</div>
+        <div className="font-medium mt-1 break-words">{children}</div>
+      </div>
+    );
+
     return (
-      <div className="text-sm space-y-2">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <div>
-            <div className="text-muted-foreground">Requires Validation</div>
-            <div className="font-medium">{job.requiresValidation ? "Yes" : "No"}</div>
-          </div>
-          <div>
-            <div className="text-muted-foreground">Jitter</div>
-            <div className="font-medium">{job.jitterEnabled ? `${job.jitterMinutes} min` : "Disabled"}</div>
-          </div>
-          <div>
-            <div className="text-muted-foreground">IDs</div>
-            <div className="font-medium">Site #{job.siteId} · Prompt #{job.promptId} · Provider #{job.aiProviderId}</div>
-          </div>
-          {hasSchedule && (
-            <div className="col-span-2 md:col-span-1">
-              <div className="text-muted-foreground">Schedule Raw</div>
-              <pre className="text-xs bg-muted/50 p-2 rounded overflow-auto">{JSON.stringify(job.schedule?.config ?? {}, null, 2)}</pre>
-            </div>
-          )}
-          <div>
-            <div className="text-muted-foreground">Categories</div>
-            <div className="font-medium">{job.categories?.length ?? 0}</div>
-          </div>
-          <div>
-            <div className="text-muted-foreground">Topics</div>
-            <div className="font-medium">{job.topics?.length ?? 0}</div>
+      <div className="text-sm space-y-4 p-4 bg-muted/30 rounded-md">
+        {/* Scheduling */}
+        <div className="space-y-2">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Scheduling</div>
+          <div className="flex flex-wrap gap-6">
+            {!schedule ? (
+              <InfoItem label="Mode">Manual</InfoItem>
+            ) : (
+              <>
+                <InfoItem label="Type">{capitalize(schedule.type)}</InfoItem>
+                {schedule.type === "once" && (
+                  <InfoItem label="Execute At">{formatDateTime(schedule.config?.executeAt)}</InfoItem>
+                )}
+                {schedule.type === "interval" && (
+                  <>
+                    <InfoItem label="Every">{schedule.config?.value} {schedule.config?.unit}</InfoItem>
+                    {schedule.config?.startAt && (
+                      <InfoItem label="Start At">{formatDateTime(schedule.config?.startAt)}</InfoItem>
+                    )}
+                  </>
+                )}
+                {schedule.type === "daily" && (
+                  <>
+                    <InfoItem label="Time">{schedule.config?.hour}:{String(schedule.config?.minute).padStart(2, "0")}</InfoItem>
+                    {Array.isArray(schedule.config?.weekdays) && (
+                      <InfoItem label="Weekdays">{schedule.config.weekdays.join(", ")}</InfoItem>
+                    )}
+                  </>
+                )}
+              </>
+            )}
           </div>
         </div>
-        {job.state && (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <div>
-              <div className="text-muted-foreground">Last Run</div>
-              <div className="font-medium">{job.state.lastRunAt ? formatDateTime(job.state.lastRunAt) : "Never"}</div>
-            </div>
-            <div>
-              <div className="text-muted-foreground">Next Run</div>
-              <div className="font-medium">{job.state.nextRunAt ? formatDateTime(job.state.nextRunAt) : "—"}</div>
-            </div>
-            <div>
-              <div className="text-muted-foreground">Last Category Index</div>
-              <div className="font-medium">{job.state.lastCategoryIndex}</div>
-            </div>
+
+        {/* Strategies */}
+        <div className="space-y-2">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Strategies</div>
+          <div className="flex flex-wrap gap-6">
+            <InfoItem label="Topic">{capitalize(job.topicStrategy)}</InfoItem>
+            <InfoItem label="Category">{capitalize(job.categoryStrategy)}</InfoItem>
+            <InfoItem label="Requires Validation">{job.requiresValidation ? "Yes" : "No"}</InfoItem>
+            <InfoItem label="Jitter">{job.jitterEnabled ? `${job.jitterMinutes} min` : "Disabled"}</InfoItem>
+          </div>
+        </div>
+
+        {/* References */}
+        <div className="space-y-2">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">References</div>
+          <div className="flex flex-wrap gap-6">
+            <InfoItem label="Site">{siteNames[job.siteId] ?? ""}</InfoItem>
+            <InfoItem label="Prompt">{promptNames[job.promptId] ?? ""}</InfoItem>
+            <InfoItem label="Provider">{providerNames[job.aiProviderId] ?? ""}</InfoItem>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="space-y-2">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Stats</div>
+          <div className="flex flex-wrap gap-6">
+            <InfoItem label="Last Run">{job.state?.lastRunAt ? formatDateTime(job.state.lastRunAt) : "Never"}</InfoItem>
+            <InfoItem label="Next Run">{job.state?.nextRunAt ? formatDateTime(job.state.nextRunAt) : "—"}</InfoItem>
+          </div>
+        </div>
+
+        {/* Next Topic */}
+        {nextTopicTitles[job.id] !== undefined && nextTopicTitles[job.id] !== null && (
+          <div className="space-y-2">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Next Topic To Use</div>
+            <Badge variant="secondary" className="text-xs px-2 py-0.5 font-medium">
+              {nextTopicTitles[job.id]}
+            </Badge>
           </div>
         )}
       </div>
     );
+  };
+
+  const renderExpandedRow = (job: Job) => {
+    return <ExpandedRow job={job} />;
   };
 
   return {

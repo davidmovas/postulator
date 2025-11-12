@@ -8,7 +8,6 @@ import { useTopicsTable } from "@/hooks/use-topics-table";
 import { Topic } from "@/models/topics";
 import { RiAddLine, RiDeleteBinLine, RiRefreshLine, RiUpload2Line } from "@remixicon/react";
 import { useContextModal } from "@/context/modal-context";
-import { ConfirmationModal } from "@/modals/confirm-modal";
 import { CreateTopicsModal } from "@/components/topics/modals/create-topics-modal";
 import { EditTopicModal } from "@/components/topics/modals/edit-topic-modal";
 import { ImportTopicsModal } from "@/components/topics/modals/import-topics-modal";
@@ -143,11 +142,6 @@ export default function SiteTopicsPage() {
                 onSuccess={handleCreateSuccess}
             />
 
-            <ConfirmationModal
-                open={confirmationModal.isOpen}
-                onOpenChange={confirmationModal.close}
-                data={confirmationModal.data}
-            />
         </div>
     );
 }

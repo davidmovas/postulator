@@ -8,7 +8,6 @@ import { healthcheckService } from "@/services/healthcheck";
 import { statsService } from "@/services/stats";
 import { useApiCall } from "@/hooks/use-api-call";
 import { useContextModal } from "@/context/modal-context";
-import { ConfirmationModal } from "@/modals/confirm-modal";
 import { EditSiteModal } from "@/components/sites/modals/edit-site-modal";
 import { ChangePasswordModal } from "@/components/sites/modals/reset-site-password-modal";
 import { SiteHeader } from "@/components/sites/site-header";

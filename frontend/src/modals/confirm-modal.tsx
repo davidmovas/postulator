@@ -33,9 +33,8 @@ export function ConfirmationModal({ open, onOpenChange, data }: ConfirmationModa
     const { execute, isLoading } = useApiCall();
     const [isConfirming, setIsConfirming] = useState(false);
 
-    if (!data) return null;
-
     const handleConfirm = async () => {
+        if (!data) return;
         setIsConfirming(true);
         try {
             await execute(
@@ -54,14 +53,17 @@ export function ConfirmationModal({ open, onOpenChange, data }: ConfirmationModa
         }
     };
 
-    const handleCancel = () => {
-        onOpenChange(false);
+    const handleOpenChange = (nextOpen: boolean) => {
+        // We only handle closing requests from the Dialog; opening is controlled by props
+        if (!nextOpen) {
+            onOpenChange(false);
+        }
     };
 
-    const isDestructive = data.variant === "destructive";
+    const isDestructive = data?.variant === "destructive";
 
     return (
-        <Dialog open={open} onOpenChange={handleCancel}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                     <div className="flex items-center gap-3">
@@ -69,28 +71,30 @@ export function ConfirmationModal({ open, onOpenChange, data }: ConfirmationModa
                             <AlertTriangle className="h-6 w-6 text-destructive" />
                         )}
                         <DialogTitle className={isDestructive ? "text-destructive" : ""}>
-                            {data.title}
+                            {data?.title || "Confirm action"}
                         </DialogTitle>
                     </div>
-                    <DialogDescription>
-                        {data.description}
-                    </DialogDescription>
+                    {data?.description && (
+                        <DialogDescription>
+                            {data.description}
+                        </DialogDescription>
+                    )}
                 </DialogHeader>
 
                 <DialogFooter className="gap-2">
                     <Button
                         variant="outline"
-                        onClick={handleCancel}
+                        onClick={() => onOpenChange(false)}
                         disabled={isLoading || isConfirming}
                     >
-                        {data.cancelText || "Cancel"}
+                        {data?.cancelText || "Cancel"}
                     </Button>
                     <Button
                         variant={isDestructive ? "destructive" : "default"}
                         onClick={handleConfirm}
-                        disabled={isLoading || isConfirming}
+                        disabled={isLoading || isConfirming || !data}
                     >
-                        {isConfirming ? "Processing..." : data.confirmText || "Confirm"}
+                        {isConfirming ? "Processing..." : data?.confirmText || "Confirm"}
                     </Button>
                 </DialogFooter>
             </DialogContent>

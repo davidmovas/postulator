@@ -7,8 +7,6 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { DataTable } from "@/components/table/data-table";
 import { useJobsTable } from "@/hooks/use-jobs-table";
-import { ConfirmationModal } from "@/modals/confirm-modal";
-import { useContextModal } from "@/context/modal-context";
 
 export default function SiteJobsPage() {
     const params = useParams();
@@ -16,7 +14,6 @@ export default function SiteJobsPage() {
     const router = useRouter();
 
     const { jobs, isLoading, loadJobs, columns, renderExpandedRow } = useJobsTable(siteId);
-    const { confirmationModal } = useContextModal();
 
     useEffect(() => {
         loadJobs();
@@ -26,11 +23,6 @@ export default function SiteJobsPage() {
         <div className="p-6 space-y-6">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <Link href={`/sites/${siteId}`}>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <ArrowLeft className="h-4 w-4" />
-                        </Button>
-                    </Link>
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight">Site Jobs</h1>
                         <p className="text-muted-foreground mt-2">
@@ -74,11 +66,6 @@ export default function SiteJobsPage() {
                 renderExpandedRow={(row) => renderExpandedRow(row)}
             />
 
-            <ConfirmationModal
-                open={confirmationModal.isOpen}
-                onOpenChange={confirmationModal.close}
-                data={confirmationModal.data}
-            />
         </div>
     );
 }

@@ -7,14 +7,11 @@ import { useRouter } from "next/navigation";
 import { RiRefreshLine } from "@remixicon/react";
 import { DataTable } from "@/components/table/data-table";
 import { useJobsTable } from "@/hooks/use-jobs-table";
-import { useContextModal } from "@/context/modal-context";
-import { ConfirmationModal } from "@/modals/confirm-modal";
 
 export default function JobsPage() {
     const router = useRouter();
 
     const { jobs, isLoading, loadJobs, columns, renderExpandedRow } = useJobsTable();
-    const { confirmationModal } = useContextModal();
 
     useEffect(() => {
         loadJobs();
@@ -66,11 +63,6 @@ export default function JobsPage() {
                 renderExpandedRow={(row) => renderExpandedRow(row)}
             />
 
-            <ConfirmationModal
-                open={confirmationModal.isOpen}
-                onOpenChange={confirmationModal.close}
-                data={confirmationModal.data}
-            />
         </div>
     );
 }

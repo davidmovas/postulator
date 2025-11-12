@@ -7,7 +7,6 @@ import { useContextModal } from "@/context/modal-context";
 import { ProvidersList } from "@/components/ai-providers/providers-list";
 import { CreateProviderModal } from "@/components/ai-providers/modals/create-provider-modal";
 import { EditProviderModal } from "@/components/ai-providers/modals/edit-provider-modal";
-import { ConfirmationModal } from "@/modals/confirm-modal";
 
 export default function ProvidersPage() {
     const {
@@ -85,11 +84,6 @@ export default function ProvidersPage() {
                 onSuccess={loadProviders}
             />
 
-            <ConfirmationModal
-                open={confirmationModal.isOpen}
-                onOpenChange={confirmationModal.close}
-                data={confirmationModal.data}
-            />
         </div>
     );
 }

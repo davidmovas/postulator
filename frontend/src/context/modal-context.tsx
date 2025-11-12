@@ -6,6 +6,7 @@ import { Category } from "@/models/categories";
 import { ConfirmationModalData } from "@/modals/confirm-modal";
 import { Provider } from "@/models/providers";
 import { Prompt } from "@/models/prompts";
+import { ConfirmationModal } from "@/modals/confirm-modal";
 
 interface ModalContextType {
     // Sites
@@ -302,6 +303,17 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
     return (
         <ModalContext.Provider value={value}>
             {children}
+            {/* Global confirmation modal mounted once to be available across all pages */}
+            <ConfirmationModal
+                open={confirmationOpen}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setConfirmationOpen(false);
+                        setConfirmationData(null);
+                    }
+                }}
+                data={confirmationData}
+            />
         </ModalContext.Provider>
     );
 }
