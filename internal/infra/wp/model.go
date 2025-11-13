@@ -6,6 +6,11 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/entities"
 )
 
+type PostOptions struct {
+	Status string // "draft" or "publish"; default "publish" if empty
+	// Future fields: Slug, Date, Tags, FeaturedMediaID, etc.
+}
+
 type Client interface {
 	// Health
 
@@ -22,7 +27,7 @@ type Client interface {
 
 	GetPost(ctx context.Context, s *entities.Site, postID int) (*entities.Article, error)
 	GetPosts(ctx context.Context, s *entities.Site) ([]*entities.Article, error)
-	CreatePost(ctx context.Context, s *entities.Site, article *entities.Article) (int, error)
+	CreatePost(ctx context.Context, s *entities.Site, article *entities.Article, opts *PostOptions) (int, error)
 	UpdatePost(ctx context.Context, s *entities.Site, article *entities.Article) error
 	DeletePost(ctx context.Context, s *entities.Site, postID int) error
 }

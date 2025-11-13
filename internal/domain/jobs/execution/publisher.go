@@ -7,10 +7,18 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
+	"github.com/davidmovas/postulator/internal/infra/wp"
 )
 
 func (e *Executor) publishArticle(ctx context.Context, pctx *pipelineContext) (*entities.Article, error) {
 	e.logger.Infof("Job %d: Publishing article to WordPress", pctx.Job.ID)
+
+	desiredStatus := entities.StatusPublished
+	wpStatus := "publish"
+	if pctx.Job.RequiresValidation {
+		desiredStatus = entities.StatusDraft
+		wpStatus = "draft"
+	}
 
 	article := &entities.Article{
 		SiteID:        pctx.Job.SiteID,
@@ -20,7 +28,7 @@ func (e *Executor) publishArticle(ctx context.Context, pctx *pipelineContext) (*
 		OriginalTitle: pctx.Topic.Title,
 		Content:       pctx.GeneratedContent,
 		WPCategoryIDs: []int{pctx.Category.WPCategoryID},
-		Status:        entities.StatusPublished,
+		Status:        desiredStatus,
 		Source:        entities.SourceGenerated,
 		IsEdited:      false,
 	}
@@ -28,7 +36,7 @@ func (e *Executor) publishArticle(ctx context.Context, pctx *pipelineContext) (*
 	wordCount := len(strings.Fields(pctx.GeneratedContent))
 	article.WordCount = &wordCount
 
-	wpPostID, err := e.wpClient.CreatePost(ctx, pctx.Site, article)
+	wpPostID, err := e.wpClient.CreatePost(ctx, pctx.Site, article, &wp.PostOptions{Status: wpStatus})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create post in WordPress: %w", err)
 	}
@@ -92,17 +100,28 @@ func (e *Executor) publishValidatedArticle(ctx context.Context, exec *entities.E
 		e.logger.Warnf("Failed to update execution status: %v", err)
 	}
 
-	wpPostID, err := e.wpClient.CreatePost(ctx, site, article)
-	if err != nil {
-		exec.Status = entities.ExecutionStatusFailed
-		errMsg := err.Error()
-		exec.ErrorMessage = &errMsg
-		_ = e.execRepo.Update(ctx, exec)
-		return fmt.Errorf("failed to publish to WordPress: %w", err)
+	// If the article already exists as a draft on WP, promote it; otherwise create as publish
+	if article.WPPostID > 0 {
+		article.Status = entities.StatusPublished
+		if err := e.wpClient.UpdatePost(ctx, site, article); err != nil {
+			exec.Status = entities.ExecutionStatusFailed
+			errMsg := err.Error()
+			exec.ErrorMessage = &errMsg
+			_ = e.execRepo.Update(ctx, exec)
+			return fmt.Errorf("failed to publish draft in WordPress: %w", err)
+		}
+	} else {
+		wpPostID, err := e.wpClient.CreatePost(ctx, site, article, &wp.PostOptions{Status: "publish"})
+		if err != nil {
+			exec.Status = entities.ExecutionStatusFailed
+			errMsg := err.Error()
+			exec.ErrorMessage = &errMsg
+			_ = e.execRepo.Update(ctx, exec)
+			return fmt.Errorf("failed to publish to WordPress: %w", err)
+		}
+		article.WPPostID = wpPostID
+		article.WPPostURL = fmt.Sprintf("%s/?p=%d", site.URL, wpPostID)
 	}
-
-	article.WPPostID = wpPostID
-	article.WPPostURL = fmt.Sprintf("%s/?p=%d", site.URL, wpPostID)
 	article.Status = entities.StatusPublished
 
 	if err := e.articleRepo.Update(ctx, article); err != nil {
@@ -119,7 +138,7 @@ func (e *Executor) publishValidatedArticle(ctx context.Context, exec *entities.E
 	}
 
 	e.logger.Infof("Validated article published successfully (Article ID: %d, WP ID: %d)",
-		article.ID, wpPostID)
+		article.ID, article.WPPostID)
 
 	return nil
 }

@@ -280,7 +280,7 @@ func (s *service) PublishToWordPress(ctx context.Context, article *entities.Arti
 		return err
 	}
 
-	wpPostID, err := s.wp.CreatePost(ctx, site, article)
+	wpPostID, err := s.wp.CreatePost(ctx, site, article, &wp.PostOptions{Status: "publish"})
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to publish article to WordPress")
 		return err

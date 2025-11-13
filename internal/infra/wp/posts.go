@@ -56,15 +56,21 @@ func (c *restyClient) GetPosts(ctx context.Context, s *entities.Site) ([]*entiti
 	return articles, nil
 }
 
-func (c *restyClient) CreatePost(ctx context.Context, s *entities.Site, article *entities.Article) (int, error) {
+func (c *restyClient) CreatePost(ctx context.Context, s *entities.Site, article *entities.Article, opts *PostOptions) (int, error) {
+	// Build payload according to WP REST API. Use plain string fields for compatibility.
+	status := "publish"
+	if opts != nil && opts.Status != "" {
+		status = opts.Status
+	}
+
 	postData := map[string]interface{}{
-		"title":   map[string]string{"raw": article.Title},
-		"content": map[string]string{"raw": article.Content},
-		"status":  "publish",
+		"title":   article.Title,
+		"content": article.Content,
+		"status":  status,
 	}
 
 	if article.Excerpt != nil && *article.Excerpt != "" {
-		postData["excerpt"] = map[string]string{"raw": *article.Excerpt}
+		postData["excerpt"] = *article.Excerpt
 	}
 
 	if len(article.WPCategoryIDs) > 0 {
@@ -97,19 +103,27 @@ func (c *restyClient) UpdatePost(ctx context.Context, s *entities.Site, article 
 	postData := map[string]interface{}{}
 
 	if article.Title != "" {
-		postData["title"] = map[string]string{"raw": article.Title}
+		postData["title"] = article.Title
 	}
 
 	if article.Content != "" {
-		postData["content"] = map[string]string{"raw": article.Content}
+		postData["content"] = article.Content
 	}
 
 	if article.Excerpt != nil {
-		postData["excerpt"] = map[string]string{"raw": *article.Excerpt}
+		postData["excerpt"] = *article.Excerpt
 	}
 
 	if len(article.WPCategoryIDs) > 0 {
 		postData["categories"] = article.WPCategoryIDs
+	}
+
+	// Allow status change based on article.Status
+	switch article.Status {
+	case entities.StatusPublished:
+		postData["status"] = "publish"
+	case entities.StatusDraft:
+		postData["status"] = "draft"
 	}
 
 	var updatedPost wpPost

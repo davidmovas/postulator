@@ -87,27 +87,13 @@ func (e *Executor) executePipeline(ctx context.Context, job *entities.Job) error
 	return nil
 }
 
-func (e *Executor) stepInitialize(ctx context.Context, pctx *pipelineContext) error {
-	// Initialization step now only prepares the context.
-	// Execution record will be created after topic, category and AI model are known.
+func (e *Executor) stepInitialize(_ context.Context, pctx *pipelineContext) error {
 	e.logger.Debugf("Job %d: Initialization complete", pctx.Job.ID)
 	return nil
 }
 
 func (e *Executor) stepValidate(ctx context.Context, pctx *pipelineContext) error {
-	if pctx.Job.Schedule != nil && pctx.Job.Schedule.Type == entities.ScheduleManual {
-		return nil
-	}
-
-	if len(pctx.Job.Topics) == 0 {
-		return errors.Validation("no topics assigned to job").
-			WithContext("reason", "no_topics_available")
-	}
-
-	if len(pctx.Job.Categories) == 0 {
-		return errors.Validation("no categories assigned to job")
-	}
-
+	// Always load site and ensure it's active, regardless of schedule type
 	site, err := e.siteService.GetSiteWithPassword(ctx, pctx.Job.SiteID)
 	if err != nil {
 		return fmt.Errorf("failed to get site: %w", err)
@@ -119,6 +105,19 @@ func (e *Executor) stepValidate(ctx context.Context, pctx *pipelineContext) erro
 	}
 
 	pctx.Site = site
+
+	// For non-manual schedules, enforce topics/categories presence here
+	if pctx.Job.Schedule == nil || pctx.Job.Schedule.Type != entities.ScheduleManual {
+		if len(pctx.Job.Topics) == 0 {
+			return errors.Validation("no topics assigned to job").
+				WithContext("reason", "no_topics_available")
+		}
+
+		if len(pctx.Job.Categories) == 0 {
+			return errors.Validation("no categories assigned to job")
+		}
+	}
+
 	return nil
 }
 
@@ -135,7 +134,8 @@ func (e *Executor) stepSelectTopic(ctx context.Context, pctx *pipelineContext) e
 		}
 
 	case entities.StrategyVariation:
-		originalTopic, err := e.topicService.GetNextTopicForJob(ctx, pctx.Job)
+		var originalTopic *entities.Topic
+		originalTopic, err = e.topicService.GetNextTopicForJob(ctx, pctx.Job)
 		if err != nil {
 			return errors.JobExecution(pctx.Job.ID, err).
 				WithContext("reason", "no_topics_available")
@@ -205,6 +205,17 @@ func (e *Executor) stepSelectCategory(ctx context.Context, pctx *pipelineContext
 }
 
 func (e *Executor) stepRenderPrompt(ctx context.Context, pctx *pipelineContext) error {
+	// Ensure required context is present to avoid nil dereference in placeholders
+	if pctx.Site == nil {
+		return errors.Validation("site not loaded")
+	}
+	if pctx.Topic == nil {
+		return errors.Validation("topic not selected")
+	}
+	if pctx.Category == nil {
+		return errors.Validation("category not selected")
+	}
+
 	prompt, err := e.promptService.GetPrompt(ctx, pctx.Job.PromptID)
 	if err != nil {
 		return fmt.Errorf("failed to get prompt: %w", err)
@@ -234,8 +245,8 @@ func (e *Executor) buildPlaceholders(pctx *pipelineContext) map[string]string {
 	}
 
 	placeholders["title"] = pctx.Topic.Title
-	placeholders["site_name"] = pctx.Site.Name
-	placeholders["site_url"] = pctx.Site.URL
+	placeholders["siteName"] = pctx.Site.Name
+	placeholders["siteUrl"] = pctx.Site.URL
 	placeholders["category"] = pctx.Category.Name
 
 	if pctx.Job.PlaceholdersValues != nil {
@@ -314,39 +325,13 @@ func (e *Executor) stepValidateOutput(ctx context.Context, pctx *pipelineContext
 			WithContext("word_count", wordCount)
 	}
 
-	if pctx.Job.RequiresValidation {
-		pctx.Execution.Status = entities.ExecutionStatusPendingValidation
-		now := time.Now()
-		pctx.Execution.ValidatedAt = &now
-
-		if err := e.execRepo.Update(ctx, pctx.Execution); err != nil {
-			return fmt.Errorf("failed to update execution for validation: %w", err)
-		}
-
-		e.logger.Infof("Job %d: Article awaiting manual validation", pctx.Job.ID)
-
-		article, err := e.createDraftArticle(ctx, pctx)
-		if err != nil {
-			e.logger.Warnf("Failed to create draft article: %v", err)
-		} else {
-			pctx.Article = article
-			pctx.Execution.ArticleID = &article.ID
-			if err := e.execRepo.Update(ctx, pctx.Execution); err != nil {
-				e.logger.Warnf("Failed to update execution with article ID: %v", err)
-			}
-		}
-
-		return nil
-	}
+	// No early pause here; publishing step will handle RequiresValidation by creating a WP draft and pausing the pipeline.
 
 	return nil
 }
 
 func (e *Executor) stepPublish(ctx context.Context, pctx *pipelineContext) error {
-	if pctx.Job.RequiresValidation {
-		return nil
-	}
-
+	// Always attempt to create a WP post. The publishArticle will send draft when RequiresValidation.
 	pctx.Execution.Status = entities.ExecutionStatusPublishing
 	if err := e.execRepo.Update(ctx, pctx.Execution); err != nil {
 		return fmt.Errorf("failed to update execution status: %w", err)
@@ -360,11 +345,22 @@ func (e *Executor) stepPublish(ctx context.Context, pctx *pipelineContext) error
 	pctx.Article = article
 	pctx.Execution.ArticleID = &article.ID
 
+	if pctx.Job.RequiresValidation {
+		// Pause pipeline for manual validation; article exists as WP draft.
+		pctx.Execution.Status = entities.ExecutionStatusPendingValidation
+		if err = e.execRepo.Update(ctx, pctx.Execution); err != nil {
+			return fmt.Errorf("failed to update execution to pending validation: %w", err)
+		}
+		e.logger.Infof("Job %d: Article created as draft and awaiting validation (Article ID: %d, WP ID: %d)",
+			pctx.Job.ID, article.ID, article.WPPostID)
+		return nil
+	}
+
 	now := time.Now()
 	pctx.Execution.PublishedAt = &now
 	pctx.Execution.Status = entities.ExecutionStatusPublished
 
-	if err := e.execRepo.Update(ctx, pctx.Execution); err != nil {
+	if err = e.execRepo.Update(ctx, pctx.Execution); err != nil {
 		return fmt.Errorf("failed to update execution after publication: %w", err)
 	}
 
@@ -406,7 +402,6 @@ func (e *Executor) randomIndex(max int) int {
 	return int(time.Now().UnixNano() % int64(max))
 }
 
-// stepCreateExecution creates the execution record after all required references are known.
 func (e *Executor) stepCreateExecution(ctx context.Context, pctx *pipelineContext) error {
 	if pctx.Topic == nil || pctx.Category == nil {
 		return errors.Validation("topic or category not selected")
@@ -430,7 +425,7 @@ func (e *Executor) stepCreateExecution(ctx context.Context, pctx *pipelineContex
 		StartedAt:    time.Now(),
 	}
 
-	if err := e.execRepo.Create(ctx, exec); err != nil {
+	if err = e.execRepo.Create(ctx, exec); err != nil {
 		return fmt.Errorf("failed to create execution record: %w", err)
 	}
 

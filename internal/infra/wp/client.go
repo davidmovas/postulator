@@ -86,8 +86,8 @@ func (c *client) GetPosts(ctx context.Context, s *entities.Site) ([]*entities.Ar
 	return c.GetCurrentClient().GetPosts(ctx, s)
 }
 
-func (c *client) CreatePost(ctx context.Context, s *entities.Site, article *entities.Article) (int, error) {
-	return c.GetCurrentClient().CreatePost(ctx, s, article)
+func (c *client) CreatePost(ctx context.Context, s *entities.Site, article *entities.Article, opts *PostOptions) (int, error) {
+	return c.GetCurrentClient().CreatePost(ctx, s, article, opts)
 }
 
 func (c *client) UpdatePost(ctx context.Context, s *entities.Site, article *entities.Article) error {
