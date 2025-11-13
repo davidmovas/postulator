@@ -14,16 +14,17 @@ import (
 type PipelineStep string
 
 const (
-	StepInitialize     PipelineStep = "initialize"
-	StepValidate       PipelineStep = "validate"
-	StepSelectTopic    PipelineStep = "select_topic"
-	StepSelectCategory PipelineStep = "select_category"
-	StepRenderPrompt   PipelineStep = "render_prompt"
-	StepGenerateAI     PipelineStep = "generate_ai"
-	StepValidateOutput PipelineStep = "validate_output"
-	StepPublish        PipelineStep = "publish"
-	StepMarkUsed       PipelineStep = "mark_used"
-	StepComplete       PipelineStep = "complete"
+	StepInitialize      PipelineStep = "initialize"
+	StepValidate        PipelineStep = "validate"
+	StepSelectTopic     PipelineStep = "select_topic"
+	StepSelectCategory  PipelineStep = "select_category"
+	StepCreateExecution PipelineStep = "create_execution"
+	StepRenderPrompt    PipelineStep = "render_prompt"
+	StepGenerateAI      PipelineStep = "generate_ai"
+	StepValidateOutput  PipelineStep = "validate_output"
+	StepPublish         PipelineStep = "publish"
+	StepMarkUsed        PipelineStep = "mark_used"
+	StepComplete        PipelineStep = "complete"
 )
 
 type pipelineContext struct {
@@ -60,6 +61,7 @@ func (e *Executor) executePipeline(ctx context.Context, job *entities.Job) error
 		{StepValidate, e.stepValidate},
 		{StepSelectTopic, e.stepSelectTopic},
 		{StepSelectCategory, e.stepSelectCategory},
+		{StepCreateExecution, e.stepCreateExecution},
 		{StepRenderPrompt, e.stepRenderPrompt},
 		{StepGenerateAI, e.stepGenerateAI},
 		{StepValidateOutput, e.stepValidateOutput},
@@ -86,22 +88,9 @@ func (e *Executor) executePipeline(ctx context.Context, job *entities.Job) error
 }
 
 func (e *Executor) stepInitialize(ctx context.Context, pctx *pipelineContext) error {
-	exec := &entities.Execution{
-		JobID:        pctx.Job.ID,
-		SiteID:       pctx.Job.SiteID,
-		PromptID:     pctx.Job.PromptID,
-		AIProviderID: pctx.Job.AIProviderID,
-		Status:       entities.ExecutionStatusPending,
-		StartedAt:    time.Now(),
-	}
-
-	if err := e.execRepo.Create(ctx, exec); err != nil {
-		return fmt.Errorf("failed to create execution record: %w", err)
-	}
-
-	pctx.Execution = exec
-	e.logger.Infof("Job %d: Created execution %d", pctx.Job.ID, exec.ID)
-
+	// Initialization step now only prepares the context.
+	// Execution record will be created after topic, category and AI model are known.
+	e.logger.Debugf("Job %d: Initialization complete", pctx.Job.ID)
 	return nil
 }
 
@@ -162,12 +151,7 @@ func (e *Executor) stepSelectTopic(ctx context.Context, pctx *pipelineContext) e
 	}
 
 	pctx.Topic = topic
-	pctx.Execution.TopicID = topic.ID
-
-	if err := e.execRepo.Update(ctx, pctx.Execution); err != nil {
-		return fmt.Errorf("failed to update execution with topic: %w", err)
-	}
-
+	// Execution record is not created yet; topic will be persisted in StepCreateExecution
 	e.logger.Infof("Job %d: Selected topic %d (%s)", pctx.Job.ID, topic.ID, topic.Title)
 	return nil
 }
@@ -215,12 +199,7 @@ func (e *Executor) stepSelectCategory(ctx context.Context, pctx *pipelineContext
 	}
 
 	pctx.Category = category
-	pctx.Execution.CategoryID = categoryID
-
-	if err := e.execRepo.Update(ctx, pctx.Execution); err != nil {
-		return fmt.Errorf("failed to update execution with category: %w", err)
-	}
-
+	// Execution record is not created yet; category will be persisted in StepCreateExecution
 	e.logger.Infof("Job %d: Selected category %d (%s)", pctx.Job.ID, category.ID, category.Name)
 	return nil
 }
@@ -425,4 +404,37 @@ func (e *Executor) stepComplete(ctx context.Context, pctx *pipelineContext) erro
 
 func (e *Executor) randomIndex(max int) int {
 	return int(time.Now().UnixNano() % int64(max))
+}
+
+// stepCreateExecution creates the execution record after all required references are known.
+func (e *Executor) stepCreateExecution(ctx context.Context, pctx *pipelineContext) error {
+	if pctx.Topic == nil || pctx.Category == nil {
+		return errors.Validation("topic or category not selected")
+	}
+
+	provider, err := e.providerService.GetProvider(ctx, pctx.Job.AIProviderID)
+	if err != nil {
+		return fmt.Errorf("failed to get AI provider: %w", err)
+	}
+	pctx.Provider = provider
+
+	exec := &entities.Execution{
+		JobID:        pctx.Job.ID,
+		SiteID:       pctx.Job.SiteID,
+		TopicID:      pctx.Topic.ID,
+		PromptID:     pctx.Job.PromptID,
+		AIProviderID: pctx.Job.AIProviderID,
+		AIModel:      provider.Model,
+		CategoryID:   pctx.Category.ID,
+		Status:       entities.ExecutionStatusPending,
+		StartedAt:    time.Now(),
+	}
+
+	if err := e.execRepo.Create(ctx, exec); err != nil {
+		return fmt.Errorf("failed to create execution record: %w", err)
+	}
+
+	pctx.Execution = exec
+	e.logger.Infof("Job %d: Created execution %d", pctx.Job.ID, exec.ID)
+	return nil
 }

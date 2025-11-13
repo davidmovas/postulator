@@ -3,6 +3,8 @@ package execution
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/Masterminds/squirrel"
@@ -48,9 +50,13 @@ func (r *repository) Create(ctx context.Context, exec *entities.Execution) error
 		).
 		MustSql()
 
+	data, _ := json.MarshalIndent(exec, "", " ")
+	fmt.Println("[RC]: Insert execution: ", string(data))
+
 	result, err := r.db.ExecContext(ctx, query, args...)
 	switch {
 	case dbx.IsForeignKeyViolation(err):
+		fmt.Println("[RC]: Foreign key violation: ", err)
 		return errors.Validation("Invalid job, topic, article, prompt, AI provider or category ID")
 	case err != nil:
 		return errors.Database(err)

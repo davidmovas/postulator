@@ -107,6 +107,8 @@ export function useJobsTable(siteId?: number) {
         if (!j.schedule) return <span className="text-muted-foreground">Manual</span>;
         const s = j.schedule;
         switch (s.type) {
+            case "manual":
+                return "Manual";
           case "once":
             return `${formatDateTime(s.config?.executeAt)}`;
           case "interval":
@@ -114,7 +116,7 @@ export function useJobsTable(siteId?: number) {
           case "daily":
             return `${s.config?.hour}:${String(s.config?.minute).padStart(2, "0")}`;
           default:
-            return "";
+            return "—";
         }
       },
     },

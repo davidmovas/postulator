@@ -44,7 +44,7 @@ export function ScheduleSection({ formData, onUpdate }: ScheduleSectionProps) {
         const ariaValue = date ? dateToCalendarDate(date) : undefined;
 
         const iso = date ? combineDateTimeToISO(date, time) : undefined;
-        const isInvalid = !!requireFuture && !!date && !!iso && new Date(iso).getTime() <= Date.now();
+        const isInvalid = requireFuture && !!date && !!iso && new Date(iso).getTime() <= Date.now();
 
         return (
             <div className="space-y-2">
@@ -335,7 +335,6 @@ export function ScheduleSection({ formData, onUpdate }: ScheduleSectionProps) {
                                         <SelectValue placeholder="Select unit" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="minutes">Minutes</SelectItem>
                                         <SelectItem value="hours">Hours</SelectItem>
                                         <SelectItem value="days">Days</SelectItem>
                                         <SelectItem value="weeks">Weeks</SelectItem>
