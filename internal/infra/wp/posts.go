@@ -57,7 +57,6 @@ func (c *restyClient) GetPosts(ctx context.Context, s *entities.Site) ([]*entiti
 }
 
 func (c *restyClient) CreatePost(ctx context.Context, s *entities.Site, article *entities.Article, opts *PostOptions) (int, error) {
-	// Build payload according to WP REST API. Use plain string fields for compatibility.
 	status := "publish"
 	if opts != nil && opts.Status != "" {
 		status = opts.Status
@@ -118,7 +117,6 @@ func (c *restyClient) UpdatePost(ctx context.Context, s *entities.Site, article 
 		postData["categories"] = article.WPCategoryIDs
 	}
 
-	// Allow status change based on article.Status
 	switch article.Status {
 	case entities.StatusPublished:
 		postData["status"] = "publish"
