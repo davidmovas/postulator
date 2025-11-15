@@ -488,7 +488,6 @@ func (r *repository) GetTopics(ctx context.Context, jobID int64) ([]int64, error
 	return topicIDs, nil
 }
 
-
 func (r *repository) scanJobFromScanner(scn dbx.RowScanner) (*entities.Job, error) {
 	var (
 		job                                  entities.Job
