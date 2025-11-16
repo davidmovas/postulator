@@ -137,7 +137,6 @@ func (r *siteTopicRepository) GetAssignedForSite(ctx context.Context, siteID int
 		return []int64{}, nil
 	}
 
-	// de-duplicate ids
 	idSet := make(map[int64]struct{}, len(topicIDs))
 	uniq := make([]int64, 0, len(topicIDs))
 	for _, id := range topicIDs {
@@ -174,14 +173,17 @@ func (r *siteTopicRepository) GetAssignedForSite(ctx context.Context, siteID int
 			for rows.Next() {
 				var id int64
 				if err = rows.Scan(&id); err != nil {
-					assigned = nil
+					// propagate scan error after the loop
 					return
 				}
 				assigned = append(assigned, id)
 			}
 		}()
-		if assigned == nil && start < len(uniq) {
-			return nil, errors.Database(nil)
+		if err != nil {
+			return nil, errors.Database(err)
+		}
+		if rows.Err() != nil {
+			return nil, errors.Database(rows.Err())
 		}
 	}
 

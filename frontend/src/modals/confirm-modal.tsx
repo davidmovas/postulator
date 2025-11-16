@@ -75,9 +75,12 @@ export function ConfirmationModal({ open, onOpenChange, data }: ConfirmationModa
                         </DialogTitle>
                     </div>
                     {data?.description && (
-                        <DialogDescription>
+                        <div
+                            className="text-muted-foreground text-sm"
+                             data-slot="alert-dialog-description"
+                        >
                             {data.description}
-                        </DialogDescription>
+                        </div>
                     )}
                 </DialogHeader>
 
