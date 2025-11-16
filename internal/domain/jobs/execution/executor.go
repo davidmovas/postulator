@@ -21,6 +21,7 @@ type Executor struct {
 	articleRepo articles.Repository
 	stateRepo   jobs.StateRepository
 
+	jobService      jobs.Service
 	topicService    topics.Service
 	promptService   prompts.Service
 	siteService     sites.Service
@@ -36,6 +37,7 @@ func NewExecutor(
 	execRepo Repository,
 	articleRepo articles.Repository,
 	stateRepo jobs.StateRepository,
+	jobService jobs.Service,
 	topicService topics.Service,
 	promptService prompts.Service,
 	siteService sites.Service,
@@ -48,6 +50,7 @@ func NewExecutor(
 		execRepo:        execRepo,
 		articleRepo:     articleRepo,
 		stateRepo:       stateRepo,
+		jobService:      jobService,
 		topicService:    topicService,
 		promptService:   promptService,
 		siteService:     siteService,

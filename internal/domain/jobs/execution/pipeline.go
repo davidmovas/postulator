@@ -119,6 +119,22 @@ func (e *Executor) stepValidate(ctx context.Context, pctx *pipelineContext) erro
 		if len(pctx.Job.Categories) == 0 {
 			return errors.Validation("no categories assigned to job")
 		}
+
+		// Pre-run guard for unique strategy: pause and abort if no unused topics remain
+		if pctx.Job.TopicStrategy == entities.StrategyUnique {
+			unusedCount, err := e.topicService.CountUnused(ctx, pctx.Job.SiteID, pctx.Job.Topics)
+			if err != nil {
+				// Do not pause on error; surface a validation error to skip this run
+				return errors.JobExecution(pctx.Job.ID, err).
+					WithContext("reason", "topics_check_failed")
+			}
+			if unusedCount == 0 {
+				// Auto-pause job and skip execution
+				_ = e.jobService.PauseJob(ctx, pctx.Job.ID)
+				return errors.Validation("no unused topics available").
+					WithContext("reason", "no_topics_available")
+			}
+		}
 	}
 
 	return nil
@@ -392,6 +408,21 @@ func (e *Executor) stepComplete(ctx context.Context, pctx *pipelineContext) erro
 
 	totalTime := time.Since(pctx.StartTime)
 	e.logger.Infof("Job %d: Execution completed successfully in %v", pctx.Job.ID, totalTime)
+
+	// Post-run: if unique strategy and non-manual schedule, pause when no topics left
+	if pctx.Job.TopicStrategy == entities.StrategyUnique && (pctx.Job.Schedule == nil || pctx.Job.Schedule.Type != entities.ScheduleManual) {
+		unusedCount, err := e.topicService.CountUnused(ctx, pctx.Job.SiteID, pctx.Job.Topics)
+		if err != nil {
+			// warn only
+			e.logger.Warnf("Job %d: Failed to count unused topics after run: %v", pctx.Job.ID, err)
+		} else if unusedCount == 0 {
+			if err := e.jobService.PauseJob(ctx, pctx.Job.ID); err != nil {
+				e.logger.Warnf("Job %d: Failed to auto-pause after topics exhausted: %v", pctx.Job.ID, err)
+			} else {
+				e.logger.Infof("Job %d: Auto-paused due to no unique topics left (site_id=%d)", pctx.Job.ID, pctx.Job.SiteID)
+			}
+		}
+	}
 
 	return nil
 }

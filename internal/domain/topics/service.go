@@ -267,6 +267,15 @@ func (s *service) MarkTopicUsed(ctx context.Context, siteID, topicID int64) erro
 	return nil
 }
 
+func (s *service) CountUnused(ctx context.Context, siteID int64, topicIDs []int64) (int, error) {
+	count, err := s.usageRepo.CountUnused(ctx, siteID, topicIDs)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to count unused topics")
+		return 0, err
+	}
+	return count, nil
+}
+
 func (s *service) GetOrGenerateVariation(ctx context.Context, providerID, siteID, originalID int64) (*entities.Topic, error) {
 	originalTopic, err := s.repo.GetByID(ctx, originalID)
 	if err != nil {

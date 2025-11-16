@@ -53,4 +53,5 @@ type Service interface {
 
 	GetNextTopicForJob(ctx context.Context, job *entities.Job) (*entities.Topic, error)
 	MarkTopicUsed(ctx context.Context, siteID, topicID int64) error
+	CountUnused(ctx context.Context, siteID int64, topicIDs []int64) (int, error)
 }
