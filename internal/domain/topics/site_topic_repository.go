@@ -131,3 +131,59 @@ func (r *siteTopicRepository) IsAssigned(ctx context.Context, siteID, topicID in
 
 	return count > 0, nil
 }
+
+func (r *siteTopicRepository) GetAssignedForSite(ctx context.Context, siteID int64, topicIDs []int64) ([]int64, error) {
+	if len(topicIDs) == 0 {
+		return []int64{}, nil
+	}
+
+	// de-duplicate ids
+	idSet := make(map[int64]struct{}, len(topicIDs))
+	uniq := make([]int64, 0, len(topicIDs))
+	for _, id := range topicIDs {
+		if _, ok := idSet[id]; ok {
+			continue
+		}
+		idSet[id] = struct{}{}
+		uniq = append(uniq, id)
+	}
+
+	const chunkSize = 1000
+	var assigned []int64
+
+	for start := 0; start < len(uniq); start += chunkSize {
+		end := start + chunkSize
+		if end > len(uniq) {
+			end = len(uniq)
+		}
+		chunk := uniq[start:end]
+
+		query, args := dbx.ST.
+			Select("topic_id").
+			From("site_topics").
+			Where(squirrel.Eq{"site_id": siteID}).
+			Where(squirrel.Eq{"topic_id": chunk}).
+			MustSql()
+
+		rows, err := r.db.QueryContext(ctx, query, args...)
+		if err != nil {
+			return nil, errors.Database(err)
+		}
+		func() {
+			defer func() { _ = rows.Close() }()
+			for rows.Next() {
+				var id int64
+				if err = rows.Scan(&id); err != nil {
+					assigned = nil
+					return
+				}
+				assigned = append(assigned, id)
+			}
+		}()
+		if assigned == nil && start < len(uniq) {
+			return nil, errors.Database(nil)
+		}
+	}
+
+	return assigned, nil
+}

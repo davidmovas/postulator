@@ -102,6 +102,24 @@ func (s *service) ListTopics(ctx context.Context) ([]*entities.Topic, error) {
 	return topics, nil
 }
 
+func (s *service) GetByTitles(ctx context.Context, titles []string) ([]*entities.Topic, error) {
+	tops, err := s.repo.GetByTitles(ctx, titles)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get topics by titles")
+		return nil, err
+	}
+	return tops, nil
+}
+
+func (s *service) GetAssignedForSite(ctx context.Context, siteID int64, topicIDs []int64) ([]int64, error) {
+	ids, err := s.siteTopicRepo.GetAssignedForSite(ctx, siteID, topicIDs)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get assigned topics for site")
+		return nil, err
+	}
+	return ids, nil
+}
+
 func (s *service) UpdateTopic(ctx context.Context, topic *entities.Topic) error {
 	if err := s.validateTopic(topic); err != nil {
 		return err

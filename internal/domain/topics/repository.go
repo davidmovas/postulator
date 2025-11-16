@@ -192,6 +192,61 @@ func (r *repository) GetByTitle(ctx context.Context, title string) (*entities.To
 	return &topic, nil
 }
 
+func (r *repository) GetByTitles(ctx context.Context, titles []string) ([]*entities.Topic, error) {
+	if len(titles) == 0 {
+		return []*entities.Topic{}, nil
+	}
+
+	titleSet := make(map[string]struct{}, len(titles))
+	uniq := make([]string, 0, len(titles))
+	for _, t := range titles {
+		if _, ok := titleSet[t]; ok {
+			continue
+		}
+		titleSet[t] = struct{}{}
+		uniq = append(uniq, t)
+	}
+
+	const chunkSize = 1000
+	var results []*entities.Topic
+
+	for start := 0; start < len(uniq); start += chunkSize {
+		end := start + chunkSize
+		if end > len(uniq) {
+			end = len(uniq)
+		}
+		chunk := uniq[start:end]
+
+		query, args := dbx.ST.
+			Select("id", "title", "created_at").
+			From("topics").
+			Where(squirrel.Eq{"title": chunk}).
+			Where(squirrel.Eq{"deleted_at": nil}).
+			MustSql()
+
+		rows, err := r.db.QueryContext(ctx, query, args...)
+		if err != nil {
+			return nil, errors.Database(err)
+		}
+		func() {
+			defer func() { _ = rows.Close() }()
+			for rows.Next() {
+				var topic entities.Topic
+				if err = rows.Scan(&topic.ID, &topic.Title, &topic.CreatedAt); err != nil {
+					results = nil
+					return
+				}
+				results = append(results, &topic)
+			}
+		}()
+		if results == nil && start < len(uniq) {
+			return nil, errors.Database(nil)
+		}
+	}
+
+	return results, nil
+}
+
 func (r *repository) Update(ctx context.Context, topic *entities.Topic) error {
 	query, args := dbx.ST.
 		Update("topics").
