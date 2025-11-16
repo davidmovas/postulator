@@ -21,16 +21,24 @@ import { siteService } from "@/services/sites";
 import { promptService } from "@/services/prompts";
 import { providerService } from "@/services/providers";
 import { topicService } from "@/services/topics";
+import { useRouter } from "next/navigation";
 
 export function useJobsTable(siteId?: number) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const { execute, isLoading } = useApiCall();
   const { confirmationModal } = useContextModal();
+  const router = useRouter();
+  // Ключ обновления, чтобы форсировать перезагрузку зависимых данных в раскрытых строках
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const loadJobs = useCallback(async () => {
     const data = await execute<Job[]>(() => jobService.listJobs());
     if (data) {
       setJobs(siteId ? data.filter(j => j.siteId === siteId) : data);
+      // Сбросить кэш «Next Topic To Use», чтобы при обновлении данные подтягивались заново
+      setNextTopicTitles({});
+      // Увеличить ключ, чтобы эффекты в раскрытых строках перезапустились
+      setRefreshKey((k) => k + 1);
     }
   }, [execute, siteId]);
 
@@ -160,9 +168,7 @@ export function useJobsTable(siteId?: number) {
         const isActive = job.status === "active";
 
         const handleEdit = () => {
-          // Placeholder: navigate to edit in future
-          // For now, we do nothing, keeping minimal changes as per scope
-          console.log("Edit job", job.id);
+            router.push(`/jobs/${job.id}/edit`);
         };
 
         return (
@@ -260,7 +266,8 @@ export function useJobsTable(siteId?: number) {
         } catch { /* noop */ }
       };
       loadRefs();
-    }, [job.id, job.siteId, job.promptId, job.aiProviderId]);
+    // Добавили refreshKey: при обновлении данных таблицы принудительно перезапрашиваем next topic
+    }, [job.id, job.siteId, job.promptId, job.aiProviderId, refreshKey]);
 
     const schedule = job.schedule;
 

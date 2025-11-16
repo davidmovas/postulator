@@ -88,12 +88,16 @@ func (e *Executor) executePipeline(ctx context.Context, job *entities.Job) error
 }
 
 func (e *Executor) stepInitialize(_ context.Context, pctx *pipelineContext) error {
+	if pctx.Job.State != nil {
+		now := time.Now()
+		pctx.Job.State.LastRunAt = &now
+	}
+
 	e.logger.Debugf("Job %d: Initialization complete", pctx.Job.ID)
 	return nil
 }
 
 func (e *Executor) stepValidate(ctx context.Context, pctx *pipelineContext) error {
-	// Always load site and ensure it's active, regardless of schedule type
 	site, err := e.siteService.GetSiteWithPassword(ctx, pctx.Job.SiteID)
 	if err != nil {
 		return fmt.Errorf("failed to get site: %w", err)
@@ -106,7 +110,6 @@ func (e *Executor) stepValidate(ctx context.Context, pctx *pipelineContext) erro
 
 	pctx.Site = site
 
-	// For non-manual schedules, enforce topics/categories presence here
 	if pctx.Job.Schedule == nil || pctx.Job.Schedule.Type != entities.ScheduleManual {
 		if len(pctx.Job.Topics) == 0 {
 			return errors.Validation("no topics assigned to job").
@@ -151,7 +154,6 @@ func (e *Executor) stepSelectTopic(ctx context.Context, pctx *pipelineContext) e
 	}
 
 	pctx.Topic = topic
-	// Execution record is not created yet; topic will be persisted in StepCreateExecution
 	e.logger.Infof("Job %d: Selected topic %d (%s)", pctx.Job.ID, topic.ID, topic.Title)
 	return nil
 }
@@ -199,13 +201,11 @@ func (e *Executor) stepSelectCategory(ctx context.Context, pctx *pipelineContext
 	}
 
 	pctx.Category = category
-	// Execution record is not created yet; category will be persisted in StepCreateExecution
 	e.logger.Infof("Job %d: Selected category %d (%s)", pctx.Job.ID, category.ID, category.Name)
 	return nil
 }
 
 func (e *Executor) stepRenderPrompt(ctx context.Context, pctx *pipelineContext) error {
-	// Ensure required context is present to avoid nil dereference in placeholders
 	if pctx.Site == nil {
 		return errors.Validation("site not loaded")
 	}
@@ -300,7 +300,7 @@ func (e *Executor) stepGenerateAI(ctx context.Context, pctx *pipelineContext) er
 		pctx.Execution.CostUSD = &result.Cost
 	}
 
-	if err := e.execRepo.Update(ctx, pctx.Execution); err != nil {
+	if err = e.execRepo.Update(ctx, pctx.Execution); err != nil {
 		return fmt.Errorf("failed to update execution with generated content: %w", err)
 	}
 
@@ -324,8 +324,6 @@ func (e *Executor) stepValidateOutput(ctx context.Context, pctx *pipelineContext
 		return errors.Validation("generated content is too short").
 			WithContext("word_count", wordCount)
 	}
-
-	// No early pause here; publishing step will handle RequiresValidation by creating a WP draft and pausing the pipeline.
 
 	return nil
 }

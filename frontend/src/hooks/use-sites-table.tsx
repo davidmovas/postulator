@@ -27,6 +27,7 @@ import {
 import { useContextModal } from "@/context/modal-context";
 import SiteStatusBadge from "@/components/sites/site-status-badge";
 import HealthIndicator from "@/components/sites/site-health-badge";
+import { jobService } from "@/services/jobs";
 
 export function useSitesTable() {
     const [sites, setSites] = useState<Site[]>([]);
@@ -172,7 +173,7 @@ export function useSitesTable() {
                 return formattedDate || 'Never';
             },
         },
-        {
+/*        {
             id: "articles",
             header: "Articles",
             cell: ({ row }) => {
@@ -205,7 +206,7 @@ export function useSitesTable() {
                     </Link>
             );
             },
-        },
+        },*/
         {
             id: "actions",
             header: "Actions",

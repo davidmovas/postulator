@@ -85,6 +85,8 @@ export function DataTable<TData, TValue>({
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+    // Хранит строки, которые уже открывались, чтобы обеспечить плавную анимацию закрытия без мгновенного размонтирования
+    const [keptAliveRows, setKeptAliveRows] = useState<Record<string, boolean>>({});
     const [pagination, setPagination] = useState<PaginationState>({
         pageIndex: 0,
         pageSize: defaultPageSize,
@@ -129,6 +131,28 @@ export function DataTable<TData, TValue>({
             pagination,
         },
     });
+
+    // Helper: не разворачивать строку при клике по интерактивным элементам
+    const isInteractiveClick = (target: EventTarget | null, container: HTMLElement | null) => {
+        if (!(target instanceof HTMLElement) || !container) return false;
+        const selectors = [
+            'button',
+            'a',
+            'input',
+            'select',
+            'textarea',
+            '[role="button"]',
+            '[role="menuitem"]',
+            '[role="menu"]',
+            '[data-prevent-row-toggle]'
+        ].join(',');
+        let el: HTMLElement | null = target;
+        while (el && el !== container) {
+            if (el.matches(selectors) || el.isContentEditable) return true;
+            el = el.parentElement;
+        }
+        return false;
+    };
 
     return (
         <div className="space-y-4">
@@ -228,13 +252,18 @@ export function DataTable<TData, TValue>({
                                     <TableRow
                                         data-state={row.getIsSelected() && "selected"}
                                         className={cn(enableRowExpand && expandOnRowClick && "cursor-pointer")}
-                                        onClick={() => {
-                                            if (enableRowExpand && expandOnRowClick && renderExpandedRow) {
-                                                setExpandedRows((prev) => ({
-                                                    ...prev,
-                                                    [row.id]: !prev[row.id],
-                                                }));
-                                            }
+                                        onClick={(e) => {
+                                            if (!(enableRowExpand && expandOnRowClick && renderExpandedRow)) return;
+                                            if (isInteractiveClick(e.target, e.currentTarget)) return;
+                                            setExpandedRows((prev) => {
+                                                const isOpen = !!prev[row.id];
+                                                // Аккордеон: в один момент времени открыта только одна строка
+                                                const next = isOpen ? {} : { [row.id]: true };
+                                                if (!isOpen) {
+                                                    setKeptAliveRows((k) => ({ ...k, [row.id]: true }));
+                                                }
+                                                return next;
+                                            });
                                         }}
                                     >
                                         {row.getVisibleCells().map((cell, index) => {
@@ -257,10 +286,23 @@ export function DataTable<TData, TValue>({
                                             );
                                         })}
                                     </TableRow>
-                                    {enableRowExpand && renderExpandedRow && expandedRows[row.id] && (
-                                        <TableRow className="bg-muted/30">
-                                            <TableCell colSpan={columns.length}>
-                                                {renderExpandedRow(row.original as TData)}
+                                    {enableRowExpand && renderExpandedRow && (keptAliveRows[row.id] || expandedRows[row.id]) && (
+                                        <TableRow className={cn(expandedRows[row.id] ? "bg-muted/30" : "bg-transparent") }>
+                                            <TableCell
+                                                colSpan={columns.length}
+                                                className={cn(!expandedRows[row.id] && "p-0")}
+                                            >
+                                                <div
+                                                    className={cn(
+                                                        "transition-all duration-200 ease-out overflow-hidden",
+                                                        expandedRows[row.id]
+                                                            ? "opacity-100 max-h-[1000px]"
+                                                            : "opacity-0 max-h-0"
+                                                    )}
+                                                    aria-hidden={!expandedRows[row.id]}
+                                                >
+                                                    {renderExpandedRow(row.original as TData)}
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     )}

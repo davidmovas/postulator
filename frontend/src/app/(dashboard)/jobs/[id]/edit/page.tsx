@@ -166,7 +166,7 @@ export default function EditJobPage() {
                     onUpdate={updateFormData}
                     prompts={prompts}
                     providers={providers}
-                    sites={sites}
+                    site={site}
                 />
 
                 {formData.siteId && (

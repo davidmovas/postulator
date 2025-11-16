@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { DataTable } from "@/components/table/data-table";
 import { useJobsTable } from "@/hooks/use-jobs-table";
+import { RiRefreshLine } from "@remixicon/react";
 
 export default function SiteJobsPage() {
     const params = useParams();
@@ -37,6 +38,7 @@ export default function SiteJobsPage() {
                         onClick={loadJobs}
                         disabled={isLoading}
                     >
+                        <RiRefreshLine className="w-4 h-4" />
                         Refresh
                     </Button>
 

@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { JobCreateInput } from "@/models/jobs";
+import { useEffect, useMemo } from "react";
 
 interface AdvancedSettingsSectionProps {
     formData: Partial<JobCreateInput>;
@@ -12,6 +13,15 @@ interface AdvancedSettingsSectionProps {
 }
 
 export function AdvancedSettingsSection({ formData, onUpdate }: AdvancedSettingsSectionProps) {
+    const isManual = useMemo(() => formData.schedule?.type === 'manual', [formData.schedule?.type]);
+
+    // Если выбран режим Manual, гарантированно выключаем Jitter
+    useEffect(() => {
+        if (isManual && formData.jitterEnabled) {
+            onUpdate({ jitterEnabled: false });
+        }
+    }, [isManual]);
+
     return (
         <Card>
             <CardHeader>
@@ -48,15 +58,24 @@ export function AdvancedSettingsSection({ formData, onUpdate }: AdvancedSettings
                             <p className="text-sm text-muted-foreground">
                                 Add random delay to prevent predictable execution patterns
                             </p>
+                            {isManual && (
+                                <p className="text-xs text-muted-foreground">
+                                    Jitter is unavailable for Manual schedule mode
+                                </p>
+                            )}
                         </div>
                         <Switch
                             id="jitter"
                             checked={formData.jitterEnabled || false}
-                            onCheckedChange={(checked) => onUpdate({ jitterEnabled: checked })}
+                            disabled={isManual}
+                            onCheckedChange={(checked) => {
+                                if (isManual) return;
+                                onUpdate({ jitterEnabled: checked });
+                            }}
                         />
                     </div>
 
-                    {formData.jitterEnabled && (
+                    {formData.jitterEnabled && !isManual && (
                         <div className="space-y-2 pl-6">
                             <Label htmlFor="jitterMinutes">Jitter Window (minutes)</Label>
                             <div className="flex items-center gap-3">
@@ -66,7 +85,12 @@ export function AdvancedSettingsSection({ formData, onUpdate }: AdvancedSettings
                                     min="1"
                                     max="240"
                                     value={formData.jitterMinutes || 30}
-                                    onChange={(e) => onUpdate({ jitterMinutes: parseInt(e.target.value) })}
+                                    disabled={isManual}
+                                    onChange={(e) => {
+                                        if (isManual) return;
+                                        const val = parseInt(e.target.value);
+                                        onUpdate({ jitterMinutes: isNaN(val) ? 30 : val });
+                                    }}
                                     className="w-20"
                                 />
                                 <span className="text-sm text-muted-foreground">
