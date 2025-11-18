@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/articles"
 	"github.com/davidmovas/postulator/internal/domain/categories"
@@ -20,8 +21,8 @@ type Executor struct {
 	execRepo    Repository
 	articleRepo articles.Repository
 	stateRepo   jobs.StateRepository
+	jobRepo     jobs.Repository
 
-	jobService      jobs.Service
 	topicService    topics.Service
 	promptService   prompts.Service
 	siteService     sites.Service
@@ -37,7 +38,7 @@ func NewExecutor(
 	execRepo Repository,
 	articleRepo articles.Repository,
 	stateRepo jobs.StateRepository,
-	jobService jobs.Service,
+	jobRepo jobs.Repository,
 	topicService topics.Service,
 	promptService prompts.Service,
 	siteService sites.Service,
@@ -50,7 +51,7 @@ func NewExecutor(
 		execRepo:        execRepo,
 		articleRepo:     articleRepo,
 		stateRepo:       stateRepo,
-		jobService:      jobService,
+		jobRepo:         jobRepo,
 		topicService:    topicService,
 		promptService:   promptService,
 		siteService:     siteService,
@@ -83,4 +84,17 @@ func (e *Executor) PublishValidatedArticle(ctx context.Context, exec *entities.E
 	}
 
 	return e.publishValidatedArticle(ctx, exec)
+}
+
+func (e *Executor) pauseJob(ctx context.Context, id int64) error {
+	job, err := e.jobRepo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if job.Status == entities.JobStatusPaused {
+		return nil
+	}
+	job.Status = entities.JobStatusPaused
+	job.UpdatedAt = time.Now()
+	return e.jobRepo.Update(ctx, job)
 }

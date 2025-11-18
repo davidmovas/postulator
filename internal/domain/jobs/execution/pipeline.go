@@ -127,7 +127,7 @@ func (e *Executor) stepValidate(ctx context.Context, pctx *pipelineContext) erro
 					WithContext("reason", "topics_check_failed")
 			}
 			if unusedCount == 0 {
-				_ = e.jobService.PauseJob(ctx, pctx.Job.ID)
+				_ = e.pauseJob(ctx, pctx.Job.ID)
 				return errors.Validation("no unused topics available").
 					WithContext("reason", "no_topics_available")
 			}
@@ -403,7 +403,7 @@ func (e *Executor) stepComplete(ctx context.Context, pctx *pipelineContext) erro
 		if err != nil {
 			e.logger.Warnf("Job %d: Failed to count unused topics after run: %v", pctx.Job.ID, err)
 		} else if unusedCount == 0 {
-			if err = e.jobService.PauseJob(ctx, pctx.Job.ID); err != nil {
+			if err = e.pauseJob(ctx, pctx.Job.ID); err != nil {
 				e.logger.Warnf("Job %d: Failed to auto-pause after topics exhausted: %v", pctx.Job.ID, err)
 			} else {
 				e.logger.Infof("Job %d: Auto-paused due to no unique topics left (site_id=%d)", pctx.Job.ID, pctx.Job.SiteID)
