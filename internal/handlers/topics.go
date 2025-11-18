@@ -125,6 +125,27 @@ func (h *TopicsHandler) GetSiteTopics(siteID int64) *dto.Response[[]*dto.Topic] 
 	return ok(dtoTopics)
 }
 
+func (h *TopicsHandler) GetSelectableSiteTopics(siteID int64, strategy string) *dto.Response[[]*dto.Topic] {
+	st := entities.StrategyUnique
+	switch entities.TopicStrategy(strategy) {
+	case entities.StrategyUnique, entities.StrategyVariation:
+		st = entities.TopicStrategy(strategy)
+	default:
+	}
+
+	listTopics, err := h.service.GetSelectableSiteTopics(ctx.FastCtx(), siteID, st)
+	if err != nil {
+		return fail[[]*dto.Topic](err)
+	}
+
+	var dtoTopics []*dto.Topic
+	for _, topic := range listTopics {
+		dtoTopics = append(dtoTopics, dto.NewTopic(topic))
+	}
+
+	return ok(dtoTopics)
+}
+
 func (h *TopicsHandler) GenerateVariations(providerID int64, topicID int64, count int) *dto.Response[[]*dto.Topic] {
 	variations, err := h.service.GenerateVariations(ctx.FastCtx(), providerID, topicID, count)
 	if err != nil {

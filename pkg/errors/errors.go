@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -26,6 +27,8 @@ const (
 
 	ErrCodeJobExecution ErrorCode = "JOB_EXECUTION"
 	ErrCodeScheduler    ErrorCode = "SCHEDULER"
+
+	ErrCodeNoResources ErrorCode = "NO_RESOURCES"
 )
 
 type AppError struct {
@@ -139,4 +142,29 @@ func JobExecutionWithNote(jobID int64, note string, err error) *AppError {
 
 func Scheduler(err error) *AppError {
 	return Wrap(ErrCodeScheduler, "Task scheduler error", err)
+}
+
+func NoResources(resource string) *AppError {
+	return New(ErrCodeNoResources, fmt.Sprintf("No resources: %s not available", resource)).
+		WithContext("resource", resource)
+}
+
+func IsNoResources(err error) bool {
+	for err != nil {
+		var ae *AppError
+		if errors.As(err, &ae) {
+			if ae.Code == ErrCodeNoResources {
+				return true
+			}
+			err = ae.Unwrap()
+			continue
+		}
+		type unwrapper interface{ Unwrap() error }
+		if u, ok := err.(unwrapper); ok {
+			err = u.Unwrap()
+			continue
+		}
+		break
+	}
+	return false
 }

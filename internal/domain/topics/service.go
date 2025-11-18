@@ -345,6 +345,33 @@ func (s *service) GetOrGenerateVariation(ctx context.Context, providerID, siteID
 	return createdTopic, nil
 }
 
+func (s *service) GetStrategy(strategyType entities.TopicStrategy) (TopicStrategyHandler, error) {
+	switch strategyType {
+	case entities.StrategyUnique:
+		return &uniqueStrategy{
+			usageRepo:     s.usageRepo,
+			siteTopicRepo: s.siteTopicRepo,
+			logger:        s.logger.WithScope("unique_strategy"),
+		}, nil
+	case entities.StrategyVariation:
+		return &variationStrategy{
+			svc:           s,
+			siteTopicRepo: s.siteTopicRepo,
+			logger:        s.logger.WithScope("variation_strategy"),
+		}, nil
+	default:
+		return nil, errors.Validation("Unknown topic strategy")
+	}
+}
+
+func (s *service) GetSelectableSiteTopics(ctx context.Context, siteID int64, strategyType entities.TopicStrategy) ([]*entities.Topic, error) {
+	strategy, err := s.GetStrategy(strategyType)
+	if err != nil {
+		return nil, err
+	}
+	return strategy.GetSelectableTopics(ctx, siteID)
+}
+
 func (s *service) validateTopic(topic *entities.Topic) error {
 	if strings.TrimSpace(topic.Title) == "" {
 		return errors.Validation("Topic title is required")

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
+	"github.com/davidmovas/postulator/internal/domain/topics"
 	"github.com/davidmovas/postulator/internal/infra/ai"
 	"github.com/davidmovas/postulator/pkg/errors"
 )
@@ -34,6 +35,8 @@ type pipelineContext struct {
 	Category  *entities.Category
 	Prompt    *entities.Prompt
 	Provider  *entities.Provider
+
+	Strategy topics.TopicStrategyHandler
 
 	SystemPrompt string
 	UserPrompt   string
@@ -73,6 +76,10 @@ func (e *Executor) executePipeline(ctx context.Context, job *entities.Job) error
 		e.logger.Infof("Job %d: Executing step '%s'", job.ID, step.name)
 
 		if err := step.fn(ctx, pctx); err != nil {
+			if errors.IsNoResources(err) {
+				e.logger.Infof("Job %d: Pipeline stopped gracefully due to no resources (step='%s')", job.ID, step.name)
+				return nil
+			}
 			e.logger.Errorf("Job %d: Step '%s' failed: %v", job.ID, step.name, err)
 			return errors.JobExecution(job.ID, err).WithContext("step", string(step.name))
 		}
@@ -109,28 +116,26 @@ func (e *Executor) stepValidate(ctx context.Context, pctx *pipelineContext) erro
 
 	pctx.Site = site
 
-	if pctx.Job.Schedule == nil || pctx.Job.Schedule.Type != entities.ScheduleManual {
-		if len(pctx.Job.Topics) == 0 {
-			return errors.Validation("no topics assigned to job").
-				WithContext("reason", "no_topics_available")
-		}
+	strat, err := e.topicService.GetStrategy(pctx.Job.TopicStrategy)
+	if err != nil {
+		return err
+	}
+	pctx.Strategy = strat
 
+	if pctx.Job.Schedule == nil || pctx.Job.Schedule.Type != entities.ScheduleManual {
 		if len(pctx.Job.Categories) == 0 {
 			return errors.Validation("no categories assigned to job")
 		}
-
-		if pctx.Job.TopicStrategy == entities.StrategyUnique {
-			var unusedCount int
-			unusedCount, err = e.topicService.CountUnused(ctx, pctx.Job.SiteID, pctx.Job.Topics)
-			if err != nil {
-				return errors.JobExecution(pctx.Job.ID, err).
-					WithContext("reason", "topics_check_failed")
+		if err = strat.CanExecute(ctx, pctx.Job); err != nil {
+			if errors.IsNoResources(err) {
+				if pauseErr := e.pauseJob(ctx, pctx.Job.ID); pauseErr != nil {
+					e.logger.Warnf("Job %d: Failed to pause on no-resources: %v", pctx.Job.ID, pauseErr)
+				} else {
+					e.logger.Infof("Job %d: Paused due to no resources for strategy '%s'", pctx.Job.ID, pctx.Job.TopicStrategy)
+				}
+				return errors.NoResources("topics")
 			}
-			if unusedCount == 0 {
-				_ = e.pauseJob(ctx, pctx.Job.ID)
-				return errors.Validation("no unused topics available").
-					WithContext("reason", "no_topics_available")
-			}
+			return err
 		}
 	}
 
@@ -138,34 +143,17 @@ func (e *Executor) stepValidate(ctx context.Context, pctx *pipelineContext) erro
 }
 
 func (e *Executor) stepSelectTopic(ctx context.Context, pctx *pipelineContext) error {
-	var topic *entities.Topic
-	var err error
-
-	switch pctx.Job.TopicStrategy {
-	case entities.StrategyUnique:
-		topic, err = e.topicService.GetNextTopicForJob(ctx, pctx.Job)
+	if pctx.Strategy == nil {
+		strat, err := e.topicService.GetStrategy(pctx.Job.TopicStrategy)
 		if err != nil {
-			return errors.JobExecution(pctx.Job.ID, err).
-				WithContext("reason", "no_topics_available")
+			return err
 		}
-
-	case entities.StrategyVariation:
-		var originalTopic *entities.Topic
-		originalTopic, err = e.topicService.GetNextTopicForJob(ctx, pctx.Job)
-		if err != nil {
-			return errors.JobExecution(pctx.Job.ID, err).
-				WithContext("reason", "no_topics_available")
-		}
-
-		topic, err = e.topicService.GetOrGenerateVariation(ctx, pctx.Job.AIProviderID, pctx.Job.SiteID, originalTopic.ID)
-		if err != nil {
-			return fmt.Errorf("failed to generate topic variation: %w", err)
-		}
-
-	default:
-		return errors.Validation("invalid topic strategy")
+		pctx.Strategy = strat
 	}
-
+	topic, err := pctx.Strategy.PickTopic(ctx, pctx.Job)
+	if err != nil {
+		return err
+	}
 	pctx.Topic = topic
 	e.logger.Infof("Job %d: Selected topic %d (%s)", pctx.Job.ID, topic.ID, topic.Title)
 	return nil
@@ -374,16 +362,13 @@ func (e *Executor) stepPublish(ctx context.Context, pctx *pipelineContext) error
 }
 
 func (e *Executor) stepMarkUsed(ctx context.Context, pctx *pipelineContext) error {
-	if pctx.Job.TopicStrategy != entities.StrategyUnique {
+	if pctx.Strategy == nil || pctx.Topic == nil {
 		return nil
 	}
-
-	if err := e.topicService.MarkTopicUsed(ctx, pctx.Job.SiteID, pctx.Topic.ID); err != nil {
-		e.logger.Errorf("Failed to mark topic as used: %v", err)
+	if err := pctx.Strategy.OnExecutionSuccess(ctx, pctx.Job, pctx.Topic); err != nil {
+		e.logger.Warnf("Job %d: Post-success hook failed: %v", pctx.Job.ID, err)
 		return nil
 	}
-
-	e.logger.Infof("Job %d: Marked topic %d as used", pctx.Job.ID, pctx.Topic.ID)
 	return nil
 }
 
@@ -397,19 +382,6 @@ func (e *Executor) stepComplete(ctx context.Context, pctx *pipelineContext) erro
 
 	totalTime := time.Since(pctx.StartTime)
 	e.logger.Infof("Job %d: Execution completed successfully in %v", pctx.Job.ID, totalTime)
-
-	if pctx.Job.TopicStrategy == entities.StrategyUnique && (pctx.Job.Schedule == nil || pctx.Job.Schedule.Type != entities.ScheduleManual) {
-		unusedCount, err := e.topicService.CountUnused(ctx, pctx.Job.SiteID, pctx.Job.Topics)
-		if err != nil {
-			e.logger.Warnf("Job %d: Failed to count unused topics after run: %v", pctx.Job.ID, err)
-		} else if unusedCount == 0 {
-			if err = e.pauseJob(ctx, pctx.Job.ID); err != nil {
-				e.logger.Warnf("Job %d: Failed to auto-pause after topics exhausted: %v", pctx.Job.ID, err)
-			} else {
-				e.logger.Infof("Job %d: Auto-paused due to no unique topics left (site_id=%d)", pctx.Job.ID, pctx.Job.SiteID)
-			}
-		}
-	}
 
 	return nil
 }
