@@ -8,6 +8,7 @@ import { jobService } from "@/services/jobs";
 import { promptService } from "@/services/prompts";
 import { siteService } from "@/services/sites";
 import { topicService } from "@/services/topics";
+import { DEFAULT_TOPIC_STRATEGY } from "@/constants/topics";
 import { categoryService } from "@/services/categories";
 import { providerService } from "@/services/providers";
 import { useJobForm } from "@/hooks/use-job-form";
@@ -58,9 +59,16 @@ export default function CreateSiteJobPage() {
     };
 
     const loadTopics = async () => {
-        const topicsData = await topicService.getSiteTopics(siteId);
+        const strategy = (formData.topicStrategy as string) || DEFAULT_TOPIC_STRATEGY;
+        const topicsData = await topicService.getSelectableTopics(siteId, strategy);
         setTopics(topicsData);
     };
+
+    useEffect(() => {
+        if (!siteId) return;
+        loadTopics();
+        updateFormData({ topics: [] as any });
+    }, [formData.topicStrategy]);
 
     const loadCategories = async () => {
         const categoriesData = await categoryService.listSiteCategories(siteId);

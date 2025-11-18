@@ -8,6 +8,7 @@ import { jobService } from "@/services/jobs";
 import { promptService } from "@/services/prompts";
 import { siteService } from "@/services/sites";
 import { topicService } from "@/services/topics";
+import { DEFAULT_TOPIC_STRATEGY } from "@/constants/topics";
 import { categoryService } from "@/services/categories";
 import { providerService } from "@/services/providers";
 import { JobCreateInput } from "@/models/jobs";
@@ -25,7 +26,7 @@ export default function CreateGlobalJobPage() {
     const { execute, isLoading } = useApiCall();
 
     const [formData, setFormData] = useState<Partial<JobCreateInput>>({
-        topicStrategy: "unique",
+        topicStrategy: DEFAULT_TOPIC_STRATEGY,
         categoryStrategy: "fixed",
         requiresValidation: false,
         jitterEnabled: true,
@@ -47,15 +48,22 @@ export default function CreateGlobalJobPage() {
         loadSites();
         loadPrompts();
         loadProviders();
-        loadTopics();
     }, []);
 
     useEffect(() => {
         if (formData.siteId) {
             loadCategories();
-            loadSiteTopics();
+            loadSelectableTopics();
+            updateFormData({ topics: [] as any });
         }
     }, [formData.siteId]);
+
+    useEffect(() => {
+        if (formData.siteId) {
+            loadSelectableTopics();
+            updateFormData({ topics: [] as any });
+        }
+    }, [formData.topicStrategy]);
 
     const loadSites = async () => {
         const sitesData = await siteService.listSites();
@@ -72,14 +80,10 @@ export default function CreateGlobalJobPage() {
         setProviders(providersData.filter(p => p.isActive));
     };
 
-    const loadTopics = async () => {
-        const topicsData = await topicService.listTopics();
-        setTopics(topicsData);
-    };
-
-    const loadSiteTopics = async () => {
+    const loadSelectableTopics = async () => {
         if (!formData.siteId) return;
-        const topicsData = await topicService.getSiteTopics(formData.siteId);
+        const strategy = formData.topicStrategy || DEFAULT_TOPIC_STRATEGY;
+        const topicsData = await topicService.getSelectableTopics(formData.siteId, strategy);
         setTopics(topicsData);
     };
 

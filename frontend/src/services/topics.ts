@@ -6,7 +6,7 @@ import {
     DeleteTopic,
     GenerateVariations,
     GetNextTopicForJob,
-    GetOrGenerateVariation,
+    GetOrGenerateVariation, GetSelectableSiteTopics,
     GetSiteTopics,
     GetTopic,
     ListTopics,
@@ -83,6 +83,12 @@ export const topicService = {
 
     async getSiteTopics(siteId: number): Promise<Topic[]> {
         const response = await GetSiteTopics(siteId);
+        const topics = unwrapArrayResponse<dto.Topic>(response);
+        return topics.map(mapTopic);
+    },
+
+    async getSelectableTopics(siteId: number, strategy: string): Promise<Topic[]> {
+        const response = await GetSelectableSiteTopics(siteId, strategy);
         const topics = unwrapArrayResponse<dto.Topic>(response);
         return topics.map(mapTopic);
     },

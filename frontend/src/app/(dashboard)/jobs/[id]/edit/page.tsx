@@ -7,6 +7,7 @@ import { jobService } from "@/services/jobs";
 import { promptService } from "@/services/prompts";
 import { siteService } from "@/services/sites";
 import { topicService } from "@/services/topics";
+import { DEFAULT_TOPIC_STRATEGY } from "@/constants/topics";
 import { categoryService } from "@/services/categories";
 import { providerService } from "@/services/providers";
 import { useJobForm } from "@/hooks/use-job-form";
@@ -34,12 +35,10 @@ export default function EditJobPage() {
     const [topics, setTopics] = useState<any[] | null>(null);
     const [categories, setCategories] = useState<any[] | null>(null);
 
-    // Загрузка данных джобы
     useEffect(() => {
         loadJob();
     }, [jobId]);
 
-    // Загрузка зависимых данных
     useEffect(() => {
         if (job) {
             loadSiteData();
@@ -79,11 +78,20 @@ export default function EditJobPage() {
     };
 
     const loadTopics = async () => {
-        if (job?.siteId) {
-            const topicsData = await topicService.getSiteTopics(job.siteId);
+        const siteId = formData.siteId || job?.siteId;
+        if (siteId) {
+            const strategy = (formData.topicStrategy as string) || DEFAULT_TOPIC_STRATEGY;
+            const topicsData = await topicService.getSelectableTopics(siteId, strategy);
             setTopics(topicsData);
         }
     };
+
+    useEffect(() => {
+        if (formData.siteId || job?.siteId) {
+            loadTopics();
+            updateFormData({ topics: [] as any });
+        }
+    }, [formData.topicStrategy]);
 
     const loadCategories = async () => {
         if (job?.siteId) {
