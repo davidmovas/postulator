@@ -146,7 +146,7 @@ export function useJobsTable(siteId?: number) {
             case "manual":
                 return "Manual";
           case "once":
-            return `${formatDateTime(s.config?.executeAt)}`;
+            return `${formatDateTime(s.config?.executeAt || s.config?.execute_at)}`;
           case "interval":
             return `Every ${s.config?.value} ${s.config?.unit}`;
           case "daily":
@@ -319,13 +319,13 @@ export function useJobsTable(siteId?: number) {
               <>
                 <InfoItem label="Type">{capitalize(schedule.type)}</InfoItem>
                 {schedule.type === "once" && (
-                  <InfoItem label="Execute At">{formatDateTime(schedule.config?.executeAt)}</InfoItem>
+                  <InfoItem label="Execute At">{formatDateTime(schedule.config?.executeAt || schedule.config?.execute_at)}</InfoItem>
                 )}
                 {schedule.type === "interval" && (
                   <>
                     <InfoItem label="Every">{schedule.config?.value} {schedule.config?.unit}</InfoItem>
-                    {schedule.config?.startAt && (
-                      <InfoItem label="Start At">{formatDateTime(schedule.config?.startAt)}</InfoItem>
+                    {(schedule.config?.startAt || schedule.config?.start_at) && (
+                      <InfoItem label="Start At">{formatDateTime(schedule.config?.startAt || schedule.config?.start_at)}</InfoItem>
                     )}
                   </>
                 )}

@@ -111,6 +111,24 @@ export default function CreateGlobalJobPage() {
             return;
         }
 
+        // TODO: debug executeAt logging (local vs UTC)
+        try {
+            const execAt = (formData.schedule?.config as any)?.executeAt as string | undefined;
+            if (execAt) {
+                const d = new Date(execAt);
+                const pad = (n: number) => String(n).padStart(2, "0");
+                const offMin = -d.getTimezoneOffset();
+                const sign = offMin >= 0 ? "+" : "-";
+                const abs = Math.abs(offMin);
+                const off = `${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
+                const localISO = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${String(d.getMilliseconds()).padStart(3, "0")}${off}`;
+                console.log("[Create Job] executeAt (UTC):", execAt);
+                console.log("[Create Job] executeAt (local):", localISO);
+            } else {
+                console.log("[Create Job] executeAt: <undefined>");
+            }
+        } catch {}
+
         const result = await execute<void>(
             () => jobService.createJob(formData as JobCreateInput),
             {

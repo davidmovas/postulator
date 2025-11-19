@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -376,6 +377,9 @@ func (s *service) validateScheduleConfig(schedule *entities.Schedule) error {
 		if err := json.Unmarshal(schedule.Config, &config); err != nil {
 			return errors.Validation("Invalid once schedule configuration")
 		}
+
+		fmt.Printf("[Schedule Once Config] Execute At: [%s]", config.ExecuteAt.String())
+
 		if config.ExecuteAt.Before(time.Now()) {
 			return errors.Validation("Execute at must be in the future")
 		}

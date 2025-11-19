@@ -9,11 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar-rac";
 import { DateInput, dateInputStyle } from "@/components/ui/datefield-rac";
 import { Button as AriaButton, DatePicker, Dialog, Group, Popover, I18nProvider } from "react-aria-components";
-import { parseDate, CalendarDate } from "@internationalized/date";
+import { CalendarDate } from "@internationalized/date";
 import { JobCreateInput, Schedule, OnceSchedule, IntervalSchedule, DailySchedule } from "@/models/jobs";
 import { useEffect, useMemo, useState } from "react";
 import { CalendarIcon } from "lucide-react";
-import { TimeInput24 } from "@/components/ui/time-24";
+import TimeInput from "@/components/ui/time-input";
 
 interface ScheduleSectionProps {
     formData: Partial<JobCreateInput>;
@@ -21,7 +21,6 @@ interface ScheduleSectionProps {
 }
 
 export function ScheduleSection({ formData, onUpdate }: ScheduleSectionProps) {
-    // Local helper subcomponents to unify date/time picking and weekday pills
     const DateTimePicker = ({
         label,
         date,
@@ -39,7 +38,8 @@ export function ScheduleSection({ formData, onUpdate }: ScheduleSectionProps) {
         requireFuture?: boolean;
         invalidHint?: string;
     }) => {
-        const dateToCalendarDate = (d: Date): CalendarDate => parseDate(d.toISOString().split("T")[0]);
+        // Convert local Date to CalendarDate using local year/month/day to avoid timezone shifts
+        const dateToCalendarDate = (d: Date): CalendarDate => new CalendarDate(d.getFullYear(), d.getMonth() + 1, d.getDate());
         const calendarDateToDate = (cd: CalendarDate): Date => new Date(cd.year, cd.month - 1, cd.day);
         const ariaValue = date ? dateToCalendarDate(date) : undefined;
 
@@ -78,11 +78,7 @@ export function ScheduleSection({ formData, onUpdate }: ScheduleSectionProps) {
                         </DatePicker>
                     </I18nProvider>
 
-                    <TimeInput24
-                        value={time}
-                        onChange={(val) => onTimeChange(val)}
-                        invalid={isInvalid}
-                    />
+                    <TimeInput value={time} onChange={onTimeChange} isValid={!isInvalid} />
                 </div>
                 {isInvalid && (
                     <p className="text-xs text-destructive">{invalidHint || "Date and time must be in the future."}</p>
@@ -144,12 +140,31 @@ export function ScheduleSection({ formData, onUpdate }: ScheduleSectionProps) {
         return `${h}:${m}`;
     };
 
+    // Build RFC3339 string with LOCAL timezone offset, e.g. 2025-11-20T03:34:00+01:00 (not Z)
+    const toLocalRFC3339 = (d: Date): string => {
+        const pad = (n: number) => String(n).padStart(2, "0");
+        const year = d.getFullYear();
+        const month = pad(d.getMonth() + 1);
+        const day = pad(d.getDate());
+        const hour = pad(d.getHours());
+        const minute = pad(d.getMinutes());
+        const second = pad(d.getSeconds());
+        const ms = String(d.getMilliseconds()).padStart(3, "0");
+        const offMinTotal = -d.getTimezoneOffset(); // minutes east of UTC
+        const sign = offMinTotal >= 0 ? "+" : "-";
+        const abs = Math.abs(offMinTotal);
+        const offH = pad(Math.floor(abs / 60));
+        const offM = pad(abs % 60);
+        return `${year}-${month}-${day}T${hour}:${minute}:${second}.${ms}${sign}${offH}:${offM}`;
+    };
+
     const combineDateTimeToISO = (date: Date | undefined, timeHHMM: string): string | undefined => {
         if (!date || !timeHHMM) return undefined;
         const [hh, mm] = timeHHMM.split(":").map((v) => parseInt(v));
         const combined = new Date(date);
         combined.setHours(hh || 0, mm || 0, 0, 0);
-        return combined.toISOString();
+        // return LOCAL time with offset instead of UTC Z
+        return toLocalRFC3339(combined);
     };
 
     const parseISOToDate = (iso?: string): Date | undefined => {
@@ -159,11 +174,23 @@ export function ScheduleSection({ formData, onUpdate }: ScheduleSectionProps) {
     };
 
     // Derived state for Once
-    const onceDate = useMemo(() => parseISOToDate((formData.schedule?.config as OnceSchedule | undefined)?.executeAt), [formData.schedule]);
+    const onceDate = useMemo(() => {
+        const cfg = formData.schedule?.config as any;
+        const val: string | undefined = cfg?.executeAt || cfg?.execute_at;
+        return parseISOToDate(val);
+    }, [formData.schedule]);
     const onceTime = useMemo(() => toTimeString(onceDate), [onceDate]);
 
-    const intervalStartDate = useMemo(() => parseISOToDate((formData.schedule?.config as IntervalSchedule | undefined)?.startAt), [formData.schedule]);
-    const intervalStartTime = useMemo(() => toTimeString(intervalStartDate || new Date()), [intervalStartDate]);
+    const intervalStartDate = useMemo(() => {
+        const cfg = formData.schedule?.config as any;
+        const val: string | undefined = cfg?.startAt || cfg?.start_at;
+        return parseISOToDate(val);
+    }, [formData.schedule]);
+    const intervalStartTime = useMemo(() => {
+        // Если стартовая дата не задана, показываем текущее время + 10 минут как дефолт
+        const base = intervalStartDate || new Date(Date.now() + 10 * 60 * 1000);
+        return toTimeString(base);
+    }, [intervalStartDate]);
 
     const isOnceInPast = useMemo(() => {
         const iso = combineDateTimeToISO(onceDate, onceTime);
@@ -187,7 +214,10 @@ export function ScheduleSection({ formData, onUpdate }: ScheduleSectionProps) {
                 newSchedule = {
                     type: "once",
                     config: {
-                        executeAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Завтра
+                        // По умолчанию: завтра, текущее время + 10 минут (локальное RFC3339 с оффсетом)
+                        executeAt: (() => toLocalRFC3339(new Date(Date.now() + 24 * 60 * 60 * 1000 + 10 * 60 * 1000)))(),
+                        // Для совместимости с сервером (snake_case)
+                        execute_at: (() => toLocalRFC3339(new Date(Date.now() + 24 * 60 * 60 * 1000 + 10 * 60 * 1000)))(),
                     } as OnceSchedule
                 };
                 break;
@@ -197,7 +227,10 @@ export function ScheduleSection({ formData, onUpdate }: ScheduleSectionProps) {
                     config: {
                         value: 1,
                         unit: "hours",
-                        startAt: new Date().toISOString()
+                        // Старт по умолчанию: текущее время + 10 минут (локальное RFC3339)
+                        startAt: (() => toLocalRFC3339(new Date(Date.now() + 10 * 60 * 1000)))(),
+                        // Для совместимости с сервером (snake_case)
+                        start_at: (() => toLocalRFC3339(new Date(Date.now() + 10 * 60 * 1000)))(),
                     } as IntervalSchedule
                 };
                 break;
@@ -298,11 +331,11 @@ export function ScheduleSection({ formData, onUpdate }: ScheduleSectionProps) {
                             invalidHint="Please pick a future date and time."
                             onDateChange={(d) => {
                                 const iso = combineDateTimeToISO(d, onceTime);
-                                if (iso) updateScheduleConfig({ executeAt: iso });
+                                if (iso) updateScheduleConfig({ executeAt: iso, execute_at: iso });
                             }}
                             onTimeChange={(t) => {
                                 const iso = combineDateTimeToISO(onceDate || new Date(), t);
-                                if (iso) updateScheduleConfig({ executeAt: iso });
+                                if (iso) updateScheduleConfig({ executeAt: iso, execute_at: iso });
                             }}
                         />
                     </div>
@@ -352,11 +385,11 @@ export function ScheduleSection({ formData, onUpdate }: ScheduleSectionProps) {
                                     invalidHint="Start time must be in the future."
                                     onDateChange={(d) => {
                                         const iso = combineDateTimeToISO(d, intervalStartTime);
-                                        updateScheduleConfig({ startAt: iso });
+                                        updateScheduleConfig({ startAt: iso, start_at: iso });
                                     }}
                                     onTimeChange={(t) => {
                                         const iso = combineDateTimeToISO(intervalStartDate || new Date(), t);
-                                        updateScheduleConfig({ startAt: iso });
+                                        updateScheduleConfig({ startAt: iso, start_at: iso });
                                     }}
                                 />
                             </div>
@@ -370,18 +403,22 @@ export function ScheduleSection({ formData, onUpdate }: ScheduleSectionProps) {
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
                             <div className="space-y-2 w-full sm:w-auto">
                                 <Label htmlFor="time">Time</Label>
-                                <TimeInput24
-                                    value={(() => {
-                                        const cfg = formData.schedule!.config as DailySchedule;
-                                        const h = (cfg.hour ?? 9).toString().padStart(2, '0');
-                                        const m = (cfg.minute ?? 0).toString().padStart(2, '0');
-                                        return `${h}:${m}`;
-                                    })()}
-                                    onChange={(val) => {
-                                        const [h, m] = val.split(":").map(v => parseInt(v));
-                                        updateScheduleConfig({ hour: h, minute: m });
-                                    }}
-                                />
+                                {(() => {
+                                    const cfg = formData.schedule!.config as DailySchedule;
+                                    const h = (cfg.hour ?? 9).toString().padStart(2, '0');
+                                    const m = (cfg.minute ?? 0).toString().padStart(2, '0');
+                                    const value = `${h}:${m}`;
+                                    return (
+                                        <TimeInput
+                                            value={value}
+                                            onChange={(val) => {
+                                                const [hh, mm] = val.split(":").map((x) => parseInt(x));
+                                                updateScheduleConfig({ hour: hh, minute: mm });
+                                            }}
+                                            isValid={true}
+                                        />
+                                    );
+                                })()}
                             </div>
                             <div className="space-y-2 w-full sm:w-auto">
                                 <Label>Days of week</Label>
