@@ -20,6 +20,7 @@ import { ContentStrategySection } from "@/components/jobs/form-sections/content-
 import { PlaceholdersSection } from "@/components/jobs/form-sections/placeholders-section";
 import { ScheduleSection } from "@/components/jobs/form-sections/schedule-section";
 import { AdvancedSettingsSection } from "@/components/jobs/form-sections/advanced-settings-section";
+import { useJobValidation } from "@/hooks/use-job-validation";
 
 export default function CreateSiteJobPage() {
     const params = useParams();
@@ -34,6 +35,8 @@ export default function CreateSiteJobPage() {
     const [providers, setProviders] = useState<any[] | null>(null);
     const [topics, setTopics] = useState<any[] | null>(null);
     const [categories, setCategories] = useState<any[] | null>(null);
+
+    const validation = useJobValidation(formData, prompts);
     
     useEffect(() => {
         loadSiteData();
@@ -92,24 +95,6 @@ export default function CreateSiteJobPage() {
             return;
         }
 
-        // TODO: debug executeAt logging (local vs UTC)
-        try {
-            const execAt = (formData.schedule?.config as any)?.executeAt as string | undefined;
-            if (execAt) {
-                const d = new Date(execAt);
-                const pad = (n: number) => String(n).padStart(2, "0");
-                const offMin = -d.getTimezoneOffset();
-                const sign = offMin >= 0 ? "+" : "-";
-                const abs = Math.abs(offMin);
-                const off = `${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
-                const localISO = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${String(d.getMilliseconds()).padStart(3, "0")}${off}`;
-                console.log("[Create Site Job] executeAt (UTC):", execAt);
-                console.log("[Create Site Job] executeAt (local):", localISO);
-            } else {
-                console.log("[Create Site Job] executeAt: <undefined>");
-            }
-        } catch {}
-
         const result = await execute<void>(
             () => jobService.createJob(formData as any),
             {
@@ -122,8 +107,6 @@ export default function CreateSiteJobPage() {
             router.push(`/sites/${siteId}/jobs`);
         }
     };
-
-    const isFormValid = formData.name && formData.promptId && formData.aiProviderId;
 
     return (
         <div className="p-6 space-y-6 max-w-4xl mx-auto">
@@ -178,20 +161,35 @@ export default function CreateSiteJobPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex justify-end gap-3 pt-6 border-t">
-                <Button
-                    variant="outline"
-                    onClick={() => router.push(`/sites/${siteId}/jobs`)}
-                    disabled={isLoading}
-                >
-                    Cancel
-                </Button>
-                <Button
-                    onClick={handleSubmit}
-                    disabled={!isFormValid || isLoading}
-                >
-                    {isLoading ? "Creating..." : "Create Job"}
-                </Button>
+            <div className="flex justify-between gap-3 pt-6 border-t">
+                <div>
+                    {validation.errors.length > 0 && (
+                        <div className="p-4 border border-destructive/50 bg-destructive/10 rounded-md">
+                            <h4 className="font-medium text-destructive mb-2">Please fix the following errors:</h4>
+                            <ul className="text-sm text-destructive list-disc list-inside space-y-1">
+                                {validation.errors.map((error, index) => (
+                                    <li key={index}>{error}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex gap-3">
+                    <Button
+                        variant="outline"
+                        onClick={() => router.push("/jobs")}
+                        disabled={isLoading}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleSubmit}
+                        disabled={!validation.isValid || isLoading}
+                    >
+                        {isLoading ? "Creating..." : "Create Job"}
+                    </Button>
+                </div>
             </div>
         </div>
     );

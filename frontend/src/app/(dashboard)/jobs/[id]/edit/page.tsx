@@ -19,6 +19,7 @@ import { ContentStrategySection } from "@/components/jobs/form-sections/content-
 import { PlaceholdersSection } from "@/components/jobs/form-sections/placeholders-section";
 import { ScheduleSection } from "@/components/jobs/form-sections/schedule-section";
 import { AdvancedSettingsSection } from "@/components/jobs/form-sections/advanced-settings-section";
+import { useJobValidation } from "@/hooks/use-job-validation";
 
 export default function EditJobPage() {
     const params = useParams();
@@ -34,6 +35,8 @@ export default function EditJobPage() {
     const [providers, setProviders] = useState<any[] | null>(null);
     const [topics, setTopics] = useState<any[] | null>(null);
     const [categories, setCategories] = useState<any[] | null>(null);
+
+    const validation = useJobValidation(formData, prompts);
 
     useEffect(() => {
         loadJob();
@@ -204,20 +207,35 @@ export default function EditJobPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex justify-end gap-3 pt-6 border-t">
-                <Button
-                    variant="outline"
-                    onClick={() => router.push("/jobs")}
-                    disabled={isLoading}
-                >
-                    Cancel
-                </Button>
-                <Button
-                    onClick={handleSubmit}
-                    disabled={!isFormValid || isLoading}
-                >
-                    {isLoading ? "Updating..." : "Update Job"}
-                </Button>
+            <div className="flex justify-between gap-3 pt-6 border-t">
+                <div>
+                    {validation.errors.length > 0 && (
+                        <div className="p-4 border border-destructive/50 bg-destructive/10 rounded-md">
+                            <h4 className="font-medium text-destructive mb-2">Please fix the following errors:</h4>
+                            <ul className="text-sm text-destructive list-disc list-inside space-y-1">
+                                {validation.errors.map((error, index) => (
+                                    <li key={index}>{error}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex gap-3">
+                    <Button
+                        variant="outline"
+                        onClick={() => router.push("/jobs")}
+                        disabled={isLoading}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleSubmit}
+                        disabled={!validation.isValid || isLoading}
+                    >
+                        {isLoading ? "Creating..." : "Create Job"}
+                    </Button>
+                </div>
             </div>
         </div>
     );
