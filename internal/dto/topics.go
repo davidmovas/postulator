@@ -73,3 +73,16 @@ func (d *BatchResult) FromEntity(entity *entities.BatchResult) *BatchResult {
 
 	return d
 }
+
+type JobTopicsStatus struct {
+	Count  int      `json:"count"`
+	Topics []*Topic `json:"topics"`
+}
+
+func NewJobTopicsStatus(topics []*entities.Topic, count int) *JobTopicsStatus {
+	dtoTopics := make([]*Topic, 0, len(topics))
+	for _, t := range topics {
+		dtoTopics = append(dtoTopics, NewTopic(t))
+	}
+	return &JobTopicsStatus{Count: count, Topics: dtoTopics}
+}

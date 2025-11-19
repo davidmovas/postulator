@@ -22,6 +22,10 @@ export function GenerateVariations(arg1, arg2, arg3) {
   return window['go']['handlers']['TopicsHandler']['GenerateVariations'](arg1, arg2, arg3);
 }
 
+export function GetJobRemainingTopics(arg1) {
+  return window['go']['handlers']['TopicsHandler']['GetJobRemainingTopics'](arg1);
+}
+
 export function GetNextTopicForJob(arg1) {
   return window['go']['handlers']['TopicsHandler']['GetNextTopicForJob'](arg1);
 }

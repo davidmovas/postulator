@@ -8,4 +8,4 @@ export function CheckSite(arg1:number):Promise<dto.Response_github_com_davidmova
 
 export function GetHistory(arg1:number,arg2:number):Promise<dto.Response___github_com_davidmovas_postulator_internal_dto_HealthCheckHistory_>;
 
-export function GetHistoryByPeriod(arg1:number,arg2:string,arg3:string):Promise<dto.Response___github_com_davidmovas_postulator_internal_dto_HealthCheckHistory_>;
+export function GetHistoryByPeriod(arg1:number,arg2:string,arg3:string,arg4:number,arg5:number):Promise<dto.PaginatedResponse_github_com_davidmovas_postulator_internal_dto_HealthCheckHistory_>;

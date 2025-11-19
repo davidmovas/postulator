@@ -12,6 +12,8 @@ export function DeleteTopic(arg1:number):Promise<dto.Response_string_>;
 
 export function GenerateVariations(arg1:number,arg2:number,arg3:number):Promise<dto.Response___github_com_davidmovas_postulator_internal_dto_Topic_>;
 
+export function GetJobRemainingTopics(arg1:number):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_JobTopicsStatus_>;
+
 export function GetNextTopicForJob(arg1:number):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_Topic_>;
 
 export function GetOrGenerateVariation(arg1:number,arg2:number,arg3:number):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_Topic_>;

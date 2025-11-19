@@ -57,4 +57,6 @@ type Service interface {
 
 	GetStrategy(strategyType entities.TopicStrategy) (TopicStrategyHandler, error)
 	GetSelectableSiteTopics(ctx context.Context, siteID int64, strategyType entities.TopicStrategy) ([]*entities.Topic, error)
+
+	GetJobRemainingTopics(ctx context.Context, job *entities.Job) ([]*entities.Topic, int, error)
 }

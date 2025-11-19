@@ -37,3 +37,15 @@ export function mapBatchResult(x: dto.BatchResult): BatchResult {
         createdTopics: (x.createdTopics || []).map(mapTopic),
     };
 }
+
+export interface JobTopicsStatus {
+    count: number;
+    topics: Topic[];
+}
+
+export function mapJobTopicsStatus(x: dto.JobTopicsStatus): JobTopicsStatus {
+    return {
+        count: x.count,
+        topics: (x.topics || []).map(mapTopic),
+    };
+}

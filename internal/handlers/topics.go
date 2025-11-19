@@ -192,3 +192,19 @@ func (h *TopicsHandler) MarkTopicUsed(siteID, topicID int64) *dto.Response[strin
 
 	return ok("Topic marked as used successfully")
 }
+
+func (h *TopicsHandler) GetJobRemainingTopics(jobID int64) *dto.Response[*dto.JobTopicsStatus] {
+	c := ctx.FastCtx()
+
+	job, err := h.jobService.GetJob(c, jobID)
+	if err != nil {
+		return fail[*dto.JobTopicsStatus](err)
+	}
+
+	tops, count, err := h.service.GetJobRemainingTopics(c, job)
+	if err != nil {
+		return fail[*dto.JobTopicsStatus](err)
+	}
+
+	return ok(dto.NewJobTopicsStatus(tops, count))
+}

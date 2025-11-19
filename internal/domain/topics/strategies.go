@@ -69,6 +69,19 @@ func (s *uniqueStrategy) GetSelectableTopics(ctx context.Context, siteID int64) 
 	return unused, nil
 }
 
+func (s *uniqueStrategy) GetRemainingTopics(ctx context.Context, job *entities.Job) ([]*entities.Topic, int, error) {
+	if len(job.Topics) == 0 {
+		return []*entities.Topic{}, 0, nil
+	}
+
+	unused, err := s.usageRepo.GetUnused(ctx, job.SiteID, job.Topics)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return unused, len(unused), nil
+}
+
 // VariationStrategy implements reuse with variation
 type variationStrategy struct {
 	svc           *service
@@ -114,4 +127,23 @@ func (s *variationStrategy) OnExecutionSuccess(_ context.Context, _ *entities.Jo
 
 func (s *variationStrategy) GetSelectableTopics(ctx context.Context, siteID int64) ([]*entities.Topic, error) {
 	return s.siteTopicRepo.GetBySiteID(ctx, siteID)
+}
+
+func (s *variationStrategy) GetRemainingTopics(ctx context.Context, job *entities.Job) ([]*entities.Topic, int, error) {
+	if len(job.Topics) == 0 {
+		return []*entities.Topic{}, 0, nil
+	}
+
+	var result []*entities.Topic
+	for _, id := range job.Topics {
+		topic, err := s.svc.repo.GetByID(ctx, id)
+		if err != nil {
+			return nil, 0, err
+		}
+		if topic != nil {
+			result = append(result, topic)
+		}
+	}
+
+	return result, len(result), nil
 }

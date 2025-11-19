@@ -11,6 +11,7 @@ import {
     GetTopic,
     ListTopics,
     MarkTopicUsed,
+    GetJobRemainingTopics,
     UnassignFromSite,
     UpdateTopic
 } from "@/wailsjs/wailsjs/go/handlers/TopicsHandler";
@@ -20,7 +21,9 @@ import {
     Topic,
     TopicCreateInput,
     TopicUpdateInput,
-    BatchResult
+    BatchResult,
+    JobTopicsStatus,
+    mapJobTopicsStatus,
 } from "@/models/topics";
 import { unwrapArrayResponse, unwrapResponse } from "@/lib/api-utils";
 
@@ -114,5 +117,11 @@ export const topicService = {
     async markTopicUsed(topicId: number, jobId: number): Promise<void> {
         const response = await MarkTopicUsed(topicId, jobId);
         unwrapResponse<string>(response);
+    },
+
+    async getJobRemainingTopics(jobId: number): Promise<JobTopicsStatus> {
+        const response = await GetJobRemainingTopics(jobId);
+        const payload = unwrapResponse<dto.JobTopicsStatus>(response);
+        return mapJobTopicsStatus(payload);
     },
 };

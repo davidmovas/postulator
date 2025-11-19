@@ -1,6 +1,9 @@
-import { dto } from "@/wailsjs/wailsjs/go/models";
+import {
+    dto,
+} from "@/wailsjs/wailsjs/go/models";
 import { unwrapArrayResponse, unwrapResponse } from "@/lib/api-utils";
 import { AutoCheckResult, HealthCheckHistory, mapAutoCheckResult, mapHealthHistory } from "@/models/healthcheck";
+import { PaginatedResponse } from "@/models/common";
 import { CheckAuto, CheckSite, GetHistory, GetHistoryByPeriod } from "@/wailsjs/wailsjs/go/handlers/HealthCheckHandler";
 
 export const healthcheckService = {
@@ -22,10 +25,17 @@ export const healthcheckService = {
         return list.map(mapHealthHistory);
     },
 
-    async getHistoryByPeriod(siteId: number, from: string, to: string): Promise<HealthCheckHistory[]> {
-        const response = await GetHistoryByPeriod(siteId, from, to);
-        const list = unwrapArrayResponse<dto.HealthCheckHistory>(response);
-        return list.map(mapHealthHistory);
+    async getHistoryByPeriod(siteId: number, from: string, to: string, page: number, pageSize: number): Promise<PaginatedResponse<HealthCheckHistory>> {
+        const response = await GetHistoryByPeriod(siteId, from, to, page, pageSize);
+        const payload = unwrapResponse<dto.PaginatedResponse__github_com_davidmovas_postulator_internal_dto_HealthCheckHistory_>(response);
+        const items = (payload.items || []).map(mapHealthHistory);
+        return {
+            items,
+            total: payload.total ?? 0,
+            limit: payload.limit ?? pageSize,
+            offset: payload.offset ?? (Math.max(1, page) - 1) * pageSize,
+            hasMore: Boolean(payload.hasMore),
+        };
     },
 
     async checkAutoDetailed(): Promise<AutoCheckResult> {

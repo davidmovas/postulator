@@ -61,6 +61,10 @@ export function HealthHistory({ siteId }: HealthHistoryProps) {
   const { execute } = useApiCall();
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>();
   const [history, setHistory] = useState<HealthCheckHistory[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(50);
+  const [hasMore, setHasMore] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [chartOpen, setChartOpen] = useState(false);
   const [tableOpen, setTableOpen] = useState(false);
 
@@ -72,23 +76,35 @@ export function HealthHistory({ siteId }: HealthHistoryProps) {
     setDateRange({ from, to });
   }, []);
 
-  const loadHistory = useCallback(async (from: Date, to: Date) => {
+  const loadPage = useCallback(async (from: Date, to: Date, pageToLoad: number, reset = false) => {
     const fromStr = toGoDateFormat(from);
     const toStr = toGoDateFormat(to);
-    const list = await execute<HealthCheckHistory[]>(
-      () => healthcheckService.getHistoryByPeriod(siteId, fromStr, toStr),
-      {
-        errorTitle: "Failed to load health history",
-      }
-    );
-    setHistory(list || []);
-  }, [execute, siteId]);
+    setIsLoading(true);
+    try {
+      const resp = await execute(
+        () => healthcheckService.getHistoryByPeriod(siteId, fromStr, toStr, pageToLoad, pageSize),
+        {
+          errorTitle: "Failed to load health history",
+        }
+      );
+      const items = resp?.items || [];
+      setHistory(prev => (reset ? items : [...prev, ...items]));
+      setHasMore(Boolean(resp?.hasMore));
+      setPage(pageToLoad + 1);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [execute, siteId, pageSize]);
 
   useEffect(() => {
     if (dateRange?.from && dateRange?.to) {
-      loadHistory(dateRange.from, dateRange.to);
+      // reset to first page on range change
+      setHistory([]);
+      setPage(1);
+      setHasMore(false);
+      loadPage(dateRange.from, dateRange.to, 1, true);
     }
-  }, [dateRange, loadHistory]);
+  }, [dateRange, loadPage]);
 
   const toStatusBand = (code?: number) => {
     if (!code || code < 100) return 0; // no response/unknown
@@ -326,12 +342,24 @@ export function HealthHistory({ siteId }: HealthHistoryProps) {
                 data={unhealthyRows}
                 searchKey="errorMessage"
                 searchPlaceholder="Search errors..."
-                isLoading={false}
+                isLoading={isLoading}
                 emptyMessage="No unhealthy events in selected period."
                 showPagination={true}
                 defaultPageSize={25}
                 enableViewOption={false}
               />
+              {hasMore && (
+                <div className="pt-4 flex justify-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => dateRange && loadPage(dateRange.from, dateRange.to, page, false)}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? "Loading..." : "Load more"}
+                  </Button>
+                </div>
+              )}
             </CardContent>
           )}
         </Card>
@@ -343,6 +371,18 @@ export function HealthHistory({ siteId }: HealthHistoryProps) {
             <div className="text-center py-8 text-sm text-muted-foreground">
               No health data available for the selected period.
             </div>
+            {hasMore && (
+              <div className="pt-4 flex justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => dateRange && loadPage(dateRange.from, dateRange.to, page, false)}
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Loading..." : "Load more"}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
