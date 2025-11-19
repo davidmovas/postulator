@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/davidmovas/postulator/pkg/errors"
 
@@ -130,7 +131,7 @@ func (c *OpenAIClient) GenerateTopicVariations(ctx context.Context, topic string
 	}
 
 	systemPrompt := "You are a helpful assistant that generates creative topic variations. Each variation should be unique but related to the original topic."
-	userPrompt := fmt.Sprintf("Generate %d variations of the following topic:\n\n'%s'\n\nEach variation should be:\n- Unique and interesting\n- Related to the original topic\n- Suitable for a blog article\n- SEO-friendly", amount, topic)
+	userPrompt := fmt.Sprintf("Generate %d variations of the following topic:\n\n'%s'\n\nEach variation should be:\n- Unique and interesting\n- Related to the original topic\n- Suitable for a blog article\n- SEO-friendly\n- WITHOUT quotation marks in the titles", amount, topic)
 
 	messages := []openaiSDK.ChatCompletionMessageParamUnion{
 		openaiSDK.SystemMessage(systemPrompt),
@@ -170,7 +171,29 @@ func (c *OpenAIClient) GenerateTopicVariations(ctx context.Context, topic string
 		result.Variations = result.Variations[:amount]
 	}
 
-	return result.Variations, nil
+	cleanedVariations := make([]string, len(result.Variations))
+	for i, variation := range result.Variations {
+		cleanedVariations[i] = cleanQuotes(variation)
+	}
+
+	return cleanedVariations, nil
+}
+
+func cleanQuotes(s string) string {
+	s = strings.TrimSpace(s)
+
+	if len(s) >= 2 {
+		firstChar := s[0]
+		lastChar := s[len(s)-1]
+
+		if (firstChar == '"' && lastChar == '"') ||
+			(firstChar == '\'' && lastChar == '\'') ||
+			(firstChar == '`' && lastChar == '`') {
+			return s[1 : len(s)-1]
+		}
+	}
+
+	return s
 }
 
 func generateSchema[T any]() interface{} {
