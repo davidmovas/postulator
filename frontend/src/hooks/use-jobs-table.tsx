@@ -25,6 +25,7 @@ import { topicService } from "@/services/topics";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { JobStatus } from "@/constants/jobs";
+import { TOPIC_STRATEGY_REUSE_WITH_VARIATION } from "@/constants/topics";
 
 export function useJobsTable(siteId?: number) {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -150,7 +151,7 @@ export function useJobsTable(siteId?: number) {
           case "interval":
             return `Every ${s.config?.value} ${s.config?.unit}`;
           case "daily":
-            return `${s.config?.hour}:${String(s.config?.minute).padStart(2, "0")}`;
+            return `Daily @ ${s.config?.hour}:${String(s.config?.minute).padStart(2, "0")}`;
           default:
             return "—";
         }
@@ -309,44 +310,46 @@ export function useJobsTable(siteId?: number) {
 
     return (
       <div className="text-sm space-y-4 p-4 bg-muted/30 rounded-md">
-        {/* Scheduling */}
-        <div className="space-y-2">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">Scheduling</div>
-          <div className="flex flex-wrap gap-6">
-            {!schedule ? (
-              <InfoItem label="Mode">Manual</InfoItem>
-            ) : (
-              <>
-                <InfoItem label="Type">{capitalize(schedule.type)}</InfoItem>
-                {schedule.type === "once" && (
-                  <InfoItem label="Execute At">{formatDateTime(schedule.config?.executeAt || schedule.config?.execute_at)}</InfoItem>
-                )}
-                {schedule.type === "interval" && (
-                  <>
-                    <InfoItem label="Every">{schedule.config?.value} {schedule.config?.unit}</InfoItem>
-                    {(schedule.config?.startAt || schedule.config?.start_at) && (
-                      <InfoItem label="Start At">{formatDateTime(schedule.config?.startAt || schedule.config?.start_at)}</InfoItem>
-                    )}
-                  </>
-                )}
-                {schedule.type === "daily" && (
-                  <>
-                    <InfoItem label="Time">{schedule.config?.hour}:{String(schedule.config?.minute).padStart(2, "0")}</InfoItem>
-                    {Array.isArray(schedule.config?.weekdays) && (
-                      <InfoItem label="Weekdays">{schedule.config.weekdays.join(", ")}</InfoItem>
-                    )}
-                  </>
-                )}
-              </>
-            )}
+          {/* Scheduling */}
+          <div className="space-y-2">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">Scheduling</div>
+              <div className="flex flex-wrap gap-6">
+                  {!schedule ? (
+                      <InfoItem label="Mode">Manual</InfoItem>
+                  ) : (
+                      <>
+                          <InfoItem label="Type">{capitalize(schedule.type)}</InfoItem>
+                          {schedule.type === "once" && (
+                              <InfoItem label="Execute At">{formatDateTime(schedule.config?.executeAt || schedule.config?.execute_at)}</InfoItem>
+                          )}
+                          {schedule.type === "interval" && (
+                              <>
+                                  <InfoItem label="Every">{schedule.config?.value} {schedule.config?.unit}</InfoItem>
+                                  {(schedule.config?.startAt || schedule.config?.start_at) && (
+                                      <InfoItem label="Start At">{formatDateTime(schedule.config?.startAt || schedule.config?.start_at)}</InfoItem>
+                                  )}
+                              </>
+                          )}
+                          {schedule.type === "daily" && (
+                              <>
+                                  <InfoItem label="Time">{schedule.config?.hour}:{String(schedule.config?.minute).padStart(2, "0")}</InfoItem>
+                                  {Array.isArray(schedule.config?.weekdays) && (
+                                      <InfoItem label="Weekdays">
+                                          {formatWeekdays(schedule.config.weekdays)}
+                                      </InfoItem>
+                                  )}
+                              </>
+                          )}
+                      </>
+                  )}
+              </div>
           </div>
-        </div>
 
         {/* Strategies */}
         <div className="space-y-2">
           <div className="text-xs uppercase tracking-wide text-muted-foreground">Strategies</div>
           <div className="flex flex-wrap gap-6">
-            <InfoItem label="Topic">{capitalize(job.topicStrategy)}</InfoItem>
+            <InfoItem label="Topic">{job.topicStrategy === TOPIC_STRATEGY_REUSE_WITH_VARIATION ? "Reuse" : "Unique"}</InfoItem>
             <InfoItem label="Category">{capitalize(job.categoryStrategy)}</InfoItem>
             <InfoItem label="Requires Validation">{job.requiresValidation ? "Yes" : "No"}</InfoItem>
             <InfoItem label="Jitter">{job.jitterEnabled ? `${job.jitterMinutes} min` : "Disabled"}</InfoItem>
@@ -397,4 +400,22 @@ export function useJobsTable(siteId?: number) {
     loadJobs,
     renderExpandedRow,
   };
+}
+
+function formatWeekdays(weekdays: number[]): string {
+    const dayMap: Record<number, string> = {
+        1: "Mon",
+        2: "Tue",
+        3: "Wed",
+        4: "Thu",
+        5: "Fri",
+        6: "Sat",
+        7: "Sun"
+    };
+
+    const sortedDays = [...weekdays].sort((a, b) => a - b);
+
+    const dayNames = sortedDays.map(day => dayMap[day]).filter(Boolean);
+
+    return dayNames.join(", ");
 }

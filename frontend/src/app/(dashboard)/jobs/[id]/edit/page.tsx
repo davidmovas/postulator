@@ -130,8 +130,6 @@ export default function EditJobPage() {
         }
     };
 
-    const isFormValid = formData.name && formData.promptId && formData.aiProviderId && formData.siteId;
-
     if (!job) {
         return (
             <div className="p-6">

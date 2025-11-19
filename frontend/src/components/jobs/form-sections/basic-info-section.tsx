@@ -99,7 +99,7 @@ export function BasicInfoSection({
                     <div className="space-y-2">
                         <Label>Target Site</Label>
                         <div className="p-2 bg-muted rounded-md">
-                            {site.name} ({site.url})
+                            {site.name}
                         </div>
                     </div>
                 )}

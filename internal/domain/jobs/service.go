@@ -406,7 +406,7 @@ func (s *service) validateScheduleConfig(schedule *entities.Schedule) error {
 			return errors.Validation("Minute must be between 0 and 59")
 		}
 		for _, day := range config.Weekdays {
-			if day < 0 || day > 6 {
+			if day < 1 || day > 7 {
 				return errors.Validation("Weekday must be between 0 and 6")
 			}
 		}

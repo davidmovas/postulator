@@ -92,7 +92,7 @@ func validateDailySchedule(config json.RawMessage) error {
 
 	for _, day := range cfg.Weekdays {
 		if day < 1 || day > 7 {
-			return errors.Validation("weekdays must be between 1 (Monday) and 7 (Sunday)")
+			return errors.Validation("Weekdays must be between 1 (Monday) and 7 (Sunday)")
 		}
 	}
 

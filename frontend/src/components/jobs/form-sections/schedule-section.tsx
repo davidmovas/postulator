@@ -23,14 +23,14 @@ interface ScheduleSectionProps {
 
 export function ScheduleSection({ formData, onUpdate, initialScheduleType }: ScheduleSectionProps) {
     const DateTimePicker = ({
-    label,
-    date,
-    time,
-    onDateChange,
-    onTimeChange,
-    requireFuture = false,
-    invalidHint,
-}: {
+        label,
+        date,
+        time,
+        onDateChange,
+        onTimeChange,
+        requireFuture = false,
+        invalidHint,
+    }: {
         label: string;
         date: Date | undefined;
         time: string;
@@ -92,14 +92,15 @@ export function ScheduleSection({ formData, onUpdate, initialScheduleType }: Sch
         onChange,
     }: { value: number[]; onChange: (days: number[]) => void }) => {
         const days = [
-            { value: 0, label: "Mon" },
-            { value: 1, label: "Tue" },
-            { value: 2, label: "Wed" },
-            { value: 3, label: "Thu" },
-            { value: 4, label: "Fri" },
-            { value: 5, label: "Sat" },
-            { value: 6, label: "Sun" },
+            { value: 1, label: "Mon" },
+            { value: 2, label: "Tue" },
+            { value: 3, label: "Wed" },
+            { value: 4, label: "Thu" },
+            { value: 5, label: "Fri" },
+            { value: 6, label: "Sat" },
+            { value: 7, label: "Sun" },
         ];
+
         return (
             <div className="flex flex-wrap gap-2">
                 {days.map((day) => {
@@ -123,7 +124,6 @@ export function ScheduleSection({ formData, onUpdate, initialScheduleType }: Sch
             </div>
         );
     };
-
     const [scheduleType, setScheduleType] = useState<string>(
         initialScheduleType || formData.schedule?.type || "manual"
     );
@@ -204,7 +204,6 @@ export function ScheduleSection({ formData, onUpdate, initialScheduleType }: Sch
                 } as Schedule;
                 break;
             case "once":
-                // ИСПРАВЛЕНО: текущее время + 10 минут
                 const executionTime = toLocalRFC3339(new Date(Date.now() + 10 * 60 * 1000));
 
                 newSchedule = {
@@ -234,7 +233,7 @@ export function ScheduleSection({ formData, onUpdate, initialScheduleType }: Sch
                     config: {
                         hour: 9,
                         minute: 0,
-                        weekdays: [0, 1, 2, 3, 4]
+                        weekdays: [1, 2, 3, 4, 5] // Mon-Fri (1-based, Mon=1, Fri=5)
                     } as DailySchedule
                 };
                 break;
