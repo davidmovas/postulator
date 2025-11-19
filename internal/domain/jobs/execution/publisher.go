@@ -25,6 +25,7 @@ func (e *Executor) publishArticle(ctx context.Context, pctx *pipelineContext) (*
 		JobID:         &pctx.Job.ID,
 		TopicID:       pctx.Topic.ID,
 		Title:         pctx.GeneratedTitle,
+		Excerpt:       &pctx.GeneratedExcerpt,
 		OriginalTitle: pctx.Topic.Title,
 		Content:       pctx.GeneratedContent,
 		WPCategoryIDs: []int{pctx.Category.WPCategoryID},
@@ -44,7 +45,7 @@ func (e *Executor) publishArticle(ctx context.Context, pctx *pipelineContext) (*
 	article.WPPostID = wpPostID
 	article.WPPostURL = fmt.Sprintf("%s/?p=%d", pctx.Site.URL, wpPostID)
 
-	if err := e.articleRepo.Create(ctx, article); err != nil {
+	if err = e.articleRepo.Create(ctx, article); err != nil {
 		e.logger.Errorf("Failed to create article record: %v", err)
 		return nil, fmt.Errorf("failed to create article record: %w", err)
 	}
@@ -63,6 +64,7 @@ func (e *Executor) createDraftArticle(ctx context.Context, pctx *pipelineContext
 		JobID:         &pctx.Job.ID,
 		TopicID:       pctx.Topic.ID,
 		Title:         pctx.GeneratedTitle,
+		Excerpt:       &pctx.GeneratedExcerpt,
 		OriginalTitle: pctx.Topic.Title,
 		Content:       pctx.GeneratedContent,
 		WPCategoryIDs: []int{pctx.Category.WPCategoryID},
@@ -96,14 +98,13 @@ func (e *Executor) publishValidatedArticle(ctx context.Context, exec *entities.E
 	}
 
 	exec.Status = entities.ExecutionStatusPublishing
-	if err := e.execRepo.Update(ctx, exec); err != nil {
+	if err = e.execRepo.Update(ctx, exec); err != nil {
 		e.logger.Warnf("Failed to update execution status: %v", err)
 	}
 
-	// If the article already exists as a draft on WP, promote it; otherwise create as publish
 	if article.WPPostID > 0 {
 		article.Status = entities.StatusPublished
-		if err := e.wpClient.UpdatePost(ctx, site, article); err != nil {
+		if err = e.wpClient.UpdatePost(ctx, site, article); err != nil {
 			exec.Status = entities.ExecutionStatusFailed
 			errMsg := err.Error()
 			exec.ErrorMessage = &errMsg
@@ -111,7 +112,8 @@ func (e *Executor) publishValidatedArticle(ctx context.Context, exec *entities.E
 			return fmt.Errorf("failed to publish draft in WordPress: %w", err)
 		}
 	} else {
-		wpPostID, err := e.wpClient.CreatePost(ctx, site, article, &wp.PostOptions{Status: "publish"})
+		var wpPostID int
+		wpPostID, err = e.wpClient.CreatePost(ctx, site, article, &wp.PostOptions{Status: "publish"})
 		if err != nil {
 			exec.Status = entities.ExecutionStatusFailed
 			errMsg := err.Error()
@@ -124,7 +126,7 @@ func (e *Executor) publishValidatedArticle(ctx context.Context, exec *entities.E
 	}
 	article.Status = entities.StatusPublished
 
-	if err := e.articleRepo.Update(ctx, article); err != nil {
+	if err = e.articleRepo.Update(ctx, article); err != nil {
 		e.logger.Errorf("Failed to update article: %v", err)
 	}
 
@@ -133,7 +135,7 @@ func (e *Executor) publishValidatedArticle(ctx context.Context, exec *entities.E
 	exec.PublishedAt = &now
 	exec.CompletedAt = &now
 
-	if err := e.execRepo.Update(ctx, exec); err != nil {
+	if err = e.execRepo.Update(ctx, exec); err != nil {
 		e.logger.Warnf("Failed to update execution: %v", err)
 	}
 

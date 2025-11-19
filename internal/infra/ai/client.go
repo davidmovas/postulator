@@ -11,6 +11,7 @@ type Client interface {
 
 type ArticleResult struct {
 	Title      string
+	Excerpt    string
 	Content    string
 	TokensUsed int
 	Cost       float64

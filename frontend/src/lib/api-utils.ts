@@ -67,6 +67,28 @@ export function unwrapPaginatedResponse<T, DTO>(
     };
 }
 
+export function unwrapTopicsResponse<T>(wailsResponse: any): T {
+    const response = adaptWailsResponse<T>(wailsResponse);
+
+    if (!response.success) {
+        if (response.error?.message?.includes('No unused topics available')) {
+            return { count: 0, jobId: 0, total: 0 } as T;
+        }
+        throw new ApiException(response.error!);
+    }
+
+    if (response.data === undefined || response.data === null) {
+        throw new ApiException({
+            code: 'INTERNAL',
+            message: 'No data in response',
+            userMessage: 'No data received from server',
+            isUserFacing: false,
+        });
+    }
+
+    return response.data;
+}
+
 export function adaptWailsResponse<T>(wailsResponse: any): ApiResponse<T> {
     return {
         success: wailsResponse.success,

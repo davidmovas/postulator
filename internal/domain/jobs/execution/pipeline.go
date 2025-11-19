@@ -42,6 +42,7 @@ type pipelineContext struct {
 	UserPrompt   string
 
 	GeneratedTitle   string
+	GeneratedExcerpt string
 	GeneratedContent string
 
 	Article *entities.Article
@@ -300,6 +301,7 @@ func (e *Executor) stepGenerateAI(ctx context.Context, pctx *pipelineContext) er
 	generationTime := int(time.Since(startTime).Milliseconds())
 
 	pctx.GeneratedTitle = result.Title
+	pctx.GeneratedExcerpt = result.Excerpt
 	pctx.GeneratedContent = result.Content
 
 	now := time.Now()

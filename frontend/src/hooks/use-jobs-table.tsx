@@ -15,7 +15,7 @@ import { useApiCall } from "@/hooks/use-api-call";
 import { jobService } from "@/services/jobs";
 import { formatDateTime } from "@/lib/time";
 import { useContextModal } from "@/context/modal-context";
-import { AlertCircle, Edit, MoreHorizontal, Pause, Play, Trash2, Zap } from "lucide-react";
+import { AlertCircle, Edit, MoreHorizontal, Pause, Play, Trash2, Zap, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import JobStatusBadge from "@/components/jobs/job-status-badge";
 import { siteService } from "@/services/sites";
@@ -44,36 +44,34 @@ export function useJobsTable(siteId?: number) {
     const loadJobs = useCallback(async () => {
         const data = await execute<Job[]>(() => jobService.listJobs());
         if (data) {
-            setJobs(siteId ? data.filter(j => j.siteId === siteId) : data);
-            setNextTopicTitles({});
-            setRemainingTopics({}); // Сбрасываем кэш оставшихся топиков
+            const filteredJobs = siteId ? data.filter(j => j.siteId === siteId) : data;
+            setJobs(filteredJobs);
+
+            loadAllRemainingTopics(filteredJobs);
+
             setRefreshKey((k) => k + 1);
         }
     }, [execute, siteId]);
 
-    // Функция для загрузки оставшихся топиков для всех джоб
-    const loadAllRemainingTopics = useCallback(async () => {
+    const loadAllRemainingTopics = useCallback(async (jobsToLoad: Job[]) => {
         const counts: Record<number, number> = {};
 
-        for (const job of jobs) {
+        for (const job of jobsToLoad) {
+            if (job.topicStrategy === TOPIC_STRATEGY_REUSE_WITH_VARIATION) {
+                counts[job.id] = -1;
+                continue;
+            }
+
             try {
                 const topicsStatus: JobTopicsStatus = await topicService.getJobRemainingTopics(job.id);
                 counts[job.id] = topicsStatus.count;
             } catch (error) {
-                console.error(`Failed to load remaining topics for job ${job.id}:`, error);
                 counts[job.id] = 0;
             }
         }
 
         setRemainingTopics(counts);
-    }, [jobs]);
-
-    // Загружаем оставшиеся топики при изменении jobs
-    useEffect(() => {
-        if (jobs.length > 0) {
-            loadAllRemainingTopics();
-        }
-    }, [jobs, loadAllRemainingTopics]);
+    }, []);
 
     const handlePause = async (job: Job) => {
         await execute<void>(() => jobService.pauseJob(job.id), {
@@ -201,31 +199,31 @@ export function useJobsTable(siteId?: number) {
                 const job = row.original;
                 const count = remainingTopics[job.id];
 
+                if (job.topicStrategy === TOPIC_STRATEGY_REUSE_WITH_VARIATION) {
+                    return (
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                            <RefreshCw className="w-3 h-3 mr-1" />
+                            Reuse Strategy
+                        </Badge>
+                    );
+                }
+
                 if (count === undefined) {
-                    return <span className="text-muted-foreground">—</span>;
+                    return <span className="text-muted-foreground">Loading...</span>;
                 }
 
                 let textColor = "";
-                if (job.topicStrategy === TOPIC_STRATEGY_REUSE_WITH_VARIATION) {
-                    textColor = count > 0 ? "" : "text-red-500";
-                    return (
-                        <span className={`font-medium ${textColor}`}>
-                            {count > 0 ? "∞" : "0"}
-                        </span>
-                    );
-                } else {
-                    if (count === 0) {
-                        textColor = "text-red-500";
-                    } else if (count <= 5) {
-                        textColor = "text-amber-500";
-                    }
-
-                    return (
-                        <span className={`font-medium ${textColor}`}>
-                            {count}
-                        </span>
-                    );
+                if (count === 0) {
+                    textColor = "text-red-500";
+                } else if (count <= 5) {
+                    textColor = "text-amber-500";
                 }
+
+                return (
+                    <span className={`font-medium ${textColor}`}>
+                        {count}
+                    </span>
+                );
             },
         },
         {
@@ -301,57 +299,85 @@ export function useJobsTable(siteId?: number) {
         },
     ], [remainingTopics, executingJobs, router]);
 
-    // Caches for human-readable names and next topic
-    const [siteNames, setSiteNames] = useState<Record<number, string>>({});
-    const [promptNames, setPromptNames] = useState<Record<number, string>>({});
-    const [providerNames, setProviderNames] = useState<Record<number, string>>({});
-    const [nextTopicTitles, setNextTopicTitles] = useState<Record<number, string | null>>({});
-
     const capitalize = (s?: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : "");
 
     const ExpandedRow = ({ job }: { job: Job }) => {
-        const [loadingRefs, setLoadingRefs] = useState({ site: false, prompt: false, provider: false, topic: false });
+        const [siteName, setSiteName] = useState<string>("");
+        const [promptName, setPromptName] = useState<string>("");
+        const [providerName, setProviderName] = useState<string>("");
+        const [nextTopicTitle, setNextTopicTitle] = useState<string | null>(null);
+        const [isLoading, setIsLoading] = useState({
+            site: false,
+            prompt: false,
+            provider: false,
+            topic: false
+        });
 
         useEffect(() => {
-            const loadRefs = async () => {
+            const loadData = async () => {
                 try {
-                    if (job.siteId && siteNames[job.siteId] === undefined && !loadingRefs.site) {
-                        setLoadingRefs(prev => ({ ...prev, site: true }));
+                    // Загружаем site name
+                    if (job.siteId) {
+                        setIsLoading(prev => ({ ...prev, site: true }));
                         try {
                             const site = await siteService.getSite(job.siteId);
-                            setSiteNames(prev => ({ ...prev, [job.siteId]: site.name }));
-                        } catch { /* silent */ }
-                        finally { setLoadingRefs(prev => ({ ...prev, site: false })); }
+                            setSiteName(site.name);
+                        } catch (error) {
+                            console.error(`Failed to load site ${job.siteId}:`, error);
+                            setSiteName("Error loading site");
+                        } finally {
+                            setIsLoading(prev => ({ ...prev, site: false }));
+                        }
                     }
-                    if (job.promptId && promptNames[job.promptId] === undefined && !loadingRefs.prompt) {
-                        setLoadingRefs(prev => ({ ...prev, prompt: true }));
+
+                    // Загружаем prompt name
+                    if (job.promptId) {
+                        setIsLoading(prev => ({ ...prev, prompt: true }));
                         try {
                             const prompt = await promptService.getPrompt(job.promptId);
-                            setPromptNames(prev => ({ ...prev, [job.promptId]: prompt.name }));
-                        } catch { /* silent */ }
-                        finally { setLoadingRefs(prev => ({ ...prev, prompt: false })); }
+                            setPromptName(prompt.name);
+                        } catch (error) {
+                            console.error(`Failed to load prompt ${job.promptId}:`, error);
+                            setPromptName("Error loading prompt");
+                        } finally {
+                            setIsLoading(prev => ({ ...prev, prompt: false }));
+                        }
                     }
-                    if (job.aiProviderId && providerNames[job.aiProviderId] === undefined && !loadingRefs.provider) {
-                        setLoadingRefs(prev => ({ ...prev, provider: true }));
+
+                    // Загружаем provider name
+                    if (job.aiProviderId) {
+                        setIsLoading(prev => ({ ...prev, provider: true }));
                         try {
                             const provider = await providerService.getProvider(job.aiProviderId);
-                            setProviderNames(prev => ({ ...prev, [job.aiProviderId]: provider.name }));
-                        } catch { /* silent */ }
-                        finally { setLoadingRefs(prev => ({ ...prev, provider: false })); }
+                            setProviderName(provider.name);
+                        } catch (error) {
+                            console.error(`Failed to load provider ${job.aiProviderId}:`, error);
+                            setProviderName("Error loading provider");
+                        } finally {
+                            setIsLoading(prev => ({ ...prev, provider: false }));
+                        }
                     }
-                    if (nextTopicTitles[job.id] === undefined && !loadingRefs.topic) {
-                        setLoadingRefs(prev => ({ ...prev, topic: true }));
+
+                    // Для НЕ-Reuse стратегий загружаем следующий топик
+                    if (job.topicStrategy !== TOPIC_STRATEGY_REUSE_WITH_VARIATION) {
+                        setIsLoading(prev => ({ ...prev, topic: true }));
                         try {
                             const topic = await topicService.getNextTopicForJob(job.id);
-                            setNextTopicTitles(prev => ({ ...prev, [job.id]: topic?.title || null }));
-                        } catch {
-                            setNextTopicTitles(prev => ({ ...prev, [job.id]: null }));
-                        } finally { setLoadingRefs(prev => ({ ...prev, topic: false })); }
+                            setNextTopicTitle(topic?.title || null);
+                        } catch (error) {
+                            console.error(`Failed to load next topic for job ${job.id}:`, error);
+                            setNextTopicTitle(null);
+                        } finally {
+                            setIsLoading(prev => ({ ...prev, topic: false }));
+                        }
                     }
-                } catch { /* noop */ }
+                } catch (error) {
+                    console.error("Error loading expanded row data:", error);
+                }
             };
-            loadRefs();
-        }, [job.id, job.siteId, job.promptId, job.aiProviderId, refreshKey]);
+
+            loadData();
+        }, [job.id, job.siteId, job.promptId, job.aiProviderId, job.topicStrategy]); // Зависимости только от ID
 
         const schedule = job.schedule;
 
@@ -361,6 +387,8 @@ export function useJobsTable(siteId?: number) {
                 <div className="font-medium mt-1 break-words">{children}</div>
             </div>
         );
+
+        const getLoadingText = (isLoading: boolean) => isLoading ? "Loading..." : "—";
 
         return (
             <div className="text-sm space-y-4 p-4 bg-muted/30 rounded-md">
@@ -414,9 +442,15 @@ export function useJobsTable(siteId?: number) {
                 <div className="space-y-2">
                     <div className="text-xs uppercase tracking-wide text-muted-foreground">References</div>
                     <div className="flex flex-wrap gap-6">
-                        <InfoItem label="Site">{siteNames[job.siteId] ?? ""}</InfoItem>
-                        <InfoItem label="Prompt">{promptNames[job.promptId] ?? ""}</InfoItem>
-                        <InfoItem label="Provider">{providerNames[job.aiProviderId] ?? ""}</InfoItem>
+                        <InfoItem label="Site">
+                            {job.siteId ? (isLoading.site ? getLoadingText(true) : siteName) : "—"}
+                        </InfoItem>
+                        <InfoItem label="Prompt">
+                            {job.promptId ? (isLoading.prompt ? getLoadingText(true) : promptName) : "—"}
+                        </InfoItem>
+                        <InfoItem label="Provider">
+                            {job.aiProviderId ? (isLoading.provider ? getLoadingText(true) : providerName) : "—"}
+                        </InfoItem>
                     </div>
                 </div>
 
@@ -432,9 +466,16 @@ export function useJobsTable(siteId?: number) {
                 {/* Next Topic */}
                 <div className="space-y-2">
                     <div className="text-xs uppercase tracking-wide text-muted-foreground">Next Topic To Use</div>
-                    {nextTopicTitles[job.id] ? (
+                    {job.topicStrategy === TOPIC_STRATEGY_REUSE_WITH_VARIATION ? (
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 flex items-center gap-1">
+                            <RefreshCw className="h-3 w-3" />
+                            Will generate topic from provided content
+                        </Badge>
+                    ) : isLoading.topic ? (
+                        <span className="text-muted-foreground">Loading next topic...</span>
+                    ) : nextTopicTitle ? (
                         <Badge variant="default" className="text-xs px-2 py-0.5 font-medium">
-                            {nextTopicTitles[job.id]}
+                            {nextTopicTitle}
                         </Badge>
                     ) : (
                         <Badge variant="destructive" className="text-xs px-2 py-0.5 font-medium flex items-center gap-1">
@@ -448,7 +489,7 @@ export function useJobsTable(siteId?: number) {
     };
 
     const renderExpandedRow = (job: Job) => {
-        return <ExpandedRow job={job} />;
+        return <ExpandedRow key={job.id} job={job} />;
     };
 
     return {

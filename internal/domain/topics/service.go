@@ -365,19 +365,19 @@ func (s *service) GetStrategy(strategyType entities.TopicStrategy) (TopicStrateg
 }
 
 func (s *service) GetSelectableSiteTopics(ctx context.Context, siteID int64, strategyType entities.TopicStrategy) ([]*entities.Topic, error) {
-    strategy, err := s.GetStrategy(strategyType)
-    if err != nil {
-        return nil, err
-    }
-    return strategy.GetSelectableTopics(ctx, siteID)
+	strategy, err := s.GetStrategy(strategyType)
+	if err != nil {
+		return nil, err
+	}
+	return strategy.GetSelectableTopics(ctx, siteID)
 }
 
 func (s *service) GetJobRemainingTopics(ctx context.Context, job *entities.Job) ([]*entities.Topic, int, error) {
-    strategy, err := s.GetStrategy(job.TopicStrategy)
-    if err != nil {
-        return nil, 0, err
-    }
-    return strategy.GetRemainingTopics(ctx, job)
+	strategy, err := s.GetStrategy(job.TopicStrategy)
+	if err != nil {
+		return nil, 0, err
+	}
+	return strategy.GetRemainingTopics(ctx, job)
 }
 
 func (s *service) validateTopic(topic *entities.Topic) error {
@@ -400,7 +400,7 @@ func (s *service) getNextUniqueTopic(ctx context.Context, job *entities.Job) (*e
 	}
 
 	if len(unusedTopics) == 0 {
-		return nil, errors.NotFound("unused_topic", "No unused topics available")
+		return nil, errors.NotFound("unused topic", "No unused topics available")
 	}
 
 	nextTopic := unusedTopics[0]

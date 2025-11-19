@@ -18,6 +18,7 @@ var _ Client = (*OpenAIClient)(nil)
 
 type ArticleContent struct {
 	Title   string `json:"title" jsonschema_description:"Article title, should be engaging and SEO-friendly"`
+	Excerpt string `json:"excerpt" jsonschema_description:"Article excerpt, should be short and concise"`
 	Content string `json:"content" jsonschema_description:"Full article content in HTML format with proper WordPress blocks"`
 }
 
@@ -111,6 +112,7 @@ func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPr
 
 	return &ArticleResult{
 		Title:      article.Title,
+		Excerpt:    article.Excerpt,
 		Content:    article.Content,
 		TokensUsed: int(chat.Usage.TotalTokens),
 		Cost:       cost,

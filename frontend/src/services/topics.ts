@@ -25,7 +25,7 @@ import {
     JobTopicsStatus,
     mapJobTopicsStatus,
 } from "@/models/topics";
-import { unwrapArrayResponse, unwrapResponse } from "@/lib/api-utils";
+import { unwrapArrayResponse, unwrapResponse, unwrapTopicsResponse } from "@/lib/api-utils";
 
 export const topicService = {
     async getTopic(id: number): Promise<Topic> {
@@ -121,7 +121,7 @@ export const topicService = {
 
     async getJobRemainingTopics(jobId: number): Promise<JobTopicsStatus> {
         const response = await GetJobRemainingTopics(jobId);
-        const payload = unwrapResponse<dto.JobTopicsStatus>(response);
+        const payload = unwrapTopicsResponse<dto.JobTopicsStatus>(response);
         return mapJobTopicsStatus(payload);
     },
 };
