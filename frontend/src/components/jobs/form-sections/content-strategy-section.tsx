@@ -10,6 +10,7 @@ import { JobCreateInput } from "@/models/jobs";
 import { VirtualizedMultiSelect } from "@/components/ui/virtualized-multi-select";
 import { RiWordpressFill } from "@remixicon/react";
 import { TOPIC_STRATEGY_REUSE_WITH_VARIATION, TOPIC_STRATEGY_UNIQUE } from "@/constants/topics";
+import { Option } from '@/components/ui/multiselect';
 
 interface ContentStrategySectionProps {
     formData: Partial<JobCreateInput>;
@@ -20,12 +21,25 @@ interface ContentStrategySectionProps {
 }
 
 export function ContentStrategySection({
-    formData,
-    onUpdate,
-    topics,
-    categories,
-    onSyncCategories
-}: ContentStrategySectionProps) {
+                                           formData,
+                                           onUpdate,
+                                           topics,
+                                           categories,
+                                           onSyncCategories
+                                       }: ContentStrategySectionProps) {
+    const topicOptions: Option[] = (topics || []).map(topic => ({
+        value: topic.id.toString(),
+        label: topic.title
+    }));
+
+    const categoryOptions: Option[] = (categories || []).map(category => ({
+        value: category.id.toString(),
+        label: category.name
+    }));
+
+    // Ensure boolean type for Switch.checked (avoid possible null from short-circuit evaluation)
+    const allTopicsSelected = !!topics && (formData.topics?.length === topics.length);
+
     return (
         <Card>
             <CardHeader>
@@ -78,7 +92,7 @@ export function ContentStrategySection({
                                 <span className="text-xs text-muted-foreground">Use all</span>
                                 <Switch
                                     disabled={!topics || topics.length === 0}
-                                    checked={(formData.topics?.length || 0) > 0 && !!topics && (formData.topics?.length === topics.length)}
+                                    checked={allTopicsSelected}
                                     onCheckedChange={(checked) => {
                                         if (!topics) return;
                                         if (checked) {
@@ -90,7 +104,8 @@ export function ContentStrategySection({
                                 />
                             </div>
                         </div>
-                        {Array.isArray(topics) && topics.length === 0 ? (
+
+                        {topics && topics.length === 0 ? (
                             <div className="space-y-2">
                                 <VirtualizedMultiSelect
                                     options={[]}
@@ -107,10 +122,7 @@ export function ContentStrategySection({
                         ) : (
                             <>
                                 <VirtualizedMultiSelect
-                                    options={(topics || []).map(topic => ({
-                                        value: topic.id.toString(),
-                                        label: topic.title
-                                    }))}
+                                    options={topicOptions}
                                     value={formData.topics?.map(t => t.toString()) || []}
                                     onChange={(values) => onUpdate({
                                         topics: values.map(v => parseInt(v))
@@ -184,14 +196,11 @@ export function ContentStrategySection({
                         </div>
                     </RadioGroup>
 
-                    {/* Category Selection (always required regardless of strategy) */}
+                    {/* Category Selection */}
                     <div className="space-y-2">
                         <Label>Select Categories</Label>
                         <VirtualizedMultiSelect
-                            options={(categories || []).map(category => ({
-                                value: category.id.toString(),
-                                label: category.name
-                            }))}
+                            options={categoryOptions}
                             value={formData.categories?.map(c => c.toString()) || []}
                             onChange={(values) => onUpdate({
                                 categories: values.map(v => parseInt(v))
@@ -200,7 +209,10 @@ export function ContentStrategySection({
                             disabled={!categories}
                         />
                         <p className="text-xs text-muted-foreground">
-                            {categories ? `Select at least one category. ${categories.length} categories available` : "Loading categories..."}
+                            {categories
+                                ? `Select at least one category. ${categories.length} categories available`
+                                : "Loading categories..."
+                            }
                         </p>
                     </div>
                 </div>

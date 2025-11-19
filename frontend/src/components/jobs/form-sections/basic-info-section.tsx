@@ -5,7 +5,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Button } from "@/components/ui/button";
 import { JobCreateInput } from "@/models/jobs";
+import { generateJobName } from "@/lib/job-name-generator";
+import { Sparkles } from "lucide-react";
 
 interface BasicInfoSectionProps {
     formData: Partial<JobCreateInput>;
@@ -14,13 +17,33 @@ interface BasicInfoSectionProps {
     providers: any[] | null;
     site?: any;
     sites?: any[];
+    categories?: any[] | null;
+    topics?: any[] | null;
 }
 
-export function BasicInfoSection({ formData, onUpdate, prompts, providers, site, sites }: BasicInfoSectionProps) {
+export function BasicInfoSection({
+    formData,
+    onUpdate,
+    prompts,
+    providers,
+    site,
+    sites,
+    categories,
+    topics
+}: BasicInfoSectionProps) {
     const promptsLoading = prompts == null;
     const providersLoading = providers == null;
     const noPrompts = !promptsLoading && prompts!.length === 0;
     const noProviders = !providersLoading && providers!.length === 0;
+
+    const handleGenerateName = () => {
+        const categoryNames = categories?.map(c => c.name) || [];
+        const topicTitles = topics?.map(t => t.title) || [];
+        const promptName = prompts?.find(p => p.id === formData.promptId)?.name;
+
+        const generatedName = generateJobName(categoryNames, topicTitles, promptName);
+        onUpdate({ name: generatedName });
+    };
 
     return (
         <Card>
@@ -31,15 +54,34 @@ export function BasicInfoSection({ formData, onUpdate, prompts, providers, site,
                 </CardFooter>
             </CardHeader>
             <CardContent className="space-y-4">
-                {/* Job Name */}
+                {/* Job Name with Generator */}
                 <div className="space-y-2">
-                    <Label htmlFor="name">Job Name</Label>
+                    <div className="flex items-center justify-between">
+                        <Label htmlFor="name">Job Name</Label>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleGenerateName}
+                            disabled={!categories || !topics}
+                            className="h-8"
+                        >
+                            <Sparkles className="h-3 w-3 mr-1" />
+                            Generate
+                        </Button>
+                    </div>
                     <Input
                         id="name"
                         placeholder="e.g., Daily Blog Posts, Weekly Newsletters"
                         value={formData.name || ""}
                         onChange={(e) => onUpdate({ name: e.target.value })}
                     />
+                    <p className="text-xs text-muted-foreground">
+                        {!categories || !topics
+                            ? "Select categories and topics to enable name generation"
+                            : "Click Generate to create a meaningful job name automatically"
+                        }
+                    </p>
                 </div>
 
                 {/* Site Selection (только для глобальной страницы) */}
@@ -66,16 +108,22 @@ export function BasicInfoSection({ formData, onUpdate, prompts, providers, site,
                     </div>
                 )}
 
-                {/* AI Provider Selection (moved above prompt) */}
+                {/* AI Provider Selection */}
                 <div className="space-y-2">
-                    <Label htmlFor="provider" className={noProviders ? "text-destructive" : undefined}>AI Provider</Label>
+                    <Label htmlFor="provider" className={noProviders ? "text-destructive" : undefined}>
+                        AI Provider
+                    </Label>
                     <Select
                         value={formData.aiProviderId?.toString()}
                         onValueChange={(value) => onUpdate({ aiProviderId: parseInt(value) })}
                         disabled={providersLoading || noProviders}
                     >
                         <SelectTrigger className={noProviders ? "border-destructive" : undefined}>
-                            <SelectValue placeholder={noProviders ? "No providers found. Please create one first" : "Select an AI provider"} />
+                            <SelectValue placeholder={
+                                noProviders
+                                    ? "No providers found. Please create one first"
+                                    : "Select an AI provider"
+                            } />
                         </SelectTrigger>
                         <SelectContent>
                             {(providers || []).map(provider => (
@@ -95,14 +143,20 @@ export function BasicInfoSection({ formData, onUpdate, prompts, providers, site,
 
                 {/* Prompt Selection */}
                 <div className="space-y-2">
-                    <Label htmlFor="prompt" className={noPrompts ? "text-destructive" : undefined}>AI Prompt</Label>
+                    <Label htmlFor="prompt" className={noPrompts ? "text-destructive" : undefined}>
+                        AI Prompt
+                    </Label>
                     <Select
                         value={formData.promptId?.toString()}
                         onValueChange={(value) => onUpdate({ promptId: parseInt(value) })}
                         disabled={promptsLoading || noPrompts}
                     >
                         <SelectTrigger className={noPrompts ? "border-destructive" : undefined}>
-                            <SelectValue placeholder={noPrompts ? "No prompts found. Please create one first" : "Select a prompt"} />
+                            <SelectValue placeholder={
+                                noPrompts
+                                    ? "No prompts found. Please create one first"
+                                    : "Select a prompt"
+                            } />
                         </SelectTrigger>
                         <SelectContent>
                             {(prompts || []).map(prompt => (
