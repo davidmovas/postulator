@@ -18,9 +18,10 @@ import TimeInput from "@/components/ui/time-input";
 interface ScheduleSectionProps {
     formData: Partial<JobCreateInput>;
     onUpdate: (updates: Partial<JobCreateInput>) => void;
+    initialScheduleType?: string; // Добавляем проп для начального значения
 }
 
-export function ScheduleSection({ formData, onUpdate }: ScheduleSectionProps) {
+export function ScheduleSection({ formData, onUpdate, initialScheduleType }: ScheduleSectionProps) {
     const DateTimePicker = ({
         label,
         date,
@@ -123,14 +124,16 @@ export function ScheduleSection({ formData, onUpdate }: ScheduleSectionProps) {
             </div>
         );
     };
-    const [scheduleType, setScheduleType] = useState<string>(formData.schedule?.type || "manual");
 
-    // Ensure schedule object exists so it gets sent to backend
+    const [scheduleType, setScheduleType] = useState<string>(
+        initialScheduleType || formData.schedule?.type || "manual"
+    );
+
     useEffect(() => {
-        if (!formData.schedule) {
-            onUpdate({ schedule: { type: "manual", config: {} } as Schedule });
+        if (formData.schedule?.type && formData.schedule.type !== scheduleType) {
+            setScheduleType(formData.schedule.type);
         }
-    }, [formData.schedule]);
+    }, [formData.schedule?.type]);
 
     // Helpers to parse/format local date + time to ISO and back
     const toTimeString = (date: Date | undefined) => {

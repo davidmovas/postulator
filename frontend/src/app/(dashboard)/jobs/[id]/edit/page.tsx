@@ -86,25 +86,20 @@ export default function EditJobPage() {
         }
     };
 
-    useEffect(() => {
-        if (formData.siteId || job?.siteId) {
-            loadTopics();
-            updateFormData({ topics: [] as any });
-        }
-    }, [formData.topicStrategy]);
-
     const loadCategories = async () => {
-        if (job?.siteId) {
-            const categoriesData = await categoryService.listSiteCategories(job.siteId);
+        const siteId = formData.siteId || job?.siteId;
+        if (siteId) {
+            const categoriesData = await categoryService.listSiteCategories(siteId);
             setCategories(categoriesData);
         }
     };
 
     const handleSyncCategories = async () => {
-        if (!job?.siteId) return;
+        const siteId = formData.siteId || job?.siteId;
+        if (!siteId) return;
 
         await execute(
-            () => categoryService.syncFromWordPress(job.siteId),
+            () => categoryService.syncFromWordPress(siteId),
             {
                 successMessage: "Categories synced successfully",
                 showSuccessToast: true,
@@ -120,7 +115,7 @@ export default function EditJobPage() {
         }
 
         const result = await execute<void>(
-            () => jobService.updateJob(formData as any),
+            () => jobService.updateJob({ ...formData, id: jobId } as any),
             {
                 successMessage: "Job updated successfully",
                 showSuccessToast: true
@@ -174,6 +169,7 @@ export default function EditJobPage() {
                     onUpdate={updateFormData}
                     prompts={prompts}
                     providers={providers}
+                    sites={sites}
                     site={site}
                 />
 
@@ -198,6 +194,7 @@ export default function EditJobPage() {
                 <ScheduleSection
                     formData={formData}
                     onUpdate={updateFormData}
+                    initialScheduleType={job.schedule?.type}
                 />
 
                 <AdvancedSettingsSection
