@@ -89,8 +89,8 @@ export const jobService = {
         unwrapResponse<string>(response);
     },
 
-    async executeManually(jobId: number): Promise<void> {
+    async executeManually(jobId: number): Promise<string> {
         const response = await ExecuteManually(jobId);
-        unwrapResponse<string>(response);
+        return unwrapResponse<string>(response);
     },
 };

@@ -94,5 +94,5 @@ func (h *JobsHandler) ExecuteManually(jobID int64) *dto.Response[string] {
 		return fail[string](err)
 	}
 
-	return ok("Job executed")
+	return ok("Job execution completed")
 }

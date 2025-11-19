@@ -17,19 +17,25 @@ import { formatDateTime } from "@/lib/time";
 import { useContextModal } from "@/context/modal-context";
 import { Edit, MoreHorizontal, Pause, Play, Trash2, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import JobStatusBadge from "@/components/jobs/job-status-badge";
 import { siteService } from "@/services/sites";
 import { promptService } from "@/services/prompts";
 import { providerService } from "@/services/providers";
 import { topicService } from "@/services/topics";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ui/use-toast";
+import { JobStatus } from "@/constants/jobs";
 
 export function useJobsTable(siteId?: number) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const { execute, isLoading } = useApiCall();
   const { confirmationModal } = useContextModal();
   const router = useRouter();
+  const { toast } = useToast();
   // Ключ обновления, чтобы форсировать перезагрузку зависимых данных в раскрытых строках
   const [refreshKey, setRefreshKey] = useState(0);
+  // Локальное состояние выполнения конкретных джоб вручную (не блокируем всю таблицу)
+  const [executingJobs, setExecutingJobs] = useState<Record<number, boolean>>({});
 
   const loadJobs = useCallback(async () => {
     const data = await execute<Job[]>(() => jobService.listJobs());
@@ -59,10 +65,29 @@ export function useJobsTable(siteId?: number) {
   };
 
   const handleExecute = async (job: Job) => {
-    await execute<void>(() => jobService.executeManually(job.id), {
-      successMessage: "Job executed manually",
-      showSuccessToast: true,
+    setExecutingJobs((prev) => ({ ...prev, [job.id]: true }));
+    toast({
+      title: "Starting job",
+      description: `Executing job "${job.name}"...`,
     });
+
+    try {
+      const message = await jobService.executeManually(job.id);
+      // Успешное завершение: обновляем таблицу и показываем тост
+      toast({
+        title: "Job finished",
+        description: message || "Execution completed",
+      });
+      await loadJobs();
+    } catch (e: any) {
+      toast({
+        title: "Execution error",
+        description: e?.message || "Failed to execute job",
+        variant: "destructive",
+      });
+    } finally {
+      setExecutingJobs((prev) => ({ ...prev, [job.id]: false }));
+    }
   };
 
   const handleDelete = (job: Job) => {
@@ -97,11 +122,7 @@ export function useJobsTable(siteId?: number) {
       header: "Status",
       cell: ({ row }) => {
         const job = row.original;
-        return (
-          <div className="text-sm">
-            <span className="capitalize">{job.status}</span>
-          </div>
-        );
+        return <JobStatusBadge status={job.status as JobStatus} />;
       },
       filterFn: (row, id, value) => {
         return (value as string[]).includes(row.getValue(id));
@@ -166,6 +187,7 @@ export function useJobsTable(siteId?: number) {
       cell: ({ row }) => {
         const job = row.original;
         const isActive = job.status === "active";
+        const isExecuting = !!executingJobs[job.id];
 
         const handleEdit = () => {
             router.push(`/jobs/${job.id}/edit`);
@@ -193,9 +215,9 @@ export function useJobsTable(siteId?: number) {
                 </DropdownMenuItem>
               )}
 
-              <DropdownMenuItem onClick={() => handleExecute(job)}>
-                <Zap className="mr-2 h-4 w-4" />
-                <span>Run Now</span>
+              <DropdownMenuItem onClick={() => !isExecuting && handleExecute(job)} disabled={isExecuting}>
+                <Zap className={`mr-2 h-4 w-4 ${isExecuting ? "opacity-50" : ""}`} />
+                <span>{isExecuting ? "Running..." : "Run Now"}</span>
               </DropdownMenuItem>
 
               <DropdownMenuItem onClick={handleEdit}>
@@ -347,7 +369,7 @@ export function useJobsTable(siteId?: number) {
         {nextTopicTitles[job.id] !== undefined && nextTopicTitles[job.id] !== null && (
           <div className="space-y-2">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">Next Topic To Use</div>
-            <Badge variant="secondary" className="text-xs px-2 py-0.5 font-medium">
+            <Badge className="text-xs px-2 py-0.5 font-medium">
               {nextTopicTitles[job.id]}
             </Badge>
           </div>
