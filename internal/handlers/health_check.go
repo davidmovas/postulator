@@ -1,9 +1,9 @@
 package handlers
 
 import (
-    "github.com/davidmovas/postulator/internal/domain/healthcheck"
-    "github.com/davidmovas/postulator/internal/dto"
-    "github.com/davidmovas/postulator/pkg/ctx"
+	"github.com/davidmovas/postulator/internal/domain/healthcheck"
+	"github.com/davidmovas/postulator/internal/dto"
+	"github.com/davidmovas/postulator/pkg/ctx"
 )
 
 type HealthCheckHandler struct {
@@ -39,29 +39,29 @@ func (h *HealthCheckHandler) GetHistory(siteID int64, limit int) *dto.Response[[
 }
 
 func (h *HealthCheckHandler) GetHistoryByPeriod(siteID int64, from, to string, page, pageSize int) *dto.PaginatedResponse[*dto.HealthCheckHistory] {
-    fromT, err := dto.StringToTime(from)
-    if err != nil {
-        return dto.PaginatedFail[*dto.HealthCheckHistory](err)
-    }
-    toT, err := dto.StringToTime(to)
-    if err != nil {
-        return dto.PaginatedFail[*dto.HealthCheckHistory](err)
-    }
+	fromT, err := dto.StringToTime(from)
+	if err != nil {
+		return dto.PaginatedFail[*dto.HealthCheckHistory](err)
+	}
+	toT, err := dto.StringToTime(to)
+	if err != nil {
+		return dto.PaginatedFail[*dto.HealthCheckHistory](err)
+	}
 
-    if page <= 0 {
-        page = 1
-    }
-    if pageSize <= 0 {
-        pageSize = 50
-    }
-    limit := pageSize
-    offset := (page - 1) * pageSize
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 50
+	}
+	limit := pageSize
+	offset := (page - 1) * pageSize
 
-    items, total, err := h.service.GetSiteHistoryByPeriod(ctx.FastCtx(), siteID, fromT, toT, limit, offset)
-    if err != nil {
-        return dto.PaginatedFail[*dto.HealthCheckHistory](err)
-    }
+	items, total, err := h.service.GetSiteHistoryByPeriod(ctx.FastCtx(), siteID, fromT, toT, limit, offset)
+	if err != nil {
+		return dto.PaginatedFail[*dto.HealthCheckHistory](err)
+	}
 
-    dtoItems := dto.NewHealthHistoryList(items)
-    return dto.PaginatedSuccess(dtoItems, total, limit, offset)
+	dtoItems := dto.NewHealthHistoryList(items)
+	return dto.PaginatedSuccess(dtoItems, total, limit, offset)
 }

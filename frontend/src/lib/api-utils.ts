@@ -1,4 +1,5 @@
 import { ApiResponse, ApiError } from "@/types/api";
+import { PaginatedResponse } from "@/models/common";
 
 export class ApiException extends Error {
     constructor(public apiError: ApiError) {
@@ -34,6 +35,36 @@ export function unwrapResponse<T>(wailsResponse: any): T {
     }
 
     return response.data;
+}
+
+export function unwrapPaginatedResponse<T, DTO>(
+    wailsResponse: any,
+    mapFn: (dto: DTO) => T
+): PaginatedResponse<T> {
+    if (!wailsResponse.success || wailsResponse.error) {
+        throw new ApiException(wailsResponse.error!);
+    }
+
+    const payload = wailsResponse;
+
+    if (!payload) {
+        throw new ApiException({
+            code: 'INTERNAL',
+            message: 'No data in response',
+            userMessage: 'No data received from server',
+            isUserFacing: false,
+        });
+    }
+
+    const items = (payload.items || []).map(mapFn);
+
+    return {
+        items,
+        total: payload.total ?? 0,
+        limit: payload.limit ?? 0,
+        offset: payload.offset ?? 0,
+        hasMore: Boolean(payload.hasMore),
+    };
 }
 
 export function adaptWailsResponse<T>(wailsResponse: any): ApiResponse<T> {
