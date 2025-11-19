@@ -394,6 +394,29 @@ func (e *Executor) stepComplete(ctx context.Context, pctx *pipelineContext) erro
 	totalTime := time.Since(pctx.StartTime)
 	e.logger.Infof("Job %d: Execution completed successfully in %v", pctx.Job.ID, totalTime)
 
+	if pctx.Job.Schedule == nil || pctx.Job.Schedule.Type != entities.ScheduleManual {
+		if pctx.Strategy == nil {
+			strat, err := e.topicService.GetStrategy(pctx.Job.TopicStrategy)
+			if err != nil {
+				e.logger.Warnf("Job %d: Failed to get strategy for post-run check: %v", pctx.Job.ID, err)
+				return nil
+			}
+			pctx.Strategy = strat
+		}
+
+		if err := pctx.Strategy.CanExecute(ctx, pctx.Job); err != nil {
+			if errors.IsNoResources(err) {
+				if pauseErr := e.pauseJob(ctx, pctx.Job.ID); pauseErr != nil {
+					e.logger.Warnf("Job %d: Failed to pause after resources exhausted: %v", pctx.Job.ID, pauseErr)
+				} else {
+					e.logger.Infof("Job %d: Paused after run due to no resources left for next execution (strategy='%s')", pctx.Job.ID, pctx.Job.TopicStrategy)
+				}
+				return nil
+			}
+			e.logger.Warnf("Job %d: Post-run resource check failed: %v", pctx.Job.ID, err)
+		}
+	}
+
 	return nil
 }
 

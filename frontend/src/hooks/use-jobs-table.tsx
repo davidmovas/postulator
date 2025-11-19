@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Job } from "@/models/jobs";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,8 @@ export function useJobsTable(siteId?: number) {
   const [refreshKey, setRefreshKey] = useState(0);
   // Локальное состояние выполнения конкретных джоб вручную (не блокируем всю таблицу)
   const [executingJobs, setExecutingJobs] = useState<Record<number, boolean>>({});
+  // Мгновенная защита от повторных кликов до обновления состояния (ре-энтранси гард)
+  const executingJobsRef = useRef<Record<number, boolean>>({});
 
   const loadJobs = useCallback(async () => {
     const data = await execute<Job[]>(() => jobService.listJobs());
@@ -65,6 +67,9 @@ export function useJobsTable(siteId?: number) {
   };
 
   const handleExecute = async (job: Job) => {
+    // Синхронная защита от повторных кликов (до того как React обновит состояние)
+    if (executingJobsRef.current[job.id]) return;
+    executingJobsRef.current[job.id] = true;
     setExecutingJobs((prev) => ({ ...prev, [job.id]: true }));
     toast({
       title: "Starting job",
@@ -86,6 +91,8 @@ export function useJobsTable(siteId?: number) {
         variant: "destructive",
       });
     } finally {
+      // Снимаем блокировку
+      delete executingJobsRef.current[job.id];
       setExecutingJobs((prev) => ({ ...prev, [job.id]: false }));
     }
   };
@@ -236,7 +243,7 @@ export function useJobsTable(siteId?: number) {
         );
       },
     },
-  ], []);
+  ], [executingJobs]);
 
   // Caches for human-readable names and next topic
   const [siteNames, setSiteNames] = useState<Record<number, string>>({});
