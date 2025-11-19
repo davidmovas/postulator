@@ -286,7 +286,6 @@ func (s *Scheduler) TriggerJob(ctx context.Context, jobID int64) error {
 
 	job.State = state
 
-	// go s.executeAndReschedule(ctx, job)
 	s.executeAndReschedule(ctx, job)
 
 	return nil

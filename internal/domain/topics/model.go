@@ -55,7 +55,6 @@ type Service interface {
 	MarkTopicUsed(ctx context.Context, siteID, topicID int64) error
 	CountUnused(ctx context.Context, siteID int64, topicIDs []int64) (int, error)
 
-	// Strategy factory and delegations
 	GetStrategy(strategyType entities.TopicStrategy) (TopicStrategyHandler, error)
 	GetSelectableSiteTopics(ctx context.Context, siteID int64, strategyType entities.TopicStrategy) ([]*entities.Topic, error)
 }

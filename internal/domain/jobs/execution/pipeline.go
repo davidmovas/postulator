@@ -133,10 +133,7 @@ func (e *Executor) stepValidate(ctx context.Context, pctx *pipelineContext) erro
 	}
 	pctx.Strategy = strat
 
-	if pctx.Job.Schedule == nil || pctx.Job.Schedule.Type != entities.ScheduleManual {
-		if len(pctx.Job.Categories) == 0 {
-			return errors.Validation("no categories assigned to job")
-		}
+	if pctx.Job.Schedule == nil {
 		if err = strat.CanExecute(ctx, pctx.Job); err != nil {
 			if errors.IsNoResources(err) {
 				if pauseErr := e.pauseJob(ctx, pctx.Job.ID); pauseErr != nil {
@@ -148,6 +145,10 @@ func (e *Executor) stepValidate(ctx context.Context, pctx *pipelineContext) erro
 			}
 			return err
 		}
+	}
+
+	if len(pctx.Job.Categories) == 0 {
+		return errors.Validation("no categories assigned to job")
 	}
 
 	return nil

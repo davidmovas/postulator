@@ -244,6 +244,20 @@ func (r *repository) GetDue(ctx context.Context, before time.Time) ([]*entities.
 			return nil, err
 		}
 		job.State = state
+
+		// Load categories for the job (needed for execution pipeline)
+		cats, err := r.GetCategories(ctx, job.ID)
+		if err != nil {
+			return nil, err
+		}
+		job.Categories = cats
+
+		// Load topics assigned to the job (used by topic strategies)
+		tops, err := r.GetTopics(ctx, job.ID)
+		if err != nil {
+			return nil, err
+		}
+		job.Topics = tops
 	}
 
 	return jobs, nil
