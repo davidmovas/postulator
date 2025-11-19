@@ -59,6 +59,7 @@ export function HealthHistory({ siteId }: HealthHistoryProps) {
     const { execute } = useApiCall();
     const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>();
     const [history, setHistory] = useState<HealthCheckHistory[]>([]);
+    const [chartHistory, setChartHistory] = useState<HealthCheckHistory[]>([]);
     const [totalCount, setTotalCount] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
     const [chartOpen, setChartOpen] = useState(false);
@@ -74,22 +75,32 @@ export function HealthHistory({ siteId }: HealthHistoryProps) {
         setDateRange({ from, to });
     }, []);
 
-    const loadHistory = useCallback(async (from: Date, to: Date, page: number = 1, size: number = 50) => {
+    const loadData = useCallback(async (from: Date, to: Date, page: number = 1, size: number = 50) => {
         const fromStr = toGoDateFormat(from);
         const toStr = toGoDateFormat(to);
         setIsLoading(true);
         try {
-            const resp = await execute(
-                () => healthcheckService.getHistoryByPeriod(siteId, fromStr, toStr, page, size),
-                {
-                    errorTitle: "Failed to load health history",
-                }
-            );
-            if (resp) {
-                setHistory(resp.items || []);
-                setTotalCount(resp.total || 0);
+            // Загружаем данные для таблицы и графика параллельно
+            const [tableResp, chartResp] = await Promise.all([
+                execute(
+                    () => healthcheckService.getHistoryByPeriod(siteId, fromStr, toStr, page, size),
+                    { errorTitle: "Failed to load health history" }
+                ),
+                execute(
+                    () => healthcheckService.getHistoryByPeriod(siteId, fromStr, toStr, 1, 1000), // Больше данных для графика
+                    { errorTitle: "Failed to load chart data" }
+                )
+            ]);
+
+            if (tableResp) {
+                setHistory(tableResp.items || []);
+                setTotalCount(tableResp.total || 0);
                 setCurrentPage(page);
                 setPageSize(size);
+            }
+
+            if (chartResp) {
+                setChartHistory(chartResp.items || []);
             }
         } finally {
             setIsLoading(false);
@@ -98,15 +109,15 @@ export function HealthHistory({ siteId }: HealthHistoryProps) {
 
     useEffect(() => {
         if (dateRange?.from && dateRange?.to) {
-            loadHistory(dateRange.from, dateRange.to, 1, pageSize);
+            loadData(dateRange.from, dateRange.to, 1, pageSize);
         }
-    }, [dateRange, loadHistory, pageSize]);
+    }, [dateRange, loadData, pageSize]);
 
-    const handlePageChange = useCallback((page: number, size: number) => {
+    const handlePaginationChange = useCallback((pagination: { pageIndex: number; pageSize: number }) => {
         if (dateRange?.from && dateRange?.to) {
-            loadHistory(dateRange.from, dateRange.to, page, size);
+            loadData(dateRange.from, dateRange.to, pagination.pageIndex + 1, pagination.pageSize);
         }
-    }, [dateRange, loadHistory]);
+    }, [dateRange, loadData]);
 
     const toStatusBand = (code?: number) => {
         if (!code || code < 100) return 0;
@@ -115,13 +126,13 @@ export function HealthHistory({ siteId }: HealthHistoryProps) {
         return 0;
     };
 
-    // Aggregate by minute+status band to make dense data larger
+    // Aggregate by minute+status band для графика
     const chartData = useMemo(() => {
         type Point = { x: number; y: number; z: number; count: number; sumResp: number; raws: HealthCheckHistory[]; code?: number; error?: string };
         const healthyMap = new Map<string, Point>();
         const unhealthyMap = new Map<string, Point>();
 
-        history.forEach((h) => {
+        chartHistory.forEach((h) => {
             const t = parseISO(h.checkedAt);
             if (!isValidDate(t)) return;
             const tsMin = Math.floor(t.getTime() / 60000);
@@ -172,7 +183,7 @@ export function HealthHistory({ siteId }: HealthHistoryProps) {
             }));
 
         return { healthy: finalize(healthyMap, false), unhealthy: finalize(unhealthyMap, true) };
-    }, [history]);
+    }, [chartHistory]);
 
     const chartConfig = {
         healthy: { label: "Healthy", color: "hsl(145, 85%, 50%)" },
@@ -237,56 +248,6 @@ export function HealthHistory({ siteId }: HealthHistoryProps) {
 
     const hasHistory = history.length > 0;
 
-    // Кастомный компонент пагинации для обработки смены страниц
-    const CustomPagination = useMemo(() => {
-        const totalPages = Math.ceil(totalCount / pageSize);
-        const startItem = (currentPage - 1) * pageSize + 1;
-        const endItem = Math.min(currentPage * pageSize, totalCount);
-
-        return (
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-sm text-muted-foreground">
-                    Showing {startItem}-{endItem} of {totalCount} records
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handlePageChange(currentPage - 1, pageSize)}
-                        disabled={currentPage <= 1 || isLoading}
-                    >
-                        Previous
-                    </Button>
-
-                    <span className="text-sm text-muted-foreground min-w-[80px] text-center">
-            Page {currentPage} of {totalPages}
-          </span>
-
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handlePageChange(currentPage + 1, pageSize)}
-                        disabled={currentPage >= totalPages || isLoading}
-                    >
-                        Next
-                    </Button>
-
-                    <select
-                        value={pageSize}
-                        onChange={(e) => handlePageChange(1, Number(e.target.value))}
-                        className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
-                        disabled={isLoading}
-                    >
-                        <option value="25">25</option>
-                        <option value="50">50</option>
-                        <option value="100">100</option>
-                    </select>
-                </div>
-            </div>
-        );
-    }, [currentPage, pageSize, totalCount, isLoading, handlePageChange]);
-
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -308,7 +269,7 @@ export function HealthHistory({ siteId }: HealthHistoryProps) {
                                 <div>
                                     <CardTitle className="text-lg">Health Check Timeline</CardTitle>
                                     <p className="text-sm text-muted-foreground">
-                                        Showing {history.length} of {totalCount} checks
+                                        Showing {chartHistory.length} checks for the period
                                     </p>
                                 </div>
                             </div>
@@ -404,10 +365,16 @@ export function HealthHistory({ siteId }: HealthHistoryProps) {
                             searchPlaceholder="Search health checks..."
                             isLoading={isLoading}
                             emptyMessage="No health data available for selected period."
-                            showPagination={false} // Отключаем встроенную пагинацию
+                            showPagination={true}
                             enableViewOption={false}
+                            serverSidePagination={{
+                                pageIndex: currentPage - 1,
+                                pageSize: pageSize,
+                                pageCount: Math.ceil(totalCount / pageSize),
+                                totalCount: totalCount,
+                                onPaginationChange: handlePaginationChange,
+                            }}
                         />
-                        {totalCount > pageSize && CustomPagination}
                     </CardContent>
                 )}
             </Card>

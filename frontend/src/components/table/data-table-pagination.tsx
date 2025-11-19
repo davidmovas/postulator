@@ -22,23 +22,35 @@ import {
     PaginationContent,
     PaginationItem,
 } from "@/components/ui/pagination";
+import { ServerSidePagination } from "./data-table";
 
 interface DataTablePaginationProps<TData> {
     table: Table<TData>;
     pageSizeOptions?: number[];
+    serverSidePagination?: ServerSidePagination;
 }
 
 export function DataTablePagination<TData>({
-        table,
-        pageSizeOptions = [5, 10, 25, 50, 100],
-    }: DataTablePaginationProps<TData>) {
+    table,
+    pageSizeOptions = [25, 50, 100],
+    serverSidePagination,
+}: DataTablePaginationProps<TData>) {
     const currentPage = table.getState().pagination.pageIndex + 1;
-    const totalPages = table.getPageCount();
+    const totalPages = serverSidePagination?.pageCount || table.getPageCount();
     const pageSize = table.getState().pagination.pageSize;
-    const totalRows = table.getFilteredRowModel().rows.length;
+    const totalRows = serverSidePagination?.totalCount || table.getFilteredRowModel().rows.length;
 
     const startRow = table.getState().pagination.pageIndex * pageSize + 1;
     const endRow = Math.min(startRow + pageSize - 1, totalRows);
+
+    const handlePageSizeChange = (value: string) => {
+        const newSize = Number(value);
+        table.setPageSize(newSize);
+        // При серверной пагинации сбрасываем на первую страницу при смене размера
+        if (serverSidePagination) {
+            table.setPageIndex(0);
+        }
+    };
 
     return (
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -49,9 +61,7 @@ export function DataTablePagination<TData>({
                 </Label>
                 <Select
                     value={pageSize.toString()}
-                    onValueChange={(value) => {
-                        table.setPageSize(Number(value));
-                    }}
+                    onValueChange={handlePageSizeChange}
                 >
                     <SelectTrigger id="rows-per-page" className="h-9 w-[70px]">
                         <SelectValue placeholder={pageSize} />
@@ -135,7 +145,7 @@ export function DataTablePagination<TData>({
                                 variant="outline"
                                 size="icon"
                                 className="h-9 w-9"
-                                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                                onClick={() => table.setPageIndex(totalPages - 1)}
                                 disabled={!table.getCanNextPage()}
                                 aria-label="Go to last page"
                             >

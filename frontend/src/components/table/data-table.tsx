@@ -40,6 +40,14 @@ export interface DataTableFilterConfig {
     }>;
 }
 
+export interface ServerSidePagination {
+    pageIndex: number;
+    pageSize: number;
+    pageCount: number;
+    totalCount?: number;
+    onPaginationChange?: (pagination: PaginationState) => void;
+}
+
 export interface DataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[];
     data: TData[];
@@ -55,7 +63,7 @@ export interface DataTableProps<TData, TValue> {
     defaultSorting?: SortingState;
     enableViewOption?: boolean;
     rowSelectionResetKey?: number | string;
-    // Optional expandable rows support
+    serverSidePagination?: ServerSidePagination;
     enableRowExpand?: boolean;
     expandOnRowClick?: boolean;
     renderExpandedRow?: (data: TData) => React.ReactNode;
@@ -76,6 +84,7 @@ export function DataTable<TData, TValue>({
     defaultSorting = [],
     enableViewOption = true,
     rowSelectionResetKey,
+    serverSidePagination,
     enableRowExpand = false,
     expandOnRowClick = false,
     renderExpandedRow,
@@ -85,12 +94,29 @@ export function DataTable<TData, TValue>({
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
-    // Хранит строки, которые уже открывались, чтобы обеспечить плавную анимацию закрытия без мгновенного размонтирования
     const [keptAliveRows, setKeptAliveRows] = useState<Record<string, boolean>>({});
-    const [pagination, setPagination] = useState<PaginationState>({
+
+    // Для серверной пагинации используем переданное состояние, иначе локальное
+    const [internalPagination, setInternalPagination] = useState<PaginationState>({
         pageIndex: 0,
         pageSize: defaultPageSize,
     });
+
+    const pagination = serverSidePagination
+        ? {
+            pageIndex: serverSidePagination.pageIndex,
+            pageSize: serverSidePagination.pageSize
+        }
+        : internalPagination;
+
+    const handlePaginationChange = serverSidePagination?.onPaginationChange
+        ? (updater: any) => {
+            const newPagination = typeof updater === 'function'
+                ? updater(pagination)
+                : updater;
+            serverSidePagination.onPaginationChange?.(newPagination);
+        }
+        : setInternalPagination;
 
     useEffect(() => {
         if (rowSelectionResetKey !== undefined) {
@@ -105,8 +131,8 @@ export function DataTable<TData, TValue>({
         data,
         columns,
         getCoreRowModel: getCoreRowModel(),
-        getPaginationRowModel: showPagination ? getPaginationRowModel() : undefined,
-        onPaginationChange: setPagination,
+        getPaginationRowModel: serverSidePagination ? undefined : getPaginationRowModel(),
+        onPaginationChange: handlePaginationChange,
         onSortingChange: setSorting,
         getSortedRowModel: getSortedRowModel(),
         onColumnFiltersChange: setColumnFilters,
@@ -123,6 +149,8 @@ export function DataTable<TData, TValue>({
             }
         },
         getFacetedUniqueValues: getFacetedUniqueValues(),
+        manualPagination: !!serverSidePagination,
+        pageCount: serverSidePagination?.pageCount,
         state: {
             sorting,
             columnFilters,
@@ -322,7 +350,12 @@ export function DataTable<TData, TValue>({
                 </Table>
             </div>
 
-            {showPagination && <DataTablePagination table={table} />}
+            {showPagination && (
+                <DataTablePagination
+                    table={table}
+                    serverSidePagination={serverSidePagination}
+                />
+            )}
         </div>
     );
 }
