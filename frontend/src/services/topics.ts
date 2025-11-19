@@ -121,7 +121,17 @@ export const topicService = {
 
     async getJobRemainingTopics(jobId: number): Promise<JobTopicsStatus> {
         const response = await GetJobRemainingTopics(jobId);
-        const payload = unwrapTopicsResponse<dto.JobTopicsStatus>(response);
+
+        const defaultValue: dto.JobTopicsStatus = {
+            count: 0,
+            topics: [],
+            convertValues(a: any, classs: any, asMap: boolean = false): any {}
+        };
+
+        const payload = unwrapResponse<dto.JobTopicsStatus>(response, {
+            suppressErrors: true,
+            defaultValue: defaultValue
+        });
         return mapJobTopicsStatus(payload);
     },
 };

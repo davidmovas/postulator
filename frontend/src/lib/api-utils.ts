@@ -18,14 +18,23 @@ export function unwrapArrayResponse<T>(wailsResponse: any): T[] {
     return response.data || [];
 }
 
-export function unwrapResponse<T>(wailsResponse: any): T {
+export function unwrapResponse<T>(
+    wailsResponse: any,
+    options?: { suppressErrors?: boolean; defaultValue?: T }
+): T {
     const response = adaptWailsResponse<T>(wailsResponse);
 
     if (!response.success || response.error) {
+        if (options?.suppressErrors) {
+            return options.defaultValue as T;
+        }
         throw new ApiException(response.error!);
     }
 
     if (response.data === undefined || response.data === null) {
+        if (options?.suppressErrors) {
+            return options.defaultValue as T;
+        }
         throw new ApiException({
             code: 'INTERNAL',
             message: 'No data in response',

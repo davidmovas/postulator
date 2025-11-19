@@ -11,6 +11,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/prompts"
 	"github.com/davidmovas/postulator/internal/domain/providers"
 	"github.com/davidmovas/postulator/internal/domain/sites"
+	"github.com/davidmovas/postulator/internal/domain/stats"
 	"github.com/davidmovas/postulator/internal/domain/topics"
 	"github.com/davidmovas/postulator/internal/infra/wp"
 	"github.com/davidmovas/postulator/pkg/errors"
@@ -26,6 +27,7 @@ type Executor struct {
 	topicService    topics.Service
 	promptService   prompts.Service
 	siteService     sites.Service
+	statsService    stats.Service
 	providerService providers.Service
 	categoryService categories.Service
 
@@ -42,6 +44,7 @@ func NewExecutor(
 	topicService topics.Service,
 	promptService prompts.Service,
 	siteService sites.Service,
+	statsService stats.Service,
 	providerService providers.Service,
 	categoryService categories.Service,
 	wpClient wp.Client,
@@ -55,6 +58,7 @@ func NewExecutor(
 		topicService:    topicService,
 		promptService:   promptService,
 		siteService:     siteService,
+		statsService:    statsService,
 		providerService: providerService,
 		categoryService: categoryService,
 		wpClient:        wpClient,

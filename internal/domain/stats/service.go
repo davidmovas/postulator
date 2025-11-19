@@ -6,7 +6,6 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/jobs"
-	"github.com/davidmovas/postulator/internal/domain/jobs/execution"
 	"github.com/davidmovas/postulator/internal/domain/sites"
 	"github.com/davidmovas/postulator/pkg/errors"
 	"github.com/davidmovas/postulator/pkg/logger"
@@ -17,7 +16,7 @@ var _ Service = (*service)(nil)
 type service struct {
 	sitesService     sites.Service
 	jobsService      jobs.Service
-	executionService execution.Service
+	executionService ExecutionStatsReader
 	repo             Repository
 	logger           *logger.Logger
 }
@@ -25,7 +24,7 @@ type service struct {
 func NewService(
 	sitesService sites.Service,
 	jobsService jobs.Service,
-	executionService execution.Service,
+	executionService ExecutionStatsReader,
 	repo Repository,
 	logger *logger.Logger,
 ) Service {

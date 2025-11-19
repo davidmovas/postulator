@@ -22,3 +22,8 @@ type Service interface {
 	RecordArticleFailed(ctx context.Context, siteID int64) error
 	RecordLinksCreated(ctx context.Context, siteID int64, internalLinks, externalLinks int) error
 }
+
+type ExecutionStatsReader interface {
+	GetPendingValidations(ctx context.Context) ([]*entities.Execution, error)
+	ListExecutions(ctx context.Context, offset, limit int, siteID int64) ([]*entities.Execution, int, error)
+}

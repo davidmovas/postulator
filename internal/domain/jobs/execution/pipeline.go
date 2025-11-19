@@ -219,6 +219,38 @@ func (e *Executor) stepSelectCategory(ctx context.Context, pctx *pipelineContext
 	return nil
 }
 
+func (e *Executor) stepCreateExecution(ctx context.Context, pctx *pipelineContext) error {
+	if pctx.Topic == nil || pctx.Category == nil {
+		return errors.Validation("topic or category not selected")
+	}
+
+	provider, err := e.providerService.GetProvider(ctx, pctx.Job.AIProviderID)
+	if err != nil {
+		return fmt.Errorf("failed to get AI provider: %w", err)
+	}
+	pctx.Provider = provider
+
+	exec := &entities.Execution{
+		JobID:        pctx.Job.ID,
+		SiteID:       pctx.Job.SiteID,
+		TopicID:      pctx.Topic.ID,
+		PromptID:     pctx.Job.PromptID,
+		AIProviderID: pctx.Job.AIProviderID,
+		AIModel:      provider.Model,
+		CategoryID:   pctx.Category.ID,
+		Status:       entities.ExecutionStatusPending,
+		StartedAt:    time.Now(),
+	}
+
+	if err = e.execRepo.Create(ctx, exec); err != nil {
+		return fmt.Errorf("failed to create execution record: %w", err)
+	}
+
+	pctx.Execution = exec
+	e.logger.Infof("Job %d: Created execution %d", pctx.Job.ID, exec.ID)
+	return nil
+}
+
 func (e *Executor) stepRenderPrompt(ctx context.Context, pctx *pipelineContext) error {
 	if pctx.Site == nil {
 		return errors.Validation("site not loaded")
@@ -275,11 +307,17 @@ func (e *Executor) buildPlaceholders(pctx *pipelineContext) map[string]string {
 func (e *Executor) stepGenerateAI(ctx context.Context, pctx *pipelineContext) error {
 	pctx.Execution.Status = entities.ExecutionStatusGenerating
 	if err := e.execRepo.Update(ctx, pctx.Execution); err != nil {
+		if recordErr := e.statsService.RecordArticleFailed(ctx, pctx.Site.ID); recordErr != nil {
+			e.logger.Warnf("Job %d: Failed to record article failed stats: %v", pctx.Job.ID, recordErr)
+		}
 		return fmt.Errorf("failed to update execution status: %w", err)
 	}
 
 	provider, err := e.providerService.GetProvider(ctx, pctx.Job.AIProviderID)
 	if err != nil {
+		if recordErr := e.statsService.RecordArticleFailed(ctx, pctx.Site.ID); recordErr != nil {
+			e.logger.Warnf("Job %d: Failed to record article failed stats: %v", pctx.Job.ID, recordErr)
+		}
 		return fmt.Errorf("failed to get AI provider: %w", err)
 	}
 
@@ -288,6 +326,9 @@ func (e *Executor) stepGenerateAI(ctx context.Context, pctx *pipelineContext) er
 
 	aiClient, err := ai.CreateClient(provider)
 	if err != nil {
+		if recordErr := e.statsService.RecordArticleFailed(ctx, pctx.Site.ID); recordErr != nil {
+			e.logger.Warnf("Job %d: Failed to record article failed stats: %v", pctx.Job.ID, recordErr)
+		}
 		return fmt.Errorf("failed to create AI client: %w", err)
 	}
 
@@ -295,6 +336,9 @@ func (e *Executor) stepGenerateAI(ctx context.Context, pctx *pipelineContext) er
 
 	result, err := aiClient.GenerateArticle(ctx, pctx.SystemPrompt, pctx.UserPrompt)
 	if err != nil {
+		if recordErr := e.statsService.RecordArticleFailed(ctx, pctx.Site.ID); recordErr != nil {
+			e.logger.Warnf("Job %d: Failed to record article failed stats: %v", pctx.Job.ID, recordErr)
+		}
 		return errors.AI(string(provider.Type), err)
 	}
 
@@ -316,6 +360,9 @@ func (e *Executor) stepGenerateAI(ctx context.Context, pctx *pipelineContext) er
 	}
 
 	if err = e.execRepo.Update(ctx, pctx.Execution); err != nil {
+		if recordErr := e.statsService.RecordArticleFailed(ctx, pctx.Site.ID); recordErr != nil {
+			e.logger.Warnf("Job %d: Failed to record article failed stats: %v", pctx.Job.ID, recordErr)
+		}
 		return fmt.Errorf("failed to update execution with generated content: %w", err)
 	}
 
@@ -345,6 +392,9 @@ func (e *Executor) stepPublish(ctx context.Context, pctx *pipelineContext) error
 
 	article, err := e.publishArticle(ctx, pctx)
 	if err != nil {
+		if recordErr := e.statsService.RecordArticleFailed(ctx, pctx.Site.ID); recordErr != nil {
+			e.logger.Warnf("Job %d: Failed to record article failed stats: %v", pctx.Job.ID, recordErr)
+		}
 		return err
 	}
 
@@ -366,6 +416,10 @@ func (e *Executor) stepPublish(ctx context.Context, pctx *pipelineContext) error
 	pctx.Execution.Status = entities.ExecutionStatusPublished
 
 	if err = e.execRepo.Update(ctx, pctx.Execution); err != nil {
+		// Записываем статистику при ошибке обновления статуса публикации
+		if recordErr := e.statsService.RecordArticleFailed(ctx, pctx.Site.ID); recordErr != nil {
+			e.logger.Warnf("Job %d: Failed to record article failed stats: %v", pctx.Job.ID, recordErr)
+		}
 		return fmt.Errorf("failed to update execution after publication: %w", err)
 	}
 
@@ -383,6 +437,7 @@ func (e *Executor) stepMarkUsed(ctx context.Context, pctx *pipelineContext) erro
 		e.logger.Warnf("Job %d: Post-success hook failed: %v", pctx.Job.ID, err)
 		return nil
 	}
+
 	return nil
 }
 
@@ -420,41 +475,13 @@ func (e *Executor) stepComplete(ctx context.Context, pctx *pipelineContext) erro
 		}
 	}
 
+	if err := e.statsService.RecordArticlePublished(ctx, pctx.Site.ID, len(pctx.GeneratedContent)); err != nil {
+		e.logger.Warnf("Job %d: Failed to record article published stats: %v", pctx.Job.ID, err)
+	}
+
 	return nil
 }
 
 func (e *Executor) randomIndex(max int) int {
 	return int(time.Now().UnixNano() % int64(max))
-}
-
-func (e *Executor) stepCreateExecution(ctx context.Context, pctx *pipelineContext) error {
-	if pctx.Topic == nil || pctx.Category == nil {
-		return errors.Validation("topic or category not selected")
-	}
-
-	provider, err := e.providerService.GetProvider(ctx, pctx.Job.AIProviderID)
-	if err != nil {
-		return fmt.Errorf("failed to get AI provider: %w", err)
-	}
-	pctx.Provider = provider
-
-	exec := &entities.Execution{
-		JobID:        pctx.Job.ID,
-		SiteID:       pctx.Job.SiteID,
-		TopicID:      pctx.Topic.ID,
-		PromptID:     pctx.Job.PromptID,
-		AIProviderID: pctx.Job.AIProviderID,
-		AIModel:      provider.Model,
-		CategoryID:   pctx.Category.ID,
-		Status:       entities.ExecutionStatusPending,
-		StartedAt:    time.Now(),
-	}
-
-	if err = e.execRepo.Create(ctx, exec); err != nil {
-		return fmt.Errorf("failed to create execution record: %w", err)
-	}
-
-	pctx.Execution = exec
-	e.logger.Infof("Job %d: Created execution %d", pctx.Job.ID, exec.ID)
-	return nil
 }

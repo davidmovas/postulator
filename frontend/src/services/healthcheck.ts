@@ -1,7 +1,7 @@
 import {
     dto,
 } from "@/wailsjs/wailsjs/go/models";
-import { adaptWailsResponse, unwrapArrayResponse, unwrapPaginatedResponse, unwrapResponse } from "@/lib/api-utils";
+import { unwrapArrayResponse, unwrapPaginatedResponse, unwrapResponse } from "@/lib/api-utils";
 import { AutoCheckResult, HealthCheckHistory, mapAutoCheckResult, mapHealthHistory } from "@/models/healthcheck";
 import { PaginatedResponse } from "@/models/common";
 import { CheckAuto, CheckSite, GetHistory, GetHistoryByPeriod } from "@/wailsjs/wailsjs/go/handlers/HealthCheckHandler";
