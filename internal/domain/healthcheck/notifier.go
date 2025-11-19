@@ -2,24 +2,21 @@ package healthcheck
 
 import (
 	"context"
-	_ "embed"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
-	"github.com/davidmovas/postulator/pkg/logger"
-
+	"github.com/davidmovas/postulator/internal/infra/notification"
 	"github.com/davidmovas/postulator/internal/infra/notifyicon"
-	"github.com/gen2brain/beeep"
+	"github.com/davidmovas/postulator/pkg/logger"
 )
 
 const (
 	unhealthNotificationTitle  = "Health Check Alert"
 	recoveredNotificationTitle = "Health Check Recovery"
-
-	maxDisplay = 2
+	maxDisplay                 = 2
 )
 
 type siteNotificationState struct {
@@ -28,22 +25,25 @@ type siteNotificationState struct {
 }
 
 type notifier struct {
-	states map[int64]*siteNotificationState
-	mu     sync.RWMutex
-	logger *logger.Logger
+	baseNotifier notification.Notifier
+	states       map[int64]*siteNotificationState
+	mu           sync.RWMutex
+	logger       *logger.Logger
 }
 
 func NewNotifier(logger *logger.Logger) Notifier {
-	beeep.AppName = "Postulator"
+	iconBytes := notifyicon.Icon()
+
 	return &notifier{
-		states: make(map[int64]*siteNotificationState),
+		baseNotifier: notification.NewWithConfig("Postulator", iconBytes),
+		states:       make(map[int64]*siteNotificationState),
 		logger: logger.
 			WithScope("notifier").
 			WithScope("healthcheck"),
 	}
 }
 
-func (n *notifier) NotifyUnhealthySites(_ context.Context, sites []*entities.Site, withSound bool) error {
+func (n *notifier) NotifyUnhealthySites(ctx context.Context, sites []*entities.Site, withSound bool) error {
 	if len(sites) == 0 {
 		return nil
 	}
@@ -74,26 +74,24 @@ func (n *notifier) NotifyUnhealthySites(_ context.Context, sites []*entities.Sit
 	if len(sitesToNotify) == 0 {
 		return nil
 	}
+
 	message := n.formatUnhealthyMessage(sitesToNotify)
 
-	if withSound {
-		err := beeep.Alert(unhealthNotificationTitle, message, notifyicon.Icon())
-		if err != nil {
-			n.logger.ErrorWithErr(err, "Failed to send notification with sound")
-			return err
-		}
-	} else {
-		err := beeep.Notify(unhealthNotificationTitle, message, notifyicon.Icon())
-		if err != nil {
-			n.logger.ErrorWithErr(err, "Failed to send notification")
-			return err
-		}
+	opts := &notification.Options{
+		Title:     unhealthNotificationTitle,
+		Message:   message,
+		WithSound: withSound,
+	}
+
+	if err := n.baseNotifier.Notify(ctx, opts); err != nil {
+		n.logger.ErrorWithErr(err, "Failed to send notification")
+		return err
 	}
 
 	return nil
 }
 
-func (n *notifier) NotifyRecoveredSites(_ context.Context, sites []*entities.Site, withSound bool) error {
+func (n *notifier) NotifyRecoveredSites(ctx context.Context, sites []*entities.Site, withSound bool) error {
 	if len(sites) == 0 {
 		return nil
 	}
@@ -109,18 +107,15 @@ func (n *notifier) NotifyRecoveredSites(_ context.Context, sites []*entities.Sit
 
 	message := n.formatRecoveredMessage(sites)
 
-	if withSound {
-		err := beeep.Alert(recoveredNotificationTitle, message, notifyicon.Icon())
-		if err != nil {
-			n.logger.ErrorWithErr(err, "Failed to send recovery notification with sound")
-			return err
-		}
-	} else {
-		err := beeep.Notify(recoveredNotificationTitle, message, notifyicon.Icon())
-		if err != nil {
-			n.logger.ErrorWithErr(err, "Failed to send recovery notification")
-			return err
-		}
+	opts := &notification.Options{
+		Title:     recoveredNotificationTitle,
+		Message:   message,
+		WithSound: withSound,
+	}
+
+	if err := n.baseNotifier.Notify(ctx, opts); err != nil {
+		n.logger.ErrorWithErr(err, "Failed to send recovery notification")
+		return err
 	}
 
 	return nil
