@@ -39,7 +39,6 @@ export function BasicInfoSection({
         onUpdate({ name: generatedName });
     };
 
-    // Проверяем, доступна ли генерация (нужен хотя бы сайт)
     const canGenerateName = !!site || !!formData.siteId;
 
     return (
@@ -51,28 +50,28 @@ export function BasicInfoSection({
                 </CardFooter>
             </CardHeader>
             <CardContent className="space-y-4">
-                {/* Job Name with Generator */}
+                {/* Job Name with Generator - Combined style */}
                 <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                        <Label htmlFor="name">Job Name</Label>
+                    <Label htmlFor="name">Job Name</Label>
+                    <div className="flex rounded-md shadow-sm">
+                        <Input
+                            id="name"
+                            placeholder="e.g., my-website-job-1234, company-blog-automation-5678"
+                            value={formData.name || ""}
+                            onChange={(e) => onUpdate({ name: e.target.value })}
+                            className="-me-px flex-1 rounded-e-none shadow-none focus-visible:z-10"
+                        />
                         <Button
                             type="button"
                             variant="outline"
-                            size="sm"
                             onClick={handleGenerateName}
                             disabled={!canGenerateName}
-                            className="h-8"
+                            className="inline-flex items-center rounded-s-none border border-input bg-background px-3 text-sm font-medium text-foreground transition-[color,box-shadow] outline-none hover:bg-accent hover:text-foreground focus:z-10 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap"
                         >
-                            <Sparkles className="h-3 w-3 mr-1" />
+                            <Sparkles className="h-4 w-4 mr-2" />
                             Generate
                         </Button>
                     </div>
-                    <Input
-                        id="name"
-                        placeholder="e.g., my-website-job-1234, company-blog-automation-5678"
-                        value={formData.name || ""}
-                        onChange={(e) => onUpdate({ name: e.target.value })}
-                    />
                     <p className="text-xs text-muted-foreground">
                         {!canGenerateName
                             ? "Select a site first to enable name generation"
