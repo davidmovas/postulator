@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { JobCreateInput } from "@/models/jobs";
 import { VirtualizedMultiSelect } from "@/components/ui/virtualized-multi-select";
 import { RiWordpressFill } from "@remixicon/react";
+import { TOPIC_STRATEGY_REUSE_WITH_VARIATION, TOPIC_STRATEGY_UNIQUE } from "@/constants/topics";
 
 interface ContentStrategySectionProps {
     formData: Partial<JobCreateInput>;
@@ -49,7 +50,7 @@ export function ContentStrategySection({
                         className="space-y-3"
                     >
                         <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="unique" id="unique" />
+                            <RadioGroupItem value={TOPIC_STRATEGY_UNIQUE} id="unique" />
                             <Label htmlFor="unique" className="flex-1">
                                 <div className="font-medium">Unique</div>
                                 <div className="text-sm text-muted-foreground">
@@ -59,8 +60,8 @@ export function ContentStrategySection({
                         </div>
 
                         <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="reuse_with_variation" id="variation" />
-                            <Label htmlFor="variation" className="flex-1">
+                            <RadioGroupItem value={TOPIC_STRATEGY_REUSE_WITH_VARIATION} id="reuse" />
+                            <Label htmlFor="reuse" className="flex-1">
                                 <div className="font-medium">Reuse with Variation</div>
                                 <div className="text-sm text-muted-foreground">
                                     Reuse topics with AI-generated variations
