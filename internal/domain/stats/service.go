@@ -15,7 +15,7 @@ var _ Service = (*service)(nil)
 
 type service struct {
 	sitesService     sites.Service
-	jobsService      jobs.Service
+	jobsRepo         jobs.Repository
 	executionService ExecutionStatsReader
 	repo             Repository
 	logger           *logger.Logger
@@ -23,14 +23,14 @@ type service struct {
 
 func NewService(
 	sitesService sites.Service,
-	jobsService jobs.Service,
+	jobsRepo jobs.Repository,
 	executionService ExecutionStatsReader,
 	repo Repository,
 	logger *logger.Logger,
 ) Service {
 	return &service{
 		sitesService:     sitesService,
-		jobsService:      jobsService,
+		jobsRepo:         jobsRepo,
 		executionService: executionService,
 		repo:             repo,
 		logger: logger.
@@ -170,7 +170,7 @@ func (s *service) populateExecutionsInfo(ctx context.Context, summary *entities.
 }
 
 func (s *service) populateJobsInfo(ctx context.Context, summary *entities.DashboardSummary) error {
-	allJobs, err := s.jobsService.ListJobs(ctx)
+	allJobs, err := s.jobsRepo.GetAll(ctx)
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to get jobs for dashboard")
 		return err
