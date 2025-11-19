@@ -169,7 +169,7 @@ export function TimeInput({ value, onChange, isValid, className }: TimeInputProp
         placeholder="00:00"
         maxLength={5}
         className={cn(
-          "font-mono tabular-nums w-[120px] pr-9",
+          "font-mono tabular-nums w-[100px] pr-9",
           !isValid && "border-destructive focus-visible:ring-destructive",
           className
         )}

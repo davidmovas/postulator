@@ -18,19 +18,19 @@ import TimeInput from "@/components/ui/time-input";
 interface ScheduleSectionProps {
     formData: Partial<JobCreateInput>;
     onUpdate: (updates: Partial<JobCreateInput>) => void;
-    initialScheduleType?: string; // Добавляем проп для начального значения
+    initialScheduleType?: string;
 }
 
 export function ScheduleSection({ formData, onUpdate, initialScheduleType }: ScheduleSectionProps) {
     const DateTimePicker = ({
-        label,
-        date,
-        time,
-        onDateChange,
-        onTimeChange,
-        requireFuture = false,
-        invalidHint,
-    }: {
+    label,
+    date,
+    time,
+    onDateChange,
+    onTimeChange,
+    requireFuture = false,
+    invalidHint,
+}: {
         label: string;
         date: Date | undefined;
         time: string;
@@ -39,7 +39,6 @@ export function ScheduleSection({ formData, onUpdate, initialScheduleType }: Sch
         requireFuture?: boolean;
         invalidHint?: string;
     }) => {
-        // Convert local Date to CalendarDate using local year/month/day to avoid timezone shifts
         const dateToCalendarDate = (d: Date): CalendarDate => new CalendarDate(d.getFullYear(), d.getMonth() + 1, d.getDate());
         const calendarDateToDate = (cd: CalendarDate): Date => new Date(cd.year, cd.month - 1, cd.day);
         const ariaValue = date ? dateToCalendarDate(date) : undefined;
@@ -135,7 +134,6 @@ export function ScheduleSection({ formData, onUpdate, initialScheduleType }: Sch
         }
     }, [formData.schedule?.type]);
 
-    // Helpers to parse/format local date + time to ISO and back
     const toTimeString = (date: Date | undefined) => {
         if (!date) return "12:00";
         const h = date.getHours().toString().padStart(2, '0');
@@ -143,7 +141,6 @@ export function ScheduleSection({ formData, onUpdate, initialScheduleType }: Sch
         return `${h}:${m}`;
     };
 
-    // Build RFC3339 string with LOCAL timezone offset, e.g. 2025-11-20T03:34:00+01:00 (not Z)
     const toLocalRFC3339 = (d: Date): string => {
         const pad = (n: number) => String(n).padStart(2, "0");
         const year = d.getFullYear();
@@ -153,7 +150,7 @@ export function ScheduleSection({ formData, onUpdate, initialScheduleType }: Sch
         const minute = pad(d.getMinutes());
         const second = pad(d.getSeconds());
         const ms = String(d.getMilliseconds()).padStart(3, "0");
-        const offMinTotal = -d.getTimezoneOffset(); // minutes east of UTC
+        const offMinTotal = -d.getTimezoneOffset();
         const sign = offMinTotal >= 0 ? "+" : "-";
         const abs = Math.abs(offMinTotal);
         const offH = pad(Math.floor(abs / 60));
@@ -166,7 +163,6 @@ export function ScheduleSection({ formData, onUpdate, initialScheduleType }: Sch
         const [hh, mm] = timeHHMM.split(":").map((v) => parseInt(v));
         const combined = new Date(date);
         combined.setHours(hh || 0, mm || 0, 0, 0);
-        // return LOCAL time with offset instead of UTC Z
         return toLocalRFC3339(combined);
     };
 
@@ -176,30 +172,24 @@ export function ScheduleSection({ formData, onUpdate, initialScheduleType }: Sch
         return isNaN(d.getTime()) ? undefined : d;
     };
 
-    // Derived state for Once
     const onceDate = useMemo(() => {
         const cfg = formData.schedule?.config as any;
         const val: string | undefined = cfg?.executeAt || cfg?.execute_at;
         return parseISOToDate(val);
-    }, [formData.schedule]);
+    }, [formData.schedule?.config]);
+
     const onceTime = useMemo(() => toTimeString(onceDate), [onceDate]);
 
     const intervalStartDate = useMemo(() => {
         const cfg = formData.schedule?.config as any;
         const val: string | undefined = cfg?.startAt || cfg?.start_at;
         return parseISOToDate(val);
-    }, [formData.schedule]);
+    }, [formData.schedule?.config]);
+
     const intervalStartTime = useMemo(() => {
-        // Если стартовая дата не задана, показываем текущее время + 10 минут как дефолт
         const base = intervalStartDate || new Date(Date.now() + 10 * 60 * 1000);
         return toTimeString(base);
     }, [intervalStartDate]);
-
-    const isOnceInPast = useMemo(() => {
-        const iso = combineDateTimeToISO(onceDate, onceTime);
-        if (!iso) return false;
-        return new Date(iso).getTime() <= Date.now();
-    }, [onceDate, onceTime]);
 
     const handleScheduleTypeChange = (type: string) => {
         setScheduleType(type);
@@ -214,26 +204,27 @@ export function ScheduleSection({ formData, onUpdate, initialScheduleType }: Sch
                 } as Schedule;
                 break;
             case "once":
+                // ИСПРАВЛЕНО: текущее время + 10 минут
+                const executionTime = toLocalRFC3339(new Date(Date.now() + 10 * 60 * 1000));
+
                 newSchedule = {
                     type: "once",
                     config: {
-                        // По умолчанию: завтра, текущее время + 10 минут (локальное RFC3339 с оффсетом)
-                        executeAt: (() => toLocalRFC3339(new Date(Date.now() + 24 * 60 * 60 * 1000 + 10 * 60 * 1000)))(),
-                        // Для совместимости с сервером (snake_case)
-                        execute_at: (() => toLocalRFC3339(new Date(Date.now() + 24 * 60 * 60 * 1000 + 10 * 60 * 1000)))(),
+                        executeAt: executionTime,
+                        execute_at: executionTime,
                     } as OnceSchedule
                 };
                 break;
             case "interval":
+                const startTime = toLocalRFC3339(new Date(Date.now() + 10 * 60 * 1000));
+
                 newSchedule = {
                     type: "interval",
                     config: {
                         value: 1,
                         unit: "hours",
-                        // Старт по умолчанию: текущее время + 10 минут (локальное RFC3339)
-                        startAt: (() => toLocalRFC3339(new Date(Date.now() + 10 * 60 * 1000)))(),
-                        // Для совместимости с сервером (snake_case)
-                        start_at: (() => toLocalRFC3339(new Date(Date.now() + 10 * 60 * 1000)))(),
+                        startAt: startTime,
+                        start_at: startTime,
                     } as IntervalSchedule
                 };
                 break;
@@ -243,7 +234,7 @@ export function ScheduleSection({ formData, onUpdate, initialScheduleType }: Sch
                     config: {
                         hour: 9,
                         minute: 0,
-                        weekdays: [0, 1, 2, 3, 4] // Mon-Fri (0-based, Mon=0)
+                        weekdays: [0, 1, 2, 3, 4]
                     } as DailySchedule
                 };
                 break;
@@ -323,7 +314,6 @@ export function ScheduleSection({ formData, onUpdate, initialScheduleType }: Sch
                     </div>
                 </RadioGroup>
 
-                {/* Once Schedule - React Aria styled (single date) */}
                 {scheduleType === "once" && formData.schedule?.config && (
                     <div className="space-y-4 border-t pt-4 pl-6">
                         <DateTimePicker
@@ -344,7 +334,6 @@ export function ScheduleSection({ formData, onUpdate, initialScheduleType }: Sch
                     </div>
                 )}
 
-                {/* Interval Schedule */}
                 {scheduleType === "interval" && formData.schedule?.config && (
                     <div className="space-y-4 border-t pt-4 pl-6">
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
@@ -400,12 +389,11 @@ export function ScheduleSection({ formData, onUpdate, initialScheduleType }: Sch
                     </div>
                 )}
 
-                {/* Daily Schedule */}
                 {scheduleType === "daily" && formData.schedule?.config && (
                     <div className="space-y-4 border-t pt-4 pl-6">
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
                             <div className="space-y-2 w-full sm:w-auto">
-                                <Label htmlFor="time">Time</Label>
+                                <Label htmlFor="time" className="pr-4">Time</Label>
                                 {(() => {
                                     const cfg = formData.schedule!.config as DailySchedule;
                                     const h = (cfg.hour ?? 9).toString().padStart(2, '0');

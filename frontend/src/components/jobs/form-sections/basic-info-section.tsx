@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Button } from "@/components/ui/button";
 import { JobCreateInput } from "@/models/jobs";
-import { generateJobName } from "@/lib/job-name-generator";
+import { generateSimpleJobName } from "@/lib/job-name-generator";
 import { Sparkles } from "lucide-react";
 
 interface BasicInfoSectionProps {
@@ -17,8 +17,6 @@ interface BasicInfoSectionProps {
     providers: any[] | null;
     site?: any;
     sites?: any[];
-    categories?: any[] | null;
-    topics?: any[] | null;
 }
 
 export function BasicInfoSection({
@@ -28,8 +26,6 @@ export function BasicInfoSection({
     providers,
     site,
     sites,
-    categories,
-    topics
 }: BasicInfoSectionProps) {
     const promptsLoading = prompts == null;
     const providersLoading = providers == null;
@@ -37,13 +33,14 @@ export function BasicInfoSection({
     const noProviders = !providersLoading && providers!.length === 0;
 
     const handleGenerateName = () => {
-        const categoryNames = categories?.map(c => c.name) || [];
-        const topicTitles = topics?.map(t => t.title) || [];
-        const promptName = prompts?.find(p => p.id === formData.promptId)?.name;
+        const siteName = site?.name || sites?.find(s => s.id === formData.siteId)?.name;
+        const generatedName = generateSimpleJobName(siteName);
 
-        const generatedName = generateJobName(categoryNames, topicTitles, promptName);
         onUpdate({ name: generatedName });
     };
+
+    // Проверяем, доступна ли генерация (нужен хотя бы сайт)
+    const canGenerateName = !!site || !!formData.siteId;
 
     return (
         <Card>
@@ -63,7 +60,7 @@ export function BasicInfoSection({
                             variant="outline"
                             size="sm"
                             onClick={handleGenerateName}
-                            disabled={!categories || !topics}
+                            disabled={!canGenerateName}
                             className="h-8"
                         >
                             <Sparkles className="h-3 w-3 mr-1" />
@@ -72,14 +69,14 @@ export function BasicInfoSection({
                     </div>
                     <Input
                         id="name"
-                        placeholder="e.g., Daily Blog Posts, Weekly Newsletters"
+                        placeholder="e.g., my-website-job-1234, company-blog-automation-5678"
                         value={formData.name || ""}
                         onChange={(e) => onUpdate({ name: e.target.value })}
                     />
                     <p className="text-xs text-muted-foreground">
-                        {!categories || !topics
-                            ? "Select categories and topics to enable name generation"
-                            : "Click Generate to create a meaningful job name automatically"
+                        {!canGenerateName
+                            ? "Select a site first to enable name generation"
+                            : "Click Generate to create a unique job name automatically"
                         }
                     </p>
                 </div>

@@ -1,62 +1,58 @@
-const JOB_NAME_TEMPLATES = [
-    "Daily {category} Content",
-    "Weekly {topic} Articles",
-    "Automated {category} Posts",
-    "Scheduled {topic} Publishing",
-    "AI-Generated {category} Content",
-    "Regular {topic} Updates",
-    "{category} Automation Series",
-    "Smart {topic} Generator",
-    "Continuous {category} Creation",
-    "Intelligent {topic} Publisher"
+const JOB_NAME_PATTERNS = [
+    "Job-{site}-#{id}",
 ];
 
-const TOPIC_CATEGORY_MAPPING: Record<string, string> = {
-    "technology": "Tech",
-    "business": "Business",
-    "health": "Health",
-    "lifestyle": "Lifestyle",
-    "entertainment": "Entertainment",
-    "sports": "Sports",
-    "news": "News",
-    "education": "Education"
-};
-
 export function generateJobName(
-    categoryNames: string[] = [],
-    topicTitles: string[] = [],
-    promptName?: string
+    siteName?: string,
+    existingJobNames: string[] = []
 ): string {
-    const categoryKeywords = extractKeywords(categoryNames);
-    const topicKeywords = extractKeywords(topicTitles);
+    const cleanSiteName = (siteName || "Website")
+        .replace(/[^\w\s-]/g, '')
+        .replace(/[\s_-]+/g, '-')
+        .toLowerCase()
+        .trim();
 
-    const primaryKeyword = categoryKeywords[0] || topicKeywords[0] || "Content";
+    const pattern = JOB_NAME_PATTERNS[Math.floor(Math.random() * JOB_NAME_PATTERNS.length)];
 
-    const template = JOB_NAME_TEMPLATES[Math.floor(Math.random() * JOB_NAME_TEMPLATES.length)];
+    const jobId = generateUniqueJobId(existingJobNames);
 
-    let jobName = template.replace("{category}", primaryKeyword)
-        .replace("{topic}", primaryKeyword);
-
-    const timestamp = new Date().getTime().toString().slice(-4);
-    jobName += ` #${timestamp}`;
-
-    return jobName;
+    return pattern
+        .replace("{site}", cleanSiteName)
+        .replace("{id}", jobId);
 }
 
-function extractKeywords(items: string[]): string[] {
-    const allWords = items.flatMap(item =>
-        item.toLowerCase()
-            .split(/[\s\-\_]+/)
-            .filter(word => word.length > 3)
-    );
+function generateUniqueJobId(existingJobNames: string[]): string {
+    const existingIds = existingJobNames.map(name => {
+        const match = name.match(/-(\d{4})$/);
+        return match ? parseInt(match[1]) : null;
+    }).filter((id): id is number => id !== null);
 
-    const frequency: Record<string, number> = {};
-    allWords.forEach(word => {
-        frequency[word] = (frequency[word] || 0) + 1;
-    });
+    let newId: number;
+    let attempts = 0;
 
-    return Object.entries(frequency)
-        .sort(([,a], [,b]) => b - a)
-        .map(([word]) => word)
-        .slice(0, 5);
+    do {
+        newId = Math.floor(Math.random() * 9000);
+        attempts++;
+
+        if (attempts > 10) {
+            return Date.now().toString().slice(-4);
+        }
+    } while (existingIds.includes(newId));
+
+    return newId.toString();
+}
+
+export function generateSimpleJobName(siteName?: string): string {
+    const cleanSiteName = (siteName || "Website")
+        .replace(/[^\w\s-]/g, '')
+        .replace(/[\s_-]+/g, '-')
+        .toLowerCase()
+        .trim();
+
+    const pattern = JOB_NAME_PATTERNS[Math.floor(Math.random() * JOB_NAME_PATTERNS.length)];
+    const timestamp = Date.now().toString().slice(-4);
+
+    return pattern
+        .replace("{site}", cleanSiteName)
+        .replace("{id}", timestamp);
 }
