@@ -93,10 +93,21 @@ func (e *Executor) executePipeline(ctx context.Context, job *entities.Job) error
 	return nil
 }
 
-func (e *Executor) stepInitialize(_ context.Context, pctx *pipelineContext) error {
-	if pctx.Job.State != nil {
-		now := time.Now()
+func (e *Executor) stepInitialize(ctx context.Context, pctx *pipelineContext) error {
+	now := time.Now()
+
+	if pctx.Job.State == nil {
+		st := &entities.State{JobID: pctx.Job.ID, LastRunAt: &now}
+		if err := e.stateRepo.Update(ctx, st); err != nil {
+			e.logger.Warnf("Job %d: Failed to persist initial LastRunAt: %v", pctx.Job.ID, err)
+		} else {
+			pctx.Job.State = st
+		}
+	} else {
 		pctx.Job.State.LastRunAt = &now
+		if err := e.stateRepo.Update(ctx, pctx.Job.State); err != nil {
+			e.logger.Warnf("Job %d: Failed to update LastRunAt: %v", pctx.Job.ID, err)
+		}
 	}
 
 	e.logger.Debugf("Job %d: Initialization complete", pctx.Job.ID)
