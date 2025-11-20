@@ -201,10 +201,7 @@ export function useJobsTable(siteId?: number) {
 
                 if (job.topicStrategy === TOPIC_STRATEGY_REUSE_WITH_VARIATION) {
                     return (
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                            <RefreshCw className="w-3 h-3 mr-1" />
-                            Reuse Strategy
-                        </Badge>
+                        <RefreshCw className="w-4 h-4" />
                     );
                 }
 
@@ -468,8 +465,7 @@ export function useJobsTable(siteId?: number) {
                     <div className="text-xs uppercase tracking-wide text-muted-foreground">Next Topic To Use</div>
                     {job.topicStrategy === TOPIC_STRATEGY_REUSE_WITH_VARIATION ? (
                         <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 flex items-center gap-1">
-                            <RefreshCw className="h-3 w-3" />
-                            Will generate topic from provided content
+                            Will generate topic variation from random provided topics
                         </Badge>
                     ) : isLoading.topic ? (
                         <span className="text-muted-foreground">Loading next topic...</span>
