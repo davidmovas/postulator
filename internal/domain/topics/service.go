@@ -80,6 +80,26 @@ func (s *service) CreateTopics(ctx context.Context, topics ...*entities.Topic) (
 	return result, nil
 }
 
+func (s *service) CreateAndAssignToSite(ctx context.Context, siteID int64, topics ...*entities.Topic) (*entities.ImportAssignResult, error) {
+	if len(topics) == 0 {
+		return &entities.ImportAssignResult{
+			TotalProcessed: 0,
+			TotalAdded:     0,
+			TotalSkipped:   0,
+			Added:          []string{},
+			Skipped:        []string{},
+		}, nil
+	}
+
+	for _, topic := range topics {
+		if err := s.validateTopic(topic); err != nil {
+			return nil, err
+		}
+	}
+
+	return s.createAndAssign(ctx, siteID, topics...)
+}
+
 func (s *service) GetTopic(ctx context.Context, id int64) (*entities.Topic, error) {
 	topic, err := s.repo.GetByID(ctx, id)
 	if err != nil {
@@ -443,4 +463,96 @@ func getTopicIDs(topics []*entities.Topic) []int64 {
 		ids[i] = topic.ID
 	}
 	return ids
+}
+
+func (s *service) createAndAssign(ctx context.Context, siteID int64, topics ...*entities.Topic) (*entities.ImportAssignResult, error) {
+	batchResult, err := s.repo.CreateBatch(ctx, topics...)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to create topics batch")
+		return nil, err
+	}
+
+	createdTopicIDs := make([]int64, 0, len(batchResult.CreatedTopics))
+	createdTitles := make([]string, 0, len(batchResult.CreatedTopics))
+	for _, topic := range batchResult.CreatedTopics {
+		createdTopicIDs = append(createdTopicIDs, topic.ID)
+		createdTitles = append(createdTitles, topic.Title)
+	}
+
+	existingTopics, err := s.GetByTitles(ctx, batchResult.SkippedTitles)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get existing topics by titles")
+		return nil, err
+	}
+
+	titleToID := make(map[string]int64, len(existingTopics))
+	existingIDs := make([]int64, 0, len(existingTopics))
+	for _, t := range existingTopics {
+		titleToID[t.Title] = t.ID
+		existingIDs = append(existingIDs, t.ID)
+	}
+
+	candidateIDs := make([]int64, 0, len(createdTopicIDs)+len(existingIDs))
+	candidateIDs = append(candidateIDs, createdTopicIDs...)
+	candidateIDs = append(candidateIDs, existingIDs...)
+
+	alreadyAssignedIDs, err := s.GetAssignedForSite(ctx, siteID, candidateIDs)
+	if err != nil {
+		s.logger.ErrorWithErr(err, fmt.Sprintf("Failed to get assigned topics for site: %d", siteID))
+		return nil, err
+	}
+
+	assigned := make(map[int64]struct{}, len(alreadyAssignedIDs))
+	for _, id := range alreadyAssignedIDs {
+		assigned[id] = struct{}{}
+	}
+
+	toAssignSet := make(map[int64]struct{})
+	for _, id := range candidateIDs {
+		if _, ok := assigned[id]; !ok {
+			toAssignSet[id] = struct{}{}
+		}
+	}
+
+	assignedExistingTitles := make([]string, 0)
+	trulySkippedTitles := make([]string, 0)
+	for _, title := range batchResult.SkippedTitles {
+		id, ok := titleToID[title]
+		if !ok {
+			trulySkippedTitles = append(trulySkippedTitles, title)
+			continue
+		}
+		if _, already := assigned[id]; already {
+			trulySkippedTitles = append(trulySkippedTitles, title)
+			continue
+		}
+		assignedExistingTitles = append(assignedExistingTitles, title)
+	}
+
+	toAssign := make([]int64, 0, len(toAssignSet))
+	for id := range toAssignSet {
+		toAssign = append(toAssign, id)
+	}
+
+	if len(toAssign) > 0 {
+		if err = s.AssignToSite(ctx, siteID, toAssign...); err != nil {
+			s.logger.ErrorWithErr(err, fmt.Sprintf("Failed to assign topics to site: %d count: %d", siteID, len(toAssign)))
+			return nil, err
+		}
+	}
+
+	result := &entities.ImportAssignResult{
+		TotalProcessed: len(topics),
+		TotalAdded:     len(createdTitles) + len(assignedExistingTitles),
+		TotalSkipped:   len(trulySkippedTitles),
+		Added:          make([]string, 0, len(createdTitles)+len(assignedExistingTitles)),
+		Skipped:        trulySkippedTitles,
+	}
+
+	result.Added = append(result.Added, createdTitles...)
+	result.Added = append(result.Added, assignedExistingTitles...)
+
+	s.logger.Infof("Topics created and assigned to site: %d successfully, totalAdded: %d, totalSkipped: %d", siteID, result.TotalAdded, result.TotalSkipped)
+
+	return result, nil
 }

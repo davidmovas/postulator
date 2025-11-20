@@ -37,6 +37,7 @@ type UsageRepository interface {
 type Service interface {
 	CreateTopic(ctx context.Context, topic *entities.Topic) error
 	CreateTopics(ctx context.Context, topics ...*entities.Topic) (*entities.BatchResult, error)
+	CreateAndAssignToSite(ctx context.Context, siteID int64, topics ...*entities.Topic) (*entities.ImportAssignResult, error)
 	GetTopic(ctx context.Context, id int64) (*entities.Topic, error)
 	ListTopics(ctx context.Context) ([]*entities.Topic, error)
 	GetByTitles(ctx context.Context, titles []string) ([]*entities.Topic, error)

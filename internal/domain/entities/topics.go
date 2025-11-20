@@ -14,3 +14,11 @@ type BatchResult struct {
 	SkippedTitles []string
 	CreatedTopics []*Topic
 }
+
+type ImportAssignResult struct {
+	TotalProcessed int
+	TotalAdded     int
+	TotalSkipped   int
+	Added          []string
+	Skipped        []string
+}
