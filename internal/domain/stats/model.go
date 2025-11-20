@@ -17,7 +17,9 @@ type Service interface {
 	GetSiteStatistics(ctx context.Context, siteID int64, from, to time.Time) ([]*entities.SiteStats, error)
 	GetTotalStatistics(ctx context.Context, siteID int64) (*entities.SiteStats, error)
 	GetDashboardSummary(ctx context.Context) (*entities.DashboardSummary, error)
+}
 
+type Recorder interface {
 	RecordArticlePublished(ctx context.Context, siteID int64, wordCount int) error
 	RecordArticleFailed(ctx context.Context, siteID int64) error
 	RecordLinksCreated(ctx context.Context, siteID int64, internalLinks, externalLinks int) error

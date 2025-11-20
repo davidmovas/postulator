@@ -11,7 +11,9 @@ import (
 	"github.com/davidmovas/postulator/pkg/logger"
 )
 
-var _ Service = (*service)(nil)
+var (
+	_ Service = (*service)(nil)
+)
 
 type service struct {
 	sitesService     sites.Service
@@ -79,55 +81,6 @@ func (s *service) GetDashboardSummary(ctx context.Context) (*entities.DashboardS
 	}
 
 	return summary, nil
-}
-
-func (s *service) RecordArticlePublished(ctx context.Context, siteID int64, wordCount int) error {
-	now := time.Now()
-
-	if err := s.repo.IncrementSiteStats(ctx, siteID, now, "articles_published", 1); err != nil {
-		s.logger.ErrorWithErr(err, "Failed to record article published")
-		return err
-	}
-
-	if wordCount > 0 {
-		if err := s.repo.IncrementSiteStats(ctx, siteID, now, "total_words", wordCount); err != nil {
-			s.logger.ErrorWithErr(err, "Failed to record word count")
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (s *service) RecordArticleFailed(ctx context.Context, siteID int64) error {
-	now := time.Now()
-
-	if err := s.repo.IncrementSiteStats(ctx, siteID, now, "articles_failed", 1); err != nil {
-		s.logger.ErrorWithErr(err, "Failed to record article failed")
-		return err
-	}
-
-	return nil
-}
-
-func (s *service) RecordLinksCreated(ctx context.Context, siteID int64, internalLinks, externalLinks int) error {
-	now := time.Now()
-
-	if internalLinks > 0 {
-		if err := s.repo.IncrementSiteStats(ctx, siteID, now, "internal_links_created", internalLinks); err != nil {
-			s.logger.ErrorWithErr(err, "Failed to record internal links")
-			return err
-		}
-	}
-
-	if externalLinks > 0 {
-		if err := s.repo.IncrementSiteStats(ctx, siteID, now, "external_links_created", externalLinks); err != nil {
-			s.logger.ErrorWithErr(err, "Failed to record external links")
-			return err
-		}
-	}
-
-	return nil
 }
 
 func (s *service) populateSitesInfo(ctx context.Context, summary *entities.DashboardSummary) error {

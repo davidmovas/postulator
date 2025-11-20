@@ -62,6 +62,7 @@ var Module = fx.Module("domain",
 		// Stats
 		stats.NewRepository,
 		stats.NewService,
+		stats.NewRecorder,
 
 		// Healthcheck
 		healthcheck.NewRepository,

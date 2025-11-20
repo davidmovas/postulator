@@ -307,7 +307,7 @@ func (e *Executor) buildPlaceholders(pctx *pipelineContext) map[string]string {
 func (e *Executor) stepGenerateAI(ctx context.Context, pctx *pipelineContext) error {
 	pctx.Execution.Status = entities.ExecutionStatusGenerating
 	if err := e.execRepo.Update(ctx, pctx.Execution); err != nil {
-		if recordErr := e.statsService.RecordArticleFailed(ctx, pctx.Site.ID); recordErr != nil {
+		if recordErr := e.statsRecorder.RecordArticleFailed(ctx, pctx.Site.ID); recordErr != nil {
 			e.logger.Warnf("Job %d: Failed to record article failed stats: %v", pctx.Job.ID, recordErr)
 		}
 		return fmt.Errorf("failed to update execution status: %w", err)
@@ -315,7 +315,7 @@ func (e *Executor) stepGenerateAI(ctx context.Context, pctx *pipelineContext) er
 
 	provider, err := e.providerService.GetProvider(ctx, pctx.Job.AIProviderID)
 	if err != nil {
-		if recordErr := e.statsService.RecordArticleFailed(ctx, pctx.Site.ID); recordErr != nil {
+		if recordErr := e.statsRecorder.RecordArticleFailed(ctx, pctx.Site.ID); recordErr != nil {
 			e.logger.Warnf("Job %d: Failed to record article failed stats: %v", pctx.Job.ID, recordErr)
 		}
 		return fmt.Errorf("failed to get AI provider: %w", err)
@@ -326,7 +326,7 @@ func (e *Executor) stepGenerateAI(ctx context.Context, pctx *pipelineContext) er
 
 	aiClient, err := ai.CreateClient(provider)
 	if err != nil {
-		if recordErr := e.statsService.RecordArticleFailed(ctx, pctx.Site.ID); recordErr != nil {
+		if recordErr := e.statsRecorder.RecordArticleFailed(ctx, pctx.Site.ID); recordErr != nil {
 			e.logger.Warnf("Job %d: Failed to record article failed stats: %v", pctx.Job.ID, recordErr)
 		}
 		return fmt.Errorf("failed to create AI client: %w", err)
@@ -336,7 +336,7 @@ func (e *Executor) stepGenerateAI(ctx context.Context, pctx *pipelineContext) er
 
 	result, err := aiClient.GenerateArticle(ctx, pctx.SystemPrompt, pctx.UserPrompt)
 	if err != nil {
-		if recordErr := e.statsService.RecordArticleFailed(ctx, pctx.Site.ID); recordErr != nil {
+		if recordErr := e.statsRecorder.RecordArticleFailed(ctx, pctx.Site.ID); recordErr != nil {
 			e.logger.Warnf("Job %d: Failed to record article failed stats: %v", pctx.Job.ID, recordErr)
 		}
 		return errors.AI(string(provider.Type), err)
@@ -360,7 +360,7 @@ func (e *Executor) stepGenerateAI(ctx context.Context, pctx *pipelineContext) er
 	}
 
 	if err = e.execRepo.Update(ctx, pctx.Execution); err != nil {
-		if recordErr := e.statsService.RecordArticleFailed(ctx, pctx.Site.ID); recordErr != nil {
+		if recordErr := e.statsRecorder.RecordArticleFailed(ctx, pctx.Site.ID); recordErr != nil {
 			e.logger.Warnf("Job %d: Failed to record article failed stats: %v", pctx.Job.ID, recordErr)
 		}
 		return fmt.Errorf("failed to update execution with generated content: %w", err)
@@ -392,7 +392,7 @@ func (e *Executor) stepPublish(ctx context.Context, pctx *pipelineContext) error
 
 	article, err := e.publishArticle(ctx, pctx)
 	if err != nil {
-		if recordErr := e.statsService.RecordArticleFailed(ctx, pctx.Site.ID); recordErr != nil {
+		if recordErr := e.statsRecorder.RecordArticleFailed(ctx, pctx.Site.ID); recordErr != nil {
 			e.logger.Warnf("Job %d: Failed to record article failed stats: %v", pctx.Job.ID, recordErr)
 		}
 		return err
@@ -417,7 +417,7 @@ func (e *Executor) stepPublish(ctx context.Context, pctx *pipelineContext) error
 
 	if err = e.execRepo.Update(ctx, pctx.Execution); err != nil {
 		// Записываем статистику при ошибке обновления статуса публикации
-		if recordErr := e.statsService.RecordArticleFailed(ctx, pctx.Site.ID); recordErr != nil {
+		if recordErr := e.statsRecorder.RecordArticleFailed(ctx, pctx.Site.ID); recordErr != nil {
 			e.logger.Warnf("Job %d: Failed to record article failed stats: %v", pctx.Job.ID, recordErr)
 		}
 		return fmt.Errorf("failed to update execution after publication: %w", err)
@@ -475,7 +475,7 @@ func (e *Executor) stepComplete(ctx context.Context, pctx *pipelineContext) erro
 		}
 	}
 
-	if err := e.statsService.RecordArticlePublished(ctx, pctx.Site.ID, len(pctx.GeneratedContent)); err != nil {
+	if err := e.statsRecorder.RecordArticlePublished(ctx, pctx.Site.ID, len(pctx.GeneratedContent)); err != nil {
 		e.logger.Warnf("Job %d: Failed to record article published stats: %v", pctx.Job.ID, err)
 	}
 

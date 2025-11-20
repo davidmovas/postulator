@@ -27,7 +27,7 @@ type Executor struct {
 	topicService    topics.Service
 	promptService   prompts.Service
 	siteService     sites.Service
-	statsService    stats.Service
+	statsRecorder   stats.Recorder
 	providerService providers.Service
 	categoryService categories.Service
 
@@ -44,7 +44,7 @@ func NewExecutor(
 	topicService topics.Service,
 	promptService prompts.Service,
 	siteService sites.Service,
-	statsService stats.Service,
+	statsRecorder stats.Recorder,
 	providerService providers.Service,
 	categoryService categories.Service,
 	wpClient wp.Client,
@@ -58,7 +58,7 @@ func NewExecutor(
 		topicService:    topicService,
 		promptService:   promptService,
 		siteService:     siteService,
-		statsService:    statsService,
+		statsRecorder:   statsRecorder,
 		providerService: providerService,
 		categoryService: categoryService,
 		wpClient:        wpClient,
