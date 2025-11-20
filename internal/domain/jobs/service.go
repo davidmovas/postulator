@@ -21,7 +21,6 @@ var _ Service = (*service)(nil)
 
 type service struct {
 	scheduler       Scheduler
-	executor        Executor
 	siteService     sites.Service
 	topicService    topics.Service
 	promptService   prompts.Service
@@ -35,7 +34,6 @@ type service struct {
 
 func NewService(
 	scheduler Scheduler,
-	executor Executor,
 	siteService sites.Service,
 	topicService topics.Service,
 	promptService prompts.Service,
@@ -48,7 +46,6 @@ func NewService(
 ) Service {
 	return &service{
 		scheduler:       scheduler,
-		executor:        executor,
 		siteService:     siteService,
 		topicService:    topicService,
 		promptService:   promptService,
