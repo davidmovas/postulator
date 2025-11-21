@@ -20,6 +20,7 @@ type scheduler struct {
 	stopChan           chan struct{}
 	updateIntervalChan chan int
 	running            bool
+	ctx                context.Context
 	mu                 sync.RWMutex
 }
 
@@ -45,6 +46,8 @@ func NewScheduler(
 
 func (s *scheduler) Start(ctx context.Context) error {
 	s.mu.Lock()
+	s.ctx = ctx
+
 	if s.running {
 		s.mu.Unlock()
 		s.logger.Warn("Scheduler already running")
@@ -52,7 +55,7 @@ func (s *scheduler) Start(ctx context.Context) error {
 	}
 	s.mu.Unlock()
 
-	s.logger.Info("Starting health check scheduler")
+	s.logger.Info("Starting job scheduler")
 
 	settings, err := s.settingsService.GetHealthCheckSettings(ctx)
 	if err != nil {
@@ -61,7 +64,7 @@ func (s *scheduler) Start(ctx context.Context) error {
 	}
 
 	if !settings.Enabled {
-		s.logger.Info("Health check scheduler is disabled in settings; not starting")
+		s.logger.Info("Health check scheduler is disabled in settings; waiting for enable")
 		return nil
 	}
 
@@ -69,6 +72,7 @@ func (s *scheduler) Start(ctx context.Context) error {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	if s.ticker != nil {
 		s.ticker.Stop()
 	}
@@ -138,13 +142,23 @@ func (s *scheduler) ApplySettings(ctx context.Context, enabled bool, intervalMin
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if ctx != nil {
+		s.ctx = ctx
+	}
+	if s.ctx == nil {
+		s.ctx = context.Background()
+	}
+
 	if !enabled {
 		if s.running {
+			s.logger.Info("Disabling health check scheduler")
 			s.running = false
+
 			if s.ticker != nil {
 				s.ticker.Stop()
 				s.ticker = nil
 			}
+
 			if s.stopChan != nil {
 				close(s.stopChan)
 				s.stopChan = make(chan struct{})
@@ -154,37 +168,58 @@ func (s *scheduler) ApplySettings(ctx context.Context, enabled bool, intervalMin
 	}
 
 	if !s.running {
+		s.logger.Infof("Enabling health check scheduler with interval: %d minutes", intervalMinutes)
+
 		if s.ticker != nil {
 			s.ticker.Stop()
 		}
+
 		s.ticker = time.NewTicker(time.Duration(intervalMinutes) * time.Minute)
+
 		if s.stopChan == nil {
 			s.stopChan = make(chan struct{})
+		} else {
+			select {
+			case <-s.stopChan:
+				s.stopChan = make(chan struct{})
+			default:
+			}
 		}
+
 		s.running = true
-		go s.run(ctx)
+
+		go s.run(s.ctx)
+
+		s.logger.Info("Health check scheduler enabled and started")
 		return nil
 	}
 
-	s.logger.Infof("Reapplying health check interval: %d minutes", intervalMinutes)
+	s.logger.Infof("Updating health check interval to: %d minutes", intervalMinutes)
 	if s.ticker != nil {
 		s.ticker.Stop()
 	}
 	s.ticker = time.NewTicker(time.Duration(intervalMinutes) * time.Minute)
+
 	return nil
 }
 
 func (s *scheduler) run(ctx context.Context) {
+	s.logger.Debug("Health check run loop started")
+
 	for {
 		select {
 		case <-s.stopChan:
+			s.logger.Debug("Health check run loop stopped")
 			return
 
 		case newInterval := <-s.updateIntervalChan:
+			s.logger.Infof("Updating interval to: %d minutes", newInterval)
+			s.mu.Lock()
 			if s.ticker != nil {
 				s.ticker.Stop()
 			}
 			s.ticker = time.NewTicker(time.Duration(newInterval) * time.Minute)
+			s.mu.Unlock()
 
 		case <-s.ticker.C:
 			s.performCheck(ctx)

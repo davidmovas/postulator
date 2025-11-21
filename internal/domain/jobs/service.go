@@ -115,11 +115,6 @@ func (s *service) CreateJob(ctx context.Context, job *entities.Job) error {
 			withJitter.Sub(baseTime))
 	}
 
-	if err := s.scheduler.ScheduleJob(ctx, job); err != nil {
-		s.logger.ErrorWithErr(err, "Failed to schedule job")
-		return err
-	}
-
 	s.logger.Info("Job created successfully")
 	return nil
 }

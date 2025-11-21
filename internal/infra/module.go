@@ -5,6 +5,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/config"
 	"github.com/davidmovas/postulator/internal/infra/database"
+	"github.com/davidmovas/postulator/internal/infra/events"
 	"github.com/davidmovas/postulator/internal/infra/importer"
 	"github.com/davidmovas/postulator/internal/infra/secret"
 	"github.com/davidmovas/postulator/internal/infra/wp"
@@ -44,4 +45,7 @@ var Module = fx.Module("infra",
 
 	// Importer service
 	fx.Provide(importer.NewImportService),
+
+	// Event bus
+	fx.Provide(events.GetGlobalEventBus),
 )

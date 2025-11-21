@@ -315,24 +315,17 @@ func (s *service) GetOrGenerateVariation(ctx context.Context, providerID, siteID
 		return nil, err
 	}
 
-	allTopics, err := s.repo.GetAll(ctx)
+	existingVariation, err := s.repo.GetByTitle(ctx, originalTopic.Title)
 	if err != nil {
-		s.logger.ErrorWithErr(err, "Failed to get all topics")
+		s.logger.ErrorWithErr(err, "Failed to search for existing variations")
 		return nil, err
 	}
 
-	var variationTopics []*entities.Topic
-	for _, topic := range allTopics {
-		if strings.Contains(topic.Title, originalTopic.Title) && topic.ID != originalID {
-			variationTopics = append(variationTopics, topic)
-		}
-	}
-
-	if len(variationTopics) > 0 {
+	if existingVariation != nil && existingVariation.ID != originalID {
 		var unusedVariations []*entities.Topic
-		unusedVariations, err = s.usageRepo.GetUnused(ctx, siteID, getTopicIDs(variationTopics))
+		unusedVariations, err = s.usageRepo.GetUnused(ctx, siteID, []int64{existingVariation.ID})
 		if err != nil {
-			s.logger.ErrorWithErr(err, "Failed to get unused variations")
+			s.logger.ErrorWithErr(err, "Failed to check if variation is unused")
 			return nil, err
 		}
 

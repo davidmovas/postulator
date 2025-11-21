@@ -72,7 +72,6 @@ func (s *service) ListSiteCategories(ctx context.Context, siteID int64) ([]*enti
 		return nil, err
 	}
 
-	s.logger.Debug("Site categories listed")
 	return categories, nil
 }
 

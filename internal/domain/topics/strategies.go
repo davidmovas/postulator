@@ -33,12 +33,12 @@ func (s *uniqueStrategy) CanExecute(ctx context.Context, job *entities.Job) erro
 	return nil
 }
 
-func (s *uniqueStrategy) PickTopic(ctx context.Context, job *entities.Job) (*entities.Topic, error) {
+func (s *uniqueStrategy) PickTopic(ctx context.Context, job *entities.Job) (*entities.Topic, *entities.Topic, error) {
 	topic, err := s.usageRepo.GetNextUnused(ctx, job.SiteID, job.Topics)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return topic, nil
+	return topic, topic, nil
 }
 
 func (s *uniqueStrategy) OnExecutionSuccess(ctx context.Context, job *entities.Job, topic *entities.Topic) error {
@@ -102,23 +102,23 @@ func (s *variationStrategy) CanExecute(ctx context.Context, job *entities.Job) e
 	return nil
 }
 
-func (s *variationStrategy) PickTopic(ctx context.Context, job *entities.Job) (*entities.Topic, error) {
+func (s *variationStrategy) PickTopic(ctx context.Context, job *entities.Job) (*entities.Topic, *entities.Topic, error) {
 	assigned, err := s.siteTopicRepo.GetBySiteID(ctx, job.SiteID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if len(assigned) == 0 {
-		return nil, errors.NoResources("topics")
+		return nil, nil, errors.NoResources("topics")
 	}
 
 	original := assigned[rand.IntN(len(assigned))]
 	variation, err := s.svc.GetOrGenerateVariation(ctx, job.AIProviderID, job.SiteID, original.ID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return variation, nil
+	return original, variation, nil
 }
 
 func (s *variationStrategy) OnExecutionSuccess(_ context.Context, _ *entities.Job, _ *entities.Topic) error {

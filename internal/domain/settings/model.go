@@ -17,3 +17,7 @@ type Service interface {
 	GetHealthCheckSettings(ctx context.Context) (*entities.HealthCheckSettings, error)
 	UpdateHealthCheckSettings(ctx context.Context, settings *entities.HealthCheckSettings) error
 }
+
+type HealthCheckScheduler interface {
+	ApplySettings(ctx context.Context, enabled bool, intervalMinutes int) error
+}

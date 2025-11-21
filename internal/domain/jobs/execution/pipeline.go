@@ -28,13 +28,14 @@ const (
 )
 
 type pipelineContext struct {
-	Job       *entities.Job
-	Execution *entities.Execution
-	Site      *entities.Site
-	Topic     *entities.Topic
-	Category  *entities.Category
-	Prompt    *entities.Prompt
-	Provider  *entities.Provider
+	Job            *entities.Job
+	Execution      *entities.Execution
+	Site           *entities.Site
+	OriginalTopic  *entities.Topic
+	VariationTopic *entities.Topic
+	Category       *entities.Category
+	Prompt         *entities.Prompt
+	Provider       *entities.Provider
 
 	Strategy topics.TopicStrategyHandler
 
@@ -163,12 +164,14 @@ func (e *Executor) stepSelectTopic(ctx context.Context, pctx *pipelineContext) e
 		}
 		pctx.Strategy = strat
 	}
-	topic, err := pctx.Strategy.PickTopic(ctx, pctx.Job)
+	original, variation, err := pctx.Strategy.PickTopic(ctx, pctx.Job)
 	if err != nil {
 		return err
 	}
-	pctx.Topic = topic
-	e.logger.Infof("Job %d: Selected topic %d (%s)", pctx.Job.ID, topic.ID, topic.Title)
+	pctx.OriginalTopic = original
+	pctx.VariationTopic = variation
+
+	e.logger.Infof("Job %d: Selected topic %d (%s)", pctx.Job.ID, variation.ID, variation.Title)
 	return nil
 }
 
@@ -220,7 +223,7 @@ func (e *Executor) stepSelectCategory(ctx context.Context, pctx *pipelineContext
 }
 
 func (e *Executor) stepCreateExecution(ctx context.Context, pctx *pipelineContext) error {
-	if pctx.Topic == nil || pctx.Category == nil {
+	if pctx.VariationTopic == nil || pctx.Category == nil {
 		return errors.Validation("topic or category not selected")
 	}
 
@@ -233,7 +236,7 @@ func (e *Executor) stepCreateExecution(ctx context.Context, pctx *pipelineContex
 	exec := &entities.Execution{
 		JobID:        pctx.Job.ID,
 		SiteID:       pctx.Job.SiteID,
-		TopicID:      pctx.Topic.ID,
+		TopicID:      pctx.VariationTopic.ID,
 		PromptID:     pctx.Job.PromptID,
 		AIProviderID: pctx.Job.AIProviderID,
 		AIModel:      provider.Model,
@@ -255,7 +258,7 @@ func (e *Executor) stepRenderPrompt(ctx context.Context, pctx *pipelineContext) 
 	if pctx.Site == nil {
 		return errors.Validation("site not loaded")
 	}
-	if pctx.Topic == nil {
+	if pctx.VariationTopic == nil {
 		return errors.Validation("topic not selected")
 	}
 	if pctx.Category == nil {
@@ -290,7 +293,7 @@ func (e *Executor) buildPlaceholders(pctx *pipelineContext) map[string]string {
 		placeholders[placeholder] = ""
 	}
 
-	placeholders["title"] = pctx.Topic.Title
+	placeholders["title"] = pctx.VariationTopic.Title
 	placeholders["siteName"] = pctx.Site.Name
 	placeholders["siteUrl"] = pctx.Site.URL
 	placeholders["category"] = pctx.Category.Name
@@ -416,7 +419,6 @@ func (e *Executor) stepPublish(ctx context.Context, pctx *pipelineContext) error
 	pctx.Execution.Status = entities.ExecutionStatusPublished
 
 	if err = e.execRepo.Update(ctx, pctx.Execution); err != nil {
-		// Записываем статистику при ошибке обновления статуса публикации
 		if recordErr := e.statsRecorder.RecordArticleFailed(ctx, pctx.Site.ID); recordErr != nil {
 			e.logger.Warnf("Job %d: Failed to record article failed stats: %v", pctx.Job.ID, recordErr)
 		}
@@ -430,10 +432,10 @@ func (e *Executor) stepPublish(ctx context.Context, pctx *pipelineContext) error
 }
 
 func (e *Executor) stepMarkUsed(ctx context.Context, pctx *pipelineContext) error {
-	if pctx.Strategy == nil || pctx.Topic == nil {
+	if pctx.Strategy == nil || pctx.VariationTopic == nil {
 		return nil
 	}
-	if err := pctx.Strategy.OnExecutionSuccess(ctx, pctx.Job, pctx.Topic); err != nil {
+	if err := pctx.Strategy.OnExecutionSuccess(ctx, pctx.Job, pctx.VariationTopic); err != nil {
 		e.logger.Warnf("Job %d: Post-success hook failed: %v", pctx.Job.ID, err)
 		return nil
 	}
