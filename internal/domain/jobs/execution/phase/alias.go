@@ -11,12 +11,12 @@ import (
 
 var (
 	ValidateJobCommand         = validation.NewValidateJobCommand
+	ValidateOutputCommand      = validation.NewValidateOutputCommand
 	SelectTopicCommand         = selection.NewSelectTopicCommand
 	SelectCategoryCommand      = selection.NewSelectCategoryCommand
 	CreateExecutionCommand     = execution.NewCreateExecutionCommand
 	RenderPromptCommand        = generation.NewRenderPromptCommand
 	GenerateContentCommand     = generation.NewGenerateContentCommand
-	ValidateOutputCommand      = validation.NewValidateOutputCommand
 	PublishArticleCommand      = publishing.NewPublishArticleCommand
 	RecordCategoryStatsCommand = tracking.NewRecordCategoryStatsCommand
 	MarkTopicUsedCommand       = tracking.NewMarkTopicUsedCommand

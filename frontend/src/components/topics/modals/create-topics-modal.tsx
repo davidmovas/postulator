@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useApiCall } from "@/hooks/use-api-call";
 import { topicService } from "@/services/topics";
 import { useToast } from "@/components/ui/use-toast";
-import { TopicCreateInput, BatchResult } from "@/models/topics";
+import { TopicCreateInput } from "@/models/topics";
 
 interface CreateTopicsModalProps {
     open: boolean;
@@ -46,25 +46,13 @@ export function CreateTopicsModal({ open, onOpenChange, siteId, onSuccess }: Cre
 
         const payload: TopicCreateInput[] = titles.map(t => ({ title: t }));
 
-        const result = await execute<BatchResult>(() => topicService.createTopics(payload), {
+        const result = await execute(() => topicService.createAndAssignToSite(siteId, payload), {
             errorTitle: "Failed to create topics",
             showSuccessToast: false,
         });
 
         if (result) {
-            // Assign newly created topics to the site if any were created
-            const createdIds = (result.createdTopics || []).map(t => t.id);
-            if (createdIds.length > 0) {
-                await execute(
-                    () => topicService.assignToSite(siteId, createdIds),
-                    {
-                        errorTitle: "Failed to assign topics to site",
-                        showSuccessToast: false,
-                    }
-                );
-            }
-
-            const description = `Created: ${result.created} | Skipped: ${result.skipped}`;
+            const description = `Added: ${result.totalAdded} | Skipped: ${result.totalSkipped}`;
 
             toast({
                 title: "Topics creation result",
@@ -75,8 +63,7 @@ export function CreateTopicsModal({ open, onOpenChange, siteId, onSuccess }: Cre
             onOpenChange(false);
             resetForm();
             onSuccess?.();
-        }
-    };
+    }
 
     const handleOpenChange = (newOpen: boolean) => {
         if (!newOpen) {
@@ -128,4 +115,5 @@ export function CreateTopicsModal({ open, onOpenChange, siteId, onSuccess }: Cre
             </DialogContent>
         </Dialog>
     );
+}
 }

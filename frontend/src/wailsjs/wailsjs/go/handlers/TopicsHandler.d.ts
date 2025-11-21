@@ -4,6 +4,8 @@ import {dto} from '../models';
 
 export function AssignToSite(arg1:number,arg2:Array<number>):Promise<dto.Response_string_>;
 
+export function CreateAndAssignToSite(arg1:number,arg2:Array<dto.Topic>):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_ImportResult_>;
+
 export function CreateTopic(arg1:dto.Topic):Promise<dto.Response_string_>;
 
 export function CreateTopics(arg1:Array<dto.Topic>):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_BatchResult_>;

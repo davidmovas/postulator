@@ -22,7 +22,7 @@ export default function SiteTopicsPage() {
     const [selected, setSelected] = useState<Topic[]>([]);
     const [selectionResetKey, setSelectionResetKey] = useState(0);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
-        const [isImportOpen, setIsImportOpen] = useState(false);
+    const [isImportOpen, setIsImportOpen] = useState(false);
     const { confirmationModal, editTopicModal } = useContextModal();
     const { execute } = useApiCall();
 

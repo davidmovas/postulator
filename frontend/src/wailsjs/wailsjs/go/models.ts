@@ -314,6 +314,7 @@ export namespace dto {
 	    jobId: number;
 	    lastRunAt?: string;
 	    nextRunAt?: string;
+	    nextRunBase?: string;
 	    totalExecutions: number;
 	    failedExecutions: number;
 	    lastCategoryIndex: number;
@@ -327,6 +328,7 @@ export namespace dto {
 	        this.jobId = source["jobId"];
 	        this.lastRunAt = source["lastRunAt"];
 	        this.nextRunAt = source["nextRunAt"];
+	        this.nextRunBase = source["nextRunBase"];
 	        this.totalExecutions = source["totalExecutions"];
 	        this.failedExecutions = source["failedExecutions"];
 	        this.lastCategoryIndex = source["lastCategoryIndex"];

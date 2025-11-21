@@ -6,6 +6,10 @@ export function AssignToSite(arg1, arg2) {
   return window['go']['handlers']['TopicsHandler']['AssignToSite'](arg1, arg2);
 }
 
+export function CreateAndAssignToSite(arg1, arg2) {
+  return window['go']['handlers']['TopicsHandler']['CreateAndAssignToSite'](arg1, arg2);
+}
+
 export function CreateTopic(arg1) {
   return window['go']['handlers']['TopicsHandler']['CreateTopic'](arg1);
 }

@@ -69,7 +69,7 @@ func NewStateMachine(initialState State) *StateMachine {
 func (sm *StateMachine) defineTransitions() {
 	sm.transitions = map[State][]State{
 		StateInitialized: {
-			StateValidating,
+			StateValidated,
 			StateFailed,
 		},
 		StateValidating: {

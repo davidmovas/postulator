@@ -13,7 +13,7 @@ import {
     MarkTopicUsed,
     GetJobRemainingTopics,
     UnassignFromSite,
-    UpdateTopic
+    UpdateTopic, CreateAndAssignToSite
 } from "@/wailsjs/wailsjs/go/handlers/TopicsHandler";
 import {
     mapTopic,
@@ -26,6 +26,8 @@ import {
     mapJobTopicsStatus,
 } from "@/models/topics";
 import { unwrapArrayResponse, unwrapResponse, unwrapTopicsResponse } from "@/lib/api-utils";
+import { ImportResult, mapImportResult } from "@/models/importer";
+import { ImportAndAssignToSite } from "@/wailsjs/wailsjs/go/handlers/ImporterHandler";
 
 export const topicService = {
     async getTopic(id: number): Promise<Topic> {
@@ -67,6 +69,16 @@ export const topicService = {
         const response = await CreateTopics(payload);
         const result = unwrapResponse<dto.BatchResult>(response);
         return mapBatchResult(result);
+    },
+
+    async createAndAssignToSite(siteId: number, topics: TopicCreateInput[]): Promise<ImportResult> {
+        const payload = topics.map(topic => new dto.Topic({
+            title: topic.title,
+        }));
+
+        const response = await CreateAndAssignToSite(siteId, payload);
+        const result = unwrapResponse<dto.ImportResult>(response);
+        return mapImportResult(result);
     },
 
     async deleteTopic(id: number): Promise<void> {

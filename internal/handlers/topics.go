@@ -5,6 +5,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/jobs"
 	"github.com/davidmovas/postulator/internal/domain/topics"
 	"github.com/davidmovas/postulator/internal/dto"
+	"github.com/davidmovas/postulator/internal/infra/importer"
 	"github.com/davidmovas/postulator/pkg/ctx"
 )
 
@@ -49,6 +50,33 @@ func (h *TopicsHandler) CreateTopics(topics []*dto.Topic) *dto.Response[*dto.Bat
 	}
 
 	return ok(dto.NewBatchResult(result))
+}
+
+func (h *TopicsHandler) CreateAndAssignToSite(siteID int64, topics []*dto.Topic) *dto.Response[*dto.ImportResult] {
+	tops := make([]*entities.Topic, len(topics))
+	for i, topic := range topics {
+		if entity, err := topic.ToEntity(); err != nil {
+			return fail[*dto.ImportResult](err)
+		} else {
+			tops[i] = entity
+		}
+	}
+
+	result, err := h.service.CreateAndAssignToSite(ctx.FastCtx(), siteID, tops...)
+	if err != nil {
+		return fail[*dto.ImportResult](err)
+	}
+
+	res := &importer.ImportResult{
+		TotalRead:    result.TotalProcessed,
+		TotalAdded:   result.TotalAdded,
+		TotalSkipped: result.TotalSkipped,
+		Added:        result.Added,
+		Skipped:      result.Skipped,
+		Errors:       []string{},
+	}
+
+	return ok(dto.NewImportResult(res))
 }
 
 func (h *TopicsHandler) GetTopic(id int64) *dto.Response[*dto.Topic] {
