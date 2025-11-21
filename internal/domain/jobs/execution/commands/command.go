@@ -32,7 +32,7 @@ func (c *BaseCommand) Name() string {
 	return c.name
 }
 
-func (c *BaseCommand) CanExecute(ctx *pipeline.Context) bool {
+func (c *BaseCommand) CanExecute(_ *pipeline.Context) bool {
 	return true
 }
 
@@ -44,7 +44,7 @@ func (c *BaseCommand) NextState() pipeline.State {
 	return c.nextState
 }
 
-func (c *BaseCommand) OnError(ctx *pipeline.Context, err error) error {
+func (c *BaseCommand) OnError(_ *pipeline.Context, err error) error {
 	return err
 }
 

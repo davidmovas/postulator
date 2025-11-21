@@ -95,3 +95,18 @@ func (eb *EventBus) PublishSync(ctx context.Context, event Event) {
 		}(handler)
 	}
 }
+
+func Subscribe(eventType EventType, handler EventHandler) {
+	GetGlobalEventBus().
+		Subscribe(eventType, handler)
+}
+
+func Publish(ctx context.Context, event Event) {
+	GetGlobalEventBus().
+		Publish(ctx, event)
+}
+
+func PublishSync(ctx context.Context, event Event) {
+	GetGlobalEventBus().
+		PublishSync(ctx, event)
+}

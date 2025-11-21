@@ -81,7 +81,8 @@ func (b *Builder) Build() *Pipeline {
 
 func (p *Pipeline) Execute(ctx context.Context, job *entities.Job) error {
 	pctx := NewContext(job).
-		WithContext(ctx)
+		WithContext(ctx).
+		WithLogger(p.logger)
 
 	p.publishEvent(events.Event{
 		Type:      pipevents.EventPipelineStarted,

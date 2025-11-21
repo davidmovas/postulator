@@ -6,17 +6,17 @@ import (
 
 type ParallelCommand struct {
 	*BaseCommand
-	commands []Command
+	commands []pipeline.Command
 }
 
 func NewParallelCommand(name string, requiredState, nextState pipeline.State) *ParallelCommand {
 	return &ParallelCommand{
 		BaseCommand: NewBaseCommand(name, requiredState, nextState),
-		commands:    make([]Command, 0),
+		commands:    make([]pipeline.Command, 0),
 	}
 }
 
-func (p *ParallelCommand) Add(cmd Command) *ParallelCommand {
+func (p *ParallelCommand) Add(cmd pipeline.Command) *ParallelCommand {
 	p.commands = append(p.commands, cmd)
 	return p
 }

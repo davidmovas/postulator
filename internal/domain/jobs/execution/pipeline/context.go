@@ -6,12 +6,14 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/topics"
+	"github.com/davidmovas/postulator/pkg/logger"
 )
 
 type MetadataKey string
 
 type Context struct {
-	ctx       context.Context
+	ctx context.Context
+
 	Job       *entities.Job
 	State     *StateMachine
 	StartTime time.Time
@@ -22,6 +24,8 @@ type Context struct {
 	Execution   *ExecutionPhase
 	Generation  *GenerationPhase
 	Publication *PublicationPhase
+
+	logger *logger.Logger
 }
 
 type ValidatedPhase struct {
@@ -62,6 +66,8 @@ func NewContext(job *entities.Job) *Context {
 		State:     NewStateMachine(StateInitialized),
 		StartTime: time.Now(),
 		Metadata:  make(map[MetadataKey]any),
+		logger: logger.Global().
+			WithScope("pipeline"),
 	}
 }
 
@@ -73,6 +79,10 @@ func (c *Context) WithContext(ctx context.Context) *Context {
 	c.ctx = ctx
 	return c
 }
+func (c *Context) WithLogger(logger *logger.Logger) *Context {
+	c.logger = logger
+	return c
+}
 
 func (c *Context) SetMetadata(key MetadataKey, value any) {
 	c.Metadata[key] = value
@@ -81,6 +91,14 @@ func (c *Context) SetMetadata(key MetadataKey, value any) {
 func (c *Context) GetMetadata(key MetadataKey) (any, bool) {
 	val, ok := c.Metadata[key]
 	return val, ok
+}
+
+func (c *Context) SetLogger(logger *logger.Logger) {
+	c.logger = logger
+}
+
+func (c *Context) Logger() *logger.Logger {
+	return c.logger
 }
 
 func (c *Context) Duration() time.Duration {
