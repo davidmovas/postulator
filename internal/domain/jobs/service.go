@@ -356,7 +356,7 @@ func (s *service) validateDependencies(ctx context.Context, job *entities.Job) e
 
 	for _, categoryID := range job.Categories {
 		if _, err := s.categoryService.GetCategory(ctx, categoryID); err != nil {
-			return errors.Validation("Category does not exist")
+			return errors.Validation("Categories does not exist")
 		}
 	}
 

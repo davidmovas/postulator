@@ -21,7 +21,11 @@ type RecordCategoryStatsCommand struct {
 
 func NewRecordCategoryStatsCommand(categoryService categories.Service) *RecordCategoryStatsCommand {
 	return &RecordCategoryStatsCommand{
-		BaseCommand:     commands.NewBaseCommand("record_category_stats", pipeline.StatePublished, pipeline.StateRecordingStats),
+		BaseCommand: commands.NewBaseCommand(
+			"record_category_stats",
+			pipeline.StatePublished,
+			pipeline.StateRecordingStats,
+		),
 		categoryService: categoryService,
 	}
 }
@@ -31,7 +35,7 @@ func (c *RecordCategoryStatsCommand) Execute(ctx *pipeline.Context) error {
 		return fault.NewFatalError(fault.ErrCodeInvalidJob, c.Name(), "article not published")
 	}
 
-	if !ctx.HasSelection() || ctx.Selection.Category == nil {
+	if !ctx.HasSelection() || ctx.Selection.Categories == nil {
 		return fault.NewFatalError(fault.ErrCodeInvalidJob, c.Name(), "category not selected")
 	}
 
@@ -40,31 +44,35 @@ func (c *RecordCategoryStatsCommand) Execute(ctx *pipeline.Context) error {
 		wordCount = *ctx.Publication.Article.WordCount
 	}
 
-	err := c.categoryService.IncrementUsage(
-		ctx.Context(),
-		ctx.Job.SiteID,
-		ctx.Selection.Category.ID,
-		time.Now(),
-		1,
-		wordCount,
-	)
-
-	if err != nil {
-		ctx.Logger().Errorf("Failed to record category usage stats: %v", err)
-		return nil
+	for _, category := range ctx.Selection.Categories {
+		err := c.categoryService.IncrementUsage(
+			ctx.Context(),
+			ctx.Job.SiteID,
+			category.ID,
+			time.Now(),
+			1,
+			wordCount,
+		)
+		if err != nil {
+			ctx.Logger().Errorf("Failed to record category usage stats: %v", err)
+			return nil
+		}
 	}
 
-	if ctx.Context() != nil {
-		events.Publish(ctx.Context(), events.NewEvent(
-			pipevents.EventStatsRecorded,
-			&pipevents.StatsRecordedEvent{
-				JobID:      ctx.Job.ID,
-				SiteID:     ctx.Job.SiteID,
-				CategoryID: ctx.Selection.Category.ID,
-				WordCount:  wordCount,
-			},
-		))
+	var categoryIDs []int64
+	for _, category := range ctx.Selection.Categories {
+		categoryIDs = append(categoryIDs, category.ID)
 	}
+
+	events.Publish(ctx.Context(), events.NewEvent(
+		pipevents.EventStatsRecorded,
+		&pipevents.StatsRecordedEvent{
+			JobID:       ctx.Job.ID,
+			SiteID:      ctx.Job.SiteID,
+			CategoryIDs: categoryIDs,
+			WordCount:   wordCount,
+		},
+	))
 
 	return nil
 }

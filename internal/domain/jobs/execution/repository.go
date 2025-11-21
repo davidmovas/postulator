@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/Masterminds/squirrel"
@@ -30,18 +31,23 @@ func NewRepository(db *database.DB, logger *logger.Logger) Repository {
 }
 
 func (r *repository) Create(ctx context.Context, exec *entities.Execution) error {
+	categoryIDsJSON, err := json.Marshal(exec.CategoryIDs)
+	if err != nil {
+		return errors.Internal(err)
+	}
+
 	query, args := dbx.ST.
 		Insert("job_executions").
 		Columns(
 			"job_id", "site_id", "topic_id", "article_id",
-			"prompt_id", "ai_provider_id", "ai_model", "category_id",
+			"prompt_id", "ai_provider_id", "ai_model", "category_ids",
 			"status", "error_message",
 			"generation_time_ms", "tokens_used",
 			"started_at", "generated_at", "validated_at", "published_at", "completed_at",
 		).
 		Values(
 			exec.JobID, exec.SiteID, exec.TopicID, exec.ArticleID,
-			exec.PromptID, exec.AIProviderID, exec.AIModel, exec.CategoryID,
+			exec.PromptID, exec.AIProviderID, exec.AIModel, string(categoryIDsJSON),
 			exec.Status, exec.ErrorMessage,
 			exec.GenerationTimeMs, exec.TokensUsed,
 			exec.StartedAt, exec.GeneratedAt, exec.ValidatedAt, exec.PublishedAt, exec.CompletedAt,
@@ -69,7 +75,7 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*entities.Execution
 	query, args := dbx.ST.
 		Select(
 			"id", "job_id", "site_id", "topic_id", "article_id",
-			"prompt_id", "ai_provider_id", "ai_model", "category_id",
+			"prompt_id", "ai_provider_id", "ai_model", "category_ids",
 			"status", "error_message",
 			"generation_time_ms", "tokens_used",
 			"started_at", "generated_at", "validated_at", "published_at", "completed_at",
@@ -93,7 +99,7 @@ func (r *repository) GetByJobID(ctx context.Context, jobID int64, limit, offset 
 	query, args := dbx.ST.
 		Select(
 			"id", "job_id", "site_id", "topic_id", "article_id",
-			"prompt_id", "ai_provider_id", "ai_model", "category_id",
+			"prompt_id", "ai_provider_id", "ai_model", "category_ids",
 			"status", "error_message",
 			"generation_time_ms", "tokens_used",
 			"started_at", "generated_at", "validated_at", "published_at", "completed_at",
@@ -132,7 +138,7 @@ func (r *repository) GetPendingValidation(ctx context.Context) ([]*entities.Exec
 	query, args := dbx.ST.
 		Select(
 			"id", "job_id", "site_id", "topic_id", "article_id",
-			"prompt_id", "ai_provider_id", "ai_model", "category_id",
+			"prompt_id", "ai_provider_id", "ai_model", "category_ids",
 			"status", "error_message",
 			"generation_time_ms", "tokens_used",
 			"started_at", "generated_at", "validated_at", "published_at", "completed_at",
@@ -149,7 +155,7 @@ func (r *repository) GetByStatus(ctx context.Context, status entities.Status) ([
 	query, args := dbx.ST.
 		Select(
 			"id", "job_id", "site_id", "topic_id", "article_id",
-			"prompt_id", "ai_provider_id", "ai_model", "category_id",
+			"prompt_id", "ai_provider_id", "ai_model", "category_ids",
 			"status", "error_message",
 			"generation_time_ms", "tokens_used",
 			"started_at", "generated_at", "validated_at", "published_at", "completed_at",
@@ -163,6 +169,11 @@ func (r *repository) GetByStatus(ctx context.Context, status entities.Status) ([
 }
 
 func (r *repository) Update(ctx context.Context, exec *entities.Execution) error {
+	categoryIDsJSON, err := json.Marshal(exec.CategoryIDs)
+	if err != nil {
+		return errors.Internal(err)
+	}
+
 	query, args := dbx.ST.
 		Update("job_executions").
 		Set("job_id", exec.JobID).
@@ -172,7 +183,7 @@ func (r *repository) Update(ctx context.Context, exec *entities.Execution) error
 		Set("prompt_id", exec.PromptID).
 		Set("ai_provider_id", exec.AIProviderID).
 		Set("ai_model", exec.AIModel).
-		Set("category_id", exec.CategoryID).
+		Set("category_ids", string(categoryIDsJSON)).
 		Set("status", exec.Status).
 		Set("error_message", exec.ErrorMessage).
 		Set("generation_time_ms", exec.GenerationTimeMs).
@@ -293,10 +304,10 @@ func (r *repository) GetAverageGenerationTime(ctx context.Context, jobID int64) 
 	return avgTime, nil
 }
 
-func (r *repository) scanExecution(query string, args []interface{}, ctx context.Context) (*entities.Execution, error) {
+func (r *repository) scanExecution(query string, args []any, ctx context.Context) (*entities.Execution, error) {
 	var exec entities.Execution
 	var articleID sql.NullInt64
-	var errorMessage sql.NullString
+	var errorMessage, categoryJSONIDs sql.NullString
 	var generationTimeMs, tokensUsed sql.NullInt32
 	var generatedAt, validatedAt, publishedAt, completedAt sql.NullTime
 
@@ -309,7 +320,7 @@ func (r *repository) scanExecution(query string, args []interface{}, ctx context
 		&exec.PromptID,
 		&exec.AIProviderID,
 		&exec.AIModel,
-		&exec.CategoryID,
+		&categoryJSONIDs,
 		&exec.Status,
 		&errorMessage,
 		&generationTimeMs,
@@ -329,6 +340,14 @@ func (r *repository) scanExecution(query string, args []interface{}, ctx context
 	}
 	if errorMessage.Valid {
 		exec.ErrorMessage = &errorMessage.String
+	}
+	if categoryJSONIDs.Valid {
+		var categoryIDs []int64
+		err = json.Unmarshal([]byte(categoryJSONIDs.String), &categoryIDs)
+		if err != nil {
+			return nil, errors.Internal(err)
+		}
+		exec.CategoryIDs = categoryIDs
 	}
 	if generationTimeMs.Valid {
 		timeMs := int(generationTimeMs.Int32)
@@ -386,7 +405,7 @@ func (r *repository) scanExecutions(query string, args []interface{}, ctx contex
 func (r *repository) scanExecutionFromRow(rows *sql.Rows) (*entities.Execution, error) {
 	var exec entities.Execution
 	var articleID sql.NullInt64
-	var errorMessage sql.NullString
+	var errorMessage, categoryJSONIDs sql.NullString
 	var generationTimeMs, tokensUsed sql.NullInt32
 	var generatedAt, validatedAt, publishedAt, completedAt sql.NullTime
 
@@ -399,7 +418,7 @@ func (r *repository) scanExecutionFromRow(rows *sql.Rows) (*entities.Execution, 
 		&exec.PromptID,
 		&exec.AIProviderID,
 		&exec.AIModel,
-		&exec.CategoryID,
+		&categoryJSONIDs,
 		&exec.Status,
 		&errorMessage,
 		&generationTimeMs,
@@ -419,6 +438,14 @@ func (r *repository) scanExecutionFromRow(rows *sql.Rows) (*entities.Execution, 
 	}
 	if errorMessage.Valid {
 		exec.ErrorMessage = &errorMessage.String
+	}
+	if categoryJSONIDs.Valid {
+		var categoryIDs []int64
+		err = json.Unmarshal([]byte(categoryJSONIDs.String), &categoryIDs)
+		if err != nil {
+			return nil, errors.Internal(err)
+		}
+		exec.CategoryIDs = categoryIDs
 	}
 	if generationTimeMs.Valid {
 		timeMs := int(generationTimeMs.Int32)

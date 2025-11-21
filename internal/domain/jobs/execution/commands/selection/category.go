@@ -26,7 +26,11 @@ func NewSelectCategoryCommand(
 	stateRepository jobs.StateRepository,
 ) *SelectCategoryCommand {
 	return &SelectCategoryCommand{
-		BaseCommand:     commands.NewBaseCommand("select_category", pipeline.StateTopicSelected, pipeline.StateCategorySelected),
+		BaseCommand: commands.NewBaseCommand(
+			"select_category",
+			pipeline.StateTopicSelected,
+			pipeline.StateCategorySelected,
+		),
 		categoryService: categoryService,
 		stateRepository: stateRepository,
 	}
@@ -34,17 +38,18 @@ func NewSelectCategoryCommand(
 
 func (c *SelectCategoryCommand) Execute(ctx *pipeline.Context) error {
 	if len(ctx.Job.Categories) == 0 {
-		return fault.NewValidationError(fault.ErrCodeNoCategories, c.Name(), "no categories assigned to job")
+		return fault.NewValidationError(fault.ErrCodeNoCategories, c.Name(), "no cats assigned to job")
 	}
 
-	var categoryID int64
+	var categoryIDs []int64
 
 	switch ctx.Job.CategoryStrategy {
 	case entities.CategoryFixed:
-		categoryID = ctx.Job.Categories[0]
+		categoryIDs = ctx.Job.Categories
 
 	case entities.CategoryRandom:
-		categoryID = ctx.Job.Categories[c.randomIndex(len(ctx.Job.Categories))]
+		id := ctx.Job.Categories[c.randomIndex(len(ctx.Job.Categories))]
+		categoryIDs = append(categoryIDs, id)
 
 	case entities.CategoryRotate:
 		state := ctx.Job.State
@@ -52,7 +57,8 @@ func (c *SelectCategoryCommand) Execute(ctx *pipeline.Context) error {
 			state = &entities.State{LastCategoryIndex: 0}
 		}
 
-		categoryID = ctx.Job.Categories[state.LastCategoryIndex]
+		id := ctx.Job.Categories[state.LastCategoryIndex]
+		categoryIDs = append(categoryIDs, id)
 
 		state.LastCategoryIndex = (state.LastCategoryIndex + 1) % len(ctx.Job.Categories)
 		if err := c.stateRepository.UpdateCategoryIndex(ctx.Context(), ctx.Job.ID, state.LastCategoryIndex); err != nil {
@@ -63,28 +69,35 @@ func (c *SelectCategoryCommand) Execute(ctx *pipeline.Context) error {
 		return fault.NewValidationError(fault.ErrCodeInvalidStrategy, c.Name(), "invalid category strategy")
 	}
 
-	category, err := c.categoryService.GetCategory(ctx.Context(), categoryID)
-	if err != nil {
-		return fault.WrapError(err, fault.ErrCodeRecordNotFound, c.Name(), "failed to get category")
+	var cats []*entities.Category
+	for _, id := range categoryIDs {
+		category, err := c.categoryService.GetCategory(ctx.Context(), id)
+		if err != nil {
+			return fault.WrapError(err, fault.ErrCodeRecordNotFound, c.Name(), "failed to get category")
+		}
+
+		cats = append(cats, category)
 	}
 
 	if ctx.HasSelection() {
-		ctx.Selection.Category = category
+		ctx.Selection.Categories = cats
 	} else {
-		ctx.InitSelectionPhase(nil, nil, category)
+		ctx.InitSelectionPhase(nil, nil, cats...)
 	}
 
-	if ctx.Context() != nil {
-		events.Publish(ctx.Context(), events.NewEvent(
-			pipevents.EventCategorySelected,
-			&pipevents.CategorySelectedEvent{
-				JobID:        ctx.Job.ID,
-				CategoryID:   category.ID,
-				CategoryName: category.Name,
-				Strategy:     string(ctx.Job.CategoryStrategy),
-			},
-		))
+	var categoriesNames []string
+	for _, cat := range cats {
+		categoriesNames = append(categoriesNames, cat.Name)
 	}
+
+	events.Publish(ctx.Context(), events.NewEvent(
+		pipevents.EventCategorySelected,
+		&pipevents.CategorySelectedEvent{
+			JobID:      ctx.Job.ID,
+			Categories: categoriesNames,
+			Strategy:   string(ctx.Job.CategoryStrategy),
+		},
+	))
 
 	return nil
 }

@@ -49,6 +49,11 @@ func (c *CreateExecutionCommand) Execute(ctx *pipeline.Context) error {
 		return fault.WrapError(err, fault.ErrCodeRecordNotFound, c.Name(), "failed to get prompt")
 	}
 
+	var categoryIDs []int64
+	for _, cat := range ctx.Selection.Categories {
+		categoryIDs = append(categoryIDs, cat.ID)
+	}
+
 	exec := &entities.Execution{
 		JobID:        ctx.Job.ID,
 		SiteID:       ctx.Job.SiteID,
@@ -56,7 +61,7 @@ func (c *CreateExecutionCommand) Execute(ctx *pipeline.Context) error {
 		PromptID:     ctx.Job.PromptID,
 		AIProviderID: ctx.Job.AIProviderID,
 		AIModel:      provider.Model,
-		CategoryID:   ctx.Selection.Category.ID,
+		CategoryIDs:  categoryIDs,
 		Status:       entities.ExecutionStatusPending,
 		StartedAt:    time.Now(),
 	}

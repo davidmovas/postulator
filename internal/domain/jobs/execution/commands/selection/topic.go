@@ -18,7 +18,11 @@ type SelectTopicCommand struct {
 
 func NewSelectTopicCommand() *SelectTopicCommand {
 	return &SelectTopicCommand{
-		BaseCommand: commands.NewBaseCommand("select_topic", pipeline.StateValidated, pipeline.StateTopicSelected),
+		BaseCommand: commands.NewBaseCommand(
+			"select_topic",
+			pipeline.StateValidated,
+			pipeline.StateTopicSelected,
+		),
 	}
 }
 

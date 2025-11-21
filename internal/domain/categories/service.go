@@ -51,7 +51,7 @@ func (s *service) CreateCategory(ctx context.Context, category *entities.Categor
 		return err
 	}
 
-	s.logger.Infof("Category created successfull %d", category.ID)
+	s.logger.Infof("Categories created successfull %d", category.ID)
 	return nil
 }
 
@@ -87,7 +87,7 @@ func (s *service) UpdateCategory(ctx context.Context, category *entities.Categor
 		return err
 	}
 
-	s.logger.Info("Category updated successfully")
+	s.logger.Info("Categories updated successfully")
 	return nil
 }
 
@@ -97,7 +97,7 @@ func (s *service) DeleteCategory(ctx context.Context, id int64) error {
 		return err
 	}
 
-	s.logger.Info("Category deleted successfully")
+	s.logger.Info("Categories deleted successfully")
 	return nil
 }
 
@@ -189,7 +189,7 @@ func (s *service) CreateInWordPress(ctx context.Context, category *entities.Cate
 		return err
 	}
 
-	s.logger.Info("Category created in WordPress successfully")
+	s.logger.Info("Categories created in WordPress successfully")
 	return nil
 }
 
@@ -212,7 +212,7 @@ func (s *service) UpdateInWordPress(ctx context.Context, category *entities.Cate
 		return err
 	}
 
-	s.logger.Info("Category updated in WordPress successfully")
+	s.logger.Info("Categories updated in WordPress successfully")
 	return nil
 }
 
@@ -239,7 +239,7 @@ func (s *service) DeleteInWordPress(ctx context.Context, categoryID int64) error
 		return err
 	}
 
-	s.logger.Info("Category deleted from WordPress successfully")
+	s.logger.Info("Categories deleted from WordPress successfully")
 	return nil
 }
 
@@ -281,7 +281,7 @@ func (s *service) validateCategory(category *entities.Category) error {
 	}
 
 	if strings.TrimSpace(category.Name) == "" {
-		return errors.Validation("Category name is required")
+		return errors.Validation("Categories name is required")
 	}
 
 	return nil

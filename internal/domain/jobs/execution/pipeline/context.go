@@ -6,6 +6,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/topics"
+	"github.com/davidmovas/postulator/pkg/ctx"
 	"github.com/davidmovas/postulator/pkg/logger"
 )
 
@@ -36,7 +37,7 @@ type ValidatedPhase struct {
 type SelectionPhase struct {
 	OriginalTopic  *entities.Topic
 	VariationTopic *entities.Topic
-	Category       *entities.Category
+	Categories     []*entities.Category
 }
 
 type ExecutionPhase struct {
@@ -72,6 +73,9 @@ func NewContext(job *entities.Job) *Context {
 }
 
 func (c *Context) Context() context.Context {
+	if c.ctx == nil {
+		c.ctx = ctx.WithTimeout(time.Minute * 3)
+	}
 	return c.ctx
 }
 
@@ -79,6 +83,7 @@ func (c *Context) WithContext(ctx context.Context) *Context {
 	c.ctx = ctx
 	return c
 }
+
 func (c *Context) WithLogger(logger *logger.Logger) *Context {
 	c.logger = logger
 	return c
@@ -112,11 +117,11 @@ func (c *Context) InitValidatedPhase(site *entities.Site, strategy topics.TopicS
 	}
 }
 
-func (c *Context) InitSelectionPhase(original, variation *entities.Topic, category *entities.Category) {
+func (c *Context) InitSelectionPhase(original, variation *entities.Topic, categories ...*entities.Category) {
 	c.Selection = &SelectionPhase{
 		OriginalTopic:  original,
 		VariationTopic: variation,
-		Category:       category,
+		Categories:     categories,
 	}
 }
 
@@ -186,9 +191,9 @@ func (c *Context) GetOriginalTopic() *entities.Topic {
 	return nil
 }
 
-func (c *Context) GetCategory() *entities.Category {
+func (c *Context) GetCategories() []*entities.Category {
 	if c.Selection != nil {
-		return c.Selection.Category
+		return c.Selection.Categories
 	}
 	return nil
 }

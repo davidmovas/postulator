@@ -132,10 +132,9 @@ type TopicSelectedEvent struct {
 }
 
 type CategorySelectedEvent struct {
-	JobID        int64
-	CategoryID   int64
-	CategoryName string
-	Strategy     string
+	JobID      int64
+	Categories []string
+	Strategy   string
 }
 
 type NoTopicsAvailableEvent struct {
@@ -165,10 +164,10 @@ type ArticlePublishedEvent struct {
 }
 
 type StatsRecordedEvent struct {
-	JobID      int64
-	SiteID     int64
-	CategoryID int64
-	WordCount  int
+	JobID       int64
+	SiteID      int64
+	CategoryIDs []int64
+	WordCount   int
 }
 
 type TokensConsumedEvent struct {

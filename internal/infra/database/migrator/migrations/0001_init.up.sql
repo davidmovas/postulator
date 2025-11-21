@@ -221,7 +221,7 @@ CREATE TABLE job_executions (
     prompt_id INTEGER NOT NULL,
     ai_provider_id INTEGER NOT NULL,
     ai_model TEXT NOT NULL,
-    category_id INTEGER NOT NULL,
+    category_ids TEXT NOT NULL,
 
     status TEXT NOT NULL,
     error_message TEXT,
@@ -240,8 +240,7 @@ CREATE TABLE job_executions (
     FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
     FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE SET NULL,
     FOREIGN KEY (prompt_id) REFERENCES prompts(id) ON DELETE RESTRICT,
-    FOREIGN KEY (ai_provider_id) REFERENCES ai_providers(id) ON DELETE RESTRICT,
-    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT
+    FOREIGN KEY (ai_provider_id) REFERENCES ai_providers(id) ON DELETE RESTRICT
 );
 
 CREATE INDEX idx_job_executions_job ON job_executions(job_id);

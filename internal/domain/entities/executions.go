@@ -25,7 +25,7 @@ type Execution struct {
 	PromptID     int64
 	AIProviderID int64
 	AIModel      string
-	CategoryID   int64
+	CategoryIDs  []int64
 
 	Status           ExecutionStatus
 	ErrorMessage     *string

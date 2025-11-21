@@ -26,7 +26,7 @@ func (h *CategoriesHandler) CreateCategory(category *dto.Category) *dto.Response
 		return fail[string](err)
 	}
 
-	return ok("Category created successfully")
+	return ok("Categories created successfully")
 }
 
 func (h *CategoriesHandler) GetCategory(id int64) *dto.Response[*dto.Category] {
@@ -62,7 +62,7 @@ func (h *CategoriesHandler) UpdateCategory(category *dto.Category) *dto.Response
 		return fail[string](err)
 	}
 
-	return ok("Category updated successfully")
+	return ok("Categories updated successfully")
 }
 
 func (h *CategoriesHandler) DeleteCategory(id int64) *dto.Response[string] {
@@ -70,7 +70,7 @@ func (h *CategoriesHandler) DeleteCategory(id int64) *dto.Response[string] {
 		return fail[string](err)
 	}
 
-	return ok("Category deleted successfully")
+	return ok("Categories deleted successfully")
 }
 
 func (h *CategoriesHandler) SyncFromWordPress(siteID int64) *dto.Response[string] {
@@ -91,7 +91,7 @@ func (h *CategoriesHandler) CreateInWordPress(category *dto.Category) *dto.Respo
 		return fail[string](err)
 	}
 
-	return ok("Category created in WordPress successfully")
+	return ok("Categories created in WordPress successfully")
 }
 
 func (h *CategoriesHandler) UpdateInWordPress(category *dto.Category) *dto.Response[string] {
@@ -104,7 +104,7 @@ func (h *CategoriesHandler) UpdateInWordPress(category *dto.Category) *dto.Respo
 		return fail[string](err)
 	}
 
-	return ok("Category updated in WordPress successfully")
+	return ok("Categories updated in WordPress successfully")
 }
 
 func (h *CategoriesHandler) DeleteInWordPress(categoryID int64) *dto.Response[string] {
@@ -112,7 +112,7 @@ func (h *CategoriesHandler) DeleteInWordPress(categoryID int64) *dto.Response[st
 		return fail[string](err)
 	}
 
-	return ok("Category deleted from WordPress successfully")
+	return ok("Categories deleted from WordPress successfully")
 }
 
 func (h *CategoriesHandler) GetStatistics(categoryID int64, from, to string) *dto.Response[[]*dto.Statistics] {

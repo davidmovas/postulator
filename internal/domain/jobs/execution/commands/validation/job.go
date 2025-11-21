@@ -74,7 +74,7 @@ func (c *ValidateJobCommand) Execute(ctx *pipeline.Context) error {
 	return nil
 }
 
-func (c *ValidateJobCommand) OnError(ctx *pipeline.Context, err error) error {
+func (c *ValidateJobCommand) OnError(_ *pipeline.Context, err error) error {
 	var pErr *fault.PipelineError
 	if errs.As(err, &pErr) {
 		if pErr.Code == fault.ErrCodeNoTopics {

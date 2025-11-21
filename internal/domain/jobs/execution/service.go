@@ -226,27 +226,27 @@ func (s *service) GetJobMetrics(ctx context.Context, jobID int64) (*entities.Met
 
 func (s *service) validateExecution(exec *entities.Execution) error {
 	if exec.JobID <= 0 {
-		return errors.Validation("Job ID is required")
+		return errors.Validation("Job is required")
 	}
 
 	if exec.SiteID <= 0 {
-		return errors.Validation("Site ID is required")
+		return errors.Validation("Site is required")
 	}
 
 	if exec.TopicID <= 0 {
-		return errors.Validation("Topic ID is required")
+		return errors.Validation("Topic is required")
 	}
 
 	if exec.PromptID <= 0 {
-		return errors.Validation("Prompt ID is required")
+		return errors.Validation("Prompt is required")
 	}
 
 	if exec.AIProviderID <= 0 {
-		return errors.Validation("AI Provider ID is required")
+		return errors.Validation("AI Provider is required")
 	}
 
-	if exec.CategoryID <= 0 {
-		return errors.Validation("Category ID is required")
+	if len(exec.CategoryIDs) <= 0 {
+		return errors.Validation("Categories is required")
 	}
 
 	return nil
