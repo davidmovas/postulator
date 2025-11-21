@@ -36,6 +36,7 @@ type Service interface {
 	UpdateInWordPress(ctx context.Context, category *entities.Category) error
 	DeleteInWordPress(ctx context.Context, categoryID int64) error
 
+	IncrementUsage(ctx context.Context, siteID, categoryID int64, date time.Time, articlesPublished, totalWords int) error
 	GetStatistics(ctx context.Context, categoryID int64, from, to time.Time) ([]*entities.Statistics, error)
 	GetSiteStatistics(ctx context.Context, siteID int64, from, to time.Time) ([]*entities.Statistics, error)
 }

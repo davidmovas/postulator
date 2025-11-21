@@ -243,6 +243,10 @@ func (s *service) DeleteInWordPress(ctx context.Context, categoryID int64) error
 	return nil
 }
 
+func (s *service) IncrementUsage(ctx context.Context, siteID, categoryID int64, date time.Time, articlesPublished, totalWords int) error {
+	return s.statsRepo.Increment(ctx, siteID, categoryID, date, articlesPublished, totalWords)
+}
+
 func (s *service) GetStatistics(ctx context.Context, categoryID int64, from, to time.Time) ([]*entities.Statistics, error) {
 	if from.After(to) {
 		return nil, errors.Validation("From date cannot be after to date")
