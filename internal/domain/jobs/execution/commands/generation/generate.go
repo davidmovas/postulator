@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
-	"github.com/davidmovas/postulator/internal/domain/jobs/execution"
 	"github.com/davidmovas/postulator/internal/domain/jobs/execution/commands"
 	"github.com/davidmovas/postulator/internal/domain/jobs/execution/fault"
 	"github.com/davidmovas/postulator/internal/domain/jobs/execution/pipeline"
@@ -18,19 +17,19 @@ var _ pipeline.Command = (*GenerateContentCommand)(nil)
 
 type GenerateContentCommand struct {
 	*commands.BaseCommand
-	execRepo      execution.Repository
-	statsRecorder stats.Recorder
+	executionProvider commands.ExecutionProvider
+	statsRecorder     stats.Recorder
 }
 
-func NewGenerateContentCommand(execRepo execution.Repository, statsRecorder stats.Recorder) *GenerateContentCommand {
+func NewGenerateContentCommand(executionProvider commands.ExecutionProvider, statsRecorder stats.Recorder) *GenerateContentCommand {
 	return &GenerateContentCommand{
 		BaseCommand: commands.NewBaseCommand(
 			"generate_content",
 			pipeline.StatePromptRendered,
 			pipeline.StateGenerated,
 		).WithRetry(3),
-		execRepo:      execRepo,
-		statsRecorder: statsRecorder,
+		executionProvider: executionProvider,
+		statsRecorder:     statsRecorder,
 	}
 }
 
@@ -44,7 +43,7 @@ func (c *GenerateContentCommand) Execute(ctx *pipeline.Context) error {
 	}
 
 	ctx.Execution.Execution.Status = entities.ExecutionStatusGenerating
-	if err := c.execRepo.Update(ctx.Context(), ctx.Execution.Execution); err != nil {
+	if err := c.executionProvider.Update(ctx.Context(), ctx.Execution.Execution); err != nil {
 		_ = c.statsRecorder.RecordArticleFailed(ctx.Context(), ctx.Job.SiteID)
 		return fault.WrapError(err, fault.ErrCodeDatabaseError, c.Name(), "failed to update execution status")
 	}
@@ -88,7 +87,7 @@ func (c *GenerateContentCommand) Execute(ctx *pipeline.Context) error {
 		ctx.Execution.Execution.CostUSD = &result.Cost
 	}
 
-	if err = c.execRepo.Update(ctx.Context(), ctx.Execution.Execution); err != nil {
+	if err = c.executionProvider.Update(ctx.Context(), ctx.Execution.Execution); err != nil {
 		_ = c.statsRecorder.RecordArticleFailed(ctx.Context(), ctx.Job.SiteID)
 		return fault.WrapError(err, fault.ErrCodeDatabaseError, c.Name(), "failed to update execution with generated content")
 	}

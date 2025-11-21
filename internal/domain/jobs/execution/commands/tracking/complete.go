@@ -5,7 +5,6 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/jobs"
-	"github.com/davidmovas/postulator/internal/domain/jobs/execution"
 	"github.com/davidmovas/postulator/internal/domain/jobs/execution/commands"
 	"github.com/davidmovas/postulator/internal/domain/jobs/execution/fault"
 	"github.com/davidmovas/postulator/internal/domain/jobs/execution/pipeline"
@@ -15,13 +14,13 @@ import (
 
 type CompleteExecutionCommand struct {
 	*commands.BaseCommand
-	execRepo      execution.Repository
-	jobRepo       jobs.Repository
-	statsRecorder stats.Recorder
+	executionProvider commands.ExecutionProvider
+	jobRepo           jobs.Repository
+	statsRecorder     stats.Recorder
 }
 
 func NewCompleteExecutionCommand(
-	execRepo execution.Repository,
+	executionProvider commands.ExecutionProvider,
 	jobRepo jobs.Repository,
 	statsRecorder stats.Recorder,
 ) *CompleteExecutionCommand {
@@ -31,9 +30,9 @@ func NewCompleteExecutionCommand(
 			pipeline.StateMarkingUsed,
 			pipeline.StateCompleted,
 		),
-		execRepo:      execRepo,
-		jobRepo:       jobRepo,
-		statsRecorder: statsRecorder,
+		executionProvider: executionProvider,
+		jobRepo:           jobRepo,
+		statsRecorder:     statsRecorder,
 	}
 }
 
@@ -45,7 +44,7 @@ func (c *CompleteExecutionCommand) Execute(ctx *pipeline.Context) error {
 	now := time.Now()
 	ctx.Execution.Execution.CompletedAt = &now
 
-	if err := c.execRepo.Update(ctx.Context(), ctx.Execution.Execution); err != nil {
+	if err := c.executionProvider.Update(ctx.Context(), ctx.Execution.Execution); err != nil {
 		return fault.WrapError(err, fault.ErrCodeDatabaseError, c.Name(), "failed to update execution completion time")
 	}
 

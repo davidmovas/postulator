@@ -2,38 +2,26 @@ package execution
 
 import (
 	"context"
-	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/articles"
 	"github.com/davidmovas/postulator/internal/domain/categories"
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/jobs"
+	"github.com/davidmovas/postulator/internal/domain/jobs/execution/phase"
+	"github.com/davidmovas/postulator/internal/domain/jobs/execution/pipeline"
 	"github.com/davidmovas/postulator/internal/domain/prompts"
 	"github.com/davidmovas/postulator/internal/domain/providers"
 	"github.com/davidmovas/postulator/internal/domain/sites"
 	"github.com/davidmovas/postulator/internal/domain/stats"
 	"github.com/davidmovas/postulator/internal/domain/topics"
+	"github.com/davidmovas/postulator/internal/infra/events"
 	"github.com/davidmovas/postulator/internal/infra/wp"
-	"github.com/davidmovas/postulator/pkg/errors"
 	"github.com/davidmovas/postulator/pkg/logger"
 )
 
 type Executor struct {
-	execRepo    Repository
-	articleRepo articles.Repository
-	stateRepo   jobs.StateRepository
-	jobRepo     jobs.Repository
-
-	topicService    topics.Service
-	promptService   prompts.Service
-	siteService     sites.Service
-	statsRecorder   stats.Recorder
-	providerService providers.Service
-	categoryService categories.Service
-
-	wpClient wp.Client
-
-	logger *logger.Logger
+	pipeline *pipeline.Pipeline
+	logger   *logger.Logger
 }
 
 func NewExecutor(
@@ -50,55 +38,30 @@ func NewExecutor(
 	wpClient wp.Client,
 	logger *logger.Logger,
 ) jobs.Executor {
+	builder := pipeline.NewPipelineBuilder().
+		WithLogger(logger).
+		WithEventBus(events.GetGlobalEventBus()).
+		AddCommands(
+			phase.ValidateJobCommand(siteService, topicService, providerService),
+			phase.SelectTopicCommand(),
+			phase.SelectCategoryCommand(categoryService, stateRepo),
+			phase.CreateExecutionCommand(execRepo, providerService, promptService),
+			phase.RenderPromptCommand(promptService),
+			phase.GenerateContentCommand(execRepo, statsRecorder),
+			phase.ValidateOutputCommand(),
+			phase.PublishArticleCommand(execRepo, articleRepo, wpClient, statsRecorder),
+			phase.RecordCategoryStatsCommand(categoryService),
+			phase.MarkTopicUsedCommand(),
+			phase.CompleteExecutionCommand(execRepo, jobRepo, statsRecorder),
+		)
+
 	return &Executor{
-		execRepo:        execRepo,
-		articleRepo:     articleRepo,
-		stateRepo:       stateRepo,
-		jobRepo:         jobRepo,
-		topicService:    topicService,
-		promptService:   promptService,
-		siteService:     siteService,
-		statsRecorder:   statsRecorder,
-		providerService: providerService,
-		categoryService: categoryService,
-		wpClient:        wpClient,
-		logger:          logger.WithScope("executor"),
+		pipeline: builder.Build(),
+		logger:   logger.WithScope("executor"),
 	}
 }
 
 func (e *Executor) Execute(ctx context.Context, job *entities.Job) error {
-	e.logger.Infof("Starting execution of job %d (%s)", job.ID, job.Name)
-
-	if err := e.executePipeline(ctx, job); err != nil {
-		e.logger.Errorf("Job %d execution failed: %v", job.ID, err)
-		return err
-	}
-
-	e.logger.Infof("Job %d execution completed", job.ID)
-	return nil
-}
-
-func (e *Executor) PublishValidatedArticle(ctx context.Context, exec *entities.Execution) error {
-	if exec.Status != entities.ExecutionStatusValidated {
-		return errors.Validation("execution is not validated")
-	}
-
-	if exec.ArticleID == nil {
-		return errors.Validation("execution has no associated article")
-	}
-
-	return e.publishValidatedArticle(ctx, exec)
-}
-
-func (e *Executor) pauseJob(ctx context.Context, id int64) error {
-	job, err := e.jobRepo.GetByID(ctx, id)
-	if err != nil {
-		return err
-	}
-	if job.Status == entities.JobStatusPaused {
-		return nil
-	}
-	job.Status = entities.JobStatusPaused
-	job.UpdatedAt = time.Now()
-	return e.jobRepo.Update(ctx, job)
+	e.logger.Infof("Starting new pipeline execution for job %d (%s)", job.ID, job.Name)
+	return e.pipeline.Execute(ctx, job)
 }

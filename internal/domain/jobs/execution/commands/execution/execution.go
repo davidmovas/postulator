@@ -1,10 +1,9 @@
-package tracking
+package execution
 
 import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
-	"github.com/davidmovas/postulator/internal/domain/jobs/execution"
 	"github.com/davidmovas/postulator/internal/domain/jobs/execution/commands"
 	"github.com/davidmovas/postulator/internal/domain/jobs/execution/fault"
 	"github.com/davidmovas/postulator/internal/domain/jobs/execution/pipeline"
@@ -16,21 +15,21 @@ var _ pipeline.Command = (*CreateExecutionCommand)(nil)
 
 type CreateExecutionCommand struct {
 	*commands.BaseCommand
-	providersService providers.Service
-	promptsService   prompts.Service
-	execRepo         execution.Repository
+	providersService  providers.Service
+	promptsService    prompts.Service
+	executionProvider commands.ExecutionProvider
 }
 
 func NewCreateExecutionCommand(
-	execRepo execution.Repository,
+	executionProvider commands.ExecutionProvider,
 	providerService providers.Service,
 	promptService prompts.Service,
 ) *CreateExecutionCommand {
 	return &CreateExecutionCommand{
-		BaseCommand:      commands.NewBaseCommand("create_execution", pipeline.StateCategorySelected, pipeline.StateExecutionCreated),
-		execRepo:         execRepo,
-		providersService: providerService,
-		promptsService:   promptService,
+		BaseCommand:       commands.NewBaseCommand("create_execution", pipeline.StateCategorySelected, pipeline.StateExecutionCreated),
+		executionProvider: executionProvider,
+		providersService:  providerService,
+		promptsService:    promptService,
 	}
 }
 
@@ -66,7 +65,7 @@ func (c *CreateExecutionCommand) Execute(ctx *pipeline.Context) error {
 		StartedAt:    time.Now(),
 	}
 
-	if err = c.execRepo.Create(ctx.Context(), exec); err != nil {
+	if err = c.executionProvider.Create(ctx.Context(), exec); err != nil {
 		return fault.WrapError(err, fault.ErrCodeDatabaseError, c.Name(), "failed to create execution record")
 	}
 

@@ -55,5 +55,4 @@ type Scheduler interface {
 
 type Executor interface {
 	Execute(ctx context.Context, job *entities.Job) error
-	PublishValidatedArticle(ctx context.Context, exec *entities.Execution) error
 }

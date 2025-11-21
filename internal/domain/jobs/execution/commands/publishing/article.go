@@ -7,7 +7,6 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/articles"
 	"github.com/davidmovas/postulator/internal/domain/entities"
-	"github.com/davidmovas/postulator/internal/domain/jobs/execution"
 	"github.com/davidmovas/postulator/internal/domain/jobs/execution/commands"
 	"github.com/davidmovas/postulator/internal/domain/jobs/execution/fault"
 	"github.com/davidmovas/postulator/internal/domain/jobs/execution/pipeline"
@@ -19,14 +18,14 @@ import (
 
 type PublishArticleCommand struct {
 	*commands.BaseCommand
-	wpClient      wp.Client
-	execRepo      execution.Repository
-	articleRepo   articles.Repository
-	statsRecorder stats.Recorder
+	wpClient          wp.Client
+	executionProvider commands.ExecutionProvider
+	articleRepo       articles.Repository
+	statsRecorder     stats.Recorder
 }
 
 func NewPublishArticleCommand(
-	execRepo execution.Repository,
+	executionProvider commands.ExecutionProvider,
 	articleRepo articles.Repository,
 	wpClient wp.Client,
 	statsRecorder stats.Recorder,
@@ -37,10 +36,10 @@ func NewPublishArticleCommand(
 			pipeline.StateOutputValidated,
 			pipeline.StatePublished,
 		),
-		wpClient:      wpClient,
-		execRepo:      execRepo,
-		articleRepo:   articleRepo,
-		statsRecorder: statsRecorder,
+		wpClient:          wpClient,
+		executionProvider: executionProvider,
+		articleRepo:       articleRepo,
+		statsRecorder:     statsRecorder,
 	}
 }
 
@@ -58,7 +57,7 @@ func (c *PublishArticleCommand) Execute(ctx *pipeline.Context) error {
 	}
 
 	ctx.Execution.Execution.Status = entities.ExecutionStatusPublishing
-	if err := c.execRepo.Update(ctx.Context(), ctx.Execution.Execution); err != nil {
+	if err := c.executionProvider.Update(ctx.Context(), ctx.Execution.Execution); err != nil {
 		return fault.WrapError(err, fault.ErrCodeDatabaseError, c.Name(), "failed to update execution status")
 	}
 
@@ -110,7 +109,7 @@ func (c *PublishArticleCommand) Execute(ctx *pipeline.Context) error {
 
 	if ctx.Job.RequiresValidation {
 		ctx.Execution.Execution.Status = entities.ExecutionStatusPendingValidation
-		if err = c.execRepo.Update(ctx.Context(), ctx.Execution.Execution); err != nil {
+		if err = c.executionProvider.Update(ctx.Context(), ctx.Execution.Execution); err != nil {
 			return fault.WrapError(err, fault.ErrCodeDatabaseError, c.Name(), "failed to update execution to pending validation")
 		}
 		return nil
@@ -120,7 +119,7 @@ func (c *PublishArticleCommand) Execute(ctx *pipeline.Context) error {
 	ctx.Execution.Execution.PublishedAt = &now
 	ctx.Execution.Execution.Status = entities.ExecutionStatusPublished
 
-	if err = c.execRepo.Update(ctx.Context(), ctx.Execution.Execution); err != nil {
+	if err = c.executionProvider.Update(ctx.Context(), ctx.Execution.Execution); err != nil {
 		_ = c.statsRecorder.RecordArticleFailed(ctx.Context(), ctx.Job.SiteID)
 		return fault.WrapError(err, fault.ErrCodeDatabaseError, c.Name(), "failed to update execution after publication")
 	}
