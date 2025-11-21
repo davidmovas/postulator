@@ -105,15 +105,16 @@ func (s *Scheduler) executeAndReschedule(_ context.Context, job *entities.Job) {
 	execCtx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 	defer cancel()
 
+	executionStart := time.Now()
+
 	err := s.executor.Execute(execCtx, job)
 
-	now := time.Now()
 	state := job.State
 	if state == nil {
 		state = &entities.State{JobID: job.ID}
 	}
 
-	state.LastRunAt = &now
+	state.LastRunAt = &executionStart
 
 	if err != nil {
 		s.logger.Errorf("Job %d execution failed: %v", job.ID, err)
@@ -122,6 +123,7 @@ func (s *Scheduler) executeAndReschedule(_ context.Context, job *entities.Job) {
 			s.logger.Warnf("No available topics for job %d, pausing job", job.ID)
 			job.Status = entities.JobStatusPaused
 			state.NextRunAt = nil
+			state.NextRunBase = nil
 
 			if updateErr := s.jobRepo.Update(execCtx, job); updateErr != nil {
 				s.logger.Errorf("Failed to pause job %d: %v", job.ID, updateErr)
@@ -147,6 +149,7 @@ func (s *Scheduler) executeAndReschedule(_ context.Context, job *entities.Job) {
 		if job.Schedule.Type == entities.ScheduleOnce {
 			job.Status = entities.JobStatusCompleted
 			state.NextRunAt = nil
+			state.NextRunBase = nil
 
 			if updateErr := s.jobRepo.Update(execCtx, job); updateErr != nil {
 				s.logger.Errorf("Failed to complete job %d: %v", job.ID, updateErr)
@@ -160,12 +163,18 @@ func (s *Scheduler) executeAndReschedule(_ context.Context, job *entities.Job) {
 				s.logger.Errorf("Failed to delete completed job %d: %v", job.ID, deleteErr)
 			}
 		} else {
-			nextRun, calcErr := s.calculator.CalculateNextRun(job, state.LastRunAt)
+			baseTime, withJitter, calcErr := s.calculator.CalculateNextRun(job, state.LastRunAt)
 			if calcErr != nil {
 				s.logger.Errorf("Failed to calculate next run for job %d: %v", job.ID, calcErr)
 			} else {
-				state.NextRunAt = &nextRun
-				if updateErr := s.stateRepo.UpdateNextRun(execCtx, job.ID, &nextRun); updateErr != nil {
+				state.NextRunBase = &baseTime
+				state.NextRunAt = &withJitter
+
+				jitterDiff := withJitter.Sub(baseTime)
+				s.logger.Infof("Job %d scheduled: base=%s, withJitter=%s, jitter=%v",
+					job.ID, baseTime.Format("15:04:05"), withJitter.Format("15:04:05"), jitterDiff)
+
+				if updateErr := s.stateRepo.Update(execCtx, state); updateErr != nil {
 					s.logger.Errorf("Failed to update next run for job %d: %v", job.ID, updateErr)
 				}
 			}
@@ -199,27 +208,36 @@ func (s *Scheduler) RestoreState(ctx context.Context) error {
 			continue
 		}
 
-		if state.NextRunAt == nil || state.NextRunAt.Before(now) {
-			if state.NextRunAt != nil && state.NextRunAt.Before(now) {
-				missedCount++
-				delay := time.Duration(rand.Intn(300)) * time.Second
-				nextRun := now.Add(delay)
-				state.NextRunAt = &nextRun
+		needsReschedule := false
 
-				s.logger.Warnf("Job %d (%s) missed execution, rescheduling with %v delay",
-					job.ID, job.Name, delay)
-			} else {
-				var nextRun time.Time
-				nextRun, err = s.calculator.CalculateNextRun(job, state.LastRunAt)
-				if err != nil {
-					s.logger.Errorf("Failed to calculate next run for job %d: %v", job.ID, err)
+		if state.NextRunAt == nil {
+			needsReschedule = true
+		} else if state.NextRunAt.Before(now) {
+			missedCount++
+			delay := time.Duration(rand.Intn(300)) * time.Second
+			nextRun := now.Add(delay)
+			state.NextRunAt = &nextRun
+
+			s.logger.Warnf("Job %d (%s) missed execution, rescheduling with %v delay",
+				job.ID, job.Name, delay)
+
+			needsReschedule = true
+		}
+
+		if needsReschedule {
+			if state.NextRunBase == nil || state.NextRunAt.Before(now) {
+				baseTime, withJitter, calcErr := s.calculator.CalculateNextRun(job, state.LastRunAt)
+				if calcErr != nil {
+					s.logger.Errorf("Failed to calculate next run for job %d: %v", job.ID, calcErr)
 					continue
 				}
-				state.NextRunAt = &nextRun
+
+				state.NextRunBase = &baseTime
+				state.NextRunAt = &withJitter
 			}
 
-			if err = s.stateRepo.UpdateNextRun(ctx, job.ID, state.NextRunAt); err != nil {
-				s.logger.Errorf("Failed to update next run for job %d during state restore: %v", job.ID, err)
+			if err = s.stateRepo.Update(ctx, state); err != nil {
+				s.logger.Errorf("Failed to update state for job %d during restore: %v", job.ID, err)
 				continue
 			}
 
@@ -233,7 +251,7 @@ func (s *Scheduler) RestoreState(ctx context.Context) error {
 	return nil
 }
 
-func (s *Scheduler) CalculateNextRun(job *entities.Job, lastRun *time.Time) (time.Time, error) {
+func (s *Scheduler) CalculateNextRun(job *entities.Job, lastRun *time.Time) (baseTime time.Time, withJitter time.Time, err error) {
 	return s.calculator.CalculateNextRun(job, lastRun)
 }
 
@@ -245,19 +263,25 @@ func (s *Scheduler) ScheduleJob(ctx context.Context, job *entities.Job) error {
 	}
 
 	if job.Schedule != nil && job.Schedule.Type != entities.ScheduleManual {
-		nextRun, err := s.calculator.CalculateNextRun(job, nil)
+		baseTime, withJitter, err := s.calculator.CalculateNextRun(job, nil)
 		if err != nil {
 			return err
 		}
 
 		state := &entities.State{
-			JobID:     job.ID,
-			NextRunAt: &nextRun,
+			JobID:       job.ID,
+			NextRunBase: &baseTime,
+			NextRunAt:   &withJitter,
 		}
 
 		if err = s.stateRepo.Update(ctx, state); err != nil {
 			return appErrors.Scheduler(err)
 		}
+
+		s.logger.Infof("Job %d scheduled: first run at %s (base: %s, jitter: %v)",
+			job.ID, withJitter.Format("2006-01-02 15:04:05"),
+			baseTime.Format("2006-01-02 15:04:05"),
+			withJitter.Sub(baseTime))
 	}
 
 	job.Status = entities.JobStatusActive

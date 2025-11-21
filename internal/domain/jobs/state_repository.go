@@ -32,7 +32,7 @@ func NewStateRepository(db *database.DB, logger *logger.Logger) StateRepository 
 func (r *stateRepository) Get(ctx context.Context, jobID int64) (*entities.State, error) {
 	query, args := dbx.ST.
 		Select(
-			"job_id", "last_run_at", "next_run_at",
+			"job_id", "last_run_at", "next_run_at", "next_run_base",
 			"total_executions", "failed_executions", "last_category_index",
 		).
 		From("job_state").
@@ -40,12 +40,13 @@ func (r *stateRepository) Get(ctx context.Context, jobID int64) (*entities.State
 		MustSql()
 
 	var state entities.State
-	var lastRunAt, nextRunAt sql.NullTime
+	var lastRunAt, nextRunAt, nextRunBase sql.NullTime
 
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(
 		&state.JobID,
 		&lastRunAt,
 		&nextRunAt,
+		&nextRunBase,
 		&state.TotalExecutions,
 		&state.FailedExecutions,
 		&state.LastCategoryIndex,
@@ -64,6 +65,9 @@ func (r *stateRepository) Get(ctx context.Context, jobID int64) (*entities.State
 	if nextRunAt.Valid {
 		state.NextRunAt = &nextRunAt.Time
 	}
+	if nextRunBase.Valid {
+		state.NextRunBase = &nextRunBase.Time
+	}
 
 	return &state, nil
 }
@@ -72,14 +76,14 @@ func (r *stateRepository) Update(ctx context.Context, state *entities.State) err
 	query, args := dbx.ST.
 		Insert("job_state").
 		Columns(
-			"job_id", "last_run_at", "next_run_at",
+			"job_id", "last_run_at", "next_run_at", "next_run_base",
 			"total_executions", "failed_executions", "last_category_index",
 		).
 		Values(
-			state.JobID, state.LastRunAt, state.NextRunAt,
+			state.JobID, state.LastRunAt, state.NextRunAt, state.NextRunBase,
 			state.TotalExecutions, state.FailedExecutions, state.LastCategoryIndex,
 		).
-		Suffix("ON CONFLICT(job_id) DO UPDATE SET last_run_at = EXCLUDED.last_run_at, next_run_at = EXCLUDED.next_run_at, total_executions = EXCLUDED.total_executions, failed_executions = EXCLUDED.failed_executions, last_category_index = EXCLUDED.last_category_index").
+		Suffix("ON CONFLICT(job_id) DO UPDATE SET last_run_at = EXCLUDED.last_run_at, next_run_at = EXCLUDED.next_run_at, next_run_base = EXCLUDED.next_run_base, total_executions = EXCLUDED.total_executions, failed_executions = EXCLUDED.failed_executions, last_category_index = EXCLUDED.last_category_index").
 		MustSql()
 
 	_, err := r.db.ExecContext(ctx, query, args...)

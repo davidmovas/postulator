@@ -169,6 +169,7 @@ CREATE TABLE job_state (
     job_id INTEGER PRIMARY KEY,
     last_run_at DATETIME,
     next_run_at DATETIME,
+    next_run_base DATETIME,
     total_executions INTEGER DEFAULT 0,
     failed_executions INTEGER DEFAULT 0,
     last_category_index INTEGER DEFAULT 0,

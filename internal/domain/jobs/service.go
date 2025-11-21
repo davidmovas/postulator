@@ -91,16 +91,28 @@ func (s *service) CreateJob(ctx context.Context, job *entities.Job) error {
 	}
 
 	if job.Schedule != nil && job.Schedule.Type != entities.ScheduleManual {
-		nextRun, err := s.scheduler.CalculateNextRun(job, nil)
+		baseTime, withJitter, err := s.scheduler.CalculateNextRun(job, nil)
 		if err != nil {
 			s.logger.ErrorWithErr(err, "Failed to calculate next run")
 			return err
 		}
 
-		if err = s.stateRepo.UpdateNextRun(ctx, job.ID, &nextRun); err != nil {
-			s.logger.ErrorWithErr(err, "Failed to update next run")
+		state := &entities.State{
+			JobID:       job.ID,
+			NextRunBase: &baseTime,
+			NextRunAt:   &withJitter,
+		}
+
+		if err = s.stateRepo.Update(ctx, state); err != nil {
+			s.logger.ErrorWithErr(err, "Failed to create initial state")
 			return err
 		}
+
+		s.logger.Infof("Job %d initial schedule: base=%s, withJitter=%s, jitter=%v",
+			job.ID,
+			baseTime.Format("2006-01-02 15:04:05"),
+			withJitter.Format("2006-01-02 15:04:05"),
+			withJitter.Sub(baseTime))
 	}
 
 	if err := s.scheduler.ScheduleJob(ctx, job); err != nil {

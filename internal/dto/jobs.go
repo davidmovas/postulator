@@ -183,6 +183,7 @@ type State struct {
 	JobID             int64   `json:"jobId"`
 	LastRunAt         *string `json:"lastRunAt"`
 	NextRunAt         *string `json:"nextRunAt"`
+	NextRunBase       *string `json:"nextRunBase"`
 	TotalExecutions   int     `json:"totalExecutions"`
 	FailedExecutions  int     `json:"failedExecutions"`
 	LastCategoryIndex int     `json:"lastCategoryIndex"`
@@ -209,10 +210,16 @@ func (d *State) ToEntity() *entities.State {
 		nextRunAt = &nextRunAtTime
 	}
 
+	if d.NextRunBase != nil {
+		nextRunBaseTime, _ := StringToTime(*d.NextRunBase)
+		nextRunAt = &nextRunBaseTime
+	}
+
 	return &entities.State{
 		JobID:             d.JobID,
 		LastRunAt:         lastRunAt,
 		NextRunAt:         nextRunAt,
+		NextRunBase:       nextRunAt,
 		TotalExecutions:   d.TotalExecutions,
 		FailedExecutions:  d.FailedExecutions,
 		LastCategoryIndex: d.LastCategoryIndex,
@@ -237,6 +244,13 @@ func (d *State) FromEntity(entity *entities.State) *State {
 		d.NextRunAt = &nextRunAt
 	} else {
 		d.NextRunAt = nil
+	}
+
+	if entity.NextRunBase != nil {
+		nextRunBase := TimeToString(*entity.NextRunBase)
+		d.NextRunBase = &nextRunBase
+	} else {
+		d.NextRunBase = nil
 	}
 
 	return d

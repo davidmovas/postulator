@@ -84,6 +84,7 @@ type State struct {
 	JobID             int64
 	LastRunAt         *time.Time
 	NextRunAt         *time.Time
+	NextRunBase       *time.Time
 	TotalExecutions   int
 	FailedExecutions  int
 	LastCategoryIndex int

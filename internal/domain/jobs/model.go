@@ -48,7 +48,7 @@ type Scheduler interface {
 	Start(ctx context.Context) error
 	Stop() error
 	RestoreState(ctx context.Context) error
-	CalculateNextRun(job *entities.Job, lastRun *time.Time) (time.Time, error)
+	CalculateNextRun(job *entities.Job, lastRun *time.Time) (baseTime time.Time, withJitter time.Time, err error)
 	ScheduleJob(ctx context.Context, job *entities.Job) error
 	TriggerJob(ctx context.Context, jobID int64) error
 }
