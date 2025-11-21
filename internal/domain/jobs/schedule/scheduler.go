@@ -129,10 +129,6 @@ func (s *Scheduler) executeAndReschedule(_ context.Context, job *entities.Job) {
 				s.logger.Errorf("Failed to pause job %d: %v", job.ID, updateErr)
 			}
 
-			if updateErr := s.stateRepo.Update(execCtx, state); updateErr != nil {
-				s.logger.Errorf("Failed to update state for job %d: %v", job.ID, updateErr)
-			}
-
 			return
 		}
 
@@ -143,6 +139,10 @@ func (s *Scheduler) executeAndReschedule(_ context.Context, job *entities.Job) {
 		if updateErr := s.stateRepo.IncrementExecutions(execCtx, job.ID, false); updateErr != nil {
 			s.logger.Errorf("Failed to increment successful executions: %v", updateErr)
 		}
+	}
+
+	if updateErr := s.stateRepo.Update(execCtx, state); updateErr != nil {
+		s.logger.Errorf("Failed to update state for job %d: %v", job.ID, updateErr)
 	}
 
 	if job.Status == entities.JobStatusActive && job.Schedule != nil && job.Schedule.Type != entities.ScheduleManual {
@@ -163,7 +163,12 @@ func (s *Scheduler) executeAndReschedule(_ context.Context, job *entities.Job) {
 				s.logger.Errorf("Failed to delete completed job %d: %v", job.ID, deleteErr)
 			}
 		} else {
-			baseTime, withJitter, calcErr := s.calculator.CalculateNextRun(job, state.LastRunAt)
+			runTime := state.LastRunAt
+			if state.NextRunBase != nil {
+				runTime = state.NextRunBase
+			}
+
+			baseTime, withJitter, calcErr := s.calculator.CalculateNextRun(job, runTime)
 			if calcErr != nil {
 				s.logger.Errorf("Failed to calculate next run for job %d: %v", job.ID, calcErr)
 			} else {

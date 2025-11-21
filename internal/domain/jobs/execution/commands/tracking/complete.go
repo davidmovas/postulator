@@ -1,6 +1,7 @@
 package tracking
 
 import (
+	"strings"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
@@ -55,7 +56,7 @@ func (c *CompleteExecutionCommand) Execute(ctx *pipeline.Context) error {
 	}
 
 	if ctx.HasPublication() && ctx.Publication.Article.Status == entities.StatusPublished {
-		_ = c.statsRecorder.RecordArticlePublished(ctx.Context(), ctx.Job.SiteID, len(ctx.Generation.GeneratedContent))
+		_ = c.statsRecorder.RecordArticlePublished(ctx.Context(), ctx.Job.SiteID, len(strings.Fields(ctx.Generation.GeneratedContent)))
 	}
 
 	return nil

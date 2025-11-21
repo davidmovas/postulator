@@ -8,34 +8,18 @@ import (
 type State string
 
 const (
-	StateInitialized State = "initialized"
-
-	StateValidating State = "validating"
-	StateValidated  State = "validated"
-
-	StateSelectingTopic    State = "selecting_topic"
-	StateTopicSelected     State = "topic_selected"
-	StateSelectingCategory State = "selecting_category"
-	StateCategorySelected  State = "category_selected"
-
-	StateCreatingExecution State = "creating_execution"
-	StateExecutionCreated  State = "execution_created"
-
-	StateRenderingPrompt State = "rendering_prompt"
-	StatePromptRendered  State = "prompt_rendered"
-	StateGenerating      State = "generating"
-	StateGenerated       State = "generated"
-
-	StateValidatingOutput State = "validating_output"
+	StateInitialized      State = "initialized"
+	StateValidated        State = "validated"
+	StateTopicSelected    State = "topic_selected"
+	StateCategorySelected State = "category_selected"
+	StateExecutionCreated State = "execution_created"
+	StatePromptRendered   State = "prompt_rendered"
+	StateGenerated        State = "generated"
 	StateOutputValidated  State = "output_validated"
-
-	StatePublishing State = "publishing"
-	StatePublished  State = "published"
-
-	StateRecordingStats State = "recording_stats"
-	StateMarkingUsed    State = "marking_used"
-	StateCompleting     State = "completing"
-	StateCompleted      State = "completed"
+	StatePublished        State = "published"
+	StateRecordingStats   State = "recording_stats"
+	StateMarkingUsed      State = "marking_used"
+	StateCompleted        State = "completed"
 
 	StatePausedForValidation State = "paused_for_validation"
 	StatePausedNoResources   State = "paused_no_resources"
@@ -72,65 +56,31 @@ func (sm *StateMachine) defineTransitions() {
 			StateValidated,
 			StateFailed,
 		},
-		StateValidating: {
-			StateValidated,
-			StatePausedNoResources,
-			StateFailed,
-		},
 		StateValidated: {
-			StateSelectingTopic,
-			StateFailed,
-		},
-		StateSelectingTopic: {
 			StateTopicSelected,
-			StatePausedNoResources,
 			StateFailed,
 		},
 		StateTopicSelected: {
-			StateSelectingCategory,
-			StateFailed,
-		},
-		StateSelectingCategory: {
 			StateCategorySelected,
 			StateFailed,
 		},
 		StateCategorySelected: {
-			StateCreatingExecution,
-			StateFailed,
-		},
-		StateCreatingExecution: {
 			StateExecutionCreated,
 			StateFailed,
 		},
 		StateExecutionCreated: {
-			StateRenderingPrompt,
-			StateFailed,
-		},
-		StateRenderingPrompt: {
 			StatePromptRendered,
 			StateFailed,
 		},
 		StatePromptRendered: {
-			StateGenerating,
-			StateFailed,
-		},
-		StateGenerating: {
 			StateGenerated,
 			StateFailed,
 		},
 		StateGenerated: {
-			StateValidatingOutput,
-			StateFailed,
-		},
-		StateValidatingOutput: {
 			StateOutputValidated,
 			StateFailed,
 		},
 		StateOutputValidated: {
-			StatePublishing,
-			StateFailed,
-		},
-		StatePublishing: {
 			StatePublished,
 			StatePausedForValidation,
 			StateFailed,
@@ -141,14 +91,9 @@ func (sm *StateMachine) defineTransitions() {
 		},
 		StateRecordingStats: {
 			StateMarkingUsed,
-			StateCompleting,
 			StateFailed,
 		},
 		StateMarkingUsed: {
-			StateCompleting,
-			StateFailed,
-		},
-		StateCompleting: {
 			StateCompleted,
 			StateFailed,
 		},

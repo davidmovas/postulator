@@ -474,10 +474,17 @@ export function useJobsTable(siteId?: number) {
                             {nextTopicTitle}
                         </Badge>
                     ) : (
-                        <Badge variant="destructive" className="text-xs px-2 py-0.5 font-medium flex items-center gap-1">
-                            <AlertCircle className="h-4 w-4" />
-                            No topics available - job paused
-                        </Badge>
+                        job.schedule?.type === "manual" ? (
+                            <Badge variant="destructive" className="text-xs px-2 py-0.5 font-medium flex items-center gap-1">
+                                <AlertCircle className="h-4 w-4" />
+                                No topics available
+                            </Badge>
+                            ) : (
+                            <Badge variant="destructive" className="text-xs px-2 py-0.5 font-medium flex items-center gap-1">
+                                <AlertCircle className="h-4 w-4" />
+                                No topics available - job paused
+                            </Badge>
+                        )
                     )}
                 </div>
             </div>

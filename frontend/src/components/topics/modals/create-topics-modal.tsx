@@ -63,6 +63,7 @@ export function CreateTopicsModal({ open, onOpenChange, siteId, onSuccess }: Cre
             onOpenChange(false);
             resetForm();
             onSuccess?.();
+        }
     }
 
     const handleOpenChange = (newOpen: boolean) => {
@@ -115,5 +116,4 @@ export function CreateTopicsModal({ open, onOpenChange, siteId, onSuccess }: Cre
             </DialogContent>
         </Dialog>
     );
-}
 }
