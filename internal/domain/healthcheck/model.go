@@ -8,18 +8,18 @@ import (
 )
 
 type Repository interface {
-    SaveHistory(ctx context.Context, history *entities.HealthCheckHistory) error
-    GetHistoryBySite(ctx context.Context, siteID int64, limit int) ([]*entities.HealthCheckHistory, error)
-    GetHistoryBySitePeriod(ctx context.Context, siteID int64, from, to time.Time, limit, offset int) ([]*entities.HealthCheckHistory, int, error)
-    GetLastCheckBySite(ctx context.Context, siteID int64) (*entities.HealthCheckHistory, error)
+	SaveHistory(ctx context.Context, history *entities.HealthCheckHistory) error
+	GetHistoryBySite(ctx context.Context, siteID int64, limit int) ([]*entities.HealthCheckHistory, error)
+	GetHistoryBySitePeriod(ctx context.Context, siteID int64, from, to time.Time, limit, offset int) ([]*entities.HealthCheckHistory, int, error)
+	GetLastCheckBySite(ctx context.Context, siteID int64) (*entities.HealthCheckHistory, error)
 }
 
 type Service interface {
-    CheckSiteHealth(ctx context.Context, site *entities.Site) (*entities.HealthCheckHistory, error)
-    CheckSiteByID(ctx context.Context, siteID int64) (*entities.HealthCheckHistory, error)
-    CheckAutoHealthSites(ctx context.Context) (unhealthy []*entities.Site, recovered []*entities.Site, err error)
-    GetSiteHistory(ctx context.Context, siteID int64, limit int) ([]*entities.HealthCheckHistory, error)
-    GetSiteHistoryByPeriod(ctx context.Context, siteID int64, from, to time.Time, limit, offset int) ([]*entities.HealthCheckHistory, int, error)
+	CheckSiteHealth(ctx context.Context, site *entities.Site) (*entities.HealthCheckHistory, error)
+	CheckSiteByID(ctx context.Context, siteID int64) (*entities.HealthCheckHistory, error)
+	CheckAutoHealthSites(ctx context.Context) (unhealthy []*entities.Site, recovered []*entities.Site, err error)
+	GetSiteHistory(ctx context.Context, siteID int64, limit int) ([]*entities.HealthCheckHistory, error)
+	GetSiteHistoryByPeriod(ctx context.Context, siteID int64, from, to time.Time, limit, offset int) ([]*entities.HealthCheckHistory, int, error)
 }
 
 type Notifier interface {

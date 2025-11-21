@@ -106,74 +106,74 @@ func (r *repository) GetHistoryBySite(ctx context.Context, siteID int64, limit i
 }
 
 func (r *repository) GetHistoryBySitePeriod(ctx context.Context, siteID int64, from, to time.Time, limit, offset int) ([]*entities.HealthCheckHistory, int, error) {
-    // total count first
-    countQ, countArgs := dbx.ST.
-        Select("COUNT(id)").
-        From("health_check_history").
-        Where(squirrel.Eq{"site_id": siteID}).
-        Where(squirrel.And{
-            squirrel.GtOrEq{"checked_at": from},
-            squirrel.LtOrEq{"checked_at": to},
-        }).
-        MustSql()
+	// total count first
+	countQ, countArgs := dbx.ST.
+		Select("COUNT(id)").
+		From("health_check_history").
+		Where(squirrel.Eq{"site_id": siteID}).
+		Where(squirrel.And{
+			squirrel.GtOrEq{"checked_at": from},
+			squirrel.LtOrEq{"checked_at": to},
+		}).
+		MustSql()
 
-    var total int
-    if err := r.db.QueryRowContext(ctx, countQ, countArgs...).Scan(&total); err != nil {
-        return nil, 0, errors.Database(err)
-    }
+	var total int
+	if err := r.db.QueryRowContext(ctx, countQ, countArgs...).Scan(&total); err != nil {
+		return nil, 0, errors.Database(err)
+	}
 
-    // items page
-    if limit < 0 {
-        limit = 0
-    }
-    if offset < 0 {
-        offset = 0
-    }
+	// items page
+	if limit < 0 {
+		limit = 0
+	}
+	if offset < 0 {
+		offset = 0
+	}
 
-    sel := dbx.ST.
-        Select("id", "site_id", "checked_at", "status", "response_time_ms", "status_code", "error_message").
-        From("health_check_history").
-        Where(squirrel.Eq{"site_id": siteID}).
-        Where(squirrel.And{
-            squirrel.GtOrEq{"checked_at": from},
-            squirrel.LtOrEq{"checked_at": to},
-        }).
-        OrderBy("checked_at DESC")
-    if limit > 0 {
-        sel = sel.Limit(uint64(limit)).Offset(uint64(offset))
-    }
-    query, args := sel.MustSql()
+	sel := dbx.ST.
+		Select("id", "site_id", "checked_at", "status", "response_time_ms", "status_code", "error_message").
+		From("health_check_history").
+		Where(squirrel.Eq{"site_id": siteID}).
+		Where(squirrel.And{
+			squirrel.GtOrEq{"checked_at": from},
+			squirrel.LtOrEq{"checked_at": to},
+		}).
+		OrderBy("checked_at DESC")
+	if limit > 0 {
+		sel = sel.Limit(uint64(limit)).Offset(uint64(offset))
+	}
+	query, args := sel.MustSql()
 
-    rows, err := r.db.QueryContext(ctx, query, args...)
-    if err != nil {
-        return nil, 0, errors.Database(err)
-    }
-    defer func() { _ = rows.Close() }()
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, 0, errors.Database(err)
+	}
+	defer func() { _ = rows.Close() }()
 
-    var history []*entities.HealthCheckHistory
-    for rows.Next() {
-        var h entities.HealthCheckHistory
-        var errorMsg sql.NullString
-        if err := rows.Scan(
-            &h.ID,
-            &h.SiteID,
-            &h.CheckedAt,
-            &h.Status,
-            &h.ResponseTimeMs,
-            &h.StatusCode,
-            &errorMsg,
-        ); err != nil {
-            return nil, 0, errors.Database(err)
-        }
-        if errorMsg.Valid {
-            h.ErrorMessage = errorMsg.String
-        }
-        history = append(history, &h)
-    }
-    if err = rows.Err(); err != nil {
-        return nil, 0, errors.Database(err)
-    }
-    return history, total, nil
+	var history []*entities.HealthCheckHistory
+	for rows.Next() {
+		var h entities.HealthCheckHistory
+		var errorMsg sql.NullString
+		if err := rows.Scan(
+			&h.ID,
+			&h.SiteID,
+			&h.CheckedAt,
+			&h.Status,
+			&h.ResponseTimeMs,
+			&h.StatusCode,
+			&errorMsg,
+		); err != nil {
+			return nil, 0, errors.Database(err)
+		}
+		if errorMsg.Valid {
+			h.ErrorMessage = errorMsg.String
+		}
+		history = append(history, &h)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, 0, errors.Database(err)
+	}
+	return history, total, nil
 }
 
 func (r *repository) GetLastCheckBySite(ctx context.Context, siteID int64) (*entities.HealthCheckHistory, error) {

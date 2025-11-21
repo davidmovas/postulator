@@ -11,9 +11,7 @@ import (
 	"github.com/davidmovas/postulator/pkg/logger"
 )
 
-var (
-	_ Service = (*service)(nil)
-)
+var _ Service = (*service)(nil)
 
 type service struct {
 	sitesService     sites.Service

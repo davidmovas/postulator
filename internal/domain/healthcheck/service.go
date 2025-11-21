@@ -143,17 +143,17 @@ func (s *service) GetSiteHistory(ctx context.Context, siteID int64, limit int) (
 }
 
 func (s *service) GetSiteHistoryByPeriod(ctx context.Context, siteID int64, from, to time.Time, limit, offset int) ([]*entities.HealthCheckHistory, int, error) {
-    if to.IsZero() {
-        to = time.Now()
-    }
-    if from.After(to) {
-        // swap to be safe
-        from, to = to, from
-    }
-    history, total, err := s.repo.GetHistoryBySitePeriod(ctx, siteID, from, to, limit, offset)
-    if err != nil {
-        s.logger.ErrorWithErr(err, "Failed to get site history by period")
-        return nil, 0, err
-    }
-    return history, total, nil
+	if to.IsZero() {
+		to = time.Now()
+	}
+	if from.After(to) {
+		// swap to be safe
+		from, to = to, from
+	}
+	history, total, err := s.repo.GetHistoryBySitePeriod(ctx, siteID, from, to, limit, offset)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get site history by period")
+		return nil, 0, err
+	}
+	return history, total, nil
 }

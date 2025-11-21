@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
 )
@@ -14,8 +15,17 @@ const (
 )
 
 type Event struct {
-	Type EventType
-	Data any
+	Type      EventType
+	Timestamp time.Time
+	Data      any
+}
+
+func NewEvent(eventType EventType, data any) Event {
+	return Event{
+		Type:      eventType,
+		Timestamp: time.Now(),
+		Data:      data,
+	}
 }
 
 type HealthCheckSettingsUpdatedEvent struct {
