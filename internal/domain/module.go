@@ -97,6 +97,7 @@ var Module = fx.Module("domain",
 	fx.Provide(healthcheck.NewScheduler, func() healthcheck.WindowVisibilityChecker {
 		return window.IsWindowOpen
 	}),
+	//
 	fx.Invoke(func(lc fx.Lifecycle, scheduler healthcheck.Scheduler) {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
