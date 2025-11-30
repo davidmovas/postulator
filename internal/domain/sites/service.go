@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/deletion"
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/infra/secret"
 	"github.com/davidmovas/postulator/internal/infra/wp"
@@ -16,17 +17,25 @@ import (
 var _ Service = (*service)(nil)
 
 type service struct {
-	wpClient wp.Client
-	secret   *secret.Manager
-	repo     Repository
-	logger   *logger.Logger
+	wpClient          wp.Client
+	secret            *secret.Manager
+	repo              Repository
+	deletionValidator *deletion.Validator
+	logger            *logger.Logger
 }
 
-func NewService(wpClient wp.Client, secretManager *secret.Manager, repo Repository, logger *logger.Logger) Service {
+func NewService(
+	wpClient wp.Client,
+	secretManager *secret.Manager,
+	repo Repository,
+	deletionValidator *deletion.Validator,
+	logger *logger.Logger,
+) Service {
 	return &service{
-		wpClient: wpClient,
-		secret:   secretManager,
-		repo:     repo,
+		wpClient:          wpClient,
+		secret:            secretManager,
+		repo:              repo,
+		deletionValidator: deletionValidator,
 		logger: logger.
 			WithScope("service").
 			WithScope("sites"),
@@ -161,9 +170,21 @@ func (s *service) UpdateSitePassword(ctx context.Context, id int64, password str
 }
 
 func (s *service) DeleteSite(ctx context.Context, id int64) error {
-	_, err := s.repo.GetByID(ctx, id)
+	site, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to get site for deletion")
+		return err
+	}
+
+	if err = s.deletionValidator.CanDeleteSite(ctx, id, site.Name); err != nil {
+		if conflictErr, ok := err.(*deletion.ConflictError); ok {
+			s.logger.Warnf("Cannot delete site %d: %s", id, conflictErr.Error())
+			return errors.ConflictWithContext(conflictErr.UserMessage(), map[string]any{
+				"entity_type":  conflictErr.EntityType,
+				"entity_id":    conflictErr.EntityID,
+				"dependencies": conflictErr.DependencyNames(),
+			})
+		}
 		return err
 	}
 

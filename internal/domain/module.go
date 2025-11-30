@@ -5,6 +5,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/articles"
 	"github.com/davidmovas/postulator/internal/domain/categories"
+	"github.com/davidmovas/postulator/internal/domain/deletion"
 	"github.com/davidmovas/postulator/internal/domain/healthcheck"
 	"github.com/davidmovas/postulator/internal/domain/jobs"
 	"github.com/davidmovas/postulator/internal/domain/jobs/execution"
@@ -22,6 +23,9 @@ import (
 
 var Module = fx.Module("domain",
 	fx.Provide(
+		// Deletion validator
+		deletion.NewValidator,
+
 		// Articles
 		articles.NewRepository,
 		articles.NewService,

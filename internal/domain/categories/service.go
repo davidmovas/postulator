@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/deletion"
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/sites"
 	"github.com/davidmovas/postulator/internal/infra/wp"
@@ -15,11 +16,12 @@ import (
 var _ Service = (*service)(nil)
 
 type service struct {
-	wp          wp.Client
-	siteService sites.Service
-	repo        Repository
-	statsRepo   StatisticsRepository
-	logger      *logger.Logger
+	wp                wp.Client
+	siteService       sites.Service
+	repo              Repository
+	statsRepo         StatisticsRepository
+	deletionValidator *deletion.Validator
+	logger            *logger.Logger
 }
 
 func NewService(
@@ -27,14 +29,16 @@ func NewService(
 	siteService sites.Service,
 	repo Repository,
 	statsRepo StatisticsRepository,
+	deletionValidator *deletion.Validator,
 	logger *logger.Logger,
 ) Service {
 	return &service{
-		wp:          wp,
-		siteService: siteService,
-		repo:        repo,
-		statsRepo:   statsRepo,
-		logger:      logger.WithScope("service").WithScope("categories"),
+		wp:                wp,
+		siteService:       siteService,
+		repo:              repo,
+		statsRepo:         statsRepo,
+		deletionValidator: deletionValidator,
+		logger:            logger.WithScope("service").WithScope("categories"),
 	}
 }
 
@@ -92,12 +96,30 @@ func (s *service) UpdateCategory(ctx context.Context, category *entities.Categor
 }
 
 func (s *service) DeleteCategory(ctx context.Context, id int64) error {
-	if err := s.repo.Delete(ctx, id); err != nil {
+	category, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get category for deletion")
+		return err
+	}
+
+	if err = s.deletionValidator.CanDeleteCategory(ctx, id, category.Name); err != nil {
+		if conflictErr, ok := err.(*deletion.ConflictError); ok {
+			s.logger.Warnf("Cannot delete category %d: %s", id, conflictErr.Error())
+			return errors.ConflictWithContext(conflictErr.UserMessage(), map[string]any{
+				"entity_type":  conflictErr.EntityType,
+				"entity_id":    conflictErr.EntityID,
+				"dependencies": conflictErr.DependencyNames(),
+			})
+		}
+		return err
+	}
+
+	if err = s.repo.Delete(ctx, id); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to delete category")
 		return err
 	}
 
-	s.logger.Info("Categories deleted successfully")
+	s.logger.Info("Category deleted successfully")
 	return nil
 }
 

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/deletion"
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/providers"
 	"github.com/davidmovas/postulator/internal/infra/ai"
@@ -17,11 +18,12 @@ import (
 var _ Service = (*service)(nil)
 
 type service struct {
-	providerService providers.Service
-	repo            Repository
-	siteTopicRepo   SiteTopicRepository
-	usageRepo       UsageRepository
-	logger          *logger.Logger
+	providerService   providers.Service
+	repo              Repository
+	siteTopicRepo     SiteTopicRepository
+	usageRepo         UsageRepository
+	deletionValidator *deletion.Validator
+	logger            *logger.Logger
 }
 
 func NewService(
@@ -29,13 +31,15 @@ func NewService(
 	repo Repository,
 	siteTopicRepo SiteTopicRepository,
 	usageRepo UsageRepository,
+	deletionValidator *deletion.Validator,
 	logger *logger.Logger,
 ) Service {
 	return &service{
-		providerService: providerService,
-		repo:            repo,
-		siteTopicRepo:   siteTopicRepo,
-		usageRepo:       usageRepo,
+		providerService:   providerService,
+		repo:              repo,
+		siteTopicRepo:     siteTopicRepo,
+		usageRepo:         usageRepo,
+		deletionValidator: deletionValidator,
 		logger: logger.
 			WithScope("service").
 			WithScope("topics"),
@@ -155,7 +159,25 @@ func (s *service) UpdateTopic(ctx context.Context, topic *entities.Topic) error 
 }
 
 func (s *service) DeleteTopic(ctx context.Context, id int64) error {
-	if err := s.repo.Delete(ctx, id); err != nil {
+	topic, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get topic for deletion")
+		return err
+	}
+
+	if err = s.deletionValidator.CanDeleteTopic(ctx, id, topic.Title); err != nil {
+		if conflictErr, ok := err.(*deletion.ConflictError); ok {
+			s.logger.Warnf("Cannot delete topic %d: %s", id, conflictErr.Error())
+			return errors.ConflictWithContext(conflictErr.UserMessage(), map[string]any{
+				"entity_type":  conflictErr.EntityType,
+				"entity_id":    conflictErr.EntityID,
+				"dependencies": conflictErr.DependencyNames(),
+			})
+		}
+		return err
+	}
+
+	if err = s.repo.Delete(ctx, id); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to delete topic")
 		return err
 	}
@@ -413,7 +435,7 @@ func (s *service) getNextUniqueTopic(ctx context.Context, job *entities.Job) (*e
 	}
 
 	if len(unusedTopics) == 0 {
-		return nil, errors.NotFound("unused topic", "No unused topics available")
+		return nil, nil
 	}
 
 	nextTopic := unusedTopics[0]
@@ -432,7 +454,7 @@ func (s *service) getNextVariationTopic(ctx context.Context, job *entities.Job) 
 	}
 
 	if len(job.Topics) == 0 {
-		return nil, errors.NotFound("topic", "No topics available for job")
+		return nil, nil
 	}
 
 	originalTopicID := job.Topics[rand.Intn(len(job.Topics))]

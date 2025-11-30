@@ -20,7 +20,7 @@ export function unwrapArrayResponse<T>(wailsResponse: any): T[] {
 
 export function unwrapResponse<T>(
     wailsResponse: any,
-    options?: { suppressErrors?: boolean; defaultValue?: T }
+    options?: { suppressErrors?: boolean; defaultValue?: T; allowNull?: boolean }
 ): T {
     const response = adaptWailsResponse<T>(wailsResponse);
 
@@ -32,6 +32,9 @@ export function unwrapResponse<T>(
     }
 
     if (response.data === undefined || response.data === null) {
+        if (options?.allowNull) {
+            return response.data as T;
+        }
         if (options?.suppressErrors) {
             return options.defaultValue as T;
         }

@@ -83,7 +83,7 @@ func (r *stateRepository) Update(ctx context.Context, state *entities.State) err
 			state.JobID, state.LastRunAt, state.NextRunAt, state.NextRunBase,
 			state.TotalExecutions, state.FailedExecutions, state.LastCategoryIndex,
 		).
-		Suffix("ON CONFLICT(job_id) DO UPDATE SET last_run_at = EXCLUDED.last_run_at, next_run_at = EXCLUDED.next_run_at, next_run_base = EXCLUDED.next_run_base, total_executions = EXCLUDED.total_executions, failed_executions = EXCLUDED.failed_executions, last_category_index = EXCLUDED.last_category_index").
+		Suffix("ON CONFLICT(job_id) DO UPDATE SET last_run_at = EXCLUDED.last_run_at, next_run_at = EXCLUDED.next_run_at, next_run_base = EXCLUDED.next_run_base, last_category_index = EXCLUDED.last_category_index").
 		MustSql()
 
 	_, err := r.db.ExecContext(ctx, query, args...)

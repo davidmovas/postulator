@@ -108,10 +108,10 @@ export const topicService = {
         return topics.map(mapTopic);
     },
 
-    async getNextTopicForJob(jobId: number): Promise<Topic> {
+    async getNextTopicForJob(jobId: number): Promise<Topic | null> {
         const response = await GetNextTopicForJob(jobId);
-        const topic = unwrapResponse<dto.Topic>(response);
-        return mapTopic(topic);
+        const topic = unwrapResponse<dto.Topic | null>(response, { allowNull: true });
+        return topic ? mapTopic(topic) : null;
     },
 
     async generateVariations(topicId: number, count: number, jobId: number): Promise<Topic[]> {

@@ -210,6 +210,10 @@ func (h *TopicsHandler) GetNextTopicForJob(jobID int64) *dto.Response[*dto.Topic
 		return fail[*dto.Topic](err)
 	}
 
+	if topic == nil {
+		return ok[*dto.Topic](nil)
+	}
+
 	return ok(dto.NewTopic(topic))
 }
 

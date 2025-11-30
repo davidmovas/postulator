@@ -5,3 +5,5 @@ frontend/dist
 .idea
 .qodo
 logs
+CLAUDE.md
+.claude

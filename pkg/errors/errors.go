@@ -12,6 +12,7 @@ const (
 	ErrCodeValidation    ErrorCode = "VALIDATION"
 	ErrCodeNotFound      ErrorCode = "NOT_FOUND"
 	ErrCodeAlreadyExists ErrorCode = "ALREADY_EXISTS"
+	ErrCodeConflict      ErrorCode = "CONFLICT"
 
 	ErrCodeDatabase ErrorCode = "DATABASE"
 
@@ -147,6 +148,18 @@ func Scheduler(err error) *AppError {
 func NoResources(resource string) *AppError {
 	return New(ErrCodeNoResources, fmt.Sprintf("No resources: %s not available", resource)).
 		WithContext("resource", resource)
+}
+
+func Conflict(message string) *AppError {
+	return New(ErrCodeConflict, message)
+}
+
+func ConflictWithContext(message string, ctx map[string]any) *AppError {
+	err := New(ErrCodeConflict, message)
+	for k, v := range ctx {
+		err.WithContext(k, v)
+	}
+	return err
 }
 
 func IsNoResources(err error) bool {

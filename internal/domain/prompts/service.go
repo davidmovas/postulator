@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/deletion"
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/pkg/errors"
 	"github.com/davidmovas/postulator/pkg/logger"
@@ -13,14 +14,16 @@ import (
 var _ Service = (*service)(nil)
 
 type service struct {
-	repo   Repository
-	logger *logger.Logger
+	repo              Repository
+	deletionValidator *deletion.Validator
+	logger            *logger.Logger
 }
 
-func NewService(repo Repository, logger *logger.Logger) Service {
+func NewService(repo Repository, deletionValidator *deletion.Validator, logger *logger.Logger) Service {
 	return &service{
-		repo:   repo,
-		logger: logger.WithScope("service").WithScope("prompts"),
+		repo:              repo,
+		deletionValidator: deletionValidator,
+		logger:            logger.WithScope("service").WithScope("prompts"),
 	}
 }
 
@@ -80,7 +83,25 @@ func (s *service) UpdatePrompt(ctx context.Context, prompt *entities.Prompt) err
 }
 
 func (s *service) DeletePrompt(ctx context.Context, id int64) error {
-	if err := s.repo.Delete(ctx, id); err != nil {
+	prompt, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get prompt for deletion")
+		return err
+	}
+
+	if err = s.deletionValidator.CanDeletePrompt(ctx, id, prompt.Name); err != nil {
+		if conflictErr, ok := err.(*deletion.ConflictError); ok {
+			s.logger.Warnf("Cannot delete prompt %d: %s", id, conflictErr.Error())
+			return errors.ConflictWithContext(conflictErr.UserMessage(), map[string]any{
+				"entity_type":  conflictErr.EntityType,
+				"entity_id":    conflictErr.EntityID,
+				"dependencies": conflictErr.DependencyNames(),
+			})
+		}
+		return err
+	}
+
+	if err = s.repo.Delete(ctx, id); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to delete prompt")
 		return err
 	}

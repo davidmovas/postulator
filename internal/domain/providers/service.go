@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/deletion"
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/infra/ai"
 	"github.com/davidmovas/postulator/pkg/errors"
@@ -14,13 +15,15 @@ import (
 var _ Service = (*service)(nil)
 
 type service struct {
-	repo   Repository
-	logger *logger.Logger
+	repo              Repository
+	deletionValidator *deletion.Validator
+	logger            *logger.Logger
 }
 
-func NewService(repo Repository, logger *logger.Logger) Service {
+func NewService(repo Repository, deletionValidator *deletion.Validator, logger *logger.Logger) Service {
 	return &service{
-		repo: repo,
+		repo:              repo,
+		deletionValidator: deletionValidator,
 		logger: logger.
 			WithScope("service").
 			WithScope("providers"),
@@ -105,9 +108,21 @@ func (s *service) UpdateProvider(ctx context.Context, provider *entities.Provide
 }
 
 func (s *service) DeleteProvider(ctx context.Context, id int64) error {
-	_, err := s.repo.GetByID(ctx, id)
+	provider, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to get provider for deletion")
+		return err
+	}
+
+	if err = s.deletionValidator.CanDeleteProvider(ctx, id, provider.Name); err != nil {
+		if conflictErr, ok := err.(*deletion.ConflictError); ok {
+			s.logger.Warnf("Cannot delete provider %d: %s", id, conflictErr.Error())
+			return errors.ConflictWithContext(conflictErr.UserMessage(), map[string]any{
+				"entity_type":  conflictErr.EntityType,
+				"entity_id":    conflictErr.EntityID,
+				"dependencies": conflictErr.DependencyNames(),
+			})
+		}
 		return err
 	}
 

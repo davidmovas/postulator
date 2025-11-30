@@ -358,15 +358,9 @@ export function useJobsTable(siteId?: number) {
                     // Для НЕ-Reuse стратегий загружаем следующий топик
                     if (job.topicStrategy !== TOPIC_STRATEGY_REUSE_WITH_VARIATION) {
                         setIsLoading(prev => ({ ...prev, topic: true }));
-                        try {
-                            const topic = await topicService.getNextTopicForJob(job.id);
-                            setNextTopicTitle(topic?.title || null);
-                        } catch (error) {
-                            console.error(`Failed to load next topic for job ${job.id}:`, error);
-                            setNextTopicTitle(null);
-                        } finally {
-                            setIsLoading(prev => ({ ...prev, topic: false }));
-                        }
+                        const topic = await topicService.getNextTopicForJob(job.id);
+                        setNextTopicTitle(topic?.title || null);
+                        setIsLoading(prev => ({ ...prev, topic: false }));
                     }
                 } catch (error) {
                     console.error("Error loading expanded row data:", error);
