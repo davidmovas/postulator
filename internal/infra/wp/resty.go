@@ -38,6 +38,14 @@ func (c *restyClient) WithoutProxy() Client {
 	return c
 }
 
+func (c *restyClient) EnableProxy(proxyURL string) {
+	c.resty.SetProxy(proxyURL)
+}
+
+func (c *restyClient) DisableProxy() {
+	c.resty.RemoveProxy()
+}
+
 func (c *restyClient) WithTimeout(timeout int) Client {
 	c.resty.SetTimeout(time.Duration(timeout) * time.Second)
 	return c

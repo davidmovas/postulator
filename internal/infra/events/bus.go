@@ -12,6 +12,11 @@ type EventType string
 
 const (
 	HealthCheckSettingsUpdated EventType = "health_check_settings_updated"
+	ProxySettingsUpdated       EventType = "proxy_settings_updated"
+	ProxyStateChanged          EventType = "proxy_state_changed"
+	ProxyNodeRotated           EventType = "proxy_node_rotated"
+	ProxyFailed                EventType = "proxy_failed"
+	ProxyRecovered             EventType = "proxy_recovered"
 )
 
 type Event struct {

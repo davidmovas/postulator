@@ -13,6 +13,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/linking"
 	"github.com/davidmovas/postulator/internal/domain/prompts"
 	"github.com/davidmovas/postulator/internal/domain/providers"
+	"github.com/davidmovas/postulator/internal/domain/proxy"
 	"github.com/davidmovas/postulator/internal/domain/settings"
 	"github.com/davidmovas/postulator/internal/domain/sites"
 	"github.com/davidmovas/postulator/internal/domain/stats"
@@ -82,6 +83,9 @@ var Module = fx.Module("domain",
 		// Settings
 		settings.NewRepository,
 		settings.NewService,
+
+		// Proxy
+		proxy.NewService,
 	),
 
 	// Job Scheduler lifecycle
@@ -108,6 +112,21 @@ var Module = fx.Module("domain",
 			},
 			OnStop: func(ctx context.Context) error {
 				return scheduler.Stop()
+			},
+		})
+	}),
+
+	// Proxy initialization
+	fx.Invoke(func(lc fx.Lifecycle, proxyService proxy.Service) {
+		type initializer interface {
+			Initialize(context.Context) error
+		}
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				if svc, ok := proxyService.(initializer); ok {
+					return svc.Initialize(ctx)
+				}
+				return nil
 			},
 		})
 	}),

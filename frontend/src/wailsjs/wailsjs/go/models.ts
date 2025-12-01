@@ -402,6 +402,26 @@ export namespace dto {
 	        this.notify_on_recover = source["notify_on_recover"];
 	    }
 	}
+	export class IPComparison {
+	    direct_ip: string;
+	    direct_error?: string;
+	    proxy_ip: string;
+	    proxy_error?: string;
+	    is_anonymous: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new IPComparison(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.direct_ip = source["direct_ip"];
+	        this.direct_error = source["direct_error"];
+	        this.proxy_ip = source["proxy_ip"];
+	        this.proxy_error = source["proxy_error"];
+	        this.is_anonymous = source["is_anonymous"];
+	    }
+	}
 	export class ImportResult {
 	    totalRead: number;
 	    totalAdded: number;
@@ -671,6 +691,144 @@ export namespace dto {
 	        this.createdAt = source["createdAt"];
 	        this.updatedAt = source["updatedAt"];
 	    }
+	}
+	export class ProxyHealth {
+	    node_id: string;
+	    status: string;
+	    latency_ms: number;
+	    last_checked: number;
+	    error?: string;
+	    external_ip?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProxyHealth(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.node_id = source["node_id"];
+	        this.status = source["status"];
+	        this.latency_ms = source["latency_ms"];
+	        this.last_checked = source["last_checked"];
+	        this.error = source["error"];
+	        this.external_ip = source["external_ip"];
+	    }
+	}
+	export class ProxyNode {
+	    id: string;
+	    type: string;
+	    host: string;
+	    port: number;
+	    username?: string;
+	    password?: string;
+	    enabled: boolean;
+	    order: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProxyNode(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.type = source["type"];
+	        this.host = source["host"];
+	        this.port = source["port"];
+	        this.username = source["username"];
+	        this.password = source["password"];
+	        this.enabled = source["enabled"];
+	        this.order = source["order"];
+	    }
+	}
+	export class ProxySettings {
+	    enabled: boolean;
+	    mode: string;
+	    nodes: ProxyNode[];
+	    rotation_enabled: boolean;
+	    rotation_interval: number;
+	    health_check_enabled: boolean;
+	    health_check_interval: number;
+	    notify_on_failure: boolean;
+	    notify_on_recover: boolean;
+	    current_node_id?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProxySettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	        this.mode = source["mode"];
+	        this.nodes = this.convertValues(source["nodes"], ProxyNode);
+	        this.rotation_enabled = source["rotation_enabled"];
+	        this.rotation_interval = source["rotation_interval"];
+	        this.health_check_enabled = source["health_check_enabled"];
+	        this.health_check_interval = source["health_check_interval"];
+	        this.notify_on_failure = source["notify_on_failure"];
+	        this.notify_on_recover = source["notify_on_recover"];
+	        this.current_node_id = source["current_node_id"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ProxyState {
+	    status: string;
+	    active_node_id?: string;
+	    external_ip?: string;
+	    latency_ms: number;
+	    nodes_health: ProxyHealth[];
+	    last_error?: string;
+	    last_checked_at: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProxyState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.status = source["status"];
+	        this.active_node_id = source["active_node_id"];
+	        this.external_ip = source["external_ip"];
+	        this.latency_ms = source["latency_ms"];
+	        this.nodes_health = this.convertValues(source["nodes_health"], ProxyHealth);
+	        this.last_error = source["last_error"];
+	        this.last_checked_at = source["last_checked_at"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class Response__github_com_davidmovas_postulator_internal_dto_ArticleListResult_ {
 	    success: boolean;
@@ -978,6 +1136,40 @@ export namespace dto {
 		    return a;
 		}
 	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_IPComparison_ {
+	    success: boolean;
+	    data?: IPComparison;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_IPComparison_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], IPComparison);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Response__github_com_davidmovas_postulator_internal_dto_ImportResult_ {
 	    success: boolean;
 	    data?: ImportResult;
@@ -1148,6 +1340,142 @@ export namespace dto {
 		    return a;
 		}
 	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_ProxyHealth_ {
+	    success: boolean;
+	    data?: ProxyHealth;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_ProxyHealth_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], ProxyHealth);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_ProxyNode_ {
+	    success: boolean;
+	    data?: ProxyNode;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_ProxyNode_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], ProxyNode);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_ProxySettings_ {
+	    success: boolean;
+	    data?: ProxySettings;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_ProxySettings_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], ProxySettings);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_ProxyState_ {
+	    success: boolean;
+	    data?: ProxyState;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_ProxyState_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], ProxyState);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class SiteStats {
 	    id: number;
 	    siteId: number;
@@ -1255,6 +1583,56 @@ export namespace dto {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
 	        this.data = this.convertValues(source["data"], Topic);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class TorDetectionResult {
+	    found: boolean;
+	    port: number;
+	    service_type: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TorDetectionResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.found = source["found"];
+	        this.port = source["port"];
+	        this.service_type = source["service_type"];
+	    }
+	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_TorDetectionResult_ {
+	    success: boolean;
+	    data?: TorDetectionResult;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_TorDetectionResult_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], TorDetectionResult);
 	        this.error = this.convertValues(source["error"], Error);
 	    }
 	
@@ -1634,6 +2012,40 @@ export namespace dto {
 		    return a;
 		}
 	}
+	export class Response___github_com_davidmovas_postulator_internal_dto_ProxyHealth_ {
+	    success: boolean;
+	    data?: ProxyHealth[];
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response___github_com_davidmovas_postulator_internal_dto_ProxyHealth_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], ProxyHealth);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Response_int_ {
 	    success: boolean;
 	    data?: number;
@@ -1702,6 +2114,7 @@ export namespace dto {
 		    return a;
 		}
 	}
+	
 	
 	
 	

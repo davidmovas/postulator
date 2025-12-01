@@ -23,4 +23,7 @@ type Client interface {
 	CreatePost(ctx context.Context, s *entities.Site, article *entities.Article, opts *PostOptions) (int, error)
 	UpdatePost(ctx context.Context, s *entities.Site, article *entities.Article) error
 	DeletePost(ctx context.Context, s *entities.Site, postID int) error
+
+	EnableProxy(proxyURL string)
+	DisableProxy()
 }

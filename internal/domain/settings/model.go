@@ -16,6 +16,8 @@ type Repository interface {
 type Service interface {
 	GetHealthCheckSettings(ctx context.Context) (*entities.HealthCheckSettings, error)
 	UpdateHealthCheckSettings(ctx context.Context, settings *entities.HealthCheckSettings) error
+	GetProxySettings(ctx context.Context) (*entities.ProxySettings, error)
+	UpdateProxySettings(ctx context.Context, settings *entities.ProxySettings) error
 }
 
 type HealthCheckScheduler interface {

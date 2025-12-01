@@ -31,6 +31,7 @@ func New(cfg *config.Config) (*App, error) {
 		topicsHandler      *handlers.TopicsHandler
 		importerHandler    *handlers.ImporterHandler
 		settingsHandler    *handlers.SettingsHandler
+		proxyHandler       *handlers.ProxyHandler
 	)
 
 	fxApp := fx.New(
@@ -52,6 +53,7 @@ func New(cfg *config.Config) (*App, error) {
 			&topicsHandler,
 			&importerHandler,
 			&settingsHandler,
+			&proxyHandler,
 		),
 	)
 
@@ -69,6 +71,7 @@ func New(cfg *config.Config) (*App, error) {
 			topicsHandler,
 			importerHandler,
 			settingsHandler,
+			proxyHandler,
 		},
 		cfg: cfg,
 	}
