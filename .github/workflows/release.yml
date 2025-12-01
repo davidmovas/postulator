@@ -2,15 +2,40 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - master
 
 env:
   NODE_VERSION: '20'
   GO_VERSION: '1.22'
+  APP_NAME: 'Postulator'
 
 jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      new_release: ${{ steps.semantic.outputs.new_release_published }}
+      version: ${{ steps.semantic.outputs.new_release_version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run go-semantic-release
+        id: semantic
+        uses: go-semantic-release/action@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          allow-initial-development-versions: true
+          force-bump-patch-version: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build-windows:
+    needs: release
+    if: needs.release.outputs.new_release == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,63 +53,81 @@ jobs:
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
+      - name: Install NSIS
+        run: |
+          iwr -useb get.scoop.sh | iex
+          scoop bucket add extras
+          scoop install nsis
+
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
 
-      - name: Get version from tag
-        id: get_version
+      - name: Get build info
+        id: info
         shell: bash
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Get commit hash
-        id: get_commit
-        shell: bash
-        run: echo "COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        run: |
+          echo "VERSION=${{ needs.release.outputs.version }}" >> $GITHUB_OUTPUT
+          echo "COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "DATE=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
 
       - name: Build Windows executable
+        shell: pwsh
         run: |
-          $version = "${{ steps.get_version.outputs.VERSION }}"
-          $commit = "${{ steps.get_commit.outputs.COMMIT }}"
-          $date = Get-Date -Format "yyyy-MM-dd"
+          $version = "${{ steps.info.outputs.VERSION }}"
+          $commit = "${{ steps.info.outputs.COMMIT }}"
+          $date = "${{ steps.info.outputs.DATE }}"
           $ldflags = "-X github.com/davidmovas/postulator/internal/version.Version=$version -X github.com/davidmovas/postulator/internal/version.Commit=$commit -X github.com/davidmovas/postulator/internal/version.BuildDate=$date -H windowsgui -s -w"
-          wails build -ldflags "$ldflags" -platform windows/amd64
+          wails build -ldflags $ldflags -platform windows/amd64 -nsis
 
-      - name: Rename executable
+      - name: Rename artifacts
+        shell: pwsh
         run: |
-          mv build/bin/Postulator.exe build/bin/Postulator-${{ steps.get_version.outputs.VERSION }}-windows-amd64.exe
+          $version = "${{ steps.info.outputs.VERSION }}"
 
-      - name: Upload artifact
+          # Rename portable exe
+          if (Test-Path "build/bin/${{ env.APP_NAME }}.exe") {
+            Move-Item "build/bin/${{ env.APP_NAME }}.exe" "build/bin/${{ env.APP_NAME }}-$version-windows-amd64.exe"
+          }
+
+          # Rename installer
+          if (Test-Path "build/bin/${{ env.APP_NAME }}-amd64-installer.exe") {
+            Move-Item "build/bin/${{ env.APP_NAME }}-amd64-installer.exe" "build/bin/${{ env.APP_NAME }}-$version-windows-amd64-installer.exe"
+          }
+
+      - name: Upload portable executable
         uses: actions/upload-artifact@v4
         with:
-          name: Postulator-windows-amd64
-          path: build/bin/Postulator-${{ steps.get_version.outputs.VERSION }}-windows-amd64.exe
+          name: ${{ env.APP_NAME }}-windows-portable
+          path: build/bin/${{ env.APP_NAME }}-${{ steps.info.outputs.VERSION }}-windows-amd64.exe
 
-  release:
-    needs: [build-windows]
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-windows-installer
+          path: build/bin/${{ env.APP_NAME }}-${{ steps.info.outputs.VERSION }}-windows-amd64-installer.exe
+          if-no-files-found: ignore
+
+  upload-release:
+    needs: [release, build-windows]
+    if: needs.release.outputs.new_release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Get version from tag
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Display structure of downloaded files
+        run: ls -R artifacts
 
-      - name: Create Release
+      - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          name: Postulator v${{ steps.get_version.outputs.VERSION }}
-          draft: false
-          prerelease: false
-          generate_release_notes: true
+          tag_name: v${{ needs.release.outputs.version }}
           files: |
-            artifacts/**/*
+            artifacts/**/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
