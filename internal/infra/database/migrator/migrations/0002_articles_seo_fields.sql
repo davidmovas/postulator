@@ -1,7 +1,7 @@
 -- +goose Up
 -- Add SEO and WordPress fields to articles table
+-- Note: wp_tag_ids was moved to 0001_init.up.sql as part of initial schema
 ALTER TABLE articles ADD COLUMN slug TEXT;
-ALTER TABLE articles ADD COLUMN wp_tag_ids TEXT NOT NULL DEFAULT '[]';
 ALTER TABLE articles ADD COLUMN featured_media_id INTEGER;
 ALTER TABLE articles ADD COLUMN featured_media_url TEXT;
 ALTER TABLE articles ADD COLUMN meta_description TEXT;
