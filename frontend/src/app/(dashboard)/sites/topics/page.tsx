@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
 import { useQueryId } from "@/hooks/use-query-param";
 import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import { DataTable } from "@/components/table/data-table";
 import { useTopicsTable } from "@/hooks/use-topics-table";
 import { Topic } from "@/models/topics";
@@ -98,9 +100,16 @@ function SiteTopicsPageContent() {
     return (
         <div className="p-6 space-y-6">
             {/* Header */}
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">Topics</h1>
-                <p className="text-muted-foreground mt-1">Manage your site topics here</p>
+            <div className="flex items-center gap-4">
+                <Link href={`/sites/view?id=${siteId}`}>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                </Link>
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Topics</h1>
+                    <p className="text-muted-foreground mt-1">Manage your site topics here</p>
+                </div>
             </div>
 
             {/* Table */}

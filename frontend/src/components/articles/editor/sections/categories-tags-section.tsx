@@ -12,6 +12,7 @@ import { RiWordpressFill } from "@remixicon/react";
 
 interface Category {
     id: number;
+    wpCategoryId: number;
     name: string;
     slug?: string;
     parentId?: number;
@@ -48,10 +49,11 @@ export function CategoriesTagsSection({
     const tagsLoading = tags === null;
 
     // Convert categories to options for VirtualizedMultiSelect
+    // Use wpCategoryId as value since article.wpCategoryIds contains WordPress IDs
     const categoryOptions = useMemo(() => {
         if (!categories) return [];
         return categories.map(c => ({
-            value: c.id.toString(),
+            value: c.wpCategoryId.toString(),
             label: c.name,
         }));
     }, [categories]);

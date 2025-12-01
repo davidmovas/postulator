@@ -32,13 +32,13 @@ func CreateClient(provider *entities.Provider) (Client, error) {
 		})
 
 	case entities.TypeAnthropic:
-		return NewOpenAIClient(Config{
+		return NewAnthropicClient(AnthropicConfig{
 			APIKey: provider.APIKey,
 			Model:  provider.Model,
 		})
 
 	case entities.TypeGoogle:
-		return NewOpenAIClient(Config{
+		return NewGoogleClient(GoogleConfig{
 			APIKey: provider.APIKey,
 			Model:  provider.Model,
 		})

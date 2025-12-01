@@ -1,0 +1,90 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  NODE_VERSION: '20'
+  GO_VERSION: '1.22'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Get version from tag
+        id: get_version
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Get commit hash
+        id: get_commit
+        shell: bash
+        run: echo "COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Build Windows executable
+        run: |
+          $version = "${{ steps.get_version.outputs.VERSION }}"
+          $commit = "${{ steps.get_commit.outputs.COMMIT }}"
+          $date = Get-Date -Format "yyyy-MM-dd"
+          $ldflags = "-X github.com/davidmovas/postulator/internal/version.Version=$version -X github.com/davidmovas/postulator/internal/version.Commit=$commit -X github.com/davidmovas/postulator/internal/version.BuildDate=$date -H windowsgui -s -w"
+          wails build -ldflags "$ldflags" -platform windows/amd64
+
+      - name: Rename executable
+        run: |
+          mv build/bin/Postulator.exe build/bin/Postulator-${{ steps.get_version.outputs.VERSION }}-windows-amd64.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Postulator-windows-amd64
+          path: build/bin/Postulator-${{ steps.get_version.outputs.VERSION }}-windows-amd64.exe
+
+  release:
+    needs: [build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Postulator v${{ steps.get_version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            artifacts/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

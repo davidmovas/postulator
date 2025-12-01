@@ -1,7 +1,9 @@
 "use client";
 import * as React from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { GetAppVersion } from "@/wailsjs/wailsjs/go/handlers/SettingsHandler";
 
 import {
     Sidebar,
@@ -27,7 +29,7 @@ import {
     RiLightbulbLine, RiArticleLine,
 } from "@remixicon/react";
 
-const APP_VERSION = "v1.0.0";
+const FALLBACK_VERSION = "dev";
 
 type NavItem = {
     title: string;
@@ -58,6 +60,20 @@ const navItems: NavGroup[] = [
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const pathname = usePathname();
+    const [version, setVersion] = useState(FALLBACK_VERSION);
+
+    useEffect(() => {
+        GetAppVersion()
+            .then((response) => {
+                if (response.success && response.data) {
+                    const v = response.data.version;
+                    setVersion(v.startsWith("v") ? v : `v${v}`);
+                }
+            })
+            .catch(() => {
+                // Keep fallback version on error
+            });
+    }, []);
 
     return (
         <Sidebar
@@ -129,7 +145,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
             <SidebarFooter>
                 <div className="flex items-center justify-start p-4">
-                    <span className="text-sm text-zinc-500">{APP_VERSION}</span>
+                    <span className="text-sm text-zinc-500">{version}</span>
                 </div>
             </SidebarFooter>
 

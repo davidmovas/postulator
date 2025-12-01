@@ -212,3 +212,9 @@ type IPComparison struct {
 	ProxyError  string `json:"proxy_error,omitempty"`
 	IsAnonymous bool   `json:"is_anonymous"`
 }
+
+type AppVersion struct {
+	Version   string `json:"version"`
+	Commit    string `json:"commit"`
+	BuildDate string `json:"buildDate"`
+}

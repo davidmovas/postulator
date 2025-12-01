@@ -2,7 +2,8 @@
 
 import { useEffect, Suspense } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryId } from "@/hooks/use-query-param";
 import { DataTable } from "@/components/table/data-table";
@@ -23,6 +24,11 @@ function SiteJobsPageContent() {
         <div className="p-6 space-y-6">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
+                    <Link href={`/sites/view?id=${siteId}`}>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <ArrowLeft className="h-4 w-4" />
+                        </Button>
+                    </Link>
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight">Site Jobs</h1>
                         <p className="text-muted-foreground mt-2">

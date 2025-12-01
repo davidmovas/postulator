@@ -97,6 +97,14 @@ export const articleService = {
     async updateArticle(input: ArticleUpdateInput): Promise<void> {
         const article = await this.getArticle(input.id);
 
+        // Handle featured media - null means explicitly clear, undefined means keep existing
+        const featuredMediaId = input.featuredMediaId === null
+            ? undefined
+            : (input.featuredMediaId ?? article.featuredMediaId);
+        const featuredMediaUrl = input.featuredMediaUrl === null
+            ? undefined
+            : (input.featuredMediaUrl ?? article.featuredMediaUrl);
+
         const payload = new dto.Article({
             id: input.id,
             siteId: article.siteId,
@@ -110,6 +118,8 @@ export const articleService = {
             status: input.status ?? article.status,
             slug: input.slug ?? article.slug,
             metaDescription: input.metaDescription ?? article.metaDescription,
+            featuredMediaId,
+            featuredMediaUrl,
         });
 
         const response = await UpdateArticle(payload);
@@ -119,6 +129,14 @@ export const articleService = {
     async updateAndSyncArticle(input: ArticleUpdateInput): Promise<Article> {
         const article = await this.getArticle(input.id);
 
+        // Handle featured media - null means explicitly clear, undefined means keep existing
+        const featuredMediaId = input.featuredMediaId === null
+            ? undefined
+            : (input.featuredMediaId ?? article.featuredMediaId);
+        const featuredMediaUrl = input.featuredMediaUrl === null
+            ? undefined
+            : (input.featuredMediaUrl ?? article.featuredMediaUrl);
+
         const payload = new dto.Article({
             id: input.id,
             siteId: article.siteId,
@@ -132,6 +150,8 @@ export const articleService = {
             status: input.status ?? article.status,
             slug: input.slug ?? article.slug,
             metaDescription: input.metaDescription ?? article.metaDescription,
+            featuredMediaId,
+            featuredMediaUrl,
         });
 
         const response = await UpdateAndSyncArticle(payload);

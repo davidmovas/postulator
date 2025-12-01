@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState, Suspense } from "react";
 import { useQueryId } from "@/hooks/use-query-param";
 import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import { DataTable } from "@/components/table/data-table";
 import { useCategoriesTable } from "@/hooks/use-categories-table";
 import { useContextModal } from "@/context/modal-context";
@@ -95,11 +97,18 @@ function SiteCategoriesPageContent() {
         <div className="p-6 space-y-6">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Categories</h1>
-                    <p className="text-muted-foreground mt-1">
-                        Manage your WordPress categories and their content
-                    </p>
+                <div className="flex items-center gap-4">
+                    <Link href={`/sites/view?id=${siteId}`}>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <ArrowLeft className="h-4 w-4" />
+                        </Button>
+                    </Link>
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight">Categories</h1>
+                        <p className="text-muted-foreground mt-1">
+                            Manage your WordPress categories and their content
+                        </p>
+                    </div>
                 </div>
 
                 <div className="flex items-center gap-2 mt-4 sm:mt-0">

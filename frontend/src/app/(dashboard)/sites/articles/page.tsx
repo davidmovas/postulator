@@ -15,10 +15,12 @@ import {
     RiUpload2Line,
     RiWordpressFill,
 } from "@remixicon/react";
+import { ArrowLeft } from "lucide-react";
 import { useContextModal } from "@/context/modal-context";
 import { useApiCall } from "@/hooks/use-api-call";
 import { articleService } from "@/services/articles";
 import { DeleteArticleModal } from "@/components/articles/modals/delete-article-modal";
+import { BulkDeleteArticlesModal } from "@/components/articles/modals/bulk-delete-articles-modal";
 
 function SiteArticlesPageContent() {
     const router = useRouter();
@@ -28,6 +30,7 @@ function SiteArticlesPageContent() {
     const [selectionResetKey, setSelectionResetKey] = useState(0);
     const [deletingArticle, setDeletingArticle] = useState<Article | null>(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
     const { confirmationModal } = useContextModal();
     const { execute } = useApiCall();
 
@@ -63,37 +66,14 @@ function SiteArticlesPageContent() {
 
     const handleBulkDelete = useCallback(() => {
         if (selected.length === 0) return;
+        setIsBulkDeleteModalOpen(true);
+    }, [selected]);
 
-        const publishedCount = selected.filter(a => a.wpPostId > 0).length;
-
-        confirmationModal.open({
-            title: "Delete Selected Articles",
-            description: (
-                <div>
-                    <p>Are you sure you want to delete {selected.length} selected article(s)?</p>
-                    {publishedCount > 0 && (
-                        <p className="mt-2 text-amber-600 dark:text-amber-400">
-                            {publishedCount} article(s) are published to WordPress. They will only be deleted locally.
-                        </p>
-                    )}
-                </div>
-            ),
-            confirmText: "Delete",
-            variant: "destructive",
-            onConfirm: async () => {
-                await execute(async () => {
-                    await articleService.bulkDeleteArticles(selected.map(a => a.id));
-                }, {
-                    showSuccessToast: true,
-                    successMessage: `Deleted ${selected.length} article(s)`,
-                    errorTitle: "Failed to delete articles",
-                });
-                await loadArticles();
-                setSelected([]);
-                setSelectionResetKey((k) => k + 1);
-            }
-        });
-    }, [selected, confirmationModal, execute, loadArticles]);
+    const handleBulkDeleteSuccess = useCallback(() => {
+        loadArticles();
+        setSelected([]);
+        setSelectionResetKey((k) => k + 1);
+    }, [loadArticles]);
 
     const handleBulkPublish = useCallback(() => {
         const draftArticles = selected.filter(a => a.status === 'draft' && !a.wpPostId);
@@ -194,11 +174,18 @@ function SiteArticlesPageContent() {
     return (
         <div className="p-6 space-y-6">
             {/* Header */}
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">Articles</h1>
-                <p className="text-muted-foreground mt-1">
-                    Manage your site articles • {total} total
-                </p>
+            <div className="flex items-center gap-4">
+                <Link href={`/sites/view?id=${siteId}`}>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                </Link>
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Articles</h1>
+                    <p className="text-muted-foreground mt-1">
+                        Manage your site articles • {total} total
+                    </p>
+                </div>
             </div>
 
             {/* Table */}
@@ -224,6 +211,14 @@ function SiteArticlesPageContent() {
                 onOpenChange={setIsDeleteModalOpen}
                 article={deletingArticle}
                 onSuccess={handleDeleteSuccess}
+            />
+
+            {/* Bulk Delete Articles Modal */}
+            <BulkDeleteArticlesModal
+                open={isBulkDeleteModalOpen}
+                onOpenChange={setIsBulkDeleteModalOpen}
+                articles={selected}
+                onSuccess={handleBulkDeleteSuccess}
             />
         </div>
     );

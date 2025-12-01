@@ -1,6 +1,37 @@
 package wp
 
-import "time"
+import (
+	"strings"
+	"time"
+)
+
+// WPTime handles WordPress date format without timezone suffix
+type WPTime struct {
+	time.Time
+}
+
+func (t *WPTime) UnmarshalJSON(data []byte) error {
+	s := strings.Trim(string(data), `"`)
+	if s == "" || s == "null" {
+		t.Time = time.Time{}
+		return nil
+	}
+
+	// Try RFC3339 first (with timezone)
+	parsed, err := time.Parse(time.RFC3339, s)
+	if err == nil {
+		t.Time = parsed
+		return nil
+	}
+
+	// WordPress format without timezone - assume UTC
+	parsed, err = time.Parse("2006-01-02T15:04:05", s)
+	if err != nil {
+		return err
+	}
+	t.Time = parsed.UTC()
+	return nil
+}
 
 type wpError struct {
 	Code    string `json:"code"`
@@ -45,11 +76,11 @@ type wpMedia struct {
 }
 
 type wpPost struct {
-	ID          int       `json:"id"`
-	Date        time.Time `json:"date"`
-	DateGMT     time.Time `json:"date_gmt"`
-	Modified    time.Time `json:"modified"`
-	ModifiedGMT time.Time `json:"modified_gmt"`
+	ID          int    `json:"id"`
+	Date        WPTime `json:"date"`
+	DateGMT     WPTime `json:"date_gmt"`
+	Modified    WPTime `json:"modified"`
+	ModifiedGMT WPTime `json:"modified_gmt"`
 	Slug        string    `json:"slug"`
 	Status      string    `json:"status"`
 	Type        string    `json:"type"`

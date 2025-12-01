@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Save, RefreshCw, RotateCcw, FileText, Eye, Info, Sparkles } from "lucide-react";
+import { Save, RefreshCw, RotateCcw, FileText, Eye, Info, Sparkles, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RiWordpressFill } from "@remixicon/react";
 import { useApiCall } from "@/hooks/use-api-call";
@@ -43,6 +44,7 @@ interface ArticleEditorProps {
 
 interface Category {
     id: number;
+    wpCategoryId: number;
     name: string;
     slug?: string;
 }
@@ -214,14 +216,21 @@ export function ArticleEditor({
         <div className="p-6 space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">
-                        {isEditMode ? "Edit Article" : "New Article"}
-                    </h1>
-                    <p className="text-muted-foreground mt-1">
-                        {siteName || `Site #${siteId}`}
-                        {isDirty && <span className="text-amber-500"> • Unsaved changes</span>}
-                    </p>
+                <div className="flex items-center gap-4">
+                    <Link href={`/sites/articles?id=${siteId}`}>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <ArrowLeft className="h-4 w-4" />
+                        </Button>
+                    </Link>
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight">
+                            {isEditMode ? "Edit Article" : "New Article"}
+                        </h1>
+                        <p className="text-muted-foreground mt-1">
+                            {siteName || `Site #${siteId}`}
+                            {isDirty && <span className="text-amber-500"> • Unsaved changes</span>}
+                        </p>
+                    </div>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -388,6 +397,7 @@ export function ArticleEditor({
                             formData={formData}
                             onUpdate={updateFormData}
                             disabled={isSaving}
+                            siteId={siteId}
                         />
 
                         <CategoriesTagsSection

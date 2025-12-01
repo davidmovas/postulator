@@ -220,6 +220,9 @@ func (c *restyClient) convertWPPostToArticle(wpPost wpPost, siteID int64) *entit
 	slug := wpPost.Slug
 	author := wpPost.Author
 
+	publishedAt := wpPost.Date.Time
+	modifiedAt := wpPost.Modified.Time
+
 	article := &entities.Article{
 		SiteID:        siteID,
 		Title:         wpPost.Title.Rendered,
@@ -233,10 +236,10 @@ func (c *restyClient) convertWPPostToArticle(wpPost wpPost, siteID int64) *entit
 		Status:        status,
 		Source:        entities.SourceImported,
 		WordCount:     &wordCount,
-		PublishedAt:   &wpPost.Date,
-		CreatedAt:     wpPost.Date,
-		UpdatedAt:     wpPost.Modified,
-		LastSyncedAt:  &wpPost.Modified,
+		PublishedAt:   &publishedAt,
+		CreatedAt:     publishedAt,
+		UpdatedAt:     modifiedAt,
+		LastSyncedAt:  &modifiedAt,
 		Slug:          &slug,
 		Author:        &author,
 	}

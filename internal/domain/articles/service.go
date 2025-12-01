@@ -54,7 +54,10 @@ func (s *service) CreateArticle(ctx context.Context, article *entities.Article) 
 	}
 
 	now := time.Now()
-	article.CreatedAt = now
+	// Preserve CreatedAt if already set (e.g., from WordPress import)
+	if article.CreatedAt.IsZero() {
+		article.CreatedAt = now
+	}
 	article.UpdatedAt = now
 
 	if article.WordCount == nil {
@@ -178,6 +181,39 @@ func (s *service) UpdateArticle(ctx context.Context, article *entities.Article) 
 	if article.OriginalTitle == "" {
 		article.OriginalTitle = existingArticle.OriginalTitle
 	}
+
+	// Preserve WordPress fields if not set (critical for update vs create logic)
+	if article.WPPostID == 0 {
+		article.WPPostID = existingArticle.WPPostID
+	}
+	if article.WPPostURL == "" {
+		article.WPPostURL = existingArticle.WPPostURL
+	}
+	if len(article.WPCategoryIDs) == 0 {
+		article.WPCategoryIDs = existingArticle.WPCategoryIDs
+	}
+	if len(article.WPTagIDs) == 0 {
+		article.WPTagIDs = existingArticle.WPTagIDs
+	}
+	if article.Source == "" {
+		article.Source = existingArticle.Source
+	}
+	if article.Slug == nil && existingArticle.Slug != nil {
+		article.Slug = existingArticle.Slug
+	}
+	if article.Author == nil && existingArticle.Author != nil {
+		article.Author = existingArticle.Author
+	}
+	// Note: FeaturedMediaID and FeaturedMediaURL are NOT preserved from existing article
+	// This allows users to clear the featured image by setting it to nil/empty
+	if article.PublishedAt == nil && existingArticle.PublishedAt != nil {
+		article.PublishedAt = existingArticle.PublishedAt
+	}
+	if article.LastSyncedAt == nil && existingArticle.LastSyncedAt != nil {
+		article.LastSyncedAt = existingArticle.LastSyncedAt
+	}
+	// Preserve CreatedAt - it should never change
+	article.CreatedAt = existingArticle.CreatedAt
 
 	// Mark as edited if content changed
 	if article.Title != existingArticle.Title || article.Content != existingArticle.Content {
@@ -396,6 +432,20 @@ func (s *service) PublishToWordPress(ctx context.Context, article *entities.Arti
 		return err
 	}
 
+	// Upload featured image if URL is provided but no media ID
+	if article.FeaturedMediaURL != nil && *article.FeaturedMediaURL != "" &&
+		(article.FeaturedMediaID == nil || *article.FeaturedMediaID == 0) {
+		s.logger.Info("Uploading featured image from URL")
+		mediaResult, uploadErr := s.wp.UploadMediaFromURL(ctx, site, *article.FeaturedMediaURL, "", article.Title)
+		if uploadErr != nil {
+			s.logger.ErrorWithErr(uploadErr, "Failed to upload featured image, continuing without it")
+		} else {
+			article.FeaturedMediaID = &mediaResult.ID
+			article.FeaturedMediaURL = &mediaResult.SourceURL
+			s.logger.Infof("Featured image uploaded, media ID: %d", mediaResult.ID)
+		}
+	}
+
 	wpPostID, err := s.wp.CreatePost(ctx, site, article, &wp.PostOptions{Status: "publish"})
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to publish article to WordPress")
@@ -422,6 +472,20 @@ func (s *service) UpdateInWordPress(ctx context.Context, article *entities.Artic
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to get site for update")
 		return err
+	}
+
+	// Upload featured image if URL is provided but no media ID
+	if article.FeaturedMediaURL != nil && *article.FeaturedMediaURL != "" &&
+		(article.FeaturedMediaID == nil || *article.FeaturedMediaID == 0) {
+		s.logger.Info("Uploading featured image from URL")
+		mediaResult, uploadErr := s.wp.UploadMediaFromURL(ctx, site, *article.FeaturedMediaURL, "", article.Title)
+		if uploadErr != nil {
+			s.logger.ErrorWithErr(uploadErr, "Failed to upload featured image, continuing without it")
+		} else {
+			article.FeaturedMediaID = &mediaResult.ID
+			article.FeaturedMediaURL = &mediaResult.SourceURL
+			s.logger.Infof("Featured image uploaded, media ID: %d", mediaResult.ID)
+		}
 	}
 
 	if err = s.wp.UpdatePost(ctx, site, article); err != nil {

@@ -70,9 +70,10 @@ func (c *PublishArticleCommand) Execute(ctx *pipeline.Context) error {
 
 	var categoryIDs []int
 	for _, cat := range ctx.Selection.Categories {
-		categoryIDs = append(categoryIDs, int(cat.ID))
+		categoryIDs = append(categoryIDs, cat.WPCategoryID)
 	}
 
+	now := time.Now()
 	article := &entities.Article{
 		SiteID:        ctx.Job.SiteID,
 		JobID:         &ctx.Job.ID,
@@ -85,6 +86,8 @@ func (c *PublishArticleCommand) Execute(ctx *pipeline.Context) error {
 		Status:        desiredStatus,
 		Source:        entities.SourceGenerated,
 		IsEdited:      false,
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
 
 	wordCount := len(strings.Fields(ctx.Generation.GeneratedContent))
@@ -115,8 +118,8 @@ func (c *PublishArticleCommand) Execute(ctx *pipeline.Context) error {
 		return nil
 	}
 
-	now := time.Now()
-	ctx.Execution.Execution.PublishedAt = &now
+	publishedAt := time.Now()
+	ctx.Execution.Execution.PublishedAt = &publishedAt
 	ctx.Execution.Execution.Status = entities.ExecutionStatusPublished
 
 	if err = c.executionProvider.Update(ctx.Context(), ctx.Execution.Execution); err != nil {

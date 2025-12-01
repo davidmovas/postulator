@@ -16,5 +16,7 @@ var Module = fx.Module("handlers",
 		NewHealthCheckHandler,
 		NewImporterHandler,
 		NewProxyHandler,
+		NewMediaHandler,
+		NewDialogsHandler,
 	),
 )

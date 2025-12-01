@@ -72,6 +72,8 @@ export interface ArticleUpdateInput {
     status?: ArticleStatus;
     slug?: string;
     metaDescription?: string;
+    featuredMediaId?: number | null;  // null means explicitly clear
+    featuredMediaUrl?: string | null; // null means explicitly clear
 }
 
 export function mapArticle(x: dto.Article): Article {

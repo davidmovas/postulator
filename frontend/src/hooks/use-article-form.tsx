@@ -15,8 +15,8 @@ export interface ArticleFormData {
     status: "draft" | "published";
     categoryIds: number[];
     tagIds: number[];
-    featuredMediaId?: number;
-    featuredMediaUrl?: string;
+    featuredMediaId?: number | null;
+    featuredMediaUrl?: string | null;
     author?: number;
     publishedAt?: string;
     topicId?: number;
@@ -109,6 +109,8 @@ export function useArticleForm({ siteId, article }: UseArticleFormOptions) {
             title: formData.title.trim(),
             content: formData.content.trim(),
             excerpt: formData.excerpt.trim() || undefined,
+            wpCategoryIds: formData.categoryIds.length > 0 ? formData.categoryIds : undefined,
+            wpTagIds: formData.tagIds.length > 0 ? formData.tagIds : undefined,
             slug: formData.slug.trim() || undefined,
             metaDescription: formData.metaDescription.trim() || undefined,
         };
@@ -121,8 +123,12 @@ export function useArticleForm({ siteId, article }: UseArticleFormOptions) {
             title: formData.title.trim(),
             content: formData.content.trim(),
             excerpt: formData.excerpt.trim() || undefined,
+            wpCategoryIds: formData.categoryIds,
+            wpTagIds: formData.tagIds,
             slug: formData.slug.trim() || undefined,
             metaDescription: formData.metaDescription.trim() || undefined,
+            featuredMediaId: formData.featuredMediaId,
+            featuredMediaUrl: formData.featuredMediaUrl,
         };
     }, [article, formData]);
 

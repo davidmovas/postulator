@@ -62,7 +62,7 @@ func (r *repository) Create(ctx context.Context, article *entities.Article) erro
 			"wp_post_id", "wp_post_url", "wp_category_ids", "wp_tag_ids",
 			"status", "source", "is_edited", "word_count",
 			"slug", "featured_media_id", "featured_media_url", "meta_description", "author",
-			"published_at", "last_synced_at",
+			"created_at", "published_at", "last_synced_at",
 		).
 		Values(
 			article.SiteID, article.JobID, article.TopicID,
@@ -70,7 +70,7 @@ func (r *repository) Create(ctx context.Context, article *entities.Article) erro
 			article.WPPostID, article.WPPostURL, categoryIDsJSON, tagIDsJSON,
 			article.Status, article.Source, article.IsEdited, article.WordCount,
 			article.Slug, article.FeaturedMediaID, article.FeaturedMediaURL, article.MetaDescription, article.Author,
-			article.PublishedAt, article.LastSyncedAt,
+			article.CreatedAt, article.PublishedAt, article.LastSyncedAt,
 		).
 		Suffix(`ON CONFLICT(site_id, wp_post_id) DO UPDATE SET
         title = EXCLUDED.title,
@@ -565,7 +565,7 @@ func (r *repository) BulkCreate(ctx context.Context, articles []*entities.Articl
 				"wp_post_id", "wp_post_url", "wp_category_ids", "wp_tag_ids",
 				"status", "source", "is_edited", "word_count",
 				"slug", "featured_media_id", "featured_media_url", "meta_description", "author",
-				"published_at", "last_synced_at",
+				"created_at", "published_at", "last_synced_at",
 			).
 			Values(
 				article.SiteID, article.JobID, article.TopicID,
@@ -573,7 +573,7 @@ func (r *repository) BulkCreate(ctx context.Context, articles []*entities.Articl
 				article.WPPostID, article.WPPostURL, categoryIDsJSON, tagIDsJSON,
 				article.Status, article.Source, article.IsEdited, article.WordCount,
 				article.Slug, article.FeaturedMediaID, article.FeaturedMediaURL, article.MetaDescription, article.Author,
-				article.PublishedAt, article.LastSyncedAt,
+				article.CreatedAt, article.PublishedAt, article.LastSyncedAt,
 			).
 			MustSql()
 

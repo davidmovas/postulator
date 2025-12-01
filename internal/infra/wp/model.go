@@ -10,6 +10,13 @@ type PostOptions struct {
 	Status string // "draft" or "publish"; default "publish" if empty
 }
 
+// MediaResult represents the result of uploading media to WordPress
+type MediaResult struct {
+	ID        int    // WordPress media ID
+	SourceURL string // Full URL to the media file
+	AltText   string // Alt text for the image
+}
+
 type Client interface {
 	CheckHealth(ctx context.Context, site *entities.Site) (*entities.HealthCheck, error)
 
@@ -23,6 +30,12 @@ type Client interface {
 	CreatePost(ctx context.Context, s *entities.Site, article *entities.Article, opts *PostOptions) (int, error)
 	UpdatePost(ctx context.Context, s *entities.Site, article *entities.Article) error
 	DeletePost(ctx context.Context, s *entities.Site, postID int) error
+
+	// Media methods
+	UploadMedia(ctx context.Context, s *entities.Site, filename string, data []byte, altText string) (*MediaResult, error)
+	UploadMediaFromURL(ctx context.Context, s *entities.Site, imageURL, filename, altText string) (*MediaResult, error)
+	GetMedia(ctx context.Context, s *entities.Site, mediaID int) (*MediaResult, error)
+	DeleteMedia(ctx context.Context, s *entities.Site, mediaID int) error
 
 	EnableProxy(proxyURL string)
 	DisableProxy()

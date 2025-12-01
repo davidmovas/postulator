@@ -72,6 +72,14 @@ var availableModels = map[entities.Type][]*entities.Model{
 
 	entities.TypeAnthropic: {
 		{
+			ID:         "claude-sonnet-4-20250514",
+			Name:       "Claude Sonnet 4",
+			Provider:   entities.TypeAnthropic,
+			MaxTokens:  200000,
+			InputCost:  3.00,
+			OutputCost: 15.00,
+		},
+		{
 			ID:         "claude-3-5-sonnet-20241022",
 			Name:       "Claude 3.5 Sonnet",
 			Provider:   entities.TypeAnthropic,
@@ -80,20 +88,20 @@ var availableModels = map[entities.Type][]*entities.Model{
 			OutputCost: 15.00,
 		},
 		{
+			ID:         "claude-3-5-haiku-20241022",
+			Name:       "Claude 3.5 Haiku",
+			Provider:   entities.TypeAnthropic,
+			MaxTokens:  200000,
+			InputCost:  0.80,
+			OutputCost: 4.00,
+		},
+		{
 			ID:         "claude-3-opus-20240229",
 			Name:       "Claude 3 Opus",
 			Provider:   entities.TypeAnthropic,
 			MaxTokens:  200000,
 			InputCost:  15.00,
 			OutputCost: 75.00,
-		},
-		{
-			ID:         "claude-3-sonnet-20240229",
-			Name:       "Claude 3 Sonnet",
-			Provider:   entities.TypeAnthropic,
-			MaxTokens:  200000,
-			InputCost:  3.00,
-			OutputCost: 15.00,
 		},
 		{
 			ID:         "claude-3-haiku-20240307",
@@ -106,6 +114,14 @@ var availableModels = map[entities.Type][]*entities.Model{
 	},
 
 	entities.TypeGoogle: {
+		{
+			ID:         "gemini-2.0-flash",
+			Name:       "Gemini 2.0 Flash",
+			Provider:   entities.TypeGoogle,
+			MaxTokens:  1048576,
+			InputCost:  0.10,
+			OutputCost: 0.40,
+		},
 		{
 			ID:         "gemini-1.5-pro",
 			Name:       "Gemini 1.5 Pro",
@@ -123,12 +139,12 @@ var availableModels = map[entities.Type][]*entities.Model{
 			OutputCost: 0.30,
 		},
 		{
-			ID:         "gemini-pro",
-			Name:       "Gemini Pro",
+			ID:         "gemini-1.5-flash-8b",
+			Name:       "Gemini 1.5 Flash 8B",
 			Provider:   entities.TypeGoogle,
-			MaxTokens:  32760,
-			InputCost:  0.50,
-			OutputCost: 1.50,
+			MaxTokens:  1048576,
+			InputCost:  0.0375,
+			OutputCost: 0.15,
 		},
 	},
 }

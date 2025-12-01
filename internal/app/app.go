@@ -12,10 +12,11 @@ import (
 )
 
 type App struct {
-	ctx      context.Context
-	fxApp    *fx.App
-	bindings []any
-	cfg      *config.Config
+	ctx            context.Context
+	fxApp          *fx.App
+	bindings       []any
+	cfg            *config.Config
+	dialogsHandler *handlers.DialogsHandler
 }
 
 func New(cfg *config.Config) (*App, error) {
@@ -32,6 +33,8 @@ func New(cfg *config.Config) (*App, error) {
 		importerHandler    *handlers.ImporterHandler
 		settingsHandler    *handlers.SettingsHandler
 		proxyHandler       *handlers.ProxyHandler
+		mediaHandler       *handlers.MediaHandler
+		dialogsHandler     *handlers.DialogsHandler
 	)
 
 	fxApp := fx.New(
@@ -54,6 +57,8 @@ func New(cfg *config.Config) (*App, error) {
 			&importerHandler,
 			&settingsHandler,
 			&proxyHandler,
+			&mediaHandler,
+			&dialogsHandler,
 		),
 	)
 
@@ -72,7 +77,10 @@ func New(cfg *config.Config) (*App, error) {
 			importerHandler,
 			settingsHandler,
 			proxyHandler,
+			mediaHandler,
+			dialogsHandler,
 		},
+		dialogsHandler: dialogsHandler,
 		cfg: cfg,
 	}
 
@@ -81,6 +89,10 @@ func New(cfg *config.Config) (*App, error) {
 
 func (a *App) Start(ctx context.Context) error {
 	a.ctx = ctx
+	// Set Wails context for dialogs handler
+	if a.dialogsHandler != nil {
+		a.dialogsHandler.SetContext(ctx)
+	}
 	return a.fxApp.Start(ctx)
 }
 

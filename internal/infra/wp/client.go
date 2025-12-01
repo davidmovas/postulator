@@ -97,3 +97,19 @@ func (c *client) UpdatePost(ctx context.Context, s *entities.Site, article *enti
 func (c *client) DeletePost(ctx context.Context, s *entities.Site, postID int) error {
 	return c.GetCurrentClient().DeletePost(ctx, s, postID)
 }
+
+func (c *client) UploadMedia(ctx context.Context, s *entities.Site, filename string, data []byte, altText string) (*MediaResult, error) {
+	return c.GetCurrentClient().UploadMedia(ctx, s, filename, data, altText)
+}
+
+func (c *client) UploadMediaFromURL(ctx context.Context, s *entities.Site, imageURL, filename, altText string) (*MediaResult, error) {
+	return c.GetCurrentClient().UploadMediaFromURL(ctx, s, imageURL, filename, altText)
+}
+
+func (c *client) GetMedia(ctx context.Context, s *entities.Site, mediaID int) (*MediaResult, error) {
+	return c.GetCurrentClient().GetMedia(ctx, s, mediaID)
+}
+
+func (c *client) DeleteMedia(ctx context.Context, s *entities.Site, mediaID int) error {
+	return c.GetCurrentClient().DeleteMedia(ctx, s, mediaID)
+}

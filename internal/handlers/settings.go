@@ -4,6 +4,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/healthcheck"
 	"github.com/davidmovas/postulator/internal/domain/settings"
 	"github.com/davidmovas/postulator/internal/dto"
+	"github.com/davidmovas/postulator/internal/version"
 	"github.com/davidmovas/postulator/pkg/ctx"
 )
 
@@ -41,4 +42,13 @@ func (h *SettingsHandler) UpdateHealthCheckSettings(settings *dto.HealthCheckSet
 	_ = h.scheduler.ApplySettings(ctx.FastCtx(), entity.Enabled, entity.IntervalMinutes)
 
 	return ok("Settings updated successfully")
+}
+
+func (h *SettingsHandler) GetAppVersion() *dto.Response[*dto.AppVersion] {
+	info := version.GetInfo()
+	return ok(&dto.AppVersion{
+		Version:   info.Version,
+		Commit:    info.Commit,
+		BuildDate: info.BuildDate,
+	})
 }
