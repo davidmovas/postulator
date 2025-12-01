@@ -1,9 +1,11 @@
 import { dto } from "@/wailsjs/wailsjs/go/models";
 import {
     CreateArticle,
+    CreateAndPublishArticle,
     CreateDraft,
     DeleteArticle,
     DeleteFromWordPress,
+    GenerateContent,
     GetArticle,
     ImportAllFromSite,
     ImportFromWordPress,
@@ -12,6 +14,7 @@ import {
     PublishToWordPress,
     SyncFromWordPress,
     UpdateArticle,
+    UpdateAndSyncArticle,
     UpdateInWordPress,
     BulkDeleteArticles,
     BulkPublishToWordPress,
@@ -20,11 +23,14 @@ import {
 import {
     mapArticle,
     mapArticleListResult,
+    mapGenerateContentResult,
     Article,
     ArticleCreateInput,
     ArticleUpdateInput,
     ArticleListFilter,
     ArticleListResult,
+    GenerateContentInput,
+    GenerateContentResult,
 } from "@/models/articles";
 import { unwrapResponse } from "@/lib/api-utils";
 
@@ -44,6 +50,24 @@ export const articleService = {
 
         const response = await CreateArticle(payload);
         unwrapResponse<string>(response);
+    },
+
+    async createAndPublishArticle(input: ArticleCreateInput): Promise<Article> {
+        const payload = new dto.Article({
+            siteId: input.siteId,
+            topicId: input.topicId,
+            title: input.title,
+            content: input.content,
+            excerpt: input.excerpt,
+            wpCategoryIds: input.wpCategoryIds,
+            wpTagIds: input.wpTagIds,
+            slug: input.slug,
+            metaDescription: input.metaDescription,
+        });
+
+        const response = await CreateAndPublishArticle(payload);
+        const article = unwrapResponse<dto.Article>(response);
+        return mapArticle(article);
     },
 
     async getArticle(id: number): Promise<Article> {
@@ -90,6 +114,29 @@ export const articleService = {
 
         const response = await UpdateArticle(payload);
         unwrapResponse<string>(response);
+    },
+
+    async updateAndSyncArticle(input: ArticleUpdateInput): Promise<Article> {
+        const article = await this.getArticle(input.id);
+
+        const payload = new dto.Article({
+            id: input.id,
+            siteId: article.siteId,
+            topicId: article.topicId,
+            title: input.title ?? article.title,
+            originalTitle: article.originalTitle,
+            content: input.content ?? article.content,
+            excerpt: input.excerpt ?? article.excerpt,
+            wpCategoryIds: input.wpCategoryIds ?? article.wpCategoryIds,
+            wpTagIds: input.wpTagIds ?? article.wpTagIds,
+            status: input.status ?? article.status,
+            slug: input.slug ?? article.slug,
+            metaDescription: input.metaDescription ?? article.metaDescription,
+        });
+
+        const response = await UpdateAndSyncArticle(payload);
+        const result = unwrapResponse<dto.Article>(response);
+        return mapArticle(result);
     },
 
     async deleteArticle(id: number): Promise<void> {
@@ -152,5 +199,20 @@ export const articleService = {
     async publishDraft(id: number): Promise<void> {
         const response = await PublishDraft(id);
         unwrapResponse<string>(response);
+    },
+
+    async generateContent(input: GenerateContentInput): Promise<GenerateContentResult> {
+        const payload = new dto.GenerateContentInput({
+            siteId: input.siteId,
+            providerId: input.providerId,
+            promptId: input.promptId,
+            topicId: input.topicId,
+            customTopicTitle: input.customTopicTitle || '',
+            placeholderValues: input.placeholderValues,
+        });
+
+        const response = await GenerateContent(payload);
+        const result = unwrapResponse<dto.GenerateContentResult>(response);
+        return mapGenerateContentResult(result);
     },
 };

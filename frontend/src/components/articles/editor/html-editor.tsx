@@ -34,6 +34,7 @@ import type { editor } from "monaco-editor";
 interface HtmlEditorProps {
     content: string;
     onChange: (html: string) => void;
+    onFormat?: (html: string) => void;
     disabled?: boolean;
 }
 
@@ -117,6 +118,7 @@ function formatHtml(html: string): string {
 export function HtmlEditor({
     content,
     onChange,
+    onFormat,
     disabled = false,
 }: HtmlEditorProps) {
     const { resolvedTheme } = useTheme();
@@ -176,8 +178,13 @@ export function HtmlEditor({
 
     const handleFormat = useCallback(() => {
         const formatted = formatHtml(content);
-        onChange(formatted);
-    }, [content, onChange]);
+        // Use onFormat if provided (doesn't mark as dirty), otherwise fall back to onChange
+        if (onFormat) {
+            onFormat(formatted);
+        } else {
+            onChange(formatted);
+        }
+    }, [content, onChange, onFormat]);
 
     const htmlSnippets = {
         bold: () => insertAtCursor("<strong>", "</strong>"),

@@ -14,6 +14,10 @@ export function BulkPublishToWordPress(arg1) {
   return window['go']['handlers']['ArticlesHandler']['BulkPublishToWordPress'](arg1);
 }
 
+export function CreateAndPublishArticle(arg1) {
+  return window['go']['handlers']['ArticlesHandler']['CreateAndPublishArticle'](arg1);
+}
+
 export function CreateArticle(arg1) {
   return window['go']['handlers']['ArticlesHandler']['CreateArticle'](arg1);
 }
@@ -28,6 +32,10 @@ export function DeleteArticle(arg1) {
 
 export function DeleteFromWordPress(arg1) {
   return window['go']['handlers']['ArticlesHandler']['DeleteFromWordPress'](arg1);
+}
+
+export function GenerateContent(arg1) {
+  return window['go']['handlers']['ArticlesHandler']['GenerateContent'](arg1);
 }
 
 export function GetArticle(arg1) {
@@ -56,6 +64,10 @@ export function PublishToWordPress(arg1) {
 
 export function SyncFromWordPress(arg1) {
   return window['go']['handlers']['ArticlesHandler']['SyncFromWordPress'](arg1);
+}
+
+export function UpdateAndSyncArticle(arg1) {
+  return window['go']['handlers']['ArticlesHandler']['UpdateAndSyncArticle'](arg1);
 }
 
 export function UpdateArticle(arg1) {

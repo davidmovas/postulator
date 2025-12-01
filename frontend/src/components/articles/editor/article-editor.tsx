@@ -5,12 +5,10 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Save, RefreshCw, RotateCcw, FileText, Eye } from "lucide-react";
+import { Save, RefreshCw, RotateCcw, FileText, Eye, Info, Sparkles } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RiWordpressFill } from "@remixicon/react";
 import { useApiCall } from "@/hooks/use-api-call";
 import { articleService } from "@/services/articles";
@@ -23,6 +21,8 @@ import { SeoSection } from "./sections/seo-section";
 import { FeaturedImageSection } from "./sections/featured-image-section";
 import { CategoriesTagsSection } from "./sections/categories-tags-section";
 import { PublishingSection } from "./sections/publishing-section";
+import { AIGenerateModal } from "./ai-generate-modal";
+import { GenerateContentResult } from "@/models/articles";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -59,6 +59,7 @@ export function ArticleEditor({
     const {
         formData,
         updateFormData,
+        updateFormDataSilent,
         resetForm,
         getCreateInput,
         getUpdateInput,
@@ -77,6 +78,7 @@ export function ArticleEditor({
     const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
+    const [showAIGenerateModal, setShowAIGenerateModal] = useState(false);
 
     // Load categories
     useEffect(() => {
@@ -108,20 +110,26 @@ export function ArticleEditor({
                 const input = getUpdateInput();
                 if (!input) return;
 
-                await execute(
-                    () => articleService.updateArticle(input),
+                // Update and sync to WordPress in one call
+                const result = await execute(
+                    () => articleService.updateAndSyncArticle(input),
                     {
-                        successMessage: "Article saved",
+                        successMessage: "Article saved and synced to WordPress",
                         showSuccessToast: true,
                         errorTitle: "Failed to save article",
                     }
                 );
+
+                if (result) {
+                    router.push(`/sites/${siteId}/articles`);
+                }
             } else {
                 const input = getCreateInput();
+                // Create and publish to WordPress in one call
                 const result = await execute(
-                    () => articleService.createArticle(input),
+                    () => articleService.createAndPublishArticle(input),
                     {
-                        successMessage: "Article created",
+                        successMessage: "Article created and published to WordPress",
                         showSuccessToast: true,
                         errorTitle: "Failed to create article",
                     }
@@ -129,7 +137,6 @@ export function ArticleEditor({
 
                 if (result) {
                     router.push(`/sites/${siteId}/articles`);
-                    return;
                 }
             }
             setIsDirty(false);
@@ -190,6 +197,16 @@ export function ArticleEditor({
         setShowUnsavedDialog(false);
         setPendingNavigation(null);
     }, [pendingNavigation, router]);
+
+    const handleAIGenerated = useCallback((result: GenerateContentResult) => {
+        updateFormData({
+            title: result.title,
+            content: result.content,
+            excerpt: result.excerpt,
+            metaDescription: result.metaDescription,
+            topicId: result.topicId,
+        });
+    }, [updateFormData]);
 
     const isPublished = article && article.wpPostId > 0;
 
@@ -286,12 +303,23 @@ export function ArticleEditor({
                                             {wordCount} words • {charCount} characters
                                         </CardDescription>
                                     </div>
-                                    <Tabs defaultValue="visual" value={editorMode} onValueChange={(v) => setEditorMode(v as EditorMode)}>
-                                        <TabsList>
-                                            <TabsTrigger value="visual">Visual</TabsTrigger>
-                                            <TabsTrigger value="html">HTML</TabsTrigger>
-                                        </TabsList>
-                                    </Tabs>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            variant="ai"
+                                            size="sm"
+                                            onClick={() => setShowAIGenerateModal(true)}
+                                            disabled={isSaving}
+                                        >
+                                            <Sparkles className="h-4 w-4 mr-2" />
+                                            Generate with AI
+                                        </Button>
+                                        <Tabs defaultValue="visual" value={editorMode} onValueChange={(v) => setEditorMode(v as EditorMode)}>
+                                            <TabsList>
+                                                <TabsTrigger value="visual">Visual</TabsTrigger>
+                                                <TabsTrigger value="html">HTML</TabsTrigger>
+                                            </TabsList>
+                                        </Tabs>
+                                    </div>
                                 </div>
                             </CardHeader>
                             <CardContent>
@@ -305,6 +333,7 @@ export function ArticleEditor({
                                     <HtmlEditor
                                         content={formData.content}
                                         onChange={(html) => updateFormData({ content: html })}
+                                        onFormat={(html) => updateFormDataSilent({ content: html })}
                                         disabled={isSaving}
                                     />
                                 )}
@@ -372,29 +401,58 @@ export function ArticleEditor({
                 </div>
             ) : (
                 /* Preview Mode */
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{formData.title || "Untitled Article"}</CardTitle>
-                        {formData.excerpt && (
-                            <CardDescription className="text-base">
-                                {formData.excerpt}
-                            </CardDescription>
-                        )}
-                    </CardHeader>
-                    <CardContent>
-                        {formData.featuredMediaUrl && (
-                            <img
-                                src={formData.featuredMediaUrl}
-                                alt={formData.title}
-                                className="w-full max-h-96 object-cover rounded-lg mb-6"
+                <div className="space-y-4">
+                    <Alert>
+                        <Info className="h-4 w-4" />
+                        <AlertDescription>
+                            This preview uses default styling. The final appearance on your website may differ based on your theme&apos;s styles.
+                        </AlertDescription>
+                    </Alert>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-3xl">{formData.title || "Untitled Article"}</CardTitle>
+                            {formData.excerpt && (
+                                <CardDescription className="text-base mt-2">
+                                    {formData.excerpt}
+                                </CardDescription>
+                            )}
+                        </CardHeader>
+                        <CardContent>
+                            {formData.featuredMediaUrl && (
+                                <img
+                                    src={formData.featuredMediaUrl}
+                                    alt={formData.title}
+                                    className="w-full max-h-96 object-cover rounded-lg mb-6"
+                                />
+                            )}
+                            <div
+                                className="
+                                    prose prose-lg dark:prose-invert max-w-none
+                                    prose-headings:font-semibold prose-headings:tracking-tight
+                                    prose-h1:text-3xl prose-h1:mt-8 prose-h1:mb-4
+                                    prose-h2:text-2xl prose-h2:mt-6 prose-h2:mb-3
+                                    prose-h3:text-xl prose-h3:mt-5 prose-h3:mb-2
+                                    prose-p:leading-7 prose-p:mb-4
+                                    prose-ul:my-4 prose-ul:list-disc prose-ul:pl-6
+                                    prose-ol:my-4 prose-ol:list-decimal prose-ol:pl-6
+                                    prose-li:my-1
+                                    prose-blockquote:border-l-4 prose-blockquote:border-primary/30 prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:my-4
+                                    prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm
+                                    prose-pre:bg-muted prose-pre:p-4 prose-pre:rounded-lg prose-pre:overflow-x-auto
+                                    prose-img:rounded-lg prose-img:my-6
+                                    prose-a:text-primary prose-a:underline prose-a:underline-offset-4 hover:prose-a:text-primary/80
+                                    prose-hr:my-8 prose-hr:border-border
+                                    prose-table:border-collapse prose-table:w-full
+                                    prose-th:border prose-th:border-border prose-th:px-4 prose-th:py-2 prose-th:bg-muted prose-th:font-semibold
+                                    prose-td:border prose-td:border-border prose-td:px-4 prose-td:py-2
+                                    prose-strong:font-semibold
+                                    prose-em:italic
+                                "
+                                dangerouslySetInnerHTML={{ __html: formData.content }}
                             />
-                        )}
-                        <div
-                            className="prose prose-lg dark:prose-invert max-w-none"
-                            dangerouslySetInnerHTML={{ __html: formData.content }}
-                        />
-                    </CardContent>
-                </Card>
+                        </CardContent>
+                    </Card>
+                </div>
             )}
 
             {/* Unsaved Changes Dialog */}
@@ -416,6 +474,14 @@ export function ArticleEditor({
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* AI Generate Modal */}
+            <AIGenerateModal
+                open={showAIGenerateModal}
+                onOpenChange={setShowAIGenerateModal}
+                siteId={siteId}
+                onGenerated={handleAIGenerated}
+            />
         </div>
     );
 }

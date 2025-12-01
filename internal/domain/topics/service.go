@@ -247,6 +247,35 @@ func (s *service) GetSiteTopics(ctx context.Context, siteID int64) ([]*entities.
 	return topics, nil
 }
 
+func (s *service) GetUnusedSiteTopics(ctx context.Context, siteID int64) ([]*entities.Topic, error) {
+	// First get all topics assigned to the site
+	siteTopics, err := s.siteTopicRepo.GetBySiteID(ctx, siteID)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get site topics")
+		return nil, err
+	}
+
+	if len(siteTopics) == 0 {
+		return []*entities.Topic{}, nil
+	}
+
+	// Get topic IDs
+	topicIDs := make([]int64, len(siteTopics))
+	for i, topic := range siteTopics {
+		topicIDs[i] = topic.ID
+	}
+
+	// Get unused topics from this list
+	unusedTopics, err := s.usageRepo.GetUnused(ctx, siteID, topicIDs)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get unused topics")
+		return nil, err
+	}
+
+	s.logger.Debug("Unused site topics retrieved")
+	return unusedTopics, nil
+}
+
 func (s *service) GenerateVariations(ctx context.Context, providerID, topicID int64, count int) ([]*entities.Topic, error) {
 	if count <= 0 {
 		return nil, errors.Validation("Count must be positive")

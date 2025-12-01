@@ -208,3 +208,22 @@ func (d *WPInfoUpdate) FromEntity(entity *entities.WPInfoUpdate) *WPInfoUpdate {
 
 	return d
 }
+
+// GenerateContentInput represents input for AI content generation
+type GenerateContentInput struct {
+	SiteID            int64             `json:"siteId"`
+	ProviderID        int64             `json:"providerId"`
+	PromptID          int64             `json:"promptId"`
+	TopicID           *int64            `json:"topicId"`
+	CustomTopicTitle  string            `json:"customTopicTitle"`
+	PlaceholderValues map[string]string `json:"placeholderValues"`
+}
+
+// GenerateContentResult represents the result of AI content generation
+type GenerateContentResult struct {
+	Title           string `json:"title"`
+	Content         string `json:"content"`
+	Excerpt         string `json:"excerpt"`
+	MetaDescription string `json:"metaDescription"`
+	TopicID         *int64 `json:"topicId"`
+}

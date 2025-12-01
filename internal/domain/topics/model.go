@@ -48,6 +48,7 @@ type Service interface {
 	UnassignFromSite(ctx context.Context, siteID int64, topicIDs ...int64) error
 	GetSiteTopics(ctx context.Context, siteID int64) ([]*entities.Topic, error)
 	GetAssignedForSite(ctx context.Context, siteID int64, topicIDs []int64) ([]int64, error)
+	GetUnusedSiteTopics(ctx context.Context, siteID int64) ([]*entities.Topic, error)
 
 	GenerateVariations(ctx context.Context, providerID int64, topicID int64, count int) ([]*entities.Topic, error)
 	GetOrGenerateVariation(ctx context.Context, providerID, siteID, originalID int64) (*entities.Topic, error)

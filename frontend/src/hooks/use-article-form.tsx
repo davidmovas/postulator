@@ -19,6 +19,7 @@ export interface ArticleFormData {
     featuredMediaUrl?: string;
     author?: number;
     publishedAt?: string;
+    topicId?: number;
 }
 
 interface UseArticleFormOptions {
@@ -39,6 +40,7 @@ const defaultFormData: ArticleFormData = {
     featuredMediaUrl: undefined,
     author: undefined,
     publishedAt: undefined,
+    topicId: undefined,
 };
 
 export function useArticleForm({ siteId, article }: UseArticleFormOptions) {
@@ -57,6 +59,7 @@ export function useArticleForm({ siteId, article }: UseArticleFormOptions) {
                 featuredMediaUrl: article.featuredMediaUrl,
                 author: article.author,
                 publishedAt: article.publishedAt,
+                topicId: article.topicId,
             };
         }
         return defaultFormData;
@@ -69,6 +72,11 @@ export function useArticleForm({ siteId, article }: UseArticleFormOptions) {
     const updateFormData = useCallback((updates: Partial<ArticleFormData>) => {
         setFormData(prev => ({ ...prev, ...updates }));
         setIsDirty(true);
+    }, []);
+
+    // Update form data without marking as dirty (for formatting operations)
+    const updateFormDataSilent = useCallback((updates: Partial<ArticleFormData>) => {
+        setFormData(prev => ({ ...prev, ...updates }));
     }, []);
 
     const resetForm = useCallback(() => {
@@ -86,6 +94,7 @@ export function useArticleForm({ siteId, article }: UseArticleFormOptions) {
                 featuredMediaUrl: article.featuredMediaUrl,
                 author: article.author,
                 publishedAt: article.publishedAt,
+                topicId: article.topicId,
             });
         } else {
             setFormData(defaultFormData);
@@ -96,6 +105,7 @@ export function useArticleForm({ siteId, article }: UseArticleFormOptions) {
     const getCreateInput = useCallback((): ArticleCreateInput => {
         return {
             siteId,
+            topicId: formData.topicId,
             title: formData.title.trim(),
             content: formData.content.trim(),
             excerpt: formData.excerpt.trim() || undefined,
@@ -131,6 +141,7 @@ export function useArticleForm({ siteId, article }: UseArticleFormOptions) {
     return {
         formData,
         updateFormData,
+        updateFormDataSilent,
         resetForm,
         getCreateInput,
         getUpdateInput,

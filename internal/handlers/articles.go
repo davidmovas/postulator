@@ -33,6 +33,34 @@ func (h *ArticlesHandler) CreateArticle(article *dto.Article) *dto.Response[stri
 	return ok("Article created successfully")
 }
 
+func (h *ArticlesHandler) CreateAndPublishArticle(article *dto.Article) *dto.Response[*dto.Article] {
+	entity, err := article.ToEntity()
+	if err != nil {
+		return fail[*dto.Article](err)
+	}
+
+	result, err := h.service.CreateAndPublishArticle(ctx.LongCtx(), entity)
+	if err != nil {
+		return fail[*dto.Article](err)
+	}
+
+	return ok(dto.NewArticle(result))
+}
+
+func (h *ArticlesHandler) UpdateAndSyncArticle(article *dto.Article) *dto.Response[*dto.Article] {
+	entity, err := article.ToEntity()
+	if err != nil {
+		return fail[*dto.Article](err)
+	}
+
+	result, err := h.service.UpdateAndSyncArticle(ctx.LongCtx(), entity)
+	if err != nil {
+		return fail[*dto.Article](err)
+	}
+
+	return ok(dto.NewArticle(result))
+}
+
 func (h *ArticlesHandler) GetArticle(id int64) *dto.Response[*dto.Article] {
 	article, err := h.service.GetArticle(ctx.FastCtx(), id)
 	if err != nil {
@@ -210,4 +238,28 @@ func (h *ArticlesHandler) PublishDraft(id int64) *dto.Response[string] {
 	}
 
 	return ok("Draft published successfully")
+}
+
+func (h *ArticlesHandler) GenerateContent(input *dto.GenerateContentInput) *dto.Response[*dto.GenerateContentResult] {
+	domainInput := &articles.GenerateContentInput{
+		SiteID:            input.SiteID,
+		ProviderID:        input.ProviderID,
+		PromptID:          input.PromptID,
+		TopicID:           input.TopicID,
+		CustomTopicTitle:  input.CustomTopicTitle,
+		PlaceholderValues: input.PlaceholderValues,
+	}
+
+	result, err := h.service.GenerateContent(ctx.LongCtx(), domainInput)
+	if err != nil {
+		return fail[*dto.GenerateContentResult](err)
+	}
+
+	return ok(&dto.GenerateContentResult{
+		Title:           result.Title,
+		Content:         result.Content,
+		Excerpt:         result.Excerpt,
+		MetaDescription: result.MetaDescription,
+		TopicID:         result.TopicID,
+	})
 }

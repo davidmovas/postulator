@@ -26,6 +26,8 @@ export function GetSiteTopics(arg1:number):Promise<dto.Response___github_com_dav
 
 export function GetTopic(arg1:number):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_Topic_>;
 
+export function GetUnusedSiteTopics(arg1:number):Promise<dto.Response___github_com_davidmovas_postulator_internal_dto_Topic_>;
+
 export function ListTopics():Promise<dto.Response___github_com_davidmovas_postulator_internal_dto_Topic_>;
 
 export function MarkTopicUsed(arg1:number,arg2:number):Promise<dto.Response_string_>;

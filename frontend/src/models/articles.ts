@@ -132,3 +132,30 @@ export const articleStatusColors: Record<ArticleStatus, string> = {
     private: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
     unknown: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
 };
+
+export interface GenerateContentInput {
+    siteId: number;
+    providerId: number;
+    promptId: number;
+    topicId?: number;
+    customTopicTitle?: string;
+    placeholderValues: Record<string, string>;
+}
+
+export interface GenerateContentResult {
+    title: string;
+    content: string;
+    excerpt: string;
+    metaDescription: string;
+    topicId?: number;
+}
+
+export function mapGenerateContentResult(x: dto.GenerateContentResult): GenerateContentResult {
+    return {
+        title: x.title,
+        content: x.content,
+        excerpt: x.excerpt,
+        metaDescription: x.metaDescription,
+        topicId: x.topicId ?? undefined,
+    };
+}

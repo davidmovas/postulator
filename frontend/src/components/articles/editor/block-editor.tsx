@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
@@ -133,6 +133,13 @@ export function BlockEditor({
             },
         },
     });
+
+    // Sync content from props when it changes externally (e.g., AI generation)
+    useEffect(() => {
+        if (editor && content !== editor.getHTML()) {
+            editor.commands.setContent(content);
+        }
+    }, [content, editor]);
 
     const handleInsertImage = useCallback((url: string, alt?: string) => {
         if (editor) {

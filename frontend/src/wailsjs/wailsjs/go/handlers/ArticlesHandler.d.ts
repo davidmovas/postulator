@@ -8,6 +8,8 @@ export function BulkDeleteFromWordPress(arg1:Array<number>):Promise<dto.Response
 
 export function BulkPublishToWordPress(arg1:Array<number>):Promise<dto.Response_int_>;
 
+export function CreateAndPublishArticle(arg1:dto.Article):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_Article_>;
+
 export function CreateArticle(arg1:dto.Article):Promise<dto.Response_string_>;
 
 export function CreateDraft(arg1:number,arg2:string,arg3:string):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_Article_>;
@@ -15,6 +17,8 @@ export function CreateDraft(arg1:number,arg2:string,arg3:string):Promise<dto.Res
 export function DeleteArticle(arg1:number):Promise<dto.Response_string_>;
 
 export function DeleteFromWordPress(arg1:number):Promise<dto.Response_string_>;
+
+export function GenerateContent(arg1:dto.GenerateContentInput):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_GenerateContentResult_>;
 
 export function GetArticle(arg1:number):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_Article_>;
 
@@ -29,6 +33,8 @@ export function PublishDraft(arg1:number):Promise<dto.Response_string_>;
 export function PublishToWordPress(arg1:number):Promise<dto.Response_string_>;
 
 export function SyncFromWordPress(arg1:number):Promise<dto.Response_string_>;
+
+export function UpdateAndSyncArticle(arg1:dto.Article):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_Article_>;
 
 export function UpdateArticle(arg1:dto.Article):Promise<dto.Response_string_>;
 

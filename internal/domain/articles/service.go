@@ -6,7 +6,11 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
+	"github.com/davidmovas/postulator/internal/domain/prompts"
+	"github.com/davidmovas/postulator/internal/domain/providers"
 	"github.com/davidmovas/postulator/internal/domain/sites"
+	"github.com/davidmovas/postulator/internal/domain/topics"
+	"github.com/davidmovas/postulator/internal/infra/ai"
 	"github.com/davidmovas/postulator/internal/infra/wp"
 	"github.com/davidmovas/postulator/pkg/errors"
 	"github.com/davidmovas/postulator/pkg/logger"
@@ -15,23 +19,32 @@ import (
 var _ Service = (*service)(nil)
 
 type service struct {
-	wp          wp.Client
-	repo        Repository
-	siteService sites.Service
-	logger      *logger.Logger
+	wp              wp.Client
+	repo            Repository
+	siteService     sites.Service
+	providerService providers.Service
+	promptService   prompts.Service
+	topicService    topics.Service
+	logger          *logger.Logger
 }
 
 func NewService(
 	repo Repository,
 	siteService sites.Service,
+	providerService providers.Service,
+	promptService prompts.Service,
+	topicService topics.Service,
 	wp wp.Client,
 	logger *logger.Logger,
 ) Service {
 	return &service{
-		repo:        repo,
-		siteService: siteService,
-		wp:          wp,
-		logger:      logger.WithScope("service").WithScope("articles"),
+		repo:            repo,
+		siteService:     siteService,
+		providerService: providerService,
+		promptService:   promptService,
+		topicService:    topicService,
+		wp:              wp,
+		logger:          logger.WithScope("service").WithScope("articles"),
 	}
 }
 
@@ -64,6 +77,66 @@ func (s *service) CreateArticle(ctx context.Context, article *entities.Article) 
 
 	s.logger.Info("Article created successfully")
 	return nil
+}
+
+func (s *service) CreateAndPublishArticle(ctx context.Context, article *entities.Article) (*entities.Article, error) {
+	// First create the article locally
+	if err := s.CreateArticle(ctx, article); err != nil {
+		return nil, err
+	}
+
+	// Then publish to WordPress
+	if err := s.PublishToWordPress(ctx, article); err != nil {
+		s.logger.ErrorWithErr(err, "Article created locally but failed to publish to WordPress")
+		return nil, errors.WordPress("publish", err)
+	}
+
+	// Fetch the updated article with WP info
+	updatedArticle, err := s.repo.GetByID(ctx, article.ID)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get updated article after publish")
+		return article, nil // Return original article if we can't fetch the updated one
+	}
+
+	s.logger.Info("Article created and published successfully")
+	return updatedArticle, nil
+}
+
+func (s *service) UpdateAndSyncArticle(ctx context.Context, article *entities.Article) (*entities.Article, error) {
+	// First update the article locally
+	if err := s.UpdateArticle(ctx, article); err != nil {
+		return nil, err
+	}
+
+	// Check if the article is already published to WordPress
+	existingArticle, err := s.repo.GetByID(ctx, article.ID)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get article for sync")
+		return nil, err
+	}
+
+	// If already published, sync to WordPress; otherwise publish
+	if existingArticle.WPPostID > 0 {
+		if err := s.UpdateInWordPress(ctx, existingArticle); err != nil {
+			s.logger.ErrorWithErr(err, "Article updated locally but failed to sync to WordPress")
+			return nil, errors.WordPress("sync", err)
+		}
+	} else {
+		if err := s.PublishToWordPress(ctx, existingArticle); err != nil {
+			s.logger.ErrorWithErr(err, "Article updated locally but failed to publish to WordPress")
+			return nil, errors.WordPress("publish", err)
+		}
+	}
+
+	// Fetch the updated article with WP info
+	updatedArticle, err := s.repo.GetByID(ctx, article.ID)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get updated article after sync")
+		return existingArticle, nil
+	}
+
+	s.logger.Info("Article updated and synced successfully")
+	return updatedArticle, nil
 }
 
 func (s *service) GetArticle(ctx context.Context, id int64) (*entities.Article, error) {
@@ -508,4 +581,177 @@ func (s *service) calculateWordCount(content string) int {
 
 func (s *service) needUpdate(local, remote *entities.Article) bool {
 	return (local.Title != remote.Title) && (local.WPPostID != remote.WPPostID)
+}
+
+func (s *service) GenerateContent(ctx context.Context, input *GenerateContentInput) (*GenerateContentResult, error) {
+	// Validate input
+	if input.SiteID <= 0 {
+		return nil, errors.Validation("Site ID is required")
+	}
+	if input.ProviderID <= 0 {
+		return nil, errors.Validation("Provider ID is required")
+	}
+	if input.PromptID <= 0 {
+		return nil, errors.Validation("Prompt ID is required")
+	}
+
+	// Get site info
+	site, err := s.siteService.GetSite(ctx, input.SiteID)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get site for content generation")
+		return nil, err
+	}
+
+	// Get provider
+	provider, err := s.providerService.GetProvider(ctx, input.ProviderID)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get provider for content generation")
+		return nil, err
+	}
+
+	// Determine topic title
+	var topicTitle string
+	var topicID *int64
+
+	if input.TopicID != nil {
+		// Use existing topic
+		topic, err := s.topicService.GetTopic(ctx, *input.TopicID)
+		if err != nil {
+			s.logger.ErrorWithErr(err, "Failed to get topic for content generation")
+			return nil, err
+		}
+		topicTitle = topic.Title
+		topicID = &topic.ID
+	} else if strings.TrimSpace(input.CustomTopicTitle) != "" {
+		// Use custom topic - create it and assign to site
+		topicTitle = strings.TrimSpace(input.CustomTopicTitle)
+
+		newTopic := &entities.Topic{
+			Title:     topicTitle,
+			CreatedAt: time.Now(),
+		}
+
+		result, err := s.topicService.CreateAndAssignToSite(ctx, input.SiteID, newTopic)
+		if err != nil {
+			s.logger.ErrorWithErr(err, "Failed to create and assign custom topic")
+			return nil, err
+		}
+
+		// Get the created topic ID
+		if result.TotalAdded > 0 {
+			// Fetch the topic by title to get its ID
+			topics, err := s.topicService.GetByTitles(ctx, []string{topicTitle})
+			if err == nil && len(topics) > 0 {
+				topicID = &topics[0].ID
+			}
+		}
+	} else {
+		return nil, errors.Validation("Either topic ID or custom topic title is required")
+	}
+
+	// Build placeholders map
+	placeholders := make(map[string]string)
+
+	// Add standard placeholders
+	placeholders["title"] = topicTitle
+	placeholders["topic"] = topicTitle
+	placeholders["siteName"] = site.Name
+	placeholders["siteUrl"] = site.URL
+
+	// Add custom placeholders from input
+	for k, v := range input.PlaceholderValues {
+		placeholders[k] = v
+	}
+
+	// Render prompts
+	systemPrompt, userPrompt, err := s.promptService.RenderPrompt(ctx, input.PromptID, placeholders)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to render prompts for content generation")
+		return nil, err
+	}
+
+	// Create AI client
+	aiClient, err := ai.CreateClient(provider)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to create AI client for content generation")
+		return nil, err
+	}
+
+	// Generate article
+	s.logger.Info("Starting AI content generation")
+	aiResult, err := aiClient.GenerateArticle(ctx, systemPrompt, userPrompt)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to generate article content")
+		return nil, errors.Internal(err)
+	}
+
+	// Mark topic as used if we have a topic ID
+	if topicID != nil {
+		if err := s.topicService.MarkTopicUsed(ctx, input.SiteID, *topicID); err != nil {
+			s.logger.ErrorWithErr(err, "Failed to mark topic as used")
+			// Don't fail the whole operation for this
+		}
+	}
+
+	// Build result
+	result := &GenerateContentResult{
+		Title:           aiResult.Title,
+		Content:         aiResult.Content,
+		Excerpt:         aiResult.Excerpt,
+		MetaDescription: s.generateMetaDescription(aiResult.Excerpt, aiResult.Content),
+		TopicID:         topicID,
+	}
+
+	s.logger.Info("AI content generation completed successfully")
+	return result, nil
+}
+
+func (s *service) generateMetaDescription(excerpt, content string) string {
+	// Use excerpt if available and not too long
+	if len(excerpt) > 0 && len(excerpt) <= 160 {
+		return excerpt
+	}
+
+	// Otherwise, extract from content
+	// Strip HTML tags and take first 160 characters
+	text := strings.TrimSpace(stripHTMLTags(content))
+	if len(text) > 160 {
+		// Find last space before 160 to avoid cutting words
+		text = text[:160]
+		lastSpace := strings.LastIndex(text, " ")
+		if lastSpace > 100 {
+			text = text[:lastSpace]
+		}
+		text = strings.TrimSuffix(text, ".") + "..."
+	}
+
+	return text
+}
+
+func stripHTMLTags(s string) string {
+	var result strings.Builder
+	inTag := false
+
+	for _, r := range s {
+		if r == '<' {
+			inTag = true
+			continue
+		}
+		if r == '>' {
+			inTag = false
+			result.WriteRune(' ')
+			continue
+		}
+		if !inTag {
+			result.WriteRune(r)
+		}
+	}
+
+	// Clean up multiple spaces
+	text := result.String()
+	for strings.Contains(text, "  ") {
+		text = strings.ReplaceAll(text, "  ", " ")
+	}
+
+	return strings.TrimSpace(text)
 }

@@ -50,6 +50,10 @@ export function GetTopic(arg1) {
   return window['go']['handlers']['TopicsHandler']['GetTopic'](arg1);
 }
 
+export function GetUnusedSiteTopics(arg1) {
+  return window['go']['handlers']['TopicsHandler']['GetUnusedSiteTopics'](arg1);
+}
+
 export function ListTopics() {
   return window['go']['handlers']['TopicsHandler']['ListTopics']();
 }

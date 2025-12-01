@@ -2,7 +2,6 @@
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -12,9 +11,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Calendar, Clock, User, Globe, FileText, Send } from "lucide-react";
+import { Clock, User, Globe, FileText, Send } from "lucide-react";
 import { ArticleFormData } from "@/hooks/use-article-form";
-import { cn } from "@/lib/utils";
 import { formatSmartDate } from "@/lib/time";
 
 interface Author {
@@ -121,23 +119,6 @@ export function PublishingSection({
                         </Select>
                     </div>
                 )}
-
-                {/* Publish Date */}
-                <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        Publish Date
-                    </Label>
-                    <Input
-                        type="datetime-local"
-                        value={formData.publishedAt ? new Date(formData.publishedAt).toISOString().slice(0, 16) : ""}
-                        onChange={(e) => onUpdate({ publishedAt: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
-                        disabled={disabled}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                        Leave empty to publish immediately
-                    </p>
-                </div>
 
                 {/* WordPress Status */}
                 {(isPublished || wpPostId) && (

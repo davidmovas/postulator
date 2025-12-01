@@ -59,11 +59,32 @@ type Repository interface {
 	BulkDelete(ctx context.Context, ids []int64) error
 }
 
+// GenerateContentInput represents input for AI content generation
+type GenerateContentInput struct {
+	SiteID            int64
+	ProviderID        int64
+	PromptID          int64
+	TopicID           *int64 // Optional - if nil, use custom topic title
+	CustomTopicTitle  string // Used when TopicID is nil
+	PlaceholderValues map[string]string
+}
+
+// GenerateContentResult represents the result of AI content generation
+type GenerateContentResult struct {
+	Title           string
+	Content         string
+	Excerpt         string
+	MetaDescription string
+	TopicID         *int64 // The topic ID that was used or created
+}
+
 type Service interface {
 	CreateArticle(ctx context.Context, article *entities.Article) error
+	CreateAndPublishArticle(ctx context.Context, article *entities.Article) (*entities.Article, error)
 	GetArticle(ctx context.Context, id int64) (*entities.Article, error)
 	ListArticles(ctx context.Context, filter *ListFilter) (*ListResult, error)
 	UpdateArticle(ctx context.Context, article *entities.Article) error
+	UpdateAndSyncArticle(ctx context.Context, article *entities.Article) (*entities.Article, error)
 	DeleteArticle(ctx context.Context, id int64) error
 	BulkDeleteArticles(ctx context.Context, ids []int64) error
 
@@ -79,4 +100,6 @@ type Service interface {
 
 	CreateDraft(ctx context.Context, exec *entities.Execution, title, content string) (*entities.Article, error)
 	PublishDraft(ctx context.Context, id int64) error
+
+	GenerateContent(ctx context.Context, input *GenerateContentInput) (*GenerateContentResult, error)
 }

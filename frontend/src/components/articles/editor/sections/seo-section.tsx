@@ -83,19 +83,13 @@ export function SeoSection({
                 <div className="space-y-2">
                     <Label htmlFor="seo-slug">URL Slug</Label>
                     <div className="flex gap-2">
-                        <div className="flex-1 flex">
-                            <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-muted-foreground text-sm">
-                                {siteUrl}/
-                            </span>
-                            <Input
-                                id="seo-slug"
-                                value={formData.slug}
-                                onChange={(e) => handleSlugChange(e.target.value)}
-                                disabled={disabled}
-                                placeholder="article-url-slug"
-                                className="rounded-l-none"
-                            />
-                        </div>
+                        <Input
+                            id="seo-slug"
+                            value={formData.slug}
+                            onChange={(e) => handleSlugChange(e.target.value)}
+                            disabled={disabled}
+                            placeholder="article-url-slug"
+                        />
                         <Button
                             type="button"
                             variant="outline"
@@ -107,6 +101,11 @@ export function SeoSection({
                             <RotateCcw className="h-4 w-4" />
                         </Button>
                     </div>
+                    {formData.slug && (
+                        <div className="text-xs text-muted-foreground bg-muted px-3 py-2 rounded-md font-mono">
+                            {siteUrl}/.../{formData.slug}
+                        </div>
+                    )}
                     <p className="text-xs text-muted-foreground">
                         The URL-friendly version of the title. Leave empty to auto-generate.
                     </p>
@@ -152,7 +151,7 @@ export function SeoSection({
                             {formData.title || "Article Title"}
                         </div>
                         <div className="text-green-700 dark:text-green-500 text-sm">
-                            {siteUrl}/{formData.slug || "article-slug"}
+                            {siteUrl}/.../{formData.slug || "article-slug"}
                         </div>
                         <div className="text-muted-foreground text-sm line-clamp-2">
                             {formData.metaDescription || formData.excerpt || "No description provided. The first part of your content will be shown instead."}

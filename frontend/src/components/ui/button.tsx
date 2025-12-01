@@ -21,6 +21,7 @@ const buttonVariants = cva(
                 link: "text-primary underline-offset-4 hover:underline",
                 wordpress:
                     "bg-[#00669b] text-white shadow-xs hover:bg-[#004d7a] focus-visible:ring-[#00669b]/20 dark:focus-visible:ring-[#00669b]/40",
+                ai: "bg-gradient-to-r from-blue-600 via-purple-600 to-violet-600 text-white shadow-md hover:from-blue-700 hover:via-purple-700 hover:to-violet-700 hover:shadow-lg transition-all duration-200 focus-visible:ring-purple-500/30",
             },
             size: {
                 default: "h-9 px-4 py-2",
