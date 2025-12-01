@@ -206,8 +206,6 @@ export function useArticlesTable(siteId: number, options?: UseArticlesTableOptio
                                 <span>Edit</span>
                             </DropdownMenuItem>
 
-                            <DropdownMenuSeparator />
-
                             {!isPublished && article.status === 'draft' && (
                                 <DropdownMenuItem onClick={() => handlePublishToWP(article)}>
                                     <Upload className="mr-2 h-4 w-4" />

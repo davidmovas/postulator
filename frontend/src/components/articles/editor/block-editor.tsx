@@ -129,7 +129,24 @@ export function BlockEditor({
         },
         editorProps: {
             attributes: {
-                class: "prose prose-sm dark:prose-invert max-w-none min-h-[400px] p-4 focus:outline-none",
+                class: `
+                    prose prose-base dark:prose-invert max-w-none min-h-[400px] p-4 focus:outline-none
+                    prose-headings:font-semibold prose-headings:tracking-tight
+                    prose-h1:text-2xl prose-h1:mt-6 prose-h1:mb-3
+                    prose-h2:text-xl prose-h2:mt-5 prose-h2:mb-2
+                    prose-h3:text-lg prose-h3:mt-4 prose-h3:mb-2
+                    prose-p:leading-7 prose-p:mb-3
+                    prose-ul:my-3 prose-ul:list-disc prose-ul:pl-5
+                    prose-ol:my-3 prose-ol:list-decimal prose-ol:pl-5
+                    prose-li:my-1
+                    prose-blockquote:border-l-4 prose-blockquote:border-primary/30 prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:my-4 prose-blockquote:text-muted-foreground
+                    prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-mono
+                    prose-pre:bg-muted prose-pre:p-4 prose-pre:rounded-lg prose-pre:overflow-x-auto
+                    prose-a:text-primary prose-a:underline prose-a:underline-offset-4 hover:prose-a:text-primary/80
+                    prose-hr:my-6 prose-hr:border-border
+                    prose-strong:font-semibold
+                    prose-em:italic
+                `.replace(/\s+/g, ' ').trim(),
             },
         },
     });

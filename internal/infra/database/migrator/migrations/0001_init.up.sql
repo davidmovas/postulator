@@ -255,18 +255,19 @@ CREATE TABLE articles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     site_id INTEGER NOT NULL,
     job_id INTEGER,
-    topic_id INTEGER NOT NULL,
+    topic_id INTEGER,  -- Nullable: imported articles may not have topics
 
     title TEXT NOT NULL,
     original_title TEXT NOT NULL,
     content TEXT NOT NULL,
     excerpt TEXT,
 
-    wp_post_id INTEGER NOT NULL,
-    wp_post_url TEXT NOT NULL,
-    wp_category_ids TEXT NOT NULL,
+    wp_post_id INTEGER NOT NULL DEFAULT 0,
+    wp_post_url TEXT NOT NULL DEFAULT '',
+    wp_category_ids TEXT NOT NULL DEFAULT '[]',
+    wp_tag_ids TEXT NOT NULL DEFAULT '[]',
 
-    status TEXT NOT NULL DEFAULT 'published',
+    status TEXT NOT NULL DEFAULT 'draft',
     source TEXT NOT NULL DEFAULT 'generated',
     is_edited BOOLEAN NOT NULL DEFAULT 0,
     word_count INTEGER,
@@ -278,7 +279,7 @@ CREATE TABLE articles (
 
     FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
     FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE SET NULL,
-    FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
+    FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE SET NULL,
     UNIQUE (site_id, wp_post_id)
 );
 

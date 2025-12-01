@@ -241,7 +241,7 @@ export function ArticleEditor({
 
                     {isDirty && (
                         <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
                             onClick={resetForm}
                             disabled={isSaving}

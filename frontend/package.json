@@ -30,6 +30,7 @@
         "@radix-ui/react-tabs": "^1.1.13",
         "@radix-ui/react-tooltip": "^1.2.8",
         "@remixicon/react": "^4.6.0",
+        "@tailwindcss/typography": "^0.5.19",
         "@tanstack/react-table": "^8.21.3",
         "@tiptap/extension-bubble-menu": "^3.11.1",
         "@tiptap/extension-image": "^3.11.1",
