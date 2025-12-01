@@ -89,7 +89,7 @@ export function useSitesTable() {
                 const site = row.original;
                 return (
                     <Link
-                        href={`/sites/${site.id}`}
+                        href={`/sites/view?id=${site.id}`}
                 className="font-medium"
                     >
                     {site.name}
@@ -182,7 +182,7 @@ export function useSitesTable() {
 
                 return (
                     <Link
-                        href={`/sites/${site.id}?tab=articles`}
+                        href={`/sites/articles?id=${site.id}`}
                 className="text-blue-500 hover:text-blue-700 hover:underline font-medium"
                     >
                     {articlesCount}
@@ -199,7 +199,7 @@ export function useSitesTable() {
 
                 return (
                     <Link
-                        href={`/sites/${site.id}?tab=jobs`}
+                        href={`/sites/jobs?id=${site.id}`}
                 className="text-blue-500 hover:text-blue-700 hover:underline font-medium"
                     >
                     {jobsCount}

@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
+import { useRouter } from "next/navigation";
+import { useQueryId } from "@/hooks/use-query-param";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/table/data-table";
@@ -19,10 +20,9 @@ import { useApiCall } from "@/hooks/use-api-call";
 import { articleService } from "@/services/articles";
 import { DeleteArticleModal } from "@/components/articles/modals/delete-article-modal";
 
-export default function SiteArticlesPage() {
-    const params = useParams();
+function SiteArticlesPageContent() {
     const router = useRouter();
-    const siteId = parseInt(params.id as string);
+    const siteId = useQueryId();
 
     const [selected, setSelected] = useState<Article[]>([]);
     const [selectionResetKey, setSelectionResetKey] = useState(0);
@@ -32,7 +32,7 @@ export default function SiteArticlesPage() {
     const { execute } = useApiCall();
 
     const handleEditArticle = useCallback((article: Article) => {
-        router.push(`/sites/${siteId}/articles/${article.id}/edit`);
+        router.push(`/sites/articles/edit?id=${siteId}&articleId=${article.id}`);
     }, [router, siteId]);
 
     const handleOpenDeleteModal = useCallback((article: Article) => {
@@ -182,7 +182,7 @@ export default function SiteArticlesPage() {
                 Sync
             </Button>
 
-            <Link href={`/sites/${siteId}/articles/new`}>
+            <Link href={`/sites/articles/new?id=${siteId}`}>
                 <Button className="flex items-center gap-2">
                     <RiAddLine className="w-4 h-4" />
                     New Article
@@ -226,5 +226,18 @@ export default function SiteArticlesPage() {
                 onSuccess={handleDeleteSuccess}
             />
         </div>
+    );
+}
+
+export default function SiteArticlesPage() {
+    return (
+        <Suspense fallback={
+            <div className="p-6 space-y-6">
+                <div className="h-8 w-32 bg-muted/30 rounded animate-pulse" />
+                <div className="h-64 bg-muted/30 rounded-lg animate-pulse" />
+            </div>
+        }>
+            <SiteArticlesPageContent />
+        </Suspense>
     );
 }

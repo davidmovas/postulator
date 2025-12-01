@@ -259,13 +259,18 @@ CREATE TABLE articles (
 
     title TEXT NOT NULL,
     original_title TEXT NOT NULL,
+    slug TEXT,
     content TEXT NOT NULL,
     excerpt TEXT,
+    meta_description TEXT,
 
     wp_post_id INTEGER NOT NULL DEFAULT 0,
     wp_post_url TEXT NOT NULL DEFAULT '',
     wp_category_ids TEXT NOT NULL DEFAULT '[]',
     wp_tag_ids TEXT NOT NULL DEFAULT '[]',
+    featured_media_id INTEGER,
+    featured_media_url TEXT,
+    author INTEGER,
 
     status TEXT NOT NULL DEFAULT 'draft',
     source TEXT NOT NULL DEFAULT 'generated',
@@ -290,6 +295,8 @@ CREATE INDEX idx_articles_status ON articles(status);
 CREATE INDEX idx_articles_source ON articles(source);
 CREATE INDEX idx_articles_published ON articles(published_at);
 CREATE INDEX idx_articles_wp_post ON articles(site_id, wp_post_id);
+CREATE INDEX idx_articles_slug ON articles(slug);
+CREATE INDEX idx_articles_author ON articles(author);
 
 -- =========================================================================
 -- ARTICLE LINKS

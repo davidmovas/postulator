@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
+import { useQueryId } from "@/hooks/use-query-param";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/table/data-table";
 import { useTopicsTable } from "@/hooks/use-topics-table";
@@ -14,9 +14,8 @@ import { ImportTopicsModal } from "@/components/topics/modals/import-topics-moda
 import { useApiCall } from "@/hooks/use-api-call";
 import { topicService } from "@/services/topics";
 
-export default function SiteTopicsPage() {
-    const params = useParams();
-    const siteId = parseInt(params.id as string);
+function SiteTopicsPageContent() {
+    const siteId = useQueryId();
 
     const { topics, columns, isLoading, loadTopics } = useTopicsTable(siteId);
     const [selected, setSelected] = useState<Topic[]>([]);
@@ -143,5 +142,18 @@ export default function SiteTopicsPage() {
             />
 
         </div>
+    );
+}
+
+export default function SiteTopicsPage() {
+    return (
+        <Suspense fallback={
+            <div className="p-6 space-y-6">
+                <div className="h-8 w-32 bg-muted/30 rounded animate-pulse" />
+                <div className="h-64 bg-muted/30 rounded-lg animate-pulse" />
+            </div>
+        }>
+            <SiteTopicsPageContent />
+        </Suspense>
     );
 }

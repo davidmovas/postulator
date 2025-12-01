@@ -248,7 +248,7 @@ export function useJobsTable(siteId?: number) {
                 const isExecuting = executingJobs[job.id];
 
                 const handleEdit = () => {
-                    router.push(`/jobs/${job.id}/edit`);
+                    router.push(`/jobs/edit?id=${job.id}`);
                 };
 
                 return (

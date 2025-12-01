@@ -1,18 +1,17 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, Suspense } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, ArrowLeft } from "lucide-react";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useQueryId } from "@/hooks/use-query-param";
 import { DataTable } from "@/components/table/data-table";
 import { useJobsTable } from "@/hooks/use-jobs-table";
 import { RiRefreshLine } from "@remixicon/react";
 
-export default function SiteJobsPage() {
-    const params = useParams();
-    const siteId = parseInt(params.id as string);
+function SiteJobsPageContent() {
     const router = useRouter();
+    const siteId = useQueryId();
 
     const { jobs, isLoading, loadJobs, columns, renderExpandedRow } = useJobsTable(siteId);
 
@@ -42,7 +41,7 @@ export default function SiteJobsPage() {
                         Refresh
                     </Button>
 
-                    <Button onClick={() => router.push(`/sites/${siteId}/jobs/new`)}>
+                    <Button onClick={() => router.push(`/sites/jobs/new?id=${siteId}`)}>
                         <Plus className="h-4 w-4 mr-2" />
                         Create Job
                     </Button>
@@ -69,5 +68,18 @@ export default function SiteJobsPage() {
             />
 
         </div>
+    );
+}
+
+export default function SiteJobsPage() {
+    return (
+        <Suspense fallback={
+            <div className="p-6 space-y-6">
+                <div className="h-8 w-32 bg-muted/30 rounded animate-pulse" />
+                <div className="h-64 bg-muted/30 rounded-lg animate-pulse" />
+            </div>
+        }>
+            <SiteJobsPageContent />
+        </Suspense>
     );
 }

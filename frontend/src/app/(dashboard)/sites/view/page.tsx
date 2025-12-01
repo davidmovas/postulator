@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useRouter } from "next/navigation";
+import { useQueryId } from "@/hooks/use-query-param";
 import { Site } from "@/models/sites";
 import { siteService } from "@/services/sites";
 import { healthcheckService } from "@/services/healthcheck";
@@ -20,9 +21,9 @@ import { toGoDateFormat } from "@/lib/time";
 import { SiteNavigation } from "@/components/sites/site-navigation";
 import { DeleteSiteModal } from "@/components/sites/modals/delete-site-modal";
 
-export default function SitePage() {
-    const params = useParams();
+function SitePageContent() {
     const router = useRouter();
+    const siteId = useQueryId();
     const { execute, isLoading } = useApiCall();
     const { deleteSiteModal } = useContextModal();
 
@@ -31,8 +32,6 @@ export default function SitePage() {
     const [dailyStats, setDailyStats] = useState<SiteStats[]>([]);
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [passwordModalOpen, setPasswordModalOpen] = useState(false);
-
-    const siteId = parseInt(params.id as string);
 
     const loadSite = async () => {
         const result = await execute<Site>(
@@ -110,19 +109,19 @@ export default function SitePage() {
     };
 
     const handleViewArticles = () => {
-        router.push(`/sites/${siteId}/articles`);
+        router.push(`/sites/articles?id=${siteId}`);
     };
 
     const handleViewJobs = () => {
-        router.push(`/sites/${siteId}/jobs`);
+        router.push(`/sites/jobs?id=${siteId}`);
     };
 
     const handleViewTopics = () => {
-        router.push(`/sites/${siteId}/topics`);
+        router.push(`/sites/topics?id=${siteId}`);
     };
 
     const handleViewCategories = () => {
-        router.push(`/sites/${siteId}/categories`);
+        router.push(`/sites/categories?id=${siteId}`);
     };
 
     const handleDelete = () => {
@@ -215,5 +214,18 @@ export default function SitePage() {
                 onSuccess={handleSuccess}
             />
         </div>
+    );
+}
+
+export default function SitePage() {
+    return (
+        <Suspense fallback={
+            <div className="p-6 space-y-6">
+                <div className="h-32 bg-muted/30 rounded-lg animate-pulse" />
+                <div className="h-64 bg-muted/30 rounded-lg animate-pulse" />
+            </div>
+        }>
+            <SitePageContent />
+        </Suspense>
     );
 }

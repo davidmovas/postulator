@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter } from "next/navigation";
+import { useQueryId } from "@/hooks/use-query-param";
 import { Button } from "@/components/ui/button";
 import { jobService } from "@/services/jobs";
 import { promptService } from "@/services/prompts";
@@ -21,10 +22,9 @@ import { ScheduleSection } from "@/components/jobs/form-sections/schedule-sectio
 import { AdvancedSettingsSection } from "@/components/jobs/form-sections/advanced-settings-section";
 import { useJobValidation } from "@/hooks/use-job-validation";
 
-export default function EditJobPage() {
-    const params = useParams();
+function EditJobPageContent() {
     const router = useRouter();
-    const jobId = parseInt(params.id as string);
+    const jobId = useQueryId();
 
     const [job, setJob] = useState<any>(null);
     const { formData, isLoading, updateFormData, execute } = useJobForm({ initialData: job });
@@ -231,10 +231,30 @@ export default function EditJobPage() {
                         onClick={handleSubmit}
                         disabled={!validation.isValid || isLoading}
                     >
-                        {isLoading ? "Creating..." : "Create Job"}
+                        {isLoading ? "Saving..." : "Save Changes"}
                     </Button>
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function EditJobPage() {
+    return (
+        <Suspense fallback={
+            <div className="p-6">
+                <div className="animate-pulse">
+                    <div className="h-8 bg-muted rounded w-1/3 mb-4"></div>
+                    <div className="h-4 bg-muted rounded w-1/2 mb-8"></div>
+                    <div className="space-y-4">
+                        <div className="h-32 bg-muted rounded"></div>
+                        <div className="h-32 bg-muted rounded"></div>
+                        <div className="h-32 bg-muted rounded"></div>
+                    </div>
+                </div>
+            </div>
+        }>
+            <EditJobPageContent />
+        </Suspense>
     );
 }

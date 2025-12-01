@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useCallback, useEffect, useState, Suspense } from "react";
+import { useQueryId } from "@/hooks/use-query-param";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/table/data-table";
 import { useCategoriesTable } from "@/hooks/use-categories-table";
@@ -15,9 +15,8 @@ import { toGoDateFormat } from "@/lib/time";
 import { categoryService } from "@/services/categories";
 import { useApiCall } from "@/hooks/use-api-call";
 
-export default function SiteCategoriesPage() {
-    const params = useParams();
-    const siteId = parseInt(params.id as string);
+function SiteCategoriesPageContent() {
+    const siteId = useQueryId();
 
     const [siteStats, setSiteStats] = useState<Statistics[]>([]);
     const [categoryStats, setCategoryStats] = useState<Statistics[]>([]);
@@ -119,7 +118,7 @@ export default function SiteCategoriesPage() {
                         className="flex items-center gap-2"
                     >
                         <RiWordpressFill className="w-4 h-4" />
-                        Sync from WordPress
+                        Sync
                     </Button>
 
                     <Button
@@ -146,22 +145,6 @@ export default function SiteCategoriesPage() {
                 enableViewOption={false}
             />
 
-            {/* Statistics Section */}
-            {/*<div className="space-y-4">
-                <h2 className="text-2xl font-bold tracking-tight">Statistics</h2>
-                <CategoryStats
-                    siteId={siteId}
-                    selectedCategoryId={selectedCategoryId}
-                    siteStats={siteStats}
-                    categories={categories}
-                    categoryStats={categoryStats}
-                    totalCategories={categories.length}
-                    activeCategories={categories.filter(cat => cat.count > 0).length}
-                    onStatsUpdate={handleStatsUpdate}
-                />
-            </div>*/}
-
-
             {/* Modals */}
             <CreateCategoryModal
                 open={createCategoryModal.isOpen}
@@ -184,5 +167,18 @@ export default function SiteCategoriesPage() {
                 onSuccess={handleSuccess}
             />
         </div>
+    );
+}
+
+export default function SiteCategoriesPage() {
+    return (
+        <Suspense fallback={
+            <div className="p-6 space-y-6">
+                <div className="h-8 w-32 bg-muted/30 rounded animate-pulse" />
+                <div className="h-64 bg-muted/30 rounded-lg animate-pulse" />
+            </div>
+        }>
+            <SiteCategoriesPageContent />
+        </Suspense>
     );
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter } from "next/navigation";
+import { useQueryId } from "@/hooks/use-query-param";
 import { Button } from "@/components/ui/button";
 import { useApiCall } from "@/hooks/use-api-call";
 import { jobService } from "@/services/jobs";
@@ -22,10 +23,9 @@ import { ScheduleSection } from "@/components/jobs/form-sections/schedule-sectio
 import { AdvancedSettingsSection } from "@/components/jobs/form-sections/advanced-settings-section";
 import { useJobValidation } from "@/hooks/use-job-validation";
 
-export default function CreateSiteJobPage() {
-    const params = useParams();
+function CreateSiteJobPageContent() {
     const router = useRouter();
-    const siteId = parseInt(params.id as string);
+    const siteId = useQueryId();
 
     const { formData, isLoading, updateFormData } = useJobForm({ siteId });
     const { execute } = useApiCall();
@@ -37,7 +37,7 @@ export default function CreateSiteJobPage() {
     const [categories, setCategories] = useState<any[] | null>(null);
 
     const validation = useJobValidation(formData, prompts);
-    
+
     useEffect(() => {
         loadSiteData();
         loadPrompts();
@@ -104,7 +104,7 @@ export default function CreateSiteJobPage() {
         );
 
         if (result !== null) {
-            router.push(`/sites/${siteId}/jobs`);
+            router.push(`/sites/jobs?id=${siteId}`);
         }
     };
 
@@ -112,7 +112,7 @@ export default function CreateSiteJobPage() {
         <div className="p-6 space-y-6 max-w-4xl mx-auto">
             {/* Header */}
             <div className="flex items-center gap-4">
-                <Link href={`/sites/${siteId}/jobs`}>
+                <Link href={`/sites/jobs?id=${siteId}`}>
                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                         <ArrowLeft className="h-4 w-4" />
                     </Button>
@@ -192,5 +192,18 @@ export default function CreateSiteJobPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function CreateSiteJobPage() {
+    return (
+        <Suspense fallback={
+            <div className="p-6 space-y-6 max-w-4xl mx-auto">
+                <div className="h-8 w-48 bg-muted/30 rounded animate-pulse" />
+                <div className="h-64 bg-muted/30 rounded-lg animate-pulse" />
+            </div>
+        }>
+            <CreateSiteJobPageContent />
+        </Suspense>
     );
 }

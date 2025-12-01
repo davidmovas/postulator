@@ -121,7 +121,7 @@ export function ArticleEditor({
                 );
 
                 if (result) {
-                    router.push(`/sites/${siteId}/articles`);
+                    router.push(`/sites/articles?id=${siteId}`);
                 }
             } else {
                 const input = getCreateInput();
@@ -136,7 +136,7 @@ export function ArticleEditor({
                 );
 
                 if (result) {
-                    router.push(`/sites/${siteId}/articles`);
+                    router.push(`/sites/articles?id=${siteId}`);
                 }
             }
             setIsDirty(false);

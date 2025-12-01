@@ -155,7 +155,7 @@ export function ContentStrategySection({
                                 title="Sync categories from WordPress"
                             >
                                 <RiWordpressFill className="h-4 w-4 mr-1" />
-                                Sync from WordPress
+                                Sync
                             </Button>
                         </div>
                     </div>

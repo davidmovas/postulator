@@ -1,17 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useQueryIds } from "@/hooks/use-query-param";
 import { siteService } from "@/services/sites";
 import { articleService } from "@/services/articles";
 import { Article } from "@/models/articles";
 import { ArticleEditor } from "@/components/articles/editor/article-editor";
 import { Loader2 } from "lucide-react";
 
-export default function EditArticlePage() {
-    const params = useParams();
-    const siteId = parseInt(params.id as string);
-    const articleId = parseInt(params.articleId as string);
+function EditArticlePageContent() {
+    const { id: siteId, articleId } = useQueryIds(['id', 'articleId']);
 
     const [site, setSite] = useState<any>(null);
     const [article, setArticle] = useState<Article | null>(null);
@@ -65,5 +63,17 @@ export default function EditArticlePage() {
             siteUrl={site?.url?.replace(/^https?:\/\//, "").replace(/\/$/, "")}
             article={article}
         />
+    );
+}
+
+export default function EditArticlePage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center min-h-[400px]">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+        }>
+            <EditArticlePageContent />
+        </Suspense>
     );
 }

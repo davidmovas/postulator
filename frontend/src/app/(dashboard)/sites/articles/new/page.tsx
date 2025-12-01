@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useQueryId } from "@/hooks/use-query-param";
 import { siteService } from "@/services/sites";
 import { ArticleEditor } from "@/components/articles/editor/article-editor";
 
-export default function NewArticlePage() {
-    const params = useParams();
-    const siteId = parseInt(params.id as string);
+function NewArticlePageContent() {
+    const siteId = useQueryId();
 
     const [site, setSite] = useState<any>(null);
 
@@ -25,5 +24,17 @@ export default function NewArticlePage() {
             siteName={site?.name}
             siteUrl={site?.url?.replace(/^https?:\/\//, "").replace(/\/$/, "")}
         />
+    );
+}
+
+export default function NewArticlePage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary" />
+            </div>
+        }>
+            <NewArticlePageContent />
+        </Suspense>
     );
 }

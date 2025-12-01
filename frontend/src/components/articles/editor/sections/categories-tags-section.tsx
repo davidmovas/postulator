@@ -8,6 +8,7 @@ import { FolderTree, Tags, RefreshCw } from "lucide-react";
 import { ArticleFormData } from "@/hooks/use-article-form";
 import { cn } from "@/lib/utils";
 import { VirtualizedMultiSelect } from "@/components/ui/virtualized-multi-select";
+import { RiWordpressFill } from "@remixicon/react";
 
 interface Category {
     id: number;
@@ -139,8 +140,8 @@ export function CategoriesTagsSection({
                                     onClick={onSyncCategories}
                                     disabled={disabled || isSyncing}
                                 >
-                                    <RefreshCw className="h-3 w-3 mr-1" />
-                                    Sync from WordPress
+                                    <RiWordpressFill className="h-3 w-3 mr-1" />
+                                    Sync
                                 </Button>
                             )}
                         </div>
