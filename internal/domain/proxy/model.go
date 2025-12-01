@@ -39,16 +39,3 @@ type TorDetectionResult struct {
 	Port        int    `json:"port"`
 	ServiceType string `json:"service_type"`
 }
-
-type HealthChecker interface {
-	Start(ctx context.Context) error
-	Stop() error
-	CheckNow(ctx context.Context)
-}
-
-type Rotator interface {
-	Start(ctx context.Context) error
-	Stop() error
-	RotateNow(ctx context.Context)
-	GetCurrentNode() *entities.ProxyNode
-}

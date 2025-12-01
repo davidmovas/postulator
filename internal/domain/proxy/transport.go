@@ -116,8 +116,12 @@ func buildMultiNodeTransport(nodes []entities.ProxyNode) (http.RoundTripper, err
 		return buildSingleNodeTransport(nodes[0])
 	}
 
+	// Build chain: first node connects to second, second to third, etc.
+	// Traffic flow: Postulator -> Node[0] -> Node[1] -> ... -> Node[n-1] -> Target
+	// Exit IP will be Node[n-1] (last node in the list)
 	var chain proxy.Dialer = proxy.Direct
 
+	// Build from last to first so that first node is the entry point
 	for i := len(nodes) - 1; i >= 0; i-- {
 		node := nodes[i]
 		addr := fmt.Sprintf("%s:%d", node.Host, node.Port)
@@ -141,8 +145,8 @@ func buildMultiNodeTransport(nodes []entities.ProxyNode) (http.RoundTripper, err
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return chain.Dial(network, addr)
 		},
-		TLSHandshakeTimeout:   10 * time.Second,
-		ResponseHeaderTimeout: 30 * time.Second,
+		TLSHandshakeTimeout:   15 * time.Second,
+		ResponseHeaderTimeout: 60 * time.Second,
 		IdleConnTimeout:       90 * time.Second,
 		MaxIdleConns:          100,
 		MaxIdleConnsPerHost:   10,

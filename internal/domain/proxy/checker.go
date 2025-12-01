@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
@@ -13,7 +14,7 @@ import (
 
 const (
 	ipCheckURL   = "https://api.ipify.org?format=json"
-	checkTimeout = 15 * time.Second
+	checkTimeout = 30 * time.Second
 )
 
 type IPResponse struct {
@@ -90,16 +91,30 @@ func (c *NodeChecker) CheckNode(node *entities.ProxyNode) *entities.ProxyHealth 
 }
 
 func (c *NodeChecker) CheckNodes(nodes []entities.ProxyNode) []entities.ProxyHealth {
-	results := make([]entities.ProxyHealth, 0, len(nodes))
-
+	var enabledNodes []entities.ProxyNode
 	for _, node := range nodes {
-		if !node.Enabled {
-			continue
+		if node.Enabled {
+			enabledNodes = append(enabledNodes, node)
 		}
-		health := c.CheckNode(&node)
-		results = append(results, *health)
 	}
 
+	if len(enabledNodes) == 0 {
+		return nil
+	}
+
+	results := make([]entities.ProxyHealth, len(enabledNodes))
+	var wg sync.WaitGroup
+
+	for i, node := range enabledNodes {
+		wg.Add(1)
+		go func(idx int, n entities.ProxyNode) {
+			defer wg.Done()
+			health := c.CheckNode(&n)
+			results[idx] = *health
+		}(i, node)
+	}
+
+	wg.Wait()
 	return results
 }
 
@@ -188,4 +203,68 @@ func (c *NodeChecker) GetProxyIP(transport http.RoundTripper) (string, error) {
 	}
 
 	return ipResp.IP, nil
+}
+
+func (c *NodeChecker) CheckChain(nodes []entities.ProxyNode) *entities.ProxyHealth {
+	startTime := time.Now()
+
+	health := &entities.ProxyHealth{
+		NodeID:      "chain",
+		Status:      entities.ProxyStatusConnecting,
+		LastChecked: time.Now().Unix(),
+	}
+
+	if len(nodes) == 0 {
+		health.Status = entities.ProxyStatusError
+		health.Error = "No nodes in chain"
+		return health
+	}
+
+	transport, err := buildMultiNodeTransport(nodes)
+	if err != nil {
+		health.Status = entities.ProxyStatusError
+		health.Error = fmt.Sprintf("Failed to create chain transport: %v", err)
+		return health
+	}
+
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   60 * time.Second,
+	}
+
+	reqCtx := ctx.WithTimeout(60 * time.Second)
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, ipCheckURL, nil)
+	if err != nil {
+		health.Status = entities.ProxyStatusError
+		health.Error = fmt.Sprintf("Failed to create request: %v", err)
+		return health
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		health.Status = entities.ProxyStatusError
+		health.Error = fmt.Sprintf("Chain connection failed: %v", err)
+		return health
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		health.Status = entities.ProxyStatusError
+		health.Error = fmt.Sprintf("Failed to read response: %v", err)
+		return health
+	}
+
+	var ipResp IPResponse
+	if err := json.Unmarshal(body, &ipResp); err != nil {
+		health.Status = entities.ProxyStatusError
+		health.Error = fmt.Sprintf("Failed to parse response: %v", err)
+		return health
+	}
+
+	health.Status = entities.ProxyStatusConnected
+	health.ExternalIP = ipResp.IP
+	health.LatencyMs = int(time.Since(startTime).Milliseconds())
+
+	return health
 }
