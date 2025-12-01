@@ -16,6 +16,8 @@ const (
 const (
 	StatusDraft     ArticleStatus = "draft"
 	StatusPublished ArticleStatus = "published"
+	StatusPending   ArticleStatus = "pending"
+	StatusPrivate   ArticleStatus = "private"
 	StatusFailed    ArticleStatus = "failed"
 	StatusUnknown   ArticleStatus = "unknown"
 )
@@ -24,7 +26,7 @@ type Article struct {
 	ID            int64
 	SiteID        int64
 	JobID         *int64
-	TopicID       int64
+	TopicID       *int64
 	Title         string
 	OriginalTitle string
 	Content       string
@@ -32,6 +34,7 @@ type Article struct {
 	WPPostID      int
 	WPPostURL     string
 	WPCategoryIDs []int
+	WPTagIDs      []int
 	Status        ArticleStatus
 	WordCount     *int
 	Source        Source
@@ -40,6 +43,13 @@ type Article struct {
 	PublishedAt   *time.Time
 	UpdatedAt     time.Time
 	LastSyncedAt  *time.Time
+
+	// SEO & WordPress fields
+	Slug            *string
+	FeaturedMediaID *int
+	FeaturedMediaURL *string
+	MetaDescription *string
+	Author          *int
 }
 
 type WPInfoUpdate struct {

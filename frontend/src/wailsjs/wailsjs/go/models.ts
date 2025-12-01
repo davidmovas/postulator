@@ -4,7 +4,7 @@ export namespace dto {
 	    id: number;
 	    siteId: number;
 	    jobId?: number;
-	    topicId: number;
+	    topicId?: number;
 	    title: string;
 	    originalTitle: string;
 	    content: string;
@@ -12,6 +12,7 @@ export namespace dto {
 	    wpPostId: number;
 	    wpPostUrl: string;
 	    wpCategoryIds: number[];
+	    wpTagIds: number[];
 	    status: string;
 	    wordCount?: number;
 	    source: string;
@@ -20,6 +21,11 @@ export namespace dto {
 	    publishedAt?: string;
 	    updatedAt: string;
 	    lastSyncedAt?: string;
+	    slug?: string;
+	    featuredMediaId?: number;
+	    featuredMediaUrl?: string;
+	    metaDescription?: string;
+	    author?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Article(source);
@@ -38,6 +44,7 @@ export namespace dto {
 	        this.wpPostId = source["wpPostId"];
 	        this.wpPostUrl = source["wpPostUrl"];
 	        this.wpCategoryIds = source["wpCategoryIds"];
+	        this.wpTagIds = source["wpTagIds"];
 	        this.status = source["status"];
 	        this.wordCount = source["wordCount"];
 	        this.source = source["source"];
@@ -46,7 +53,72 @@ export namespace dto {
 	        this.publishedAt = source["publishedAt"];
 	        this.updatedAt = source["updatedAt"];
 	        this.lastSyncedAt = source["lastSyncedAt"];
+	        this.slug = source["slug"];
+	        this.featuredMediaId = source["featuredMediaId"];
+	        this.featuredMediaUrl = source["featuredMediaUrl"];
+	        this.metaDescription = source["metaDescription"];
+	        this.author = source["author"];
 	    }
+	}
+	export class ArticleListFilter {
+	    siteId: number;
+	    status?: string;
+	    source?: string;
+	    categoryId?: number;
+	    search?: string;
+	    sortBy: string;
+	    sortOrder: string;
+	    limit: number;
+	    offset: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ArticleListFilter(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.siteId = source["siteId"];
+	        this.status = source["status"];
+	        this.source = source["source"];
+	        this.categoryId = source["categoryId"];
+	        this.search = source["search"];
+	        this.sortBy = source["sortBy"];
+	        this.sortOrder = source["sortOrder"];
+	        this.limit = source["limit"];
+	        this.offset = source["offset"];
+	    }
+	}
+	export class ArticleListResult {
+	    articles: Article[];
+	    total: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ArticleListResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.articles = this.convertValues(source["articles"], Article);
+	        this.total = source["total"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class Site {
 	    id: number;
@@ -466,48 +538,6 @@ export namespace dto {
 	        this.outputCost = source["outputCost"];
 	    }
 	}
-	export class PaginatedResponse__github_com_davidmovas_postulator_internal_dto_Article_ {
-	    success: boolean;
-	    items?: Article[];
-	    total?: number;
-	    limit?: number;
-	    offset?: number;
-	    hasMore?: boolean;
-	    error?: Error;
-	
-	    static createFrom(source: any = {}) {
-	        return new PaginatedResponse__github_com_davidmovas_postulator_internal_dto_Article_(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.success = source["success"];
-	        this.items = this.convertValues(source["items"], Article);
-	        this.total = source["total"];
-	        this.limit = source["limit"];
-	        this.offset = source["offset"];
-	        this.hasMore = source["hasMore"];
-	        this.error = this.convertValues(source["error"], Error);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class PaginatedResponse__github_com_davidmovas_postulator_internal_dto_HealthCheckHistory_ {
 	    success: boolean;
 	    items?: HealthCheckHistory[];
@@ -599,6 +629,40 @@ export namespace dto {
 	        this.createdAt = source["createdAt"];
 	        this.updatedAt = source["updatedAt"];
 	    }
+	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_ArticleListResult_ {
+	    success: boolean;
+	    data?: ArticleListResult;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_ArticleListResult_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], ArticleListResult);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class Response__github_com_davidmovas_postulator_internal_dto_Article_ {
 	    success: boolean;

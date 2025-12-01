@@ -76,7 +76,7 @@ func (c *PublishArticleCommand) Execute(ctx *pipeline.Context) error {
 	article := &entities.Article{
 		SiteID:        ctx.Job.SiteID,
 		JobID:         &ctx.Job.ID,
-		TopicID:       ctx.Selection.VariationTopic.ID,
+		TopicID:       &ctx.Selection.VariationTopic.ID,
 		Title:         ctx.Generation.GeneratedTitle,
 		Excerpt:       &ctx.Generation.GeneratedExcerpt,
 		OriginalTitle: ctx.Selection.OriginalTopic.Title,

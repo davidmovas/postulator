@@ -10,7 +10,7 @@ type Article struct {
 	ID            int64   `json:"id"`
 	SiteID        int64   `json:"siteId"`
 	JobID         *int64  `json:"jobId"`
-	TopicID       int64   `json:"topicId"`
+	TopicID       *int64  `json:"topicId"`
 	Title         string  `json:"title"`
 	OriginalTitle string  `json:"originalTitle"`
 	Content       string  `json:"content"`
@@ -18,6 +18,7 @@ type Article struct {
 	WPPostID      int     `json:"wpPostId"`
 	WPPostURL     string  `json:"wpPostUrl"`
 	WPCategoryIDs []int   `json:"wpCategoryIds"`
+	WPTagIDs      []int   `json:"wpTagIds"`
 	Status        string  `json:"status"`
 	WordCount     *int    `json:"wordCount"`
 	Source        string  `json:"source"`
@@ -26,6 +27,13 @@ type Article struct {
 	PublishedAt   *string `json:"publishedAt"`
 	UpdatedAt     string  `json:"updatedAt"`
 	LastSyncedAt  *string `json:"lastSyncedAt"`
+
+	// SEO & WordPress fields
+	Slug             *string `json:"slug"`
+	FeaturedMediaID  *int    `json:"featuredMediaId"`
+	FeaturedMediaURL *string `json:"featuredMediaUrl"`
+	MetaDescription  *string `json:"metaDescription"`
+	Author           *int    `json:"author"`
 }
 
 func NewArticle(entity *entities.Article) *Article {
@@ -64,25 +72,31 @@ func (d *Article) ToEntity() (*entities.Article, error) {
 	}
 
 	return &entities.Article{
-		ID:            d.ID,
-		SiteID:        d.SiteID,
-		JobID:         d.JobID,
-		TopicID:       d.TopicID,
-		Title:         d.Title,
-		OriginalTitle: d.OriginalTitle,
-		Content:       d.Content,
-		Excerpt:       d.Excerpt,
-		WPPostID:      d.WPPostID,
-		WPPostURL:     d.WPPostURL,
-		WPCategoryIDs: d.WPCategoryIDs,
-		Status:        entities.ArticleStatus(d.Status),
-		WordCount:     d.WordCount,
-		Source:        entities.Source(d.Source),
-		IsEdited:      d.IsEdited,
-		CreatedAt:     createdAt,
-		PublishedAt:   publishedAt,
-		UpdatedAt:     updatedAt,
-		LastSyncedAt:  lastSyncedAt,
+		ID:               d.ID,
+		SiteID:           d.SiteID,
+		JobID:            d.JobID,
+		TopicID:          d.TopicID,
+		Title:            d.Title,
+		OriginalTitle:    d.OriginalTitle,
+		Content:          d.Content,
+		Excerpt:          d.Excerpt,
+		WPPostID:         d.WPPostID,
+		WPPostURL:        d.WPPostURL,
+		WPCategoryIDs:    d.WPCategoryIDs,
+		WPTagIDs:         d.WPTagIDs,
+		Status:           entities.ArticleStatus(d.Status),
+		WordCount:        d.WordCount,
+		Source:           entities.Source(d.Source),
+		IsEdited:         d.IsEdited,
+		CreatedAt:        createdAt,
+		PublishedAt:      publishedAt,
+		UpdatedAt:        updatedAt,
+		LastSyncedAt:     lastSyncedAt,
+		Slug:             d.Slug,
+		FeaturedMediaID:  d.FeaturedMediaID,
+		FeaturedMediaURL: d.FeaturedMediaURL,
+		MetaDescription:  d.MetaDescription,
+		Author:           d.Author,
 	}, nil
 }
 
@@ -98,12 +112,20 @@ func (d *Article) FromEntity(entity *entities.Article) *Article {
 	d.WPPostID = entity.WPPostID
 	d.WPPostURL = entity.WPPostURL
 	d.WPCategoryIDs = entity.WPCategoryIDs
+	d.WPTagIDs = entity.WPTagIDs
 	d.Status = string(entity.Status)
 	d.WordCount = entity.WordCount
 	d.Source = string(entity.Source)
 	d.IsEdited = entity.IsEdited
 	d.CreatedAt = TimeToString(entity.CreatedAt)
 	d.UpdatedAt = TimeToString(entity.UpdatedAt)
+
+	// SEO & WordPress fields
+	d.Slug = entity.Slug
+	d.FeaturedMediaID = entity.FeaturedMediaID
+	d.FeaturedMediaURL = entity.FeaturedMediaURL
+	d.MetaDescription = entity.MetaDescription
+	d.Author = entity.Author
 
 	if entity.PublishedAt != nil {
 		publishedAt := TimeToString(*entity.PublishedAt)
@@ -120,6 +142,23 @@ func (d *Article) FromEntity(entity *entities.Article) *Article {
 	}
 
 	return d
+}
+
+type ArticleListFilter struct {
+	SiteID     int64   `json:"siteId"`
+	Status     *string `json:"status"`
+	Source     *string `json:"source"`
+	CategoryID *int    `json:"categoryId"`
+	Search     *string `json:"search"`
+	SortBy     string  `json:"sortBy"`
+	SortOrder  string  `json:"sortOrder"`
+	Limit      int     `json:"limit"`
+	Offset     int     `json:"offset"`
+}
+
+type ArticleListResult struct {
+	Articles []*Article `json:"articles"`
+	Total    int        `json:"total"`
 }
 
 type WPInfoUpdate struct {

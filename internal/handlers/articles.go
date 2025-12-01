@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"github.com/davidmovas/postulator/internal/domain/articles"
+	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/jobs/execution"
 	"github.com/davidmovas/postulator/internal/dto"
 	"github.com/davidmovas/postulator/pkg/ctx"
@@ -41,18 +42,45 @@ func (h *ArticlesHandler) GetArticle(id int64) *dto.Response[*dto.Article] {
 	return ok(dto.NewArticle(article))
 }
 
-func (h *ArticlesHandler) ListArticles(siteID int64, limit, offset int) *dto.PaginatedResponse[*dto.Article] {
-	listArticles, total, err := h.service.ListArticles(ctx.FastCtx(), siteID, limit, offset)
+func (h *ArticlesHandler) ListArticles(filter *dto.ArticleListFilter) *dto.Response[*dto.ArticleListResult] {
+	var status *entities.ArticleStatus
+	if filter.Status != nil {
+		s := entities.ArticleStatus(*filter.Status)
+		status = &s
+	}
+
+	var source *entities.Source
+	if filter.Source != nil {
+		s := entities.Source(*filter.Source)
+		source = &s
+	}
+
+	domainFilter := &articles.ListFilter{
+		SiteID:     filter.SiteID,
+		Status:     status,
+		Source:     source,
+		CategoryID: filter.CategoryID,
+		Search:     filter.Search,
+		SortBy:     filter.SortBy,
+		SortOrder:  filter.SortOrder,
+		Limit:      filter.Limit,
+		Offset:     filter.Offset,
+	}
+
+	result, err := h.service.ListArticles(ctx.FastCtx(), domainFilter)
 	if err != nil {
-		return paginatedErr[*dto.Article](err)
+		return fail[*dto.ArticleListResult](err)
 	}
 
 	var dtoArticles []*dto.Article
-	for _, article := range listArticles {
+	for _, article := range result.Articles {
 		dtoArticles = append(dtoArticles, dto.NewArticle(article))
 	}
 
-	return paginated(dtoArticles, total, limit, offset)
+	return ok(&dto.ArticleListResult{
+		Articles: dtoArticles,
+		Total:    result.Total,
+	})
 }
 
 func (h *ArticlesHandler) UpdateArticle(article *dto.Article) *dto.Response[string] {
@@ -74,6 +102,14 @@ func (h *ArticlesHandler) DeleteArticle(id int64) *dto.Response[string] {
 	}
 
 	return ok("Article deleted successfully")
+}
+
+func (h *ArticlesHandler) BulkDeleteArticles(ids []int64) *dto.Response[string] {
+	if err := h.service.BulkDeleteArticles(ctx.FastCtx(), ids); err != nil {
+		return fail[string](err)
+	}
+
+	return ok("Articles deleted successfully")
 }
 
 func (h *ArticlesHandler) ImportFromWordPress(siteID int64, wpPostID int) *dto.Response[*dto.Article] {
@@ -102,26 +138,35 @@ func (h *ArticlesHandler) SyncFromWordPress(siteID int64) *dto.Response[string] 
 	return ok("Articles synced successfully")
 }
 
-func (h *ArticlesHandler) PublishToWordPress(article *dto.Article) *dto.Response[string] {
-	entity, err := article.ToEntity()
+func (h *ArticlesHandler) PublishToWordPress(id int64) *dto.Response[string] {
+	article, err := h.service.GetArticle(ctx.FastCtx(), id)
 	if err != nil {
 		return fail[string](err)
 	}
 
-	if err = h.service.PublishToWordPress(ctx.FastCtx(), entity); err != nil {
+	if err = h.service.PublishToWordPress(ctx.FastCtx(), article); err != nil {
 		return fail[string](err)
 	}
 
 	return ok("Article published successfully")
 }
 
-func (h *ArticlesHandler) UpdateInWordPress(article *dto.Article) *dto.Response[string] {
-	entity, err := article.ToEntity()
+func (h *ArticlesHandler) BulkPublishToWordPress(ids []int64) *dto.Response[int] {
+	count, err := h.service.BulkPublishToWordPress(ctx.FastCtx(), ids)
+	if err != nil {
+		return fail[int](err)
+	}
+
+	return ok(count)
+}
+
+func (h *ArticlesHandler) UpdateInWordPress(id int64) *dto.Response[string] {
+	article, err := h.service.GetArticle(ctx.FastCtx(), id)
 	if err != nil {
 		return fail[string](err)
 	}
 
-	if err = h.service.UpdateInWordPress(ctx.FastCtx(), entity); err != nil {
+	if err = h.service.UpdateInWordPress(ctx.FastCtx(), article); err != nil {
 		return fail[string](err)
 	}
 
@@ -134,6 +179,15 @@ func (h *ArticlesHandler) DeleteFromWordPress(id int64) *dto.Response[string] {
 	}
 
 	return ok("Article deleted from WordPress successfully")
+}
+
+func (h *ArticlesHandler) BulkDeleteFromWordPress(ids []int64) *dto.Response[int] {
+	count, err := h.service.BulkDeleteFromWordPress(ctx.FastCtx(), ids)
+	if err != nil {
+		return fail[int](err)
+	}
+
+	return ok(count)
 }
 
 func (h *ArticlesHandler) CreateDraft(execID int64, title, content string) *dto.Response[*dto.Article] {

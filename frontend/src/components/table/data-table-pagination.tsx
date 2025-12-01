@@ -35,20 +35,37 @@ export function DataTablePagination<TData>({
     pageSizeOptions = [25, 50, 100],
     serverSidePagination,
 }: DataTablePaginationProps<TData>) {
-    const currentPage = table.getState().pagination.pageIndex + 1;
+    const currentPage = serverSidePagination
+        ? serverSidePagination.pageIndex + 1
+        : table.getState().pagination.pageIndex + 1;
     const totalPages = serverSidePagination?.pageCount || table.getPageCount();
-    const pageSize = table.getState().pagination.pageSize;
+    const pageSize = serverSidePagination?.pageSize || table.getState().pagination.pageSize;
     const totalRows = serverSidePagination?.totalCount || table.getFilteredRowModel().rows.length;
 
-    const startRow = table.getState().pagination.pageIndex * pageSize + 1;
+    const startRow = (serverSidePagination?.pageIndex ?? table.getState().pagination.pageIndex) * pageSize + 1;
     const endRow = Math.min(startRow + pageSize - 1, totalRows);
 
     const handlePageSizeChange = (value: string) => {
         const newSize = Number(value);
-        table.setPageSize(newSize);
-        // При серверной пагинации сбрасываем на первую страницу при смене размера
-        if (serverSidePagination) {
-            table.setPageIndex(0);
+        // For server-side pagination, directly call the callback with new values
+        if (serverSidePagination?.onPaginationChange) {
+            serverSidePagination.onPaginationChange({
+                pageIndex: 0, // Reset to first page when changing size
+                pageSize: newSize,
+            });
+        } else {
+            table.setPageSize(newSize);
+        }
+    };
+
+    const handlePageChange = (newPageIndex: number) => {
+        if (serverSidePagination?.onPaginationChange) {
+            serverSidePagination.onPaginationChange({
+                pageIndex: newPageIndex,
+                pageSize,
+            });
+        } else {
+            table.setPageIndex(newPageIndex);
         }
     };
 
@@ -96,8 +113,8 @@ export function DataTablePagination<TData>({
                                 variant="outline"
                                 size="icon"
                                 className="h-9 w-9"
-                                onClick={() => table.setPageIndex(0)}
-                                disabled={!table.getCanPreviousPage()}
+                                onClick={() => handlePageChange(0)}
+                                disabled={currentPage <= 1}
                                 aria-label="Go to first page"
                             >
                                 <ChevronFirstIcon className="h-4 w-4" />
@@ -110,8 +127,8 @@ export function DataTablePagination<TData>({
                                 variant="outline"
                                 size="icon"
                                 className="h-9 w-9"
-                                onClick={() => table.previousPage()}
-                                disabled={!table.getCanPreviousPage()}
+                                onClick={() => handlePageChange(currentPage - 2)}
+                                disabled={currentPage <= 1}
                                 aria-label="Go to previous page"
                             >
                                 <ChevronLeftIcon className="h-4 w-4" />
@@ -131,8 +148,8 @@ export function DataTablePagination<TData>({
                                 variant="outline"
                                 size="icon"
                                 className="h-9 w-9"
-                                onClick={() => table.nextPage()}
-                                disabled={!table.getCanNextPage()}
+                                onClick={() => handlePageChange(currentPage)}
+                                disabled={currentPage >= totalPages}
                                 aria-label="Go to next page"
                             >
                                 <ChevronRightIcon className="h-4 w-4" />
@@ -145,8 +162,8 @@ export function DataTablePagination<TData>({
                                 variant="outline"
                                 size="icon"
                                 className="h-9 w-9"
-                                onClick={() => table.setPageIndex(totalPages - 1)}
-                                disabled={!table.getCanNextPage()}
+                                onClick={() => handlePageChange(totalPages - 1)}
+                                disabled={currentPage >= totalPages}
                                 aria-label="Go to last page"
                             >
                                 <ChevronLastIcon className="h-4 w-4" />

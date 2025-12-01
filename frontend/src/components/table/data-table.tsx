@@ -67,6 +67,8 @@ export interface DataTableProps<TData, TValue> {
     enableRowExpand?: boolean;
     expandOnRowClick?: boolean;
     renderExpandedRow?: (data: TData) => React.ReactNode;
+    // Server-side search callback
+    onSearchChange?: (search: string) => void;
 }
 
 export function DataTable<TData, TValue>({
@@ -88,6 +90,7 @@ export function DataTable<TData, TValue>({
     enableRowExpand = false,
     expandOnRowClick = false,
     renderExpandedRow,
+    onSearchChange,
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>(defaultSorting);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -191,6 +194,7 @@ export function DataTable<TData, TValue>({
                 filters={filters}
                 toolbarActions={toolbarActions}
                 enableViewOptions={enableViewOption}
+                onSearchChange={onSearchChange}
             />
 
             <div className="overflow-hidden rounded-md border bg-background">

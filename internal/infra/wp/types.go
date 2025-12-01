@@ -18,6 +18,32 @@ type wpCategory struct {
 	Count       int    `json:"count"`
 }
 
+type wpTag struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Slug        string `json:"slug"`
+	Description string `json:"description"`
+	Count       int    `json:"count"`
+}
+
+type wpMedia struct {
+	ID           int    `json:"id"`
+	SourceURL    string `json:"source_url"`
+	MediaDetails struct {
+		Width  int `json:"width"`
+		Height int `json:"height"`
+		Sizes  map[string]struct {
+			SourceURL string `json:"source_url"`
+			Width     int    `json:"width"`
+			Height    int    `json:"height"`
+		} `json:"sizes"`
+	} `json:"media_details"`
+	AltText string `json:"alt_text"`
+	Title   struct {
+		Rendered string `json:"rendered"`
+	} `json:"title"`
+}
+
 type wpPost struct {
 	ID          int       `json:"id"`
 	Date        time.Time `json:"date"`
@@ -31,14 +57,19 @@ type wpPost struct {
 		Rendered string `json:"rendered"`
 	} `json:"title"`
 	Content struct {
-		Rendered string `json:"rendered"`
+		Rendered  string `json:"rendered"`
+		Protected bool   `json:"protected"`
 	} `json:"content"`
 	Excerpt struct {
-		Rendered string `json:"rendered"`
+		Rendered  string `json:"rendered"`
+		Protected bool   `json:"protected"`
 	} `json:"excerpt"`
 	Author        int    `json:"author"`
 	FeaturedMedia int    `json:"featured_media"`
 	Categories    []int  `json:"categories"`
 	Tags          []int  `json:"tags"`
 	Link          string `json:"link"`
+	Meta          struct {
+		Description string `json:"_yoast_wpseo_metadesc,omitempty"`
+	} `json:"meta,omitempty"`
 }

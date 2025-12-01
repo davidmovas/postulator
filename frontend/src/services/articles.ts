@@ -12,14 +12,19 @@ import {
     PublishToWordPress,
     SyncFromWordPress,
     UpdateArticle,
-    UpdateInWordPress
+    UpdateInWordPress,
+    BulkDeleteArticles,
+    BulkPublishToWordPress,
+    BulkDeleteFromWordPress,
 } from "@/wailsjs/wailsjs/go/handlers/ArticlesHandler";
 import {
     mapArticle,
+    mapArticleListResult,
     Article,
     ArticleCreateInput,
     ArticleUpdateInput,
-    WPInfoUpdate
+    ArticleListFilter,
+    ArticleListResult,
 } from "@/models/articles";
 import { unwrapResponse } from "@/lib/api-utils";
 
@@ -32,6 +37,9 @@ export const articleService = {
             content: input.content,
             excerpt: input.excerpt,
             wpCategoryIds: input.wpCategoryIds,
+            wpTagIds: input.wpTagIds,
+            slug: input.slug,
+            metaDescription: input.metaDescription,
         });
 
         const response = await CreateArticle(payload);
@@ -44,25 +52,40 @@ export const articleService = {
         return mapArticle(article);
     },
 
-    async listArticles(siteId: number, limit: number, offset: number): Promise<{ items: Article[], total: number }> {
-        const response = await ListArticles(siteId, limit, offset);
-        const paginated = unwrapResponse<any>(response);
-        return {
-            items: (paginated.items || []).map(mapArticle),
-            total: paginated.total || 0
-        };
+    async listArticles(filter: ArticleListFilter): Promise<ArticleListResult> {
+        const payload = new dto.ArticleListFilter({
+            siteId: filter.siteId,
+            status: filter.status,
+            source: filter.source,
+            categoryId: filter.categoryId,
+            search: filter.search,
+            sortBy: filter.sortBy || 'created_at',
+            sortOrder: filter.sortOrder || 'desc',
+            limit: filter.limit,
+            offset: filter.offset,
+        });
+
+        const response = await ListArticles(payload);
+        const result = unwrapResponse<dto.ArticleListResult>(response);
+        return mapArticleListResult(result);
     },
 
     async updateArticle(input: ArticleUpdateInput): Promise<void> {
+        const article = await this.getArticle(input.id);
+
         const payload = new dto.Article({
             id: input.id,
-            siteId: input.siteId,
-            topicId: input.topicId,
-            title: input.title,
-            content: input.content,
-            excerpt: input.excerpt,
-            wpCategoryIds: input.wpCategoryIds,
-            status: input.status,
+            siteId: article.siteId,
+            topicId: article.topicId,
+            title: input.title ?? article.title,
+            originalTitle: article.originalTitle,
+            content: input.content ?? article.content,
+            excerpt: input.excerpt ?? article.excerpt,
+            wpCategoryIds: input.wpCategoryIds ?? article.wpCategoryIds,
+            wpTagIds: input.wpTagIds ?? article.wpTagIds,
+            status: input.status ?? article.status,
+            slug: input.slug ?? article.slug,
+            metaDescription: input.metaDescription ?? article.metaDescription,
         });
 
         const response = await UpdateArticle(payload);
@@ -71,6 +94,11 @@ export const articleService = {
 
     async deleteArticle(id: number): Promise<void> {
         const response = await DeleteArticle(id);
+        unwrapResponse<string>(response);
+    },
+
+    async bulkDeleteArticles(ids: number[]): Promise<void> {
+        const response = await BulkDeleteArticles(ids);
         unwrapResponse<string>(response);
     },
 
@@ -90,38 +118,29 @@ export const articleService = {
         unwrapResponse<string>(response);
     },
 
-    async publishToWordPress(input: ArticleUpdateInput): Promise<void> {
-        const payload = new dto.Article({
-            id: input.id,
-            siteId: input.siteId,
-            topicId: input.topicId,
-            title: input.title,
-            content: input.content,
-            excerpt: input.excerpt,
-            wpCategoryIds: input.wpCategoryIds,
-            status: input.status,
-        });
-
-        const response = await PublishToWordPress(payload);
+    async publishToWordPress(id: number): Promise<void> {
+        const response = await PublishToWordPress(id);
         unwrapResponse<string>(response);
     },
 
-    async updateInWordPress(input: WPInfoUpdate): Promise<void> {
-        const payload = new dto.Article({
-            id: input.id,
-            wpPostId: input.wpPostId,
-            wpPostUrl: input.wpPostUrl,
-            status: input.status,
-            publishedAt: input.publishedAt,
-        });
+    async bulkPublishToWordPress(ids: number[]): Promise<number> {
+        const response = await BulkPublishToWordPress(ids);
+        return unwrapResponse<number>(response);
+    },
 
-        const response = await UpdateInWordPress(payload);
+    async updateInWordPress(id: number): Promise<void> {
+        const response = await UpdateInWordPress(id);
         unwrapResponse<string>(response);
     },
 
     async deleteFromWordPress(id: number): Promise<void> {
         const response = await DeleteFromWordPress(id);
         unwrapResponse<string>(response);
+    },
+
+    async bulkDeleteFromWordPress(ids: number[]): Promise<number> {
+        const response = await BulkDeleteFromWordPress(ids);
+        return unwrapResponse<number>(response);
     },
 
     async createDraft(execId: number, title: string, content: string): Promise<Article> {

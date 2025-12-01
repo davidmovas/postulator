@@ -76,6 +76,22 @@ func (c *restyClient) CreatePost(ctx context.Context, s *entities.Site, article 
 		postData["categories"] = article.WPCategoryIDs
 	}
 
+	if len(article.WPTagIDs) > 0 {
+		postData["tags"] = article.WPTagIDs
+	}
+
+	if article.Slug != nil && *article.Slug != "" {
+		postData["slug"] = *article.Slug
+	}
+
+	if article.FeaturedMediaID != nil && *article.FeaturedMediaID > 0 {
+		postData["featured_media"] = *article.FeaturedMediaID
+	}
+
+	if article.Author != nil && *article.Author > 0 {
+		postData["author"] = *article.Author
+	}
+
 	var createdPost wpPost
 
 	resp, err := c.resty.R().
@@ -94,6 +110,7 @@ func (c *restyClient) CreatePost(ctx context.Context, s *entities.Site, article 
 
 	article.WPPostID = createdPost.ID
 	article.WPPostURL = createdPost.Link
+	article.Slug = &createdPost.Slug
 
 	return createdPost.ID, nil
 }
@@ -117,11 +134,31 @@ func (c *restyClient) UpdatePost(ctx context.Context, s *entities.Site, article 
 		postData["categories"] = article.WPCategoryIDs
 	}
 
+	if len(article.WPTagIDs) > 0 {
+		postData["tags"] = article.WPTagIDs
+	}
+
+	if article.Slug != nil && *article.Slug != "" {
+		postData["slug"] = *article.Slug
+	}
+
+	if article.FeaturedMediaID != nil {
+		postData["featured_media"] = *article.FeaturedMediaID
+	}
+
+	if article.Author != nil && *article.Author > 0 {
+		postData["author"] = *article.Author
+	}
+
 	switch article.Status {
 	case entities.StatusPublished:
 		postData["status"] = "publish"
 	case entities.StatusDraft:
 		postData["status"] = "draft"
+	case entities.StatusPending:
+		postData["status"] = "pending"
+	case entities.StatusPrivate:
+		postData["status"] = "private"
 	}
 
 	var updatedPost wpPost
@@ -141,6 +178,7 @@ func (c *restyClient) UpdatePost(ctx context.Context, s *entities.Site, article 
 	}
 
 	article.WPPostURL = updatedPost.Link
+	article.Slug = &updatedPost.Slug
 
 	return nil
 }
@@ -171,11 +209,18 @@ func (c *restyClient) convertWPPostToArticle(wpPost wpPost, siteID int64) *entit
 		status = entities.StatusPublished
 	case "draft":
 		status = entities.StatusDraft
+	case "pending":
+		status = entities.StatusPending
+	case "private":
+		status = entities.StatusPrivate
 	default:
 		status = entities.StatusUnknown
 	}
 
-	return &entities.Article{
+	slug := wpPost.Slug
+	author := wpPost.Author
+
+	article := &entities.Article{
 		SiteID:        siteID,
 		Title:         wpPost.Title.Rendered,
 		OriginalTitle: wpPost.Title.Rendered,
@@ -184,6 +229,7 @@ func (c *restyClient) convertWPPostToArticle(wpPost wpPost, siteID int64) *entit
 		WPPostID:      wpPost.ID,
 		WPPostURL:     wpPost.Link,
 		WPCategoryIDs: wpPost.Categories,
+		WPTagIDs:      wpPost.Tags,
 		Status:        status,
 		Source:        entities.SourceImported,
 		WordCount:     &wordCount,
@@ -191,7 +237,15 @@ func (c *restyClient) convertWPPostToArticle(wpPost wpPost, siteID int64) *entit
 		CreatedAt:     wpPost.Date,
 		UpdatedAt:     wpPost.Modified,
 		LastSyncedAt:  &wpPost.Modified,
+		Slug:          &slug,
+		Author:        &author,
 	}
+
+	if wpPost.FeaturedMedia > 0 {
+		article.FeaturedMediaID = &wpPost.FeaturedMedia
+	}
+
+	return article
 }
 
 func (c *restyClient) calculateWordCount(content string) int {

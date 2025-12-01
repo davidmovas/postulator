@@ -49,6 +49,14 @@ func (s *service) CreateArticle(ctx context.Context, article *entities.Article) 
 		article.WordCount = &count
 	}
 
+	if article.Source == "" {
+		article.Source = entities.SourceManual
+	}
+
+	if article.Status == "" {
+		article.Status = entities.StatusDraft
+	}
+
 	if err := s.repo.Create(ctx, article); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to create article")
 		return err
@@ -68,20 +76,18 @@ func (s *service) GetArticle(ctx context.Context, id int64) (*entities.Article, 
 	return article, nil
 }
 
-func (s *service) ListArticles(ctx context.Context, siteID int64, limit, offset int) ([]*entities.Article, int, error) {
-	articles, err := s.repo.ListBySite(ctx, siteID, limit, offset)
+func (s *service) ListArticles(ctx context.Context, filter *ListFilter) (*ListResult, error) {
+	if filter.Limit <= 0 {
+		filter.Limit = 25
+	}
+
+	result, err := s.repo.List(ctx, filter)
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to list articles")
-		return nil, 0, err
+		return nil, err
 	}
 
-	total, err := s.repo.CountBySite(ctx, siteID)
-	if err != nil {
-		s.logger.ErrorWithErr(err, "Failed to count articles")
-		return nil, 0, err
-	}
-
-	return articles, total, nil
+	return result, nil
 }
 
 func (s *service) UpdateArticle(ctx context.Context, article *entities.Article) error {
@@ -89,10 +95,29 @@ func (s *service) UpdateArticle(ctx context.Context, article *entities.Article) 
 		return err
 	}
 
-	article.UpdatedAt = time.Now()
-	article.IsEdited = true
+	existingArticle, err := s.repo.GetByID(ctx, article.ID)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get article for update")
+		return err
+	}
 
-	if err := s.repo.Update(ctx, article); err != nil {
+	// Preserve original title if not set
+	if article.OriginalTitle == "" {
+		article.OriginalTitle = existingArticle.OriginalTitle
+	}
+
+	// Mark as edited if content changed
+	if article.Title != existingArticle.Title || article.Content != existingArticle.Content {
+		article.IsEdited = true
+	}
+
+	// Recalculate word count
+	count := s.calculateWordCount(article.Content)
+	article.WordCount = &count
+
+	article.UpdatedAt = time.Now()
+
+	if err = s.repo.Update(ctx, article); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to update article")
 		return err
 	}
@@ -108,6 +133,20 @@ func (s *service) DeleteArticle(ctx context.Context, id int64) error {
 	}
 
 	s.logger.Info("Article deleted successfully")
+	return nil
+}
+
+func (s *service) BulkDeleteArticles(ctx context.Context, ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	if err := s.repo.BulkDelete(ctx, ids); err != nil {
+		s.logger.ErrorWithErr(err, "Failed to bulk delete articles")
+		return err
+	}
+
+	s.logger.Infof("Bulk deleted %d articles", len(ids))
 	return nil
 }
 
@@ -205,7 +244,7 @@ func (s *service) SyncFromWordPress(ctx context.Context, siteID int64) error {
 		remoteMap[article.WPPostID] = article
 	}
 
-	// Статьи для создания (есть в удаленке, но нет в локальной)
+	// Articles to create (exist in remote but not in local)
 	var articlesToCreate []*entities.Article
 	for wpID, remoteArticle := range remoteMap {
 		if _, exists := localMap[wpID]; !exists {
@@ -214,7 +253,7 @@ func (s *service) SyncFromWordPress(ctx context.Context, siteID int64) error {
 		}
 	}
 
-	// Статьи для удаления (есть в локальной, но нет в удаленке)
+	// Articles to delete (exist in local but not in remote)
 	var articlesToDelete []int64
 	for wpID, localArticle := range localMap {
 		if _, exists := remoteMap[wpID]; !exists {
@@ -240,17 +279,21 @@ func (s *service) SyncFromWordPress(ctx context.Context, siteID int64) error {
 		s.logger.Infof("Articles deleted during sync %d", len(articlesToDelete))
 	}
 
-	// Обновляем существующие статьи (синхронизируем контент)
+	// Update existing articles (sync content)
 	var articlesToUpdate []*entities.Article
 	for wpID, localArticle := range localMap {
 		now := time.Now()
 		if remoteArticle, exists := remoteMap[wpID]; exists {
-			// Проверяем, нужно ли обновить статью
+			// Check if update is needed
 			if s.needUpdate(localArticle, remoteArticle) {
 				localArticle.Title = remoteArticle.Title
 				localArticle.Content = remoteArticle.Content
 				localArticle.Excerpt = remoteArticle.Excerpt
 				localArticle.WPCategoryIDs = remoteArticle.WPCategoryIDs
+				localArticle.WPTagIDs = remoteArticle.WPTagIDs
+				localArticle.Slug = remoteArticle.Slug
+				localArticle.FeaturedMediaID = remoteArticle.FeaturedMediaID
+				localArticle.Author = remoteArticle.Author
 				localArticle.UpdatedAt = now
 				localArticle.LastSyncedAt = &now
 				articlesToUpdate = append(articlesToUpdate, localArticle)
@@ -349,7 +392,7 @@ func (s *service) DeleteFromWordPress(ctx context.Context, id int64) error {
 	article.PublishedAt = nil
 	article.UpdatedAt = time.Now()
 
-	if err := s.repo.Update(ctx, article); err != nil {
+	if err = s.repo.Update(ctx, article); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to update article after WordPress deletion")
 		return err
 	}
@@ -358,13 +401,57 @@ func (s *service) DeleteFromWordPress(ctx context.Context, id int64) error {
 	return nil
 }
 
+func (s *service) BulkPublishToWordPress(ctx context.Context, ids []int64) (int, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+
+	var publishedCount int
+	for _, id := range ids {
+		article, err := s.repo.GetByID(ctx, id)
+		if err != nil {
+			s.logger.ErrorWithErr(err, "Failed to get article for bulk publish")
+			continue
+		}
+
+		if err = s.PublishToWordPress(ctx, article); err != nil {
+			s.logger.ErrorWithErr(err, "Failed to publish article in bulk")
+			continue
+		}
+
+		publishedCount++
+	}
+
+	s.logger.Infof("Bulk published %d articles to WordPress", publishedCount)
+	return publishedCount, nil
+}
+
+func (s *service) BulkDeleteFromWordPress(ctx context.Context, ids []int64) (int, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+
+	var deletedCount int
+	for _, id := range ids {
+		if err := s.DeleteFromWordPress(ctx, id); err != nil {
+			s.logger.ErrorWithErr(err, "Failed to delete article from WordPress in bulk")
+			continue
+		}
+
+		deletedCount++
+	}
+
+	s.logger.Infof("Bulk deleted %d articles from WordPress", deletedCount)
+	return deletedCount, nil
+}
+
 func (s *service) CreateDraft(ctx context.Context, exec *entities.Execution, title, content string) (*entities.Article, error) {
 	wordCount := s.calculateWordCount(content)
 
 	article := &entities.Article{
 		JobID:         &exec.JobID,
 		SiteID:        exec.SiteID,
-		TopicID:       exec.TopicID,
+		TopicID:       &exec.TopicID,
 		Title:         title,
 		OriginalTitle: title,
 		Content:       content,
@@ -409,10 +496,6 @@ func (s *service) validateArticle(article *entities.Article) error {
 
 	if strings.TrimSpace(article.Content) == "" {
 		return errors.Validation("Article content is required")
-	}
-
-	if article.TopicID <= 0 {
-		return errors.Validation("Topic ID is required")
 	}
 
 	return nil
