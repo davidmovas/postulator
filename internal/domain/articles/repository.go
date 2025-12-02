@@ -72,25 +72,6 @@ func (r *repository) Create(ctx context.Context, article *entities.Article) erro
 			article.Slug, article.FeaturedMediaID, article.FeaturedMediaURL, article.MetaDescription, article.Author,
 			article.CreatedAt, article.PublishedAt, article.LastSyncedAt,
 		).
-		Suffix(`ON CONFLICT(site_id, wp_post_id) DO UPDATE SET
-        title = EXCLUDED.title,
-        content = EXCLUDED.content,
-        excerpt = EXCLUDED.excerpt,
-        wp_post_url = EXCLUDED.wp_post_url,
-        wp_category_ids = EXCLUDED.wp_category_ids,
-        wp_tag_ids = EXCLUDED.wp_tag_ids,
-        status = EXCLUDED.status,
-        is_edited = EXCLUDED.is_edited,
-        word_count = EXCLUDED.word_count,
-        slug = EXCLUDED.slug,
-        featured_media_id = EXCLUDED.featured_media_id,
-        featured_media_url = EXCLUDED.featured_media_url,
-        meta_description = EXCLUDED.meta_description,
-        author = EXCLUDED.author,
-        published_at = EXCLUDED.published_at,
-        last_synced_at = EXCLUDED.last_synced_at,
-        updated_at = CURRENT_TIMESTAMP
-		`).
 		MustSql()
 
 	result, err := r.db.ExecContext(ctx, query, args...)
