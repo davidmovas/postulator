@@ -42,6 +42,10 @@ export function GetSelectableSiteTopics(arg1, arg2) {
   return window['go']['handlers']['TopicsHandler']['GetSelectableSiteTopics'](arg1, arg2);
 }
 
+export function GetSelectableSiteTopicsForJob(arg1, arg2, arg3) {
+  return window['go']['handlers']['TopicsHandler']['GetSelectableSiteTopicsForJob'](arg1, arg2, arg3);
+}
+
 export function GetSiteTopics(arg1) {
   return window['go']['handlers']['TopicsHandler']['GetSiteTopics'](arg1);
 }

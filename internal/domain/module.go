@@ -78,6 +78,11 @@ var Module = fx.Module("domain",
 		topics.NewRepository,
 		topics.NewUsageRepository,
 		topics.NewSiteTopicRepository,
+		// Use jobs.Repository as topics.JobTopicReader to provide cross-domain topic filtering
+		fx.Annotate(
+			func(repo jobs.Repository) topics.JobTopicReader { return repo },
+			fx.As(new(topics.JobTopicReader)),
+		),
 		topics.NewService,
 
 		// Settings

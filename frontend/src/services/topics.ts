@@ -6,7 +6,9 @@ import {
     DeleteTopic,
     GenerateVariations,
     GetNextTopicForJob,
-    GetOrGenerateVariation, GetSelectableSiteTopics,
+    GetOrGenerateVariation,
+    GetSelectableSiteTopics,
+    GetSelectableSiteTopicsForJob,
     GetSiteTopics,
     GetUnusedSiteTopics,
     GetTopic,
@@ -14,7 +16,8 @@ import {
     MarkTopicUsed,
     GetJobRemainingTopics,
     UnassignFromSite,
-    UpdateTopic, CreateAndAssignToSite
+    UpdateTopic,
+    CreateAndAssignToSite
 } from "@/wailsjs/wailsjs/go/handlers/TopicsHandler";
 import {
     mapTopic,
@@ -111,6 +114,16 @@ export const topicService = {
 
     async getSelectableTopics(siteId: number, strategy: string): Promise<Topic[]> {
         const response = await GetSelectableSiteTopics(siteId, strategy);
+        const topics = unwrapArrayResponse<dto.Topic>(response);
+        return topics.map(mapTopic);
+    },
+
+    /**
+     * Get selectable topics for a job, excluding topics assigned to other unique-strategy jobs.
+     * Use jobId = 0 for new jobs.
+     */
+    async getSelectableTopicsForJob(siteId: number, strategy: string, jobId: number): Promise<Topic[]> {
+        const response = await GetSelectableSiteTopicsForJob(siteId, strategy, jobId);
         const topics = unwrapArrayResponse<dto.Topic>(response);
         return topics.map(mapTopic);
     },

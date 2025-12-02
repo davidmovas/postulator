@@ -63,7 +63,8 @@ function CreateSiteJobPageContent() {
 
     const loadTopics = async () => {
         const strategy = (formData.topicStrategy as string) || DEFAULT_TOPIC_STRATEGY;
-        const topicsData = await topicService.getSelectableTopics(siteId, strategy);
+        // Use 0 as jobId for new jobs to exclude topics from other unique-strategy jobs
+        const topicsData = await topicService.getSelectableTopicsForJob(siteId, strategy, 0);
         setTopics(topicsData);
     };
 

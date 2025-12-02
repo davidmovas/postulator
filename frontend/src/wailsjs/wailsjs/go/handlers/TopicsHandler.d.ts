@@ -22,6 +22,8 @@ export function GetOrGenerateVariation(arg1:number,arg2:number,arg3:number):Prom
 
 export function GetSelectableSiteTopics(arg1:number,arg2:string):Promise<dto.Response___github_com_davidmovas_postulator_internal_dto_Topic_>;
 
+export function GetSelectableSiteTopicsForJob(arg1:number,arg2:string,arg3:number):Promise<dto.Response___github_com_davidmovas_postulator_internal_dto_Topic_>;
+
 export function GetSiteTopics(arg1:number):Promise<dto.Response___github_com_davidmovas_postulator_internal_dto_Topic_>;
 
 export function GetTopic(arg1:number):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_Topic_>;

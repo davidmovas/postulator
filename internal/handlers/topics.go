@@ -188,6 +188,29 @@ func (h *TopicsHandler) GetSelectableSiteTopics(siteID int64, strategy string) *
 	return ok(dtoTopics)
 }
 
+// GetSelectableSiteTopicsForJob returns topics available for selection when creating/editing a job.
+// For unique strategy, it excludes topics already assigned to other active jobs on the same site.
+func (h *TopicsHandler) GetSelectableSiteTopicsForJob(siteID int64, strategy string, excludeJobID int64) *dto.Response[[]*dto.Topic] {
+	st := entities.StrategyUnique
+	switch entities.TopicStrategy(strategy) {
+	case entities.StrategyUnique, entities.StrategyVariation:
+		st = entities.TopicStrategy(strategy)
+	default:
+	}
+
+	listTopics, err := h.service.GetSelectableSiteTopicsForJob(ctx.FastCtx(), siteID, st, excludeJobID)
+	if err != nil {
+		return fail[[]*dto.Topic](err)
+	}
+
+	var dtoTopics []*dto.Topic
+	for _, topic := range listTopics {
+		dtoTopics = append(dtoTopics, dto.NewTopic(topic))
+	}
+
+	return ok(dtoTopics)
+}
+
 func (h *TopicsHandler) GenerateVariations(providerID int64, topicID int64, count int) *dto.Response[[]*dto.Topic] {
 	variations, err := h.service.GenerateVariations(ctx.FastCtx(), providerID, topicID, count)
 	if err != nil {

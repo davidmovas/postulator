@@ -84,7 +84,8 @@ function EditJobPageContent() {
         const siteId = formData.siteId || job?.siteId;
         if (siteId) {
             const strategy = (formData.topicStrategy as string) || DEFAULT_TOPIC_STRATEGY;
-            const topicsData = await topicService.getSelectableTopics(siteId, strategy);
+            // Use current jobId to exclude topics from OTHER unique-strategy jobs (but allow this job's topics)
+            const topicsData = await topicService.getSelectableTopicsForJob(siteId, strategy, jobId);
             setTopics(topicsData);
         }
     };

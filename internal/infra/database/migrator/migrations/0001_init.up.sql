@@ -284,8 +284,8 @@ CREATE TABLE articles (
 
     FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
     FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE SET NULL,
-    FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE SET NULL,
-    UNIQUE (site_id, wp_post_id)
+    FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE SET NULL
+    -- Note: UNIQUE (site_id, wp_post_id) removed, replaced with partial index below
 );
 
 CREATE INDEX idx_articles_site ON articles(site_id);
@@ -297,6 +297,10 @@ CREATE INDEX idx_articles_published ON articles(published_at);
 CREATE INDEX idx_articles_wp_post ON articles(site_id, wp_post_id);
 CREATE INDEX idx_articles_slug ON articles(slug);
 CREATE INDEX idx_articles_author ON articles(author);
+
+-- Partial unique index: only enforce uniqueness for published articles (wp_post_id > 0)
+-- This allows multiple articles to have wp_post_id = 0 (unpublished/deleted from WP)
+CREATE UNIQUE INDEX idx_articles_site_wp_post_unique ON articles(site_id, wp_post_id) WHERE wp_post_id > 0;
 
 -- =========================================================================
 -- ARTICLE LINKS

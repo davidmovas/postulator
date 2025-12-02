@@ -86,7 +86,8 @@ export default function CreateGlobalJobPage() {
     const loadSelectableTopics = async () => {
         if (!formData.siteId) return;
         const strategy = formData.topicStrategy || DEFAULT_TOPIC_STRATEGY;
-        const topicsData = await topicService.getSelectableTopics(formData.siteId, strategy);
+        // Use 0 as jobId for new jobs to exclude topics from other unique-strategy jobs
+        const topicsData = await topicService.getSelectableTopicsForJob(formData.siteId, strategy, 0);
         setTopics(topicsData);
     };
 

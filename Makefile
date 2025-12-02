@@ -42,4 +42,4 @@ go-fmt:
 
 # Create a conventional commit using Claude AI
 commit:
-	@npx @anthropic-ai/claude-code -p "Analyze git status and git diff, then create a conventional commit for all current changes. Use conventional commit format (feat:, fix:, docs:, chore:, refactor:, etc). Write commit message in English. Stage all changes with 'git add -A' first, then commit. After committing, show the commit hash and message. Do not push."
+	@npx @anthropic-ai/claude-code@2.0.56 -p "Analyze git status and git diff, then create a conventional commit for all current changes. Use conventional commit format (feat:, fix:, docs:, chore:, refactor:, etc). Write commit message in English. Stage all changes with 'git add -A' first, then commit. After committing, show the commit hash and message. Do not push."
