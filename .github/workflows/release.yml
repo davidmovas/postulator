@@ -106,32 +106,21 @@ jobs:
           $ldflags = "-X github.com/davidmovas/postulator/internal/version.Version=$version -X github.com/davidmovas/postulator/internal/version.Commit=$commit -X github.com/davidmovas/postulator/internal/version.BuildDate=$date -H windowsgui -s -w"
           wails build -ldflags $ldflags -platform windows/amd64 -nsis
 
-      - name: Rename artifacts
+      - name: List build output
         shell: pwsh
-        run: |
-          $version = "${{ steps.info.outputs.VERSION }}"
-
-          # Rename portable exe
-          if (Test-Path "build/bin/${{ env.APP_NAME }}.exe") {
-            Move-Item "build/bin/${{ env.APP_NAME }}.exe" "build/bin/${{ env.APP_NAME }}-$version-windows-amd64.exe"
-          }
-
-          # Rename installer
-          if (Test-Path "build/bin/${{ env.APP_NAME }}-amd64-installer.exe") {
-            Move-Item "build/bin/${{ env.APP_NAME }}-amd64-installer.exe" "build/bin/${{ env.APP_NAME }}-$version-windows-amd64-installer.exe"
-          }
+        run: Get-ChildItem -Path build/bin -Recurse
 
       - name: Upload portable executable
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.APP_NAME }}-windows-portable
-          path: build/bin/${{ env.APP_NAME }}-${{ steps.info.outputs.VERSION }}-windows-amd64.exe
+          name: ${{ env.APP_NAME }}
+          path: build/bin/${{ env.APP_NAME }}.exe
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.APP_NAME }}-windows-installer
-          path: build/bin/${{ env.APP_NAME }}-${{ steps.info.outputs.VERSION }}-windows-amd64-installer.exe
+          name: ${{ env.APP_NAME }}-installer
+          path: build/bin/${{ env.APP_NAME }}-amd64-installer.exe
           if-no-files-found: ignore
 
   upload-release:
