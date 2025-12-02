@@ -16,8 +16,7 @@ jobs:
     permissions:
       contents: write
     outputs:
-      new_release: ${{ steps.semantic.outputs.new_release_published }}
-      version: ${{ steps.semantic.outputs.new_release_version }}
+      version: ${{ steps.semantic.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,9 +32,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check release output
+        run: |
+          echo "Version: ${{ steps.semantic.outputs.version }}"
+          echo "Version file exists: $(test -f .version && echo yes || echo no)"
+
   build-windows:
     needs: release
-    if: needs.release.outputs.new_release == 'true'
+    if: needs.release.outputs.version != ''
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -110,7 +114,7 @@ jobs:
 
   upload-release:
     needs: [release, build-windows]
-    if: needs.release.outputs.new_release == 'true'
+    if: needs.release.outputs.version != ''
     runs-on: ubuntu-latest
     permissions:
       contents: write
