@@ -17,6 +17,7 @@ type App struct {
 	bindings       []any
 	cfg            *config.Config
 	dialogsHandler *handlers.DialogsHandler
+	appHandler     *handlers.AppHandler
 }
 
 func New(cfg *config.Config) (*App, error) {
@@ -35,6 +36,7 @@ func New(cfg *config.Config) (*App, error) {
 		proxyHandler       *handlers.ProxyHandler
 		mediaHandler       *handlers.MediaHandler
 		dialogsHandler     *handlers.DialogsHandler
+		appHandler         *handlers.AppHandler
 	)
 
 	fxApp := fx.New(
@@ -59,6 +61,7 @@ func New(cfg *config.Config) (*App, error) {
 			&proxyHandler,
 			&mediaHandler,
 			&dialogsHandler,
+			&appHandler,
 		),
 	)
 
@@ -79,9 +82,11 @@ func New(cfg *config.Config) (*App, error) {
 			proxyHandler,
 			mediaHandler,
 			dialogsHandler,
+			appHandler,
 		},
 		dialogsHandler: dialogsHandler,
-		cfg: cfg,
+		appHandler:     appHandler,
+		cfg:            cfg,
 	}
 
 	return a, nil
@@ -96,6 +101,9 @@ func (a *App) Start(ctx context.Context) error {
 func (a *App) SetWailsContext(ctx context.Context) {
 	if a.dialogsHandler != nil {
 		a.dialogsHandler.SetContext(ctx)
+	}
+	if a.appHandler != nil {
+		a.appHandler.SetContext(ctx)
 	}
 }
 

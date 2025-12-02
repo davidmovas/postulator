@@ -28,6 +28,7 @@ import { useContextModal } from "@/context/modal-context";
 import SiteStatusBadge from "@/components/sites/site-status-badge";
 import HealthIndicator from "@/components/sites/site-health-badge";
 import { jobService } from "@/services/jobs";
+import { BrowserOpenURL } from "@/wailsjs/wailsjs/runtime/runtime";
 
 export function useSitesTable() {
     const [sites, setSites] = useState<Site[]>([]);
@@ -103,16 +104,14 @@ export function useSitesTable() {
             cell: ({ row }) => {
                 const url = row.getValue("url") as string;
                 return (
-                    <a
-                        href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-500 hover:text-blue-700 hover:underline flex items-center gap-1"
+                    <button
+                        onClick={() => BrowserOpenURL(url)}
+                        className="text-blue-500 hover:text-blue-700 hover:underline flex items-center gap-1 cursor-pointer"
                     >
-                    {url.replace(/^https?:\/\//, '')}
-                    <ExternalLink className="w-3 h-3" />
-                    </a>
-            );
+                        {url.replace(/^https?:\/\//, '')}
+                        <ExternalLink className="w-3 h-3" />
+                    </button>
+                );
             },
         },
         {
@@ -230,7 +229,7 @@ export function useSitesTable() {
                 };
 
                 const openWordPress = () => {
-                    window.open(site.url + '/wp-admin', '_blank');
+                    BrowserOpenURL(site.url + '/wp-admin');
                 };
 
                 return (

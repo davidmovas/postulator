@@ -50,23 +50,31 @@ func onReady(ctx context.Context, app *app.App) {
 	go func() {
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case <-mShow.ClickedCh:
 				if appCtx != nil {
-					runtime.WindowShow(appCtx)
-					window.SetWindowOpen(true)
+					go func() {
+						runtime.WindowShow(appCtx)
+						window.SetWindowOpen(true)
+					}()
 				}
 			case <-mHide.ClickedCh:
 				if appCtx != nil {
-					runtime.WindowHide(appCtx)
-					window.SetWindowOpen(false)
+					go func() {
+						runtime.WindowHide(appCtx)
+						window.SetWindowOpen(false)
+					}()
 				}
 			case <-mQuit.ClickedCh:
-				if appCtx != nil {
-					runtime.Quit(appCtx)
+				go func() {
+					if appCtx != nil {
+						runtime.Quit(appCtx)
+					}
 					window.SetWindowOpen(false)
-				}
-				systray.Quit()
-				os.Exit(0)
+					systray.Quit()
+					os.Exit(0)
+				}()
 				return
 			}
 		}

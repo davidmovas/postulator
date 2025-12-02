@@ -581,3 +581,41 @@ func (r *repository) scanJobs(ctx context.Context, query string, args []any) ([]
 
 	return jobs, nil
 }
+
+// GetTopicsAssignedToOtherUniqueJobs returns topic IDs that are assigned to
+// active jobs with unique strategy on the same site, excluding the specified job.
+// This is used to filter out topics that shouldn't be selectable for new jobs.
+func (r *repository) GetTopicsAssignedToOtherUniqueJobs(ctx context.Context, siteID int64, excludeJobID int64) ([]int64, error) {
+	query, args := dbx.ST.
+		Select("DISTINCT jt.topic_id").
+		From("job_topics jt").
+		Join("jobs j ON j.id = jt.job_id").
+		Where(squirrel.Eq{
+			"j.site_id":        siteID,
+			"j.topic_strategy": entities.StrategyUnique,
+			"j.status":         entities.JobStatusActive,
+		}).
+		Where(squirrel.NotEq{"j.id": excludeJobID}).
+		MustSql()
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, errors.Database(err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var topicIDs []int64
+	for rows.Next() {
+		var topicID int64
+		if err = rows.Scan(&topicID); err != nil {
+			return nil, errors.Database(err)
+		}
+		topicIDs = append(topicIDs, topicID)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, errors.Database(err)
+	}
+
+	return topicIDs, nil
+}

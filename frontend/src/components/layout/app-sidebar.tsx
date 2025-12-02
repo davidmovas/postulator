@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { GetAppVersion } from "@/wailsjs/wailsjs/go/handlers/SettingsHandler";
+import { QuitApp } from "@/wailsjs/wailsjs/go/handlers/AppHandler";
 
 import {
     Sidebar,
@@ -26,10 +27,14 @@ import {
     RemixiconComponentType,
     RiChatAiLine,
     RiDashboard2Line,
-    RiLightbulbLine, RiArticleLine,
+    RiLightbulbLine,
+    RiArticleLine,
+    RiShutDownLine,
 } from "@remixicon/react";
+import { SplitSquareHorizontal } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 
-const FALLBACK_VERSION = "dev";
+const FALLBACK_VERSION = "-dev";
 
 type NavItem = {
     title: string;
@@ -144,8 +149,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </SidebarContent>
 
             <SidebarFooter>
-                <div className="flex items-center justify-start p-4">
-                    <span className="text-sm text-zinc-500">{version}</span>
+                <div className="grid grid-cols-1 gap-2 px-4 py-2">
+                    <div className="text-sm text-zinc-500">{version}</div>
+
+                    <Separator />
+
+                    <button
+                        onClick={() => QuitApp()}
+                        className="flex items-center justify-center gap-2 px-3 py-1.5 text-lg text-zinc-400 hover:text-red-400 hover:bg-zinc-800 rounded-md transition-colors w-full"
+                        title="Quit Application"
+                    >
+                        <RiShutDownLine className="size-5" />
+                        <span>Quit</span>
+                    </button>
                 </div>
             </SidebarFooter>
 

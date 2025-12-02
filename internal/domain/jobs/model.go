@@ -21,6 +21,10 @@ type Repository interface {
 
 	SetTopics(ctx context.Context, jobID int64, topicIDs []int64) error
 	GetTopics(ctx context.Context, jobID int64) ([]int64, error)
+
+	// GetTopicsAssignedToOtherUniqueJobs returns topic IDs that are assigned to
+	// active jobs with unique strategy on the same site, excluding the specified job
+	GetTopicsAssignedToOtherUniqueJobs(ctx context.Context, siteID int64, excludeJobID int64) ([]int64, error)
 }
 
 type StateRepository interface {

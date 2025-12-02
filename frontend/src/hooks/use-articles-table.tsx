@@ -24,6 +24,7 @@ import {
 import { articleService } from "@/services/articles";
 import { useApiCall } from "@/hooks/use-api-call";
 import { formatSmartDate } from "@/lib/time";
+import { BrowserOpenURL } from "@/wailsjs/wailsjs/runtime/runtime";
 
 const DEFAULT_PAGE_SIZE = 25;
 
@@ -221,7 +222,7 @@ export function useArticlesTable(siteId: number, options?: UseArticlesTableOptio
                                     </DropdownMenuItem>
 
                                     <DropdownMenuItem
-                                        onClick={() => window.open(article.wpPostUrl, '_blank')}
+                                        onClick={() => BrowserOpenURL(article.wpPostUrl)}
                                     >
                                         <ExternalLink className="mr-2 h-4 w-4" />
                                         <span>View</span>

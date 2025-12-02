@@ -22,6 +22,7 @@ type service struct {
 	repo              Repository
 	siteTopicRepo     SiteTopicRepository
 	usageRepo         UsageRepository
+	jobTopicReader    JobTopicReader
 	deletionValidator *deletion.Validator
 	logger            *logger.Logger
 }
@@ -31,6 +32,7 @@ func NewService(
 	repo Repository,
 	siteTopicRepo SiteTopicRepository,
 	usageRepo UsageRepository,
+	jobTopicReader JobTopicReader,
 	deletionValidator *deletion.Validator,
 	logger *logger.Logger,
 ) Service {
@@ -39,6 +41,7 @@ func NewService(
 		repo:              repo,
 		siteTopicRepo:     siteTopicRepo,
 		usageRepo:         usageRepo,
+		jobTopicReader:    jobTopicReader,
 		deletionValidator: deletionValidator,
 		logger: logger.
 			WithScope("service").
@@ -434,6 +437,50 @@ func (s *service) GetSelectableSiteTopics(ctx context.Context, siteID int64, str
 		return nil, err
 	}
 	return strategy.GetSelectableTopics(ctx, siteID)
+}
+
+func (s *service) GetSelectableSiteTopicsForJob(ctx context.Context, siteID int64, strategyType entities.TopicStrategy, excludeJobID int64) ([]*entities.Topic, error) {
+	// For non-unique strategies, no filtering needed
+	if strategyType != entities.StrategyUnique {
+		return s.GetSelectableSiteTopics(ctx, siteID, strategyType)
+	}
+
+	// Get all selectable topics first
+	topics, err := s.GetSelectableSiteTopics(ctx, siteID, strategyType)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(topics) == 0 {
+		return topics, nil
+	}
+
+	// Get topics assigned to other unique jobs on this site
+	assignedToOtherJobs, err := s.jobTopicReader.GetTopicsAssignedToOtherUniqueJobs(ctx, siteID, excludeJobID)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get topics assigned to other jobs")
+		return nil, err
+	}
+
+	if len(assignedToOtherJobs) == 0 {
+		return topics, nil
+	}
+
+	// Create a set of excluded topic IDs
+	excludedSet := make(map[int64]struct{}, len(assignedToOtherJobs))
+	for _, id := range assignedToOtherJobs {
+		excludedSet[id] = struct{}{}
+	}
+
+	// Filter out topics assigned to other jobs
+	var filtered []*entities.Topic
+	for _, topic := range topics {
+		if _, excluded := excludedSet[topic.ID]; !excluded {
+			filtered = append(filtered, topic)
+		}
+	}
+
+	return filtered, nil
 }
 
 func (s *service) GetJobRemainingTopics(ctx context.Context, job *entities.Job) ([]*entities.Topic, int, error) {

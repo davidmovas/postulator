@@ -34,6 +34,14 @@ type UsageRepository interface {
 	GetNextUnused(ctx context.Context, siteID int64, topicIDs []int64) (*entities.Topic, error)
 }
 
+// JobTopicReader provides read-only access to job-topic relationships
+// This interface is implemented by jobs.Repository to avoid circular dependencies
+type JobTopicReader interface {
+	// GetTopicsAssignedToOtherUniqueJobs returns topic IDs that are assigned to
+	// active jobs with unique strategy on the same site, excluding the specified job
+	GetTopicsAssignedToOtherUniqueJobs(ctx context.Context, siteID int64, excludeJobID int64) ([]int64, error)
+}
+
 type Service interface {
 	CreateTopic(ctx context.Context, topic *entities.Topic) error
 	CreateTopics(ctx context.Context, topics ...*entities.Topic) (*entities.BatchResult, error)
@@ -59,6 +67,7 @@ type Service interface {
 
 	GetStrategy(strategyType entities.TopicStrategy) (TopicStrategyHandler, error)
 	GetSelectableSiteTopics(ctx context.Context, siteID int64, strategyType entities.TopicStrategy) ([]*entities.Topic, error)
+	GetSelectableSiteTopicsForJob(ctx context.Context, siteID int64, strategyType entities.TopicStrategy, excludeJobID int64) ([]*entities.Topic, error)
 
 	GetJobRemainingTopics(ctx context.Context, job *entities.Job) ([]*entities.Topic, int, error)
 }

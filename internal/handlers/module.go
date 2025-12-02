@@ -18,5 +18,6 @@ var Module = fx.Module("handlers",
 		NewProxyHandler,
 		NewMediaHandler,
 		NewDialogsHandler,
+		NewAppHandler,
 	),
 )

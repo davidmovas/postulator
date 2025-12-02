@@ -20,7 +20,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Loader2, Sparkles, AlertCircle } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import { Provider } from "@/models/providers";
 import { Prompt } from "@/models/prompts";
 import { Topic } from "@/models/topics";
@@ -31,7 +31,6 @@ import { providerService } from "@/services/providers";
 import { promptService } from "@/services/prompts";
 import { topicService } from "@/services/topics";
 import { toast } from "sonner";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface AIGenerateModalProps {
     open: boolean;
@@ -182,22 +181,16 @@ export function AIGenerateModal({
                         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                     </div>
                 ) : error && !providers ? (
-                    <Alert variant="destructive">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>{error}</AlertDescription>
-                    </Alert>
+                    <p className="text-sm text-destructive py-4 text-center">{error}</p>
                 ) : (
                     <div className="space-y-6 py-4">
                         {/* Provider Selection */}
                         <div className="space-y-2">
                             <Label>AI Provider</Label>
                             {providers && providers.length === 0 ? (
-                                <Alert>
-                                    <AlertCircle className="h-4 w-4" />
-                                    <AlertDescription>
-                                        No active providers found. Please configure a provider first.
-                                    </AlertDescription>
-                                </Alert>
+                                <p className="text-sm text-amber-600 dark:text-amber-500">
+                                    No active providers found. Please configure a provider first.
+                                </p>
                             ) : (
                                 <Select
                                     value={selectedProviderId}
@@ -224,12 +217,9 @@ export function AIGenerateModal({
                         <div className="space-y-2">
                             <Label>Prompt</Label>
                             {prompts && prompts.length === 0 ? (
-                                <Alert>
-                                    <AlertCircle className="h-4 w-4" />
-                                    <AlertDescription>
-                                        No prompts found. Please create a prompt first.
-                                    </AlertDescription>
-                                </Alert>
+                                <p className="text-sm text-amber-600 dark:text-amber-500">
+                                    No prompts found. Please create a prompt first.
+                                </p>
                             ) : (
                                 <Select
                                     value={selectedPromptId}
@@ -287,12 +277,9 @@ export function AIGenerateModal({
                             {topicMode === "existing" && (
                                 <div className="pl-6">
                                     {topics && topics.length === 0 ? (
-                                        <Alert>
-                                            <AlertCircle className="h-4 w-4" />
-                                            <AlertDescription>
-                                                No unused topics available. Enter a custom topic instead.
-                                            </AlertDescription>
-                                        </Alert>
+                                        <p className="text-sm text-amber-600 dark:text-amber-500">
+                                            No unused topics available. Enter a custom topic instead.
+                                        </p>
                                     ) : (
                                         <Select
                                             value={selectedTopicId}
@@ -367,10 +354,7 @@ export function AIGenerateModal({
 
                         {/* Error display */}
                         {error && (
-                            <Alert variant="destructive">
-                                <AlertCircle className="h-4 w-4" />
-                                <AlertDescription>{error}</AlertDescription>
-                            </Alert>
+                            <p className="text-sm text-destructive">{error}</p>
                         )}
                     </div>
                 )}
