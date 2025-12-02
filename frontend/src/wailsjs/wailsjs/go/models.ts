@@ -1,14 +1,14 @@
 export namespace dto {
-
+	
 	export class AppVersion {
 	    version: string;
 	    commit: string;
 	    buildDate: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new AppVersion(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.version = source["version"];
@@ -876,22 +876,22 @@ export namespace dto {
 		    return a;
 		}
 	}
-	export class Response_github_com_davidmovas_postulator_internal_dto_AppVersion_ {
+	export class Response__github_com_davidmovas_postulator_internal_dto_AppVersion_ {
 	    success: boolean;
 	    data?: AppVersion;
 	    error?: Error;
-
+	
 	    static createFrom(source: any = {}) {
-	        return new Response_github_com_davidmovas_postulator_internal_dto_AppVersion_(source);
+	        return new Response__github_com_davidmovas_postulator_internal_dto_AppVersion_(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
 	        this.data = this.convertValues(source["data"], AppVersion);
 	        this.error = this.convertValues(source["error"], Error);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;

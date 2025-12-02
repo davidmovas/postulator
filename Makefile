@@ -1,4 +1,4 @@
-.PHONY: test test-verbose test-coverage clean help
+.PHONY: test test-verbose test-coverage clean help commit
 
 # Default target
 help:
@@ -7,6 +7,7 @@ help:
 	@echo "  make test-verbose   - Run all Go tests with verbose output"
 	@echo "  make test-coverage  - Run all Go tests with coverage report"
 	@echo "  make clean          - Clean test cache and temporary files"
+	@echo "  make commit         - Create conventional commit using Claude AI"
 
 # Run all tests
 test:
@@ -38,3 +39,7 @@ go-lint:
 
 go-fmt:
 	 gofumpt -l -w .
+
+# Create a conventional commit using Claude AI
+commit:
+	@npx @anthropic-ai/claude-code -p "Analyze git status and git diff, then create a conventional commit for all current changes. Use conventional commit format (feat:, fix:, docs:, chore:, refactor:, etc). Write commit message in English. Stage all changes with 'git add -A' first, then commit. After committing, show the commit hash and message. Do not push."
