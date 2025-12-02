@@ -124,6 +124,10 @@ function SitePageContent() {
         router.push(`/sites/categories?id=${siteId}`);
     };
 
+    const handleViewSitemaps = () => {
+        router.push(`/sites/sitemaps?id=${siteId}`);
+    };
+
     const handleDelete = () => {
         if (site) {
             deleteSiteModal.open(site);
@@ -175,6 +179,7 @@ function SitePageContent() {
                 onViewJobs={handleViewJobs}
                 onViewTopics={handleViewTopics}
                 onViewCategories={handleViewCategories}
+                onViewSitemaps={handleViewSitemaps}
             />
 
             {/* Statistics Section */}

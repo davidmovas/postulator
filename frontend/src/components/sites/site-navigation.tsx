@@ -4,6 +4,7 @@ import {
     RiTimerLine,
     RiLightbulbLine,
     RiChatThreadLine,
+    RiOrganizationChart,
 } from "@remixicon/react";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +13,7 @@ interface SiteNavigationProps {
     onViewJobs: () => void;
     onViewTopics?: () => void;
     onViewCategories?: () => void;
+    onViewSitemaps?: () => void;
 }
 
 export function SiteNavigation({
@@ -19,6 +21,7 @@ export function SiteNavigation({
     onViewJobs,
     onViewTopics,
     onViewCategories,
+    onViewSitemaps,
 }: SiteNavigationProps) {
     const navItems = [
         {
@@ -44,13 +47,19 @@ export function SiteNavigation({
             label: "Topics",
             onClick: onViewTopics,
             color: "text-orange-500 border-orange-500 hover:bg-orange-500/10"
+        },
+        {
+            icon: RiOrganizationChart,
+            label: "Site Structure",
+            onClick: onViewSitemaps,
+            color: "text-cyan-500 border-cyan-500 hover:bg-cyan-500/10"
         }
     ];
 
     return (
         <div className="space-y-4">
             <h2 className="text-2xl font-bold tracking-tight">Site Sections</h2>
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                 {navItems.map((item, index) => (
                     <Button
                         key={index}

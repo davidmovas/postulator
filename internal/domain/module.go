@@ -15,6 +15,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/providers"
 	"github.com/davidmovas/postulator/internal/domain/proxy"
 	"github.com/davidmovas/postulator/internal/domain/settings"
+	"github.com/davidmovas/postulator/internal/domain/sitemap"
 	"github.com/davidmovas/postulator/internal/domain/sites"
 	"github.com/davidmovas/postulator/internal/domain/stats"
 	"github.com/davidmovas/postulator/internal/domain/topics"
@@ -91,6 +92,12 @@ var Module = fx.Module("domain",
 
 		// Proxy
 		proxy.NewService,
+
+		// Sitemap
+		sitemap.NewRepository,
+		sitemap.NewNodeRepository,
+		sitemap.NewKeywordRepository,
+		sitemap.NewService,
 	),
 
 	// Job Scheduler lifecycle

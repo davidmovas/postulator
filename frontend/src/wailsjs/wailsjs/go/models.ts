@@ -280,6 +280,52 @@ export namespace dto {
 	        this.updatedAt = source["updatedAt"];
 	    }
 	}
+	export class CreateNodeRequest {
+	    sitemapId: number;
+	    parentId?: number;
+	    title: string;
+	    slug: string;
+	    description?: string;
+	    position: number;
+	    source: string;
+	    keywords?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new CreateNodeRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sitemapId = source["sitemapId"];
+	        this.parentId = source["parentId"];
+	        this.title = source["title"];
+	        this.slug = source["slug"];
+	        this.description = source["description"];
+	        this.position = source["position"];
+	        this.source = source["source"];
+	        this.keywords = source["keywords"];
+	    }
+	}
+	export class CreateSitemapRequest {
+	    siteId: number;
+	    name: string;
+	    description?: string;
+	    source: string;
+	    siteUrl: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CreateSitemapRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.siteId = source["siteId"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.source = source["source"];
+	        this.siteUrl = source["siteUrl"];
+	    }
+	}
 	export class DashboardSummary {
 	    totalSites: number;
 	    activeSites: number;
@@ -306,6 +352,36 @@ export namespace dto {
 	        this.pendingValidations = source["pendingValidations"];
 	        this.executionsToday = source["executionsToday"];
 	        this.failedExecutionsToday = source["failedExecutionsToday"];
+	    }
+	}
+	export class DistributeKeywordsRequest {
+	    sitemapId: number;
+	    keywords: string[];
+	    strategy: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DistributeKeywordsRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sitemapId = source["sitemapId"];
+	        this.keywords = source["keywords"];
+	        this.strategy = source["strategy"];
+	    }
+	}
+	export class DuplicateSitemapRequest {
+	    id: number;
+	    newName: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DuplicateSitemapRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.newName = source["newName"];
 	    }
 	}
 	export class Error {
@@ -608,6 +684,36 @@ export namespace dto {
 		    return a;
 		}
 	}
+	export class LinkNodeToArticleRequest {
+	    nodeId: number;
+	    articleId: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new LinkNodeToArticleRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.nodeId = source["nodeId"];
+	        this.articleId = source["articleId"];
+	    }
+	}
+	export class LinkNodeToPageRequest {
+	    nodeId: number;
+	    wpPageId: number;
+	    wpUrl: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LinkNodeToPageRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.nodeId = source["nodeId"];
+	        this.wpPageId = source["wpPageId"];
+	        this.wpUrl = source["wpUrl"];
+	    }
+	}
 	export class MediaResult {
 	    id: number;
 	    sourceUrl: string;
@@ -644,6 +750,22 @@ export namespace dto {
 	        this.maxTokens = source["maxTokens"];
 	        this.inputCost = source["inputCost"];
 	        this.outputCost = source["outputCost"];
+	    }
+	}
+	export class MoveNodeRequest {
+	    nodeId: number;
+	    newParentId?: number;
+	    position: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MoveNodeRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.nodeId = source["nodeId"];
+	        this.newParentId = source["newParentId"];
+	        this.position = source["position"];
 	    }
 	}
 	export class PaginatedResponse__github_com_davidmovas_postulator_internal_dto_HealthCheckHistory_ {
@@ -1684,6 +1806,242 @@ export namespace dto {
 		    return a;
 		}
 	}
+	export class SitemapNode {
+	    id: number;
+	    sitemapId: number;
+	    parentId?: number;
+	    title: string;
+	    slug: string;
+	    description?: string;
+	    isRoot: boolean;
+	    depth: number;
+	    position: number;
+	    path: string;
+	    contentType: string;
+	    articleId?: number;
+	    wpPageId?: number;
+	    wpUrl?: string;
+	    source: string;
+	    isSynced: boolean;
+	    lastSyncedAt?: string;
+	    contentStatus: string;
+	    positionX?: number;
+	    positionY?: number;
+	    keywords?: string[];
+	    children?: SitemapNode[];
+	    createdAt: string;
+	    updatedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SitemapNode(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.sitemapId = source["sitemapId"];
+	        this.parentId = source["parentId"];
+	        this.title = source["title"];
+	        this.slug = source["slug"];
+	        this.description = source["description"];
+	        this.isRoot = source["isRoot"];
+	        this.depth = source["depth"];
+	        this.position = source["position"];
+	        this.path = source["path"];
+	        this.contentType = source["contentType"];
+	        this.articleId = source["articleId"];
+	        this.wpPageId = source["wpPageId"];
+	        this.wpUrl = source["wpUrl"];
+	        this.source = source["source"];
+	        this.isSynced = source["isSynced"];
+	        this.lastSyncedAt = source["lastSyncedAt"];
+	        this.contentStatus = source["contentStatus"];
+	        this.positionX = source["positionX"];
+	        this.positionY = source["positionY"];
+	        this.keywords = source["keywords"];
+	        this.children = this.convertValues(source["children"], SitemapNode);
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_SitemapNode_ {
+	    success: boolean;
+	    data?: SitemapNode;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_SitemapNode_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], SitemapNode);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Sitemap {
+	    id: number;
+	    siteId: number;
+	    name: string;
+	    description?: string;
+	    source: string;
+	    status: string;
+	    createdAt: string;
+	    updatedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Sitemap(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.siteId = source["siteId"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.source = source["source"];
+	        this.status = source["status"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	}
+	export class SitemapWithNodes {
+	    sitemap?: Sitemap;
+	    nodes: SitemapNode[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SitemapWithNodes(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sitemap = this.convertValues(source["sitemap"], Sitemap);
+	        this.nodes = this.convertValues(source["nodes"], SitemapNode);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_SitemapWithNodes_ {
+	    success: boolean;
+	    data?: SitemapWithNodes;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_SitemapWithNodes_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], SitemapWithNodes);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_Sitemap_ {
+	    success: boolean;
+	    data?: Sitemap;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_Sitemap_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], Sitemap);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Response__github_com_davidmovas_postulator_internal_dto_Topic_ {
 	    success: boolean;
 	    data?: Topic;
@@ -2040,6 +2398,74 @@ export namespace dto {
 		    return a;
 		}
 	}
+	export class Response____github_com_davidmovas_postulator_internal_dto_SitemapNode_ {
+	    success: boolean;
+	    data?: SitemapNode[];
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response____github_com_davidmovas_postulator_internal_dto_SitemapNode_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], SitemapNode);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response____github_com_davidmovas_postulator_internal_dto_Sitemap_ {
+	    success: boolean;
+	    data?: Sitemap[];
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response____github_com_davidmovas_postulator_internal_dto_Sitemap_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], Sitemap);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Statistics {
 	    categoryId: number;
 	    date: string;
@@ -2263,11 +2689,83 @@ export namespace dto {
 		}
 	}
 	
+	export class SetNodeKeywordsRequest {
+	    nodeId: number;
+	    keywords: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SetNodeKeywordsRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.nodeId = source["nodeId"];
+	        this.keywords = source["keywords"];
+	    }
+	}
 	
 	
 	
 	
 	
+	
+	
+	
+	
+	export class UpdateNodePositionsRequest {
+	    nodeId: number;
+	    positionX: number;
+	    positionY: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateNodePositionsRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.nodeId = source["nodeId"];
+	        this.positionX = source["positionX"];
+	        this.positionY = source["positionY"];
+	    }
+	}
+	export class UpdateNodeRequest {
+	    id: number;
+	    title: string;
+	    slug: string;
+	    description?: string;
+	    keywords?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateNodeRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.title = source["title"];
+	        this.slug = source["slug"];
+	        this.description = source["description"];
+	        this.keywords = source["keywords"];
+	    }
+	}
+	export class UpdateSitemapRequest {
+	    id: number;
+	    name: string;
+	    description?: string;
+	    status: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateSitemapRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.status = source["status"];
+	    }
+	}
 
 }
 
