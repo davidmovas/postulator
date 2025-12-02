@@ -132,7 +132,7 @@ export function BasicInfoSection({
                     {noProviders && (
                         <div className="flex items-center gap-2 text-xs text-destructive">
                             You need to create an AI provider first.
-                            <a href="/ai-providers" className="underline">Go to Providers</a>
+                            <a href="/ai-providers/" className="underline">Go to Providers</a>
                         </div>
                     )}
                 </div>
@@ -165,7 +165,7 @@ export function BasicInfoSection({
                     {noPrompts && (
                         <div className="flex items-center gap-2 text-xs text-destructive">
                             You need to create a prompt first.
-                            <a href="/prompts" className="underline">Go to Prompts</a>
+                            <a href="/prompts/" className="underline">Go to Prompts</a>
                         </div>
                     )}
                 </div>
