@@ -132,6 +132,7 @@ func main() {
 		LogLevel: logger.DEBUG,
 		OnStartup: func(ctx context.Context) {
 			appCtx = ctx
+			appInst.SetWailsContext(ctx)
 			window.SetWindowOpen(true)
 		},
 		OnBeforeClose: func(ctx context.Context) (prevent bool) {

@@ -89,11 +89,14 @@ func New(cfg *config.Config) (*App, error) {
 
 func (a *App) Start(ctx context.Context) error {
 	a.ctx = ctx
-	// Set Wails context for dialogs handler
+	return a.fxApp.Start(ctx)
+}
+
+// SetWailsContext sets the Wails runtime context for handlers that need it
+func (a *App) SetWailsContext(ctx context.Context) {
 	if a.dialogsHandler != nil {
 		a.dialogsHandler.SetContext(ctx)
 	}
-	return a.fxApp.Start(ctx)
 }
 
 func (a *App) Stop() error {
