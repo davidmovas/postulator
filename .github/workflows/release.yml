@@ -7,7 +7,7 @@ on:
 
 env:
   NODE_VERSION: '20'
-  GO_VERSION: '1.22'
+  GO_VERSION: '1.24'
   APP_NAME: 'Postulator'
 
 jobs:
@@ -16,8 +16,7 @@ jobs:
     permissions:
       contents: write
     outputs:
-      new_release: ${{ steps.semantic.outputs.new_release_published }}
-      version: ${{ steps.semantic.outputs.new_release_version }}
+      version: ${{ steps.semantic.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,9 +32,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check release output
+        run: |
+          echo "Version: ${{ steps.semantic.outputs.version }}"
+          echo "Version file exists: $(test -f .version && echo yes || echo no)"
+
   build-windows:
     needs: release
-    if: needs.release.outputs.new_release == 'true'
+    if: needs.release.outputs.version != ''
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,20 +48,42 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: true
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Cache Wails
+        id: cache-wails
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/wails.exe
+          key: wails-v2.10.1-windows
 
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+        if: steps.cache-wails.outputs.cache-hit != 'true'
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.10.1
+
+      - name: Cache NSIS
+        id: cache-nsis
+        uses: actions/cache@v4
+        with:
+          path: ~/scoop
+          key: nsis-windows-scoop
 
       - name: Install NSIS
+        if: steps.cache-nsis.outputs.cache-hit != 'true'
         run: |
           iwr -useb get.scoop.sh | iex
           scoop bucket add extras
           scoop install nsis
+
+      - name: Add NSIS to PATH
+        run: echo "$env:USERPROFILE\scoop\shims" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install frontend dependencies
         working-directory: frontend
@@ -110,7 +136,7 @@ jobs:
 
   upload-release:
     needs: [release, build-windows]
-    if: needs.release.outputs.new_release == 'true'
+    if: needs.release.outputs.version != ''
     runs-on: ubuntu-latest
     permissions:
       contents: write
