@@ -351,3 +351,61 @@ type UpdateNodesToWPRequest struct {
 	SiteID  int64   `json:"siteId"`
 	NodeIDs []int64 `json:"nodeIds"`
 }
+
+// =========================================================================
+// AI Generation DTOs
+// =========================================================================
+
+// TitleInput represents a single title with optional keywords for AI generation
+type TitleInput struct {
+	Title    string   `json:"title"`
+	Keywords []string `json:"keywords,omitempty"`
+}
+
+// GenerateSitemapStructureRequest contains parameters for AI sitemap generation
+type GenerateSitemapStructureRequest struct {
+	// SitemapID is set when adding to existing sitemap, nil for new sitemap
+	SitemapID *int64 `json:"sitemapId,omitempty"`
+	// SiteID is required when creating new sitemap
+	SiteID *int64 `json:"siteId,omitempty"`
+	// Name for new sitemap (required when SitemapID is nil)
+	Name string `json:"name,omitempty"`
+	// PromptID is the ID of the prompt template to use
+	PromptID int64 `json:"promptId"`
+	// Placeholders for the prompt template
+	Placeholders map[string]string `json:"placeholders,omitempty"`
+	// Titles with optional keywords to generate structure for
+	Titles []TitleInput `json:"titles"`
+	// ParentNodeIDs - nodes to use as roots for new nodes (empty = use root node)
+	ParentNodeIDs []int64 `json:"parentNodeIds,omitempty"`
+	// MaxDepth limits the depth of generated structure (0 = no limit)
+	MaxDepth int `json:"maxDepth,omitempty"`
+	// IncludeExistingTree sends the current tree structure to AI for context
+	IncludeExistingTree bool `json:"includeExistingTree,omitempty"`
+	// ProviderID is the AI provider to use
+	ProviderID int64 `json:"providerId"`
+}
+
+// GeneratedNode represents a single node in AI-generated structure
+type GeneratedNode struct {
+	Title    string          `json:"title"`
+	Slug     string          `json:"slug"`
+	Keywords []string        `json:"keywords,omitempty"`
+	Children []GeneratedNode `json:"children,omitempty"`
+}
+
+// GenerateSitemapStructureResponse contains the AI-generated sitemap structure
+type GenerateSitemapStructureResponse struct {
+	SitemapID    int64 `json:"sitemapId"`
+	NodesCreated int   `json:"nodesCreated"`
+	DurationMs   int64 `json:"durationMs"`
+}
+
+// ExistingNodeInfo represents simplified node info sent to AI for context
+type ExistingNodeInfo struct {
+	Title    string             `json:"title"`
+	Slug     string             `json:"slug"`
+	Path     string             `json:"path"`
+	Keywords []string           `json:"keywords,omitempty"`
+	Children []ExistingNodeInfo `json:"children,omitempty"`
+}

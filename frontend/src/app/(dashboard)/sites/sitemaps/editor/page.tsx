@@ -60,6 +60,7 @@ import {
     Redo2,
     Upload,
     ScanLine,
+    Sparkles,
 } from "lucide-react";
 import {
     Tooltip,
@@ -78,6 +79,7 @@ import { BulkCreateDialog } from "@/components/sitemaps/bulk-create-dialog";
 import { CommandPalette } from "@/components/sitemaps/command-palette";
 import { ImportDialog } from "@/components/sitemaps/import-dialog";
 import { ScanDialog } from "@/components/sitemaps/scan-dialog";
+import { GenerateDialog } from "@/components/sitemaps/generate-dialog";
 import { createNodesFromPaths } from "@/lib/sitemap-utils";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
@@ -199,6 +201,7 @@ function SitemapEditorFlow() {
     const [bulkCreateDialogOpen, setBulkCreateDialogOpen] = useState(false);
     const [importDialogOpen, setImportDialogOpen] = useState(false);
     const [scanDialogOpen, setScanDialogOpen] = useState(false);
+    const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
     const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
     const [hotkeysDialogOpen, setHotkeysDialogOpen] = useState(false);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -1031,6 +1034,21 @@ function SitemapEditorFlow() {
                             <p>Scan from WordPress <span className="text-muted-foreground ml-1">Ctrl+K</span></p>
                         </TooltipContent>
                     </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => setGenerateDialogOpen(true)}
+                            >
+                                <Sparkles className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>AI Generate <span className="text-muted-foreground ml-1">Ctrl+G</span></p>
+                        </TooltipContent>
+                    </Tooltip>
 
                     <Separator orientation="vertical" className="h-5 mx-1" />
 
@@ -1196,6 +1214,15 @@ function SitemapEditorFlow() {
             <ScanDialog
                 open={scanDialogOpen}
                 onOpenChange={setScanDialogOpen}
+                mode="add"
+                sitemapId={sitemapId}
+                onSuccess={() => loadData()}
+            />
+
+            {/* Generate Dialog */}
+            <GenerateDialog
+                open={generateDialogOpen}
+                onOpenChange={setGenerateDialogOpen}
                 mode="add"
                 sitemapId={sitemapId}
                 onSuccess={() => loadData()}

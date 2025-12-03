@@ -8,7 +8,7 @@ export type SitemapSource = "manual" | "imported" | "generated" | "scanned";
 export type SitemapStatus = "draft" | "active" | "archived";
 export type NodeSource = "manual" | "imported" | "generated" | "scanned";
 export type NodeContentType = "page" | "post" | "none";
-export type NodeContentStatus = "none" | "pending" | "draft" | "published";
+export type NodeContentStatus = "none" | "ai_draft" | "pending" | "draft" | "published";
 
 export interface Sitemap {
     id: number;
@@ -282,5 +282,43 @@ export function mapSyncNodesResult(x: dto.SyncNodesResponse): SyncNodesResult {
             success: r.success,
             error: r.error || undefined,
         })),
+    };
+}
+
+// =========================================================================
+// AI Generation Types
+// =========================================================================
+
+export interface TitleInput {
+    title: string;
+    keywords?: string[];
+}
+
+export interface GenerateSitemapStructureInput {
+    sitemapId?: number;
+    siteId?: number;
+    name?: string;
+    promptId: number;
+    placeholders?: Record<string, string>;
+    titles: TitleInput[];
+    parentNodeIds?: number[];
+    maxDepth?: number;
+    includeExistingTree?: boolean;
+    providerId: number;
+}
+
+export interface GenerateSitemapStructureResult {
+    sitemapId: number;
+    nodesCreated: number;
+    durationMs: number;
+}
+
+export function mapGenerateSitemapStructureResult(
+    x: dto.GenerateSitemapStructureResponse
+): GenerateSitemapStructureResult {
+    return {
+        sitemapId: x.sitemapId,
+        nodesCreated: x.nodesCreated,
+        durationMs: x.durationMs,
     };
 }

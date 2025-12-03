@@ -460,6 +460,84 @@ export namespace dto {
 	        this.topicId = source["topicId"];
 	    }
 	}
+	export class TitleInput {
+	    title: string;
+	    keywords?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new TitleInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.title = source["title"];
+	        this.keywords = source["keywords"];
+	    }
+	}
+	export class GenerateSitemapStructureRequest {
+	    sitemapId?: number;
+	    siteId?: number;
+	    name?: string;
+	    promptId: number;
+	    placeholders?: Record<string, string>;
+	    titles: TitleInput[];
+	    parentNodeIds?: number[];
+	    maxDepth?: number;
+	    includeExistingTree?: boolean;
+	    providerId: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new GenerateSitemapStructureRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sitemapId = source["sitemapId"];
+	        this.siteId = source["siteId"];
+	        this.name = source["name"];
+	        this.promptId = source["promptId"];
+	        this.placeholders = source["placeholders"];
+	        this.titles = this.convertValues(source["titles"], TitleInput);
+	        this.parentNodeIds = source["parentNodeIds"];
+	        this.maxDepth = source["maxDepth"];
+	        this.includeExistingTree = source["includeExistingTree"];
+	        this.providerId = source["providerId"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class GenerateSitemapStructureResponse {
+	    sitemapId: number;
+	    nodesCreated: number;
+	    durationMs: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new GenerateSitemapStructureResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sitemapId = source["sitemapId"];
+	        this.nodesCreated = source["nodesCreated"];
+	        this.durationMs = source["durationMs"];
+	    }
+	}
 	export class HealthCheckHistory {
 	    id: number;
 	    siteId: number;
@@ -1321,6 +1399,40 @@ export namespace dto {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
 	        this.data = this.convertValues(source["data"], GenerateContentResult);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_GenerateSitemapStructureResponse_ {
+	    success: boolean;
+	    data?: GenerateSitemapStructureResponse;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_GenerateSitemapStructureResponse_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], GenerateSitemapStructureResponse);
 	        this.error = this.convertValues(source["error"], Error);
 	    }
 	
@@ -3104,6 +3216,7 @@ export namespace dto {
 	        this.nodeIds = source["nodeIds"];
 	    }
 	}
+	
 	
 	
 	

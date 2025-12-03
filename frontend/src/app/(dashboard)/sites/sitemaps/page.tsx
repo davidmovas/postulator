@@ -44,7 +44,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatSmartDate } from "@/lib/time";
 import { ImportDialog } from "@/components/sitemaps/import-dialog";
 import { ScanDialog } from "@/components/sitemaps/scan-dialog";
-import { ScanSiteResult } from "@/models/sitemaps";
+import { GenerateDialog } from "@/components/sitemaps/generate-dialog";
+import { ScanSiteResult, GenerateSitemapStructureResult } from "@/models/sitemaps";
 
 function SitemapsPageContent() {
     const router = useRouter();
@@ -59,6 +60,7 @@ function SitemapsPageContent() {
     const [renameDialogOpen, setRenameDialogOpen] = useState(false);
     const [importDialogOpen, setImportDialogOpen] = useState(false);
     const [scanDialogOpen, setScanDialogOpen] = useState(false);
+    const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
     const [selectedSitemap, setSelectedSitemap] = useState<Sitemap | null>(null);
     const [createdSitemapId, setCreatedSitemapId] = useState<number | null>(null);
 
@@ -96,6 +98,13 @@ function SitemapsPageContent() {
         if (newSource === "scanned") {
             setCreateDialogOpen(false);
             setScanDialogOpen(true);
+            return;
+        }
+
+        // For generated mode, we don't create sitemap first - the generator does it
+        if (newSource === "generated") {
+            setCreateDialogOpen(false);
+            setGenerateDialogOpen(true);
             return;
         }
 
@@ -175,6 +184,25 @@ function SitemapsPageContent() {
             loadData();
         }
         setScanDialogOpen(open);
+    };
+
+    const handleGenerateSuccess = (result: GenerateSitemapStructureResult) => {
+        // Generation completed - navigate to editor
+        setNewName("");
+        setNewDescription("");
+        setNewSource("manual");
+        router.push(`/sites/sitemaps/editor?id=${siteId}&sitemapId=${result.sitemapId}`);
+    };
+
+    const handleGenerateClose = (open: boolean) => {
+        if (!open) {
+            // Reset form state when closing
+            setNewName("");
+            setNewDescription("");
+            setNewSource("manual");
+            loadData();
+        }
+        setGenerateDialogOpen(open);
     };
 
     const handleDuplicate = async () => {
@@ -426,7 +454,6 @@ function SitemapsPageContent() {
                                         color: "purple",
                                         activeClasses: "bg-purple-500/10 border-purple-500 text-purple-600 dark:text-purple-400",
                                         iconClasses: "text-purple-500",
-                                        disabled: true,
                                     },
                                     {
                                         value: "scanned",
@@ -582,6 +609,16 @@ function SitemapsPageContent() {
                 siteId={siteId}
                 sitemapName={newName}
                 onSuccess={handleScanSuccess}
+            />
+
+            {/* Generate Dialog */}
+            <GenerateDialog
+                open={generateDialogOpen}
+                onOpenChange={handleGenerateClose}
+                mode="create"
+                siteId={siteId}
+                sitemapName={newName}
+                onSuccess={handleGenerateSuccess}
             />
         </div>
     );

@@ -58,6 +58,8 @@ const (
 type NodeContentStatus string
 
 const (
+	NodeContentStatusNone      NodeContentStatus = "none"
+	NodeContentStatusAIDraft   NodeContentStatus = "ai_draft" // AI generated, needs review
 	NodeContentStatusPending   NodeContentStatus = "pending"
 	NodeContentStatusDraft     NodeContentStatus = "draft"
 	NodeContentStatusPublished NodeContentStatus = "published"

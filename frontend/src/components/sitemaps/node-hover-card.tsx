@@ -12,6 +12,7 @@ import {
     CheckCircle2,
     AlertCircle,
     Circle,
+    Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +41,12 @@ const getStatusInfo = (status: NodeContentStatus | undefined) => {
                 label: "Pending",
                 icon: Clock,
                 className: "text-blue-500",
+            };
+        case "ai_draft":
+            return {
+                label: "AI Draft",
+                icon: Sparkles,
+                className: "text-purple-500",
             };
         default:
             return {

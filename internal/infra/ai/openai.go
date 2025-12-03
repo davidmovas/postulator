@@ -34,8 +34,9 @@ type Config struct {
 }
 
 type OpenAIClient struct {
-	client *openaiSDK.Client
-	model  openaiSDK.ChatModel
+	client               *openaiSDK.Client
+	model                openaiSDK.ChatModel
+	usesCompletionTokens bool
 }
 
 func NewOpenAIClient(cfg Config) (*OpenAIClient, error) {
@@ -57,9 +58,16 @@ func NewOpenAIClient(cfg Config) (*OpenAIClient, error) {
 
 	client := openaiSDK.NewClient(opts...)
 
+	// Check if this model uses max_completion_tokens instead of max_tokens
+	usesCompletionTokens := false
+	if modelInfo := GetModelInfo("openai", cfg.Model); modelInfo != nil {
+		usesCompletionTokens = modelInfo.UsesCompletionTokens
+	}
+
 	return &OpenAIClient{
-		client: &client,
-		model:  cfg.Model,
+		client:               &client,
+		model:                cfg.Model,
+		usesCompletionTokens: usesCompletionTokens,
 	}, nil
 }
 
@@ -78,7 +86,7 @@ func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPr
 		openaiSDK.UserMessage(userPrompt),
 	}
 
-	chat, err := c.client.Chat.Completions.New(ctx, openaiSDK.ChatCompletionNewParams{
+	params := openaiSDK.ChatCompletionNewParams{
 		Messages: messages,
 		ResponseFormat: openaiSDK.ChatCompletionNewParamsResponseFormatUnion{
 			OfJSONSchema: &openaiSDK.ResponseFormatJSONSchemaParam{
@@ -87,8 +95,16 @@ func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPr
 		},
 		Model:       c.model,
 		Temperature: openaiSDK.Float(0.7),
-		MaxTokens:   openaiSDK.Int(4096),
-	})
+	}
+
+	// Use appropriate token limit parameter based on model
+	if c.usesCompletionTokens {
+		params.MaxCompletionTokens = openaiSDK.Int(4096)
+	} else {
+		params.MaxTokens = openaiSDK.Int(4096)
+	}
+
+	chat, err := c.client.Chat.Completions.New(ctx, params)
 	if err != nil {
 		return nil, errors.AI(providerName, fmt.Errorf("API error: %w", err))
 	}
@@ -138,7 +154,7 @@ func (c *OpenAIClient) GenerateTopicVariations(ctx context.Context, topic string
 		openaiSDK.UserMessage(userPrompt),
 	}
 
-	chat, err := c.client.Chat.Completions.New(ctx, openaiSDK.ChatCompletionNewParams{
+	params := openaiSDK.ChatCompletionNewParams{
 		Messages: messages,
 		ResponseFormat: openaiSDK.ChatCompletionNewParamsResponseFormatUnion{
 			OfJSONSchema: &openaiSDK.ResponseFormatJSONSchemaParam{
@@ -147,8 +163,16 @@ func (c *OpenAIClient) GenerateTopicVariations(ctx context.Context, topic string
 		},
 		Model:       c.model,
 		Temperature: openaiSDK.Float(0.8),
-		MaxTokens:   openaiSDK.Int(1024),
-	})
+	}
+
+	// Use appropriate token limit parameter based on model
+	if c.usesCompletionTokens {
+		params.MaxCompletionTokens = openaiSDK.Int(1024)
+	} else {
+		params.MaxTokens = openaiSDK.Int(1024)
+	}
+
+	chat, err := c.client.Chat.Completions.New(ctx, params)
 	if err != nil {
 		return nil, errors.AI(providerName, fmt.Errorf("API error: %w", err))
 	}
@@ -196,6 +220,85 @@ func cleanQuotes(s string) string {
 	return s
 }
 
+func (c *OpenAIClient) GenerateSitemapStructure(ctx context.Context, systemPrompt, userPrompt string) (*SitemapStructureResult, error) {
+	// Use JSON instructions in prompt instead of Structured Outputs
+	// because recursive schemas (Children -> SitemapGeneratedNode) are not supported with strict mode
+	jsonInstructions := `
+You must respond with a valid JSON object in the following format:
+{
+  "nodes": [
+    {
+      "title": "Page title",
+      "slug": "page-slug",
+      "keywords": ["keyword1", "keyword2"],
+      "children": [
+        {
+          "title": "Child page title",
+          "slug": "child-page-slug",
+          "keywords": ["keyword1"],
+          "children": []
+        }
+      ]
+    }
+  ]
+}
+
+Do not include any text before or after the JSON object. Only output the JSON.`
+
+	fullSystemPrompt := systemPrompt + "\n\n" + jsonInstructions
+
+	messages := []openaiSDK.ChatCompletionMessageParamUnion{
+		openaiSDK.SystemMessage(fullSystemPrompt),
+		openaiSDK.UserMessage(userPrompt),
+	}
+
+	params := openaiSDK.ChatCompletionNewParams{
+		Messages: messages,
+		ResponseFormat: openaiSDK.ChatCompletionNewParamsResponseFormatUnion{
+			OfJSONObject: &openaiSDK.ResponseFormatJSONObjectParam{},
+		},
+		Model:       c.model,
+		Temperature: openaiSDK.Float(0.7),
+	}
+
+	// Use appropriate token limit parameter based on model
+	if c.usesCompletionTokens {
+		params.MaxCompletionTokens = openaiSDK.Int(8192)
+	} else {
+		params.MaxTokens = openaiSDK.Int(8192)
+	}
+
+	chat, err := c.client.Chat.Completions.New(ctx, params)
+	if err != nil {
+		return nil, errors.AI(providerName, fmt.Errorf("API error: %w", err))
+	}
+
+	if len(chat.Choices) == 0 {
+		return nil, errors.AI(providerName, fmt.Errorf("no response from API"))
+	}
+
+	content := chat.Choices[0].Message.Content
+	var result SitemapStructureSchema
+	jsonStr := extractJSON(content)
+	if err = json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		return nil, errors.AI(providerName, fmt.Errorf("failed to parse response: %w, raw: %s", err, content[:min(200, len(content))]))
+	}
+
+	if len(result.Nodes) == 0 {
+		return nil, errors.AI(providerName, fmt.Errorf("no nodes generated"))
+	}
+
+	inputTokens := chat.Usage.PromptTokens
+	outputTokens := chat.Usage.CompletionTokens
+	cost := CalculateCost("openai", c.model, int(inputTokens), int(outputTokens))
+
+	return &SitemapStructureResult{
+		Nodes:      result.Nodes,
+		TokensUsed: int(chat.Usage.TotalTokens),
+		Cost:       cost,
+	}, nil
+}
+
 func generateSchema[T any]() interface{} {
 	reflector := jsonschema.Reflector{
 		AllowAdditionalProperties: false,
@@ -205,3 +308,4 @@ func generateSchema[T any]() interface{} {
 	schema := reflector.Reflect(v)
 	return schema
 }
+

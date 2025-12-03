@@ -193,3 +193,83 @@ func (c *GoogleClient) Close() error {
 	}
 	return nil
 }
+
+func (c *GoogleClient) GenerateSitemapStructure(ctx context.Context, systemPrompt, userPrompt string) (*SitemapStructureResult, error) {
+	model := c.client.GenerativeModel(c.model)
+
+	// Configure the model
+	model.SetTemperature(0.7)
+	model.SetMaxOutputTokens(8192)
+
+	jsonInstructions := `
+You must respond with a valid JSON object in the following format:
+{
+  "nodes": [
+    {
+      "title": "Page title",
+      "slug": "page-slug",
+      "keywords": ["keyword1", "keyword2"],
+      "children": [
+        {
+          "title": "Child page title",
+          "slug": "child-page-slug",
+          "keywords": ["keyword1"],
+          "children": []
+        }
+      ]
+    }
+  ]
+}
+
+Do not include any text before or after the JSON object. Only output the JSON.`
+
+	model.SystemInstruction = &genai.Content{
+		Parts: []genai.Part{genai.Text(systemPrompt + "\n\n" + jsonInstructions)},
+	}
+
+	resp, err := model.GenerateContent(ctx, genai.Text(userPrompt))
+	if err != nil {
+		return nil, errors.AI(googleProviderName, fmt.Errorf("API error: %w", err))
+	}
+
+	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
+		return nil, errors.AI(googleProviderName, fmt.Errorf("no response from API"))
+	}
+
+	var responseText string
+	for _, part := range resp.Candidates[0].Content.Parts {
+		if text, ok := part.(genai.Text); ok {
+			responseText = string(text)
+			break
+		}
+	}
+
+	if responseText == "" {
+		return nil, errors.AI(googleProviderName, fmt.Errorf("no text content in response"))
+	}
+
+	var result SitemapStructureSchema
+	jsonStr := extractJSON(responseText)
+	if err = json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		return nil, errors.AI(googleProviderName, fmt.Errorf("failed to parse response: %w, raw: %s", err, responseText[:min(200, len(responseText))]))
+	}
+
+	if len(result.Nodes) == 0 {
+		return nil, errors.AI(googleProviderName, fmt.Errorf("no nodes generated"))
+	}
+
+	// Calculate tokens and cost
+	inputTokens := 0
+	outputTokens := 0
+	if resp.UsageMetadata != nil {
+		inputTokens = int(resp.UsageMetadata.PromptTokenCount)
+		outputTokens = int(resp.UsageMetadata.CandidatesTokenCount)
+	}
+	cost := CalculateCost(entities.TypeGoogle, c.model, inputTokens, outputTokens)
+
+	return &SitemapStructureResult{
+		Nodes:      result.Nodes,
+		TokensUsed: inputTokens + outputTokens,
+		Cost:       cost,
+	}, nil
+}

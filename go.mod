@@ -10,6 +10,7 @@ require (
 	github.com/getlantern/systray v1.2.2
 	github.com/go-resty/resty/v2 v2.16.5
 	github.com/google/generative-ai-go v0.20.1
+	github.com/gosimple/slug v1.15.0
 	github.com/invopop/jsonschema v0.13.0
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0
 	github.com/ncruces/go-sqlite3 v0.28.0
@@ -53,6 +54,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.12.5 // indirect
+	github.com/gosimple/unidecode v1.0.1 // indirect
 	github.com/jackmordaunt/icns/v3 v3.0.1 // indirect
 	github.com/jchv/go-winloader v0.0.0-20210711035445-715c2860da7e // indirect
 	github.com/labstack/echo/v4 v4.13.3 // indirect

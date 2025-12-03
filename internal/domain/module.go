@@ -6,6 +6,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/articles"
 	"github.com/davidmovas/postulator/internal/domain/categories"
 	"github.com/davidmovas/postulator/internal/domain/deletion"
+	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/healthcheck"
 	"github.com/davidmovas/postulator/internal/domain/jobs"
 	"github.com/davidmovas/postulator/internal/domain/jobs/execution"
@@ -20,7 +21,9 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/sites"
 	"github.com/davidmovas/postulator/internal/domain/stats"
 	"github.com/davidmovas/postulator/internal/domain/topics"
+	"github.com/davidmovas/postulator/internal/infra/ai"
 	"github.com/davidmovas/postulator/internal/infra/window"
+	"github.com/davidmovas/postulator/pkg/logger"
 	"go.uber.org/fx"
 )
 
@@ -100,6 +103,28 @@ var Module = fx.Module("domain",
 		sitemap.NewKeywordRepository,
 		sitemap.NewService,
 		sitemap.NewSyncService,
+
+		// Sitemap Generation Service (with AI client factory)
+		fx.Annotate(
+			func(
+				sitemapSvc sitemap.Service,
+				sitesSvc sites.Service,
+				promptSvc prompts.Service,
+				providerSvc providers.Service,
+				logger *logger.Logger,
+			) *sitemap.GenerationService {
+				return sitemap.NewGenerationService(
+					sitemapSvc,
+					sitesSvc,
+					promptSvc,
+					providerSvc,
+					func(provider *entities.Provider) (ai.Client, error) {
+						return ai.CreateClient(provider)
+					},
+					logger,
+				)
+			},
+		),
 
 		// Sitemap Scanner
 		scanner.NewScanner,

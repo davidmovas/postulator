@@ -207,3 +207,82 @@ func min(a, b int) int {
 	}
 	return b
 }
+
+func (c *AnthropicClient) GenerateSitemapStructure(ctx context.Context, systemPrompt, userPrompt string) (*SitemapStructureResult, error) {
+	jsonInstructions := `
+You must respond with a valid JSON object in the following format:
+{
+  "nodes": [
+    {
+      "title": "Page title",
+      "slug": "page-slug",
+      "keywords": ["keyword1", "keyword2"],
+      "children": [
+        {
+          "title": "Child page title",
+          "slug": "child-page-slug",
+          "keywords": ["keyword1"],
+          "children": []
+        }
+      ]
+    }
+  ]
+}
+
+Do not include any text before or after the JSON object. Only output the JSON.`
+
+	fullSystemPrompt := systemPrompt + "\n\n" + jsonInstructions
+
+	message, err := c.client.Messages.New(ctx, anthropic.MessageNewParams{
+		Model:     anthropic.Model(c.model),
+		MaxTokens: 8192,
+		System: []anthropic.TextBlockParam{
+			{
+				Type: "text",
+				Text: fullSystemPrompt,
+			},
+		},
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock(userPrompt)),
+		},
+	})
+	if err != nil {
+		return nil, errors.AI(anthropicProviderName, fmt.Errorf("API error: %w", err))
+	}
+
+	if len(message.Content) == 0 {
+		return nil, errors.AI(anthropicProviderName, fmt.Errorf("no response from API"))
+	}
+
+	var responseText string
+	for _, block := range message.Content {
+		if block.Type == "text" {
+			responseText = block.Text
+			break
+		}
+	}
+
+	if responseText == "" {
+		return nil, errors.AI(anthropicProviderName, fmt.Errorf("no text content in response"))
+	}
+
+	var result SitemapStructureSchema
+	jsonStr := extractJSON(responseText)
+	if err = json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		return nil, errors.AI(anthropicProviderName, fmt.Errorf("failed to parse response: %w, raw: %s", err, responseText[:min(200, len(responseText))]))
+	}
+
+	if len(result.Nodes) == 0 {
+		return nil, errors.AI(anthropicProviderName, fmt.Errorf("no nodes generated"))
+	}
+
+	inputTokens := int(message.Usage.InputTokens)
+	outputTokens := int(message.Usage.OutputTokens)
+	cost := CalculateCost(entities.TypeAnthropic, c.model, inputTokens, outputTokens)
+
+	return &SitemapStructureResult{
+		Nodes:      result.Nodes,
+		TokensUsed: inputTokens + outputTokens,
+		Cost:       cost,
+	}, nil
+}

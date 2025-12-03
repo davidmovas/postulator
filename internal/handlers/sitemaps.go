@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"context"
 	"encoding/base64"
+	"sync"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/sitemap"
@@ -14,23 +16,30 @@ import (
 )
 
 type SitemapsHandler struct {
-	service     sitemap.Service
-	syncService *sitemap.SyncService
-	importer    *importer.Importer
-	scanner     *scanner.Scanner
+	service           sitemap.Service
+	syncService       *sitemap.SyncService
+	generationService *sitemap.GenerationService
+	importer          *importer.Importer
+	scanner           *scanner.Scanner
+
+	// For cancellable AI generation
+	generationMu     sync.Mutex
+	generationCancel context.CancelFunc
 }
 
 func NewSitemapsHandler(
 	service sitemap.Service,
 	syncService *sitemap.SyncService,
+	generationService *sitemap.GenerationService,
 	siteScanner *scanner.Scanner,
 	log *logger.Logger,
 ) *SitemapsHandler {
 	return &SitemapsHandler{
-		service:     service,
-		syncService: syncService,
-		importer:    importer.NewImporter(log),
-		scanner:     siteScanner,
+		service:           service,
+		syncService:       syncService,
+		generationService: generationService,
+		importer:          importer.NewImporter(log),
+		scanner:           siteScanner,
 	}
 }
 
@@ -519,4 +528,86 @@ func (h *SitemapsHandler) ResetNode(nodeID int64) *dto.Response[string] {
 	}
 
 	return ok("Node reset successfully")
+}
+
+// =========================================================================
+// AI Generation Operations
+// =========================================================================
+
+// GenerateSitemapStructure generates sitemap structure using AI
+func (h *SitemapsHandler) GenerateSitemapStructure(req *dto.GenerateSitemapStructureRequest) *dto.Response[*dto.GenerateSitemapStructureResponse] {
+	// Convert DTO titles to service input
+	titles := make([]sitemap.TitleInput, len(req.Titles))
+	for i, t := range req.Titles {
+		titles[i] = sitemap.TitleInput{
+			Title:    t.Title,
+			Keywords: t.Keywords,
+		}
+	}
+
+	input := sitemap.GenerationInput{
+		SitemapID:           derefInt64(req.SitemapID),
+		SiteID:              derefInt64(req.SiteID),
+		Name:                req.Name,
+		PromptID:            req.PromptID,
+		Placeholders:        req.Placeholders,
+		Titles:              titles,
+		ParentNodeIDs:       req.ParentNodeIDs,
+		MaxDepth:            req.MaxDepth,
+		IncludeExistingTree: req.IncludeExistingTree,
+		ProviderID:          req.ProviderID,
+	}
+
+	// Create cancellable context with AI timeout (5 minutes)
+	genCtx, cancel := ctx.CancellableCtx(ctx.AIContextTimeout)
+
+	// Store cancel function for potential cancellation
+	h.generationMu.Lock()
+	// Cancel any previous generation
+	if h.generationCancel != nil {
+		h.generationCancel()
+	}
+	h.generationCancel = cancel
+	h.generationMu.Unlock()
+
+	// Ensure we clean up the cancel function when done
+	defer func() {
+		h.generationMu.Lock()
+		h.generationCancel = nil
+		h.generationMu.Unlock()
+		cancel() // Always call cancel to release resources
+	}()
+
+	result, err := h.generationService.GenerateStructure(genCtx, input)
+	if err != nil {
+		return fail[*dto.GenerateSitemapStructureResponse](err)
+	}
+
+	return ok(&dto.GenerateSitemapStructureResponse{
+		SitemapID:    result.SitemapID,
+		NodesCreated: result.NodesCreated,
+		DurationMs:   result.DurationMs,
+	})
+}
+
+// CancelSitemapGeneration cancels the current AI generation operation
+func (h *SitemapsHandler) CancelSitemapGeneration() *dto.Response[string] {
+	h.generationMu.Lock()
+	defer h.generationMu.Unlock()
+
+	if h.generationCancel != nil {
+		h.generationCancel()
+		h.generationCancel = nil
+		return ok("Generation cancelled")
+	}
+
+	return ok("No active generation to cancel")
+}
+
+// derefInt64 safely dereferences an int64 pointer, returning 0 if nil
+func derefInt64(p *int64) int64 {
+	if p == nil {
+		return 0
+	}
+	return *p
 }

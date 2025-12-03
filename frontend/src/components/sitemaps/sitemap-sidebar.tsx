@@ -130,6 +130,8 @@ function TreeItem({
                     return "text-yellow-500 fill-yellow-500";
                 case "pending":
                     return "text-blue-500 fill-blue-500";
+                case "ai_draft":
+                    return "text-purple-500 fill-purple-500";
                 default:
                     return "text-muted-foreground/50";
             }

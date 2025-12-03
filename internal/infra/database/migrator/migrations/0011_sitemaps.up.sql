@@ -31,34 +31,40 @@ CREATE TABLE sitemap_nodes (
     sitemap_id INTEGER NOT NULL,
     parent_id INTEGER,
 
-    -- Basic fields
+    -- Node identification
     title TEXT NOT NULL,
     slug TEXT NOT NULL,
     description TEXT,
+    is_root BOOLEAN NOT NULL DEFAULT FALSE,
 
-    -- Hierarchy
+    -- Tree structure
     depth INTEGER NOT NULL DEFAULT 0,
     position INTEGER NOT NULL DEFAULT 0,
-    path TEXT NOT NULL DEFAULT '',
+    path TEXT NOT NULL DEFAULT '/',
 
-    -- Content association
+    -- Content type and linking
     content_type TEXT NOT NULL DEFAULT 'none',
     article_id INTEGER,
     wp_page_id INTEGER,
     wp_url TEXT,
 
-    -- Source and sync
+    -- Source tracking
     source TEXT NOT NULL DEFAULT 'manual',
-    is_synced BOOLEAN NOT NULL DEFAULT 0,
+
+    -- Sync status
+    is_synced BOOLEAN NOT NULL DEFAULT FALSE,
     last_synced_at DATETIME,
+    wp_title TEXT,
+    wp_slug TEXT,
 
     -- Content status
-    content_status TEXT NOT NULL DEFAULT 'pending',
+    content_status TEXT NOT NULL DEFAULT 'none',
 
     -- React Flow positions
     position_x REAL,
     position_y REAL,
 
+    -- Timestamps
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -68,7 +74,7 @@ CREATE TABLE sitemap_nodes (
 
     CHECK (source IN ('manual', 'imported', 'generated', 'scanned')),
     CHECK (content_type IN ('page', 'post', 'none')),
-    CHECK (content_status IN ('pending', 'draft', 'published'))
+    CHECK (content_status IN ('none', 'ai_draft', 'pending', 'draft', 'published'))
 );
 
 CREATE INDEX idx_sitemap_nodes_sitemap ON sitemap_nodes(sitemap_id);
@@ -80,7 +86,8 @@ CREATE INDEX idx_sitemap_nodes_slug ON sitemap_nodes(sitemap_id, slug);
 CREATE INDEX idx_sitemap_nodes_content_status ON sitemap_nodes(content_status);
 
 -- Unique slug within same parent (siblings can't have same slug)
-CREATE UNIQUE INDEX idx_sitemap_nodes_unique_slug ON sitemap_nodes(sitemap_id, parent_id, slug);
+CREATE UNIQUE INDEX idx_sitemap_nodes_unique_slug
+    ON sitemap_nodes(sitemap_id, COALESCE(parent_id, 0), slug);
 
 -- =========================================================================
 -- SITEMAP NODE KEYWORDS

@@ -6,6 +6,10 @@ export function AddNodeKeyword(arg1, arg2) {
   return window['go']['handlers']['SitemapsHandler']['AddNodeKeyword'](arg1, arg2);
 }
 
+export function CancelSitemapGeneration() {
+  return window['go']['handlers']['SitemapsHandler']['CancelSitemapGeneration']();
+}
+
 export function CreateNode(arg1) {
   return window['go']['handlers']['SitemapsHandler']['CreateNode'](arg1);
 }
@@ -28,6 +32,10 @@ export function DistributeKeywords(arg1) {
 
 export function DuplicateSitemap(arg1) {
   return window['go']['handlers']['SitemapsHandler']['DuplicateSitemap'](arg1);
+}
+
+export function GenerateSitemapStructure(arg1) {
+  return window['go']['handlers']['SitemapsHandler']['GenerateSitemapStructure'](arg1);
 }
 
 export function GetNode(arg1) {

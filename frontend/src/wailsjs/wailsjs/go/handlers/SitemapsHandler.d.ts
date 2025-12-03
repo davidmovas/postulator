@@ -4,6 +4,8 @@ import {dto} from '../models';
 
 export function AddNodeKeyword(arg1:number,arg2:string):Promise<dto.Response_string_>;
 
+export function CancelSitemapGeneration():Promise<dto.Response_string_>;
+
 export function CreateNode(arg1:dto.CreateNodeRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_SitemapNode_>;
 
 export function CreateSitemap(arg1:dto.CreateSitemapRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_Sitemap_>;
@@ -15,6 +17,8 @@ export function DeleteSitemap(arg1:number):Promise<dto.Response_string_>;
 export function DistributeKeywords(arg1:dto.DistributeKeywordsRequest):Promise<dto.Response_string_>;
 
 export function DuplicateSitemap(arg1:dto.DuplicateSitemapRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_Sitemap_>;
+
+export function GenerateSitemapStructure(arg1:dto.GenerateSitemapStructureRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_GenerateSitemapStructureResponse_>;
 
 export function GetNode(arg1:number):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_SitemapNode_>;
 

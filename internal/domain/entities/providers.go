@@ -28,4 +28,6 @@ type Model struct {
 	MaxTokens  int
 	InputCost  float64
 	OutputCost float64
+	// UsesCompletionTokens indicates if the model uses max_completion_tokens instead of max_tokens (newer OpenAI models)
+	UsesCompletionTokens bool
 }

@@ -31,6 +31,8 @@ import {
     SyncNodesFromWP,
     UpdateNodesToWP,
     ResetNode,
+    GenerateSitemapStructure,
+    CancelSitemapGeneration,
 } from "@/wailsjs/wailsjs/go/handlers/SitemapsHandler";
 import {
     Sitemap,
@@ -51,12 +53,15 @@ import {
     SyncNodesResult,
     SitemapStatus,
     NodeContentStatus,
+    GenerateSitemapStructureInput,
+    GenerateSitemapStructureResult,
     mapSitemap,
     mapSitemapNode,
     mapSitemapWithNodes,
     mapImportNodesResult,
     mapScanSiteResult,
     mapSyncNodesResult,
+    mapGenerateSitemapStructureResult,
 } from "@/models/sitemaps";
 import { unwrapArrayResponse, unwrapResponse } from "@/lib/api-utils";
 
@@ -340,6 +345,38 @@ export const sitemapService = {
 
     async resetNode(nodeId: number): Promise<void> {
         const response = await ResetNode(nodeId);
+        unwrapResponse<string>(response);
+    },
+
+    async generateSitemapStructure(
+        input: GenerateSitemapStructureInput
+    ): Promise<GenerateSitemapStructureResult> {
+        const payload = new dto.GenerateSitemapStructureRequest({
+            sitemapId: input.sitemapId,
+            siteId: input.siteId,
+            name: input.name,
+            promptId: input.promptId,
+            placeholders: input.placeholders,
+            titles: input.titles.map(
+                (t) =>
+                    new dto.TitleInput({
+                        title: t.title,
+                        keywords: t.keywords,
+                    })
+            ),
+            parentNodeIds: input.parentNodeIds,
+            maxDepth: input.maxDepth,
+            includeExistingTree: input.includeExistingTree,
+            providerId: input.providerId,
+        });
+
+        const response = await GenerateSitemapStructure(payload);
+        const data = unwrapResponse<dto.GenerateSitemapStructureResponse>(response);
+        return mapGenerateSitemapStructureResult(data);
+    },
+
+    async cancelSitemapGeneration(): Promise<void> {
+        const response = await CancelSitemapGeneration();
         unwrapResponse<string>(response);
     },
 };

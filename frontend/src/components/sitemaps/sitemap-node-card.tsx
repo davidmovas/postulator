@@ -45,6 +45,11 @@ const getStatusClasses = (status: NodeContentStatus | undefined, isRoot: boolean
                 border: "border-l-blue-500",
                 hover: "hover:border-blue-500",
             };
+        case "ai_draft":
+            return {
+                border: "border-l-purple-500",
+                hover: "hover:border-purple-500",
+            };
         default:
             return {
                 border: "border-l-muted-foreground/30",
