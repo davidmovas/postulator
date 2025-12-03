@@ -40,9 +40,17 @@ export function MoveNode(arg1:dto.MoveNodeRequest):Promise<dto.Response_string_>
 
 export function RemoveNodeKeyword(arg1:number,arg2:string):Promise<dto.Response_string_>;
 
+export function ResetNode(arg1:number):Promise<dto.Response_string_>;
+
+export function ScanIntoSitemap(arg1:dto.ScanIntoSitemapRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_ScanSiteResponse_>;
+
+export function ScanSite(arg1:dto.ScanSiteRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_ScanSiteResponse_>;
+
 export function SetNodeKeywords(arg1:dto.SetNodeKeywordsRequest):Promise<dto.Response_string_>;
 
 export function SetSitemapStatus(arg1:number,arg2:string):Promise<dto.Response_string_>;
+
+export function SyncNodesFromWP(arg1:dto.SyncNodesRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_SyncNodesResponse_>;
 
 export function UnlinkNodeContent(arg1:number):Promise<dto.Response_string_>;
 
@@ -51,5 +59,7 @@ export function UpdateNode(arg1:dto.UpdateNodeRequest):Promise<dto.Response_stri
 export function UpdateNodeContentStatus(arg1:number,arg2:string):Promise<dto.Response_string_>;
 
 export function UpdateNodePositions(arg1:dto.UpdateNodePositionsRequest):Promise<dto.Response_string_>;
+
+export function UpdateNodesToWP(arg1:dto.UpdateNodesToWPRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_SyncNodesResponse_>;
 
 export function UpdateSitemap(arg1:dto.UpdateSitemapRequest):Promise<dto.Response_string_>;

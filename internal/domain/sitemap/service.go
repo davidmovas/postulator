@@ -151,18 +151,20 @@ func (s *service) ListSitemaps(ctx context.Context, siteID int64) ([]*entities.S
 }
 
 func (s *service) UpdateSitemap(ctx context.Context, sitemap *entities.Sitemap) error {
-	if err := s.validateSitemap(sitemap); err != nil {
-		return err
-	}
-
 	existing, err := s.repo.GetByID(ctx, sitemap.ID)
 	if err != nil {
 		return err
 	}
 
+	// Copy fields from existing that shouldn't be changed
 	sitemap.SiteID = existing.SiteID
+	sitemap.Source = existing.Source
 	sitemap.CreatedAt = existing.CreatedAt
 	sitemap.UpdatedAt = time.Now()
+
+	if err := s.validateSitemap(sitemap); err != nil {
+		return err
+	}
 
 	if err = s.repo.Update(ctx, sitemap); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to update sitemap")
@@ -359,6 +361,14 @@ func (s *service) GetNodes(ctx context.Context, sitemapID int64) ([]*entities.Si
 
 func (s *service) FindNodeBySlugAndParent(ctx context.Context, sitemapID int64, slug string, parentID *int64) (*entities.SitemapNode, error) {
 	node, err := s.nodeRepo.GetBySlugAndParent(ctx, sitemapID, slug, parentID)
+	if err != nil {
+		return nil, err
+	}
+	return node, nil
+}
+
+func (s *service) FindNodeByWPID(ctx context.Context, sitemapID int64, wpID int, contentType entities.NodeContentType) (*entities.SitemapNode, error) {
+	node, err := s.nodeRepo.GetByWPID(ctx, sitemapID, wpID, contentType)
 	if err != nil {
 		return nil, err
 	}
@@ -664,7 +674,12 @@ func (s *service) calculateNodeHierarchy(ctx context.Context, node *entities.Sit
 	}
 
 	node.Depth = parent.Depth + 1
-	node.Path = parent.Path + "/" + node.Slug
+	// Avoid double slashes when parent is root (path = "/")
+	if parent.Path == "/" {
+		node.Path = "/" + node.Slug
+	} else {
+		node.Path = parent.Path + "/" + node.Slug
+	}
 	return nil
 }
 

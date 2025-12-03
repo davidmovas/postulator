@@ -113,3 +113,27 @@ func (c *client) GetMedia(ctx context.Context, s *entities.Site, mediaID int) (*
 func (c *client) DeleteMedia(ctx context.Context, s *entities.Site, mediaID int) error {
 	return c.GetCurrentClient().DeleteMedia(ctx, s, mediaID)
 }
+
+func (c *client) GetPage(ctx context.Context, s *entities.Site, pageID int) (*WPPage, error) {
+	return c.GetCurrentClient().GetPage(ctx, s, pageID)
+}
+
+func (c *client) GetPages(ctx context.Context, s *entities.Site, opts *PageListOptions) ([]*WPPage, error) {
+	return c.GetCurrentClient().GetPages(ctx, s, opts)
+}
+
+func (c *client) GetAllPages(ctx context.Context, s *entities.Site) ([]*WPPage, error) {
+	return c.GetCurrentClient().GetAllPages(ctx, s)
+}
+
+func (c *client) CreatePage(ctx context.Context, s *entities.Site, page *WPPage, opts *PageCreateOptions) (int, error) {
+	return c.GetCurrentClient().CreatePage(ctx, s, page, opts)
+}
+
+func (c *client) UpdatePage(ctx context.Context, s *entities.Site, page *WPPage) error {
+	return c.GetCurrentClient().UpdatePage(ctx, s, page)
+}
+
+func (c *client) DeletePage(ctx context.Context, s *entities.Site, pageID int, force bool) error {
+	return c.GetCurrentClient().DeletePage(ctx, s, pageID, force)
+}

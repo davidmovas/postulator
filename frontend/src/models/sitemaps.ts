@@ -39,6 +39,9 @@ export interface SitemapNode {
     source: NodeSource;
     isSynced: boolean;
     lastSyncedAt?: string;
+    wpTitle?: string;
+    wpSlug?: string;
+    isModified: boolean;
     contentStatus: NodeContentStatus;
     positionX?: number;
     positionY?: number;
@@ -160,6 +163,9 @@ export function mapSitemapNode(x: dto.SitemapNode): SitemapNode {
         source: x.source as NodeSource,
         isSynced: x.isSynced,
         lastSyncedAt: x.lastSyncedAt || undefined,
+        wpTitle: x.wpTitle || undefined,
+        wpSlug: x.wpSlug || undefined,
+        isModified: x.isModified || false,
         contentStatus: x.contentStatus as NodeContentStatus,
         positionX: x.positionX || undefined,
         positionY: x.positionY || undefined,
@@ -188,5 +194,93 @@ export function mapImportNodesResult(x: dto.ImportNodesResponse): ImportNodesRes
             message: e.message,
         })),
         processingTime: x.processingTime,
+    };
+}
+
+// =========================================================================
+// Scanner Types
+// =========================================================================
+
+export type TitleSource = "title" | "h1";
+export type ContentFilter = "all" | "pages" | "posts";
+
+export interface ScanSiteInput {
+    siteId: number;
+    sitemapName: string;
+    titleSource: TitleSource;
+    contentFilter: ContentFilter;
+    includeDrafts: boolean;
+    maxDepth: number;
+}
+
+export interface ScanIntoSitemapInput {
+    sitemapId: number;
+    parentNodeId?: number;
+    titleSource: TitleSource;
+    contentFilter: ContentFilter;
+    includeDrafts: boolean;
+    maxDepth: number;
+}
+
+export interface ScanError {
+    wpId?: number;
+    type?: string;
+    title?: string;
+    message: string;
+}
+
+export interface ScanSiteResult {
+    sitemapId: number;
+    pagesScanned: number;
+    postsScanned: number;
+    nodesCreated: number;
+    nodesSkipped: number;
+    totalDuration: string;
+    errors: ScanError[];
+}
+
+export function mapScanSiteResult(x: dto.ScanSiteResponse): ScanSiteResult {
+    return {
+        sitemapId: x.sitemapId,
+        pagesScanned: x.pagesScanned,
+        postsScanned: x.postsScanned,
+        nodesCreated: x.nodesCreated,
+        nodesSkipped: x.nodesSkipped,
+        totalDuration: x.totalDuration,
+        errors: (x.errors || []).map((e) => ({
+            wpId: e.wpId,
+            type: e.type,
+            title: e.title,
+            message: e.message,
+        })),
+    };
+}
+
+// =========================================================================
+// Sync Types
+// =========================================================================
+
+export interface SyncNodesInput {
+    siteId: number;
+    nodeIds: number[];
+}
+
+export interface SyncNodeResult {
+    nodeId: number;
+    success: boolean;
+    error?: string;
+}
+
+export interface SyncNodesResult {
+    results: SyncNodeResult[];
+}
+
+export function mapSyncNodesResult(x: dto.SyncNodesResponse): SyncNodesResult {
+    return {
+        results: (x.results || []).map((r) => ({
+            nodeId: r.nodeId,
+            success: r.success,
+            error: r.error || undefined,
+        })),
     };
 }

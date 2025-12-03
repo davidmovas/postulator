@@ -19,6 +19,7 @@ import {
     Keyboard,
     Trash2,
     Upload,
+    ScanLine,
 } from "lucide-react";
 
 interface CommandPaletteProps {
@@ -31,6 +32,7 @@ interface CommandPaletteProps {
     onAddNode: () => void;
     onBulkCreate: () => void;
     onImport: () => void;
+    onScan: () => void;
     onFocusSearch: () => void;
     onDeleteSelected: () => void;
     onShowHotkeys: () => void;
@@ -46,6 +48,7 @@ export function CommandPalette({
     onAddNode,
     onBulkCreate,
     onImport,
+    onScan,
     onFocusSearch,
     onDeleteSelected,
     onShowHotkeys,
@@ -76,6 +79,11 @@ export function CommandPalette({
                         <Upload className="mr-2 h-4 w-4" />
                         <span>Import from File</span>
                         <CommandShortcut>Ctrl+I</CommandShortcut>
+                    </CommandItem>
+                    <CommandItem onSelect={() => runCommand(onScan)}>
+                        <ScanLine className="mr-2 h-4 w-4" />
+                        <span>Scan from WordPress</span>
+                        <CommandShortcut>Ctrl+K</CommandShortcut>
                     </CommandItem>
                     {hasSelectedNodes && (
                         <CommandItem onSelect={() => runCommand(onDeleteSelected)}>

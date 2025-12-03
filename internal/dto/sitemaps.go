@@ -74,6 +74,9 @@ type SitemapNode struct {
 	Source        string         `json:"source"`
 	IsSynced      bool           `json:"isSynced"`
 	LastSyncedAt  *string        `json:"lastSyncedAt,omitempty"`
+	WPTitle       *string        `json:"wpTitle,omitempty"`
+	WPSlug        *string        `json:"wpSlug,omitempty"`
+	IsModified    bool           `json:"isModified"`
 	ContentStatus string         `json:"contentStatus"`
 	PositionX     *float64       `json:"positionX,omitempty"`
 	PositionY     *float64       `json:"positionY,omitempty"`
@@ -141,6 +144,9 @@ func (d *SitemapNode) FromEntity(entity *entities.SitemapNode) *SitemapNode {
 	d.WPURL = entity.WPURL
 	d.Source = string(entity.Source)
 	d.IsSynced = entity.IsSynced
+	d.WPTitle = entity.WPTitle
+	d.WPSlug = entity.WPSlug
+	d.IsModified = entity.IsModified()
 	d.ContentStatus = string(entity.ContentStatus)
 	d.PositionX = entity.PositionX
 	d.PositionY = entity.PositionY
@@ -273,4 +279,75 @@ type ImportError struct {
 
 type SupportedFormatsResponse struct {
 	Formats []string `json:"formats"`
+}
+
+// =========================================================================
+// Scanner DTOs
+// =========================================================================
+
+// ScanSiteRequest contains parameters for scanning a WordPress site
+type ScanSiteRequest struct {
+	SiteID        int64  `json:"siteId"`
+	SitemapName   string `json:"sitemapName"`
+	TitleSource   string `json:"titleSource"`   // "title" or "h1"
+	ContentFilter string `json:"contentFilter"` // "all", "pages", or "posts"
+	IncludeDrafts bool   `json:"includeDrafts"`
+	MaxDepth      int    `json:"maxDepth"` // 0 = unlimited
+}
+
+// ScanSiteResponse contains the result of a site scan
+type ScanSiteResponse struct {
+	SitemapID     int64       `json:"sitemapId"`
+	PagesScanned  int         `json:"pagesScanned"`
+	PostsScanned  int         `json:"postsScanned"`
+	NodesCreated  int         `json:"nodesCreated"`
+	NodesSkipped  int         `json:"nodesSkipped"`
+	TotalDuration string      `json:"totalDuration"`
+	Errors        []ScanError `json:"errors,omitempty"`
+}
+
+// ScanError represents an error during scanning
+type ScanError struct {
+	WPID    int    `json:"wpId,omitempty"`
+	Type    string `json:"type,omitempty"` // "page" or "post"
+	Title   string `json:"title,omitempty"`
+	Message string `json:"message"`
+}
+
+// ScanIntoSitemapRequest contains parameters for scanning into an existing sitemap
+type ScanIntoSitemapRequest struct {
+	SitemapID     int64  `json:"sitemapId"`
+	ParentNodeID  *int64 `json:"parentNodeId,omitempty"` // Optional: if nil, uses root node
+	TitleSource   string `json:"titleSource"`            // "title" or "h1"
+	ContentFilter string `json:"contentFilter"`          // "all", "pages", or "posts"
+	IncludeDrafts bool   `json:"includeDrafts"`
+	MaxDepth      int    `json:"maxDepth"` // 0 = unlimited
+}
+
+// =========================================================================
+// Sync DTOs
+// =========================================================================
+
+// SyncNodesRequest contains parameters for syncing nodes from WordPress
+type SyncNodesRequest struct {
+	SiteID  int64   `json:"siteId"`
+	NodeIDs []int64 `json:"nodeIds"`
+}
+
+// SyncNodesResponse contains the result of syncing nodes
+type SyncNodesResponse struct {
+	Results []SyncNodeResult `json:"results"`
+}
+
+// SyncNodeResult contains the result of syncing a single node
+type SyncNodeResult struct {
+	NodeID  int64  `json:"nodeId"`
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+}
+
+// UpdateNodesToWPRequest contains parameters for updating WordPress from local nodes
+type UpdateNodesToWPRequest struct {
+	SiteID  int64   `json:"siteId"`
+	NodeIDs []int64 `json:"nodeIds"`
 }

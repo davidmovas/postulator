@@ -90,6 +90,10 @@ type SitemapNode struct {
 	IsSynced     bool
 	LastSyncedAt *time.Time
 
+	// Original WP data (for tracking local modifications)
+	WPTitle *string
+	WPSlug  *string
+
 	// Content status
 	ContentStatus NodeContentStatus
 
@@ -103,6 +107,27 @@ type SitemapNode struct {
 	// Loaded relations (not stored in DB directly)
 	Keywords []string
 	Children []*SitemapNode
+}
+
+// IsModified returns true if local data differs from WP data
+func (n *SitemapNode) IsModified() bool {
+	// Only scanned nodes can be modified
+	if n.WPPageID == nil {
+		return false
+	}
+	// Check if we have original data to compare
+	if n.WPTitle == nil && n.WPSlug == nil {
+		return false
+	}
+	// Compare title
+	if n.WPTitle != nil && n.Title != *n.WPTitle {
+		return true
+	}
+	// Compare slug
+	if n.WPSlug != nil && n.Slug != *n.WPSlug {
+		return true
+	}
+	return false
 }
 
 // =========================================================================

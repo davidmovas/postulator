@@ -59,6 +59,7 @@ import {
     Undo2,
     Redo2,
     Upload,
+    ScanLine,
 } from "lucide-react";
 import {
     Tooltip,
@@ -72,10 +73,13 @@ import { CanvasControls } from "@/components/sitemaps/canvas-controls";
 import { CanvasContextMenu } from "@/components/sitemaps/canvas-context-menu";
 import { EdgeContextMenu } from "@/components/sitemaps/edge-context-menu";
 import { HotkeysDialog } from "@/components/sitemaps/hotkeys-dialog";
+import { ColorLegendPopover } from "@/components/sitemaps/color-legend-popover";
 import { BulkCreateDialog } from "@/components/sitemaps/bulk-create-dialog";
 import { CommandPalette } from "@/components/sitemaps/command-palette";
 import { ImportDialog } from "@/components/sitemaps/import-dialog";
+import { ScanDialog } from "@/components/sitemaps/scan-dialog";
 import { createNodesFromPaths } from "@/lib/sitemap-utils";
+import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 // Custom node types
@@ -125,7 +129,7 @@ const getLayoutedElements = (
 };
 
 // Convert sitemap nodes to React Flow nodes
-const convertToFlowNodes = (sitemapNodes: SitemapNode[]): Node[] => {
+const convertToFlowNodes = (sitemapNodes: SitemapNode[], siteUrl?: string): Node[] => {
     return sitemapNodes.map((node) => ({
         id: String(node.id),
         type: "sitemapNode",
@@ -136,6 +140,7 @@ const convertToFlowNodes = (sitemapNodes: SitemapNode[]): Node[] => {
         data: {
             ...node,
             label: node.title,
+            siteUrl,
         },
     }));
 };
@@ -193,6 +198,7 @@ function SitemapEditorFlow() {
     const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
     const [bulkCreateDialogOpen, setBulkCreateDialogOpen] = useState(false);
     const [importDialogOpen, setImportDialogOpen] = useState(false);
+    const [scanDialogOpen, setScanDialogOpen] = useState(false);
     const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
     const [hotkeysDialogOpen, setHotkeysDialogOpen] = useState(false);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -226,7 +232,7 @@ function SitemapEditorFlow() {
             setSitemapNodes(sitemapResult.nodes);
 
             // Convert to React Flow format
-            const flowNodes = convertToFlowNodes(sitemapResult.nodes);
+            const flowNodes = convertToFlowNodes(sitemapResult.nodes, siteResult?.url);
             const flowEdges = convertToFlowEdges(sitemapResult.nodes);
 
             // If preserving positions, keep current node positions and only update edges
@@ -700,6 +706,42 @@ function SitemapEditorFlow() {
         setEditDialogOpen(true);
     }, []);
 
+    // Get selected nodes from React Flow
+    const getSelectedSitemapNodes = useCallback((): SitemapNode[] => {
+        const selectedFlowNodeIds = nodes
+            .filter((n) => n.selected)
+            .map((n) => Number(n.id));
+        return sitemapNodes.filter((n) => selectedFlowNodeIds.includes(n.id));
+    }, [nodes, sitemapNodes]);
+
+    // Sync nodes from WordPress (pull latest data)
+    const handleSyncFromWP = useCallback(async (nodeIds: number[]) => {
+        if (!siteId) return;
+        await execute(
+            () => sitemapService.syncNodesFromWP({ siteId, nodeIds }),
+            {
+                successTitle: "Synced from WordPress",
+                successDescription: `${nodeIds.length} node(s) updated`,
+                errorTitle: "Failed to sync from WordPress",
+            }
+        );
+        await loadData(true);
+    }, [siteId, execute, loadData]);
+
+    // Update nodes to WordPress (push local changes)
+    const handleUpdateToWP = useCallback(async (nodeIds: number[]) => {
+        if (!siteId) return;
+        await execute(
+            () => sitemapService.updateNodesToWP({ siteId, nodeIds }),
+            {
+                successTitle: "Updated to WordPress",
+                successDescription: `${nodeIds.length} node(s) updated`,
+                errorTitle: "Failed to update to WordPress",
+            }
+        );
+        await loadData(true);
+    }, [siteId, execute, loadData]);
+
     // Handle sidebar multi-select - sync with React Flow selection
     const handleSidebarNodesSelect = useCallback((nodeIds: number[]) => {
         setSidebarSelectedNodeIds(new Set(nodeIds));
@@ -805,6 +847,13 @@ function SitemapEditorFlow() {
             action: () => setImportDialogOpen(true),
         },
         {
+            key: "k",
+            ctrl: true,
+            description: "Scan from WordPress",
+            category: "Nodes",
+            action: () => setScanDialogOpen(true),
+        },
+        {
             key: "z",
             ctrl: true,
             description: "Undo",
@@ -856,7 +905,13 @@ function SitemapEditorFlow() {
                     </div>
                 </div>
                 <div className="flex items-center gap-1">
+                    {/* Help */}
+                    <ColorLegendPopover />
                     <HotkeysDialog hotkeys={hotkeys} />
+
+                    <Separator orientation="vertical" className="h-5 mx-1" />
+
+                    {/* History Group */}
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button
@@ -889,7 +944,10 @@ function SitemapEditorFlow() {
                             <p>Redo <span className="text-muted-foreground ml-1">Ctrl+Shift+Z</span></p>
                         </TooltipContent>
                     </Tooltip>
-                    <div className="w-px h-5 bg-border mx-1" />
+
+                    <Separator orientation="vertical" className="h-5 mx-1" />
+
+                    {/* Layout Group */}
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button
@@ -905,6 +963,10 @@ function SitemapEditorFlow() {
                             <p>Auto Layout <span className="text-muted-foreground ml-1">Ctrl+L</span></p>
                         </TooltipContent>
                     </Tooltip>
+
+                    <Separator orientation="vertical" className="h-5 mx-1" />
+
+                    {/* Create Nodes Group */}
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button
@@ -935,6 +997,10 @@ function SitemapEditorFlow() {
                             <p>Bulk Create <span className="text-muted-foreground ml-1">Ctrl+B</span></p>
                         </TooltipContent>
                     </Tooltip>
+
+                    <Separator orientation="vertical" className="h-5 mx-1" />
+
+                    {/* Import Group */}
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button
@@ -947,9 +1013,28 @@ function SitemapEditorFlow() {
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                            <p>Import <span className="text-muted-foreground ml-1">Ctrl+I</span></p>
+                            <p>Import from File <span className="text-muted-foreground ml-1">Ctrl+I</span></p>
                         </TooltipContent>
                     </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => setScanDialogOpen(true)}
+                            >
+                                <ScanLine className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Scan from WordPress <span className="text-muted-foreground ml-1">Ctrl+K</span></p>
+                        </TooltipContent>
+                    </Tooltip>
+
+                    <Separator orientation="vertical" className="h-5 mx-1" />
+
+                    {/* Save */}
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button
@@ -1033,13 +1118,17 @@ function SitemapEditorFlow() {
             {/* Context Menus - rendered outside ReactFlow for proper positioning */}
             <CanvasContextMenu
                 selectedNode={contextMenuNode}
+                selectedNodes={getSelectedSitemapNodes()}
                 position={contextMenuPosition}
+                siteUrl={site?.url}
                 onClose={closeContextMenu}
                 onAddNode={handleAddNode}
                 onAddOrphanNode={handleAddOrphanNode}
                 onEditNode={handleEditNode}
                 onDeleteNode={handleDeleteNode}
                 onAddChildNode={handleAddChild}
+                onSyncFromWP={handleSyncFromWP}
+                onUpdateToWP={handleUpdateToWP}
             />
             <EdgeContextMenu
                 position={edgeContextMenuPosition}
@@ -1103,6 +1192,15 @@ function SitemapEditorFlow() {
                 onSuccess={() => loadData()}
             />
 
+            {/* Scan Dialog */}
+            <ScanDialog
+                open={scanDialogOpen}
+                onOpenChange={setScanDialogOpen}
+                mode="add"
+                sitemapId={sitemapId}
+                onSuccess={() => loadData()}
+            />
+
             {/* Command Palette */}
             <CommandPalette
                 open={commandPaletteOpen}
@@ -1114,6 +1212,7 @@ function SitemapEditorFlow() {
                 onAddNode={() => handleAddNode()}
                 onBulkCreate={() => setBulkCreateDialogOpen(true)}
                 onImport={() => setImportDialogOpen(true)}
+                onScan={() => setScanDialogOpen(true)}
                 onFocusSearch={() => searchInputRef.current?.focus()}
                 onDeleteSelected={handleDeleteSelectedNodes}
                 onShowHotkeys={() => setHotkeysDialogOpen(true)}

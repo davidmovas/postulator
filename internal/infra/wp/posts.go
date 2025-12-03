@@ -37,6 +37,7 @@ func (c *restyClient) GetPosts(ctx context.Context, s *entities.Site) ([]*entiti
 			"per_page": "100",
 			"orderby":  "date",
 			"order":    "desc",
+			"status":   "publish,draft,pending,private",
 		}).
 		SetResult(&wpPosts).
 		Get(c.getAPIURL(s.URL, "posts"))

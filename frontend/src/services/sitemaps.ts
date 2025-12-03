@@ -26,6 +26,11 @@ import {
     UpdateNodeContentStatus,
     GetSupportedImportFormats,
     ImportNodes,
+    ScanSite,
+    ScanIntoSitemap,
+    SyncNodesFromWP,
+    UpdateNodesToWP,
+    ResetNode,
 } from "@/wailsjs/wailsjs/go/handlers/SitemapsHandler";
 import {
     Sitemap,
@@ -39,12 +44,19 @@ import {
     UpdateNodePositionsInput,
     ImportNodesInput,
     ImportNodesResult,
+    ScanSiteInput,
+    ScanIntoSitemapInput,
+    ScanSiteResult,
+    SyncNodesInput,
+    SyncNodesResult,
     SitemapStatus,
     NodeContentStatus,
     mapSitemap,
     mapSitemapNode,
     mapSitemapWithNodes,
     mapImportNodesResult,
+    mapScanSiteResult,
+    mapSyncNodesResult,
 } from "@/models/sitemaps";
 import { unwrapArrayResponse, unwrapResponse } from "@/lib/api-utils";
 
@@ -272,5 +284,62 @@ export const sitemapService = {
         const response = await ImportNodes(payload);
         const data = unwrapResponse<dto.ImportNodesResponse>(response);
         return mapImportNodesResult(data);
+    },
+
+    async scanSite(input: ScanSiteInput): Promise<ScanSiteResult> {
+        const payload = new dto.ScanSiteRequest({
+            siteId: input.siteId,
+            sitemapName: input.sitemapName,
+            titleSource: input.titleSource,
+            contentFilter: input.contentFilter,
+            includeDrafts: input.includeDrafts,
+            maxDepth: input.maxDepth,
+        });
+
+        const response = await ScanSite(payload);
+        const data = unwrapResponse<dto.ScanSiteResponse>(response);
+        return mapScanSiteResult(data);
+    },
+
+    async scanIntoSitemap(input: ScanIntoSitemapInput): Promise<ScanSiteResult> {
+        const payload = new dto.ScanIntoSitemapRequest({
+            sitemapId: input.sitemapId,
+            parentNodeId: input.parentNodeId,
+            titleSource: input.titleSource,
+            contentFilter: input.contentFilter,
+            includeDrafts: input.includeDrafts,
+            maxDepth: input.maxDepth,
+        });
+
+        const response = await ScanIntoSitemap(payload);
+        const data = unwrapResponse<dto.ScanSiteResponse>(response);
+        return mapScanSiteResult(data);
+    },
+
+    async syncNodesFromWP(input: SyncNodesInput): Promise<SyncNodesResult> {
+        const payload = new dto.SyncNodesRequest({
+            siteId: input.siteId,
+            nodeIds: input.nodeIds,
+        });
+
+        const response = await SyncNodesFromWP(payload);
+        const data = unwrapResponse<dto.SyncNodesResponse>(response);
+        return mapSyncNodesResult(data);
+    },
+
+    async updateNodesToWP(input: SyncNodesInput): Promise<SyncNodesResult> {
+        const payload = new dto.UpdateNodesToWPRequest({
+            siteId: input.siteId,
+            nodeIds: input.nodeIds,
+        });
+
+        const response = await UpdateNodesToWP(payload);
+        const data = unwrapResponse<dto.SyncNodesResponse>(response);
+        return mapSyncNodesResult(data);
+    },
+
+    async resetNode(nodeId: number): Promise<void> {
+        const response = await ResetNode(nodeId);
+        unwrapResponse<string>(response);
     },
 };

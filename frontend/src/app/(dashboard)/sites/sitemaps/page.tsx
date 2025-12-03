@@ -43,6 +43,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatSmartDate } from "@/lib/time";
 import { ImportDialog } from "@/components/sitemaps/import-dialog";
+import { ScanDialog } from "@/components/sitemaps/scan-dialog";
+import { ScanSiteResult } from "@/models/sitemaps";
 
 function SitemapsPageContent() {
     const router = useRouter();
@@ -56,6 +58,7 @@ function SitemapsPageContent() {
     const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
     const [renameDialogOpen, setRenameDialogOpen] = useState(false);
     const [importDialogOpen, setImportDialogOpen] = useState(false);
+    const [scanDialogOpen, setScanDialogOpen] = useState(false);
     const [selectedSitemap, setSelectedSitemap] = useState<Sitemap | null>(null);
     const [createdSitemapId, setCreatedSitemapId] = useState<number | null>(null);
 
@@ -88,6 +91,13 @@ function SitemapsPageContent() {
 
     const handleCreate = async () => {
         if (!site) return;
+
+        // For scanned mode, we don't create sitemap first - the scanner does it
+        if (newSource === "scanned") {
+            setCreateDialogOpen(false);
+            setScanDialogOpen(true);
+            return;
+        }
 
         const result = await execute<Sitemap>(
             () =>
@@ -146,6 +156,25 @@ function SitemapsPageContent() {
             setImportSuccessful(false);
         }
         setImportDialogOpen(open);
+    };
+
+    const handleScanSuccess = (result: ScanSiteResult) => {
+        // Scan completed - navigate to editor
+        setNewName("");
+        setNewDescription("");
+        setNewSource("manual");
+        router.push(`/sites/sitemaps/editor?id=${siteId}&sitemapId=${result.sitemapId}`);
+    };
+
+    const handleScanClose = (open: boolean) => {
+        if (!open) {
+            // Reset form state when closing
+            setNewName("");
+            setNewDescription("");
+            setNewSource("manual");
+            loadData();
+        }
+        setScanDialogOpen(open);
     };
 
     const handleDuplicate = async () => {
@@ -369,30 +398,75 @@ function SitemapsPageContent() {
                         </div>
                         <div className="space-y-2">
                             <Label>Creation Method</Label>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-2 gap-3">
                                 {[
-                                    { value: "manual", label: "Manual", icon: Map, description: "Build from scratch" },
-                                    { value: "imported", label: "Import", icon: FileInput, description: "From file" },
-                                    { value: "generated", label: "AI Generate", icon: Sparkles, description: "AI-powered", disabled: true },
-                                    { value: "scanned", label: "Scan Site", icon: ScanLine, description: "From WP", disabled: true },
-                                ].map((option) => (
-                                    <Button
-                                        key={option.value}
-                                        type="button"
-                                        variant={newSource === option.value ? "default" : "outline"}
-                                        className="h-auto flex-col items-start p-3"
-                                        onClick={() => !option.disabled && setNewSource(option.value as "manual" | "imported" | "generated" | "scanned")}
-                                        disabled={option.disabled}
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            <option.icon className="h-4 w-4" />
-                                            <span>{option.label}</span>
-                                        </div>
-                                        <span className="text-xs text-muted-foreground font-normal">
-                                            {option.disabled ? "Coming soon" : option.description}
-                                        </span>
-                                    </Button>
-                                ))}
+                                    {
+                                        value: "manual",
+                                        label: "Manual",
+                                        icon: Map,
+                                        description: "Build from scratch",
+                                        color: "blue",
+                                        activeClasses: "bg-blue-500/10 border-blue-500 text-blue-600 dark:text-blue-400",
+                                        iconClasses: "text-blue-500",
+                                    },
+                                    {
+                                        value: "imported",
+                                        label: "Import",
+                                        icon: FileInput,
+                                        description: "From CSV/Excel file",
+                                        color: "amber",
+                                        activeClasses: "bg-amber-500/10 border-amber-500 text-amber-600 dark:text-amber-400",
+                                        iconClasses: "text-amber-500",
+                                    },
+                                    {
+                                        value: "generated",
+                                        label: "AI Generate",
+                                        icon: Sparkles,
+                                        description: "AI-powered",
+                                        color: "purple",
+                                        activeClasses: "bg-purple-500/10 border-purple-500 text-purple-600 dark:text-purple-400",
+                                        iconClasses: "text-purple-500",
+                                        disabled: true,
+                                    },
+                                    {
+                                        value: "scanned",
+                                        label: "Scan Site",
+                                        icon: ScanLine,
+                                        description: "From WordPress",
+                                        color: "green",
+                                        activeClasses: "bg-green-500/10 border-green-500 text-green-600 dark:text-green-400",
+                                        iconClasses: "text-green-500",
+                                    },
+                                ].map((option) => {
+                                    const isSelected = newSource === option.value;
+                                    return (
+                                        <button
+                                            key={option.value}
+                                            type="button"
+                                            className={`
+                                                relative flex flex-col items-start gap-1 rounded-lg border-2 p-3 text-left transition-all
+                                                ${isSelected
+                                                    ? option.activeClasses
+                                                    : "border-muted bg-background hover:border-muted-foreground/30 hover:bg-muted/50"
+                                                }
+                                                ${option.disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                                            `}
+                                            onClick={() => !option.disabled && setNewSource(option.value as "manual" | "imported" | "generated" | "scanned")}
+                                            disabled={option.disabled}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <option.icon className={`h-4 w-4 ${isSelected ? "" : option.iconClasses}`} />
+                                                <span className="font-medium text-sm">{option.label}</span>
+                                            </div>
+                                            <span className={`text-xs ${isSelected ? "opacity-80" : "text-muted-foreground"}`}>
+                                                {option.disabled ? "Coming soon" : option.description}
+                                            </span>
+                                            {isSelected && (
+                                                <div className="absolute top-2 right-2 h-2 w-2 rounded-full bg-current" />
+                                            )}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>
@@ -499,6 +573,16 @@ function SitemapsPageContent() {
                     onSuccess={handleImportSuccess}
                 />
             )}
+
+            {/* Scan Dialog */}
+            <ScanDialog
+                open={scanDialogOpen}
+                onOpenChange={handleScanClose}
+                mode="create"
+                siteId={siteId}
+                sitemapName={newName}
+                onSuccess={handleScanSuccess}
+            />
         </div>
     );
 }

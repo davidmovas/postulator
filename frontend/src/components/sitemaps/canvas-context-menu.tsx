@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
 import { SitemapNode } from "@/models/sitemaps";
-import { Plus, Pencil, Trash2, GitBranchPlus } from "lucide-react";
+import { Plus, Pencil, Trash2, GitBranchPlus, ExternalLink, Upload } from "lucide-react";
+import { RiWordpressLine } from "@remixicon/react";
 import { cn } from "@/lib/utils";
+import { BrowserOpenURL } from "@/wailsjs/wailsjs/runtime/runtime";
 
 interface MenuPosition {
     x: number;
@@ -12,24 +14,32 @@ interface MenuPosition {
 
 interface CanvasContextMenuProps {
     selectedNode: SitemapNode | null;
+    selectedNodes?: SitemapNode[];
     position: MenuPosition | null;
+    siteUrl?: string;
     onClose: () => void;
     onAddNode: (parentId?: number) => void;
     onAddOrphanNode: () => void;
     onEditNode: (node: SitemapNode) => void;
     onDeleteNode: (nodeId: number) => void;
     onAddChildNode: (parentId: number) => void;
+    onSyncFromWP?: (nodeIds: number[]) => void;
+    onUpdateToWP?: (nodeIds: number[]) => void;
 }
 
 export function CanvasContextMenu({
     selectedNode,
+    selectedNodes = [],
     position,
+    siteUrl,
     onClose,
     onAddNode,
     onAddOrphanNode,
     onEditNode,
     onDeleteNode,
     onAddChildNode,
+    onSyncFromWP,
+    onUpdateToWP,
 }: CanvasContextMenuProps) {
     // Close on click outside or escape
     useEffect(() => {
@@ -51,8 +61,38 @@ export function CanvasContextMenu({
 
     if (!position) return null;
 
+    // Build full URL for the node
+    const getFullUrl = (node: SitemapNode) => {
+        if (!siteUrl) return null;
+        const baseUrl = siteUrl.replace(/\/$/, "");
+        if (node.isRoot) return baseUrl;
+        return `${baseUrl}${node.path}`;
+    };
+
+    // Get all nodes to operate on (multiselect or single)
+    const targetNodes = selectedNodes.length > 1 ? selectedNodes : selectedNode ? [selectedNode] : [];
+    const isMultiSelect = selectedNodes.length > 1;
+
+    // Check capabilities
+    const canView = selectedNode && selectedNode.contentStatus === "published" && siteUrl && !isMultiSelect;
+    const hasWPNodes = targetNodes.some((n) => n.wpPageId != null);
+    const hasModifiedNodes = targetNodes.some((n) => n.isModified);
+
     const menuItems = selectedNode
         ? [
+              ...(canView
+                  ? [
+                        {
+                            icon: ExternalLink,
+                            label: "View",
+                            onClick: () => {
+                                const url = getFullUrl(selectedNode);
+                                if (url) BrowserOpenURL(url);
+                                onClose();
+                            },
+                        },
+                    ]
+                  : []),
               {
                   icon: Pencil,
                   label: "Edit",
@@ -69,6 +109,34 @@ export function CanvasContextMenu({
                       onClose();
                   },
               },
+              // Sync operations for WP-linked nodes
+              ...(hasWPNodes && onSyncFromWP
+                  ? [
+                        {
+                            icon: RiWordpressLine,
+                            label: isMultiSelect ? `Sync ${targetNodes.filter((n) => n.wpPageId != null).length}` : "Sync",
+                            onClick: () => {
+                                const wpNodeIds = targetNodes.filter((n) => n.wpPageId != null).map((n) => n.id);
+                                onSyncFromWP(wpNodeIds);
+                                onClose();
+                            },
+                            separator: true,
+                        },
+                    ]
+                  : []),
+              ...(hasModifiedNodes && onUpdateToWP
+                  ? [
+                        {
+                            icon: Upload,
+                            label: isMultiSelect ? `Update ${targetNodes.filter((n) => n.isModified).length}` : "Update",
+                            onClick: () => {
+                                const modifiedNodeIds = targetNodes.filter((n) => n.isModified).map((n) => n.id);
+                                onUpdateToWP(modifiedNodeIds);
+                                onClose();
+                            },
+                        },
+                    ]
+                  : []),
               ...(selectedNode.isRoot
                   ? []
                   : [

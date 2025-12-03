@@ -6,6 +6,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/sitemap"
 	"github.com/davidmovas/postulator/internal/domain/sitemap/importer"
+	"github.com/davidmovas/postulator/internal/domain/sitemap/scanner"
 	"github.com/davidmovas/postulator/internal/dto"
 	"github.com/davidmovas/postulator/pkg/ctx"
 	"github.com/davidmovas/postulator/pkg/errors"
@@ -13,14 +14,23 @@ import (
 )
 
 type SitemapsHandler struct {
-	service  sitemap.Service
-	importer *importer.Importer
+	service     sitemap.Service
+	syncService *sitemap.SyncService
+	importer    *importer.Importer
+	scanner     *scanner.Scanner
 }
 
-func NewSitemapsHandler(service sitemap.Service, log *logger.Logger) *SitemapsHandler {
+func NewSitemapsHandler(
+	service sitemap.Service,
+	syncService *sitemap.SyncService,
+	siteScanner *scanner.Scanner,
+	log *logger.Logger,
+) *SitemapsHandler {
 	return &SitemapsHandler{
-		service:  service,
-		importer: importer.NewImporter(log),
+		service:     service,
+		syncService: syncService,
+		importer:    importer.NewImporter(log),
+		scanner:     siteScanner,
 	}
 }
 
@@ -356,4 +366,157 @@ func (h *SitemapsHandler) ImportNodes(req *dto.ImportNodesRequest) *dto.Response
 		Errors:         importErrors,
 		ProcessingTime: stats.ProcessingTime.String(),
 	})
+}
+
+// =========================================================================
+// Scanner Operations
+// =========================================================================
+
+func (h *SitemapsHandler) ScanSite(req *dto.ScanSiteRequest) *dto.Response[*dto.ScanSiteResponse] {
+	opts := &scanner.ScanOptions{
+		TitleSource:   scanner.TitleSource(req.TitleSource),
+		ContentFilter: scanner.ContentFilter(req.ContentFilter),
+		IncludeDrafts: req.IncludeDrafts,
+		MaxDepth:      req.MaxDepth,
+	}
+
+	// Use defaults if not specified
+	if opts.TitleSource == "" {
+		opts.TitleSource = scanner.TitleSourceTitle
+	}
+	if opts.ContentFilter == "" {
+		opts.ContentFilter = scanner.ContentFilterPages
+	}
+
+	result, err := h.scanner.ScanAndCreateSitemap(
+		ctx.FastCtx(),
+		req.SiteID,
+		req.SitemapName,
+		opts,
+	)
+	if err != nil {
+		return fail[*dto.ScanSiteResponse](err)
+	}
+
+	// Convert errors to DTO
+	scanErrors := make([]dto.ScanError, len(result.Errors))
+	for i, e := range result.Errors {
+		scanErrors[i] = dto.ScanError{
+			WPID:    e.WPID,
+			Type:    e.Type,
+			Title:   e.Title,
+			Message: e.Message,
+		}
+	}
+
+	return ok(&dto.ScanSiteResponse{
+		SitemapID:     result.SitemapID,
+		PagesScanned:  result.PagesScanned,
+		PostsScanned:  result.PostsScanned,
+		NodesCreated:  result.NodesCreated,
+		NodesSkipped:  result.NodesSkipped,
+		TotalDuration: result.TotalDuration.String(),
+		Errors:        scanErrors,
+	})
+}
+
+func (h *SitemapsHandler) ScanIntoSitemap(req *dto.ScanIntoSitemapRequest) *dto.Response[*dto.ScanSiteResponse] {
+	opts := &scanner.ScanOptions{
+		TitleSource:   scanner.TitleSource(req.TitleSource),
+		ContentFilter: scanner.ContentFilter(req.ContentFilter),
+		IncludeDrafts: req.IncludeDrafts,
+		MaxDepth:      req.MaxDepth,
+	}
+
+	// Use defaults if not specified
+	if opts.TitleSource == "" {
+		opts.TitleSource = scanner.TitleSourceTitle
+	}
+	if opts.ContentFilter == "" {
+		opts.ContentFilter = scanner.ContentFilterPages
+	}
+
+	result, err := h.scanner.ScanIntoSitemap(
+		ctx.FastCtx(),
+		req.SitemapID,
+		req.ParentNodeID,
+		opts,
+	)
+	if err != nil {
+		return fail[*dto.ScanSiteResponse](err)
+	}
+
+	// Convert errors to DTO
+	scanErrors := make([]dto.ScanError, len(result.Errors))
+	for i, e := range result.Errors {
+		scanErrors[i] = dto.ScanError{
+			WPID:    e.WPID,
+			Type:    e.Type,
+			Title:   e.Title,
+			Message: e.Message,
+		}
+	}
+
+	return ok(&dto.ScanSiteResponse{
+		SitemapID:     result.SitemapID,
+		PagesScanned:  result.PagesScanned,
+		PostsScanned:  result.PostsScanned,
+		NodesCreated:  result.NodesCreated,
+		NodesSkipped:  result.NodesSkipped,
+		TotalDuration: result.TotalDuration.String(),
+		Errors:        scanErrors,
+	})
+}
+
+// =========================================================================
+// Sync Operations
+// =========================================================================
+
+// SyncNodesFromWP fetches data from WordPress and updates local nodes
+// This resets local changes and pulls the latest data from WP
+func (h *SitemapsHandler) SyncNodesFromWP(req *dto.SyncNodesRequest) *dto.Response[*dto.SyncNodesResponse] {
+	results, err := h.syncService.SyncFromWP(ctx.FastCtx(), req.SiteID, req.NodeIDs)
+	if err != nil {
+		return fail[*dto.SyncNodesResponse](err)
+	}
+
+	dtoResults := make([]dto.SyncNodeResult, len(results))
+	for i, r := range results {
+		dtoResults[i] = dto.SyncNodeResult{
+			NodeID:  r.NodeID,
+			Success: r.Success,
+			Error:   r.Error,
+		}
+	}
+
+	return ok(&dto.SyncNodesResponse{Results: dtoResults})
+}
+
+// UpdateNodesToWP pushes local node data to WordPress
+// This updates the WP page/post with local changes
+func (h *SitemapsHandler) UpdateNodesToWP(req *dto.UpdateNodesToWPRequest) *dto.Response[*dto.SyncNodesResponse] {
+	results, err := h.syncService.UpdateToWP(ctx.FastCtx(), req.SiteID, req.NodeIDs)
+	if err != nil {
+		return fail[*dto.SyncNodesResponse](err)
+	}
+
+	dtoResults := make([]dto.SyncNodeResult, len(results))
+	for i, r := range results {
+		dtoResults[i] = dto.SyncNodeResult{
+			NodeID:  r.NodeID,
+			Success: r.Success,
+			Error:   r.Error,
+		}
+	}
+
+	return ok(&dto.SyncNodesResponse{Results: dtoResults})
+}
+
+// ResetNode resets a node to its original WP data without fetching from WP
+func (h *SitemapsHandler) ResetNode(nodeID int64) *dto.Response[string] {
+	if err := h.syncService.ResetNode(ctx.FastCtx(), nodeID); err != nil {
+		return fail[string](err)
+	}
+
+	return ok("Node reset successfully")
 }

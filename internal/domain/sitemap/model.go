@@ -32,6 +32,7 @@ type NodeRepository interface {
 	GetBySitemapID(ctx context.Context, sitemapID int64) ([]*entities.SitemapNode, error)
 	GetByParentID(ctx context.Context, sitemapID int64, parentID *int64) ([]*entities.SitemapNode, error)
 	GetBySlugAndParent(ctx context.Context, sitemapID int64, slug string, parentID *int64) (*entities.SitemapNode, error)
+	GetByWPID(ctx context.Context, sitemapID int64, wpID int, contentType entities.NodeContentType) (*entities.SitemapNode, error)
 	GetRootNodes(ctx context.Context, sitemapID int64) ([]*entities.SitemapNode, error)
 	Update(ctx context.Context, node *entities.SitemapNode) error
 	Delete(ctx context.Context, id int64) error
@@ -94,6 +95,7 @@ type Service interface {
 	GetNodes(ctx context.Context, sitemapID int64) ([]*entities.SitemapNode, error)
 	GetNodesTree(ctx context.Context, sitemapID int64) ([]*entities.SitemapNode, error)
 	FindNodeBySlugAndParent(ctx context.Context, sitemapID int64, slug string, parentID *int64) (*entities.SitemapNode, error)
+	FindNodeByWPID(ctx context.Context, sitemapID int64, wpID int, contentType entities.NodeContentType) (*entities.SitemapNode, error)
 	UpdateNode(ctx context.Context, node *entities.SitemapNode) error
 	DeleteNode(ctx context.Context, id int64) error
 	MoveNode(ctx context.Context, nodeID int64, newParentID *int64, position int) error

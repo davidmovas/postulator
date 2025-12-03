@@ -78,12 +78,28 @@ export function RemoveNodeKeyword(arg1, arg2) {
   return window['go']['handlers']['SitemapsHandler']['RemoveNodeKeyword'](arg1, arg2);
 }
 
+export function ResetNode(arg1) {
+  return window['go']['handlers']['SitemapsHandler']['ResetNode'](arg1);
+}
+
+export function ScanIntoSitemap(arg1) {
+  return window['go']['handlers']['SitemapsHandler']['ScanIntoSitemap'](arg1);
+}
+
+export function ScanSite(arg1) {
+  return window['go']['handlers']['SitemapsHandler']['ScanSite'](arg1);
+}
+
 export function SetNodeKeywords(arg1) {
   return window['go']['handlers']['SitemapsHandler']['SetNodeKeywords'](arg1);
 }
 
 export function SetSitemapStatus(arg1, arg2) {
   return window['go']['handlers']['SitemapsHandler']['SetSitemapStatus'](arg1, arg2);
+}
+
+export function SyncNodesFromWP(arg1) {
+  return window['go']['handlers']['SitemapsHandler']['SyncNodesFromWP'](arg1);
 }
 
 export function UnlinkNodeContent(arg1) {
@@ -100,6 +116,10 @@ export function UpdateNodeContentStatus(arg1, arg2) {
 
 export function UpdateNodePositions(arg1) {
   return window['go']['handlers']['SitemapsHandler']['UpdateNodePositions'](arg1);
+}
+
+export function UpdateNodesToWP(arg1) {
+  return window['go']['handlers']['SitemapsHandler']['UpdateNodesToWP'](arg1);
 }
 
 export function UpdateSitemap(arg1) {

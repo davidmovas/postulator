@@ -39,12 +39,14 @@ func (r *nodeRepository) Create(ctx context.Context, node *entities.SitemapNode)
 			"sitemap_id", "parent_id", "title", "slug", "description", "is_root",
 			"depth", "position", "path", "content_type", "article_id",
 			"wp_page_id", "wp_url", "source", "is_synced", "last_synced_at",
+			"wp_title", "wp_slug",
 			"content_status", "position_x", "position_y",
 		).
 		Values(
 			node.SitemapID, node.ParentID, node.Title, node.Slug, node.Description, node.IsRoot,
 			node.Depth, node.Position, node.Path, node.ContentType, node.ArticleID,
 			node.WPPageID, node.WPURL, node.Source, node.IsSynced, node.LastSyncedAt,
+			node.WPTitle, node.WPSlug,
 			node.ContentStatus, node.PositionX, node.PositionY,
 		).
 		MustSql()
@@ -77,6 +79,7 @@ func (r *nodeRepository) CreateBatch(ctx context.Context, nodes []*entities.Site
 			"sitemap_id", "parent_id", "title", "slug", "description", "is_root",
 			"depth", "position", "path", "content_type", "article_id",
 			"wp_page_id", "wp_url", "source", "is_synced", "last_synced_at",
+			"wp_title", "wp_slug",
 			"content_status", "position_x", "position_y",
 		)
 
@@ -85,6 +88,7 @@ func (r *nodeRepository) CreateBatch(ctx context.Context, nodes []*entities.Site
 			node.SitemapID, node.ParentID, node.Title, node.Slug, node.Description, node.IsRoot,
 			node.Depth, node.Position, node.Path, node.ContentType, node.ArticleID,
 			node.WPPageID, node.WPURL, node.Source, node.IsSynced, node.LastSyncedAt,
+			node.WPTitle, node.WPSlug,
 			node.ContentStatus, node.PositionX, node.PositionY,
 		)
 	}
@@ -175,6 +179,27 @@ func (r *nodeRepository) GetRootNodes(ctx context.Context, sitemapID int64) ([]*
 	return r.GetByParentID(ctx, sitemapID, nil)
 }
 
+func (r *nodeRepository) GetByWPID(ctx context.Context, sitemapID int64, wpID int, contentType entities.NodeContentType) (*entities.SitemapNode, error) {
+	query, args := dbx.ST.
+		Select(nodeColumns()...).
+		From("sitemap_nodes").
+		Where(squirrel.Eq{"sitemap_id": sitemapID}).
+		Where(squirrel.Eq{"wp_page_id": wpID}).
+		Where(squirrel.Eq{"content_type": contentType}).
+		Limit(1).
+		MustSql()
+
+	node, err := r.scanNode(r.db.QueryRowContext(ctx, query, args...))
+	if err != nil {
+		if dbx.IsNoRows(err) {
+			return nil, errors.NotFound("sitemap node", fmt.Sprintf("wp_id=%d", wpID))
+		}
+		return nil, errors.Database(err)
+	}
+
+	return node, nil
+}
+
 func (r *nodeRepository) Update(ctx context.Context, node *entities.SitemapNode) error {
 	query, args := dbx.ST.
 		Update("sitemap_nodes").
@@ -192,6 +217,8 @@ func (r *nodeRepository) Update(ctx context.Context, node *entities.SitemapNode)
 		Set("source", node.Source).
 		Set("is_synced", node.IsSynced).
 		Set("last_synced_at", node.LastSyncedAt).
+		Set("wp_title", node.WPTitle).
+		Set("wp_slug", node.WPSlug).
 		Set("content_status", node.ContentStatus).
 		Set("position_x", node.PositionX).
 		Set("position_y", node.PositionY).
@@ -487,6 +514,7 @@ func nodeColumns() []string {
 		"id", "sitemap_id", "parent_id", "title", "slug", "description", "is_root",
 		"depth", "position", "path", "content_type", "article_id",
 		"wp_page_id", "wp_url", "source", "is_synced", "last_synced_at",
+		"wp_title", "wp_slug",
 		"content_status", "position_x", "position_y", "created_at", "updated_at",
 	}
 }
@@ -499,6 +527,8 @@ func (r *nodeRepository) scanNode(row *sql.Row) (*entities.SitemapNode, error) {
 	var wpPageID sql.NullInt64
 	var wpURL sql.NullString
 	var lastSyncedAt sql.NullTime
+	var wpTitle sql.NullString
+	var wpSlug sql.NullString
 	var positionX sql.NullFloat64
 	var positionY sql.NullFloat64
 
@@ -520,6 +550,8 @@ func (r *nodeRepository) scanNode(row *sql.Row) (*entities.SitemapNode, error) {
 		&node.Source,
 		&node.IsSynced,
 		&lastSyncedAt,
+		&wpTitle,
+		&wpSlug,
 		&node.ContentStatus,
 		&positionX,
 		&positionY,
@@ -549,6 +581,12 @@ func (r *nodeRepository) scanNode(row *sql.Row) (*entities.SitemapNode, error) {
 	if lastSyncedAt.Valid {
 		node.LastSyncedAt = &lastSyncedAt.Time
 	}
+	if wpTitle.Valid {
+		node.WPTitle = &wpTitle.String
+	}
+	if wpSlug.Valid {
+		node.WPSlug = &wpSlug.String
+	}
 	if positionX.Valid {
 		node.PositionX = &positionX.Float64
 	}
@@ -556,7 +594,22 @@ func (r *nodeRepository) scanNode(row *sql.Row) (*entities.SitemapNode, error) {
 		node.PositionY = &positionY.Float64
 	}
 
+	// Normalize path to avoid double slashes
+	node.Path = normalizePath(node.Path)
+
 	return &node, nil
+}
+
+// normalizePath removes duplicate slashes from path
+func normalizePath(path string) string {
+	if path == "" || path == "/" {
+		return path
+	}
+	// Replace multiple slashes with single slash
+	for strings.Contains(path, "//") {
+		path = strings.ReplaceAll(path, "//", "/")
+	}
+	return path
 }
 
 func (r *nodeRepository) queryNodes(ctx context.Context, query string, args []any) ([]*entities.SitemapNode, error) {
@@ -577,6 +630,8 @@ func (r *nodeRepository) queryNodes(ctx context.Context, query string, args []an
 		var wpPageID sql.NullInt64
 		var wpURL sql.NullString
 		var lastSyncedAt sql.NullTime
+		var wpTitle sql.NullString
+		var wpSlug sql.NullString
 		var positionX sql.NullFloat64
 		var positionY sql.NullFloat64
 
@@ -598,6 +653,8 @@ func (r *nodeRepository) queryNodes(ctx context.Context, query string, args []an
 			&node.Source,
 			&node.IsSynced,
 			&lastSyncedAt,
+			&wpTitle,
+			&wpSlug,
 			&node.ContentStatus,
 			&positionX,
 			&positionY,
@@ -627,12 +684,21 @@ func (r *nodeRepository) queryNodes(ctx context.Context, query string, args []an
 		if lastSyncedAt.Valid {
 			node.LastSyncedAt = &lastSyncedAt.Time
 		}
+		if wpTitle.Valid {
+			node.WPTitle = &wpTitle.String
+		}
+		if wpSlug.Valid {
+			node.WPSlug = &wpSlug.String
+		}
 		if positionX.Valid {
 			node.PositionX = &positionX.Float64
 		}
 		if positionY.Valid {
 			node.PositionY = &positionY.Float64
 		}
+
+		// Normalize path to avoid double slashes
+		node.Path = normalizePath(node.Path)
 
 		nodes = append(nodes, &node)
 	}
