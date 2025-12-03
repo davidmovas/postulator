@@ -194,14 +194,16 @@ export function NodeHoverCard({
     );
 
     return (
-        <div
-            onMouseEnter={showCard}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={hideCard}
-            className="relative"
-        >
-            {children}
+        <>
+            <div
+                onMouseEnter={showCard}
+                onMouseMove={handleMouseMove}
+                onMouseLeave={hideCard}
+                style={{ pointerEvents: 'auto' }}
+            >
+                {children}
+            </div>
             {mounted && typeof document !== 'undefined' && createPortal(tooltipContent, document.body)}
-        </div>
+        </>
     );
 }

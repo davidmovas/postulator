@@ -24,6 +24,7 @@ import dagre from "dagre";
 
 import { useApiCall } from "@/hooks/use-api-call";
 import { useHotkeys, HotkeyConfig } from "@/hooks/use-hotkeys";
+import { useSitemapHistory } from "@/hooks/use-sitemap-history";
 import { sitemapService } from "@/services/sitemaps";
 import { siteService } from "@/services/sites";
 import {
@@ -55,7 +56,14 @@ import {
     Save,
     LayoutGrid,
     ListPlus,
+    Undo2,
+    Redo2,
 } from "lucide-react";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { SitemapNodeCard } from "@/components/sitemaps/sitemap-node-card";
 import { NodeEditDialog } from "@/components/sitemaps/node-edit-dialog";
 import { SitemapSidebar } from "@/components/sitemaps/sitemap-sidebar";
@@ -187,13 +195,16 @@ function SitemapEditorFlow() {
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [sidebarSelectedNodeIds, setSidebarSelectedNodeIds] = useState<Set<number>>(new Set());
 
+    // Universal history for undo/redo
+    const history = useSitemapHistory({ maxHistory: 50 });
+
     // Refs
     const searchInputRef = useRef<HTMLInputElement>(null);
     const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
     const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
     const [initialPositions, setInitialPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
 
-    const loadData = useCallback(async () => {
+    const loadData = useCallback(async (preservePositions = false) => {
         const [siteResult, sitemapResult] = await Promise.all([
             execute<Site>(() => siteService.getSite(siteId), {
                 errorTitle: "Failed to load site",
@@ -214,6 +225,20 @@ function SitemapEditorFlow() {
             // Convert to React Flow format
             const flowNodes = convertToFlowNodes(sitemapResult.nodes);
             const flowEdges = convertToFlowEdges(sitemapResult.nodes);
+
+            // If preserving positions, keep current node positions and only update edges
+            if (preservePositions) {
+                console.log("[loadData] preservePositions mode, edges:", flowEdges.map(e => `${e.source}->${e.target}`));
+                setNodes((currentNodes) => {
+                    const positionMap = new Map(currentNodes.map((n) => [n.id, n.position]));
+                    return flowNodes.map((n) => ({
+                        ...n,
+                        position: positionMap.get(n.id) || n.position,
+                    }));
+                });
+                setEdges(flowEdges);
+                return;
+            }
 
             // Check if ANY node is missing positions - if so, run auto layout
             const hasNodesWithoutPositions = sitemapResult.nodes.some(
@@ -248,6 +273,52 @@ function SitemapEditorFlow() {
             loadData();
         }
     }, [siteId, sitemapId, loadData]);
+
+    // Setup history service functions
+    useEffect(() => {
+        history.setServices({
+            createNode: async (input) => {
+                const result = await sitemapService.createNode(input);
+                return result;
+            },
+            createNodeWithPosition: async (input, x, y) => {
+                const result = await sitemapService.createNode(input);
+                if (result) {
+                    // Set the position after creating the node
+                    await sitemapService.updateNodePositions({
+                        nodeId: result.id,
+                        positionX: x,
+                        positionY: y,
+                    });
+                }
+                return result;
+            },
+            deleteNode: async (nodeId) => {
+                await sitemapService.deleteNode(nodeId);
+            },
+            updateNode: async (nodeId, data) => {
+                const node = sitemapNodes.find((n) => n.id === nodeId);
+                if (!node) return;
+                await sitemapService.updateNode({
+                    ...node,
+                    ...data,
+                });
+            },
+            moveNode: async (nodeId, newParentId) => {
+                await sitemapService.moveNode({ nodeId, newParentId });
+            },
+            updatePositions: async (nodeId, x, y) => {
+                await sitemapService.updateNodePositions({ nodeId, positionX: x, positionY: y });
+            },
+            reloadData: async () => {
+                await loadData(true);
+            },
+        });
+    }, [history, sitemapNodes, loadData]);
+
+    // Undo/Redo handlers
+    const handleUndo = useCallback(() => history.undo(), [history]);
+    const handleRedo = useCallback(() => history.redo(), [history]);
 
     // Detect position changes
     useEffect(() => {
@@ -288,30 +359,82 @@ function SitemapEditorFlow() {
     }, []);
 
     const onConnect = useCallback(
-        (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-        [setEdges]
+        async (params: Connection) => {
+            if (!params.source || !params.target) return;
+
+            const sourceId = Number(params.source);
+            const targetId = Number(params.target);
+
+            console.log("[onConnect] Moving node", targetId, "to parent", sourceId);
+
+            // Find the target node to get its current parent for undo
+            const targetNode = sitemapNodes.find((n) => n.id === targetId);
+            const previousParentId = targetNode?.parentId ?? null;
+
+            // Save to server - move target node to have source as parent
+            await execute(
+                () => sitemapService.moveNode({ nodeId: targetId, newParentId: sourceId }),
+                {
+                    errorTitle: "Failed to create connection",
+                }
+            );
+
+            // Record action for undo/redo
+            history.recordMoveNode(targetId, previousParentId, sourceId);
+
+            // Reload edges only, preserve node positions
+            await loadData(true);
+        },
+        [execute, loadData, history, sitemapNodes]
     );
 
-    // Auto-create node when dragging from handle and dropping on empty space
+    // Handle connection end - drop on pane creates new node, drop on node creates connection
     const onConnectEnd = useCallback(
-        (event: MouseEvent | TouchEvent) => {
+        async (event: MouseEvent | TouchEvent) => {
             if (!connectingNodeId.current) return;
 
-            const targetIsPane = (event.target as Element).classList.contains("react-flow__pane");
-            if (!targetIsPane) return;
+            const target = event.target as Element;
+            const sourceId = Number(connectingNodeId.current);
 
-            // Get position from event
-            const clientX = "changedTouches" in event ? event.changedTouches[0].clientX : event.clientX;
-            const clientY = "changedTouches" in event ? event.changedTouches[0].clientY : event.clientY;
+            // Check if dropped on a node (not on handle - handle is handled by onConnect)
+            const nodeElement = target.closest('.react-flow__node');
+            if (nodeElement) {
+                const targetNodeId = nodeElement.getAttribute('data-id');
+                if (targetNodeId && targetNodeId !== connectingNodeId.current) {
+                    // Dropped on a different node - make that node a child of source
+                    const targetId = Number(targetNodeId);
+                    console.log("[onConnectEnd] Dropped on node, making", targetId, "child of", sourceId);
 
-            // Open create dialog with the connecting node as parent
-            const parentId = Number(connectingNodeId.current);
-            setParentNodeId(parentId);
-            setCreateDialogOpen(true);
+                    // Find the target node to get its current parent for undo
+                    const targetNode = sitemapNodes.find((n) => n.id === targetId);
+                    const previousParentId = targetNode?.parentId ?? null;
+
+                    await execute(
+                        () => sitemapService.moveNode({ nodeId: targetId, newParentId: sourceId }),
+                        {
+                            errorTitle: "Failed to create connection",
+                        }
+                    );
+
+                    // Record action for undo/redo
+                    history.recordMoveNode(targetId, previousParentId, sourceId);
+
+                    await loadData(true);
+                }
+                connectingNodeId.current = null;
+                return;
+            }
+
+            // Check if dropped on empty pane - create new node
+            const targetIsPane = target.classList.contains("react-flow__pane");
+            if (targetIsPane) {
+                setParentNodeId(sourceId);
+                setCreateDialogOpen(true);
+            }
 
             connectingNodeId.current = null;
         },
-        []
+        [execute, loadData, history, sitemapNodes]
     );
 
     // Get all descendant IDs of a node
@@ -433,13 +556,14 @@ function SitemapEditorFlow() {
         const result = await execute<SitemapNode>(
             () => sitemapService.createNode(input),
             {
-                successMessage: "Node created successfully",
-                showSuccessToast: true,
                 errorTitle: "Failed to create node",
             }
         );
 
         if (result) {
+            // Record action for undo/redo
+            history.recordCreateNode(result.id, input);
+
             setCreateDialogOpen(false);
             // loadData will automatically run auto-layout for nodes without positions
             await loadData();
@@ -452,17 +576,18 @@ function SitemapEditorFlow() {
     };
 
     const handleDeleteNode = async (nodeId: number) => {
-        // Find the node to check if it's root
+        // Find the node to check if it's root and to save for undo
         const node = sitemapNodes.find((n) => n.id === nodeId);
-        if (node?.isRoot) {
+        if (!node || node.isRoot) {
             return; // Don't delete root node
         }
+
+        // Record action for undo BEFORE deleting
+        history.recordDeleteNode(node);
 
         await execute(
             () => sitemapService.deleteNode(nodeId),
             {
-                successMessage: "Node deleted successfully",
-                showSuccessToast: true,
                 errorTitle: "Failed to delete node",
             }
         );
@@ -479,21 +604,26 @@ function SitemapEditorFlow() {
         const match = selectedEdgeId.match(/^e(\d+)-(\d+)$/);
         if (!match) return;
 
+        const parentId = Number(match[1]);
         const childId = Number(match[2]);
+
+        console.log("[handleDeleteEdge] Removing parent from node", childId, "edgeId:", selectedEdgeId);
 
         // Move the child node to have no parent (becomes orphan)
         await execute(
             () => sitemapService.moveNode({ nodeId: childId, newParentId: undefined }),
             {
-                successMessage: "Connection removed",
-                showSuccessToast: true,
                 errorTitle: "Failed to remove connection",
             }
         );
 
+        // Record action for undo/redo (parentId -> null)
+        history.recordMoveNode(childId, parentId, null);
+
         closeEdgeContextMenu();
-        loadData();
-    }, [selectedEdgeId, execute, closeEdgeContextMenu, loadData]);
+        // Preserve positions when updating edges
+        await loadData(true);
+    }, [selectedEdgeId, execute, closeEdgeContextMenu, loadData, history]);
 
     // Bulk create nodes from paths
     const handleBulkCreate = useCallback(async (paths: string[]) => {
@@ -520,19 +650,17 @@ function SitemapEditorFlow() {
         }
     }, [sitemapId, sitemapNodes, loadData]);
 
-    // Double-Shift detection for Command Palette
-    const lastShiftPressRef = useRef<number>(0);
+    // Tab key opens Command Palette (when not in input)
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Shift" && !e.repeat) {
-                const now = Date.now();
-                if (now - lastShiftPressRef.current < 400) {
-                    // Double shift detected - open command palette
-                    setCommandPaletteOpen(true);
-                    lastShiftPressRef.current = 0;
-                } else {
-                    lastShiftPressRef.current = now;
+            if (e.key === "Tab" && !e.repeat) {
+                // Don't trigger if focused on input/textarea
+                const target = e.target as HTMLElement;
+                if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
+                    return;
                 }
+                e.preventDefault();
+                setCommandPaletteOpen(true);
             }
         };
 
@@ -667,12 +795,27 @@ function SitemapEditorFlow() {
             action: () => setBulkCreateDialogOpen(true),
         },
         {
-            key: "Shift",
-            description: "Command palette (double press)",
+            key: "z",
+            ctrl: true,
+            description: "Undo",
+            category: "History",
+            action: handleUndo,
+        },
+        {
+            key: "z",
+            ctrl: true,
+            shift: true,
+            description: "Redo",
+            category: "History",
+            action: handleRedo,
+        },
+        {
+            key: "Tab",
+            description: "Command palette",
             category: "General",
             action: () => {}, // Handled by separate effect
         },
-    ], [hasUnsavedChanges, handleSavePositions, handleAutoLayout, handleAddNode, handleDeleteSelectedNodes, setNodes]);
+    ], [hasUnsavedChanges, handleSavePositions, handleAutoLayout, handleAddNode, handleDeleteSelectedNodes, setNodes, handleUndo, handleRedo]);
 
     useHotkeys(hotkeys);
 
@@ -687,45 +830,117 @@ function SitemapEditorFlow() {
     return (
         <div className="h-full flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="border-b px-4 py-3 flex items-center justify-between bg-background shrink-0">
-                <div className="flex items-center gap-4">
+            <div className="border-b px-3 py-1.5 flex items-center justify-between bg-background shrink-0">
+                <div className="flex items-center gap-2">
                     <Button
                         variant="ghost"
                         size="icon"
+                        className="h-7 w-7"
                         onClick={handleNavigateBack}
                     >
                         <ArrowLeft className="h-4 w-4" />
                     </Button>
-                    <div>
-                        <h1 className="text-lg font-semibold">{sitemap?.name}</h1>
-                        <p className="text-sm text-muted-foreground">{site?.name}</p>
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{sitemap?.name}</span>
+                        <span className="text-xs text-muted-foreground">({site?.name})</span>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                     <HotkeysDialog hotkeys={hotkeys} />
-                    <Button variant="outline" size="sm" onClick={handleAutoLayout}>
-                        <LayoutGrid className="mr-2 h-4 w-4" />
-                        Auto Layout
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleAddNode()}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Node
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => setBulkCreateDialogOpen(true)}>
-                        <ListPlus className="mr-2 h-4 w-4" />
-                        Bulk Create
-                    </Button>
-                    <Button
-                        variant={hasUnsavedChanges ? "default" : "outline"}
-                        size="sm"
-                        onClick={handleSavePositions}
-                        className={cn(
-                            hasUnsavedChanges && "animate-pulse"
-                        )}
-                    >
-                        <Save className="mr-2 h-4 w-4" />
-                        Save
-                    </Button>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={handleUndo}
+                                disabled={!history.canUndo}
+                            >
+                                <Undo2 className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Undo <span className="text-muted-foreground ml-1">Ctrl+Z</span></p>
+                        </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={handleRedo}
+                                disabled={!history.canRedo}
+                            >
+                                <Redo2 className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Redo <span className="text-muted-foreground ml-1">Ctrl+Shift+Z</span></p>
+                        </TooltipContent>
+                    </Tooltip>
+                    <div className="w-px h-5 bg-border mx-1" />
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={handleAutoLayout}
+                            >
+                                <LayoutGrid className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Auto Layout <span className="text-muted-foreground ml-1">Ctrl+L</span></p>
+                        </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => handleAddNode()}
+                            >
+                                <Plus className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Add Node <span className="text-muted-foreground ml-1">Ctrl+N</span></p>
+                        </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => setBulkCreateDialogOpen(true)}
+                            >
+                                <ListPlus className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Bulk Create <span className="text-muted-foreground ml-1">Ctrl+B</span></p>
+                        </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant={hasUnsavedChanges ? "default" : "outline"}
+                                size="sm"
+                                className={cn("h-7", hasUnsavedChanges && "animate-pulse")}
+                                onClick={handleSavePositions}
+                            >
+                                <Save className="h-4 w-4 mr-1" />
+                                Save
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Save Layout <span className="text-muted-foreground ml-1">Ctrl+S</span></p>
+                        </TooltipContent>
+                    </Tooltip>
                 </div>
             </div>
 
@@ -816,6 +1031,7 @@ function SitemapEditorFlow() {
                     onUpdate={handleUpdateNode}
                     onDelete={() => handleDeleteNode(selectedNode.id)}
                     onAddChild={() => handleAddChild(selectedNode.id)}
+                    onRecordUpdate={history.recordUpdateNode}
                 />
             )}
 

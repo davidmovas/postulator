@@ -152,6 +152,7 @@ func (r *nodeRepository) GetRootNodes(ctx context.Context, sitemapID int64) ([]*
 func (r *nodeRepository) Update(ctx context.Context, node *entities.SitemapNode) error {
 	query, args := dbx.ST.
 		Update("sitemap_nodes").
+		Set("parent_id", node.ParentID).
 		Set("title", node.Title).
 		Set("slug", node.Slug).
 		Set("description", node.Description).

@@ -47,9 +47,9 @@ const getStatusClasses = (status: NodeContentStatus | undefined, isRoot: boolean
 function SitemapNodeCardComponent({ data, selected }: NodeProps<SitemapNodeData>) {
     const statusClasses = getStatusClasses(data.contentStatus, data.isRoot);
 
-    const cardContent = (
+    return (
         <>
-            {/* Left handle - target (hidden for root) */}
+            {/* Left handle - target (hidden for root) - MUST be direct child for React Flow */}
             {!data.isRoot && (
                 <Handle
                     type="target"
@@ -57,46 +57,45 @@ function SitemapNodeCardComponent({ data, selected }: NodeProps<SitemapNodeData>
                     className="!bg-primary !w-2.5 !h-2.5"
                 />
             )}
-            <Card
-                className={cn(
-                    "w-[200px] cursor-pointer transition-colors duration-200",
-                    "border-l-4",
-                    statusClasses.border,
-                    statusClasses.hover,
-                    selected && "ring-2 ring-primary"
-                )}
-            >
-                <CardContent className="p-3">
-                    <div className="flex items-start gap-2">
-                        {data.isRoot && (
-                            <div className="flex-shrink-0 text-primary mt-0.5">
-                                <Home className="h-4 w-4" />
-                            </div>
-                        )}
-                        <div className="min-w-0 flex-1">
-                            <p className="font-medium text-sm truncate">{data.title}</p>
-                            {!data.isRoot && (
-                                <p className="text-xs text-muted-foreground truncate">
-                                    /{data.slug}
-                                </p>
+
+            {/* Card wrapped in hover card */}
+            <NodeHoverCard node={data} delay={400}>
+                <Card
+                    className={cn(
+                        "w-[200px] cursor-pointer transition-colors duration-200",
+                        "border-l-4",
+                        statusClasses.border,
+                        statusClasses.hover,
+                        selected && "ring-2 ring-primary"
+                    )}
+                >
+                    <CardContent className="p-3">
+                        <div className="flex items-start gap-2">
+                            {data.isRoot && (
+                                <div className="flex-shrink-0 text-primary mt-0.5">
+                                    <Home className="h-4 w-4" />
+                                </div>
                             )}
+                            <div className="min-w-0 flex-1">
+                                <p className="font-medium text-sm truncate">{data.title}</p>
+                                {!data.isRoot && (
+                                    <p className="text-xs text-muted-foreground truncate">
+                                        /{data.slug}
+                                    </p>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                </CardContent>
-            </Card>
-            {/* Right handle - source */}
+                    </CardContent>
+                </Card>
+            </NodeHoverCard>
+
+            {/* Right handle - source - MUST be direct child for React Flow */}
             <Handle
                 type="source"
                 position={Position.Right}
                 className="!bg-primary !w-2.5 !h-2.5"
             />
         </>
-    );
-
-    return (
-        <NodeHoverCard node={data} delay={400}>
-            {cardContent}
-        </NodeHoverCard>
     );
 }
 
