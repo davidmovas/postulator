@@ -289,7 +289,10 @@ func (s *service) CreateNode(ctx context.Context, node *entities.SitemapNode) er
 	node.UpdatedAt = now
 
 	if err := s.nodeRepo.Create(ctx, node); err != nil {
-		s.logger.ErrorWithErr(err, "Failed to create node")
+		// Don't log ALREADY_EXISTS as error - it's an expected conflict, not a failure
+		if !errors.IsAlreadyExists(err) {
+			s.logger.ErrorWithErr(err, "Failed to create node")
+		}
 		return err
 	}
 
@@ -301,7 +304,9 @@ func (s *service) CreateNode(ctx context.Context, node *entities.SitemapNode) er
 		}
 	}
 
-	s.logger.Infof("Node created successfully: %d", node.ID)
+	// Update sitemap's updated_at
+	_ = s.repo.TouchUpdatedAt(ctx, node.SitemapID)
+
 	return nil
 }
 
@@ -350,6 +355,14 @@ func (s *service) GetNodes(ctx context.Context, sitemapID int64) ([]*entities.Si
 		return nil, err
 	}
 	return nodes, nil
+}
+
+func (s *service) FindNodeBySlugAndParent(ctx context.Context, sitemapID int64, slug string, parentID *int64) (*entities.SitemapNode, error) {
+	node, err := s.nodeRepo.GetBySlugAndParent(ctx, sitemapID, slug, parentID)
+	if err != nil {
+		return nil, err
+	}
+	return node, nil
 }
 
 func (s *service) GetNodesTree(ctx context.Context, sitemapID int64) ([]*entities.SitemapNode, error) {
@@ -410,18 +423,28 @@ func (s *service) UpdateNode(ctx context.Context, node *entities.SitemapNode) er
 		return err
 	}
 
-	s.logger.Infof("Node updated successfully: %d", node.ID)
+	// Update sitemap's updated_at
+	_ = s.repo.TouchUpdatedAt(ctx, node.SitemapID)
+
 	return nil
 }
 
 func (s *service) DeleteNode(ctx context.Context, id int64) error {
+	// Get node to know sitemap_id before deletion
+	node, err := s.nodeRepo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
 	// Delete will cascade to children and keywords due to FK constraints
 	if err := s.nodeRepo.Delete(ctx, id); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to delete node")
 		return err
 	}
 
-	s.logger.Infof("Node deleted successfully: %d", id)
+	// Update sitemap's updated_at
+	_ = s.repo.TouchUpdatedAt(ctx, node.SitemapID)
+
 	return nil
 }
 
@@ -461,7 +484,9 @@ func (s *service) MoveNode(ctx context.Context, nodeID int64, newParentID *int64
 		}
 	}
 
-	s.logger.Infof("Node moved successfully: %d", nodeID)
+	// Update sitemap's updated_at
+	_ = s.repo.TouchUpdatedAt(ctx, node.SitemapID)
+
 	return nil
 }
 
@@ -478,6 +503,12 @@ func (s *service) SetNodeKeywords(ctx context.Context, nodeID int64, keywords []
 		s.logger.ErrorWithErr(err, "Failed to set node keywords")
 		return err
 	}
+
+	// Update sitemap's updated_at
+	if node, err := s.nodeRepo.GetByID(ctx, nodeID); err == nil {
+		_ = s.repo.TouchUpdatedAt(ctx, node.SitemapID)
+	}
+
 	return nil
 }
 
@@ -490,6 +521,12 @@ func (s *service) AddNodeKeyword(ctx context.Context, nodeID int64, keyword stri
 		s.logger.ErrorWithErr(err, "Failed to add node keyword")
 		return err
 	}
+
+	// Update sitemap's updated_at
+	if node, err := s.nodeRepo.GetByID(ctx, nodeID); err == nil {
+		_ = s.repo.TouchUpdatedAt(ctx, node.SitemapID)
+	}
+
 	return nil
 }
 
@@ -503,7 +540,16 @@ func (s *service) RemoveNodeKeyword(ctx context.Context, nodeID int64, keyword s
 	// Find and delete the specific keyword
 	for _, kw := range keywords {
 		if kw.Keyword == keyword {
-			return s.keywordRepo.Delete(ctx, kw.ID)
+			if err := s.keywordRepo.Delete(ctx, kw.ID); err != nil {
+				return err
+			}
+
+			// Update sitemap's updated_at
+			if node, nodeErr := s.nodeRepo.GetByID(ctx, nodeID); nodeErr == nil {
+				_ = s.repo.TouchUpdatedAt(ctx, node.SitemapID)
+			}
+
+			return nil
 		}
 	}
 
@@ -516,6 +562,9 @@ func (s *service) DistributeKeywords(ctx context.Context, sitemapID int64, keywo
 		return err
 	}
 
+	// Update sitemap's updated_at
+	_ = s.repo.TouchUpdatedAt(ctx, sitemapID)
+
 	s.logger.Infof("Keywords distributed successfully for sitemap: %d", sitemapID)
 	return nil
 }
@@ -524,6 +573,11 @@ func (s *service) LinkNodeToArticle(ctx context.Context, nodeID int64, articleID
 	if err := s.nodeRepo.UpdateContentLink(ctx, nodeID, entities.NodeContentTypePost, &articleID, nil, nil); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to link node to article")
 		return err
+	}
+
+	// Update sitemap's updated_at
+	if node, err := s.nodeRepo.GetByID(ctx, nodeID); err == nil {
+		_ = s.repo.TouchUpdatedAt(ctx, node.SitemapID)
 	}
 
 	s.logger.Infof("Node %d linked to article %d", nodeID, articleID)
@@ -536,6 +590,11 @@ func (s *service) LinkNodeToPage(ctx context.Context, nodeID int64, wpPageID int
 		return err
 	}
 
+	// Update sitemap's updated_at
+	if node, err := s.nodeRepo.GetByID(ctx, nodeID); err == nil {
+		_ = s.repo.TouchUpdatedAt(ctx, node.SitemapID)
+	}
+
 	s.logger.Infof("Node %d linked to WP page %d", nodeID, wpPageID)
 	return nil
 }
@@ -544,6 +603,11 @@ func (s *service) UnlinkNodeContent(ctx context.Context, nodeID int64) error {
 	if err := s.nodeRepo.UpdateContentLink(ctx, nodeID, entities.NodeContentTypeNone, nil, nil, nil); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to unlink node content")
 		return err
+	}
+
+	// Update sitemap's updated_at
+	if node, err := s.nodeRepo.GetByID(ctx, nodeID); err == nil {
+		_ = s.repo.TouchUpdatedAt(ctx, node.SitemapID)
 	}
 
 	s.logger.Infof("Node %d content unlinked", nodeID)
@@ -555,6 +619,12 @@ func (s *service) UpdateNodeContentStatus(ctx context.Context, nodeID int64, sta
 		s.logger.ErrorWithErr(err, "Failed to update node content status")
 		return err
 	}
+
+	// Update sitemap's updated_at
+	if node, err := s.nodeRepo.GetByID(ctx, nodeID); err == nil {
+		_ = s.repo.TouchUpdatedAt(ctx, node.SitemapID)
+	}
+
 	return nil
 }
 
@@ -640,10 +710,10 @@ func (s *service) copyNode(original *entities.SitemapNode, newSitemapID int64, n
 		Depth:         original.Depth,
 		Position:      original.Position,
 		Path:          original.Path,
-		ContentType:   entities.NodeContentTypeNone,
+		ContentType:   original.ContentType,
 		Source:        original.Source,
 		IsSynced:      false,
-		ContentStatus: entities.NodeContentStatusPending,
+		ContentStatus: original.ContentStatus,
 		PositionX:     original.PositionX,
 		PositionY:     original.PositionY,
 	}

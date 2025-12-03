@@ -6,11 +6,10 @@ import { useQueryId } from "@/hooks/use-query-param";
 import { useApiCall } from "@/hooks/use-api-call";
 import { sitemapService } from "@/services/sitemaps";
 import { siteService } from "@/services/sites";
-import { Sitemap, SitemapSource } from "@/models/sitemaps";
+import { Sitemap } from "@/models/sitemaps";
 import { Site } from "@/models/sites";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
     Plus,
     Map,
@@ -22,6 +21,7 @@ import {
     Copy,
     Trash2,
     ArrowLeft,
+    Type,
 } from "lucide-react";
 import {
     DropdownMenu,
@@ -41,7 +41,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { formatDistanceToNow } from "date-fns";
+import { formatSmartDate } from "@/lib/time";
+import { ImportDialog } from "@/components/sitemaps/import-dialog";
 
 function SitemapsPageContent() {
     const router = useRouter();
@@ -53,13 +54,17 @@ function SitemapsPageContent() {
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
+    const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+    const [importDialogOpen, setImportDialogOpen] = useState(false);
     const [selectedSitemap, setSelectedSitemap] = useState<Sitemap | null>(null);
+    const [createdSitemapId, setCreatedSitemapId] = useState<number | null>(null);
 
     // Form states
     const [newName, setNewName] = useState("");
     const [newDescription, setNewDescription] = useState("");
-    const [newSource, setNewSource] = useState<SitemapSource>("manual");
+    const [newSource, setNewSource] = useState<"manual" | "imported" | "generated" | "scanned">("manual");
     const [duplicateName, setDuplicateName] = useState("");
+    const [renameName, setRenameName] = useState("");
 
     const loadData = async () => {
         const [siteResult, sitemapsResult] = await Promise.all([
@@ -94,8 +99,8 @@ function SitemapsPageContent() {
                     siteUrl: site.url,
                 }),
             {
-                successMessage: "Sitemap created successfully",
-                showSuccessToast: true,
+                successMessage: newSource === "imported" ? "Sitemap created" : "Sitemap created successfully",
+                showSuccessToast: newSource !== "imported",
                 errorTitle: "Failed to create sitemap",
             }
         );
@@ -104,9 +109,43 @@ function SitemapsPageContent() {
             setCreateDialogOpen(false);
             setNewName("");
             setNewDescription("");
-            setNewSource("manual");
-            router.push(`/sites/sitemaps/editor?id=${siteId}&sitemapId=${result.id}`);
+
+            if (newSource === "imported") {
+                // Open import dialog for the newly created sitemap
+                setCreatedSitemapId(result.id);
+                setImportDialogOpen(true);
+            } else {
+                setNewSource("manual");
+                router.push(`/sites/sitemaps/editor?id=${siteId}&sitemapId=${result.id}`);
+            }
         }
+    };
+
+    const [importSuccessful, setImportSuccessful] = useState(false);
+
+    const handleImportSuccess = () => {
+        // Just mark import as successful - navigation happens on dialog close
+        setImportSuccessful(true);
+    };
+
+    const handleImportClose = async (open: boolean) => {
+        if (!open) {
+            if (importSuccessful && createdSitemapId) {
+                // Import was successful - navigate to editor
+                router.push(`/sites/sitemaps/editor?id=${siteId}&sitemapId=${createdSitemapId}`);
+            } else if (createdSitemapId) {
+                // User closed dialog without importing - delete the empty sitemap
+                await execute(
+                    () => sitemapService.deleteSitemap(createdSitemapId),
+                    { errorTitle: "Failed to cancel sitemap creation" }
+                );
+                loadData();
+            }
+            setCreatedSitemapId(null);
+            setNewSource("manual");
+            setImportSuccessful(false);
+        }
+        setImportDialogOpen(open);
     };
 
     const handleDuplicate = async () => {
@@ -146,34 +185,30 @@ function SitemapsPageContent() {
         loadData();
     };
 
+    const handleRename = async () => {
+        if (!selectedSitemap) return;
+
+        await execute(
+            () =>
+                sitemapService.updateSitemap({
+                    ...selectedSitemap,
+                    name: renameName,
+                }),
+            {
+                successMessage: "Sitemap renamed successfully",
+                showSuccessToast: true,
+                errorTitle: "Failed to rename sitemap",
+            }
+        );
+
+        setRenameDialogOpen(false);
+        setRenameName("");
+        setSelectedSitemap(null);
+        loadData();
+    };
+
     const openEditor = (sitemapId: number) => {
         router.push(`/sites/sitemaps/editor?id=${siteId}&sitemapId=${sitemapId}`);
-    };
-
-    const getSourceIcon = (source: SitemapSource) => {
-        switch (source) {
-            case "manual":
-                return <Map className="h-4 w-4" />;
-            case "imported":
-                return <FileInput className="h-4 w-4" />;
-            case "generated":
-                return <Sparkles className="h-4 w-4" />;
-            case "scanned":
-                return <ScanLine className="h-4 w-4" />;
-        }
-    };
-
-    const getStatusBadge = (status: string) => {
-        switch (status) {
-            case "active":
-                return <Badge variant="default">Active</Badge>;
-            case "draft":
-                return <Badge variant="secondary">Draft</Badge>;
-            case "archived":
-                return <Badge variant="outline">Archived</Badge>;
-            default:
-                return <Badge variant="outline">{status}</Badge>;
-        }
     };
 
     if (isLoading && !site) {
@@ -260,6 +295,17 @@ function SitemapsPageContent() {
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 setSelectedSitemap(sitemap);
+                                                setRenameName(sitemap.name);
+                                                setRenameDialogOpen(true);
+                                            }}
+                                        >
+                                            <Type className="mr-2 h-4 w-4" />
+                                            Rename
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedSitemap(sitemap);
                                                 setDuplicateName(`${sitemap.name} (Copy)`);
                                                 setDuplicateDialogOpen(true);
                                             }}
@@ -283,15 +329,8 @@ function SitemapsPageContent() {
                                 </DropdownMenu>
                             </CardHeader>
                             <CardContent>
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                        {getSourceIcon(sitemap.source)}
-                                        <span className="capitalize">{sitemap.source}</span>
-                                    </div>
-                                    {getStatusBadge(sitemap.status)}
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-2">
-                                    Updated {formatDistanceToNow(new Date(sitemap.updatedAt), { addSuffix: true })}
+                                <p className="text-xs text-muted-foreground">
+                                    Updated {formatSmartDate(sitemap.updatedAt)}
                                 </p>
                             </CardContent>
                         </Card>
@@ -334,22 +373,23 @@ function SitemapsPageContent() {
                                 {[
                                     { value: "manual", label: "Manual", icon: Map, description: "Build from scratch" },
                                     { value: "imported", label: "Import", icon: FileInput, description: "From file" },
-                                    { value: "generated", label: "AI Generate", icon: Sparkles, description: "AI-powered" },
-                                    { value: "scanned", label: "Scan Site", icon: ScanLine, description: "From WP" },
+                                    { value: "generated", label: "AI Generate", icon: Sparkles, description: "AI-powered", disabled: true },
+                                    { value: "scanned", label: "Scan Site", icon: ScanLine, description: "From WP", disabled: true },
                                 ].map((option) => (
                                     <Button
                                         key={option.value}
                                         type="button"
                                         variant={newSource === option.value ? "default" : "outline"}
                                         className="h-auto flex-col items-start p-3"
-                                        onClick={() => setNewSource(option.value as SitemapSource)}
+                                        onClick={() => !option.disabled && setNewSource(option.value as "manual" | "imported" | "generated" | "scanned")}
+                                        disabled={option.disabled}
                                     >
                                         <div className="flex items-center gap-2">
                                             <option.icon className="h-4 w-4" />
                                             <span>{option.label}</span>
                                         </div>
                                         <span className="text-xs text-muted-foreground font-normal">
-                                            {option.description}
+                                            {option.disabled ? "Coming soon" : option.description}
                                         </span>
                                     </Button>
                                 ))}
@@ -418,6 +458,47 @@ function SitemapsPageContent() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Rename Dialog */}
+            <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Rename Sitemap</DialogTitle>
+                        <DialogDescription>
+                            Enter a new name for "{selectedSitemap?.name}".
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="renameName">Name</Label>
+                            <Input
+                                id="renameName"
+                                value={renameName}
+                                onChange={(e) => setRenameName(e.target.value)}
+                                placeholder="Sitemap name"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setRenameDialogOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleRename} disabled={!renameName.trim() || isLoading}>
+                            Rename
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Import Dialog */}
+            {createdSitemapId && (
+                <ImportDialog
+                    open={importDialogOpen}
+                    onOpenChange={handleImportClose}
+                    sitemapId={createdSitemapId}
+                    onSuccess={handleImportSuccess}
+                />
+            )}
         </div>
     );
 }

@@ -145,6 +145,32 @@ func (r *nodeRepository) GetByParentID(ctx context.Context, sitemapID int64, par
 	return r.queryNodes(ctx, query, args)
 }
 
+func (r *nodeRepository) GetBySlugAndParent(ctx context.Context, sitemapID int64, slug string, parentID *int64) (*entities.SitemapNode, error) {
+	builder := dbx.ST.
+		Select(nodeColumns()...).
+		From("sitemap_nodes").
+		Where(squirrel.Eq{"sitemap_id": sitemapID}).
+		Where(squirrel.Eq{"slug": slug})
+
+	if parentID == nil {
+		builder = builder.Where("parent_id IS NULL")
+	} else {
+		builder = builder.Where(squirrel.Eq{"parent_id": *parentID})
+	}
+
+	query, args := builder.Limit(1).MustSql()
+
+	node, err := r.scanNode(r.db.QueryRowContext(ctx, query, args...))
+	if err != nil {
+		if dbx.IsNoRows(err) {
+			return nil, errors.NotFound("sitemap node", fmt.Sprintf("slug=%s", slug))
+		}
+		return nil, errors.Database(err)
+	}
+
+	return node, nil
+}
+
 func (r *nodeRepository) GetRootNodes(ctx context.Context, sitemapID int64) ([]*entities.SitemapNode, error) {
 	return r.GetByParentID(ctx, sitemapID, nil)
 }

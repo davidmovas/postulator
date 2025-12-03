@@ -245,3 +245,32 @@ type SitemapWithNodes struct {
 	Sitemap *Sitemap       `json:"sitemap"`
 	Nodes   []*SitemapNode `json:"nodes"`
 }
+
+// =========================================================================
+// Import DTOs
+// =========================================================================
+
+type ImportNodesRequest struct {
+	SitemapID      int64  `json:"sitemapId"`
+	ParentNodeID   *int64 `json:"parentNodeId,omitempty"` // If set, import as children of this node
+	Filename       string `json:"filename"`
+	FileDataBase64 string `json:"fileDataBase64"` // Base64 encoded file content
+}
+
+type ImportNodesResponse struct {
+	TotalRows      int           `json:"totalRows"`
+	NodesCreated   int           `json:"nodesCreated"`
+	NodesSkipped   int           `json:"nodesSkipped"`
+	Errors         []ImportError `json:"errors,omitempty"`
+	ProcessingTime string        `json:"processingTime"`
+}
+
+type ImportError struct {
+	Row     int    `json:"row,omitempty"`
+	Column  string `json:"column,omitempty"`
+	Message string `json:"message"`
+}
+
+type SupportedFormatsResponse struct {
+	Formats []string `json:"formats"`
+}

@@ -58,6 +58,7 @@ import {
     ListPlus,
     Undo2,
     Redo2,
+    Upload,
 } from "lucide-react";
 import {
     Tooltip,
@@ -73,6 +74,7 @@ import { EdgeContextMenu } from "@/components/sitemaps/edge-context-menu";
 import { HotkeysDialog } from "@/components/sitemaps/hotkeys-dialog";
 import { BulkCreateDialog } from "@/components/sitemaps/bulk-create-dialog";
 import { CommandPalette } from "@/components/sitemaps/command-palette";
+import { ImportDialog } from "@/components/sitemaps/import-dialog";
 import { createNodesFromPaths } from "@/lib/sitemap-utils";
 import { cn } from "@/lib/utils";
 
@@ -190,6 +192,7 @@ function SitemapEditorFlow() {
     const [edgeContextMenuPosition, setEdgeContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
     const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
     const [bulkCreateDialogOpen, setBulkCreateDialogOpen] = useState(false);
+    const [importDialogOpen, setImportDialogOpen] = useState(false);
     const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
     const [hotkeysDialogOpen, setHotkeysDialogOpen] = useState(false);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -795,6 +798,13 @@ function SitemapEditorFlow() {
             action: () => setBulkCreateDialogOpen(true),
         },
         {
+            key: "i",
+            ctrl: true,
+            description: "Import from file",
+            category: "Nodes",
+            action: () => setImportDialogOpen(true),
+        },
+        {
             key: "z",
             ctrl: true,
             description: "Undo",
@@ -928,6 +938,21 @@ function SitemapEditorFlow() {
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => setImportDialogOpen(true)}
+                            >
+                                <Upload className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Import <span className="text-muted-foreground ml-1">Ctrl+I</span></p>
+                        </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
                                 variant={hasUnsavedChanges ? "default" : "outline"}
                                 size="sm"
                                 className={cn("h-7", hasUnsavedChanges && "animate-pulse")}
@@ -947,7 +972,7 @@ function SitemapEditorFlow() {
             {/* Main Content */}
             <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
                 {/* Sidebar */}
-                <ResizablePanel defaultSize={20} minSize={15} maxSize={35}>
+                <ResizablePanel defaultSize={20} minSize={15} maxSize={35} className="overflow-hidden">
                     <SitemapSidebar
                         nodes={sitemapNodes}
                         selectedNodeIds={sidebarSelectedNodeIds}
@@ -1070,6 +1095,14 @@ function SitemapEditorFlow() {
                 onSubmit={handleBulkCreate}
             />
 
+            {/* Import Dialog */}
+            <ImportDialog
+                open={importDialogOpen}
+                onOpenChange={setImportDialogOpen}
+                sitemapId={sitemapId}
+                onSuccess={() => loadData()}
+            />
+
             {/* Command Palette */}
             <CommandPalette
                 open={commandPaletteOpen}
@@ -1080,6 +1113,7 @@ function SitemapEditorFlow() {
                 onAutoLayout={handleAutoLayout}
                 onAddNode={() => handleAddNode()}
                 onBulkCreate={() => setBulkCreateDialogOpen(true)}
+                onImport={() => setImportDialogOpen(true)}
                 onFocusSearch={() => searchInputRef.current?.focus()}
                 onDeleteSelected={handleDeleteSelectedNodes}
                 onShowHotkeys={() => setHotkeysDialogOpen(true)}

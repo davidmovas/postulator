@@ -24,6 +24,8 @@ import {
     LinkNodeToPage,
     UnlinkNodeContent,
     UpdateNodeContentStatus,
+    GetSupportedImportFormats,
+    ImportNodes,
 } from "@/wailsjs/wailsjs/go/handlers/SitemapsHandler";
 import {
     Sitemap,
@@ -35,11 +37,14 @@ import {
     UpdateNodeInput,
     MoveNodeInput,
     UpdateNodePositionsInput,
+    ImportNodesInput,
+    ImportNodesResult,
     SitemapStatus,
     NodeContentStatus,
     mapSitemap,
     mapSitemapNode,
     mapSitemapWithNodes,
+    mapImportNodesResult,
 } from "@/models/sitemaps";
 import { unwrapArrayResponse, unwrapResponse } from "@/lib/api-utils";
 
@@ -248,5 +253,24 @@ export const sitemapService = {
     async updateNodeContentStatus(nodeId: number, status: NodeContentStatus): Promise<void> {
         const response = await UpdateNodeContentStatus(nodeId, status);
         unwrapResponse<string>(response);
+    },
+
+    async getSupportedImportFormats(): Promise<string[]> {
+        const response = await GetSupportedImportFormats();
+        const data = unwrapResponse<dto.SupportedFormatsResponse>(response);
+        return data.formats || [];
+    },
+
+    async importNodes(input: ImportNodesInput): Promise<ImportNodesResult> {
+        const payload = new dto.ImportNodesRequest({
+            sitemapId: input.sitemapId,
+            parentNodeId: input.parentNodeId,
+            filename: input.filename,
+            fileDataBase64: input.fileDataBase64,
+        });
+
+        const response = await ImportNodes(payload);
+        const data = unwrapResponse<dto.ImportNodesResponse>(response);
+        return mapImportNodesResult(data);
     },
 };

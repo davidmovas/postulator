@@ -103,6 +103,27 @@ export interface UpdateNodePositionsInput {
     positionY: number;
 }
 
+export interface ImportNodesInput {
+    sitemapId: number;
+    parentNodeId?: number;
+    filename: string;
+    fileDataBase64: string;
+}
+
+export interface ImportError {
+    row?: number;
+    column?: string;
+    message: string;
+}
+
+export interface ImportNodesResult {
+    totalRows: number;
+    nodesCreated: number;
+    nodesSkipped: number;
+    errors: ImportError[];
+    processingTime: string;
+}
+
 // =========================================================================
 // Mappers
 // =========================================================================
@@ -153,5 +174,19 @@ export function mapSitemapWithNodes(x: dto.SitemapWithNodes): SitemapWithNodes {
     return {
         sitemap: mapSitemap(x.sitemap!),
         nodes: (x.nodes || []).map(mapSitemapNode),
+    };
+}
+
+export function mapImportNodesResult(x: dto.ImportNodesResponse): ImportNodesResult {
+    return {
+        totalRows: x.totalRows,
+        nodesCreated: x.nodesCreated,
+        nodesSkipped: x.nodesSkipped,
+        errors: (x.errors || []).map((e) => ({
+            row: e.row,
+            column: e.column,
+            message: e.message,
+        })),
+        processingTime: x.processingTime,
     };
 }

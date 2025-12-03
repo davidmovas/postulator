@@ -26,6 +26,10 @@ export function GetSitemap(arg1:number):Promise<dto.Response_github_com_davidmov
 
 export function GetSitemapWithNodes(arg1:number):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_SitemapWithNodes_>;
 
+export function GetSupportedImportFormats():Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_SupportedFormatsResponse_>;
+
+export function ImportNodes(arg1:dto.ImportNodesRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_ImportNodesResponse_>;
+
 export function LinkNodeToArticle(arg1:dto.LinkNodeToArticleRequest):Promise<dto.Response_string_>;
 
 export function LinkNodeToPage(arg1:dto.LinkNodeToPageRequest):Promise<dto.Response_string_>;

@@ -1,19 +1,26 @@
 package handlers
 
 import (
+	"encoding/base64"
+
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/sitemap"
+	"github.com/davidmovas/postulator/internal/domain/sitemap/importer"
 	"github.com/davidmovas/postulator/internal/dto"
 	"github.com/davidmovas/postulator/pkg/ctx"
+	"github.com/davidmovas/postulator/pkg/errors"
+	"github.com/davidmovas/postulator/pkg/logger"
 )
 
 type SitemapsHandler struct {
-	service sitemap.Service
+	service  sitemap.Service
+	importer *importer.Importer
 }
 
-func NewSitemapsHandler(service sitemap.Service) *SitemapsHandler {
+func NewSitemapsHandler(service sitemap.Service, log *logger.Logger) *SitemapsHandler {
 	return &SitemapsHandler{
-		service: service,
+		service:  service,
+		importer: importer.NewImporter(log),
 	}
 }
 
@@ -297,4 +304,56 @@ func (h *SitemapsHandler) UpdateNodeContentStatus(nodeID int64, status string) *
 	}
 
 	return ok("Node content status updated successfully")
+}
+
+// =========================================================================
+// Import Operations
+// =========================================================================
+
+func (h *SitemapsHandler) GetSupportedImportFormats() *dto.Response[*dto.SupportedFormatsResponse] {
+	return ok(&dto.SupportedFormatsResponse{
+		Formats: h.importer.SupportedFormats(),
+	})
+}
+
+func (h *SitemapsHandler) ImportNodes(req *dto.ImportNodesRequest) *dto.Response[*dto.ImportNodesResponse] {
+	// Decode base64 file data
+	fileData, err := base64.StdEncoding.DecodeString(req.FileDataBase64)
+	if err != nil {
+		return fail[*dto.ImportNodesResponse](errors.Validation("Invalid file data: failed to decode base64"))
+	}
+
+	opts := &importer.ImportOptions{
+		ParentNodeID: req.ParentNodeID,
+	}
+
+	stats, err := h.importer.Import(
+		ctx.FastCtx(),
+		req.Filename,
+		fileData,
+		req.SitemapID,
+		h.service, // Service implements NodeCreator interface
+		opts,
+	)
+	if err != nil {
+		return fail[*dto.ImportNodesResponse](err)
+	}
+
+	// Convert import errors to DTO
+	importErrors := make([]dto.ImportError, len(stats.Errors))
+	for i, e := range stats.Errors {
+		importErrors[i] = dto.ImportError{
+			Row:     e.Row,
+			Column:  e.Column,
+			Message: e.Message,
+		}
+	}
+
+	return ok(&dto.ImportNodesResponse{
+		TotalRows:      stats.TotalRows,
+		NodesCreated:   stats.NodesCreated,
+		NodesSkipped:   stats.NodesSkipped,
+		Errors:         importErrors,
+		ProcessingTime: stats.ProcessingTime.String(),
+	})
 }

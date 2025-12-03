@@ -15,16 +15,16 @@ export default function DashboardLayout({
     return (
         <SidebarProvider>
             <AppSidebar />
-            <SidebarInset className="relative">
+            <SidebarInset className="relative h-svh max-h-svh overflow-hidden">
                 <AppBackground />
-                <header className="flex h-16 shrink-0 items-center gap-2 border-b relative z-10"> {/* Добавляем z-10 */}
+                <header className="flex h-16 shrink-0 items-center gap-2 border-b relative z-10">
                     <div className="flex flex-1 items-center gap-2 px-3">
                         <SidebarTrigger />
                         <Separator orientation="vertical" className="mr-2 h-4" />
                         <DynamicBreadcrumbs />
                     </div>
                 </header>
-                <div className="flex-1 min-h-0 relative z-10">
+                <div className="flex-1 min-h-0 overflow-hidden relative z-10">
                     {children}
                 </div>
             </SidebarInset>

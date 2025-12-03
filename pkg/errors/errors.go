@@ -162,6 +162,26 @@ func ConflictWithContext(message string, ctx map[string]any) *AppError {
 	return err
 }
 
+func IsAlreadyExists(err error) bool {
+	for err != nil {
+		var ae *AppError
+		if errors.As(err, &ae) {
+			if ae.Code == ErrCodeAlreadyExists {
+				return true
+			}
+			err = ae.Unwrap()
+			continue
+		}
+		type unwrapper interface{ Unwrap() error }
+		if u, ok := err.(unwrapper); ok {
+			err = u.Unwrap()
+			continue
+		}
+		break
+	}
+	return false
+}
+
 func IsNoResources(err error) bool {
 	for err != nil {
 		var ae *AppError

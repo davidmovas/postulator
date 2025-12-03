@@ -528,6 +528,78 @@ export namespace dto {
 	        this.is_anonymous = source["is_anonymous"];
 	    }
 	}
+	export class ImportError {
+	    row?: number;
+	    column?: string;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportError(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.row = source["row"];
+	        this.column = source["column"];
+	        this.message = source["message"];
+	    }
+	}
+	export class ImportNodesRequest {
+	    sitemapId: number;
+	    parentNodeId?: number;
+	    filename: string;
+	    fileDataBase64: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportNodesRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sitemapId = source["sitemapId"];
+	        this.parentNodeId = source["parentNodeId"];
+	        this.filename = source["filename"];
+	        this.fileDataBase64 = source["fileDataBase64"];
+	    }
+	}
+	export class ImportNodesResponse {
+	    totalRows: number;
+	    nodesCreated: number;
+	    nodesSkipped: number;
+	    errors?: ImportError[];
+	    processingTime: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportNodesResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.totalRows = source["totalRows"];
+	        this.nodesCreated = source["nodesCreated"];
+	        this.nodesSkipped = source["nodesSkipped"];
+	        this.errors = this.convertValues(source["errors"], ImportError);
+	        this.processingTime = source["processingTime"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class ImportResult {
 	    totalRead: number;
 	    totalAdded: number;
@@ -1372,6 +1444,40 @@ export namespace dto {
 		    return a;
 		}
 	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_ImportNodesResponse_ {
+	    success: boolean;
+	    data?: ImportNodesResponse;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_ImportNodesResponse_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], ImportNodesResponse);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Response__github_com_davidmovas_postulator_internal_dto_ImportResult_ {
 	    success: boolean;
 	    data?: ImportResult;
@@ -2021,6 +2127,52 @@ export namespace dto {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
 	        this.data = this.convertValues(source["data"], Sitemap);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SupportedFormatsResponse {
+	    formats: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SupportedFormatsResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.formats = source["formats"];
+	    }
+	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_SupportedFormatsResponse_ {
+	    success: boolean;
+	    data?: SupportedFormatsResponse;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_SupportedFormatsResponse_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], SupportedFormatsResponse);
 	        this.error = this.convertValues(source["error"], Error);
 	    }
 	
@@ -2703,6 +2855,7 @@ export namespace dto {
 	        this.keywords = source["keywords"];
 	    }
 	}
+	
 	
 	
 	

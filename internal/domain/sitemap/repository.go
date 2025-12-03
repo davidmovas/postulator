@@ -233,3 +233,18 @@ func (r *repository) UpdateStatus(ctx context.Context, id int64, status entities
 
 	return nil
 }
+
+func (r *repository) TouchUpdatedAt(ctx context.Context, id int64) error {
+	query, args := dbx.ST.
+		Update("sitemaps").
+		Set("updated_at", time.Now()).
+		Where(squirrel.Eq{"id": id}).
+		MustSql()
+
+	_, err := r.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return errors.Database(err)
+	}
+
+	return nil
+}

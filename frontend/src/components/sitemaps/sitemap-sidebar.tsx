@@ -267,8 +267,8 @@ export function SitemapSidebar({
     const selectedCount = selectedNodeIds.size;
 
     return (
-        <div className="h-full flex flex-col bg-background">
-            <div className="p-3 border-b">
+        <div className="h-full flex flex-col bg-background overflow-hidden">
+            <div className="p-3 border-b shrink-0">
                 <div className="relative">
                     <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -281,7 +281,7 @@ export function SitemapSidebar({
                 </div>
             </div>
 
-            <ScrollArea className="flex-1">
+            <ScrollArea className="flex-1 min-h-0">
                 <div className="p-2">
                     {tree.length === 0 ? (
                         <div className="text-center py-8 text-sm text-muted-foreground">
@@ -303,7 +303,7 @@ export function SitemapSidebar({
                 </div>
             </ScrollArea>
 
-            <div className="p-3 border-t text-xs text-muted-foreground text-center">
+            <div className="p-3 border-t text-xs text-muted-foreground text-center shrink-0">
                 {selectedCount > 0 ? (
                     <span>{selectedCount} selected / {nodes.length} nodes</span>
                 ) : (

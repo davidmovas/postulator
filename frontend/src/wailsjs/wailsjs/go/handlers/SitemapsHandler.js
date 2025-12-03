@@ -50,6 +50,14 @@ export function GetSitemapWithNodes(arg1) {
   return window['go']['handlers']['SitemapsHandler']['GetSitemapWithNodes'](arg1);
 }
 
+export function GetSupportedImportFormats() {
+  return window['go']['handlers']['SitemapsHandler']['GetSupportedImportFormats']();
+}
+
+export function ImportNodes(arg1) {
+  return window['go']['handlers']['SitemapsHandler']['ImportNodes'](arg1);
+}
+
 export function LinkNodeToArticle(arg1) {
   return window['go']['handlers']['SitemapsHandler']['LinkNodeToArticle'](arg1);
 }

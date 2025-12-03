@@ -18,6 +18,7 @@ import {
     ListPlus,
     Keyboard,
     Trash2,
+    Upload,
 } from "lucide-react";
 
 interface CommandPaletteProps {
@@ -29,6 +30,7 @@ interface CommandPaletteProps {
     onAutoLayout: () => void;
     onAddNode: () => void;
     onBulkCreate: () => void;
+    onImport: () => void;
     onFocusSearch: () => void;
     onDeleteSelected: () => void;
     onShowHotkeys: () => void;
@@ -43,6 +45,7 @@ export function CommandPalette({
     onAutoLayout,
     onAddNode,
     onBulkCreate,
+    onImport,
     onFocusSearch,
     onDeleteSelected,
     onShowHotkeys,
@@ -68,6 +71,11 @@ export function CommandPalette({
                         <ListPlus className="mr-2 h-4 w-4" />
                         <span>Bulk Create Nodes</span>
                         <CommandShortcut>Ctrl+B</CommandShortcut>
+                    </CommandItem>
+                    <CommandItem onSelect={() => runCommand(onImport)}>
+                        <Upload className="mr-2 h-4 w-4" />
+                        <span>Import from File</span>
+                        <CommandShortcut>Ctrl+I</CommandShortcut>
                     </CommandItem>
                     {hasSelectedNodes && (
                         <CommandItem onSelect={() => runCommand(onDeleteSelected)}>
