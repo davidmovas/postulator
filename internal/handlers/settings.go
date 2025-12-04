@@ -52,3 +52,22 @@ func (h *SettingsHandler) GetAppVersion() *dto.Response[*dto.AppVersion] {
 		BuildDate: info.BuildDate,
 	})
 }
+
+func (h *SettingsHandler) GetDashboardSettings() *dto.Response[*dto.DashboardSettings] {
+	s, err := h.service.GetDashboardSettings(ctx.FastCtx())
+	if err != nil {
+		return fail[*dto.DashboardSettings](err)
+	}
+
+	return ok(dto.NewDashboardSettings(s))
+}
+
+func (h *SettingsHandler) UpdateDashboardSettings(settings *dto.DashboardSettings) *dto.Response[string] {
+	entity := settings.ToEntity()
+
+	if err := h.service.UpdateDashboardSettings(ctx.FastCtx(), entity); err != nil {
+		return fail[string](err)
+	}
+
+	return ok("Dashboard settings updated successfully")
+}

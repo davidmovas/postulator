@@ -21,6 +21,14 @@ type AnthropicClient struct {
 	model  string
 }
 
+func (c *AnthropicClient) GetProviderName() string {
+	return "anthropic"
+}
+
+func (c *AnthropicClient) GetModelName() string {
+	return c.model
+}
+
 type AnthropicConfig struct {
 	APIKey string
 	Model  string
@@ -106,14 +114,21 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 
 	inputTokens := int(message.Usage.InputTokens)
 	outputTokens := int(message.Usage.OutputTokens)
+	totalTokens := inputTokens + outputTokens
 	cost := CalculateCost(entities.TypeAnthropic, c.model, inputTokens, outputTokens)
 
 	return &ArticleResult{
 		Title:      article.Title,
 		Excerpt:    article.Excerpt,
 		Content:    article.Content,
-		TokensUsed: inputTokens + outputTokens,
+		TokensUsed: totalTokens,
 		Cost:       cost,
+		Usage: Usage{
+			InputTokens:  inputTokens,
+			OutputTokens: outputTokens,
+			TotalTokens:  totalTokens,
+			CostUSD:      cost,
+		},
 	}, nil
 }
 
@@ -278,11 +293,18 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 
 	inputTokens := int(message.Usage.InputTokens)
 	outputTokens := int(message.Usage.OutputTokens)
+	totalTokens := inputTokens + outputTokens
 	cost := CalculateCost(entities.TypeAnthropic, c.model, inputTokens, outputTokens)
 
 	return &SitemapStructureResult{
 		Nodes:      result.Nodes,
-		TokensUsed: inputTokens + outputTokens,
+		TokensUsed: totalTokens,
 		Cost:       cost,
+		Usage: Usage{
+			InputTokens:  inputTokens,
+			OutputTokens: outputTokens,
+			TotalTokens:  totalTokens,
+			CostUSD:      cost,
+		},
 	}, nil
 }

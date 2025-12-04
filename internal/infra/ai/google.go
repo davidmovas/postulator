@@ -20,6 +20,14 @@ type GoogleClient struct {
 	model  string
 }
 
+func (c *GoogleClient) GetProviderName() string {
+	return "google"
+}
+
+func (c *GoogleClient) GetModelName() string {
+	return c.model
+}
+
 type GoogleConfig struct {
 	APIKey string
 	Model  string
@@ -109,14 +117,21 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 		inputTokens = int(resp.UsageMetadata.PromptTokenCount)
 		outputTokens = int(resp.UsageMetadata.CandidatesTokenCount)
 	}
+	totalTokens := inputTokens + outputTokens
 	cost := CalculateCost(entities.TypeGoogle, c.model, inputTokens, outputTokens)
 
 	return &ArticleResult{
 		Title:      article.Title,
 		Excerpt:    article.Excerpt,
 		Content:    article.Content,
-		TokensUsed: inputTokens + outputTokens,
+		TokensUsed: totalTokens,
 		Cost:       cost,
+		Usage: Usage{
+			InputTokens:  inputTokens,
+			OutputTokens: outputTokens,
+			TotalTokens:  totalTokens,
+			CostUSD:      cost,
+		},
 	}, nil
 }
 
@@ -265,11 +280,18 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 		inputTokens = int(resp.UsageMetadata.PromptTokenCount)
 		outputTokens = int(resp.UsageMetadata.CandidatesTokenCount)
 	}
+	totalTokens := inputTokens + outputTokens
 	cost := CalculateCost(entities.TypeGoogle, c.model, inputTokens, outputTokens)
 
 	return &SitemapStructureResult{
 		Nodes:      result.Nodes,
-		TokensUsed: inputTokens + outputTokens,
+		TokensUsed: totalTokens,
 		Cost:       cost,
+		Usage: Usage{
+			InputTokens:  inputTokens,
+			OutputTokens: outputTokens,
+			TotalTokens:  totalTokens,
+			CostUSD:      cost,
+		},
 	}, nil
 }

@@ -38,6 +38,7 @@ func New(cfg *config.Config) (*App, error) {
 		dialogsHandler     *handlers.DialogsHandler
 		appHandler         *handlers.AppHandler
 		sitemapsHandler    *handlers.SitemapsHandler
+		aiUsageHandler     *handlers.AIUsageHandler
 	)
 
 	fxApp := fx.New(
@@ -64,6 +65,7 @@ func New(cfg *config.Config) (*App, error) {
 			&dialogsHandler,
 			&appHandler,
 			&sitemapsHandler,
+			&aiUsageHandler,
 		),
 	)
 
@@ -86,6 +88,7 @@ func New(cfg *config.Config) (*App, error) {
 			dialogsHandler,
 			appHandler,
 			sitemapsHandler,
+			aiUsageHandler,
 		},
 		dialogsHandler: dialogsHandler,
 		appHandler:     appHandler,

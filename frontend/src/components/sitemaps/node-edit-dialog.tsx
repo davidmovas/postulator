@@ -42,7 +42,6 @@ interface NodeEditDialogProps {
     onCreate?: (input: CreateNodeInput) => void;
     onDelete?: () => void;
     onAddChild?: () => void;
-    onRecordUpdate?: (nodeId: number, previousData: Partial<SitemapNode>, newData: Partial<SitemapNode>) => void;
 }
 
 export function NodeEditDialog({
@@ -55,7 +54,6 @@ export function NodeEditDialog({
     onCreate,
     onDelete,
     onAddChild,
-    onRecordUpdate,
 }: NodeEditDialogProps) {
     const { execute, isLoading } = useApiCall();
     const isEditMode = !!node;
@@ -158,23 +156,6 @@ export function NodeEditDialog({
                 keywords,
             };
 
-            // Record the update for undo/redo BEFORE applying
-            if (onRecordUpdate && initialValuesRef.current) {
-                const previousData: Partial<SitemapNode> = {
-                    title: initialValuesRef.current.title,
-                    slug: initialValuesRef.current.slug,
-                    description: initialValuesRef.current.description || undefined,
-                    keywords: initialValuesRef.current.keywords,
-                };
-                const newData: Partial<SitemapNode> = {
-                    title,
-                    slug,
-                    description: description || undefined,
-                    keywords,
-                };
-                onRecordUpdate(node.id, previousData, newData);
-            }
-
             await execute(() => sitemapService.updateNode(input), {
                 errorTitle: "Failed to update node",
             });
@@ -192,7 +173,7 @@ export function NodeEditDialog({
 
             onCreate?.(input);
         }
-    }, [isEditMode, node, isRootNode, title, slug, description, keywords, execute, onUpdate, sitemapId, parentId, onCreate, onRecordUpdate]);
+    }, [isEditMode, node, isRootNode, title, slug, description, keywords, execute, onUpdate, sitemapId, parentId, onCreate]);
 
     // Auto-save on close for edit mode
     const handleOpenChange = useCallback(async (newOpen: boolean) => {

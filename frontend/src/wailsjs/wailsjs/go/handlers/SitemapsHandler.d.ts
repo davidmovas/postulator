@@ -6,6 +6,8 @@ export function AddNodeKeyword(arg1:number,arg2:string):Promise<dto.Response_str
 
 export function CancelSitemapGeneration():Promise<dto.Response_string_>;
 
+export function ClearHistory(arg1:number):Promise<dto.Response_string_>;
+
 export function CreateNode(arg1:dto.CreateNodeRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_SitemapNode_>;
 
 export function CreateSitemap(arg1:dto.CreateSitemapRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_Sitemap_>;
@@ -19,6 +21,8 @@ export function DistributeKeywords(arg1:dto.DistributeKeywordsRequest):Promise<d
 export function DuplicateSitemap(arg1:dto.DuplicateSitemapRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_Sitemap_>;
 
 export function GenerateSitemapStructure(arg1:dto.GenerateSitemapStructureRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_GenerateSitemapStructureResponse_>;
+
+export function GetHistoryState(arg1:number):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_HistoryState_>;
 
 export function GetNode(arg1:number):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_SitemapNode_>;
 
@@ -42,6 +46,8 @@ export function ListSitemaps(arg1:number):Promise<dto.Response___github_com_davi
 
 export function MoveNode(arg1:dto.MoveNodeRequest):Promise<dto.Response_string_>;
 
+export function Redo(arg1:number):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_HistoryState_>;
+
 export function RemoveNodeKeyword(arg1:number,arg2:string):Promise<dto.Response_string_>;
 
 export function ResetNode(arg1:number):Promise<dto.Response_string_>;
@@ -55,6 +61,8 @@ export function SetNodeKeywords(arg1:dto.SetNodeKeywordsRequest):Promise<dto.Res
 export function SetSitemapStatus(arg1:number,arg2:string):Promise<dto.Response_string_>;
 
 export function SyncNodesFromWP(arg1:dto.SyncNodesRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_SyncNodesResponse_>;
+
+export function Undo(arg1:number):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_HistoryState_>;
 
 export function UnlinkNodeContent(arg1:number):Promise<dto.Response_string_>;
 

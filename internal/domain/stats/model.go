@@ -11,12 +11,14 @@ type Repository interface {
 	IncrementSiteStats(ctx context.Context, siteID int64, date time.Time, field string, value int) error
 	GetSiteStats(ctx context.Context, siteID int64, from, to time.Time) ([]*entities.SiteStats, error)
 	GetTotalSiteStats(ctx context.Context, siteID int64) (*entities.SiteStats, error)
+	GetGlobalStats(ctx context.Context, from, to time.Time) ([]*entities.SiteStats, error)
 }
 
 type Service interface {
 	GetSiteStatistics(ctx context.Context, siteID int64, from, to time.Time) ([]*entities.SiteStats, error)
 	GetTotalStatistics(ctx context.Context, siteID int64) (*entities.SiteStats, error)
 	GetDashboardSummary(ctx context.Context) (*entities.DashboardSummary, error)
+	GetGlobalStatistics(ctx context.Context, from, to time.Time) ([]*entities.SiteStats, error)
 }
 
 type Recorder interface {

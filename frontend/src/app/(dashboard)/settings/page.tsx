@@ -2,6 +2,7 @@
 
 import { HealthCheckSettings } from "@/components/settings/health-check-settings";
 import { ProxySettings } from "@/components/settings/proxy-settings";
+import { DashboardSettingsComponent } from "@/components/settings/dashboard-settings";
 import { useSettingsForm } from "@/hooks/use-settings-form";
 
 export default function SettingsPage() {
@@ -17,6 +18,8 @@ export default function SettingsPage() {
             </div>
 
             <div className="max-w-3xl mx-auto space-y-6">
+                <DashboardSettingsComponent />
+
                 <HealthCheckSettings
                     onSave={saveChanges}
                     isSaving={isSaving}

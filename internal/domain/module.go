@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 
+	"github.com/davidmovas/postulator/internal/domain/aiusage"
 	"github.com/davidmovas/postulator/internal/domain/articles"
 	"github.com/davidmovas/postulator/internal/domain/categories"
 	"github.com/davidmovas/postulator/internal/domain/deletion"
@@ -79,6 +80,10 @@ var Module = fx.Module("domain",
 		healthcheck.NewService,
 		healthcheck.NewNotifier,
 
+		// AI Usage
+		aiusage.NewRepository,
+		aiusage.NewService,
+
 		// Topics
 		topics.NewRepository,
 		topics.NewUsageRepository,
@@ -111,6 +116,7 @@ var Module = fx.Module("domain",
 				sitesSvc sites.Service,
 				promptSvc prompts.Service,
 				providerSvc providers.Service,
+				aiUsageSvc aiusage.Service,
 				logger *logger.Logger,
 			) *sitemap.GenerationService {
 				return sitemap.NewGenerationService(
@@ -118,6 +124,7 @@ var Module = fx.Module("domain",
 					sitesSvc,
 					promptSvc,
 					providerSvc,
+					aiUsageSvc,
 					func(provider *entities.Provider) (ai.Client, error) {
 						return ai.CreateClient(provider)
 					},

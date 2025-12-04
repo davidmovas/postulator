@@ -57,3 +57,27 @@ func (h *StatsHandler) GetDashboardSummary() *dto.Response[*dto.DashboardSummary
 
 	return ok(dto.NewDashboardSummary(summary))
 }
+
+func (h *StatsHandler) GetGlobalStatistics(from, to string) *dto.Response[[]*dto.SiteStats] {
+	fromTime, err := dto.StringToTime(from)
+	if err != nil {
+		return fail[[]*dto.SiteStats](err)
+	}
+
+	toTime, err := dto.StringToTime(to)
+	if err != nil {
+		return fail[[]*dto.SiteStats](err)
+	}
+
+	statistics, err := h.service.GetGlobalStatistics(ctx.MediumCtx(), fromTime, toTime)
+	if err != nil {
+		return fail[[]*dto.SiteStats](err)
+	}
+
+	var dtoStats []*dto.SiteStats
+	for _, stat := range statistics {
+		dtoStats = append(dtoStats, dto.NewSiteStats(stat))
+	}
+
+	return ok(dtoStats)
+}

@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 
+	"github.com/davidmovas/postulator/internal/domain/aiusage"
 	"github.com/davidmovas/postulator/internal/domain/articles"
 	"github.com/davidmovas/postulator/internal/domain/categories"
 	"github.com/davidmovas/postulator/internal/domain/entities"
@@ -35,6 +36,7 @@ func NewExecutor(
 	statsRecorder stats.Recorder,
 	providerService providers.Service,
 	categoryService categories.Service,
+	aiUsageService aiusage.Service,
 	wpClient wp.Client,
 	logger *logger.Logger,
 ) jobs.Executor {
@@ -47,7 +49,7 @@ func NewExecutor(
 			phase.SelectCategoryCommand(categoryService, stateRepo),
 			phase.CreateExecutionCommand(execRepo, providerService, promptService),
 			phase.RenderPromptCommand(promptService),
-			phase.GenerateContentCommand(execRepo, statsRecorder),
+			phase.GenerateContentCommand(execRepo, statsRecorder, aiUsageService),
 			phase.ValidateOutputCommand(),
 			phase.PublishArticleCommand(execRepo, articleRepo, wpClient, statsRecorder),
 			phase.RecordCategoryStatsCommand(categoryService),

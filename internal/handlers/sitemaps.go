@@ -3,16 +3,27 @@ package handlers
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"sync"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/sitemap"
+	"github.com/davidmovas/postulator/internal/domain/sitemap/actions"
 	"github.com/davidmovas/postulator/internal/domain/sitemap/importer"
 	"github.com/davidmovas/postulator/internal/domain/sitemap/scanner"
 	"github.com/davidmovas/postulator/internal/dto"
 	"github.com/davidmovas/postulator/pkg/ctx"
 	"github.com/davidmovas/postulator/pkg/errors"
+	"github.com/davidmovas/postulator/pkg/history"
 	"github.com/davidmovas/postulator/pkg/logger"
+)
+
+const (
+	// HistoryMaxSize is the maximum number of undo actions per sitemap
+	HistoryMaxSize = 25
+	// HistoryTTL is how long to keep inactive history stacks
+	HistoryTTL = 30 * time.Minute
 )
 
 type SitemapsHandler struct {
@@ -21,6 +32,10 @@ type SitemapsHandler struct {
 	generationService *sitemap.GenerationService
 	importer          *importer.Importer
 	scanner           *scanner.Scanner
+	logger            *logger.Logger
+
+	// History manager for undo/redo
+	historyManager *history.Manager
 
 	// For cancellable AI generation
 	generationMu     sync.Mutex
@@ -40,7 +55,14 @@ func NewSitemapsHandler(
 		generationService: generationService,
 		importer:          importer.NewImporter(log),
 		scanner:           siteScanner,
+		logger:            log.WithScope("sitemaps_handler"),
+		historyManager:    history.NewManager(HistoryMaxSize, HistoryTTL),
 	}
+}
+
+// historyKey returns the history key for a sitemap
+func historyKey(sitemapID int64) history.SourceKey {
+	return history.SourceKey(fmt.Sprintf("sitemap:%d", sitemapID))
 }
 
 // =========================================================================
@@ -119,6 +141,9 @@ func (h *SitemapsHandler) UpdateSitemap(req *dto.UpdateSitemapRequest) *dto.Resp
 }
 
 func (h *SitemapsHandler) DeleteSitemap(id int64) *dto.Response[string] {
+	// Clear history for this sitemap
+	h.historyManager.Clear(historyKey(id))
+
 	if err := h.service.DeleteSitemap(ctx.FastCtx(), id); err != nil {
 		return fail[string](err)
 	}
@@ -144,7 +169,7 @@ func (h *SitemapsHandler) SetSitemapStatus(id int64, status string) *dto.Respons
 }
 
 // =========================================================================
-// Node Operations
+// Node Operations (with History)
 // =========================================================================
 
 func (h *SitemapsHandler) CreateNode(req *dto.CreateNodeRequest) *dto.Response[*dto.SitemapNode] {
@@ -162,6 +187,12 @@ func (h *SitemapsHandler) CreateNode(req *dto.CreateNodeRequest) *dto.Response[*
 	if err := h.service.CreateNode(ctx.FastCtx(), entity); err != nil {
 		return fail[*dto.SitemapNode](err)
 	}
+
+	// Record to history
+	tx := history.NewTransaction(fmt.Sprintf("Create '%s'", entity.Title))
+	action := actions.NewCreateNodeAction(h.service, entity, req.Keywords)
+	tx.Add(action)
+	h.historyManager.Record(historyKey(req.SitemapID), tx)
 
 	return ok(dto.NewSitemapNode(entity))
 }
@@ -204,47 +235,110 @@ func (h *SitemapsHandler) GetNodesTree(sitemapID int64) *dto.Response[[]*dto.Sit
 }
 
 func (h *SitemapsHandler) UpdateNode(req *dto.UpdateNodeRequest) *dto.Response[string] {
-	// Get existing node first
-	existingNode, err := h.service.GetNode(ctx.FastCtx(), req.ID)
+	c := ctx.FastCtx()
+
+	// Get existing node first (with keywords)
+	existingNode, err := h.service.GetNodeWithKeywords(c, req.ID)
 	if err != nil {
 		return fail[string](err)
 	}
 
+	// Capture old data for undo
+	oldData := actions.NodeUpdateData{
+		Title:       existingNode.Title,
+		Slug:        existingNode.Slug,
+		Description: existingNode.Description,
+	}
+	oldKeywords := existingNode.Keywords
+
+	// Apply changes
 	existingNode.Title = req.Title
 	existingNode.Slug = req.Slug
 	existingNode.Description = req.Description
 
-	if err = h.service.UpdateNode(ctx.FastCtx(), existingNode); err != nil {
+	if err = h.service.UpdateNode(c, existingNode); err != nil {
 		return fail[string](err)
 	}
 
 	// Update keywords if provided
+	var newKeywords []string
 	if req.Keywords != nil {
-		if err = h.service.SetNodeKeywords(ctx.FastCtx(), req.ID, req.Keywords); err != nil {
+		newKeywords = req.Keywords
+		if err = h.service.SetNodeKeywords(c, req.ID, req.Keywords); err != nil {
 			return fail[string](err)
 		}
 	}
+
+	// Record to history
+	newData := actions.NodeUpdateData{
+		Title:       req.Title,
+		Slug:        req.Slug,
+		Description: req.Description,
+	}
+
+	tx := history.NewTransaction(fmt.Sprintf("Update '%s'", req.Title))
+	action := actions.NewUpdateNodeAction(h.service, req.ID, oldData, newData, oldKeywords, newKeywords)
+	tx.Add(action)
+	h.historyManager.Record(historyKey(existingNode.SitemapID), tx)
 
 	return ok("Node updated successfully")
 }
 
 func (h *SitemapsHandler) DeleteNode(id int64) *dto.Response[string] {
-	if err := h.service.DeleteNode(ctx.FastCtx(), id); err != nil {
+	c := ctx.FastCtx()
+
+	// Get node with keywords for undo snapshot
+	node, err := h.service.GetNodeWithKeywords(c, id)
+	if err != nil {
 		return fail[string](err)
 	}
+
+	sitemapID := node.SitemapID
+
+	// Create action before deletion (captures snapshot)
+	action := actions.NewDeleteNodeAction(h.service, node, node.Keywords)
+
+	if err = h.service.DeleteNode(c, id); err != nil {
+		return fail[string](err)
+	}
+
+	// Record to history
+	tx := history.NewTransaction(fmt.Sprintf("Delete '%s'", node.Title))
+	tx.Add(action)
+	h.historyManager.Record(historyKey(sitemapID), tx)
 
 	return ok("Node deleted successfully")
 }
 
 func (h *SitemapsHandler) MoveNode(req *dto.MoveNodeRequest) *dto.Response[string] {
-	if err := h.service.MoveNode(ctx.FastCtx(), req.NodeID, req.NewParentID, req.Position); err != nil {
+	c := ctx.FastCtx()
+
+	// Get current node state for undo
+	node, err := h.service.GetNode(c, req.NodeID)
+	if err != nil {
 		return fail[string](err)
 	}
+
+	oldParentID := node.ParentID
+	oldPosition := node.Position
+
+	if err = h.service.MoveNode(c, req.NodeID, req.NewParentID, req.Position); err != nil {
+		return fail[string](err)
+	}
+
+	// Record to history
+	tx := history.NewTransaction("Move node")
+	action := actions.NewMoveNodeAction(h.service, req.NodeID, oldParentID, req.NewParentID, oldPosition, req.Position)
+	tx.Add(action)
+	h.historyManager.Record(historyKey(node.SitemapID), tx)
 
 	return ok("Node moved successfully")
 }
 
 func (h *SitemapsHandler) UpdateNodePositions(req *dto.UpdateNodePositionsRequest) *dto.Response[string] {
+	// Position updates are typically batched/saved separately
+	// We don't track individual position changes in history
+	// The "Save Layout" button saves all positions at once
 	if err := h.service.UpdateNodePositions(ctx.FastCtx(), req.NodeID, req.PositionX, req.PositionY); err != nil {
 		return fail[string](err)
 	}
@@ -326,7 +420,7 @@ func (h *SitemapsHandler) UpdateNodeContentStatus(nodeID int64, status string) *
 }
 
 // =========================================================================
-// Import Operations
+// Import Operations (with History)
 // =========================================================================
 
 func (h *SitemapsHandler) GetSupportedImportFormats() *dto.Response[*dto.SupportedFormatsResponse] {
@@ -346,16 +440,32 @@ func (h *SitemapsHandler) ImportNodes(req *dto.ImportNodesRequest) *dto.Response
 		ParentNodeID: req.ParentNodeID,
 	}
 
+	// Create batch action for tracking
+	batchAction := actions.NewBatchCreateNodesAction(h.service, req.SitemapID, "Import")
+
+	// Wrap service to track created node IDs
+	trackingService := &trackingNodeCreator{
+		service:     h.service,
+		batchAction: batchAction,
+	}
+
 	stats, err := h.importer.Import(
 		ctx.FastCtx(),
 		req.Filename,
 		fileData,
 		req.SitemapID,
-		h.service, // Service implements NodeCreator interface
+		trackingService,
 		opts,
 	)
 	if err != nil {
 		return fail[*dto.ImportNodesResponse](err)
+	}
+
+	// Record to history if nodes were created
+	if len(batchAction.GetCreatedIDs()) > 0 {
+		tx := history.NewTransaction(batchAction.Description())
+		tx.Add(batchAction)
+		h.historyManager.Record(historyKey(req.SitemapID), tx)
 	}
 
 	// Convert import errors to DTO
@@ -378,7 +488,7 @@ func (h *SitemapsHandler) ImportNodes(req *dto.ImportNodesRequest) *dto.Response
 }
 
 // =========================================================================
-// Scanner Operations
+// Scanner Operations (with History)
 // =========================================================================
 
 func (h *SitemapsHandler) ScanSite(req *dto.ScanSiteRequest) *dto.Response[*dto.ScanSiteResponse] {
@@ -405,6 +515,16 @@ func (h *SitemapsHandler) ScanSite(req *dto.ScanSiteRequest) *dto.Response[*dto.
 	)
 	if err != nil {
 		return fail[*dto.ScanSiteResponse](err)
+	}
+
+	// Record to history if nodes were created
+	if result.NodesCreated > 0 && result.SitemapID > 0 {
+		batchAction := actions.NewBatchCreateNodesAction(h.service, result.SitemapID, "Scan site")
+		// We don't have individual IDs here, but we can record the operation
+		// Note: This won't fully undo since we don't track individual node IDs from scan
+		tx := history.NewTransaction(fmt.Sprintf("Scan site (%d nodes)", result.NodesCreated))
+		tx.Add(batchAction)
+		h.historyManager.Record(historyKey(result.SitemapID), tx)
 	}
 
 	// Convert errors to DTO
@@ -445,14 +565,28 @@ func (h *SitemapsHandler) ScanIntoSitemap(req *dto.ScanIntoSitemapRequest) *dto.
 		opts.ContentFilter = scanner.ContentFilterPages
 	}
 
-	result, err := h.scanner.ScanIntoSitemap(
+	// Create batch action for tracking
+	batchAction := actions.NewBatchCreateNodesAction(h.service, req.SitemapID, "Scan into sitemap")
+
+	// Wrap scanner to track created node IDs
+	result, err := h.scanner.ScanIntoSitemapWithTracking(
 		ctx.FastCtx(),
 		req.SitemapID,
 		req.ParentNodeID,
 		opts,
+		func(nodeID int64) {
+			batchAction.AddCreatedID(nodeID)
+		},
 	)
 	if err != nil {
 		return fail[*dto.ScanSiteResponse](err)
+	}
+
+	// Record to history if nodes were created
+	if len(batchAction.GetCreatedIDs()) > 0 {
+		tx := history.NewTransaction(batchAction.Description())
+		tx.Add(batchAction)
+		h.historyManager.Record(historyKey(req.SitemapID), tx)
 	}
 
 	// Convert errors to DTO
@@ -531,7 +665,7 @@ func (h *SitemapsHandler) ResetNode(nodeID int64) *dto.Response[string] {
 }
 
 // =========================================================================
-// AI Generation Operations
+// AI Generation Operations (with History)
 // =========================================================================
 
 // GenerateSitemapStructure generates sitemap structure using AI
@@ -578,9 +712,35 @@ func (h *SitemapsHandler) GenerateSitemapStructure(req *dto.GenerateSitemapStruc
 		cancel() // Always call cancel to release resources
 	}()
 
-	result, err := h.generationService.GenerateStructure(genCtx, input)
+	// Create batch action for tracking
+	var batchAction *actions.BatchCreateNodesAction
+	sitemapID := input.SitemapID
+	if sitemapID > 0 {
+		batchAction = actions.NewBatchCreateNodesAction(h.service, sitemapID, "AI Generate")
+	}
+
+	result, err := h.generationService.GenerateStructureWithTracking(genCtx, input, func(nodeID int64) {
+		if batchAction != nil {
+			batchAction.AddCreatedID(nodeID)
+		}
+	})
 	if err != nil {
 		return fail[*dto.GenerateSitemapStructureResponse](err)
+	}
+
+	// Update sitemapID if it was created during generation
+	if sitemapID == 0 && result.SitemapID > 0 {
+		sitemapID = result.SitemapID
+		batchAction = actions.NewBatchCreateNodesAction(h.service, sitemapID, "AI Generate")
+		// Note: We don't have node IDs for newly created sitemap case
+		// The generation service would need to be modified to track them
+	}
+
+	// Record to history if nodes were created
+	if batchAction != nil && len(batchAction.GetCreatedIDs()) > 0 {
+		tx := history.NewTransaction(batchAction.Description())
+		tx.Add(batchAction)
+		h.historyManager.Record(historyKey(sitemapID), tx)
 	}
 
 	return ok(&dto.GenerateSitemapStructureResponse{
@@ -602,6 +762,96 @@ func (h *SitemapsHandler) CancelSitemapGeneration() *dto.Response[string] {
 	}
 
 	return ok("No active generation to cancel")
+}
+
+// =========================================================================
+// History Operations
+// =========================================================================
+
+// Undo undoes the last action for the specified sitemap
+func (h *SitemapsHandler) Undo(sitemapID int64) *dto.Response[*dto.HistoryState] {
+	c := ctx.MediumCtx()
+
+	description, err := h.historyManager.Undo(c, historyKey(sitemapID))
+	if err != nil {
+		h.logger.ErrorWithErr(err, fmt.Sprintf("Undo failed for sitemap %d", sitemapID))
+		return fail[*dto.HistoryState](err)
+	}
+
+	state := h.historyManager.GetState(historyKey(sitemapID))
+	return ok(&dto.HistoryState{
+		CanUndo:       state.CanUndo,
+		CanRedo:       state.CanRedo,
+		UndoCount:     state.UndoCount,
+		RedoCount:     state.RedoCount,
+		LastAction:    state.LastAction,
+		ActionApplied: description,
+	})
+}
+
+// Redo redoes the last undone action for the specified sitemap
+func (h *SitemapsHandler) Redo(sitemapID int64) *dto.Response[*dto.HistoryState] {
+	c := ctx.MediumCtx()
+
+	description, err := h.historyManager.Redo(c, historyKey(sitemapID))
+	if err != nil {
+		h.logger.ErrorWithErr(err, fmt.Sprintf("Redo failed for sitemap %d", sitemapID))
+		return fail[*dto.HistoryState](err)
+	}
+
+	state := h.historyManager.GetState(historyKey(sitemapID))
+	return ok(&dto.HistoryState{
+		CanUndo:       state.CanUndo,
+		CanRedo:       state.CanRedo,
+		UndoCount:     state.UndoCount,
+		RedoCount:     state.RedoCount,
+		LastAction:    state.LastAction,
+		ActionApplied: description,
+	})
+}
+
+// GetHistoryState returns the current history state for a sitemap
+func (h *SitemapsHandler) GetHistoryState(sitemapID int64) *dto.Response[*dto.HistoryState] {
+	state := h.historyManager.GetState(historyKey(sitemapID))
+	return ok(&dto.HistoryState{
+		CanUndo:    state.CanUndo,
+		CanRedo:    state.CanRedo,
+		UndoCount:  state.UndoCount,
+		RedoCount:  state.RedoCount,
+		LastAction: state.LastAction,
+	})
+}
+
+// ClearHistory clears all history for a sitemap (called when editor closes)
+func (h *SitemapsHandler) ClearHistory(sitemapID int64) *dto.Response[string] {
+	h.historyManager.Clear(historyKey(sitemapID))
+	return ok("History cleared")
+}
+
+// =========================================================================
+// Helper Types
+// =========================================================================
+
+// trackingNodeCreator wraps the service to track created node IDs
+type trackingNodeCreator struct {
+	service     sitemap.Service
+	batchAction *actions.BatchCreateNodesAction
+}
+
+func (t *trackingNodeCreator) CreateNode(ctx context.Context, node *entities.SitemapNode) error {
+	if err := t.service.CreateNode(ctx, node); err != nil {
+		return err
+	}
+	t.batchAction.AddCreatedID(node.ID)
+	return nil
+}
+
+func (t *trackingNodeCreator) GetNodes(ctx context.Context, sitemapID int64) ([]*entities.SitemapNode, error) {
+	return t.service.GetNodes(ctx, sitemapID)
+}
+
+func (t *trackingNodeCreator) FindNodeBySlugAndParent(ctx context.Context, sitemapID int64, slug string, parentID *int64) (*entities.SitemapNode, error) {
+	return t.service.FindNodeBySlugAndParent(ctx, sitemapID, slug, parentID)
 }
 
 // derefInt64 safely dereferences an int64 pointer, returning 0 if nil

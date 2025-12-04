@@ -36,6 +36,7 @@ type Config struct {
 type OpenAIClient struct {
 	client               *openaiSDK.Client
 	model                openaiSDK.ChatModel
+	modelName            string
 	usesCompletionTokens bool
 }
 
@@ -67,8 +68,17 @@ func NewOpenAIClient(cfg Config) (*OpenAIClient, error) {
 	return &OpenAIClient{
 		client:               &client,
 		model:                cfg.Model,
+		modelName:            cfg.Model,
 		usesCompletionTokens: usesCompletionTokens,
 	}, nil
+}
+
+func (c *OpenAIClient) GetProviderName() string {
+	return "openai"
+}
+
+func (c *OpenAIClient) GetModelName() string {
+	return c.modelName
 }
 
 func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPrompt string) (*ArticleResult, error) {
@@ -123,16 +133,23 @@ func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPr
 		return nil, errors.AI(providerName, fmt.Errorf("empty title or content in response"))
 	}
 
-	inputTokens := chat.Usage.PromptTokens
-	outputTokens := chat.Usage.CompletionTokens
-	cost := CalculateCost("openai", c.model, int(inputTokens), int(outputTokens))
+	inputTokens := int(chat.Usage.PromptTokens)
+	outputTokens := int(chat.Usage.CompletionTokens)
+	totalTokens := int(chat.Usage.TotalTokens)
+	cost := CalculateCost("openai", c.model, inputTokens, outputTokens)
 
 	return &ArticleResult{
 		Title:      article.Title,
 		Excerpt:    article.Excerpt,
 		Content:    article.Content,
-		TokensUsed: int(chat.Usage.TotalTokens),
+		TokensUsed: totalTokens,
 		Cost:       cost,
+		Usage: Usage{
+			InputTokens:  inputTokens,
+			OutputTokens: outputTokens,
+			TotalTokens:  totalTokens,
+			CostUSD:      cost,
+		},
 	}, nil
 }
 
@@ -288,14 +305,21 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 		return nil, errors.AI(providerName, fmt.Errorf("no nodes generated"))
 	}
 
-	inputTokens := chat.Usage.PromptTokens
-	outputTokens := chat.Usage.CompletionTokens
-	cost := CalculateCost("openai", c.model, int(inputTokens), int(outputTokens))
+	inputTokens := int(chat.Usage.PromptTokens)
+	outputTokens := int(chat.Usage.CompletionTokens)
+	totalTokens := int(chat.Usage.TotalTokens)
+	cost := CalculateCost("openai", c.model, inputTokens, outputTokens)
 
 	return &SitemapStructureResult{
 		Nodes:      result.Nodes,
-		TokensUsed: int(chat.Usage.TotalTokens),
+		TokensUsed: totalTokens,
 		Cost:       cost,
+		Usage: Usage{
+			InputTokens:  inputTokens,
+			OutputTokens: outputTokens,
+			TotalTokens:  totalTokens,
+			CostUSD:      cost,
+		},
 	}, nil
 }
 

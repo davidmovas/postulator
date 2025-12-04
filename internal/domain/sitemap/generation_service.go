@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/aiusage"
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/prompts"
 	"github.com/davidmovas/postulator/internal/domain/providers"
@@ -68,6 +69,7 @@ type GenerationService struct {
 	sitesSvc        sites.Service
 	promptSvc       prompts.Service
 	providerSvc     providers.Service
+	aiUsageSvc      aiusage.Service
 	aiClientFactory func(provider *entities.Provider) (ai.Client, error)
 	logger          *logger.Logger
 }
@@ -78,6 +80,7 @@ func NewGenerationService(
 	sitesSvc sites.Service,
 	promptSvc prompts.Service,
 	providerSvc providers.Service,
+	aiUsageSvc aiusage.Service,
 	aiClientFactory func(provider *entities.Provider) (ai.Client, error),
 	logger *logger.Logger,
 ) *GenerationService {
@@ -86,6 +89,7 @@ func NewGenerationService(
 		sitesSvc:        sitesSvc,
 		promptSvc:       promptSvc,
 		providerSvc:     providerSvc,
+		aiUsageSvc:      aiUsageSvc,
 		aiClientFactory: aiClientFactory,
 		logger:          logger.WithScope("generation_service"),
 	}
@@ -93,6 +97,11 @@ func NewGenerationService(
 
 // GenerateStructure generates sitemap structure using AI
 func (s *GenerationService) GenerateStructure(ctx context.Context, input GenerationInput) (*GenerationResult, error) {
+	return s.GenerateStructureWithTracking(ctx, input, nil)
+}
+
+// GenerateStructureWithTracking generates sitemap structure using AI and calls onNodeCreated for each created node
+func (s *GenerationService) GenerateStructureWithTracking(ctx context.Context, input GenerationInput, onNodeCreated func(nodeID int64)) (*GenerationResult, error) {
 	startTime := time.Now()
 
 	s.logger.Infof("Starting sitemap generation: siteID=%d, sitemapID=%d, titles=%d",
@@ -139,15 +148,39 @@ func (s *GenerationService) GenerateStructure(ctx context.Context, input Generat
 	s.logger.Debugf("Generating sitemap structure with prompt length: system=%d, user=%d", len(systemPrompt), len(userPrompt))
 
 	// Call AI FIRST - before creating any sitemap
-	aiResult, err := aiClient.GenerateSitemapStructure(ctx, systemPrompt, userPrompt)
-	if err != nil {
+	aiStartTime := time.Now()
+	aiResult, aiErr := aiClient.GenerateSitemapStructure(ctx, systemPrompt, userPrompt)
+	aiDurationMs := time.Since(aiStartTime).Milliseconds()
+
+	// Log AI usage regardless of success/failure
+	if s.aiUsageSvc != nil {
+		var usage ai.Usage
+		if aiResult != nil {
+			usage = aiResult.Usage
+		}
+		_ = s.aiUsageSvc.LogFromResult(
+			ctx,
+			input.SiteID,
+			aiusage.OperationSitemapGeneration,
+			aiClient,
+			usage,
+			aiDurationMs,
+			aiErr,
+			map[string]interface{}{
+				"sitemap_id":   input.SitemapID,
+				"titles_count": len(input.Titles),
+			},
+		)
+	}
+
+	if aiErr != nil {
 		// Check if this was a cancellation - not an error
 		if ctx.Err() == context.Canceled {
 			s.logger.Info("AI generation was cancelled by user")
 			return nil, errors.New(errors.ErrCodeValidation, "Generation was cancelled")
 		}
-		s.logger.ErrorWithErr(err, "AI generation failed")
-		return nil, fmt.Errorf("AI generation failed: %w", err)
+		s.logger.ErrorWithErr(aiErr, "AI generation failed")
+		return nil, fmt.Errorf("AI generation failed: %w", aiErr)
 	}
 
 	if len(aiResult.Nodes) == 0 {
@@ -210,7 +243,7 @@ func (s *GenerationService) GenerateStructure(ctx context.Context, input Generat
 	}
 
 	// Create nodes from AI response
-	nodesCreated, err := s.createNodesFromAIResponse(ctx, sitemapID, parentNodeIDs, aiResult.Nodes, input.MaxDepth)
+	nodesCreated, err := s.createNodesFromAIResponse(ctx, sitemapID, parentNodeIDs, aiResult.Nodes, input.MaxDepth, onNodeCreated)
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to create nodes from AI response")
 		return nil, fmt.Errorf("failed to create nodes: %w", err)
@@ -336,6 +369,7 @@ func (s *GenerationService) createNodesFromAIResponse(
 	parentNodeIDs []int64,
 	nodes []ai.SitemapGeneratedNode,
 	maxDepth int,
+	onNodeCreated func(nodeID int64),
 ) (int, error) {
 	nodesCreated := 0
 
@@ -347,7 +381,7 @@ func (s *GenerationService) createNodesFromAIResponse(
 		parentID := parentNodeIDs[parentIdx%len(parentNodeIDs)]
 		parentIdx++
 
-		created, err := s.createNodeRecursive(ctx, sitemapID, &parentID, genNode, 1, maxDepth)
+		created, err := s.createNodeRecursive(ctx, sitemapID, &parentID, genNode, 1, maxDepth, onNodeCreated)
 		if err != nil {
 			s.logger.ErrorWithErr(err, fmt.Sprintf("Failed to create node, title: %s", genNode.Title))
 			continue
@@ -365,6 +399,7 @@ func (s *GenerationService) createNodeRecursive(
 	genNode ai.SitemapGeneratedNode,
 	currentDepth int,
 	maxDepth int,
+	onNodeCreated func(nodeID int64),
 ) (int, error) {
 	// Check depth limit
 	if maxDepth > 0 && currentDepth > maxDepth {
@@ -398,9 +433,14 @@ func (s *GenerationService) createNodeRecursive(
 
 	nodesCreated := 1
 
+	// Track created node for undo
+	if onNodeCreated != nil {
+		onNodeCreated(node.ID)
+	}
+
 	// Create children recursively
 	for _, child := range genNode.Children {
-		childCreated, err := s.createNodeRecursive(ctx, sitemapID, &node.ID, child, currentDepth+1, maxDepth)
+		childCreated, err := s.createNodeRecursive(ctx, sitemapID, &node.ID, child, currentDepth+1, maxDepth, onNodeCreated)
 		if err != nil {
 			s.logger.ErrorWithErr(err, fmt.Sprintf("Failed to create child node, parentTitle %s childTitle %s", genNode.Title, child.Title))
 			continue

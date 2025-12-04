@@ -409,3 +409,17 @@ type ExistingNodeInfo struct {
 	Keywords []string           `json:"keywords,omitempty"`
 	Children []ExistingNodeInfo `json:"children,omitempty"`
 }
+
+// =========================================================================
+// History DTOs
+// =========================================================================
+
+// HistoryState represents the current state of the history stack
+type HistoryState struct {
+	CanUndo       bool   `json:"canUndo"`
+	CanRedo       bool   `json:"canRedo"`
+	UndoCount     int    `json:"undoCount"`
+	RedoCount     int    `json:"redoCount"`
+	LastAction    string `json:"lastAction,omitempty"`
+	ActionApplied string `json:"actionApplied,omitempty"` // Description of the action that was just applied (undo/redo)
+}

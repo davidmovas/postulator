@@ -207,8 +207,8 @@ function SitemapEditorFlow() {
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [sidebarSelectedNodeIds, setSidebarSelectedNodeIds] = useState<Set<number>>(new Set());
 
-    // Universal history for undo/redo
-    const history = useSitemapHistory({ maxHistory: 50 });
+    // Universal history for undo/redo (Go-based)
+    const history = useSitemapHistory({ sitemapId });
 
     // Refs
     const searchInputRef = useRef<HTMLInputElement>(null);
@@ -286,51 +286,20 @@ function SitemapEditorFlow() {
         }
     }, [siteId, sitemapId, loadData]);
 
-    // Setup history service functions
-    useEffect(() => {
-        history.setServices({
-            createNode: async (input) => {
-                const result = await sitemapService.createNode(input);
-                return result;
-            },
-            createNodeWithPosition: async (input, x, y) => {
-                const result = await sitemapService.createNode(input);
-                if (result) {
-                    // Set the position after creating the node
-                    await sitemapService.updateNodePositions({
-                        nodeId: result.id,
-                        positionX: x,
-                        positionY: y,
-                    });
-                }
-                return result;
-            },
-            deleteNode: async (nodeId) => {
-                await sitemapService.deleteNode(nodeId);
-            },
-            updateNode: async (nodeId, data) => {
-                const node = sitemapNodes.find((n) => n.id === nodeId);
-                if (!node) return;
-                await sitemapService.updateNode({
-                    ...node,
-                    ...data,
-                });
-            },
-            moveNode: async (nodeId, newParentId) => {
-                await sitemapService.moveNode({ nodeId, newParentId });
-            },
-            updatePositions: async (nodeId, x, y) => {
-                await sitemapService.updateNodePositions({ nodeId, positionX: x, positionY: y });
-            },
-            reloadData: async () => {
-                await loadData(true);
-            },
-        });
-    }, [history, sitemapNodes, loadData]);
+    // Undo/Redo handlers - now Go-based, reload data after operation
+    const handleUndo = useCallback(async () => {
+        const success = await history.undo();
+        if (success) {
+            await loadData(true);
+        }
+    }, [history, loadData]);
 
-    // Undo/Redo handlers
-    const handleUndo = useCallback(() => history.undo(), [history]);
-    const handleRedo = useCallback(() => history.redo(), [history]);
+    const handleRedo = useCallback(async () => {
+        const success = await history.redo();
+        if (success) {
+            await loadData(true);
+        }
+    }, [history, loadData]);
 
     // Detect position changes
     useEffect(() => {
@@ -379,10 +348,6 @@ function SitemapEditorFlow() {
 
             console.log("[onConnect] Moving node", targetId, "to parent", sourceId);
 
-            // Find the target node to get its current parent for undo
-            const targetNode = sitemapNodes.find((n) => n.id === targetId);
-            const previousParentId = targetNode?.parentId ?? null;
-
             // Save to server - move target node to have source as parent
             await execute(
                 () => sitemapService.moveNode({ nodeId: targetId, newParentId: sourceId }),
@@ -391,13 +356,11 @@ function SitemapEditorFlow() {
                 }
             );
 
-            // Record action for undo/redo
-            history.recordMoveNode(targetId, previousParentId, sourceId);
-
-            // Reload edges only, preserve node positions
+            // Reload edges only, preserve node positions, and refresh history state
             await loadData(true);
+            await history.refreshState();
         },
-        [execute, loadData, history, sitemapNodes]
+        [execute, loadData, history]
     );
 
     // Handle connection end - drop on pane creates new node, drop on node creates connection
@@ -417,10 +380,6 @@ function SitemapEditorFlow() {
                     const targetId = Number(targetNodeId);
                     console.log("[onConnectEnd] Dropped on node, making", targetId, "child of", sourceId);
 
-                    // Find the target node to get its current parent for undo
-                    const targetNode = sitemapNodes.find((n) => n.id === targetId);
-                    const previousParentId = targetNode?.parentId ?? null;
-
                     await execute(
                         () => sitemapService.moveNode({ nodeId: targetId, newParentId: sourceId }),
                         {
@@ -428,10 +387,8 @@ function SitemapEditorFlow() {
                         }
                     );
 
-                    // Record action for undo/redo
-                    history.recordMoveNode(targetId, previousParentId, sourceId);
-
                     await loadData(true);
+                    await history.refreshState();
                 }
                 connectingNodeId.current = null;
                 return;
@@ -446,7 +403,7 @@ function SitemapEditorFlow() {
 
             connectingNodeId.current = null;
         },
-        [execute, loadData, history, sitemapNodes]
+        [execute, loadData, history]
     );
 
     // Get all descendant IDs of a node
@@ -573,29 +530,25 @@ function SitemapEditorFlow() {
         );
 
         if (result) {
-            // Record action for undo/redo
-            history.recordCreateNode(result.id, input);
-
             setCreateDialogOpen(false);
             // loadData will automatically run auto-layout for nodes without positions
             await loadData();
+            await history.refreshState();
         }
     };
 
     const handleUpdateNode = async () => {
         setEditDialogOpen(false);
-        loadData();
+        await loadData();
+        await history.refreshState();
     };
 
     const handleDeleteNode = async (nodeId: number) => {
-        // Find the node to check if it's root and to save for undo
+        // Find the node to check if it's root
         const node = sitemapNodes.find((n) => n.id === nodeId);
         if (!node || node.isRoot) {
             return; // Don't delete root node
         }
-
-        // Record action for undo BEFORE deleting
-        history.recordDeleteNode(node);
 
         await execute(
             () => sitemapService.deleteNode(nodeId),
@@ -605,7 +558,8 @@ function SitemapEditorFlow() {
         );
 
         setEditDialogOpen(false);
-        loadData();
+        await loadData();
+        await history.refreshState();
     };
 
     const handleDeleteEdge = useCallback(async () => {
@@ -616,7 +570,6 @@ function SitemapEditorFlow() {
         const match = selectedEdgeId.match(/^e(\d+)-(\d+)$/);
         if (!match) return;
 
-        const parentId = Number(match[1]);
         const childId = Number(match[2]);
 
         console.log("[handleDeleteEdge] Removing parent from node", childId, "edgeId:", selectedEdgeId);
@@ -629,12 +582,10 @@ function SitemapEditorFlow() {
             }
         );
 
-        // Record action for undo/redo (parentId -> null)
-        history.recordMoveNode(childId, parentId, null);
-
         closeEdgeContextMenu();
         // Preserve positions when updating edges
         await loadData(true);
+        await history.refreshState();
     }, [selectedEdgeId, execute, closeEdgeContextMenu, loadData, history]);
 
     // Bulk create nodes from paths
@@ -762,7 +713,7 @@ function SitemapEditorFlow() {
     }, []);
 
     // Delete selected nodes
-    const handleDeleteSelectedNodes = useCallback(() => {
+    const handleDeleteSelectedNodes = useCallback(async () => {
         const selectedNodeIds = nodes
             .filter((n) => n.selected)
             .map((n) => Number(n.id));
@@ -770,16 +721,46 @@ function SitemapEditorFlow() {
         if (selectedNodeIds.length === 0) return;
 
         // Filter out root nodes
-        const nodesToDelete = selectedNodeIds.filter((id) => {
+        const nonRootNodeIds = selectedNodeIds.filter((id) => {
             const node = sitemapNodes.find((n) => n.id === id);
             return node && !node.isRoot;
         });
 
-        if (nodesToDelete.length > 0) {
-            // Delete first selected node for now
-            handleDeleteNode(nodesToDelete[0]);
+        if (nonRootNodeIds.length === 0) return;
+
+        // Filter to only delete "top-level" nodes in the selection
+        // Child nodes will be deleted automatically via cascade
+        const selectedSet = new Set(nonRootNodeIds);
+        const nodesToDelete = nonRootNodeIds.filter((id) => {
+            const node = sitemapNodes.find((n) => n.id === id);
+            if (!node) return false;
+
+            // Check if any ancestor is also in the selection
+            let currentNode = node;
+            while (currentNode.parentId) {
+                if (selectedSet.has(currentNode.parentId)) {
+                    // Parent is also selected, skip this node (will be cascade deleted)
+                    return false;
+                }
+                currentNode = sitemapNodes.find((n) => n.id === currentNode.parentId)!;
+                if (!currentNode) break;
+            }
+            return true;
+        });
+
+        if (nodesToDelete.length === 0) return;
+
+        // Delete only top-level selected nodes (children cascade automatically)
+        for (const nodeId of nodesToDelete) {
+            await execute(
+                () => sitemapService.deleteNode(nodeId),
+                { errorTitle: "Failed to delete node" }
+            );
         }
-    }, [nodes, sitemapNodes, handleDeleteNode]);
+
+        await loadData();
+        await history.refreshState();
+    }, [nodes, sitemapNodes, execute, loadData, history]);
 
     // Hotkeys configuration
     const hotkeys = useMemo<HotkeyConfig[]>(() => [
@@ -1163,7 +1144,6 @@ function SitemapEditorFlow() {
                     onUpdate={handleUpdateNode}
                     onDelete={() => handleDeleteNode(selectedNode.id)}
                     onAddChild={() => handleAddChild(selectedNode.id)}
-                    onRecordUpdate={history.recordUpdateNode}
                 />
             )}
 

@@ -333,6 +333,18 @@ func (s *Scanner) createNodesFromPages(
 	pages []*ScannedPage,
 	opts *ScanOptions,
 ) (int, int, []ScanError) {
+	return s.createNodesFromPagesWithTracking(ctx, sitemapID, rootNodeID, pages, opts, nil)
+}
+
+// createNodesFromPagesWithTracking creates sitemap nodes from scanned pages with tracking callback
+func (s *Scanner) createNodesFromPagesWithTracking(
+	ctx context.Context,
+	sitemapID int64,
+	rootNodeID int64,
+	pages []*ScannedPage,
+	opts *ScanOptions,
+	onNodeCreated func(nodeID int64),
+) (int, int, []ScanError) {
 	var created, skipped int
 	var errors []ScanError
 
@@ -418,6 +430,11 @@ func (s *Scanner) createNodesFromPages(
 		created++
 		wpIDToNodeID[page.WPID] = node.ID
 
+		// Track created node for undo
+		if onNodeCreated != nil {
+			onNodeCreated(node.ID)
+		}
+
 		// Process children
 		for _, child := range page.Children {
 			processPage(child, node.ID)
@@ -439,6 +456,18 @@ func (s *Scanner) createNodesFromPosts(
 	parentNodeID int64,
 	posts []*ScannedPage,
 	opts *ScanOptions,
+) (int, int, []ScanError) {
+	return s.createNodesFromPostsWithTracking(ctx, sitemapID, parentNodeID, posts, opts, nil)
+}
+
+// createNodesFromPostsWithTracking creates sitemap nodes from scanned posts with tracking callback
+func (s *Scanner) createNodesFromPostsWithTracking(
+	ctx context.Context,
+	sitemapID int64,
+	parentNodeID int64,
+	posts []*ScannedPage,
+	opts *ScanOptions,
+	onNodeCreated func(nodeID int64),
 ) (int, int, []ScanError) {
 	var created, skipped int
 	var errors []ScanError
@@ -508,6 +537,11 @@ func (s *Scanner) createNodesFromPosts(
 		}
 
 		created++
+
+		// Track created node for undo
+		if onNodeCreated != nil {
+			onNodeCreated(node.ID)
+		}
 	}
 
 	return created, skipped, errors
@@ -531,6 +565,18 @@ func (s *Scanner) ScanIntoSitemap(
 	sitemapID int64,
 	parentNodeID *int64,
 	opts *ScanOptions,
+) (*ScanResult, error) {
+	return s.ScanIntoSitemapWithTracking(ctx, sitemapID, parentNodeID, opts, nil)
+}
+
+// ScanIntoSitemapWithTracking scans a WordPress site and adds nodes to an existing sitemap,
+// calling onNodeCreated for each node that is created (for undo tracking).
+func (s *Scanner) ScanIntoSitemapWithTracking(
+	ctx context.Context,
+	sitemapID int64,
+	parentNodeID *int64,
+	opts *ScanOptions,
+	onNodeCreated func(nodeID int64),
 ) (*ScanResult, error) {
 	startTime := time.Now()
 
@@ -604,8 +650,8 @@ func (s *Scanner) ScanIntoSitemap(
 	}
 
 	// Create nodes from scanned pages
-	nodesCreated, nodesSkipped, createErrors := s.createNodesFromPages(
-		ctx, sitemapID, targetParentID, pageTree, opts,
+	nodesCreated, nodesSkipped, createErrors := s.createNodesFromPagesWithTracking(
+		ctx, sitemapID, targetParentID, pageTree, opts, onNodeCreated,
 	)
 	result.NodesCreated += nodesCreated
 	result.NodesSkipped += nodesSkipped
@@ -613,8 +659,8 @@ func (s *Scanner) ScanIntoSitemap(
 
 	// Create nodes from posts
 	if len(scannedPosts) > 0 {
-		created, skipped, postErrors := s.createNodesFromPosts(
-			ctx, sitemapID, targetParentID, scannedPosts, opts,
+		created, skipped, postErrors := s.createNodesFromPostsWithTracking(
+			ctx, sitemapID, targetParentID, scannedPosts, opts, onNodeCreated,
 		)
 		result.NodesCreated += created
 		result.NodesSkipped += skipped

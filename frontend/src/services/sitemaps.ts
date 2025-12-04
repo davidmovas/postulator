@@ -33,6 +33,10 @@ import {
     ResetNode,
     GenerateSitemapStructure,
     CancelSitemapGeneration,
+    Undo,
+    Redo,
+    GetHistoryState,
+    ClearHistory,
 } from "@/wailsjs/wailsjs/go/handlers/SitemapsHandler";
 import {
     Sitemap,
@@ -55,6 +59,7 @@ import {
     NodeContentStatus,
     GenerateSitemapStructureInput,
     GenerateSitemapStructureResult,
+    HistoryState,
     mapSitemap,
     mapSitemapNode,
     mapSitemapWithNodes,
@@ -62,6 +67,7 @@ import {
     mapScanSiteResult,
     mapSyncNodesResult,
     mapGenerateSitemapStructureResult,
+    mapHistoryState,
 } from "@/models/sitemaps";
 import { unwrapArrayResponse, unwrapResponse } from "@/lib/api-utils";
 
@@ -377,6 +383,30 @@ export const sitemapService = {
 
     async cancelSitemapGeneration(): Promise<void> {
         const response = await CancelSitemapGeneration();
+        unwrapResponse<string>(response);
+    },
+
+    // History operations
+    async undo(sitemapId: number): Promise<HistoryState | null> {
+        const response = await Undo(sitemapId);
+        const data = unwrapResponse<dto.HistoryState>(response);
+        return mapHistoryState(data);
+    },
+
+    async redo(sitemapId: number): Promise<HistoryState | null> {
+        const response = await Redo(sitemapId);
+        const data = unwrapResponse<dto.HistoryState>(response);
+        return mapHistoryState(data);
+    },
+
+    async getHistoryState(sitemapId: number): Promise<HistoryState | null> {
+        const response = await GetHistoryState(sitemapId);
+        const data = unwrapResponse<dto.HistoryState>(response);
+        return mapHistoryState(data);
+    },
+
+    async clearHistory(sitemapId: number): Promise<void> {
+        const response = await ClearHistory(sitemapId);
         unwrapResponse<string>(response);
     },
 };

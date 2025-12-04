@@ -2,7 +2,8 @@ import { dto } from "@/wailsjs/wailsjs/go/models";
 import {
     GetDashboardSummary,
     GetSiteStatistics,
-    GetTotalStatistics
+    GetTotalStatistics,
+    GetGlobalStatistics
 } from "@/wailsjs/wailsjs/go/handlers/StatsHandler";
 import {
     mapSiteStats,
@@ -29,5 +30,11 @@ export const statsService = {
         const response = await GetDashboardSummary();
         const summary = unwrapResponse<dto.DashboardSummary>(response);
         return mapDashboardSummary(summary);
+    },
+
+    async getGlobalStatistics(from: string, to: string): Promise<SiteStats[]> {
+        const response = await GetGlobalStatistics(from, to);
+        const stats = unwrapArrayResponse<dto.SiteStats>(response);
+        return stats.map(mapSiteStats);
     },
 };

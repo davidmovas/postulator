@@ -1,5 +1,181 @@
 export namespace dto {
 	
+	export class AIUsageByOperation {
+	    operationType: string;
+	    totalTokens: number;
+	    totalCostUsd: number;
+	    requestCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AIUsageByOperation(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.operationType = source["operationType"];
+	        this.totalTokens = source["totalTokens"];
+	        this.totalCostUsd = source["totalCostUsd"];
+	        this.requestCount = source["requestCount"];
+	    }
+	}
+	export class AIUsageByPeriod {
+	    period: string;
+	    totalTokens: number;
+	    totalCostUsd: number;
+	    requestCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AIUsageByPeriod(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.period = source["period"];
+	        this.totalTokens = source["totalTokens"];
+	        this.totalCostUsd = source["totalCostUsd"];
+	        this.requestCount = source["requestCount"];
+	    }
+	}
+	export class AIUsageByProvider {
+	    providerName: string;
+	    modelName: string;
+	    totalTokens: number;
+	    totalCostUsd: number;
+	    requestCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AIUsageByProvider(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.providerName = source["providerName"];
+	        this.modelName = source["modelName"];
+	        this.totalTokens = source["totalTokens"];
+	        this.totalCostUsd = source["totalCostUsd"];
+	        this.requestCount = source["requestCount"];
+	    }
+	}
+	export class AIUsageBySite {
+	    siteId: number;
+	    siteName: string;
+	    totalTokens: number;
+	    totalCostUsd: number;
+	    requestCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AIUsageBySite(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.siteId = source["siteId"];
+	        this.siteName = source["siteName"];
+	        this.totalTokens = source["totalTokens"];
+	        this.totalCostUsd = source["totalCostUsd"];
+	        this.requestCount = source["requestCount"];
+	    }
+	}
+	export class AIUsageLog {
+	    id: number;
+	    siteId: number;
+	    operationType: string;
+	    providerName: string;
+	    modelName: string;
+	    inputTokens: number;
+	    outputTokens: number;
+	    totalTokens: number;
+	    costUsd: number;
+	    durationMs: number;
+	    success: boolean;
+	    errorMessage?: string;
+	    metadata?: string;
+	    createdAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AIUsageLog(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.siteId = source["siteId"];
+	        this.operationType = source["operationType"];
+	        this.providerName = source["providerName"];
+	        this.modelName = source["modelName"];
+	        this.inputTokens = source["inputTokens"];
+	        this.outputTokens = source["outputTokens"];
+	        this.totalTokens = source["totalTokens"];
+	        this.costUsd = source["costUsd"];
+	        this.durationMs = source["durationMs"];
+	        this.success = source["success"];
+	        this.errorMessage = source["errorMessage"];
+	        this.metadata = source["metadata"];
+	        this.createdAt = source["createdAt"];
+	    }
+	}
+	export class AIUsageLogsResult {
+	    items: AIUsageLog[];
+	    total: number;
+	    limit: number;
+	    offset: number;
+	    hasMore: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new AIUsageLogsResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.items = this.convertValues(source["items"], AIUsageLog);
+	        this.total = source["total"];
+	        this.limit = source["limit"];
+	        this.offset = source["offset"];
+	        this.hasMore = source["hasMore"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AIUsageSummary {
+	    totalRequests: number;
+	    totalTokens: number;
+	    totalInputTokens: number;
+	    totalOutputTokens: number;
+	    totalCostUsd: number;
+	    successCount: number;
+	    errorCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AIUsageSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.totalRequests = source["totalRequests"];
+	        this.totalTokens = source["totalTokens"];
+	        this.totalInputTokens = source["totalInputTokens"];
+	        this.totalOutputTokens = source["totalOutputTokens"];
+	        this.totalCostUsd = source["totalCostUsd"];
+	        this.successCount = source["successCount"];
+	        this.errorCount = source["errorCount"];
+	    }
+	}
 	export class AppVersion {
 	    version: string;
 	    commit: string;
@@ -326,6 +502,22 @@ export namespace dto {
 	        this.siteUrl = source["siteUrl"];
 	    }
 	}
+	export class DashboardSettings {
+	    autoRefreshEnabled: boolean;
+	    autoRefreshInterval: number;
+	    minRefreshInterval: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DashboardSettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.autoRefreshEnabled = source["autoRefreshEnabled"];
+	        this.autoRefreshInterval = source["autoRefreshInterval"];
+	        this.minRefreshInterval = source["minRefreshInterval"];
+	    }
+	}
 	export class DashboardSummary {
 	    totalSites: number;
 	    activeSites: number;
@@ -584,6 +776,28 @@ export namespace dto {
 	        this.notify_always = source["notify_always"];
 	        this.notify_with_sound = source["notify_with_sound"];
 	        this.notify_on_recover = source["notify_on_recover"];
+	    }
+	}
+	export class HistoryState {
+	    canUndo: boolean;
+	    canRedo: boolean;
+	    undoCount: number;
+	    redoCount: number;
+	    lastAction?: string;
+	    actionApplied?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HistoryState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.canUndo = source["canUndo"];
+	        this.canRedo = source["canRedo"];
+	        this.undoCount = source["undoCount"];
+	        this.redoCount = source["redoCount"];
+	        this.lastAction = source["lastAction"];
+	        this.actionApplied = source["actionApplied"];
 	    }
 	}
 	export class IPComparison {
@@ -1148,6 +1362,74 @@ export namespace dto {
 		    return a;
 		}
 	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_AIUsageLogsResult_ {
+	    success: boolean;
+	    data?: AIUsageLogsResult;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_AIUsageLogsResult_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], AIUsageLogsResult);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_AIUsageSummary_ {
+	    success: boolean;
+	    data?: AIUsageSummary;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_AIUsageSummary_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], AIUsageSummary);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Response__github_com_davidmovas_postulator_internal_dto_AppVersion_ {
 	    success: boolean;
 	    data?: AppVersion;
@@ -1352,6 +1634,40 @@ export namespace dto {
 		    return a;
 		}
 	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_DashboardSettings_ {
+	    success: boolean;
+	    data?: DashboardSettings;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_DashboardSettings_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], DashboardSettings);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Response__github_com_davidmovas_postulator_internal_dto_DashboardSummary_ {
 	    success: boolean;
 	    data?: DashboardSummary;
@@ -1501,6 +1817,40 @@ export namespace dto {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
 	        this.data = this.convertValues(source["data"], HealthCheckSettings);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_HistoryState_ {
+	    success: boolean;
+	    data?: HistoryState;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_HistoryState_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], HistoryState);
 	        this.error = this.convertValues(source["error"], Error);
 	    }
 	
@@ -2975,6 +3325,142 @@ export namespace dto {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
 	        this.data = this.convertValues(source["data"], Topic);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response___github_com_davidmovas_postulator_internal_dto_AIUsageByOperation_ {
+	    success: boolean;
+	    data?: AIUsageByOperation[];
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response___github_com_davidmovas_postulator_internal_dto_AIUsageByOperation_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], AIUsageByOperation);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response___github_com_davidmovas_postulator_internal_dto_AIUsageByPeriod_ {
+	    success: boolean;
+	    data?: AIUsageByPeriod[];
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response___github_com_davidmovas_postulator_internal_dto_AIUsageByPeriod_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], AIUsageByPeriod);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response___github_com_davidmovas_postulator_internal_dto_AIUsageByProvider_ {
+	    success: boolean;
+	    data?: AIUsageByProvider[];
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response___github_com_davidmovas_postulator_internal_dto_AIUsageByProvider_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], AIUsageByProvider);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response___github_com_davidmovas_postulator_internal_dto_AIUsageBySite_ {
+	    success: boolean;
+	    data?: AIUsageBySite[];
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response___github_com_davidmovas_postulator_internal_dto_AIUsageBySite_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], AIUsageBySite);
 	        this.error = this.convertValues(source["error"], Error);
 	    }
 	

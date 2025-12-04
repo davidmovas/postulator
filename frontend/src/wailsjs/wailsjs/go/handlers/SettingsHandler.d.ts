@@ -4,6 +4,10 @@ import {dto} from '../models';
 
 export function GetAppVersion():Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_AppVersion_>;
 
+export function GetDashboardSettings():Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_DashboardSettings_>;
+
 export function GetHealthCheckSettings():Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_HealthCheckSettings_>;
+
+export function UpdateDashboardSettings(arg1:dto.DashboardSettings):Promise<dto.Response_string_>;
 
 export function UpdateHealthCheckSettings(arg1:dto.HealthCheckSettings):Promise<dto.Response_string_>;

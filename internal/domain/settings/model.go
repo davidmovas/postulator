@@ -18,6 +18,8 @@ type Service interface {
 	UpdateHealthCheckSettings(ctx context.Context, settings *entities.HealthCheckSettings) error
 	GetProxySettings(ctx context.Context) (*entities.ProxySettings, error)
 	UpdateProxySettings(ctx context.Context, settings *entities.ProxySettings) error
+	GetDashboardSettings(ctx context.Context) (*entities.DashboardSettings, error)
+	UpdateDashboardSettings(ctx context.Context, settings *entities.DashboardSettings) error
 }
 
 type HealthCheckScheduler interface {

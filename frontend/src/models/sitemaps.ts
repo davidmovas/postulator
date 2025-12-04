@@ -322,3 +322,27 @@ export function mapGenerateSitemapStructureResult(
         durationMs: x.durationMs,
     };
 }
+
+// =========================================================================
+// History Types
+// =========================================================================
+
+export interface HistoryState {
+    canUndo: boolean;
+    canRedo: boolean;
+    undoCount: number;
+    redoCount: number;
+    lastAction?: string;
+    actionApplied?: string;
+}
+
+export function mapHistoryState(x: dto.HistoryState): HistoryState {
+    return {
+        canUndo: x.canUndo,
+        canRedo: x.canRedo,
+        undoCount: x.undoCount,
+        redoCount: x.redoCount,
+        lastAction: x.lastAction,
+        actionApplied: x.actionApplied,
+    };
+}

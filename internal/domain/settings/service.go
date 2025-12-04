@@ -108,3 +108,45 @@ func (s *service) UpdateProxySettings(ctx context.Context, settings *entities.Pr
 	s.logger.Info("Proxy settings updated successfully")
 	return nil
 }
+
+func (s *service) GetDashboardSettings(ctx context.Context) (*entities.DashboardSettings, error) {
+	value, err := s.repo.Get(ctx, entities.SettingsKeyDashboard)
+	if err != nil {
+		var appErr *appErrors.AppError
+		if errors.As(err, &appErr) && appErr.Code == appErrors.ErrCodeNotFound {
+			s.logger.Info("Dashboard settings not found, returning defaults")
+			return entities.DefaultDashboardSettings(), nil
+		}
+		s.logger.ErrorWithErr(err, "Failed to get dashboard settings")
+		return nil, err
+	}
+
+	var settings entities.DashboardSettings
+	if err = json.Unmarshal([]byte(value), &settings); err != nil {
+		s.logger.ErrorWithErr(err, "Failed to unmarshal dashboard settings")
+		return nil, appErrors.Internal(err)
+	}
+
+	return &settings, nil
+}
+
+func (s *service) UpdateDashboardSettings(ctx context.Context, settings *entities.DashboardSettings) error {
+	if err := settings.Validate(); err != nil {
+		s.logger.ErrorWithErr(err, "Invalid dashboard settings")
+		return err
+	}
+
+	data, err := json.Marshal(settings)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to marshal dashboard settings")
+		return appErrors.Internal(err)
+	}
+
+	if err = s.repo.Set(ctx, entities.SettingsKeyDashboard, string(data)); err != nil {
+		s.logger.ErrorWithErr(err, "Failed to save dashboard settings")
+		return err
+	}
+
+	s.logger.Info("Dashboard settings updated successfully")
+	return nil
+}
