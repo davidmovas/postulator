@@ -42,6 +42,39 @@ export const getLayoutedElements = (
     return { nodes: newNodes as Node[], edges };
 };
 
+// Layout specifically for links mode - wider spacing for better link visibility
+export const getLinksLayoutedElements = (
+    nodes: Node[],
+    edges: Edge[],
+    direction = "TB" // Top to bottom works better for links visualization
+) => {
+    const dagreGraph = new dagre.graphlib.Graph();
+    dagreGraph.setDefaultEdgeLabel(() => ({}));
+    // Wider spacing for links mode
+    dagreGraph.setGraph({ rankdir: direction, nodesep: 80, ranksep: 150 });
+
+    nodes.forEach((node) => {
+        dagreGraph.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT + 20 }); // Taller for link badges
+    });
+
+    edges.forEach((edge) => {
+        dagreGraph.setEdge(edge.source, edge.target);
+    });
+
+    dagre.layout(dagreGraph);
+
+    const newPositions = new Map<string, { x: number; y: number }>();
+    nodes.forEach((node) => {
+        const nodeWithPosition = dagreGraph.node(node.id);
+        newPositions.set(node.id, {
+            x: nodeWithPosition.x - NODE_WIDTH / 2,
+            y: nodeWithPosition.y - (NODE_HEIGHT + 20) / 2,
+        });
+    });
+
+    return newPositions;
+};
+
 export const convertToFlowNodes = (sitemapNodes: SitemapNode[], siteUrl?: string): Node[] => {
     return sitemapNodes.map((node) => ({
         id: String(node.id),

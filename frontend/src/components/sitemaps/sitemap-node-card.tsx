@@ -3,15 +3,21 @@
 import { memo, useCallback } from "react";
 import { Handle, Position, NodeProps } from "@xyflow/react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { SitemapNode, NodeGenerationStatus, NodePublishStatus } from "@/models/sitemaps";
-import { Home, Loader2, Upload } from "lucide-react";
+import { Home, Loader2, Upload, ArrowRightToLine, ArrowLeftFromLine } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NodeHoverCard } from "./node-hover-card";
 import { BrowserOpenURL } from "@/wailsjs/wailsjs/runtime/runtime";
 
-interface SitemapNodeData extends SitemapNode {
+export type EditorMode = "map" | "links";
+
+export interface SitemapNodeData extends SitemapNode {
     label: string;
     siteUrl?: string;
+    editorMode?: EditorMode;
+    outgoingLinkCount?: number;
+    incomingLinkCount?: number;
 }
 
 // Status color classes for border, hover, and animations based on 3-status system
@@ -123,8 +129,8 @@ const getStatusClasses = (
 };
 
 function SitemapNodeCardComponent({ data, selected }: NodeProps<SitemapNodeData>) {
-    // Debug: log when component renders with status
-    // console.log(`[SitemapNodeCard] id=${data.id} publishStatus=${data.publishStatus} genStatus=${data.generationStatus}`);
+    const isLinkingMode = data.editorMode === "links";
+
     const statusClasses = getStatusClasses(
         data.generationStatus,
         data.publishStatus,
@@ -132,46 +138,126 @@ function SitemapNodeCardComponent({ data, selected }: NodeProps<SitemapNodeData>
         data.isModifiedLocally
     );
 
-    // Check if the node is clickable (published status or has WP URL)
     const isClickable = (data.publishStatus === "published" || data.wpUrl) && data.siteUrl;
-
-    // Display just the slug with leading slash in the card
     const displaySlug = data.isRoot ? "/" : `/${data.slug}`;
 
-    // Build full URL for the node
     const getFullUrl = useCallback(() => {
         if (!data.siteUrl) return null;
-        // Remove trailing slash from siteUrl
         const baseUrl = data.siteUrl.replace(/\/$/, "");
-        // For root node, just return base URL
         if (data.isRoot) {
             return baseUrl;
         }
-        // Use the path for full URL, normalize to avoid double slashes
         const path = (data.path || `/${data.slug}`).replace(/^\/+/, "/");
         return `${baseUrl}${path}`;
     }, [data.siteUrl, data.isRoot, data.path, data.slug]);
 
     const handleSlugClick = useCallback((e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent node selection
+        e.stopPropagation();
         const url = getFullUrl();
         if (url) {
             BrowserOpenURL(url);
         }
     }, [getFullUrl]);
 
+    const outgoingCount = data.outgoingLinkCount || 0;
+    const incomingCount = data.incomingLinkCount || 0;
+
+    // Card content - shared between modes
+    const cardContent = (
+        <Card
+            className={cn(
+                "w-[200px] cursor-pointer transition-all duration-300",
+                "border-l-4",
+                statusClasses.border,
+                statusClasses.hover,
+                statusClasses.animation,
+                selected && "ring-2 ring-primary"
+            )}
+        >
+            <CardContent className="p-3">
+                <div className="flex items-start gap-2">
+                    {statusClasses.isActive && (
+                        <div className="flex-shrink-0 mt-0.5">
+                            {data.generationStatus === "generating" ? (
+                                <Loader2 className="h-4 w-4 animate-spin text-purple-500" />
+                            ) : data.publishStatus === "publishing" ? (
+                                <Upload className="h-4 w-4 animate-bounce text-cyan-500" />
+                            ) : null}
+                        </div>
+                    )}
+                    {data.isRoot && !statusClasses.isActive && (
+                        <div className="flex-shrink-0 text-primary mt-0.5">
+                            <Home className="h-4 w-4" />
+                        </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                        <p className="font-medium text-sm truncate">{data.title}</p>
+                        {isClickable ? (
+                            <button
+                                onClick={handleSlugClick}
+                                className="text-xs text-primary hover:underline truncate max-w-full text-left block"
+                                title={getFullUrl() || undefined}
+                            >
+                                {displaySlug}
+                            </button>
+                        ) : !data.isRoot ? (
+                            <p className="text-xs text-muted-foreground truncate">
+                                {displaySlug}
+                            </p>
+                        ) : null}
+                    </div>
+                </div>
+
+                {/* Link counts - only in linking mode */}
+                {isLinkingMode && (outgoingCount > 0 || incomingCount > 0) && (
+                    <div className="flex items-center gap-2 mt-2 pt-2 border-t">
+                        {outgoingCount > 0 && (
+                            <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                <ArrowRightToLine className="h-3 w-3" />
+                                {outgoingCount}
+                            </Badge>
+                        )}
+                        {incomingCount > 0 && (
+                            <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                <ArrowLeftFromLine className="h-3 w-3" />
+                                {incomingCount}
+                            </Badge>
+                        )}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+
+    // Linking mode - each side has both source and target handle (visually merged)
+    if (isLinkingMode) {
+        return (
+            <>
+                {/* Top */}
+                <Handle type="source" position={Position.Top} id="top-source" className="!bg-primary !w-2.5 !h-2.5" />
+                <Handle type="target" position={Position.Top} id="top-target" className="!bg-primary !w-2.5 !h-2.5" />
+                {/* Right */}
+                <Handle type="source" position={Position.Right} id="right-source" className="!bg-primary !w-2.5 !h-2.5" />
+                <Handle type="target" position={Position.Right} id="right-target" className="!bg-primary !w-2.5 !h-2.5" />
+                {/* Bottom */}
+                <Handle type="source" position={Position.Bottom} id="bottom-source" className="!bg-primary !w-2.5 !h-2.5" />
+                <Handle type="target" position={Position.Bottom} id="bottom-target" className="!bg-primary !w-2.5 !h-2.5" />
+                {/* Left */}
+                <Handle type="source" position={Position.Left} id="left-source" className="!bg-primary !w-2.5 !h-2.5" />
+                <Handle type="target" position={Position.Left} id="left-target" className="!bg-primary !w-2.5 !h-2.5" />
+                {cardContent}
+            </>
+        );
+    }
+
+    // Map mode - original layout with NodeHoverCard
     return (
         <>
-            {/* Left handle - target (hidden for root) - MUST be direct child for React Flow */}
             {!data.isRoot && (
-                <Handle
-                    type="target"
-                    position={Position.Left}
-                    className="!bg-primary !w-2.5 !h-2.5"
-                />
+                <Handle type="target" position={Position.Left} className="!bg-primary !w-2.5 !h-2.5" />
             )}
+            <Handle type="source" position={Position.Right} className="!bg-primary !w-2.5 !h-2.5" />
 
-            {/* Card wrapped in hover card for detailed info */}
             <NodeHoverCard node={data} delay={500}>
                 <Card
                     className={cn(
@@ -185,7 +271,6 @@ function SitemapNodeCardComponent({ data, selected }: NodeProps<SitemapNodeData>
                 >
                     <CardContent className="p-3">
                         <div className="flex items-start gap-2">
-                            {/* Status indicator for active states */}
                             {statusClasses.isActive && (
                                 <div className="flex-shrink-0 mt-0.5">
                                     {data.generationStatus === "generating" ? (
@@ -220,42 +305,9 @@ function SitemapNodeCardComponent({ data, selected }: NodeProps<SitemapNodeData>
                     </CardContent>
                 </Card>
             </NodeHoverCard>
-
-            {/* Right handle - source - MUST be direct child for React Flow */}
-            <Handle
-                type="source"
-                position={Position.Right}
-                className="!bg-primary !w-2.5 !h-2.5"
-            />
         </>
     );
 }
 
-// Custom comparison to ensure status changes trigger re-render
-const arePropsEqual = (
-    prevProps: NodeProps<SitemapNodeData>,
-    nextProps: NodeProps<SitemapNodeData>
-) => {
-    // Check selection state
-    if (prevProps.selected !== nextProps.selected) return false;
-
-    // Check key data properties that affect rendering
-    const prev = prevProps.data;
-    const next = nextProps.data;
-
-    return (
-        prev.id === next.id &&
-        prev.title === next.title &&
-        prev.slug === next.slug &&
-        prev.path === next.path &&
-        prev.isRoot === next.isRoot &&
-        prev.publishStatus === next.publishStatus &&
-        prev.generationStatus === next.generationStatus &&
-        prev.designStatus === next.designStatus &&
-        prev.isModifiedLocally === next.isModifiedLocally &&
-        prev.wpUrl === next.wpUrl &&
-        prev.siteUrl === next.siteUrl
-    );
-};
-
-export const SitemapNodeCard = memo(SitemapNodeCardComponent, arePropsEqual);
+// Temporarily disabled memo to debug handle issues
+export const SitemapNodeCard = SitemapNodeCardComponent;

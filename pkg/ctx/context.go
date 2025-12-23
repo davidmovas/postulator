@@ -6,10 +6,11 @@ import (
 )
 
 const (
-	FastContextTimeout   = time.Second * 5
-	MediumContextTimeout = time.Second * 10
-	LongContextTimeout   = time.Second * 30
-	AIContextTimeout     = time.Minute * 5
+	FastContextTimeout    = time.Second * 5
+	MediumContextTimeout  = time.Second * 10
+	LongContextTimeout    = time.Second * 30
+	AIContextTimeout      = time.Minute * 5
+	ScannerContextTimeout = time.Minute * 10 // For scanning WordPress sites
 )
 
 func FastCtx() context.Context {
@@ -40,6 +41,13 @@ func WithTimeout(timeout time.Duration) context.Context {
 func AICtx() context.Context {
 	ctx, cancel := context.WithTimeout(context.Background(), AIContextTimeout)
 	time.AfterFunc(AIContextTimeout, cancel)
+	return ctx
+}
+
+// ScannerCtx returns a context with 10-minute timeout for scanning WordPress sites
+func ScannerCtx() context.Context {
+	ctx, cancel := context.WithTimeout(context.Background(), ScannerContextTimeout)
+	time.AfterFunc(ScannerContextTimeout, cancel)
 	return ctx
 }
 

@@ -41,6 +41,7 @@ func New(cfg *config.Config) (*App, error) {
 		appHandler         *handlers.AppHandler
 		sitemapsHandler    *handlers.SitemapsHandler
 		aiUsageHandler     *handlers.AIUsageHandler
+		linkingHandler     *handlers.LinkingHandler
 		eventsBridge       *events.WailsBridge
 	)
 
@@ -69,6 +70,7 @@ func New(cfg *config.Config) (*App, error) {
 			&appHandler,
 			&sitemapsHandler,
 			&aiUsageHandler,
+			&linkingHandler,
 			&eventsBridge,
 		),
 	)
@@ -93,6 +95,7 @@ func New(cfg *config.Config) (*App, error) {
 			appHandler,
 			sitemapsHandler,
 			aiUsageHandler,
+			linkingHandler,
 		},
 		dialogsHandler: dialogsHandler,
 		appHandler:     appHandler,

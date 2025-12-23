@@ -523,7 +523,7 @@ func (h *SitemapsHandler) ScanSite(req *dto.ScanSiteRequest) *dto.Response[*dto.
 	}
 
 	result, err := h.scanner.ScanAndCreateSitemap(
-		ctx.FastCtx(),
+		ctx.ScannerCtx(),
 		req.SiteID,
 		req.SitemapName,
 		opts,
@@ -585,7 +585,7 @@ func (h *SitemapsHandler) ScanIntoSitemap(req *dto.ScanIntoSitemapRequest) *dto.
 
 	// Wrap scanner to track created node IDs
 	result, err := h.scanner.ScanIntoSitemapWithTracking(
-		ctx.FastCtx(),
+		ctx.ScannerCtx(),
 		req.SitemapID,
 		req.ParentNodeID,
 		opts,

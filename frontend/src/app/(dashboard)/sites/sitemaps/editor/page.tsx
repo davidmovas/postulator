@@ -5,12 +5,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
     ReactFlow,
     Background,
-    Node,
     BackgroundVariant,
     Panel,
     NodeTypes,
+    EdgeTypes,
     ReactFlowProvider,
     SelectionMode,
+    ConnectionMode,
+    useUpdateNodeInternals,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -37,6 +39,9 @@ import {
     ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { SitemapNodeCard } from "@/components/sitemaps/sitemap-node-card";
+import { LinkEdge } from "@/components/sitemaps/link-edge";
+import { LinkContextMenu } from "@/components/sitemaps/link-context-menu";
+import { useSitemapLinking } from "@/hooks/use-sitemap-linking";
 import { NodeEditDialog } from "@/components/sitemaps/node-edit-dialog";
 import { SitemapSidebar } from "@/components/sitemaps/sitemap-sidebar";
 import { CanvasControls } from "@/components/sitemaps/canvas-controls";
@@ -49,12 +54,17 @@ import { ImportDialog } from "@/components/sitemaps/import-dialog";
 import { ScanDialog } from "@/components/sitemaps/scan-dialog";
 import { GenerateDialog } from "@/components/sitemaps/generate-dialog";
 import { PageGenerateDialog } from "@/components/sitemaps/page-generate-dialog";
-import { EditorHeader } from "@/components/sitemaps/editor-header";
+import { EditorHeader, EditorMode } from "@/components/sitemaps/editor-header";
 import { GenerationProgressPanel } from "@/components/sitemaps/generation-progress-panel";
 import { createNodesFromPaths } from "@/lib/sitemap-utils";
+import { getLinksLayoutedElements } from "@/lib/sitemap-editor";
 
 const nodeTypes: NodeTypes = {
     sitemapNode: SitemapNodeCard,
+};
+
+const edgeTypes: EdgeTypes = {
+    linkEdge: LinkEdge,
 };
 
 function SitemapEditorFlow() {
@@ -118,6 +128,156 @@ function SitemapEditorFlow() {
         setHasUnsavedChanges,
     });
 
+    const [editorMode, setEditorMode] = useState<EditorMode>("map");
+    const updateNodeInternals = useUpdateNodeInternals();
+
+    // Update all node internals when editor mode changes (handles change)
+    useEffect(() => {
+        if (nodes.length > 0) {
+            // Small delay to ensure React has re-rendered the nodes with new handles
+            const timer = setTimeout(() => {
+                const nodeIds = nodes.map((node) => node.id);
+                updateNodeInternals(nodeIds);
+            }, 50);
+            return () => clearTimeout(timer);
+        }
+    }, [editorMode, nodes, updateNodeInternals]);
+
+    // Separate positions for links mode (doesn't affect map mode positions)
+    const [linkModePositions, setLinkModePositions] = useState<Map<string, { x: number; y: number }>>(new Map());
+    const [linkModeInitialized, setLinkModeInitialized] = useState(false);
+
+    // Initialize link mode positions from current map positions when first entering links mode
+    useEffect(() => {
+        if (editorMode === "links" && !linkModeInitialized && nodes.length > 0) {
+            const positions = new Map<string, { x: number; y: number }>();
+            nodes.forEach((node) => {
+                positions.set(node.id, { ...node.position });
+            });
+            setLinkModePositions(positions);
+            setLinkModeInitialized(true);
+        }
+    }, [editorMode, linkModeInitialized, nodes]);
+
+    // Reset link mode initialization when nodes change significantly (e.g., reload)
+    useEffect(() => {
+        if (nodes.length === 0) {
+            setLinkModeInitialized(false);
+        }
+    }, [nodes.length]);
+
+    // Linking mode hook - only manages edges and link counts
+    const linking = useSitemapLinking({
+        sitemapId,
+        siteId,
+        enabled: editorMode === "links",
+    });
+
+    // Handle node position changes in links mode
+    const handleLinkModeNodesChange = useCallback((changes: any[]) => {
+        changes.forEach((change: any) => {
+            if (change.type === "position" && change.position) {
+                setLinkModePositions((prev) => {
+                    const newMap = new Map(prev);
+                    newMap.set(change.id, change.position);
+                    return newMap;
+                });
+            }
+        });
+    }, []);
+
+    // Unified handlers that check mode internally - React Flow needs stable handler references
+    const handleConnectStart = useCallback(
+        (event: React.MouseEvent | React.TouchEvent, params: { nodeId: string | null; handleId: string | null; handleType: "source" | "target" | null }) => {
+            console.log("[Editor] handleConnectStart, mode:", editorMode, params);
+            if (editorMode === "links") {
+                linking.onConnectStart(event as any, params);
+            } else {
+                canvas.onConnectStart(event as any, params);
+            }
+        },
+        [editorMode, linking.onConnectStart, canvas.onConnectStart]
+    );
+
+    const handleConnect = useCallback(
+        (connection: any) => {
+            console.log("[Editor] handleConnect, mode:", editorMode, connection);
+            if (editorMode === "links") {
+                linking.onConnect(connection);
+            } else {
+                canvas.onConnect(connection);
+            }
+        },
+        [editorMode, linking.onConnect, canvas.onConnect]
+    );
+
+    const handleConnectEnd = useCallback(
+        (event: MouseEvent | TouchEvent) => {
+            console.log("[Editor] handleConnectEnd, mode:", editorMode);
+            if (editorMode === "links") {
+                linking.onConnectEnd(event);
+            } else {
+                canvas.onConnectEnd(event);
+            }
+        },
+        [editorMode, linking.onConnectEnd, canvas.onConnectEnd]
+    );
+
+    // Compute nodes with mode-specific data and positions
+    // Key includes editorMode to force re-mount when mode changes (handles need to re-register)
+    const displayNodes = useMemo(() => {
+        return nodes.map((node) => {
+            const linkCounts = linking.linkCountsMap.get(Number(node.id));
+            // Use link mode positions if in links mode and initialized
+            const position = editorMode === "links" && linkModeInitialized
+                ? (linkModePositions.get(node.id) || node.position)
+                : node.position;
+
+            return {
+                ...node,
+                position,
+                draggable: true, // Allow dragging in both modes
+                data: {
+                    ...node.data,
+                    editorMode,
+                    siteUrl: site?.url,
+                    outgoingLinkCount: linkCounts?.outgoing || 0,
+                    incomingLinkCount: linkCounts?.incoming || 0,
+                },
+            };
+        });
+    }, [nodes, editorMode, linking.linkCountsMap, site?.url, linkModePositions, linkModeInitialized]);
+
+    // Hierarchy edges (серые пунктирные) для режима links - показывают структуру сайтмапы
+    // Без указания sourceHandle/targetHandle - React Flow сам выберет подходящие хендлеры
+    const hierarchyEdges = useMemo(() => {
+        if (editorMode !== "links") return [];
+        return edges.map((edge) => ({
+            ...edge,
+            id: `hierarchy-${edge.id}`,
+            type: "default",
+            animated: false,
+            selectable: false,
+            focusable: false,
+            style: { stroke: "#9ca3af", strokeWidth: 1.5, strokeDasharray: "4,4" },
+            markerEnd: {
+                type: "arrowclosed" as const,
+                width: 10,
+                height: 10,
+                color: "#9ca3af",
+            },
+        }));
+    }, [editorMode, edges]);
+
+    // Выбираем какие edges показывать в зависимости от режима
+    const displayEdges = useMemo(() => {
+        if (editorMode === "links") {
+            // В режиме links показываем и hierarchy (серые) и link edges (цветные)
+            return [...hierarchyEdges, ...linking.linkEdges];
+        }
+        return edges;
+    }, [editorMode, hierarchyEdges, linking.linkEdges, edges]);
+
     const [bulkCreateDialogOpen, setBulkCreateDialogOpen] = useState(false);
     const [importDialogOpen, setImportDialogOpen] = useState(false);
     const [scanDialogOpen, setScanDialogOpen] = useState(false);
@@ -140,6 +300,24 @@ function SitemapEditorFlow() {
             await loadData(true);
         }
     }, [history, loadData]);
+
+    // Auto layout for links mode - uses hierarchy edges for layout
+    const handleLinkModeAutoLayout = useCallback(() => {
+        if (nodes.length === 0) return;
+
+        // Use hierarchy edges for layout
+        const newPositions = getLinksLayoutedElements(nodes, edges);
+        setLinkModePositions(newPositions);
+    }, [nodes, edges]);
+
+    // Combined auto layout handler that works for both modes
+    const handleAutoLayout = useCallback(() => {
+        if (editorMode === "links") {
+            handleLinkModeAutoLayout();
+        } else {
+            canvas.handleAutoLayout();
+        }
+    }, [editorMode, handleLinkModeAutoLayout, canvas]);
 
     const handleNavigateBack = useCallback(() => {
         if (wpOps.activeGenerationTask &&
@@ -215,7 +393,7 @@ function SitemapEditorFlow() {
             ctrl: true,
             description: "Auto layout",
             category: "Layout",
-            action: canvas.handleAutoLayout,
+            action: handleAutoLayout,
         },
         {
             key: "n",
@@ -302,7 +480,7 @@ function SitemapEditorFlow() {
             category: "General",
             action: () => {},
         },
-    ], [hasUnsavedChanges, handleSavePositions, canvas.handleAutoLayout, nodeOps, setNodes, handleUndo, handleRedo, wpOps]);
+    ], [hasUnsavedChanges, handleSavePositions, handleAutoLayout, nodeOps, setNodes, handleUndo, handleRedo, wpOps]);
 
     useHotkeys(hotkeys);
 
@@ -324,10 +502,12 @@ function SitemapEditorFlow() {
                 canRedo={history.canRedo}
                 activeGenerationTask={wpOps.activeGenerationTask}
                 hotkeys={hotkeys}
+                editorMode={editorMode}
+                onModeChange={setEditorMode}
                 onNavigateBack={handleNavigateBack}
                 onUndo={handleUndo}
                 onRedo={handleRedo}
-                onAutoLayout={canvas.handleAutoLayout}
+                onAutoLayout={handleAutoLayout}
                 onAddNode={() => nodeOps.handleAddNode()}
                 onBulkCreate={() => setBulkCreateDialogOpen(true)}
                 onImport={() => setImportDialogOpen(true)}
@@ -366,24 +546,26 @@ function SitemapEditorFlow() {
                 <ResizablePanel defaultSize={80}>
                     <div className="h-full" ref={reactFlowWrapper}>
                         <ReactFlow
-                            nodes={nodes}
-                            edges={edges}
-                            onNodesChange={onNodesChange}
-                            onEdgesChange={onEdgesChange}
-                            onConnectStart={canvas.onConnectStart}
-                            onConnect={canvas.onConnect}
-                            onConnectEnd={canvas.onConnectEnd}
-                            onNodeClick={canvas.onNodeClick}
-                            onNodeDoubleClick={canvas.onNodeDoubleClick}
-                            onNodeContextMenu={canvas.onNodeContextMenu}
-                            onPaneContextMenu={canvas.onPaneContextMenu}
-                            onEdgeContextMenu={canvas.onEdgeContextMenu}
+                            nodes={displayNodes}
+                            edges={displayEdges}
+                            onNodesChange={editorMode === "map" ? onNodesChange : handleLinkModeNodesChange}
+                            onEdgesChange={editorMode === "map" ? onEdgesChange : undefined}
+                            onConnectStart={handleConnectStart}
+                            onConnect={handleConnect}
+                            onConnectEnd={handleConnectEnd}
+                            onNodeClick={editorMode === "map" ? canvas.onNodeClick : undefined}
+                            onNodeDoubleClick={editorMode === "map" ? canvas.onNodeDoubleClick : undefined}
+                            onNodeContextMenu={editorMode === "map" ? canvas.onNodeContextMenu : undefined}
+                            onPaneContextMenu={editorMode === "map" ? canvas.onPaneContextMenu : undefined}
+                            onEdgeContextMenu={editorMode === "map" ? canvas.onEdgeContextMenu : linking.onEdgeContextMenu}
                             onPaneClick={() => {
                                 canvas.closeContextMenu();
                                 canvas.closeEdgeContextMenu();
+                                linking.closeLinkContextMenu();
                             }}
                             onSelectionChange={canvas.handleSelectionChange}
                             nodeTypes={nodeTypes}
+                            edgeTypes={edgeTypes}
                             fitView
                             fitViewOptions={{ padding: 0.3, maxZoom: 0.8 }}
                             snapToGrid
@@ -394,6 +576,7 @@ function SitemapEditorFlow() {
                             selectionMode={SelectionMode.Partial}
                             selectionOnDrag={false}
                             panOnDrag
+                            connectionMode={editorMode === "links" ? ConnectionMode.Loose : ConnectionMode.Strict}
                         >
                             <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
                             <Panel position="bottom-right">
@@ -426,6 +609,19 @@ function SitemapEditorFlow() {
                 onClose={canvas.closeEdgeContextMenu}
                 onDeleteEdge={canvas.handleDeleteEdge}
             />
+
+            {/* Link context menu for links mode */}
+            {linking.linkContextMenu && (
+                <LinkContextMenu
+                    linkId={linking.linkContextMenu.linkId}
+                    position={linking.linkContextMenu.position}
+                    status={linking.linkContextMenu.status}
+                    onApprove={linking.approveLink}
+                    onReject={linking.rejectLink}
+                    onRemove={linking.removeLink}
+                    onClose={linking.closeLinkContextMenu}
+                />
+            )}
 
             {nodeOps.selectedNode && (
                 <NodeEditDialog
@@ -519,7 +715,7 @@ function SitemapEditorFlow() {
                 hasUnsavedChanges={hasUnsavedChanges}
                 hasSelectedNodes={nodes.some((n) => n.selected)}
                 onSave={handleSavePositions}
-                onAutoLayout={canvas.handleAutoLayout}
+                onAutoLayout={handleAutoLayout}
                 onAddNode={() => nodeOps.handleAddNode()}
                 onBulkCreate={() => setBulkCreateDialogOpen(true)}
                 onImport={() => setImportDialogOpen(true)}

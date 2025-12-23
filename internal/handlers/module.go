@@ -21,5 +21,6 @@ var Module = fx.Module("handlers",
 		NewAppHandler,
 		NewSitemapsHandler,
 		NewAIUsageHandler,
+		NewLinkingHandler,
 	),
 )

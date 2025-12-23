@@ -23,11 +23,14 @@ import {
     Upload,
     ScanLine,
     Sparkles,
-    FileText,
     Loader2,
     Wand2,
+    Network,
+    GitBranch,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+export type EditorMode = "map" | "links";
 
 interface EditorHeaderProps {
     site: Site | null;
@@ -37,6 +40,8 @@ interface EditorHeaderProps {
     canRedo: boolean;
     activeGenerationTask: GenerationTask | null;
     hotkeys: HotkeyConfig[];
+    editorMode: EditorMode;
+    onModeChange: (mode: EditorMode) => void;
     onNavigateBack: () => void;
     onUndo: () => void;
     onRedo: () => void;
@@ -58,6 +63,8 @@ export function EditorHeader({
     canRedo,
     activeGenerationTask,
     hotkeys,
+    editorMode,
+    onModeChange,
     onNavigateBack,
     onUndo,
     onRedo,
@@ -100,6 +107,50 @@ export function EditorHeader({
                 <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">{sitemap?.name}</span>
                     <span className="text-xs text-muted-foreground">({site?.name})</span>
+                </div>
+
+                <Separator orientation="vertical" className="h-5 mx-1" />
+
+                {/* Mode Switcher */}
+                <div className="flex">
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant={editorMode === "map" ? "default" : "outline"}
+                                size="sm"
+                                aria-label="Map mode"
+                                className={cn(
+                                    "h-7 px-2.5 rounded-r-none",
+                                    editorMode === "map" && "bg-primary text-primary-foreground"
+                                )}
+                                onClick={() => onModeChange("map")}
+                            >
+                                <Network className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Sitemap Mode <span className="text-muted-foreground ml-1">Edit structure</span></p>
+                        </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant={editorMode === "links" ? "default" : "outline"}
+                                size="sm"
+                                aria-label="Links mode"
+                                className={cn(
+                                    "h-7 px-2.5 rounded-l-none border-l-0",
+                                    editorMode === "links" && "bg-primary text-primary-foreground"
+                                )}
+                                onClick={() => onModeChange("links")}
+                            >
+                                <GitBranch className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Links Mode <span className="text-muted-foreground ml-1">Manage internal links</span></p>
+                        </TooltipContent>
+                    </Tooltip>
                 </div>
             </div>
             <div className="flex items-center gap-1">

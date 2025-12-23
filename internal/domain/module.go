@@ -57,9 +57,7 @@ var Module = fx.Module("domain",
 		execution.NewExecutionStatsAdapter,
 
 		// Linking
-		linking.NewRepository,
-		linking.NewProposalRepository,
-		linking.NewLinkRepository,
+		linking.NewService,
 
 		// Prompts
 		prompts.NewRepository,
