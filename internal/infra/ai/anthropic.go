@@ -67,6 +67,7 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 
 	fullSystemPrompt := systemPrompt + "\n\n" + jsonInstructions
 
+	// 4096 is plenty for 800-1500 words of content
 	message, err := c.client.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:     anthropic.Model(c.model),
 		MaxTokens: 4096,
@@ -105,7 +106,11 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 	var article ArticleContent
 	jsonStr := extractJSON(responseText)
 	if err = json.Unmarshal([]byte(jsonStr), &article); err != nil {
-		return nil, errors.AI(anthropicProviderName, fmt.Errorf("failed to parse response: %w, raw: %s", err, responseText[:min(200, len(responseText))]))
+		// Try sanitizing the JSON to fix invalid escape sequences
+		sanitized := sanitizeJSON(jsonStr)
+		if err2 := json.Unmarshal([]byte(sanitized), &article); err2 != nil {
+			return nil, errors.AI(anthropicProviderName, fmt.Errorf("failed to parse response: %w, raw: %s", err, responseText[:min(200, len(responseText))]))
+		}
 	}
 
 	if article.Title == "" || article.Content == "" {
@@ -213,6 +218,41 @@ func extractJSON(s string) string {
 	}
 
 	return s
+}
+
+// sanitizeJSON fixes common invalid escape sequences in JSON strings
+// This helps handle cases where AI generates content with invalid escapes like "\ " or "\x"
+func sanitizeJSON(s string) string {
+	// Fix invalid escape sequences by finding backslash not followed by valid escape chars
+	// Valid JSON escapes: " \ / b f n r t u
+	result := strings.Builder{}
+	result.Grow(len(s))
+
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\\' && i+1 < len(s) {
+			next := s[i+1]
+			// Check if it's a valid escape sequence
+			switch next {
+			case '"', '\\', '/', 'b', 'f', 'n', 'r', 't':
+				result.WriteByte(s[i])
+			case 'u':
+				// Unicode escape - check if followed by 4 hex digits
+				if i+5 < len(s) {
+					result.WriteByte(s[i])
+				} else {
+					// Invalid unicode escape, skip the backslash
+					continue
+				}
+			default:
+				// Invalid escape - skip the backslash
+				continue
+			}
+		} else {
+			result.WriteByte(s[i])
+		}
+	}
+
+	return result.String()
 }
 
 // min returns the minimum of two integers

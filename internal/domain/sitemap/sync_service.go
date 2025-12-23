@@ -112,13 +112,13 @@ func (s *SyncService) SyncFromWP(ctx context.Context, siteID int64, nodeIDs []in
 			continue
 		}
 
-		// Update local node with WP data
 		node.Title = wpTitle
 		node.Slug = wpSlug
 		node.WPURL = &wpURL
 		node.WPTitle = &wpTitle
 		node.WPSlug = &wpSlug
-		node.ContentStatus = mapWPStatusToNodeStatus(wpStatus)
+		node.PublishStatus = mapWPStatusToPublishStatus(wpStatus)
+		node.IsModifiedLocally = false
 		node.IsSynced = true
 		now := time.Now()
 		node.LastSyncedAt = &now
@@ -236,15 +236,16 @@ func (s *SyncService) UpdateToWP(ctx context.Context, siteID int64, nodeIDs []in
 	return results, nil
 }
 
-// mapWPStatusToNodeStatus converts WP status string to NodeContentStatus
-func mapWPStatusToNodeStatus(wpStatus string) entities.NodeContentStatus {
+func mapWPStatusToPublishStatus(wpStatus string) entities.NodePublishStatus {
 	switch wpStatus {
 	case "publish":
-		return entities.NodeContentStatusPublished
+		return entities.PubStatusPublished
 	case "draft":
-		return entities.NodeContentStatusDraft
+		return entities.PubStatusDraft
+	case "pending":
+		return entities.PubStatusPending
 	default:
-		return entities.NodeContentStatusPending
+		return entities.PubStatusNone
 	}
 }
 
@@ -296,4 +297,93 @@ func (s *SyncService) ResetNode(ctx context.Context, nodeID int64) error {
 	node.Slug = *node.WPSlug
 
 	return s.sitemapSvc.UpdateNode(ctx, node)
+}
+
+// ChangePublishStatus changes the publish status of a node both locally and in WordPress
+func (s *SyncService) ChangePublishStatus(ctx context.Context, siteID int64, nodeID int64, newStatus entities.NodePublishStatus) error {
+	// Get site with credentials
+	site, err := s.siteService.GetSiteWithPassword(ctx, siteID)
+	if err != nil {
+		return fmt.Errorf("failed to get site: %w", err)
+	}
+
+	// Get the node
+	node, err := s.sitemapSvc.GetNode(ctx, nodeID)
+	if err != nil {
+		return fmt.Errorf("failed to get node: %w", err)
+	}
+
+	// Node must have WP ID to change status
+	if node.WPPageID == nil {
+		return errors.Validation("node is not linked to WordPress")
+	}
+
+	wpID := *node.WPPageID
+
+	// Map our status to WP status
+	wpStatus := mapPublishStatusToWPStatus(newStatus)
+
+	// Update WP based on content type
+	switch node.ContentType {
+	case entities.NodeContentTypePage:
+		page := &wp.WPPage{
+			ID:     wpID,
+			Status: wpStatus,
+		}
+		if err := s.wpClient.UpdatePage(ctx, site, page); err != nil {
+			return fmt.Errorf("failed to update page status in WP: %w", err)
+		}
+
+	case entities.NodeContentTypePost:
+		article := &entities.Article{
+			WPPostID: wpID,
+			Status:   mapWPStatusToArticleStatus(wpStatus),
+		}
+		if err := s.wpClient.UpdatePost(ctx, site, article); err != nil {
+			return fmt.Errorf("failed to update post status in WP: %w", err)
+		}
+
+	default:
+		return errors.Validation("unsupported content type")
+	}
+
+	// Update local node status
+	node.PublishStatus = newStatus
+	now := time.Now()
+	node.LastSyncedAt = &now
+
+	if err := s.sitemapSvc.UpdateNode(ctx, node); err != nil {
+		return fmt.Errorf("failed to update local node: %w", err)
+	}
+
+	s.logger.Infof("Changed publish status for node %d to %s", nodeID, newStatus)
+	return nil
+}
+
+func mapPublishStatusToWPStatus(status entities.NodePublishStatus) string {
+	switch status {
+	case entities.PubStatusPublished:
+		return "publish"
+	case entities.PubStatusDraft:
+		return "draft"
+	case entities.PubStatusPending:
+		return "pending"
+	default:
+		return "draft"
+	}
+}
+
+func mapWPStatusToArticleStatus(wpStatus string) entities.ArticleStatus {
+	switch wpStatus {
+	case "publish":
+		return entities.StatusPublished
+	case "draft":
+		return entities.StatusDraft
+	case "pending":
+		return entities.StatusPending
+	case "private":
+		return entities.StatusPrivate
+	default:
+		return entities.StatusDraft
+	}
 }

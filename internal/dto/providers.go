@@ -54,12 +54,16 @@ func (d *Provider) FromEntity(entity *entities.Provider) *Provider {
 }
 
 type Model struct {
-	ID         string  `json:"id"`
-	Name       string  `json:"name"`
-	Provider   string  `json:"provider"`
-	MaxTokens  int     `json:"maxTokens"`
-	InputCost  float64 `json:"inputCost"`
-	OutputCost float64 `json:"outputCost"`
+	ID                   string  `json:"id"`
+	Name                 string  `json:"name"`
+	Provider             string  `json:"provider"`
+	ContextWindow        int     `json:"contextWindow"`
+	MaxOutputTokens      int     `json:"maxOutputTokens"`
+	InputCost            float64 `json:"inputCost"`
+	OutputCost           float64 `json:"outputCost"`
+	RPM                  int     `json:"rpm"`
+	TPM                  int     `json:"tpm"`
+	UsesCompletionTokens bool    `json:"usesCompletionTokens"`
 }
 
 func NewModel(entity *entities.Model) *Model {
@@ -69,12 +73,16 @@ func NewModel(entity *entities.Model) *Model {
 
 func (d *Model) ToEntity() *entities.Model {
 	return &entities.Model{
-		ID:         d.ID,
-		Name:       d.Name,
-		Provider:   entities.Type(d.Provider),
-		MaxTokens:  d.MaxTokens,
-		InputCost:  d.InputCost,
-		OutputCost: d.OutputCost,
+		ID:                   d.ID,
+		Name:                 d.Name,
+		Provider:             entities.Type(d.Provider),
+		ContextWindow:        d.ContextWindow,
+		MaxOutputTokens:      d.MaxOutputTokens,
+		InputCost:            d.InputCost,
+		OutputCost:           d.OutputCost,
+		RPM:                  d.RPM,
+		TPM:                  d.TPM,
+		UsesCompletionTokens: d.UsesCompletionTokens,
 	}
 }
 
@@ -82,8 +90,12 @@ func (d *Model) FromEntity(entity *entities.Model) *Model {
 	d.ID = entity.ID
 	d.Name = entity.Name
 	d.Provider = string(entity.Provider)
-	d.MaxTokens = entity.MaxTokens
+	d.ContextWindow = entity.ContextWindow
+	d.MaxOutputTokens = entity.MaxOutputTokens
 	d.InputCost = entity.InputCost
 	d.OutputCost = entity.OutputCost
+	d.RPM = entity.RPM
+	d.TPM = entity.TPM
+	d.UsesCompletionTokens = entity.UsesCompletionTokens
 	return d
 }

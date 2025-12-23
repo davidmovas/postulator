@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Badge } from "@/components/ui/badge";
-import { SitemapNode, NodeContentStatus } from "@/models/sitemaps";
+import { SitemapNode, NodeGenerationStatus, NodePublishStatus } from "@/models/sitemaps";
 import {
     Globe,
     FileText,
@@ -13,6 +13,9 @@ import {
     AlertCircle,
     Circle,
     Sparkles,
+    Loader2,
+    XCircle,
+    Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,8 +25,21 @@ interface NodeHoverCardProps {
     delay?: number;
 }
 
-const getStatusInfo = (status: NodeContentStatus | undefined) => {
-    switch (status) {
+const getStatusInfo = (
+    generationStatus: NodeGenerationStatus,
+    publishStatus: NodePublishStatus,
+    isModifiedLocally: boolean
+) => {
+    // Modified locally has priority
+    if (isModifiedLocally) {
+        return {
+            label: "Modified Locally",
+            icon: Upload,
+            className: "text-orange-500",
+        };
+    }
+    // Publish status has highest priority
+    switch (publishStatus) {
         case "published":
             return {
                 label: "Published",
@@ -32,29 +48,62 @@ const getStatusInfo = (status: NodeContentStatus | undefined) => {
             };
         case "draft":
             return {
-                label: "Draft",
+                label: "WP Draft",
                 icon: AlertCircle,
                 className: "text-yellow-500",
             };
         case "pending":
             return {
-                label: "Pending",
+                label: "WP Pending",
                 icon: Clock,
                 className: "text-blue-500",
             };
-        case "ai_draft":
+        case "publishing":
             return {
-                label: "AI Draft",
+                label: "Publishing...",
+                icon: Loader2,
+                className: "text-cyan-500",
+            };
+        case "failed":
+            return {
+                label: "Publish Failed",
+                icon: XCircle,
+                className: "text-red-500",
+            };
+    }
+    // Then generation status
+    switch (generationStatus) {
+        case "generated":
+            return {
+                label: "Generated",
                 icon: Sparkles,
                 className: "text-purple-500",
             };
-        default:
+        case "generating":
             return {
-                label: "No content",
-                icon: Circle,
-                className: "text-muted-foreground",
+                label: "Generating...",
+                icon: Loader2,
+                className: "text-purple-400",
+            };
+        case "queued":
+            return {
+                label: "Queued",
+                icon: Clock,
+                className: "text-slate-400",
+            };
+        case "failed":
+            return {
+                label: "Generation Failed",
+                icon: XCircle,
+                className: "text-red-400",
             };
     }
+    // Default
+    return {
+        label: "No content",
+        icon: Circle,
+        className: "text-muted-foreground",
+    };
 };
 
 export function NodeHoverCard({
@@ -133,7 +182,11 @@ export function NodeHoverCard({
         return <>{children}</>;
     }
 
-    const statusInfo = getStatusInfo(node.contentStatus);
+    const statusInfo = getStatusInfo(
+        node.generationStatus,
+        node.publishStatus,
+        node.isModifiedLocally
+    );
     const StatusIcon = statusInfo.icon;
 
     const tooltipContent = isVisible && mounted && (

@@ -369,13 +369,12 @@ func (s *Scanner) createNodesFromPagesWithTracking(
 		// Check if node with this WP ID already exists - if so, update it
 		existingNode, err := s.sitemapSvc.FindNodeByWPID(ctx, sitemapID, page.WPID, entities.NodeContentTypePage)
 		if err == nil && existingNode != nil {
-			// Update existing node with new data from WP
 			existingNode.Title = title
 			existingNode.Slug = page.Slug
 			existingNode.WPURL = &page.URL
-			existingNode.WPTitle = &title     // Update original WP title
-			existingNode.WPSlug = &page.Slug  // Update original WP slug
-			existingNode.ContentStatus = s.mapWPStatusToNodeStatus(page.Status)
+			existingNode.WPTitle = &title
+			existingNode.WPSlug = &page.Slug
+			existingNode.PublishStatus = s.mapWPStatusToPublishStatus(page.Status)
 
 			if updateErr := s.sitemapSvc.UpdateNode(ctx, existingNode); updateErr != nil {
 				errors = append(errors, ScanError{
@@ -398,17 +397,19 @@ func (s *Scanner) createNodesFromPagesWithTracking(
 
 		// Create new node
 		node := &entities.SitemapNode{
-			SitemapID:     sitemapID,
-			ParentID:      &parentNodeID,
-			Title:         title,
-			Slug:          page.Slug,
-			Source:        entities.NodeSourceScanned,
-			ContentType:   entities.NodeContentTypePage,
-			WPPageID:      &page.WPID,
-			WPURL:         &page.URL,
-			WPTitle:       &title,     // Store original WP title
-			WPSlug:        &page.Slug, // Store original WP slug
-			ContentStatus: s.mapWPStatusToNodeStatus(page.Status),
+			SitemapID:        sitemapID,
+			ParentID:         &parentNodeID,
+			Title:            title,
+			Slug:             page.Slug,
+			Source:           entities.NodeSourceScanned,
+			ContentType:      entities.NodeContentTypePage,
+			WPPageID:         &page.WPID,
+			WPURL:            &page.URL,
+			WPTitle:          &title,
+			WPSlug:           &page.Slug,
+			DesignStatus:     entities.DesignStatusApproved,
+			GenerationStatus: entities.GenStatusGenerated,
+			PublishStatus:    s.mapWPStatusToPublishStatus(page.Status),
 		}
 
 		if err := s.sitemapSvc.CreateNode(ctx, node); err != nil {
@@ -481,16 +482,14 @@ func (s *Scanner) createNodesFromPostsWithTracking(
 
 		wpID := post.WPID
 
-		// Check if node with this WP ID already exists - if so, update it
 		existingNode, err := s.sitemapSvc.FindNodeByWPID(ctx, sitemapID, wpID, entities.NodeContentTypePost)
 		if err == nil && existingNode != nil {
-			// Update existing node with new data from WP
 			existingNode.Title = title
 			existingNode.Slug = post.Slug
 			existingNode.WPURL = &post.URL
-			existingNode.WPTitle = &title     // Update original WP title
-			existingNode.WPSlug = &post.Slug  // Update original WP slug
-			existingNode.ContentStatus = s.mapWPStatusToNodeStatus(post.Status)
+			existingNode.WPTitle = &title
+			existingNode.WPSlug = &post.Slug
+			existingNode.PublishStatus = s.mapWPStatusToPublishStatus(post.Status)
 
 			if updateErr := s.sitemapSvc.UpdateNode(ctx, existingNode); updateErr != nil {
 				errors = append(errors, ScanError{
@@ -500,24 +499,25 @@ func (s *Scanner) createNodesFromPostsWithTracking(
 					Message: fmt.Sprintf("failed to update node: %v", updateErr),
 				})
 			}
-			skipped++ // Count as skipped (not newly created)
+			skipped++
 			continue
 		}
 
-		// Create new node
 		node := &entities.SitemapNode{
-			SitemapID:     sitemapID,
-			ParentID:      &parentNodeID,
-			Title:         title,
-			Slug:          post.Slug,
-			Source:        entities.NodeSourceScanned,
-			ContentType:   entities.NodeContentTypePost,
-			ArticleID:     nil, // We don't have internal article ID yet
-			WPPageID:      &wpID,
-			WPURL:         &post.URL,
-			WPTitle:       &title,     // Store original WP title
-			WPSlug:        &post.Slug, // Store original WP slug
-			ContentStatus: s.mapWPStatusToNodeStatus(post.Status),
+			SitemapID:        sitemapID,
+			ParentID:         &parentNodeID,
+			Title:            title,
+			Slug:             post.Slug,
+			Source:           entities.NodeSourceScanned,
+			ContentType:      entities.NodeContentTypePost,
+			ArticleID:        nil,
+			WPPageID:         &wpID,
+			WPURL:            &post.URL,
+			WPTitle:          &title,
+			WPSlug:           &post.Slug,
+			DesignStatus:     entities.DesignStatusApproved,
+			GenerationStatus: entities.GenStatusGenerated,
+			PublishStatus:    s.mapWPStatusToPublishStatus(post.Status),
 		}
 
 		if err := s.sitemapSvc.CreateNode(ctx, node); err != nil {
@@ -547,15 +547,16 @@ func (s *Scanner) createNodesFromPostsWithTracking(
 	return created, skipped, errors
 }
 
-// mapWPStatusToNodeStatus maps WordPress status to node content status
-func (s *Scanner) mapWPStatusToNodeStatus(wpStatus string) entities.NodeContentStatus {
+func (s *Scanner) mapWPStatusToPublishStatus(wpStatus string) entities.NodePublishStatus {
 	switch wpStatus {
 	case "publish":
-		return entities.NodeContentStatusPublished
+		return entities.PubStatusPublished
 	case "draft":
-		return entities.NodeContentStatusDraft
+		return entities.PubStatusDraft
+	case "pending":
+		return entities.PubStatusPending
 	default:
-		return entities.NodeContentStatusPending
+		return entities.PubStatusNone
 	}
 }
 

@@ -44,7 +44,12 @@ type NodeRepository interface {
 	GetDescendants(ctx context.Context, nodeID int64) ([]*entities.SitemapNode, error)
 	GetAncestors(ctx context.Context, nodeID int64) ([]*entities.SitemapNode, error)
 
-	UpdateContentStatus(ctx context.Context, nodeID int64, status entities.NodeContentStatus) error
+	UpdateDesignStatus(ctx context.Context, nodeID int64, status entities.NodeDesignStatus) error
+	UpdateGenerationStatus(ctx context.Context, nodeID int64, status entities.NodeGenerationStatus, lastError *string) error
+	UpdatePublishStatus(ctx context.Context, nodeID int64, status entities.NodePublishStatus, lastError *string) error
+	UpdateAllStatuses(ctx context.Context, nodeID int64, design entities.NodeDesignStatus, generation entities.NodeGenerationStatus, publish entities.NodePublishStatus) error
+	GetByGenerationStatus(ctx context.Context, sitemapID int64, status entities.NodeGenerationStatus) ([]*entities.SitemapNode, error)
+
 	UpdateContentLink(ctx context.Context, nodeID int64, contentType entities.NodeContentType, articleID *int64, wpPageID *int, wpURL *string) error
 
 	UpdateSyncStatus(ctx context.Context, nodeID int64, isSynced bool) error
@@ -109,7 +114,11 @@ type Service interface {
 	LinkNodeToArticle(ctx context.Context, nodeID int64, articleID int64) error
 	LinkNodeToPage(ctx context.Context, nodeID int64, wpPageID int, wpURL string) error
 	UnlinkNodeContent(ctx context.Context, nodeID int64) error
-	UpdateNodeContentStatus(ctx context.Context, nodeID int64, status entities.NodeContentStatus) error
+
+	UpdateNodeDesignStatus(ctx context.Context, nodeID int64, status entities.NodeDesignStatus) error
+	UpdateNodeGenerationStatus(ctx context.Context, nodeID int64, status entities.NodeGenerationStatus, lastError *string) error
+	UpdateNodePublishStatus(ctx context.Context, nodeID int64, status entities.NodePublishStatus, lastError *string) error
+	GetNodesByGenerationStatus(ctx context.Context, sitemapID int64, status entities.NodeGenerationStatus) ([]*entities.SitemapNode, error)
 
 	// Import/Export (for future phases)
 	// ImportFromJSON(ctx context.Context, siteID int64, data []byte) (*entities.Sitemap, error)

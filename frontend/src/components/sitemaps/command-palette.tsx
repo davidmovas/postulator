@@ -20,6 +20,7 @@ import {
     Trash2,
     Upload,
     ScanLine,
+    Wand2,
 } from "lucide-react";
 
 interface CommandPaletteProps {
@@ -33,6 +34,7 @@ interface CommandPaletteProps {
     onBulkCreate: () => void;
     onImport: () => void;
     onScan: () => void;
+    onGeneratePages: () => void;
     onFocusSearch: () => void;
     onDeleteSelected: () => void;
     onShowHotkeys: () => void;
@@ -49,6 +51,7 @@ export function CommandPalette({
     onBulkCreate,
     onImport,
     onScan,
+    onGeneratePages,
     onFocusSearch,
     onDeleteSelected,
     onShowHotkeys,
@@ -92,6 +95,16 @@ export function CommandPalette({
                             <CommandShortcut>Del</CommandShortcut>
                         </CommandItem>
                     )}
+                </CommandGroup>
+
+                <CommandSeparator />
+
+                <CommandGroup heading="Content">
+                    <CommandItem onSelect={() => runCommand(onGeneratePages)}>
+                        <Wand2 className="mr-2 h-4 w-4" />
+                        <span>Generate Page Content</span>
+                        <CommandShortcut>Ctrl+G</CommandShortcut>
+                    </CommandItem>
                 </CommandGroup>
 
                 <CommandSeparator />

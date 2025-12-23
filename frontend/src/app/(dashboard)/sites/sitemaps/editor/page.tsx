@@ -5,36 +5,22 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
     ReactFlow,
     Background,
-    useNodesState,
-    useEdgesState,
-    addEdge,
-    Connection,
-    Edge,
     Node,
     BackgroundVariant,
     Panel,
     NodeTypes,
-    useReactFlow,
     ReactFlowProvider,
-    MarkerType,
     SelectionMode,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import dagre from "dagre";
 
-import { useApiCall } from "@/hooks/use-api-call";
 import { useHotkeys, HotkeyConfig } from "@/hooks/use-hotkeys";
-import { useSitemapHistory } from "@/hooks/use-sitemap-history";
+import { useSitemapEditorData } from "@/hooks/use-sitemap-editor-data";
+import { useSitemapNodeOperations } from "@/hooks/use-sitemap-node-operations";
+import { useSitemapWPOperations } from "@/hooks/use-sitemap-wp-operations";
+import { useSitemapCanvas } from "@/hooks/use-sitemap-canvas";
 import { sitemapService } from "@/services/sitemaps";
-import { siteService } from "@/services/sites";
-import {
-    Sitemap,
-    SitemapNode,
-    SitemapWithNodes,
-    CreateNodeInput,
-} from "@/models/sitemaps";
-import { Site } from "@/models/sites";
-import { Button } from "@/components/ui/button";
+import { CreateNodeInput } from "@/models/sitemaps";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -50,23 +36,6 @@ import {
     ResizablePanel,
     ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import {
-    ArrowLeft,
-    Plus,
-    Save,
-    LayoutGrid,
-    ListPlus,
-    Undo2,
-    Redo2,
-    Upload,
-    ScanLine,
-    Sparkles,
-} from "lucide-react";
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { SitemapNodeCard } from "@/components/sitemaps/sitemap-node-card";
 import { NodeEditDialog } from "@/components/sitemaps/node-edit-dialog";
 import { SitemapSidebar } from "@/components/sitemaps/sitemap-sidebar";
@@ -74,103 +43,18 @@ import { CanvasControls } from "@/components/sitemaps/canvas-controls";
 import { CanvasContextMenu } from "@/components/sitemaps/canvas-context-menu";
 import { EdgeContextMenu } from "@/components/sitemaps/edge-context-menu";
 import { HotkeysDialog } from "@/components/sitemaps/hotkeys-dialog";
-import { ColorLegendPopover } from "@/components/sitemaps/color-legend-popover";
 import { BulkCreateDialog } from "@/components/sitemaps/bulk-create-dialog";
 import { CommandPalette } from "@/components/sitemaps/command-palette";
 import { ImportDialog } from "@/components/sitemaps/import-dialog";
 import { ScanDialog } from "@/components/sitemaps/scan-dialog";
 import { GenerateDialog } from "@/components/sitemaps/generate-dialog";
+import { PageGenerateDialog } from "@/components/sitemaps/page-generate-dialog";
+import { EditorHeader } from "@/components/sitemaps/editor-header";
+import { GenerationProgressPanel } from "@/components/sitemaps/generation-progress-panel";
 import { createNodesFromPaths } from "@/lib/sitemap-utils";
-import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
 
-// Custom node types
 const nodeTypes: NodeTypes = {
     sitemapNode: SitemapNodeCard,
-};
-
-// Dagre layout configuration - horizontal (left-to-right)
-const NODE_WIDTH = 200;
-const NODE_HEIGHT = 60;
-
-const getLayoutedElements = (
-    nodes: Node[],
-    edges: Edge[],
-    direction = "LR" // Changed to left-to-right
-) => {
-    const dagreGraph = new dagre.graphlib.Graph();
-    dagreGraph.setDefaultEdgeLabel(() => ({}));
-    dagreGraph.setGraph({ rankdir: direction, nodesep: 40, ranksep: 100 });
-
-    nodes.forEach((node) => {
-        dagreGraph.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
-    });
-
-    edges.forEach((edge) => {
-        dagreGraph.setEdge(edge.source, edge.target);
-    });
-
-    dagre.layout(dagreGraph);
-
-    const newNodes = nodes.map((node) => {
-        const nodeWithPosition = dagreGraph.node(node.id);
-        const newNode = {
-            ...node,
-            targetPosition: "left",
-            sourcePosition: "right",
-            position: {
-                x: nodeWithPosition.x - NODE_WIDTH / 2,
-                y: nodeWithPosition.y - NODE_HEIGHT / 2,
-            },
-        };
-
-        return newNode;
-    });
-
-    return { nodes: newNodes as Node[], edges };
-};
-
-// Convert sitemap nodes to React Flow nodes
-const convertToFlowNodes = (sitemapNodes: SitemapNode[], siteUrl?: string): Node[] => {
-    return sitemapNodes.map((node) => ({
-        id: String(node.id),
-        type: "sitemapNode",
-        position: {
-            x: node.positionX || 0,
-            y: node.positionY || 0,
-        },
-        data: {
-            ...node,
-            label: node.title,
-            siteUrl,
-        },
-    }));
-};
-
-// Convert sitemap nodes to React Flow edges with smooth bezier curves
-const convertToFlowEdges = (sitemapNodes: SitemapNode[]): Edge[] => {
-    const edges: Edge[] = [];
-
-    sitemapNodes.forEach((node) => {
-        if (node.parentId) {
-            edges.push({
-                id: `e${node.parentId}-${node.id}`,
-                source: String(node.parentId),
-                target: String(node.id),
-                type: "default", // bezier curve
-                animated: false,
-                style: { stroke: "#888", strokeWidth: 1.5 },
-                markerEnd: {
-                    type: MarkerType.ArrowClosed,
-                    width: 12,
-                    height: 12,
-                    color: "#888",
-                },
-            });
-        }
-    });
-
-    return edges;
 };
 
 function SitemapEditorFlow() {
@@ -179,114 +63,70 @@ function SitemapEditorFlow() {
     const siteId = Number(searchParams.get("id"));
     const sitemapId = Number(searchParams.get("sitemapId"));
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
+    const searchInputRef = useRef<HTMLInputElement>(null);
 
-    const { execute, isLoading } = useApiCall();
-    const { fitView, screenToFlowPosition } = useReactFlow();
+    const editorData = useSitemapEditorData({ siteId, sitemapId });
+    const {
+        site,
+        sitemap,
+        sitemapNodes,
+        nodes,
+        edges,
+        setNodes,
+        setEdges,
+        onNodesChange,
+        onEdgesChange,
+        isLoading,
+        hasUnsavedChanges,
+        setHasUnsavedChanges,
+        history,
+        loadData,
+        handleSavePositions,
+        execute,
+    } = editorData;
 
-    const [site, setSite] = useState<Site | null>(null);
-    const [sitemap, setSitemap] = useState<Sitemap | null>(null);
-    const [sitemapNodes, setSitemapNodes] = useState<SitemapNode[]>([]);
+    const nodeOps = useSitemapNodeOperations({
+        sitemapId,
+        sitemapNodes,
+        nodes,
+        execute,
+        loadData,
+        refreshHistory: history.refreshState,
+    });
 
-    const [nodes, setNodes, onNodesChange] = useNodesState([]);
-    const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+    const wpOps = useSitemapWPOperations({
+        siteId,
+        sitemapId,
+        execute,
+        loadData,
+    });
 
-    const [selectedNode, setSelectedNode] = useState<SitemapNode | null>(null);
-    const [editDialogOpen, setEditDialogOpen] = useState(false);
-    const [createDialogOpen, setCreateDialogOpen] = useState(false);
-    const [parentNodeId, setParentNodeId] = useState<number | undefined>();
-    const [contextMenuNode, setContextMenuNode] = useState<SitemapNode | null>(null);
-    const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
-    const [edgeContextMenuPosition, setEdgeContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
-    const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+    const canvas = useSitemapCanvas({
+        sitemapNodes,
+        nodes,
+        edges,
+        setNodes,
+        setEdges,
+        execute,
+        loadData,
+        refreshHistory: history.refreshState,
+        getAllDescendantIds: nodeOps.getAllDescendantIds,
+        setParentNodeId: nodeOps.setParentNodeId,
+        setCreateDialogOpen: nodeOps.setCreateDialogOpen,
+        setSelectedNode: nodeOps.setSelectedNode,
+        setEditDialogOpen: nodeOps.setEditDialogOpen,
+        setHasUnsavedChanges,
+    });
+
     const [bulkCreateDialogOpen, setBulkCreateDialogOpen] = useState(false);
     const [importDialogOpen, setImportDialogOpen] = useState(false);
     const [scanDialogOpen, setScanDialogOpen] = useState(false);
     const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
     const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
     const [hotkeysDialogOpen, setHotkeysDialogOpen] = useState(false);
-    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-    const [sidebarSelectedNodeIds, setSidebarSelectedNodeIds] = useState<Set<number>>(new Set());
-
-    // Universal history for undo/redo (Go-based)
-    const history = useSitemapHistory({ sitemapId });
-
-    // Refs
-    const searchInputRef = useRef<HTMLInputElement>(null);
     const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
     const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
-    const [initialPositions, setInitialPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
 
-    const loadData = useCallback(async (preservePositions = false) => {
-        const [siteResult, sitemapResult] = await Promise.all([
-            execute<Site>(() => siteService.getSite(siteId), {
-                errorTitle: "Failed to load site",
-            }),
-            execute<SitemapWithNodes>(
-                () => sitemapService.getSitemapWithNodes(sitemapId),
-                {
-                    errorTitle: "Failed to load sitemap",
-                }
-            ),
-        ]);
-
-        if (siteResult) setSite(siteResult);
-        if (sitemapResult) {
-            setSitemap(sitemapResult.sitemap);
-            setSitemapNodes(sitemapResult.nodes);
-
-            // Convert to React Flow format
-            const flowNodes = convertToFlowNodes(sitemapResult.nodes, siteResult?.url);
-            const flowEdges = convertToFlowEdges(sitemapResult.nodes);
-
-            // If preserving positions, keep current node positions and only update edges
-            if (preservePositions) {
-                console.log("[loadData] preservePositions mode, edges:", flowEdges.map(e => `${e.source}->${e.target}`));
-                setNodes((currentNodes) => {
-                    const positionMap = new Map(currentNodes.map((n) => [n.id, n.position]));
-                    return flowNodes.map((n) => ({
-                        ...n,
-                        position: positionMap.get(n.id) || n.position,
-                    }));
-                });
-                setEdges(flowEdges);
-                return;
-            }
-
-            // Check if ANY node is missing positions - if so, run auto layout
-            const hasNodesWithoutPositions = sitemapResult.nodes.some(
-                (n) => !n.isRoot && (n.positionX === undefined || n.positionY === undefined || (n.positionX === 0 && n.positionY === 0))
-            );
-
-            if (hasNodesWithoutPositions && flowNodes.length > 0) {
-                const { nodes: layoutedNodes, edges: layoutedEdges } =
-                    getLayoutedElements(flowNodes, flowEdges);
-                setNodes(layoutedNodes);
-                setEdges(layoutedEdges);
-                // Store initial positions
-                const positions = new Map<string, { x: number; y: number }>();
-                layoutedNodes.forEach((n) => positions.set(n.id, { ...n.position }));
-                setInitialPositions(positions);
-                // Mark as having unsaved changes since we auto-layouted
-                setHasUnsavedChanges(true);
-            } else {
-                setNodes(flowNodes);
-                setEdges(flowEdges);
-                // Store initial positions
-                const positions = new Map<string, { x: number; y: number }>();
-                flowNodes.forEach((n) => positions.set(n.id, { ...n.position }));
-                setInitialPositions(positions);
-                setHasUnsavedChanges(false);
-            }
-        }
-    }, [execute, setEdges, setNodes, siteId, sitemapId]);
-
-    useEffect(() => {
-        if (siteId && sitemapId) {
-            loadData();
-        }
-    }, [siteId, sitemapId, loadData]);
-
-    // Undo/Redo handlers - now Go-based, reload data after operation
     const handleUndo = useCallback(async () => {
         const success = await history.undo();
         if (success) {
@@ -301,21 +141,11 @@ function SitemapEditorFlow() {
         }
     }, [history, loadData]);
 
-    // Detect position changes
-    useEffect(() => {
-        if (initialPositions.size === 0) return;
-
-        const hasChanges = nodes.some((node) => {
-            const initial = initialPositions.get(node.id);
-            if (!initial) return false;
-            return Math.abs(node.position.x - initial.x) > 1 || Math.abs(node.position.y - initial.y) > 1;
-        });
-
-        setHasUnsavedChanges(hasChanges);
-    }, [nodes, initialPositions]);
-
-    // Handle navigation with unsaved changes
     const handleNavigateBack = useCallback(() => {
+        if (wpOps.activeGenerationTask &&
+            (wpOps.activeGenerationTask.status === "running" || wpOps.activeGenerationTask.status === "paused")) {
+            return;
+        }
         const backUrl = `/sites/sitemaps?id=${siteId}`;
         if (hasUnsavedChanges) {
             setPendingNavigation(backUrl);
@@ -323,7 +153,7 @@ function SitemapEditorFlow() {
         } else {
             router.push(backUrl);
         }
-    }, [hasUnsavedChanges, router, siteId]);
+    }, [hasUnsavedChanges, router, siteId, wpOps.activeGenerationTask]);
 
     const confirmNavigation = useCallback(() => {
         setShowUnsavedDialog(false);
@@ -332,263 +162,6 @@ function SitemapEditorFlow() {
         }
     }, [pendingNavigation, router]);
 
-    // Track connection source when drag starts
-    const connectingNodeId = useRef<string | null>(null);
-
-    const onConnectStart = useCallback((_: React.MouseEvent | React.TouchEvent, { nodeId }: { nodeId: string | null }) => {
-        connectingNodeId.current = nodeId;
-    }, []);
-
-    const onConnect = useCallback(
-        async (params: Connection) => {
-            if (!params.source || !params.target) return;
-
-            const sourceId = Number(params.source);
-            const targetId = Number(params.target);
-
-            console.log("[onConnect] Moving node", targetId, "to parent", sourceId);
-
-            // Save to server - move target node to have source as parent
-            await execute(
-                () => sitemapService.moveNode({ nodeId: targetId, newParentId: sourceId }),
-                {
-                    errorTitle: "Failed to create connection",
-                }
-            );
-
-            // Reload edges only, preserve node positions, and refresh history state
-            await loadData(true);
-            await history.refreshState();
-        },
-        [execute, loadData, history]
-    );
-
-    // Handle connection end - drop on pane creates new node, drop on node creates connection
-    const onConnectEnd = useCallback(
-        async (event: MouseEvent | TouchEvent) => {
-            if (!connectingNodeId.current) return;
-
-            const target = event.target as Element;
-            const sourceId = Number(connectingNodeId.current);
-
-            // Check if dropped on a node (not on handle - handle is handled by onConnect)
-            const nodeElement = target.closest('.react-flow__node');
-            if (nodeElement) {
-                const targetNodeId = nodeElement.getAttribute('data-id');
-                if (targetNodeId && targetNodeId !== connectingNodeId.current) {
-                    // Dropped on a different node - make that node a child of source
-                    const targetId = Number(targetNodeId);
-                    console.log("[onConnectEnd] Dropped on node, making", targetId, "child of", sourceId);
-
-                    await execute(
-                        () => sitemapService.moveNode({ nodeId: targetId, newParentId: sourceId }),
-                        {
-                            errorTitle: "Failed to create connection",
-                        }
-                    );
-
-                    await loadData(true);
-                    await history.refreshState();
-                }
-                connectingNodeId.current = null;
-                return;
-            }
-
-            // Check if dropped on empty pane - create new node
-            const targetIsPane = target.classList.contains("react-flow__pane");
-            if (targetIsPane) {
-                setParentNodeId(sourceId);
-                setCreateDialogOpen(true);
-            }
-
-            connectingNodeId.current = null;
-        },
-        [execute, loadData, history]
-    );
-
-    // Get all descendant IDs of a node
-    const getAllDescendantIds = useCallback((nodeId: number): number[] => {
-        const ids: number[] = [nodeId];
-        const children = sitemapNodes.filter((n) => n.parentId === nodeId);
-        for (const child of children) {
-            ids.push(...getAllDescendantIds(child.id));
-        }
-        return ids;
-    }, [sitemapNodes]);
-
-    // Handle Shift+click on canvas node to select node and all descendants
-    const onNodeClick = useCallback(
-        (event: React.MouseEvent, node: Node) => {
-            if (event.shiftKey) {
-                event.preventDefault();
-                const nodeId = Number(node.id);
-                const allIds = getAllDescendantIds(nodeId);
-
-                // Check if all are already selected
-                const allSelected = allIds.every((id) =>
-                    nodes.find((n) => n.id === String(id))?.selected
-                );
-
-                if (allSelected) {
-                    // Deselect all descendants
-                    setNodes((nds) => nds.map((n) => ({
-                        ...n,
-                        selected: allIds.includes(Number(n.id)) ? false : n.selected,
-                    })));
-                } else {
-                    // Select all descendants
-                    setNodes((nds) => nds.map((n) => ({
-                        ...n,
-                        selected: allIds.includes(Number(n.id)) ? true : n.selected,
-                    })));
-                }
-            }
-            // Regular click handled by React Flow default behavior
-        },
-        [getAllDescendantIds, nodes, setNodes]
-    );
-
-    const onNodeDoubleClick = useCallback(
-        (_: React.MouseEvent, node: Node) => {
-            const sitemapNode = sitemapNodes.find((n) => n.id === Number(node.id));
-            if (sitemapNode) {
-                setSelectedNode(sitemapNode);
-                setEditDialogOpen(true);
-            }
-        },
-        [sitemapNodes]
-    );
-
-    const onNodeContextMenu = useCallback(
-        (event: React.MouseEvent, node: Node) => {
-            event.preventDefault();
-            const sitemapNode = sitemapNodes.find((n) => n.id === Number(node.id));
-            if (sitemapNode) {
-                setContextMenuNode(sitemapNode);
-                setContextMenuPosition({ x: event.clientX, y: event.clientY });
-            }
-        },
-        [sitemapNodes]
-    );
-
-    const onPaneContextMenu = useCallback((event: React.MouseEvent) => {
-        event.preventDefault();
-        setContextMenuNode(null);
-        setContextMenuPosition({ x: event.clientX, y: event.clientY });
-    }, []);
-
-    const onEdgeContextMenu = useCallback((event: React.MouseEvent, edge: Edge) => {
-        event.preventDefault();
-        setSelectedEdgeId(edge.id);
-        setEdgeContextMenuPosition({ x: event.clientX, y: event.clientY });
-    }, []);
-
-    const closeContextMenu = useCallback(() => {
-        setContextMenuPosition(null);
-        setContextMenuNode(null);
-    }, []);
-
-    const closeEdgeContextMenu = useCallback(() => {
-        setEdgeContextMenuPosition(null);
-        setSelectedEdgeId(null);
-    }, []);
-
-    const handleAutoLayout = useCallback(() => {
-        const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
-            nodes,
-            edges
-        );
-        setNodes(layoutedNodes);
-        setEdges(layoutedEdges);
-        setHasUnsavedChanges(true);
-        setTimeout(() => fitView({ duration: 300, padding: 0.3 }), 50);
-    }, [edges, fitView, nodes, setEdges, setNodes]);
-
-    const handleSavePositions = useCallback(async () => {
-        for (const node of nodes) {
-            const nodeId = Number(node.id);
-            await sitemapService.updateNodePositions({
-                nodeId,
-                positionX: node.position.x,
-                positionY: node.position.y,
-            });
-        }
-        // Update initial positions after save
-        const positions = new Map<string, { x: number; y: number }>();
-        nodes.forEach((n) => positions.set(n.id, { ...n.position }));
-        setInitialPositions(positions);
-        setHasUnsavedChanges(false);
-    }, [nodes]);
-
-
-    const handleCreateNode = async (input: CreateNodeInput) => {
-        const result = await execute<SitemapNode>(
-            () => sitemapService.createNode(input),
-            {
-                errorTitle: "Failed to create node",
-            }
-        );
-
-        if (result) {
-            setCreateDialogOpen(false);
-            // loadData will automatically run auto-layout for nodes without positions
-            await loadData();
-            await history.refreshState();
-        }
-    };
-
-    const handleUpdateNode = async () => {
-        setEditDialogOpen(false);
-        await loadData();
-        await history.refreshState();
-    };
-
-    const handleDeleteNode = async (nodeId: number) => {
-        // Find the node to check if it's root
-        const node = sitemapNodes.find((n) => n.id === nodeId);
-        if (!node || node.isRoot) {
-            return; // Don't delete root node
-        }
-
-        await execute(
-            () => sitemapService.deleteNode(nodeId),
-            {
-                errorTitle: "Failed to delete node",
-            }
-        );
-
-        setEditDialogOpen(false);
-        await loadData();
-        await history.refreshState();
-    };
-
-    const handleDeleteEdge = useCallback(async () => {
-        if (!selectedEdgeId) return;
-
-        // Parse edge ID to get source and target node IDs
-        // Edge ID format: e{parentId}-{childId}
-        const match = selectedEdgeId.match(/^e(\d+)-(\d+)$/);
-        if (!match) return;
-
-        const childId = Number(match[2]);
-
-        console.log("[handleDeleteEdge] Removing parent from node", childId, "edgeId:", selectedEdgeId);
-
-        // Move the child node to have no parent (becomes orphan)
-        await execute(
-            () => sitemapService.moveNode({ nodeId: childId, newParentId: undefined }),
-            {
-                errorTitle: "Failed to remove connection",
-            }
-        );
-
-        closeEdgeContextMenu();
-        // Preserve positions when updating edges
-        await loadData(true);
-        await history.refreshState();
-    }, [selectedEdgeId, execute, closeEdgeContextMenu, loadData, history]);
-
-    // Bulk create nodes from paths
     const handleBulkCreate = useCallback(async (paths: string[]) => {
         if (!sitemapId) return;
 
@@ -604,20 +177,16 @@ function SitemapEditorFlow() {
                 sitemapNodes,
                 createNodeFn
             )) {
-                // Progress updates happen here if needed
             }
-            // loadData will automatically run auto-layout for nodes without positions
             await loadData();
         } catch (error) {
             console.error("Failed to create nodes:", error);
         }
     }, [sitemapId, sitemapNodes, loadData]);
 
-    // Tab key opens Command Palette (when not in input)
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === "Tab" && !e.repeat) {
-                // Don't trigger if focused on input/textarea
                 const target = e.target as HTMLElement;
                 if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
                     return;
@@ -631,138 +200,6 @@ function SitemapEditorFlow() {
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, []);
 
-    const handleAddChild = useCallback((parentId: number) => {
-        setParentNodeId(parentId);
-        setCreateDialogOpen(true);
-    }, []);
-
-    const handleAddNode = useCallback((parentId?: number) => {
-        // If no parent specified, find the root node
-        if (parentId === undefined) {
-            const rootNode = sitemapNodes.find((n) => n.isRoot);
-            if (rootNode) {
-                setParentNodeId(rootNode.id);
-            }
-        } else {
-            setParentNodeId(parentId);
-        }
-        setCreateDialogOpen(true);
-    }, [sitemapNodes]);
-
-    const handleAddOrphanNode = useCallback(() => {
-        // Create node without parent (standalone)
-        setParentNodeId(undefined);
-        setCreateDialogOpen(true);
-    }, []);
-
-    const handleEditNode = useCallback((node: SitemapNode) => {
-        setSelectedNode(node);
-        setEditDialogOpen(true);
-    }, []);
-
-    // Get selected nodes from React Flow
-    const getSelectedSitemapNodes = useCallback((): SitemapNode[] => {
-        const selectedFlowNodeIds = nodes
-            .filter((n) => n.selected)
-            .map((n) => Number(n.id));
-        return sitemapNodes.filter((n) => selectedFlowNodeIds.includes(n.id));
-    }, [nodes, sitemapNodes]);
-
-    // Sync nodes from WordPress (pull latest data)
-    const handleSyncFromWP = useCallback(async (nodeIds: number[]) => {
-        if (!siteId) return;
-        await execute(
-            () => sitemapService.syncNodesFromWP({ siteId, nodeIds }),
-            {
-                successTitle: "Synced from WordPress",
-                successDescription: `${nodeIds.length} node(s) updated`,
-                errorTitle: "Failed to sync from WordPress",
-            }
-        );
-        await loadData(true);
-    }, [siteId, execute, loadData]);
-
-    // Update nodes to WordPress (push local changes)
-    const handleUpdateToWP = useCallback(async (nodeIds: number[]) => {
-        if (!siteId) return;
-        await execute(
-            () => sitemapService.updateNodesToWP({ siteId, nodeIds }),
-            {
-                successTitle: "Updated to WordPress",
-                successDescription: `${nodeIds.length} node(s) updated`,
-                errorTitle: "Failed to update to WordPress",
-            }
-        );
-        await loadData(true);
-    }, [siteId, execute, loadData]);
-
-    // Handle sidebar multi-select - sync with React Flow selection
-    const handleSidebarNodesSelect = useCallback((nodeIds: number[]) => {
-        setSidebarSelectedNodeIds(new Set(nodeIds));
-        // Also sync selection to React Flow canvas
-        setNodes((nds) => nds.map((n) => ({
-            ...n,
-            selected: nodeIds.includes(Number(n.id)),
-        })));
-    }, [setNodes]);
-
-    // Sync React Flow canvas selection to sidebar (only when selection changes on canvas)
-    const handleSelectionChange = useCallback(({ nodes: selectedNodes }: { nodes: Node[] }) => {
-        const selectedIds = selectedNodes.map((n) => Number(n.id));
-        setSidebarSelectedNodeIds(new Set(selectedIds));
-    }, []);
-
-    // Delete selected nodes
-    const handleDeleteSelectedNodes = useCallback(async () => {
-        const selectedNodeIds = nodes
-            .filter((n) => n.selected)
-            .map((n) => Number(n.id));
-
-        if (selectedNodeIds.length === 0) return;
-
-        // Filter out root nodes
-        const nonRootNodeIds = selectedNodeIds.filter((id) => {
-            const node = sitemapNodes.find((n) => n.id === id);
-            return node && !node.isRoot;
-        });
-
-        if (nonRootNodeIds.length === 0) return;
-
-        // Filter to only delete "top-level" nodes in the selection
-        // Child nodes will be deleted automatically via cascade
-        const selectedSet = new Set(nonRootNodeIds);
-        const nodesToDelete = nonRootNodeIds.filter((id) => {
-            const node = sitemapNodes.find((n) => n.id === id);
-            if (!node) return false;
-
-            // Check if any ancestor is also in the selection
-            let currentNode = node;
-            while (currentNode.parentId) {
-                if (selectedSet.has(currentNode.parentId)) {
-                    // Parent is also selected, skip this node (will be cascade deleted)
-                    return false;
-                }
-                currentNode = sitemapNodes.find((n) => n.id === currentNode.parentId)!;
-                if (!currentNode) break;
-            }
-            return true;
-        });
-
-        if (nodesToDelete.length === 0) return;
-
-        // Delete only top-level selected nodes (children cascade automatically)
-        for (const nodeId of nodesToDelete) {
-            await execute(
-                () => sitemapService.deleteNode(nodeId),
-                { errorTitle: "Failed to delete node" }
-            );
-        }
-
-        await loadData();
-        await history.refreshState();
-    }, [nodes, sitemapNodes, execute, loadData, history]);
-
-    // Hotkeys configuration
     const hotkeys = useMemo<HotkeyConfig[]>(() => [
         {
             key: "s",
@@ -778,26 +215,26 @@ function SitemapEditorFlow() {
             ctrl: true,
             description: "Auto layout",
             category: "Layout",
-            action: handleAutoLayout,
+            action: canvas.handleAutoLayout,
         },
         {
             key: "n",
             ctrl: true,
             description: "Add new node",
             category: "Nodes",
-            action: () => handleAddNode(),
+            action: () => nodeOps.handleAddNode(),
         },
         {
             key: "Delete",
             description: "Delete selected nodes",
             category: "Nodes",
-            action: handleDeleteSelectedNodes,
+            action: nodeOps.handleDeleteSelectedNodes,
         },
         {
             key: "Backspace",
             description: "Delete selected nodes",
             category: "Nodes",
-            action: handleDeleteSelectedNodes,
+            action: nodeOps.handleDeleteSelectedNodes,
         },
         {
             key: "Escape",
@@ -853,12 +290,19 @@ function SitemapEditorFlow() {
             action: handleRedo,
         },
         {
+            key: "g",
+            ctrl: true,
+            description: "Generate page content",
+            category: "Content",
+            action: () => wpOps.setPageGenerateDialogOpen(true),
+        },
+        {
             key: "Tab",
             description: "Command palette",
             category: "General",
-            action: () => {}, // Handled by separate effect
+            action: () => {},
         },
-    ], [hasUnsavedChanges, handleSavePositions, handleAutoLayout, handleAddNode, handleDeleteSelectedNodes, setNodes, handleUndo, handleRedo]);
+    ], [hasUnsavedChanges, handleSavePositions, canvas.handleAutoLayout, nodeOps, setNodes, handleUndo, handleRedo, wpOps]);
 
     useHotkeys(hotkeys);
 
@@ -872,207 +316,53 @@ function SitemapEditorFlow() {
 
     return (
         <div className="h-full flex flex-col overflow-hidden">
-            {/* Header */}
-            <div className="border-b px-3 py-1.5 flex items-center justify-between bg-background shrink-0">
-                <div className="flex items-center gap-2">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={handleNavigateBack}
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{sitemap?.name}</span>
-                        <span className="text-xs text-muted-foreground">({site?.name})</span>
-                    </div>
-                </div>
-                <div className="flex items-center gap-1">
-                    {/* Help */}
-                    <ColorLegendPopover />
-                    <HotkeysDialog hotkeys={hotkeys} />
+            <EditorHeader
+                site={site}
+                sitemap={sitemap}
+                hasUnsavedChanges={hasUnsavedChanges}
+                canUndo={history.canUndo}
+                canRedo={history.canRedo}
+                activeGenerationTask={wpOps.activeGenerationTask}
+                hotkeys={hotkeys}
+                onNavigateBack={handleNavigateBack}
+                onUndo={handleUndo}
+                onRedo={handleRedo}
+                onAutoLayout={canvas.handleAutoLayout}
+                onAddNode={() => nodeOps.handleAddNode()}
+                onBulkCreate={() => setBulkCreateDialogOpen(true)}
+                onImport={() => setImportDialogOpen(true)}
+                onScan={() => setScanDialogOpen(true)}
+                onGenerateStructure={() => setGenerateDialogOpen(true)}
+                onGeneratePages={() => wpOps.setPageGenerateDialogOpen(true)}
+                onSave={handleSavePositions}
+            />
 
-                    <Separator orientation="vertical" className="h-5 mx-1" />
+            {wpOps.activeGenerationTask && (
+                <GenerationProgressPanel
+                    task={wpOps.activeGenerationTask}
+                    onPause={wpOps.handlePauseGeneration}
+                    onResume={wpOps.handleResumeGeneration}
+                    onCancel={wpOps.handleCancelGeneration}
+                />
+            )}
 
-                    {/* History Group */}
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={handleUndo}
-                                disabled={!history.canUndo}
-                            >
-                                <Undo2 className="h-4 w-4" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Undo <span className="text-muted-foreground ml-1">Ctrl+Z</span></p>
-                        </TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={handleRedo}
-                                disabled={!history.canRedo}
-                            >
-                                <Redo2 className="h-4 w-4" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Redo <span className="text-muted-foreground ml-1">Ctrl+Shift+Z</span></p>
-                        </TooltipContent>
-                    </Tooltip>
-
-                    <Separator orientation="vertical" className="h-5 mx-1" />
-
-                    {/* Layout Group */}
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={handleAutoLayout}
-                            >
-                                <LayoutGrid className="h-4 w-4" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Auto Layout <span className="text-muted-foreground ml-1">Ctrl+L</span></p>
-                        </TooltipContent>
-                    </Tooltip>
-
-                    <Separator orientation="vertical" className="h-5 mx-1" />
-
-                    {/* Create Nodes Group */}
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => handleAddNode()}
-                            >
-                                <Plus className="h-4 w-4" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Add Node <span className="text-muted-foreground ml-1">Ctrl+N</span></p>
-                        </TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => setBulkCreateDialogOpen(true)}
-                            >
-                                <ListPlus className="h-4 w-4" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Bulk Create <span className="text-muted-foreground ml-1">Ctrl+B</span></p>
-                        </TooltipContent>
-                    </Tooltip>
-
-                    <Separator orientation="vertical" className="h-5 mx-1" />
-
-                    {/* Import Group */}
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => setImportDialogOpen(true)}
-                            >
-                                <Upload className="h-4 w-4" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Import from File <span className="text-muted-foreground ml-1">Ctrl+I</span></p>
-                        </TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => setScanDialogOpen(true)}
-                            >
-                                <ScanLine className="h-4 w-4" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Scan from WordPress <span className="text-muted-foreground ml-1">Ctrl+K</span></p>
-                        </TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => setGenerateDialogOpen(true)}
-                            >
-                                <Sparkles className="h-4 w-4" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>AI Generate <span className="text-muted-foreground ml-1">Ctrl+G</span></p>
-                        </TooltipContent>
-                    </Tooltip>
-
-                    <Separator orientation="vertical" className="h-5 mx-1" />
-
-                    {/* Save */}
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                variant={hasUnsavedChanges ? "default" : "outline"}
-                                size="sm"
-                                className={cn("h-7", hasUnsavedChanges && "animate-pulse")}
-                                onClick={handleSavePositions}
-                            >
-                                <Save className="h-4 w-4 mr-1" />
-                                Save
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Save Layout <span className="text-muted-foreground ml-1">Ctrl+S</span></p>
-                        </TooltipContent>
-                    </Tooltip>
-                </div>
-            </div>
-
-            {/* Main Content */}
             <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
-                {/* Sidebar */}
                 <ResizablePanel defaultSize={20} minSize={15} maxSize={35} className="overflow-hidden">
                     <SitemapSidebar
                         nodes={sitemapNodes}
-                        selectedNodeIds={sidebarSelectedNodeIds}
+                        selectedNodeIds={canvas.sidebarSelectedNodeIds}
                         onNodeSelect={(node) => {
-                            setSelectedNode(node);
-                            setEditDialogOpen(true);
+                            nodeOps.setSelectedNode(node);
+                            nodeOps.setEditDialogOpen(true);
                         }}
-                        onNodesSelect={handleSidebarNodesSelect}
-                        onAddChild={handleAddChild}
+                        onNodesSelect={canvas.handleSidebarNodesSelect}
+                        onAddChild={nodeOps.handleAddChild}
                         searchInputRef={searchInputRef}
                     />
                 </ResizablePanel>
 
                 <ResizableHandle withHandle />
 
-                {/* Canvas */}
                 <ResizablePanel defaultSize={80}>
                     <div className="h-full" ref={reactFlowWrapper}>
                         <ReactFlow
@@ -1080,19 +370,19 @@ function SitemapEditorFlow() {
                             edges={edges}
                             onNodesChange={onNodesChange}
                             onEdgesChange={onEdgesChange}
-                            onConnectStart={onConnectStart}
-                            onConnect={onConnect}
-                            onConnectEnd={onConnectEnd}
-                            onNodeClick={onNodeClick}
-                            onNodeDoubleClick={onNodeDoubleClick}
-                            onNodeContextMenu={onNodeContextMenu}
-                            onPaneContextMenu={onPaneContextMenu}
-                            onEdgeContextMenu={onEdgeContextMenu}
+                            onConnectStart={canvas.onConnectStart}
+                            onConnect={canvas.onConnect}
+                            onConnectEnd={canvas.onConnectEnd}
+                            onNodeClick={canvas.onNodeClick}
+                            onNodeDoubleClick={canvas.onNodeDoubleClick}
+                            onNodeContextMenu={canvas.onNodeContextMenu}
+                            onPaneContextMenu={canvas.onPaneContextMenu}
+                            onEdgeContextMenu={canvas.onEdgeContextMenu}
                             onPaneClick={() => {
-                                closeContextMenu();
-                                closeEdgeContextMenu();
+                                canvas.closeContextMenu();
+                                canvas.closeEdgeContextMenu();
                             }}
-                            onSelectionChange={handleSelectionChange}
+                            onSelectionChange={canvas.handleSelectionChange}
                             nodeTypes={nodeTypes}
                             fitView
                             fitViewOptions={{ padding: 0.3, maxZoom: 0.8 }}
@@ -1102,8 +392,8 @@ function SitemapEditorFlow() {
                             maxZoom={1.5}
                             defaultViewport={{ x: 0, y: 0, zoom: 0.7 }}
                             selectionMode={SelectionMode.Partial}
-                            selectionOnDrag
-                            panOnDrag={[1, 2]}
+                            selectionOnDrag={false}
+                            panOnDrag
                         >
                             <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
                             <Panel position="bottom-right">
@@ -1114,49 +404,48 @@ function SitemapEditorFlow() {
                 </ResizablePanel>
             </ResizablePanelGroup>
 
-            {/* Context Menus - rendered outside ReactFlow for proper positioning */}
             <CanvasContextMenu
-                selectedNode={contextMenuNode}
-                selectedNodes={getSelectedSitemapNodes()}
-                position={contextMenuPosition}
+                selectedNode={canvas.contextMenuNode}
+                selectedNodes={nodeOps.getSelectedSitemapNodes()}
+                position={canvas.contextMenuPosition}
                 siteUrl={site?.url}
-                onClose={closeContextMenu}
-                onAddNode={handleAddNode}
-                onAddOrphanNode={handleAddOrphanNode}
-                onEditNode={handleEditNode}
-                onDeleteNode={handleDeleteNode}
-                onAddChildNode={handleAddChild}
-                onSyncFromWP={handleSyncFromWP}
-                onUpdateToWP={handleUpdateToWP}
+                onClose={canvas.closeContextMenu}
+                onAddNode={nodeOps.handleAddNode}
+                onAddOrphanNode={nodeOps.handleAddOrphanNode}
+                onEditNode={nodeOps.handleEditNode}
+                onDeleteNode={nodeOps.handleDeleteNode}
+                onAddChildNode={nodeOps.handleAddChild}
+                onSyncFromWP={wpOps.handleSyncFromWP}
+                onUpdateToWP={wpOps.handleUpdateToWP}
+                onGenerateContent={wpOps.handleGenerateContent}
+                onPublish={wpOps.handlePublish}
+                onUnpublish={wpOps.handleUnpublish}
             />
             <EdgeContextMenu
-                position={edgeContextMenuPosition}
-                onClose={closeEdgeContextMenu}
-                onDeleteEdge={handleDeleteEdge}
+                position={canvas.edgeContextMenuPosition}
+                onClose={canvas.closeEdgeContextMenu}
+                onDeleteEdge={canvas.handleDeleteEdge}
             />
 
-            {/* Edit Dialog */}
-            {selectedNode && (
+            {nodeOps.selectedNode && (
                 <NodeEditDialog
-                    open={editDialogOpen}
-                    onOpenChange={setEditDialogOpen}
-                    node={selectedNode}
-                    onUpdate={handleUpdateNode}
-                    onDelete={() => handleDeleteNode(selectedNode.id)}
-                    onAddChild={() => handleAddChild(selectedNode.id)}
+                    open={nodeOps.editDialogOpen}
+                    onOpenChange={nodeOps.setEditDialogOpen}
+                    node={nodeOps.selectedNode}
+                    onUpdate={nodeOps.handleUpdateNode}
+                    onDelete={() => nodeOps.handleDeleteNode(nodeOps.selectedNode!.id)}
+                    onAddChild={() => nodeOps.handleAddChild(nodeOps.selectedNode!.id)}
                 />
             )}
 
-            {/* Create Dialog */}
             <NodeEditDialog
-                open={createDialogOpen}
-                onOpenChange={setCreateDialogOpen}
+                open={nodeOps.createDialogOpen}
+                onOpenChange={nodeOps.setCreateDialogOpen}
                 sitemapId={sitemapId}
-                parentId={parentNodeId}
-                onCreate={handleCreateNode}
+                parentId={nodeOps.parentNodeId}
+                onCreate={nodeOps.handleCreateNode}
             />
 
-            {/* Unsaved Changes Dialog */}
             <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -1175,14 +464,12 @@ function SitemapEditorFlow() {
                 </AlertDialogContent>
             </AlertDialog>
 
-            {/* Bulk Create Dialog */}
             <BulkCreateDialog
                 open={bulkCreateDialogOpen}
                 onOpenChange={setBulkCreateDialogOpen}
                 onSubmit={handleBulkCreate}
             />
 
-            {/* Import Dialog */}
             <ImportDialog
                 open={importDialogOpen}
                 onOpenChange={setImportDialogOpen}
@@ -1190,7 +477,6 @@ function SitemapEditorFlow() {
                 onSuccess={() => loadData()}
             />
 
-            {/* Scan Dialog */}
             <ScanDialog
                 open={scanDialogOpen}
                 onOpenChange={setScanDialogOpen}
@@ -1199,7 +485,6 @@ function SitemapEditorFlow() {
                 onSuccess={() => loadData()}
             />
 
-            {/* Generate Dialog */}
             <GenerateDialog
                 open={generateDialogOpen}
                 onOpenChange={setGenerateDialogOpen}
@@ -1208,24 +493,43 @@ function SitemapEditorFlow() {
                 onSuccess={() => loadData()}
             />
 
-            {/* Command Palette */}
+            <PageGenerateDialog
+                open={wpOps.pageGenerateDialogOpen}
+                onOpenChange={(open) => {
+                    wpOps.setPageGenerateDialogOpen(open);
+                    if (!open) {
+                        wpOps.setContextMenuSelectedNodes([]);
+                    }
+                }}
+                sitemapId={sitemapId}
+                selectedNodes={
+                    wpOps.contextMenuSelectedNodes.length > 0
+                        ? wpOps.contextMenuSelectedNodes
+                        : nodeOps.getSelectedSitemapNodes()
+                }
+                allNodes={sitemapNodes}
+                onSuccess={() => loadData()}
+                onTaskStarted={wpOps.setActiveGenerationTask}
+                activeTask={wpOps.activeGenerationTask}
+            />
+
             <CommandPalette
                 open={commandPaletteOpen}
                 onOpenChange={setCommandPaletteOpen}
                 hasUnsavedChanges={hasUnsavedChanges}
                 hasSelectedNodes={nodes.some((n) => n.selected)}
                 onSave={handleSavePositions}
-                onAutoLayout={handleAutoLayout}
-                onAddNode={() => handleAddNode()}
+                onAutoLayout={canvas.handleAutoLayout}
+                onAddNode={() => nodeOps.handleAddNode()}
                 onBulkCreate={() => setBulkCreateDialogOpen(true)}
                 onImport={() => setImportDialogOpen(true)}
                 onScan={() => setScanDialogOpen(true)}
+                onGeneratePages={() => wpOps.setPageGenerateDialogOpen(true)}
                 onFocusSearch={() => searchInputRef.current?.focus()}
-                onDeleteSelected={handleDeleteSelectedNodes}
+                onDeleteSelected={nodeOps.handleDeleteSelectedNodes}
                 onShowHotkeys={() => setHotkeysDialogOpen(true)}
             />
 
-            {/* Hotkeys Dialog (controlled) */}
             <HotkeysDialog
                 hotkeys={hotkeys}
                 open={hotkeysDialogOpen}

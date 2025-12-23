@@ -201,14 +201,24 @@ export function EditProviderModal({ open, onOpenChange, provider, onSuccess }: E
                                 <h4 className="font-medium text-sm">Model Specifications</h4>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-4 text-sm">
+                            <div className="grid grid-cols-2 gap-4 text-sm">
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-1 text-muted-foreground">
                                         <Hash className="h-3 w-3" />
-                                        <span>Max Tokens</span>
+                                        <span>Context Window</span>
                                     </div>
                                     <Badge variant="outline" className="font-mono text-xs">
-                                        {formatTokens(selectedModelInfo.maxTokens)}
+                                        {formatTokens(selectedModelInfo.contextWindow)}
+                                    </Badge>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-1 text-muted-foreground">
+                                        <Hash className="h-3 w-3" />
+                                        <span>Max Output</span>
+                                    </div>
+                                    <Badge variant="outline" className="font-mono text-xs">
+                                        {formatTokens(selectedModelInfo.maxOutputTokens)}
                                     </Badge>
                                 </div>
 

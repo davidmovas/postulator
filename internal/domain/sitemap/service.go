@@ -72,13 +72,15 @@ func (s *service) CreateSitemapWithRoot(ctx context.Context, sitemap *entities.S
 		SitemapID:     sitemap.ID,
 		Title:         siteURL,
 		Slug:          "",
-		IsRoot:        true,
-		Depth:         0,
-		Position:      0,
-		Path:          "/",
-		ContentType:   entities.NodeContentTypeNone,
-		Source:        entities.NodeSourceManual,
-		ContentStatus: entities.NodeContentStatusPublished,
+		IsRoot:           true,
+		Depth:            0,
+		Position:         0,
+		Path:             "/",
+		ContentType:      entities.NodeContentTypeNone,
+		Source:           entities.NodeSourceManual,
+		DesignStatus:     entities.DesignStatusApproved,
+		GenerationStatus: entities.GenStatusNone,
+		PublishStatus:    entities.PubStatusNone,
 	}
 
 	now := time.Now()
@@ -277,8 +279,14 @@ func (s *service) CreateNode(ctx context.Context, node *entities.SitemapNode) er
 	if node.ContentType == "" {
 		node.ContentType = entities.NodeContentTypeNone
 	}
-	if node.ContentStatus == "" {
-		node.ContentStatus = entities.NodeContentStatusDraft
+	if node.DesignStatus == "" {
+		node.DesignStatus = entities.DesignStatusDraft
+	}
+	if node.GenerationStatus == "" {
+		node.GenerationStatus = entities.GenStatusNone
+	}
+	if node.PublishStatus == "" {
+		node.PublishStatus = entities.PubStatusNone
 	}
 
 	// Calculate depth and path
@@ -624,18 +632,47 @@ func (s *service) UnlinkNodeContent(ctx context.Context, nodeID int64) error {
 	return nil
 }
 
-func (s *service) UpdateNodeContentStatus(ctx context.Context, nodeID int64, status entities.NodeContentStatus) error {
-	if err := s.nodeRepo.UpdateContentStatus(ctx, nodeID, status); err != nil {
-		s.logger.ErrorWithErr(err, "Failed to update node content status")
+func (s *service) UpdateNodeDesignStatus(ctx context.Context, nodeID int64, status entities.NodeDesignStatus) error {
+	if err := s.nodeRepo.UpdateDesignStatus(ctx, nodeID, status); err != nil {
+		s.logger.ErrorWithErr(err, "Failed to update node design status")
 		return err
 	}
 
-	// Update sitemap's updated_at
 	if node, err := s.nodeRepo.GetByID(ctx, nodeID); err == nil {
 		_ = s.repo.TouchUpdatedAt(ctx, node.SitemapID)
 	}
 
 	return nil
+}
+
+func (s *service) UpdateNodeGenerationStatus(ctx context.Context, nodeID int64, status entities.NodeGenerationStatus, lastError *string) error {
+	if err := s.nodeRepo.UpdateGenerationStatus(ctx, nodeID, status, lastError); err != nil {
+		s.logger.ErrorWithErr(err, "Failed to update node generation status")
+		return err
+	}
+
+	if node, err := s.nodeRepo.GetByID(ctx, nodeID); err == nil {
+		_ = s.repo.TouchUpdatedAt(ctx, node.SitemapID)
+	}
+
+	return nil
+}
+
+func (s *service) UpdateNodePublishStatus(ctx context.Context, nodeID int64, status entities.NodePublishStatus, lastError *string) error {
+	if err := s.nodeRepo.UpdatePublishStatus(ctx, nodeID, status, lastError); err != nil {
+		s.logger.ErrorWithErr(err, "Failed to update node publish status")
+		return err
+	}
+
+	if node, err := s.nodeRepo.GetByID(ctx, nodeID); err == nil {
+		_ = s.repo.TouchUpdatedAt(ctx, node.SitemapID)
+	}
+
+	return nil
+}
+
+func (s *service) GetNodesByGenerationStatus(ctx context.Context, sitemapID int64, status entities.NodeGenerationStatus) ([]*entities.SitemapNode, error) {
+	return s.nodeRepo.GetByGenerationStatus(ctx, sitemapID, status)
 }
 
 func (s *service) validateSitemap(sitemap *entities.Sitemap) error {
@@ -717,19 +754,21 @@ func (s *service) maxDepth(nodes []*entities.SitemapNode) int {
 
 func (s *service) copyNode(original *entities.SitemapNode, newSitemapID int64, newParentID *int64) *entities.SitemapNode {
 	return &entities.SitemapNode{
-		SitemapID:     newSitemapID,
-		ParentID:      newParentID,
-		Title:         original.Title,
-		Slug:          original.Slug,
-		Description:   original.Description,
-		Depth:         original.Depth,
-		Position:      original.Position,
-		Path:          original.Path,
-		ContentType:   original.ContentType,
-		Source:        original.Source,
-		IsSynced:      false,
-		ContentStatus: original.ContentStatus,
-		PositionX:     original.PositionX,
-		PositionY:     original.PositionY,
+		SitemapID:        newSitemapID,
+		ParentID:         newParentID,
+		Title:            original.Title,
+		Slug:             original.Slug,
+		Description:      original.Description,
+		Depth:            original.Depth,
+		Position:         original.Position,
+		Path:             original.Path,
+		ContentType:      original.ContentType,
+		Source:           original.Source,
+		IsSynced:         false,
+		DesignStatus:     original.DesignStatus,
+		GenerationStatus: entities.GenStatusNone,
+		PublishStatus:    entities.PubStatusNone,
+		PositionX:        original.PositionX,
+		PositionY:        original.PositionY,
 	}
 }

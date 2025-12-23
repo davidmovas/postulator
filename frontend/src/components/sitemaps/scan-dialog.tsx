@@ -19,7 +19,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { AlertCircle, CheckCircle2, Loader2, ScanLine, FileText, Heading1, FileStack } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, ScanLine, FileText, Heading1 } from "lucide-react";
 import { sitemapService } from "@/services/sitemaps";
 import { ScanSiteResult, TitleSource, ContentFilter } from "@/models/sitemaps";
 
@@ -55,8 +55,9 @@ export function ScanDialog(props: ScanDialogProps) {
 
     // Scan options
     const [titleSource, setTitleSource] = useState<TitleSource>("title");
-    const [contentFilter, setContentFilter] = useState<ContentFilter>("pages");
     const [includeDrafts, setIncludeDrafts] = useState(true);
+    // Always use pages only - sitemaps are for page structure, not posts
+    const contentFilter: ContentFilter = "pages";
 
     const handleScan = async () => {
         setScanState("loading");
@@ -112,8 +113,8 @@ export function ScanDialog(props: ScanDialogProps) {
                     </DialogTitle>
                     <DialogDescription>
                         {props.mode === "create"
-                            ? "Fetch pages and posts from WordPress to build the sitemap structure."
-                            : "Scan the WordPress site and add discovered pages/posts to your sitemap."}
+                            ? "Fetch pages from WordPress to build the sitemap structure."
+                            : "Scan the WordPress site and add discovered pages to your sitemap."}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -152,46 +153,6 @@ export function ScanDialog(props: ScanDialogProps) {
                                 </p>
                             </div>
 
-                            {/* Content Filter */}
-                            <div className="space-y-2">
-                                <Label>Content Type</Label>
-                                <Select
-                                    value={contentFilter}
-                                    onValueChange={(v) => setContentFilter(v as ContentFilter)}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="pages">
-                                            <div className="flex items-center gap-2">
-                                                <FileText className="h-4 w-4" />
-                                                <span>Pages Only</span>
-                                            </div>
-                                        </SelectItem>
-                                        <SelectItem value="posts">
-                                            <div className="flex items-center gap-2">
-                                                <FileStack className="h-4 w-4" />
-                                                <span>Posts Only</span>
-                                            </div>
-                                        </SelectItem>
-                                        <SelectItem value="all">
-                                            <div className="flex items-center gap-2">
-                                                <FileStack className="h-4 w-4" />
-                                                <span>Both Pages & Posts</span>
-                                            </div>
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <p className="text-xs text-muted-foreground">
-                                    {contentFilter === "pages"
-                                        ? "Scan WordPress pages with hierarchy"
-                                        : contentFilter === "posts"
-                                        ? "Scan WordPress posts (flat structure)"
-                                        : "Scan both pages and posts"}
-                                </p>
-                            </div>
-
                             {/* Include Drafts */}
                             <div className="flex items-center justify-between">
                                 <div className="space-y-0.5">
@@ -214,7 +175,7 @@ export function ScanDialog(props: ScanDialogProps) {
                             <div className="text-center">
                                 <p className="text-sm font-medium">Scanning site structure...</p>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                    Fetching {contentFilter === "all" ? "pages and posts" : contentFilter} from WordPress
+                                    Fetching pages from WordPress
                                 </p>
                             </div>
                         </div>
@@ -227,19 +188,11 @@ export function ScanDialog(props: ScanDialogProps) {
                                 <p className="text-sm font-medium">Scan completed</p>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4 text-center">
-                                {(contentFilter === "pages" || contentFilter === "all") && (
-                                    <div className="bg-muted/50 rounded-lg p-3">
-                                        <p className="text-2xl font-bold">{result.pagesScanned}</p>
-                                        <p className="text-xs text-muted-foreground">Pages found</p>
-                                    </div>
-                                )}
-                                {(contentFilter === "posts" || contentFilter === "all") && (
-                                    <div className="bg-muted/50 rounded-lg p-3">
-                                        <p className="text-2xl font-bold">{result.postsScanned}</p>
-                                        <p className="text-xs text-muted-foreground">Posts found</p>
-                                    </div>
-                                )}
+                            <div className="grid grid-cols-3 gap-4 text-center">
+                                <div className="bg-muted/50 rounded-lg p-3">
+                                    <p className="text-2xl font-bold">{result.pagesScanned}</p>
+                                    <p className="text-xs text-muted-foreground">Pages found</p>
+                                </div>
                                 <div className="bg-muted/50 rounded-lg p-3">
                                     <p className="text-2xl font-bold text-green-600">{result.nodesCreated}</p>
                                     <p className="text-xs text-muted-foreground">Nodes created</p>

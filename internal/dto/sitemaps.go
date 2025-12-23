@@ -75,10 +75,14 @@ type SitemapNode struct {
 	IsSynced      bool           `json:"isSynced"`
 	LastSyncedAt  *string        `json:"lastSyncedAt,omitempty"`
 	WPTitle       *string        `json:"wpTitle,omitempty"`
-	WPSlug        *string        `json:"wpSlug,omitempty"`
-	IsModified    bool           `json:"isModified"`
-	ContentStatus string         `json:"contentStatus"`
-	PositionX     *float64       `json:"positionX,omitempty"`
+	WPSlug           *string        `json:"wpSlug,omitempty"`
+	IsModified       bool           `json:"isModified"`
+	DesignStatus     string         `json:"designStatus"`
+	GenerationStatus string         `json:"generationStatus"`
+	PublishStatus    string         `json:"publishStatus"`
+	IsModifiedLocally bool          `json:"isModifiedLocally"`
+	LastError        *string        `json:"lastError,omitempty"`
+	PositionX        *float64       `json:"positionX,omitempty"`
 	PositionY     *float64       `json:"positionY,omitempty"`
 	Keywords      []string       `json:"keywords,omitempty"`
 	Children      []*SitemapNode `json:"children,omitempty"`
@@ -96,27 +100,31 @@ func (d *SitemapNode) ToEntity() *entities.SitemapNode {
 	updatedAt, _ := StringToTime(d.UpdatedAt)
 
 	node := &entities.SitemapNode{
-		ID:            d.ID,
-		SitemapID:     d.SitemapID,
-		ParentID:      d.ParentID,
-		Title:         d.Title,
-		Slug:          d.Slug,
-		Description:   d.Description,
-		Depth:         d.Depth,
-		Position:      d.Position,
-		Path:          d.Path,
-		ContentType:   entities.NodeContentType(d.ContentType),
-		ArticleID:     d.ArticleID,
-		WPPageID:      d.WPPageID,
-		WPURL:         d.WPURL,
-		Source:        entities.NodeSource(d.Source),
-		IsSynced:      d.IsSynced,
-		ContentStatus: entities.NodeContentStatus(d.ContentStatus),
-		PositionX:     d.PositionX,
-		PositionY:     d.PositionY,
-		Keywords:      d.Keywords,
-		CreatedAt:     createdAt,
-		UpdatedAt:     updatedAt,
+		ID:                d.ID,
+		SitemapID:         d.SitemapID,
+		ParentID:          d.ParentID,
+		Title:             d.Title,
+		Slug:              d.Slug,
+		Description:       d.Description,
+		Depth:             d.Depth,
+		Position:          d.Position,
+		Path:              d.Path,
+		ContentType:       entities.NodeContentType(d.ContentType),
+		ArticleID:         d.ArticleID,
+		WPPageID:          d.WPPageID,
+		WPURL:             d.WPURL,
+		Source:            entities.NodeSource(d.Source),
+		IsSynced:          d.IsSynced,
+		DesignStatus:      entities.NodeDesignStatus(d.DesignStatus),
+		GenerationStatus:  entities.NodeGenerationStatus(d.GenerationStatus),
+		PublishStatus:     entities.NodePublishStatus(d.PublishStatus),
+		IsModifiedLocally: d.IsModifiedLocally,
+		LastError:         d.LastError,
+		PositionX:         d.PositionX,
+		PositionY:         d.PositionY,
+		Keywords:          d.Keywords,
+		CreatedAt:         createdAt,
+		UpdatedAt:         updatedAt,
 	}
 
 	if d.LastSyncedAt != nil {
@@ -147,7 +155,11 @@ func (d *SitemapNode) FromEntity(entity *entities.SitemapNode) *SitemapNode {
 	d.WPTitle = entity.WPTitle
 	d.WPSlug = entity.WPSlug
 	d.IsModified = entity.IsModified()
-	d.ContentStatus = string(entity.ContentStatus)
+	d.DesignStatus = string(entity.DesignStatus)
+	d.GenerationStatus = string(entity.GenerationStatus)
+	d.PublishStatus = string(entity.PublishStatus)
+	d.IsModifiedLocally = entity.IsModifiedLocally
+	d.LastError = entity.LastError
 	d.PositionX = entity.PositionX
 	d.PositionY = entity.PositionY
 	d.Keywords = entity.Keywords
@@ -352,6 +364,13 @@ type UpdateNodesToWPRequest struct {
 	NodeIDs []int64 `json:"nodeIds"`
 }
 
+// ChangePublishStatusRequest contains parameters for changing publish status
+type ChangePublishStatusRequest struct {
+	SiteID    int64  `json:"siteId"`
+	NodeID    int64  `json:"nodeId"`
+	NewStatus string `json:"newStatus"` // "published", "draft", "pending"
+}
+
 // =========================================================================
 // AI Generation DTOs
 // =========================================================================
@@ -422,4 +441,61 @@ type HistoryState struct {
 	RedoCount     int    `json:"redoCount"`
 	LastAction    string `json:"lastAction,omitempty"`
 	ActionApplied string `json:"actionApplied,omitempty"` // Description of the action that was just applied (undo/redo)
+}
+
+// =========================================================================
+// Page Generation DTOs
+// =========================================================================
+
+type ContentSettingsDTO struct {
+	WordCount          string `json:"wordCount"`          // e.g. "1000" or "800-1200"
+	WritingStyle       string `json:"writingStyle"`       // professional, casual, formal, friendly, technical
+	ContentTone        string `json:"contentTone"`        // informative, persuasive, educational, engaging, authoritative
+	CustomInstructions string `json:"customInstructions"` // Additional instructions
+}
+
+type StartPageGenerationRequest struct {
+	SitemapID       int64               `json:"sitemapId"`
+	NodeIDs         []int64             `json:"nodeIds,omitempty"`
+	ProviderID      int64               `json:"providerId"`
+	PromptID        *int64              `json:"promptId,omitempty"`
+	PublishAs       string              `json:"publishAs"`
+	Placeholders    map[string]string   `json:"placeholders,omitempty"`
+	MaxConcurrency  int                 `json:"maxConcurrency,omitempty"`
+	ContentSettings *ContentSettingsDTO `json:"contentSettings,omitempty"`
+}
+
+type GenerationTaskResponse struct {
+	ID             string               `json:"id"`
+	SitemapID      int64                `json:"sitemapId"`
+	SiteID         int64                `json:"siteId"`
+	TotalNodes     int                  `json:"totalNodes"`
+	ProcessedNodes int                  `json:"processedNodes"`
+	FailedNodes    int                  `json:"failedNodes"`
+	SkippedNodes   int                  `json:"skippedNodes"`
+	Status         string               `json:"status"`
+	StartedAt      string               `json:"startedAt"`
+	CompletedAt    *string              `json:"completedAt,omitempty"`
+	Error          *string              `json:"error,omitempty"`
+	Nodes          []GenerationNodeInfo `json:"nodes,omitempty"`
+}
+
+type GenerationNodeInfo struct {
+	NodeID      int64   `json:"nodeId"`
+	Title       string  `json:"title"`
+	Path        string  `json:"path"`
+	Status      string  `json:"status"`
+	ArticleID   *int64  `json:"articleId,omitempty"`
+	WPPageID    *int    `json:"wpPageId,omitempty"`
+	WPURL       *string `json:"wpUrl,omitempty"`
+	Error       *string `json:"error,omitempty"`
+	StartedAt   *string `json:"startedAt,omitempty"`
+	CompletedAt *string `json:"completedAt,omitempty"`
+}
+
+type DefaultPromptResponse struct {
+	Name         string   `json:"name"`
+	SystemPrompt string   `json:"systemPrompt"`
+	UserPrompt   string   `json:"userPrompt"`
+	Placeholders []string `json:"placeholders"`
 }

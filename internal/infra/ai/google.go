@@ -58,6 +58,7 @@ func (c *GoogleClient) GenerateArticle(ctx context.Context, systemPrompt, userPr
 	model := c.client.GenerativeModel(c.model)
 
 	// Configure the model
+	// 4096 is plenty for 800-1500 words of content
 	model.SetTemperature(0.7)
 	model.SetMaxOutputTokens(4096)
 
@@ -103,7 +104,11 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 	var article ArticleContent
 	jsonStr := extractJSON(responseText)
 	if err = json.Unmarshal([]byte(jsonStr), &article); err != nil {
-		return nil, errors.AI(googleProviderName, fmt.Errorf("failed to parse response: %w, raw: %s", err, responseText[:min(200, len(responseText))]))
+		// Try sanitizing the JSON to fix invalid escape sequences
+		sanitized := sanitizeJSON(jsonStr)
+		if err2 := json.Unmarshal([]byte(sanitized), &article); err2 != nil {
+			return nil, errors.AI(googleProviderName, fmt.Errorf("failed to parse response: %w, raw: %s", err, responseText[:min(200, len(responseText))]))
+		}
 	}
 
 	if article.Title == "" || article.Content == "" {

@@ -3,8 +3,8 @@
 import { memo, useCallback } from "react";
 import { Handle, Position, NodeProps } from "@xyflow/react";
 import { Card, CardContent } from "@/components/ui/card";
-import { SitemapNode, NodeContentStatus } from "@/models/sitemaps";
-import { Home } from "lucide-react";
+import { SitemapNode, NodeGenerationStatus, NodePublishStatus } from "@/models/sitemaps";
+import { Home, Loader2, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NodeHoverCard } from "./node-hover-card";
 import { BrowserOpenURL } from "@/wailsjs/wailsjs/runtime/runtime";
@@ -14,55 +14,126 @@ interface SitemapNodeData extends SitemapNode {
     siteUrl?: string;
 }
 
-// Status color classes for border and hover
-const getStatusClasses = (status: NodeContentStatus | undefined, isRoot: boolean, isModified: boolean) => {
+// Status color classes for border, hover, and animations based on 3-status system
+const getStatusClasses = (
+    generationStatus: NodeGenerationStatus,
+    publishStatus: NodePublishStatus,
+    isRoot: boolean,
+    isModifiedLocally: boolean
+) => {
     // Modified nodes have orange border (priority over other statuses)
-    if (isModified) {
+    if (isModifiedLocally) {
         return {
             border: "border-l-orange-500",
             hover: "hover:border-orange-500",
+            animation: "",
+            isActive: false,
         };
     }
     if (isRoot) {
         return {
             border: "border-l-primary",
             hover: "hover:border-primary",
+            animation: "",
+            isActive: false,
         };
     }
-    switch (status) {
+    // Publishing status - active with cyan glow
+    if (publishStatus === "publishing") {
+        return {
+            border: "border-l-cyan-500",
+            hover: "hover:border-cyan-500",
+            animation: "animate-pulse shadow-[0_0_15px_rgba(6,182,212,0.5)]",
+            isActive: true,
+            icon: "publishing",
+        };
+    }
+    // Publish status takes priority
+    switch (publishStatus) {
         case "published":
             return {
                 border: "border-l-green-500",
                 hover: "hover:border-green-500",
+                animation: "",
+                isActive: false,
             };
         case "draft":
             return {
                 border: "border-l-yellow-500",
                 hover: "hover:border-yellow-500",
+                animation: "",
+                isActive: false,
             };
         case "pending":
             return {
                 border: "border-l-blue-500",
                 hover: "hover:border-blue-500",
+                animation: "",
+                isActive: false,
             };
-        case "ai_draft":
+        case "failed":
+            return {
+                border: "border-l-red-500",
+                hover: "hover:border-red-500",
+                animation: "",
+                isActive: false,
+            };
+    }
+    // Generating status - active with purple glow
+    if (generationStatus === "generating") {
+        return {
+            border: "border-l-purple-500",
+            hover: "hover:border-purple-500",
+            animation: "animate-pulse shadow-[0_0_15px_rgba(168,85,247,0.5)]",
+            isActive: true,
+            icon: "generating",
+        };
+    }
+    // Then check generation status
+    switch (generationStatus) {
+        case "generated":
             return {
                 border: "border-l-purple-500",
                 hover: "hover:border-purple-500",
+                animation: "",
+                isActive: false,
             };
-        default:
+        case "queued":
             return {
-                border: "border-l-muted-foreground/30",
-                hover: "hover:border-muted-foreground/50",
+                border: "border-l-slate-400",
+                hover: "hover:border-slate-400",
+                animation: "",
+                isActive: false,
+            };
+        case "failed":
+            return {
+                border: "border-l-red-400",
+                hover: "hover:border-red-400",
+                animation: "",
+                isActive: false,
             };
     }
+    // Default - no content
+    return {
+        border: "border-l-muted-foreground/30",
+        hover: "hover:border-muted-foreground/50",
+        animation: "",
+        isActive: false,
+    };
 };
 
 function SitemapNodeCardComponent({ data, selected }: NodeProps<SitemapNodeData>) {
-    const statusClasses = getStatusClasses(data.contentStatus, data.isRoot, data.isModified);
+    // Debug: log when component renders with status
+    // console.log(`[SitemapNodeCard] id=${data.id} publishStatus=${data.publishStatus} genStatus=${data.generationStatus}`);
+    const statusClasses = getStatusClasses(
+        data.generationStatus,
+        data.publishStatus,
+        data.isRoot,
+        data.isModifiedLocally
+    );
 
-    // Check if the node is clickable (published status)
-    const isClickable = data.contentStatus === "published" && data.siteUrl;
+    // Check if the node is clickable (published status or has WP URL)
+    const isClickable = (data.publishStatus === "published" || data.wpUrl) && data.siteUrl;
 
     // Display just the slug with leading slash in the card
     const displaySlug = data.isRoot ? "/" : `/${data.slug}`;
@@ -104,16 +175,27 @@ function SitemapNodeCardComponent({ data, selected }: NodeProps<SitemapNodeData>
             <NodeHoverCard node={data} delay={500}>
                 <Card
                     className={cn(
-                        "w-[200px] cursor-pointer transition-colors duration-200",
+                        "w-[200px] cursor-pointer transition-all duration-300",
                         "border-l-4",
                         statusClasses.border,
                         statusClasses.hover,
+                        statusClasses.animation,
                         selected && "ring-2 ring-primary"
                     )}
                 >
                     <CardContent className="p-3">
                         <div className="flex items-start gap-2">
-                            {data.isRoot && (
+                            {/* Status indicator for active states */}
+                            {statusClasses.isActive && (
+                                <div className="flex-shrink-0 mt-0.5">
+                                    {data.generationStatus === "generating" ? (
+                                        <Loader2 className="h-4 w-4 animate-spin text-purple-500" />
+                                    ) : data.publishStatus === "publishing" ? (
+                                        <Upload className="h-4 w-4 animate-bounce text-cyan-500" />
+                                    ) : null}
+                                </div>
+                            )}
+                            {data.isRoot && !statusClasses.isActive && (
                                 <div className="flex-shrink-0 text-primary mt-0.5">
                                     <Home className="h-4 w-4" />
                                 </div>
@@ -149,4 +231,31 @@ function SitemapNodeCardComponent({ data, selected }: NodeProps<SitemapNodeData>
     );
 }
 
-export const SitemapNodeCard = memo(SitemapNodeCardComponent);
+// Custom comparison to ensure status changes trigger re-render
+const arePropsEqual = (
+    prevProps: NodeProps<SitemapNodeData>,
+    nextProps: NodeProps<SitemapNodeData>
+) => {
+    // Check selection state
+    if (prevProps.selected !== nextProps.selected) return false;
+
+    // Check key data properties that affect rendering
+    const prev = prevProps.data;
+    const next = nextProps.data;
+
+    return (
+        prev.id === next.id &&
+        prev.title === next.title &&
+        prev.slug === next.slug &&
+        prev.path === next.path &&
+        prev.isRoot === next.isRoot &&
+        prev.publishStatus === next.publishStatus &&
+        prev.generationStatus === next.generationStatus &&
+        prev.designStatus === next.designStatus &&
+        prev.isModifiedLocally === next.isModifiedLocally &&
+        prev.wpUrl === next.wpUrl &&
+        prev.siteUrl === next.siteUrl
+    );
+};
+
+export const SitemapNodeCard = memo(SitemapNodeCardComponent, arePropsEqual);

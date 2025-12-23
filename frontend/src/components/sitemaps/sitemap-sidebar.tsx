@@ -121,20 +121,38 @@ function TreeItem({
         if (node.isRoot) {
             return <Home className="h-4 w-4 text-primary" />;
         }
-        // Status-based colors for the circle indicator
+        // Status-based colors for the circle indicator (using new 3-status system)
         const getStatusColor = () => {
-            switch (node.contentStatus) {
+            // Modified locally takes priority
+            if (node.isModifiedLocally) {
+                return "text-orange-500 fill-orange-500";
+            }
+            // Publish status has highest priority
+            switch (node.publishStatus) {
                 case "published":
                     return "text-green-500 fill-green-500";
                 case "draft":
                     return "text-yellow-500 fill-yellow-500";
                 case "pending":
                     return "text-blue-500 fill-blue-500";
-                case "ai_draft":
-                    return "text-purple-500 fill-purple-500";
-                default:
-                    return "text-muted-foreground/50";
+                case "publishing":
+                    return "text-cyan-500 fill-cyan-500";
+                case "failed":
+                    return "text-red-500 fill-red-500";
             }
+            // Then generation status
+            switch (node.generationStatus) {
+                case "generated":
+                    return "text-purple-500 fill-purple-500";
+                case "generating":
+                    return "text-purple-400 fill-purple-400";
+                case "queued":
+                    return "text-slate-400 fill-slate-400";
+                case "failed":
+                    return "text-red-400 fill-red-400";
+            }
+            // Default - none
+            return "text-muted-foreground/50";
         };
         return <Circle className={cn("h-2 w-2", getStatusColor())} />;
     };

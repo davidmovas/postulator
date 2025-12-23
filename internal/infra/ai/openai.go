@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/pkg/errors"
 
 	"github.com/invopop/jsonschema"
@@ -18,9 +19,9 @@ const providerName = "OpenAI"
 var _ Client = (*OpenAIClient)(nil)
 
 type ArticleContent struct {
-	Title   string `json:"title" jsonschema_description:"Article title, should be engaging and SEO-friendly"`
-	Excerpt string `json:"excerpt" jsonschema_description:"Article excerpt, should be short and concise"`
-	Content string `json:"content" jsonschema_description:"Full article content in HTML format with proper WordPress blocks"`
+	Title   string `json:"title" jsonschema_description:"Page title"`
+	Excerpt string `json:"excerpt" jsonschema_description:"Brief summary for previews"`
+	Content string `json:"content" jsonschema_description:"Page content in HTML format"`
 }
 
 type TopicVariations struct {
@@ -38,6 +39,7 @@ type OpenAIClient struct {
 	model                openaiSDK.ChatModel
 	modelName            string
 	usesCompletionTokens bool
+	isReasoningModel     bool
 }
 
 func NewOpenAIClient(cfg Config) (*OpenAIClient, error) {
@@ -59,10 +61,11 @@ func NewOpenAIClient(cfg Config) (*OpenAIClient, error) {
 
 	client := openaiSDK.NewClient(opts...)
 
-	// Check if this model uses max_completion_tokens instead of max_tokens
 	usesCompletionTokens := false
-	if modelInfo := GetModelInfo("openai", cfg.Model); modelInfo != nil {
+	isReasoningModel := false
+	if modelInfo := GetModelInfo(entities.TypeOpenAI, cfg.Model); modelInfo != nil {
 		usesCompletionTokens = modelInfo.UsesCompletionTokens
+		isReasoningModel = modelInfo.IsReasoningModel
 	}
 
 	return &OpenAIClient{
@@ -70,6 +73,7 @@ func NewOpenAIClient(cfg Config) (*OpenAIClient, error) {
 		model:                cfg.Model,
 		modelName:            cfg.Model,
 		usesCompletionTokens: usesCompletionTokens,
+		isReasoningModel:     isReasoningModel,
 	}, nil
 }
 
@@ -86,7 +90,7 @@ func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPr
 
 	schemaParam := openaiSDK.ResponseFormatJSONSchemaJSONSchemaParam{
 		Name:        "article_content",
-		Description: openaiSDK.String("Generated article with title and content in HTML format"),
+		Description: openaiSDK.String("Generated page content"),
 		Schema:      schema,
 		Strict:      openaiSDK.Bool(true),
 	}
@@ -103,16 +107,22 @@ func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPr
 				JSONSchema: schemaParam,
 			},
 		},
-		Model:       c.model,
-		Temperature: openaiSDK.Float(0.7),
+		Model: c.model,
 	}
 
-	// Use appropriate token limit parameter based on model
-	if c.usesCompletionTokens {
-		params.MaxCompletionTokens = openaiSDK.Int(4096)
-	} else {
-		params.MaxTokens = openaiSDK.Int(4096)
+	// Reasoning models (o1, o3, gpt-5 series) don't support temperature
+	if !c.isReasoningModel {
+		params.Temperature = openaiSDK.Float(0.7)
 	}
+
+	const articleMaxTokens = 4096
+	if c.usesCompletionTokens {
+		params.MaxCompletionTokens = openaiSDK.Int(articleMaxTokens)
+	} else {
+		params.MaxTokens = openaiSDK.Int(articleMaxTokens)
+	}
+
+	fmt.Printf("[OpenAI] GenerateArticle: model=%s, maxTokens=%d\n", c.modelName, articleMaxTokens)
 
 	chat, err := c.client.Chat.Completions.New(ctx, params)
 	if err != nil {
@@ -123,10 +133,38 @@ func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPr
 		return nil, errors.AI(providerName, fmt.Errorf("no response from API"))
 	}
 
-	content := chat.Choices[0].Message.Content
+	choice := chat.Choices[0]
+
+	// Log response stats
+	fmt.Printf("[OpenAI] Response: promptTokens=%d, completionTokens=%d, finishReason=%s\n",
+		chat.Usage.PromptTokens, chat.Usage.CompletionTokens, choice.FinishReason)
+
+	// Check finish_reason for truncation
+	finishReason := string(choice.FinishReason)
+	if finishReason == "length" {
+		return nil, errors.AI(providerName, fmt.Errorf("response truncated: max tokens reached. Try reducing word count or using a shorter prompt"))
+	}
+	if finishReason == "content_filter" {
+		return nil, errors.AI(providerName, fmt.Errorf("content filtered by safety system"))
+	}
+
+	content := choice.Message.Content
+	if content == "" {
+		return nil, errors.AI(providerName, fmt.Errorf("empty response from API (finish_reason: %s)", finishReason))
+	}
+
 	var article ArticleContent
 	if err = json.Unmarshal([]byte(content), &article); err != nil {
-		return nil, errors.AI(providerName, fmt.Errorf("failed to parse response: %w", err))
+		// Try sanitizing the JSON to fix invalid escape sequences
+		sanitized := sanitizeJSON(content)
+		if err2 := json.Unmarshal([]byte(sanitized), &article); err2 != nil {
+			// Log the raw content for debugging (first 500 chars)
+			preview := content
+			if len(preview) > 500 {
+				preview = preview[:500] + "..."
+			}
+			return nil, errors.AI(providerName, fmt.Errorf("failed to parse response (finish_reason: %s): %w, preview: %s", finishReason, err, preview))
+		}
 	}
 
 	if article.Title == "" || article.Content == "" {
@@ -136,7 +174,7 @@ func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPr
 	inputTokens := int(chat.Usage.PromptTokens)
 	outputTokens := int(chat.Usage.CompletionTokens)
 	totalTokens := int(chat.Usage.TotalTokens)
-	cost := CalculateCost("openai", c.model, inputTokens, outputTokens)
+	cost := CalculateCost(entities.TypeOpenAI, c.modelName, inputTokens, outputTokens)
 
 	return &ArticleResult{
 		Title:      article.Title,
@@ -178,8 +216,12 @@ func (c *OpenAIClient) GenerateTopicVariations(ctx context.Context, topic string
 				JSONSchema: schemaParam,
 			},
 		},
-		Model:       c.model,
-		Temperature: openaiSDK.Float(0.8),
+		Model: c.model,
+	}
+
+	// Reasoning models (o1, o3, gpt-5 series) don't support temperature
+	if !c.isReasoningModel {
+		params.Temperature = openaiSDK.Float(0.8)
 	}
 
 	// Use appropriate token limit parameter based on model
@@ -274,8 +316,12 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 		ResponseFormat: openaiSDK.ChatCompletionNewParamsResponseFormatUnion{
 			OfJSONObject: &openaiSDK.ResponseFormatJSONObjectParam{},
 		},
-		Model:       c.model,
-		Temperature: openaiSDK.Float(0.7),
+		Model: c.model,
+	}
+
+	// Reasoning models (o1, o3, gpt-5 series) don't support temperature
+	if !c.isReasoningModel {
+		params.Temperature = openaiSDK.Float(0.7)
 	}
 
 	// Use appropriate token limit parameter based on model
@@ -308,7 +354,7 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 	inputTokens := int(chat.Usage.PromptTokens)
 	outputTokens := int(chat.Usage.CompletionTokens)
 	totalTokens := int(chat.Usage.TotalTokens)
-	cost := CalculateCost("openai", c.model, inputTokens, outputTokens)
+	cost := CalculateCost(entities.TypeOpenAI, c.modelName, inputTokens, outputTokens)
 
 	return &SitemapStructureResult{
 		Nodes:      result.Nodes,

@@ -8,7 +8,10 @@ export type SitemapSource = "manual" | "imported" | "generated" | "scanned";
 export type SitemapStatus = "draft" | "active" | "archived";
 export type NodeSource = "manual" | "imported" | "generated" | "scanned";
 export type NodeContentType = "page" | "post" | "none";
-export type NodeContentStatus = "none" | "ai_draft" | "pending" | "draft" | "published";
+
+export type NodeDesignStatus = "draft" | "ready" | "approved";
+export type NodeGenerationStatus = "none" | "queued" | "generating" | "generated" | "failed";
+export type NodePublishStatus = "none" | "publishing" | "draft" | "pending" | "published" | "failed";
 
 export interface Sitemap {
     id: number;
@@ -42,7 +45,11 @@ export interface SitemapNode {
     wpTitle?: string;
     wpSlug?: string;
     isModified: boolean;
-    contentStatus: NodeContentStatus;
+    designStatus: NodeDesignStatus;
+    generationStatus: NodeGenerationStatus;
+    publishStatus: NodePublishStatus;
+    isModifiedLocally: boolean;
+    lastError?: string;
     positionX?: number;
     positionY?: number;
     keywords: string[];
@@ -166,7 +173,11 @@ export function mapSitemapNode(x: dto.SitemapNode): SitemapNode {
         wpTitle: x.wpTitle || undefined,
         wpSlug: x.wpSlug || undefined,
         isModified: x.isModified || false,
-        contentStatus: x.contentStatus as NodeContentStatus,
+        designStatus: x.designStatus as NodeDesignStatus,
+        generationStatus: x.generationStatus as NodeGenerationStatus,
+        publishStatus: x.publishStatus as NodePublishStatus,
+        isModifiedLocally: x.isModifiedLocally || false,
+        lastError: x.lastError || undefined,
         positionX: x.positionX || undefined,
         positionY: x.positionY || undefined,
         keywords: x.keywords || [],
@@ -285,6 +296,12 @@ export function mapSyncNodesResult(x: dto.SyncNodesResponse): SyncNodesResult {
     };
 }
 
+export interface ChangePublishStatusInput {
+    siteId: number;
+    nodeId: number;
+    newStatus: NodePublishStatus;
+}
+
 // =========================================================================
 // AI Generation Types
 // =========================================================================
@@ -344,5 +361,106 @@ export function mapHistoryState(x: dto.HistoryState): HistoryState {
         redoCount: x.redoCount,
         lastAction: x.lastAction,
         actionApplied: x.actionApplied,
+    };
+}
+
+// =========================================================================
+// Page Generation Types
+// =========================================================================
+
+export type PageGenerationTaskStatus = "pending" | "running" | "paused" | "completed" | "failed" | "cancelled";
+export type PageGenerationNodeStatus = "pending" | "generating" | "publishing" | "completed" | "failed" | "skipped";
+export type PublishAs = "draft" | "pending" | "publish";
+
+export type WritingStyle = "professional" | "casual" | "formal" | "friendly" | "technical";
+export type ContentTone = "informative" | "persuasive" | "educational" | "engaging" | "authoritative";
+
+export interface ContentSettings {
+    wordCount: string; // e.g. "1000" or "800-1200"
+    writingStyle: WritingStyle;
+    contentTone: ContentTone;
+    customInstructions?: string;
+}
+
+export interface StartPageGenerationInput {
+    sitemapId: number;
+    nodeIds?: number[];
+    providerId: number;
+    promptId?: number;
+    publishAs: PublishAs;
+    placeholders?: Record<string, string>;
+    maxConcurrency?: number;
+    contentSettings?: ContentSettings;
+}
+
+export interface GenerationNodeInfo {
+    nodeId: number;
+    title: string;
+    path: string;
+    status: PageGenerationNodeStatus;
+    articleId?: number;
+    wpPageId?: number;
+    wpUrl?: string;
+    error?: string;
+    startedAt?: string;
+    completedAt?: string;
+}
+
+export interface GenerationTask {
+    id: string;
+    sitemapId: number;
+    siteId: number;
+    totalNodes: number;
+    processedNodes: number;
+    failedNodes: number;
+    skippedNodes: number;
+    status: PageGenerationTaskStatus;
+    startedAt: string;
+    completedAt?: string;
+    error?: string;
+    nodes?: GenerationNodeInfo[];
+}
+
+export interface DefaultPrompt {
+    name: string;
+    systemPrompt: string;
+    userPrompt: string;
+    placeholders: string[];
+}
+
+export function mapGenerationTask(x: dto.GenerationTaskResponse): GenerationTask {
+    return {
+        id: x.id,
+        sitemapId: x.sitemapId,
+        siteId: x.siteId,
+        totalNodes: x.totalNodes,
+        processedNodes: x.processedNodes,
+        failedNodes: x.failedNodes,
+        skippedNodes: x.skippedNodes,
+        status: x.status as PageGenerationTaskStatus,
+        startedAt: x.startedAt,
+        completedAt: x.completedAt || undefined,
+        error: x.error || undefined,
+        nodes: x.nodes?.map((n) => ({
+            nodeId: n.nodeId,
+            title: n.title,
+            path: n.path,
+            status: n.status as PageGenerationNodeStatus,
+            articleId: n.articleId || undefined,
+            wpPageId: n.wpPageId || undefined,
+            wpUrl: n.wpUrl || undefined,
+            error: n.error || undefined,
+            startedAt: n.startedAt || undefined,
+            completedAt: n.completedAt || undefined,
+        })),
+    };
+}
+
+export function mapDefaultPrompt(x: dto.DefaultPromptResponse): DefaultPrompt {
+    return {
+        name: x.name,
+        systemPrompt: x.systemPrompt,
+        userPrompt: x.userPrompt,
+        placeholders: x.placeholders || [],
     };
 }

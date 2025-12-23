@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { SitemapNode } from "@/models/sitemaps";
-import { Plus, Pencil, Trash2, GitBranchPlus, ExternalLink, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, GitBranchPlus, ExternalLink, Upload, FileText, Globe, FileX } from "lucide-react";
 import { RiWordpressLine } from "@remixicon/react";
 import { cn } from "@/lib/utils";
 import { BrowserOpenURL } from "@/wailsjs/wailsjs/runtime/runtime";
@@ -25,6 +25,9 @@ interface CanvasContextMenuProps {
     onAddChildNode: (parentId: number) => void;
     onSyncFromWP?: (nodeIds: number[]) => void;
     onUpdateToWP?: (nodeIds: number[]) => void;
+    onGenerateContent?: (nodes: SitemapNode[]) => void;
+    onPublish?: (nodeId: number) => void;
+    onUnpublish?: (nodeId: number) => void;
 }
 
 export function CanvasContextMenu({
@@ -40,6 +43,9 @@ export function CanvasContextMenu({
     onAddChildNode,
     onSyncFromWP,
     onUpdateToWP,
+    onGenerateContent,
+    onPublish,
+    onUnpublish,
 }: CanvasContextMenuProps) {
     // Close on click outside or escape
     useEffect(() => {
@@ -74,9 +80,21 @@ export function CanvasContextMenu({
     const isMultiSelect = selectedNodes.length > 1;
 
     // Check capabilities
-    const canView = selectedNode && selectedNode.contentStatus === "published" && siteUrl && !isMultiSelect;
+    const canView = selectedNode && selectedNode.publishStatus === "published" && siteUrl && !isMultiSelect;
     const hasWPNodes = targetNodes.some((n) => n.wpPageId != null);
-    const hasModifiedNodes = targetNodes.some((n) => n.isModified);
+    const hasModifiedNodes = targetNodes.some((n) => n.isModifiedLocally);
+    // Check if there are nodes that can be generated (not root, not already generated)
+    const generatableNodes = targetNodes.filter(
+        (n) => !n.isRoot && n.generationStatus !== "generated"
+    );
+    // Check if node can be published (has WP content and is draft/pending)
+    const canPublish = selectedNode && !isMultiSelect &&
+        selectedNode.wpPageId != null &&
+        (selectedNode.publishStatus === "draft" || selectedNode.publishStatus === "pending");
+    // Check if node can be unpublished (has WP content and is published)
+    const canUnpublish = selectedNode && !isMultiSelect &&
+        selectedNode.wpPageId != null &&
+        selectedNode.publishStatus === "published";
 
     const menuItems = selectedNode
         ? [
@@ -109,6 +127,22 @@ export function CanvasContextMenu({
                       onClose();
                   },
               },
+              // Generate content option
+              ...(generatableNodes.length > 0 && onGenerateContent
+                  ? [
+                        {
+                            icon: FileText,
+                            label: isMultiSelect
+                                ? `Generate Content (${generatableNodes.length})`
+                                : "Generate Content",
+                            onClick: () => {
+                                onGenerateContent(generatableNodes);
+                                onClose();
+                            },
+                            separator: true,
+                        },
+                    ]
+                  : []),
               // Sync operations for WP-linked nodes
               ...(hasWPNodes && onSyncFromWP
                   ? [
@@ -128,10 +162,36 @@ export function CanvasContextMenu({
                   ? [
                         {
                             icon: Upload,
-                            label: isMultiSelect ? `Update ${targetNodes.filter((n) => n.isModified).length}` : "Update",
+                            label: isMultiSelect ? `Update ${targetNodes.filter((n) => n.isModifiedLocally).length}` : "Update",
                             onClick: () => {
-                                const modifiedNodeIds = targetNodes.filter((n) => n.isModified).map((n) => n.id);
+                                const modifiedNodeIds = targetNodes.filter((n) => n.isModifiedLocally).map((n) => n.id);
                                 onUpdateToWP(modifiedNodeIds);
+                                onClose();
+                            },
+                        },
+                    ]
+                  : []),
+              // Publish option for draft/pending nodes
+              ...(canPublish && onPublish
+                  ? [
+                        {
+                            icon: Globe,
+                            label: "Publish",
+                            onClick: () => {
+                                onPublish(selectedNode.id);
+                                onClose();
+                            },
+                        },
+                    ]
+                  : []),
+              // Unpublish option for published nodes
+              ...(canUnpublish && onUnpublish
+                  ? [
+                        {
+                            icon: FileX,
+                            label: "Unpublish (Draft)",
+                            onClick: () => {
+                                onUnpublish(selectedNode.id);
                                 onClose();
                             },
                         },

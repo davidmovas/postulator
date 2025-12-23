@@ -48,4 +48,11 @@ var Module = fx.Module("infra",
 
 	// Event bus
 	fx.Provide(events.GetGlobalEventBus),
+
+	// Wails event bridge
+	fx.Provide(func(eventBus *events.EventBus) *events.WailsBridge {
+		bridge := events.NewWailsBridge(eventBus)
+		bridge.SubscribeToPageGeneration()
+		return bridge
+	}),
 )

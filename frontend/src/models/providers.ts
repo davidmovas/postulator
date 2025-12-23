@@ -27,9 +27,13 @@ export interface Model {
     id: string;
     name: string;
     provider: string;
-    maxTokens: number;
+    contextWindow: number;
+    maxOutputTokens: number;
     inputCost: number;
     outputCost: number;
+    rpm: number;
+    tpm: number;
+    usesCompletionTokens: boolean;
 }
 
 export function mapProvider(x: dto.Provider): Provider {
@@ -50,8 +54,12 @@ export function mapModel(x: dto.Model): Model {
         id: x.id,
         name: x.name,
         provider: x.provider,
-        maxTokens: x.maxTokens,
+        contextWindow: x.contextWindow,
+        maxOutputTokens: x.maxOutputTokens,
         inputCost: x.inputCost,
         outputCost: x.outputCost,
+        rpm: x.rpm,
+        tpm: x.tpm,
+        usesCompletionTokens: x.usesCompletionTokens,
     };
 }

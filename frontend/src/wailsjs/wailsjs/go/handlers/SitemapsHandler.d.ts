@@ -4,7 +4,11 @@ import {dto} from '../models';
 
 export function AddNodeKeyword(arg1:number,arg2:string):Promise<dto.Response_string_>;
 
+export function CancelPageGeneration(arg1:string):Promise<dto.Response_string_>;
+
 export function CancelSitemapGeneration():Promise<dto.Response_string_>;
+
+export function ChangePublishStatus(arg1:dto.ChangePublishStatusRequest):Promise<dto.Response_string_>;
 
 export function ClearHistory(arg1:number):Promise<dto.Response_string_>;
 
@@ -22,6 +26,8 @@ export function DuplicateSitemap(arg1:dto.DuplicateSitemapRequest):Promise<dto.R
 
 export function GenerateSitemapStructure(arg1:dto.GenerateSitemapStructureRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_GenerateSitemapStructureResponse_>;
 
+export function GetDefaultPagePrompt():Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_DefaultPromptResponse_>;
+
 export function GetHistoryState(arg1:number):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_HistoryState_>;
 
 export function GetNode(arg1:number):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_SitemapNode_>;
@@ -29,6 +35,8 @@ export function GetNode(arg1:number):Promise<dto.Response_github_com_davidmovas_
 export function GetNodes(arg1:number):Promise<dto.Response___github_com_davidmovas_postulator_internal_dto_SitemapNode_>;
 
 export function GetNodesTree(arg1:number):Promise<dto.Response___github_com_davidmovas_postulator_internal_dto_SitemapNode_>;
+
+export function GetPageGenerationTask(arg1:string):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_GenerationTaskResponse_>;
 
 export function GetSitemap(arg1:number):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_Sitemap_>;
 
@@ -42,15 +50,21 @@ export function LinkNodeToArticle(arg1:dto.LinkNodeToArticleRequest):Promise<dto
 
 export function LinkNodeToPage(arg1:dto.LinkNodeToPageRequest):Promise<dto.Response_string_>;
 
+export function ListActivePageGenerationTasks():Promise<dto.Response___github_com_davidmovas_postulator_internal_dto_GenerationTaskResponse_>;
+
 export function ListSitemaps(arg1:number):Promise<dto.Response___github_com_davidmovas_postulator_internal_dto_Sitemap_>;
 
 export function MoveNode(arg1:dto.MoveNodeRequest):Promise<dto.Response_string_>;
+
+export function PausePageGeneration(arg1:string):Promise<dto.Response_string_>;
 
 export function Redo(arg1:number):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_HistoryState_>;
 
 export function RemoveNodeKeyword(arg1:number,arg2:string):Promise<dto.Response_string_>;
 
 export function ResetNode(arg1:number):Promise<dto.Response_string_>;
+
+export function ResumePageGeneration(arg1:string):Promise<dto.Response_string_>;
 
 export function ScanIntoSitemap(arg1:dto.ScanIntoSitemapRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_ScanSiteResponse_>;
 
@@ -60,6 +74,8 @@ export function SetNodeKeywords(arg1:dto.SetNodeKeywordsRequest):Promise<dto.Res
 
 export function SetSitemapStatus(arg1:number,arg2:string):Promise<dto.Response_string_>;
 
+export function StartPageGeneration(arg1:dto.StartPageGenerationRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_GenerationTaskResponse_>;
+
 export function SyncNodesFromWP(arg1:dto.SyncNodesRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_SyncNodesResponse_>;
 
 export function Undo(arg1:number):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_HistoryState_>;
@@ -68,9 +84,13 @@ export function UnlinkNodeContent(arg1:number):Promise<dto.Response_string_>;
 
 export function UpdateNode(arg1:dto.UpdateNodeRequest):Promise<dto.Response_string_>;
 
-export function UpdateNodeContentStatus(arg1:number,arg2:string):Promise<dto.Response_string_>;
+export function UpdateNodeDesignStatus(arg1:number,arg2:string):Promise<dto.Response_string_>;
+
+export function UpdateNodeGenerationStatus(arg1:number,arg2:string):Promise<dto.Response_string_>;
 
 export function UpdateNodePositions(arg1:dto.UpdateNodePositionsRequest):Promise<dto.Response_string_>;
+
+export function UpdateNodePublishStatus(arg1:number,arg2:string):Promise<dto.Response_string_>;
 
 export function UpdateNodesToWP(arg1:dto.UpdateNodesToWPRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_SyncNodesResponse_>;
 

@@ -55,14 +55,33 @@ const (
 	NodeContentTypeNone NodeContentType = "none"
 )
 
-type NodeContentStatus string
+type NodeDesignStatus string
 
 const (
-	NodeContentStatusNone      NodeContentStatus = "none"
-	NodeContentStatusAIDraft   NodeContentStatus = "ai_draft" // AI generated, needs review
-	NodeContentStatusPending   NodeContentStatus = "pending"
-	NodeContentStatusDraft     NodeContentStatus = "draft"
-	NodeContentStatusPublished NodeContentStatus = "published"
+	DesignStatusDraft    NodeDesignStatus = "draft"
+	DesignStatusReady    NodeDesignStatus = "ready"
+	DesignStatusApproved NodeDesignStatus = "approved"
+)
+
+type NodeGenerationStatus string
+
+const (
+	GenStatusNone       NodeGenerationStatus = "none"
+	GenStatusQueued     NodeGenerationStatus = "queued"
+	GenStatusGenerating NodeGenerationStatus = "generating"
+	GenStatusGenerated  NodeGenerationStatus = "generated"
+	GenStatusFailed     NodeGenerationStatus = "failed"
+)
+
+type NodePublishStatus string
+
+const (
+	PubStatusNone       NodePublishStatus = "none"
+	PubStatusPublishing NodePublishStatus = "publishing"
+	PubStatusDraft      NodePublishStatus = "draft"
+	PubStatusPending    NodePublishStatus = "pending"
+	PubStatusPublished  NodePublishStatus = "published"
+	PubStatusFailed     NodePublishStatus = "failed"
 )
 
 type SitemapNode struct {
@@ -96,8 +115,14 @@ type SitemapNode struct {
 	WPTitle *string
 	WPSlug  *string
 
-	// Content status
-	ContentStatus NodeContentStatus
+	// Status groups (3 separate concerns)
+	DesignStatus     NodeDesignStatus
+	GenerationStatus NodeGenerationStatus
+	PublishStatus    NodePublishStatus
+
+	// Local modifications tracking
+	IsModifiedLocally bool
+	LastError         *string
 
 	// React Flow positions
 	PositionX *float64

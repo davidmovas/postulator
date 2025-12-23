@@ -29,6 +29,13 @@ CREATE TABLE articles (
     is_edited BOOLEAN NOT NULL DEFAULT 0,
     word_count INTEGER,
 
+    content_type TEXT NOT NULL DEFAULT 'post',
+    wp_page_id INTEGER,
+    parent_page_id INTEGER,
+    menu_order INTEGER,
+    page_template TEXT,
+    sitemap_node_id INTEGER,
+
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     published_at DATETIME,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -47,12 +54,22 @@ CREATE INDEX idx_articles_published ON articles(published_at);
 CREATE INDEX idx_articles_wp_post ON articles(site_id, wp_post_id);
 CREATE INDEX idx_articles_slug ON articles(slug);
 CREATE INDEX idx_articles_author ON articles(author);
+CREATE INDEX idx_articles_content_type ON articles(content_type);
+CREATE INDEX idx_articles_wp_page ON articles(site_id, wp_page_id);
+CREATE INDEX idx_articles_sitemap_node ON articles(sitemap_node_id);
 
 -- Partial unique index: only enforce uniqueness for published articles (wp_post_id > 0)
 CREATE UNIQUE INDEX idx_articles_site_wp_post_unique ON articles(site_id, wp_post_id) WHERE wp_post_id > 0;
 
+-- Partial unique index: only enforce uniqueness for published pages (wp_page_id > 0)
+CREATE UNIQUE INDEX idx_articles_site_wp_page_unique ON articles(site_id, wp_page_id) WHERE wp_page_id > 0;
+
 -- +goose Down
+DROP INDEX IF EXISTS idx_articles_site_wp_page_unique;
 DROP INDEX IF EXISTS idx_articles_site_wp_post_unique;
+DROP INDEX IF EXISTS idx_articles_sitemap_node;
+DROP INDEX IF EXISTS idx_articles_wp_page;
+DROP INDEX IF EXISTS idx_articles_content_type;
 DROP INDEX IF EXISTS idx_articles_author;
 DROP INDEX IF EXISTS idx_articles_slug;
 DROP INDEX IF EXISTS idx_articles_wp_post;

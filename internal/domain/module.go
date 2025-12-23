@@ -18,12 +18,15 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/proxy"
 	"github.com/davidmovas/postulator/internal/domain/settings"
 	"github.com/davidmovas/postulator/internal/domain/sitemap"
+	"github.com/davidmovas/postulator/internal/domain/sitemap/generation"
 	"github.com/davidmovas/postulator/internal/domain/sitemap/scanner"
 	"github.com/davidmovas/postulator/internal/domain/sites"
 	"github.com/davidmovas/postulator/internal/domain/stats"
 	"github.com/davidmovas/postulator/internal/domain/topics"
 	"github.com/davidmovas/postulator/internal/infra/ai"
+	"github.com/davidmovas/postulator/internal/infra/events"
 	"github.com/davidmovas/postulator/internal/infra/window"
+	"github.com/davidmovas/postulator/internal/infra/wp"
 	"github.com/davidmovas/postulator/pkg/logger"
 	"go.uber.org/fx"
 )
@@ -135,6 +138,36 @@ var Module = fx.Module("domain",
 
 		// Sitemap Scanner
 		scanner.NewScanner,
+
+		// Page Generation Service
+		fx.Annotate(
+			func(
+				sitemapSvc sitemap.Service,
+				articleSvc articles.Service,
+				siteSvc sites.Service,
+				promptSvc prompts.Service,
+				providerSvc providers.Service,
+				aiUsageService aiusage.Service,
+				wpClient wp.Client,
+				eventBus *events.EventBus,
+				logger *logger.Logger,
+			) generation.Service {
+				return generation.NewService(
+					sitemapSvc,
+					articleSvc,
+					siteSvc,
+					promptSvc,
+					providerSvc,
+					aiUsageService,
+					wpClient,
+					eventBus,
+					func(provider *entities.Provider) (ai.Client, error) {
+						return ai.CreateClient(provider)
+					},
+					logger,
+				)
+			},
+		),
 	),
 
 	// Job Scheduler lifecycle

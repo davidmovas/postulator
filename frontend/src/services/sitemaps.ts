@@ -23,7 +23,9 @@ import {
     LinkNodeToArticle,
     LinkNodeToPage,
     UnlinkNodeContent,
-    UpdateNodeContentStatus,
+    UpdateNodeDesignStatus,
+    UpdateNodeGenerationStatus,
+    UpdateNodePublishStatus,
     GetSupportedImportFormats,
     ImportNodes,
     ScanSite,
@@ -31,8 +33,16 @@ import {
     SyncNodesFromWP,
     UpdateNodesToWP,
     ResetNode,
+    ChangePublishStatus,
     GenerateSitemapStructure,
     CancelSitemapGeneration,
+    StartPageGeneration,
+    PausePageGeneration,
+    ResumePageGeneration,
+    CancelPageGeneration,
+    GetPageGenerationTask,
+    ListActivePageGenerationTasks,
+    GetDefaultPagePrompt,
     Undo,
     Redo,
     GetHistoryState,
@@ -55,11 +65,17 @@ import {
     ScanSiteResult,
     SyncNodesInput,
     SyncNodesResult,
+    ChangePublishStatusInput,
     SitemapStatus,
-    NodeContentStatus,
+    NodeDesignStatus,
+    NodeGenerationStatus,
+    NodePublishStatus,
     GenerateSitemapStructureInput,
     GenerateSitemapStructureResult,
     HistoryState,
+    StartPageGenerationInput,
+    GenerationTask,
+    DefaultPrompt,
     mapSitemap,
     mapSitemapNode,
     mapSitemapWithNodes,
@@ -68,6 +84,8 @@ import {
     mapSyncNodesResult,
     mapGenerateSitemapStructureResult,
     mapHistoryState,
+    mapGenerationTask,
+    mapDefaultPrompt,
 } from "@/models/sitemaps";
 import { unwrapArrayResponse, unwrapResponse } from "@/lib/api-utils";
 
@@ -273,8 +291,18 @@ export const sitemapService = {
         unwrapResponse<string>(response);
     },
 
-    async updateNodeContentStatus(nodeId: number, status: NodeContentStatus): Promise<void> {
-        const response = await UpdateNodeContentStatus(nodeId, status);
+    async updateNodeDesignStatus(nodeId: number, status: NodeDesignStatus): Promise<void> {
+        const response = await UpdateNodeDesignStatus(nodeId, status);
+        unwrapResponse<string>(response);
+    },
+
+    async updateNodeGenerationStatus(nodeId: number, status: NodeGenerationStatus): Promise<void> {
+        const response = await UpdateNodeGenerationStatus(nodeId, status);
+        unwrapResponse<string>(response);
+    },
+
+    async updateNodePublishStatus(nodeId: number, status: NodePublishStatus): Promise<void> {
+        const response = await UpdateNodePublishStatus(nodeId, status);
         unwrapResponse<string>(response);
     },
 
@@ -354,6 +382,17 @@ export const sitemapService = {
         unwrapResponse<string>(response);
     },
 
+    async changePublishStatus(input: ChangePublishStatusInput): Promise<void> {
+        const payload = new dto.ChangePublishStatusRequest({
+            siteId: input.siteId,
+            nodeId: input.nodeId,
+            newStatus: input.newStatus,
+        });
+
+        const response = await ChangePublishStatus(payload);
+        unwrapResponse<string>(response);
+    },
+
     async generateSitemapStructure(
         input: GenerateSitemapStructureInput
     ): Promise<GenerateSitemapStructureResult> {
@@ -408,5 +447,61 @@ export const sitemapService = {
     async clearHistory(sitemapId: number): Promise<void> {
         const response = await ClearHistory(sitemapId);
         unwrapResponse<string>(response);
+    },
+
+    // Page Generation operations
+    async startPageGeneration(input: StartPageGenerationInput): Promise<GenerationTask> {
+        const payload = new dto.StartPageGenerationRequest({
+            sitemapId: input.sitemapId,
+            nodeIds: input.nodeIds,
+            providerId: input.providerId,
+            promptId: input.promptId,
+            publishAs: input.publishAs,
+            placeholders: input.placeholders,
+            maxConcurrency: input.maxConcurrency,
+            contentSettings: input.contentSettings ? new dto.ContentSettingsDTO({
+                wordCount: input.contentSettings.wordCount,
+                writingStyle: input.contentSettings.writingStyle,
+                contentTone: input.contentSettings.contentTone,
+                customInstructions: input.contentSettings.customInstructions || "",
+            }) : undefined,
+        });
+
+        const response = await StartPageGeneration(payload);
+        const data = unwrapResponse<dto.GenerationTaskResponse>(response);
+        return mapGenerationTask(data);
+    },
+
+    async pausePageGeneration(taskId: string): Promise<void> {
+        const response = await PausePageGeneration(taskId);
+        unwrapResponse<string>(response);
+    },
+
+    async resumePageGeneration(taskId: string): Promise<void> {
+        const response = await ResumePageGeneration(taskId);
+        unwrapResponse<string>(response);
+    },
+
+    async cancelPageGeneration(taskId: string): Promise<void> {
+        const response = await CancelPageGeneration(taskId);
+        unwrapResponse<string>(response);
+    },
+
+    async getPageGenerationTask(taskId: string): Promise<GenerationTask> {
+        const response = await GetPageGenerationTask(taskId);
+        const data = unwrapResponse<dto.GenerationTaskResponse>(response);
+        return mapGenerationTask(data);
+    },
+
+    async listActivePageGenerationTasks(): Promise<GenerationTask[]> {
+        const response = await ListActivePageGenerationTasks();
+        const data = unwrapArrayResponse<dto.GenerationTaskResponse>(response);
+        return data.map(mapGenerationTask);
+    },
+
+    async getDefaultPagePrompt(): Promise<DefaultPrompt> {
+        const response = await GetDefaultPagePrompt();
+        const data = unwrapResponse<dto.DefaultPromptResponse>(response);
+        return mapDefaultPrompt(data);
     },
 };

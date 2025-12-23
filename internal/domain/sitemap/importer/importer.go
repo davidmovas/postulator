@@ -177,17 +177,18 @@ func (i *Importer) Import(
 			}
 		}
 
-		// Create node
 		node := &entities.SitemapNode{
-			SitemapID:     sitemapID,
-			ParentID:      parentID,
-			Title:         parsed.Title,
-			Slug:          parsed.Slug,
-			IsRoot:        false,
-			Source:        entities.NodeSourceImported,
-			ContentType:   entities.NodeContentTypeNone,
-			ContentStatus: entities.NodeContentStatusDraft,
-			Keywords:      parsed.Keywords,
+			SitemapID:        sitemapID,
+			ParentID:         parentID,
+			Title:            parsed.Title,
+			Slug:             parsed.Slug,
+			IsRoot:           false,
+			Source:           entities.NodeSourceImported,
+			ContentType:      entities.NodeContentTypePage,
+			DesignStatus:     entities.DesignStatusDraft,
+			GenerationStatus: entities.GenStatusNone,
+			PublishStatus:    entities.PubStatusNone,
+			Keywords:         parsed.Keywords,
 		}
 
 		if err := nodeCreator.CreateNode(ctx, node); err != nil {

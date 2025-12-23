@@ -10,6 +10,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/sitemap"
 	"github.com/davidmovas/postulator/internal/domain/sitemap/actions"
+	"github.com/davidmovas/postulator/internal/domain/sitemap/generation"
 	"github.com/davidmovas/postulator/internal/domain/sitemap/importer"
 	"github.com/davidmovas/postulator/internal/domain/sitemap/scanner"
 	"github.com/davidmovas/postulator/internal/dto"
@@ -27,17 +28,16 @@ const (
 )
 
 type SitemapsHandler struct {
-	service           sitemap.Service
-	syncService       *sitemap.SyncService
-	generationService *sitemap.GenerationService
-	importer          *importer.Importer
-	scanner           *scanner.Scanner
-	logger            *logger.Logger
+	service               sitemap.Service
+	syncService           *sitemap.SyncService
+	generationService     *sitemap.GenerationService
+	pageGenerationService generation.Service
+	importer              *importer.Importer
+	scanner               *scanner.Scanner
+	logger                *logger.Logger
 
-	// History manager for undo/redo
 	historyManager *history.Manager
 
-	// For cancellable AI generation
 	generationMu     sync.Mutex
 	generationCancel context.CancelFunc
 }
@@ -46,17 +46,19 @@ func NewSitemapsHandler(
 	service sitemap.Service,
 	syncService *sitemap.SyncService,
 	generationService *sitemap.GenerationService,
+	pageGenerationService generation.Service,
 	siteScanner *scanner.Scanner,
 	log *logger.Logger,
 ) *SitemapsHandler {
 	return &SitemapsHandler{
-		service:           service,
-		syncService:       syncService,
-		generationService: generationService,
-		importer:          importer.NewImporter(log),
-		scanner:           siteScanner,
-		logger:            log.WithScope("sitemaps_handler"),
-		historyManager:    history.NewManager(HistoryMaxSize, HistoryTTL),
+		service:               service,
+		syncService:           syncService,
+		generationService:     generationService,
+		pageGenerationService: pageGenerationService,
+		importer:              importer.NewImporter(log),
+		scanner:               siteScanner,
+		logger:                log.WithScope("sitemaps_handler"),
+		historyManager:        history.NewManager(HistoryMaxSize, HistoryTTL),
 	}
 }
 
@@ -411,12 +413,25 @@ func (h *SitemapsHandler) UnlinkNodeContent(nodeID int64) *dto.Response[string] 
 	return ok("Node content unlinked successfully")
 }
 
-func (h *SitemapsHandler) UpdateNodeContentStatus(nodeID int64, status string) *dto.Response[string] {
-	if err := h.service.UpdateNodeContentStatus(ctx.FastCtx(), nodeID, entities.NodeContentStatus(status)); err != nil {
+func (h *SitemapsHandler) UpdateNodeDesignStatus(nodeID int64, status string) *dto.Response[string] {
+	if err := h.service.UpdateNodeDesignStatus(ctx.FastCtx(), nodeID, entities.NodeDesignStatus(status)); err != nil {
 		return fail[string](err)
 	}
+	return ok("Node design status updated successfully")
+}
 
-	return ok("Node content status updated successfully")
+func (h *SitemapsHandler) UpdateNodeGenerationStatus(nodeID int64, status string) *dto.Response[string] {
+	if err := h.service.UpdateNodeGenerationStatus(ctx.FastCtx(), nodeID, entities.NodeGenerationStatus(status), nil); err != nil {
+		return fail[string](err)
+	}
+	return ok("Node generation status updated successfully")
+}
+
+func (h *SitemapsHandler) UpdateNodePublishStatus(nodeID int64, status string) *dto.Response[string] {
+	if err := h.service.UpdateNodePublishStatus(ctx.FastCtx(), nodeID, entities.NodePublishStatus(status), nil); err != nil {
+		return fail[string](err)
+	}
+	return ok("Node publish status updated successfully")
 }
 
 // =========================================================================
@@ -664,6 +679,16 @@ func (h *SitemapsHandler) ResetNode(nodeID int64) *dto.Response[string] {
 	return ok("Node reset successfully")
 }
 
+// ChangePublishStatus changes the publish status of a node both locally and in WordPress
+func (h *SitemapsHandler) ChangePublishStatus(req *dto.ChangePublishStatusRequest) *dto.Response[string] {
+	status := entities.NodePublishStatus(req.NewStatus)
+	if err := h.syncService.ChangePublishStatus(ctx.FastCtx(), req.SiteID, req.NodeID, status); err != nil {
+		return fail[string](err)
+	}
+
+	return ok("Status changed successfully")
+}
+
 // =========================================================================
 // AI Generation Operations (with History)
 // =========================================================================
@@ -762,6 +787,140 @@ func (h *SitemapsHandler) CancelSitemapGeneration() *dto.Response[string] {
 	}
 
 	return ok("No active generation to cancel")
+}
+
+// =========================================================================
+// Page Content Generation Operations
+// =========================================================================
+
+func (h *SitemapsHandler) StartPageGeneration(req *dto.StartPageGenerationRequest) *dto.Response[*dto.GenerationTaskResponse] {
+	sm, err := h.service.GetSitemap(ctx.FastCtx(), req.SitemapID)
+	if err != nil {
+		return fail[*dto.GenerationTaskResponse](err)
+	}
+
+	config := generation.GenerationConfig{
+		SitemapID:      req.SitemapID,
+		SiteID:         sm.SiteID,
+		NodeIDs:        req.NodeIDs,
+		ProviderID:     req.ProviderID,
+		PromptID:       req.PromptID,
+		PublishAs:      generation.PublishAs(req.PublishAs),
+		Placeholders:   req.Placeholders,
+		MaxConcurrency: req.MaxConcurrency,
+	}
+
+	// Map content settings from DTO to domain model
+	if req.ContentSettings != nil {
+		config.ContentSettings = &generation.ContentSettings{
+			WordCount:          req.ContentSettings.WordCount,
+			WritingStyle:       generation.WritingStyle(req.ContentSettings.WritingStyle),
+			ContentTone:        generation.ContentTone(req.ContentSettings.ContentTone),
+			CustomInstructions: req.ContentSettings.CustomInstructions,
+		}
+	}
+
+	task, err := h.pageGenerationService.StartGeneration(context.Background(), config)
+	if err != nil {
+		return fail[*dto.GenerationTaskResponse](err)
+	}
+
+	return ok(h.taskToDTO(task))
+}
+
+func (h *SitemapsHandler) PausePageGeneration(taskID string) *dto.Response[string] {
+	if err := h.pageGenerationService.PauseGeneration(taskID); err != nil {
+		return fail[string](err)
+	}
+	return ok("Generation paused")
+}
+
+func (h *SitemapsHandler) ResumePageGeneration(taskID string) *dto.Response[string] {
+	if err := h.pageGenerationService.ResumeGeneration(taskID); err != nil {
+		return fail[string](err)
+	}
+	return ok("Generation resumed")
+}
+
+func (h *SitemapsHandler) CancelPageGeneration(taskID string) *dto.Response[string] {
+	if err := h.pageGenerationService.CancelGeneration(taskID); err != nil {
+		return fail[string](err)
+	}
+	return ok("Generation cancelled")
+}
+
+func (h *SitemapsHandler) GetPageGenerationTask(taskID string) *dto.Response[*dto.GenerationTaskResponse] {
+	task := h.pageGenerationService.GetTask(taskID)
+	if task == nil {
+		return fail[*dto.GenerationTaskResponse](errors.NotFound("task", taskID))
+	}
+	return ok(h.taskToDTO(task))
+}
+
+func (h *SitemapsHandler) ListActivePageGenerationTasks() *dto.Response[[]*dto.GenerationTaskResponse] {
+	tasks := h.pageGenerationService.ListActiveTasks()
+	result := make([]*dto.GenerationTaskResponse, len(tasks))
+	for i, task := range tasks {
+		result[i] = h.taskToDTO(task)
+	}
+	return ok(result)
+}
+
+func (h *SitemapsHandler) GetDefaultPagePrompt() *dto.Response[*dto.DefaultPromptResponse] {
+	prompt := h.pageGenerationService.GetDefaultPrompt()
+	return ok(&dto.DefaultPromptResponse{
+		Name:         prompt.Name,
+		SystemPrompt: prompt.SystemPrompt,
+		UserPrompt:   prompt.UserPrompt,
+		Placeholders: prompt.Placeholders,
+	})
+}
+
+func (h *SitemapsHandler) taskToDTO(task *generation.Task) *dto.GenerationTaskResponse {
+	resp := &dto.GenerationTaskResponse{
+		ID:             task.ID,
+		SitemapID:      task.SitemapID,
+		SiteID:         task.SiteID,
+		TotalNodes:     task.TotalNodes,
+		ProcessedNodes: task.ProcessedNodes,
+		FailedNodes:    task.FailedNodes,
+		SkippedNodes:   task.SkippedNodes,
+		Status:         string(task.Status),
+		StartedAt:      dto.TimeToString(task.StartedAt),
+		Error:          task.Error,
+	}
+
+	if task.CompletedAt != nil {
+		completedStr := dto.TimeToString(*task.CompletedAt)
+		resp.CompletedAt = &completedStr
+	}
+
+	if len(task.Nodes) > 0 {
+		resp.Nodes = make([]dto.GenerationNodeInfo, len(task.Nodes))
+		for i, node := range task.Nodes {
+			info := dto.GenerationNodeInfo{
+				NodeID:    node.NodeID,
+				Title:     node.Title,
+				Path:      node.Path,
+				Status:    string(node.Status),
+				ArticleID: node.ArticleID,
+				WPPageID:  node.WPPageID,
+				WPURL:     node.WPURL,
+				Error:     node.Error,
+			}
+			if node.StartedAt != nil {
+				startedStr := dto.TimeToString(*node.StartedAt)
+				info.StartedAt = &startedStr
+			}
+			if node.CompletedAt != nil {
+				completedStr := dto.TimeToString(*node.CompletedAt)
+				info.CompletedAt = &completedStr
+			}
+			resp.Nodes[i] = info
+		}
+	}
+
+	return resp
 }
 
 // =========================================================================

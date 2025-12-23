@@ -412,19 +412,20 @@ func (s *GenerationService) createNodeRecursive(
 		nodeSlug = slug.Make(genNode.Title)
 	}
 
-	// Create node
 	now := time.Now()
 	node := &entities.SitemapNode{
-		SitemapID:     sitemapID,
-		ParentID:      parentID,
-		Title:         genNode.Title,
-		Slug:          nodeSlug,
-		Source:        entities.NodeSourceGenerated,
-		ContentType:   entities.NodeContentTypeNone,
-		ContentStatus: entities.NodeContentStatusAIDraft,
-		Keywords:      genNode.Keywords,
-		CreatedAt:     now,
-		UpdatedAt:     now,
+		SitemapID:        sitemapID,
+		ParentID:         parentID,
+		Title:            genNode.Title,
+		Slug:             nodeSlug,
+		Source:           entities.NodeSourceGenerated,
+		ContentType:      entities.NodeContentTypePage,
+		DesignStatus:     entities.DesignStatusDraft,
+		GenerationStatus: entities.GenStatusNone,
+		PublishStatus:    entities.PubStatusNone,
+		Keywords:         genNode.Keywords,
+		CreatedAt:        now,
+		UpdatedAt:        now,
 	}
 
 	if err := s.sitemapSvc.CreateNode(ctx, node); err != nil {

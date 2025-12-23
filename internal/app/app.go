@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain"
 	"github.com/davidmovas/postulator/internal/handlers"
 	"github.com/davidmovas/postulator/internal/infra"
+	"github.com/davidmovas/postulator/internal/infra/events"
 	"go.uber.org/fx"
 )
 
@@ -18,6 +19,7 @@ type App struct {
 	cfg            *config.Config
 	dialogsHandler *handlers.DialogsHandler
 	appHandler     *handlers.AppHandler
+	eventsBridge   *events.WailsBridge
 }
 
 func New(cfg *config.Config) (*App, error) {
@@ -39,6 +41,7 @@ func New(cfg *config.Config) (*App, error) {
 		appHandler         *handlers.AppHandler
 		sitemapsHandler    *handlers.SitemapsHandler
 		aiUsageHandler     *handlers.AIUsageHandler
+		eventsBridge       *events.WailsBridge
 	)
 
 	fxApp := fx.New(
@@ -66,6 +69,7 @@ func New(cfg *config.Config) (*App, error) {
 			&appHandler,
 			&sitemapsHandler,
 			&aiUsageHandler,
+			&eventsBridge,
 		),
 	)
 
@@ -92,6 +96,7 @@ func New(cfg *config.Config) (*App, error) {
 		},
 		dialogsHandler: dialogsHandler,
 		appHandler:     appHandler,
+		eventsBridge:   eventsBridge,
 		cfg:            cfg,
 	}
 
@@ -110,6 +115,9 @@ func (a *App) SetWailsContext(ctx context.Context) {
 	}
 	if a.appHandler != nil {
 		a.appHandler.SetContext(ctx)
+	}
+	if a.eventsBridge != nil {
+		a.eventsBridge.SetContext(ctx)
 	}
 }
 

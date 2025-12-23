@@ -57,8 +57,12 @@ CREATE TABLE sitemap_nodes (
     wp_title TEXT,
     wp_slug TEXT,
 
-    -- Content status
-    content_status TEXT NOT NULL DEFAULT 'none',
+    -- Status groups (3 separate concerns)
+    design_status TEXT NOT NULL DEFAULT 'draft',
+    generation_status TEXT NOT NULL DEFAULT 'none',
+    publish_status TEXT NOT NULL DEFAULT 'none',
+    is_modified_locally BOOLEAN NOT NULL DEFAULT FALSE,
+    last_error TEXT,
 
     -- React Flow positions
     position_x REAL,
@@ -74,7 +78,9 @@ CREATE TABLE sitemap_nodes (
 
     CHECK (source IN ('manual', 'imported', 'generated', 'scanned')),
     CHECK (content_type IN ('page', 'post', 'none')),
-    CHECK (content_status IN ('none', 'ai_draft', 'pending', 'draft', 'published'))
+    CHECK (design_status IN ('draft', 'ready', 'approved')),
+    CHECK (generation_status IN ('none', 'queued', 'generating', 'generated', 'failed')),
+    CHECK (publish_status IN ('none', 'publishing', 'draft', 'pending', 'published', 'failed'))
 );
 
 CREATE INDEX idx_sitemap_nodes_sitemap ON sitemap_nodes(sitemap_id);
@@ -83,7 +89,9 @@ CREATE INDEX idx_sitemap_nodes_article ON sitemap_nodes(article_id);
 CREATE INDEX idx_sitemap_nodes_depth ON sitemap_nodes(sitemap_id, depth);
 CREATE INDEX idx_sitemap_nodes_path ON sitemap_nodes(path);
 CREATE INDEX idx_sitemap_nodes_slug ON sitemap_nodes(sitemap_id, slug);
-CREATE INDEX idx_sitemap_nodes_content_status ON sitemap_nodes(content_status);
+CREATE INDEX idx_sitemap_nodes_design_status ON sitemap_nodes(design_status);
+CREATE INDEX idx_sitemap_nodes_generation_status ON sitemap_nodes(generation_status);
+CREATE INDEX idx_sitemap_nodes_publish_status ON sitemap_nodes(publish_status);
 
 -- Unique slug within same parent (siblings can't have same slug)
 CREATE UNIQUE INDEX idx_sitemap_nodes_unique_slug
@@ -116,7 +124,9 @@ DROP INDEX IF EXISTS idx_sitemap_node_keywords_node;
 DROP TABLE IF EXISTS sitemap_node_keywords;
 
 DROP INDEX IF EXISTS idx_sitemap_nodes_unique_slug;
-DROP INDEX IF EXISTS idx_sitemap_nodes_content_status;
+DROP INDEX IF EXISTS idx_sitemap_nodes_publish_status;
+DROP INDEX IF EXISTS idx_sitemap_nodes_generation_status;
+DROP INDEX IF EXISTS idx_sitemap_nodes_design_status;
 DROP INDEX IF EXISTS idx_sitemap_nodes_slug;
 DROP INDEX IF EXISTS idx_sitemap_nodes_path;
 DROP INDEX IF EXISTS idx_sitemap_nodes_depth;

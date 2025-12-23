@@ -456,6 +456,40 @@ export namespace dto {
 	        this.updatedAt = source["updatedAt"];
 	    }
 	}
+	export class ChangePublishStatusRequest {
+	    siteId: number;
+	    nodeId: number;
+	    newStatus: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ChangePublishStatusRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.siteId = source["siteId"];
+	        this.nodeId = source["nodeId"];
+	        this.newStatus = source["newStatus"];
+	    }
+	}
+	export class ContentSettingsDTO {
+	    wordCount: string;
+	    writingStyle: string;
+	    contentTone: string;
+	    customInstructions: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ContentSettingsDTO(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.wordCount = source["wordCount"];
+	        this.writingStyle = source["writingStyle"];
+	        this.contentTone = source["contentTone"];
+	        this.customInstructions = source["customInstructions"];
+	    }
+	}
 	export class CreateNodeRequest {
 	    sitemapId: number;
 	    parentId?: number;
@@ -544,6 +578,24 @@ export namespace dto {
 	        this.pendingValidations = source["pendingValidations"];
 	        this.executionsToday = source["executionsToday"];
 	        this.failedExecutionsToday = source["failedExecutionsToday"];
+	    }
+	}
+	export class DefaultPromptResponse {
+	    name: string;
+	    systemPrompt: string;
+	    userPrompt: string;
+	    placeholders: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DefaultPromptResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.systemPrompt = source["systemPrompt"];
+	        this.userPrompt = source["userPrompt"];
+	        this.placeholders = source["placeholders"];
 	    }
 	}
 	export class DistributeKeywordsRequest {
@@ -729,6 +781,88 @@ export namespace dto {
 	        this.nodesCreated = source["nodesCreated"];
 	        this.durationMs = source["durationMs"];
 	    }
+	}
+	export class GenerationNodeInfo {
+	    nodeId: number;
+	    title: string;
+	    path: string;
+	    status: string;
+	    articleId?: number;
+	    wpPageId?: number;
+	    wpUrl?: string;
+	    error?: string;
+	    startedAt?: string;
+	    completedAt?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new GenerationNodeInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.nodeId = source["nodeId"];
+	        this.title = source["title"];
+	        this.path = source["path"];
+	        this.status = source["status"];
+	        this.articleId = source["articleId"];
+	        this.wpPageId = source["wpPageId"];
+	        this.wpUrl = source["wpUrl"];
+	        this.error = source["error"];
+	        this.startedAt = source["startedAt"];
+	        this.completedAt = source["completedAt"];
+	    }
+	}
+	export class GenerationTaskResponse {
+	    id: string;
+	    sitemapId: number;
+	    siteId: number;
+	    totalNodes: number;
+	    processedNodes: number;
+	    failedNodes: number;
+	    skippedNodes: number;
+	    status: string;
+	    startedAt: string;
+	    completedAt?: string;
+	    error?: string;
+	    nodes?: GenerationNodeInfo[];
+	
+	    static createFrom(source: any = {}) {
+	        return new GenerationTaskResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.sitemapId = source["sitemapId"];
+	        this.siteId = source["siteId"];
+	        this.totalNodes = source["totalNodes"];
+	        this.processedNodes = source["processedNodes"];
+	        this.failedNodes = source["failedNodes"];
+	        this.skippedNodes = source["skippedNodes"];
+	        this.status = source["status"];
+	        this.startedAt = source["startedAt"];
+	        this.completedAt = source["completedAt"];
+	        this.error = source["error"];
+	        this.nodes = this.convertValues(source["nodes"], GenerationNodeInfo);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class HealthCheckHistory {
 	    id: number;
@@ -1098,9 +1232,13 @@ export namespace dto {
 	    id: string;
 	    name: string;
 	    provider: string;
-	    maxTokens: number;
+	    contextWindow: number;
+	    maxOutputTokens: number;
 	    inputCost: number;
 	    outputCost: number;
+	    rpm: number;
+	    tpm: number;
+	    usesCompletionTokens: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Model(source);
@@ -1111,9 +1249,13 @@ export namespace dto {
 	        this.id = source["id"];
 	        this.name = source["name"];
 	        this.provider = source["provider"];
-	        this.maxTokens = source["maxTokens"];
+	        this.contextWindow = source["contextWindow"];
+	        this.maxOutputTokens = source["maxOutputTokens"];
 	        this.inputCost = source["inputCost"];
 	        this.outputCost = source["outputCost"];
+	        this.rpm = source["rpm"];
+	        this.tpm = source["tpm"];
+	        this.usesCompletionTokens = source["usesCompletionTokens"];
 	    }
 	}
 	export class MoveNodeRequest {
@@ -1702,6 +1844,40 @@ export namespace dto {
 		    return a;
 		}
 	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_DefaultPromptResponse_ {
+	    success: boolean;
+	    data?: DefaultPromptResponse;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_DefaultPromptResponse_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], DefaultPromptResponse);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Response__github_com_davidmovas_postulator_internal_dto_GenerateContentResult_ {
 	    success: boolean;
 	    data?: GenerateContentResult;
@@ -1749,6 +1925,40 @@ export namespace dto {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
 	        this.data = this.convertValues(source["data"], GenerateSitemapStructureResponse);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_GenerationTaskResponse_ {
+	    success: boolean;
+	    data?: GenerationTaskResponse;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_GenerationTaskResponse_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], GenerationTaskResponse);
 	        this.error = this.convertValues(source["error"], Error);
 	    }
 	
@@ -2489,7 +2699,11 @@ export namespace dto {
 	    wpTitle?: string;
 	    wpSlug?: string;
 	    isModified: boolean;
-	    contentStatus: string;
+	    designStatus: string;
+	    generationStatus: string;
+	    publishStatus: string;
+	    isModifiedLocally: boolean;
+	    lastError?: string;
 	    positionX?: number;
 	    positionY?: number;
 	    keywords?: string[];
@@ -2523,7 +2737,11 @@ export namespace dto {
 	        this.wpTitle = source["wpTitle"];
 	        this.wpSlug = source["wpSlug"];
 	        this.isModified = source["isModified"];
-	        this.contentStatus = source["contentStatus"];
+	        this.designStatus = source["designStatus"];
+	        this.generationStatus = source["generationStatus"];
+	        this.publishStatus = source["publishStatus"];
+	        this.isModifiedLocally = source["isModifiedLocally"];
+	        this.lastError = source["lastError"];
 	        this.positionX = source["positionX"];
 	        this.positionY = source["positionY"];
 	        this.keywords = source["keywords"];
@@ -2933,6 +3151,40 @@ export namespace dto {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
 	        this.data = this.convertValues(source["data"], Category);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response____github_com_davidmovas_postulator_internal_dto_GenerationTaskResponse_ {
+	    success: boolean;
+	    data?: GenerationTaskResponse[];
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response____github_com_davidmovas_postulator_internal_dto_GenerationTaskResponse_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], GenerationTaskResponse);
 	        this.error = this.convertValues(source["error"], Error);
 	    }
 	
@@ -3684,6 +3936,50 @@ export namespace dto {
 	
 	
 	
+	export class StartPageGenerationRequest {
+	    sitemapId: number;
+	    nodeIds?: number[];
+	    providerId: number;
+	    promptId?: number;
+	    publishAs: string;
+	    placeholders?: Record<string, string>;
+	    maxConcurrency?: number;
+	    contentSettings?: ContentSettingsDTO;
+	
+	    static createFrom(source: any = {}) {
+	        return new StartPageGenerationRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sitemapId = source["sitemapId"];
+	        this.nodeIds = source["nodeIds"];
+	        this.providerId = source["providerId"];
+	        this.promptId = source["promptId"];
+	        this.publishAs = source["publishAs"];
+	        this.placeholders = source["placeholders"];
+	        this.maxConcurrency = source["maxConcurrency"];
+	        this.contentSettings = this.convertValues(source["contentSettings"], ContentSettingsDTO);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	
 	
