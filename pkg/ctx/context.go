@@ -6,9 +6,9 @@ import (
 )
 
 const (
-	FastContextTimeout    = time.Second * 5
-	MediumContextTimeout  = time.Second * 10
-	LongContextTimeout    = time.Second * 30
+	FastContextTimeout    = time.Second * 10
+	MediumContextTimeout  = time.Second * 30
+	LongContextTimeout    = time.Minute * 1
 	AIContextTimeout      = time.Minute * 5
 	ScannerContextTimeout = time.Minute * 10 // For scanning WordPress sites
 )

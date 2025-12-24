@@ -68,3 +68,26 @@ func (b *WailsBridge) SubscribeToPageGeneration() {
 		b.SubscribeAndForward(eventType)
 	}
 }
+
+// SubscribeToLinking sets up forwarding for all linking events
+func (b *WailsBridge) SubscribeToLinking() {
+	linkingEvents := []EventType{
+		// Apply events
+		"linking.apply.started",
+		"linking.apply.progress",
+		"linking.apply.completed",
+		"linking.apply.failed",
+		"linking.page.processing",
+		"linking.page.completed",
+		"linking.page.failed",
+		// Suggest events
+		"linking.suggest.started",
+		"linking.suggest.progress",
+		"linking.suggest.completed",
+		"linking.suggest.failed",
+	}
+
+	for _, eventType := range linkingEvents {
+		b.SubscribeAndForward(eventType)
+	}
+}

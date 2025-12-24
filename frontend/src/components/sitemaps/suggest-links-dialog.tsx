@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
     Dialog,
     DialogContent,
@@ -22,18 +22,26 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
     Collapsible,
     CollapsibleContent,
     CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { AlertCircle, CheckCircle2, Loader2, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, Sparkles, ChevronDown, ChevronUp, Link2 } from "lucide-react";
+import { EventsOn } from "@/wailsjs/wailsjs/runtime/runtime";
 import { providerService } from "@/services/providers";
 import { promptService } from "@/services/prompts";
 import { linkingService } from "@/services/linking";
 import { Provider } from "@/models/providers";
 import { Prompt } from "@/models/prompts";
 import { SitemapNode } from "@/models/sitemaps";
+import {
+    SuggestStartedEvent,
+    SuggestProgressEvent,
+    SuggestCompletedEvent,
+    SuggestFailedEvent,
+} from "@/models/linking";
 
 interface SuggestLinksDialogProps {
     open: boolean;
@@ -68,6 +76,17 @@ export function SuggestLinksDialog({
     const [isLoadingData, setIsLoadingData] = useState(true);
     const [showAdvanced, setShowAdvanced] = useState(false);
 
+    // Progress tracking
+    const [currentBatch, setCurrentBatch] = useState(0);
+    const [totalBatches, setTotalBatches] = useState(0);
+    const [processedNodes, setProcessedNodes] = useState(0);
+    const [totalNodes, setTotalNodes] = useState(0);
+    const [linksCreated, setLinksCreated] = useState(0);
+
+    // Refs to avoid stale closures
+    const isRunningRef = useRef(false);
+    const isCompletedRef = useRef(false);
+
     const nodesToAnalyze = useMemo(() => {
         if (selectedNodes.length > 0) {
             return selectedNodes.filter((n) => !n.isRoot);
@@ -80,6 +99,62 @@ export function SuggestLinksDialog({
             loadData();
         }
     }, [open]);
+
+    // Event subscriptions
+    useEffect(() => {
+        if (!open) return;
+
+        const cleanupFns: (() => void)[] = [];
+
+        // Suggest started
+        cleanupFns.push(
+            EventsOn("linking.suggest.started", (data: SuggestStartedEvent) => {
+                setTotalNodes(data.TotalNodes);
+                setTotalBatches(data.TotalBatches);
+                setCurrentBatch(0);
+                setProcessedNodes(0);
+                setLinksCreated(0);
+            })
+        );
+
+        // Suggest progress
+        cleanupFns.push(
+            EventsOn("linking.suggest.progress", (data: SuggestProgressEvent) => {
+                setCurrentBatch(data.CurrentBatch);
+                setTotalBatches(data.TotalBatches);
+                setProcessedNodes(data.ProcessedNodes);
+                setTotalNodes(data.TotalNodes);
+                setLinksCreated(data.LinksCreated);
+            })
+        );
+
+        // Suggest completed
+        cleanupFns.push(
+            EventsOn("linking.suggest.completed", (data: SuggestCompletedEvent) => {
+                if (isCompletedRef.current) return;
+                isCompletedRef.current = true;
+                isRunningRef.current = false;
+
+                setLinksCreated(data.LinksCreated);
+                setSuggestState("success");
+                onSuccess();
+            })
+        );
+
+        // Suggest failed
+        cleanupFns.push(
+            EventsOn("linking.suggest.failed", (data: SuggestFailedEvent) => {
+                isRunningRef.current = false;
+                isCompletedRef.current = true;
+                setError(data.Error);
+                setSuggestState("error");
+            })
+        );
+
+        return () => {
+            cleanupFns.forEach((cleanup) => cleanup());
+        };
+    }, [open, onSuccess]);
 
     const loadData = async () => {
         setIsLoadingData(true);
@@ -114,8 +189,17 @@ export function SuggestLinksDialog({
             return;
         }
 
+        // Reset refs
+        isRunningRef.current = true;
+        isCompletedRef.current = false;
+
         setSuggestState("loading");
         setError(null);
+        setCurrentBatch(0);
+        setTotalBatches(0);
+        setProcessedNodes(0);
+        setTotalNodes(nodesToAnalyze.length);
+        setLinksCreated(0);
 
         try {
             await linkingService.suggestLinks({
@@ -128,24 +212,49 @@ export function SuggestLinksDialog({
                 maxOutgoing: maxOutgoing ? parseInt(maxOutgoing, 10) : undefined,
             });
 
-            setSuggestState("success");
-            onSuccess();
+            // Fallback if events don't work
+            if (isRunningRef.current && !isCompletedRef.current) {
+                isRunningRef.current = false;
+                isCompletedRef.current = true;
+                setSuggestState("success");
+                onSuccess();
+            }
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to generate suggestions");
-            setSuggestState("error");
+            if (isRunningRef.current) {
+                isRunningRef.current = false;
+                setError(err instanceof Error ? err.message : "Failed to generate suggestions");
+                setSuggestState("error");
+            }
         }
     };
 
     const handleClose = () => {
+        // Don't allow closing while loading
+        if (suggestState === "loading") return;
+
+        // Reset refs
+        isRunningRef.current = false;
+        isCompletedRef.current = false;
+
         setSuggestState("idle");
         setError(null);
         setFeedback("");
         setMaxIncoming("");
         setMaxOutgoing("");
+        setCurrentBatch(0);
+        setTotalBatches(0);
+        setProcessedNodes(0);
+        setLinksCreated(0);
         onOpenChange(false);
     };
 
     const canSuggest = providerId !== null && nodesToAnalyze.length >= 2 && !isLoadingData;
+
+    // Calculate progress percentage
+    const progressPercent = useMemo(() => {
+        if (totalNodes === 0) return 0;
+        return Math.round((processedNodes / totalNodes) * 100);
+    }, [processedNodes, totalNodes]);
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
@@ -320,13 +429,32 @@ export function SuggestLinksDialog({
                     )}
 
                     {suggestState === "loading" && (
-                        <div className="flex flex-col items-center justify-center py-8 gap-4">
-                            <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                            <div className="text-center">
-                                <p className="text-lg font-medium">Analyzing {nodesToAnalyze.length} pages...</p>
-                                <p className="text-sm text-muted-foreground mt-1">
-                                    AI is generating link suggestions
-                                </p>
+                        <div className="space-y-4">
+                            <div className="flex flex-col items-center justify-center py-4 gap-2">
+                                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                                <p className="text-lg font-medium">Analyzing pages...</p>
+                                {totalBatches > 1 && (
+                                    <p className="text-sm text-muted-foreground">
+                                        Batch {currentBatch} of {totalBatches}
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span>Progress</span>
+                                    <span className="text-muted-foreground">
+                                        {processedNodes} / {totalNodes} pages
+                                    </span>
+                                </div>
+                                <Progress value={progressPercent} className="h-2" />
+                            </div>
+
+                            <div className="flex justify-center gap-6 text-sm">
+                                <div className="flex items-center gap-1">
+                                    <Link2 className="h-4 w-4 text-primary" />
+                                    <span>{linksCreated} links suggested</span>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -337,6 +465,9 @@ export function SuggestLinksDialog({
                             <div className="text-center">
                                 <p className="text-lg font-medium">Suggestions generated!</p>
                                 <p className="text-sm text-muted-foreground mt-1">
+                                    {linksCreated} link suggestions created
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-2">
                                     Review the suggested links in the editor
                                 </p>
                             </div>
@@ -369,7 +500,12 @@ export function SuggestLinksDialog({
                             </Button>
                         </>
                     )}
-                    {suggestState === "success" && (
+                    {suggestState === "loading" && (
+                        <p className="text-sm text-muted-foreground">
+                            Please wait, generating suggestions...
+                        </p>
+                    )}
+                    {(suggestState === "success" || suggestState === "error") && (
                         <Button onClick={handleClose}>Close</Button>
                     )}
                 </DialogFooter>

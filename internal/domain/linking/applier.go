@@ -3,6 +3,7 @@ package linking
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/aiusage"
@@ -11,8 +12,10 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/sitemap"
 	"github.com/davidmovas/postulator/internal/domain/sites"
 	"github.com/davidmovas/postulator/internal/infra/ai"
+	"github.com/davidmovas/postulator/internal/infra/events"
 	"github.com/davidmovas/postulator/internal/infra/wp"
 	"github.com/davidmovas/postulator/pkg/logger"
+	"github.com/google/uuid"
 )
 
 type Applier struct {
@@ -22,6 +25,8 @@ type Applier struct {
 	linkRepo       LinkRepository
 	wpClient       wp.Client
 	aiUsageService aiusage.Service
+	eventBus       *events.EventBus
+	emitter        *ApplyEventEmitter
 	logger         *logger.Logger
 }
 
@@ -32,6 +37,7 @@ func NewApplier(
 	linkRepo LinkRepository,
 	wpClient wp.Client,
 	aiUsageService aiusage.Service,
+	eventBus *events.EventBus,
 	logger *logger.Logger,
 ) *Applier {
 	return &Applier{
@@ -41,6 +47,8 @@ func NewApplier(
 		linkRepo:       linkRepo,
 		wpClient:       wpClient,
 		aiUsageService: aiUsageService,
+		eventBus:       eventBus,
+		emitter:        NewApplyEventEmitter(eventBus),
 		logger:         logger.WithScope("linking.applier"),
 	}
 }
@@ -52,7 +60,49 @@ type ApplyConfig struct {
 	LinkIDs    []int64
 }
 
+// calculateConcurrency determines optimal concurrency based on provider's RPM limits
+// Returns a value between 1 and maxConcurrency based on the model's rate limits
+func (a *Applier) calculateConcurrency(provider *entities.Provider) int {
+	modelInfo := ai.GetModelInfo(provider.Type, provider.Model)
+	if modelInfo == nil {
+		return 1 // Default to sequential if model info not found
+	}
+
+	// Calculate concurrency based on RPM
+	// Assume each request takes ~6 seconds on average (10 requests per minute per worker)
+	// We want to stay safely under the limit, so use 80% of theoretical max
+	concurrency := (modelInfo.RPM * 8) / 100 // RPM * 0.8 / 10
+
+	// Clamp between 1 and 10
+	if concurrency < 1 {
+		concurrency = 1
+	}
+	if concurrency > 10 {
+		concurrency = 10
+	}
+
+	return concurrency
+}
+
+// sourceNodeWork represents work to be done for a single source node
+type sourceNodeWork struct {
+	sourceNodeID int64
+	sourceNode   *entities.SitemapNode
+	links        []*PlannedLink
+}
+
+// sourceNodeResult represents the result of processing a single source node
+type sourceNodeResult struct {
+	sourceNodeID int64
+	appliedInfos []*AppliedLinkInfo
+	failedCount  int
+	err          error
+}
+
 func (a *Applier) Apply(ctx context.Context, config ApplyConfig) (*ApplyResult, error) {
+	startTime := time.Now()
+	taskID := uuid.New().String()
+
 	provider, err := a.providerSvc.GetProvider(ctx, config.ProviderID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get provider: %w", err)
@@ -99,60 +149,164 @@ func (a *Applier) Apply(ctx context.Context, config ApplyConfig) (*ApplyResult, 
 		}, nil
 	}
 
-	// Group links by source node
+	// Group links by source node and prepare work items
 	linksBySource := make(map[int64][]*PlannedLink)
 	for _, link := range linksToApply {
 		linksBySource[link.SourceNodeID] = append(linksBySource[link.SourceNodeID], link)
 	}
+
+	// Prepare work items with source node info
+	workItems := make([]sourceNodeWork, 0, len(linksBySource))
+	for sourceNodeID, links := range linksBySource {
+		sourceNode, err := a.sitemapSvc.GetNode(ctx, sourceNodeID)
+		if err != nil {
+			a.logger.ErrorWithErr(err, fmt.Sprintf("Failed to get source node %d", sourceNodeID))
+			// Mark all links for this node as failed
+			errMsg := fmt.Sprintf("failed to get source node: %v", err)
+			for _, link := range links {
+				_ = a.linkRepo.UpdateStatus(ctx, link.ID, LinkStatusFailed, &errMsg)
+			}
+			continue
+		}
+		workItems = append(workItems, sourceNodeWork{
+			sourceNodeID: sourceNodeID,
+			sourceNode:   sourceNode,
+			links:        links,
+		})
+	}
+
+	if len(workItems) == 0 {
+		return &ApplyResult{
+			TotalLinks:   len(linksToApply),
+			AppliedLinks: 0,
+			FailedLinks:  len(linksToApply),
+		}, nil
+	}
+
+	// Emit start event
+	a.emitter.EmitApplyStarted(ctx, taskID, len(linksToApply), len(workItems))
 
 	result := &ApplyResult{
 		TotalLinks: len(linksToApply),
 		Results:    make([]*AppliedLinkInfo, 0),
 	}
 
-	// Process each source node
-	for sourceNodeID, links := range linksBySource {
-		appliedInfos, failedCount, err := a.applyLinksToNode(ctx, aiClient, site, sourceNodeID, links, config.SiteID)
-		if err != nil {
-			a.logger.ErrorWithErr(err, fmt.Sprintf("Failed to apply links to node %d", sourceNodeID))
-			result.FailedLinks += len(links)
-			// Note: applyLinksToNode already marked links as failed
-			continue
+	// Determine concurrency based on provider's rate limits
+	concurrency := a.calculateConcurrency(provider)
+	if concurrency > len(workItems) {
+		concurrency = len(workItems)
+	}
+	a.logger.Infof("Using concurrency %d for %d pages (RPM-based)", concurrency, len(workItems))
+
+	// Process work items with concurrency
+	results := a.processWorkItems(ctx, taskID, workItems, aiClient, site, config.SiteID, concurrency)
+
+	// Aggregate results
+	for _, r := range results {
+		if r.err != nil {
+			result.FailedLinks += r.failedCount
+		} else {
+			result.AppliedLinks += len(r.appliedInfos)
+			result.FailedLinks += r.failedCount
+			result.Results = append(result.Results, r.appliedInfos...)
 		}
-		result.AppliedLinks += len(appliedInfos)
-		result.FailedLinks += failedCount
-		result.Results = append(result.Results, appliedInfos...)
 	}
 
+	// Emit completion event
+	a.emitter.EmitApplyCompleted(ctx, taskID, len(linksToApply), result.AppliedLinks, result.FailedLinks, startTime)
+
 	return result, nil
+}
+
+func (a *Applier) processWorkItems(
+	ctx context.Context,
+	taskID string,
+	workItems []sourceNodeWork,
+	aiClient ai.Client,
+	site *entities.Site,
+	siteID int64,
+	concurrency int,
+) []sourceNodeResult {
+	results := make([]sourceNodeResult, len(workItems))
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	// Semaphore for concurrency limiting
+	sem := make(chan struct{}, concurrency)
+
+	// Progress tracking
+	var processedPages int
+	var totalApplied, totalFailed int
+
+	for i, work := range workItems {
+		wg.Add(1)
+		go func(idx int, w sourceNodeWork) {
+			defer wg.Done()
+
+			// Acquire semaphore
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			// Emit page processing event
+			a.emitter.EmitPageProcessing(ctx, taskID, w.sourceNodeID, w.sourceNode.Title, len(w.links))
+
+			// Process the node
+			appliedInfos, failedCount, err := a.applyLinksToNode(ctx, aiClient, site, w.sourceNode, w.links, siteID)
+
+			// Store result
+			results[idx] = sourceNodeResult{
+				sourceNodeID: w.sourceNodeID,
+				appliedInfos: appliedInfos,
+				failedCount:  failedCount,
+				err:          err,
+			}
+
+			// Update progress and emit events
+			mu.Lock()
+			processedPages++
+			if err != nil {
+				totalFailed += len(w.links)
+				a.emitter.EmitPageFailed(ctx, taskID, w.sourceNodeID, w.sourceNode.Title, err.Error())
+			} else {
+				totalApplied += len(appliedInfos)
+				totalFailed += failedCount
+				a.emitter.EmitPageCompleted(ctx, taskID, w.sourceNodeID, w.sourceNode.Title, len(appliedInfos), failedCount)
+			}
+
+			// Emit progress
+			a.emitter.EmitApplyProgress(ctx, taskID, processedPages, len(workItems), totalApplied, totalFailed, &PageInfo{
+				NodeID: w.sourceNodeID,
+				Title:  w.sourceNode.Title,
+				Path:   w.sourceNode.Path,
+			})
+			mu.Unlock()
+		}(i, work)
+	}
+
+	wg.Wait()
+	return results
 }
 
 func (a *Applier) applyLinksToNode(
 	ctx context.Context,
 	aiClient ai.Client,
 	site *entities.Site,
-	sourceNodeID int64,
+	sourceNode *entities.SitemapNode,
 	links []*PlannedLink,
 	siteID int64,
 ) ([]*AppliedLinkInfo, int, error) {
-	// Get source node to find WordPress page ID
-	sourceNode, err := a.sitemapSvc.GetNode(ctx, sourceNodeID)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get source node: %w", err)
-	}
-
 	if sourceNode.WPPageID == nil {
-		return nil, 0, fmt.Errorf("source node has no WordPress page ID")
+		return nil, len(links), fmt.Errorf("source node has no WordPress page ID")
 	}
 
 	// Get page content from WordPress
 	page, err := a.wpClient.GetPage(ctx, site, *sourceNode.WPPageID)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get WordPress page: %w", err)
+		return nil, len(links), fmt.Errorf("failed to get WordPress page: %w", err)
 	}
 
 	if page.Content == "" {
-		return nil, 0, fmt.Errorf("page has no content")
+		return nil, len(links), fmt.Errorf("page has no content")
 	}
 
 	// Build link targets for AI, tracking which links are valid
@@ -166,7 +320,6 @@ func (a *Applier) applyLinksToNode(
 		targetNode, err := a.sitemapSvc.GetNode(ctx, link.TargetNodeID)
 		if err != nil {
 			a.logger.ErrorWithErr(err, fmt.Sprintf("Failed to get target node %d", link.TargetNodeID))
-			// Mark this specific link as failed
 			errMsg := fmt.Sprintf("failed to get target node: %v", err)
 			_ = a.linkRepo.UpdateStatus(ctx, link.ID, LinkStatusFailed, &errMsg)
 			continue
@@ -186,7 +339,6 @@ func (a *Applier) applyLinksToNode(
 		return nil, len(links), fmt.Errorf("no valid link targets")
 	}
 
-	// Count how many were already marked as failed
 	failedCount := len(links) - len(validLinks)
 
 	// Mark only valid links as applying
@@ -200,10 +352,8 @@ func (a *Applier) applyLinksToNode(
 		linkTargets[i] = vl.target
 	}
 
-	// Use default language (could be extended to get from site settings)
 	language := "English"
 
-	// Call AI to insert links
 	request := &ai.InsertLinksRequest{
 		Content:   page.Content,
 		PageTitle: sourceNode.Title,
@@ -216,7 +366,6 @@ func (a *Applier) applyLinksToNode(
 
 	insertResult, err := aiClient.InsertLinks(ctx, request)
 	if err != nil {
-		// Mark all applying links as failed
 		errMsg := fmt.Sprintf("AI insertion failed: %v", err)
 		for _, vl := range validLinks {
 			_ = a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusFailed, &errMsg)
@@ -235,7 +384,7 @@ func (a *Applier) applyLinksToNode(
 			0,
 			nil,
 			map[string]interface{}{
-				"source_node_id": sourceNodeID,
+				"source_node_id": sourceNode.ID,
 				"links_count":    len(linkTargets),
 				"links_applied":  insertResult.LinksApplied,
 			},
@@ -243,8 +392,7 @@ func (a *Applier) applyLinksToNode(
 	}
 
 	if insertResult.LinksApplied == 0 {
-		a.logger.Warnf("AI did not insert any links for node %d", sourceNodeID)
-		// Revert links back to approved status (they weren't applied but aren't failed)
+		a.logger.Warnf("AI did not insert any links for node %d", sourceNode.ID)
 		for _, vl := range validLinks {
 			_ = a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusApproved, nil)
 		}
@@ -254,7 +402,6 @@ func (a *Applier) applyLinksToNode(
 	// Update WordPress page with new content
 	page.Content = insertResult.Content
 	if err := a.wpClient.UpdatePage(ctx, site, page); err != nil {
-		// Mark all as failed since we couldn't save to WordPress
 		errMsg := fmt.Sprintf("failed to update WordPress: %v", err)
 		for _, vl := range validLinks {
 			_ = a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusFailed, &errMsg)
@@ -264,10 +411,6 @@ func (a *Applier) applyLinksToNode(
 
 	a.logger.Infof("Successfully applied %d/%d links to page %s", insertResult.LinksApplied, len(validLinks), sourceNode.Title)
 
-	// Mark links as applied
-	// Note: AI returns count of applied links but not which specific ones.
-	// We mark the first N links as applied. This is a best-effort approach.
-	// In practice, if AI applies 2 out of 3 links, we assume it's the first 2.
 	now := time.Now()
 	appliedCount := insertResult.LinksApplied
 	if appliedCount > len(validLinks) {
@@ -282,7 +425,6 @@ func (a *Applier) applyLinksToNode(
 			vl.link.AppliedAt = &now
 			_ = a.linkRepo.Update(ctx, vl.link)
 
-			// Build applied link info
 			anchor := ""
 			if vl.link.AnchorText != nil {
 				anchor = *vl.link.AnchorText
@@ -292,15 +434,9 @@ func (a *Applier) applyLinksToNode(
 				AnchorText: anchor,
 			})
 		} else {
-			// Links that weren't applied go back to approved
 			_ = a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusApproved, nil)
 		}
 	}
 
-	// Count non-applied valid links as not failed (they went back to approved)
-	notAppliedCount := len(validLinks) - appliedCount
-	_ = notAppliedCount // Not counted as failed, just not applied this time
-
 	return appliedInfos, failedCount, nil
 }
-

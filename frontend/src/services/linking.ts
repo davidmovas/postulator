@@ -27,6 +27,7 @@ import {
     UpdateLinkInput,
     SuggestLinksInput,
     ApplyLinksInput,
+    ApplyLinksResult,
     mapLinkPlan,
     mapPlannedLink,
     mapLinkGraph,
@@ -147,13 +148,19 @@ export const linkingService = {
     },
 
     // Apply links to WordPress
-    async applyLinks(input: ApplyLinksInput): Promise<void> {
+    async applyLinks(input: ApplyLinksInput): Promise<ApplyLinksResult> {
         const payload = new dto.ApplyLinksRequest({
             planId: input.planId,
             linkIds: input.linkIds,
+            providerId: input.providerId,
         });
         const response = await ApplyLinks(payload);
-        unwrapResponse<boolean>(response);
+        const data = unwrapResponse<dto.ApplyLinksResult>(response);
+        return {
+            totalLinks: data.totalLinks,
+            appliedLinks: data.appliedLinks,
+            failedLinks: data.failedLinks,
+        };
     },
 
     // Graph visualization

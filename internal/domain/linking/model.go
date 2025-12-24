@@ -113,6 +113,7 @@ type Service interface {
 	GetLinksByNode(ctx context.Context, planID int64, nodeID int64) ([]*PlannedLink, error)
 	ApproveLink(ctx context.Context, linkID int64) error
 	RejectLink(ctx context.Context, linkID int64) error
+	ApproveAndApplyLink(ctx context.Context, linkID int64) error
 
 	SuggestLinks(ctx context.Context, config SuggestLinksConfig) error
 	ApplyLinks(ctx context.Context, planID int64, linkIDs []int64, providerID int64) (*ApplyResult, error)

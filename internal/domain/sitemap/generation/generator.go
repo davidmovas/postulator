@@ -93,8 +93,8 @@ func (g *Generator) Generate(ctx context.Context, req GenerateRequest) (*Generat
 		return nil, fmt.Errorf("failed to build prompts: %w", err)
 	}
 
-	g.logger.Infof("Generating content for node %d (%s) with provider %s/%s",
-		req.Node.ID, req.Node.Title, aiClient.GetProviderName(), aiClient.GetModelName())
+	g.logger.Infof("Generating content for node %d (%s) with provider %s/%s, links=%d",
+		req.Node.ID, req.Node.Title, aiClient.GetProviderName(), aiClient.GetModelName(), len(req.LinkTargets))
 
 	articleResult, err := aiClient.GenerateArticle(ctx, systemPrompt, userPrompt)
 	durationMs := time.Since(startTime).Milliseconds()

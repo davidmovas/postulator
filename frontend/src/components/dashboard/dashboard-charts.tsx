@@ -90,9 +90,9 @@ export function DashboardCharts() {
             </div>
 
             {isLoading && !hasData && (
-                <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-                    {[...Array(6)].map((_, i) => (
-                        <Card key={i}>
+                <div className="flex flex-wrap gap-4">
+                    {[...Array(5)].map((_, i) => (
+                        <Card key={i} className="flex-1 min-w-[150px]">
                             <CardContent className="pt-4 pb-4">
                                 <div className="h-16 bg-muted/30 rounded animate-pulse" />
                             </CardContent>
@@ -102,8 +102,8 @@ export function DashboardCharts() {
             )}
 
             {hasData && (
-                <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-                    <Card className="border-l-4 border-l-green-500">
+                <div className="flex flex-wrap gap-4">
+                    <Card className="border-l-4 border-l-green-500 flex-1 min-w-[150px]">
                         <CardContent className="pt-4 pb-4">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 rounded-lg bg-green-500/10">
@@ -120,7 +120,7 @@ export function DashboardCharts() {
                     </Card>
 
                     {totals.failed > 0 && (
-                        <Card className="border-l-4 border-l-red-500">
+                        <Card className="border-l-4 border-l-red-500 flex-1 min-w-[150px]">
                             <CardContent className="pt-4 pb-4">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 rounded-lg bg-red-500/10">
@@ -137,7 +137,7 @@ export function DashboardCharts() {
                         </Card>
                     )}
 
-                    <Card className="border-l-4 border-l-blue-500">
+                    <Card className="border-l-4 border-l-blue-500 flex-1 min-w-[150px]">
                         <CardContent className="pt-4 pb-4">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 rounded-lg bg-blue-500/10">
@@ -153,7 +153,7 @@ export function DashboardCharts() {
                         </CardContent>
                     </Card>
 
-                    <Card className="border-l-4 border-l-purple-500">
+                    <Card className="border-l-4 border-l-purple-500 flex-1 min-w-[150px]">
                         <CardContent className="pt-4 pb-4">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 rounded-lg bg-purple-500/10">
@@ -169,7 +169,7 @@ export function DashboardCharts() {
                         </CardContent>
                     </Card>
 
-                    <Card className="border-l-4 border-l-cyan-500">
+                    <Card className="border-l-4 border-l-cyan-500 flex-1 min-w-[150px]">
                         <CardContent className="pt-4 pb-4">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 rounded-lg bg-cyan-500/10">
@@ -185,7 +185,7 @@ export function DashboardCharts() {
                         </CardContent>
                     </Card>
 
-                    <Card className="border-l-4 border-l-orange-500">
+                    <Card className="border-l-4 border-l-orange-500 flex-1 min-w-[150px]">
                         <CardContent className="pt-4 pb-4">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 rounded-lg bg-orange-500/10">

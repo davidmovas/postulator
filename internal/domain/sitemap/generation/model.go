@@ -112,6 +112,7 @@ type ContentSettings struct {
 
 // LinkTarget represents a target page for internal linking during content generation
 type LinkTarget struct {
+	LinkID       int64   // ID of the PlannedLink in the linking plan
 	TargetNodeID int64
 	TargetTitle  string
 	TargetPath   string

@@ -1,0 +1,639 @@
+{
+  "nodes": [
+    {
+      "path": "/sleep",
+      "title": "Sleep & Rest",
+      "keywords": ["sleep", "rest", "recovery", "sleeping", "bedtime", "night rest", "restful sleep", "sleep health", "quality sleep", "healthy sleep", "sleep wellness", "restorative sleep"]
+    },
+    {
+      "path": "/sleep/science",
+      "title": "Sleep Science",
+      "keywords": ["sleep science", "circadian rhythm", "sleep cycles", "sleep research", "chronobiology", "sleep studies", "sleep physiology", "neuroscience of sleep"]
+    },
+    {
+      "path": "/sleep/science/circadian-rhythm",
+      "title": "Circadian Rhythm",
+      "keywords": ["circadian rhythm", "body clock", "sleep-wake cycle", "internal clock", "biological rhythm", "24-hour cycle", "circadian system", "master clock", "SCN", "suprachiasmatic nucleus", "chronotype", "circadian disruption"]
+    },
+    {
+      "path": "/sleep/science/circadian-rhythm/light-exposure",
+      "title": "Light Exposure & Sleep",
+      "keywords": ["light exposure", "blue light", "melatonin", "photoreceptors", "light therapy", "lux", "light sensitivity"]
+    },
+    {
+      "path": "/sleep/science/circadian-rhythm/light-exposure/morning-sunlight",
+      "title": "Morning Sunlight Benefits",
+      "keywords": []
+    },
+    {
+      "path": "/sleep/science/circadian-rhythm/light-exposure/blue-light-blocking",
+      "title": "Blue Light Blocking",
+      "keywords": ["blue light blocking", "blue light glasses", "screen time", "evening routine", "blue light filter", "night mode", "f.lux", "digital wellness", "eye strain", "LED screens", "blue wavelength", "melanopsin", "phone before bed", "computer glasses", "blue light apps"]
+    },
+    {
+      "path": "/sleep/science/circadian-rhythm/chronotypes",
+      "title": "Chronotypes",
+      "keywords": ["chronotype", "morning person", "night owl", "early bird", "lark", "wolf chronotype", "dolphin chronotype", "lion chronotype", "bear chronotype"]
+    },
+    {
+      "path": "/sleep/science/sleep-stages",
+      "title": "Sleep Stages",
+      "keywords": ["sleep stages", "REM", "deep sleep", "NREM", "sleep architecture"]
+    },
+    {
+      "path": "/sleep/science/sleep-stages/rem-sleep",
+      "title": "REM Sleep",
+      "keywords": ["REM sleep", "rapid eye movement", "dreaming", "memory consolidation", "REM cycle", "paradoxical sleep", "dream sleep", "REM behavior disorder", "REM latency", "REM rebound", "vivid dreams", "lucid dreaming", "REM paralysis", "brain activity during REM", "emotional processing", "learning during sleep", "REM percentage", "REM deprivation"]
+    },
+    {
+      "path": "/sleep/science/sleep-stages/deep-sleep",
+      "title": "Deep Sleep",
+      "keywords": ["deep sleep", "slow wave sleep", "physical recovery", "N3 stage", "delta waves"]
+    },
+    {
+      "path": "/sleep/science/sleep-stages/light-sleep",
+      "title": "Light Sleep",
+      "keywords": []
+    },
+    {
+      "path": "/sleep/disorders",
+      "title": "Sleep Disorders",
+      "keywords": ["sleep disorders", "insomnia", "sleep problems", "sleep conditions", "dyssomnia", "parasomnia", "sleep medicine", "sleep clinic", "polysomnography", "sleep specialist", "sleep doctor", "somnologist"]
+    },
+    {
+      "path": "/sleep/disorders/insomnia",
+      "title": "Insomnia",
+      "keywords": ["insomnia", "sleeplessness", "cant sleep", "trouble sleeping"]
+    },
+    {
+      "path": "/sleep/disorders/insomnia/acute-insomnia",
+      "title": "Acute Insomnia",
+      "keywords": ["acute insomnia", "short-term insomnia", "temporary sleeplessness", "stress insomnia", "adjustment insomnia"]
+    },
+    {
+      "path": "/sleep/disorders/insomnia/chronic-insomnia",
+      "title": "Chronic Insomnia",
+      "keywords": []
+    },
+    {
+      "path": "/sleep/disorders/sleep-apnea",
+      "title": "Sleep Apnea",
+      "keywords": ["sleep apnea", "snoring", "breathing", "CPAP", "obstructive sleep apnea", "OSA", "central sleep apnea", "apnea-hypopnea index", "AHI"]
+    },
+    {
+      "path": "/sleep/optimization",
+      "title": "Sleep Optimization",
+      "keywords": ["sleep optimization", "better sleep", "sleep quality", "sleep improvement", "sleep hacks", "sleep tips", "optimize rest", "sleep performance", "biohacking sleep"]
+    },
+    {
+      "path": "/nutrition",
+      "title": "Nutrition & Diet",
+      "keywords": ["nutrition", "diet", "healthy eating", "food", "nutrients", "dietary", "eating habits", "nutritional science", "dietetics", "food science", "nourishment", "balanced diet", "wholesome food", "nutritional health", "dietary guidelines", "food pyramid", "myplate", "eating well", "food choices", "nutritional value", "nutrient-dense", "whole foods", "clean eating"]
+    },
+    {
+      "path": "/nutrition/macronutrients",
+      "title": "Macronutrients",
+      "keywords": ["macronutrients", "macros", "calories", "energy nutrients"]
+    },
+    {
+      "path": "/nutrition/macronutrients/protein",
+      "title": "Protein",
+      "keywords": ["protein", "amino acids", "muscle building", "protein synthesis", "complete protein", "incomplete protein", "essential amino acids", "BCAAs", "leucine", "protein intake", "high protein", "protein diet"]
+    },
+    {
+      "path": "/nutrition/macronutrients/protein/sources",
+      "title": "Protein Sources",
+      "keywords": ["protein sources", "protein foods", "high protein foods"]
+    },
+    {
+      "path": "/nutrition/macronutrients/protein/sources/animal-protein",
+      "title": "Animal Protein",
+      "keywords": ["animal protein", "meat", "eggs", "dairy protein", "complete protein sources", "animal-based protein", "meat protein", "egg protein", "whey", "casein"]
+    },
+    {
+      "path": "/nutrition/macronutrients/protein/sources/animal-protein/poultry",
+      "title": "Poultry Protein",
+      "keywords": []
+    },
+    {
+      "path": "/nutrition/macronutrients/protein/sources/animal-protein/red-meat",
+      "title": "Red Meat",
+      "keywords": ["red meat", "beef", "lamb", "pork", "steak", "ground beef", "iron", "B12", "heme iron", "saturated fat", "grass-fed", "grain-fed", "marbling", "lean cuts"]
+    },
+    {
+      "path": "/nutrition/macronutrients/protein/sources/animal-protein/fish",
+      "title": "Fish & Seafood",
+      "keywords": ["fish", "seafood", "omega-3", "salmon", "tuna", "shellfish", "fatty fish", "white fish", "fish oil", "DHA", "EPA", "mercury", "sustainable seafood"]
+    },
+    {
+      "path": "/nutrition/macronutrients/protein/sources/animal-protein/eggs",
+      "title": "Eggs",
+      "keywords": ["eggs", "egg protein", "egg whites", "whole eggs", "yolk", "choline", "breakfast protein", "cage-free", "pasture-raised", "omega-3 eggs"]
+    },
+    {
+      "path": "/nutrition/macronutrients/protein/sources/plant-protein",
+      "title": "Plant Protein",
+      "keywords": ["plant protein", "vegan protein", "vegetarian protein", "plant-based"]
+    },
+    {
+      "path": "/nutrition/macronutrients/protein/sources/plant-protein/legumes",
+      "title": "Legumes",
+      "keywords": ["legumes", "beans", "lentils", "chickpeas", "black beans", "kidney beans", "pinto beans", "split peas", "dal", "fiber", "plant fiber", "resistant starch"]
+    },
+    {
+      "path": "/nutrition/macronutrients/protein/sources/plant-protein/soy",
+      "title": "Soy Products",
+      "keywords": []
+    },
+    {
+      "path": "/nutrition/macronutrients/protein/sources/plant-protein/nuts-seeds",
+      "title": "Nuts & Seeds",
+      "keywords": ["nuts", "seeds", "almonds", "walnuts", "cashews", "peanuts", "chia seeds", "flaxseeds", "hemp seeds", "pumpkin seeds", "sunflower seeds", "nut butter", "seed butter", "healthy fats", "snacking", "trail mix", "raw nuts", "roasted nuts"]
+    },
+    {
+      "path": "/nutrition/macronutrients/protein/supplements",
+      "title": "Protein Supplements",
+      "keywords": ["protein supplements", "protein powder", "whey protein", "casein protein", "plant protein powder", "protein shakes", "post-workout", "muscle recovery", "protein bars"]
+    },
+    {
+      "path": "/nutrition/macronutrients/protein/supplements/whey",
+      "title": "Whey Protein",
+      "keywords": ["whey protein", "whey isolate", "whey concentrate", "whey hydrolysate", "fast-digesting protein", "milk protein", "lactose", "muscle building supplement"]
+    },
+    {
+      "path": "/nutrition/macronutrients/protein/supplements/casein",
+      "title": "Casein Protein",
+      "keywords": []
+    },
+    {
+      "path": "/nutrition/macronutrients/protein/supplements/plant-based",
+      "title": "Plant-Based Protein Powder",
+      "keywords": ["plant protein powder", "pea protein", "rice protein", "hemp protein", "vegan protein powder", "dairy-free protein", "soy protein isolate", "mixed plant protein"]
+    },
+    {
+      "path": "/nutrition/macronutrients/carbohydrates",
+      "title": "Carbohydrates",
+      "keywords": ["carbohydrates", "carbs", "energy", "glucose", "sugar", "starch", "fiber", "carb intake", "low carb", "high carb", "carb cycling"]
+    },
+    {
+      "path": "/nutrition/macronutrients/carbohydrates/simple-carbs",
+      "title": "Simple Carbohydrates",
+      "keywords": ["simple carbs", "sugar", "glucose", "fructose", "sucrose", "fast carbs", "quick energy", "blood sugar spike", "refined sugar", "added sugar", "natural sugar"]
+    },
+    {
+      "path": "/nutrition/macronutrients/carbohydrates/complex-carbs",
+      "title": "Complex Carbohydrates",
+      "keywords": ["complex carbs", "whole grains", "fiber", "slow carbs", "sustained energy"]
+    },
+    {
+      "path": "/nutrition/macronutrients/carbohydrates/complex-carbs/whole-grains",
+      "title": "Whole Grains",
+      "keywords": ["whole grains", "oats", "brown rice", "quinoa", "barley", "whole wheat", "bulgur", "farro", "millet", "buckwheat", "amaranth", "teff", "sorghum", "whole grain bread", "whole grain pasta", "ancient grains"]
+    },
+    {
+      "path": "/nutrition/macronutrients/carbohydrates/complex-carbs/vegetables",
+      "title": "Starchy Vegetables",
+      "keywords": []
+    },
+    {
+      "path": "/nutrition/macronutrients/carbohydrates/fiber",
+      "title": "Dietary Fiber",
+      "keywords": ["fiber", "dietary fiber", "roughage", "soluble fiber", "insoluble fiber", "prebiotic fiber", "gut health", "digestion", "bowel health", "fiber supplements", "psyllium", "inulin", "fiber intake", "high fiber foods", "fiber benefits"]
+    },
+    {
+      "path": "/nutrition/macronutrients/carbohydrates/glycemic-index",
+      "title": "Glycemic Index",
+      "keywords": ["glycemic index", "GI", "blood sugar", "glycemic load", "low GI", "high GI"]
+    },
+    {
+      "path": "/nutrition/macronutrients/fats",
+      "title": "Dietary Fats",
+      "keywords": ["fats", "dietary fats", "lipids", "fatty acids", "fat intake", "healthy fats", "fat consumption"]
+    },
+    {
+      "path": "/nutrition/macronutrients/fats/unsaturated",
+      "title": "Unsaturated Fats",
+      "keywords": ["unsaturated fats", "healthy fats", "monounsaturated", "polyunsaturated", "MUFA", "PUFA", "liquid fats", "plant fats", "heart healthy fats"]
+    },
+    {
+      "path": "/nutrition/macronutrients/fats/unsaturated/omega-3",
+      "title": "Omega-3 Fatty Acids",
+      "keywords": ["omega-3", "fish oil", "DHA", "EPA", "ALA", "fatty fish", "omega-3 supplements", "brain health", "anti-inflammatory", "heart health", "omega-3 benefits", "omega-3 sources", "algae oil", "krill oil", "fish oil capsules", "omega-3 deficiency", "omega ratio", "omega balance"]
+    },
+    {
+      "path": "/nutrition/macronutrients/fats/unsaturated/omega-6",
+      "title": "Omega-6 Fatty Acids",
+      "keywords": ["omega-6", "linoleic acid", "vegetable oils", "omega ratio"]
+    },
+    {
+      "path": "/nutrition/macronutrients/fats/saturated",
+      "title": "Saturated Fats",
+      "keywords": []
+    },
+    {
+      "path": "/nutrition/macronutrients/fats/trans-fats",
+      "title": "Trans Fats",
+      "keywords": ["trans fats", "hydrogenated oils", "partially hydrogenated", "artificial trans fats", "trans fatty acids", "margarine", "shortening", "processed foods", "heart disease risk", "banned fats", "industrial trans fats"]
+    },
+    {
+      "path": "/nutrition/micronutrients",
+      "title": "Micronutrients",
+      "keywords": ["micronutrients", "vitamins", "minerals", "essential nutrients", "trace elements", "micronutrient deficiency"]
+    },
+    {
+      "path": "/nutrition/micronutrients/vitamins",
+      "title": "Vitamins",
+      "keywords": ["vitamins", "essential vitamins", "vitamin supplements", "multivitamins", "fat-soluble vitamins", "water-soluble vitamins", "vitamin deficiency", "hypervitaminosis"]
+    },
+    {
+      "path": "/nutrition/micronutrients/vitamins/vitamin-d",
+      "title": "Vitamin D",
+      "keywords": ["vitamin D", "sunshine vitamin", "bone health", "D3", "cholecalciferol", "vitamin D deficiency", "vitamin D supplements", "calcium absorption", "immune function", "sun exposure", "vitamin D foods", "fortified foods", "25-hydroxyvitamin D", "vitamin D testing"]
+    },
+    {
+      "path": "/nutrition/micronutrients/vitamins/b-vitamins",
+      "title": "B Vitamins Complex",
+      "keywords": ["B vitamins", "B complex", "B12", "B6", "folate", "thiamine", "riboflavin", "niacin", "biotin", "pantothenic acid", "energy metabolism", "nervous system", "red blood cells"]
+    },
+    {
+      "path": "/nutrition/micronutrients/vitamins/vitamin-c",
+      "title": "Vitamin C",
+      "keywords": []
+    },
+    {
+      "path": "/nutrition/micronutrients/minerals",
+      "title": "Minerals",
+      "keywords": ["minerals", "essential minerals", "trace minerals", "macro minerals", "electrolytes", "mineral supplements"]
+    },
+    {
+      "path": "/nutrition/micronutrients/minerals/iron",
+      "title": "Iron",
+      "keywords": ["iron", "heme iron", "non-heme iron", "iron deficiency", "anemia", "ferritin", "iron absorption", "iron supplements", "iron-rich foods", "hemoglobin", "red blood cells", "iron overload"]
+    },
+    {
+      "path": "/nutrition/micronutrients/minerals/magnesium",
+      "title": "Magnesium",
+      "keywords": ["magnesium", "muscle function", "nerve function", "magnesium deficiency", "magnesium supplements", "magnesium glycinate", "magnesium citrate", "magnesium oxide", "relaxation mineral", "sleep mineral", "magnesium foods"]
+    },
+    {
+      "path": "/nutrition/micronutrients/minerals/zinc",
+      "title": "Zinc",
+      "keywords": []
+    },
+    {
+      "path": "/nutrition/diets",
+      "title": "Diet Types",
+      "keywords": ["diets", "diet types", "eating patterns", "dietary approaches", "weight loss diets", "health diets", "lifestyle diets"]
+    },
+    {
+      "path": "/nutrition/diets/keto",
+      "title": "Ketogenic Diet",
+      "keywords": ["keto", "ketogenic", "low carb", "ketosis", "keto diet", "LCHF", "ketones", "fat adaptation", "keto flu", "net carbs", "keto macros", "keto recipes", "keto snacks", "keto breakfast", "keto desserts", "lazy keto", "strict keto", "dirty keto", "clean keto", "cyclical keto", "targeted keto"]
+    },
+    {
+      "path": "/nutrition/diets/mediterranean",
+      "title": "Mediterranean Diet",
+      "keywords": ["mediterranean diet", "olive oil", "heart healthy", "longevity diet", "blue zones", "mediterranean foods"]
+    },
+    {
+      "path": "/nutrition/diets/vegetarian",
+      "title": "Vegetarian Diet",
+      "keywords": ["vegetarian", "plant-based", "meatless", "lacto-vegetarian", "ovo-vegetarian", "lacto-ovo vegetarian", "pescatarian"]
+    },
+    {
+      "path": "/nutrition/diets/vegan",
+      "title": "Vegan Diet",
+      "keywords": ["vegan", "plant-based", "animal-free", "vegan lifestyle", "vegan nutrition", "B12 vegan", "vegan protein", "vegan calcium", "whole food plant based", "WFPB"]
+    },
+    {
+      "path": "/nutrition/hydration",
+      "title": "Hydration",
+      "keywords": ["hydration", "water intake", "drinking water", "fluid intake", "dehydration", "electrolytes", "water consumption", "daily water", "hydration tips"]
+    },
+    {
+      "path": "/sport",
+      "title": "Sports & Fitness",
+      "keywords": ["sport", "sports", "fitness", "exercise", "physical activity", "training", "workout", "athletics", "active lifestyle", "physical fitness", "health and fitness", "getting fit", "staying active", "exercise routine", "fitness journey", "fitness goals", "athletic performance", "sports training", "fitness lifestyle"]
+    },
+    {
+      "path": "/sport/running",
+      "title": "Running",
+      "keywords": ["running", "jogging", "cardio", "runner", "run training", "running shoes", "running form", "running technique"]
+    },
+    {
+      "path": "/sport/running/beginner",
+      "title": "Running for Beginners",
+      "keywords": ["beginner running", "couch to 5k", "C25K", "start running", "new runner", "first run", "learn to run", "running basics", "jogging for beginners"]
+    },
+    {
+      "path": "/sport/running/beginner/first-5k",
+      "title": "Your First 5K",
+      "keywords": ["first 5k", "5k training", "5k race", "5 kilometer", "beginner 5k plan", "5k goal"]
+    },
+    {
+      "path": "/sport/running/beginner/gear",
+      "title": "Beginner Running Gear",
+      "keywords": []
+    },
+    {
+      "path": "/sport/running/marathon",
+      "title": "Marathon Training",
+      "keywords": ["marathon", "marathon training", "26.2 miles", "42.195km", "marathon plan", "long distance running", "marathon preparation", "race day", "marathon nutrition", "hitting the wall", "marathon pace", "BQ", "Boston qualifier", "marathon PR", "marathon recovery", "taper", "carb loading"]
+    },
+    {
+      "path": "/sport/running/marathon/training-plans",
+      "title": "Marathon Training Plans",
+      "keywords": ["marathon training plan", "16 week marathon", "18 week marathon", "20 week marathon", "beginner marathon plan", "advanced marathon plan", "Hanson method", "Pfitzinger", "Hal Higdon", "Jack Daniels running", "80/20 running"]
+    },
+    {
+      "path": "/sport/running/marathon/training-plans/beginner-marathon",
+      "title": "Beginner Marathon Plan",
+      "keywords": []
+    },
+    {
+      "path": "/sport/running/marathon/training-plans/advanced-marathon",
+      "title": "Advanced Marathon Training",
+      "keywords": ["advanced marathon", "sub 3 marathon", "sub 4 marathon", "elite marathon training", "high mileage", "marathon speedwork", "tempo runs", "long run variations", "marathon specific training", "peak week", "race simulation"]
+    },
+    {
+      "path": "/sport/running/marathon/nutrition",
+      "title": "Marathon Nutrition",
+      "keywords": ["marathon nutrition", "race fuel", "gels", "energy gels", "sports drinks", "electrolytes", "carb loading", "pre-race meal", "during race nutrition", "hydration strategy", "salt tablets", "bonking prevention"]
+    },
+    {
+      "path": "/sport/running/marathon/recovery",
+      "title": "Marathon Recovery",
+      "keywords": ["marathon recovery", "post-marathon", "recovery timeline", "reverse taper"]
+    },
+    {
+      "path": "/sport/running/trail",
+      "title": "Trail Running",
+      "keywords": ["trail running", "off-road running", "mountain running", "trail shoes", "technical terrain", "elevation gain", "ultra trail", "single track", "trail racing", "fell running", "skyrunning"]
+    },
+    {
+      "path": "/sport/running/trail/gear",
+      "title": "Trail Running Gear",
+      "keywords": ["trail running shoes", "trail gear", "hydration vest", "running pack", "trekking poles", "gaiters", "headlamp", "trail essentials", "mandatory gear"]
+    },
+    {
+      "path": "/sport/running/trail/ultramarathon",
+      "title": "Ultramarathon",
+      "keywords": ["ultramarathon", "ultra running", "50k", "100k", "100 miles", "ultra training", "ultra nutrition", "aid stations", "crew", "pacer", "DNF", "cutoff times", "ultra mindset", "overnight running", "sleep deprivation running", "UTMB", "Western States", "Hardrock"]
+    },
+    {
+      "path": "/sport/running/trail/ultramarathon/training",
+      "title": "Ultra Training",
+      "keywords": []
+    },
+    {
+      "path": "/sport/running/trail/ultramarathon/nutrition",
+      "title": "Ultra Nutrition Strategy",
+      "keywords": ["ultra nutrition", "real food running", "stomach issues", "nausea running", "calorie deficit ultra", "fat adaptation ultra", "aid station strategy", "drop bags", "crew nutrition"]
+    },
+    {
+      "path": "/sport/running/speedwork",
+      "title": "Speed Training",
+      "keywords": ["speedwork", "interval training", "track workout", "tempo run", "fartlek", "hill repeats", "strides", "VO2max intervals", "threshold training", "speed development"]
+    },
+    {
+      "path": "/sport/running/injury-prevention",
+      "title": "Running Injury Prevention",
+      "keywords": ["running injuries", "injury prevention", "runners knee", "IT band", "shin splints", "plantar fasciitis", "achilles tendinitis", "stress fractures", "overuse injuries", "prehab", "running form", "recovery", "rest days", "cross training"]
+    },
+    {
+      "path": "/sport/strength-training",
+      "title": "Strength Training",
+      "keywords": ["strength training", "weight training", "resistance training", "weightlifting", "building muscle", "hypertrophy", "strength gains", "lifting weights", "barbell training", "dumbbell training", "gym workout"]
+    },
+    {
+      "path": "/sport/strength-training/exercises",
+      "title": "Strength Exercises",
+      "keywords": ["strength exercises", "compound movements", "isolation exercises", "exercise library", "proper form", "exercise technique"]
+    },
+    {
+      "path": "/sport/strength-training/exercises/compound",
+      "title": "Compound Exercises",
+      "keywords": ["compound exercises", "multi-joint", "big lifts", "squat", "deadlift", "bench press", "overhead press", "barbell row", "pull-ups", "dips", "compound movements", "functional strength"]
+    },
+    {
+      "path": "/sport/strength-training/exercises/compound/squat",
+      "title": "Squat",
+      "keywords": ["squat", "back squat", "front squat", "squat form", "squat depth", "squat variations", "leg press alternative", "barbell squat", "squat rack", "squat shoes", "high bar", "low bar", "goblet squat", "box squat", "pause squat", "tempo squat", "squat mobility"]
+    },
+    {
+      "path": "/sport/strength-training/exercises/compound/squat/variations",
+      "title": "Squat Variations",
+      "keywords": []
+    },
+    {
+      "path": "/sport/strength-training/exercises/compound/squat/mobility",
+      "title": "Squat Mobility",
+      "keywords": ["squat mobility", "ankle mobility", "hip mobility", "thoracic mobility", "squat depth issues", "mobility drills", "squat stretches", "third world squat", "deep squat", "asian squat"]
+    },
+    {
+      "path": "/sport/strength-training/exercises/compound/deadlift",
+      "title": "Deadlift",
+      "keywords": ["deadlift", "conventional deadlift", "sumo deadlift", "deadlift form", "hip hinge", "posterior chain", "back strength", "grip strength", "deadlift variations", "trap bar deadlift", "Romanian deadlift", "RDL", "stiff leg deadlift", "deficit deadlift", "block pulls", "deadlift accessories"]
+    },
+    {
+      "path": "/sport/strength-training/exercises/compound/deadlift/technique",
+      "title": "Deadlift Technique",
+      "keywords": ["deadlift technique", "deadlift setup", "deadlift cues", "pulling slack", "leg drive", "lockout", "hip hinge pattern", "neutral spine", "bracing", "grip types", "mixed grip", "hook grip", "straps"]
+    },
+    {
+      "path": "/sport/strength-training/exercises/compound/bench-press",
+      "title": "Bench Press",
+      "keywords": ["bench press", "chest press", "barbell bench", "bench form", "chest development", "pressing strength", "bench arch", "leg drive bench", "pause bench", "touch and go", "bench grip width", "bench press variations"]
+    },
+    {
+      "path": "/sport/strength-training/exercises/isolation",
+      "title": "Isolation Exercises",
+      "keywords": ["isolation exercises", "single joint", "bicep curls", "tricep extensions", "leg curls", "leg extensions", "lateral raises", "flyes", "concentration exercises", "mind-muscle connection", "pump", "accessory work"]
+    },
+    {
+      "path": "/sport/strength-training/programs",
+      "title": "Strength Programs",
+      "keywords": ["strength programs", "workout programs", "training programs", "lifting programs", "periodization", "progressive overload", "training split"]
+    },
+    {
+      "path": "/sport/strength-training/programs/beginner",
+      "title": "Beginner Strength Programs",
+      "keywords": ["beginner program", "Starting Strength", "StrongLifts 5x5", "Greyskull LP", "beginner gains", "linear progression", "novice program", "learning the lifts", "3x per week", "full body beginner"]
+    },
+    {
+      "path": "/sport/strength-training/programs/intermediate",
+      "title": "Intermediate Programs",
+      "keywords": []
+    },
+    {
+      "path": "/sport/strength-training/programs/advanced",
+      "title": "Advanced Strength Programs",
+      "keywords": ["advanced program", "conjugate method", "Westside", "block periodization", "daily undulating periodization", "DUP", "peaking", "competition prep", "advanced lifter", "strength plateau", "Sheiko", "RTS", "reactive training"]
+    },
+    {
+      "path": "/sport/strength-training/programs/powerlifting",
+      "title": "Powerlifting Programs",
+      "keywords": ["powerlifting", "powerlifting program", "SBD", "squat bench deadlift", "meet prep", "powerlifting meet", "IPF", "USAPL", "weight classes", "wilks score", "dots", "powerlifting total", "equipped powerlifting", "raw powerlifting", "classic powerlifting"]
+    },
+    {
+      "path": "/sport/strength-training/programs/powerlifting/meet-prep",
+      "title": "Powerlifting Meet Prep",
+      "keywords": ["meet prep", "peaking program", "competition preparation", "water cut", "weight cut", "attempts selection", "opener", "second attempt", "third attempt", "commands", "weigh-in", "24 hour weigh-in", "2 hour weigh-in"]
+    },
+    {
+      "path": "/sport/strength-training/programs/bodybuilding",
+      "title": "Bodybuilding Programs",
+      "keywords": ["bodybuilding", "hypertrophy training", "muscle building", "bro split", "PPL", "push pull legs", "upper lower", "Arnold split", "volume training", "time under tension", "muscle growth", "aesthetics", "symmetry", "proportions"]
+    },
+    {
+      "path": "/sport/cycling",
+      "title": "Cycling",
+      "keywords": ["cycling", "biking", "bicycle", "bike training", "cyclist", "road cycling", "cycling fitness"]
+    },
+    {
+      "path": "/sport/cycling/road",
+      "title": "Road Cycling",
+      "keywords": ["road cycling", "road bike", "road racing", "sportive", "gran fondo", "group ride", "peloton", "drafting", "paceline", "climbing", "descending", "criterium", "road race", "time trial", "cycling kit", "clipless pedals"]
+    },
+    {
+      "path": "/sport/cycling/road/training",
+      "title": "Road Cycling Training",
+      "keywords": ["cycling training", "FTP", "functional threshold power", "power zones", "heart rate training", "base miles", "sweet spot training", "interval training cycling", "indoor training", "Zwift", "TrainerRoad", "cycling coach", "training peaks"]
+    },
+    {
+      "path": "/sport/cycling/road/training/power-training",
+      "title": "Power-Based Training",
+      "keywords": []
+    },
+    {
+      "path": "/sport/cycling/road/training/endurance",
+      "title": "Endurance Cycling",
+      "keywords": ["endurance cycling", "long rides", "base training", "aerobic base", "zone 2 training", "fat adaptation", "century ride", "100 miles", "ultra cycling", "brevets", "randonneuring", "audax"]
+    },
+    {
+      "path": "/sport/cycling/mountain",
+      "title": "Mountain Biking",
+      "keywords": ["mountain biking", "MTB", "off-road cycling", "trail riding", "cross country", "XC", "downhill", "enduro", "full suspension", "hardtail", "single track", "flow trail", "tech trail"]
+    },
+    {
+      "path": "/sport/cycling/mountain/disciplines",
+      "title": "MTB Disciplines",
+      "keywords": ["MTB disciplines", "cross country XC", "downhill DH", "enduro", "trail riding", "all mountain", "freeride", "dirt jumping", "slopestyle"]
+    },
+    {
+      "path": "/sport/cycling/mountain/skills",
+      "title": "Mountain Biking Skills",
+      "keywords": []
+    },
+    {
+      "path": "/sport/swimming",
+      "title": "Swimming",
+      "keywords": ["swimming", "swim training", "pool workout", "open water", "swimmer", "lap swimming", "swim fitness", "aquatic exercise", "water workout"]
+    },
+    {
+      "path": "/sport/swimming/techniques",
+      "title": "Swimming Techniques",
+      "keywords": ["swimming technique", "stroke technique", "swim form", "efficient swimming", "swim drills", "catch", "pull", "kick", "rotation", "streamline", "bilateral breathing"]
+    },
+    {
+      "path": "/sport/swimming/techniques/freestyle",
+      "title": "Freestyle Swimming",
+      "keywords": ["freestyle", "front crawl", "freestyle technique", "freestyle drills", "catch up drill", "fingertip drag", "freestyle kick", "flutter kick", "high elbow catch", "early vertical forearm", "EVF", "freestyle breathing", "sighting"]
+    },
+    {
+      "path": "/sport/swimming/techniques/freestyle/drills",
+      "title": "Freestyle Drills",
+      "keywords": ["freestyle drills", "swim drills", "catch up drill", "fingertip drag drill", "fist drill", "single arm drill", "kickboard drills", "pull buoy drills", "sculling", "tarzan drill", "head up freestyle"]
+    },
+    {
+      "path": "/sport/swimming/techniques/breaststroke",
+      "title": "Breaststroke",
+      "keywords": ["breaststroke", "breaststroke technique", "frog kick", "whip kick", "breaststroke timing", "glide phase", "breaststroke pull", "underwater pullout"]
+    },
+    {
+      "path": "/sport/swimming/techniques/backstroke",
+      "title": "Backstroke",
+      "keywords": []
+    },
+    {
+      "path": "/sport/swimming/open-water",
+      "title": "Open Water Swimming",
+      "keywords": ["open water", "open water swimming", "lake swimming", "ocean swimming", "sea swimming", "mass start", "sighting", "drafting swimming", "wetsuit swimming", "cold water", "wild swimming", "marathon swimming", "channel swimming"]
+    },
+    {
+      "path": "/sport/flexibility",
+      "title": "Flexibility & Mobility",
+      "keywords": ["flexibility", "mobility", "stretching", "range of motion", "ROM", "joint mobility", "muscle flexibility", "limberness", "suppleness"]
+    },
+    {
+      "path": "/sport/flexibility/stretching",
+      "title": "Stretching",
+      "keywords": ["stretching", "static stretching", "dynamic stretching", "PNF stretching", "ballistic stretching", "active stretching", "passive stretching", "hold stretch", "stretch routine", "warm up stretches", "cool down stretches", "flexibility exercises"]
+    },
+    {
+      "path": "/sport/flexibility/stretching/static",
+      "title": "Static Stretching",
+      "keywords": []
+    },
+    {
+      "path": "/sport/flexibility/stretching/dynamic",
+      "title": "Dynamic Stretching",
+      "keywords": ["dynamic stretching", "dynamic warm up", "movement prep", "leg swings", "arm circles", "walking lunges", "high knees", "butt kicks", "A-skips", "B-skips", "active warm up", "pre-workout stretching"]
+    },
+    {
+      "path": "/sport/flexibility/yoga",
+      "title": "Yoga",
+      "keywords": ["yoga", "yoga practice", "asana", "yoga poses", "yoga flow", "vinyasa", "hatha yoga", "yin yoga", "power yoga", "ashtanga", "yoga for athletes", "yoga benefits", "mind body", "breathwork", "pranayama", "meditation yoga", "yoga flexibility"]
+    },
+    {
+      "path": "/sport/flexibility/yoga/styles",
+      "title": "Yoga Styles",
+      "keywords": ["yoga styles", "hatha", "vinyasa flow", "ashtanga", "bikram", "hot yoga", "yin yoga", "restorative yoga", "iyengar", "kundalini", "power yoga", "rocket yoga", "yoga nidra"]
+    },
+    {
+      "path": "/sport/flexibility/yoga/poses",
+      "title": "Yoga Poses",
+      "keywords": ["yoga poses", "asanas", "downward dog", "warrior poses", "sun salutation", "standing poses", "seated poses", "inversions", "backbends", "hip openers", "twists", "balance poses", "arm balances", "savasana", "child pose"]
+    },
+    {
+      "path": "/sport/flexibility/foam-rolling",
+      "title": "Foam Rolling",
+      "keywords": ["foam rolling", "self myofascial release", "SMR", "trigger points", "muscle knots", "foam roller exercises", "lacrosse ball", "massage ball", "recovery tool", "muscle tension", "IT band rolling", "quad rolling", "back rolling"]
+    },
+    {
+      "path": "/sport/recovery",
+      "title": "Recovery & Rest",
+      "keywords": ["recovery", "rest", "muscle recovery", "workout recovery", "rest days", "active recovery", "deload", "overtraining", "recovery methods", "sports recovery"]
+    },
+    {
+      "path": "/sport/recovery/sleep",
+      "title": "Sleep for Athletes",
+      "keywords": []
+    },
+    {
+      "path": "/sport/recovery/nutrition",
+      "title": "Recovery Nutrition",
+      "keywords": ["recovery nutrition", "post workout meal", "protein timing", "glycogen replenishment", "recovery shake", "anabolic window", "muscle repair nutrition", "anti-inflammatory foods", "tart cherry", "recovery foods"]
+    },
+    {
+      "path": "/sport/recovery/techniques",
+      "title": "Recovery Techniques",
+      "keywords": ["recovery techniques", "ice bath", "cold therapy", "cryotherapy", "contrast therapy", "compression", "massage", "sports massage", "percussion therapy", "theragun", "hypervolt", "sauna", "heat therapy", "epsom salt bath", "active recovery", "low intensity cardio"]
+    },
+    {
+      "path": "/sport/recovery/techniques/cold-therapy",
+      "title": "Cold Therapy",
+      "keywords": ["cold therapy", "ice bath", "cold plunge", "cold water immersion", "CWI", "cryotherapy", "cold shower", "Wim Hof", "cold exposure", "vasoconstriction", "inflammation reduction", "DOMS treatment"]
+    },
+    {
+      "path": "/sport/recovery/techniques/cold-therapy/ice-bath",
+      "title": "Ice Bath Protocol",
+      "keywords": ["ice bath", "cold plunge protocol", "ice bath temperature", "ice bath duration", "ice bath benefits", "post workout ice bath", "ice bath frequency", "ice bath setup", "DIY ice bath", "chest freezer cold plunge"]
+    },
+    {
+      "path": "/sport/recovery/techniques/massage",
+      "title": "Sports Massage",
+      "keywords": []
+    }
+  ]
+}

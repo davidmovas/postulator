@@ -464,6 +464,7 @@ export const sitemapService = {
                 writingStyle: input.contentSettings.writingStyle,
                 contentTone: input.contentSettings.contentTone,
                 customInstructions: input.contentSettings.customInstructions || "",
+                includeLinks: input.contentSettings.includeLinks || false,
             }) : undefined,
         });
 

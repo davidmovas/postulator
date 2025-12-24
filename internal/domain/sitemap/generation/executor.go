@@ -371,6 +371,11 @@ func (e *Executor) processNode(ctx context.Context, task *Task, taskNode *TaskNo
 		return fmt.Errorf("publish failed: %w", err)
 	}
 
+	// Mark links as applied if IncludeLinks was used
+	if len(linkTargets) > 0 {
+		e.markLinksAsApplied(ctx, linkTargets)
+	}
+
 	taskNode.MarkCompleted(pubResult.ArticleID, pubResult.WPPageID, pubResult.WPURL)
 	e.emitter.EmitNodeCompleted(ctx, task.ID, taskNode.NodeID, taskNode.Title,
 		pubResult.ArticleID, pubResult.WPPageID, pubResult.WPURL)
@@ -504,7 +509,6 @@ func (e *Executor) getApprovedLinkTargets(ctx context.Context, sitemapID, siteID
 	// Get all links for this plan
 	links, err := e.linkingSvc.GetLinks(ctx, plan.ID)
 	if err != nil {
-		e.logger.ErrorWithErr(err, "Failed to get links for plan")
 		return nil
 	}
 
@@ -512,21 +516,18 @@ func (e *Executor) getApprovedLinkTargets(ctx context.Context, sitemapID, siteID
 	var targets []LinkTarget
 	for _, link := range links {
 		// Only outgoing links from this node that are approved
-		if link.SourceNodeID != nodeID {
-			continue
-		}
-		if link.Status != linking.LinkStatusApproved {
+		if link.SourceNodeID != nodeID || link.Status != linking.LinkStatusApproved {
 			continue
 		}
 
 		// Get target node info
 		targetNode, err := e.sitemapSvc.GetNode(ctx, link.TargetNodeID)
 		if err != nil {
-			e.logger.ErrorWithErr(err, fmt.Sprintf("Failed to get target node %d", link.TargetNodeID))
 			continue
 		}
 
 		targets = append(targets, LinkTarget{
+			LinkID:       link.ID,
 			TargetNodeID: targetNode.ID,
 			TargetTitle:  targetNode.Title,
 			TargetPath:   targetNode.Path,
@@ -534,5 +535,25 @@ func (e *Executor) getApprovedLinkTargets(ctx context.Context, sitemapID, siteID
 		})
 	}
 
+	if len(targets) > 0 {
+		e.logger.Infof("Node %d: found %d approved link targets", nodeID, len(targets))
+	}
 	return targets
+}
+
+// markLinksAsApplied marks the given links as applied in the linking plan
+func (e *Executor) markLinksAsApplied(ctx context.Context, linkTargets []LinkTarget) {
+	if e.linkingSvc == nil || len(linkTargets) == 0 {
+		return
+	}
+
+	for _, target := range linkTargets {
+		if target.LinkID > 0 {
+			if err := e.linkingSvc.ApproveAndApplyLink(ctx, target.LinkID); err != nil {
+				e.logger.ErrorWithErr(err, fmt.Sprintf("Failed to mark link %d as applied", target.LinkID))
+			}
+		}
+	}
+
+	e.logger.Infof("Marked %d links as applied", len(linkTargets))
 }

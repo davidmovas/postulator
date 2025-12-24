@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/aiusage"
 	"github.com/davidmovas/postulator/internal/domain/entities"
@@ -11,7 +12,9 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/providers"
 	"github.com/davidmovas/postulator/internal/domain/sitemap"
 	"github.com/davidmovas/postulator/internal/infra/ai"
+	"github.com/davidmovas/postulator/internal/infra/events"
 	"github.com/davidmovas/postulator/pkg/logger"
+	"github.com/google/uuid"
 )
 
 type Suggester struct {
@@ -20,6 +23,8 @@ type Suggester struct {
 	promptSvc      prompts.Service
 	linkRepo       LinkRepository
 	aiUsageService aiusage.Service
+	eventBus       *events.EventBus
+	emitter        *SuggestEventEmitter
 	logger         *logger.Logger
 }
 
@@ -29,6 +34,7 @@ func NewSuggester(
 	promptSvc prompts.Service,
 	linkRepo LinkRepository,
 	aiUsageService aiusage.Service,
+	eventBus *events.EventBus,
 	logger *logger.Logger,
 ) *Suggester {
 	return &Suggester{
@@ -37,6 +43,8 @@ func NewSuggester(
 		promptSvc:      promptSvc,
 		linkRepo:       linkRepo,
 		aiUsageService: aiUsageService,
+		eventBus:       eventBus,
+		emitter:        NewSuggestEventEmitter(eventBus),
 		logger:         logger.WithScope("linking.suggester"),
 	}
 }
@@ -59,23 +67,32 @@ type SuggestResult struct {
 	Explanation  string
 }
 
+const maxNodesPerBatch = 15 // Limit to prevent token overflow in AI response
+
 func (s *Suggester) Suggest(ctx context.Context, config SuggestConfig) (*SuggestResult, error) {
+	startTime := time.Now()
+	taskID := uuid.New().String()
+
 	provider, err := s.providerSvc.GetProvider(ctx, config.ProviderID)
 	if err != nil {
+		s.emitter.EmitSuggestFailed(ctx, taskID, err.Error())
 		return nil, fmt.Errorf("failed to get provider: %w", err)
 	}
 
 	if !provider.IsActive {
+		s.emitter.EmitSuggestFailed(ctx, taskID, "provider is not active")
 		return nil, fmt.Errorf("provider is not active")
 	}
 
 	aiClient, err := ai.CreateClient(provider)
 	if err != nil {
+		s.emitter.EmitSuggestFailed(ctx, taskID, err.Error())
 		return nil, fmt.Errorf("failed to create AI client: %w", err)
 	}
 
 	_, nodes, err := s.sitemapSvc.GetSitemapWithNodes(ctx, config.SitemapID)
 	if err != nil {
+		s.emitter.EmitSuggestFailed(ctx, taskID, err.Error())
 		return nil, fmt.Errorf("failed to get sitemap nodes: %w", err)
 	}
 
@@ -94,9 +111,11 @@ func (s *Suggester) Suggest(ctx context.Context, config SuggestConfig) (*Suggest
 	}
 
 	if len(filteredNodes) < 2 {
+		s.emitter.EmitSuggestFailed(ctx, taskID, "need at least 2 nodes to suggest links")
 		return nil, fmt.Errorf("need at least 2 nodes to suggest links")
 	}
 
+	// Track link counts across all batches
 	outgoingCount := make(map[int64]int)
 	incomingCount := make(map[int64]int)
 	for _, link := range config.ExistingLinks {
@@ -104,51 +123,125 @@ func (s *Suggester) Suggest(ctx context.Context, config SuggestConfig) (*Suggest
 		incomingCount[link.TargetNodeID]++
 	}
 
-	systemPrompt, userPrompt := s.buildPrompts(ctx, config, filteredNodes, outgoingCount, incomingCount)
-
-	request := &ai.LinkSuggestionRequest{
-		Nodes:        s.buildAINodes(filteredNodes, outgoingCount, incomingCount, config.ExistingLinks),
-		SystemPrompt: systemPrompt,
-		UserPrompt:   userPrompt,
-		MaxIncoming:  config.MaxIncoming,
-		MaxOutgoing:  config.MaxOutgoing,
-	}
-
-	s.logger.Infof("Requesting link suggestions for %d nodes from %s", len(filteredNodes), provider.Name)
-	s.logger.Debugf("System prompt length: %d, User prompt length: %d", len(systemPrompt), len(userPrompt))
-
-	result, err := aiClient.GenerateLinkSuggestions(ctx, request)
-	if err != nil {
-		s.logger.ErrorWithErr(err, "AI link suggestion failed")
-		return nil, fmt.Errorf("AI suggestion failed: %w", err)
-	}
-
-	s.logger.Infof("AI returned %d link suggestions", len(result.Links))
-
-	if s.aiUsageService != nil {
-		_ = s.aiUsageService.LogFromResult(
-			ctx,
-			config.SiteID,
-			aiusage.OpLinkSuggestion,
-			aiClient,
-			result.Usage,
-			0,
-			nil,
-			map[string]interface{}{
-				"plan_id":     config.PlanID,
-				"sitemap_id":  config.SitemapID,
-				"nodes_count": len(filteredNodes),
-			},
-		)
-	}
-
+	// Build node ID set for validation
 	nodeIDSet := make(map[int64]bool)
 	for _, node := range filteredNodes {
 		nodeIDSet[node.ID] = true
 	}
 
+	// Split into batches if too many nodes
+	batches := s.splitIntoBatches(filteredNodes, maxNodesPerBatch)
+	totalBatches := len(batches)
+	totalNodes := len(filteredNodes)
+
+	s.logger.Infof("Processing %d nodes in %d batch(es)", totalNodes, totalBatches)
+
+	// Emit started event
+	s.emitter.EmitSuggestStarted(ctx, taskID, totalNodes, totalBatches)
+
+	totalLinksCreated := 0
+	processedNodes := 0
+	var lastExplanation string
+
+	for batchIdx, batchNodes := range batches {
+		if len(batchNodes) < 2 {
+			processedNodes += len(batchNodes)
+			continue
+		}
+
+		s.logger.Infof("Processing batch %d/%d with %d nodes", batchIdx+1, totalBatches, len(batchNodes))
+
+		// Emit progress before processing batch
+		s.emitter.EmitSuggestProgress(ctx, taskID, batchIdx+1, totalBatches, processedNodes, totalNodes, totalLinksCreated, len(batchNodes))
+
+		systemPrompt, userPrompt := s.buildPrompts(ctx, config, batchNodes, outgoingCount, incomingCount)
+
+		request := &ai.LinkSuggestionRequest{
+			Nodes:        s.buildAINodes(batchNodes, outgoingCount, incomingCount, config.ExistingLinks),
+			SystemPrompt: systemPrompt,
+			UserPrompt:   userPrompt,
+			MaxIncoming:  config.MaxIncoming,
+			MaxOutgoing:  config.MaxOutgoing,
+		}
+
+		result, err := aiClient.GenerateLinkSuggestions(ctx, request)
+		if err != nil {
+			s.logger.ErrorWithErr(err, fmt.Sprintf("AI link suggestion failed for batch %d", batchIdx+1))
+			processedNodes += len(batchNodes)
+			// Continue with next batch instead of failing entirely
+			continue
+		}
+
+		s.logger.Infof("Batch %d: AI returned %d link suggestions", batchIdx+1, len(result.Links))
+		lastExplanation = result.Explanation
+
+		if s.aiUsageService != nil {
+			_ = s.aiUsageService.LogFromResult(
+				ctx,
+				config.SiteID,
+				aiusage.OpLinkSuggestion,
+				aiClient,
+				result.Usage,
+				0,
+				nil,
+				map[string]interface{}{
+					"plan_id":       config.PlanID,
+					"sitemap_id":    config.SitemapID,
+					"nodes_count":   len(batchNodes),
+					"batch":         batchIdx + 1,
+					"total_batches": totalBatches,
+				},
+			)
+		}
+
+		// Process links from this batch
+		linksCreated := s.processLinks(ctx, config, result.Links, nodeIDSet, outgoingCount, incomingCount)
+		totalLinksCreated += linksCreated
+		processedNodes += len(batchNodes)
+
+		// Emit progress after processing batch
+		s.emitter.EmitSuggestProgress(ctx, taskID, batchIdx+1, totalBatches, processedNodes, totalNodes, totalLinksCreated, len(batchNodes))
+	}
+
+	s.logger.Infof("Created %d total link suggestions across %d batches", totalLinksCreated, totalBatches)
+
+	// Emit completed event
+	s.emitter.EmitSuggestCompleted(ctx, taskID, totalNodes, totalLinksCreated, startTime)
+
+	return &SuggestResult{
+		LinksCreated: totalLinksCreated,
+		Explanation:  lastExplanation,
+	}, nil
+}
+
+// splitIntoBatches divides nodes into batches of maxSize
+func (s *Suggester) splitIntoBatches(nodes []*entities.SitemapNode, maxSize int) [][]*entities.SitemapNode {
+	if len(nodes) <= maxSize {
+		return [][]*entities.SitemapNode{nodes}
+	}
+
+	var batches [][]*entities.SitemapNode
+	for i := 0; i < len(nodes); i += maxSize {
+		end := i + maxSize
+		if end > len(nodes) {
+			end = len(nodes)
+		}
+		batches = append(batches, nodes[i:end])
+	}
+	return batches
+}
+
+// processLinks creates planned links from AI suggestions
+func (s *Suggester) processLinks(
+	ctx context.Context,
+	config SuggestConfig,
+	links []ai.SuggestedLink,
+	nodeIDSet map[int64]bool,
+	outgoingCount, incomingCount map[int64]int,
+) int {
 	linksCreated := 0
-	for _, link := range result.Links {
+
+	for _, link := range links {
 		if !nodeIDSet[link.SourceNodeID] || !nodeIDSet[link.TargetNodeID] {
 			s.logger.Warnf("Skipping invalid link: source=%d target=%d", link.SourceNodeID, link.TargetNodeID)
 			continue
@@ -196,12 +289,7 @@ func (s *Suggester) Suggest(ctx context.Context, config SuggestConfig) (*Suggest
 		linksCreated++
 	}
 
-	s.logger.Infof("Created %d link suggestions", linksCreated)
-
-	return &SuggestResult{
-		LinksCreated: linksCreated,
-		Explanation:  result.Explanation,
-	}, nil
+	return linksCreated
 }
 
 func (s *Suggester) buildPrompts(ctx context.Context, config SuggestConfig, nodes []*entities.SitemapNode, outgoing, incoming map[int64]int) (system, user string) {

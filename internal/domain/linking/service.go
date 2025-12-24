@@ -3,6 +3,7 @@ package linking
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/aiusage"
 	"github.com/davidmovas/postulator/internal/domain/entities"
@@ -45,8 +46,8 @@ func NewService(
 		planRepo:   NewPlanRepository(db.DB),
 		linkRepo:   linkRepo,
 		sitemapSvc: sitemapSvc,
-		suggester:  NewSuggester(sitemapSvc, providerSvc, promptSvc, linkRepo, aiUsageService, logger),
-		applier:    NewApplier(sitemapSvc, sitesSvc, providerSvc, linkRepo, wpClient, aiUsageService, logger),
+		suggester:  NewSuggester(sitemapSvc, providerSvc, promptSvc, linkRepo, aiUsageService, eventBus, logger),
+		applier:    NewApplier(sitemapSvc, sitesSvc, providerSvc, linkRepo, wpClient, aiUsageService, eventBus, logger),
 		eventBus:   eventBus,
 		logger:     logger.WithScope("linking"),
 	}
@@ -183,6 +184,23 @@ func (s *serviceImpl) ApproveLink(ctx context.Context, linkID int64) error {
 
 func (s *serviceImpl) RejectLink(ctx context.Context, linkID int64) error {
 	return s.linkRepo.UpdateStatus(ctx, linkID, LinkStatusRejected, nil)
+}
+
+func (s *serviceImpl) ApproveAndApplyLink(ctx context.Context, linkID int64) error {
+	link, err := s.linkRepo.GetByID(ctx, linkID)
+	if err != nil {
+		return err
+	}
+
+	// Only mark as applied if the link is approved (or planned, for automatic apply during generation)
+	if link.Status != LinkStatusApproved && link.Status != LinkStatusPlanned {
+		return nil // Skip if already applied, rejected, or failed
+	}
+
+	now := time.Now()
+	link.Status = LinkStatusApplied
+	link.AppliedAt = &now
+	return s.linkRepo.Update(ctx, link)
 }
 
 func (s *serviceImpl) SuggestLinks(ctx context.Context, config SuggestLinksConfig) error {

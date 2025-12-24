@@ -57,6 +57,7 @@ import { ScanDialog } from "@/components/sitemaps/scan-dialog";
 import { GenerateDialog } from "@/components/sitemaps/generate-dialog";
 import { PageGenerateDialog } from "@/components/sitemaps/page-generate-dialog";
 import { SuggestLinksDialog } from "@/components/sitemaps/suggest-links-dialog";
+import { ApplyLinksDialog } from "@/components/sitemaps/apply-links-dialog";
 import { EditorHeader, EditorMode } from "@/components/sitemaps/editor-header";
 import { GenerationProgressPanel } from "@/components/sitemaps/generation-progress-panel";
 import { createNodesFromPaths } from "@/lib/sitemap-utils";
@@ -176,6 +177,11 @@ function SitemapEditorFlow() {
         siteId,
         enabled: editorMode === "links",
     });
+
+    // Get approved links for ApplyLinksDialog
+    const approvedLinks = useMemo(() => {
+        return linking.links.filter((link) => link.status === "approved");
+    }, [linking.links]);
 
     // Handle node position changes in links mode
     const handleLinkModeNodesChange = useCallback((changes: any[]) => {
@@ -353,6 +359,7 @@ function SitemapEditorFlow() {
     const [scanDialogOpen, setScanDialogOpen] = useState(false);
     const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
     const [suggestLinksDialogOpen, setSuggestLinksDialogOpen] = useState(false);
+    const [applyLinksDialogOpen, setApplyLinksDialogOpen] = useState(false);
     const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
     const [hotkeysDialogOpen, setHotkeysDialogOpen] = useState(false);
     const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
@@ -725,7 +732,7 @@ function SitemapEditorFlow() {
                 onGeneratePages={() => wpOps.setPageGenerateDialogOpen(true)}
                 // Links mode actions
                 onSuggestLinks={() => setSuggestLinksDialogOpen(true)}
-                onApplyLinks={() => console.log("TODO: Apply links")}
+                onApplyLinks={() => setApplyLinksDialogOpen(true)}
                 onApproveAllLinks={linking.approveAllLinks}
                 onRejectAllLinks={linking.rejectAllLinks}
                 onClearAILinks={linking.clearAILinks}
@@ -947,6 +954,18 @@ function SitemapEditorFlow() {
                     planId={linking.plan.id}
                     selectedNodes={nodeOps.getSelectedSitemapNodes()}
                     allNodes={sitemapNodes}
+                    onSuccess={() => linking.loadLinkingData()}
+                />
+            )}
+
+            {linking.plan && (
+                <ApplyLinksDialog
+                    open={applyLinksDialogOpen}
+                    onOpenChange={setApplyLinksDialogOpen}
+                    planId={linking.plan.id}
+                    approvedLinks={approvedLinks}
+                    selectedNodes={nodeOps.getSelectedSitemapNodes()}
+                    sitemapNodes={sitemapNodes}
                     onSuccess={() => linking.loadLinkingData()}
                 />
             )}

@@ -98,6 +98,105 @@ export interface SuggestLinksInput {
 export interface ApplyLinksInput {
     planId: number;
     linkIds: number[];
+    providerId: number;
+}
+
+export interface ApplyLinksResult {
+    totalLinks: number;
+    appliedLinks: number;
+    failedLinks: number;
+}
+
+// =========================================================================
+// Apply Links Event Types (PascalCase - as sent from Go)
+// =========================================================================
+
+export interface ApplyStartedEvent {
+    TaskID: string;
+    TotalLinks: number;
+    TotalPages: number;
+}
+
+export interface ApplyProgressEvent {
+    TaskID: string;
+    ProcessedPages: number;
+    TotalPages: number;
+    AppliedLinks: number;
+    FailedLinks: number;
+    CurrentPage?: PageInfo;
+}
+
+export interface PageInfo {
+    NodeID: number;
+    Title: string;
+    Path: string;
+}
+
+export interface ApplyCompletedEvent {
+    TaskID: string;
+    TotalLinks: number;
+    AppliedLinks: number;
+    FailedLinks: number;
+    DurationMs: number;
+}
+
+export interface ApplyFailedEvent {
+    TaskID: string;
+    Error: string;
+}
+
+export interface PageProcessingEvent {
+    TaskID: string;
+    NodeID: number;
+    Title: string;
+    LinkCount: number;
+}
+
+export interface PageCompletedEvent {
+    TaskID: string;
+    NodeID: number;
+    Title: string;
+    AppliedLinks: number;
+    FailedLinks: number;
+}
+
+export interface PageFailedEvent {
+    TaskID: string;
+    NodeID: number;
+    Title: string;
+    Error: string;
+}
+
+// =========================================================================
+// Suggest Links Event Types (PascalCase - as sent from Go)
+// =========================================================================
+
+export interface SuggestStartedEvent {
+    TaskID: string;
+    TotalNodes: number;
+    TotalBatches: number;
+}
+
+export interface SuggestProgressEvent {
+    TaskID: string;
+    CurrentBatch: number;
+    TotalBatches: number;
+    ProcessedNodes: number;
+    TotalNodes: number;
+    LinksCreated: number;
+    CurrentBatchSize: number;
+}
+
+export interface SuggestCompletedEvent {
+    TaskID: string;
+    TotalNodes: number;
+    LinksCreated: number;
+    DurationMs: number;
+}
+
+export interface SuggestFailedEvent {
+    TaskID: string;
+    Error: string;
 }
 
 // =========================================================================

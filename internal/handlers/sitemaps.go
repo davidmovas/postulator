@@ -465,7 +465,7 @@ func (h *SitemapsHandler) ImportNodes(req *dto.ImportNodesRequest) *dto.Response
 	}
 
 	stats, err := h.importer.Import(
-		ctx.FastCtx(),
+		ctx.LongCtx(),
 		req.Filename,
 		fileData,
 		req.SitemapID,
@@ -817,6 +817,7 @@ func (h *SitemapsHandler) StartPageGeneration(req *dto.StartPageGenerationReques
 			WritingStyle:       generation.WritingStyle(req.ContentSettings.WritingStyle),
 			ContentTone:        generation.ContentTone(req.ContentSettings.ContentTone),
 			CustomInstructions: req.ContentSettings.CustomInstructions,
+			IncludeLinks:       req.ContentSettings.IncludeLinks,
 		}
 	}
 
