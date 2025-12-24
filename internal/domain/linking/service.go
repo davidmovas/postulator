@@ -269,7 +269,6 @@ func (s *serviceImpl) ApplyLinks(ctx context.Context, planID int64, linkIDs []in
 		ProviderID: providerID,
 		LinkIDs:    linkIDs,
 	})
-
 	if err != nil {
 		errMsg := err.Error()
 		plan.Status = PlanStatusFailed

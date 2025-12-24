@@ -9,8 +9,10 @@ import (
 
 // Default prompts use system_instructions and user_instructions placeholders
 // which are built dynamically from ContentSettings
-const DefaultPageSystemPrompt = `{{system_instructions}}`
-const DefaultPageUserPrompt = `{{user_instructions}}`
+const (
+	DefaultPageSystemPrompt = `{{system_instructions}}`
+	DefaultPageUserPrompt   = `{{user_instructions}}`
+)
 
 var DefaultPagePlaceholders = []string{
 	"title",

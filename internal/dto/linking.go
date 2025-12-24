@@ -171,13 +171,13 @@ type UpdateLinkRequest struct {
 }
 
 type SuggestLinksRequest struct {
-	PlanID       int64   `json:"planId"`
-	ProviderID   int64   `json:"providerId"`
-	PromptID     *int64  `json:"promptId,omitempty"`
-	NodeIDs      []int64 `json:"nodeIds,omitempty"`
-	Feedback     string  `json:"feedback,omitempty"`
-	MaxIncoming  int     `json:"maxIncoming,omitempty"`
-	MaxOutgoing  int     `json:"maxOutgoing,omitempty"`
+	PlanID      int64   `json:"planId"`
+	ProviderID  int64   `json:"providerId"`
+	PromptID    *int64  `json:"promptId,omitempty"`
+	NodeIDs     []int64 `json:"nodeIds,omitempty"`
+	Feedback    string  `json:"feedback,omitempty"`
+	MaxIncoming int     `json:"maxIncoming,omitempty"`
+	MaxOutgoing int     `json:"maxOutgoing,omitempty"`
 }
 
 type ApplyLinksRequest struct {
@@ -188,11 +188,11 @@ type ApplyLinksRequest struct {
 
 // ApplyLinksResult contains the result of applying links to content
 type ApplyLinksResult struct {
-	TotalLinks   int                 `json:"totalLinks"`
-	AppliedLinks int                 `json:"appliedLinks"`
-	FailedLinks  int                 `json:"failedLinks"`
-	Results      []*AppliedLinkInfo  `json:"results"`
-	Errors       []string            `json:"errors,omitempty"`
+	TotalLinks   int                `json:"totalLinks"`
+	AppliedLinks int                `json:"appliedLinks"`
+	FailedLinks  int                `json:"failedLinks"`
+	Results      []*AppliedLinkInfo `json:"results"`
+	Errors       []string           `json:"errors,omitempty"`
 }
 
 // AppliedLinkInfo contains info about a successfully applied link

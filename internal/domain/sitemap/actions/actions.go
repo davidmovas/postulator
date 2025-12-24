@@ -337,12 +337,12 @@ func (a *BatchCreateNodesAction) Description() string {
 
 // UpdatePositionAction represents updating a node's canvas position.
 type UpdatePositionAction struct {
-	svc     sitemap.Service
-	nodeID  int64
-	oldX    float64
-	oldY    float64
-	newX    float64
-	newY    float64
+	svc    sitemap.Service
+	nodeID int64
+	oldX   float64
+	oldY   float64
+	newX   float64
+	newY   float64
 }
 
 // NewUpdatePositionAction creates an action for position update.

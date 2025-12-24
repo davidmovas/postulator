@@ -38,15 +38,15 @@ type WPPage struct {
 
 // PageListOptions configures page listing request
 type PageListOptions struct {
-	Page       int    // Page number (1-based)
-	PerPage    int    // Items per page (max 100)
-	Status     string // Filter by status: publish, draft, pending, private, any
-	Parent     *int   // Filter by parent ID (nil = all, 0 = top-level only)
-	OrderBy    string // Order by: date, id, title, slug, menu_order, parent
-	Order      string // Order direction: asc, desc
-	Search     string // Search term
-	Exclude    []int  // Exclude specific page IDs
-	Include    []int  // Include only specific page IDs
+	Page    int    // Page number (1-based)
+	PerPage int    // Items per page (max 100)
+	Status  string // Filter by status: publish, draft, pending, private, any
+	Parent  *int   // Filter by parent ID (nil = all, 0 = top-level only)
+	OrderBy string // Order by: date, id, title, slug, menu_order, parent
+	Order   string // Order direction: asc, desc
+	Search  string // Search term
+	Exclude []int  // Exclude specific page IDs
+	Include []int  // Include only specific page IDs
 }
 
 // PageCreateOptions configures page creation

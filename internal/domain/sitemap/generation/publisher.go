@@ -20,11 +20,11 @@ type PublishResult struct {
 }
 
 type Publisher struct {
-	sitemapSvc  sitemap.Service
-	articleSvc  articles.Service
-	siteSvc     sites.Service
-	wpClient    wp.Client
-	logger      *logger.Logger
+	sitemapSvc sitemap.Service
+	articleSvc articles.Service
+	siteSvc    sites.Service
+	wpClient   wp.Client
+	logger     *logger.Logger
 }
 
 func NewPublisher(
@@ -35,19 +35,19 @@ func NewPublisher(
 	logger *logger.Logger,
 ) *Publisher {
 	return &Publisher{
-		sitemapSvc:  sitemapSvc,
-		articleSvc:  articleSvc,
-		siteSvc:     siteSvc,
-		wpClient:    wpClient,
-		logger:      logger.WithScope("page_publisher"),
+		sitemapSvc: sitemapSvc,
+		articleSvc: articleSvc,
+		siteSvc:    siteSvc,
+		wpClient:   wpClient,
+		logger:     logger.WithScope("page_publisher"),
 	}
 }
 
 type PublishRequest struct {
-	Node         *entities.SitemapNode
-	Content      *PageContent
-	SiteID       int64
-	PublishAs    PublishAs
+	Node           *entities.SitemapNode
+	Content        *PageContent
+	SiteID         int64
+	PublishAs      PublishAs
 	ParentWPPageID *int
 }
 
@@ -60,11 +60,11 @@ func (p *Publisher) Publish(ctx context.Context, req PublishRequest) (*PublishRe
 	wpStatus := mapPublishAsToWPStatus(req.PublishAs)
 
 	wpPage := &wp.WPPage{
-		Title:    req.Content.Title,
-		Slug:     req.Node.Slug,
-		Content:  req.Content.Content,
-		Excerpt:  req.Content.Excerpt,
-		Status:   wpStatus,
+		Title:   req.Content.Title,
+		Slug:    req.Node.Slug,
+		Content: req.Content.Content,
+		Excerpt: req.Content.Excerpt,
+		Status:  wpStatus,
 	}
 
 	if req.ParentWPPageID != nil {

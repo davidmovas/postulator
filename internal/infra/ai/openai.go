@@ -692,4 +692,3 @@ func buildInsertLinksUserPrompt(request *InsertLinksRequest) string {
 
 	return sb.String()
 }
-

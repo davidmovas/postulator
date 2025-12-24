@@ -68,10 +68,10 @@ type ImportOptions struct {
 
 // ImportStats contains statistics about the import
 type ImportStats struct {
-	TotalRows     int
-	NodesCreated  int
-	NodesSkipped  int // Already existed (same path)
-	Errors        []ImportError
+	TotalRows      int
+	NodesCreated   int
+	NodesSkipped   int // Already existed (same path)
+	Errors         []ImportError
 	ProcessingTime time.Duration
 }
 

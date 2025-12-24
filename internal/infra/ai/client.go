@@ -99,18 +99,18 @@ type LinkSuggestionResult struct {
 
 // InsertLinkTarget represents a link to be inserted into content
 type InsertLinkTarget struct {
-	TargetPath string  // URL path to link to
-	TargetTitle string // Title of the target page (for context)
-	AnchorText *string // Suggested anchor text (optional, AI can choose)
+	TargetPath  string  // URL path to link to
+	TargetTitle string  // Title of the target page (for context)
+	AnchorText  *string // Suggested anchor text (optional, AI can choose)
 }
 
 // InsertLinksRequest contains the data for inserting links into existing HTML content
 type InsertLinksRequest struct {
-	Content     string             // Existing HTML content
-	PageTitle   string             // Title of the current page
-	PagePath    string             // Path of the current page
-	Links       []InsertLinkTarget // Links to insert
-	Language    string             // Content language
+	Content   string             // Existing HTML content
+	PageTitle string             // Title of the current page
+	PagePath  string             // Path of the current page
+	Links     []InsertLinkTarget // Links to insert
+	Language  string             // Content language
 }
 
 // InsertLinksResult contains the content with links inserted

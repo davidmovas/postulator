@@ -314,12 +314,12 @@ func (s *Suggester) buildPlaceholders(config SuggestConfig, nodes []*entities.Si
 	}
 
 	placeholders := map[string]string{
-		"nodes_count":     fmt.Sprintf("%d", len(nodes)),
-		"nodes_info":      nodesInfo.String(),
-		"feedback":        config.Feedback,
-		"max_incoming":    fmt.Sprintf("%d", config.MaxIncoming),
-		"max_outgoing":    fmt.Sprintf("%d", config.MaxOutgoing),
-		"existing_links":  fmt.Sprintf("%d", len(config.ExistingLinks)),
+		"nodes_count":    fmt.Sprintf("%d", len(nodes)),
+		"nodes_info":     nodesInfo.String(),
+		"feedback":       config.Feedback,
+		"max_incoming":   fmt.Sprintf("%d", config.MaxIncoming),
+		"max_outgoing":   fmt.Sprintf("%d", config.MaxOutgoing),
+		"existing_links": fmt.Sprintf("%d", len(config.ExistingLinks)),
 	}
 
 	return placeholders

@@ -26,18 +26,18 @@ const (
 )
 
 type ApplyStartedEvent struct {
-	TaskID      string
-	TotalLinks  int
-	TotalPages  int // Number of unique source pages
+	TaskID     string
+	TotalLinks int
+	TotalPages int // Number of unique source pages
 }
 
 type ApplyProgressEvent struct {
-	TaskID        string
+	TaskID         string
 	ProcessedPages int
-	TotalPages    int
-	AppliedLinks  int
-	FailedLinks   int
-	CurrentPage   *PageInfo
+	TotalPages     int
+	AppliedLinks   int
+	FailedLinks    int
+	CurrentPage    *PageInfo
 }
 
 type PageInfo struct {

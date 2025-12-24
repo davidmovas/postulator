@@ -8,12 +8,12 @@ import (
 type OperationType string
 
 const (
-	OperationArticleGeneration  OperationType = "article_generation"
-	OperationSitemapGeneration  OperationType = "sitemap_generation"
-	OperationTopicVariations    OperationType = "topic_variations"
-	OperationPageGeneration     OperationType = "page_generation"
-	OpLinkSuggestion            OperationType = "link_suggestion"
-	OpLinkInsertion             OperationType = "link_insertion"
+	OperationArticleGeneration OperationType = "article_generation"
+	OperationSitemapGeneration OperationType = "sitemap_generation"
+	OperationTopicVariations   OperationType = "topic_variations"
+	OperationPageGeneration    OperationType = "page_generation"
+	OpLinkSuggestion           OperationType = "link_suggestion"
+	OpLinkInsertion            OperationType = "link_insertion"
 )
 
 // UsageLog represents a single AI usage log entry
@@ -36,18 +36,18 @@ type UsageLog struct {
 
 // UsageSummary represents aggregated usage statistics
 type UsageSummary struct {
-	TotalRequests   int64
-	TotalTokens     int64
+	TotalRequests     int64
+	TotalTokens       int64
 	TotalInputTokens  int64
 	TotalOutputTokens int64
-	TotalCostUSD    float64
-	SuccessCount    int64
-	ErrorCount      int64
+	TotalCostUSD      float64
+	SuccessCount      int64
+	ErrorCount        int64
 }
 
 // UsageByPeriod represents usage grouped by time period
 type UsageByPeriod struct {
-	Period       string  // "2024-01-15" for daily, "2024-01" for monthly
+	Period       string // "2024-01-15" for daily, "2024-01" for monthly
 	TotalTokens  int64
 	TotalCostUSD float64
 	RequestCount int64

@@ -32,13 +32,13 @@ type Parser interface {
 // ParsedNode represents a node ready for creation
 // Built from ImportRow with hierarchy resolved
 type ParsedNode struct {
-	Path        string   // Full path
-	Slug        string   // Just the last segment
-	Title       string   // Page title
-	Keywords    []string // Keywords
-	ParentPath  string   // Parent's path (empty for root children)
-	Depth       int      // Nesting level
-	IsRoot      bool     // True for root node (path = "/" or "")
+	Path       string   // Full path
+	Slug       string   // Just the last segment
+	Title      string   // Page title
+	Keywords   []string // Keywords
+	ParentPath string   // Parent's path (empty for root children)
+	Depth      int      // Nesting level
+	IsRoot     bool     // True for root node (path = "/" or "")
 }
 
 // TreeBuilder builds node hierarchy from flat list of paths

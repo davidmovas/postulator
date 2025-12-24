@@ -128,23 +128,23 @@ type LinkGraph struct {
 }
 
 type GraphNode struct {
-	NodeID           int64   `json:"nodeId"`
-	Title            string  `json:"title"`
-	Slug             string  `json:"slug"`
-	Path             string  `json:"path"`
-	HasContent       bool    `json:"hasContent"`
+	NodeID            int64  `json:"nodeId"`
+	Title             string `json:"title"`
+	Slug              string `json:"slug"`
+	Path              string `json:"path"`
+	HasContent        bool   `json:"hasContent"`
 	OutgoingLinkCount int    `json:"outgoingLinkCount"`
 	IncomingLinkCount int    `json:"incomingLinkCount"`
 }
 
 type GraphEdge struct {
-	ID            int64      `json:"id"`
-	SourceNodeID  int64      `json:"sourceNodeId"`
-	TargetNodeID  int64      `json:"targetNodeId"`
-	AnchorText    *string    `json:"anchorText"`
-	Status        LinkStatus `json:"status"`
-	Source        LinkSource `json:"source"`
-	Confidence    *float64   `json:"confidence"`
+	ID           int64      `json:"id"`
+	SourceNodeID int64      `json:"sourceNodeId"`
+	TargetNodeID int64      `json:"targetNodeId"`
+	AnchorText   *string    `json:"anchorText"`
+	Status       LinkStatus `json:"status"`
+	Source       LinkSource `json:"source"`
+	Confidence   *float64   `json:"confidence"`
 }
 
 type SuggestLinksConfig struct {

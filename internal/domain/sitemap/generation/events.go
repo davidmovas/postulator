@@ -91,11 +91,11 @@ type NodeGeneratingEvent struct {
 }
 
 type NodeGeneratedEvent struct {
-	TaskID      string
-	NodeID      int64
-	Title       string
-	TokensUsed  int
-	DurationMs  int64
+	TaskID     string
+	NodeID     int64
+	Title      string
+	TokensUsed int
+	DurationMs int64
 }
 
 type NodePublishingEvent struct {

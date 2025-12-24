@@ -69,9 +69,9 @@ func (s *service) CreateSitemapWithRoot(ctx context.Context, sitemap *entities.S
 
 	// Create root node with site URL as title
 	rootNode := &entities.SitemapNode{
-		SitemapID:     sitemap.ID,
-		Title:         siteURL,
-		Slug:          "",
+		SitemapID:        sitemap.ID,
+		Title:            siteURL,
+		Slug:             "",
 		IsRoot:           true,
 		Depth:            0,
 		Position:         0,

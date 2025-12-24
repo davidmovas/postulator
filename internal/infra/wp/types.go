@@ -81,9 +81,9 @@ type wpPost struct {
 	DateGMT     WPTime `json:"date_gmt"`
 	Modified    WPTime `json:"modified"`
 	ModifiedGMT WPTime `json:"modified_gmt"`
-	Slug        string    `json:"slug"`
-	Status      string    `json:"status"`
-	Type        string    `json:"type"`
+	Slug        string `json:"slug"`
+	Status      string `json:"status"`
+	Type        string `json:"type"`
 	Title       struct {
 		Rendered string `json:"rendered"`
 	} `json:"title"`
