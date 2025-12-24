@@ -347,47 +347,49 @@ export function ApplyLinksDialog({
         if (statuses.length === 0) return null;
 
         return (
-            <ScrollArea className="h-48 mt-4">
-                <div className="space-y-2 pr-4">
-                    {statuses.map((page) => (
-                        <div
-                            key={page.nodeId}
-                            className={cn(
-                                "flex items-center justify-between p-2 rounded-lg text-sm",
-                                page.status === "processing" && "bg-blue-50 dark:bg-blue-950",
-                                page.status === "completed" && "bg-green-50 dark:bg-green-950",
-                                page.status === "failed" && "bg-red-50 dark:bg-red-950"
-                            )}
-                        >
-                            <div className="flex items-center gap-2 flex-1 min-w-0">
-                                {page.status === "processing" && (
-                                    <Loader2 className="h-4 w-4 animate-spin text-blue-500 flex-shrink-0" />
+            <div className="w-full mt-4">
+                <ScrollArea className="h-48">
+                    <div className="space-y-2">
+                        {statuses.map((page) => (
+                            <div
+                                key={page.nodeId}
+                                className={cn(
+                                    "flex items-center justify-between p-2 rounded-lg text-sm",
+                                    page.status === "processing" && "bg-blue-50 dark:bg-blue-950",
+                                    page.status === "completed" && "bg-green-50 dark:bg-green-950",
+                                    page.status === "failed" && "bg-red-50 dark:bg-red-950"
                                 )}
-                                {page.status === "completed" && (
-                                    <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
-                                )}
-                                {page.status === "failed" && (
-                                    <XCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
-                                )}
-                                <span className="truncate">{page.title}</span>
+                            >
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    {page.status === "processing" && (
+                                        <Loader2 className="h-4 w-4 animate-spin text-blue-500 flex-shrink-0" />
+                                    )}
+                                    {page.status === "completed" && (
+                                        <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                    )}
+                                    {page.status === "failed" && (
+                                        <XCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                                    )}
+                                    <span className="truncate">{page.title}</span>
+                                </div>
+                                <div className="flex-shrink-0 ml-2">
+                                    {page.status === "completed" && (
+                                        <span className="text-xs text-muted-foreground">
+                                            {page.appliedLinks} applied
+                                            {page.failedLinks ? `, ${page.failedLinks} failed` : ""}
+                                        </span>
+                                    )}
+                                    {page.status === "failed" && (
+                                        <span className="text-xs text-red-600 truncate max-w-32">
+                                            {page.error}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
-                            <div className="flex-shrink-0 ml-2">
-                                {page.status === "completed" && (
-                                    <span className="text-xs text-muted-foreground">
-                                        {page.appliedLinks} applied
-                                        {page.failedLinks ? `, ${page.failedLinks} failed` : ""}
-                                    </span>
-                                )}
-                                {page.status === "failed" && (
-                                    <span className="text-xs text-red-600 truncate max-w-32">
-                                        {page.error}
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </ScrollArea>
+                        ))}
+                    </div>
+                </ScrollArea>
+            </div>
         );
     };
 
@@ -532,17 +534,19 @@ export function ApplyLinksDialog({
                     )}
 
                     {applyState === "success" && result && (
-                        <div className="flex flex-col items-center justify-center py-8 gap-4">
-                            <CheckCircle2 className="h-16 w-16 text-green-500" />
-                            <div className="text-center">
-                                <p className="text-lg font-medium">Links applied!</p>
-                                <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-                                    <p>Applied: {result.appliedLinks} / {result.totalLinks}</p>
-                                    {result.failedLinks > 0 && (
-                                        <p className="text-amber-600">
-                                            Failed: {result.failedLinks}
-                                        </p>
-                                    )}
+                        <div className="space-y-4">
+                            <div className="flex flex-col items-center justify-center py-6 gap-4">
+                                <CheckCircle2 className="h-16 w-16 text-green-500" />
+                                <div className="text-center">
+                                    <p className="text-lg font-medium">Links applied!</p>
+                                    <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+                                        <p>Applied: {result.appliedLinks} / {result.totalLinks}</p>
+                                        {result.failedLinks > 0 && (
+                                            <p className="text-amber-600">
+                                                Failed: {result.failedLinks}
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                             {renderPageStatuses()}
