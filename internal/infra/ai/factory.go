@@ -31,17 +31,18 @@ func CreateClient(provider *entities.Provider) (Client, error) {
 			Model:  provider.Model,
 		})
 
-	case entities.TypeAnthropic:
-		return NewAnthropicClient(AnthropicConfig{
-			APIKey: provider.APIKey,
-			Model:  provider.Model,
-		})
+	// NOTE: Anthropic and Google providers are commented out for now
+	// case entities.TypeAnthropic:
+	// 	return NewAnthropicClient(AnthropicConfig{
+	// 		APIKey: provider.APIKey,
+	// 		Model:  provider.Model,
+	// 	})
 
-	case entities.TypeGoogle:
-		return NewGoogleClient(GoogleConfig{
-			APIKey: provider.APIKey,
-			Model:  provider.Model,
-		})
+	// case entities.TypeGoogle:
+	// 	return NewGoogleClient(GoogleConfig{
+	// 		APIKey: provider.APIKey,
+	// 		Model:  provider.Model,
+	// 	})
 
 	default:
 		return nil, errors.Validation(fmt.Sprintf("unsupported provider type: %s", provider.Type))
