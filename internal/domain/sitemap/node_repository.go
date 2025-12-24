@@ -624,47 +624,91 @@ func nodeColumns() []string {
 	}
 }
 
+// nullableNodeFields holds nullable database fields for scanning
+type nullableNodeFields struct {
+	parentID     sql.NullInt64
+	description  sql.NullString
+	articleID    sql.NullInt64
+	wpPageID     sql.NullInt64
+	wpURL        sql.NullString
+	lastSyncedAt sql.NullTime
+	wpTitle      sql.NullString
+	wpSlug       sql.NullString
+	lastError    sql.NullString
+	positionX    sql.NullFloat64
+	positionY    sql.NullFloat64
+}
+
+// applyNullableFields applies nullable field values to the node
+func applyNullableFields(node *entities.SitemapNode, nf *nullableNodeFields) {
+	if nf.parentID.Valid {
+		node.ParentID = &nf.parentID.Int64
+	}
+	if nf.description.Valid {
+		node.Description = &nf.description.String
+	}
+	if nf.articleID.Valid {
+		node.ArticleID = &nf.articleID.Int64
+	}
+	if nf.wpPageID.Valid {
+		wpPageIDInt := int(nf.wpPageID.Int64)
+		node.WPPageID = &wpPageIDInt
+	}
+	if nf.wpURL.Valid {
+		node.WPURL = &nf.wpURL.String
+	}
+	if nf.lastSyncedAt.Valid {
+		node.LastSyncedAt = &nf.lastSyncedAt.Time
+	}
+	if nf.wpTitle.Valid {
+		node.WPTitle = &nf.wpTitle.String
+	}
+	if nf.wpSlug.Valid {
+		node.WPSlug = &nf.wpSlug.String
+	}
+	if nf.lastError.Valid {
+		node.LastError = &nf.lastError.String
+	}
+	if nf.positionX.Valid {
+		node.PositionX = &nf.positionX.Float64
+	}
+	if nf.positionY.Valid {
+		node.PositionY = &nf.positionY.Float64
+	}
+	node.Path = normalizePath(node.Path)
+}
+
 func (r *nodeRepository) scanNode(row *sql.Row) (*entities.SitemapNode, error) {
 	var node entities.SitemapNode
-	var parentID sql.NullInt64
-	var description sql.NullString
-	var articleID sql.NullInt64
-	var wpPageID sql.NullInt64
-	var wpURL sql.NullString
-	var lastSyncedAt sql.NullTime
-	var wpTitle sql.NullString
-	var wpSlug sql.NullString
-	var lastError sql.NullString
-	var positionX sql.NullFloat64
-	var positionY sql.NullFloat64
+	var nf nullableNodeFields
 
 	err := row.Scan(
 		&node.ID,
 		&node.SitemapID,
-		&parentID,
+		&nf.parentID,
 		&node.Title,
 		&node.Slug,
-		&description,
+		&nf.description,
 		&node.IsRoot,
 		&node.Depth,
 		&node.Position,
 		&node.Path,
 		&node.ContentType,
-		&articleID,
-		&wpPageID,
-		&wpURL,
+		&nf.articleID,
+		&nf.wpPageID,
+		&nf.wpURL,
 		&node.Source,
 		&node.IsSynced,
-		&lastSyncedAt,
-		&wpTitle,
-		&wpSlug,
+		&nf.lastSyncedAt,
+		&nf.wpTitle,
+		&nf.wpSlug,
 		&node.DesignStatus,
 		&node.GenerationStatus,
 		&node.PublishStatus,
 		&node.IsModifiedLocally,
-		&lastError,
-		&positionX,
-		&positionY,
+		&nf.lastError,
+		&nf.positionX,
+		&nf.positionY,
 		&node.CreatedAt,
 		&node.UpdatedAt,
 	)
@@ -672,43 +716,7 @@ func (r *nodeRepository) scanNode(row *sql.Row) (*entities.SitemapNode, error) {
 		return nil, err
 	}
 
-	if parentID.Valid {
-		node.ParentID = &parentID.Int64
-	}
-	if description.Valid {
-		node.Description = &description.String
-	}
-	if articleID.Valid {
-		node.ArticleID = &articleID.Int64
-	}
-	if wpPageID.Valid {
-		wpPageIDInt := int(wpPageID.Int64)
-		node.WPPageID = &wpPageIDInt
-	}
-	if wpURL.Valid {
-		node.WPURL = &wpURL.String
-	}
-	if lastSyncedAt.Valid {
-		node.LastSyncedAt = &lastSyncedAt.Time
-	}
-	if wpTitle.Valid {
-		node.WPTitle = &wpTitle.String
-	}
-	if wpSlug.Valid {
-		node.WPSlug = &wpSlug.String
-	}
-	if lastError.Valid {
-		node.LastError = &lastError.String
-	}
-	if positionX.Valid {
-		node.PositionX = &positionX.Float64
-	}
-	if positionY.Valid {
-		node.PositionY = &positionY.Float64
-	}
-
-	node.Path = normalizePath(node.Path)
-
+	applyNullableFields(&node, &nf)
 	return &node, nil
 }
 
@@ -736,45 +744,35 @@ func (r *nodeRepository) queryNodes(ctx context.Context, query string, args []an
 	var nodes []*entities.SitemapNode
 	for rows.Next() {
 		var node entities.SitemapNode
-		var parentID sql.NullInt64
-		var description sql.NullString
-		var articleID sql.NullInt64
-		var wpPageID sql.NullInt64
-		var wpURL sql.NullString
-		var lastSyncedAt sql.NullTime
-		var wpTitle sql.NullString
-		var wpSlug sql.NullString
-		var lastError sql.NullString
-		var positionX sql.NullFloat64
-		var positionY sql.NullFloat64
+		var nf nullableNodeFields
 
 		err = rows.Scan(
 			&node.ID,
 			&node.SitemapID,
-			&parentID,
+			&nf.parentID,
 			&node.Title,
 			&node.Slug,
-			&description,
+			&nf.description,
 			&node.IsRoot,
 			&node.Depth,
 			&node.Position,
 			&node.Path,
 			&node.ContentType,
-			&articleID,
-			&wpPageID,
-			&wpURL,
+			&nf.articleID,
+			&nf.wpPageID,
+			&nf.wpURL,
 			&node.Source,
 			&node.IsSynced,
-			&lastSyncedAt,
-			&wpTitle,
-			&wpSlug,
+			&nf.lastSyncedAt,
+			&nf.wpTitle,
+			&nf.wpSlug,
 			&node.DesignStatus,
 			&node.GenerationStatus,
 			&node.PublishStatus,
 			&node.IsModifiedLocally,
-			&lastError,
-			&positionX,
-			&positionY,
+			&nf.lastError,
+			&nf.positionX,
+			&nf.positionY,
 			&node.CreatedAt,
 			&node.UpdatedAt,
 		)
@@ -782,43 +780,7 @@ func (r *nodeRepository) queryNodes(ctx context.Context, query string, args []an
 			return nil, errors.Database(err)
 		}
 
-		if parentID.Valid {
-			node.ParentID = &parentID.Int64
-		}
-		if description.Valid {
-			node.Description = &description.String
-		}
-		if articleID.Valid {
-			node.ArticleID = &articleID.Int64
-		}
-		if wpPageID.Valid {
-			wpPageIDInt := int(wpPageID.Int64)
-			node.WPPageID = &wpPageIDInt
-		}
-		if wpURL.Valid {
-			node.WPURL = &wpURL.String
-		}
-		if lastSyncedAt.Valid {
-			node.LastSyncedAt = &lastSyncedAt.Time
-		}
-		if wpTitle.Valid {
-			node.WPTitle = &wpTitle.String
-		}
-		if wpSlug.Valid {
-			node.WPSlug = &wpSlug.String
-		}
-		if lastError.Valid {
-			node.LastError = &lastError.String
-		}
-		if positionX.Valid {
-			node.PositionX = &positionX.Float64
-		}
-		if positionY.Valid {
-			node.PositionY = &positionY.Float64
-		}
-
-		node.Path = normalizePath(node.Path)
-
+		applyNullableFields(&node, &nf)
 		nodes = append(nodes, &node)
 	}
 

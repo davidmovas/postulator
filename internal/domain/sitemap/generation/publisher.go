@@ -57,7 +57,7 @@ func (p *Publisher) Publish(ctx context.Context, req PublishRequest) (*PublishRe
 		return nil, fmt.Errorf("failed to get site: %w", err)
 	}
 
-	wpStatus := mapPublishAsToWPStatus(req.PublishAs)
+	wpStatus := MapPublishAsToWPStatus(req.PublishAs)
 
 	wpPage := &wp.WPPage{
 		Title:   req.Content.Title,
@@ -93,7 +93,7 @@ func (p *Publisher) Publish(ctx context.Context, req PublishRequest) (*PublishRe
 
 	now := time.Now()
 	var publishedAt *time.Time
-	if wpStatus == "publish" {
+	if wpStatus == sitemap.WPStatusPublish {
 		publishedAt = &now
 	}
 
@@ -111,7 +111,7 @@ func (p *Publisher) Publish(ctx context.Context, req PublishRequest) (*PublishRe
 		ContentType:     entities.ContentTypePage,
 		WPPageID:        &wpPageID,
 		WPPostURL:       wpURL,
-		Status:          mapWPStatusToArticleStatus(wpStatus),
+		Status:          sitemap.WPStatusToArticleStatus(wpStatus),
 		WordCount:       &wordCount,
 		Source:          entities.SourceGenerated,
 		Slug:            &wpPage.Slug,
@@ -157,7 +157,7 @@ func (p *Publisher) updateNodeAfterPublish(
 	node.WPSlug = &node.Slug
 	node.ContentType = entities.NodeContentTypePage // Set content type for publish status changes
 	node.GenerationStatus = entities.GenStatusGenerated
-	node.PublishStatus = mapWPStatusToPublishStatus(wpStatus)
+	node.PublishStatus = sitemap.WPStatusToPublishStatus(wpStatus)
 	node.IsSynced = true
 	now := time.Now()
 	node.LastSyncedAt = &now
@@ -165,44 +165,16 @@ func (p *Publisher) updateNodeAfterPublish(
 	return p.sitemapSvc.UpdateNode(ctx, node)
 }
 
-func mapPublishAsToWPStatus(publishAs PublishAs) string {
+func MapPublishAsToWPStatus(publishAs PublishAs) string {
 	switch publishAs {
 	case PublishAsPublish:
-		return "publish"
+		return sitemap.WPStatusPublish
 	case PublishAsDraft:
-		return "draft"
+		return sitemap.WPStatusDraft
 	case PublishAsPending:
-		return "pending"
+		return sitemap.WPStatusPending
 	default:
-		return "draft"
-	}
-}
-
-func mapWPStatusToArticleStatus(wpStatus string) entities.ArticleStatus {
-	switch wpStatus {
-	case "publish":
-		return entities.StatusPublished
-	case "draft":
-		return entities.StatusDraft
-	case "pending":
-		return entities.StatusPending
-	case "private":
-		return entities.StatusPrivate
-	default:
-		return entities.StatusDraft
-	}
-}
-
-func mapWPStatusToPublishStatus(wpStatus string) entities.NodePublishStatus {
-	switch wpStatus {
-	case "publish":
-		return entities.PubStatusPublished
-	case "draft":
-		return entities.PubStatusDraft
-	case "pending":
-		return entities.PubStatusPending
-	default:
-		return entities.PubStatusDraft
+		return sitemap.WPStatusDraft
 	}
 }
 

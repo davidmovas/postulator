@@ -34,8 +34,8 @@ export function useSitemapHistory(options: UseSitemapHistoryOptions) {
             if (result) {
                 setState(result);
             }
-        } catch (error) {
-            console.error("[History] Failed to load state:", error);
+        } catch {
+            // Error handled silently - history state will remain empty
         }
     }, [sitemapId]);
 
@@ -48,7 +48,7 @@ export function useSitemapHistory(options: UseSitemapHistoryOptions) {
     useEffect(() => {
         return () => {
             if (sitemapId) {
-                sitemapService.clearHistory(sitemapId).catch(console.error);
+                sitemapService.clearHistory(sitemapId).catch(() => {});
             }
         };
     }, [sitemapId]);
@@ -65,8 +65,7 @@ export function useSitemapHistory(options: UseSitemapHistoryOptions) {
                 return true;
             }
             return false;
-        } catch (error) {
-            console.error("[History] Undo failed:", error);
+        } catch {
             return false;
         } finally {
             setIsApplying(false);
@@ -85,8 +84,7 @@ export function useSitemapHistory(options: UseSitemapHistoryOptions) {
                 return true;
             }
             return false;
-        } catch (error) {
-            console.error("[History] Redo failed:", error);
+        } catch {
             return false;
         } finally {
             setIsApplying(false);
@@ -110,8 +108,8 @@ export function useSitemapHistory(options: UseSitemapHistoryOptions) {
                 undoCount: 0,
                 redoCount: 0,
             });
-        } catch (error) {
-            console.error("[History] Clear failed:", error);
+        } catch {
+            // Error handled silently
         }
     }, [sitemapId]);
 

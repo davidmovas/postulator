@@ -85,8 +85,8 @@ export function useSitemapWPOperations({
                 const tasks = await sitemapService.listActivePageGenerationTasks();
                 const activeTask = tasks.find((t) => t.sitemapId === sitemapId);
                 setActiveGenerationTask(activeTask || null);
-            } catch (err) {
-                console.error("Failed to check active tasks:", err);
+            } catch {
+                // Error handled silently - active task will remain null
             }
         };
         checkActiveTask();
@@ -102,8 +102,7 @@ export function useSitemapWPOperations({
             try {
                 const task = await sitemapService.getPageGenerationTask(data.TaskID);
                 setActiveGenerationTask(task);
-            } catch (err) {
-                console.error("Failed to fetch task after started event:", err);
+            } catch {
                 // Fallback: create minimal task from event data
                 setActiveGenerationTask({
                     id: data.TaskID,
@@ -265,8 +264,8 @@ export function useSitemapWPOperations({
         try {
             await sitemapService.pausePageGeneration(activeGenerationTask.id);
             setActiveGenerationTask((prev) => prev ? { ...prev, status: "paused" } : null);
-        } catch (err) {
-            console.error("Failed to pause generation:", err);
+        } catch {
+            // Error handled silently
         }
     }, [activeGenerationTask]);
 
@@ -275,8 +274,8 @@ export function useSitemapWPOperations({
         try {
             await sitemapService.resumePageGeneration(activeGenerationTask.id);
             setActiveGenerationTask((prev) => prev ? { ...prev, status: "running" } : null);
-        } catch (err) {
-            console.error("Failed to resume generation:", err);
+        } catch {
+            // Error handled silently
         }
     }, [activeGenerationTask]);
 
@@ -285,8 +284,8 @@ export function useSitemapWPOperations({
         try {
             await sitemapService.cancelPageGeneration(activeGenerationTask.id);
             setActiveGenerationTask((prev) => prev ? { ...prev, status: "cancelled" } : null);
-        } catch (err) {
-            console.error("Failed to cancel generation:", err);
+        } catch {
+            // Error handled silently
         }
     }, [activeGenerationTask]);
 

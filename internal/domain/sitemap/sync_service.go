@@ -104,7 +104,7 @@ func (s *SyncService) SyncFromWP(ctx context.Context, siteID int64, nodeIDs []in
 				wpSlug = *article.Slug
 			}
 			wpURL = article.WPPostURL
-			wpStatus = mapArticleStatusToWPStatus(article.Status)
+			wpStatus = ArticleStatusToWPStatus(article.Status)
 
 		default:
 			result.Error = "unsupported content type for sync"
@@ -117,7 +117,7 @@ func (s *SyncService) SyncFromWP(ctx context.Context, siteID int64, nodeIDs []in
 		node.WPURL = &wpURL
 		node.WPTitle = &wpTitle
 		node.WPSlug = &wpSlug
-		node.PublishStatus = mapWPStatusToPublishStatus(wpStatus)
+		node.PublishStatus = WPStatusToPublishStatus(wpStatus)
 		node.IsModifiedLocally = false
 		node.IsSynced = true
 		now := time.Now()
@@ -236,34 +236,6 @@ func (s *SyncService) UpdateToWP(ctx context.Context, siteID int64, nodeIDs []in
 	return results, nil
 }
 
-func mapWPStatusToPublishStatus(wpStatus string) entities.NodePublishStatus {
-	switch wpStatus {
-	case "publish":
-		return entities.PubStatusPublished
-	case "draft":
-		return entities.PubStatusDraft
-	case "pending":
-		return entities.PubStatusPending
-	default:
-		return entities.PubStatusNone
-	}
-}
-
-// mapArticleStatusToWPStatus converts ArticleStatus to WP status string
-func mapArticleStatusToWPStatus(status entities.ArticleStatus) string {
-	switch status {
-	case entities.StatusPublished:
-		return "publish"
-	case entities.StatusDraft:
-		return "draft"
-	case entities.StatusPending:
-		return "pending"
-	case entities.StatusPrivate:
-		return "private"
-	default:
-		return "draft"
-	}
-}
 
 // GetModifiedNodes returns all nodes in a sitemap that have local modifications
 func (s *SyncService) GetModifiedNodes(ctx context.Context, sitemapID int64) ([]*entities.SitemapNode, error) {
@@ -321,7 +293,7 @@ func (s *SyncService) ChangePublishStatus(ctx context.Context, siteID int64, nod
 	wpID := *node.WPPageID
 
 	// Map our status to WP status
-	wpStatus := mapPublishStatusToWPStatus(newStatus)
+	wpStatus := PublishStatusToWPStatus(newStatus)
 
 	// Update WP based on content type
 	switch node.ContentType {
@@ -337,7 +309,7 @@ func (s *SyncService) ChangePublishStatus(ctx context.Context, siteID int64, nod
 	case entities.NodeContentTypePost:
 		article := &entities.Article{
 			WPPostID: wpID,
-			Status:   mapWPStatusToArticleStatus(wpStatus),
+			Status:   WPStatusToArticleStatus(wpStatus),
 		}
 		if err := s.wpClient.UpdatePost(ctx, site, article); err != nil {
 			return fmt.Errorf("failed to update post status in WP: %w", err)
@@ -360,30 +332,3 @@ func (s *SyncService) ChangePublishStatus(ctx context.Context, siteID int64, nod
 	return nil
 }
 
-func mapPublishStatusToWPStatus(status entities.NodePublishStatus) string {
-	switch status {
-	case entities.PubStatusPublished:
-		return "publish"
-	case entities.PubStatusDraft:
-		return "draft"
-	case entities.PubStatusPending:
-		return "pending"
-	default:
-		return "draft"
-	}
-}
-
-func mapWPStatusToArticleStatus(wpStatus string) entities.ArticleStatus {
-	switch wpStatus {
-	case "publish":
-		return entities.StatusPublished
-	case "draft":
-		return entities.StatusDraft
-	case "pending":
-		return entities.StatusPending
-	case "private":
-		return entities.StatusPrivate
-	default:
-		return entities.StatusDraft
-	}
-}

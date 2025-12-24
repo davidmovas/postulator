@@ -214,8 +214,8 @@ func (s *Scanner) scanPosts(ctx context.Context, site *entities.Site, opts *Scan
 
 	for _, post := range posts {
 		// Filter by status
-		wpStatus := mapArticleStatusToWPStatus(post.Status)
-		if wpStatus != "publish" && !opts.IncludeDrafts {
+		wpStatus := sitemap.ArticleStatusToWPStatus(post.Status)
+		if wpStatus != sitemap.WPStatusPublish && !opts.IncludeDrafts {
 			continue
 		}
 
@@ -249,21 +249,6 @@ func (s *Scanner) scanPosts(ctx context.Context, site *entities.Site, opts *Scan
 	return scanned, errors
 }
 
-// mapArticleStatusToWPStatus converts ArticleStatus to WP status string
-func mapArticleStatusToWPStatus(status entities.ArticleStatus) string {
-	switch status {
-	case entities.StatusPublished:
-		return "publish"
-	case entities.StatusDraft:
-		return "draft"
-	case entities.StatusPending:
-		return "pending"
-	case entities.StatusPrivate:
-		return "private"
-	default:
-		return "draft"
-	}
-}
 
 // buildPageTree builds a tree structure from flat pages list
 func (s *Scanner) buildPageTree(pages []*ScannedPage, siteURL string) []*ScannedPage {
@@ -374,7 +359,7 @@ func (s *Scanner) createNodesFromPagesWithTracking(
 			existingNode.WPURL = &page.URL
 			existingNode.WPTitle = &title
 			existingNode.WPSlug = &page.Slug
-			existingNode.PublishStatus = s.mapWPStatusToPublishStatus(page.Status)
+			existingNode.PublishStatus = sitemap.WPStatusToPublishStatus(page.Status)
 
 			if updateErr := s.sitemapSvc.UpdateNode(ctx, existingNode); updateErr != nil {
 				errors = append(errors, ScanError{
@@ -409,7 +394,7 @@ func (s *Scanner) createNodesFromPagesWithTracking(
 			WPSlug:           &page.Slug,
 			DesignStatus:     entities.DesignStatusApproved,
 			GenerationStatus: entities.GenStatusGenerated,
-			PublishStatus:    s.mapWPStatusToPublishStatus(page.Status),
+			PublishStatus:    sitemap.WPStatusToPublishStatus(page.Status),
 		}
 
 		if err := s.sitemapSvc.CreateNode(ctx, node); err != nil {
@@ -489,7 +474,7 @@ func (s *Scanner) createNodesFromPostsWithTracking(
 			existingNode.WPURL = &post.URL
 			existingNode.WPTitle = &title
 			existingNode.WPSlug = &post.Slug
-			existingNode.PublishStatus = s.mapWPStatusToPublishStatus(post.Status)
+			existingNode.PublishStatus = sitemap.WPStatusToPublishStatus(post.Status)
 
 			if updateErr := s.sitemapSvc.UpdateNode(ctx, existingNode); updateErr != nil {
 				errors = append(errors, ScanError{
@@ -517,7 +502,7 @@ func (s *Scanner) createNodesFromPostsWithTracking(
 			WPSlug:           &post.Slug,
 			DesignStatus:     entities.DesignStatusApproved,
 			GenerationStatus: entities.GenStatusGenerated,
-			PublishStatus:    s.mapWPStatusToPublishStatus(post.Status),
+			PublishStatus:    sitemap.WPStatusToPublishStatus(post.Status),
 		}
 
 		if err := s.sitemapSvc.CreateNode(ctx, node); err != nil {
@@ -547,18 +532,6 @@ func (s *Scanner) createNodesFromPostsWithTracking(
 	return created, skipped, errors
 }
 
-func (s *Scanner) mapWPStatusToPublishStatus(wpStatus string) entities.NodePublishStatus {
-	switch wpStatus {
-	case "publish":
-		return entities.PubStatusPublished
-	case "draft":
-		return entities.PubStatusDraft
-	case "pending":
-		return entities.PubStatusPending
-	default:
-		return entities.PubStatusNone
-	}
-}
 
 // ScanIntoSitemap scans a WordPress site and adds nodes to an existing sitemap
 func (s *Scanner) ScanIntoSitemap(

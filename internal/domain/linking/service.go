@@ -238,7 +238,9 @@ func (s *serviceImpl) SuggestLinks(ctx context.Context, config SuggestLinksConfi
 		errMsg := err.Error()
 		plan.Status = PlanStatusFailed
 		plan.Error = &errMsg
-		_ = s.planRepo.Update(ctx, plan)
+		if updateErr := s.planRepo.Update(ctx, plan); updateErr != nil {
+			s.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to update plan %d status", plan.ID))
+		}
 		return err
 	}
 
@@ -273,7 +275,9 @@ func (s *serviceImpl) ApplyLinks(ctx context.Context, planID int64, linkIDs []in
 		errMsg := err.Error()
 		plan.Status = PlanStatusFailed
 		plan.Error = &errMsg
-		_ = s.planRepo.Update(ctx, plan)
+		if updateErr := s.planRepo.Update(ctx, plan); updateErr != nil {
+			s.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to update plan %d status", plan.ID))
+		}
 		return nil, err
 	}
 
@@ -286,7 +290,9 @@ func (s *serviceImpl) ApplyLinks(ctx context.Context, planID int64, linkIDs []in
 		plan.Status = PlanStatusFailed
 	}
 	plan.Error = nil
-	_ = s.planRepo.Update(ctx, plan)
+	if updateErr := s.planRepo.Update(ctx, plan); updateErr != nil {
+		s.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to update plan %d status", plan.ID))
+	}
 
 	s.logger.Infof("Applied %d/%d links for plan %d", result.AppliedLinks, result.TotalLinks, planID)
 

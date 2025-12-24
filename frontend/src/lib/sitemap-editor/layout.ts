@@ -2,17 +2,53 @@ import dagre from "dagre";
 import { Node, Edge, MarkerType } from "@xyflow/react";
 import { SitemapNode } from "@/models/sitemaps";
 
-export const NODE_WIDTH = 200;
-export const NODE_HEIGHT = 60;
+export const LAYOUT = {
+    NODE: {
+        WIDTH: 200,
+        HEIGHT: 60,
+    },
+    MAP_MODE: {
+        DIRECTION: "LR" as const,
+        NODE_SEP: 40,
+        RANK_SEP: 100,
+    },
+    LINKS_MODE: {
+        DIRECTION: "TB" as const,
+        NODE_SEP: 100,
+        RANK_SEP: 180,
+        EDGE_SEP: 50,
+        EXTRA_WIDTH: 20,
+        EXTRA_HEIGHT: 30,
+    },
+} as const;
+
+export const EDGE_STYLES = {
+    HIERARCHY: {
+        STROKE: "#888",
+        STROKE_WIDTH: 1.5,
+    },
+    MARKER: {
+        WIDTH: 12,
+        HEIGHT: 12,
+    },
+} as const;
+
+// Backwards compatibility
+export const NODE_WIDTH = LAYOUT.NODE.WIDTH;
+export const NODE_HEIGHT = LAYOUT.NODE.HEIGHT;
 
 export const getLayoutedElements = (
     nodes: Node[],
     edges: Edge[],
-    direction = "LR"
+    direction = LAYOUT.MAP_MODE.DIRECTION
 ) => {
     const dagreGraph = new dagre.graphlib.Graph();
     dagreGraph.setDefaultEdgeLabel(() => ({}));
-    dagreGraph.setGraph({ rankdir: direction, nodesep: 40, ranksep: 100 });
+    dagreGraph.setGraph({
+        rankdir: direction,
+        nodesep: LAYOUT.MAP_MODE.NODE_SEP,
+        ranksep: LAYOUT.MAP_MODE.RANK_SEP,
+    });
 
     nodes.forEach((node) => {
         dagreGraph.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
@@ -48,23 +84,24 @@ export const getLinksLayoutedElements = (
     nodes: Node[],
     hierarchyEdges: Edge[],
     linkEdges: Edge[] = [],
-    direction = "TB" // Top to bottom works better for links visualization
+    direction = LAYOUT.LINKS_MODE.DIRECTION
 ) => {
     const dagreGraph = new dagre.graphlib.Graph();
     dagreGraph.setDefaultEdgeLabel(() => ({}));
-    // Wider spacing for links mode to accommodate additional link edges
     dagreGraph.setGraph({
         rankdir: direction,
-        nodesep: 100,  // Horizontal spacing between nodes
-        ranksep: 180,  // Vertical spacing between ranks
-        edgesep: 50,   // Spacing between edges
+        nodesep: LAYOUT.LINKS_MODE.NODE_SEP,
+        ranksep: LAYOUT.LINKS_MODE.RANK_SEP,
+        edgesep: LAYOUT.LINKS_MODE.EDGE_SEP,
     });
 
-    // Set nodes with extra height for link badges
+    const nodeWidth = NODE_WIDTH + LAYOUT.LINKS_MODE.EXTRA_WIDTH;
+    const nodeHeight = NODE_HEIGHT + LAYOUT.LINKS_MODE.EXTRA_HEIGHT;
+
     nodes.forEach((node) => {
         dagreGraph.setNode(node.id, {
-            width: NODE_WIDTH + 20,  // Extra width for handles
-            height: NODE_HEIGHT + 30, // Extra height for link badges
+            width: nodeWidth,
+            height: nodeHeight,
         });
     });
 
@@ -93,8 +130,8 @@ export const getLinksLayoutedElements = (
         const nodeWithPosition = dagreGraph.node(node.id);
         if (nodeWithPosition) {
             newPositions.set(node.id, {
-                x: nodeWithPosition.x - (NODE_WIDTH + 20) / 2,
-                y: nodeWithPosition.y - (NODE_HEIGHT + 30) / 2,
+                x: nodeWithPosition.x - nodeWidth / 2,
+                y: nodeWithPosition.y - nodeHeight / 2,
             });
         }
     });
@@ -129,12 +166,12 @@ export const convertToFlowEdges = (sitemapNodes: SitemapNode[]): Edge[] => {
                 target: String(node.id),
                 type: "default",
                 animated: false,
-                style: { stroke: "#888", strokeWidth: 1.5 },
+                style: { stroke: EDGE_STYLES.HIERARCHY.STROKE, strokeWidth: EDGE_STYLES.HIERARCHY.STROKE_WIDTH },
                 markerEnd: {
                     type: MarkerType.ArrowClosed,
-                    width: 12,
-                    height: 12,
-                    color: "#888",
+                    width: EDGE_STYLES.MARKER.WIDTH,
+                    height: EDGE_STYLES.MARKER.HEIGHT,
+                    color: EDGE_STYLES.HIERARCHY.STROKE,
                 },
             });
         }

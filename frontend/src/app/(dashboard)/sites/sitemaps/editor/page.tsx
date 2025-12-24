@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
     ReactFlow,
     Background,
-    BackgroundVariant,
     Panel,
     NodeTypes,
     EdgeTypes,
@@ -17,23 +16,16 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { useHotkeys, HotkeyConfig } from "@/hooks/use-hotkeys";
+import { useHotkeys } from "@/hooks/use-hotkeys";
 import { useSitemapEditorData } from "@/hooks/use-sitemap-editor-data";
 import { useSitemapNodeOperations } from "@/hooks/use-sitemap-node-operations";
 import { useSitemapWPOperations } from "@/hooks/use-sitemap-wp-operations";
 import { useSitemapCanvas } from "@/hooks/use-sitemap-canvas";
 import { sitemapService } from "@/services/sitemaps";
 import { CreateNodeInput } from "@/models/sitemaps";
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { EDITOR } from "./constants";
+import { EditorDialogs } from "./components/editor-dialogs";
+import { createHotkeyConfig } from "./components/editor-hotkeys";
 import {
     ResizableHandle,
     ResizablePanel,
@@ -41,23 +33,9 @@ import {
 } from "@/components/ui/resizable";
 import { SitemapNodeCard } from "@/components/sitemaps/sitemap-node-card";
 import { LinkEdge } from "@/components/sitemaps/link-edge";
-import { LinkContextMenu } from "@/components/sitemaps/link-context-menu";
 import { useSitemapLinking } from "@/hooks/use-sitemap-linking";
-import { NodeEditDialog } from "@/components/sitemaps/node-edit-dialog";
-import { NodeLinksDialog } from "@/components/sitemaps/node-links-dialog";
 import { SitemapSidebar } from "@/components/sitemaps/sitemap-sidebar";
 import { CanvasControls } from "@/components/sitemaps/canvas-controls";
-import { CanvasContextMenu } from "@/components/sitemaps/canvas-context-menu";
-import { EdgeContextMenu } from "@/components/sitemaps/edge-context-menu";
-import { HotkeysDialog } from "@/components/sitemaps/hotkeys-dialog";
-import { BulkCreateDialog } from "@/components/sitemaps/bulk-create-dialog";
-import { CommandPalette } from "@/components/sitemaps/command-palette";
-import { ImportDialog } from "@/components/sitemaps/import-dialog";
-import { ScanDialog } from "@/components/sitemaps/scan-dialog";
-import { GenerateDialog } from "@/components/sitemaps/generate-dialog";
-import { PageGenerateDialog } from "@/components/sitemaps/page-generate-dialog";
-import { SuggestLinksDialog } from "@/components/sitemaps/suggest-links-dialog";
-import { ApplyLinksDialog } from "@/components/sitemaps/apply-links-dialog";
 import { EditorHeader, EditorMode } from "@/components/sitemaps/editor-header";
 import { GenerationProgressPanel } from "@/components/sitemaps/generation-progress-panel";
 import { createNodesFromPaths } from "@/lib/sitemap-utils";
@@ -143,7 +121,7 @@ function SitemapEditorFlow() {
             const timer = setTimeout(() => {
                 const nodeIds = nodes.map((node) => node.id);
                 updateNodeInternals(nodeIds);
-            }, 50);
+            }, EDITOR.TIMING.MODE_SWITCH_DELAY_MS);
             return () => clearTimeout(timer);
         }
     }, [editorMode, nodes, updateNodeInternals]);
@@ -233,7 +211,6 @@ function SitemapEditorFlow() {
     // Links mode - hovered node for highlighting connections
     const [hoveredNodeId, setHoveredNodeId] = useState<number | null>(null);
     const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const HOVER_DELAY_MS = 200; // Delay before highlighting to avoid flickering
 
     // Compute nodes with mode-specific data and positions
     // Key includes editorMode to force re-mount when mode changes (handles need to re-register)
@@ -429,7 +406,7 @@ function SitemapEditorFlow() {
         // Apply delay before highlighting
         hoverTimeoutRef.current = setTimeout(() => {
             setHoveredNodeId(nodeId);
-        }, HOVER_DELAY_MS);
+        }, EDITOR.TIMING.HOVER_DELAY_MS);
     }, [editorMode, linking.linkCountsMap]);
 
     const handleNodeMouseLeave = useCallback(() => {
@@ -520,11 +497,11 @@ function SitemapEditorFlow() {
         setTimeout(() => {
             fitView({
                 nodes: [{ id: String(nodeId) }],
-                duration: 300,
-                padding: 0.5,
-                maxZoom: 1,
+                duration: EDITOR.FIT_VIEW.GO_TO_NODE_DURATION,
+                padding: EDITOR.FIT_VIEW.GO_TO_NODE_PADDING,
+                maxZoom: EDITOR.FIT_VIEW.GO_TO_NODE_MAX_ZOOM,
             });
-        }, 100);
+        }, EDITOR.TIMING.DIALOG_CLOSE_DELAY_MS);
     }, [fitView]);
 
     // Get the selected node for links dialog
@@ -571,8 +548,8 @@ function SitemapEditorFlow() {
             )) {
             }
             await loadData();
-        } catch (error) {
-            console.error("Failed to create nodes:", error);
+        } catch {
+            // Error handled silently - nodes creation failure
         }
     }, [sitemapId, sitemapNodes, loadData]);
 
@@ -592,109 +569,21 @@ function SitemapEditorFlow() {
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, []);
 
-    const hotkeys = useMemo<HotkeyConfig[]>(() => [
-        {
-            key: "s",
-            ctrl: true,
-            description: "Save layout",
-            category: "General",
-            action: () => {
-                if (hasUnsavedChanges) handleSavePositions();
-            },
-        },
-        {
-            key: "l",
-            ctrl: true,
-            description: "Auto layout",
-            category: "Layout",
-            action: handleAutoLayout,
-        },
-        {
-            key: "n",
-            ctrl: true,
-            description: "Add new node",
-            category: "Nodes",
-            action: () => nodeOps.handleAddNode(),
-        },
-        {
-            key: "Delete",
-            description: "Delete selected nodes",
-            category: "Nodes",
-            action: nodeOps.handleDeleteSelectedNodes,
-        },
-        {
-            key: "Backspace",
-            description: "Delete selected nodes",
-            category: "Nodes",
-            action: nodeOps.handleDeleteSelectedNodes,
-        },
-        {
-            key: "Escape",
-            description: "Deselect all",
-            category: "Selection",
-            action: () => {
-                setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
-            },
-        },
-        {
-            key: "f",
-            shift: true,
-            description: "Focus search",
-            category: "Navigation",
-            action: () => {
-                searchInputRef.current?.focus();
-            },
-        },
-        {
-            key: "b",
-            ctrl: true,
-            description: "Bulk create nodes",
-            category: "Nodes",
-            action: () => setBulkCreateDialogOpen(true),
-        },
-        {
-            key: "i",
-            ctrl: true,
-            description: "Import from file",
-            category: "Nodes",
-            action: () => setImportDialogOpen(true),
-        },
-        {
-            key: "k",
-            ctrl: true,
-            description: "Scan from WordPress",
-            category: "Nodes",
-            action: () => setScanDialogOpen(true),
-        },
-        {
-            key: "z",
-            ctrl: true,
-            description: "Undo",
-            category: "History",
-            action: handleUndo,
-        },
-        {
-            key: "z",
-            ctrl: true,
-            shift: true,
-            description: "Redo",
-            category: "History",
-            action: handleRedo,
-        },
-        {
-            key: "g",
-            ctrl: true,
-            description: "Generate page content",
-            category: "Content",
-            action: () => wpOps.setPageGenerateDialogOpen(true),
-        },
-        {
-            key: "Tab",
-            description: "Command palette",
-            category: "General",
-            action: () => {},
-        },
-    ], [hasUnsavedChanges, handleSavePositions, handleAutoLayout, nodeOps, setNodes, handleUndo, handleRedo, wpOps]);
+    const hotkeys = useMemo(() => createHotkeyConfig({
+        hasUnsavedChanges,
+        handleSavePositions,
+        handleAutoLayout,
+        handleAddNode: () => nodeOps.handleAddNode(),
+        handleDeleteSelectedNodes: nodeOps.handleDeleteSelectedNodes,
+        setNodes,
+        handleUndo,
+        handleRedo,
+        setBulkCreateDialogOpen,
+        setImportDialogOpen,
+        setScanDialogOpen,
+        setPageGenerateDialogOpen: wpOps.setPageGenerateDialogOpen,
+        searchInputRef,
+    }), [hasUnsavedChanges, handleSavePositions, handleAutoLayout, nodeOps, setNodes, handleUndo, handleRedo, wpOps]);
 
     useHotkeys(hotkeys);
 
@@ -791,18 +680,18 @@ function SitemapEditorFlow() {
                             nodeTypes={nodeTypes}
                             edgeTypes={edgeTypes}
                             fitView
-                            fitViewOptions={{ padding: 0.3, maxZoom: 0.8 }}
+                            fitViewOptions={{ padding: EDITOR.FIT_VIEW.PADDING, maxZoom: EDITOR.FIT_VIEW.MAX_ZOOM }}
                             snapToGrid
-                            snapGrid={[15, 15]}
-                            minZoom={0.1}
-                            maxZoom={1.5}
-                            defaultViewport={{ x: 0, y: 0, zoom: 0.7 }}
+                            snapGrid={EDITOR.CANVAS.SNAP_GRID}
+                            minZoom={EDITOR.CANVAS.MIN_ZOOM}
+                            maxZoom={EDITOR.CANVAS.MAX_ZOOM}
+                            defaultViewport={{ x: 0, y: 0, zoom: EDITOR.CANVAS.DEFAULT_ZOOM }}
                             selectionMode={SelectionMode.Partial}
                             selectionOnDrag={false}
                             panOnDrag
                             connectionMode={ConnectionMode.Strict}
                         >
-                            <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+                            <Background variant={EDITOR.CANVAS.BACKGROUND_VARIANT} gap={EDITOR.CANVAS.BACKGROUND_GAP} size={EDITOR.CANVAS.BACKGROUND_SIZE} />
                             <Panel position="bottom-right">
                                 <CanvasControls />
                             </Panel>

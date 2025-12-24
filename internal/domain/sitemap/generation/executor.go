@@ -75,7 +75,7 @@ func (e *Executor) Start(ctx context.Context, config GenerationConfig) (*Task, e
 
 	// Use a background context with long timeout for the goroutine
 	// This ensures the task continues even if the original request context is cancelled
-	taskCtx, cancel := context.WithTimeout(context.Background(), 4*time.Hour)
+	taskCtx, cancel := context.WithTimeout(context.Background(), DefaultTaskTimeout)
 	e.cancelFuncs.Store(taskID, cancel)
 
 	pauseCh := make(chan struct{})

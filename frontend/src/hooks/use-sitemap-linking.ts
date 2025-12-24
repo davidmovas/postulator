@@ -128,7 +128,6 @@ export function useSitemapLinking({
             const graph = await linkingService.getLinkGraph(activePlan.id);
             setLinkGraph(graph);
         } catch (err) {
-            console.error("Failed to load linking data:", err);
             setError(err instanceof Error ? err.message : "Failed to load linking data");
         } finally {
             setIsLoading(false);
@@ -253,7 +252,6 @@ export function useSitemapLinking({
             await loadLinkingData();
             return newLink;
         } catch (err) {
-            console.error("Failed to add link:", err);
             setError(err instanceof Error ? err.message : "Failed to add link");
             return null;
         }
@@ -267,7 +265,6 @@ export function useSitemapLinking({
             await loadLinkingData();
             return true;
         } catch (err) {
-            console.error("Failed to remove link:", err);
             setError(err instanceof Error ? err.message : "Failed to remove link");
             return false;
         }
@@ -281,7 +278,6 @@ export function useSitemapLinking({
             await loadLinkingData();
             return true;
         } catch (err) {
-            console.error("Failed to approve link:", err);
             setError(err instanceof Error ? err.message : "Failed to approve link");
             return false;
         }
@@ -295,7 +291,6 @@ export function useSitemapLinking({
             await loadLinkingData();
             return true;
         } catch (err) {
-            console.error("Failed to reject link:", err);
             setError(err instanceof Error ? err.message : "Failed to reject link");
             return false;
         }
@@ -313,7 +308,6 @@ export function useSitemapLinking({
             await loadLinkingData();
             return true;
         } catch (err) {
-            console.error("Failed to approve all links:", err);
             setError(err instanceof Error ? err.message : "Failed to approve all links");
             return false;
         }
@@ -331,7 +325,6 @@ export function useSitemapLinking({
             await loadLinkingData();
             return true;
         } catch (err) {
-            console.error("Failed to reject all links:", err);
             setError(err instanceof Error ? err.message : "Failed to reject all links");
             return false;
         }
@@ -349,7 +342,6 @@ export function useSitemapLinking({
             await loadLinkingData();
             return true;
         } catch (err) {
-            console.error("Failed to clear AI links:", err);
             setError(err instanceof Error ? err.message : "Failed to clear AI links");
             return false;
         }

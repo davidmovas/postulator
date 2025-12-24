@@ -71,14 +71,14 @@ func (a *Applier) calculateConcurrency(provider *entities.Provider) int {
 	// Calculate concurrency based on RPM
 	// Assume each request takes ~6 seconds on average (10 requests per minute per worker)
 	// We want to stay safely under the limit, so use 80% of theoretical max
-	concurrency := (modelInfo.RPM * 8) / 100 // RPM * 0.8 / 10
+	concurrency := (modelInfo.RPM * RPMMultiplier) / RPMDivisor
 
-	// Clamp between 1 and 10
-	if concurrency < 1 {
-		concurrency = 1
+	// Clamp between MinConcurrency and MaxConcurrency
+	if concurrency < MinConcurrency {
+		concurrency = MinConcurrency
 	}
-	if concurrency > 10 {
-		concurrency = 10
+	if concurrency > MaxConcurrency {
+		concurrency = MaxConcurrency
 	}
 
 	return concurrency
@@ -164,7 +164,9 @@ func (a *Applier) Apply(ctx context.Context, config ApplyConfig) (*ApplyResult, 
 			// Mark all links for this node as failed
 			errMsg := fmt.Sprintf("failed to get source node: %v", err)
 			for _, link := range links {
-				_ = a.linkRepo.UpdateStatus(ctx, link.ID, LinkStatusFailed, &errMsg)
+				if updateErr := a.linkRepo.UpdateStatus(ctx, link.ID, LinkStatusFailed, &errMsg); updateErr != nil {
+					a.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to update link %d status", link.ID))
+				}
 			}
 			continue
 		}
@@ -321,7 +323,9 @@ func (a *Applier) applyLinksToNode(
 		if err != nil {
 			a.logger.ErrorWithErr(err, fmt.Sprintf("Failed to get target node %d", link.TargetNodeID))
 			errMsg := fmt.Sprintf("failed to get target node: %v", err)
-			_ = a.linkRepo.UpdateStatus(ctx, link.ID, LinkStatusFailed, &errMsg)
+			if updateErr := a.linkRepo.UpdateStatus(ctx, link.ID, LinkStatusFailed, &errMsg); updateErr != nil {
+				a.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to update link %d status", link.ID))
+			}
 			continue
 		}
 
@@ -343,7 +347,9 @@ func (a *Applier) applyLinksToNode(
 
 	// Mark only valid links as applying
 	for _, vl := range validLinks {
-		_ = a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusApplying, nil)
+		if updateErr := a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusApplying, nil); updateErr != nil {
+			a.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to update link %d status to applying", vl.link.ID))
+		}
 	}
 
 	// Build AI request with valid targets only
@@ -352,14 +358,12 @@ func (a *Applier) applyLinksToNode(
 		linkTargets[i] = vl.target
 	}
 
-	language := "English"
-
 	request := &ai.InsertLinksRequest{
 		Content:   page.Content,
 		PageTitle: sourceNode.Title,
 		PagePath:  sourceNode.Path,
 		Links:     linkTargets,
-		Language:  language,
+		Language:  DefaultLanguage,
 	}
 
 	a.logger.Infof("Inserting %d links into page %s", len(linkTargets), sourceNode.Title)
@@ -368,14 +372,16 @@ func (a *Applier) applyLinksToNode(
 	if err != nil {
 		errMsg := fmt.Sprintf("AI insertion failed: %v", err)
 		for _, vl := range validLinks {
-			_ = a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusFailed, &errMsg)
+			if updateErr := a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusFailed, &errMsg); updateErr != nil {
+				a.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to update link %d status", vl.link.ID))
+			}
 		}
 		return nil, len(links), fmt.Errorf("AI link insertion failed: %w", err)
 	}
 
 	// Log AI usage
 	if a.aiUsageService != nil {
-		_ = a.aiUsageService.LogFromResult(
+		if logErr := a.aiUsageService.LogFromResult(
 			ctx,
 			siteID,
 			aiusage.OpLinkInsertion,
@@ -388,13 +394,17 @@ func (a *Applier) applyLinksToNode(
 				"links_count":    len(linkTargets),
 				"links_applied":  insertResult.LinksApplied,
 			},
-		)
+		); logErr != nil {
+			a.logger.ErrorWithErr(logErr, "Failed to log AI usage")
+		}
 	}
 
 	if insertResult.LinksApplied == 0 {
 		a.logger.Warnf("AI did not insert any links for node %d", sourceNode.ID)
 		for _, vl := range validLinks {
-			_ = a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusApproved, nil)
+			if updateErr := a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusApproved, nil); updateErr != nil {
+				a.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to reset link %d status to approved", vl.link.ID))
+			}
 		}
 		return nil, failedCount, nil
 	}
@@ -404,7 +414,9 @@ func (a *Applier) applyLinksToNode(
 	if err := a.wpClient.UpdatePage(ctx, site, page); err != nil {
 		errMsg := fmt.Sprintf("failed to update WordPress: %v", err)
 		for _, vl := range validLinks {
-			_ = a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusFailed, &errMsg)
+			if updateErr := a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusFailed, &errMsg); updateErr != nil {
+				a.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to update link %d status", vl.link.ID))
+			}
 		}
 		return nil, len(links), fmt.Errorf("failed to update WordPress page: %w", err)
 	}
@@ -423,7 +435,9 @@ func (a *Applier) applyLinksToNode(
 		if i < appliedCount {
 			vl.link.Status = LinkStatusApplied
 			vl.link.AppliedAt = &now
-			_ = a.linkRepo.Update(ctx, vl.link)
+			if updateErr := a.linkRepo.Update(ctx, vl.link); updateErr != nil {
+				a.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to update link %d", vl.link.ID))
+			}
 
 			anchor := ""
 			if vl.link.AnchorText != nil {
@@ -434,7 +448,9 @@ func (a *Applier) applyLinksToNode(
 				AnchorText: anchor,
 			})
 		} else {
-			_ = a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusApproved, nil)
+			if updateErr := a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusApproved, nil); updateErr != nil {
+				a.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to reset link %d status to approved", vl.link.ID))
+			}
 		}
 	}
 

@@ -13,6 +13,18 @@ type linkRepository struct {
 	db *sql.DB
 }
 
+// linkColumns defines the column list for planned_links table
+var linkColumns = []string{
+	"id", "plan_id", "source_node_id", "target_node_id", "anchor_text", "anchor_context",
+	"status", "source", "position", "confidence", "error", "applied_at", "created_at", "updated_at",
+}
+
+// linkInsertColumns defines the columns for insert operations (excludes id)
+var linkInsertColumns = []string{
+	"plan_id", "source_node_id", "target_node_id", "anchor_text", "anchor_context",
+	"status", "source", "position", "confidence", "error", "applied_at", "created_at", "updated_at",
+}
+
 func NewLinkRepository(db *sql.DB) LinkRepository {
 	return &linkRepository{db: db}
 }
@@ -23,10 +35,7 @@ func (r *linkRepository) Create(ctx context.Context, link *PlannedLink) error {
 	link.UpdatedAt = now
 
 	query, args, err := sq.Insert("planned_links").
-		Columns(
-			"plan_id", "source_node_id", "target_node_id", "anchor_text", "anchor_context",
-			"status", "source", "position", "confidence", "error", "applied_at", "created_at", "updated_at",
-		).
+		Columns(linkInsertColumns...).
 		Values(
 			link.PlanID, link.SourceNodeID, link.TargetNodeID, link.AnchorText, link.AnchorContext,
 			link.Status, link.Source, link.Position, link.Confidence, link.Error, link.AppliedAt, link.CreatedAt, link.UpdatedAt,
@@ -57,10 +66,7 @@ func (r *linkRepository) CreateBatch(ctx context.Context, links []*PlannedLink) 
 
 	now := time.Now()
 	builder := sq.Insert("planned_links").
-		Columns(
-			"plan_id", "source_node_id", "target_node_id", "anchor_text", "anchor_context",
-			"status", "source", "position", "confidence", "error", "applied_at", "created_at", "updated_at",
-		)
+		Columns(linkInsertColumns...)
 
 	for _, link := range links {
 		link.CreatedAt = now
@@ -85,10 +91,7 @@ func (r *linkRepository) CreateBatch(ctx context.Context, links []*PlannedLink) 
 }
 
 func (r *linkRepository) GetByID(ctx context.Context, id int64) (*PlannedLink, error) {
-	query, args, err := sq.Select(
-		"id", "plan_id", "source_node_id", "target_node_id", "anchor_text", "anchor_context",
-		"status", "source", "position", "confidence", "error", "applied_at", "created_at", "updated_at",
-	).
+	query, args, err := sq.Select(linkColumns...).
 		From("planned_links").
 		Where(sq.Eq{"id": id}).
 		ToSql()
@@ -124,10 +127,7 @@ func (r *linkRepository) GetByTargetNodeID(ctx context.Context, planID int64, no
 }
 
 func (r *linkRepository) GetByNodePair(ctx context.Context, planID int64, sourceID int64, targetID int64) (*PlannedLink, error) {
-	query, args, err := sq.Select(
-		"id", "plan_id", "source_node_id", "target_node_id", "anchor_text", "anchor_context",
-		"status", "source", "position", "confidence", "error", "applied_at", "created_at", "updated_at",
-	).
+	query, args, err := sq.Select(linkColumns...).
 		From("planned_links").
 		Where(sq.Eq{"plan_id": planID, "source_node_id": sourceID, "target_node_id": targetID}).
 		ToSql()
@@ -151,10 +151,7 @@ func (r *linkRepository) GetByNodePair(ctx context.Context, planID int64, source
 }
 
 func (r *linkRepository) queryLinks(ctx context.Context, where interface{}) ([]*PlannedLink, error) {
-	query, args, err := sq.Select(
-		"id", "plan_id", "source_node_id", "target_node_id", "anchor_text", "anchor_context",
-		"status", "source", "position", "confidence", "error", "applied_at", "created_at", "updated_at",
-	).
+	query, args, err := sq.Select(linkColumns...).
 		From("planned_links").
 		Where(where).
 		OrderBy("created_at ASC").
