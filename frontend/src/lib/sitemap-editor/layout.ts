@@ -14,9 +14,9 @@ export const LAYOUT = {
     },
     LINKS_MODE: {
         DIRECTION: "TB" as const,
-        NODE_SEP: 100,
-        RANK_SEP: 180,
-        EDGE_SEP: 50,
+        NODE_SEP: 75,
+        RANK_SEP: 140,
+        EDGE_SEP: 40,
         EXTRA_WIDTH: 20,
         EXTRA_HEIGHT: 30,
     },

@@ -389,7 +389,16 @@ function SitemapEditorFlow() {
         // Pass both hierarchy edges and link edges for smart layout
         const newPositions = getLinksLayoutedElements(nodes, edges, linking.linkEdges);
         setLinkModePositions(newPositions);
-    }, [nodes, edges, linking.linkEdges]);
+
+        // Center camera on all nodes after layout
+        setTimeout(() => {
+            fitView({
+                padding: EDITOR.FIT_VIEW.PADDING,
+                duration: EDITOR.FIT_VIEW.GO_TO_NODE_DURATION,
+                maxZoom: EDITOR.FIT_VIEW.MAX_ZOOM,
+            });
+        }, EDITOR.TIMING.MODE_SWITCH_DELAY_MS);
+    }, [nodes, edges, linking.linkEdges, fitView]);
 
     // Combined auto layout handler that works for both modes
     const handleAutoLayout = useCallback(() => {
