@@ -36,7 +36,7 @@ interface UseSitemapWPOperationsProps {
         errorTitle?: string;
         successTitle?: string;
         successDescription?: string;
-    }) => Promise<T | undefined>;
+    }) => Promise<T | null>;
     loadData: (preservePositions?: boolean) => Promise<void>;
 }
 

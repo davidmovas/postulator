@@ -455,8 +455,15 @@ You must respond with a valid JSON object in the following format:
 
 Do not include any text before or after the JSON object. Only output the JSON.`
 
-	systemPrompt := buildInsertLinksSystemPrompt(request.Language) + "\n\n" + jsonInstructions
-	userPrompt := buildInsertLinksUserPrompt(request)
+	systemPrompt := request.SystemPrompt
+	if systemPrompt == "" {
+		systemPrompt = buildInsertLinksSystemPrompt(request.Language)
+	}
+	systemPrompt = systemPrompt + "\n\n" + jsonInstructions
+	userPrompt := request.UserPrompt
+	if userPrompt == "" {
+		userPrompt = buildInsertLinksUserPrompt(request)
+	}
 
 	fmt.Printf("[Anthropic] InsertLinks: model=%s, contentLen=%d, links=%d\n",
 		c.model, len(request.Content), len(request.Links))

@@ -15,7 +15,9 @@ import {
     ApproveLink,
     RejectLink,
     SuggestLinks,
+    CancelSuggest,
     ApplyLinks,
+    CancelApply,
     GetLinkGraph,
 } from "@/wailsjs/wailsjs/go/handlers/LinkingHandler";
 import {
@@ -147,6 +149,11 @@ export const linkingService = {
         unwrapResponse<boolean>(response);
     },
 
+    async cancelSuggest(planId: number): Promise<boolean> {
+        const response = await CancelSuggest(planId);
+        return unwrapResponse<boolean>(response);
+    },
+
     // Apply links to WordPress
     async applyLinks(input: ApplyLinksInput): Promise<ApplyLinksResult> {
         const payload = new dto.ApplyLinksRequest({
@@ -161,6 +168,11 @@ export const linkingService = {
             appliedLinks: data.appliedLinks,
             failedLinks: data.failedLinks,
         };
+    },
+
+    async cancelApply(planId: number): Promise<boolean> {
+        const response = await CancelApply(planId);
+        return unwrapResponse<boolean>(response);
     },
 
     // Graph visualization

@@ -106,11 +106,13 @@ type InsertLinkTarget struct {
 
 // InsertLinksRequest contains the data for inserting links into existing HTML content
 type InsertLinksRequest struct {
-	Content   string             // Existing HTML content
-	PageTitle string             // Title of the current page
-	PagePath  string             // Path of the current page
-	Links     []InsertLinkTarget // Links to insert
-	Language  string             // Content language
+	Content      string             // Existing HTML content
+	PageTitle    string             // Title of the current page
+	PagePath     string             // Path of the current page
+	Links        []InsertLinkTarget // Links to insert
+	Language     string             // Content language
+	SystemPrompt string             // Optional: custom system prompt (uses default if empty)
+	UserPrompt   string             // Optional: custom user prompt (uses default if empty)
 }
 
 // InsertLinksResult contains the content with links inserted

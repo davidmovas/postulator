@@ -150,24 +150,19 @@ export function GenerateDialog(props: GenerateDialogProps) {
             const activeProviders = providersData.filter((p) => p.isActive);
             setProviders(activeProviders);
 
-            // Filter sitemap-related prompts (or all if no category filter exists)
-            setPrompts(promptsData);
+            // Filter prompts by sitemap_gen category
+            const sitemapPrompts = promptsData.filter((p) => p.category === "sitemap_gen");
+            setPrompts(sitemapPrompts);
 
             // Set defaults
             if (activeProviders.length > 0 && !providerId) {
                 setProviderId(activeProviders[0].id);
             }
-            if (promptsData.length > 0 && !promptId) {
-                // Try to find a sitemap generation prompt
-                const sitemapPrompt = promptsData.find(
-                    (p) =>
-                        p.name.toLowerCase().includes("sitemap") ||
-                        p.name.toLowerCase().includes("structure")
-                );
-                setPromptId(sitemapPrompt?.id || promptsData[0].id);
+            if (sitemapPrompts.length > 0 && !promptId) {
+                setPromptId(sitemapPrompts[0].id);
             }
-        } catch (err) {
-            console.error("Failed to load data:", err);
+        } catch {
+            // Error already handled by Promise rejection
         } finally {
             setIsLoadingData(false);
         }
@@ -225,8 +220,8 @@ export function GenerateDialog(props: GenerateDialogProps) {
         try {
             await sitemapService.cancelSitemapGeneration();
             setGenerateState("cancelled");
-        } catch (err) {
-            console.error("Failed to cancel generation:", err);
+        } catch {
+            // Cancel failed silently - user will see generation continues
         }
     };
 
@@ -320,6 +315,7 @@ export function GenerateDialog(props: GenerateDialogProps) {
 
                                     {/* Tabs for Input/Preview */}
                                     <Tabs
+                                        defaultValue="input"
                                         value={activeTab}
                                         onValueChange={(v) => setActiveTab(v as "input" | "preview")}
                                         className="flex-1 flex flex-col min-h-0"

@@ -1,5 +1,5 @@
 import { useCallback, useState, useRef } from "react";
-import { Node, Edge, Connection, useReactFlow } from "@xyflow/react";
+import { Node, Edge, Connection, useReactFlow, OnConnectStart, OnConnectEnd } from "@xyflow/react";
 import { sitemapService } from "@/services/sitemaps";
 import { SitemapNode } from "@/models/sitemaps";
 import { getLayoutedElements } from "@/lib/sitemap-editor";
@@ -10,7 +10,7 @@ interface UseSitemapCanvasProps {
     edges: Edge[];
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
     setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
-    execute: <T>(fn: () => Promise<T>, options?: { errorTitle?: string }) => Promise<T | undefined>;
+    execute: <T>(fn: () => Promise<T>, options?: { errorTitle?: string }) => Promise<T | null>;
     loadData: (preservePositions?: boolean) => Promise<void>;
     refreshHistory: () => Promise<void>;
     getAllDescendantIds: (nodeId: number) => number[];
@@ -46,7 +46,7 @@ export function useSitemapCanvas({
     const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
     const [sidebarSelectedNodeIds, setSidebarSelectedNodeIds] = useState<Set<number>>(new Set());
 
-    const onConnectStart = useCallback((_: React.MouseEvent | React.TouchEvent, { nodeId }: { nodeId: string | null }) => {
+    const onConnectStart: OnConnectStart = useCallback((_event, { nodeId }) => {
         connectingNodeId.current = nodeId;
     }, []);
 
@@ -65,7 +65,7 @@ export function useSitemapCanvas({
         await refreshHistory();
     }, [execute, loadData, refreshHistory]);
 
-    const onConnectEnd = useCallback(async (event: MouseEvent | TouchEvent) => {
+    const onConnectEnd: OnConnectEnd = useCallback(async (event, _connectionState) => {
         if (!connectingNodeId.current) return;
 
         const target = event.target as Element;
@@ -139,7 +139,7 @@ export function useSitemapCanvas({
         }
     }, [sitemapNodes]);
 
-    const onPaneContextMenu = useCallback((event: React.MouseEvent) => {
+    const onPaneContextMenu = useCallback((event: MouseEvent | React.MouseEvent) => {
         event.preventDefault();
         setContextMenuNode(null);
         setContextMenuPosition({ x: event.clientX, y: event.clientY });

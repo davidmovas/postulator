@@ -8,6 +8,10 @@ export function ApplyLinks(arg1:dto.ApplyLinksRequest):Promise<dto.Response_gith
 
 export function ApproveLink(arg1:number):Promise<dto.Response_bool_>;
 
+export function CancelApply(arg1:number):Promise<dto.Response_bool_>;
+
+export function CancelSuggest(arg1:number):Promise<dto.Response_bool_>;
+
 export function CreatePlan(arg1:dto.CreateLinkPlanRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_LinkPlan_>;
 
 export function DeletePlan(arg1:number):Promise<dto.Response_bool_>;

@@ -14,11 +14,18 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { useApiCall } from "@/hooks/use-api-call";
 import { promptService } from "@/services/prompts";
-import { PromptCreateInput } from "@/models/prompts";
+import { PromptCreateInput, PromptCategory, PROMPT_CATEGORIES } from "@/models/prompts";
 import { extractPlaceholdersFromPrompts } from "@/lib/prompt-utils";
-import { MessageSquare, User, Tag } from "lucide-react";
+import { MessageSquare, User, Tag, FolderOpen } from "lucide-react";
 
 interface CreatePromptModalProps {
     open: boolean;
@@ -31,6 +38,7 @@ export function CreatePromptModal({ open, onOpenChange, onSuccess }: CreatePromp
 
     const [formData, setFormData] = useState<PromptCreateInput>({
         name: "",
+        category: "post_gen",
         systemPrompt: "",
         userPrompt: "",
         placeholders: []
@@ -43,6 +51,7 @@ export function CreatePromptModal({ open, onOpenChange, onSuccess }: CreatePromp
     const resetForm = () => {
         setFormData({
             name: "",
+            category: "post_gen",
             systemPrompt: "",
             userPrompt: "",
             placeholders: []
@@ -92,19 +101,49 @@ export function CreatePromptModal({ open, onOpenChange, onSuccess }: CreatePromp
                 </DialogHeader>
 
                 <div className="space-y-6 py-4">
-                    {/* Name */}
-                    <div className="space-y-2">
-                        <Label htmlFor="name">Prompt Name</Label>
-                        <Input
-                            id="name"
-                            placeholder="e.g., Article Generator, Social Media Post"
-                            value={formData.name}
-                            onChange={(e) => setFormData(prev => ({
-                                ...prev,
-                                name: e.target.value
-                            }))}
-                            disabled={isLoading}
-                        />
+                    {/* Name and Category Row */}
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* Name */}
+                        <div className="space-y-2">
+                            <Label htmlFor="name">Prompt Name</Label>
+                            <Input
+                                id="name"
+                                placeholder="e.g., Article Generator"
+                                value={formData.name}
+                                onChange={(e) => setFormData(prev => ({
+                                    ...prev,
+                                    name: e.target.value
+                                }))}
+                                disabled={isLoading}
+                            />
+                        </div>
+
+                        {/* Category */}
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                                <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                                <Label htmlFor="category">Category</Label>
+                            </div>
+                            <Select
+                                value={formData.category}
+                                onValueChange={(value: PromptCategory) => setFormData(prev => ({
+                                    ...prev,
+                                    category: value
+                                }))}
+                                disabled={isLoading}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {Object.entries(PROMPT_CATEGORIES).map(([value, label]) => (
+                                        <SelectItem key={value} value={value}>
+                                            {label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
 
                     {/* System Prompt */}

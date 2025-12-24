@@ -13,6 +13,8 @@ import {
     ConnectionMode,
     useUpdateNodeInternals,
     useReactFlow,
+    OnConnectStart,
+    OnConnectEnd,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -198,12 +200,12 @@ function SitemapEditorFlow() {
     }, []);
 
     // Unified handlers that check mode internally - React Flow needs stable handler references
-    const handleConnectStart = useCallback(
-        (event: React.MouseEvent | React.TouchEvent, params: { nodeId: string | null; handleId: string | null; handleType: "source" | "target" | null }) => {
+    const handleConnectStart: OnConnectStart = useCallback(
+        (event, params) => {
             if (editorMode === "links") {
-                linking.onConnectStart(event as any, params);
+                linking.onConnectStart(event, params);
             } else {
-                canvas.onConnectStart(event as any, params);
+                canvas.onConnectStart(event, params);
             }
         },
         [editorMode, linking.onConnectStart, canvas.onConnectStart]
@@ -220,12 +222,12 @@ function SitemapEditorFlow() {
         [editorMode, linking.onConnect, canvas.onConnect]
     );
 
-    const handleConnectEnd = useCallback(
-        (event: MouseEvent | TouchEvent) => {
+    const handleConnectEnd: OnConnectEnd = useCallback(
+        (event, connectionState) => {
             if (editorMode === "links") {
-                linking.onConnectEnd(event);
+                linking.onConnectEnd(event, connectionState);
             } else {
-                canvas.onConnectEnd(event);
+                canvas.onConnectEnd(event, connectionState);
             }
         },
         [editorMode, linking.onConnectEnd, canvas.onConnectEnd]
@@ -325,19 +327,21 @@ function SitemapEditorFlow() {
 
                 if (isIncoming) {
                     // Cyan - edge coming into hovered node (links TO hovered)
+                    const existingMarker = typeof edge.markerEnd === "object" ? edge.markerEnd : { type: "arrowclosed" as const };
                     return {
                         ...edge,
                         style: { ...edge.style, stroke: "#22d3ee", strokeWidth: 3 },
-                        markerEnd: { ...edge.markerEnd, color: "#22d3ee" },
+                        markerEnd: { ...existingMarker, color: "#22d3ee" },
                         zIndex: 10,
                     };
                 }
                 if (isOutgoing) {
                     // Emerald - edge going out from hovered node (hovered links TO)
+                    const existingMarker = typeof edge.markerEnd === "object" ? edge.markerEnd : { type: "arrowclosed" as const };
                     return {
                         ...edge,
                         style: { ...edge.style, stroke: "#34d399", strokeWidth: 3 },
-                        markerEnd: { ...edge.markerEnd, color: "#34d399" },
+                        markerEnd: { ...existingMarker, color: "#34d399" },
                         zIndex: 10,
                     };
                 }

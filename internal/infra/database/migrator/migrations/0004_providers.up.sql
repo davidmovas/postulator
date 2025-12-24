@@ -18,22 +18,6 @@ CREATE TABLE ai_providers (
 
 CREATE INDEX idx_ai_providers_active ON ai_providers(is_active);
 
--- =========================================================================
--- PROMPTS
--- =========================================================================
-
-CREATE TABLE prompts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    system_prompt TEXT NOT NULL,
-    user_prompt TEXT NOT NULL,
-    placeholders TEXT,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
 -- +goose Down
-DROP TABLE IF EXISTS prompts;
-
 DROP INDEX IF EXISTS idx_ai_providers_active;
 DROP TABLE IF EXISTS ai_providers;

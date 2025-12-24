@@ -20,8 +20,8 @@ export function useSitemapEditorData({ siteId, sitemapId }: UseSitemapEditorData
     const [sitemap, setSitemap] = useState<Sitemap | null>(null);
     const [sitemapNodes, setSitemapNodes] = useState<SitemapNode[]>([]);
 
-    const [nodes, setNodes, onNodesChange] = useNodesState([]);
-    const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+    const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+    const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
     const [initialPositions, setInitialPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);

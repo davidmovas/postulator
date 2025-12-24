@@ -47,7 +47,7 @@ func NewService(
 		linkRepo:   linkRepo,
 		sitemapSvc: sitemapSvc,
 		suggester:  NewSuggester(sitemapSvc, providerSvc, promptSvc, linkRepo, aiUsageService, eventBus, logger),
-		applier:    NewApplier(sitemapSvc, sitesSvc, providerSvc, linkRepo, wpClient, aiUsageService, eventBus, logger),
+		applier:    NewApplier(sitemapSvc, sitesSvc, providerSvc, promptSvc, linkRepo, wpClient, aiUsageService, eventBus, logger),
 		eventBus:   eventBus,
 		logger:     logger.WithScope("linking"),
 	}

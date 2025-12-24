@@ -13,6 +13,7 @@ const (
 	EventApplyProgress  events.EventType = "linking.apply.progress"
 	EventApplyCompleted events.EventType = "linking.apply.completed"
 	EventApplyFailed    events.EventType = "linking.apply.failed"
+	EventApplyCancelled events.EventType = "linking.apply.cancelled"
 
 	EventPageProcessing events.EventType = "linking.page.processing"
 	EventPageCompleted  events.EventType = "linking.page.completed"
@@ -23,6 +24,7 @@ const (
 	EventSuggestProgress  events.EventType = "linking.suggest.progress"
 	EventSuggestCompleted events.EventType = "linking.suggest.completed"
 	EventSuggestFailed    events.EventType = "linking.suggest.failed"
+	EventSuggestCancelled events.EventType = "linking.suggest.cancelled"
 )
 
 type ApplyStartedEvent struct {
@@ -125,6 +127,14 @@ func (e *ApplyEventEmitter) EmitApplyFailed(ctx context.Context, taskID, errMsg 
 	}))
 }
 
+func (e *ApplyEventEmitter) EmitApplyCancelled(ctx context.Context, taskID string, processedPages, appliedLinks int) {
+	e.eventBus.Publish(ctx, events.NewEvent(EventApplyCancelled, ApplyCancelledEvent{
+		TaskID:         taskID,
+		ProcessedPages: processedPages,
+		AppliedLinks:   appliedLinks,
+	}))
+}
+
 func (e *ApplyEventEmitter) EmitPageProcessing(ctx context.Context, taskID string, nodeID int64, title string, linkCount int) {
 	e.eventBus.Publish(ctx, events.NewEvent(EventPageProcessing, PageProcessingEvent{
 		TaskID:    taskID,
@@ -185,6 +195,18 @@ type SuggestFailedEvent struct {
 	Error  string
 }
 
+type SuggestCancelledEvent struct {
+	TaskID         string
+	ProcessedNodes int
+	LinksCreated   int
+}
+
+type ApplyCancelledEvent struct {
+	TaskID         string
+	ProcessedPages int
+	AppliedLinks   int
+}
+
 type SuggestEventEmitter struct {
 	eventBus *events.EventBus
 }
@@ -226,5 +248,13 @@ func (e *SuggestEventEmitter) EmitSuggestFailed(ctx context.Context, taskID, err
 	e.eventBus.Publish(ctx, events.NewEvent(EventSuggestFailed, SuggestFailedEvent{
 		TaskID: taskID,
 		Error:  errMsg,
+	}))
+}
+
+func (e *SuggestEventEmitter) EmitSuggestCancelled(ctx context.Context, taskID string, processedNodes, linksCreated int) {
+	e.eventBus.Publish(ctx, events.NewEvent(EventSuggestCancelled, SuggestCancelledEvent{
+		TaskID:         taskID,
+		ProcessedNodes: processedNodes,
+		LinksCreated:   linksCreated,
 	}))
 }

@@ -88,8 +88,8 @@ export interface CreateNodeInput {
     title: string;
     slug: string;
     description?: string;
-    position: number;
-    source: NodeSource;
+    position?: number;
+    source?: NodeSource;
     keywords?: string[];
 }
 
@@ -104,7 +104,7 @@ export interface UpdateNodeInput {
 export interface MoveNodeInput {
     nodeId: number;
     newParentId?: number;
-    position: number;
+    position?: number;
 }
 
 export interface UpdateNodePositionsInput {

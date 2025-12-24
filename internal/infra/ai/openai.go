@@ -492,51 +492,53 @@ func generateSchema[T any]() interface{} {
 }
 
 func buildLinkSuggestionSystemPrompt() string {
-	return `You are an SEO expert specializing in internal linking strategies.
-Analyze the provided website pages and suggest internal links that will:
-- Improve site navigation and user experience
-- Distribute page authority (link equity) effectively
-- Create topical clusters by linking related content
-- Help search engines understand site structure
+	return `You are an internal linking strategist for websites.
 
-Guidelines:
-- Each page should have 2-5 outgoing links (not too many, not too few)
-- Prioritize semantic relevance over quantity
-- Use descriptive, natural anchor text
-- Avoid linking to the same page multiple times from one source
-- Consider the user journey and information hierarchy`
+TASK: Suggest links between pages to improve site structure and SEO.
+
+GOALS (priority order):
+1. Connect semantically related pages (same topic, complementary content)
+2. Link from high-content pages to low-visibility pages
+3. Create logical navigation paths for users
+4. Balance link distribution (avoid orphan pages with no links)
+
+RULES:
+- Only suggest NEW links (respect existing outgoing/incoming counts shown)
+- One page should not link to another more than once
+- Anchor text should describe the target page naturally, not generic like "click here"
+- If anchor text is obvious from context, you can skip it
+
+OUTPUT: Return suggested links with sourceId, targetId, and optional anchorText.`
 }
 
 func buildLinkSuggestionUserPrompt(request *LinkSuggestionRequest) string {
 	var sb strings.Builder
-	sb.WriteString("Pages to analyze:\n\n")
+	sb.WriteString("PAGES:\n")
 
 	for _, node := range request.Nodes {
-		// Compact format: ID | Title | Path | Keywords | out/in counts
-		sb.WriteString(fmt.Sprintf("ID:%d | %s | %s", node.ID, node.Title, node.Path))
+		// Format: [ID:X] "Title" /path | keywords: a,b | links: X→ Y←
+		sb.WriteString(fmt.Sprintf("[ID:%d] \"%s\" %s", node.ID, node.Title, node.Path))
 		if len(node.Keywords) > 0 {
-			// Limit to first 5 keywords to reduce prompt size
 			kw := node.Keywords
 			if len(kw) > 5 {
 				kw = kw[:5]
 			}
-			sb.WriteString(fmt.Sprintf(" | kw: %s", strings.Join(kw, ",")))
+			sb.WriteString(fmt.Sprintf(" | keywords: %s", strings.Join(kw, ", ")))
 		}
-		sb.WriteString(fmt.Sprintf(" | out:%d in:%d\n", node.OutgoingCount, node.IncomingCount))
+		sb.WriteString(fmt.Sprintf(" | links: %d→ %d←\n", node.OutgoingCount, node.IncomingCount))
 	}
 
 	if request.MaxOutgoing > 0 || request.MaxIncoming > 0 {
-		sb.WriteString("\nLimits: ")
+		sb.WriteString("\nCONSTRAINTS:\n")
 		if request.MaxOutgoing > 0 {
-			sb.WriteString(fmt.Sprintf("max %d outgoing, ", request.MaxOutgoing))
+			sb.WriteString(fmt.Sprintf("- Max %d outgoing links per page\n", request.MaxOutgoing))
 		}
 		if request.MaxIncoming > 0 {
-			sb.WriteString(fmt.Sprintf("max %d incoming", request.MaxIncoming))
+			sb.WriteString(fmt.Sprintf("- Max %d incoming links per page\n", request.MaxIncoming))
 		}
-		sb.WriteString("\n")
 	}
 
-	sb.WriteString("\nSuggest internal links using exact page IDs. Focus on semantic relevance.")
+	sb.WriteString("\nSuggest links that make sense semantically. Use exact page IDs.")
 	return sb.String()
 }
 
@@ -564,8 +566,14 @@ func (c *OpenAIClient) InsertLinks(ctx context.Context, request *InsertLinksRequ
 		Strict:      openaiSDK.Bool(true),
 	}
 
-	systemPrompt := buildInsertLinksSystemPrompt(request.Language)
-	userPrompt := buildInsertLinksUserPrompt(request)
+	systemPrompt := request.SystemPrompt
+	if systemPrompt == "" {
+		systemPrompt = buildInsertLinksSystemPrompt(request.Language)
+	}
+	userPrompt := request.UserPrompt
+	if userPrompt == "" {
+		userPrompt = buildInsertLinksUserPrompt(request)
+	}
 
 	messages := []openaiSDK.ChatCompletionMessageParamUnion{
 		openaiSDK.SystemMessage(systemPrompt),
@@ -656,38 +664,44 @@ func buildInsertLinksSystemPrompt(language string) string {
 	if language == "" {
 		language = "English"
 	}
-	return fmt.Sprintf(`You are an expert content editor. Your task is to insert internal links into existing HTML content.
+	return fmt.Sprintf(`You are a link insertion tool. Your ONLY job is to add <a> tags to existing HTML content.
 
-Language: %s
+TASK: Insert the specified internal links into the content without modifying anything else.
 
-Guidelines:
-- Insert links naturally where they fit contextually
-- Use <a href="PATH">ANCHOR TEXT</a> format
-- If anchor text is provided, prefer using it; otherwise choose appropriate text from the existing content
-- DO NOT change any other content - only add the link tags
-- DO NOT add links that don't fit naturally
-- Preserve all existing HTML structure and formatting
-- Each link should be inserted only once
-- Count how many links you successfully inserted`, language)
+STRICT RULES:
+1. Return the EXACT same HTML, only adding <a href="...">...</a> tags
+2. Do NOT rewrite, rephrase, or change any text
+3. Do NOT change HTML structure, formatting, or whitespace
+4. Do NOT add links inside existing <a> tags (avoid nested links)
+5. Insert each link only ONCE per page (first suitable occurrence)
+6. Do NOT repeat the same link multiple times
+
+HOW TO INSERT:
+- If anchor text is provided: find that exact text (or close match) and wrap it with <a> tag
+- If no anchor text: find text that naturally describes the target page and wrap it
+- If no suitable text exists in content: skip that link (don't force it)
+
+Language for anchor text selection: %s
+
+OUTPUT: Return modified HTML and count of successfully inserted links.`, language)
 }
 
 func buildInsertLinksUserPrompt(request *InsertLinksRequest) string {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("Current page: %s (%s)\n\n", request.PageTitle, request.PagePath))
+	sb.WriteString(fmt.Sprintf("PAGE: \"%s\" %s\n\n", request.PageTitle, request.PagePath))
 
-	sb.WriteString("LINKS TO INSERT:\n")
+	sb.WriteString("INSERT THESE LINKS:\n")
 	for i, link := range request.Links {
-		sb.WriteString(fmt.Sprintf("%d. Link to: %s\n", i+1, link.TargetTitle))
-		sb.WriteString(fmt.Sprintf("   Path: %s\n", link.TargetPath))
+		sb.WriteString(fmt.Sprintf("%d. → %s \"%s\"\n", i+1, link.TargetPath, link.TargetTitle))
 		if link.AnchorText != nil && *link.AnchorText != "" {
-			sb.WriteString(fmt.Sprintf("   Anchor text: \"%s\"\n", *link.AnchorText))
+			sb.WriteString(fmt.Sprintf("   Anchor: \"%s\"\n", *link.AnchorText))
 		} else {
-			sb.WriteString("   Anchor text: Choose appropriate text from content\n")
+			sb.WriteString("   Anchor: find suitable text\n")
 		}
 	}
 
-	sb.WriteString("\nEXISTING CONTENT:\n")
+	sb.WriteString("\nCONTENT:\n")
 	sb.WriteString(request.Content)
 
 	return sb.String()

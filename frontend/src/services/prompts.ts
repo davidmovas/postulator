@@ -18,6 +18,7 @@ export const promptService = {
     async createPrompt(input: PromptCreateInput): Promise<void> {
         const payload = new dto.Prompt({
             name: input.name,
+            category: input.category,
             systemPrompt: input.systemPrompt,
             userPrompt: input.userPrompt,
             placeholders: input.placeholders,
@@ -43,6 +44,7 @@ export const promptService = {
         const payload = new dto.Prompt({
             id: input.id,
             name: input.name,
+            category: input.category,
             systemPrompt: input.systemPrompt,
             userPrompt: input.userPrompt,
             placeholders: input.placeholders,

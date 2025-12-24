@@ -199,6 +199,18 @@ export interface SuggestFailedEvent {
     Error: string;
 }
 
+export interface SuggestCancelledEvent {
+    TaskID: string;
+    ProcessedNodes: number;
+    LinksCreated: number;
+}
+
+export interface ApplyCancelledEvent {
+    TaskID: string;
+    ProcessedPages: number;
+    AppliedLinks: number;
+}
+
 // =========================================================================
 // Mappers
 // =========================================================================

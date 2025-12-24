@@ -7,7 +7,7 @@ interface UseSitemapNodeOperationsProps {
     sitemapId: number;
     sitemapNodes: SitemapNode[];
     nodes: Node[];
-    execute: <T>(fn: () => Promise<T>, options?: { errorTitle?: string }) => Promise<T | undefined>;
+    execute: <T>(fn: () => Promise<T>, options?: { errorTitle?: string }) => Promise<T | null>;
     loadData: (preservePositions?: boolean) => Promise<void>;
     refreshHistory: () => Promise<void>;
 }

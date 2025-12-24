@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/linking"
@@ -13,6 +15,10 @@ import (
 type LinkingHandler struct {
 	service linking.Service
 	logger  *logger.Logger
+
+	// Cancel functions for running operations (keyed by planID)
+	suggestCancels sync.Map // map[int64]context.CancelFunc
+	applyCancels   sync.Map // map[int64]context.CancelFunc
 }
 
 func NewLinkingHandler(
@@ -188,7 +194,13 @@ func (h *LinkingHandler) RejectLink(linkID int64) *dto.Response[bool] {
 
 func (h *LinkingHandler) SuggestLinks(req *dto.SuggestLinksRequest) *dto.Response[bool] {
 	longCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
+
+	// Store cancel function for this plan
+	h.suggestCancels.Store(req.PlanID, cancel)
+	defer func() {
+		h.suggestCancels.Delete(req.PlanID)
+		cancel()
+	}()
 
 	config := linking.SuggestLinksConfig{
 		PlanID:      req.PlanID,
@@ -202,9 +214,23 @@ func (h *LinkingHandler) SuggestLinks(req *dto.SuggestLinksRequest) *dto.Respons
 
 	err := h.service.SuggestLinks(longCtx, config)
 	if err != nil {
+		// Check if it was cancelled
+		if longCtx.Err() == context.Canceled {
+			return fail[bool](fmt.Errorf("operation cancelled"))
+		}
 		return fail[bool](err)
 	}
 	return ok(true)
+}
+
+func (h *LinkingHandler) CancelSuggest(planID int64) *dto.Response[bool] {
+	if cancelFunc, found := h.suggestCancels.Load(planID); found {
+		cancelFunc.(context.CancelFunc)()
+		h.suggestCancels.Delete(planID)
+		h.logger.Infof("Cancelled suggest operation for plan %d", planID)
+		return ok(true)
+	}
+	return ok(false) // No running operation
 }
 
 // =========================================================================
@@ -213,10 +239,20 @@ func (h *LinkingHandler) SuggestLinks(req *dto.SuggestLinksRequest) *dto.Respons
 
 func (h *LinkingHandler) ApplyLinks(req *dto.ApplyLinksRequest) *dto.Response[*dto.ApplyLinksResult] {
 	longCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
+
+	// Store cancel function for this plan
+	h.applyCancels.Store(req.PlanID, cancel)
+	defer func() {
+		h.applyCancels.Delete(req.PlanID)
+		cancel()
+	}()
 
 	result, err := h.service.ApplyLinks(longCtx, req.PlanID, req.LinkIDs, req.ProviderID)
 	if err != nil {
+		// Check if it was cancelled
+		if longCtx.Err() == context.Canceled {
+			return fail[*dto.ApplyLinksResult](fmt.Errorf("operation cancelled"))
+		}
 		return fail[*dto.ApplyLinksResult](err)
 	}
 
@@ -236,6 +272,16 @@ func (h *LinkingHandler) ApplyLinks(req *dto.ApplyLinksRequest) *dto.Response[*d
 	}
 
 	return ok(dtoResult)
+}
+
+func (h *LinkingHandler) CancelApply(planID int64) *dto.Response[bool] {
+	if cancelFunc, found := h.applyCancels.Load(planID); found {
+		cancelFunc.(context.CancelFunc)()
+		h.applyCancels.Delete(planID)
+		h.logger.Infof("Cancelled apply operation for plan %d", planID)
+		return ok(true)
+	}
+	return ok(false) // No running operation
 }
 
 // =========================================================================

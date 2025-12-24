@@ -3,7 +3,7 @@
 import { RefObject } from "react";
 import { Node } from "@xyflow/react";
 import { HotkeyConfig } from "@/hooks/use-hotkeys";
-import { SitemapNode, GenerationTask } from "@/models/sitemaps";
+import { SitemapNode, GenerationTask, CreateNodeInput } from "@/models/sitemaps";
 import { PlannedLink, LinkGraph, LinkStatus } from "@/models/linking";
 import {
     AlertDialog,
@@ -46,11 +46,11 @@ interface EditorDialogsProps {
     setEditDialogOpen: (open: boolean) => void;
     createDialogOpen: boolean;
     setCreateDialogOpen: (open: boolean) => void;
-    parentNodeId: number | null;
-    onUpdateNode: (node: SitemapNode) => Promise<void>;
+    parentNodeId: number | undefined;
+    onUpdateNode: () => void;
     onDeleteNode: (id: number) => void;
     onAddChild: (parentId: number) => void;
-    onCreateNode: (node: SitemapNode) => Promise<void>;
+    onCreateNode: (input: CreateNodeInput) => void;
     getSelectedSitemapNodes: () => SitemapNode[];
 
     // Bulk create

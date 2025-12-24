@@ -1616,6 +1616,8 @@ export namespace dto {
 	export class Prompt {
 	    id: number;
 	    name: string;
+	    category: string;
+	    isBuiltin: boolean;
 	    systemPrompt: string;
 	    userPrompt: string;
 	    placeholders: string[];
@@ -1630,6 +1632,8 @@ export namespace dto {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.name = source["name"];
+	        this.category = source["category"];
+	        this.isBuiltin = source["isBuiltin"];
 	        this.systemPrompt = source["systemPrompt"];
 	        this.userPrompt = source["userPrompt"];
 	        this.placeholders = source["placeholders"];

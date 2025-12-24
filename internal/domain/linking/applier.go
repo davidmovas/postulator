@@ -3,11 +3,13 @@ package linking
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/aiusage"
 	"github.com/davidmovas/postulator/internal/domain/entities"
+	"github.com/davidmovas/postulator/internal/domain/prompts"
 	"github.com/davidmovas/postulator/internal/domain/providers"
 	"github.com/davidmovas/postulator/internal/domain/sitemap"
 	"github.com/davidmovas/postulator/internal/domain/sites"
@@ -22,6 +24,7 @@ type Applier struct {
 	sitemapSvc     sitemap.Service
 	sitesSvc       sites.Service
 	providerSvc    providers.Service
+	promptSvc      prompts.Service
 	linkRepo       LinkRepository
 	wpClient       wp.Client
 	aiUsageService aiusage.Service
@@ -34,6 +37,7 @@ func NewApplier(
 	sitemapSvc sitemap.Service,
 	sitesSvc sites.Service,
 	providerSvc providers.Service,
+	promptSvc prompts.Service,
 	linkRepo LinkRepository,
 	wpClient wp.Client,
 	aiUsageService aiusage.Service,
@@ -44,6 +48,7 @@ func NewApplier(
 		sitemapSvc:     sitemapSvc,
 		sitesSvc:       sitesSvc,
 		providerSvc:    providerSvc,
+		promptSvc:      promptSvc,
 		linkRepo:       linkRepo,
 		wpClient:       wpClient,
 		aiUsageService: aiUsageService,
@@ -57,6 +62,7 @@ type ApplyConfig struct {
 	PlanID     int64
 	SiteID     int64
 	ProviderID int64
+	PromptID   *int64
 	LinkIDs    []int64
 }
 
@@ -185,6 +191,9 @@ func (a *Applier) Apply(ctx context.Context, config ApplyConfig) (*ApplyResult, 
 		}, nil
 	}
 
+	// Get prompt for link insertion (custom or builtin)
+	prompt := a.getApplyPrompt(ctx, config.PromptID)
+
 	// Emit start event
 	a.emitter.EmitApplyStarted(ctx, taskID, len(linksToApply), len(workItems))
 
@@ -201,7 +210,7 @@ func (a *Applier) Apply(ctx context.Context, config ApplyConfig) (*ApplyResult, 
 	a.logger.Infof("Using concurrency %d for %d pages (RPM-based)", concurrency, len(workItems))
 
 	// Process work items with concurrency
-	results := a.processWorkItems(ctx, taskID, workItems, aiClient, site, config.SiteID, concurrency)
+	results := a.processWorkItems(ctx, taskID, workItems, aiClient, site, config.SiteID, concurrency, prompt)
 
 	// Aggregate results
 	for _, r := range results {
@@ -228,6 +237,7 @@ func (a *Applier) processWorkItems(
 	site *entities.Site,
 	siteID int64,
 	concurrency int,
+	prompt *entities.Prompt,
 ) []sourceNodeResult {
 	results := make([]sourceNodeResult, len(workItems))
 	var mu sync.Mutex
@@ -240,20 +250,49 @@ func (a *Applier) processWorkItems(
 	var processedPages int
 	var totalApplied, totalFailed int
 
+	// Track cancelled state
+	var cancelled bool
+	var cancelledMu sync.Mutex
+
 	for i, work := range workItems {
 		wg.Add(1)
 		go func(idx int, w sourceNodeWork) {
 			defer wg.Done()
 
+			// Check for cancellation before acquiring semaphore
+			select {
+			case <-ctx.Done():
+				cancelledMu.Lock()
+				if !cancelled {
+					cancelled = true
+					a.logger.Infof("Apply operation cancelled")
+					a.emitter.EmitApplyCancelled(ctx, taskID, processedPages, totalApplied)
+				}
+				cancelledMu.Unlock()
+				return
+			default:
+			}
+
 			// Acquire semaphore
-			sem <- struct{}{}
-			defer func() { <-sem }()
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			case <-ctx.Done():
+				cancelledMu.Lock()
+				if !cancelled {
+					cancelled = true
+					a.logger.Infof("Apply operation cancelled")
+					a.emitter.EmitApplyCancelled(ctx, taskID, processedPages, totalApplied)
+				}
+				cancelledMu.Unlock()
+				return
+			}
 
 			// Emit page processing event
 			a.emitter.EmitPageProcessing(ctx, taskID, w.sourceNodeID, w.sourceNode.Title, len(w.links))
 
 			// Process the node
-			appliedInfos, failedCount, err := a.applyLinksToNode(ctx, aiClient, site, w.sourceNode, w.links, siteID)
+			appliedInfos, failedCount, err := a.applyLinksToNode(ctx, aiClient, site, w.sourceNode, w.links, siteID, prompt)
 
 			// Store result
 			results[idx] = sourceNodeResult{
@@ -296,6 +335,7 @@ func (a *Applier) applyLinksToNode(
 	sourceNode *entities.SitemapNode,
 	links []*PlannedLink,
 	siteID int64,
+	prompt *entities.Prompt,
 ) ([]*AppliedLinkInfo, int, error) {
 	if sourceNode.WPPageID == nil {
 		return nil, len(links), fmt.Errorf("source node has no WordPress page ID")
@@ -358,12 +398,17 @@ func (a *Applier) applyLinksToNode(
 		linkTargets[i] = vl.target
 	}
 
+	// Build prompts from DB template or use defaults
+	systemPrompt, userPrompt := a.buildApplyPrompts(prompt, sourceNode, linkTargets, page.Content, DefaultLanguage)
+
 	request := &ai.InsertLinksRequest{
-		Content:   page.Content,
-		PageTitle: sourceNode.Title,
-		PagePath:  sourceNode.Path,
-		Links:     linkTargets,
-		Language:  DefaultLanguage,
+		Content:      page.Content,
+		PageTitle:    sourceNode.Title,
+		PagePath:     sourceNode.Path,
+		Links:        linkTargets,
+		Language:     DefaultLanguage,
+		SystemPrompt: systemPrompt,
+		UserPrompt:   userPrompt,
 	}
 
 	a.logger.Infof("Inserting %d links into page %s", len(linkTargets), sourceNode.Title)
@@ -455,4 +500,77 @@ func (a *Applier) applyLinksToNode(
 	}
 
 	return appliedInfos, failedCount, nil
+}
+
+// getApplyPrompt fetches the prompt for link insertion
+// Returns the prompt entity, or nil if using defaults
+func (a *Applier) getApplyPrompt(ctx context.Context, promptID *int64) *entities.Prompt {
+	// If a specific prompt ID is provided, use it
+	if promptID != nil && *promptID > 0 {
+		prompt, err := a.promptSvc.GetPrompt(ctx, *promptID)
+		if err == nil {
+			return prompt
+		}
+		a.logger.ErrorWithErr(err, "Failed to get custom prompt, falling back to builtin")
+	}
+
+	// Otherwise, get the first builtin prompt for link_apply category
+	prompts, err := a.promptSvc.ListPromptsByCategory(ctx, entities.PromptCategoryLinkApply)
+	if err != nil {
+		a.logger.ErrorWithErr(err, "Failed to get builtin link_apply prompts")
+		return nil
+	}
+
+	for _, p := range prompts {
+		if p.IsBuiltin {
+			return p
+		}
+	}
+
+	return nil
+}
+
+// buildApplyPrompts renders the prompt with page-specific placeholders
+func (a *Applier) buildApplyPrompts(
+	prompt *entities.Prompt,
+	sourceNode *entities.SitemapNode,
+	linkTargets []ai.InsertLinkTarget,
+	content, language string,
+) (systemPrompt, userPrompt string) {
+	if prompt == nil {
+		return "", "" // Use defaults in AI client
+	}
+
+	// Build links list
+	var linksList strings.Builder
+	for _, link := range linkTargets {
+		anchor := "(auto)"
+		if link.AnchorText != nil && *link.AnchorText != "" {
+			anchor = *link.AnchorText
+		}
+		linksList.WriteString(fmt.Sprintf("→ %s \"%s\" (anchor: %s)\n", link.TargetPath, link.TargetTitle, anchor))
+	}
+
+	placeholders := map[string]string{
+		"language":   language,
+		"page_title": sourceNode.Title,
+		"page_path":  sourceNode.Path,
+		"links_list": linksList.String(),
+		"content":    content,
+	}
+
+	// Render prompts using prompt service's template rendering
+	systemPrompt = a.renderTemplate(prompt.SystemPrompt, placeholders)
+	userPrompt = a.renderTemplate(prompt.UserPrompt, placeholders)
+
+	return systemPrompt, userPrompt
+}
+
+// renderTemplate replaces {{placeholder}} with values
+func (a *Applier) renderTemplate(template string, placeholders map[string]string) string {
+	result := template
+	for key, value := range placeholders {
+		result = strings.ReplaceAll(result, "{{"+key+"}}", value)
+	}
+	return result
 }

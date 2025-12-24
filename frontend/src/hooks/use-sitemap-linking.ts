@@ -353,7 +353,7 @@ export function useSitemapLinking({
     }, []);
 
     // Конец создания связи (если не попали в target)
-    const onConnectEnd: OnConnectEnd = useCallback(() => {
+    const onConnectEnd: OnConnectEnd = useCallback((_event, _connectionState) => {
         connectingNodeId.current = null;
     }, []);
 

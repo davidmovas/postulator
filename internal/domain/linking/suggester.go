@@ -144,6 +144,18 @@ func (s *Suggester) Suggest(ctx context.Context, config SuggestConfig) (*Suggest
 	var lastExplanation string
 
 	for batchIdx, batchNodes := range batches {
+		// Check for cancellation before processing each batch
+		select {
+		case <-ctx.Done():
+			s.logger.Infof("Suggest operation cancelled at batch %d/%d", batchIdx+1, totalBatches)
+			s.emitter.EmitSuggestCancelled(ctx, taskID, processedNodes, totalLinksCreated)
+			return &SuggestResult{
+				LinksCreated: totalLinksCreated,
+				Explanation:  "Operation cancelled",
+			}, ctx.Err()
+		default:
+		}
+
 		if len(batchNodes) < 2 {
 			processedNodes += len(batchNodes)
 			continue
@@ -293,30 +305,80 @@ func (s *Suggester) processLinks(
 }
 
 func (s *Suggester) buildPrompts(ctx context.Context, config SuggestConfig, nodes []*entities.SitemapNode, outgoing, incoming map[int64]int) (system, user string) {
+	placeholders := s.buildPlaceholders(config, nodes, outgoing, incoming)
+
+	// If a custom prompt ID is specified, use it
 	if config.PromptID != nil && *config.PromptID > 0 {
-		placeholders := s.buildPlaceholders(config, nodes, outgoing, incoming)
 		sys, usr, err := s.promptSvc.RenderPrompt(ctx, *config.PromptID, placeholders)
 		if err == nil {
 			return sys, usr
 		}
-		s.logger.ErrorWithErr(err, "Failed to render custom prompt, using default")
+		s.logger.ErrorWithErr(err, "Failed to render custom prompt, trying builtin")
 	}
 
+	// Try to get the builtin prompt for link_suggest category
+	prompts, err := s.promptSvc.ListPromptsByCategory(ctx, entities.PromptCategoryLinkSuggest)
+	if err == nil {
+		for _, p := range prompts {
+			if p.IsBuiltin {
+				sys := s.renderTemplate(p.SystemPrompt, placeholders)
+				usr := s.renderTemplate(p.UserPrompt, placeholders)
+				return sys, usr
+			}
+		}
+	}
+
+	// Fall back to hardcoded default
+	s.logger.Warn("No builtin prompt found for link_suggest, using hardcoded default")
 	return s.buildDefaultPrompts(config, nodes, outgoing, incoming)
+}
+
+// renderTemplate replaces {{placeholder}} with values
+func (s *Suggester) renderTemplate(template string, placeholders map[string]string) string {
+	result := template
+	for key, value := range placeholders {
+		result = strings.ReplaceAll(result, "{{"+key+"}}", value)
+	}
+	return result
 }
 
 func (s *Suggester) buildPlaceholders(config SuggestConfig, nodes []*entities.SitemapNode, outgoing, incoming map[int64]int) map[string]string {
 	var nodesInfo strings.Builder
 	for _, node := range nodes {
-		nodesInfo.WriteString(fmt.Sprintf("- ID:%d | %s | /%s | keywords: %s | out:%d in:%d\n",
-			node.ID, node.Title, node.Slug, strings.Join(node.Keywords, ","),
-			outgoing[node.ID], incoming[node.ID]))
+		nodesInfo.WriteString(fmt.Sprintf("[ID:%d] \"%s\" /%s", node.ID, node.Title, node.Slug))
+		if len(node.Keywords) > 0 {
+			kw := node.Keywords
+			if len(kw) > 5 {
+				kw = kw[:5]
+			}
+			nodesInfo.WriteString(fmt.Sprintf(" | keywords: %s", strings.Join(kw, ", ")))
+		}
+		nodesInfo.WriteString(fmt.Sprintf(" | links: %d→ %d←\n", outgoing[node.ID], incoming[node.ID]))
+	}
+
+	// Build constraints section
+	var constraints strings.Builder
+	if config.MaxIncoming > 0 || config.MaxOutgoing > 0 {
+		constraints.WriteString("\nCONSTRAINTS:\n")
+		if config.MaxOutgoing > 0 {
+			constraints.WriteString(fmt.Sprintf("- Max %d outgoing links per page\n", config.MaxOutgoing))
+		}
+		if config.MaxIncoming > 0 {
+			constraints.WriteString(fmt.Sprintf("- Max %d incoming links per page\n", config.MaxIncoming))
+		}
+	}
+
+	// Build feedback section
+	feedback := ""
+	if config.Feedback != "" {
+		feedback = fmt.Sprintf("\nUSER INSTRUCTIONS: %s\n", config.Feedback)
 	}
 
 	placeholders := map[string]string{
 		"nodes_count":    fmt.Sprintf("%d", len(nodes)),
 		"nodes_info":     nodesInfo.String(),
-		"feedback":       config.Feedback,
+		"constraints":    constraints.String(),
+		"feedback":       feedback,
 		"max_incoming":   fmt.Sprintf("%d", config.MaxIncoming),
 		"max_outgoing":   fmt.Sprintf("%d", config.MaxOutgoing),
 		"existing_links": fmt.Sprintf("%d", len(config.ExistingLinks)),
@@ -326,44 +388,54 @@ func (s *Suggester) buildPlaceholders(config SuggestConfig, nodes []*entities.Si
 }
 
 func (s *Suggester) buildDefaultPrompts(config SuggestConfig, nodes []*entities.SitemapNode, outgoing, incoming map[int64]int) (system, user string) {
-	system = `You are an SEO expert specializing in internal linking strategies.
-Your task is to analyze website pages and suggest strategic internal links that:
-1. Improve user navigation and content discoverability
-2. Distribute page authority (link juice) effectively
-3. Create topical clusters by linking related content
-4. Help search engines understand site structure
+	system = `You are an internal linking strategist for websites.
 
-Consider existing links when making suggestions - don't over-link pages that already have many links.
-Suggest anchor text that is natural, descriptive, and includes relevant keywords when appropriate.`
+TASK: Suggest links between pages to improve site structure and SEO.
+
+GOALS (priority order):
+1. Connect semantically related pages (same topic, complementary content)
+2. Link from high-content pages to low-visibility pages
+3. Create logical navigation paths for users
+4. Balance link distribution (avoid orphan pages with no links)
+
+RULES:
+- Only suggest NEW links (respect existing outgoing/incoming counts shown)
+- One page should not link to another more than once
+- Anchor text should describe the target page naturally, not generic like "click here"
+- If anchor text is obvious from context, you can skip it
+
+OUTPUT: Return suggested links with sourceId, targetId, and optional anchorText.`
 
 	var sb strings.Builder
-	sb.WriteString("Analyze these pages and suggest internal links:\n\n")
+	sb.WriteString("PAGES:\n")
 
 	for _, node := range nodes {
-		sb.WriteString(fmt.Sprintf("Page ID: %d\n", node.ID))
-		sb.WriteString(fmt.Sprintf("Title: %s\n", node.Title))
-		sb.WriteString(fmt.Sprintf("Path: /%s\n", node.Slug))
+		sb.WriteString(fmt.Sprintf("[ID:%d] \"%s\" /%s", node.ID, node.Title, node.Slug))
 		if len(node.Keywords) > 0 {
-			sb.WriteString(fmt.Sprintf("Keywords: %s\n", strings.Join(node.Keywords, ", ")))
+			kw := node.Keywords
+			if len(kw) > 5 {
+				kw = kw[:5]
+			}
+			sb.WriteString(fmt.Sprintf(" | keywords: %s", strings.Join(kw, ", ")))
 		}
-		sb.WriteString(fmt.Sprintf("Current outgoing links: %d\n", outgoing[node.ID]))
-		sb.WriteString(fmt.Sprintf("Current incoming links: %d\n", incoming[node.ID]))
-		sb.WriteString("\n")
+		sb.WriteString(fmt.Sprintf(" | links: %d→ %d←\n", outgoing[node.ID], incoming[node.ID]))
 	}
 
 	if config.MaxIncoming > 0 || config.MaxOutgoing > 0 {
-		sb.WriteString("\nConstraints:\n")
+		sb.WriteString("\nCONSTRAINTS:\n")
 		if config.MaxOutgoing > 0 {
-			sb.WriteString(fmt.Sprintf("- Maximum %d outgoing links per page\n", config.MaxOutgoing))
+			sb.WriteString(fmt.Sprintf("- Max %d outgoing links per page\n", config.MaxOutgoing))
 		}
 		if config.MaxIncoming > 0 {
-			sb.WriteString(fmt.Sprintf("- Maximum %d incoming links per page\n", config.MaxIncoming))
+			sb.WriteString(fmt.Sprintf("- Max %d incoming links per page\n", config.MaxIncoming))
 		}
 	}
 
 	if config.Feedback != "" {
-		sb.WriteString(fmt.Sprintf("\nAdditional instructions: %s\n", config.Feedback))
+		sb.WriteString(fmt.Sprintf("\nUSER INSTRUCTIONS: %s\n", config.Feedback))
 	}
+
+	sb.WriteString("\nSuggest links that make sense semantically. Use exact page IDs.")
 
 	return system, sb.String()
 }

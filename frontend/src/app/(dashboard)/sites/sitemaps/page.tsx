@@ -476,17 +476,16 @@ function SitemapsPageContent() {
                                                     ? option.activeClasses
                                                     : "border-muted bg-background hover:border-muted-foreground/30 hover:bg-muted/50"
                                                 }
-                                                ${option.disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                                                cursor-pointer
                                             `}
-                                            onClick={() => !option.disabled && setNewSource(option.value as "manual" | "imported" | "generated" | "scanned")}
-                                            disabled={option.disabled}
+                                            onClick={() => setNewSource(option.value as "manual" | "imported" | "generated" | "scanned")}
                                         >
                                             <div className="flex items-center gap-2">
                                                 <option.icon className={`h-4 w-4 ${isSelected ? "" : option.iconClasses}`} />
                                                 <span className="font-medium text-sm">{option.label}</span>
                                             </div>
                                             <span className={`text-xs ${isSelected ? "opacity-80" : "text-muted-foreground"}`}>
-                                                {option.disabled ? "Coming soon" : option.description}
+                                                {option.description}
                                             </span>
                                             {isSelected && (
                                                 <div className="absolute top-2 right-2 h-2 w-2 rounded-full bg-current" />
@@ -514,7 +513,7 @@ function SitemapsPageContent() {
                     <DialogHeader>
                         <DialogTitle>Duplicate Sitemap</DialogTitle>
                         <DialogDescription>
-                            Create a copy of "{selectedSitemap?.name}" with a new name.
+                            Create a copy of &quot;{selectedSitemap?.name}&quot; with a new name.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
@@ -545,7 +544,7 @@ function SitemapsPageContent() {
                     <DialogHeader>
                         <DialogTitle>Delete Sitemap</DialogTitle>
                         <DialogDescription>
-                            Are you sure you want to delete "{selectedSitemap?.name}"? This action cannot be
+                            Are you sure you want to delete &quot;{selectedSitemap?.name}&quot;? This action cannot be
                             undone and will delete all nodes in this sitemap.
                         </DialogDescription>
                     </DialogHeader>
@@ -566,7 +565,7 @@ function SitemapsPageContent() {
                     <DialogHeader>
                         <DialogTitle>Rename Sitemap</DialogTitle>
                         <DialogDescription>
-                            Enter a new name for "{selectedSitemap?.name}".
+                            Enter a new name for &quot;{selectedSitemap?.name}&quot;.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">

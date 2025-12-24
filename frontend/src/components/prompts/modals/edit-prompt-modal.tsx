@@ -14,11 +14,19 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useApiCall } from "@/hooks/use-api-call";
 import { promptService } from "@/services/prompts";
-import { Prompt, PromptUpdateInput } from "@/models/prompts";
+import { Prompt, PromptUpdateInput, PromptCategory, PROMPT_CATEGORIES } from "@/models/prompts";
 import { extractPlaceholdersFromPrompts } from "@/lib/prompt-utils";
-import { MessageSquare, User, Tag } from "lucide-react";
+import { MessageSquare, User, Tag, FolderOpen, Lock } from "lucide-react";
 
 interface EditPromptModalProps {
     open: boolean;
@@ -33,6 +41,7 @@ export function EditPromptModal({ open, onOpenChange, prompt, onSuccess }: EditP
     const [formData, setFormData] = useState<PromptUpdateInput>({
         id: 0,
         name: "",
+        category: "post_gen",
         systemPrompt: "",
         userPrompt: "",
         placeholders: []
@@ -47,6 +56,7 @@ export function EditPromptModal({ open, onOpenChange, prompt, onSuccess }: EditP
             setFormData({
                 id: prompt.id,
                 name: prompt.name,
+                category: prompt.category,
                 systemPrompt: prompt.systemPrompt,
                 userPrompt: prompt.userPrompt,
                 placeholders: prompt.placeholders
@@ -58,6 +68,7 @@ export function EditPromptModal({ open, onOpenChange, prompt, onSuccess }: EditP
         setFormData({
             id: 0,
             name: "",
+            category: "post_gen",
             systemPrompt: "",
             userPrompt: "",
             placeholders: []
@@ -109,19 +120,59 @@ export function EditPromptModal({ open, onOpenChange, prompt, onSuccess }: EditP
                 </DialogHeader>
 
                 <div className="space-y-6 py-4">
-                    {/* Name */}
-                    <div className="space-y-2">
-                        <Label htmlFor="edit-name">Prompt Name</Label>
-                        <Input
-                            id="edit-name"
-                            placeholder="e.g., Article Generator, Social Media Post"
-                            value={formData.name || ""}
-                            onChange={(e) => setFormData(prev => ({
-                                ...prev,
-                                name: e.target.value
-                            }))}
-                            disabled={isLoading}
-                        />
+                    {/* Builtin Warning */}
+                    {prompt.isBuiltin && (
+                        <Alert>
+                            <Lock className="h-4 w-4" />
+                            <AlertDescription>
+                                This is a builtin prompt. You can customize its content, but cannot delete it or change its category.
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
+                    {/* Name and Category Row */}
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* Name */}
+                        <div className="space-y-2">
+                            <Label htmlFor="edit-name">Prompt Name</Label>
+                            <Input
+                                id="edit-name"
+                                placeholder="e.g., Article Generator"
+                                value={formData.name || ""}
+                                onChange={(e) => setFormData(prev => ({
+                                    ...prev,
+                                    name: e.target.value
+                                }))}
+                                disabled={isLoading}
+                            />
+                        </div>
+
+                        {/* Category */}
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                                <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                                <Label htmlFor="edit-category">Category</Label>
+                            </div>
+                            <Select
+                                value={formData.category}
+                                onValueChange={(value: PromptCategory) => setFormData(prev => ({
+                                    ...prev,
+                                    category: value
+                                }))}
+                                disabled={isLoading || prompt.isBuiltin}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {Object.entries(PROMPT_CATEGORIES).map(([value, label]) => (
+                                        <SelectItem key={value} value={value}>
+                                            {label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
 
                     {/* System Prompt */}

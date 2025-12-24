@@ -14,6 +14,14 @@ export function ApproveLink(arg1) {
   return window['go']['handlers']['LinkingHandler']['ApproveLink'](arg1);
 }
 
+export function CancelApply(arg1) {
+  return window['go']['handlers']['LinkingHandler']['CancelApply'](arg1);
+}
+
+export function CancelSuggest(arg1) {
+  return window['go']['handlers']['LinkingHandler']['CancelSuggest'](arg1);
+}
+
 export function CreatePlan(arg1) {
   return window['go']['handlers']['LinkingHandler']['CreatePlan'](arg1);
 }

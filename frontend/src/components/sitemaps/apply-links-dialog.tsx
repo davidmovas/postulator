@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
     Dialog,
     DialogContent,
@@ -9,6 +9,16 @@ import {
     DialogFooter,
     DialogDescription,
 } from "@/components/ui/dialog";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -33,6 +43,7 @@ import {
     ApplyProgressEvent,
     ApplyCompletedEvent,
     ApplyFailedEvent,
+    ApplyCancelledEvent,
     PageProcessingEvent,
     PageCompletedEvent,
     PageFailedEvent,
@@ -50,7 +61,7 @@ interface ApplyLinksDialogProps {
     onSuccess: () => void;
 }
 
-type ApplyState = "idle" | "running" | "success" | "error";
+type ApplyState = "idle" | "running" | "success" | "error" | "cancelled";
 
 interface PageStatus {
     nodeId: number;
@@ -73,6 +84,7 @@ export function ApplyLinksDialog({
     const [applyState, setApplyState] = useState<ApplyState>("idle");
     const [error, setError] = useState<string | null>(null);
     const [result, setResult] = useState<ApplyLinksResult | null>(null);
+    const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
     const [providerId, setProviderId] = useState<number | null>(null);
     const [providers, setProviders] = useState<Provider[]>([]);
@@ -253,6 +265,17 @@ export function ApplyLinksDialog({
             })
         );
 
+        // Apply cancelled
+        cleanupFns.push(
+            EventsOn("linking.apply.cancelled", (data: ApplyCancelledEvent) => {
+                isRunningRef.current = false;
+                isCompletedRef.current = true;
+                setProcessedPages(data.ProcessedPages);
+                setAppliedLinks(data.AppliedLinks);
+                setApplyState("cancelled");
+            })
+        );
+
         return () => {
             cleanupFns.forEach((cleanup) => cleanup());
         };
@@ -325,8 +348,16 @@ export function ApplyLinksDialog({
     };
 
     const handleClose = () => {
-        if (applyState === "running") return; // Don't allow closing while running
+        // Show confirmation when running
+        if (applyState === "running") {
+            setShowCancelConfirm(true);
+            return;
+        }
 
+        resetAndClose();
+    };
+
+    const resetAndClose = () => {
         // Reset refs
         isRunningRef.current = false;
         isCompletedRef.current = false;
@@ -336,7 +367,26 @@ export function ApplyLinksDialog({
         setResult(null);
         setTaskId(null);
         setPageStatuses(new Map());
+        setShowCancelConfirm(false);
         onOpenChange(false);
+    };
+
+    const handleConfirmCancel = async () => {
+        // Call cancel on the backend
+        try {
+            await linkingService.cancelApply(planId);
+        } catch {
+            // Ignore errors - operation may have already completed
+        }
+        // Mark as completed to prevent event handlers from updating state
+        isCompletedRef.current = true;
+        isRunningRef.current = false;
+        resetAndClose();
+    };
+
+    const handleStop = () => {
+        // Show confirmation before stopping
+        setShowCancelConfirm(true);
     };
 
     const canApply = providerId !== null && linksToApply.length > 0 && !isLoadingData;
@@ -394,8 +444,20 @@ export function ApplyLinksDialog({
     };
 
     return (
+        <>
         <Dialog open={open} onOpenChange={handleClose}>
-            <DialogContent className="max-w-lg">
+            <DialogContent
+                className="max-w-lg"
+                onPointerDownOutside={(e) => {
+                    if (applyState === "running") e.preventDefault();
+                }}
+                onEscapeKeyDown={(e) => {
+                    if (applyState === "running") {
+                        e.preventDefault();
+                        setShowCancelConfirm(true);
+                    }
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Link2 className="h-5 w-5" />
@@ -529,6 +591,27 @@ export function ApplyLinksDialog({
                                 )}
                             </div>
 
+                            <div className="flex justify-center pt-2">
+                                <Button variant="outline" onClick={handleStop}>
+                                    Stop
+                                </Button>
+                            </div>
+
+                            {renderPageStatuses()}
+                        </div>
+                    )}
+
+                    {applyState === "cancelled" && (
+                        <div className="space-y-4">
+                            <div className="flex flex-col items-center justify-center py-6 gap-4">
+                                <AlertCircle className="h-16 w-16 text-yellow-500" />
+                                <div className="text-center">
+                                    <p className="text-lg font-medium">Operation stopped</p>
+                                    <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+                                        <p>Applied: {appliedLinks} links before stopping</p>
+                                    </div>
+                                </div>
+                            </div>
                             {renderPageStatuses()}
                         </div>
                     )}
@@ -584,11 +667,30 @@ export function ApplyLinksDialog({
                             Please wait, applying links...
                         </p>
                     )}
-                    {applyState === "success" && (
+                    {(applyState === "success" || applyState === "cancelled") && (
                         <Button onClick={handleClose}>Close</Button>
                     )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+
+        <AlertDialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Stop Applying Links?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Link insertion is in progress. Stopping will cancel the operation.
+                        Links already applied will be kept.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Continue</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleConfirmCancel}>
+                        Stop
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+        </>
     );
 }

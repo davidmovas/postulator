@@ -9,6 +9,16 @@ import {
     DialogFooter,
     DialogDescription,
 } from "@/components/ui/dialog";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -41,6 +51,7 @@ import {
     SuggestProgressEvent,
     SuggestCompletedEvent,
     SuggestFailedEvent,
+    SuggestCancelledEvent,
 } from "@/models/linking";
 
 interface SuggestLinksDialogProps {
@@ -52,7 +63,7 @@ interface SuggestLinksDialogProps {
     onSuccess: () => void;
 }
 
-type SuggestState = "idle" | "loading" | "success" | "error";
+type SuggestState = "idle" | "loading" | "success" | "error" | "cancelled";
 
 export function SuggestLinksDialog({
     open,
@@ -64,6 +75,7 @@ export function SuggestLinksDialog({
 }: SuggestLinksDialogProps) {
     const [suggestState, setSuggestState] = useState<SuggestState>("idle");
     const [error, setError] = useState<string | null>(null);
+    const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
     const [providerId, setProviderId] = useState<number | null>(null);
     const [promptId, setPromptId] = useState<number | null>(null);
@@ -151,6 +163,17 @@ export function SuggestLinksDialog({
             })
         );
 
+        // Suggest cancelled
+        cleanupFns.push(
+            EventsOn("linking.suggest.cancelled", (data: SuggestCancelledEvent) => {
+                isRunningRef.current = false;
+                isCompletedRef.current = true;
+                setLinksCreated(data.LinksCreated);
+                setProcessedNodes(data.ProcessedNodes);
+                setSuggestState("cancelled");
+            })
+        );
+
         return () => {
             cleanupFns.forEach((cleanup) => cleanup());
         };
@@ -229,9 +252,16 @@ export function SuggestLinksDialog({
     };
 
     const handleClose = () => {
-        // Don't allow closing while loading
-        if (suggestState === "loading") return;
+        // Show confirmation when loading
+        if (suggestState === "loading") {
+            setShowCancelConfirm(true);
+            return;
+        }
 
+        resetAndClose();
+    };
+
+    const resetAndClose = () => {
         // Reset refs
         isRunningRef.current = false;
         isCompletedRef.current = false;
@@ -245,7 +275,26 @@ export function SuggestLinksDialog({
         setTotalBatches(0);
         setProcessedNodes(0);
         setLinksCreated(0);
+        setShowCancelConfirm(false);
         onOpenChange(false);
+    };
+
+    const handleConfirmCancel = async () => {
+        // Call cancel on the backend
+        try {
+            await linkingService.cancelSuggest(planId);
+        } catch {
+            // Ignore errors - operation may have already completed
+        }
+        // Mark as completed to prevent event handlers from updating state
+        isCompletedRef.current = true;
+        isRunningRef.current = false;
+        resetAndClose();
+    };
+
+    const handleStop = async () => {
+        // Show confirmation before stopping
+        setShowCancelConfirm(true);
     };
 
     const canSuggest = providerId !== null && nodesToAnalyze.length >= 2 && !isLoadingData;
@@ -257,8 +306,20 @@ export function SuggestLinksDialog({
     }, [processedNodes, totalNodes]);
 
     return (
+        <>
         <Dialog open={open} onOpenChange={handleClose}>
-            <DialogContent className="max-w-lg">
+            <DialogContent
+                className="max-w-lg"
+                onPointerDownOutside={(e) => {
+                    if (suggestState === "loading") e.preventDefault();
+                }}
+                onEscapeKeyDown={(e) => {
+                    if (suggestState === "loading") {
+                        e.preventDefault();
+                        setShowCancelConfirm(true);
+                    }
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Sparkles className="h-5 w-5" />
@@ -456,6 +517,24 @@ export function SuggestLinksDialog({
                                     <span>{linksCreated} links suggested</span>
                                 </div>
                             </div>
+
+                            <div className="flex justify-center pt-2">
+                                <Button variant="outline" onClick={handleStop}>
+                                    Stop
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {suggestState === "cancelled" && (
+                        <div className="flex flex-col items-center justify-center py-8 gap-4">
+                            <AlertCircle className="h-16 w-16 text-yellow-500" />
+                            <div className="text-center">
+                                <p className="text-lg font-medium">Operation stopped</p>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    {linksCreated} link suggestions created before stopping
+                                </p>
+                            </div>
                         </div>
                     )}
 
@@ -505,11 +584,30 @@ export function SuggestLinksDialog({
                             Please wait, generating suggestions...
                         </p>
                     )}
-                    {(suggestState === "success" || suggestState === "error") && (
+                    {(suggestState === "success" || suggestState === "error" || suggestState === "cancelled") && (
                         <Button onClick={handleClose}>Close</Button>
                     )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+
+        <AlertDialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Stop Generation?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Link suggestion is in progress. Stopping will cancel the operation.
+                        Links already suggested will be kept.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Continue</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleConfirmCancel}>
+                        Stop
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+        </>
     );
 }
