@@ -26,6 +26,16 @@ import { CreateNodeInput } from "@/models/sitemaps";
 import { EDITOR } from "./constants";
 import { createHotkeyConfig } from "./components/editor-hotkeys";
 import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
     ResizableHandle,
     ResizablePanel,
     ResizablePanelGroup,
