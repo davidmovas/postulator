@@ -91,6 +91,8 @@ export interface SuggestLinksInput {
     promptId?: number;
     nodeIds?: number[];
     feedback?: string;
+    maxIncoming?: number;
+    maxOutgoing?: number;
 }
 
 export interface ApplyLinksInput {

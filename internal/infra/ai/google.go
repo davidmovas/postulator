@@ -300,3 +300,92 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 		},
 	}, nil
 }
+
+func (c *GoogleClient) GenerateLinkSuggestions(ctx context.Context, request *LinkSuggestionRequest) (*LinkSuggestionResult, error) {
+	model := c.client.GenerativeModel(c.model)
+
+	model.SetTemperature(0.5)
+	model.SetMaxOutputTokens(4096)
+
+	jsonInstructions := `
+You must respond with a valid JSON object in the following format:
+{
+  "links": [
+    {
+      "sourceNodeId": 1,
+      "targetNodeId": 2,
+      "anchorText": "text for the hyperlink",
+      "reason": "why this link is valuable",
+      "confidence": 0.85
+    }
+  ],
+  "explanation": "overall strategy explanation"
+}
+
+Do not include any text before or after the JSON object. Only output the JSON.`
+
+	baseSystem := request.SystemPrompt
+	if baseSystem == "" {
+		baseSystem = buildLinkSuggestionSystemPrompt()
+	}
+	systemPrompt := baseSystem + "\n\n" + jsonInstructions
+
+	userPrompt := request.UserPrompt
+	if userPrompt == "" {
+		userPrompt = buildLinkSuggestionUserPrompt(request)
+	}
+
+	model.SystemInstruction = &genai.Content{
+		Parts: []genai.Part{genai.Text(systemPrompt)},
+	}
+
+	resp, err := model.GenerateContent(ctx, genai.Text(userPrompt))
+	if err != nil {
+		return nil, errors.AI(googleProviderName, fmt.Errorf("API error: %w", err))
+	}
+
+	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
+		return nil, errors.AI(googleProviderName, fmt.Errorf("no response from API"))
+	}
+
+	var responseText string
+	for _, part := range resp.Candidates[0].Content.Parts {
+		if text, ok := part.(genai.Text); ok {
+			responseText = string(text)
+			break
+		}
+	}
+
+	if responseText == "" {
+		return nil, errors.AI(googleProviderName, fmt.Errorf("no text content in response"))
+	}
+
+	var result LinkSuggestionSchema
+	jsonStr := extractJSON(responseText)
+	if err = json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		sanitized := sanitizeJSON(jsonStr)
+		if err2 := json.Unmarshal([]byte(sanitized), &result); err2 != nil {
+			return nil, errors.AI(googleProviderName, fmt.Errorf("failed to parse response: %w", err))
+		}
+	}
+
+	inputTokens := 0
+	outputTokens := 0
+	if resp.UsageMetadata != nil {
+		inputTokens = int(resp.UsageMetadata.PromptTokenCount)
+		outputTokens = int(resp.UsageMetadata.CandidatesTokenCount)
+	}
+	totalTokens := inputTokens + outputTokens
+	cost := CalculateCost(entities.TypeGoogle, c.model, inputTokens, outputTokens)
+
+	return &LinkSuggestionResult{
+		Links:       result.Links,
+		Explanation: result.Explanation,
+		Usage: Usage{
+			InputTokens:  inputTokens,
+			OutputTokens: outputTokens,
+			TotalTokens:  totalTokens,
+			CostUSD:      cost,
+		},
+	}, nil
+}

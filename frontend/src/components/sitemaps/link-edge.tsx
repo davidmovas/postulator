@@ -4,13 +4,11 @@ import { memo } from "react";
 import {
     EdgeProps,
     getBezierPath,
-    EdgeLabelRenderer,
     BaseEdge,
 } from "@xyflow/react";
 import { LinkStatus, LinkSource } from "@/models/linking";
-import { cn } from "@/lib/utils";
 
-interface LinkEdgeData {
+export interface LinkEdgeData extends Record<string, unknown> {
     linkId: number;
     status: LinkStatus;
     linkSource: LinkSource;
@@ -18,14 +16,14 @@ interface LinkEdgeData {
     confidence?: number;
 }
 
-// Color mapping for link statuses
+// Color mapping for link statuses - distinct from hierarchy (gray dashed)
 const statusColors: Record<LinkStatus, { stroke: string; fill: string }> = {
-    planned: { stroke: "#6b7280", fill: "#9ca3af" },       // gray
-    approved: { stroke: "#22c55e", fill: "#4ade80" },      // green
-    rejected: { stroke: "#ef4444", fill: "#f87171" },      // red
-    applying: { stroke: "#3b82f6", fill: "#60a5fa" },      // blue
-    applied: { stroke: "#8b5cf6", fill: "#a78bfa" },       // purple
-    failed: { stroke: "#f97316", fill: "#fb923c" },        // orange
+    planned: { stroke: "#f59e0b", fill: "#fbbf24" },       // amber/orange - AI suggestions
+    approved: { stroke: "#22c55e", fill: "#4ade80" },      // green - approved
+    rejected: { stroke: "#ef4444", fill: "#f87171" },      // red - rejected
+    applying: { stroke: "#3b82f6", fill: "#60a5fa" },      // blue - in progress
+    applied: { stroke: "#8b5cf6", fill: "#a78bfa" },       // purple - done
+    failed: { stroke: "#dc2626", fill: "#f87171" },        // dark red - failed
 };
 
 // Arrow marker for directional links
@@ -33,23 +31,25 @@ function getMarkerEnd(status: LinkStatus) {
     return `url(#link-arrow-${status})`;
 }
 
-function LinkEdgeComponent({
-    id,
-    sourceX,
-    sourceY,
-    targetX,
-    targetY,
-    sourcePosition,
-    targetPosition,
-    style = {},
-    data,
-    selected,
-}: EdgeProps<LinkEdgeData>) {
-    const status = data?.status || "planned";
-    const linkSource = data?.linkSource || "manual";
+function LinkEdgeComponent(props: EdgeProps) {
+    const {
+        id,
+        sourceX,
+        sourceY,
+        targetX,
+        targetY,
+        sourcePosition,
+        targetPosition,
+        style = {},
+        data,
+        selected,
+    } = props;
+
+    const edgeData = data as LinkEdgeData | undefined;
+    const status = edgeData?.status || "planned";
     const colors = statusColors[status];
 
-    const [edgePath, labelX, labelY] = getBezierPath({
+    const [edgePath] = getBezierPath({
         sourceX,
         sourceY,
         sourcePosition,
@@ -59,15 +59,8 @@ function LinkEdgeComponent({
         curvature: 0.25,
     });
 
-    // Dashed line for AI-suggested links, solid for manual
-    const strokeDasharray = linkSource === "ai" ? "5,5" : undefined;
-
-    // Show anchor text or confidence for AI links
-    const label = data?.anchorText
-        ? data.anchorText
-        : data?.confidence
-            ? `${Math.round(data.confidence * 100)}%`
-            : null;
+    // All links are solid - hierarchy edges are dashed gray, link edges are solid colored
+    // No labels to avoid clutter with many links
 
     return (
         <>
@@ -101,30 +94,9 @@ function LinkEdgeComponent({
                     ...style,
                     stroke: colors.stroke,
                     strokeWidth: selected ? 3 : 2,
-                    strokeDasharray,
                 }}
                 markerEnd={getMarkerEnd(status)}
             />
-
-            {/* Label for anchor text or confidence */}
-            {label && (
-                <EdgeLabelRenderer>
-                    <div
-                        style={{
-                            position: "absolute",
-                            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-                            pointerEvents: "all",
-                        }}
-                        className={cn(
-                            "px-2 py-0.5 rounded text-xs font-medium",
-                            "bg-background border shadow-sm",
-                            selected && "ring-2 ring-primary"
-                        )}
-                    >
-                        {label}
-                    </div>
-                </EdgeLabelRenderer>
-            )}
         </>
     );
 }

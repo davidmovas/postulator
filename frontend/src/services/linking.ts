@@ -139,6 +139,8 @@ export const linkingService = {
             promptId: input.promptId,
             nodeIds: input.nodeIds,
             feedback: input.feedback || "",
+            maxIncoming: input.maxIncoming || 0,
+            maxOutgoing: input.maxOutgoing || 0,
         });
         const response = await SuggestLinks(payload);
         unwrapResponse<boolean>(response);

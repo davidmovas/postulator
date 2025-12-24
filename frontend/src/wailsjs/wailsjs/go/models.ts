@@ -4427,6 +4427,8 @@ export namespace dto {
 	    promptId?: number;
 	    nodeIds?: number[];
 	    feedback?: string;
+	    maxIncoming?: number;
+	    maxOutgoing?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new SuggestLinksRequest(source);
@@ -4439,6 +4441,8 @@ export namespace dto {
 	        this.promptId = source["promptId"];
 	        this.nodeIds = source["nodeIds"];
 	        this.feedback = source["feedback"];
+	        this.maxIncoming = source["maxIncoming"];
+	        this.maxOutgoing = source["maxOutgoing"];
 	    }
 	}
 	

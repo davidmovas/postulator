@@ -12,6 +12,7 @@ const (
 	OperationSitemapGeneration  OperationType = "sitemap_generation"
 	OperationTopicVariations    OperationType = "topic_variations"
 	OperationPageGeneration     OperationType = "page_generation"
+	OpLinkSuggestion            OperationType = "link_suggestion"
 )
 
 // UsageLog represents a single AI usage log entry

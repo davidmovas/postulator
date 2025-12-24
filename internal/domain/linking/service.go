@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/davidmovas/postulator/internal/domain/aiusage"
 	"github.com/davidmovas/postulator/internal/domain/entities"
+	"github.com/davidmovas/postulator/internal/domain/prompts"
+	"github.com/davidmovas/postulator/internal/domain/providers"
 	"github.com/davidmovas/postulator/internal/domain/sitemap"
 	"github.com/davidmovas/postulator/internal/infra/database"
 	"github.com/davidmovas/postulator/internal/infra/events"
@@ -18,6 +21,7 @@ type serviceImpl struct {
 	planRepo   PlanRepository
 	linkRepo   LinkRepository
 	sitemapSvc sitemap.Service
+	suggester  *Suggester
 	eventBus   *events.EventBus
 	logger     *logger.Logger
 }
@@ -25,13 +29,18 @@ type serviceImpl struct {
 func NewService(
 	db *database.DB,
 	sitemapSvc sitemap.Service,
+	providerSvc providers.Service,
+	promptSvc prompts.Service,
+	aiUsageService aiusage.Service,
 	eventBus *events.EventBus,
 	logger *logger.Logger,
 ) Service {
+	linkRepo := NewLinkRepository(db.DB)
 	return &serviceImpl{
 		planRepo:   NewPlanRepository(db.DB),
-		linkRepo:   NewLinkRepository(db.DB),
+		linkRepo:   linkRepo,
 		sitemapSvc: sitemapSvc,
+		suggester:  NewSuggester(sitemapSvc, providerSvc, promptSvc, linkRepo, aiUsageService, logger),
 		eventBus:   eventBus,
 		logger:     logger.WithScope("linking"),
 	}
@@ -170,23 +179,51 @@ func (s *serviceImpl) RejectLink(ctx context.Context, linkID int64) error {
 	return s.linkRepo.UpdateStatus(ctx, linkID, LinkStatusRejected, nil)
 }
 
-// AI suggestions - placeholder for now, will be implemented with AI integration
-func (s *serviceImpl) SuggestLinks(ctx context.Context, planID int64, providerID int64, promptID *int64, nodeIDs []int64, feedback string) error {
-	plan, err := s.planRepo.GetByID(ctx, planID)
+func (s *serviceImpl) SuggestLinks(ctx context.Context, config SuggestLinksConfig) error {
+	plan, err := s.planRepo.GetByID(ctx, config.PlanID)
 	if err != nil {
 		return err
 	}
 
 	plan.Status = PlanStatusSuggesting
-	plan.ProviderID = &providerID
-	plan.PromptID = promptID
+	plan.ProviderID = &config.ProviderID
+	plan.PromptID = config.PromptID
 	if err := s.planRepo.Update(ctx, plan); err != nil {
 		return err
 	}
 
-	// TODO: Implement AI suggestion generation
-	// This will be done in a separate suggester component
+	existingLinks, err := s.linkRepo.GetByPlanID(ctx, config.PlanID)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get existing links")
+		existingLinks = []*PlannedLink{}
+	}
 
+	result, err := s.suggester.Suggest(ctx, SuggestConfig{
+		PlanID:        config.PlanID,
+		SitemapID:     plan.SitemapID,
+		SiteID:        plan.SiteID,
+		ProviderID:    config.ProviderID,
+		PromptID:      config.PromptID,
+		NodeIDs:       config.NodeIDs,
+		Feedback:      config.Feedback,
+		MaxIncoming:   config.MaxIncoming,
+		MaxOutgoing:   config.MaxOutgoing,
+		ExistingLinks: existingLinks,
+	})
+	if err != nil {
+		errMsg := err.Error()
+		plan.Status = PlanStatusFailed
+		plan.Error = &errMsg
+		_ = s.planRepo.Update(ctx, plan)
+		return err
+	}
+
+	plan.Status = PlanStatusReady
+	if err := s.planRepo.Update(ctx, plan); err != nil {
+		return err
+	}
+
+	s.logger.Infof("AI suggested %d links for plan %d", result.LinksCreated, config.PlanID)
 	return nil
 }
 

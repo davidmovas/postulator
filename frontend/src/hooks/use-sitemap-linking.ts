@@ -20,6 +20,13 @@ interface LinkContextMenuState {
     status: LinkStatus;
 }
 
+interface LinkStats {
+    total: number;
+    planned: number;
+    approved: number;
+    applied: number;
+}
+
 interface UseSitemapLinkingReturn {
     // State
     plan: LinkPlan | null;
@@ -27,6 +34,9 @@ interface UseSitemapLinkingReturn {
     linkGraph: LinkGraph | null;
     isLoading: boolean;
     error: string | null;
+
+    // Link statistics
+    linkStats: LinkStats;
 
     // Link counts per node (nodeId -> counts)
     linkCountsMap: Map<number, LinkCounts>;
@@ -49,6 +59,9 @@ interface UseSitemapLinkingReturn {
     removeLink: (linkId: number) => Promise<boolean>;
     approveLink: (linkId: number) => Promise<boolean>;
     rejectLink: (linkId: number) => Promise<boolean>;
+    approveAllLinks: () => Promise<boolean>;
+    rejectAllLinks: () => Promise<boolean>;
+    clearAILinks: () => Promise<boolean>;
     onConnect: (connection: Connection) => Promise<void>;
 }
 
@@ -143,6 +156,29 @@ export function useSitemapLinking({
         return map;
     }, [linkGraph]);
 
+    // Статистика по линкам
+    const linkStats = useMemo<LinkStats>(() => {
+        if (!linkGraph) {
+            return { total: 0, planned: 0, approved: 0, applied: 0 };
+        }
+        const stats = { total: 0, planned: 0, approved: 0, applied: 0 };
+        linkGraph.edges.forEach((edge) => {
+            stats.total++;
+            switch (edge.status) {
+                case "planned":
+                    stats.planned++;
+                    break;
+                case "approved":
+                    stats.approved++;
+                    break;
+                case "applied":
+                    stats.applied++;
+                    break;
+            }
+        });
+        return stats;
+    }, [linkGraph]);
+
     // Конвертируем линки в React Flow edges
     const linkEdges = useMemo<Edge[]>(() => {
         if (!enabled || !linkGraph) return [];
@@ -155,9 +191,12 @@ export function useSitemapLinking({
                 id: `link-${edge.id}`,
                 source: String(edge.sourceNodeId),
                 target: String(edge.targetNodeId),
-                type: "default", // Bezier curves
+                sourceHandle: "right", // Outgoing from right
+                targetHandle: "left",  // Incoming to left
+                type: "linkEdge", // Use custom link edge component
                 animated: edge.status === "applying",
                 selectable: true,
+                focusable: true,
                 style,
                 markerEnd: {
                     type: "arrowclosed" as const,
@@ -183,14 +222,14 @@ export function useSitemapLinking({
 
         event.preventDefault();
 
-        const linkId = edge.data?.linkId;
-        const status = edge.data?.status;
+        const linkId = edge.data?.linkId as number | undefined;
+        const status = edge.data?.status as LinkStatus | undefined;
 
         if (linkId) {
             setLinkContextMenu({
                 linkId,
                 position: { x: event.clientX, y: event.clientY },
-                status,
+                status: status || "planned",
             });
         }
     }, []);
@@ -262,9 +301,62 @@ export function useSitemapLinking({
         }
     }, [loadLinkingData, closeLinkContextMenu]);
 
+    // Одобрить все planned линки
+    const approveAllLinks = useCallback(async (): Promise<boolean> => {
+        if (!linkGraph) return false;
+
+        try {
+            const plannedLinks = linkGraph.edges.filter((edge) => edge.status === "planned");
+            for (const link of plannedLinks) {
+                await linkingService.approveLink(link.id);
+            }
+            await loadLinkingData();
+            return true;
+        } catch (err) {
+            console.error("Failed to approve all links:", err);
+            setError(err instanceof Error ? err.message : "Failed to approve all links");
+            return false;
+        }
+    }, [linkGraph, loadLinkingData]);
+
+    // Отклонить все planned линки
+    const rejectAllLinks = useCallback(async (): Promise<boolean> => {
+        if (!linkGraph) return false;
+
+        try {
+            const plannedLinks = linkGraph.edges.filter((edge) => edge.status === "planned");
+            for (const link of plannedLinks) {
+                await linkingService.rejectLink(link.id);
+            }
+            await loadLinkingData();
+            return true;
+        } catch (err) {
+            console.error("Failed to reject all links:", err);
+            setError(err instanceof Error ? err.message : "Failed to reject all links");
+            return false;
+        }
+    }, [linkGraph, loadLinkingData]);
+
+    // Удалить все AI-сгенерированные ссылки
+    const clearAILinks = useCallback(async (): Promise<boolean> => {
+        if (!linkGraph) return false;
+
+        try {
+            const aiLinks = linkGraph.edges.filter((edge) => edge.source === "ai");
+            for (const link of aiLinks) {
+                await linkingService.removeLink(link.id);
+            }
+            await loadLinkingData();
+            return true;
+        } catch (err) {
+            console.error("Failed to clear AI links:", err);
+            setError(err instanceof Error ? err.message : "Failed to clear AI links");
+            return false;
+        }
+    }, [linkGraph, loadLinkingData]);
+
     // Начало создания связи
-    const onConnectStart: OnConnectStart = useCallback((event, { nodeId, handleId, handleType }) => {
-        console.log("[Linking] onConnectStart:", { nodeId, handleId, handleType });
+    const onConnectStart: OnConnectStart = useCallback((event, { nodeId }) => {
         connectingNodeId.current = nodeId;
     }, []);
 
@@ -296,6 +388,7 @@ export function useSitemapLinking({
         linkGraph,
         isLoading,
         error,
+        linkStats,
         linkCountsMap,
         linkEdges,
         linkContextMenu,
@@ -308,6 +401,9 @@ export function useSitemapLinking({
         removeLink,
         approveLink,
         rejectLink,
+        approveAllLinks,
+        rejectAllLinks,
+        clearAILinks,
         onConnect,
     };
 }

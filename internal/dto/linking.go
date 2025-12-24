@@ -171,11 +171,13 @@ type UpdateLinkRequest struct {
 }
 
 type SuggestLinksRequest struct {
-	PlanID     int64   `json:"planId"`
-	ProviderID int64   `json:"providerId"`
-	PromptID   *int64  `json:"promptId,omitempty"`
-	NodeIDs    []int64 `json:"nodeIds,omitempty"`
-	Feedback   string  `json:"feedback,omitempty"`
+	PlanID       int64   `json:"planId"`
+	ProviderID   int64   `json:"providerId"`
+	PromptID     *int64  `json:"promptId,omitempty"`
+	NodeIDs      []int64 `json:"nodeIds,omitempty"`
+	Feedback     string  `json:"feedback,omitempty"`
+	MaxIncoming  int     `json:"maxIncoming,omitempty"`
+	MaxOutgoing  int     `json:"maxOutgoing,omitempty"`
 }
 
 type ApplyLinksRequest struct {

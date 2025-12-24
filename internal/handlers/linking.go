@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"context"
+	"time"
+
 	"github.com/davidmovas/postulator/internal/domain/linking"
 	"github.com/davidmovas/postulator/internal/dto"
 	"github.com/davidmovas/postulator/pkg/ctx"
@@ -184,7 +187,20 @@ func (h *LinkingHandler) RejectLink(linkID int64) *dto.Response[bool] {
 // =========================================================================
 
 func (h *LinkingHandler) SuggestLinks(req *dto.SuggestLinksRequest) *dto.Response[bool] {
-	err := h.service.SuggestLinks(ctx.FastCtx(), req.PlanID, req.ProviderID, req.PromptID, req.NodeIDs, req.Feedback)
+	longCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	config := linking.SuggestLinksConfig{
+		PlanID:      req.PlanID,
+		ProviderID:  req.ProviderID,
+		PromptID:    req.PromptID,
+		NodeIDs:     req.NodeIDs,
+		Feedback:    req.Feedback,
+		MaxIncoming: req.MaxIncoming,
+		MaxOutgoing: req.MaxOutgoing,
+	}
+
+	err := h.service.SuggestLinks(longCtx, config)
 	if err != nil {
 		return fail[bool](err)
 	}

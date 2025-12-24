@@ -114,7 +114,7 @@ type Service interface {
 	ApproveLink(ctx context.Context, linkID int64) error
 	RejectLink(ctx context.Context, linkID int64) error
 
-	SuggestLinks(ctx context.Context, planID int64, providerID int64, promptID *int64, nodeIDs []int64, feedback string) error
+	SuggestLinks(ctx context.Context, config SuggestLinksConfig) error
 	ApplyLinks(ctx context.Context, planID int64, linkIDs []int64) error
 
 	GetLinkGraph(ctx context.Context, planID int64) (*LinkGraph, error)
@@ -144,6 +144,16 @@ type GraphEdge struct {
 	Status        LinkStatus `json:"status"`
 	Source        LinkSource `json:"source"`
 	Confidence    *float64   `json:"confidence"`
+}
+
+type SuggestLinksConfig struct {
+	PlanID      int64
+	ProviderID  int64
+	PromptID    *int64
+	NodeIDs     []int64
+	Feedback    string
+	MaxIncoming int
+	MaxOutgoing int
 }
 
 type SuggestionRequest struct {

@@ -17,9 +17,8 @@ type Client interface {
 	GenerateArticle(ctx context.Context, systemPrompt, userPrompt string) (*ArticleResult, error)
 	GenerateTopicVariations(ctx context.Context, topic string, amount int) ([]string, error)
 	GenerateSitemapStructure(ctx context.Context, systemPrompt, userPrompt string) (*SitemapStructureResult, error)
-	// GetProviderName returns the provider name (e.g., "openai", "anthropic")
+	GenerateLinkSuggestions(ctx context.Context, request *LinkSuggestionRequest) (*LinkSuggestionResult, error)
 	GetProviderName() string
-	// GetModelName returns the model name (e.g., "gpt-4", "claude-3-opus")
 	GetModelName() string
 }
 
@@ -51,4 +50,48 @@ type SitemapStructureResult struct {
 	TokensUsed int     // Deprecated: use Usage.TotalTokens
 	Cost       float64 // Deprecated: use Usage.CostUSD
 	Usage      Usage   // Detailed usage metrics
+}
+
+type ExistingLinkInfo struct {
+	TargetNodeID int64  `json:"targetNodeId"`
+	Status       string `json:"status"`
+	IsOutgoing   bool   `json:"isOutgoing"`
+}
+
+type LinkSuggestionNode struct {
+	ID            int64              `json:"id"`
+	Title         string             `json:"title"`
+	Path          string             `json:"path"`
+	Keywords      []string           `json:"keywords,omitempty"`
+	Content       string             `json:"content,omitempty"`
+	OutgoingCount int                `json:"outgoingCount"`
+	IncomingCount int                `json:"incomingCount"`
+	ExistingLinks []ExistingLinkInfo `json:"existingLinks,omitempty"`
+}
+
+type LinkSuggestionRequest struct {
+	Nodes        []LinkSuggestionNode
+	SystemPrompt string
+	UserPrompt   string
+	MaxIncoming  int
+	MaxOutgoing  int
+}
+
+type SuggestedLink struct {
+	SourceNodeID int64   `json:"sourceNodeId" jsonschema_description:"ID of the page that will contain the link"`
+	TargetNodeID int64   `json:"targetNodeId" jsonschema_description:"ID of the page being linked to"`
+	AnchorText   string  `json:"anchorText" jsonschema_description:"Text for the hyperlink"`
+	Reason       string  `json:"reason" jsonschema_description:"Brief explanation why this link is valuable"`
+	Confidence   float64 `json:"confidence" jsonschema_description:"Confidence score from 0.0 to 1.0"`
+}
+
+type LinkSuggestionSchema struct {
+	Links       []SuggestedLink `json:"links" jsonschema_description:"List of suggested internal links"`
+	Explanation string          `json:"explanation" jsonschema_description:"Overall strategy explanation"`
+}
+
+type LinkSuggestionResult struct {
+	Links       []SuggestedLink
+	Explanation string
+	Usage       Usage
 }

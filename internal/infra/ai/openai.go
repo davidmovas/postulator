@@ -369,6 +369,118 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 	}, nil
 }
 
+func (c *OpenAIClient) GenerateLinkSuggestions(ctx context.Context, request *LinkSuggestionRequest) (*LinkSuggestionResult, error) {
+	schema := generateSchema[LinkSuggestionSchema]()
+
+	schemaParam := openaiSDK.ResponseFormatJSONSchemaJSONSchemaParam{
+		Name:        "link_suggestions",
+		Description: openaiSDK.String("Internal linking suggestions between pages"),
+		Schema:      schema,
+		Strict:      openaiSDK.Bool(true),
+	}
+
+	systemPrompt := request.SystemPrompt
+	userPrompt := request.UserPrompt
+	if systemPrompt == "" {
+		systemPrompt = buildLinkSuggestionSystemPrompt()
+	}
+	if userPrompt == "" {
+		userPrompt = buildLinkSuggestionUserPrompt(request)
+	}
+
+	messages := []openaiSDK.ChatCompletionMessageParamUnion{
+		openaiSDK.SystemMessage(systemPrompt),
+		openaiSDK.UserMessage(userPrompt),
+	}
+
+	params := openaiSDK.ChatCompletionNewParams{
+		Messages: messages,
+		ResponseFormat: openaiSDK.ChatCompletionNewParamsResponseFormatUnion{
+			OfJSONSchema: &openaiSDK.ResponseFormatJSONSchemaParam{
+				JSONSchema: schemaParam,
+			},
+		},
+		Model: c.model,
+	}
+
+	if !c.isReasoningModel {
+		params.Temperature = openaiSDK.Float(0.5)
+	}
+
+	const maxTokens = 8192
+	if c.usesCompletionTokens {
+		params.MaxCompletionTokens = openaiSDK.Int(maxTokens)
+	} else {
+		params.MaxTokens = openaiSDK.Int(maxTokens)
+	}
+
+	// Log request info
+	fmt.Printf("[OpenAI] GenerateLinkSuggestions: model=%s, nodes=%d, promptLen=%d\n",
+		c.modelName, len(request.Nodes), len(systemPrompt)+len(userPrompt))
+
+	chat, err := c.client.Chat.Completions.New(ctx, params)
+	if err != nil {
+		return nil, errors.AI(providerName, fmt.Errorf("API error: %w", err))
+	}
+
+	if len(chat.Choices) == 0 {
+		return nil, errors.AI(providerName, fmt.Errorf("no response from API"))
+	}
+
+	choice := chat.Choices[0]
+	finishReason := string(choice.FinishReason)
+
+	// Log response info
+	fmt.Printf("[OpenAI] LinkSuggestions response: promptTokens=%d, completionTokens=%d, finishReason=%s\n",
+		chat.Usage.PromptTokens, chat.Usage.CompletionTokens, finishReason)
+
+	// Check for problematic finish reasons
+	if finishReason == "length" {
+		return nil, errors.AI(providerName, fmt.Errorf("response truncated: max tokens reached"))
+	}
+	if finishReason == "content_filter" {
+		return nil, errors.AI(providerName, fmt.Errorf("content filtered by safety system"))
+	}
+
+	content := choice.Message.Content
+	if content == "" {
+		// Log more details about the empty response
+		fmt.Printf("[OpenAI] Empty response details: finishReason=%s, refusal=%v\n",
+			finishReason, choice.Message.Refusal)
+		return nil, errors.AI(providerName, fmt.Errorf("empty response from API (finishReason: %s)", finishReason))
+	}
+
+	var result LinkSuggestionSchema
+	if err = json.Unmarshal([]byte(content), &result); err != nil {
+		sanitized := sanitizeJSON(content)
+		if err2 := json.Unmarshal([]byte(sanitized), &result); err2 != nil {
+			preview := content
+			if len(preview) > 300 {
+				preview = preview[:300] + "..."
+			}
+			return nil, errors.AI(providerName, fmt.Errorf("failed to parse response: %w, raw: %s", err, preview))
+		}
+	}
+
+	inputTokens := int(chat.Usage.PromptTokens)
+	outputTokens := int(chat.Usage.CompletionTokens)
+	totalTokens := int(chat.Usage.TotalTokens)
+	cost := CalculateCost(entities.TypeOpenAI, c.modelName, inputTokens, outputTokens)
+
+	fmt.Printf("[OpenAI] LinkSuggestions success: links=%d, cost=$%.4f\n", len(result.Links), cost)
+
+	return &LinkSuggestionResult{
+		Links:       result.Links,
+		Explanation: result.Explanation,
+		Usage: Usage{
+			InputTokens:  inputTokens,
+			OutputTokens: outputTokens,
+			TotalTokens:  totalTokens,
+			CostUSD:      cost,
+		},
+	}, nil
+}
+
 func generateSchema[T any]() interface{} {
 	reflector := jsonschema.Reflector{
 		AllowAdditionalProperties: false,
@@ -377,5 +489,54 @@ func generateSchema[T any]() interface{} {
 	var v T
 	schema := reflector.Reflect(v)
 	return schema
+}
+
+func buildLinkSuggestionSystemPrompt() string {
+	return `You are an SEO expert specializing in internal linking strategies.
+Analyze the provided website pages and suggest internal links that will:
+- Improve site navigation and user experience
+- Distribute page authority (link equity) effectively
+- Create topical clusters by linking related content
+- Help search engines understand site structure
+
+Guidelines:
+- Each page should have 2-5 outgoing links (not too many, not too few)
+- Prioritize semantic relevance over quantity
+- Use descriptive, natural anchor text
+- Avoid linking to the same page multiple times from one source
+- Consider the user journey and information hierarchy`
+}
+
+func buildLinkSuggestionUserPrompt(request *LinkSuggestionRequest) string {
+	var sb strings.Builder
+	sb.WriteString("Pages to analyze:\n\n")
+
+	for _, node := range request.Nodes {
+		// Compact format: ID | Title | Path | Keywords | out/in counts
+		sb.WriteString(fmt.Sprintf("ID:%d | %s | %s", node.ID, node.Title, node.Path))
+		if len(node.Keywords) > 0 {
+			// Limit to first 5 keywords to reduce prompt size
+			kw := node.Keywords
+			if len(kw) > 5 {
+				kw = kw[:5]
+			}
+			sb.WriteString(fmt.Sprintf(" | kw: %s", strings.Join(kw, ",")))
+		}
+		sb.WriteString(fmt.Sprintf(" | out:%d in:%d\n", node.OutgoingCount, node.IncomingCount))
+	}
+
+	if request.MaxOutgoing > 0 || request.MaxIncoming > 0 {
+		sb.WriteString("\nLimits: ")
+		if request.MaxOutgoing > 0 {
+			sb.WriteString(fmt.Sprintf("max %d outgoing, ", request.MaxOutgoing))
+		}
+		if request.MaxIncoming > 0 {
+			sb.WriteString(fmt.Sprintf("max %d incoming", request.MaxIncoming))
+		}
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("\nSuggest internal links using exact page IDs. Focus on semantic relevance.")
+	return sb.String()
 }
 

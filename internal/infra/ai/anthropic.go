@@ -348,3 +348,91 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 		},
 	}, nil
 }
+
+func (c *AnthropicClient) GenerateLinkSuggestions(ctx context.Context, request *LinkSuggestionRequest) (*LinkSuggestionResult, error) {
+	jsonInstructions := `
+You must respond with a valid JSON object in the following format:
+{
+  "links": [
+    {
+      "sourceNodeId": 1,
+      "targetNodeId": 2,
+      "anchorText": "text for the hyperlink",
+      "reason": "why this link is valuable",
+      "confidence": 0.85
+    }
+  ],
+  "explanation": "overall strategy explanation"
+}
+
+Do not include any text before or after the JSON object. Only output the JSON.`
+
+	baseSystem := request.SystemPrompt
+	if baseSystem == "" {
+		baseSystem = buildLinkSuggestionSystemPrompt()
+	}
+	systemPrompt := baseSystem + "\n\n" + jsonInstructions
+
+	userPrompt := request.UserPrompt
+	if userPrompt == "" {
+		userPrompt = buildLinkSuggestionUserPrompt(request)
+	}
+
+	message, err := c.client.Messages.New(ctx, anthropic.MessageNewParams{
+		Model:     anthropic.Model(c.model),
+		MaxTokens: 4096,
+		System: []anthropic.TextBlockParam{
+			{
+				Type: "text",
+				Text: systemPrompt,
+			},
+		},
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock(userPrompt)),
+		},
+	})
+	if err != nil {
+		return nil, errors.AI(anthropicProviderName, fmt.Errorf("API error: %w", err))
+	}
+
+	if len(message.Content) == 0 {
+		return nil, errors.AI(anthropicProviderName, fmt.Errorf("no response from API"))
+	}
+
+	var responseText string
+	for _, block := range message.Content {
+		if block.Type == "text" {
+			responseText = block.Text
+			break
+		}
+	}
+
+	if responseText == "" {
+		return nil, errors.AI(anthropicProviderName, fmt.Errorf("no text content in response"))
+	}
+
+	var result LinkSuggestionSchema
+	jsonStr := extractJSON(responseText)
+	if err = json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		sanitized := sanitizeJSON(jsonStr)
+		if err2 := json.Unmarshal([]byte(sanitized), &result); err2 != nil {
+			return nil, errors.AI(anthropicProviderName, fmt.Errorf("failed to parse response: %w", err))
+		}
+	}
+
+	inputTokens := int(message.Usage.InputTokens)
+	outputTokens := int(message.Usage.OutputTokens)
+	totalTokens := inputTokens + outputTokens
+	cost := CalculateCost(entities.TypeAnthropic, c.model, inputTokens, outputTokens)
+
+	return &LinkSuggestionResult{
+		Links:       result.Links,
+		Explanation: result.Explanation,
+		Usage: Usage{
+			InputTokens:  inputTokens,
+			OutputTokens: outputTokens,
+			TotalTokens:  totalTokens,
+			CostUSD:      cost,
+		},
+	}, nil
+}

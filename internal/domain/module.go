@@ -56,12 +56,12 @@ var Module = fx.Module("domain",
 		execution.NewExecutor,
 		execution.NewExecutionStatsAdapter,
 
-		// Linking
-		linking.NewService,
-
-		// Prompts
+		// Prompts (before linking as linking depends on prompts)
 		prompts.NewRepository,
 		prompts.NewService,
+
+		// Linking
+		linking.NewService,
 
 		// Providers
 		providers.NewRepository,
