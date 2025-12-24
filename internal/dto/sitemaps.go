@@ -452,6 +452,15 @@ type ContentSettingsDTO struct {
 	WritingStyle       string `json:"writingStyle"`       // professional, casual, formal, friendly, technical
 	ContentTone        string `json:"contentTone"`        // informative, persuasive, educational, engaging, authoritative
 	CustomInstructions string `json:"customInstructions"` // Additional instructions
+	IncludeLinks       bool   `json:"includeLinks"`       // Include approved links from linking plan
+}
+
+// LinkTargetDTO represents a target page for internal linking during generation
+type LinkTargetDTO struct {
+	TargetNodeID int64   `json:"targetNodeId"`
+	TargetTitle  string  `json:"targetTitle"`
+	TargetPath   string  `json:"targetPath"`
+	AnchorText   *string `json:"anchorText,omitempty"` // Suggested anchor text (optional)
 }
 
 type StartPageGenerationRequest struct {

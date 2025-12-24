@@ -937,6 +937,7 @@ function SitemapEditorFlow() {
                 onSuccess={() => loadData()}
                 onTaskStarted={wpOps.setActiveGenerationTask}
                 activeTask={wpOps.activeGenerationTask}
+                hasApprovedLinks={linking.linkStats.approved > 0}
             />
 
             {linking.plan && (

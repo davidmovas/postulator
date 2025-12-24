@@ -9,8 +9,10 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/prompts"
 	"github.com/davidmovas/postulator/internal/domain/providers"
 	"github.com/davidmovas/postulator/internal/domain/sitemap"
+	"github.com/davidmovas/postulator/internal/domain/sites"
 	"github.com/davidmovas/postulator/internal/infra/database"
 	"github.com/davidmovas/postulator/internal/infra/events"
+	"github.com/davidmovas/postulator/internal/infra/wp"
 	"github.com/davidmovas/postulator/pkg/errors"
 	"github.com/davidmovas/postulator/pkg/logger"
 )
@@ -22,6 +24,7 @@ type serviceImpl struct {
 	linkRepo   LinkRepository
 	sitemapSvc sitemap.Service
 	suggester  *Suggester
+	applier    *Applier
 	eventBus   *events.EventBus
 	logger     *logger.Logger
 }
@@ -29,8 +32,10 @@ type serviceImpl struct {
 func NewService(
 	db *database.DB,
 	sitemapSvc sitemap.Service,
+	sitesSvc sites.Service,
 	providerSvc providers.Service,
 	promptSvc prompts.Service,
+	wpClient wp.Client,
 	aiUsageService aiusage.Service,
 	eventBus *events.EventBus,
 	logger *logger.Logger,
@@ -41,6 +46,7 @@ func NewService(
 		linkRepo:   linkRepo,
 		sitemapSvc: sitemapSvc,
 		suggester:  NewSuggester(sitemapSvc, providerSvc, promptSvc, linkRepo, aiUsageService, logger),
+		applier:    NewApplier(sitemapSvc, sitesSvc, providerSvc, linkRepo, wpClient, aiUsageService, logger),
 		eventBus:   eventBus,
 		logger:     logger.WithScope("linking"),
 	}
@@ -227,22 +233,47 @@ func (s *serviceImpl) SuggestLinks(ctx context.Context, config SuggestLinksConfi
 	return nil
 }
 
-// Apply links - placeholder for now
-func (s *serviceImpl) ApplyLinks(ctx context.Context, planID int64, linkIDs []int64) error {
+// ApplyLinks applies approved links to WordPress content using AI
+func (s *serviceImpl) ApplyLinks(ctx context.Context, planID int64, linkIDs []int64, providerID int64) (*ApplyResult, error) {
 	plan, err := s.planRepo.GetByID(ctx, planID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	plan.Status = PlanStatusApplying
 	if err := s.planRepo.Update(ctx, plan); err != nil {
-		return err
+		return nil, err
 	}
 
-	// TODO: Implement link application to WordPress
-	// This will be done in a separate applier component
+	result, err := s.applier.Apply(ctx, ApplyConfig{
+		PlanID:     planID,
+		SiteID:     plan.SiteID,
+		ProviderID: providerID,
+		LinkIDs:    linkIDs,
+	})
 
-	return nil
+	if err != nil {
+		errMsg := err.Error()
+		plan.Status = PlanStatusFailed
+		plan.Error = &errMsg
+		_ = s.planRepo.Update(ctx, plan)
+		return nil, err
+	}
+
+	// Check if all requested links were processed
+	if result.FailedLinks == 0 {
+		plan.Status = PlanStatusReady
+	} else if result.AppliedLinks > 0 {
+		plan.Status = PlanStatusReady // Partial success
+	} else {
+		plan.Status = PlanStatusFailed
+	}
+	plan.Error = nil
+	_ = s.planRepo.Update(ctx, plan)
+
+	s.logger.Infof("Applied %d/%d links for plan %d", result.AppliedLinks, result.TotalLinks, planID)
+
+	return result, nil
 }
 
 // Graph visualization

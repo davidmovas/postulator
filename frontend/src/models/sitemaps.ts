@@ -380,6 +380,7 @@ export interface ContentSettings {
     writingStyle: WritingStyle;
     contentTone: ContentTone;
     customInstructions?: string;
+    includeLinks?: boolean; // Include approved links from linking plan
 }
 
 export interface StartPageGenerationInput {

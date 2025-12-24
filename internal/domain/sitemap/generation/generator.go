@@ -61,6 +61,7 @@ type GenerateRequest struct {
 	PromptID        *int64
 	Placeholders    map[string]string
 	ContentSettings *ContentSettings
+	LinkTargets     []LinkTarget // Approved outgoing links for this node
 }
 
 type GenerateResult struct {
@@ -147,11 +148,12 @@ func (g *Generator) Generate(ctx context.Context, req GenerateRequest) (*Generat
 
 func (g *Generator) buildPrompts(ctx context.Context, req GenerateRequest) (string, string, error) {
 	nodeCtx := NodeContext{
-		Title:    req.Node.Title,
-		Path:     req.Node.Path,
-		Keywords: req.Node.Keywords,
-		Language: req.Placeholders["language"],
-		Context:  req.Placeholders["context"],
+		Title:       req.Node.Title,
+		Path:        req.Node.Path,
+		Keywords:    req.Node.Keywords,
+		Language:    req.Placeholders["language"],
+		Context:     req.Placeholders["context"],
+		LinkTargets: req.LinkTargets,
 	}
 
 	// Apply content settings if provided

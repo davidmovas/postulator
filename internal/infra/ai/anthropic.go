@@ -436,3 +436,92 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 		},
 	}, nil
 }
+
+func (c *AnthropicClient) InsertLinks(ctx context.Context, request *InsertLinksRequest) (*InsertLinksResult, error) {
+	if len(request.Links) == 0 {
+		return &InsertLinksResult{
+			Content:      request.Content,
+			LinksApplied: 0,
+			Usage:        Usage{},
+		}, nil
+	}
+
+	jsonInstructions := `
+You must respond with a valid JSON object in the following format:
+{
+  "content": "The modified HTML content with links inserted",
+  "linksApplied": 3
+}
+
+Do not include any text before or after the JSON object. Only output the JSON.`
+
+	systemPrompt := buildInsertLinksSystemPrompt(request.Language) + "\n\n" + jsonInstructions
+	userPrompt := buildInsertLinksUserPrompt(request)
+
+	fmt.Printf("[Anthropic] InsertLinks: model=%s, contentLen=%d, links=%d\n",
+		c.model, len(request.Content), len(request.Links))
+
+	message, err := c.client.Messages.New(ctx, anthropic.MessageNewParams{
+		Model:     anthropic.Model(c.model),
+		MaxTokens: 16384, // More tokens for full content with links
+		System: []anthropic.TextBlockParam{
+			{
+				Type: "text",
+				Text: systemPrompt,
+			},
+		},
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock(userPrompt)),
+		},
+	})
+	if err != nil {
+		return nil, errors.AI(anthropicProviderName, fmt.Errorf("API error: %w", err))
+	}
+
+	if len(message.Content) == 0 {
+		return nil, errors.AI(anthropicProviderName, fmt.Errorf("no response from API"))
+	}
+
+	var responseText string
+	for _, block := range message.Content {
+		if block.Type == "text" {
+			responseText = block.Text
+			break
+		}
+	}
+
+	if responseText == "" {
+		return nil, errors.AI(anthropicProviderName, fmt.Errorf("no text content in response"))
+	}
+
+	var result InsertLinksContentSchema
+	jsonStr := extractJSON(responseText)
+	if err = json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		sanitized := sanitizeJSON(jsonStr)
+		if err2 := json.Unmarshal([]byte(sanitized), &result); err2 != nil {
+			preview := jsonStr
+			if len(preview) > 300 {
+				preview = preview[:300] + "..."
+			}
+			return nil, errors.AI(anthropicProviderName, fmt.Errorf("failed to parse response: %w, raw: %s", err, preview))
+		}
+	}
+
+	inputTokens := int(message.Usage.InputTokens)
+	outputTokens := int(message.Usage.OutputTokens)
+	totalTokens := inputTokens + outputTokens
+	cost := CalculateCost(entities.TypeAnthropic, c.model, inputTokens, outputTokens)
+
+	fmt.Printf("[Anthropic] InsertLinks success: linksApplied=%d, cost=$%.4f\n", result.LinksApplied, cost)
+
+	return &InsertLinksResult{
+		Content:      result.Content,
+		LinksApplied: result.LinksApplied,
+		Usage: Usage{
+			InputTokens:  inputTokens,
+			OutputTokens: outputTokens,
+			TotalTokens:  totalTokens,
+			CostUSD:      cost,
+		},
+	}, nil
+}

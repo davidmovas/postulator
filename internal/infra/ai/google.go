@@ -389,3 +389,93 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 		},
 	}, nil
 }
+
+func (c *GoogleClient) InsertLinks(ctx context.Context, request *InsertLinksRequest) (*InsertLinksResult, error) {
+	if len(request.Links) == 0 {
+		return &InsertLinksResult{
+			Content:      request.Content,
+			LinksApplied: 0,
+			Usage:        Usage{},
+		}, nil
+	}
+
+	model := c.client.GenerativeModel(c.model)
+
+	model.SetTemperature(0.3) // Lower for precise edits
+	model.SetMaxOutputTokens(16384)
+
+	jsonInstructions := `
+You must respond with a valid JSON object in the following format:
+{
+  "content": "The modified HTML content with links inserted",
+  "linksApplied": 3
+}
+
+Do not include any text before or after the JSON object. Only output the JSON.`
+
+	systemPrompt := buildInsertLinksSystemPrompt(request.Language) + "\n\n" + jsonInstructions
+	userPrompt := buildInsertLinksUserPrompt(request)
+
+	model.SystemInstruction = &genai.Content{
+		Parts: []genai.Part{genai.Text(systemPrompt)},
+	}
+
+	fmt.Printf("[Google] InsertLinks: model=%s, contentLen=%d, links=%d\n",
+		c.model, len(request.Content), len(request.Links))
+
+	resp, err := model.GenerateContent(ctx, genai.Text(userPrompt))
+	if err != nil {
+		return nil, errors.AI(googleProviderName, fmt.Errorf("API error: %w", err))
+	}
+
+	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
+		return nil, errors.AI(googleProviderName, fmt.Errorf("no response from API"))
+	}
+
+	var responseText string
+	for _, part := range resp.Candidates[0].Content.Parts {
+		if text, ok := part.(genai.Text); ok {
+			responseText = string(text)
+			break
+		}
+	}
+
+	if responseText == "" {
+		return nil, errors.AI(googleProviderName, fmt.Errorf("no text content in response"))
+	}
+
+	var result InsertLinksContentSchema
+	jsonStr := extractJSON(responseText)
+	if err = json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		sanitized := sanitizeJSON(jsonStr)
+		if err2 := json.Unmarshal([]byte(sanitized), &result); err2 != nil {
+			preview := jsonStr
+			if len(preview) > 300 {
+				preview = preview[:300] + "..."
+			}
+			return nil, errors.AI(googleProviderName, fmt.Errorf("failed to parse response: %w, raw: %s", err, preview))
+		}
+	}
+
+	inputTokens := 0
+	outputTokens := 0
+	if resp.UsageMetadata != nil {
+		inputTokens = int(resp.UsageMetadata.PromptTokenCount)
+		outputTokens = int(resp.UsageMetadata.CandidatesTokenCount)
+	}
+	totalTokens := inputTokens + outputTokens
+	cost := CalculateCost(entities.TypeGoogle, c.model, inputTokens, outputTokens)
+
+	fmt.Printf("[Google] InsertLinks success: linksApplied=%d, cost=$%.4f\n", result.LinksApplied, cost)
+
+	return &InsertLinksResult{
+		Content:      result.Content,
+		LinksApplied: result.LinksApplied,
+		Usage: Usage{
+			InputTokens:  inputTokens,
+			OutputTokens: outputTokens,
+			TotalTokens:  totalTokens,
+			CostUSD:      cost,
+		},
+	}, nil
+}

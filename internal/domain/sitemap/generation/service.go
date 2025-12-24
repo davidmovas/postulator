@@ -6,6 +6,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/aiusage"
 	"github.com/davidmovas/postulator/internal/domain/articles"
 	"github.com/davidmovas/postulator/internal/domain/entities"
+	"github.com/davidmovas/postulator/internal/domain/linking"
 	"github.com/davidmovas/postulator/internal/domain/prompts"
 	"github.com/davidmovas/postulator/internal/domain/providers"
 	"github.com/davidmovas/postulator/internal/domain/sitemap"
@@ -38,6 +39,7 @@ func NewService(
 	siteSvc sites.Service,
 	promptSvc prompts.Service,
 	providerSvc providers.Service,
+	linkingSvc linking.Service,
 	aiUsageService aiusage.Service,
 	wpClient wp.Client,
 	eventBus *events.EventBus,
@@ -67,6 +69,7 @@ func NewService(
 
 	executor := NewExecutor(
 		sitemapSvc,
+		linkingSvc,
 		generator,
 		publisher,
 		eventBus,

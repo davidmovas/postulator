@@ -23,6 +23,7 @@ var DefaultPagePlaceholders = []string{
 	"writing_style",
 	"content_tone",
 	"custom_instructions",
+	"internal_links",
 	"system_instructions",
 	"user_instructions",
 }
@@ -80,6 +81,7 @@ type NodeContext struct {
 	WritingStyle       string
 	ContentTone        string
 	CustomInstructions string
+	LinkTargets        []LinkTarget // Internal links to include in content
 }
 
 type HierarchyNode struct {
@@ -126,11 +128,14 @@ func BuildPlaceholders(ctx NodeContext) map[string]string {
 		contentTone = "informative"
 	}
 
+	// Build internal links section
+	internalLinks := buildInternalLinksSection(ctx.LinkTargets)
+
 	// Build system instructions from settings
-	systemInstructions := buildSystemInstructions(language, wordCount, writingStyle, contentTone, ctx.CustomInstructions)
+	systemInstructions := buildSystemInstructions(language, wordCount, writingStyle, contentTone, ctx.CustomInstructions, len(ctx.LinkTargets) > 0)
 
 	// Build user instructions from node data
-	userInstructions := buildUserInstructions(ctx.Title, ctx.Path, keywords, hierarchy, ctx.Context)
+	userInstructions := buildUserInstructions(ctx.Title, ctx.Path, keywords, hierarchy, ctx.Context, internalLinks)
 
 	return map[string]string{
 		"title":               ctx.Title,
@@ -143,12 +148,13 @@ func BuildPlaceholders(ctx NodeContext) map[string]string {
 		"writing_style":       writingStyle,
 		"content_tone":        contentTone,
 		"custom_instructions": ctx.CustomInstructions,
+		"internal_links":      internalLinks,
 		"system_instructions": systemInstructions,
 		"user_instructions":   userInstructions,
 	}
 }
 
-func buildSystemInstructions(language, wordCount, writingStyle, contentTone, customInstructions string) string {
+func buildSystemInstructions(language, wordCount, writingStyle, contentTone, customInstructions string, hasLinks bool) string {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("Generate WordPress page content in %s.\n", language))
@@ -158,6 +164,13 @@ func buildSystemInstructions(language, wordCount, writingStyle, contentTone, cus
 	sb.WriteString("Use HTML tags: p, h2, h3, ul, li.\n")
 	sb.WriteString("Be concise and direct.")
 
+	if hasLinks {
+		sb.WriteString("\n\nIMPORTANT: You MUST include ALL specified internal links in the content. ")
+		sb.WriteString("Use <a href=\"PATH\">ANCHOR TEXT</a> format. ")
+		sb.WriteString("Place links naturally within the text where they fit contextually. ")
+		sb.WriteString("If anchor text is not specified, choose appropriate anchor text based on context.")
+	}
+
 	if customInstructions != "" {
 		sb.WriteString("\n\nAdditional instructions: ")
 		sb.WriteString(customInstructions)
@@ -166,7 +179,7 @@ func buildSystemInstructions(language, wordCount, writingStyle, contentTone, cus
 	return sb.String()
 }
 
-func buildUserInstructions(title, path, keywords, hierarchy, context string) string {
+func buildUserInstructions(title, path, keywords, hierarchy, context, internalLinks string) string {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("Create content for page: %s\n", title))
@@ -181,7 +194,33 @@ func buildUserInstructions(title, path, keywords, hierarchy, context string) str
 	}
 
 	if context != "" {
-		sb.WriteString(fmt.Sprintf("\nContext: %s", context))
+		sb.WriteString(fmt.Sprintf("\nContext: %s\n", context))
+	}
+
+	if internalLinks != "" {
+		sb.WriteString(fmt.Sprintf("\n%s", internalLinks))
+	}
+
+	return sb.String()
+}
+
+// buildInternalLinksSection creates a formatted section describing required internal links
+func buildInternalLinksSection(links []LinkTarget) string {
+	if len(links) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString("REQUIRED INTERNAL LINKS (must be included in content):\n")
+
+	for i, link := range links {
+		sb.WriteString(fmt.Sprintf("%d. Link to: %s\n", i+1, link.TargetTitle))
+		sb.WriteString(fmt.Sprintf("   Path: %s\n", link.TargetPath))
+		if link.AnchorText != nil && *link.AnchorText != "" {
+			sb.WriteString(fmt.Sprintf("   Suggested anchor: \"%s\"\n", *link.AnchorText))
+		} else {
+			sb.WriteString("   Anchor: Choose appropriate text based on context\n")
+		}
 	}
 
 	return sb.String()

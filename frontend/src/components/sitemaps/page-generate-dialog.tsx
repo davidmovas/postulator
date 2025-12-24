@@ -33,6 +33,7 @@ import {
     ExternalLink,
     ChevronDown,
     ChevronUp,
+    Link2,
 } from "lucide-react";
 import { sitemapService } from "@/services/sitemaps";
 import { providerService } from "@/services/providers";
@@ -47,11 +48,17 @@ import {
 import { Provider } from "@/models/providers";
 import { Prompt } from "@/models/prompts";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
     Collapsible,
     CollapsibleContent,
     CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 interface PageGenerateDialogProps {
@@ -63,6 +70,7 @@ interface PageGenerateDialogProps {
     onSuccess: () => void;
     onTaskStarted?: (task: GenerationTask) => void;
     activeTask?: GenerationTask | null;
+    hasApprovedLinks?: boolean; // Whether there are approved links available
 }
 
 export function PageGenerateDialog({
@@ -74,6 +82,7 @@ export function PageGenerateDialog({
     onSuccess,
     onTaskStarted,
     activeTask,
+    hasApprovedLinks = false,
 }: PageGenerateDialogProps) {
     const [task, setTask] = useState<GenerationTask | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -87,6 +96,7 @@ export function PageGenerateDialog({
     const [writingStyle, setWritingStyle] = useState<WritingStyle>("professional");
     const [contentTone, setContentTone] = useState<ContentTone>("informative");
     const [customInstructions, setCustomInstructions] = useState("");
+    const [includeLinks, setIncludeLinks] = useState(false);
 
     const [providers, setProviders] = useState<Provider[]>([]);
     const [prompts, setPrompts] = useState<Prompt[]>([]);
@@ -199,6 +209,7 @@ export function PageGenerateDialog({
                     writingStyle,
                     contentTone,
                     customInstructions: customInstructions || undefined,
+                    includeLinks: includeLinks || undefined,
                 },
             });
 
@@ -425,6 +436,33 @@ export function PageGenerateDialog({
                                             <SelectItem value="authoritative">Authoritative</SelectItem>
                                         </SelectContent>
                                     </Select>
+                                </div>
+
+                                {/* Include Links Option */}
+                                <div className="flex items-center gap-3 py-2 px-3 rounded-md border bg-muted/30">
+                                    <Checkbox
+                                        id="includeLinks"
+                                        checked={includeLinks}
+                                        onCheckedChange={(checked) => setIncludeLinks(checked === true)}
+                                        disabled={!hasApprovedLinks}
+                                    />
+                                    <div className="flex-1">
+                                        <Label
+                                            htmlFor="includeLinks"
+                                            className={cn(
+                                                "flex items-center gap-2 cursor-pointer",
+                                                !hasApprovedLinks && "text-muted-foreground cursor-not-allowed"
+                                            )}
+                                        >
+                                            <Link2 className="h-4 w-4" />
+                                            Include Internal Links
+                                        </Label>
+                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                            {hasApprovedLinks
+                                                ? "Embed approved internal links in generated content"
+                                                : "No approved links available (approve links in Links Mode first)"}
+                                        </p>
+                                    </div>
                                 </div>
 
                                 <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>

@@ -181,6 +181,25 @@ type SuggestLinksRequest struct {
 }
 
 type ApplyLinksRequest struct {
-	PlanID  int64   `json:"planId"`
-	LinkIDs []int64 `json:"linkIds"`
+	PlanID     int64   `json:"planId"`
+	LinkIDs    []int64 `json:"linkIds"`
+	ProviderID int64   `json:"providerId"`
+}
+
+// ApplyLinksResult contains the result of applying links to content
+type ApplyLinksResult struct {
+	TotalLinks   int                 `json:"totalLinks"`
+	AppliedLinks int                 `json:"appliedLinks"`
+	FailedLinks  int                 `json:"failedLinks"`
+	Results      []*AppliedLinkInfo  `json:"results"`
+	Errors       []string            `json:"errors,omitempty"`
+}
+
+// AppliedLinkInfo contains info about a successfully applied link
+type AppliedLinkInfo struct {
+	LinkID       int64  `json:"linkId"`
+	SourceNodeID int64  `json:"sourceNodeId"`
+	TargetNodeID int64  `json:"targetNodeId"`
+	AnchorText   string `json:"anchorText"`
+	TargetPath   string `json:"targetPath"`
 }

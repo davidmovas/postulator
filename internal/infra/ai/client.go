@@ -18,6 +18,7 @@ type Client interface {
 	GenerateTopicVariations(ctx context.Context, topic string, amount int) ([]string, error)
 	GenerateSitemapStructure(ctx context.Context, systemPrompt, userPrompt string) (*SitemapStructureResult, error)
 	GenerateLinkSuggestions(ctx context.Context, request *LinkSuggestionRequest) (*LinkSuggestionResult, error)
+	InsertLinks(ctx context.Context, request *InsertLinksRequest) (*InsertLinksResult, error)
 	GetProviderName() string
 	GetModelName() string
 }
@@ -94,4 +95,27 @@ type LinkSuggestionResult struct {
 	Links       []SuggestedLink
 	Explanation string
 	Usage       Usage
+}
+
+// InsertLinkTarget represents a link to be inserted into content
+type InsertLinkTarget struct {
+	TargetPath string  // URL path to link to
+	TargetTitle string // Title of the target page (for context)
+	AnchorText *string // Suggested anchor text (optional, AI can choose)
+}
+
+// InsertLinksRequest contains the data for inserting links into existing HTML content
+type InsertLinksRequest struct {
+	Content     string             // Existing HTML content
+	PageTitle   string             // Title of the current page
+	PagePath    string             // Path of the current page
+	Links       []InsertLinkTarget // Links to insert
+	Language    string             // Content language
+}
+
+// InsertLinksResult contains the content with links inserted
+type InsertLinksResult struct {
+	Content      string // Modified HTML content with links
+	LinksApplied int    // Number of links successfully inserted
+	Usage        Usage  // Token usage metrics
 }

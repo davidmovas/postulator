@@ -540,3 +540,156 @@ func buildLinkSuggestionUserPrompt(request *LinkSuggestionRequest) string {
 	return sb.String()
 }
 
+// InsertLinksResult schema for JSON response
+type InsertLinksContentSchema struct {
+	Content      string `json:"content" jsonschema_description:"Modified HTML content with links inserted"`
+	LinksApplied int    `json:"linksApplied" jsonschema_description:"Number of links successfully inserted"`
+}
+
+func (c *OpenAIClient) InsertLinks(ctx context.Context, request *InsertLinksRequest) (*InsertLinksResult, error) {
+	if len(request.Links) == 0 {
+		return &InsertLinksResult{
+			Content:      request.Content,
+			LinksApplied: 0,
+			Usage:        Usage{},
+		}, nil
+	}
+
+	schema := generateSchema[InsertLinksContentSchema]()
+
+	schemaParam := openaiSDK.ResponseFormatJSONSchemaJSONSchemaParam{
+		Name:        "content_with_links",
+		Description: openaiSDK.String("HTML content with internal links inserted"),
+		Schema:      schema,
+		Strict:      openaiSDK.Bool(true),
+	}
+
+	systemPrompt := buildInsertLinksSystemPrompt(request.Language)
+	userPrompt := buildInsertLinksUserPrompt(request)
+
+	messages := []openaiSDK.ChatCompletionMessageParamUnion{
+		openaiSDK.SystemMessage(systemPrompt),
+		openaiSDK.UserMessage(userPrompt),
+	}
+
+	params := openaiSDK.ChatCompletionNewParams{
+		Messages: messages,
+		ResponseFormat: openaiSDK.ChatCompletionNewParamsResponseFormatUnion{
+			OfJSONSchema: &openaiSDK.ResponseFormatJSONSchemaParam{
+				JSONSchema: schemaParam,
+			},
+		},
+		Model: c.model,
+	}
+
+	if !c.isReasoningModel {
+		params.Temperature = openaiSDK.Float(0.3) // Lower temperature for more precise edits
+	}
+
+	// Allow more tokens since we're outputting full HTML content
+	const maxTokens = 16384
+	if c.usesCompletionTokens {
+		params.MaxCompletionTokens = openaiSDK.Int(maxTokens)
+	} else {
+		params.MaxTokens = openaiSDK.Int(maxTokens)
+	}
+
+	fmt.Printf("[OpenAI] InsertLinks: model=%s, contentLen=%d, links=%d\n",
+		c.modelName, len(request.Content), len(request.Links))
+
+	chat, err := c.client.Chat.Completions.New(ctx, params)
+	if err != nil {
+		return nil, errors.AI(providerName, fmt.Errorf("API error: %w", err))
+	}
+
+	if len(chat.Choices) == 0 {
+		return nil, errors.AI(providerName, fmt.Errorf("no response from API"))
+	}
+
+	choice := chat.Choices[0]
+	finishReason := string(choice.FinishReason)
+
+	if finishReason == "length" {
+		return nil, errors.AI(providerName, fmt.Errorf("response truncated: content too long"))
+	}
+	if finishReason == "content_filter" {
+		return nil, errors.AI(providerName, fmt.Errorf("content filtered by safety system"))
+	}
+
+	content := choice.Message.Content
+	if content == "" {
+		return nil, errors.AI(providerName, fmt.Errorf("empty response from API"))
+	}
+
+	var result InsertLinksContentSchema
+	if err = json.Unmarshal([]byte(content), &result); err != nil {
+		sanitized := sanitizeJSON(content)
+		if err2 := json.Unmarshal([]byte(sanitized), &result); err2 != nil {
+			preview := content
+			if len(preview) > 300 {
+				preview = preview[:300] + "..."
+			}
+			return nil, errors.AI(providerName, fmt.Errorf("failed to parse response: %w, raw: %s", err, preview))
+		}
+	}
+
+	inputTokens := int(chat.Usage.PromptTokens)
+	outputTokens := int(chat.Usage.CompletionTokens)
+	totalTokens := int(chat.Usage.TotalTokens)
+	cost := CalculateCost(entities.TypeOpenAI, c.modelName, inputTokens, outputTokens)
+
+	fmt.Printf("[OpenAI] InsertLinks success: linksApplied=%d, cost=$%.4f\n", result.LinksApplied, cost)
+
+	return &InsertLinksResult{
+		Content:      result.Content,
+		LinksApplied: result.LinksApplied,
+		Usage: Usage{
+			InputTokens:  inputTokens,
+			OutputTokens: outputTokens,
+			TotalTokens:  totalTokens,
+			CostUSD:      cost,
+		},
+	}, nil
+}
+
+func buildInsertLinksSystemPrompt(language string) string {
+	if language == "" {
+		language = "English"
+	}
+	return fmt.Sprintf(`You are an expert content editor. Your task is to insert internal links into existing HTML content.
+
+Language: %s
+
+Guidelines:
+- Insert links naturally where they fit contextually
+- Use <a href="PATH">ANCHOR TEXT</a> format
+- If anchor text is provided, prefer using it; otherwise choose appropriate text from the existing content
+- DO NOT change any other content - only add the link tags
+- DO NOT add links that don't fit naturally
+- Preserve all existing HTML structure and formatting
+- Each link should be inserted only once
+- Count how many links you successfully inserted`, language)
+}
+
+func buildInsertLinksUserPrompt(request *InsertLinksRequest) string {
+	var sb strings.Builder
+
+	sb.WriteString(fmt.Sprintf("Current page: %s (%s)\n\n", request.PageTitle, request.PagePath))
+
+	sb.WriteString("LINKS TO INSERT:\n")
+	for i, link := range request.Links {
+		sb.WriteString(fmt.Sprintf("%d. Link to: %s\n", i+1, link.TargetTitle))
+		sb.WriteString(fmt.Sprintf("   Path: %s\n", link.TargetPath))
+		if link.AnchorText != nil && *link.AnchorText != "" {
+			sb.WriteString(fmt.Sprintf("   Anchor text: \"%s\"\n", *link.AnchorText))
+		} else {
+			sb.WriteString("   Anchor text: Choose appropriate text from content\n")
+		}
+	}
+
+	sb.WriteString("\nEXISTING CONTENT:\n")
+	sb.WriteString(request.Content)
+
+	return sb.String()
+}
+

@@ -4,7 +4,7 @@ import {dto} from '../models';
 
 export function AddLink(arg1:dto.AddLinkRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_PlannedLink_>;
 
-export function ApplyLinks(arg1:dto.ApplyLinksRequest):Promise<dto.Response_bool_>;
+export function ApplyLinks(arg1:dto.ApplyLinksRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_ApplyLinksResult_>;
 
 export function ApproveLink(arg1:number):Promise<dto.Response_bool_>;
 

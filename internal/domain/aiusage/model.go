@@ -13,6 +13,7 @@ const (
 	OperationTopicVariations    OperationType = "topic_variations"
 	OperationPageGeneration     OperationType = "page_generation"
 	OpLinkSuggestion            OperationType = "link_suggestion"
+	OpLinkInsertion             OperationType = "link_insertion"
 )
 
 // UsageLog represents a single AI usage log entry

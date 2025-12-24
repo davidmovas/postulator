@@ -208,9 +208,30 @@ export namespace dto {
 	        this.buildDate = source["buildDate"];
 	    }
 	}
+	export class AppliedLinkInfo {
+	    linkId: number;
+	    sourceNodeId: number;
+	    targetNodeId: number;
+	    anchorText: string;
+	    targetPath: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AppliedLinkInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.linkId = source["linkId"];
+	        this.sourceNodeId = source["sourceNodeId"];
+	        this.targetNodeId = source["targetNodeId"];
+	        this.anchorText = source["anchorText"];
+	        this.targetPath = source["targetPath"];
+	    }
+	}
 	export class ApplyLinksRequest {
 	    planId: number;
 	    linkIds: number[];
+	    providerId: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new ApplyLinksRequest(source);
@@ -220,7 +241,46 @@ export namespace dto {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.planId = source["planId"];
 	        this.linkIds = source["linkIds"];
+	        this.providerId = source["providerId"];
 	    }
+	}
+	export class ApplyLinksResult {
+	    totalLinks: number;
+	    appliedLinks: number;
+	    failedLinks: number;
+	    results: AppliedLinkInfo[];
+	    errors?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ApplyLinksResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.totalLinks = source["totalLinks"];
+	        this.appliedLinks = source["appliedLinks"];
+	        this.failedLinks = source["failedLinks"];
+	        this.results = this.convertValues(source["results"], AppliedLinkInfo);
+	        this.errors = source["errors"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class Article {
 	    id: number;
@@ -507,6 +567,7 @@ export namespace dto {
 	    writingStyle: string;
 	    contentTone: string;
 	    customInstructions: string;
+	    includeLinks: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ContentSettingsDTO(source);
@@ -518,6 +579,7 @@ export namespace dto {
 	        this.writingStyle = source["writingStyle"];
 	        this.contentTone = source["contentTone"];
 	        this.customInstructions = source["customInstructions"];
+	        this.includeLinks = source["includeLinks"];
 	    }
 	}
 	export class CreateLinkPlanRequest {
@@ -1820,6 +1882,40 @@ export namespace dto {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
 	        this.data = this.convertValues(source["data"], AppVersion);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_ApplyLinksResult_ {
+	    success: boolean;
+	    data?: ApplyLinksResult;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_ApplyLinksResult_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], ApplyLinksResult);
 	        this.error = this.convertValues(source["error"], Error);
 	    }
 	

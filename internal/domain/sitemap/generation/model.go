@@ -103,10 +103,19 @@ const (
 )
 
 type ContentSettings struct {
-	WordCount    string       `json:"wordCount"`    // "1000" or "800-1200"
-	WritingStyle WritingStyle `json:"writingStyle"` // professional, casual, etc.
-	ContentTone  ContentTone  `json:"contentTone"`  // informative, persuasive, etc.
-	CustomInstructions string  `json:"customInstructions"` // Additional instructions
+	WordCount          string       `json:"wordCount"`          // "1000" or "800-1200"
+	WritingStyle       WritingStyle `json:"writingStyle"`       // professional, casual, etc.
+	ContentTone        ContentTone  `json:"contentTone"`        // informative, persuasive, etc.
+	CustomInstructions string       `json:"customInstructions"` // Additional instructions
+	IncludeLinks       bool         `json:"includeLinks"`       // Include approved links from linking plan
+}
+
+// LinkTarget represents a target page for internal linking during content generation
+type LinkTarget struct {
+	TargetNodeID int64
+	TargetTitle  string
+	TargetPath   string
+	AnchorText   *string // Suggested anchor text (optional, AI will choose if nil)
 }
 
 type GenerationConfig struct {

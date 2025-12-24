@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
+	"github.com/davidmovas/postulator/internal/domain/linking"
 	"github.com/davidmovas/postulator/internal/domain/sitemap"
 	"github.com/davidmovas/postulator/internal/infra/events"
 	"github.com/davidmovas/postulator/pkg/logger"
@@ -17,6 +18,7 @@ import (
 type Executor struct {
 	tasks       sync.Map
 	sitemapSvc  sitemap.Service
+	linkingSvc  linking.Service
 	generator   *Generator
 	publisher   *Publisher
 	eventBus    *events.EventBus
@@ -28,6 +30,7 @@ type Executor struct {
 
 func NewExecutor(
 	sitemapSvc sitemap.Service,
+	linkingSvc linking.Service,
 	generator *Generator,
 	publisher *Publisher,
 	eventBus *events.EventBus,
@@ -35,6 +38,7 @@ func NewExecutor(
 ) *Executor {
 	return &Executor{
 		sitemapSvc: sitemapSvc,
+		linkingSvc: linkingSvc,
 		generator:  generator,
 		publisher:  publisher,
 		eventBus:   eventBus,
@@ -318,6 +322,15 @@ func (e *Executor) processNode(ctx context.Context, task *Task, taskNode *TaskNo
 		e.logger.ErrorWithErr(err, "Failed to get ancestors")
 	}
 
+	// Fetch link targets if IncludeLinks is enabled
+	var linkTargets []LinkTarget
+	if config.ContentSettings != nil && config.ContentSettings.IncludeLinks {
+		linkTargets = e.getApprovedLinkTargets(ctx, task.SitemapID, task.SiteID, node.ID)
+		if len(linkTargets) > 0 {
+			e.logger.Infof("Node %d: including %d approved link targets in generation", node.ID, len(linkTargets))
+		}
+	}
+
 	genStartTime := time.Now()
 	genResult, err := e.generator.Generate(ctx, GenerateRequest{
 		Node:            node,
@@ -327,6 +340,7 @@ func (e *Executor) processNode(ctx context.Context, task *Task, taskNode *TaskNo
 		PromptID:        config.PromptID,
 		Placeholders:    config.Placeholders,
 		ContentSettings: config.ContentSettings,
+		LinkTargets:     linkTargets,
 	})
 	if err != nil {
 		errStr := err.Error()
@@ -473,4 +487,52 @@ func (e *Executor) CleanupCompletedTasks(olderThan time.Duration) {
 		}
 		return true
 	})
+}
+
+// getApprovedLinkTargets fetches approved outgoing links for a node from the linking plan
+func (e *Executor) getApprovedLinkTargets(ctx context.Context, sitemapID, siteID, nodeID int64) []LinkTarget {
+	if e.linkingSvc == nil {
+		return nil
+	}
+
+	// Get active link plan for this sitemap
+	plan, err := e.linkingSvc.GetActivePlan(ctx, sitemapID)
+	if err != nil || plan == nil {
+		return nil
+	}
+
+	// Get all links for this plan
+	links, err := e.linkingSvc.GetLinks(ctx, plan.ID)
+	if err != nil {
+		e.logger.ErrorWithErr(err, "Failed to get links for plan")
+		return nil
+	}
+
+	// Filter for approved outgoing links from this node
+	var targets []LinkTarget
+	for _, link := range links {
+		// Only outgoing links from this node that are approved
+		if link.SourceNodeID != nodeID {
+			continue
+		}
+		if link.Status != linking.LinkStatusApproved {
+			continue
+		}
+
+		// Get target node info
+		targetNode, err := e.sitemapSvc.GetNode(ctx, link.TargetNodeID)
+		if err != nil {
+			e.logger.ErrorWithErr(err, fmt.Sprintf("Failed to get target node %d", link.TargetNodeID))
+			continue
+		}
+
+		targets = append(targets, LinkTarget{
+			TargetNodeID: targetNode.ID,
+			TargetTitle:  targetNode.Title,
+			TargetPath:   targetNode.Path,
+			AnchorText:   link.AnchorText,
+		})
+	}
+
+	return targets
 }

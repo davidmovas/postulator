@@ -211,12 +211,31 @@ func (h *LinkingHandler) SuggestLinks(req *dto.SuggestLinksRequest) *dto.Respons
 // Apply Links
 // =========================================================================
 
-func (h *LinkingHandler) ApplyLinks(req *dto.ApplyLinksRequest) *dto.Response[bool] {
-	err := h.service.ApplyLinks(ctx.FastCtx(), req.PlanID, req.LinkIDs)
+func (h *LinkingHandler) ApplyLinks(req *dto.ApplyLinksRequest) *dto.Response[*dto.ApplyLinksResult] {
+	longCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	result, err := h.service.ApplyLinks(longCtx, req.PlanID, req.LinkIDs, req.ProviderID)
 	if err != nil {
-		return fail[bool](err)
+		return fail[*dto.ApplyLinksResult](err)
 	}
-	return ok(true)
+
+	// Convert domain result to DTO
+	dtoResult := &dto.ApplyLinksResult{
+		TotalLinks:   result.TotalLinks,
+		AppliedLinks: result.AppliedLinks,
+		FailedLinks:  result.FailedLinks,
+		Results:      make([]*dto.AppliedLinkInfo, 0, len(result.Results)),
+	}
+
+	for _, r := range result.Results {
+		dtoResult.Results = append(dtoResult.Results, &dto.AppliedLinkInfo{
+			LinkID:     r.LinkID,
+			AnchorText: r.AnchorText,
+		})
+	}
+
+	return ok(dtoResult)
 }
 
 // =========================================================================
