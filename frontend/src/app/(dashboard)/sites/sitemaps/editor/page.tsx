@@ -24,7 +24,6 @@ import { useSitemapCanvas } from "@/hooks/use-sitemap-canvas";
 import { sitemapService } from "@/services/sitemaps";
 import { CreateNodeInput } from "@/models/sitemaps";
 import { EDITOR } from "./constants";
-import { EditorDialogs } from "./components/editor-dialogs";
 import { createHotkeyConfig } from "./components/editor-hotkeys";
 import {
     ResizableHandle,
@@ -33,9 +32,23 @@ import {
 } from "@/components/ui/resizable";
 import { SitemapNodeCard } from "@/components/sitemaps/sitemap-node-card";
 import { LinkEdge } from "@/components/sitemaps/link-edge";
+import { LinkContextMenu } from "@/components/sitemaps/link-context-menu";
 import { useSitemapLinking } from "@/hooks/use-sitemap-linking";
+import { NodeEditDialog } from "@/components/sitemaps/node-edit-dialog";
+import { NodeLinksDialog } from "@/components/sitemaps/node-links-dialog";
 import { SitemapSidebar } from "@/components/sitemaps/sitemap-sidebar";
 import { CanvasControls } from "@/components/sitemaps/canvas-controls";
+import { CanvasContextMenu } from "@/components/sitemaps/canvas-context-menu";
+import { EdgeContextMenu } from "@/components/sitemaps/edge-context-menu";
+import { HotkeysDialog } from "@/components/sitemaps/hotkeys-dialog";
+import { BulkCreateDialog } from "@/components/sitemaps/bulk-create-dialog";
+import { CommandPalette } from "@/components/sitemaps/command-palette";
+import { ImportDialog } from "@/components/sitemaps/import-dialog";
+import { ScanDialog } from "@/components/sitemaps/scan-dialog";
+import { GenerateDialog } from "@/components/sitemaps/generate-dialog";
+import { PageGenerateDialog } from "@/components/sitemaps/page-generate-dialog";
+import { SuggestLinksDialog } from "@/components/sitemaps/suggest-links-dialog";
+import { ApplyLinksDialog } from "@/components/sitemaps/apply-links-dialog";
 import { EditorHeader, EditorMode } from "@/components/sitemaps/editor-header";
 import { GenerationProgressPanel } from "@/components/sitemaps/generation-progress-panel";
 import { createNodesFromPaths } from "@/lib/sitemap-utils";

@@ -249,7 +249,6 @@ func (s *Scanner) scanPosts(ctx context.Context, site *entities.Site, opts *Scan
 	return scanned, errors
 }
 
-
 // buildPageTree builds a tree structure from flat pages list
 func (s *Scanner) buildPageTree(pages []*ScannedPage, siteURL string) []*ScannedPage {
 	// Create a map for quick lookup by WordPress ID
@@ -531,7 +530,6 @@ func (s *Scanner) createNodesFromPostsWithTracking(
 
 	return created, skipped, errors
 }
-
 
 // ScanIntoSitemap scans a WordPress site and adds nodes to an existing sitemap
 func (s *Scanner) ScanIntoSitemap(

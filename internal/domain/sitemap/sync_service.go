@@ -236,7 +236,6 @@ func (s *SyncService) UpdateToWP(ctx context.Context, siteID int64, nodeIDs []in
 	return results, nil
 }
 
-
 // GetModifiedNodes returns all nodes in a sitemap that have local modifications
 func (s *SyncService) GetModifiedNodes(ctx context.Context, sitemapID int64) ([]*entities.SitemapNode, error) {
 	nodes, err := s.sitemapSvc.GetNodes(ctx, sitemapID)
@@ -331,4 +330,3 @@ func (s *SyncService) ChangePublishStatus(ctx context.Context, siteID int64, nod
 	s.logger.Infof("Changed publish status for node %d to %s", nodeID, newStatus)
 	return nil
 }
-
