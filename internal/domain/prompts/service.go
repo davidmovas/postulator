@@ -2,7 +2,6 @@ package prompts
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -133,9 +132,10 @@ func (s *service) RenderPrompt(ctx context.Context, promptID int64, placeholders
 		return "", "", err
 	}
 
+	// Non-blocking validation - just warn about missing placeholders
+	// Many placeholders are optional or auto-filled, so we don't block on this
 	if err = s.ValidatePlaceholders(prompt, placeholders); err != nil {
-		s.logger.Warn(fmt.Sprintf("Placeholder validation failed: %v", err))
-		return "", "", err
+		s.logger.Warnf("Placeholder validation: %v (continuing anyway)", err)
 	}
 
 	system = s.renderTemplate(prompt.SystemPrompt, placeholders)
