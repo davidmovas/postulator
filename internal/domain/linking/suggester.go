@@ -313,13 +313,13 @@ func (s *Suggester) buildPrompts(ctx context.Context, config SuggestConfig, node
 		if err == nil {
 			return sys, usr
 		}
-		s.logger.WarnWithErr(err, "Failed to render custom prompt, trying builtin")
+		s.logger.Warn(fmt.Sprintf("Failed to render custom prompt, trying builtin: %v", err))
 	}
 
 	// Try to get the builtin prompt for link_suggest category
-	prompts, err := s.promptSvc.ListPromptsByCategory(ctx, entities.PromptCategoryLinkSuggest)
+	promptsByCategory, err := s.promptSvc.ListPromptsByCategory(ctx, entities.PromptCategoryLinkSuggest)
 	if err == nil {
-		for _, p := range prompts {
+		for _, p := range promptsByCategory {
 			if p.IsBuiltin {
 				sys := s.renderTemplate(p.SystemPrompt, placeholders)
 				usr := s.renderTemplate(p.UserPrompt, placeholders)
