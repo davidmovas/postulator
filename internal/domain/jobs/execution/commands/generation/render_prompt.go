@@ -1,6 +1,7 @@
 package generation
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/jobs/execution/commands"
@@ -37,6 +38,11 @@ func (c *RenderPromptCommand) Execute(ctx *pipeline.Context) error {
 	}
 
 	placeholders := c.buildPlaceholders(ctx)
+
+	// Strict validation for jobs - user must provide all required placeholder values
+	if err := c.validatePlaceholdersStrict(ctx, placeholders); err != nil {
+		return fault.NewFatalError(fault.ErrCodePromptRenderFailed, c.Name(), err.Error())
+	}
 
 	systemPrompt, userPrompt, err := c.promptService.RenderPrompt(
 		ctx.Context(),
@@ -82,4 +88,23 @@ func (c *RenderPromptCommand) buildPlaceholders(ctx *pipeline.Context) map[strin
 	}
 
 	return placeholders
+}
+
+// validatePlaceholdersStrict checks that all required placeholders have non-empty values.
+// For jobs, users must explicitly provide values for all placeholders in the prompt.
+func (c *RenderPromptCommand) validatePlaceholdersStrict(ctx *pipeline.Context, placeholders map[string]string) error {
+	var missing []string
+
+	for _, placeholder := range ctx.Execution.Prompt.Placeholders {
+		value, exists := placeholders[placeholder]
+		if !exists || strings.TrimSpace(value) == "" {
+			missing = append(missing, placeholder)
+		}
+	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf("missing required placeholders: %s", strings.Join(missing, ", "))
+	}
+
+	return nil
 }
