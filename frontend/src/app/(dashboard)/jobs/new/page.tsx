@@ -74,7 +74,7 @@ export default function CreateGlobalJobPage() {
     };
 
     const loadPrompts = async () => {
-        const promptsData = await promptService.listPrompts();
+        const promptsData = await promptService.listPromptsByCategory("post_gen");
         setPrompts(promptsData);
     };
 

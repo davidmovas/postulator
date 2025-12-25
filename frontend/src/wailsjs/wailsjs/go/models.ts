@@ -232,6 +232,7 @@ export namespace dto {
 	    planId: number;
 	    linkIds: number[];
 	    providerId: number;
+	    promptId: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new ApplyLinksRequest(source);
@@ -242,6 +243,7 @@ export namespace dto {
 	        this.planId = source["planId"];
 	        this.linkIds = source["linkIds"];
 	        this.providerId = source["providerId"];
+	        this.promptId = source["promptId"];
 	    }
 	}
 	export class ApplyLinksResult {

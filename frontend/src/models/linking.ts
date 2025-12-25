@@ -99,6 +99,7 @@ export interface ApplyLinksInput {
     planId: number;
     linkIds: number[];
     providerId: number;
+    promptId: number;
 }
 
 export interface ApplyLinksResult {

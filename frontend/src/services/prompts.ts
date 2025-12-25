@@ -4,11 +4,13 @@ import {
     DeletePrompt,
     GetPrompt,
     ListPrompts,
+    ListPromptsByCategory,
     UpdatePrompt
 } from "@/wailsjs/wailsjs/go/handlers/PromptsHandler";
 import {
     mapPrompt,
     Prompt,
+    PromptCategory,
     PromptCreateInput,
     PromptUpdateInput
 } from "@/models/prompts";
@@ -36,6 +38,12 @@ export const promptService = {
 
     async listPrompts(): Promise<Prompt[]> {
         const response = await ListPrompts();
+        const prompts = unwrapArrayResponse<dto.Prompt>(response);
+        return prompts.map(mapPrompt);
+    },
+
+    async listPromptsByCategory(category: PromptCategory): Promise<Prompt[]> {
+        const response = await ListPromptsByCategory(category);
         const prompts = unwrapArrayResponse<dto.Prompt>(response);
         return prompts.map(mapPrompt);
     },

@@ -247,7 +247,7 @@ func (h *LinkingHandler) ApplyLinks(req *dto.ApplyLinksRequest) *dto.Response[*d
 		cancel()
 	}()
 
-	result, err := h.service.ApplyLinks(longCtx, req.PlanID, req.LinkIDs, req.ProviderID)
+	result, err := h.service.ApplyLinks(longCtx, req.PlanID, req.LinkIDs, req.ProviderID, req.PromptID)
 	if err != nil {
 		// Check if it was cancelled
 		if longCtx.Err() == context.Canceled {

@@ -34,7 +34,6 @@ TASK: Generate a complete, engaging article optimized for search engines.
 CONTENT SETTINGS:
 - Language: {{language}}
 - Target length: {{words}} words
-- Tone: {{tone}}
 
 STRUCTURE:
 - Introduction: Hook that addresses search intent
@@ -54,11 +53,8 @@ SEO RULES:
 - Write for humans first, search engines second',
     'TOPIC: {{title}}
 
-SITE: {{siteName}} ({{siteUrl}})
-CATEGORY: {{category}}
-
 Generate the complete article now.',
-    'language,words,tone,title,siteName,siteUrl,category'
+    'language,words,title'
 );
 
 -- 2. Link Suggestions (link_suggest)

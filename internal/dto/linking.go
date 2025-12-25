@@ -184,6 +184,7 @@ type ApplyLinksRequest struct {
 	PlanID     int64   `json:"planId"`
 	LinkIDs    []int64 `json:"linkIds"`
 	ProviderID int64   `json:"providerId"`
+	PromptID   int64   `json:"promptId"`
 }
 
 // ApplyLinksResult contains the result of applying links to content

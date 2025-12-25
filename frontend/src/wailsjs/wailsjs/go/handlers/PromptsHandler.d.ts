@@ -10,4 +10,6 @@ export function GetPrompt(arg1:number):Promise<dto.Response_github_com_davidmova
 
 export function ListPrompts():Promise<dto.Response___github_com_davidmovas_postulator_internal_dto_Prompt_>;
 
+export function ListPromptsByCategory(arg1:string):Promise<dto.Response___github_com_davidmovas_postulator_internal_dto_Prompt_>;
+
 export function UpdatePrompt(arg1:dto.Prompt):Promise<dto.Response_string_>;

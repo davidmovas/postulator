@@ -160,6 +160,7 @@ export const linkingService = {
             planId: input.planId,
             linkIds: input.linkIds,
             providerId: input.providerId,
+            promptId: input.promptId,
         });
         const response = await ApplyLinks(payload);
         const data = unwrapResponse<dto.ApplyLinksResult>(response);

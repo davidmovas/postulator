@@ -98,15 +98,7 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*entities.Prompt, e
 
 	prompt.Category = entities.PromptCategory(category)
 
-	if placeholdersJSON.Valid && strings.TrimSpace(placeholdersJSON.String) != "" {
-		var placeholders []string
-		if err = json.Unmarshal([]byte(placeholdersJSON.String), &placeholders); err != nil {
-			return nil, errors.Database(err)
-		}
-		prompt.Placeholders = placeholders
-	} else {
-		prompt.Placeholders = []string{}
-	}
+	prompt.Placeholders = parsePlaceholders(placeholdersJSON)
 
 	return &prompt, nil
 }
@@ -148,16 +140,7 @@ func (r *repository) GetAll(ctx context.Context) ([]*entities.Prompt, error) {
 		}
 
 		prompt.Category = entities.PromptCategory(category)
-
-		if placeholdersJSON.Valid && strings.TrimSpace(placeholdersJSON.String) != "" {
-			var placeholders []string
-			if err = json.Unmarshal([]byte(placeholdersJSON.String), &placeholders); err != nil {
-				return nil, errors.Database(err)
-			}
-			prompt.Placeholders = placeholders
-		} else {
-			prompt.Placeholders = []string{}
-		}
+		prompt.Placeholders = parsePlaceholders(placeholdersJSON)
 
 		prompts = append(prompts, &prompt)
 	}
@@ -210,16 +193,7 @@ func (r *repository) GetByCategory(ctx context.Context, category entities.Prompt
 		}
 
 		prompt.Category = entities.PromptCategory(cat)
-
-		if placeholdersJSON.Valid && strings.TrimSpace(placeholdersJSON.String) != "" {
-			var placeholders []string
-			if err = json.Unmarshal([]byte(placeholdersJSON.String), &placeholders); err != nil {
-				return nil, errors.Database(err)
-			}
-			prompt.Placeholders = placeholders
-		} else {
-			prompt.Placeholders = []string{}
-		}
+		prompt.Placeholders = parsePlaceholders(placeholdersJSON)
 
 		prompts = append(prompts, &prompt)
 	}
@@ -297,4 +271,32 @@ func (r *repository) Delete(ctx context.Context, id int64) error {
 	}
 
 	return nil
+}
+
+// parsePlaceholders handles both JSON array format and comma-separated format
+func parsePlaceholders(placeholdersJSON sql.NullString) []string {
+	if !placeholdersJSON.Valid || strings.TrimSpace(placeholdersJSON.String) == "" {
+		return []string{}
+	}
+
+	raw := strings.TrimSpace(placeholdersJSON.String)
+
+	// Try JSON array format first
+	if strings.HasPrefix(raw, "[") {
+		var placeholders []string
+		if err := json.Unmarshal([]byte(raw), &placeholders); err == nil {
+			return placeholders
+		}
+	}
+
+	// Fall back to comma-separated format
+	parts := strings.Split(raw, ",")
+	var result []string
+	for _, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }

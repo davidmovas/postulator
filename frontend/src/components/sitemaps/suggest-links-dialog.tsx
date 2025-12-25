@@ -184,7 +184,7 @@ export function SuggestLinksDialog({
         try {
             const [providersData, promptsData] = await Promise.all([
                 providerService.listProviders(),
-                promptService.listPrompts(),
+                promptService.listPromptsByCategory("link_suggest"),
             ]);
 
             const activeProviders = providersData.filter((p) => p.isActive);
@@ -202,8 +202,8 @@ export function SuggestLinksDialog({
     };
 
     const handleSuggest = async () => {
-        if (!providerId) {
-            setError("Please select a provider");
+        if (!providerId || !promptId) {
+            setError("Please select a provider and prompt");
             return;
         }
 
@@ -228,7 +228,7 @@ export function SuggestLinksDialog({
             await linkingService.suggestLinks({
                 planId,
                 providerId,
-                promptId: promptId || undefined,
+                promptId,
                 nodeIds: nodesToAnalyze.map((n) => n.id),
                 feedback: feedback.trim() || undefined,
                 maxIncoming: maxIncoming ? parseInt(maxIncoming, 10) : undefined,
@@ -297,7 +297,7 @@ export function SuggestLinksDialog({
         setShowCancelConfirm(true);
     };
 
-    const canSuggest = providerId !== null && nodesToAnalyze.length >= 2 && !isLoadingData;
+    const canSuggest = providerId !== null && promptId !== null && nodesToAnalyze.length >= 2 && !isLoadingData;
 
     // Calculate progress percentage
     const progressPercent = useMemo(() => {
@@ -398,16 +398,15 @@ export function SuggestLinksDialog({
                                         </div>
 
                                         <div className="space-y-2">
-                                            <Label>Prompt Template</Label>
+                                            <Label>Prompt Template *</Label>
                                             <Select
-                                                value={promptId?.toString() || "default"}
-                                                onValueChange={(v) => setPromptId(v === "default" ? null : Number(v))}
+                                                value={promptId?.toString() || ""}
+                                                onValueChange={(v) => setPromptId(Number(v))}
                                             >
                                                 <SelectTrigger>
-                                                    <SelectValue />
+                                                    <SelectValue placeholder="Select prompt" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="default">Default (Built-in)</SelectItem>
                                                     {prompts.map((p) => (
                                                         <SelectItem key={p.id} value={p.id.toString()}>
                                                             {p.name}

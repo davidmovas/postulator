@@ -254,7 +254,7 @@ func (s *serviceImpl) SuggestLinks(ctx context.Context, config SuggestLinksConfi
 }
 
 // ApplyLinks applies approved links to WordPress content using AI
-func (s *serviceImpl) ApplyLinks(ctx context.Context, planID int64, linkIDs []int64, providerID int64) (*ApplyResult, error) {
+func (s *serviceImpl) ApplyLinks(ctx context.Context, planID int64, linkIDs []int64, providerID int64, promptID int64) (*ApplyResult, error) {
 	plan, err := s.planRepo.GetByID(ctx, planID)
 	if err != nil {
 		return nil, err
@@ -269,6 +269,7 @@ func (s *serviceImpl) ApplyLinks(ctx context.Context, planID int64, linkIDs []in
 		PlanID:     planID,
 		SiteID:     plan.SiteID,
 		ProviderID: providerID,
+		PromptID:   &promptID,
 		LinkIDs:    linkIDs,
 	})
 	if err != nil {

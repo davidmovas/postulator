@@ -157,7 +157,7 @@ export function PageGenerateDialog({
         try {
             const [providersData, promptsData] = await Promise.all([
                 providerService.listProviders(),
-                promptService.listPrompts(),
+                promptService.listPromptsByCategory("page_gen"),
             ]);
 
             const activeProviders = providersData.filter((p) => p.isActive);
@@ -175,8 +175,8 @@ export function PageGenerateDialog({
     };
 
     const handleGenerate = async () => {
-        if (!providerId || nodesToGenerate.length === 0) {
-            setError("Please select a provider and ensure there are nodes to generate");
+        if (!providerId || !promptId || nodesToGenerate.length === 0) {
+            setError("Please select a provider, prompt, and ensure there are nodes to generate");
             return;
         }
 
@@ -199,7 +199,7 @@ export function PageGenerateDialog({
                 sitemapId,
                 nodeIds: nodesToGenerate.map((n) => n.id),
                 providerId,
-                promptId: promptId || undefined,
+                promptId,
                 publishAs,
                 placeholders: {
                     language,
@@ -264,7 +264,7 @@ export function PageGenerateDialog({
         ? Math.round((task.processedNodes / task.totalNodes) * 100)
         : 0;
 
-    const canGenerate = providerId !== null && nodesToGenerate.length > 0 && !isLoadingData;
+    const canGenerate = providerId !== null && promptId !== null && nodesToGenerate.length > 0 && !isLoadingData;
     const isRunning = task?.status === "running" || task?.status === "paused";
 
     return (
@@ -337,16 +337,15 @@ export function PageGenerateDialog({
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label>Prompt Template</Label>
+                                        <Label>Prompt Template *</Label>
                                         <Select
-                                            value={promptId?.toString() || "default"}
-                                            onValueChange={(v) => setPromptId(v === "default" ? null : Number(v))}
+                                            value={promptId?.toString() || ""}
+                                            onValueChange={(v) => setPromptId(Number(v))}
                                         >
                                             <SelectTrigger>
-                                                <SelectValue />
+                                                <SelectValue placeholder="Select prompt" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="default">Default (Built-in)</SelectItem>
                                                 {prompts.map((p) => (
                                                     <SelectItem key={p.id} value={p.id.toString()}>
                                                         {p.name}

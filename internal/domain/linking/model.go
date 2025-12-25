@@ -116,7 +116,7 @@ type Service interface {
 	ApproveAndApplyLink(ctx context.Context, linkID int64) error
 
 	SuggestLinks(ctx context.Context, config SuggestLinksConfig) error
-	ApplyLinks(ctx context.Context, planID int64, linkIDs []int64, providerID int64) (*ApplyResult, error)
+	ApplyLinks(ctx context.Context, planID int64, linkIDs []int64, providerID int64, promptID int64) (*ApplyResult, error)
 
 	GetLinkGraph(ctx context.Context, planID int64) (*LinkGraph, error)
 	GetOrCreateActivePlan(ctx context.Context, sitemapID int64, siteID int64) (*LinkPlan, error)

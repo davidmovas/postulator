@@ -34,8 +34,10 @@ import { Progress } from "@/components/ui/progress";
 import { AlertCircle, CheckCircle2, Loader2, Link2, XCircle, FileText } from "lucide-react";
 import { EventsOn } from "@/wailsjs/wailsjs/runtime/runtime";
 import { providerService } from "@/services/providers";
+import { promptService } from "@/services/prompts";
 import { linkingService } from "@/services/linking";
 import { Provider } from "@/models/providers";
+import { Prompt } from "@/models/prompts";
 import {
     PlannedLink,
     ApplyLinksResult,
@@ -87,7 +89,9 @@ export function ApplyLinksDialog({
     const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
     const [providerId, setProviderId] = useState<number | null>(null);
+    const [promptId, setPromptId] = useState<number | null>(null);
     const [providers, setProviders] = useState<Provider[]>([]);
+    const [prompts, setPrompts] = useState<Prompt[]>([]);
     const [isLoadingData, setIsLoadingData] = useState(true);
 
     // Use ref to track running state to avoid stale closure issues
@@ -284,23 +288,28 @@ export function ApplyLinksDialog({
     const loadData = async () => {
         setIsLoadingData(true);
         try {
-            const providersData = await providerService.listProviders();
+            const [providersData, promptsData] = await Promise.all([
+                providerService.listProviders(),
+                promptService.listPromptsByCategory("link_apply"),
+            ]);
+
             const activeProviders = providersData.filter((p) => p.isActive);
             setProviders(activeProviders);
+            setPrompts(promptsData);
 
             if (activeProviders.length > 0 && !providerId) {
                 setProviderId(activeProviders[0].id);
             }
         } catch (err) {
-            console.error("Failed to load providers:", err);
+            console.error("Failed to load data:", err);
         } finally {
             setIsLoadingData(false);
         }
     };
 
     const handleApply = async () => {
-        if (!providerId) {
-            setError("Please select a provider");
+        if (!providerId || !promptId) {
+            setError("Please select a provider and prompt");
             return;
         }
 
@@ -327,6 +336,7 @@ export function ApplyLinksDialog({
                 planId,
                 linkIds: linksToApply.map((l) => l.id),
                 providerId,
+                promptId,
             });
 
             // Use ref to check if still running (not already handled by event)
@@ -389,7 +399,7 @@ export function ApplyLinksDialog({
         setShowCancelConfirm(true);
     };
 
-    const canApply = providerId !== null && linksToApply.length > 0 && !isLoadingData;
+    const canApply = providerId !== null && promptId !== null && linksToApply.length > 0 && !isLoadingData;
 
     // Render page status list
     const renderPageStatuses = () => {
@@ -520,28 +530,49 @@ export function ApplyLinksDialog({
                                         )}
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <Label>AI Provider *</Label>
-                                        <Select
-                                            value={providerId?.toString() || ""}
-                                            onValueChange={(v) => setProviderId(Number(v))}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select provider" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {providers.map((p) => (
-                                                    <SelectItem key={p.id} value={p.id.toString()}>
-                                                        {p.name} ({p.type})
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {providers.length === 0 && (
-                                            <p className="text-xs text-destructive">
-                                                No active providers found
-                                            </p>
-                                        )}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>AI Provider *</Label>
+                                            <Select
+                                                value={providerId?.toString() || ""}
+                                                onValueChange={(v) => setProviderId(Number(v))}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select provider" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {providers.map((p) => (
+                                                        <SelectItem key={p.id} value={p.id.toString()}>
+                                                            {p.name} ({p.type})
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            {providers.length === 0 && (
+                                                <p className="text-xs text-destructive">
+                                                    No active providers found
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label>Prompt Template *</Label>
+                                            <Select
+                                                value={promptId?.toString() || ""}
+                                                onValueChange={(v) => setPromptId(Number(v))}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select prompt" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {prompts.map((p) => (
+                                                        <SelectItem key={p.id} value={p.id.toString()}>
+                                                            {p.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
                                     </div>
 
                                     {error && (
