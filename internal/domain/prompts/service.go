@@ -2,6 +2,7 @@ package prompts
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -133,7 +134,7 @@ func (s *service) RenderPrompt(ctx context.Context, promptID int64, placeholders
 	}
 
 	if err = s.ValidatePlaceholders(prompt, placeholders); err != nil {
-		s.logger.WarnWithErr(err, "Placeholder validation failed")
+		s.logger.Warn(fmt.Sprintf("Placeholder validation failed: %v", err))
 		return "", "", err
 	}
 
