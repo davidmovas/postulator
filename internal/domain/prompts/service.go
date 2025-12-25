@@ -133,7 +133,7 @@ func (s *service) RenderPrompt(ctx context.Context, promptID int64, placeholders
 	}
 
 	if err = s.ValidatePlaceholders(prompt, placeholders); err != nil {
-		s.logger.ErrorWithErr(err, "Placeholder validation failed")
+		s.logger.WarnWithErr(err, "Placeholder validation failed")
 		return "", "", err
 	}
 

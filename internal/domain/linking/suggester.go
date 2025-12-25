@@ -313,7 +313,7 @@ func (s *Suggester) buildPrompts(ctx context.Context, config SuggestConfig, node
 		if err == nil {
 			return sys, usr
 		}
-		s.logger.ErrorWithErr(err, "Failed to render custom prompt, trying builtin")
+		s.logger.WarnWithErr(err, "Failed to render custom prompt, trying builtin")
 	}
 
 	// Try to get the builtin prompt for link_suggest category
