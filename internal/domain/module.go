@@ -3,9 +3,11 @@ package domain
 import (
 	"context"
 
+	"github.com/davidmovas/postulator/internal/domain/aiusage"
 	"github.com/davidmovas/postulator/internal/domain/articles"
 	"github.com/davidmovas/postulator/internal/domain/categories"
 	"github.com/davidmovas/postulator/internal/domain/deletion"
+	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/healthcheck"
 	"github.com/davidmovas/postulator/internal/domain/jobs"
 	"github.com/davidmovas/postulator/internal/domain/jobs/execution"
@@ -15,10 +17,17 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/providers"
 	"github.com/davidmovas/postulator/internal/domain/proxy"
 	"github.com/davidmovas/postulator/internal/domain/settings"
+	"github.com/davidmovas/postulator/internal/domain/sitemap"
+	"github.com/davidmovas/postulator/internal/domain/sitemap/generation"
+	"github.com/davidmovas/postulator/internal/domain/sitemap/scanner"
 	"github.com/davidmovas/postulator/internal/domain/sites"
 	"github.com/davidmovas/postulator/internal/domain/stats"
 	"github.com/davidmovas/postulator/internal/domain/topics"
+	"github.com/davidmovas/postulator/internal/infra/ai"
+	"github.com/davidmovas/postulator/internal/infra/events"
 	"github.com/davidmovas/postulator/internal/infra/window"
+	"github.com/davidmovas/postulator/internal/infra/wp"
+	"github.com/davidmovas/postulator/pkg/logger"
 	"go.uber.org/fx"
 )
 
@@ -47,14 +56,12 @@ var Module = fx.Module("domain",
 		execution.NewExecutor,
 		execution.NewExecutionStatsAdapter,
 
-		// Linking
-		linking.NewRepository,
-		linking.NewProposalRepository,
-		linking.NewLinkRepository,
-
-		// Prompts
+		// Prompts (before linking as linking depends on prompts)
 		prompts.NewRepository,
 		prompts.NewService,
+
+		// Linking
+		linking.NewService,
 
 		// Providers
 		providers.NewRepository,
@@ -74,6 +81,10 @@ var Module = fx.Module("domain",
 		healthcheck.NewService,
 		healthcheck.NewNotifier,
 
+		// AI Usage
+		aiusage.NewRepository,
+		aiusage.NewService,
+
 		// Topics
 		topics.NewRepository,
 		topics.NewUsageRepository,
@@ -91,6 +102,72 @@ var Module = fx.Module("domain",
 
 		// Proxy
 		proxy.NewService,
+
+		// Sitemap
+		sitemap.NewRepository,
+		sitemap.NewNodeRepository,
+		sitemap.NewKeywordRepository,
+		sitemap.NewService,
+		sitemap.NewSyncService,
+
+		// Sitemap Generation Service (with AI client factory)
+		fx.Annotate(
+			func(
+				sitemapSvc sitemap.Service,
+				sitesSvc sites.Service,
+				promptSvc prompts.Service,
+				providerSvc providers.Service,
+				aiUsageSvc aiusage.Service,
+				logger *logger.Logger,
+			) *sitemap.GenerationService {
+				return sitemap.NewGenerationService(
+					sitemapSvc,
+					sitesSvc,
+					promptSvc,
+					providerSvc,
+					aiUsageSvc,
+					func(provider *entities.Provider) (ai.Client, error) {
+						return ai.CreateClient(provider)
+					},
+					logger,
+				)
+			},
+		),
+
+		// Sitemap Scanner
+		scanner.NewScanner,
+
+		// Page Generation Service
+		fx.Annotate(
+			func(
+				sitemapSvc sitemap.Service,
+				articleSvc articles.Service,
+				siteSvc sites.Service,
+				promptSvc prompts.Service,
+				providerSvc providers.Service,
+				linkingSvc linking.Service,
+				aiUsageService aiusage.Service,
+				wpClient wp.Client,
+				eventBus *events.EventBus,
+				logger *logger.Logger,
+			) generation.Service {
+				return generation.NewService(
+					sitemapSvc,
+					articleSvc,
+					siteSvc,
+					promptSvc,
+					providerSvc,
+					linkingSvc,
+					aiUsageService,
+					wpClient,
+					eventBus,
+					func(provider *entities.Provider) (ai.Client, error) {
+						return ai.CreateClient(provider)
+					},
+					logger,
+				)
+			},
+		),
 	),
 
 	// Job Scheduler lifecycle

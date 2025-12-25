@@ -85,6 +85,10 @@ func getUserMessage(err *appErrors.AppError) string {
 	if !err.IsUserFacing() {
 		return "An unexpected error occurred. Please try again later."
 	}
+	// Include internal error details for user-facing errors (like AI errors)
+	if err.InternalError != nil {
+		return fmt.Sprintf("%s: %v", err.Message, err.InternalError)
+	}
 	return err.Message
 }
 

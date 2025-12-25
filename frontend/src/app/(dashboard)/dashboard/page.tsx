@@ -1,44 +1,33 @@
 "use client";
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { RefreshCw, Globe, PlayCircle, PauseCircle, AlertTriangle, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+    RefreshCw,
+    Globe,
+    PlayCircle,
+    AlertTriangle,
+    CheckCircle2,
+    Clock,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useDashboard } from "@/hooks/use-dashboard";
-import { StatsCard } from "@/components/dashboard/stats-card";
 import { LastUpdated } from "@/components/dashboard/last-updated";
-
-const DashboardIcons = {
-    sites: Globe,
-    activeJobs: PlayCircle,
-    pausedJobs: PauseCircle,
-    unhealthy: AlertTriangle,
-    healthy: CheckCircle2,
-    pending: Clock,
-    failed: XCircle
-};
-
-const borderColors = {
-    sites: "border-l-blue-500",
-    jobs: "border-l-purple-500",
-    active: "border-l-green-500",
-    warning: "border-l-orange-500",
-    danger: "border-l-red-500",
-    neutral: "border-l-gray-500"
-};
+import { DashboardCharts } from "@/components/dashboard/dashboard-charts";
+import { AIUsageSection } from "@/components/dashboard/ai-usage-section";
+import Link from "next/link";
 
 export default function DashboardPage() {
-    const [autoRefresh, setAutoRefresh] = useState(true);
-    const { data, isLoading, error, lastUpdated, refresh } = useDashboard(autoRefresh);
+    const { data, isLoading, error, lastUpdated, refresh } = useDashboard();
 
     if (error) {
         return (
-            <div className="flex items-center justify-center">
+            <div className="flex items-center justify-center min-h-[50vh]">
                 <div className="text-center space-y-4">
                     <AlertTriangle className="h-16 w-16 text-destructive mx-auto" />
-                    <h2 className="text-2xl font-bold text-destructive">Failed to load dashboard</h2>
+                    <h2 className="text-2xl font-bold text-destructive">
+                        Failed to load dashboard
+                    </h2>
                     <Button onClick={refresh} variant="outline">
                         Try Again
                     </Button>
@@ -49,51 +38,36 @@ export default function DashboardPage() {
 
     return (
         <div className="p-6 space-y-8">
-
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-                    <p className="text-muted-foreground mt-1">
-                        Overview of your sites and jobs performance
+                    <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+                    <p className="text-muted-foreground text-sm">
+                        Overview of your sites and jobs
                     </p>
                 </div>
 
                 <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                        <Switch
-                            checked={autoRefresh}
-                            onCheckedChange={setAutoRefresh}
-                            id="auto-refresh"
-                        />
-                        <Label htmlFor="auto-refresh" className="text-sm">
-                            Auto-refresh
-                        </Label>
-                    </div>
-
+                    <LastUpdated
+                        lastUpdated={lastUpdated}
+                        isLoading={isLoading}
+                        autoRefresh={true}
+                    />
                     <Button
                         onClick={refresh}
                         variant="outline"
                         size="sm"
                         disabled={isLoading}
-                        className="flex items-center gap-2"
                     >
-                        <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+                        <RefreshCw
+                            className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`}
+                        />
                         Refresh
                     </Button>
                 </div>
             </div>
 
-            {/* Last Updated */}
-            <div className="flex justify-end">
-                <LastUpdated
-                    lastUpdated={lastUpdated}
-                    isLoading={isLoading}
-                    autoRefresh={autoRefresh}
-                />
-            </div>
-
-            {/* Main Stats Grid */}
+            {/* Main Content */}
             <AnimatePresence>
                 {!isLoading && data && (
                     <motion.div
@@ -102,95 +76,114 @@ export default function DashboardPage() {
                         exit={{ opacity: 0 }}
                         className="space-y-8"
                     >
-                        {/* Sites Section */}
-                        <div>
-                            <h2 className="text-xl font-semibold mb-4">Sites Overview</h2>
-                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                <StatsCard
-                                    title="Total Sites"
-                                    value={data.totalSites}
-                                    icon={<DashboardIcons.sites />}
-                                    description="All WordPress sites"
-                                    className={borderColors.sites}
-                                />
+                        {/* Quick Stats Row - 4 cards */}
+                        <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+                            <Link href="/sites/">
+                                <Card className="border-l-4 border-l-blue-500 hover:bg-muted/50 transition-colors cursor-pointer h-full">
+                                    <CardContent className="pt-4 pb-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 rounded-lg bg-blue-500/10">
+                                                <Globe className="w-5 h-5 text-blue-500" />
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-muted-foreground">Sites</p>
+                                                <p className="text-2xl font-bold">{data.totalSites}</p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {data.activeSites} active
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </Link>
 
-                                <StatsCard
-                                    title="Active Sites"
-                                    value={data.activeSites}
-                                    icon={<DashboardIcons.healthy />}
-                                    description="Currently operational"
-                                    className={borderColors.active}
-                                />
+                            <Link href="/sites/">
+                                <Card className={`border-l-4 ${data.unhealthySites > 0 ? "border-l-yellow-500" : "border-l-green-500"} hover:bg-muted/50 transition-colors cursor-pointer h-full`}>
+                                    <CardContent className="pt-4 pb-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-lg ${data.unhealthySites > 0 ? "bg-yellow-500/10" : "bg-green-500/10"}`}>
+                                                {data.unhealthySites > 0 ? (
+                                                    <AlertTriangle className="w-5 h-5 text-yellow-500" />
+                                                ) : (
+                                                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                                                )}
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-muted-foreground">Health</p>
+                                                <p className="text-2xl font-bold">
+                                                    <span className="text-green-500">{data.totalSites - data.unhealthySites}</span>
+                                                    <span className="text-muted-foreground mx-1">/</span>
+                                                    <span className={data.unhealthySites > 0 ? "text-red-500" : "text-green-500"}>{data.unhealthySites}</span>
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    healthy / unhealthy
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </Link>
 
-                                <StatsCard
-                                    title="Unhealthy Sites"
-                                    value={data.unhealthySites}
-                                    icon={<DashboardIcons.unhealthy />}
-                                    description="Requiring attention"
-                                    className={borderColors.danger}
-                                />
-                            </div>
+                            <Link href="/jobs/">
+                                <Card className="border-l-4 border-l-purple-500 hover:bg-muted/50 transition-colors cursor-pointer h-full">
+                                    <CardContent className="pt-4 pb-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 rounded-lg bg-purple-500/10">
+                                                <PlayCircle className="w-5 h-5 text-purple-500" />
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-muted-foreground">Jobs</p>
+                                                <p className="text-2xl font-bold">{data.totalJobs}</p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {data.activeJobs} active{data.pausedJobs > 0 ? `, ${data.pausedJobs} paused` : ""}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </Link>
+
+                            <Card className="border-l-4 border-l-cyan-500 h-full">
+                                <CardContent className="pt-4 pb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 rounded-lg bg-cyan-500/10">
+                                            <CheckCircle2 className="w-5 h-5 text-cyan-500" />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-muted-foreground">Today</p>
+                                            <p className="text-2xl font-bold">
+                                                {data.executionsToday}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                executions{data.failedExecutionsToday > 0 ? `, ${data.failedExecutionsToday} failed` : ""}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
                         </div>
 
-                        {/* Jobs Section */}
-                        <div>
-                            <h2 className="text-xl font-semibold mb-4">Jobs Performance</h2>
-                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                                <StatsCard
-                                    title="Total Jobs"
-                                    value={data.totalJobs}
-                                    icon={<DashboardIcons.sites />}
-                                    description="All configured jobs"
-                                    className={borderColors.jobs}
-                                />
+                        {/* Pending Validations Alert */}
+                        {data.pendingValidations > 0 && (
+                            <Card className="border-blue-500/30 bg-blue-500/5">
+                                <CardContent className="py-4">
+                                    <div className="flex items-center gap-3">
+                                        <Clock className="h-5 w-5 text-blue-500" />
+                                        <span className="text-sm">
+                                            <strong>{data.pendingValidations}</strong> article
+                                            {data.pendingValidations !== 1 ? "s" : ""} pending
+                                            validation
+                                        </span>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
 
-                                <StatsCard
-                                    title="Active Jobs"
-                                    value={data.activeJobs}
-                                    icon={<DashboardIcons.activeJobs />}
-                                    description="Currently running"
-                                    className={borderColors.active}
-                                />
+                        {/* Content Statistics Section */}
+                        <DashboardCharts />
 
-                                <StatsCard
-                                    title="Paused Jobs"
-                                    value={data.pausedJobs}
-                                    icon={<DashboardIcons.pausedJobs />}
-                                    description="Temporarily stopped"
-                                    className={borderColors.warning}
-                                />
-
-                                <StatsCard
-                                    title="Pending Validations"
-                                    value={data.pendingValidations}
-                                    icon={<DashboardIcons.pending />}
-                                    description="Awaiting approval"
-                                    className={borderColors.sites}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Activity Section */}
-                        <div>
-                            <h2 className="text-xl font-semibold mb-4">Today&apos;s Activity</h2>
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <StatsCard
-                                    title="Executions"
-                                    value={data.executionsToday}
-                                    icon={<DashboardIcons.healthy />}
-                                    description="Successful job runs"
-                                    className={borderColors.active}
-                                />
-
-                                <StatsCard
-                                    title="Failed Executions"
-                                    value={data.failedExecutionsToday}
-                                    icon={<DashboardIcons.failed />}
-                                    description="Unsuccessful runs"
-                                    className={borderColors.danger}
-                                />
-                            </div>
-                        </div>
+                        {/* AI Usage Section */}
+                        <AIUsageSection />
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -198,22 +191,24 @@ export default function DashboardPage() {
             {/* Loading State */}
             {isLoading && !data && (
                 <div className="space-y-8">
-                    {[...Array(3)].map((_, sectionIndex) => (
-                        <div key={sectionIndex} className="space-y-4">
-                            <div className="h-6 bg-muted/50 rounded-lg w-48 animate-pulse" />
-                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                {[...Array(sectionIndex === 1 ? 4 : 3)].map((_, cardIndex) => (
-                                    <div
-                                        key={cardIndex}
-                                        className="h-32 bg-muted/30 rounded-lg animate-pulse"
-                                        style={{
-                                            animationDelay: `${cardIndex * 0.1}s`
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    ))}
+                    <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+                        {[...Array(4)].map((_, i) => (
+                            <div
+                                key={i}
+                                className="h-24 bg-muted/30 rounded-lg animate-pulse"
+                                style={{ animationDelay: `${i * 0.05}s` }}
+                            />
+                        ))}
+                    </div>
+                    <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+                        {[...Array(4)].map((_, i) => (
+                            <div
+                                key={i}
+                                className="h-24 bg-muted/30 rounded-lg animate-pulse"
+                                style={{ animationDelay: `${i * 0.05}s` }}
+                            />
+                        ))}
+                    </div>
                 </div>
             )}
         </div>

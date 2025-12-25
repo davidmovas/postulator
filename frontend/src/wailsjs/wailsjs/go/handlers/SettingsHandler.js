@@ -6,8 +6,16 @@ export function GetAppVersion() {
   return window['go']['handlers']['SettingsHandler']['GetAppVersion']();
 }
 
+export function GetDashboardSettings() {
+  return window['go']['handlers']['SettingsHandler']['GetDashboardSettings']();
+}
+
 export function GetHealthCheckSettings() {
   return window['go']['handlers']['SettingsHandler']['GetHealthCheckSettings']();
+}
+
+export function UpdateDashboardSettings(arg1) {
+  return window['go']['handlers']['SettingsHandler']['UpdateDashboardSettings'](arg1);
 }
 
 export function UpdateHealthCheckSettings(arg1) {

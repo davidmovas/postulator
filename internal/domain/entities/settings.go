@@ -9,6 +9,7 @@ import (
 const (
 	SettingsKeyHealthCheck = "health_check"
 	SettingsKeyProxy       = "proxy"
+	SettingsKeyDashboard   = "dashboard"
 )
 
 type ProxyType string
@@ -201,4 +202,26 @@ type AppError struct {
 
 func (e *AppError) Error() string {
 	return e.Message
+}
+
+// DashboardSettings contains dashboard-specific settings
+type DashboardSettings struct {
+	AutoRefreshEnabled  bool `json:"autoRefreshEnabled"`
+	AutoRefreshInterval int  `json:"autoRefreshInterval"` // in seconds
+	MinRefreshInterval  int  `json:"minRefreshInterval"`  // minimum allowed interval
+}
+
+func DefaultDashboardSettings() *DashboardSettings {
+	return &DashboardSettings{
+		AutoRefreshEnabled:  true,
+		AutoRefreshInterval: 30,
+		MinRefreshInterval:  10,
+	}
+}
+
+func (s *DashboardSettings) Validate() error {
+	if s.AutoRefreshInterval < s.MinRefreshInterval {
+		return errors.Validation("Refresh interval cannot be less than minimum interval")
+	}
+	return nil
 }

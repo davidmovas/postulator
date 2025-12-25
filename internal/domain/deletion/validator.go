@@ -213,13 +213,15 @@ func (v *Validator) queryDependencies(ctx context.Context, query string, args []
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	var deps []Dependency
 	for rows.Next() {
 		var id int64
 		var name string
-		if err := rows.Scan(&id, &name); err != nil {
+		if err = rows.Scan(&id, &name); err != nil {
 			return nil, err
 		}
 		deps = append(deps, Dependency{

@@ -41,3 +41,31 @@ export function toDtoHealthCheckSettings(input: HealthCheckSettingsUpdateInput):
         notify_on_recover: input.notifyOnRecover,
     });
 }
+
+// Dashboard Settings
+export interface DashboardSettings {
+    autoRefreshEnabled: boolean;
+    autoRefreshInterval: number;
+    minRefreshInterval: number;
+}
+
+export interface DashboardSettingsUpdateInput {
+    autoRefreshEnabled?: boolean;
+    autoRefreshInterval?: number;
+}
+
+export function mapDashboardSettings(x: dto.DashboardSettings): DashboardSettings {
+    return {
+        autoRefreshEnabled: x.autoRefreshEnabled,
+        autoRefreshInterval: x.autoRefreshInterval,
+        minRefreshInterval: x.minRefreshInterval,
+    };
+}
+
+export function toDtoDashboardSettings(input: DashboardSettingsUpdateInput, current: DashboardSettings): dto.DashboardSettings {
+    return new dto.DashboardSettings({
+        autoRefreshEnabled: input.autoRefreshEnabled ?? current.autoRefreshEnabled,
+        autoRefreshInterval: input.autoRefreshInterval ?? current.autoRefreshInterval,
+        minRefreshInterval: current.minRefreshInterval,
+    });
+}

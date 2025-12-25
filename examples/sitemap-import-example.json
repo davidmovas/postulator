@@ -1,0 +1,79 @@
+{
+  "nodes": [
+    {
+      "path": "/products",
+      "title": "Products",
+      "keywords": ["products", "shop", "store"]
+    },
+    {
+      "path": "/products/electronics",
+      "title": "Electronics",
+      "keywords": ["electronics", "gadgets", "tech"]
+    },
+    {
+      "path": "/products/electronics/smartphones",
+      "title": "Smartphones",
+      "keywords": ["phones", "mobile", "smartphones"]
+    },
+    {
+      "path": "/products/electronics/laptops",
+      "title": "Laptops & Computers",
+      "keywords": ["laptops", "computers", "pc"]
+    },
+    {
+      "path": "/products/electronics/accessories",
+      "title": "Accessories",
+      "keywords": ["accessories", "cables", "chargers"]
+    },
+    {
+      "path": "/products/clothing",
+      "title": "Clothing",
+      "keywords": ["clothing", "fashion", "apparel"]
+    },
+    {
+      "path": "/products/clothing/mens",
+      "title": "Men's Clothing",
+      "keywords": ["mens", "male", "fashion"]
+    },
+    {
+      "path": "/products/clothing/womens",
+      "title": "Women's Clothing",
+      "keywords": ["womens", "female", "fashion"]
+    },
+    {
+      "path": "/products/home-garden",
+      "title": "Home & Garden",
+      "keywords": ["home", "garden", "furniture"]
+    },
+    {
+      "path": "/account",
+      "title": "My Account",
+      "keywords": ["account", "profile", "settings"]
+    },
+    {
+      "path": "/account/orders",
+      "title": "Order History",
+      "keywords": ["orders", "purchases", "history"]
+    },
+    {
+      "path": "/account/wishlist",
+      "title": "Wishlist",
+      "keywords": ["wishlist", "favorites", "saved"]
+    },
+    {
+      "path": "/support",
+      "title": "Customer Support",
+      "keywords": ["support", "help", "customer service"]
+    },
+    {
+      "path": "/support/shipping",
+      "title": "Shipping Information",
+      "keywords": ["shipping", "delivery", "tracking"]
+    },
+    {
+      "path": "/support/returns",
+      "title": "Returns & Refunds",
+      "keywords": ["returns", "refunds", "exchange"]
+    }
+  ]
+}

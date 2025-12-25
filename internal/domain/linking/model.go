@@ -5,133 +5,188 @@ import (
 	"time"
 )
 
-type TaskStatus string
+type PlanStatus string
 
 const (
-	StatusPending   TaskStatus = "pending"
-	StatusAnalyzing TaskStatus = "analyzing"
-	StatusReady     TaskStatus = "ready"
-	StatusApplying  TaskStatus = "applying"
-	StatusApplied   TaskStatus = "applied"
-	StatusFailed    TaskStatus = "failed"
+	PlanStatusDraft      PlanStatus = "draft"
+	PlanStatusSuggesting PlanStatus = "suggesting"
+	PlanStatusReady      PlanStatus = "ready"
+	PlanStatusApplying   PlanStatus = "applying"
+	PlanStatusApplied    PlanStatus = "applied"
+	PlanStatusFailed     PlanStatus = "failed"
 )
 
-type ProposalStatus string
+type LinkStatus string
 
 const (
-	ProposalPending  ProposalStatus = "pending"
-	ProposalApproved ProposalStatus = "approved"
-	ProposalRejected ProposalStatus = "rejected"
-	ProposalModified ProposalStatus = "modified"
+	LinkStatusPlanned  LinkStatus = "planned"
+	LinkStatusApproved LinkStatus = "approved"
+	LinkStatusRejected LinkStatus = "rejected"
+	LinkStatusApplying LinkStatus = "applying"
+	LinkStatusApplied  LinkStatus = "applied"
+	LinkStatusFailed   LinkStatus = "failed"
 )
 
-type Task struct {
-	ID                 int64
-	Name               string
-	SiteIDs            []int64
-	ArticleIDs         []int64
-	MaxLinksPerArticle int
-	MinLinkDistance    int
-	PromptID           *int64
-	AIProviderID       int64
-	Status             TaskStatus
-	ErrorMessage       *string
-	CreatedAt          time.Time
-	StartedAt          *time.Time
-	CompletedAt        *time.Time
-	AppliedAt          *time.Time
+type LinkSource string
+
+const (
+	LinkSourceAI     LinkSource = "ai"
+	LinkSourceManual LinkSource = "manual"
+)
+
+type LinkPlan struct {
+	ID         int64
+	SitemapID  int64
+	SiteID     int64
+	Name       string
+	Status     PlanStatus
+	ProviderID *int64
+	PromptID   *int64
+	Error      *string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
-type Proposal struct {
-	ID              int64
-	TaskID          int64
-	SourceArticleID int64
-	TargetArticleID int64
-	AnchorText      string
-	Position        int
-	Confidence      *float64
-	Status          ProposalStatus
-	CreatedAt       time.Time
+type PlannedLink struct {
+	ID            int64
+	PlanID        int64
+	SourceNodeID  int64
+	TargetNodeID  int64
+	AnchorText    *string
+	AnchorContext *string
+	Status        LinkStatus
+	Source        LinkSource
+	Position      *int
+	Confidence    *float64
+	Error         *string
+	AppliedAt     *time.Time
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
-type Link struct {
-	ID              int64
-	ArticleID       int64
-	LinkType        string
-	TargetArticleID *int64
-	URL             string
-	AnchorText      string
-	Position        *int
-	TaskID          *int64
-	CreatedAt       time.Time
+type AppliedLinkInfo struct {
+	LinkID      int64
+	AnchorText  string
+	Position    int
+	TargetURL   string
+	TargetTitle string
 }
 
-type Repository interface {
-	CreateTask(ctx context.Context, task *Task) error
-	GetTaskByID(ctx context.Context, id int64) (*Task, error)
-	GetAllTasks(ctx context.Context) ([]*Task, error)
-	GetPendingTasks(ctx context.Context) ([]*Task, error)
-	UpdateTask(ctx context.Context, task *Task) error
-	DeleteTask(ctx context.Context, id int64) error
-}
-
-type ProposalRepository interface {
-	CreateProposal(ctx context.Context, proposal *Proposal) error
-	CreateBatch(ctx context.Context, proposals []*Proposal) error
-	GetByID(ctx context.Context, id int64) (*Proposal, error)
-	GetByTaskID(ctx context.Context, taskID int64) ([]*Proposal, error)
-	Update(ctx context.Context, proposal *Proposal) error
+type PlanRepository interface {
+	Create(ctx context.Context, plan *LinkPlan) error
+	GetByID(ctx context.Context, id int64) (*LinkPlan, error)
+	GetBySitemapID(ctx context.Context, sitemapID int64) (*LinkPlan, error)
+	GetActiveBySitemapID(ctx context.Context, sitemapID int64) (*LinkPlan, error)
+	List(ctx context.Context, siteID int64) ([]*LinkPlan, error)
+	Update(ctx context.Context, plan *LinkPlan) error
 	Delete(ctx context.Context, id int64) error
-	DeleteByTaskID(ctx context.Context, taskID int64) error
-
-	CountByStatus(ctx context.Context, taskID int64, status ProposalStatus) (int, error)
 }
 
 type LinkRepository interface {
-	CreateLink(ctx context.Context, link *Link) error
-	GetByArticleID(ctx context.Context, articleID int64) ([]*Link, error)
-	GetByTaskID(ctx context.Context, taskID int64) ([]*Link, error)
-	Update(ctx context.Context, link *Link) error
+	Create(ctx context.Context, link *PlannedLink) error
+	CreateBatch(ctx context.Context, links []*PlannedLink) error
+	GetByID(ctx context.Context, id int64) (*PlannedLink, error)
+	GetByPlanID(ctx context.Context, planID int64) ([]*PlannedLink, error)
+	GetBySourceNodeID(ctx context.Context, planID int64, nodeID int64) ([]*PlannedLink, error)
+	GetByTargetNodeID(ctx context.Context, planID int64, nodeID int64) ([]*PlannedLink, error)
+	GetByNodePair(ctx context.Context, planID int64, sourceID int64, targetID int64) (*PlannedLink, error)
+	Update(ctx context.Context, link *PlannedLink) error
+	UpdateStatus(ctx context.Context, id int64, status LinkStatus, errorMsg *string) error
 	Delete(ctx context.Context, id int64) error
-	DeleteByArticleID(ctx context.Context, articleID int64) error
+	DeleteByPlanID(ctx context.Context, planID int64) error
+	CountByStatus(ctx context.Context, planID int64, status LinkStatus) (int, error)
 }
 
 type Service interface {
-	CreateTask(ctx context.Context, task *Task) error
-	GetTask(ctx context.Context, id int64) (*Task, error)
-	ListTasks(ctx context.Context) ([]*Task, error)
-	DeleteTask(ctx context.Context, id int64) error
+	CreatePlan(ctx context.Context, sitemapID int64, siteID int64, name string) (*LinkPlan, error)
+	GetPlan(ctx context.Context, id int64) (*LinkPlan, error)
+	GetPlanBySitemap(ctx context.Context, sitemapID int64) (*LinkPlan, error)
+	GetActivePlan(ctx context.Context, sitemapID int64) (*LinkPlan, error)
+	ListPlans(ctx context.Context, siteID int64) ([]*LinkPlan, error)
+	UpdatePlan(ctx context.Context, plan *LinkPlan) error
+	DeletePlan(ctx context.Context, id int64) error
 
-	AnalyzeTask(ctx context.Context, id int64) error
+	AddLink(ctx context.Context, planID int64, sourceNodeID int64, targetNodeID int64) (*PlannedLink, error)
+	RemoveLink(ctx context.Context, linkID int64) error
+	UpdateLink(ctx context.Context, link *PlannedLink) error
+	GetLinks(ctx context.Context, planID int64) ([]*PlannedLink, error)
+	GetLinksByNode(ctx context.Context, planID int64, nodeID int64) ([]*PlannedLink, error)
+	ApproveLink(ctx context.Context, linkID int64) error
+	RejectLink(ctx context.Context, linkID int64) error
+	ApproveAndApplyLink(ctx context.Context, linkID int64) error
 
-	GetProposals(ctx context.Context, taskID int64) ([]*Proposal, error)
-	UpdateProposal(ctx context.Context, proposal *Proposal) error
-	ApproveProposal(ctx context.Context, id int64) error
-	RejectProposal(ctx context.Context, id int64) error
+	SuggestLinks(ctx context.Context, config SuggestLinksConfig) error
+	ApplyLinks(ctx context.Context, planID int64, linkIDs []int64, providerID int64, promptID int64) (*ApplyResult, error)
 
-	ApplyTask(ctx context.Context, taskID int64) error
-
-	GetTaskGraph(ctx context.Context, taskID int64) (*LinkGraph, error)
-
-	GetArticleLinks(ctx context.Context, articleID int64) ([]*Link, error)
-	DeleteLink(ctx context.Context, id int64) error
+	GetLinkGraph(ctx context.Context, planID int64) (*LinkGraph, error)
+	GetOrCreateActivePlan(ctx context.Context, sitemapID int64, siteID int64) (*LinkPlan, error)
 }
 
 type LinkGraph struct {
-	Nodes []*GraphNode
-	Edges []*GraphEdge
+	Nodes []*GraphNode `json:"nodes"`
+	Edges []*GraphEdge `json:"edges"`
 }
 
 type GraphNode struct {
-	ArticleID int64
-	Title     string
-	URL       string
+	NodeID            int64  `json:"nodeId"`
+	Title             string `json:"title"`
+	Slug              string `json:"slug"`
+	Path              string `json:"path"`
+	HasContent        bool   `json:"hasContent"`
+	OutgoingLinkCount int    `json:"outgoingLinkCount"`
+	IncomingLinkCount int    `json:"incomingLinkCount"`
 }
 
 type GraphEdge struct {
-	SourceID   int64
-	TargetID   int64
-	AnchorText string
-	Status     ProposalStatus
-	Confidence *float64
+	ID           int64      `json:"id"`
+	SourceNodeID int64      `json:"sourceNodeId"`
+	TargetNodeID int64      `json:"targetNodeId"`
+	AnchorText   *string    `json:"anchorText"`
+	Status       LinkStatus `json:"status"`
+	Source       LinkSource `json:"source"`
+	Confidence   *float64   `json:"confidence"`
+}
+
+type SuggestLinksConfig struct {
+	PlanID      int64
+	ProviderID  int64
+	PromptID    *int64
+	NodeIDs     []int64
+	Feedback    string
+	MaxIncoming int
+	MaxOutgoing int
+}
+
+type SuggestionRequest struct {
+	PlanID     int64
+	ProviderID int64
+	PromptID   *int64
+	NodeIDs    []int64
+	Feedback   string
+}
+
+type SuggestionResult struct {
+	Links       []*SuggestedLink `json:"links"`
+	Explanation string           `json:"explanation"`
+}
+
+type SuggestedLink struct {
+	SourceNodeID int64   `json:"sourceNodeId"`
+	TargetNodeID int64   `json:"targetNodeId"`
+	AnchorText   string  `json:"anchorText"`
+	Reason       string  `json:"reason"`
+	Confidence   float64 `json:"confidence"`
+}
+
+type ApplyRequest struct {
+	PlanID  int64
+	LinkIDs []int64
+	SiteID  int64
+}
+
+type ApplyResult struct {
+	TotalLinks   int                `json:"totalLinks"`
+	AppliedLinks int                `json:"appliedLinks"`
+	FailedLinks  int                `json:"failedLinks"`
+	Results      []*AppliedLinkInfo `json:"results"`
 }

@@ -1,13 +1,29 @@
 import { useState, useEffect, useCallback } from "react";
 import { statsService } from "@/services/stats";
+import { settingsService } from "@/services/settings";
 import { DashboardSummary } from "@/models/stats";
+import { DashboardSettings } from "@/models/settings";
 import { useApiCall } from "@/hooks/use-api-call";
-import { DASHBOARD_AUTO_REFRESH_INTERVAL } from "@/constants/dashboard";
 
-export function useDashboard(autoRefresh: boolean = true) {
+export function useDashboard() {
     const [data, setData] = useState<DashboardSummary | null>(null);
+    const [settings, setSettings] = useState<DashboardSettings | null>(null);
     const { execute, isLoading, error } = useApiCall();
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+    const loadSettings = useCallback(async () => {
+        const result = await execute<DashboardSettings>(
+            () => settingsService.getDashboardSettings(),
+            {
+                showSuccessToast: false,
+                errorTitle: "Failed to load dashboard settings"
+            }
+        );
+
+        if (result) {
+            setSettings(result);
+        }
+    }, [execute]);
 
     const loadData = useCallback(async () => {
         const result = await execute<DashboardSummary>(
@@ -24,23 +40,35 @@ export function useDashboard(autoRefresh: boolean = true) {
         }
     }, [execute]);
 
+    // Load settings on mount
     useEffect(() => {
-        if (!autoRefresh) return;
+        loadSettings();
+    }, [loadSettings]);
+
+    // Auto-refresh based on settings
+    useEffect(() => {
+        if (!settings?.autoRefreshEnabled) {
+            loadData(); // Load once
+            return;
+        }
 
         loadData();
 
+        const intervalMs = (settings.autoRefreshInterval || 30) * 1000;
         const interval = setInterval(() => {
             loadData();
-        }, DASHBOARD_AUTO_REFRESH_INTERVAL);
+        }, intervalMs);
 
         return () => clearInterval(interval);
-    }, [autoRefresh, loadData]);
+    }, [settings?.autoRefreshEnabled, settings?.autoRefreshInterval, loadData]);
 
     return {
         data,
         isLoading: isLoading && !data,
         error,
         lastUpdated,
-        refresh: loadData
+        refresh: loadData,
+        settings,
+        refreshSettings: loadSettings
     };
 }

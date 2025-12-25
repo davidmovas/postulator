@@ -6,6 +6,10 @@ export function GetDashboardSummary() {
   return window['go']['handlers']['StatsHandler']['GetDashboardSummary']();
 }
 
+export function GetGlobalStatistics(arg1, arg2) {
+  return window['go']['handlers']['StatsHandler']['GetGlobalStatistics'](arg1, arg2);
+}
+
 export function GetSiteStatistics(arg1, arg2, arg3) {
   return window['go']['handlers']['StatsHandler']['GetSiteStatistics'](arg1, arg2, arg3);
 }

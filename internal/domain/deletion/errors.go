@@ -1,6 +1,7 @@
 package deletion
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -103,6 +104,7 @@ func NewConflictError(entityType DependencyType, entityID int64, entityName stri
 
 // IsConflictError checks if the error is a deletion conflict error
 func IsConflictError(err error) bool {
-	_, ok := err.(*ConflictError)
+	var conflictError *ConflictError
+	ok := errors.As(err, &conflictError)
 	return ok
 }

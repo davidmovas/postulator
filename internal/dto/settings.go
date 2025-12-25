@@ -218,3 +218,25 @@ type AppVersion struct {
 	Commit    string `json:"commit"`
 	BuildDate string `json:"buildDate"`
 }
+
+type DashboardSettings struct {
+	AutoRefreshEnabled  bool `json:"autoRefreshEnabled"`
+	AutoRefreshInterval int  `json:"autoRefreshInterval"`
+	MinRefreshInterval  int  `json:"minRefreshInterval"`
+}
+
+func NewDashboardSettings(e *entities.DashboardSettings) *DashboardSettings {
+	return &DashboardSettings{
+		AutoRefreshEnabled:  e.AutoRefreshEnabled,
+		AutoRefreshInterval: e.AutoRefreshInterval,
+		MinRefreshInterval:  e.MinRefreshInterval,
+	}
+}
+
+func (s *DashboardSettings) ToEntity() *entities.DashboardSettings {
+	return &entities.DashboardSettings{
+		AutoRefreshEnabled:  s.AutoRefreshEnabled,
+		AutoRefreshInterval: s.AutoRefreshInterval,
+		MinRefreshInterval:  s.MinRefreshInterval,
+	}
+}

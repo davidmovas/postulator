@@ -1,6 +1,6 @@
 "use client";
 
-import { Prompt } from "@/models/prompts";
+import { Prompt, PROMPT_CATEGORIES } from "@/models/prompts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import {
     DropdownMenuItem, DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Edit, MoreVertical, Trash2, MessageSquare, User } from "lucide-react";
+import { Edit, MoreVertical, Trash2, MessageSquare, User, Lock } from "lucide-react";
 
 interface PromptCardProps {
     prompt: Prompt;
@@ -19,13 +19,32 @@ interface PromptCardProps {
 }
 
 export function PromptCard({ prompt, onEdit, onDelete }: PromptCardProps) {
+    const categoryLabel = PROMPT_CATEGORIES[prompt.category] || prompt.category;
+
     return (
         <Card className="relative overflow-hidden hover:shadow-lg transition-shadow duration-200 flex flex-col h-full min-h-[320px]">
             <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
-                    <CardTitle className="text-lg font-bold line-clamp-2">
-                        {prompt.name}
-                    </CardTitle>
+                    <div className="space-y-1.5 flex-1 min-w-0 pr-2">
+                        <div className="flex items-center gap-2">
+                            {prompt.isBuiltin && (
+                                <Lock className="h-4 w-4 text-muted-foreground shrink-0" />
+                            )}
+                            <CardTitle className="text-lg font-bold line-clamp-2">
+                                {prompt.name}
+                            </CardTitle>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">
+                                {categoryLabel}
+                            </Badge>
+                            {prompt.isBuiltin && (
+                                <Badge variant="secondary" className="text-xs">
+                                    Builtin
+                                </Badge>
+                            )}
+                        </div>
+                    </div>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -38,15 +57,18 @@ export function PromptCard({ prompt, onEdit, onDelete }: PromptCardProps) {
                                 Edit
                             </DropdownMenuItem>
 
-                            <DropdownMenuSeparator />
-
-                            <DropdownMenuItem
-                                onClick={() => onDelete(prompt)}
-                                className="text-destructive focus:text-destructive"
-                            >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                            </DropdownMenuItem>
+                            {!prompt.isBuiltin && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                        onClick={() => onDelete(prompt)}
+                                        className="text-destructive focus:text-destructive"
+                                    >
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Delete
+                                    </DropdownMenuItem>
+                                </>
+                            )}
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>

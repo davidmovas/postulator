@@ -18,6 +18,10 @@ export function ListPrompts() {
   return window['go']['handlers']['PromptsHandler']['ListPrompts']();
 }
 
+export function ListPromptsByCategory(arg1) {
+  return window['go']['handlers']['PromptsHandler']['ListPromptsByCategory'](arg1);
+}
+
 export function UpdatePrompt(arg1) {
   return window['go']['handlers']['PromptsHandler']['UpdatePrompt'](arg1);
 }

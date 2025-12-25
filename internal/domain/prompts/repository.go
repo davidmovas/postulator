@@ -38,10 +38,15 @@ func (r *repository) Create(ctx context.Context, prompt *entities.Prompt) error 
 		return errors.Validation("Invalid placeholders format")
 	}
 
+	category := prompt.Category
+	if category == "" {
+		category = entities.PromptCategoryPostGen
+	}
+
 	query, args := dbx.ST.
 		Insert("prompts").
-		Columns("name", "system_prompt", "user_prompt", "placeholders").
-		Values(prompt.Name, prompt.SystemPrompt, prompt.UserPrompt, placeholdersJSON).
+		Columns("name", "category", "is_builtin", "system_prompt", "user_prompt", "placeholders").
+		Values(prompt.Name, category, prompt.IsBuiltin, prompt.SystemPrompt, prompt.UserPrompt, placeholdersJSON).
 		MustSql()
 
 	result, err := r.db.ExecContext(ctx, query, args...)
@@ -63,17 +68,20 @@ func (r *repository) Create(ctx context.Context, prompt *entities.Prompt) error 
 
 func (r *repository) GetByID(ctx context.Context, id int64) (*entities.Prompt, error) {
 	query, args := dbx.ST.
-		Select("id", "name", "system_prompt", "user_prompt", "placeholders", "created_at", "updated_at").
+		Select("id", "name", "category", "is_builtin", "system_prompt", "user_prompt", "placeholders", "created_at", "updated_at").
 		From("prompts").
 		Where(squirrel.Eq{"id": id}).
 		MustSql()
 
 	var prompt entities.Prompt
+	var category string
 	var placeholdersJSON sql.NullString
 
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(
 		&prompt.ID,
 		&prompt.Name,
+		&category,
+		&prompt.IsBuiltin,
 		&prompt.SystemPrompt,
 		&prompt.UserPrompt,
 		&placeholdersJSON,
@@ -88,24 +96,18 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*entities.Prompt, e
 		return nil, errors.Database(err)
 	}
 
-	if placeholdersJSON.Valid && strings.TrimSpace(placeholdersJSON.String) != "" {
-		var placeholders []string
-		if err = json.Unmarshal([]byte(placeholdersJSON.String), &placeholders); err != nil {
-			return nil, errors.Database(err)
-		}
-		prompt.Placeholders = placeholders
-	} else {
-		prompt.Placeholders = []string{}
-	}
+	prompt.Category = entities.PromptCategory(category)
+
+	prompt.Placeholders = parsePlaceholders(placeholdersJSON)
 
 	return &prompt, nil
 }
 
 func (r *repository) GetAll(ctx context.Context) ([]*entities.Prompt, error) {
 	query, args := dbx.ST.
-		Select("id", "name", "system_prompt", "user_prompt", "placeholders", "created_at", "updated_at").
+		Select("id", "name", "category", "is_builtin", "system_prompt", "user_prompt", "placeholders", "created_at", "updated_at").
 		From("prompts").
-		OrderBy("created_at DESC").
+		OrderBy("is_builtin DESC", "created_at DESC").
 		MustSql()
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
@@ -119,11 +121,14 @@ func (r *repository) GetAll(ctx context.Context) ([]*entities.Prompt, error) {
 	var prompts []*entities.Prompt
 	for rows.Next() {
 		var prompt entities.Prompt
+		var category string
 		var placeholdersJSON sql.NullString
 
 		err = rows.Scan(
 			&prompt.ID,
 			&prompt.Name,
+			&category,
+			&prompt.IsBuiltin,
 			&prompt.SystemPrompt,
 			&prompt.UserPrompt,
 			&placeholdersJSON,
@@ -134,15 +139,61 @@ func (r *repository) GetAll(ctx context.Context) ([]*entities.Prompt, error) {
 			return nil, errors.Database(err)
 		}
 
-		if placeholdersJSON.Valid && strings.TrimSpace(placeholdersJSON.String) != "" {
-			var placeholders []string
-			if err = json.Unmarshal([]byte(placeholdersJSON.String), &placeholders); err != nil {
-				return nil, errors.Database(err)
-			}
-			prompt.Placeholders = placeholders
-		} else {
-			prompt.Placeholders = []string{}
+		prompt.Category = entities.PromptCategory(category)
+		prompt.Placeholders = parsePlaceholders(placeholdersJSON)
+
+		prompts = append(prompts, &prompt)
+	}
+
+	switch {
+	case dbx.IsNoRows(err) || len(prompts) == 0:
+		return prompts, nil
+	case err != nil || rows.Err() != nil:
+		return nil, errors.Database(err)
+	}
+
+	return prompts, nil
+}
+
+func (r *repository) GetByCategory(ctx context.Context, category entities.PromptCategory) ([]*entities.Prompt, error) {
+	query, args := dbx.ST.
+		Select("id", "name", "category", "is_builtin", "system_prompt", "user_prompt", "placeholders", "created_at", "updated_at").
+		From("prompts").
+		Where(squirrel.Eq{"category": string(category)}).
+		OrderBy("is_builtin DESC", "created_at DESC").
+		MustSql()
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, errors.Database(err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	var prompts []*entities.Prompt
+	for rows.Next() {
+		var prompt entities.Prompt
+		var cat string
+		var placeholdersJSON sql.NullString
+
+		err = rows.Scan(
+			&prompt.ID,
+			&prompt.Name,
+			&cat,
+			&prompt.IsBuiltin,
+			&prompt.SystemPrompt,
+			&prompt.UserPrompt,
+			&placeholdersJSON,
+			&prompt.CreatedAt,
+			&prompt.UpdatedAt,
+		)
+		if err != nil {
+			return nil, errors.Database(err)
 		}
+
+		prompt.Category = entities.PromptCategory(cat)
+		prompt.Placeholders = parsePlaceholders(placeholdersJSON)
 
 		prompts = append(prompts, &prompt)
 	}
@@ -163,9 +214,15 @@ func (r *repository) Update(ctx context.Context, prompt *entities.Prompt) error 
 		return errors.Validation("Invalid placeholders format")
 	}
 
+	category := prompt.Category
+	if category == "" {
+		category = entities.PromptCategoryPostGen
+	}
+
 	query, args := dbx.ST.
 		Update("prompts").
 		Set("name", prompt.Name).
+		Set("category", string(category)).
 		Set("system_prompt", prompt.SystemPrompt).
 		Set("user_prompt", prompt.UserPrompt).
 		Set("placeholders", placeholdersJSON).
@@ -214,4 +271,32 @@ func (r *repository) Delete(ctx context.Context, id int64) error {
 	}
 
 	return nil
+}
+
+// parsePlaceholders handles both JSON array format and comma-separated format
+func parsePlaceholders(placeholdersJSON sql.NullString) []string {
+	if !placeholdersJSON.Valid || strings.TrimSpace(placeholdersJSON.String) == "" {
+		return []string{}
+	}
+
+	raw := strings.TrimSpace(placeholdersJSON.String)
+
+	// Try JSON array format first
+	if strings.HasPrefix(raw, "[") {
+		var placeholders []string
+		if err := json.Unmarshal([]byte(raw), &placeholders); err == nil {
+			return placeholders
+		}
+	}
+
+	// Fall back to comma-separated format
+	parts := strings.Split(raw, ",")
+	var result []string
+	for _, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }

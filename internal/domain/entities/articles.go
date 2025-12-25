@@ -5,6 +5,12 @@ import "time"
 type (
 	Source        string
 	ArticleStatus string
+	ContentType   string
+)
+
+const (
+	ContentTypePost ContentType = "post"
+	ContentTypePage ContentType = "page"
 )
 
 const (
@@ -45,11 +51,19 @@ type Article struct {
 	LastSyncedAt  *time.Time
 
 	// SEO & WordPress fields
-	Slug            *string
-	FeaturedMediaID *int
+	Slug             *string
+	FeaturedMediaID  *int
 	FeaturedMediaURL *string
-	MetaDescription *string
-	Author          *int
+	MetaDescription  *string
+	Author           *int
+
+	// Page-specific fields
+	ContentType   ContentType
+	WPPageID      *int
+	ParentPageID  *int
+	MenuOrder     *int
+	PageTemplate  *string
+	SitemapNodeID *int64
 }
 
 type WPInfoUpdate struct {

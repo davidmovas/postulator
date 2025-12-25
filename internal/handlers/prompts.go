@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/prompts"
 	"github.com/davidmovas/postulator/internal/dto"
 	"github.com/davidmovas/postulator/pkg/ctx"
@@ -40,6 +41,20 @@ func (h *PromptsHandler) GetPrompt(id int64) *dto.Response[*dto.Prompt] {
 
 func (h *PromptsHandler) ListPrompts() *dto.Response[[]*dto.Prompt] {
 	listPrompts, err := h.service.ListPrompts(ctx.FastCtx())
+	if err != nil {
+		return fail[[]*dto.Prompt](err)
+	}
+
+	var dtoPrompts []*dto.Prompt
+	for _, prompt := range listPrompts {
+		dtoPrompts = append(dtoPrompts, dto.NewPrompt(prompt))
+	}
+
+	return ok(dtoPrompts)
+}
+
+func (h *PromptsHandler) ListPromptsByCategory(category string) *dto.Response[[]*dto.Prompt] {
+	listPrompts, err := h.service.ListPromptsByCategory(ctx.FastCtx(), entities.PromptCategory(category))
 	if err != nil {
 		return fail[[]*dto.Prompt](err)
 	}

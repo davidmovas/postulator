@@ -169,3 +169,64 @@ func (r *repository) GetTotalSiteStats(ctx context.Context, siteID int64) (*enti
 
 	return &stat, nil
 }
+
+func (r *repository) GetGlobalStats(ctx context.Context, from, to time.Time) ([]*entities.SiteStats, error) {
+	from = time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, from.Location())
+	to = time.Date(to.Year(), to.Month(), to.Day(), 23, 59, 59, 999999999, to.Location())
+
+	query, args := dbx.ST.
+		Select(
+			"date",
+			"SUM(articles_published)",
+			"SUM(articles_failed)",
+			"SUM(total_words)",
+			"SUM(internal_links_created)",
+			"SUM(external_links_created)",
+		).
+		From("site_statistics").
+		Where(squirrel.GtOrEq{"date": from}).
+		Where(squirrel.LtOrEq{"date": to}).
+		GroupBy("date").
+		OrderBy("date ASC").
+		MustSql()
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, errors.Database(err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	var stats []*entities.SiteStats
+	for rows.Next() {
+		var stat entities.SiteStats
+		var articlesPublished, articlesFailed, totalWords, internalLinks, externalLinks sql.NullInt64
+		err = rows.Scan(
+			&stat.Date,
+			&articlesPublished,
+			&articlesFailed,
+			&totalWords,
+			&internalLinks,
+			&externalLinks,
+		)
+		if err != nil {
+			return nil, errors.Database(err)
+		}
+		stat.ArticlesPublished = int(articlesPublished.Int64)
+		stat.ArticlesFailed = int(articlesFailed.Int64)
+		stat.TotalWords = int(totalWords.Int64)
+		stat.InternalLinksCreated = int(internalLinks.Int64)
+		stat.ExternalLinksCreated = int(externalLinks.Int64)
+		stats = append(stats, &stat)
+	}
+
+	switch {
+	case dbx.IsNoRows(err) || len(stats) == 0:
+		return stats, nil
+	case err != nil || rows.Err() != nil:
+		return nil, errors.Database(err)
+	}
+
+	return stats, nil
+}

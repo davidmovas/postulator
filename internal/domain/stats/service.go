@@ -194,3 +194,17 @@ func (s *service) countFailedExecutionsToday(executions []*entities.Execution, t
 	}
 	return count
 }
+
+func (s *service) GetGlobalStatistics(ctx context.Context, from, to time.Time) ([]*entities.SiteStats, error) {
+	if from.After(to) {
+		return nil, errors.Validation("From date cannot be after to date")
+	}
+
+	stats, err := s.repo.GetGlobalStats(ctx, from, to)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get global statistics")
+		return nil, err
+	}
+
+	return stats, nil
+}

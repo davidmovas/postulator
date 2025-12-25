@@ -81,9 +81,9 @@ type wpPost struct {
 	DateGMT     WPTime `json:"date_gmt"`
 	Modified    WPTime `json:"modified"`
 	ModifiedGMT WPTime `json:"modified_gmt"`
-	Slug        string    `json:"slug"`
-	Status      string    `json:"status"`
-	Type        string    `json:"type"`
+	Slug        string `json:"slug"`
+	Status      string `json:"status"`
+	Type        string `json:"type"`
 	Title       struct {
 		Rendered string `json:"rendered"`
 	} `json:"title"`
@@ -103,4 +103,32 @@ type wpPost struct {
 	Meta          struct {
 		Description string `json:"_yoast_wpseo_metadesc,omitempty"`
 	} `json:"meta,omitempty"`
+}
+
+type wpPage struct {
+	ID          int    `json:"id"`
+	Date        WPTime `json:"date"`
+	DateGMT     WPTime `json:"date_gmt"`
+	Modified    WPTime `json:"modified"`
+	ModifiedGMT WPTime `json:"modified_gmt"`
+	Slug        string `json:"slug"`
+	Status      string `json:"status"`
+	Type        string `json:"type"`
+	Parent      int    `json:"parent"`
+	Title       struct {
+		Rendered string `json:"rendered"`
+	} `json:"title"`
+	Content struct {
+		Rendered  string `json:"rendered"`
+		Protected bool   `json:"protected"`
+	} `json:"content"`
+	Excerpt struct {
+		Rendered  string `json:"rendered"`
+		Protected bool   `json:"protected"`
+	} `json:"excerpt"`
+	Author        int    `json:"author"`
+	FeaturedMedia int    `json:"featured_media"`
+	MenuOrder     int    `json:"menu_order"`
+	Link          string `json:"link"`
+	Template      string `json:"template"`
 }

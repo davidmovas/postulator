@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/aiusage"
 	"github.com/davidmovas/postulator/internal/domain/deletion"
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/infra/secret"
@@ -21,6 +22,7 @@ type service struct {
 	secret            *secret.Manager
 	repo              Repository
 	deletionValidator *deletion.Validator
+	aiUsageService    aiusage.Service
 	logger            *logger.Logger
 }
 
@@ -29,6 +31,7 @@ func NewService(
 	secretManager *secret.Manager,
 	repo Repository,
 	deletionValidator *deletion.Validator,
+	aiUsageService aiusage.Service,
 	logger *logger.Logger,
 ) Service {
 	return &service{
@@ -36,6 +39,7 @@ func NewService(
 		secret:            secretManager,
 		repo:              repo,
 		deletionValidator: deletionValidator,
+		aiUsageService:    aiUsageService,
 		logger: logger.
 			WithScope("service").
 			WithScope("sites"),
@@ -186,6 +190,14 @@ func (s *service) DeleteSite(ctx context.Context, id int64) error {
 			})
 		}
 		return err
+	}
+
+	// Delete AI usage logs for this site (no FK constraint)
+	if s.aiUsageService != nil {
+		if err = s.aiUsageService.DeleteBySiteID(ctx, id); err != nil {
+			s.logger.ErrorWithErr(err, "Failed to delete AI usage logs for site")
+			// Don't fail the deletion, just log the error
+		}
 	}
 
 	if err = s.repo.Delete(ctx, id); err != nil {

@@ -66,6 +66,17 @@ func (s *service) ListPrompts(ctx context.Context) ([]*entities.Prompt, error) {
 	return prompts, nil
 }
 
+func (s *service) ListPromptsByCategory(ctx context.Context, category entities.PromptCategory) ([]*entities.Prompt, error) {
+	prompts, err := s.repo.GetByCategory(ctx, category)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to list prompts by category")
+		return nil, err
+	}
+
+	s.logger.Debug("Prompts listed by category")
+	return prompts, nil
+}
+
 func (s *service) UpdatePrompt(ctx context.Context, prompt *entities.Prompt) error {
 	if err := s.validatePrompt(prompt); err != nil {
 		return err
@@ -87,6 +98,10 @@ func (s *service) DeletePrompt(ctx context.Context, id int64) error {
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to get prompt for deletion")
 		return err
+	}
+
+	if prompt.IsBuiltin {
+		return errors.Validation("Cannot delete builtin prompt")
 	}
 
 	if err = s.deletionValidator.CanDeletePrompt(ctx, id, prompt.Name); err != nil {
@@ -118,7 +133,7 @@ func (s *service) RenderPrompt(ctx context.Context, promptID int64, placeholders
 	}
 
 	if err = s.ValidatePlaceholders(prompt, placeholders); err != nil {
-		s.logger.ErrorWithErr(err, "Placeholder validation failed")
+		s.logger.WarnWithErr(err, "Placeholder validation failed")
 		return "", "", err
 	}
 

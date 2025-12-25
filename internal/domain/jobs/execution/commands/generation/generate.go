@@ -3,6 +3,7 @@ package generation
 import (
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/aiusage"
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/internal/domain/jobs/execution/commands"
 	"github.com/davidmovas/postulator/internal/domain/jobs/execution/fault"
@@ -19,9 +20,10 @@ type GenerateContentCommand struct {
 	*commands.BaseCommand
 	executionProvider commands.ExecutionProvider
 	statsRecorder     stats.Recorder
+	aiUsageService    aiusage.Service
 }
 
-func NewGenerateContentCommand(executionProvider commands.ExecutionProvider, statsRecorder stats.Recorder) *GenerateContentCommand {
+func NewGenerateContentCommand(executionProvider commands.ExecutionProvider, statsRecorder stats.Recorder, aiUsageService aiusage.Service) *GenerateContentCommand {
 	return &GenerateContentCommand{
 		BaseCommand: commands.NewBaseCommand(
 			"generate_content",
@@ -30,6 +32,7 @@ func NewGenerateContentCommand(executionProvider commands.ExecutionProvider, sta
 		).WithRetry(3),
 		executionProvider: executionProvider,
 		statsRecorder:     statsRecorder,
+		aiUsageService:    aiUsageService,
 	}
 }
 
@@ -57,12 +60,35 @@ func (c *GenerateContentCommand) Execute(ctx *pipeline.Context) error {
 	startTime := time.Now()
 
 	result, err := aiClient.GenerateArticle(ctx.Context(), ctx.Generation.SystemPrompt, ctx.Generation.UserPrompt)
+	durationMs := time.Since(startTime).Milliseconds()
+
+	// Log AI usage regardless of success/failure
+	if c.aiUsageService != nil {
+		var usage ai.Usage
+		if result != nil {
+			usage = result.Usage
+		}
+		_ = c.aiUsageService.LogFromResult(
+			ctx.Context(),
+			ctx.Job.SiteID,
+			aiusage.OperationArticleGeneration,
+			aiClient,
+			usage,
+			durationMs,
+			err,
+			map[string]interface{}{
+				"job_id":       ctx.Job.ID,
+				"execution_id": ctx.Execution.Execution.ID,
+			},
+		)
+	}
+
 	if err != nil {
 		_ = c.statsRecorder.RecordArticleFailed(ctx.Context(), ctx.Job.SiteID)
 		return fault.WrapError(err, fault.ErrCodeAIGenerationFailed, c.Name(), "AI generation failed")
 	}
 
-	generationTime := int(time.Since(startTime).Milliseconds())
+	generationTime := int(durationMs)
 
 	ctx.Generation.GeneratedTitle = result.Title
 	ctx.Generation.GeneratedExcerpt = result.Excerpt
