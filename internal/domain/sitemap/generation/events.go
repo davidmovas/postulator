@@ -23,6 +23,10 @@ const (
 	EventNodeCompleted  events.EventType = "pagegeneration.node.completed"
 	EventNodeFailed     events.EventType = "pagegeneration.node.failed"
 	EventNodeSkipped    events.EventType = "pagegeneration.node.skipped"
+
+	// Linking phase events
+	EventLinkingPhaseStarted   events.EventType = "pagegeneration.linking.started"
+	EventLinkingPhaseCompleted events.EventType = "pagegeneration.linking.completed"
 )
 
 type TaskStartedEvent struct {
@@ -256,5 +260,37 @@ func (e *EventEmitter) EmitNodeSkipped(ctx context.Context, taskID string, nodeI
 		NodeID: nodeID,
 		Title:  title,
 		Reason: reason,
+	}))
+}
+
+// Linking phase events
+
+type LinkingPhaseStartedEvent struct {
+	TaskID string
+	Phase  string // "suggesting" or "applying"
+}
+
+type LinkingPhaseCompletedEvent struct {
+	TaskID       string
+	Phase        string
+	LinksCreated int
+	LinksApplied int
+	LinksFailed  int
+}
+
+func (e *EventEmitter) EmitLinkingPhaseStarted(ctx context.Context, taskID, phase string) {
+	e.eventBus.Publish(ctx, events.NewEvent(EventLinkingPhaseStarted, LinkingPhaseStartedEvent{
+		TaskID: taskID,
+		Phase:  phase,
+	}))
+}
+
+func (e *EventEmitter) EmitLinkingPhaseCompleted(ctx context.Context, taskID, phase string, created, applied, failed int) {
+	e.eventBus.Publish(ctx, events.NewEvent(EventLinkingPhaseCompleted, LinkingPhaseCompletedEvent{
+		TaskID:       taskID,
+		Phase:        phase,
+		LinksCreated: created,
+		LinksApplied: applied,
+		LinksFailed:  failed,
 	}))
 }

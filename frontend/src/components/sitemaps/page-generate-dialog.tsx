@@ -34,6 +34,7 @@ import {
     ChevronDown,
     ChevronUp,
     Link2,
+    Globe,
 } from "lucide-react";
 import { sitemapService } from "@/services/sitemaps";
 import { providerService } from "@/services/providers";
@@ -44,11 +45,13 @@ import {
     PublishAs,
     WritingStyle,
     ContentTone,
+    AutoLinkMode,
 } from "@/models/sitemaps";
-import { Provider } from "@/models/providers";
+import { Provider, Model } from "@/models/providers";
 import { Prompt } from "@/models/prompts";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
     Collapsible,
     CollapsibleContent,
@@ -96,10 +99,19 @@ export function PageGenerateDialog({
     const [writingStyle, setWritingStyle] = useState<WritingStyle>("professional");
     const [contentTone, setContentTone] = useState<ContentTone>("informative");
     const [customInstructions, setCustomInstructions] = useState("");
+    const [useWebSearch, setUseWebSearch] = useState(false);
     const [includeLinks, setIncludeLinks] = useState(false);
+    const [autoLinkMode, setAutoLinkMode] = useState<AutoLinkMode>("none");
+    const [maxIncomingLinks, setMaxIncomingLinks] = useState(5);
+    const [maxOutgoingLinks, setMaxOutgoingLinks] = useState(3);
+    const [linkSuggestPromptId, setLinkSuggestPromptId] = useState<number | null>(null);
+    const [linkApplyPromptId, setLinkApplyPromptId] = useState<number | null>(null);
 
     const [providers, setProviders] = useState<Provider[]>([]);
     const [prompts, setPrompts] = useState<Prompt[]>([]);
+    const [linkSuggestPrompts, setLinkSuggestPrompts] = useState<Prompt[]>([]);
+    const [linkApplyPrompts, setLinkApplyPrompts] = useState<Prompt[]>([]);
+    const [modelsMap, setModelsMap] = useState<Record<string, Model[]>>({});
     const [isLoadingData, setIsLoadingData] = useState(true);
     const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -113,6 +125,20 @@ export function PageGenerateDialog({
             (n) => !n.isRoot && n.generationStatus !== "generated"
         );
     }, [selectedNodes, allNodes]);
+
+    // Get selected provider and check if model supports web search
+    const selectedProvider = useMemo(() => {
+        if (!providerId || providers.length === 0) return null;
+        return providers.find(p => p.id === providerId) || null;
+    }, [providerId, providers]);
+
+    const selectedModelInfo = useMemo(() => {
+        if (!selectedProvider) return null;
+        const models = modelsMap[selectedProvider.type] || [];
+        return models.find(m => m.id === selectedProvider.model) || null;
+    }, [selectedProvider, modelsMap]);
+
+    const supportsWebSearch = selectedModelInfo?.supportsWebSearch ?? false;
 
     useEffect(() => {
         if (open) {
@@ -155,18 +181,45 @@ export function PageGenerateDialog({
     const loadData = async () => {
         setIsLoadingData(true);
         try {
-            const [providersData, promptsData] = await Promise.all([
+            const [providersData, promptsData, linkSuggestData, linkApplyData] = await Promise.all([
                 providerService.listProviders(),
                 promptService.listPromptsByCategory("page_gen"),
+                promptService.listPromptsByCategory("link_suggest"),
+                promptService.listPromptsByCategory("link_apply"),
             ]);
 
             const activeProviders = providersData.filter((p) => p.isActive);
             setProviders(activeProviders);
             setPrompts(promptsData);
+            setLinkSuggestPrompts(linkSuggestData);
+            setLinkApplyPrompts(linkApplyData);
 
             if (activeProviders.length > 0 && !providerId) {
                 setProviderId(activeProviders[0].id);
             }
+
+            // Set default link prompts (first builtin or first available)
+            if (linkSuggestData.length > 0 && !linkSuggestPromptId) {
+                const builtin = linkSuggestData.find(p => p.isBuiltin);
+                setLinkSuggestPromptId(builtin?.id || linkSuggestData[0].id);
+            }
+            if (linkApplyData.length > 0 && !linkApplyPromptId) {
+                const builtin = linkApplyData.find(p => p.isBuiltin);
+                setLinkApplyPromptId(builtin?.id || linkApplyData[0].id);
+            }
+
+            // Load models for all unique provider types (for web search support check)
+            const uniqueTypes = [...new Set(activeProviders.map(p => p.type))];
+            const modelsPromises = uniqueTypes.map(async (type) => {
+                const models = await providerService.getAvailableModels(type);
+                return { type, models };
+            });
+            const modelsResults = await Promise.all(modelsPromises);
+            const newModelsMap: Record<string, Model[]> = {};
+            modelsResults.forEach(({ type, models }) => {
+                newModelsMap[type] = models;
+            });
+            setModelsMap(newModelsMap);
         } catch (err) {
             console.error("Failed to load data:", err);
         } finally {
@@ -209,7 +262,15 @@ export function PageGenerateDialog({
                     writingStyle,
                     contentTone,
                     customInstructions: customInstructions || undefined,
-                    includeLinks: includeLinks || undefined,
+                    useWebSearch: supportsWebSearch && useWebSearch,
+                    // Only include approved links if autoLinkMode is none
+                    includeLinks: autoLinkMode === "none" ? includeLinks : undefined,
+                    autoLinkMode,
+                    autoLinkProviderId: autoLinkMode !== "none" ? providerId : undefined,
+                    autoLinkSuggestPromptId: autoLinkMode !== "none" ? linkSuggestPromptId ?? undefined : undefined,
+                    autoLinkApplyPromptId: autoLinkMode === "after" ? linkApplyPromptId ?? undefined : undefined,
+                    maxIncomingLinks: autoLinkMode !== "none" ? maxIncomingLinks : undefined,
+                    maxOutgoingLinks: autoLinkMode !== "none" ? maxOutgoingLinks : undefined,
                 },
             });
 
@@ -321,7 +382,11 @@ export function PageGenerateDialog({
                                         <Label>AI Provider *</Label>
                                         <Select
                                             value={providerId?.toString() || ""}
-                                            onValueChange={(v) => setProviderId(Number(v))}
+                                            onValueChange={(v) => {
+                                                setProviderId(Number(v));
+                                                // Reset web search when provider changes
+                                                setUseWebSearch(false);
+                                            }}
                                         >
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Select provider" />
@@ -355,6 +420,29 @@ export function PageGenerateDialog({
                                         </Select>
                                     </div>
                                 </div>
+
+                                {/* Web Search Option */}
+                                {supportsWebSearch && (
+                                    <div className="flex items-center space-x-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                                        <Checkbox
+                                            id="useWebSearch"
+                                            checked={useWebSearch}
+                                            onCheckedChange={(checked) => setUseWebSearch(checked === true)}
+                                        />
+                                        <div className="flex-1">
+                                            <Label
+                                                htmlFor="useWebSearch"
+                                                className="flex items-center gap-2 cursor-pointer"
+                                            >
+                                                <Globe className="h-4 w-4 text-blue-500" />
+                                                <span className="font-medium">Enable Web Search</span>
+                                            </Label>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                Allow the AI to search the web for up-to-date information
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
@@ -437,31 +525,147 @@ export function PageGenerateDialog({
                                     </Select>
                                 </div>
 
-                                {/* Include Links Option */}
-                                <div className="flex items-center gap-3 py-2 px-3 rounded-md border bg-muted/30">
-                                    <Checkbox
-                                        id="includeLinks"
-                                        checked={includeLinks}
-                                        onCheckedChange={(checked) => setIncludeLinks(checked === true)}
-                                        disabled={!hasApprovedLinks}
-                                    />
-                                    <div className="flex-1">
-                                        <Label
-                                            htmlFor="includeLinks"
-                                            className={cn(
-                                                "flex items-center gap-2 cursor-pointer",
-                                                !hasApprovedLinks && "text-muted-foreground cursor-not-allowed"
-                                            )}
-                                        >
-                                            <Link2 className="h-4 w-4" />
-                                            Include Internal Links
-                                        </Label>
-                                        <p className="text-xs text-muted-foreground mt-0.5">
-                                            {hasApprovedLinks
-                                                ? "Embed approved internal links in generated content"
-                                                : "No approved links available (approve links in Links Mode first)"}
-                                        </p>
+                                {/* Auto-Link Mode Selection */}
+                                <div className="space-y-3 p-3 rounded-md border bg-muted/30">
+                                    <div className="flex items-center gap-2">
+                                        <Link2 className="h-4 w-4" />
+                                        <Label className="font-medium">Internal Linking</Label>
                                     </div>
+                                    <RadioGroup
+                                        value={autoLinkMode}
+                                        onValueChange={(v) => setAutoLinkMode(v as AutoLinkMode)}
+                                        className="space-y-2"
+                                    >
+                                        <div className="flex items-start gap-2">
+                                            <RadioGroupItem value="none" id="link-none" className="mt-1" />
+                                            <div className="flex-1">
+                                                <Label htmlFor="link-none" className="cursor-pointer font-normal">
+                                                    No automatic linking
+                                                </Label>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Generate content without internal links
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-start gap-2">
+                                            <RadioGroupItem value="before" id="link-before" className="mt-1" />
+                                            <div className="flex-1">
+                                                <Label htmlFor="link-before" className="cursor-pointer font-normal">
+                                                    Embed links during generation
+                                                </Label>
+                                                <p className="text-xs text-muted-foreground">
+                                                    AI suggests links before generation and embeds them in content
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-start gap-2">
+                                            <RadioGroupItem value="after" id="link-after" className="mt-1" />
+                                            <div className="flex-1">
+                                                <Label htmlFor="link-after" className="cursor-pointer font-normal">
+                                                    Apply links after generation
+                                                </Label>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Generate content first, then AI suggests and applies links to WordPress
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </RadioGroup>
+
+                                    {/* Link settings when auto-link mode is enabled */}
+                                    {autoLinkMode !== "none" && (
+                                        <div className="space-y-3 pt-2 border-t mt-3">
+                                            {/* Link Suggest Prompt */}
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">Link Suggestion Prompt</Label>
+                                                <Select
+                                                    value={linkSuggestPromptId?.toString() || ""}
+                                                    onValueChange={(v) => setLinkSuggestPromptId(Number(v))}
+                                                >
+                                                    <SelectTrigger className="h-8">
+                                                        <SelectValue placeholder="Select prompt..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {linkSuggestPrompts.map((p) => (
+                                                            <SelectItem key={p.id} value={p.id.toString()}>
+                                                                {p.name}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+
+                                            {/* Link Apply Prompt - only for "after" mode */}
+                                            {autoLinkMode === "after" && (
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs">Link Insertion Prompt</Label>
+                                                    <Select
+                                                        value={linkApplyPromptId?.toString() || ""}
+                                                        onValueChange={(v) => setLinkApplyPromptId(Number(v))}
+                                                    >
+                                                        <SelectTrigger className="h-8">
+                                                            <SelectValue placeholder="Select prompt..." />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {linkApplyPrompts.map((p) => (
+                                                                <SelectItem key={p.id} value={p.id.toString()}>
+                                                                    {p.name}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            )}
+
+                                            {/* Link limits */}
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs">Max Outgoing Links</Label>
+                                                    <Input
+                                                        type="number"
+                                                        min={0}
+                                                        max={20}
+                                                        value={maxOutgoingLinks}
+                                                        onChange={(e) => setMaxOutgoingLinks(Number(e.target.value))}
+                                                        className="h-8"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs">Max Incoming Links</Label>
+                                                    <Input
+                                                        type="number"
+                                                        min={0}
+                                                        max={20}
+                                                        value={maxIncomingLinks}
+                                                        onChange={(e) => setMaxIncomingLinks(Number(e.target.value))}
+                                                        className="h-8"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Include approved links checkbox - only show when autoLinkMode is none */}
+                                    {autoLinkMode === "none" && (
+                                        <div className="flex items-center gap-2 pt-2 border-t mt-3">
+                                            <Checkbox
+                                                id="includeLinks"
+                                                checked={includeLinks}
+                                                onCheckedChange={(checked) => setIncludeLinks(checked === true)}
+                                                disabled={!hasApprovedLinks}
+                                            />
+                                            <Label
+                                                htmlFor="includeLinks"
+                                                className={cn(
+                                                    "text-sm cursor-pointer",
+                                                    !hasApprovedLinks && "text-muted-foreground cursor-not-allowed"
+                                                )}
+                                            >
+                                                {hasApprovedLinks
+                                                    ? "Include pre-approved links from linking plan"
+                                                    : "No approved links available"}
+                                            </Label>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
@@ -539,10 +743,52 @@ export function PageGenerateDialog({
                             </div>
                         </div>
 
-                        {task.status === "running" && (
+                        {task.status === "running" && (!task.linkingPhase || task.linkingPhase === "none") && (
                             <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                                 <Loader2 className="h-4 w-4 animate-spin" />
                                 Generating content...
+                            </div>
+                        )}
+
+                        {task.status === "running" && task.linkingPhase === "suggesting" && (
+                            <div className="flex flex-col items-center gap-2 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                                <div className="flex items-center gap-2 text-sm text-blue-600">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <Link2 className="h-4 w-4" />
+                                    AI is suggesting internal links...
+                                </div>
+                                {task.linksCreated !== undefined && task.linksCreated > 0 && (
+                                    <div className="text-xs text-blue-500">
+                                        {task.linksCreated} links suggested so far
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {task.status === "running" && task.linkingPhase === "applying" && (
+                            <div className="flex flex-col items-center gap-2 p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                                <div className="flex items-center gap-2 text-sm text-purple-600">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <Link2 className="h-4 w-4" />
+                                    Applying links to WordPress...
+                                </div>
+                                {task.linksCreated !== undefined && task.linksCreated > 0 && (
+                                    <div className="flex items-center gap-3 text-xs">
+                                        <span className="text-purple-500">
+                                            {task.linksCreated} to apply
+                                        </span>
+                                        {task.linksApplied !== undefined && task.linksApplied > 0 && (
+                                            <span className="text-green-600">
+                                                {task.linksApplied} done
+                                            </span>
+                                        )}
+                                        {task.linksFailed !== undefined && task.linksFailed > 0 && (
+                                            <span className="text-red-500">
+                                                {task.linksFailed} failed
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -557,6 +803,25 @@ export function PageGenerateDialog({
                             <div className="flex flex-col items-center gap-2 py-4">
                                 <CheckCircle2 className="h-12 w-12 text-green-500" />
                                 <p className="font-medium">Generation completed!</p>
+                                {/* Show linking results if linking was performed */}
+                                {(task.linksCreated !== undefined && task.linksCreated > 0) && (
+                                    <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
+                                        <span className="flex items-center gap-1">
+                                            <Link2 className="h-4 w-4" />
+                                            {task.linksCreated} links suggested
+                                        </span>
+                                        {task.linksApplied !== undefined && task.linksApplied > 0 && (
+                                            <span className="text-green-600">
+                                                {task.linksApplied} applied
+                                            </span>
+                                        )}
+                                        {task.linksFailed !== undefined && task.linksFailed > 0 && (
+                                            <span className="text-red-600">
+                                                {task.linksFailed} failed
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         )}
 

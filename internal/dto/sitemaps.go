@@ -448,11 +448,18 @@ type HistoryState struct {
 // =========================================================================
 
 type ContentSettingsDTO struct {
-	WordCount          string `json:"wordCount"`          // e.g. "1000" or "800-1200"
-	WritingStyle       string `json:"writingStyle"`       // professional, casual, formal, friendly, technical
-	ContentTone        string `json:"contentTone"`        // informative, persuasive, educational, engaging, authoritative
-	CustomInstructions string `json:"customInstructions"` // Additional instructions
-	IncludeLinks       bool   `json:"includeLinks"`       // Include approved links from linking plan
+	WordCount               string `json:"wordCount"`                         // e.g. "1000" or "800-1200"
+	WritingStyle            string `json:"writingStyle"`                      // professional, casual, formal, friendly, technical
+	ContentTone             string `json:"contentTone"`                       // informative, persuasive, educational, engaging, authoritative
+	CustomInstructions      string `json:"customInstructions"`                // Additional instructions
+	UseWebSearch            bool   `json:"useWebSearch"`                      // Enable web search for AI generation
+	IncludeLinks            bool   `json:"includeLinks"`                      // Include approved links from linking plan
+	AutoLinkMode            string `json:"autoLinkMode,omitempty"`            // "none", "before", or "after"
+	AutoLinkProviderID      *int64 `json:"autoLinkProviderId,omitempty"`      // Provider for link suggestion
+	AutoLinkSuggestPromptID *int64 `json:"autoLinkSuggestPromptId,omitempty"` // Prompt for link suggestion (link_suggest)
+	AutoLinkApplyPromptID   *int64 `json:"autoLinkApplyPromptId,omitempty"`   // Prompt for link insertion (link_apply)
+	MaxIncomingLinks        int    `json:"maxIncomingLinks,omitempty"`        // Max incoming links per page
+	MaxOutgoingLinks        int    `json:"maxOutgoingLinks,omitempty"`        // Max outgoing links per page
 }
 
 // LinkTargetDTO represents a target page for internal linking during generation
@@ -487,6 +494,11 @@ type GenerationTaskResponse struct {
 	CompletedAt    *string              `json:"completedAt,omitempty"`
 	Error          *string              `json:"error,omitempty"`
 	Nodes          []GenerationNodeInfo `json:"nodes,omitempty"`
+	// Linking phase tracking
+	LinkingPhase string `json:"linkingPhase,omitempty"` // "none", "suggesting", "applying", "completed"
+	LinksCreated int    `json:"linksCreated,omitempty"` // Number of links suggested
+	LinksApplied int    `json:"linksApplied,omitempty"` // Number of links applied
+	LinksFailed  int    `json:"linksFailed,omitempty"`  // Number of links that failed to apply
 }
 
 type GenerationNodeInfo struct {

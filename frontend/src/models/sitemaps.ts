@@ -374,13 +374,22 @@ export type PublishAs = "draft" | "pending" | "publish";
 
 export type WritingStyle = "professional" | "casual" | "formal" | "friendly" | "technical";
 export type ContentTone = "informative" | "persuasive" | "educational" | "engaging" | "authoritative";
+export type AutoLinkMode = "none" | "before" | "after";
+export type LinkingPhase = "none" | "suggesting" | "applying" | "completed";
 
 export interface ContentSettings {
     wordCount: string; // e.g. "1000" or "800-1200"
     writingStyle: WritingStyle;
     contentTone: ContentTone;
     customInstructions?: string;
+    useWebSearch?: boolean; // Enable web search for AI generation
     includeLinks?: boolean; // Include approved links from linking plan
+    autoLinkMode?: AutoLinkMode; // Automatic link suggestion mode
+    autoLinkProviderId?: number; // Provider for link suggestion (defaults to content provider)
+    autoLinkSuggestPromptId?: number; // Prompt for link suggestion (link_suggest category)
+    autoLinkApplyPromptId?: number; // Prompt for link insertion (link_apply category)
+    maxIncomingLinks?: number; // Max incoming links per page (0 = no limit)
+    maxOutgoingLinks?: number; // Max outgoing links per page (0 = no limit)
 }
 
 export interface StartPageGenerationInput {
@@ -420,6 +429,11 @@ export interface GenerationTask {
     completedAt?: string;
     error?: string;
     nodes?: GenerationNodeInfo[];
+    // Linking phase tracking
+    linkingPhase?: LinkingPhase;
+    linksCreated?: number;
+    linksApplied?: number;
+    linksFailed?: number;
 }
 
 export interface DefaultPrompt {
@@ -454,6 +468,11 @@ export function mapGenerationTask(x: dto.GenerationTaskResponse): GenerationTask
             startedAt: n.startedAt || undefined,
             completedAt: n.completedAt || undefined,
         })),
+        // Linking phase tracking
+        linkingPhase: (x.linkingPhase as LinkingPhase) || undefined,
+        linksCreated: x.linksCreated || undefined,
+        linksApplied: x.linksApplied || undefined,
+        linksFailed: x.linksFailed || undefined,
     };
 }
 

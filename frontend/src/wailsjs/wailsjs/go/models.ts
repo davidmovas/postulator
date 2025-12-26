@@ -569,7 +569,14 @@ export namespace dto {
 	    writingStyle: string;
 	    contentTone: string;
 	    customInstructions: string;
+	    useWebSearch: boolean;
 	    includeLinks: boolean;
+	    autoLinkMode?: string;
+	    autoLinkProviderId?: number;
+	    autoLinkSuggestPromptId?: number;
+	    autoLinkApplyPromptId?: number;
+	    maxIncomingLinks?: number;
+	    maxOutgoingLinks?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new ContentSettingsDTO(source);
@@ -581,7 +588,14 @@ export namespace dto {
 	        this.writingStyle = source["writingStyle"];
 	        this.contentTone = source["contentTone"];
 	        this.customInstructions = source["customInstructions"];
+	        this.useWebSearch = source["useWebSearch"];
 	        this.includeLinks = source["includeLinks"];
+	        this.autoLinkMode = source["autoLinkMode"];
+	        this.autoLinkProviderId = source["autoLinkProviderId"];
+	        this.autoLinkSuggestPromptId = source["autoLinkSuggestPromptId"];
+	        this.autoLinkApplyPromptId = source["autoLinkApplyPromptId"];
+	        this.maxIncomingLinks = source["maxIncomingLinks"];
+	        this.maxOutgoingLinks = source["maxOutgoingLinks"];
 	    }
 	}
 	export class CreateLinkPlanRequest {
@@ -937,6 +951,10 @@ export namespace dto {
 	    completedAt?: string;
 	    error?: string;
 	    nodes?: GenerationNodeInfo[];
+	    linkingPhase?: string;
+	    linksCreated?: number;
+	    linksApplied?: number;
+	    linksFailed?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new GenerationTaskResponse(source);
@@ -956,6 +974,10 @@ export namespace dto {
 	        this.completedAt = source["completedAt"];
 	        this.error = source["error"];
 	        this.nodes = this.convertValues(source["nodes"], GenerationNodeInfo);
+	        this.linkingPhase = source["linkingPhase"];
+	        this.linksCreated = source["linksCreated"];
+	        this.linksApplied = source["linksApplied"];
+	        this.linksFailed = source["linksFailed"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

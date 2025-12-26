@@ -464,7 +464,14 @@ export const sitemapService = {
                 writingStyle: input.contentSettings.writingStyle,
                 contentTone: input.contentSettings.contentTone,
                 customInstructions: input.contentSettings.customInstructions || "",
+                useWebSearch: input.contentSettings.useWebSearch || false,
                 includeLinks: input.contentSettings.includeLinks || false,
+                autoLinkMode: input.contentSettings.autoLinkMode || "none",
+                autoLinkProviderId: input.contentSettings.autoLinkProviderId,
+                autoLinkSuggestPromptId: input.contentSettings.autoLinkSuggestPromptId,
+                autoLinkApplyPromptId: input.contentSettings.autoLinkApplyPromptId,
+                maxIncomingLinks: input.contentSettings.maxIncomingLinks || 0,
+                maxOutgoingLinks: input.contentSettings.maxOutgoingLinks || 0,
             }) : undefined,
         });
 

@@ -93,10 +93,16 @@ func (g *Generator) Generate(ctx context.Context, req GenerateRequest) (*Generat
 		return nil, fmt.Errorf("failed to build prompts: %w", err)
 	}
 
-	g.logger.Infof("Generating content for node %d (%s) with provider %s/%s, links=%d",
-		req.Node.ID, req.Node.Title, aiClient.GetProviderName(), aiClient.GetModelName(), len(req.LinkTargets))
+	// Prepare generation options
+	var opts *ai.GenerateArticleOptions
+	if req.ContentSettings != nil && req.ContentSettings.UseWebSearch {
+		opts = &ai.GenerateArticleOptions{UseWebSearch: true}
+	}
 
-	articleResult, err := aiClient.GenerateArticle(ctx, systemPrompt, userPrompt, nil)
+	g.logger.Infof("Generating content for node %d (%s) with provider %s/%s, links=%d, webSearch=%v",
+		req.Node.ID, req.Node.Title, aiClient.GetProviderName(), aiClient.GetModelName(), len(req.LinkTargets), opts != nil && opts.UseWebSearch)
+
+	articleResult, err := aiClient.GenerateArticle(ctx, systemPrompt, userPrompt, opts)
 	durationMs := time.Since(startTime).Milliseconds()
 
 	// Log AI usage regardless of success/failure

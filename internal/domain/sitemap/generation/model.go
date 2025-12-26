@@ -35,6 +35,16 @@ const (
 	PublishAsPublish PublishAs = "publish"
 )
 
+// LinkingPhase represents the current phase of automatic link processing
+type LinkingPhase string
+
+const (
+	LinkingPhaseNone       LinkingPhase = "none"       // No linking phase active
+	LinkingPhaseSuggesting LinkingPhase = "suggesting" // AI is suggesting links
+	LinkingPhaseApplying   LinkingPhase = "applying"   // Applying links to WordPress content
+	LinkingPhaseCompleted  LinkingPhase = "completed"  // Linking phase completed
+)
+
 type Task struct {
 	ID             string
 	SitemapID      int64
@@ -51,7 +61,12 @@ type Task struct {
 	StartedAt      time.Time
 	CompletedAt    *time.Time
 	Error          *string
-	mu             sync.RWMutex
+	// Linking phase tracking
+	LinkingPhase LinkingPhase
+	LinksCreated int
+	LinksApplied int
+	LinksFailed  int
+	mu           sync.RWMutex
 }
 
 type TaskNode struct {
@@ -102,12 +117,28 @@ const (
 	ContentToneAuthoritative ContentTone = "authoritative"
 )
 
+// AutoLinkMode determines when/how to automatically suggest and apply internal links
+type AutoLinkMode string
+
+const (
+	AutoLinkModeNone   AutoLinkMode = "none"   // No automatic linking (default)
+	AutoLinkModeBefore AutoLinkMode = "before" // Suggest links before generation, embed during content creation
+	AutoLinkModeAfter  AutoLinkMode = "after"  // Generate content first, then suggest and apply links to WP
+)
+
 type ContentSettings struct {
-	WordCount          string       `json:"wordCount"`          // "1000" or "800-1200"
-	WritingStyle       WritingStyle `json:"writingStyle"`       // professional, casual, etc.
-	ContentTone        ContentTone  `json:"contentTone"`        // informative, persuasive, etc.
-	CustomInstructions string       `json:"customInstructions"` // Additional instructions
-	IncludeLinks       bool         `json:"includeLinks"`       // Include approved links from linking plan
+	WordCount               string       `json:"wordCount"`                         // "1000" or "800-1200"
+	WritingStyle            WritingStyle `json:"writingStyle"`                      // professional, casual, etc.
+	ContentTone             ContentTone  `json:"contentTone"`                       // informative, persuasive, etc.
+	CustomInstructions      string       `json:"customInstructions"`                // Additional instructions
+	UseWebSearch            bool         `json:"useWebSearch"`                      // Enable web search for AI generation
+	IncludeLinks            bool         `json:"includeLinks"`                      // Include approved links from linking plan
+	AutoLinkMode            AutoLinkMode `json:"autoLinkMode"`                      // Automatic link suggestion mode
+	AutoLinkProviderID      *int64       `json:"autoLinkProviderId,omitempty"`      // Provider for link suggestion (defaults to content provider)
+	AutoLinkSuggestPromptID *int64       `json:"autoLinkSuggestPromptId,omitempty"` // Prompt for link suggestion (link_suggest category)
+	AutoLinkApplyPromptID   *int64       `json:"autoLinkApplyPromptId,omitempty"`   // Prompt for link insertion (link_apply category)
+	MaxIncomingLinks        int          `json:"maxIncomingLinks"`                  // Max incoming links per page (0 = no limit)
+	MaxOutgoingLinks        int          `json:"maxOutgoingLinks"`                  // Max outgoing links per page (0 = no limit)
 }
 
 // LinkTarget represents a target page for internal linking during content generation
@@ -183,6 +214,32 @@ func (t *Task) Complete() {
 	} else {
 		t.Status = TaskStatusCompleted
 	}
+}
+
+func (t *Task) SetLinkingPhase(phase LinkingPhase) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.LinkingPhase = phase
+}
+
+func (t *Task) GetLinkingPhase() LinkingPhase {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.LinkingPhase
+}
+
+func (t *Task) SetLinkingResults(created, applied, failed int) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.LinksCreated = created
+	t.LinksApplied = applied
+	t.LinksFailed = failed
+}
+
+func (t *Task) GetLinkingResults() (created, applied, failed int) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.LinksCreated, t.LinksApplied, t.LinksFailed
 }
 
 func (tn *TaskNode) SetStatus(status NodeStatus) {

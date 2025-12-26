@@ -160,9 +160,9 @@ export function CreatePromptModal({ open, onOpenChange, onSuccess }: CreatePromp
                                 ...prev,
                                 systemPrompt: e.target.value
                             }))}
-                            rows={8}
+                            rows={12}
                             disabled={isLoading}
-                            className="resize-none font-mono text-sm"
+                            className="resize-y min-h-[200px] font-mono text-sm"
                         />
                     </div>
 
@@ -180,9 +180,9 @@ export function CreatePromptModal({ open, onOpenChange, onSuccess }: CreatePromp
                                 ...prev,
                                 userPrompt: e.target.value
                             }))}
-                            rows={8}
+                            rows={12}
                             disabled={isLoading}
-                            className="resize-none font-mono text-sm"
+                            className="resize-y min-h-[200px] font-mono text-sm"
                         />
                     </div>
 
