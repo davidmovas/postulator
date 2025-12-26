@@ -440,7 +440,7 @@ func (c *OpenAIClient) GenerateLinkSuggestions(ctx context.Context, request *Lin
 	}
 
 	choice := chat.Choices[0]
-	finishReason := string(choice.FinishReason)
+	finishReason := choice.FinishReason
 
 	// Check for problematic finish reasons
 	if finishReason == "length" {

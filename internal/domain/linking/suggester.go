@@ -67,7 +67,7 @@ type SuggestResult struct {
 	Explanation  string
 }
 
-const maxNodesPerBatch = 15 // Limit to prevent token overflow in AI response
+const maxNodesPerBatch = 25 // Limit to prevent token overflow in AI response
 
 func (s *Suggester) Suggest(ctx context.Context, config SuggestConfig) (*SuggestResult, error) {
 	startTime := time.Now()
@@ -316,21 +316,23 @@ func (s *Suggester) buildPrompts(ctx context.Context, config SuggestConfig, node
 		s.logger.Warn(fmt.Sprintf("Failed to render custom prompt, trying builtin: %v", err))
 	}
 
-	// Try to get the builtin prompt for link_suggest category
+	// Get the builtin prompt for link_suggest category
 	promptsByCategory, err := s.promptSvc.ListPromptsByCategory(ctx, entities.PromptCategoryLinkSuggest)
-	if err == nil {
-		for _, p := range promptsByCategory {
-			if p.IsBuiltin {
-				sys := s.renderTemplate(p.SystemPrompt, placeholders)
-				usr := s.renderTemplate(p.UserPrompt, placeholders)
-				return sys, usr
-			}
+	if err != nil {
+		s.logger.Warn(fmt.Sprintf("Failed to get prompts for link_suggest category: %v", err))
+		return "", ""
+	}
+
+	for _, p := range promptsByCategory {
+		if p.IsBuiltin {
+			sys := s.renderTemplate(p.SystemPrompt, placeholders)
+			usr := s.renderTemplate(p.UserPrompt, placeholders)
+			return sys, usr
 		}
 	}
 
-	// Fall back to hardcoded default
-	s.logger.Warn("No builtin prompt found for link_suggest, using hardcoded default")
-	return s.buildDefaultPrompts(config, nodes, outgoing, incoming)
+	s.logger.Warn("No builtin prompt found for link_suggest category")
+	return "", ""
 }
 
 // renderTemplate replaces {{placeholder}} with values
@@ -343,6 +345,7 @@ func (s *Suggester) renderTemplate(template string, placeholders map[string]stri
 }
 
 func (s *Suggester) buildPlaceholders(config SuggestConfig, nodes []*entities.SitemapNode, outgoing, incoming map[int64]int) map[string]string {
+	// Build flat nodes info (kept for backward compatibility)
 	var nodesInfo strings.Builder
 	for _, node := range nodes {
 		nodesInfo.WriteString(fmt.Sprintf("[ID:%d] \"%s\" /%s", node.ID, node.Title, node.Slug))
@@ -354,6 +357,14 @@ func (s *Suggester) buildPlaceholders(config SuggestConfig, nodes []*entities.Si
 			nodesInfo.WriteString(fmt.Sprintf(" | keywords: %s", strings.Join(kw, ", ")))
 		}
 		nodesInfo.WriteString(fmt.Sprintf(" | links: %d→ %d←\n", outgoing[node.ID], incoming[node.ID]))
+	}
+
+	// Build hierarchical tree representation
+	hierarchyTree := s.buildHierarchyTree(nodes, outgoing, incoming)
+
+	// DEBUG: Print hierarchy tree
+	if hierarchyTree != "" {
+		fmt.Printf("\n=== HIERARCHY TREE DEBUG ===\n%s=== END HIERARCHY TREE ===\n\n", hierarchyTree)
 	}
 
 	// Build constraints section
@@ -377,6 +388,7 @@ func (s *Suggester) buildPlaceholders(config SuggestConfig, nodes []*entities.Si
 	placeholders := map[string]string{
 		"nodes_count":    fmt.Sprintf("%d", len(nodes)),
 		"nodes_info":     nodesInfo.String(),
+		"hierarchy_tree": hierarchyTree,
 		"constraints":    constraints.String(),
 		"feedback":       feedback,
 		"max_incoming":   fmt.Sprintf("%d", config.MaxIncoming),
@@ -387,57 +399,109 @@ func (s *Suggester) buildPlaceholders(config SuggestConfig, nodes []*entities.Si
 	return placeholders
 }
 
-func (s *Suggester) buildDefaultPrompts(config SuggestConfig, nodes []*entities.SitemapNode, outgoing, incoming map[int64]int) (system, user string) {
-	system = `You are an internal linking strategist for websites.
+// buildHierarchyTree creates a visual tree representation of the site structure
+func (s *Suggester) buildHierarchyTree(nodes []*entities.SitemapNode, outgoing, incoming map[int64]int) string {
+	if len(nodes) == 0 {
+		return ""
+	}
 
-TASK: Suggest links between pages to improve site structure and SEO.
+	// Build a map of nodes by ID for quick lookup
+	nodeMap := make(map[int64]*entities.SitemapNode)
+	for _, node := range nodes {
+		nodeMap[node.ID] = node
+	}
 
-GOALS (priority order):
-1. Connect semantically related pages (same topic, complementary content)
-2. Link from high-content pages to low-visibility pages
-3. Create logical navigation paths for users
-4. Balance link distribution (avoid orphan pages with no links)
-
-RULES:
-- Only suggest NEW links (respect existing outgoing/incoming counts shown)
-- One page should not link to another more than once
-- Anchor text should describe the target page naturally, not generic like "click here"
-- If anchor text is obvious from context, you can skip it
-
-OUTPUT: Return suggested links with sourceId, targetId, and optional anchorText.`
-
-	var sb strings.Builder
-	sb.WriteString("PAGES:\n")
+	// Build children map
+	childrenMap := make(map[int64][]*entities.SitemapNode)
+	var roots []*entities.SitemapNode
 
 	for _, node := range nodes {
-		sb.WriteString(fmt.Sprintf("[ID:%d] \"%s\" /%s", node.ID, node.Title, node.Slug))
-		if len(node.Keywords) > 0 {
-			kw := node.Keywords
-			if len(kw) > 5 {
-				kw = kw[:5]
+		if node.ParentID == nil || nodeMap[*node.ParentID] == nil {
+			// No parent or parent not in current batch - treat as root
+			roots = append(roots, node)
+		} else {
+			childrenMap[*node.ParentID] = append(childrenMap[*node.ParentID], node)
+		}
+	}
+
+	// Sort roots by position
+	sortNodesByPosition(roots)
+
+	// Sort all children by position
+	for parentID := range childrenMap {
+		sortNodesByPosition(childrenMap[parentID])
+	}
+
+	// Build the tree string
+	var sb strings.Builder
+	sb.WriteString("SITE HIERARCHY:\n")
+
+	for i, root := range roots {
+		isLast := i == len(roots)-1
+		s.writeTreeNode(&sb, root, "", isLast, childrenMap, outgoing, incoming)
+	}
+
+	return sb.String()
+}
+
+func sortNodesByPosition(nodes []*entities.SitemapNode) {
+	for i := 0; i < len(nodes)-1; i++ {
+		for j := i + 1; j < len(nodes); j++ {
+			if nodes[i].Position > nodes[j].Position {
+				nodes[i], nodes[j] = nodes[j], nodes[i]
 			}
-			sb.WriteString(fmt.Sprintf(" | keywords: %s", strings.Join(kw, ", ")))
-		}
-		sb.WriteString(fmt.Sprintf(" | links: %d→ %d←\n", outgoing[node.ID], incoming[node.ID]))
-	}
-
-	if config.MaxIncoming > 0 || config.MaxOutgoing > 0 {
-		sb.WriteString("\nCONSTRAINTS:\n")
-		if config.MaxOutgoing > 0 {
-			sb.WriteString(fmt.Sprintf("- Max %d outgoing links per page\n", config.MaxOutgoing))
-		}
-		if config.MaxIncoming > 0 {
-			sb.WriteString(fmt.Sprintf("- Max %d incoming links per page\n", config.MaxIncoming))
 		}
 	}
+}
 
-	if config.Feedback != "" {
-		sb.WriteString(fmt.Sprintf("\nUSER INSTRUCTIONS: %s\n", config.Feedback))
+func (s *Suggester) writeTreeNode(
+	sb *strings.Builder,
+	node *entities.SitemapNode,
+	prefix string,
+	isLast bool,
+	childrenMap map[int64][]*entities.SitemapNode,
+	outgoing, incoming map[int64]int,
+) {
+	// Choose the appropriate connector
+	connector := "├── "
+	if isLast {
+		connector = "└── "
 	}
 
-	sb.WriteString("\nSuggest links that make sense semantically. Use exact page IDs.")
+	// Write the node line
+	sb.WriteString(prefix)
+	sb.WriteString(connector)
+	sb.WriteString(fmt.Sprintf("[ID:%d] \"%s\" /%s", node.ID, node.Title, node.Slug))
 
-	return system, sb.String()
+	// Add keywords if present
+	if len(node.Keywords) > 0 {
+		kw := node.Keywords
+		if len(kw) > 3 {
+			kw = kw[:3]
+		}
+		sb.WriteString(fmt.Sprintf(" (keywords: %s)", strings.Join(kw, ", ")))
+	}
+
+	// Add link counts
+	sb.WriteString(fmt.Sprintf(" [%d→ %d←]", outgoing[node.ID], incoming[node.ID]))
+	sb.WriteString("\n")
+
+	// Process children
+	children := childrenMap[node.ID]
+	if len(children) > 0 {
+		// Choose the appropriate prefix for children
+		childPrefix := prefix
+		if isLast {
+			childPrefix += "    "
+		} else {
+			childPrefix += "│   "
+		}
+
+		for i, child := range children {
+			childIsLast := i == len(children)-1
+			s.writeTreeNode(sb, child, childPrefix, childIsLast, childrenMap, outgoing, incoming)
+		}
+	}
 }
 
 func (s *Suggester) buildAINodes(nodes []*entities.SitemapNode, outgoing, incoming map[int64]int, existingLinks []*PlannedLink) []ai.LinkSuggestionNode {
