@@ -20,8 +20,9 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Loader2, Sparkles } from "lucide-react";
-import { Provider } from "@/models/providers";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2, Sparkles, Globe } from "lucide-react";
+import { Provider, Model } from "@/models/providers";
 import { Prompt } from "@/models/prompts";
 import { Topic } from "@/models/topics";
 import { GenerateContentResult } from "@/models/articles";
@@ -52,6 +53,7 @@ export function AIGenerateModal({
     const [providers, setProviders] = useState<Provider[] | null>(null);
     const [prompts, setPrompts] = useState<Prompt[] | null>(null);
     const [topics, setTopics] = useState<Topic[] | null>(null);
+    const [modelsMap, setModelsMap] = useState<Record<string, Model[]>>({});
 
     const [selectedProviderId, setSelectedProviderId] = useState<string>("");
     const [selectedPromptId, setSelectedPromptId] = useState<string>("");
@@ -59,6 +61,7 @@ export function AIGenerateModal({
     const [selectedTopicId, setSelectedTopicId] = useState<string>("");
     const [customTopicTitle, setCustomTopicTitle] = useState("");
     const [placeholderValues, setPlaceholderValues] = useState<Record<string, string>>({});
+    const [useWebSearch, setUseWebSearch] = useState(false);
 
     const [isLoading, setIsLoading] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -84,6 +87,19 @@ export function AIGenerateModal({
             setProviders(providersData);
             setPrompts(promptsData);
             setTopics(topicsData);
+
+            // Load models for all unique provider types
+            const uniqueTypes = [...new Set(providersData.map(p => p.type))];
+            const modelsPromises = uniqueTypes.map(async (type) => {
+                const models = await providerService.getAvailableModels(type);
+                return { type, models };
+            });
+            const modelsResults = await Promise.all(modelsPromises);
+            const newModelsMap: Record<string, Model[]> = {};
+            modelsResults.forEach(({ type, models }) => {
+                newModelsMap[type] = models;
+            });
+            setModelsMap(newModelsMap);
         } catch (err) {
             setError("Failed to load data");
             console.error(err);
@@ -91,6 +107,20 @@ export function AIGenerateModal({
             setIsLoading(false);
         }
     };
+
+    // Get selected provider and its model info
+    const selectedProvider = useMemo(() => {
+        if (!selectedProviderId || !providers) return null;
+        return providers.find(p => p.id.toString() === selectedProviderId) || null;
+    }, [selectedProviderId, providers]);
+
+    const selectedModelInfo = useMemo(() => {
+        if (!selectedProvider) return null;
+        const models = modelsMap[selectedProvider.type] || [];
+        return models.find(m => m.id === selectedProvider.model) || null;
+    }, [selectedProvider, modelsMap]);
+
+    const supportsWebSearch = selectedModelInfo?.supportsWebSearch ?? false;
 
     // Get placeholders from selected prompt
     const selectedPrompt = useMemo(() => {
@@ -115,9 +145,17 @@ export function AIGenerateModal({
         setSelectedTopicId("");
         setCustomTopicTitle("");
         setPlaceholderValues({});
+        setUseWebSearch(false);
         setError(null);
         onOpenChange(false);
     }, [onOpenChange]);
+
+    // Reset web search when provider changes and doesn't support it
+    const handleProviderChange = useCallback((providerId: string) => {
+        setSelectedProviderId(providerId);
+        // Reset web search - will be enabled again if user wants and model supports it
+        setUseWebSearch(false);
+    }, []);
 
     const updatePlaceholderValue = (key: string, value: string) => {
         setPlaceholderValues(prev => ({ ...prev, [key]: value }));
@@ -148,6 +186,7 @@ export function AIGenerateModal({
                 topicId: topicMode === "existing" ? parseInt(selectedTopicId) : undefined,
                 customTopicTitle: topicMode === "custom" ? customTopicTitle.trim() : undefined,
                 placeholderValues,
+                useWebSearch: supportsWebSearch && useWebSearch,
             };
 
             const result = await articleService.generateContent(input);
@@ -194,7 +233,7 @@ export function AIGenerateModal({
                             ) : (
                                 <Select
                                     value={selectedProviderId}
-                                    onValueChange={setSelectedProviderId}
+                                    onValueChange={handleProviderChange}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select a provider" />
@@ -212,6 +251,29 @@ export function AIGenerateModal({
                                 </Select>
                             )}
                         </div>
+
+                        {/* Web Search Option */}
+                        {supportsWebSearch && (
+                            <div className="flex items-center space-x-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                                <Checkbox
+                                    id="useWebSearch"
+                                    checked={useWebSearch}
+                                    onCheckedChange={(checked) => setUseWebSearch(checked === true)}
+                                />
+                                <div className="flex-1">
+                                    <Label
+                                        htmlFor="useWebSearch"
+                                        className="flex items-center gap-2 cursor-pointer"
+                                    >
+                                        <Globe className="h-4 w-4 text-blue-500" />
+                                        <span className="font-medium">Enable Web Search</span>
+                                    </Label>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Allow the AI to search the web for up-to-date information
+                                    </p>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Prompt Selection */}
                         <div className="space-y-2">

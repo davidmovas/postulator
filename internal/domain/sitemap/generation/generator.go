@@ -96,7 +96,7 @@ func (g *Generator) Generate(ctx context.Context, req GenerateRequest) (*Generat
 	g.logger.Infof("Generating content for node %d (%s) with provider %s/%s, links=%d",
 		req.Node.ID, req.Node.Title, aiClient.GetProviderName(), aiClient.GetModelName(), len(req.LinkTargets))
 
-	articleResult, err := aiClient.GenerateArticle(ctx, systemPrompt, userPrompt)
+	articleResult, err := aiClient.GenerateArticle(ctx, systemPrompt, userPrompt, nil)
 	durationMs := time.Since(startTime).Milliseconds()
 
 	// Log AI usage regardless of success/failure

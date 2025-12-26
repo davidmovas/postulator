@@ -12,7 +12,7 @@ import { Provider, ProviderUpdateInput } from "@/models/providers";
 import { useApiCall } from "@/hooks/use-api-call";
 import { useProviderModels } from "@/hooks/use-provider-models";
 import { providerService } from "@/services/providers";
-import { Cpu, DollarSign, Hash } from "lucide-react";
+import { Cpu, DollarSign, Hash, Globe } from "lucide-react";
 import { PROVIDER_TYPES } from "@/constants/providers";
 
 interface EditProviderModalProps {
@@ -242,6 +242,18 @@ export function EditProviderModal({ open, onOpenChange, provider, onSuccess }: E
                                     </Badge>
                                 </div>
                             </div>
+
+                            {selectedModelInfo.supportsWebSearch && (
+                                <div className="flex items-center gap-2 pt-2 border-t">
+                                    <Globe className="h-4 w-4 text-blue-500" />
+                                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                                        Web Search
+                                    </Badge>
+                                    <span className="text-xs text-muted-foreground">
+                                        This model can search the web for real-time information
+                                    </span>
+                                </div>
+                            )}
                         </div>
                     )}
 

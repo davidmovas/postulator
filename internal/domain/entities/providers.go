@@ -35,4 +35,6 @@ type Model struct {
 	UsesCompletionTokens bool
 	// IsReasoningModel indicates models that don't support temperature (o1, o3, gpt-5 series)
 	IsReasoningModel bool
+	// SupportsWebSearch indicates if the model supports web search tool
+	SupportsWebSearch bool
 }

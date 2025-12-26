@@ -779,6 +779,7 @@ export namespace dto {
 	    topicId?: number;
 	    customTopicTitle: string;
 	    placeholderValues: Record<string, string>;
+	    useWebSearch: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new GenerateContentInput(source);
@@ -792,6 +793,7 @@ export namespace dto {
 	        this.topicId = source["topicId"];
 	        this.customTopicTitle = source["customTopicTitle"];
 	        this.placeholderValues = source["placeholderValues"];
+	        this.useWebSearch = source["useWebSearch"];
 	    }
 	}
 	export class GenerateContentResult {
@@ -1479,6 +1481,7 @@ export namespace dto {
 	    rpm: number;
 	    tpm: number;
 	    usesCompletionTokens: boolean;
+	    supportsWebSearch: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Model(source);
@@ -1496,6 +1499,7 @@ export namespace dto {
 	        this.rpm = source["rpm"];
 	        this.tpm = source["tpm"];
 	        this.usesCompletionTokens = source["usesCompletionTokens"];
+	        this.supportsWebSearch = source["supportsWebSearch"];
 	    }
 	}
 	export class MoveNodeRequest {

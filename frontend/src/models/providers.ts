@@ -34,6 +34,7 @@ export interface Model {
     rpm: number;
     tpm: number;
     usesCompletionTokens: boolean;
+    supportsWebSearch: boolean;
 }
 
 export function mapProvider(x: dto.Provider): Provider {
@@ -61,5 +62,6 @@ export function mapModel(x: dto.Model): Model {
         rpm: x.rpm,
         tpm: x.tpm,
         usesCompletionTokens: x.usesCompletionTokens,
+        supportsWebSearch: x.supportsWebSearch,
     };
 }

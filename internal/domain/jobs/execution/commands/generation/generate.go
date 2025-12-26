@@ -59,7 +59,7 @@ func (c *GenerateContentCommand) Execute(ctx *pipeline.Context) error {
 
 	startTime := time.Now()
 
-	result, err := aiClient.GenerateArticle(ctx.Context(), ctx.Generation.SystemPrompt, ctx.Generation.UserPrompt)
+	result, err := aiClient.GenerateArticle(ctx.Context(), ctx.Generation.SystemPrompt, ctx.Generation.UserPrompt, nil)
 	durationMs := time.Since(startTime).Milliseconds()
 
 	// Log AI usage regardless of success/failure
