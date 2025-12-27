@@ -23,7 +23,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Sparkles, Globe } from "lucide-react";
 import { Provider, Model } from "@/models/providers";
-import { Prompt, isV2Prompt } from "@/models/prompts";
+import { Prompt, isV2Prompt, ContextConfig } from "@/models/prompts";
+import { ContextConfigEditor } from "@/components/prompts/context-config/context-config-editor";
 import { Topic } from "@/models/topics";
 import { GenerateContentResult } from "@/models/articles";
 import { extractPlaceholdersFromPrompts } from "@/lib/prompt-utils";
@@ -61,6 +62,7 @@ export function AIGenerateModal({
     const [selectedTopicId, setSelectedTopicId] = useState<string>("");
     const [customTopicTitle, setCustomTopicTitle] = useState("");
     const [placeholderValues, setPlaceholderValues] = useState<Record<string, string>>({});
+    const [contextOverrides, setContextOverrides] = useState<ContextConfig>({});
     const [useWebSearch, setUseWebSearch] = useState(false);
 
     const [isLoading, setIsLoading] = useState(false);
@@ -157,6 +159,7 @@ export function AIGenerateModal({
         setSelectedTopicId("");
         setCustomTopicTitle("");
         setPlaceholderValues({});
+        setContextOverrides({});
         setUseWebSearch(false);
         setError(null);
         onOpenChange(false);
@@ -193,13 +196,23 @@ export function AIGenerateModal({
         setError(null);
 
         try {
+            // For v2 prompts, convert context overrides to placeholder values
+            let finalPlaceholderValues = { ...placeholderValues };
+            if (selectedPrompt && isV2Prompt(selectedPrompt)) {
+                Object.entries(contextOverrides).forEach(([key, value]) => {
+                    if (value.enabled && value.value) {
+                        finalPlaceholderValues[key] = value.value;
+                    }
+                });
+            }
+
             const input = {
                 siteId,
                 providerId: parseInt(selectedProviderId),
                 promptId: parseInt(selectedPromptId),
                 topicId: topicMode === "existing" ? parseInt(selectedTopicId) : undefined,
                 customTopicTitle: topicMode === "custom" ? customTopicTitle.trim() : undefined,
-                placeholderValues,
+                placeholderValues: finalPlaceholderValues,
                 useWebSearch: supportsWebSearch && useWebSearch,
             };
 
@@ -302,6 +315,13 @@ export function AIGenerateModal({
                                     onValueChange={(value) => {
                                         setSelectedPromptId(value);
                                         setPlaceholderValues({});
+                                        // Initialize context overrides for v2 prompts
+                                        const prompt = prompts?.find(p => p.id.toString() === value);
+                                        if (prompt && isV2Prompt(prompt) && prompt.contextConfig) {
+                                            setContextOverrides(prompt.contextConfig);
+                                        } else {
+                                            setContextOverrides({});
+                                        }
                                     }}
                                 >
                                     <SelectTrigger>
@@ -422,9 +442,23 @@ export function AIGenerateModal({
                             </div>
                         )}
 
+                        {/* Context Settings - for v2 prompts */}
                         {selectedPrompt && isV2Prompt(selectedPrompt) && (
-                            <div className="text-center py-4 text-muted-foreground text-sm border-t pt-4">
-                                Context fields are configured in the prompt
+                            <div className="space-y-4 border-t pt-4">
+                                <div>
+                                    <Label className="text-base">Content Settings</Label>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        Adjust settings for content generation
+                                    </p>
+                                </div>
+                                <ContextConfigEditor
+                                    category="post_gen"
+                                    mode="override"
+                                    baseConfig={selectedPrompt.contextConfig}
+                                    config={contextOverrides}
+                                    onChange={setContextOverrides}
+                                    compact
+                                />
                             </div>
                         )}
 

@@ -48,8 +48,9 @@ import {
     AutoLinkMode,
 } from "@/models/sitemaps";
 import { Provider, Model } from "@/models/providers";
-import { Prompt, isV2Prompt } from "@/models/prompts";
+import { Prompt, isV2Prompt, ContextConfig } from "@/models/prompts";
 import { Textarea } from "@/components/ui/textarea";
+import { ContextConfigEditor } from "@/components/prompts/context-config/context-config-editor";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
@@ -93,11 +94,7 @@ export function PageGenerateDialog({
     const [providerId, setProviderId] = useState<number | null>(null);
     const [promptId, setPromptId] = useState<number | null>(null);
     const [publishAs, setPublishAs] = useState<PublishAs>("draft");
-    const [language, setLanguage] = useState("English");
-
-    const [wordCount, setWordCount] = useState("800-1200");
-    const [writingStyle, setWritingStyle] = useState<WritingStyle>("professional");
-    const [contentTone, setContentTone] = useState<ContentTone>("informative");
+    const [contextOverrides, setContextOverrides] = useState<ContextConfig>({});
     const [customInstructions, setCustomInstructions] = useState("");
     const [useWebSearch, setUseWebSearch] = useState(false);
     const [includeLinks, setIncludeLinks] = useState(false);
@@ -146,39 +143,15 @@ export function PageGenerateDialog({
         return prompts.find(p => p.id === promptId) || null;
     }, [promptId, prompts]);
 
-    // Apply context config values from a prompt to the form fields
-    const applyPromptConfig = (prompt: Prompt) => {
-        if (!isV2Prompt(prompt) || !prompt.contextConfig) return;
-
-        const config = prompt.contextConfig;
-
-        // Apply wordCount if enabled
-        if (config.wordCount?.enabled && config.wordCount.value) {
-            setWordCount(config.wordCount.value);
-        }
-
-        // Apply writingStyle if enabled
-        if (config.writingStyle?.enabled && config.writingStyle.value) {
-            setWritingStyle(config.writingStyle.value as WritingStyle);
-        }
-
-        // Apply contentTone if enabled
-        if (config.contentTone?.enabled && config.contentTone.value) {
-            setContentTone(config.contentTone.value as ContentTone);
-        }
-
-        // Apply language if enabled
-        if (config.language?.enabled && config.language.value) {
-            setLanguage(config.language.value);
-        }
-    };
-
-    // Handle prompt selection change
+    // Handle prompt selection change - initialize context overrides from prompt config
     const handlePromptChange = (newPromptId: number) => {
         setPromptId(newPromptId);
         const prompt = prompts.find(p => p.id === newPromptId);
-        if (prompt) {
-            applyPromptConfig(prompt);
+        if (prompt && isV2Prompt(prompt) && prompt.contextConfig) {
+            // Initialize overrides with prompt's config values
+            setContextOverrides(prompt.contextConfig);
+        } else {
+            setContextOverrides({});
         }
     };
 
@@ -245,8 +218,10 @@ export function PageGenerateDialog({
                 const builtin = promptsData.find(p => p.isBuiltin);
                 const defaultPrompt = builtin || promptsData[0];
                 setPromptId(defaultPrompt.id);
-                // Apply context config values from the prompt
-                applyPromptConfig(defaultPrompt);
+                // Initialize context overrides from the prompt's config
+                if (isV2Prompt(defaultPrompt) && defaultPrompt.contextConfig) {
+                    setContextOverrides(defaultPrompt.contextConfig);
+                }
             }
 
             // Set default link prompts (first builtin or first available)
@@ -299,6 +274,12 @@ export function PageGenerateDialog({
         }
 
         try {
+            // Extract values from context overrides
+            const language = contextOverrides.language?.enabled ? contextOverrides.language.value || "English" : "English";
+            const wordCount = contextOverrides.wordCount?.enabled ? contextOverrides.wordCount.value || "800-1200" : "800-1200";
+            const writingStyle = (contextOverrides.writingStyle?.enabled ? contextOverrides.writingStyle.value || "professional" : "professional") as WritingStyle;
+            const contentTone = (contextOverrides.contentTone?.enabled ? contextOverrides.contentTone.value || "informative" : "informative") as ContentTone;
+
             const result = await sitemapService.startPageGeneration({
                 sitemapId,
                 nodeIds: nodesToGenerate.map((n) => n.id),
@@ -469,11 +450,6 @@ export function PageGenerateDialog({
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                        {selectedPrompt && isV2Prompt(selectedPrompt) && (
-                                            <p className="text-xs text-muted-foreground">
-                                                Settings below are pre-filled from prompt config
-                                            </p>
-                                        )}
                                     </div>
                                 </div>
 
@@ -518,68 +494,22 @@ export function PageGenerateDialog({
                                         </Select>
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <Label>Content Language</Label>
-                                        <Input
-                                            value={language}
-                                            onChange={(e) => setLanguage(e.target.value)}
-                                            placeholder="English"
+                                </div>
+
+                                {/* Context Settings - Dynamic based on prompt config */}
+                                {selectedPrompt && isV2Prompt(selectedPrompt) && (
+                                    <div className="space-y-3 p-3 rounded-md border bg-muted/30">
+                                        <Label className="font-medium">Content Settings</Label>
+                                        <ContextConfigEditor
+                                            category="page_gen"
+                                            mode="override"
+                                            baseConfig={selectedPrompt.contextConfig}
+                                            config={contextOverrides}
+                                            onChange={setContextOverrides}
+                                            compact
                                         />
                                     </div>
-                                </div>
-
-                                {/* Content Settings */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>Word Count</Label>
-                                        <Input
-                                            value={wordCount}
-                                            onChange={(e) => setWordCount(e.target.value)}
-                                            placeholder="800-1200 or 1000"
-                                        />
-                                        <p className="text-xs text-muted-foreground">
-                                            Target: exact number or range
-                                        </p>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label>Writing Style</Label>
-                                        <Select
-                                            value={writingStyle}
-                                            onValueChange={(v) => setWritingStyle(v as WritingStyle)}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="professional">Professional</SelectItem>
-                                                <SelectItem value="casual">Casual</SelectItem>
-                                                <SelectItem value="formal">Formal</SelectItem>
-                                                <SelectItem value="friendly">Friendly</SelectItem>
-                                                <SelectItem value="technical">Technical</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>Content Tone</Label>
-                                    <Select
-                                        value={contentTone}
-                                        onValueChange={(v) => setContentTone(v as ContentTone)}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="informative">Informative</SelectItem>
-                                            <SelectItem value="persuasive">Persuasive</SelectItem>
-                                            <SelectItem value="educational">Educational</SelectItem>
-                                            <SelectItem value="engaging">Engaging</SelectItem>
-                                            <SelectItem value="authoritative">Authoritative</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                                )}
 
                                 {/* Auto-Link Mode Selection */}
                                 <div className="space-y-3 p-3 rounded-md border bg-muted/30">

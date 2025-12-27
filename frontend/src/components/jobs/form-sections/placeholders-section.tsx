@@ -4,8 +4,9 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Input } from "@/components/ui/input";
 import { JobCreateInput } from "@/models/jobs";
 import { extractPlaceholdersFromPrompts } from "@/lib/prompt-utils";
-import { isV2Prompt, Prompt } from "@/models/prompts";
-import { useMemo } from "react";
+import { isV2Prompt, Prompt, ContextConfig } from "@/models/prompts";
+import { ContextConfigEditor } from "@/components/prompts/context-config/context-config-editor";
+import { useMemo, useState, useEffect } from "react";
 
 interface PlaceholdersSectionProps {
     formData: Partial<JobCreateInput>;
@@ -20,6 +21,31 @@ export function PlaceholdersSection({ formData, onUpdate, prompts }: Placeholder
 
     // For v2 prompts, placeholders are not needed - context fields are configured in the prompt
     const isV2 = selectedPrompt && isV2Prompt(selectedPrompt);
+
+    // Context overrides for v2 prompts
+    const [contextOverrides, setContextOverrides] = useState<ContextConfig>({});
+
+    // Initialize context overrides when prompt changes
+    useEffect(() => {
+        if (selectedPrompt && isV2Prompt(selectedPrompt) && selectedPrompt.contextConfig) {
+            setContextOverrides(selectedPrompt.contextConfig);
+        } else {
+            setContextOverrides({});
+        }
+    }, [selectedPrompt?.id]);
+
+    // Handle context config changes - convert to placeholdersValues for backend compatibility
+    const handleContextConfigChange = (config: ContextConfig) => {
+        setContextOverrides(config);
+        // Convert to placeholdersValues format for backend
+        const placeholderValues: Record<string, string> = {};
+        Object.entries(config).forEach(([key, value]) => {
+            if (value.enabled && value.value) {
+                placeholderValues[key] = value.value;
+            }
+        });
+        onUpdate({ placeholdersValues: placeholderValues });
+    };
 
     const placeholders = useMemo(() => {
         if (!selectedPrompt || isV2) return [];
@@ -58,23 +84,30 @@ export function PlaceholdersSection({ formData, onUpdate, prompts }: Placeholder
         );
     }
 
-    // For v2 prompts, show a simpler card
-    if (isV2) {
+    // For v2 prompts, show ContextConfigEditor
+    if (isV2 && selectedPrompt) {
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle>Context Configuration</CardTitle>
+                    <CardTitle>Content Settings</CardTitle>
                     <CardFooter>
-                        This prompt uses the new context system
+                        Configure settings for content generation. These are based on the prompt&apos;s context configuration.
                     </CardFooter>
                 </CardHeader>
                 <CardContent>
-                    <div className="p-3 bg-muted/50 rounded-md">
+                    <div className="p-3 bg-muted/50 rounded-md mb-4">
                         <div className="font-medium">{selectedPrompt.name}</div>
                         <div className="text-sm text-muted-foreground mt-1">
-                            Context fields are configured in the prompt settings
+                            Adjust values below to customize generation
                         </div>
                     </div>
+                    <ContextConfigEditor
+                        category="post_gen"
+                        mode="override"
+                        baseConfig={selectedPrompt.contextConfig}
+                        config={contextOverrides}
+                        onChange={handleContextConfigChange}
+                    />
                 </CardContent>
             </Card>
         );

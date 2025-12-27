@@ -44,7 +44,8 @@ import { providerService } from "@/services/providers";
 import { promptService } from "@/services/prompts";
 import { linkingService } from "@/services/linking";
 import { Provider } from "@/models/providers";
-import { Prompt, isV2Prompt } from "@/models/prompts";
+import { Prompt, isV2Prompt, ContextConfig } from "@/models/prompts";
+import { ContextConfigEditor } from "@/components/prompts/context-config/context-config-editor";
 import { SitemapNode } from "@/models/sitemaps";
 import {
     SuggestStartedEvent,
@@ -79,9 +80,8 @@ export function SuggestLinksDialog({
 
     const [providerId, setProviderId] = useState<number | null>(null);
     const [promptId, setPromptId] = useState<number | null>(null);
+    const [contextOverrides, setContextOverrides] = useState<ContextConfig>({});
     const [feedback, setFeedback] = useState("");
-    const [maxIncoming, setMaxIncoming] = useState("");
-    const [maxOutgoing, setMaxOutgoing] = useState("");
 
     const [providers, setProviders] = useState<Provider[]>([]);
     const [prompts, setPrompts] = useState<Prompt[]>([]);
@@ -112,26 +112,14 @@ export function SuggestLinksDialog({
         return prompts.find(p => p.id === promptId) || null;
     }, [promptId, prompts]);
 
-    // Apply context config values from a prompt
-    const applyPromptConfig = (prompt: Prompt) => {
-        if (!isV2Prompt(prompt) || !prompt.contextConfig) return;
-
-        const config = prompt.contextConfig;
-
-        if (config.maxIncoming?.enabled && config.maxIncoming.value) {
-            setMaxIncoming(config.maxIncoming.value);
-        }
-        if (config.maxOutgoing?.enabled && config.maxOutgoing.value) {
-            setMaxOutgoing(config.maxOutgoing.value);
-        }
-    };
-
-    // Handle prompt selection change
+    // Handle prompt selection change - initialize context overrides from prompt config
     const handlePromptChange = (newPromptId: number) => {
         setPromptId(newPromptId);
         const prompt = prompts.find(p => p.id === newPromptId);
-        if (prompt) {
-            applyPromptConfig(prompt);
+        if (prompt && isV2Prompt(prompt) && prompt.contextConfig) {
+            setContextOverrides(prompt.contextConfig);
+        } else {
+            setContextOverrides({});
         }
     };
 
@@ -229,7 +217,9 @@ export function SuggestLinksDialog({
                 const builtin = promptsData.find(p => p.isBuiltin);
                 const defaultPrompt = builtin || promptsData[0];
                 setPromptId(defaultPrompt.id);
-                applyPromptConfig(defaultPrompt);
+                if (isV2Prompt(defaultPrompt) && defaultPrompt.contextConfig) {
+                    setContextOverrides(defaultPrompt.contextConfig);
+                }
             }
         } catch (err) {
             console.error("Failed to load data:", err);
@@ -262,14 +252,22 @@ export function SuggestLinksDialog({
         setLinksCreated(0);
 
         try {
+            // Extract values from context overrides
+            const maxIncoming = contextOverrides.maxIncoming?.enabled && contextOverrides.maxIncoming.value
+                ? parseInt(contextOverrides.maxIncoming.value, 10)
+                : undefined;
+            const maxOutgoing = contextOverrides.maxOutgoing?.enabled && contextOverrides.maxOutgoing.value
+                ? parseInt(contextOverrides.maxOutgoing.value, 10)
+                : undefined;
+
             await linkingService.suggestLinks({
                 planId,
                 providerId,
                 promptId,
                 nodeIds: nodesToAnalyze.map((n) => n.id),
                 feedback: feedback.trim() || undefined,
-                maxIncoming: maxIncoming ? parseInt(maxIncoming, 10) : undefined,
-                maxOutgoing: maxOutgoing ? parseInt(maxOutgoing, 10) : undefined,
+                maxIncoming,
+                maxOutgoing,
             });
 
             // Fallback if events don't work
@@ -306,8 +304,7 @@ export function SuggestLinksDialog({
         setSuggestState("idle");
         setError(null);
         setFeedback("");
-        setMaxIncoming("");
-        setMaxOutgoing("");
+        setContextOverrides({});
         setCurrentBatch(0);
         setTotalBatches(0);
         setProcessedNodes(0);
@@ -454,6 +451,21 @@ export function SuggestLinksDialog({
                                         </div>
                                     </div>
 
+                                    {/* Context Settings - Dynamic based on prompt config */}
+                                    {selectedPrompt && isV2Prompt(selectedPrompt) && (
+                                        <div className="space-y-3 p-3 rounded-md border bg-muted/30">
+                                            <Label className="font-medium">Link Settings</Label>
+                                            <ContextConfigEditor
+                                                category="link_suggest"
+                                                mode="override"
+                                                baseConfig={selectedPrompt.contextConfig}
+                                                config={contextOverrides}
+                                                onChange={setContextOverrides}
+                                                compact
+                                            />
+                                        </div>
+                                    )}
+
                                     <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
                                         <CollapsibleTrigger asChild>
                                             <Button
@@ -461,7 +473,7 @@ export function SuggestLinksDialog({
                                                 size="sm"
                                                 className="w-full justify-between"
                                             >
-                                                Advanced Options
+                                                Additional Instructions
                                                 {showAdvanced ? (
                                                     <ChevronUp className="h-4 w-4" />
                                                 ) : (
@@ -469,38 +481,8 @@ export function SuggestLinksDialog({
                                                 )}
                                             </Button>
                                         </CollapsibleTrigger>
-                                        <CollapsibleContent className="pt-2 space-y-4">
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="space-y-2">
-                                                    <Label>Max Outgoing Links</Label>
-                                                    <Input
-                                                        type="number"
-                                                        min="0"
-                                                        placeholder="0 = no limit"
-                                                        value={maxOutgoing}
-                                                        onChange={(e) => setMaxOutgoing(e.target.value)}
-                                                    />
-                                                    <p className="text-xs text-muted-foreground">
-                                                        Per page limit
-                                                    </p>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Max Incoming Links</Label>
-                                                    <Input
-                                                        type="number"
-                                                        min="0"
-                                                        placeholder="0 = no limit"
-                                                        value={maxIncoming}
-                                                        onChange={(e) => setMaxIncoming(e.target.value)}
-                                                    />
-                                                    <p className="text-xs text-muted-foreground">
-                                                        Per page limit
-                                                    </p>
-                                                </div>
-                                            </div>
-
+                                        <CollapsibleContent className="pt-2">
                                             <div className="space-y-2">
-                                                <Label>Additional Instructions</Label>
                                                 <Textarea
                                                     placeholder="e.g. Focus on creating links from service pages to blog posts..."
                                                     value={feedback}
