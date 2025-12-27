@@ -207,6 +207,7 @@ func (g *Generator) buildPrompts(ctx context.Context, req GenerateRequest) (stri
 }
 
 // contentSettingsToOverrides converts ContentSettings to ContextConfig overrides
+// NOTE: customInstructions is passed via RuntimeData, not overrides (it's a runtime-only field)
 func contentSettingsToOverrides(settings *ContentSettings) entities.ContextConfig {
 	overrides := make(entities.ContextConfig)
 
@@ -218,9 +219,6 @@ func contentSettingsToOverrides(settings *ContentSettings) entities.ContextConfi
 	}
 	if settings.ContentTone != "" {
 		overrides["contentTone"] = entities.ContextFieldValue{Enabled: true, Value: string(settings.ContentTone)}
-	}
-	if settings.CustomInstructions != "" {
-		overrides["customInstructions"] = entities.ContextFieldValue{Enabled: true, Value: settings.CustomInstructions}
 	}
 	if settings.IncludeLinks {
 		overrides["internalLinks"] = entities.ContextFieldValue{Enabled: true}

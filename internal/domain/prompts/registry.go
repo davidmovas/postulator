@@ -185,15 +185,8 @@ func (r *ContextFieldRegistry) registerAllFields() {
 		Categories: []entities.PromptCategory{entities.PromptCategoryPageGen},
 		Group:      "style",
 	})
-	r.register(&entities.ContextFieldDefinition{
-		Key:          "customInstructions",
-		Label:        "Custom Instructions",
-		Description:  "Additional instructions for the AI",
-		Type:         entities.ContextFieldTypeTextarea,
-		DefaultValue: "",
-		Categories:   []entities.PromptCategory{entities.PromptCategoryPageGen},
-		Group:        "advanced",
-	})
+	// NOTE: customInstructions is a runtime-only field, not stored in prompt config
+	// It's passed at usage time via overrides
 	r.register(&entities.ContextFieldDefinition{
 		Key:          "internalLinks",
 		Label:        "Internal Links",
@@ -253,15 +246,8 @@ func (r *ContextFieldRegistry) registerAllFields() {
 		Categories:   []entities.PromptCategory{entities.PromptCategoryLinkSuggest},
 		Group:        "settings",
 	})
-	r.register(&entities.ContextFieldDefinition{
-		Key:          "feedback",
-		Label:        "User Feedback",
-		Description:  "Additional linking instructions",
-		Type:         entities.ContextFieldTypeTextarea,
-		DefaultValue: "",
-		Categories:   []entities.PromptCategory{entities.PromptCategoryLinkSuggest},
-		Group:        "advanced",
-	})
+	// NOTE: feedback is a runtime-only field, not stored in prompt config
+	// It's passed at usage time via overrides
 
 	// =========================================================================
 	// LINK_APPLY Fields

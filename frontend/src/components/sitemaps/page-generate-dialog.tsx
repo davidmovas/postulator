@@ -48,7 +48,7 @@ import {
     AutoLinkMode,
 } from "@/models/sitemaps";
 import { Provider, Model } from "@/models/providers";
-import { Prompt } from "@/models/prompts";
+import { Prompt, isV2Prompt } from "@/models/prompts";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -140,6 +140,48 @@ export function PageGenerateDialog({
 
     const supportsWebSearch = selectedModelInfo?.supportsWebSearch ?? false;
 
+    // Get selected prompt
+    const selectedPrompt = useMemo(() => {
+        if (!promptId || prompts.length === 0) return null;
+        return prompts.find(p => p.id === promptId) || null;
+    }, [promptId, prompts]);
+
+    // Apply context config values from a prompt to the form fields
+    const applyPromptConfig = (prompt: Prompt) => {
+        if (!isV2Prompt(prompt) || !prompt.contextConfig) return;
+
+        const config = prompt.contextConfig;
+
+        // Apply wordCount if enabled
+        if (config.wordCount?.enabled && config.wordCount.value) {
+            setWordCount(config.wordCount.value);
+        }
+
+        // Apply writingStyle if enabled
+        if (config.writingStyle?.enabled && config.writingStyle.value) {
+            setWritingStyle(config.writingStyle.value as WritingStyle);
+        }
+
+        // Apply contentTone if enabled
+        if (config.contentTone?.enabled && config.contentTone.value) {
+            setContentTone(config.contentTone.value as ContentTone);
+        }
+
+        // Apply language if enabled
+        if (config.language?.enabled && config.language.value) {
+            setLanguage(config.language.value);
+        }
+    };
+
+    // Handle prompt selection change
+    const handlePromptChange = (newPromptId: number) => {
+        setPromptId(newPromptId);
+        const prompt = prompts.find(p => p.id === newPromptId);
+        if (prompt) {
+            applyPromptConfig(prompt);
+        }
+    };
+
     useEffect(() => {
         if (open) {
             loadData();
@@ -196,6 +238,15 @@ export function PageGenerateDialog({
 
             if (activeProviders.length > 0 && !providerId) {
                 setProviderId(activeProviders[0].id);
+            }
+
+            // Set default prompt (first builtin or first available)
+            if (promptsData.length > 0 && !promptId) {
+                const builtin = promptsData.find(p => p.isBuiltin);
+                const defaultPrompt = builtin || promptsData[0];
+                setPromptId(defaultPrompt.id);
+                // Apply context config values from the prompt
+                applyPromptConfig(defaultPrompt);
             }
 
             // Set default link prompts (first builtin or first available)
@@ -405,7 +456,7 @@ export function PageGenerateDialog({
                                         <Label>Prompt Template *</Label>
                                         <Select
                                             value={promptId?.toString() || ""}
-                                            onValueChange={(v) => setPromptId(Number(v))}
+                                            onValueChange={(v) => handlePromptChange(Number(v))}
                                         >
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Select prompt" />
@@ -418,6 +469,11 @@ export function PageGenerateDialog({
                                                 ))}
                                             </SelectContent>
                                         </Select>
+                                        {selectedPrompt && isV2Prompt(selectedPrompt) && (
+                                            <p className="text-xs text-muted-foreground">
+                                                Settings below are pre-filled from prompt config
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
 

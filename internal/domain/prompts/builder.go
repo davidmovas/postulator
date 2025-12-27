@@ -55,6 +55,14 @@ func (b *PromptBuilder) Build(req *BuildRequest) *BuildResult {
 	}
 }
 
+// Runtime-only fields that are not in registry but can be passed via RuntimeData
+// Supports both snake_case and camelCase keys for compatibility
+var runtimeOnlyFields = map[string]string{
+	"customInstructions":  "Additional Instructions",
+	"custom_instructions": "Additional Instructions",
+	"feedback":            "Feedback",
+}
+
 // buildUserPrompt builds the user prompt from enabled context fields
 func (b *PromptBuilder) buildUserPrompt(
 	category entities.PromptCategory,
@@ -121,6 +129,17 @@ func (b *PromptBuilder) buildUserPrompt(
 			// Format and append to output
 			sb.WriteString(field.Label)
 			sb.WriteString(": ")
+			sb.WriteString(value)
+			sb.WriteString("\n")
+		}
+	}
+
+	// Add runtime-only fields if present in data
+	for key, label := range runtimeOnlyFields {
+		if value, ok := data[key]; ok && strings.TrimSpace(value) != "" {
+			sb.WriteString("\n")
+			sb.WriteString(label)
+			sb.WriteString(":\n")
 			sb.WriteString(value)
 			sb.WriteString("\n")
 		}

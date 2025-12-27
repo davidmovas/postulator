@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
     Select,
     SelectContent,
@@ -12,12 +11,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Lock } from "lucide-react";
 import {
     ContextConfig,
     ContextFieldDefinition,
@@ -26,36 +22,34 @@ import {
 } from "@/models/prompts";
 import { promptService } from "@/services/prompts";
 
-interface ContextConfigEditorProps {
+export interface ContextConfigEditorProps {
     category: PromptCategory;
     config: ContextConfig;
     onChange: (config: ContextConfig) => void;
     disabled?: boolean;
+    /**
+     * Mode:
+     * - "edit" = for prompt creation/editing (show all fields, allow enabling/disabling)
+     * - "override" = for usage time (only show enabled fields from base config, allow value changes)
+     */
+    mode?: "edit" | "override";
+    /** Base config from prompt (used in override mode) */
+    baseConfig?: ContextConfig;
+    /** Compact display for inline usage */
+    compact?: boolean;
 }
-
-interface FieldGroup {
-    name: string;
-    label: string;
-    fields: ContextFieldDefinition[];
-}
-
-const GROUP_LABELS: Record<string, string> = {
-    content: "Content",
-    site: "Site Info",
-    settings: "Settings",
-    style: "Style",
-    advanced: "Advanced",
-};
 
 export function ContextConfigEditor({
     category,
     config,
     onChange,
     disabled = false,
+    mode = "edit",
+    baseConfig,
+    compact = false,
 }: ContextConfigEditorProps) {
     const [fields, setFields] = useState<ContextFieldDefinition[]>([]);
     const [defaultConfig, setDefaultConfig] = useState<ContextConfig>({});
-    const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(["content", "site"]));
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -66,8 +60,8 @@ export function ContextConfigEditor({
                 setFields(response.fields);
                 setDefaultConfig(response.defaultConfig);
 
-                // Initialize config with defaults if empty
-                if (Object.keys(config).length === 0) {
+                // Initialize config with defaults if empty (only in edit mode)
+                if (mode === "edit" && Object.keys(config).length === 0) {
                     onChange(response.defaultConfig);
                 }
             } catch (error) {
@@ -79,6 +73,33 @@ export function ContextConfigEditor({
         loadFields();
     }, [category]);
 
+    // Sort fields: required first, then by group
+    const sortedFields = useMemo(() => {
+        const sorted = [...fields];
+        sorted.sort((a, b) => {
+            // Required fields first
+            if (a.required && !b.required) return -1;
+            if (!a.required && b.required) return 1;
+            // Then by group order
+            const groupOrder = ["content", "site", "settings", "style", "advanced"];
+            const aIdx = groupOrder.indexOf(a.group || "content");
+            const bIdx = groupOrder.indexOf(b.group || "content");
+            return aIdx - bIdx;
+        });
+        return sorted;
+    }, [fields]);
+
+    // In override mode, filter to only show enabled fields from base config
+    const visibleFields = useMemo(() => {
+        if (mode === "override" && baseConfig) {
+            return sortedFields.filter(field => {
+                const baseValue = baseConfig[field.key];
+                return field.required || baseValue?.enabled;
+            });
+        }
+        return sortedFields;
+    }, [sortedFields, mode, baseConfig]);
+
     const updateField = (key: string, value: Partial<ContextFieldValue>) => {
         const currentValue = config[key] || defaultConfig[key] || { enabled: false };
         onChange({
@@ -87,88 +108,89 @@ export function ContextConfigEditor({
         });
     };
 
-    // Group fields by their group property
-    const groups: FieldGroup[] = [];
-    const groupMap = new Map<string, ContextFieldDefinition[]>();
-
-    for (const field of fields) {
-        const groupName = field.group || "content";
-        if (!groupMap.has(groupName)) {
-            groupMap.set(groupName, []);
-        }
-        groupMap.get(groupName)!.push(field);
-    }
-
-    const groupOrder = ["content", "site", "settings", "style", "advanced"];
-    for (const name of groupOrder) {
-        const groupFields = groupMap.get(name);
-        if (groupFields && groupFields.length > 0) {
-            groups.push({
-                name,
-                label: GROUP_LABELS[name] || name,
-                fields: groupFields,
-            });
-        }
-    }
-
-    const toggleGroup = (groupName: string) => {
-        const newExpanded = new Set(expandedGroups);
-        if (newExpanded.has(groupName)) {
-            newExpanded.delete(groupName);
-        } else {
-            newExpanded.add(groupName);
-        }
-        setExpandedGroups(newExpanded);
+    const getFieldValue = (key: string): ContextFieldValue | undefined => {
+        return config[key] || (mode === "override" ? baseConfig?.[key] : defaultConfig[key]);
     };
 
     if (isLoading) {
         return (
-            <div className="p-4 text-center text-muted-foreground">
-                Loading context fields...
+            <div className={compact ? "py-2" : "p-4"}>
+                <span className="text-sm text-muted-foreground">Loading...</span>
             </div>
         );
     }
 
-    if (fields.length === 0) {
+    if (visibleFields.length === 0) {
         return (
-            <div className="p-4 text-center text-muted-foreground">
-                No context fields available for this category.
+            <div className={compact ? "py-2" : "p-4"}>
+                <span className="text-sm text-muted-foreground">
+                    No context fields available.
+                </span>
             </div>
         );
     }
+
+    // Separate required and optional fields
+    const requiredFields = visibleFields.filter(f => f.required);
+    const optionalFields = visibleFields.filter(f => !f.required);
 
     return (
-        <div className="space-y-2">
-            {groups.map((group) => (
-                <Collapsible
-                    key={group.name}
-                    open={expandedGroups.has(group.name)}
-                    onOpenChange={() => toggleGroup(group.name)}
-                >
-                    <CollapsibleTrigger className="flex items-center gap-2 w-full p-2 hover:bg-muted/50 rounded-md">
-                        {expandedGroups.has(group.name) ? (
-                            <ChevronDown className="h-4 w-4" />
-                        ) : (
-                            <ChevronRight className="h-4 w-4" />
-                        )}
-                        <span className="font-medium text-sm">{group.label}</span>
-                        <span className="text-xs text-muted-foreground">
-                            ({group.fields.length} fields)
-                        </span>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="pl-6 space-y-3 pt-2">
-                        {group.fields.map((field) => (
+        <div className={compact ? "space-y-3" : "space-y-4"}>
+            {/* Required Fields */}
+            {requiredFields.length > 0 && (
+                <div className="space-y-3">
+                    {!compact && (
+                        <div className="flex items-center gap-2">
+                            <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                Required
+                            </span>
+                        </div>
+                    )}
+                    <div className={compact ? "space-y-2" : "space-y-3"}>
+                        {requiredFields.map((field) => (
                             <ContextField
                                 key={field.key}
                                 field={field}
-                                value={config[field.key] || defaultConfig[field.key]}
+                                value={getFieldValue(field.key)}
                                 onChange={(value) => updateField(field.key, value)}
                                 disabled={disabled}
+                                compact={compact}
+                                mode={mode}
                             />
                         ))}
-                    </CollapsibleContent>
-                </Collapsible>
-            ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Separator */}
+            {requiredFields.length > 0 && optionalFields.length > 0 && (
+                <Separator />
+            )}
+
+            {/* Optional Fields */}
+            {optionalFields.length > 0 && (
+                <div className="space-y-3">
+                    {!compact && (
+                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            Optional
+                        </span>
+                    )}
+                    <div className={compact ? "space-y-2" : "space-y-3"}>
+                        {optionalFields.map((field) => (
+                            <ContextField
+                                key={field.key}
+                                field={field}
+                                value={getFieldValue(field.key)}
+                                onChange={(value) => updateField(field.key, value)}
+                                disabled={disabled}
+                                compact={compact}
+                                mode={mode}
+                            />
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -178,131 +200,153 @@ interface ContextFieldProps {
     value: ContextFieldValue | undefined;
     onChange: (value: Partial<ContextFieldValue>) => void;
     disabled?: boolean;
+    compact?: boolean;
+    mode: "edit" | "override";
 }
 
-function ContextField({ field, value, onChange, disabled }: ContextFieldProps) {
+function ContextField({ field, value, onChange, disabled, compact, mode }: ContextFieldProps) {
     const isEnabled = value?.enabled ?? false;
     const fieldValue = value?.value ?? field.defaultValue ?? "";
+    const isRequired = field.required;
 
-    switch (field.type) {
-        case "checkbox":
-            return (
-                <div className="flex items-start gap-3">
+    // In override mode, we can't disable fields, only change values
+    const canToggle = mode === "edit" && !isRequired;
+
+    if (field.type === "checkbox") {
+        return (
+            <div className={`flex items-center gap-3 ${compact ? "py-1" : "py-1.5"}`}>
+                <Checkbox
+                    id={field.key}
+                    checked={isEnabled}
+                    onCheckedChange={(checked) => onChange({ enabled: !!checked })}
+                    disabled={disabled || !canToggle}
+                />
+                <div className="flex-1 min-w-0">
+                    <Label
+                        htmlFor={field.key}
+                        className={`cursor-pointer ${compact ? "text-sm" : ""}`}
+                    >
+                        {field.label}
+                    </Label>
+                    {!compact && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                            {field.description}
+                        </p>
+                    )}
+                </div>
+                {isRequired && (
+                    <Badge variant="outline" className="text-[10px] shrink-0">
+                        Required
+                    </Badge>
+                )}
+            </div>
+        );
+    }
+
+    if (field.type === "input") {
+        return (
+            <div className={`space-y-2 ${compact ? "py-1" : "py-1.5"}`}>
+                <div className="flex items-center gap-3">
                     <Checkbox
-                        id={field.key}
+                        id={`${field.key}-enabled`}
                         checked={isEnabled}
                         onCheckedChange={(checked) => onChange({ enabled: !!checked })}
-                        disabled={disabled || field.required}
+                        disabled={disabled || !canToggle}
                     />
-                    <div className="space-y-1">
-                        <Label
-                            htmlFor={field.key}
-                            className="text-sm font-medium cursor-pointer"
-                        >
-                            {field.label}
-                            {field.required && (
-                                <span className="text-muted-foreground ml-1">(required)</span>
-                            )}
-                        </Label>
-                        <p className="text-xs text-muted-foreground">{field.description}</p>
-                    </div>
-                </div>
-            );
-
-        case "input":
-            return (
-                <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                        <Checkbox
-                            id={`${field.key}-enabled`}
-                            checked={isEnabled}
-                            onCheckedChange={(checked) => onChange({ enabled: !!checked })}
-                            disabled={disabled || field.required}
-                        />
-                        <Label htmlFor={field.key} className="text-sm font-medium">
-                            {field.label}
-                        </Label>
-                    </div>
-                    {isEnabled && (
-                        <Input
-                            id={field.key}
-                            value={fieldValue}
-                            onChange={(e) => onChange({ value: e.target.value })}
-                            placeholder={field.defaultValue}
-                            disabled={disabled}
-                            className="ml-7"
-                        />
+                    <Label htmlFor={field.key} className={compact ? "text-sm" : ""}>
+                        {field.label}
+                    </Label>
+                    {isRequired && (
+                        <Badge variant="outline" className="text-[10px]">
+                            Required
+                        </Badge>
                     )}
-                    <p className="text-xs text-muted-foreground ml-7">{field.description}</p>
                 </div>
-            );
-
-        case "select":
-            return (
-                <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                        <Checkbox
-                            id={`${field.key}-enabled`}
-                            checked={isEnabled}
-                            onCheckedChange={(checked) => onChange({ enabled: !!checked })}
-                            disabled={disabled || field.required}
-                        />
-                        <Label htmlFor={field.key} className="text-sm font-medium">
-                            {field.label}
-                        </Label>
-                    </div>
-                    {isEnabled && (
-                        <Select
-                            value={fieldValue}
-                            onValueChange={(value) => onChange({ value })}
-                            disabled={disabled}
-                        >
-                            <SelectTrigger className="ml-7 w-[calc(100%-1.75rem)]">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {field.options?.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>
-                                        {option.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    )}
-                    <p className="text-xs text-muted-foreground ml-7">{field.description}</p>
-                </div>
-            );
-
-        case "textarea":
-            return (
-                <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                        <Checkbox
-                            id={`${field.key}-enabled`}
-                            checked={isEnabled}
-                            onCheckedChange={(checked) => onChange({ enabled: !!checked })}
-                            disabled={disabled || field.required}
-                        />
-                        <Label htmlFor={field.key} className="text-sm font-medium">
-                            {field.label}
-                        </Label>
-                    </div>
-                    {isEnabled && (
-                        <Textarea
-                            id={field.key}
-                            value={fieldValue}
-                            onChange={(e) => onChange({ value: e.target.value })}
-                            placeholder={field.description}
-                            disabled={disabled}
-                            className="ml-7 min-h-[80px]"
-                            rows={3}
-                        />
-                    )}
-                    <p className="text-xs text-muted-foreground ml-7">{field.description}</p>
-                </div>
-            );
-
-        default:
-            return null;
+                {isEnabled && (
+                    <Input
+                        id={field.key}
+                        value={fieldValue}
+                        onChange={(e) => onChange({ value: e.target.value })}
+                        placeholder={field.defaultValue || field.description}
+                        disabled={disabled}
+                        className={`ml-7 ${compact ? "h-8 text-sm" : ""}`}
+                    />
+                )}
+            </div>
+        );
     }
+
+    if (field.type === "select") {
+        return (
+            <div className={`space-y-2 ${compact ? "py-1" : "py-1.5"}`}>
+                <div className="flex items-center gap-3">
+                    <Checkbox
+                        id={`${field.key}-enabled`}
+                        checked={isEnabled}
+                        onCheckedChange={(checked) => onChange({ enabled: !!checked })}
+                        disabled={disabled || !canToggle}
+                    />
+                    <Label htmlFor={field.key} className={compact ? "text-sm" : ""}>
+                        {field.label}
+                    </Label>
+                    {isRequired && (
+                        <Badge variant="outline" className="text-[10px]">
+                            Required
+                        </Badge>
+                    )}
+                </div>
+                {isEnabled && (
+                    <Select
+                        value={fieldValue}
+                        onValueChange={(val) => onChange({ value: val })}
+                        disabled={disabled}
+                    >
+                        <SelectTrigger className={`ml-7 w-[calc(100%-1.75rem)] ${compact ? "h-8 text-sm" : ""}`}>
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {field.options?.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                )}
+            </div>
+        );
+    }
+
+    // textarea type - typically not used in prompts, but support it
+    return null;
+}
+
+/**
+ * Compact inline display of enabled context fields as badges
+ * Used to show current config at a glance
+ */
+export function ContextConfigBadges({
+    config,
+    className = "",
+}: {
+    config: ContextConfig;
+    className?: string;
+}) {
+    const enabledKeys = Object.entries(config)
+        .filter(([_, v]) => v.enabled)
+        .map(([k]) => k);
+
+    if (enabledKeys.length === 0) {
+        return null;
+    }
+
+    return (
+        <div className={`flex flex-wrap gap-1 ${className}`}>
+            {enabledKeys.map((key) => (
+                <Badge key={key} variant="secondary" className="text-xs font-normal">
+                    {key}
+                </Badge>
+            ))}
+        </div>
+    );
 }

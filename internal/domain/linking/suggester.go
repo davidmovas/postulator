@@ -344,6 +344,7 @@ func (s *Suggester) buildPrompts(ctx context.Context, config SuggestConfig, node
 }
 
 // configToOverrides converts SuggestConfig to ContextConfig overrides
+// NOTE: feedback is passed via RuntimeData, not overrides (it's a runtime-only field)
 func (s *Suggester) configToOverrides(config SuggestConfig) entities.ContextConfig {
 	overrides := make(entities.ContextConfig)
 
@@ -352,9 +353,6 @@ func (s *Suggester) configToOverrides(config SuggestConfig) entities.ContextConf
 	}
 	if config.MaxOutgoing > 0 {
 		overrides["maxOutgoing"] = entities.ContextFieldValue{Enabled: true, Value: fmt.Sprintf("%d", config.MaxOutgoing)}
-	}
-	if config.Feedback != "" {
-		overrides["feedback"] = entities.ContextFieldValue{Enabled: true, Value: config.Feedback}
 	}
 
 	return overrides
