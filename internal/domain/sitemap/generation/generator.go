@@ -178,20 +178,55 @@ func (g *Generator) buildPrompts(ctx context.Context, req GenerateRequest) (stri
 		})
 	}
 
-	placeholders := BuildPlaceholders(nodeCtx)
+	// Build runtime data from node context
+	runtimeData := BuildPlaceholders(nodeCtx)
 	for k, v := range req.Placeholders {
-		if _, exists := placeholders[k]; !exists {
-			placeholders[k] = v
+		if _, exists := runtimeData[k]; !exists {
+			runtimeData[k] = v
 		}
 	}
 
 	if req.PromptID != nil && *req.PromptID > 0 {
-		return g.promptSvc.RenderPrompt(ctx, *req.PromptID, placeholders)
+		prompt, err := g.promptSvc.GetPrompt(ctx, *req.PromptID)
+		if err != nil {
+			return "", "", err
+		}
+
+		// Build context config overrides from ContentSettings
+		var overrides entities.ContextConfig
+		if req.ContentSettings != nil {
+			overrides = contentSettingsToOverrides(req.ContentSettings)
+		}
+
+		return g.promptSvc.RenderPromptWithOverrides(ctx, prompt, runtimeData, overrides)
 	}
 
 	renderer := NewDefaultPromptRenderer()
-	system, user := renderer.Render(placeholders)
+	system, user := renderer.Render(runtimeData)
 	return system, user, nil
+}
+
+// contentSettingsToOverrides converts ContentSettings to ContextConfig overrides
+func contentSettingsToOverrides(settings *ContentSettings) entities.ContextConfig {
+	overrides := make(entities.ContextConfig)
+
+	if settings.WordCount != "" {
+		overrides["wordCount"] = entities.ContextFieldValue{Enabled: true, Value: settings.WordCount}
+	}
+	if settings.WritingStyle != "" {
+		overrides["writingStyle"] = entities.ContextFieldValue{Enabled: true, Value: string(settings.WritingStyle)}
+	}
+	if settings.ContentTone != "" {
+		overrides["contentTone"] = entities.ContextFieldValue{Enabled: true, Value: string(settings.ContentTone)}
+	}
+	if settings.CustomInstructions != "" {
+		overrides["customInstructions"] = entities.ContextFieldValue{Enabled: true, Value: settings.CustomInstructions}
+	}
+	if settings.IncludeLinks {
+		overrides["internalLinks"] = entities.ContextFieldValue{Enabled: true}
+	}
+
+	return overrides
 }
 
 func extractMetaDescription(result *ai.ArticleResult) string {

@@ -305,13 +305,19 @@ func (s *Suggester) processLinks(
 }
 
 func (s *Suggester) buildPrompts(ctx context.Context, config SuggestConfig, nodes []*entities.SitemapNode, outgoing, incoming map[int64]int) (system, user string) {
-	placeholders := s.buildPlaceholders(config, nodes, outgoing, incoming)
+	runtimeData := s.buildPlaceholders(config, nodes, outgoing, incoming)
+
+	// Build context config overrides from SuggestConfig
+	overrides := s.configToOverrides(config)
 
 	// If a custom prompt ID is specified, use it
 	if config.PromptID != nil && *config.PromptID > 0 {
-		sys, usr, err := s.promptSvc.RenderPrompt(ctx, *config.PromptID, placeholders)
+		prompt, err := s.promptSvc.GetPrompt(ctx, *config.PromptID)
 		if err == nil {
-			return sys, usr
+			sys, usr, err := s.promptSvc.RenderPromptWithOverrides(ctx, prompt, runtimeData, overrides)
+			if err == nil {
+				return sys, usr
+			}
 		}
 		s.logger.Warn(fmt.Sprintf("Failed to render custom prompt, trying builtin: %v", err))
 	}
@@ -325,9 +331,11 @@ func (s *Suggester) buildPrompts(ctx context.Context, config SuggestConfig, node
 
 	for _, p := range promptsByCategory {
 		if p.IsBuiltin {
-			sys := s.renderTemplate(p.SystemPrompt, placeholders)
-			usr := s.renderTemplate(p.UserPrompt, placeholders)
-			return sys, usr
+			sys, usr, err := s.promptSvc.RenderPromptWithOverrides(ctx, p, runtimeData, overrides)
+			if err == nil {
+				return sys, usr
+			}
+			s.logger.Warn(fmt.Sprintf("Failed to render builtin prompt: %v", err))
 		}
 	}
 
@@ -335,13 +343,21 @@ func (s *Suggester) buildPrompts(ctx context.Context, config SuggestConfig, node
 	return "", ""
 }
 
-// renderTemplate replaces {{placeholder}} with values
-func (s *Suggester) renderTemplate(template string, placeholders map[string]string) string {
-	result := template
-	for key, value := range placeholders {
-		result = strings.ReplaceAll(result, "{{"+key+"}}", value)
+// configToOverrides converts SuggestConfig to ContextConfig overrides
+func (s *Suggester) configToOverrides(config SuggestConfig) entities.ContextConfig {
+	overrides := make(entities.ContextConfig)
+
+	if config.MaxIncoming > 0 {
+		overrides["maxIncoming"] = entities.ContextFieldValue{Enabled: true, Value: fmt.Sprintf("%d", config.MaxIncoming)}
 	}
-	return result
+	if config.MaxOutgoing > 0 {
+		overrides["maxOutgoing"] = entities.ContextFieldValue{Enabled: true, Value: fmt.Sprintf("%d", config.MaxOutgoing)}
+	}
+	if config.Feedback != "" {
+		overrides["feedback"] = entities.ContextFieldValue{Enabled: true, Value: config.Feedback}
+	}
+
+	return overrides
 }
 
 func (s *Suggester) buildPlaceholders(config SuggestConfig, nodes []*entities.SitemapNode, outgoing, incoming map[int64]int) map[string]string {

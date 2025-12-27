@@ -37,17 +37,20 @@ func (c *RenderPromptCommand) Execute(ctx *pipeline.Context) error {
 		return fault.NewFatalError(fault.ErrCodeInvalidJob, c.Name(), "topic or category not selected")
 	}
 
-	placeholders := c.buildPlaceholders(ctx)
+	runtimeData := c.buildPlaceholders(ctx)
 
-	// Strict validation for jobs - user must provide all required placeholder values
-	if err := c.validatePlaceholdersStrict(ctx, placeholders); err != nil {
-		return fault.NewFatalError(fault.ErrCodePromptRenderFailed, c.Name(), err.Error())
+	// For v1 prompts: validate placeholders
+	// For v2 prompts: no placeholder validation needed (context fields are optional)
+	if !ctx.Execution.Prompt.IsV2() {
+		if err := c.validatePlaceholdersStrict(ctx, runtimeData); err != nil {
+			return fault.NewFatalError(fault.ErrCodePromptRenderFailed, c.Name(), err.Error())
+		}
 	}
 
 	systemPrompt, userPrompt, err := c.promptService.RenderPrompt(
 		ctx.Context(),
 		ctx.Execution.Prompt.ID,
-		placeholders,
+		runtimeData,
 	)
 	if err != nil {
 		return fault.WrapError(err, fault.ErrCodePromptRenderFailed, c.Name(), "failed to render prompt")

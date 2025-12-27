@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -13,7 +13,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import {
     Select,
     SelectContent,
@@ -24,9 +24,9 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useApiCall } from "@/hooks/use-api-call";
 import { promptService } from "@/services/prompts";
-import { Prompt, PromptUpdateInput, PromptCategory, PROMPT_CATEGORIES } from "@/models/prompts";
-import { extractPlaceholdersFromPrompts } from "@/lib/prompt-utils";
-import { MessageSquare, User, Tag, FolderOpen, Lock } from "lucide-react";
+import { Prompt, PromptUpdateInput, PromptCategory, PROMPT_CATEGORIES, ContextConfig, isV2Prompt } from "@/models/prompts";
+import { ContextConfigEditor } from "@/components/prompts/context-config/context-config-editor";
+import { FileText, FolderOpen, Lock, Settings2 } from "lucide-react";
 
 interface EditPromptModalProps {
     open: boolean;
@@ -42,14 +42,10 @@ export function EditPromptModal({ open, onOpenChange, prompt, onSuccess }: EditP
         id: 0,
         name: "",
         category: "post_gen",
-        systemPrompt: "",
-        userPrompt: "",
-        placeholders: []
+        version: 2,
+        instructions: "",
+        contextConfig: {},
     });
-
-    const detectedPlaceholders = useMemo(() => {
-        return extractPlaceholdersFromPrompts(formData.systemPrompt || "", formData.userPrompt || "");
-    }, [formData.systemPrompt, formData.userPrompt]);
 
     useEffect(() => {
         if (prompt) {
@@ -57,9 +53,13 @@ export function EditPromptModal({ open, onOpenChange, prompt, onSuccess }: EditP
                 id: prompt.id,
                 name: prompt.name,
                 category: prompt.category,
+                version: prompt.version || 2,
+                instructions: prompt.instructions || "",
+                contextConfig: prompt.contextConfig || {},
+                // Keep legacy fields for backward compatibility
                 systemPrompt: prompt.systemPrompt,
                 userPrompt: prompt.userPrompt,
-                placeholders: prompt.placeholders
+                placeholders: prompt.placeholders,
             });
         }
     }, [prompt]);
@@ -69,24 +69,19 @@ export function EditPromptModal({ open, onOpenChange, prompt, onSuccess }: EditP
             id: 0,
             name: "",
             category: "post_gen",
-            systemPrompt: "",
-            userPrompt: "",
-            placeholders: []
+            version: 2,
+            instructions: "",
+            contextConfig: {},
         });
     };
 
-    const isFormValid = formData.name?.trim() &&
-        formData.systemPrompt?.trim() &&
-        formData.userPrompt?.trim();
+    const isFormValid = formData.name?.trim() && formData.instructions?.trim();
 
     const handleSubmit = async () => {
         if (!isFormValid || !prompt) return;
 
         const result = await execute<void>(
-            () => promptService.updatePrompt({
-                ...formData,
-                placeholders: detectedPlaceholders
-            }),
+            () => promptService.updatePrompt(formData),
             {
                 successMessage: "Prompt updated successfully",
                 showSuccessToast: true
@@ -107,6 +102,21 @@ export function EditPromptModal({ open, onOpenChange, prompt, onSuccess }: EditP
         onOpenChange(newOpen);
     };
 
+    const handleCategoryChange = (value: PromptCategory) => {
+        setFormData(prev => ({
+            ...prev,
+            category: value,
+            contextConfig: {}, // Reset config when category changes
+        }));
+    };
+
+    const handleContextConfigChange = (config: ContextConfig) => {
+        setFormData(prev => ({
+            ...prev,
+            contextConfig: config,
+        }));
+    };
+
     if (!prompt) return null;
 
     return (
@@ -115,7 +125,7 @@ export function EditPromptModal({ open, onOpenChange, prompt, onSuccess }: EditP
                 <DialogHeader>
                     <DialogTitle>Edit Prompt</DialogTitle>
                     <DialogDescription>
-                        Update your AI prompt. Placeholders like {"{{variable}}"} will be automatically detected.
+                        Update your AI prompt instructions and context configuration.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -137,7 +147,7 @@ export function EditPromptModal({ open, onOpenChange, prompt, onSuccess }: EditP
                             <Label htmlFor="edit-name">Prompt Name</Label>
                             <Input
                                 id="edit-name"
-                                placeholder="e.g., Article Generator"
+                                placeholder="e.g., SEO Article Writer"
                                 value={formData.name || ""}
                                 onChange={(e) => setFormData(prev => ({
                                     ...prev,
@@ -155,10 +165,7 @@ export function EditPromptModal({ open, onOpenChange, prompt, onSuccess }: EditP
                             </div>
                             <Select
                                 value={formData.category}
-                                onValueChange={(value: PromptCategory) => setFormData(prev => ({
-                                    ...prev,
-                                    category: value
-                                }))}
+                                onValueChange={handleCategoryChange}
                                 disabled={isLoading || prompt.isBuiltin}
                             >
                                 <SelectTrigger>
@@ -175,69 +182,51 @@ export function EditPromptModal({ open, onOpenChange, prompt, onSuccess }: EditP
                         </div>
                     </div>
 
-                    {/* System Prompt */}
+                    {/* Instructions */}
                     <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                            <Label htmlFor="edit-systemPrompt">System Prompt</Label>
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                            <Label htmlFor="edit-instructions">Instructions</Label>
                         </div>
                         <Textarea
-                            id="edit-systemPrompt"
-                            placeholder="You are a helpful assistant that generates content..."
-                            value={formData.systemPrompt || ""}
+                            id="edit-instructions"
+                            placeholder="You are an SEO copywriter. Generate engaging content that is optimized for search engines..."
+                            value={formData.instructions || ""}
                             onChange={(e) => setFormData(prev => ({
                                 ...prev,
-                                systemPrompt: e.target.value
+                                instructions: e.target.value
                             }))}
-                            rows={12}
+                            rows={10}
                             disabled={isLoading}
                             className="resize-y min-h-[200px] font-mono text-sm"
                         />
+                        <p className="text-xs text-muted-foreground">
+                            Write your instructions for the AI. This becomes the system prompt.
+                            Focus on describing the desired behavior, style, and output format.
+                        </p>
                     </div>
 
-                    {/* User Prompt */}
-                    <div className="space-y-2">
+                    <Separator />
+
+                    {/* Context Configuration */}
+                    <div className="space-y-3">
                         <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-muted-foreground" />
-                            <Label htmlFor="edit-userPrompt">User Prompt</Label>
+                            <Settings2 className="h-4 w-4 text-muted-foreground" />
+                            <Label>Context Fields</Label>
                         </div>
-                        <Textarea
-                            id="edit-userPrompt"
-                            placeholder="Write an article about {{topic}} with {{wordCount}} words..."
-                            value={formData.userPrompt || ""}
-                            onChange={(e) => setFormData(prev => ({
-                                ...prev,
-                                userPrompt: e.target.value
-                            }))}
-                            rows={12}
-                            disabled={isLoading}
-                            className="resize-y min-h-[200px] font-mono text-sm"
-                        />
+                        <p className="text-sm text-muted-foreground">
+                            Configure which data is included when using this prompt.
+                            These settings can be overridden at usage time.
+                        </p>
+                        <div className="border rounded-lg p-4 bg-muted/30">
+                            <ContextConfigEditor
+                                category={formData.category || "post_gen"}
+                                config={formData.contextConfig || {}}
+                                onChange={handleContextConfigChange}
+                                disabled={isLoading}
+                            />
+                        </div>
                     </div>
-
-                    {/* Detected Placeholders */}
-                    {detectedPlaceholders.length > 0 && (
-                        <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                                <Tag className="h-4 w-4 text-muted-foreground" />
-                                <Label>Detected Placeholders</Label>
-                            </div>
-                            <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-md">
-                                {detectedPlaceholders.map((placeholder, index) => (
-                                    <Badge
-                                        key={index}
-                                        variant="secondary"
-                                        className="font-mono text-xs"
-                                    >
-                                        {placeholder}
-                                    </Badge>
-                                ))}
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                                Placeholders are automatically detected from {"{{variable}}"} patterns in your prompts
-                            </p>
-                        </div>
-                    )}
                 </div>
 
                 <DialogFooter>

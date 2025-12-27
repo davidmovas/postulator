@@ -131,8 +131,8 @@ export function AIGenerateModal({
     const placeholders = useMemo(() => {
         if (!selectedPrompt) return [];
         const keys = extractPlaceholdersFromPrompts(
-            selectedPrompt.systemPrompt,
-            selectedPrompt.userPrompt
+            selectedPrompt.systemPrompt || "",
+            selectedPrompt.userPrompt || ""
         );
         return keys.filter(k => !EXCLUDED_PLACEHOLDERS.includes(k.toLowerCase()));
     }, [selectedPrompt]);

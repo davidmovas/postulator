@@ -598,6 +598,112 @@ export namespace dto {
 	        this.maxOutgoingLinks = source["maxOutgoingLinks"];
 	    }
 	}
+	export class SelectOption {
+	    value: string;
+	    label: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SelectOption(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.value = source["value"];
+	        this.label = source["label"];
+	    }
+	}
+	export class ContextFieldDefinition {
+	    key: string;
+	    label: string;
+	    description: string;
+	    type: string;
+	    options?: SelectOption[];
+	    defaultValue: string;
+	    required: boolean;
+	    categories: string[];
+	    group?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ContextFieldDefinition(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.label = source["label"];
+	        this.description = source["description"];
+	        this.type = source["type"];
+	        this.options = this.convertValues(source["options"], SelectOption);
+	        this.defaultValue = source["defaultValue"];
+	        this.required = source["required"];
+	        this.categories = source["categories"];
+	        this.group = source["group"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ContextFieldValue {
+	    enabled: boolean;
+	    value?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ContextFieldValue(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	        this.value = source["value"];
+	    }
+	}
+	export class ContextFieldsResponse {
+	    fields: ContextFieldDefinition[];
+	    defaultConfig: Record<string, ContextFieldValue>;
+	
+	    static createFrom(source: any = {}) {
+	        return new ContextFieldsResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.fields = this.convertValues(source["fields"], ContextFieldDefinition);
+	        this.defaultConfig = this.convertValues(source["defaultConfig"], ContextFieldValue, true);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class CreateLinkPlanRequest {
 	    sitemapId: number;
 	    siteId: number;
@@ -1646,9 +1752,12 @@ export namespace dto {
 	    name: string;
 	    category: string;
 	    isBuiltin: boolean;
-	    systemPrompt: string;
-	    userPrompt: string;
-	    placeholders: string[];
+	    version: number;
+	    instructions?: string;
+	    contextConfig?: Record<string, ContextFieldValue>;
+	    systemPrompt?: string;
+	    userPrompt?: string;
+	    placeholders?: string[];
 	    createdAt: string;
 	    updatedAt: string;
 	
@@ -1662,12 +1771,33 @@ export namespace dto {
 	        this.name = source["name"];
 	        this.category = source["category"];
 	        this.isBuiltin = source["isBuiltin"];
+	        this.version = source["version"];
+	        this.instructions = source["instructions"];
+	        this.contextConfig = this.convertValues(source["contextConfig"], ContextFieldValue, true);
 	        this.systemPrompt = source["systemPrompt"];
 	        this.userPrompt = source["userPrompt"];
 	        this.placeholders = source["placeholders"];
 	        this.createdAt = source["createdAt"];
 	        this.updatedAt = source["updatedAt"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class Provider {
 	    id: number;
@@ -2118,6 +2248,40 @@ export namespace dto {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
 	        this.data = this.convertValues(source["data"], Category);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_ContextFieldsResponse_ {
+	    success: boolean;
+	    data?: ContextFieldsResponse;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_ContextFieldsResponse_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], ContextFieldsResponse);
 	        this.error = this.convertValues(source["error"], Error);
 	    }
 	
@@ -4482,6 +4646,7 @@ export namespace dto {
 	        this.maxDepth = source["maxDepth"];
 	    }
 	}
+	
 	
 	
 	export class SetNodeKeywordsRequest {

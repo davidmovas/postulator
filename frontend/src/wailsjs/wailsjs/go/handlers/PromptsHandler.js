@@ -10,6 +10,10 @@ export function DeletePrompt(arg1) {
   return window['go']['handlers']['PromptsHandler']['DeletePrompt'](arg1);
 }
 
+export function GetContextFields(arg1) {
+  return window['go']['handlers']['PromptsHandler']['GetContextFields'](arg1);
+}
+
 export function GetPrompt(arg1) {
   return window['go']['handlers']['PromptsHandler']['GetPrompt'](arg1);
 }

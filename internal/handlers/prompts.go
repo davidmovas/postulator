@@ -87,3 +87,12 @@ func (h *PromptsHandler) DeletePrompt(id int64) *dto.Response[string] {
 
 	return ok("Prompt deleted successfully")
 }
+
+// GetContextFields returns context field definitions and default config for a category
+func (h *PromptsHandler) GetContextFields(category string) *dto.Response[*dto.ContextFieldsResponse] {
+	cat := entities.PromptCategory(category)
+	fields := h.service.GetContextFields(cat)
+	defaultConfig := h.service.GetDefaultContextConfig(cat)
+
+	return ok(dto.NewContextFieldsResponse(fields, defaultConfig))
+}
