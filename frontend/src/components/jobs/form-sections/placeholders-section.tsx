@@ -4,12 +4,13 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Input } from "@/components/ui/input";
 import { JobCreateInput } from "@/models/jobs";
 import { extractPlaceholdersFromPrompts } from "@/lib/prompt-utils";
+import { isV2Prompt, Prompt } from "@/models/prompts";
 import { useMemo } from "react";
 
 interface PlaceholdersSectionProps {
     formData: Partial<JobCreateInput>;
     onUpdate: (updates: Partial<JobCreateInput>) => void;
-    prompts: any[] | null;
+    prompts: Prompt[] | null;
 }
 
 export function PlaceholdersSection({ formData, onUpdate, prompts }: PlaceholdersSectionProps) {
@@ -17,14 +18,17 @@ export function PlaceholdersSection({ formData, onUpdate, prompts }: Placeholder
 
     const EXCLUDED_KEYS = ["title", "topic"]; // These will be filled dynamically during execution
 
+    // For v2 prompts, placeholders are not needed - context fields are configured in the prompt
+    const isV2 = selectedPrompt && isV2Prompt(selectedPrompt);
+
     const placeholders = useMemo(() => {
-        if (!selectedPrompt) return [];
+        if (!selectedPrompt || isV2) return [];
         const keys = extractPlaceholdersFromPrompts(
-            selectedPrompt.systemPrompt,
-            selectedPrompt.userPrompt
+            selectedPrompt.systemPrompt || "",
+            selectedPrompt.userPrompt || ""
         );
         return keys.filter(k => !EXCLUDED_KEYS.includes(k.toLowerCase()));
-    }, [selectedPrompt]);
+    }, [selectedPrompt, isV2]);
 
     const updatePlaceholderValue = (placeholder: string, value: string) => {
         const currentValues = formData.placeholdersValues || {};
@@ -48,6 +52,28 @@ export function PlaceholdersSection({ formData, onUpdate, prompts }: Placeholder
                 <CardContent>
                     <div className="text-center py-6 text-muted-foreground">
                         Please select a prompt first
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    // For v2 prompts, show a simpler card
+    if (isV2) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Context Configuration</CardTitle>
+                    <CardFooter>
+                        This prompt uses the new context system
+                    </CardFooter>
+                </CardHeader>
+                <CardContent>
+                    <div className="p-3 bg-muted/50 rounded-md">
+                        <div className="font-medium">{selectedPrompt.name}</div>
+                        <div className="text-sm text-muted-foreground mt-1">
+                            Context fields are configured in the prompt settings
+                        </div>
                     </div>
                 </CardContent>
             </Card>

@@ -23,7 +23,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Sparkles, Globe } from "lucide-react";
 import { Provider, Model } from "@/models/providers";
-import { Prompt } from "@/models/prompts";
+import { Prompt, isV2Prompt } from "@/models/prompts";
 import { Topic } from "@/models/topics";
 import { GenerateContentResult } from "@/models/articles";
 import { extractPlaceholdersFromPrompts } from "@/lib/prompt-utils";
@@ -81,12 +81,23 @@ export function AIGenerateModal({
         try {
             const [providersData, promptsData, topicsData] = await Promise.all([
                 providerService.listActiveProviders(),
-                promptService.listPrompts(),
+                promptService.listPromptsByCategory("post_gen"),
                 topicService.getUnusedSiteTopics(siteId),
             ]);
             setProviders(providersData);
             setPrompts(promptsData);
             setTopics(topicsData);
+
+            // Set default provider
+            if (providersData.length > 0 && !selectedProviderId) {
+                setSelectedProviderId(providersData[0].id.toString());
+            }
+
+            // Set default prompt (first builtin or first available)
+            if (promptsData.length > 0 && !selectedPromptId) {
+                const builtin = promptsData.find(p => p.isBuiltin);
+                setSelectedPromptId((builtin?.id || promptsData[0].id).toString());
+            }
 
             // Load models for all unique provider types
             const uniqueTypes = [...new Set(providersData.map(p => p.type))];
@@ -128,8 +139,9 @@ export function AIGenerateModal({
         return prompts.find(p => p.id.toString() === selectedPromptId) || null;
     }, [selectedPromptId, prompts]);
 
+    // Placeholders only for v1 prompts - v2 prompts use contextConfig
     const placeholders = useMemo(() => {
-        if (!selectedPrompt) return [];
+        if (!selectedPrompt || isV2Prompt(selectedPrompt)) return [];
         const keys = extractPlaceholdersFromPrompts(
             selectedPrompt.systemPrompt || "",
             selectedPrompt.userPrompt || ""
@@ -165,12 +177,14 @@ export function AIGenerateModal({
         if (!selectedProviderId || !selectedPromptId) return false;
         if (topicMode === "existing" && !selectedTopicId) return false;
         if (topicMode === "custom" && !customTopicTitle.trim()) return false;
-        // Check all placeholders are filled
-        for (const placeholder of placeholders) {
-            if (!placeholderValues[placeholder]?.trim()) return false;
+        // Check all placeholders are filled (only for v1 prompts)
+        if (selectedPrompt && !isV2Prompt(selectedPrompt)) {
+            for (const placeholder of placeholders) {
+                if (!placeholderValues[placeholder]?.trim()) return false;
+            }
         }
         return true;
-    }, [selectedProviderId, selectedPromptId, topicMode, selectedTopicId, customTopicTitle, placeholders, placeholderValues]);
+    }, [selectedProviderId, selectedPromptId, topicMode, selectedTopicId, customTopicTitle, placeholders, placeholderValues, selectedPrompt]);
 
     const handleGenerate = async () => {
         if (!canGenerate) return;
@@ -379,8 +393,8 @@ export function AIGenerateModal({
                             )}
                         </div>
 
-                        {/* Placeholders */}
-                        {selectedPrompt && placeholders.length > 0 && (
+                        {/* Placeholders - only for v1 prompts */}
+                        {selectedPrompt && !isV2Prompt(selectedPrompt) && placeholders.length > 0 && (
                             <div className="space-y-4 border-t pt-4">
                                 <div>
                                     <Label className="text-base">Prompt Placeholders</Label>
@@ -408,7 +422,13 @@ export function AIGenerateModal({
                             </div>
                         )}
 
-                        {selectedPrompt && placeholders.length === 0 && (
+                        {selectedPrompt && isV2Prompt(selectedPrompt) && (
+                            <div className="text-center py-4 text-muted-foreground text-sm border-t pt-4">
+                                Context fields are configured in the prompt
+                            </div>
+                        )}
+
+                        {selectedPrompt && !isV2Prompt(selectedPrompt) && placeholders.length === 0 && (
                             <div className="text-center py-4 text-muted-foreground text-sm border-t pt-4">
                                 No additional placeholders to fill (standard fields are auto-filled)
                             </div>

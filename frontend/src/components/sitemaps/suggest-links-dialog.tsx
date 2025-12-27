@@ -44,7 +44,7 @@ import { providerService } from "@/services/providers";
 import { promptService } from "@/services/prompts";
 import { linkingService } from "@/services/linking";
 import { Provider } from "@/models/providers";
-import { Prompt } from "@/models/prompts";
+import { Prompt, isV2Prompt } from "@/models/prompts";
 import { SitemapNode } from "@/models/sitemaps";
 import {
     SuggestStartedEvent,
@@ -105,6 +105,35 @@ export function SuggestLinksDialog({
         }
         return allNodes.filter((n) => !n.isRoot);
     }, [selectedNodes, allNodes]);
+
+    // Get selected prompt
+    const selectedPrompt = useMemo(() => {
+        if (!promptId || prompts.length === 0) return null;
+        return prompts.find(p => p.id === promptId) || null;
+    }, [promptId, prompts]);
+
+    // Apply context config values from a prompt
+    const applyPromptConfig = (prompt: Prompt) => {
+        if (!isV2Prompt(prompt) || !prompt.contextConfig) return;
+
+        const config = prompt.contextConfig;
+
+        if (config.maxIncoming?.enabled && config.maxIncoming.value) {
+            setMaxIncoming(config.maxIncoming.value);
+        }
+        if (config.maxOutgoing?.enabled && config.maxOutgoing.value) {
+            setMaxOutgoing(config.maxOutgoing.value);
+        }
+    };
+
+    // Handle prompt selection change
+    const handlePromptChange = (newPromptId: number) => {
+        setPromptId(newPromptId);
+        const prompt = prompts.find(p => p.id === newPromptId);
+        if (prompt) {
+            applyPromptConfig(prompt);
+        }
+    };
 
     useEffect(() => {
         if (open) {
@@ -193,6 +222,14 @@ export function SuggestLinksDialog({
 
             if (activeProviders.length > 0 && !providerId) {
                 setProviderId(activeProviders[0].id);
+            }
+
+            // Set default prompt (first builtin or first available)
+            if (promptsData.length > 0 && !promptId) {
+                const builtin = promptsData.find(p => p.isBuiltin);
+                const defaultPrompt = builtin || promptsData[0];
+                setPromptId(defaultPrompt.id);
+                applyPromptConfig(defaultPrompt);
             }
         } catch (err) {
             console.error("Failed to load data:", err);
@@ -401,7 +438,7 @@ export function SuggestLinksDialog({
                                             <Label>Prompt Template *</Label>
                                             <Select
                                                 value={promptId?.toString() || ""}
-                                                onValueChange={(v) => setPromptId(Number(v))}
+                                                onValueChange={(v) => handlePromptChange(Number(v))}
                                             >
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Select prompt" />
