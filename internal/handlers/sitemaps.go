@@ -825,6 +825,7 @@ func (h *SitemapsHandler) StartPageGeneration(req *dto.StartPageGenerationReques
 			AutoLinkApplyPromptID:   req.ContentSettings.AutoLinkApplyPromptID,
 			MaxIncomingLinks:        req.ContentSettings.MaxIncomingLinks,
 			MaxOutgoingLinks:        req.ContentSettings.MaxOutgoingLinks,
+			ContextOverrides:        convertContextOverrides(req.ContentSettings.ContextOverrides),
 		}
 	}
 
@@ -934,6 +935,21 @@ func (h *SitemapsHandler) taskToDTO(task *generation.Task) *dto.GenerationTaskRe
 	}
 
 	return resp
+}
+
+// convertContextOverrides converts DTO context overrides to entities
+func convertContextOverrides(overrides map[string]dto.ContextFieldValue) entities.ContextConfig {
+	if overrides == nil {
+		return nil
+	}
+	result := make(entities.ContextConfig, len(overrides))
+	for k, v := range overrides {
+		result[k] = entities.ContextFieldValue{
+			Enabled: v.Enabled,
+			Value:   v.Value,
+		}
+	}
+	return result
 }
 
 // =========================================================================

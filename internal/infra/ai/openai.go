@@ -40,7 +40,6 @@ type OpenAIClient struct {
 	modelName            string
 	usesCompletionTokens bool
 	isReasoningModel     bool
-	supportsWebSearch    bool
 }
 
 func NewOpenAIClient(cfg Config) (*OpenAIClient, error) {
@@ -64,11 +63,9 @@ func NewOpenAIClient(cfg Config) (*OpenAIClient, error) {
 
 	usesCompletionTokens := false
 	isReasoningModel := false
-	supportsWebSearch := false
 	if modelInfo := GetModelInfo(entities.TypeOpenAI, cfg.Model); modelInfo != nil {
 		usesCompletionTokens = modelInfo.UsesCompletionTokens
 		isReasoningModel = modelInfo.IsReasoningModel
-		supportsWebSearch = modelInfo.SupportsWebSearch
 	}
 
 	return &OpenAIClient{
@@ -77,7 +74,6 @@ func NewOpenAIClient(cfg Config) (*OpenAIClient, error) {
 		modelName:            cfg.Model,
 		usesCompletionTokens: usesCompletionTokens,
 		isReasoningModel:     isReasoningModel,
-		supportsWebSearch:    supportsWebSearch,
 	}, nil
 }
 
@@ -87,10 +83,6 @@ func (c *OpenAIClient) GetProviderName() string {
 
 func (c *OpenAIClient) GetModelName() string {
 	return c.modelName
-}
-
-func (c *OpenAIClient) SupportsWebSearch() bool {
-	return c.supportsWebSearch
 }
 
 func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPrompt string, opts *GenerateArticleOptions) (*ArticleResult, error) {
@@ -118,14 +110,6 @@ func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPr
 		Model: c.model,
 	}
 
-	// Add web search if requested and supported
-	useWebSearch := opts != nil && opts.UseWebSearch && c.supportsWebSearch
-	if useWebSearch {
-		params.WebSearchOptions = openaiSDK.ChatCompletionNewParamsWebSearchOptions{
-			SearchContextSize: "medium",
-		}
-	}
-
 	// Reasoning models (o1, o3, gpt-5 series) don't support temperature
 	if !c.isReasoningModel {
 		params.Temperature = openaiSDK.Float(0.7)
@@ -138,7 +122,7 @@ func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPr
 		params.MaxTokens = openaiSDK.Int(articleMaxTokens)
 	}
 
-	fmt.Printf("[OpenAI] GenerateArticle: model=%s, maxTokens=%d, webSearch=%v\n", c.modelName, articleMaxTokens, useWebSearch)
+	fmt.Printf("[OpenAI] GenerateArticle: model=%s, maxTokens=%d\n", c.modelName, articleMaxTokens)
 
 	chat, err := c.client.Chat.Completions.New(ctx, params)
 	if err != nil {

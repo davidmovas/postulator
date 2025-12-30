@@ -15,8 +15,7 @@ type Usage struct {
 
 // GenerateArticleOptions contains optional parameters for article generation
 type GenerateArticleOptions struct {
-	// UseWebSearch enables web search tool for models that support it
-	UseWebSearch bool
+	// Reserved for future options
 }
 
 type Client interface {
@@ -27,7 +26,6 @@ type Client interface {
 	InsertLinks(ctx context.Context, request *InsertLinksRequest) (*InsertLinksResult, error)
 	GetProviderName() string
 	GetModelName() string
-	SupportsWebSearch() bool
 }
 
 type ArticleResult struct {

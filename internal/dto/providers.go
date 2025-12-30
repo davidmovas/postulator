@@ -64,7 +64,6 @@ type Model struct {
 	RPM                  int     `json:"rpm"`
 	TPM                  int     `json:"tpm"`
 	UsesCompletionTokens bool    `json:"usesCompletionTokens"`
-	SupportsWebSearch    bool    `json:"supportsWebSearch"`
 }
 
 func NewModel(entity *entities.Model) *Model {
@@ -84,7 +83,6 @@ func (d *Model) ToEntity() *entities.Model {
 		RPM:                  d.RPM,
 		TPM:                  d.TPM,
 		UsesCompletionTokens: d.UsesCompletionTokens,
-		SupportsWebSearch:    d.SupportsWebSearch,
 	}
 }
 
@@ -99,6 +97,5 @@ func (d *Model) FromEntity(entity *entities.Model) *Model {
 	d.RPM = entity.RPM
 	d.TPM = entity.TPM
 	d.UsesCompletionTokens = entity.UsesCompletionTokens
-	d.SupportsWebSearch = entity.SupportsWebSearch
 	return d
 }

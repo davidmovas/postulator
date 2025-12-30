@@ -472,6 +472,8 @@ export const sitemapService = {
                 autoLinkApplyPromptId: input.contentSettings.autoLinkApplyPromptId,
                 maxIncomingLinks: input.contentSettings.maxIncomingLinks || 0,
                 maxOutgoingLinks: input.contentSettings.maxOutgoingLinks || 0,
+                // Pass context overrides for proper enabled/disabled field handling
+                contextOverrides: input.contentSettings.contextOverrides,
             }) : undefined,
         });
 

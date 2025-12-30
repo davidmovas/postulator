@@ -209,8 +209,8 @@ function ContextField({ field, value, onChange, disabled, compact, mode }: Conte
     const fieldValue = value?.value ?? field.defaultValue ?? "";
     const isRequired = field.required;
 
-    // In override mode, we can't disable fields, only change values
-    const canToggle = mode === "edit" && !isRequired;
+    // Optional fields can be toggled in both modes, required fields are always enabled
+    const canToggle = !isRequired;
 
     if (field.type === "checkbox") {
         return (

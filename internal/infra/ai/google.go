@@ -28,10 +28,6 @@ func (c *GoogleClient) GetModelName() string {
 	return c.model
 }
 
-func (c *GoogleClient) SupportsWebSearch() bool {
-	return false // Google doesn't support web search in this SDK
-}
-
 type GoogleConfig struct {
 	APIKey string
 	Model  string

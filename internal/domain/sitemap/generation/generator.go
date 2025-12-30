@@ -93,16 +93,10 @@ func (g *Generator) Generate(ctx context.Context, req GenerateRequest) (*Generat
 		return nil, fmt.Errorf("failed to build prompts: %w", err)
 	}
 
-	// Prepare generation options
-	var opts *ai.GenerateArticleOptions
-	if req.ContentSettings != nil && req.ContentSettings.UseWebSearch {
-		opts = &ai.GenerateArticleOptions{UseWebSearch: true}
-	}
+	g.logger.Infof("Generating content for node %d (%s) with provider %s/%s, links=%d",
+		req.Node.ID, req.Node.Title, aiClient.GetProviderName(), aiClient.GetModelName(), len(req.LinkTargets))
 
-	g.logger.Infof("Generating content for node %d (%s) with provider %s/%s, links=%d, webSearch=%v",
-		req.Node.ID, req.Node.Title, aiClient.GetProviderName(), aiClient.GetModelName(), len(req.LinkTargets), opts != nil && opts.UseWebSearch)
-
-	articleResult, err := aiClient.GenerateArticle(ctx, systemPrompt, userPrompt, opts)
+	articleResult, err := aiClient.GenerateArticle(ctx, systemPrompt, userPrompt, nil)
 	durationMs := time.Since(startTime).Milliseconds()
 
 	// Log AI usage regardless of success/failure
@@ -209,6 +203,13 @@ func (g *Generator) buildPrompts(ctx context.Context, req GenerateRequest) (stri
 // contentSettingsToOverrides converts ContentSettings to ContextConfig overrides
 // NOTE: customInstructions is passed via RuntimeData, not overrides (it's a runtime-only field)
 func contentSettingsToOverrides(settings *ContentSettings) entities.ContextConfig {
+	// If ContextOverrides is provided from UI, use it directly
+	// This allows proper handling of enabled/disabled fields from the frontend
+	if settings.ContextOverrides != nil && len(settings.ContextOverrides) > 0 {
+		return settings.ContextOverrides
+	}
+
+	// Legacy fallback: convert individual fields to overrides
 	overrides := make(entities.ContextConfig)
 
 	if settings.WordCount != "" {

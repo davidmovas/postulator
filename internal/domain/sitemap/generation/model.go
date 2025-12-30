@@ -3,6 +3,8 @@ package generation
 import (
 	"sync"
 	"time"
+
+	"github.com/davidmovas/postulator/internal/domain/entities"
 )
 
 type TaskStatus string
@@ -139,6 +141,8 @@ type ContentSettings struct {
 	AutoLinkApplyPromptID   *int64       `json:"autoLinkApplyPromptId,omitempty"`   // Prompt for link insertion (link_apply category)
 	MaxIncomingLinks        int          `json:"maxIncomingLinks"`                  // Max incoming links per page (0 = no limit)
 	MaxOutgoingLinks        int          `json:"maxOutgoingLinks"`                  // Max outgoing links per page (0 = no limit)
+	// Context overrides from UI - allows enabling/disabling specific context fields
+	ContextOverrides entities.ContextConfig `json:"contextOverrides,omitempty"`
 }
 
 // LinkTarget represents a target page for internal linking during content generation

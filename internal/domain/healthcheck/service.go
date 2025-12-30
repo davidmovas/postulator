@@ -132,6 +132,41 @@ func (s *service) CheckAutoHealthSites(ctx context.Context) (unhealthy []*entiti
 	return unhealthySites, recoveredSites, nil
 }
 
+func (s *service) CheckAllSites(ctx context.Context) (checked int, failed int, err error) {
+	allSites, err := s.siteService.ListSites(ctx)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to get sites list")
+		return 0, 0, err
+	}
+
+	var sitesToCheck []*entities.Site
+	for _, site := range allSites {
+		if site.Status == entities.StatusActive {
+			sitesToCheck = append(sitesToCheck, site)
+		}
+	}
+
+	if len(sitesToCheck) == 0 {
+		s.logger.Info("No active sites to check")
+		return 0, 0, nil
+	}
+
+	s.logger.Infof("Checking health for %d sites", len(sitesToCheck))
+
+	for _, site := range sitesToCheck {
+		_, checkErr := s.CheckSiteHealth(ctx, site)
+		if checkErr != nil {
+			s.logger.Errorf("Health check failed for site %d (%s): %v", site.ID, site.Name, checkErr)
+			failed++
+		} else {
+			checked++
+		}
+	}
+
+	s.logger.Infof("Health check completed: %d checked, %d failed", checked, failed)
+	return checked, failed, nil
+}
+
 func (s *service) GetSiteHistory(ctx context.Context, siteID int64, limit int) ([]*entities.HealthCheckHistory, error) {
 	history, err := s.repo.GetHistoryBySite(ctx, siteID, limit)
 	if err != nil {

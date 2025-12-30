@@ -29,10 +29,6 @@ func (c *AnthropicClient) GetModelName() string {
 	return c.model
 }
 
-func (c *AnthropicClient) SupportsWebSearch() bool {
-	return false // Anthropic doesn't support web search
-}
-
 type AnthropicConfig struct {
 	APIKey string
 	Model  string

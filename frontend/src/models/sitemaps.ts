@@ -378,9 +378,9 @@ export type AutoLinkMode = "none" | "before" | "after";
 export type LinkingPhase = "none" | "suggesting" | "applying" | "completed";
 
 export interface ContentSettings {
-    wordCount: string; // e.g. "1000" or "800-1200"
-    writingStyle: WritingStyle;
-    contentTone: ContentTone;
+    wordCount?: string; // e.g. "1000" or "800-1200"
+    writingStyle?: WritingStyle;
+    contentTone?: ContentTone;
     customInstructions?: string;
     useWebSearch?: boolean; // Enable web search for AI generation
     includeLinks?: boolean; // Include approved links from linking plan
@@ -390,6 +390,8 @@ export interface ContentSettings {
     autoLinkApplyPromptId?: number; // Prompt for link insertion (link_apply category)
     maxIncomingLinks?: number; // Max incoming links per page (0 = no limit)
     maxOutgoingLinks?: number; // Max outgoing links per page (0 = no limit)
+    // Context overrides from UI - allows proper enabled/disabled handling
+    contextOverrides?: import("@/models/prompts").ContextConfig;
 }
 
 export interface StartPageGenerationInput {

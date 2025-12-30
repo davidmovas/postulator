@@ -30,6 +30,14 @@ func (h *HealthCheckHandler) CheckAuto() *dto.Response[*dto.AutoCheckResult] {
 	return ok(&dto.AutoCheckResult{Unhealthy: dto.SitesToDTO(unhealthy), Recovered: dto.SitesToDTO(recovered)})
 }
 
+func (h *HealthCheckHandler) CheckAll() *dto.Response[*dto.CheckAllResult] {
+	checked, failed, err := h.service.CheckAllSites(ctx.LongCtx())
+	if err != nil {
+		return fail[*dto.CheckAllResult](err)
+	}
+	return ok(&dto.CheckAllResult{Checked: checked, Failed: failed})
+}
+
 func (h *HealthCheckHandler) GetHistory(siteID int64, limit int) *dto.Response[[]*dto.HealthCheckHistory] {
 	items, err := h.service.GetSiteHistory(ctx.FastCtx(), siteID, limit)
 	if err != nil {

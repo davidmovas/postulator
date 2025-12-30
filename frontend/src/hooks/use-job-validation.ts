@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { DailySchedule, IntervalSchedule, JobCreateInput, OnceSchedule } from "@/models/jobs";
+import { isV2Prompt } from "@/models/prompts";
 
 const AUTO_FILLED_PLACEHOLDERS = ["title", "topic", "category"];
 
@@ -36,8 +37,9 @@ export function useJobValidation(formData: Partial<JobCreateInput>, prompts: any
             errors.push("At least one category must be selected");
         }
 
-        // Placeholders validation
-        if (selectedPrompt) {
+        // Placeholders validation - only for legacy v1 prompts
+        // V2 prompts use context fields with required/optional distinction handled in UI
+        if (selectedPrompt && !isV2Prompt(selectedPrompt)) {
             const requiredPlaceholders = extractRequiredPlaceholders(selectedPrompt);
             const missingPlaceholders = requiredPlaceholders.filter(
                 placeholder => !formData.placeholdersValues?.[placeholder]

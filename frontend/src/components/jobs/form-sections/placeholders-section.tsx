@@ -2,6 +2,9 @@
 
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { JobCreateInput } from "@/models/jobs";
 import { extractPlaceholdersFromPrompts } from "@/lib/prompt-utils";
 import { isV2Prompt, Prompt, ContextConfig } from "@/models/prompts";
@@ -24,26 +27,44 @@ export function PlaceholdersSection({ formData, onUpdate, prompts }: Placeholder
 
     // Context overrides for v2 prompts
     const [contextOverrides, setContextOverrides] = useState<ContextConfig>({});
+    // Additional instructions for v2 prompts (job-specific, not saved to prompt)
+    const [customInstructions, setCustomInstructions] = useState<string>("");
 
-    // Initialize context overrides when prompt changes
+    // Initialize context overrides and custom instructions when prompt changes
     useEffect(() => {
         if (selectedPrompt && isV2Prompt(selectedPrompt) && selectedPrompt.contextConfig) {
             setContextOverrides(selectedPrompt.contextConfig);
         } else {
             setContextOverrides({});
         }
+        // Initialize customInstructions from existing formData if available
+        setCustomInstructions(formData.placeholdersValues?.customInstructions || "");
     }, [selectedPrompt?.id]);
 
     // Handle context config changes - convert to placeholdersValues for backend compatibility
     const handleContextConfigChange = (config: ContextConfig) => {
         setContextOverrides(config);
-        // Convert to placeholdersValues format for backend
+        updatePlaceholdersFromConfig(config, customInstructions);
+    };
+
+    // Handle custom instructions changes
+    const handleCustomInstructionsChange = (value: string) => {
+        setCustomInstructions(value);
+        updatePlaceholdersFromConfig(contextOverrides, value);
+    };
+
+    // Convert context config and custom instructions to placeholdersValues format
+    const updatePlaceholdersFromConfig = (config: ContextConfig, instructions: string) => {
         const placeholderValues: Record<string, string> = {};
         Object.entries(config).forEach(([key, value]) => {
             if (value.enabled && value.value) {
                 placeholderValues[key] = value.value;
             }
         });
+        // Add custom instructions if provided
+        if (instructions.trim()) {
+            placeholderValues.customInstructions = instructions.trim();
+        }
         onUpdate({ placeholdersValues: placeholderValues });
     };
 
@@ -94,8 +115,8 @@ export function PlaceholdersSection({ formData, onUpdate, prompts }: Placeholder
                         Configure settings for content generation. These are based on the prompt&apos;s context configuration.
                     </CardFooter>
                 </CardHeader>
-                <CardContent>
-                    <div className="p-3 bg-muted/50 rounded-md mb-4">
+                <CardContent className="space-y-6">
+                    <div className="p-3 bg-muted/50 rounded-md">
                         <div className="font-medium">{selectedPrompt.name}</div>
                         <div className="text-sm text-muted-foreground mt-1">
                             Adjust values below to customize generation
@@ -108,6 +129,29 @@ export function PlaceholdersSection({ formData, onUpdate, prompts }: Placeholder
                         config={contextOverrides}
                         onChange={handleContextConfigChange}
                     />
+
+                    <Separator />
+
+                    {/* Additional Instructions - job-specific */}
+                    <div className="space-y-3">
+                        <div>
+                            <Label htmlFor="customInstructions" className="text-sm font-medium">
+                                Additional Instructions
+                                <span className="text-muted-foreground font-normal ml-2">(Optional)</span>
+                            </Label>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Add temporary instructions specific to this job. These will be appended to the prompt and won&apos;t affect the base prompt template.
+                            </p>
+                        </div>
+                        <Textarea
+                            id="customInstructions"
+                            placeholder="e.g., Focus on technical details, use a formal tone, include code examples..."
+                            value={customInstructions}
+                            onChange={(e) => handleCustomInstructionsChange(e.target.value)}
+                            rows={3}
+                            className="resize-none"
+                        />
+                    </div>
                 </CardContent>
             </Card>
         );

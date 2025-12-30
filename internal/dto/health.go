@@ -19,6 +19,11 @@ type AutoCheckResult struct {
 	Recovered []*Site `json:"recovered"`
 }
 
+type CheckAllResult struct {
+	Checked int `json:"checked"`
+	Failed  int `json:"failed"`
+}
+
 func NewHealthHistory(h *entities.HealthCheckHistory) *HealthCheckHistory {
 	return (&HealthCheckHistory{}).FromEntity(h)
 }

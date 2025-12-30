@@ -18,6 +18,7 @@ type Service interface {
 	CheckSiteHealth(ctx context.Context, site *entities.Site) (*entities.HealthCheckHistory, error)
 	CheckSiteByID(ctx context.Context, siteID int64) (*entities.HealthCheckHistory, error)
 	CheckAutoHealthSites(ctx context.Context) (unhealthy []*entities.Site, recovered []*entities.Site, err error)
+	CheckAllSites(ctx context.Context) (checked int, failed int, err error)
 	GetSiteHistory(ctx context.Context, siteID int64, limit int) ([]*entities.HealthCheckHistory, error)
 	GetSiteHistoryByPeriod(ctx context.Context, siteID int64, from, to time.Time, limit, offset int) ([]*entities.HealthCheckHistory, int, error)
 }

@@ -200,10 +200,12 @@ func (r *ContextFieldRegistry) registerAllFields() {
 	// =========================================================================
 	// LINK_SUGGEST Fields
 	// =========================================================================
+	// NOTE: nodesInfo was removed - hierarchyTree now includes all node info
+	// (ID, title, path, keywords, link counts)
 	r.register(&entities.ContextFieldDefinition{
-		Key:          "nodesInfo",
-		Label:        "Nodes Information",
-		Description:  "Include page nodes data",
+		Key:          "hierarchyTree",
+		Label:        "Hierarchy Tree",
+		Description:  "Include visual site hierarchy with node details",
 		Type:         entities.ContextFieldTypeCheckbox,
 		DefaultValue: "true",
 		Required:     true,
@@ -211,41 +213,16 @@ func (r *ContextFieldRegistry) registerAllFields() {
 		Group:        "content",
 	})
 	r.register(&entities.ContextFieldDefinition{
-		Key:          "hierarchyTree",
-		Label:        "Hierarchy Tree",
-		Description:  "Include visual site hierarchy",
-		Type:         entities.ContextFieldTypeCheckbox,
-		DefaultValue: "true",
-		Categories:   []entities.PromptCategory{entities.PromptCategoryLinkSuggest},
-		Group:        "content",
-	})
-	r.register(&entities.ContextFieldDefinition{
 		Key:          "constraints",
 		Label:        "Link Constraints",
-		Description:  "Include max link limits",
+		Description:  "Include max link limits (passed via runtime data)",
 		Type:         entities.ContextFieldTypeCheckbox,
 		DefaultValue: "true",
 		Categories:   []entities.PromptCategory{entities.PromptCategoryLinkSuggest},
 		Group:        "content",
 	})
-	r.register(&entities.ContextFieldDefinition{
-		Key:          "maxIncoming",
-		Label:        "Max Incoming Links",
-		Description:  "Maximum incoming links per page",
-		Type:         entities.ContextFieldTypeInput,
-		DefaultValue: "5",
-		Categories:   []entities.PromptCategory{entities.PromptCategoryLinkSuggest},
-		Group:        "settings",
-	})
-	r.register(&entities.ContextFieldDefinition{
-		Key:          "maxOutgoing",
-		Label:        "Max Outgoing Links",
-		Description:  "Maximum outgoing links per page",
-		Type:         entities.ContextFieldTypeInput,
-		DefaultValue: "3",
-		Categories:   []entities.PromptCategory{entities.PromptCategoryLinkSuggest},
-		Group:        "settings",
-	})
+	// NOTE: maxIncoming/maxOutgoing are now included in the constraints placeholder
+	// and passed via runtime data, not as separate registry fields
 	// NOTE: feedback is a runtime-only field, not stored in prompt config
 	// It's passed at usage time via overrides
 

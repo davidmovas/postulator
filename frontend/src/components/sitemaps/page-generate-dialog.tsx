@@ -274,25 +274,15 @@ export function PageGenerateDialog({
         }
 
         try {
-            // Extract values from context overrides
-            const language = contextOverrides.language?.enabled ? contextOverrides.language.value || "English" : "English";
-            const wordCount = contextOverrides.wordCount?.enabled ? contextOverrides.wordCount.value || "800-1200" : "800-1200";
-            const writingStyle = (contextOverrides.writingStyle?.enabled ? contextOverrides.writingStyle.value || "professional" : "professional") as WritingStyle;
-            const contentTone = (contextOverrides.contentTone?.enabled ? contextOverrides.contentTone.value || "informative" : "informative") as ContentTone;
-
+            // Pass contextOverrides directly to backend for proper enabled/disabled handling
             const result = await sitemapService.startPageGeneration({
                 sitemapId,
                 nodeIds: nodesToGenerate.map((n) => n.id),
                 providerId,
                 promptId,
                 publishAs,
-                placeholders: {
-                    language,
-                },
+                placeholders: {},
                 contentSettings: {
-                    wordCount,
-                    writingStyle,
-                    contentTone,
                     customInstructions: customInstructions || undefined,
                     useWebSearch: supportsWebSearch && useWebSearch,
                     // Only include approved links if autoLinkMode is none
@@ -303,6 +293,8 @@ export function PageGenerateDialog({
                     autoLinkApplyPromptId: autoLinkMode === "after" ? linkApplyPromptId ?? undefined : undefined,
                     maxIncomingLinks: autoLinkMode !== "none" ? maxIncomingLinks : undefined,
                     maxOutgoingLinks: autoLinkMode !== "none" ? maxOutgoingLinks : undefined,
+                    // Pass context overrides directly - this allows proper enabled/disabled handling
+                    contextOverrides,
                 },
             });
 

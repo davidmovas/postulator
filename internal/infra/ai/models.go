@@ -17,7 +17,6 @@ var availableModels = map[entities.Type][]*entities.Model{
 			TPM:                  500000,
 			UsesCompletionTokens: true,
 			IsReasoningModel:     true,
-			SupportsWebSearch:    true,
 		},
 		// GPT-5 Mini - Fast and efficient
 		{
@@ -32,7 +31,6 @@ var availableModels = map[entities.Type][]*entities.Model{
 			TPM:                  500000,
 			UsesCompletionTokens: true,
 			IsReasoningModel:     true,
-			SupportsWebSearch:    true,
 		},
 		// GPT-5 Nano - Cheapest option
 		{
@@ -47,7 +45,6 @@ var availableModels = map[entities.Type][]*entities.Model{
 			TPM:                  200000,
 			UsesCompletionTokens: true,
 			IsReasoningModel:     true,
-			SupportsWebSearch:    true,
 		},
 		// GPT-4o Mini - Legacy fast model
 		{
@@ -73,7 +70,6 @@ var availableModels = map[entities.Type][]*entities.Model{
 			RPM:                  500,
 			TPM:                  30000,
 			UsesCompletionTokens: true,
-			SupportsWebSearch:    true,
 		},
 		// GPT-4.1 Mini - Fast large context model
 		{
@@ -87,7 +83,6 @@ var availableModels = map[entities.Type][]*entities.Model{
 			RPM:                  500,
 			TPM:                  200000,
 			UsesCompletionTokens: true,
-			SupportsWebSearch:    true,
 		},
 	},
 

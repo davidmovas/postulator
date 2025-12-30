@@ -460,6 +460,8 @@ type ContentSettingsDTO struct {
 	AutoLinkApplyPromptID   *int64 `json:"autoLinkApplyPromptId,omitempty"`   // Prompt for link insertion (link_apply)
 	MaxIncomingLinks        int    `json:"maxIncomingLinks,omitempty"`        // Max incoming links per page
 	MaxOutgoingLinks        int    `json:"maxOutgoingLinks,omitempty"`        // Max outgoing links per page
+	// Context overrides from UI - allows enabling/disabling specific context fields
+	ContextOverrides map[string]ContextFieldValue `json:"contextOverrides,omitempty"`
 }
 
 // LinkTargetDTO represents a target page for internal linking during generation

@@ -60,12 +60,12 @@ func NewContextFieldDefinition(def *entities.ContextFieldDefinition) *ContextFie
 
 // Prompt represents a prompt DTO with support for both v1 and v2 formats
 type Prompt struct {
-	ID           int64         `json:"id"`
-	Name         string        `json:"name"`
-	Category     string        `json:"category"`
-	IsBuiltin    bool          `json:"isBuiltin"`
-	Version      int           `json:"version"`
-	Instructions string        `json:"instructions,omitempty"`
+	ID            int64         `json:"id"`
+	Name          string        `json:"name"`
+	Category      string        `json:"category"`
+	IsBuiltin     bool          `json:"isBuiltin"`
+	Version       int           `json:"version"`
+	Instructions  string        `json:"instructions,omitempty"`
 	ContextConfig ContextConfig `json:"contextConfig,omitempty"`
 	// Legacy fields (v1 format)
 	SystemPrompt string   `json:"systemPrompt,omitempty"`

@@ -345,41 +345,17 @@ func (s *Suggester) buildPrompts(ctx context.Context, config SuggestConfig, node
 
 // configToOverrides converts SuggestConfig to ContextConfig overrides
 // NOTE: feedback is passed via RuntimeData, not overrides (it's a runtime-only field)
+// NOTE: maxIncoming/maxOutgoing are NOT added here - they're already in constraints placeholder
 func (s *Suggester) configToOverrides(config SuggestConfig) entities.ContextConfig {
 	overrides := make(entities.ContextConfig)
-
-	if config.MaxIncoming > 0 {
-		overrides["maxIncoming"] = entities.ContextFieldValue{Enabled: true, Value: fmt.Sprintf("%d", config.MaxIncoming)}
-	}
-	if config.MaxOutgoing > 0 {
-		overrides["maxOutgoing"] = entities.ContextFieldValue{Enabled: true, Value: fmt.Sprintf("%d", config.MaxOutgoing)}
-	}
-
+	// Constraints field handles max incoming/outgoing via placeholder
+	// No need to add separate fields that would duplicate the info
 	return overrides
 }
 
 func (s *Suggester) buildPlaceholders(config SuggestConfig, nodes []*entities.SitemapNode, outgoing, incoming map[int64]int) map[string]string {
-	// Build flat nodes info (kept for backward compatibility)
-	var nodesInfo strings.Builder
-	for _, node := range nodes {
-		nodesInfo.WriteString(fmt.Sprintf("[ID:%d] \"%s\" /%s", node.ID, node.Title, node.Slug))
-		if len(node.Keywords) > 0 {
-			kw := node.Keywords
-			if len(kw) > 5 {
-				kw = kw[:5]
-			}
-			nodesInfo.WriteString(fmt.Sprintf(" | keywords: %s", strings.Join(kw, ", ")))
-		}
-		nodesInfo.WriteString(fmt.Sprintf(" | links: %d→ %d←\n", outgoing[node.ID], incoming[node.ID]))
-	}
-
-	// Build hierarchical tree representation
+	// Build hierarchical tree representation (includes all node info: ID, title, path, keywords, link counts)
 	hierarchyTree := s.buildHierarchyTree(nodes, outgoing, incoming)
-
-	// DEBUG: Print hierarchy tree
-	if hierarchyTree != "" {
-		fmt.Printf("\n=== HIERARCHY TREE DEBUG ===\n%s=== END HIERARCHY TREE ===\n\n", hierarchyTree)
-	}
 
 	// Build constraints section
 	var constraints strings.Builder
@@ -401,12 +377,9 @@ func (s *Suggester) buildPlaceholders(config SuggestConfig, nodes []*entities.Si
 
 	placeholders := map[string]string{
 		"nodes_count":    fmt.Sprintf("%d", len(nodes)),
-		"nodes_info":     nodesInfo.String(),
-		"hierarchy_tree": hierarchyTree,
+		"hierarchyTree":  hierarchyTree,
 		"constraints":    constraints.String(),
 		"feedback":       feedback,
-		"max_incoming":   fmt.Sprintf("%d", config.MaxIncoming),
-		"max_outgoing":   fmt.Sprintf("%d", config.MaxOutgoing),
 		"existing_links": fmt.Sprintf("%d", len(config.ExistingLinks)),
 	}
 
