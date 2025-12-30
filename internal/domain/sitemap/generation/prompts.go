@@ -140,15 +140,23 @@ func BuildPlaceholders(ctx NodeContext) map[string]string {
 	userInstructions := buildUserInstructions(ctx.Title, ctx.Path, keywords, hierarchy, ctx.Context, internalLinks)
 
 	return map[string]string{
+		// Registry-matching keys (camelCase) for v2 prompt builder
+		"pageTitle":          ctx.Title,
+		"path":               ctx.Path,
+		"keywords":           keywords,
+		"hierarchy":          hierarchy,
+		"wordCount":          wordCount,
+		"writingStyle":       writingStyle,
+		"contentTone":        contentTone,
+		"language":           language,
+		"internalLinks":      internalLinks,
+		"customInstructions": ctx.CustomInstructions,
+		// Legacy keys (snake_case) for v1 prompt compatibility
 		"title":               ctx.Title,
-		"path":                ctx.Path,
-		"keywords":            keywords,
-		"hierarchy":           hierarchy,
-		"context":             ctx.Context,
-		"language":            language,
 		"word_count":          wordCount,
 		"writing_style":       writingStyle,
 		"content_tone":        contentTone,
+		"context":             ctx.Context,
 		"custom_instructions": ctx.CustomInstructions,
 		"internal_links":      internalLinks,
 		"system_instructions": systemInstructions,

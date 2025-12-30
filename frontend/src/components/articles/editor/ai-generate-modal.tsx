@@ -20,9 +20,11 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Loader2, Sparkles } from "lucide-react";
-import { Provider } from "@/models/providers";
-import { Prompt } from "@/models/prompts";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2, Sparkles, Globe } from "lucide-react";
+import { Provider, Model } from "@/models/providers";
+import { Prompt, isV2Prompt, ContextConfig } from "@/models/prompts";
+import { ContextConfigEditor } from "@/components/prompts/context-config/context-config-editor";
 import { Topic } from "@/models/topics";
 import { GenerateContentResult } from "@/models/articles";
 import { extractPlaceholdersFromPrompts } from "@/lib/prompt-utils";
@@ -52,6 +54,7 @@ export function AIGenerateModal({
     const [providers, setProviders] = useState<Provider[] | null>(null);
     const [prompts, setPrompts] = useState<Prompt[] | null>(null);
     const [topics, setTopics] = useState<Topic[] | null>(null);
+    const [modelsMap, setModelsMap] = useState<Record<string, Model[]>>({});
 
     const [selectedProviderId, setSelectedProviderId] = useState<string>("");
     const [selectedPromptId, setSelectedPromptId] = useState<string>("");
@@ -59,6 +62,8 @@ export function AIGenerateModal({
     const [selectedTopicId, setSelectedTopicId] = useState<string>("");
     const [customTopicTitle, setCustomTopicTitle] = useState("");
     const [placeholderValues, setPlaceholderValues] = useState<Record<string, string>>({});
+    const [contextOverrides, setContextOverrides] = useState<ContextConfig>({});
+    const [useWebSearch, setUseWebSearch] = useState(false);
 
     const [isLoading, setIsLoading] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -78,12 +83,36 @@ export function AIGenerateModal({
         try {
             const [providersData, promptsData, topicsData] = await Promise.all([
                 providerService.listActiveProviders(),
-                promptService.listPrompts(),
+                promptService.listPromptsByCategory("post_gen"),
                 topicService.getUnusedSiteTopics(siteId),
             ]);
             setProviders(providersData);
             setPrompts(promptsData);
             setTopics(topicsData);
+
+            // Set default provider
+            if (providersData.length > 0 && !selectedProviderId) {
+                setSelectedProviderId(providersData[0].id.toString());
+            }
+
+            // Set default prompt (first builtin or first available)
+            if (promptsData.length > 0 && !selectedPromptId) {
+                const builtin = promptsData.find(p => p.isBuiltin);
+                setSelectedPromptId((builtin?.id || promptsData[0].id).toString());
+            }
+
+            // Load models for all unique provider types
+            const uniqueTypes = [...new Set(providersData.map(p => p.type))];
+            const modelsPromises = uniqueTypes.map(async (type) => {
+                const models = await providerService.getAvailableModels(type);
+                return { type, models };
+            });
+            const modelsResults = await Promise.all(modelsPromises);
+            const newModelsMap: Record<string, Model[]> = {};
+            modelsResults.forEach(({ type, models }) => {
+                newModelsMap[type] = models;
+            });
+            setModelsMap(newModelsMap);
         } catch (err) {
             setError("Failed to load data");
             console.error(err);
@@ -92,17 +121,32 @@ export function AIGenerateModal({
         }
     };
 
+    // Get selected provider and its model info
+    const selectedProvider = useMemo(() => {
+        if (!selectedProviderId || !providers) return null;
+        return providers.find(p => p.id.toString() === selectedProviderId) || null;
+    }, [selectedProviderId, providers]);
+
+    const selectedModelInfo = useMemo(() => {
+        if (!selectedProvider) return null;
+        const models = modelsMap[selectedProvider.type] || [];
+        return models.find(m => m.id === selectedProvider.model) || null;
+    }, [selectedProvider, modelsMap]);
+
+    const supportsWebSearch = selectedModelInfo?.supportsWebSearch ?? false;
+
     // Get placeholders from selected prompt
     const selectedPrompt = useMemo(() => {
         if (!selectedPromptId || !prompts) return null;
         return prompts.find(p => p.id.toString() === selectedPromptId) || null;
     }, [selectedPromptId, prompts]);
 
+    // Placeholders only for v1 prompts - v2 prompts use contextConfig
     const placeholders = useMemo(() => {
-        if (!selectedPrompt) return [];
+        if (!selectedPrompt || isV2Prompt(selectedPrompt)) return [];
         const keys = extractPlaceholdersFromPrompts(
-            selectedPrompt.systemPrompt,
-            selectedPrompt.userPrompt
+            selectedPrompt.systemPrompt || "",
+            selectedPrompt.userPrompt || ""
         );
         return keys.filter(k => !EXCLUDED_PLACEHOLDERS.includes(k.toLowerCase()));
     }, [selectedPrompt]);
@@ -115,9 +159,18 @@ export function AIGenerateModal({
         setSelectedTopicId("");
         setCustomTopicTitle("");
         setPlaceholderValues({});
+        setContextOverrides({});
+        setUseWebSearch(false);
         setError(null);
         onOpenChange(false);
     }, [onOpenChange]);
+
+    // Reset web search when provider changes and doesn't support it
+    const handleProviderChange = useCallback((providerId: string) => {
+        setSelectedProviderId(providerId);
+        // Reset web search - will be enabled again if user wants and model supports it
+        setUseWebSearch(false);
+    }, []);
 
     const updatePlaceholderValue = (key: string, value: string) => {
         setPlaceholderValues(prev => ({ ...prev, [key]: value }));
@@ -127,12 +180,14 @@ export function AIGenerateModal({
         if (!selectedProviderId || !selectedPromptId) return false;
         if (topicMode === "existing" && !selectedTopicId) return false;
         if (topicMode === "custom" && !customTopicTitle.trim()) return false;
-        // Check all placeholders are filled
-        for (const placeholder of placeholders) {
-            if (!placeholderValues[placeholder]?.trim()) return false;
+        // Check all placeholders are filled (only for v1 prompts)
+        if (selectedPrompt && !isV2Prompt(selectedPrompt)) {
+            for (const placeholder of placeholders) {
+                if (!placeholderValues[placeholder]?.trim()) return false;
+            }
         }
         return true;
-    }, [selectedProviderId, selectedPromptId, topicMode, selectedTopicId, customTopicTitle, placeholders, placeholderValues]);
+    }, [selectedProviderId, selectedPromptId, topicMode, selectedTopicId, customTopicTitle, placeholders, placeholderValues, selectedPrompt]);
 
     const handleGenerate = async () => {
         if (!canGenerate) return;
@@ -141,13 +196,24 @@ export function AIGenerateModal({
         setError(null);
 
         try {
+            // For v2 prompts, convert context overrides to placeholder values
+            let finalPlaceholderValues = { ...placeholderValues };
+            if (selectedPrompt && isV2Prompt(selectedPrompt)) {
+                Object.entries(contextOverrides).forEach(([key, value]) => {
+                    if (value.enabled && value.value) {
+                        finalPlaceholderValues[key] = value.value;
+                    }
+                });
+            }
+
             const input = {
                 siteId,
                 providerId: parseInt(selectedProviderId),
                 promptId: parseInt(selectedPromptId),
                 topicId: topicMode === "existing" ? parseInt(selectedTopicId) : undefined,
                 customTopicTitle: topicMode === "custom" ? customTopicTitle.trim() : undefined,
-                placeholderValues,
+                placeholderValues: finalPlaceholderValues,
+                useWebSearch: supportsWebSearch && useWebSearch,
             };
 
             const result = await articleService.generateContent(input);
@@ -194,7 +260,7 @@ export function AIGenerateModal({
                             ) : (
                                 <Select
                                     value={selectedProviderId}
-                                    onValueChange={setSelectedProviderId}
+                                    onValueChange={handleProviderChange}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select a provider" />
@@ -213,6 +279,29 @@ export function AIGenerateModal({
                             )}
                         </div>
 
+                        {/* Web Search Option */}
+                        {supportsWebSearch && (
+                            <div className="flex items-center space-x-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                                <Checkbox
+                                    id="useWebSearch"
+                                    checked={useWebSearch}
+                                    onCheckedChange={(checked) => setUseWebSearch(checked === true)}
+                                />
+                                <div className="flex-1">
+                                    <Label
+                                        htmlFor="useWebSearch"
+                                        className="flex items-center gap-2 cursor-pointer"
+                                    >
+                                        <Globe className="h-4 w-4 text-blue-500" />
+                                        <span className="font-medium">Enable Web Search</span>
+                                    </Label>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Allow the AI to search the web for up-to-date information
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Prompt Selection */}
                         <div className="space-y-2">
                             <Label>Prompt</Label>
@@ -226,6 +315,13 @@ export function AIGenerateModal({
                                     onValueChange={(value) => {
                                         setSelectedPromptId(value);
                                         setPlaceholderValues({});
+                                        // Initialize context overrides for v2 prompts
+                                        const prompt = prompts?.find(p => p.id.toString() === value);
+                                        if (prompt && isV2Prompt(prompt) && prompt.contextConfig) {
+                                            setContextOverrides(prompt.contextConfig);
+                                        } else {
+                                            setContextOverrides({});
+                                        }
                                     }}
                                 >
                                     <SelectTrigger>
@@ -317,8 +413,8 @@ export function AIGenerateModal({
                             )}
                         </div>
 
-                        {/* Placeholders */}
-                        {selectedPrompt && placeholders.length > 0 && (
+                        {/* Placeholders - only for v1 prompts */}
+                        {selectedPrompt && !isV2Prompt(selectedPrompt) && placeholders.length > 0 && (
                             <div className="space-y-4 border-t pt-4">
                                 <div>
                                     <Label className="text-base">Prompt Placeholders</Label>
@@ -346,7 +442,27 @@ export function AIGenerateModal({
                             </div>
                         )}
 
-                        {selectedPrompt && placeholders.length === 0 && (
+                        {/* Context Settings - for v2 prompts */}
+                        {selectedPrompt && isV2Prompt(selectedPrompt) && (
+                            <div className="space-y-4 border-t pt-4">
+                                <div>
+                                    <Label className="text-base">Content Settings</Label>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        Adjust settings for content generation
+                                    </p>
+                                </div>
+                                <ContextConfigEditor
+                                    category="post_gen"
+                                    mode="override"
+                                    baseConfig={selectedPrompt.contextConfig}
+                                    config={contextOverrides}
+                                    onChange={setContextOverrides}
+                                    compact
+                                />
+                            </div>
+                        )}
+
+                        {selectedPrompt && !isV2Prompt(selectedPrompt) && placeholders.length === 0 && (
                             <div className="text-center py-4 text-muted-foreground text-sm border-t pt-4">
                                 No additional placeholders to fill (standard fields are auto-filled)
                             </div>

@@ -54,7 +54,8 @@ func NewGoogleClient(cfg GoogleConfig) (*GoogleClient, error) {
 	}, nil
 }
 
-func (c *GoogleClient) GenerateArticle(ctx context.Context, systemPrompt, userPrompt string) (*ArticleResult, error) {
+func (c *GoogleClient) GenerateArticle(ctx context.Context, systemPrompt, userPrompt string, opts *GenerateArticleOptions) (*ArticleResult, error) {
+	// Note: opts.UseWebSearch is ignored as Google doesn't support web search in this SDK
 	model := c.client.GenerativeModel(c.model)
 
 	// Configure the model

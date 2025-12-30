@@ -813,11 +813,19 @@ func (h *SitemapsHandler) StartPageGeneration(req *dto.StartPageGenerationReques
 	// Map content settings from DTO to domain model
 	if req.ContentSettings != nil {
 		config.ContentSettings = &generation.ContentSettings{
-			WordCount:          req.ContentSettings.WordCount,
-			WritingStyle:       generation.WritingStyle(req.ContentSettings.WritingStyle),
-			ContentTone:        generation.ContentTone(req.ContentSettings.ContentTone),
-			CustomInstructions: req.ContentSettings.CustomInstructions,
-			IncludeLinks:       req.ContentSettings.IncludeLinks,
+			WordCount:               req.ContentSettings.WordCount,
+			WritingStyle:            generation.WritingStyle(req.ContentSettings.WritingStyle),
+			ContentTone:             generation.ContentTone(req.ContentSettings.ContentTone),
+			CustomInstructions:      req.ContentSettings.CustomInstructions,
+			UseWebSearch:            req.ContentSettings.UseWebSearch,
+			IncludeLinks:            req.ContentSettings.IncludeLinks,
+			AutoLinkMode:            generation.AutoLinkMode(req.ContentSettings.AutoLinkMode),
+			AutoLinkProviderID:      req.ContentSettings.AutoLinkProviderID,
+			AutoLinkSuggestPromptID: req.ContentSettings.AutoLinkSuggestPromptID,
+			AutoLinkApplyPromptID:   req.ContentSettings.AutoLinkApplyPromptID,
+			MaxIncomingLinks:        req.ContentSettings.MaxIncomingLinks,
+			MaxOutgoingLinks:        req.ContentSettings.MaxOutgoingLinks,
+			ContextOverrides:        convertContextOverrides(req.ContentSettings.ContextOverrides),
 		}
 	}
 
@@ -889,6 +897,11 @@ func (h *SitemapsHandler) taskToDTO(task *generation.Task) *dto.GenerationTaskRe
 		Status:         string(task.Status),
 		StartedAt:      dto.TimeToString(task.StartedAt),
 		Error:          task.Error,
+		// Linking phase tracking
+		LinkingPhase: string(task.LinkingPhase),
+		LinksCreated: task.LinksCreated,
+		LinksApplied: task.LinksApplied,
+		LinksFailed:  task.LinksFailed,
 	}
 
 	if task.CompletedAt != nil {
@@ -922,6 +935,21 @@ func (h *SitemapsHandler) taskToDTO(task *generation.Task) *dto.GenerationTaskRe
 	}
 
 	return resp
+}
+
+// convertContextOverrides converts DTO context overrides to entities
+func convertContextOverrides(overrides map[string]dto.ContextFieldValue) entities.ContextConfig {
+	if overrides == nil {
+		return nil
+	}
+	result := make(entities.ContextConfig, len(overrides))
+	for k, v := range overrides {
+		result[k] = entities.ContextFieldValue{
+			Enabled: v.Enabled,
+			Value:   v.Value,
+		}
+	}
+	return result
 }
 
 // =========================================================================

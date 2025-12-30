@@ -175,6 +175,14 @@ func (e *Executor) runTask(ctx context.Context, task *Task, config GenerationCon
 		}
 	}()
 
+	// Handle "before" auto-link mode - suggest and approve links before generation
+	if config.ContentSettings != nil && config.ContentSettings.AutoLinkMode == AutoLinkModeBefore {
+		if err := e.autoSuggestAndApproveLinksBefore(ctx, task, config); err != nil {
+			e.logger.ErrorWithErr(err, "Failed to auto-suggest links before generation")
+			// Continue without links - don't fail the entire task
+		}
+	}
+
 	nodesByDepth := make(map[int][]*TaskNode)
 	for _, node := range task.Nodes {
 		nodesByDepth[node.Depth] = append(nodesByDepth[node.Depth], node)
@@ -230,7 +238,17 @@ func (e *Executor) runTask(ctx context.Context, task *Task, config GenerationCon
 		e.logger.Infof("Completed processing depth %d", depth)
 	}
 
+	// Handle "after" auto-link mode - suggest and apply links after all content is generated
+	// This must happen BEFORE task.Complete() so the task stays in "running" status during linking
+	if config.ContentSettings != nil && config.ContentSettings.AutoLinkMode == AutoLinkModeAfter {
+		if err := e.autoSuggestAndApplyLinksAfter(ctx, task, config); err != nil {
+			e.logger.ErrorWithErr(err, "Failed to auto-suggest/apply links after generation")
+			// Continue to complete the task, but linking failed
+		}
+	}
+
 	task.Complete()
+
 	e.emitter.EmitTaskCompleted(ctx, task.ID,
 		task.ProcessedNodes, task.FailedNodes, task.SkippedNodes, task.TotalNodes, task.StartedAt)
 
@@ -322,9 +340,12 @@ func (e *Executor) processNode(ctx context.Context, task *Task, taskNode *TaskNo
 		e.logger.ErrorWithErr(err, "Failed to get ancestors")
 	}
 
-	// Fetch link targets if IncludeLinks is enabled
+	// Fetch link targets if IncludeLinks is enabled OR if AutoLinkMode is "before"
+	// (in "before" mode, links were auto-approved before generation started)
 	var linkTargets []LinkTarget
-	if config.ContentSettings != nil && config.ContentSettings.IncludeLinks {
+	shouldIncludeLinks := config.ContentSettings != nil &&
+		(config.ContentSettings.IncludeLinks || config.ContentSettings.AutoLinkMode == AutoLinkModeBefore)
+	if shouldIncludeLinks {
 		linkTargets = e.getApprovedLinkTargets(ctx, task.SitemapID, task.SiteID, node.ID)
 		if len(linkTargets) > 0 {
 			e.logger.Infof("Node %d: including %d approved link targets in generation", node.ID, len(linkTargets))
@@ -556,4 +577,207 @@ func (e *Executor) markLinksAsApplied(ctx context.Context, linkTargets []LinkTar
 	}
 
 	e.logger.Infof("Marked %d links as applied", len(linkTargets))
+}
+
+// autoSuggestAndApproveLinksBefore suggests links via AI and auto-approves them for embedding during generation
+func (e *Executor) autoSuggestAndApproveLinksBefore(ctx context.Context, task *Task, config GenerationConfig) error {
+	if e.linkingSvc == nil {
+		return fmt.Errorf("linking service not available")
+	}
+
+	task.SetLinkingPhase(LinkingPhaseSuggesting)
+	e.emitter.EmitLinkingPhaseStarted(ctx, task.ID, string(LinkingPhaseSuggesting))
+
+	// Get or create a link plan for this sitemap
+	plan, err := e.linkingSvc.GetOrCreateActivePlan(ctx, task.SitemapID, task.SiteID)
+	if err != nil {
+		task.SetLinkingPhase(LinkingPhaseNone)
+		return fmt.Errorf("failed to get/create link plan: %w", err)
+	}
+
+	// Collect all node IDs to be generated
+	nodeIDs := make([]int64, len(task.Nodes))
+	for i, node := range task.Nodes {
+		nodeIDs[i] = node.NodeID
+	}
+
+	// Determine which provider to use for link suggestion
+	providerID := config.ProviderID
+	if config.ContentSettings != nil && config.ContentSettings.AutoLinkProviderID != nil {
+		providerID = *config.ContentSettings.AutoLinkProviderID
+	}
+
+	// Get link limits
+	maxIncoming := 5 // default
+	maxOutgoing := 3 // default
+	if config.ContentSettings != nil {
+		if config.ContentSettings.MaxIncomingLinks > 0 {
+			maxIncoming = config.ContentSettings.MaxIncomingLinks
+		}
+		if config.ContentSettings.MaxOutgoingLinks > 0 {
+			maxOutgoing = config.ContentSettings.MaxOutgoingLinks
+		}
+	}
+
+	e.logger.Infof("Auto-suggesting links for %d nodes using provider %d", len(nodeIDs), providerID)
+
+	// Suggest links
+	err = e.linkingSvc.SuggestLinks(ctx, linking.SuggestLinksConfig{
+		PlanID:      plan.ID,
+		ProviderID:  providerID,
+		PromptID:    config.ContentSettings.AutoLinkSuggestPromptID,
+		NodeIDs:     nodeIDs,
+		MaxIncoming: maxIncoming,
+		MaxOutgoing: maxOutgoing,
+	})
+	if err != nil {
+		task.SetLinkingPhase(LinkingPhaseNone)
+		return fmt.Errorf("failed to suggest links: %w", err)
+	}
+
+	// Auto-approve all newly created (planned) links
+	links, err := e.linkingSvc.GetLinks(ctx, plan.ID)
+	if err != nil {
+		task.SetLinkingPhase(LinkingPhaseNone)
+		return fmt.Errorf("failed to get links: %w", err)
+	}
+
+	linksApproved := 0
+	for _, link := range links {
+		if link.Status == linking.LinkStatusPlanned {
+			if err := e.linkingSvc.ApproveLink(ctx, link.ID); err != nil {
+				e.logger.ErrorWithErr(err, fmt.Sprintf("Failed to auto-approve link %d", link.ID))
+			} else {
+				linksApproved++
+			}
+		}
+	}
+
+	task.SetLinkingResults(linksApproved, 0, 0)
+	task.SetLinkingPhase(LinkingPhaseCompleted)
+	e.emitter.EmitLinkingPhaseCompleted(ctx, task.ID, string(LinkingPhaseSuggesting), linksApproved, 0, 0)
+
+	e.logger.Infof("Auto-approved %d links before generation", linksApproved)
+	return nil
+}
+
+// autoSuggestAndApplyLinksAfter suggests links via AI and applies them to already-published WordPress content
+func (e *Executor) autoSuggestAndApplyLinksAfter(ctx context.Context, task *Task, config GenerationConfig) error {
+	if e.linkingSvc == nil {
+		return fmt.Errorf("linking service not available")
+	}
+
+	// Phase 1: Suggesting
+	task.SetLinkingPhase(LinkingPhaseSuggesting)
+	e.emitter.EmitLinkingPhaseStarted(ctx, task.ID, string(LinkingPhaseSuggesting))
+
+	plan, err := e.linkingSvc.GetOrCreateActivePlan(ctx, task.SitemapID, task.SiteID)
+	if err != nil {
+		task.SetLinkingPhase(LinkingPhaseNone)
+		return fmt.Errorf("failed to get/create link plan: %w", err)
+	}
+
+	// Get successfully generated node IDs (those with WPPageID)
+	var nodeIDs []int64
+	for _, node := range task.Nodes {
+		if node.Status == NodeStatusCompleted && node.WPPageID != nil {
+			nodeIDs = append(nodeIDs, node.NodeID)
+		}
+	}
+
+	if len(nodeIDs) == 0 {
+		e.logger.Info("No successfully generated nodes for auto-linking")
+		task.SetLinkingPhase(LinkingPhaseCompleted)
+		return nil
+	}
+
+	providerID := config.ProviderID
+	if config.ContentSettings != nil && config.ContentSettings.AutoLinkProviderID != nil {
+		providerID = *config.ContentSettings.AutoLinkProviderID
+	}
+
+	maxIncoming := 5
+	maxOutgoing := 3
+	if config.ContentSettings != nil {
+		if config.ContentSettings.MaxIncomingLinks > 0 {
+			maxIncoming = config.ContentSettings.MaxIncomingLinks
+		}
+		if config.ContentSettings.MaxOutgoingLinks > 0 {
+			maxOutgoing = config.ContentSettings.MaxOutgoingLinks
+		}
+	}
+
+	e.logger.Infof("Auto-suggesting links for %d generated nodes", len(nodeIDs))
+
+	// Get prompt IDs
+	var suggestPromptID *int64
+	var applyPromptID int64
+	if config.ContentSettings != nil {
+		suggestPromptID = config.ContentSettings.AutoLinkSuggestPromptID
+		if config.ContentSettings.AutoLinkApplyPromptID != nil {
+			applyPromptID = *config.ContentSettings.AutoLinkApplyPromptID
+		}
+	}
+
+	// Suggest links
+	err = e.linkingSvc.SuggestLinks(ctx, linking.SuggestLinksConfig{
+		PlanID:      plan.ID,
+		ProviderID:  providerID,
+		PromptID:    suggestPromptID,
+		NodeIDs:     nodeIDs,
+		MaxIncoming: maxIncoming,
+		MaxOutgoing: maxOutgoing,
+	})
+	if err != nil {
+		task.SetLinkingPhase(LinkingPhaseNone)
+		return fmt.Errorf("failed to suggest links: %w", err)
+	}
+
+	// Phase 2: Approving and Applying
+	task.SetLinkingPhase(LinkingPhaseApplying)
+	e.emitter.EmitLinkingPhaseStarted(ctx, task.ID, string(LinkingPhaseApplying))
+
+	// Get all planned links and auto-approve them
+	links, err := e.linkingSvc.GetLinks(ctx, plan.ID)
+	if err != nil {
+		task.SetLinkingPhase(LinkingPhaseNone)
+		return fmt.Errorf("failed to get links: %w", err)
+	}
+
+	var linkIDsToApply []int64
+	for _, link := range links {
+		if link.Status == linking.LinkStatusPlanned {
+			if err := e.linkingSvc.ApproveLink(ctx, link.ID); err != nil {
+				e.logger.ErrorWithErr(err, fmt.Sprintf("Failed to auto-approve link %d", link.ID))
+			} else {
+				linkIDsToApply = append(linkIDsToApply, link.ID)
+			}
+		}
+	}
+
+	if len(linkIDsToApply) == 0 {
+		e.logger.Info("No links to apply after suggestion")
+		task.SetLinkingResults(0, 0, 0)
+		task.SetLinkingPhase(LinkingPhaseCompleted)
+		e.emitter.EmitLinkingPhaseCompleted(ctx, task.ID, string(LinkingPhaseApplying), 0, 0, 0)
+		return nil
+	}
+
+	e.logger.Infof("Applying %d auto-approved links to WordPress content", len(linkIDsToApply))
+
+	// Apply links to WordPress content
+	result, err := e.linkingSvc.ApplyLinks(ctx, plan.ID, linkIDsToApply, providerID, applyPromptID)
+	if err != nil {
+		task.SetLinkingResults(len(linkIDsToApply), 0, len(linkIDsToApply))
+		task.SetLinkingPhase(LinkingPhaseCompleted)
+		e.emitter.EmitLinkingPhaseCompleted(ctx, task.ID, string(LinkingPhaseApplying), len(linkIDsToApply), 0, len(linkIDsToApply))
+		return fmt.Errorf("failed to apply links: %w", err)
+	}
+
+	task.SetLinkingResults(len(linkIDsToApply), result.AppliedLinks, result.FailedLinks)
+	task.SetLinkingPhase(LinkingPhaseCompleted)
+	e.emitter.EmitLinkingPhaseCompleted(ctx, task.ID, string(LinkingPhaseApplying), len(linkIDsToApply), result.AppliedLinks, result.FailedLinks)
+
+	e.logger.Infof("Applied %d/%d links after generation", result.AppliedLinks, len(linkIDsToApply))
+	return nil
 }

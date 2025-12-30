@@ -399,7 +399,7 @@ func (a *Applier) applyLinksToNode(
 	}
 
 	// Build prompts from DB template or use defaults
-	systemPrompt, userPrompt := a.buildApplyPrompts(prompt, sourceNode, linkTargets, page.Content, DefaultLanguage)
+	systemPrompt, userPrompt := a.buildApplyPrompts(ctx, prompt, sourceNode, linkTargets, page.Content, DefaultLanguage)
 
 	request := &ai.InsertLinksRequest{
 		Content:      page.Content,
@@ -532,6 +532,7 @@ func (a *Applier) getApplyPrompt(ctx context.Context, promptID *int64) *entities
 
 // buildApplyPrompts renders the prompt with page-specific placeholders
 func (a *Applier) buildApplyPrompts(
+	ctx context.Context,
 	prompt *entities.Prompt,
 	sourceNode *entities.SitemapNode,
 	linkTargets []ai.InsertLinkTarget,
@@ -551,7 +552,7 @@ func (a *Applier) buildApplyPrompts(
 		linksList.WriteString(fmt.Sprintf("→ %s \"%s\" (anchor: %s)\n", link.TargetPath, link.TargetTitle, anchor))
 	}
 
-	placeholders := map[string]string{
+	runtimeData := map[string]string{
 		"language":   language,
 		"page_title": sourceNode.Title,
 		"page_path":  sourceNode.Path,
@@ -559,18 +560,12 @@ func (a *Applier) buildApplyPrompts(
 		"content":    content,
 	}
 
-	// Render prompts using prompt service's template rendering
-	systemPrompt = a.renderTemplate(prompt.SystemPrompt, placeholders)
-	userPrompt = a.renderTemplate(prompt.UserPrompt, placeholders)
-
-	return systemPrompt, userPrompt
-}
-
-// renderTemplate replaces {{placeholder}} with values
-func (a *Applier) renderTemplate(template string, placeholders map[string]string) string {
-	result := template
-	for key, value := range placeholders {
-		result = strings.ReplaceAll(result, "{{"+key+"}}", value)
+	// Use the prompt service to render (supports both v1 and v2)
+	sys, usr, err := a.promptSvc.RenderPromptWithOverrides(ctx, prompt, runtimeData, nil)
+	if err != nil {
+		a.logger.ErrorWithErr(err, "Failed to render prompt, using empty defaults")
+		return "", ""
 	}
-	return result
+
+	return sys, usr
 }

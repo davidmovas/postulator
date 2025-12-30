@@ -4,7 +4,7 @@ import {
 import { unwrapArrayResponse, unwrapPaginatedResponse, unwrapResponse } from "@/lib/api-utils";
 import { AutoCheckResult, HealthCheckHistory, mapAutoCheckResult, mapHealthHistory } from "@/models/healthcheck";
 import { PaginatedResponse } from "@/models/common";
-import { CheckAuto, CheckSite, GetHistory, GetHistoryByPeriod } from "@/wailsjs/wailsjs/go/handlers/HealthCheckHandler";
+import { CheckAll, CheckAuto, CheckSite, GetHistory, GetHistoryByPeriod } from "@/wailsjs/wailsjs/go/handlers/HealthCheckHandler";
 
 export const healthcheckService = {
     async checkHealth(siteId: number): Promise<string> {
@@ -14,9 +14,9 @@ export const healthcheckService = {
     },
 
     async checkAllHealth(): Promise<string> {
-        const response = await CheckAuto();
-        unwrapResponse<dto.AutoCheckResult>(response);
-        return "All sites health checked";
+        const response = await CheckAll();
+        const result = unwrapResponse<dto.CheckAllResult>(response);
+        return `Checked ${result.checked} sites${result.failed > 0 ? `, ${result.failed} failed` : ''}`;
     },
 
     async getHistory(siteId: number, limit: number): Promise<HealthCheckHistory[]> {

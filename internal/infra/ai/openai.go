@@ -85,7 +85,7 @@ func (c *OpenAIClient) GetModelName() string {
 	return c.modelName
 }
 
-func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPrompt string) (*ArticleResult, error) {
+func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPrompt string, opts *GenerateArticleOptions) (*ArticleResult, error) {
 	schema := generateSchema[ArticleContent]()
 
 	schemaParam := openaiSDK.ResponseFormatJSONSchemaJSONSchemaParam{
@@ -414,10 +414,6 @@ func (c *OpenAIClient) GenerateLinkSuggestions(ctx context.Context, request *Lin
 		params.MaxTokens = openaiSDK.Int(maxTokens)
 	}
 
-	// Log request info
-	fmt.Printf("[OpenAI] GenerateLinkSuggestions: model=%s, nodes=%d, promptLen=%d\n",
-		c.modelName, len(request.Nodes), len(systemPrompt)+len(userPrompt))
-
 	chat, err := c.client.Chat.Completions.New(ctx, params)
 	if err != nil {
 		return nil, errors.AI(providerName, fmt.Errorf("API error: %w", err))
@@ -428,11 +424,7 @@ func (c *OpenAIClient) GenerateLinkSuggestions(ctx context.Context, request *Lin
 	}
 
 	choice := chat.Choices[0]
-	finishReason := string(choice.FinishReason)
-
-	// Log response info
-	fmt.Printf("[OpenAI] LinkSuggestions response: promptTokens=%d, completionTokens=%d, finishReason=%s\n",
-		chat.Usage.PromptTokens, chat.Usage.CompletionTokens, finishReason)
+	finishReason := choice.FinishReason
 
 	// Check for problematic finish reasons
 	if finishReason == "length" {
@@ -444,9 +436,6 @@ func (c *OpenAIClient) GenerateLinkSuggestions(ctx context.Context, request *Lin
 
 	content := choice.Message.Content
 	if content == "" {
-		// Log more details about the empty response
-		fmt.Printf("[OpenAI] Empty response details: finishReason=%s, refusal=%v\n",
-			finishReason, choice.Message.Refusal)
 		return nil, errors.AI(providerName, fmt.Errorf("empty response from API (finishReason: %s)", finishReason))
 	}
 
@@ -466,8 +455,6 @@ func (c *OpenAIClient) GenerateLinkSuggestions(ctx context.Context, request *Lin
 	outputTokens := int(chat.Usage.CompletionTokens)
 	totalTokens := int(chat.Usage.TotalTokens)
 	cost := CalculateCost(entities.TypeOpenAI, c.modelName, inputTokens, outputTokens)
-
-	fmt.Printf("[OpenAI] LinkSuggestions success: links=%d, cost=$%.4f\n", len(result.Links), cost)
 
 	return &LinkSuggestionResult{
 		Links:       result.Links,
@@ -542,7 +529,6 @@ func buildLinkSuggestionUserPrompt(request *LinkSuggestionRequest) string {
 	return sb.String()
 }
 
-// InsertLinksResult schema for JSON response
 type InsertLinksContentSchema struct {
 	Content      string `json:"content" jsonschema_description:"Modified HTML content with links inserted"`
 	LinksApplied int    `json:"linksApplied" jsonschema_description:"Number of links successfully inserted"`

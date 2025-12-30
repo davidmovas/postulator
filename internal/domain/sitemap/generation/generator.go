@@ -96,7 +96,7 @@ func (g *Generator) Generate(ctx context.Context, req GenerateRequest) (*Generat
 	g.logger.Infof("Generating content for node %d (%s) with provider %s/%s, links=%d",
 		req.Node.ID, req.Node.Title, aiClient.GetProviderName(), aiClient.GetModelName(), len(req.LinkTargets))
 
-	articleResult, err := aiClient.GenerateArticle(ctx, systemPrompt, userPrompt)
+	articleResult, err := aiClient.GenerateArticle(ctx, systemPrompt, userPrompt, nil)
 	durationMs := time.Since(startTime).Milliseconds()
 
 	// Log AI usage regardless of success/failure
@@ -172,20 +172,60 @@ func (g *Generator) buildPrompts(ctx context.Context, req GenerateRequest) (stri
 		})
 	}
 
-	placeholders := BuildPlaceholders(nodeCtx)
+	// Build runtime data from node context
+	runtimeData := BuildPlaceholders(nodeCtx)
 	for k, v := range req.Placeholders {
-		if _, exists := placeholders[k]; !exists {
-			placeholders[k] = v
+		if _, exists := runtimeData[k]; !exists {
+			runtimeData[k] = v
 		}
 	}
 
 	if req.PromptID != nil && *req.PromptID > 0 {
-		return g.promptSvc.RenderPrompt(ctx, *req.PromptID, placeholders)
+		prompt, err := g.promptSvc.GetPrompt(ctx, *req.PromptID)
+		if err != nil {
+			return "", "", err
+		}
+
+		// Build context config overrides from ContentSettings
+		var overrides entities.ContextConfig
+		if req.ContentSettings != nil {
+			overrides = contentSettingsToOverrides(req.ContentSettings)
+		}
+
+		return g.promptSvc.RenderPromptWithOverrides(ctx, prompt, runtimeData, overrides)
 	}
 
 	renderer := NewDefaultPromptRenderer()
-	system, user := renderer.Render(placeholders)
+	system, user := renderer.Render(runtimeData)
 	return system, user, nil
+}
+
+// contentSettingsToOverrides converts ContentSettings to ContextConfig overrides
+// NOTE: customInstructions is passed via RuntimeData, not overrides (it's a runtime-only field)
+func contentSettingsToOverrides(settings *ContentSettings) entities.ContextConfig {
+	// If ContextOverrides is provided from UI, use it directly
+	// This allows proper handling of enabled/disabled fields from the frontend
+	if settings.ContextOverrides != nil && len(settings.ContextOverrides) > 0 {
+		return settings.ContextOverrides
+	}
+
+	// Legacy fallback: convert individual fields to overrides
+	overrides := make(entities.ContextConfig)
+
+	if settings.WordCount != "" {
+		overrides["wordCount"] = entities.ContextFieldValue{Enabled: true, Value: settings.WordCount}
+	}
+	if settings.WritingStyle != "" {
+		overrides["writingStyle"] = entities.ContextFieldValue{Enabled: true, Value: string(settings.WritingStyle)}
+	}
+	if settings.ContentTone != "" {
+		overrides["contentTone"] = entities.ContextFieldValue{Enabled: true, Value: string(settings.ContentTone)}
+	}
+	if settings.IncludeLinks {
+		overrides["internalLinks"] = entities.ContextFieldValue{Enabled: true}
+	}
+
+	return overrides
 }
 
 func extractMetaDescription(result *ai.ArticleResult) string {

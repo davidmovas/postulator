@@ -67,6 +67,7 @@ type GenerateContentInput struct {
 	TopicID           *int64 // Optional - if nil, use custom topic title
 	CustomTopicTitle  string // Used when TopicID is nil
 	PlaceholderValues map[string]string
+	UseWebSearch      bool // Enable web search for models that support it
 }
 
 // GenerateContentResult represents the result of AI content generation

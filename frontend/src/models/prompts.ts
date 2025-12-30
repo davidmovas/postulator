@@ -10,14 +10,52 @@ export const PROMPT_CATEGORIES: Record<PromptCategory, string> = {
     sitemap_gen: "Sitemap Structure",
 };
 
+// Context field types for v2 prompts
+export type ContextFieldType = "checkbox" | "select" | "input" | "textarea";
+
+export interface SelectOption {
+    value: string;
+    label: string;
+}
+
+export interface ContextFieldValue {
+    enabled: boolean;
+    value?: string;
+}
+
+export type ContextConfig = Record<string, ContextFieldValue>;
+
+export interface ContextFieldDefinition {
+    key: string;
+    label: string;
+    description: string;
+    type: ContextFieldType;
+    options?: SelectOption[];
+    defaultValue: string;
+    required: boolean;
+    categories: string[];
+    group?: string;
+}
+
+export interface ContextFieldsResponse {
+    fields: ContextFieldDefinition[];
+    defaultConfig: ContextConfig;
+}
+
+// Prompt interface with v2 support
 export interface Prompt {
     id: number;
     name: string;
     category: PromptCategory;
     isBuiltin: boolean;
-    systemPrompt: string;
-    userPrompt: string;
-    placeholders: string[];
+    version: number;
+    // V2 fields
+    instructions?: string;
+    contextConfig?: ContextConfig;
+    // Legacy v1 fields
+    systemPrompt?: string;
+    userPrompt?: string;
+    placeholders?: string[];
     createdAt: string;
     updatedAt: string;
 }
@@ -25,9 +63,14 @@ export interface Prompt {
 export interface PromptCreateInput {
     name: string;
     category: PromptCategory;
-    systemPrompt: string;
-    userPrompt: string;
-    placeholders: string[];
+    version: number;
+    // V2 fields
+    instructions?: string;
+    contextConfig?: ContextConfig;
+    // Legacy v1 fields
+    systemPrompt?: string;
+    userPrompt?: string;
+    placeholders?: string[];
 }
 
 export interface PromptUpdateInput extends Partial<PromptCreateInput> {
@@ -40,10 +83,53 @@ export function mapPrompt(x: dto.Prompt): Prompt {
         name: x.name,
         category: (x.category || "post_gen") as PromptCategory,
         isBuiltin: x.isBuiltin || false,
-        systemPrompt: x.systemPrompt,
-        userPrompt: x.userPrompt,
+        version: x.version || 1,
+        instructions: x.instructions || "",
+        contextConfig: x.contextConfig ? mapContextConfig(x.contextConfig) : undefined,
+        systemPrompt: x.systemPrompt || "",
+        userPrompt: x.userPrompt || "",
         placeholders: x.placeholders || [],
         createdAt: x.createdAt,
         updatedAt: x.updatedAt,
     };
+}
+
+export function mapContextConfig(config: Record<string, dto.ContextFieldValue>): ContextConfig {
+    const result: ContextConfig = {};
+    for (const [key, value] of Object.entries(config)) {
+        result[key] = {
+            enabled: value.enabled,
+            value: value.value,
+        };
+    }
+    return result;
+}
+
+export function mapContextFieldDefinition(def: dto.ContextFieldDefinition): ContextFieldDefinition {
+    return {
+        key: def.key,
+        label: def.label,
+        description: def.description,
+        type: def.type as ContextFieldType,
+        options: def.options?.map(opt => ({
+            value: opt.value,
+            label: opt.label,
+        })),
+        defaultValue: def.defaultValue,
+        required: def.required,
+        categories: def.categories,
+        group: def.group,
+    };
+}
+
+export function mapContextFieldsResponse(resp: dto.ContextFieldsResponse): ContextFieldsResponse {
+    return {
+        fields: resp.fields?.map(mapContextFieldDefinition) || [],
+        defaultConfig: resp.defaultConfig ? mapContextConfig(resp.defaultConfig) : {},
+    };
+}
+
+// Helper to check if a prompt is v2
+export function isV2Prompt(prompt: Prompt): boolean {
+    return prompt.version >= 2;
 }

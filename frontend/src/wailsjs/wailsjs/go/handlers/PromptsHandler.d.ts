@@ -6,6 +6,8 @@ export function CreatePrompt(arg1:dto.Prompt):Promise<dto.Response_string_>;
 
 export function DeletePrompt(arg1:number):Promise<dto.Response_string_>;
 
+export function GetContextFields(arg1:string):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_ContextFieldsResponse_>;
+
 export function GetPrompt(arg1:number):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_Prompt_>;
 
 export function ListPrompts():Promise<dto.Response___github_com_davidmovas_postulator_internal_dto_Prompt_>;

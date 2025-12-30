@@ -37,7 +37,7 @@ import { providerService } from "@/services/providers";
 import { promptService } from "@/services/prompts";
 import { linkingService } from "@/services/linking";
 import { Provider } from "@/models/providers";
-import { Prompt } from "@/models/prompts";
+import { Prompt, isV2Prompt } from "@/models/prompts";
 import {
     PlannedLink,
     ApplyLinksResult,
@@ -299,6 +299,12 @@ export function ApplyLinksDialog({
 
             if (activeProviders.length > 0 && !providerId) {
                 setProviderId(activeProviders[0].id);
+            }
+
+            // Set default prompt (first builtin or first available)
+            if (promptsData.length > 0 && !promptId) {
+                const builtin = promptsData.find(p => p.isBuiltin);
+                setPromptId(builtin?.id || promptsData[0].id);
             }
         } catch (err) {
             console.error("Failed to load data:", err);

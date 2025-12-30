@@ -59,6 +59,7 @@ var Module = fx.Module("domain",
 		// Prompts (before linking as linking depends on prompts)
 		prompts.NewRepository,
 		prompts.NewService,
+		prompts.NewMigrator,
 
 		// Linking
 		linking.NewService,
@@ -209,6 +210,15 @@ var Module = fx.Module("domain",
 					return svc.Initialize(ctx)
 				}
 				return nil
+			},
+		})
+	}),
+
+	// Prompts V2 migration (runs once on startup)
+	fx.Invoke(func(lc fx.Lifecycle, migrator *prompts.Migrator) {
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				return migrator.MigrateAllToV2(ctx)
 			},
 		})
 	}),

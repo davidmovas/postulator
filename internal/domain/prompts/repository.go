@@ -38,15 +38,26 @@ func (r *repository) Create(ctx context.Context, prompt *entities.Prompt) error 
 		return errors.Validation("Invalid placeholders format")
 	}
 
+	contextConfigJSON, err := json.Marshal(prompt.ContextConfig)
+	if err != nil {
+		return errors.Validation("Invalid context config format")
+	}
+
 	category := prompt.Category
 	if category == "" {
 		category = entities.PromptCategoryPostGen
 	}
 
+	// Default to version 2 for new prompts
+	version := prompt.Version
+	if version == 0 {
+		version = 2
+	}
+
 	query, args := dbx.ST.
 		Insert("prompts").
-		Columns("name", "category", "is_builtin", "system_prompt", "user_prompt", "placeholders").
-		Values(prompt.Name, category, prompt.IsBuiltin, prompt.SystemPrompt, prompt.UserPrompt, placeholdersJSON).
+		Columns("name", "category", "is_builtin", "system_prompt", "user_prompt", "placeholders", "instructions", "context_config", "version").
+		Values(prompt.Name, category, prompt.IsBuiltin, prompt.SystemPrompt, prompt.UserPrompt, placeholdersJSON, prompt.Instructions, contextConfigJSON, version).
 		MustSql()
 
 	result, err := r.db.ExecContext(ctx, query, args...)
@@ -63,12 +74,13 @@ func (r *repository) Create(ctx context.Context, prompt *entities.Prompt) error 
 	}
 
 	prompt.ID = id
+	prompt.Version = version
 	return nil
 }
 
 func (r *repository) GetByID(ctx context.Context, id int64) (*entities.Prompt, error) {
 	query, args := dbx.ST.
-		Select("id", "name", "category", "is_builtin", "system_prompt", "user_prompt", "placeholders", "created_at", "updated_at").
+		Select("id", "name", "category", "is_builtin", "system_prompt", "user_prompt", "placeholders", "instructions", "context_config", "version", "created_at", "updated_at").
 		From("prompts").
 		Where(squirrel.Eq{"id": id}).
 		MustSql()
@@ -76,6 +88,9 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*entities.Prompt, e
 	var prompt entities.Prompt
 	var category string
 	var placeholdersJSON sql.NullString
+	var instructions sql.NullString
+	var contextConfigJSON sql.NullString
+	var version sql.NullInt64
 
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(
 		&prompt.ID,
@@ -85,6 +100,9 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*entities.Prompt, e
 		&prompt.SystemPrompt,
 		&prompt.UserPrompt,
 		&placeholdersJSON,
+		&instructions,
+		&contextConfigJSON,
+		&version,
 		&prompt.CreatedAt,
 		&prompt.UpdatedAt,
 	)
@@ -97,15 +115,17 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*entities.Prompt, e
 	}
 
 	prompt.Category = entities.PromptCategory(category)
-
 	prompt.Placeholders = parsePlaceholders(placeholdersJSON)
+	prompt.Instructions = instructions.String
+	prompt.ContextConfig = parseContextConfig(contextConfigJSON)
+	prompt.Version = int(version.Int64)
 
 	return &prompt, nil
 }
 
 func (r *repository) GetAll(ctx context.Context) ([]*entities.Prompt, error) {
 	query, args := dbx.ST.
-		Select("id", "name", "category", "is_builtin", "system_prompt", "user_prompt", "placeholders", "created_at", "updated_at").
+		Select("id", "name", "category", "is_builtin", "system_prompt", "user_prompt", "placeholders", "instructions", "context_config", "version", "created_at", "updated_at").
 		From("prompts").
 		OrderBy("is_builtin DESC", "created_at DESC").
 		MustSql()
@@ -123,6 +143,9 @@ func (r *repository) GetAll(ctx context.Context) ([]*entities.Prompt, error) {
 		var prompt entities.Prompt
 		var category string
 		var placeholdersJSON sql.NullString
+		var instructions sql.NullString
+		var contextConfigJSON sql.NullString
+		var version sql.NullInt64
 
 		err = rows.Scan(
 			&prompt.ID,
@@ -132,6 +155,9 @@ func (r *repository) GetAll(ctx context.Context) ([]*entities.Prompt, error) {
 			&prompt.SystemPrompt,
 			&prompt.UserPrompt,
 			&placeholdersJSON,
+			&instructions,
+			&contextConfigJSON,
+			&version,
 			&prompt.CreatedAt,
 			&prompt.UpdatedAt,
 		)
@@ -141,6 +167,9 @@ func (r *repository) GetAll(ctx context.Context) ([]*entities.Prompt, error) {
 
 		prompt.Category = entities.PromptCategory(category)
 		prompt.Placeholders = parsePlaceholders(placeholdersJSON)
+		prompt.Instructions = instructions.String
+		prompt.ContextConfig = parseContextConfig(contextConfigJSON)
+		prompt.Version = int(version.Int64)
 
 		prompts = append(prompts, &prompt)
 	}
@@ -157,7 +186,7 @@ func (r *repository) GetAll(ctx context.Context) ([]*entities.Prompt, error) {
 
 func (r *repository) GetByCategory(ctx context.Context, category entities.PromptCategory) ([]*entities.Prompt, error) {
 	query, args := dbx.ST.
-		Select("id", "name", "category", "is_builtin", "system_prompt", "user_prompt", "placeholders", "created_at", "updated_at").
+		Select("id", "name", "category", "is_builtin", "system_prompt", "user_prompt", "placeholders", "instructions", "context_config", "version", "created_at", "updated_at").
 		From("prompts").
 		Where(squirrel.Eq{"category": string(category)}).
 		OrderBy("is_builtin DESC", "created_at DESC").
@@ -176,6 +205,9 @@ func (r *repository) GetByCategory(ctx context.Context, category entities.Prompt
 		var prompt entities.Prompt
 		var cat string
 		var placeholdersJSON sql.NullString
+		var instructions sql.NullString
+		var contextConfigJSON sql.NullString
+		var version sql.NullInt64
 
 		err = rows.Scan(
 			&prompt.ID,
@@ -185,6 +217,9 @@ func (r *repository) GetByCategory(ctx context.Context, category entities.Prompt
 			&prompt.SystemPrompt,
 			&prompt.UserPrompt,
 			&placeholdersJSON,
+			&instructions,
+			&contextConfigJSON,
+			&version,
 			&prompt.CreatedAt,
 			&prompt.UpdatedAt,
 		)
@@ -194,6 +229,9 @@ func (r *repository) GetByCategory(ctx context.Context, category entities.Prompt
 
 		prompt.Category = entities.PromptCategory(cat)
 		prompt.Placeholders = parsePlaceholders(placeholdersJSON)
+		prompt.Instructions = instructions.String
+		prompt.ContextConfig = parseContextConfig(contextConfigJSON)
+		prompt.Version = int(version.Int64)
 
 		prompts = append(prompts, &prompt)
 	}
@@ -214,6 +252,11 @@ func (r *repository) Update(ctx context.Context, prompt *entities.Prompt) error 
 		return errors.Validation("Invalid placeholders format")
 	}
 
+	contextConfigJSON, err := json.Marshal(prompt.ContextConfig)
+	if err != nil {
+		return errors.Validation("Invalid context config format")
+	}
+
 	category := prompt.Category
 	if category == "" {
 		category = entities.PromptCategoryPostGen
@@ -226,6 +269,9 @@ func (r *repository) Update(ctx context.Context, prompt *entities.Prompt) error 
 		Set("system_prompt", prompt.SystemPrompt).
 		Set("user_prompt", prompt.UserPrompt).
 		Set("placeholders", placeholdersJSON).
+		Set("instructions", prompt.Instructions).
+		Set("context_config", contextConfigJSON).
+		Set("version", prompt.Version).
 		Set("updated_at", time.Now()).
 		Where(squirrel.Eq{"id": prompt.ID}).
 		MustSql()
@@ -299,4 +345,17 @@ func parsePlaceholders(placeholdersJSON sql.NullString) []string {
 		}
 	}
 	return result
+}
+
+// parseContextConfig parses JSON context config from database
+func parseContextConfig(configJSON sql.NullString) entities.ContextConfig {
+	if !configJSON.Valid || strings.TrimSpace(configJSON.String) == "" {
+		return nil
+	}
+
+	var config entities.ContextConfig
+	if err := json.Unmarshal([]byte(configJSON.String), &config); err != nil {
+		return nil
+	}
+	return config
 }

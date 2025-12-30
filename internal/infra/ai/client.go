@@ -13,8 +13,13 @@ type Usage struct {
 	DurationMs   int64   // Operation duration in milliseconds
 }
 
+// GenerateArticleOptions contains optional parameters for article generation
+type GenerateArticleOptions struct {
+	// Reserved for future options
+}
+
 type Client interface {
-	GenerateArticle(ctx context.Context, systemPrompt, userPrompt string) (*ArticleResult, error)
+	GenerateArticle(ctx context.Context, systemPrompt, userPrompt string, opts *GenerateArticleOptions) (*ArticleResult, error)
 	GenerateTopicVariations(ctx context.Context, topic string, amount int) ([]string, error)
 	GenerateSitemapStructure(ctx context.Context, systemPrompt, userPrompt string) (*SitemapStructureResult, error)
 	GenerateLinkSuggestions(ctx context.Context, request *LinkSuggestionRequest) (*LinkSuggestionResult, error)

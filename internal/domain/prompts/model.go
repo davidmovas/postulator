@@ -23,6 +23,12 @@ type Service interface {
 	UpdatePrompt(ctx context.Context, prompt *entities.Prompt) error
 	DeletePrompt(ctx context.Context, id int64) error
 
+	// Prompt rendering
 	RenderPrompt(ctx context.Context, promptID int64, placeholders map[string]string) (system, user string, err error)
+	RenderPromptWithOverrides(ctx context.Context, prompt *entities.Prompt, runtimeData map[string]string, overrides entities.ContextConfig) (system, user string, err error)
 	ValidatePlaceholders(prompt *entities.Prompt, provided map[string]string) error
+
+	// Context fields for V2 prompts
+	GetContextFields(category entities.PromptCategory) []*entities.ContextFieldDefinition
+	GetDefaultContextConfig(category entities.PromptCategory) entities.ContextConfig
 }

@@ -16,6 +16,7 @@ var _ Service = (*service)(nil)
 type service struct {
 	repo              Repository
 	deletionValidator *deletion.Validator
+	builder           *PromptBuilder
 	logger            *logger.Logger
 }
 
@@ -23,6 +24,7 @@ func NewService(repo Repository, deletionValidator *deletion.Validator, logger *
 	return &service{
 		repo:              repo,
 		deletionValidator: deletionValidator,
+		builder:           NewPromptBuilder(),
 		logger:            logger.WithScope("service").WithScope("prompts"),
 	}
 }
@@ -132,17 +134,19 @@ func (s *service) RenderPrompt(ctx context.Context, promptID int64, placeholders
 		return "", "", err
 	}
 
-	// Non-blocking validation - just warn about missing placeholders
-	// Many placeholders are optional or auto-filled, so we don't block on this
-	if err = s.ValidatePlaceholders(prompt, placeholders); err != nil {
-		s.logger.Warnf("Placeholder validation: %v (continuing anyway)", err)
-	}
+	return s.RenderPromptWithOverrides(ctx, prompt, placeholders, nil)
+}
 
-	system = s.renderTemplate(prompt.SystemPrompt, placeholders)
-	user = s.renderTemplate(prompt.UserPrompt, placeholders)
+// RenderPromptWithOverrides builds prompts using the new v2 format with optional context overrides
+func (s *service) RenderPromptWithOverrides(ctx context.Context, prompt *entities.Prompt, runtimeData map[string]string, overrides entities.ContextConfig) (system, user string, err error) {
+	result := s.builder.Build(&BuildRequest{
+		Prompt:      prompt,
+		RuntimeData: runtimeData,
+		Overrides:   overrides,
+	})
 
 	s.logger.Debug("Prompt rendered successfully")
-	return system, user, nil
+	return result.SystemPrompt, result.UserPrompt, nil
 }
 
 func (s *service) ValidatePlaceholders(prompt *entities.Prompt, provided map[string]string) error {
@@ -167,6 +171,15 @@ func (s *service) validatePrompt(prompt *entities.Prompt) error {
 		return errors.Validation("Prompt name is required")
 	}
 
+	// V2 prompts: require instructions
+	if prompt.IsV2() {
+		if strings.TrimSpace(prompt.Instructions) == "" {
+			return errors.Validation("Instructions are required")
+		}
+		return nil
+	}
+
+	// V1 prompts: require system and user prompts
 	if strings.TrimSpace(prompt.SystemPrompt) == "" {
 		return errors.Validation("System prompt is required")
 	}
@@ -185,4 +198,14 @@ func (s *service) renderTemplate(template string, placeholders map[string]string
 		result = strings.ReplaceAll(result, placeholderPattern, value)
 	}
 	return result
+}
+
+// GetContextFields returns all context field definitions for a category
+func (s *service) GetContextFields(category entities.PromptCategory) []*entities.ContextFieldDefinition {
+	return s.builder.GetFieldsByCategory(category)
+}
+
+// GetDefaultContextConfig returns the default context config for a category
+func (s *service) GetDefaultContextConfig(category entities.PromptCategory) entities.ContextConfig {
+	return s.builder.GetDefaultContextConfig(category)
 }

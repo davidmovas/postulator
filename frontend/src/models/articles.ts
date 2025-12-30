@@ -142,6 +142,7 @@ export interface GenerateContentInput {
     topicId?: number;
     customTopicTitle?: string;
     placeholderValues: Record<string, string>;
+    useWebSearch?: boolean;
 }
 
 export interface GenerateContentResult {

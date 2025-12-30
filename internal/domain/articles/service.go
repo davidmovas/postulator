@@ -743,7 +743,7 @@ func (s *service) GenerateContent(ctx context.Context, input *GenerateContentInp
 
 	// Generate article
 	s.logger.Info("Starting AI content generation")
-	aiResult, err := aiClient.GenerateArticle(ctx, systemPrompt, userPrompt)
+	aiResult, err := aiClient.GenerateArticle(ctx, systemPrompt, userPrompt, nil)
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to generate article content")
 		return nil, errors.Internal(err)
