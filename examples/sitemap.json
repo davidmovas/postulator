@@ -634,6 +634,321 @@
       "path": "/sport/recovery/techniques/massage",
       "title": "Sports Massage",
       "keywords": []
+    },
+    {
+      "path": "/mental-health",
+      "title": "Mental Health & Wellness",
+      "keywords": ["mental health", "mental wellness", "psychological health", "emotional wellbeing", "mental fitness", "brain health", "cognitive health", "mental hygiene", "psychological wellness"]
+    },
+    {
+      "path": "/mental-health/stress",
+      "title": "Stress Management",
+      "keywords": ["stress management", "stress relief", "stress reduction", "chronic stress", "acute stress", "cortisol", "stress response", "fight or flight", "stress coping", "stress techniques"]
+    },
+    {
+      "path": "/mental-health/stress/techniques",
+      "title": "Stress Relief Techniques",
+      "keywords": ["stress relief techniques", "deep breathing", "progressive muscle relaxation", "grounding techniques", "stress ball", "journaling", "time management", "boundary setting"]
+    },
+    {
+      "path": "/mental-health/stress/chronic-stress",
+      "title": "Chronic Stress",
+      "keywords": ["chronic stress", "long-term stress", "stress burnout", "adrenal fatigue", "stress hormones", "cortisol levels", "stress adaptation", "allostatic load"]
+    },
+    {
+      "path": "/mental-health/anxiety",
+      "title": "Anxiety",
+      "keywords": ["anxiety", "anxiety disorders", "generalized anxiety", "GAD", "panic attacks", "social anxiety", "performance anxiety", "anxiety symptoms", "anxiousness", "worry"]
+    },
+    {
+      "path": "/mental-health/anxiety/coping",
+      "title": "Anxiety Coping Strategies",
+      "keywords": ["anxiety coping", "anxiety management", "calm anxiety", "anxiety relief", "anxiety exercises", "box breathing", "grounding techniques", "5-4-3-2-1 technique"]
+    },
+    {
+      "path": "/mental-health/meditation",
+      "title": "Meditation",
+      "keywords": ["meditation", "mindfulness meditation", "transcendental meditation", "TM", "meditation practice", "meditation benefits", "daily meditation", "meditation techniques", "meditation apps", "guided meditation"]
+    },
+    {
+      "path": "/mental-health/meditation/mindfulness",
+      "title": "Mindfulness Practice",
+      "keywords": ["mindfulness", "mindful awareness", "present moment", "mindfulness meditation", "MBSR", "mindfulness based stress reduction", "mindful living", "mindful eating", "mindful breathing"]
+    },
+    {
+      "path": "/mental-health/meditation/breathing",
+      "title": "Breathing Techniques",
+      "keywords": ["breathing techniques", "breathwork", "pranayama", "box breathing", "4-7-8 breathing", "diaphragmatic breathing", "wim hof breathing", "holotropic breathwork", "breath control"]
+    },
+    {
+      "path": "/mental-health/focus",
+      "title": "Focus & Concentration",
+      "keywords": ["focus", "concentration", "attention", "cognitive focus", "mental clarity", "deep work", "flow state", "attention span", "distraction management"]
+    },
+    {
+      "path": "/mental-health/focus/techniques",
+      "title": "Focus Techniques",
+      "keywords": ["focus techniques", "pomodoro technique", "time blocking", "deep work sessions", "elimination of distractions", "single tasking", "focus apps", "forest app", "freedom app"]
+    },
+    {
+      "path": "/mental-health/cognitive-health",
+      "title": "Cognitive Health",
+      "keywords": ["cognitive health", "brain health", "cognitive function", "mental sharpness", "cognitive decline prevention", "neuroplasticity", "brain training", "cognitive reserve"]
+    },
+    {
+      "path": "/mental-health/cognitive-health/memory",
+      "title": "Memory Enhancement",
+      "keywords": ["memory", "memory improvement", "short term memory", "long term memory", "working memory", "memory techniques", "mnemonics", "spaced repetition", "memory palace"]
+    },
+    {
+      "path": "/supplements",
+      "title": "Supplements",
+      "keywords": ["supplements", "dietary supplements", "nutritional supplements", "vitamins supplements", "health supplements", "supplement stack", "supplementation"]
+    },
+    {
+      "path": "/supplements/vitamins",
+      "title": "Vitamin Supplements",
+      "keywords": ["vitamin supplements", "multivitamin", "vitamin deficiency", "vitamin dosage", "vitamin quality", "bioavailability"]
+    },
+    {
+      "path": "/supplements/vitamins/vitamin-d3",
+      "title": "Vitamin D3 Supplements",
+      "keywords": ["vitamin D3", "cholecalciferol supplement", "D3 dosage", "vitamin D3 K2", "D3 benefits", "vitamin D testing", "vitamin D levels"]
+    },
+    {
+      "path": "/supplements/vitamins/vitamin-b12",
+      "title": "Vitamin B12 Supplements",
+      "keywords": ["B12 supplements", "methylcobalamin", "cyanocobalamin", "B12 deficiency", "B12 injection", "sublingual B12", "vegan B12"]
+    },
+    {
+      "path": "/supplements/minerals",
+      "title": "Mineral Supplements",
+      "keywords": ["mineral supplements", "trace minerals", "electrolyte supplements", "mineral deficiency", "chelated minerals"]
+    },
+    {
+      "path": "/supplements/minerals/magnesium",
+      "title": "Magnesium Supplements",
+      "keywords": ["magnesium supplements", "magnesium glycinate", "magnesium citrate", "magnesium threonate", "magnesium dosage", "magnesium before bed", "magnesium forms"]
+    },
+    {
+      "path": "/supplements/minerals/zinc",
+      "title": "Zinc Supplements",
+      "keywords": ["zinc supplements", "zinc picolinate", "zinc citrate", "zinc dosage", "zinc immune", "zinc deficiency symptoms"]
+    },
+    {
+      "path": "/supplements/performance",
+      "title": "Performance Supplements",
+      "keywords": ["performance supplements", "athletic supplements", "workout supplements", "pre workout", "post workout supplements", "sports supplements", "ergogenic aids"]
+    },
+    {
+      "path": "/supplements/performance/creatine",
+      "title": "Creatine",
+      "keywords": ["creatine", "creatine monohydrate", "creatine loading", "creatine benefits", "creatine dosage", "5g creatine", "creatine timing", "creatine muscle", "creatine cognitive"]
+    },
+    {
+      "path": "/supplements/performance/beta-alanine",
+      "title": "Beta-Alanine",
+      "keywords": ["beta alanine", "carnosine", "muscle endurance", "tingles", "paresthesia", "beta alanine dosage"]
+    },
+    {
+      "path": "/supplements/performance/caffeine",
+      "title": "Caffeine Supplements",
+      "keywords": ["caffeine supplements", "caffeine pills", "caffeine dosage", "caffeine timing", "caffeine tolerance", "caffeine cycling", "pre workout caffeine"]
+    },
+    {
+      "path": "/supplements/nootropics",
+      "title": "Nootropics",
+      "keywords": ["nootropics", "smart drugs", "cognitive enhancers", "brain supplements", "nootropic stack", "study drugs", "focus supplements"]
+    },
+    {
+      "path": "/supplements/nootropics/racetams",
+      "title": "Racetams",
+      "keywords": ["racetams", "piracetam", "aniracetam", "oxiracetam", "phenylpiracetam", "noopept"]
+    },
+    {
+      "path": "/supplements/nootropics/l-theanine",
+      "title": "L-Theanine",
+      "keywords": ["l-theanine", "theanine", "caffeine theanine", "theanine anxiety", "theanine dosage", "green tea theanine", "theanine calm focus"]
+    },
+    {
+      "path": "/supplements/nootropics/lions-mane",
+      "title": "Lion's Mane Mushroom",
+      "keywords": ["lions mane", "hericium erinaceus", "mushroom nootropic", "NGF", "nerve growth factor", "lions mane benefits", "mushroom supplement"]
+    },
+    {
+      "path": "/supplements/adaptogens",
+      "title": "Adaptogens",
+      "keywords": ["adaptogens", "adaptogenic herbs", "stress adaptogens", "cortisol adaptogens", "herbal adaptogens"]
+    },
+    {
+      "path": "/supplements/adaptogens/ashwagandha",
+      "title": "Ashwagandha",
+      "keywords": ["ashwagandha", "withania somnifera", "KSM-66", "sensoril", "ashwagandha cortisol", "ashwagandha stress", "ashwagandha dosage", "ashwagandha benefits"]
+    },
+    {
+      "path": "/supplements/adaptogens/rhodiola",
+      "title": "Rhodiola Rosea",
+      "keywords": ["rhodiola", "rhodiola rosea", "golden root", "arctic root", "rhodiola fatigue", "rhodiola stress", "rhodiola dosage"]
+    },
+    {
+      "path": "/biohacking",
+      "title": "Biohacking",
+      "keywords": ["biohacking", "human optimization", "self optimization", "quantified self", "body hacking", "biohacking techniques", "biohacker", "performance optimization"]
+    },
+    {
+      "path": "/biohacking/tracking",
+      "title": "Health Tracking",
+      "keywords": ["health tracking", "quantified self", "self tracking", "biomarkers", "health metrics", "data driven health", "personal analytics"]
+    },
+    {
+      "path": "/biohacking/tracking/wearables",
+      "title": "Wearable Devices",
+      "keywords": ["wearables", "fitness tracker", "health tracker", "smart watch", "oura ring", "whoop", "apple watch", "garmin", "fitbit", "continuous monitoring"]
+    },
+    {
+      "path": "/biohacking/tracking/wearables/oura-ring",
+      "title": "Oura Ring",
+      "keywords": ["oura ring", "oura", "sleep tracker ring", "readiness score", "HRV tracking", "body temperature", "activity tracking ring"]
+    },
+    {
+      "path": "/biohacking/tracking/wearables/whoop",
+      "title": "WHOOP Band",
+      "keywords": ["whoop", "whoop strap", "strain coach", "recovery score", "whoop metrics", "hrv whoop", "subscription wearable"]
+    },
+    {
+      "path": "/biohacking/tracking/blood-work",
+      "title": "Blood Work & Testing",
+      "keywords": ["blood work", "lab testing", "biomarker testing", "blood test", "comprehensive metabolic panel", "lipid panel", "hormone testing", "at home blood test"]
+    },
+    {
+      "path": "/biohacking/cold-exposure",
+      "title": "Cold Exposure",
+      "keywords": ["cold exposure", "cold therapy", "cold adaptation", "brown fat", "cold thermogenesis", "hormesis", "cold showers", "ice baths biohacking"]
+    },
+    {
+      "path": "/biohacking/cold-exposure/protocols",
+      "title": "Cold Exposure Protocols",
+      "keywords": ["cold exposure protocol", "cold adaptation protocol", "wim hof method", "cold shower routine", "progressive cold exposure"]
+    },
+    {
+      "path": "/biohacking/heat-exposure",
+      "title": "Heat Therapy",
+      "keywords": ["heat therapy", "sauna", "infrared sauna", "heat stress", "heat shock proteins", "HSP", "sauna benefits", "sauna protocol"]
+    },
+    {
+      "path": "/biohacking/heat-exposure/sauna",
+      "title": "Sauna",
+      "keywords": ["sauna", "traditional sauna", "infrared sauna", "sauna frequency", "sauna duration", "sauna temperature", "finnish sauna", "sauna health benefits"]
+    },
+    {
+      "path": "/biohacking/intermittent-fasting",
+      "title": "Intermittent Fasting",
+      "keywords": ["intermittent fasting", "IF", "time restricted eating", "16:8", "OMAD", "one meal a day", "fasting window", "eating window", "fasting benefits"]
+    },
+    {
+      "path": "/biohacking/intermittent-fasting/protocols",
+      "title": "Fasting Protocols",
+      "keywords": ["fasting protocols", "16:8 fasting", "18:6 fasting", "20:4 fasting", "alternate day fasting", "5:2 diet", "extended fasting"]
+    },
+    {
+      "path": "/biohacking/red-light-therapy",
+      "title": "Red Light Therapy",
+      "keywords": ["red light therapy", "photobiomodulation", "infrared light", "near infrared", "red light panel", "red light benefits", "mitochondrial health"]
+    },
+    {
+      "path": "/biohacking/grounding",
+      "title": "Grounding/Earthing",
+      "keywords": ["grounding", "earthing", "barefoot", "earth connection", "grounding mat", "grounding benefits", "electron transfer"]
+    },
+    {
+      "path": "/longevity",
+      "title": "Longevity & Anti-Aging",
+      "keywords": ["longevity", "anti-aging", "lifespan", "healthspan", "aging", "longevity science", "life extension", "healthy aging", "aging research"]
+    },
+    {
+      "path": "/longevity/science",
+      "title": "Longevity Science",
+      "keywords": ["longevity science", "aging research", "geroscience", "senescence", "cellular aging", "mitochondrial theory", "free radical theory", "telomeres"]
+    },
+    {
+      "path": "/longevity/science/telomeres",
+      "title": "Telomeres",
+      "keywords": ["telomeres", "telomerase", "chromosome ends", "telomere length", "telomere shortening", "cellular aging markers"]
+    },
+    {
+      "path": "/longevity/science/autophagy",
+      "title": "Autophagy",
+      "keywords": ["autophagy", "cellular cleanup", "cellular recycling", "mTOR", "autophagy fasting", "autophagy exercise", "cellular renewal"]
+    },
+    {
+      "path": "/longevity/lifestyle",
+      "title": "Longevity Lifestyle",
+      "keywords": ["longevity lifestyle", "blue zones", "centenarians", "longevity factors", "healthy aging lifestyle", "ikigai", "okinawa diet"]
+    },
+    {
+      "path": "/longevity/lifestyle/blue-zones",
+      "title": "Blue Zones",
+      "keywords": ["blue zones", "longevity hotspots", "okinawa", "sardinia", "ikaria", "nicoya", "loma linda", "centenarian communities", "longevity secrets"]
+    },
+    {
+      "path": "/longevity/supplements",
+      "title": "Longevity Supplements",
+      "keywords": ["longevity supplements", "anti-aging supplements", "life extension supplements", "geroprotectors"]
+    },
+    {
+      "path": "/longevity/supplements/nmn",
+      "title": "NMN",
+      "keywords": ["NMN", "nicotinamide mononucleotide", "NAD precursor", "NAD booster", "NMN dosage", "NMN benefits", "sirtuins"]
+    },
+    {
+      "path": "/longevity/supplements/resveratrol",
+      "title": "Resveratrol",
+      "keywords": ["resveratrol", "red wine compound", "polyphenol", "sirtuin activator", "resveratrol benefits", "trans-resveratrol"]
+    },
+    {
+      "path": "/longevity/supplements/metformin",
+      "title": "Metformin",
+      "keywords": ["metformin", "metformin longevity", "anti-aging drug", "TAME trial", "metformin off-label", "glucose control"]
+    },
+    {
+      "path": "/longevity/supplements/rapamycin",
+      "title": "Rapamycin",
+      "keywords": ["rapamycin", "sirolimus", "mTOR inhibitor", "rapamycin longevity", "rapamycin aging", "immunosuppressant"]
+    },
+    {
+      "path": "/longevity/caloric-restriction",
+      "title": "Caloric Restriction",
+      "keywords": ["caloric restriction", "CR", "calorie restriction longevity", "CR mimetics", "FMD", "fasting mimicking diet", "protein restriction"]
+    },
+    {
+      "path": "/longevity/exercise",
+      "title": "Exercise for Longevity",
+      "keywords": ["exercise longevity", "longevity exercise", "lifespan exercise", "VO2max longevity", "strength training longevity", "zone 2 cardio", "longevity workout"]
+    },
+    {
+      "path": "/longevity/exercise/vo2max",
+      "title": "VO2 Max Training",
+      "keywords": ["VO2max", "maximal oxygen uptake", "cardiorespiratory fitness", "VO2max testing", "VO2max training", "aerobic capacity", "fitness predictor"]
+    },
+    {
+      "path": "/longevity/exercise/zone2",
+      "title": "Zone 2 Cardio",
+      "keywords": ["zone 2", "zone 2 training", "aerobic base", "fat oxidation", "mitochondrial density", "low intensity cardio", "MAF training", "conversational pace"]
+    },
+    {
+      "path": "/longevity/hormones",
+      "title": "Hormone Optimization",
+      "keywords": ["hormone optimization", "hormone health", "endocrine system", "hormone balance", "hormone testing", "bioidentical hormones"]
+    },
+    {
+      "path": "/longevity/hormones/testosterone",
+      "title": "Testosterone",
+      "keywords": ["testosterone", "testosterone optimization", "low testosterone", "TRT", "testosterone replacement", "free testosterone", "total testosterone"]
+    },
+    {
+      "path": "/longevity/hormones/growth-hormone",
+      "title": "Growth Hormone",
+      "keywords": ["growth hormone", "HGH", "human growth hormone", "IGF-1", "growth hormone optimization", "GH secretagogues"]
     }
   ]
 }

@@ -371,6 +371,59 @@ type ChangePublishStatusRequest struct {
 	NewStatus string `json:"newStatus"` // "published", "draft", "pending"
 }
 
+// BatchChangePublishStatusRequest contains parameters for batch changing publish status
+type BatchChangePublishStatusRequest struct {
+	SiteID    int64   `json:"siteId"`
+	NodeIDs   []int64 `json:"nodeIds"`
+	NewStatus string  `json:"newStatus"` // "published", "draft"
+}
+
+// BatchChangeStatusResult contains the result of changing status for a single node
+type BatchChangeStatusResult struct {
+	NodeID  int64  `json:"nodeId"`
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+}
+
+// BatchChangeStatusResponse contains the results of batch status change
+type BatchChangeStatusResponse struct {
+	Results      []BatchChangeStatusResult `json:"results"`
+	SuccessCount int                       `json:"successCount"`
+	FailedCount  int                       `json:"failedCount"`
+}
+
+// =========================================================================
+// Delete Operations DTOs
+// =========================================================================
+
+// DeleteNodeWithWPRequest contains parameters for deleting a node and its WP page
+type DeleteNodeWithWPRequest struct {
+	SiteID int64 `json:"siteId"`
+	NodeID int64 `json:"nodeId"`
+}
+
+// BatchDeleteNodesWithWPRequest contains parameters for batch deleting nodes with WP pages
+type BatchDeleteNodesWithWPRequest struct {
+	SiteID  int64   `json:"siteId"`
+	NodeIDs []int64 `json:"nodeIds"`
+}
+
+// DeleteNodeResult contains the result of deleting a single node
+type DeleteNodeResult struct {
+	NodeID        int64  `json:"nodeId"`
+	Success       bool   `json:"success"`
+	Error         string `json:"error,omitempty"`
+	ChildrenMoved int    `json:"childrenMoved"`
+	DeletedFromWP bool   `json:"deletedFromWP"`
+}
+
+// BatchDeleteNodesResponse contains the results of batch delete operation
+type BatchDeleteNodesResponse struct {
+	Results      []DeleteNodeResult `json:"results"`
+	SuccessCount int                `json:"successCount"`
+	FailedCount  int                `json:"failedCount"`
+}
+
 // =========================================================================
 // AI Generation DTOs
 // =========================================================================
@@ -452,7 +505,6 @@ type ContentSettingsDTO struct {
 	WritingStyle            string `json:"writingStyle"`                      // professional, casual, formal, friendly, technical
 	ContentTone             string `json:"contentTone"`                       // informative, persuasive, educational, engaging, authoritative
 	CustomInstructions      string `json:"customInstructions"`                // Additional instructions
-	UseWebSearch            bool   `json:"useWebSearch"`                      // Enable web search for AI generation
 	IncludeLinks            bool   `json:"includeLinks"`                      // Include approved links from linking plan
 	AutoLinkMode            string `json:"autoLinkMode,omitempty"`            // "none", "before", or "after"
 	AutoLinkProviderID      *int64 `json:"autoLinkProviderId,omitempty"`      // Provider for link suggestion

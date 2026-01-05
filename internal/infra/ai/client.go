@@ -87,7 +87,6 @@ type SuggestedLink struct {
 	SourceNodeID int64   `json:"sourceNodeId" jsonschema_description:"ID of the page that will contain the link"`
 	TargetNodeID int64   `json:"targetNodeId" jsonschema_description:"ID of the page being linked to"`
 	AnchorText   string  `json:"anchorText" jsonschema_description:"Text for the hyperlink"`
-	Reason       string  `json:"reason" jsonschema_description:"Brief explanation why this link is valuable"`
 	Confidence   float64 `json:"confidence" jsonschema_description:"Confidence score from 0.0 to 1.0"`
 }
 

@@ -6,7 +6,47 @@ import (
 	"unicode"
 )
 
+// stripSitePrefix removes common URL prefixes from path
+// Examples:
+// - "https://example.com/blog/article" -> "/blog/article"
+// - "http://site.com/page" -> "/page"
+// - "example.com/about" -> "/about"
+// - "/about" -> "/about" (unchanged)
+// - "HTTPS://Example.COM/blog" -> "/blog" (case-insensitive)
+func stripSitePrefix(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+
+	pathLower := strings.ToLower(path)
+
+	// Remove http:// or https:// prefix (case-insensitive)
+	for _, prefix := range []string{"https://", "http://"} {
+		if strings.HasPrefix(pathLower, prefix) {
+			path = path[len(prefix):] // Use original case for the remaining part
+			pathLower = pathLower[len(prefix):]
+			break
+		}
+	}
+
+	// If path still contains a domain (has dot and no leading slash)
+	// Extract just the path part after first slash
+	if !strings.HasPrefix(path, "/") && strings.Contains(path, ".") {
+		// Find first slash after domain
+		if idx := strings.Index(path, "/"); idx != -1 {
+			path = path[idx:] // Keep from first slash onwards
+		} else {
+			// Domain only, no path -> return root
+			return "/"
+		}
+	}
+
+	return path
+}
+
 // normalizePath ensures consistent path format
+// - Removes site prefix (http://example.com, https://site.com, etc.)
 // - Adds leading slash if missing
 // - Removes trailing slash
 // - Converts to lowercase
@@ -16,6 +56,9 @@ func normalizePath(path string) string {
 	if path == "" {
 		return ""
 	}
+
+	// First, strip any site prefix (https://example.com/blog -> /blog)
+	path = stripSitePrefix(path)
 
 	// Lowercase
 	path = strings.ToLower(path)

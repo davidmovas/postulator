@@ -354,8 +354,8 @@ func (s *Suggester) configToOverrides(config SuggestConfig) entities.ContextConf
 }
 
 func (s *Suggester) buildPlaceholders(config SuggestConfig, nodes []*entities.SitemapNode, outgoing, incoming map[int64]int) map[string]string {
-	// Build hierarchical tree representation (includes all node info: ID, title, path, keywords, link counts)
-	hierarchyTree := s.buildHierarchyTree(nodes, outgoing, incoming)
+	// Build compact node list (optimized: only includes nodes in current batch)
+	nodesList := s.buildHierarchyTree(nodes, outgoing, incoming)
 
 	// Build constraints section
 	var constraints strings.Builder
@@ -377,7 +377,7 @@ func (s *Suggester) buildPlaceholders(config SuggestConfig, nodes []*entities.Si
 
 	placeholders := map[string]string{
 		"nodes_count":    fmt.Sprintf("%d", len(nodes)),
-		"hierarchyTree":  hierarchyTree,
+		"hierarchyTree":  nodesList, // Keep name for compatibility with existing prompts
 		"constraints":    constraints.String(),
 		"feedback":       feedback,
 		"existing_links": fmt.Sprintf("%d", len(config.ExistingLinks)),
@@ -386,19 +386,20 @@ func (s *Suggester) buildPlaceholders(config SuggestConfig, nodes []*entities.Si
 	return placeholders
 }
 
-// buildHierarchyTree creates a visual tree representation of the site structure
+// buildHierarchyTree creates a hierarchical tree showing parent-child relationships
+// Optimized: sends only nodes in batch, with visual tree structure preserved
 func (s *Suggester) buildHierarchyTree(nodes []*entities.SitemapNode, outgoing, incoming map[int64]int) string {
 	if len(nodes) == 0 {
 		return ""
 	}
 
-	// Build a map of nodes by ID for quick lookup
+	// Build a map of nodes by ID for quick lookup (only nodes in batch)
 	nodeMap := make(map[int64]*entities.SitemapNode)
 	for _, node := range nodes {
 		nodeMap[node.ID] = node
 	}
 
-	// Build children map
+	// Build children map - only for nodes within this batch
 	childrenMap := make(map[int64][]*entities.SitemapNode)
 	var roots []*entities.SitemapNode
 
@@ -421,11 +422,11 @@ func (s *Suggester) buildHierarchyTree(nodes []*entities.SitemapNode, outgoing, 
 
 	// Build the tree string
 	var sb strings.Builder
-	sb.WriteString("SITE HIERARCHY:\n")
+	sb.WriteString("SITE STRUCTURE:\n")
 
 	for i, root := range roots {
 		isLast := i == len(roots)-1
-		s.writeTreeNode(&sb, root, "", isLast, childrenMap, outgoing, incoming)
+		s.writeCompactTreeNode(&sb, root, "", isLast, childrenMap, outgoing, incoming)
 	}
 
 	return sb.String()
@@ -441,7 +442,8 @@ func sortNodesByPosition(nodes []*entities.SitemapNode) {
 	}
 }
 
-func (s *Suggester) writeTreeNode(
+// writeCompactTreeNode writes a single node in compact tree format
+func (s *Suggester) writeCompactTreeNode(
 	sb *strings.Builder,
 	node *entities.SitemapNode,
 	prefix string,
@@ -455,18 +457,19 @@ func (s *Suggester) writeTreeNode(
 		connector = "└── "
 	}
 
-	// Write the node line
+	// Write the node line - compact format
+	// Format: ├── [ID:X] "Title" /path [kw: a,b] [X→ Y←]
 	sb.WriteString(prefix)
 	sb.WriteString(connector)
 	sb.WriteString(fmt.Sprintf("[ID:%d] \"%s\" /%s", node.ID, node.Title, node.Slug))
 
-	// Add keywords if present
+	// Add keywords if present (limit to 3)
 	if len(node.Keywords) > 0 {
 		kw := node.Keywords
 		if len(kw) > 3 {
 			kw = kw[:3]
 		}
-		sb.WriteString(fmt.Sprintf(" (keywords: %s)", strings.Join(kw, ", ")))
+		sb.WriteString(fmt.Sprintf(" [kw: %s]", strings.Join(kw, ", ")))
 	}
 
 	// Add link counts
@@ -486,7 +489,7 @@ func (s *Suggester) writeTreeNode(
 
 		for i, child := range children {
 			childIsLast := i == len(children)-1
-			s.writeTreeNode(sb, child, childPrefix, childIsLast, childrenMap, outgoing, incoming)
+			s.writeCompactTreeNode(sb, child, childPrefix, childIsLast, childrenMap, outgoing, incoming)
 		}
 	}
 }
