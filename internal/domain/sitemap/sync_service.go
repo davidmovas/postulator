@@ -330,3 +330,167 @@ func (s *SyncService) ChangePublishStatus(ctx context.Context, siteID int64, nod
 	s.logger.Infof("Changed publish status for node %d to %s", nodeID, newStatus)
 	return nil
 }
+
+// BatchChangeStatusResult contains the result of changing status for a single node
+type BatchChangeStatusResult struct {
+	NodeID  int64
+	Success bool
+	Error   string
+}
+
+// BatchChangePublishStatus changes the publish status of multiple nodes both locally and in WordPress
+func (s *SyncService) BatchChangePublishStatus(
+	ctx context.Context,
+	siteID int64,
+	nodeIDs []int64,
+	newStatus entities.NodePublishStatus,
+) ([]BatchChangeStatusResult, error) {
+	if len(nodeIDs) == 0 {
+		return nil, nil
+	}
+
+	results := make([]BatchChangeStatusResult, 0, len(nodeIDs))
+
+	for _, nodeID := range nodeIDs {
+		result := BatchChangeStatusResult{NodeID: nodeID}
+
+		err := s.ChangePublishStatus(ctx, siteID, nodeID, newStatus)
+		if err != nil {
+			result.Error = err.Error()
+		} else {
+			result.Success = true
+		}
+
+		results = append(results, result)
+	}
+
+	successCount := 0
+	for _, r := range results {
+		if r.Success {
+			successCount++
+		}
+	}
+
+	s.logger.Infof("Batch changed publish status for %d/%d nodes to %s", successCount, len(nodeIDs), newStatus)
+	return results, nil
+}
+
+// DeleteNodeResult contains the result of deleting a node
+type DeleteNodeResult struct {
+	NodeID        int64
+	Success       bool
+	Error         string
+	ChildrenMoved int
+	DeletedFromWP bool
+}
+
+// DeleteNodeWithWP deletes a node from WordPress and locally, moving children to parent
+func (s *SyncService) DeleteNodeWithWP(
+	ctx context.Context,
+	siteID int64,
+	nodeID int64,
+) (*DeleteNodeResult, error) {
+	result := &DeleteNodeResult{NodeID: nodeID}
+
+	// Get the node
+	node, err := s.sitemapSvc.GetNode(ctx, nodeID)
+	if err != nil {
+		result.Error = fmt.Sprintf("failed to get node: %v", err)
+		return result, err
+	}
+
+	// Get site with credentials
+	site, err := s.siteService.GetSiteWithPassword(ctx, siteID)
+	if err != nil {
+		result.Error = fmt.Sprintf("failed to get site: %v", err)
+		return result, err
+	}
+
+	// Reparent children to parent node (like WordPress does)
+	childrenMoved, err := s.sitemapSvc.ReparentChildren(ctx, nodeID, node.ParentID)
+	if err != nil {
+		result.Error = fmt.Sprintf("failed to reparent children: %v", err)
+		return result, err
+	}
+	result.ChildrenMoved = childrenMoved
+
+	// Delete from WordPress if node has WP ID
+	if node.WPPageID != nil {
+		wpID := *node.WPPageID
+
+		switch node.ContentType {
+		case entities.NodeContentTypePage:
+			if err := s.wpClient.DeletePage(ctx, site, wpID, true); err != nil {
+				result.Error = fmt.Sprintf("failed to delete page from WP: %v", err)
+				return result, err
+			}
+			result.DeletedFromWP = true
+
+		case entities.NodeContentTypePost:
+			if err := s.wpClient.DeletePost(ctx, site, wpID); err != nil {
+				result.Error = fmt.Sprintf("failed to delete post from WP: %v", err)
+				return result, err
+			}
+			result.DeletedFromWP = true
+		}
+	}
+
+	// Delete locally
+	if err := s.sitemapSvc.DeleteNode(ctx, nodeID); err != nil {
+		result.Error = fmt.Sprintf("failed to delete node locally: %v", err)
+		return result, err
+	}
+
+	result.Success = true
+	s.logger.Infof("Deleted node %d (WP: %v, children moved: %d)", nodeID, result.DeletedFromWP, childrenMoved)
+	return result, nil
+}
+
+// BatchDeleteNodesWithWP deletes multiple nodes from WordPress and locally
+func (s *SyncService) BatchDeleteNodesWithWP(
+	ctx context.Context,
+	siteID int64,
+	nodeIDs []int64,
+) ([]DeleteNodeResult, error) {
+	if len(nodeIDs) == 0 {
+		return nil, nil
+	}
+
+	// Get all nodes to sort by depth (delete leaves first)
+	nodes := make([]*entities.SitemapNode, 0, len(nodeIDs))
+	for _, nodeID := range nodeIDs {
+		node, err := s.sitemapSvc.GetNode(ctx, nodeID)
+		if err != nil {
+			continue
+		}
+		nodes = append(nodes, node)
+	}
+
+	// Sort by depth descending (leaves first)
+	for i := 0; i < len(nodes)-1; i++ {
+		for j := i + 1; j < len(nodes); j++ {
+			if nodes[i].Depth < nodes[j].Depth {
+				nodes[i], nodes[j] = nodes[j], nodes[i]
+			}
+		}
+	}
+
+	results := make([]DeleteNodeResult, 0, len(nodes))
+
+	for _, node := range nodes {
+		result, _ := s.DeleteNodeWithWP(ctx, siteID, node.ID)
+		if result != nil {
+			results = append(results, *result)
+		}
+	}
+
+	successCount := 0
+	for _, r := range results {
+		if r.Success {
+			successCount++
+		}
+	}
+
+	s.logger.Infof("Batch deleted %d/%d nodes", successCount, len(nodeIDs))
+	return results, nil
+}

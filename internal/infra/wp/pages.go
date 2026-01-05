@@ -221,8 +221,15 @@ func (c *restyClient) UpdatePage(ctx context.Context, s *entities.Site, page *WP
 		pageData["status"] = page.Status
 	}
 
-	// Parent can be 0 (to move to top-level), so we always set it if explicitly provided
-	pageData["parent"] = page.ParentID
+	// Only set parent if explicitly provided (non-zero value)
+	// ParentID = 0 means "don't change parent" (not "remove parent")
+	// To explicitly move to top-level, set ParentID = -1 which we'll convert to 0
+	if page.ParentID > 0 {
+		pageData["parent"] = page.ParentID
+	} else if page.ParentID == -1 {
+		// Special case: explicitly move to top-level
+		pageData["parent"] = 0
+	}
 
 	if page.Excerpt != "" {
 		pageData["excerpt"] = page.Excerpt

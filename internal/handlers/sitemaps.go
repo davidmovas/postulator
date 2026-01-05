@@ -689,6 +689,82 @@ func (h *SitemapsHandler) ChangePublishStatus(req *dto.ChangePublishStatusReques
 	return ok("Status changed successfully")
 }
 
+// BatchChangePublishStatus changes the publish status of multiple nodes
+func (h *SitemapsHandler) BatchChangePublishStatus(req *dto.BatchChangePublishStatusRequest) *dto.Response[*dto.BatchChangeStatusResponse] {
+	status := entities.NodePublishStatus(req.NewStatus)
+	// Use 5 minute timeout for batch WP operations (each node = ~3 sec WP API call)
+	results, err := h.syncService.BatchChangePublishStatus(ctx.WithTimeout(5*time.Minute), req.SiteID, req.NodeIDs, status)
+	if err != nil {
+		return fail[*dto.BatchChangeStatusResponse](err)
+	}
+
+	dtoResults := make([]dto.BatchChangeStatusResult, len(results))
+	successCount := 0
+	for i, r := range results {
+		dtoResults[i] = dto.BatchChangeStatusResult{
+			NodeID:  r.NodeID,
+			Success: r.Success,
+			Error:   r.Error,
+		}
+		if r.Success {
+			successCount++
+		}
+	}
+
+	return ok(&dto.BatchChangeStatusResponse{
+		Results:      dtoResults,
+		SuccessCount: successCount,
+		FailedCount:  len(results) - successCount,
+	})
+}
+
+// DeleteNodeWithWP deletes a node from WordPress and locally
+func (h *SitemapsHandler) DeleteNodeWithWP(req *dto.DeleteNodeWithWPRequest) *dto.Response[*dto.DeleteNodeResult] {
+	// Use 5 minute timeout for WP delete operations (includes children reparenting)
+	result, err := h.syncService.DeleteNodeWithWP(ctx.WithTimeout(5*time.Minute), req.SiteID, req.NodeID)
+	if err != nil {
+		return fail[*dto.DeleteNodeResult](err)
+	}
+
+	return ok(&dto.DeleteNodeResult{
+		NodeID:        result.NodeID,
+		Success:       result.Success,
+		Error:         result.Error,
+		ChildrenMoved: result.ChildrenMoved,
+		DeletedFromWP: result.DeletedFromWP,
+	})
+}
+
+// BatchDeleteNodesWithWP deletes multiple nodes from WordPress and locally
+func (h *SitemapsHandler) BatchDeleteNodesWithWP(req *dto.BatchDeleteNodesWithWPRequest) *dto.Response[*dto.BatchDeleteNodesResponse] {
+	// Use 5 minute timeout for batch WP delete operations
+	results, err := h.syncService.BatchDeleteNodesWithWP(ctx.WithTimeout(5*time.Minute), req.SiteID, req.NodeIDs)
+	if err != nil {
+		return fail[*dto.BatchDeleteNodesResponse](err)
+	}
+
+	dtoResults := make([]dto.DeleteNodeResult, len(results))
+	successCount := 0
+	for i, r := range results {
+		dtoResults[i] = dto.DeleteNodeResult{
+			NodeID:        r.NodeID,
+			Success:       r.Success,
+			Error:         r.Error,
+			ChildrenMoved: r.ChildrenMoved,
+			DeletedFromWP: r.DeletedFromWP,
+		}
+		if r.Success {
+			successCount++
+		}
+	}
+
+	return ok(&dto.BatchDeleteNodesResponse{
+		Results:      dtoResults,
+		SuccessCount: successCount,
+		FailedCount:  len(results) - successCount,
+	})
+}
+
 // =========================================================================
 // AI Generation Operations (with History)
 // =========================================================================
@@ -817,7 +893,6 @@ func (h *SitemapsHandler) StartPageGeneration(req *dto.StartPageGenerationReques
 			WritingStyle:            generation.WritingStyle(req.ContentSettings.WritingStyle),
 			ContentTone:             generation.ContentTone(req.ContentSettings.ContentTone),
 			CustomInstructions:      req.ContentSettings.CustomInstructions,
-			UseWebSearch:            req.ContentSettings.UseWebSearch,
 			IncludeLinks:            req.ContentSettings.IncludeLinks,
 			AutoLinkMode:            generation.AutoLinkMode(req.ContentSettings.AutoLinkMode),
 			AutoLinkProviderID:      req.ContentSettings.AutoLinkProviderID,

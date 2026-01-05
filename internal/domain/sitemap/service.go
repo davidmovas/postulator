@@ -508,6 +508,62 @@ func (s *service) MoveNode(ctx context.Context, nodeID int64, newParentID *int64
 	return nil
 }
 
+// ReparentChildren moves all direct children of nodeID to newParentID
+func (s *service) ReparentChildren(ctx context.Context, nodeID int64, newParentID *int64) (int, error) {
+	// Get the node to access its sitemapID
+	node, err := s.nodeRepo.GetByID(ctx, nodeID)
+	if err != nil {
+		return 0, err
+	}
+
+	// Get direct children of the node
+	children, err := s.nodeRepo.GetByParentID(ctx, node.SitemapID, &nodeID)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(children) == 0 {
+		return 0, nil
+	}
+
+	// Move each child to the new parent
+	for _, child := range children {
+		child.ParentID = newParentID
+
+		// Recalculate hierarchy (depth and path)
+		if err := s.calculateNodeHierarchy(ctx, child); err != nil {
+			s.logger.ErrorWithErr(err, "Failed to calculate hierarchy for child during reparent")
+			continue
+		}
+
+		if err := s.nodeRepo.Update(ctx, child); err != nil {
+			s.logger.ErrorWithErr(err, "Failed to update child during reparent")
+			continue
+		}
+
+		// Update descendants paths
+		descendants, err := s.nodeRepo.GetDescendants(ctx, child.ID)
+		if err != nil {
+			continue
+		}
+
+		for _, desc := range descendants {
+			if err := s.calculateNodeHierarchy(ctx, desc); err != nil {
+				continue
+			}
+			if err := s.nodeRepo.Update(ctx, desc); err != nil {
+				s.logger.ErrorWithErr(err, "Failed to update descendant path during reparent")
+			}
+		}
+	}
+
+	// Update sitemap's updated_at
+	_ = s.repo.TouchUpdatedAt(ctx, node.SitemapID)
+
+	s.logger.Infof("Reparented %d children from node %d to parent %v", len(children), nodeID, newParentID)
+	return len(children), nil
+}
+
 func (s *service) UpdateNodePositions(ctx context.Context, nodeID int64, positionX, positionY float64) error {
 	if err := s.nodeRepo.UpdatePositions(ctx, nodeID, positionX, positionY); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to update node positions")

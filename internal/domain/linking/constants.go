@@ -10,5 +10,5 @@ const (
 	MaxConcurrency = 10
 
 	// Batch processing
-	MaxNodesPerBatch = 15
+	MaxNodesPerBatch = 30
 )

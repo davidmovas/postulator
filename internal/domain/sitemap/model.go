@@ -104,6 +104,7 @@ type Service interface {
 	UpdateNode(ctx context.Context, node *entities.SitemapNode) error
 	DeleteNode(ctx context.Context, id int64) error
 	MoveNode(ctx context.Context, nodeID int64, newParentID *int64, position int) error
+	ReparentChildren(ctx context.Context, nodeID int64, newParentID *int64) (int, error)
 	UpdateNodePositions(ctx context.Context, nodeID int64, positionX, positionY float64) error
 
 	SetNodeKeywords(ctx context.Context, nodeID int64, keywords []string) error

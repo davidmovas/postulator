@@ -40,6 +40,8 @@ type OpenAIClient struct {
 	modelName            string
 	usesCompletionTokens bool
 	isReasoningModel     bool
+	contextWindow        int // Total context window size
+	maxOutputTokens      int // Maximum output tokens for the model
 }
 
 func NewOpenAIClient(cfg Config) (*OpenAIClient, error) {
@@ -63,9 +65,17 @@ func NewOpenAIClient(cfg Config) (*OpenAIClient, error) {
 
 	usesCompletionTokens := false
 	isReasoningModel := false
+	contextWindow := 128000  // Default fallback
+	maxOutputTokens := 16384 // Default fallback
 	if modelInfo := GetModelInfo(entities.TypeOpenAI, cfg.Model); modelInfo != nil {
 		usesCompletionTokens = modelInfo.UsesCompletionTokens
 		isReasoningModel = modelInfo.IsReasoningModel
+		if modelInfo.ContextWindow > 0 {
+			contextWindow = modelInfo.ContextWindow
+		}
+		if modelInfo.MaxOutputTokens > 0 {
+			maxOutputTokens = modelInfo.MaxOutputTokens
+		}
 	}
 
 	return &OpenAIClient{
@@ -74,6 +84,8 @@ func NewOpenAIClient(cfg Config) (*OpenAIClient, error) {
 		modelName:            cfg.Model,
 		usesCompletionTokens: usesCompletionTokens,
 		isReasoningModel:     isReasoningModel,
+		contextWindow:        contextWindow,
+		maxOutputTokens:      maxOutputTokens,
 	}, nil
 }
 
@@ -85,7 +97,73 @@ func (c *OpenAIClient) GetModelName() string {
 	return c.modelName
 }
 
+// EstimateTokens estimates the number of tokens in a text string.
+// Uses a rough approximation of ~4 characters per token for English text.
+// For mixed content (HTML, JSON), uses ~3.5 chars per token to be more conservative.
+func (c *OpenAIClient) EstimateTokens(text string) int {
+	// Average ~3.5 chars per token for mixed content (code, HTML, etc.)
+	return (len(text) * 10) / 35
+}
+
+// CalculateAvailableOutputTokens determines how many output tokens are available
+// given the input prompt sizes and desired output tokens.
+// It ensures we don't exceed the model's context window or max output limits.
+func (c *OpenAIClient) CalculateAvailableOutputTokens(systemPrompt, userPrompt string, desiredOutput int) int {
+	inputTokens := c.EstimateTokens(systemPrompt) + c.EstimateTokens(userPrompt)
+
+	// Add 10% safety buffer for input estimation errors
+	inputWithBuffer := int(float64(inputTokens) * 1.1)
+
+	// Calculate available space in context window
+	availableInContext := c.contextWindow - inputWithBuffer
+
+	// Take the minimum of: available in context, model max output, desired output
+	maxPossible := availableInContext
+	if c.maxOutputTokens < maxPossible {
+		maxPossible = c.maxOutputTokens
+	}
+	if desiredOutput > 0 && desiredOutput < maxPossible {
+		maxPossible = desiredOutput
+	}
+
+	// Ensure we have at least some tokens for output
+	if maxPossible < 100 {
+		maxPossible = 100
+	}
+
+	return maxPossible
+}
+
+// ValidateRequest checks if the prompt will fit in the context window with room for output.
+// Returns an error if the prompt is too large.
+func (c *OpenAIClient) ValidateRequest(systemPrompt, userPrompt string, minRequiredOutput int) error {
+	inputTokens := c.EstimateTokens(systemPrompt) + c.EstimateTokens(userPrompt)
+	inputWithBuffer := int(float64(inputTokens) * 1.1)
+
+	available := c.contextWindow - inputWithBuffer
+
+	if available < minRequiredOutput {
+		return fmt.Errorf("prompt too large: estimated %d input tokens, only %d tokens available for output (need at least %d). Context window: %d",
+			inputTokens, available, minRequiredOutput, c.contextWindow)
+	}
+
+	return nil
+}
+
 func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPrompt string, opts *GenerateArticleOptions) (*ArticleResult, error) {
+	// Calculate dynamic token limits based on input size
+	// Default desired output is 4096 for articles, but we'll calculate what's actually available
+	const desiredArticleTokens = 8192 // Desired output for a typical article
+	const minArticleTokens = 2000     // Minimum tokens needed for a reasonable article
+
+	// Validate request first
+	if err := c.ValidateRequest(systemPrompt, userPrompt, minArticleTokens); err != nil {
+		return nil, errors.AI(providerName, err)
+	}
+
+	// Calculate actual available tokens
+	maxTokens := c.CalculateAvailableOutputTokens(systemPrompt, userPrompt, desiredArticleTokens)
+
 	schema := generateSchema[ArticleContent]()
 
 	schemaParam := openaiSDK.ResponseFormatJSONSchemaJSONSchemaParam{
@@ -115,14 +193,15 @@ func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPr
 		params.Temperature = openaiSDK.Float(0.7)
 	}
 
-	const articleMaxTokens = 4096
 	if c.usesCompletionTokens {
-		params.MaxCompletionTokens = openaiSDK.Int(articleMaxTokens)
+		params.MaxCompletionTokens = openaiSDK.Int(int64(maxTokens))
 	} else {
-		params.MaxTokens = openaiSDK.Int(articleMaxTokens)
+		params.MaxTokens = openaiSDK.Int(int64(maxTokens))
 	}
 
-	fmt.Printf("[OpenAI] GenerateArticle: model=%s, maxTokens=%d\n", c.modelName, articleMaxTokens)
+	inputEstimate := c.EstimateTokens(systemPrompt) + c.EstimateTokens(userPrompt)
+	fmt.Printf("[OpenAI] GenerateArticle: model=%s, inputEstimate=%d, maxTokens=%d, contextWindow=%d\n",
+		c.modelName, inputEstimate, maxTokens, c.contextWindow)
 
 	chat, err := c.client.Chat.Completions.New(ctx, params)
 	if err != nil {
@@ -142,7 +221,11 @@ func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPr
 	// Check finish_reason for truncation
 	finishReason := string(choice.FinishReason)
 	if finishReason == "length" {
-		return nil, errors.AI(providerName, fmt.Errorf("response truncated: max tokens reached. Try reducing word count or using a shorter prompt"))
+		// Provide detailed error message with token usage info
+		return nil, errors.AI(providerName, fmt.Errorf(
+			"response truncated: max tokens reached (used %d/%d output tokens, input: %d tokens). "+
+				"Try: 1) reducing word count requirement, 2) using a shorter prompt, or 3) using a model with larger context window",
+			chat.Usage.CompletionTokens, maxTokens, chat.Usage.PromptTokens))
 	}
 	if finishReason == "content_filter" {
 		return nil, errors.AI(providerName, fmt.Errorf("content filtered by safety system"))
@@ -370,14 +453,12 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 }
 
 func (c *OpenAIClient) GenerateLinkSuggestions(ctx context.Context, request *LinkSuggestionRequest) (*LinkSuggestionResult, error) {
-	schema := generateSchema[LinkSuggestionSchema]()
-
-	schemaParam := openaiSDK.ResponseFormatJSONSchemaJSONSchemaParam{
-		Name:        "link_suggestions",
-		Description: openaiSDK.String("Internal linking suggestions between pages"),
-		Schema:      schema,
-		Strict:      openaiSDK.Bool(true),
-	}
+	// Calculate dynamic token limits based on input size
+	// For link suggestions, we need room for links array and explanation
+	// Estimate: ~50 tokens per suggested link + 200 for explanation
+	// For 25 nodes, expect ~30-60 links = 1500-3000 tokens minimum
+	const minRequiredTokens = 2000
+	const desiredTokens = 16384 // Increased from 8192 to handle larger batches
 
 	systemPrompt := request.SystemPrompt
 	userPrompt := request.UserPrompt
@@ -386,6 +467,30 @@ func (c *OpenAIClient) GenerateLinkSuggestions(ctx context.Context, request *Lin
 	}
 	if userPrompt == "" {
 		userPrompt = buildLinkSuggestionUserPrompt(request)
+	}
+
+	// Validate request first - check that prompt isn't too large
+	if err := c.ValidateRequest(systemPrompt, userPrompt, minRequiredTokens); err != nil {
+		return nil, errors.AI(providerName, fmt.Errorf(
+			"prompt too large for link suggestions (%d nodes): %w. Try reducing batch size or simplifying node data.",
+			len(request.Nodes), err))
+	}
+
+	// Calculate actual available tokens dynamically
+	maxTokens := c.CalculateAvailableOutputTokens(systemPrompt, userPrompt, desiredTokens)
+
+	// Log for debugging
+	inputEstimate := c.EstimateTokens(systemPrompt) + c.EstimateTokens(userPrompt)
+	fmt.Printf("[OpenAI] LinkSuggestions: nodes=%d, inputEstimate=%d, maxTokens=%d, contextWindow=%d\n",
+		len(request.Nodes), inputEstimate, maxTokens, c.contextWindow)
+
+	schema := generateSchema[LinkSuggestionSchema]()
+
+	schemaParam := openaiSDK.ResponseFormatJSONSchemaJSONSchemaParam{
+		Name:        "link_suggestions",
+		Description: openaiSDK.String("Internal linking suggestions between pages"),
+		Schema:      schema,
+		Strict:      openaiSDK.Bool(true),
 	}
 
 	messages := []openaiSDK.ChatCompletionMessageParamUnion{
@@ -407,11 +512,10 @@ func (c *OpenAIClient) GenerateLinkSuggestions(ctx context.Context, request *Lin
 		params.Temperature = openaiSDK.Float(0.5)
 	}
 
-	const maxTokens = 8192
 	if c.usesCompletionTokens {
-		params.MaxCompletionTokens = openaiSDK.Int(maxTokens)
+		params.MaxCompletionTokens = openaiSDK.Int(int64(maxTokens))
 	} else {
-		params.MaxTokens = openaiSDK.Int(maxTokens)
+		params.MaxTokens = openaiSDK.Int(int64(maxTokens))
 	}
 
 	chat, err := c.client.Chat.Completions.New(ctx, params)
@@ -426,9 +530,17 @@ func (c *OpenAIClient) GenerateLinkSuggestions(ctx context.Context, request *Lin
 	choice := chat.Choices[0]
 	finishReason := choice.FinishReason
 
+	// Log response stats
+	fmt.Printf("[OpenAI] LinkSuggestions response: promptTokens=%d, completionTokens=%d, finishReason=%s\n",
+		chat.Usage.PromptTokens, chat.Usage.CompletionTokens, finishReason)
+
 	// Check for problematic finish reasons
 	if finishReason == "length" {
-		return nil, errors.AI(providerName, fmt.Errorf("response truncated: max tokens reached"))
+		return nil, errors.AI(providerName, fmt.Errorf(
+			"response truncated: max tokens reached (used %d/%d output tokens, input: %d tokens). "+
+				"Try: 1) reducing batch size (current: %d nodes), 2) limiting keywords per node, "+
+				"or 3) using a model with larger context window",
+			chat.Usage.CompletionTokens, maxTokens, chat.Usage.PromptTokens, len(request.Nodes)))
 	}
 	if finishReason == "content_filter" {
 		return nil, errors.AI(providerName, fmt.Errorf("content filtered by safety system"))
@@ -503,16 +615,16 @@ func buildLinkSuggestionUserPrompt(request *LinkSuggestionRequest) string {
 	sb.WriteString("PAGES:\n")
 
 	for _, node := range request.Nodes {
-		// Format: [ID:X] "Title" /path | keywords: a,b | links: X→ Y←
+		// Format: [ID:X] "Title" /path [kw: a,b] [X→ Y←]
 		sb.WriteString(fmt.Sprintf("[ID:%d] \"%s\" %s", node.ID, node.Title, node.Path))
 		if len(node.Keywords) > 0 {
 			kw := node.Keywords
-			if len(kw) > 5 {
-				kw = kw[:5]
+			if len(kw) > 3 {
+				kw = kw[:3]
 			}
-			sb.WriteString(fmt.Sprintf(" | keywords: %s", strings.Join(kw, ", ")))
+			sb.WriteString(fmt.Sprintf(" [kw: %s]", strings.Join(kw, ", ")))
 		}
-		sb.WriteString(fmt.Sprintf(" | links: %d→ %d←\n", node.OutgoingCount, node.IncomingCount))
+		sb.WriteString(fmt.Sprintf(" [%d→ %d←]\n", node.OutgoingCount, node.IncomingCount))
 	}
 
 	if request.MaxOutgoing > 0 || request.MaxIncoming > 0 {
@@ -561,6 +673,22 @@ func (c *OpenAIClient) InsertLinks(ctx context.Context, request *InsertLinksRequ
 		userPrompt = buildInsertLinksUserPrompt(request)
 	}
 
+	// For InsertLinks, output should be at least as large as input content
+	// since we're returning modified HTML. Add 20% buffer for links and JSON wrapper.
+	contentTokenEstimate := c.EstimateTokens(request.Content)
+	desiredOutputTokens := int(float64(contentTokenEstimate) * 1.3)
+	if desiredOutputTokens < 4096 {
+		desiredOutputTokens = 4096
+	}
+
+	// Validate request
+	if err := c.ValidateRequest(systemPrompt, userPrompt, contentTokenEstimate); err != nil {
+		return nil, errors.AI(providerName, fmt.Errorf("content too large for link insertion: %w", err))
+	}
+
+	// Calculate actual available tokens
+	maxTokens := c.CalculateAvailableOutputTokens(systemPrompt, userPrompt, desiredOutputTokens)
+
 	messages := []openaiSDK.ChatCompletionMessageParamUnion{
 		openaiSDK.SystemMessage(systemPrompt),
 		openaiSDK.UserMessage(userPrompt),
@@ -580,16 +708,15 @@ func (c *OpenAIClient) InsertLinks(ctx context.Context, request *InsertLinksRequ
 		params.Temperature = openaiSDK.Float(0.3) // Lower temperature for more precise edits
 	}
 
-	// Allow more tokens since we're outputting full HTML content
-	const maxTokens = 16384
 	if c.usesCompletionTokens {
-		params.MaxCompletionTokens = openaiSDK.Int(maxTokens)
+		params.MaxCompletionTokens = openaiSDK.Int(int64(maxTokens))
 	} else {
-		params.MaxTokens = openaiSDK.Int(maxTokens)
+		params.MaxTokens = openaiSDK.Int(int64(maxTokens))
 	}
 
-	fmt.Printf("[OpenAI] InsertLinks: model=%s, contentLen=%d, links=%d\n",
-		c.modelName, len(request.Content), len(request.Links))
+	inputEstimate := c.EstimateTokens(systemPrompt) + c.EstimateTokens(userPrompt)
+	fmt.Printf("[OpenAI] InsertLinks: model=%s, contentLen=%d, links=%d, inputEstimate=%d, maxTokens=%d\n",
+		c.modelName, len(request.Content), len(request.Links), inputEstimate, maxTokens)
 
 	chat, err := c.client.Chat.Completions.New(ctx, params)
 	if err != nil {
@@ -604,7 +731,10 @@ func (c *OpenAIClient) InsertLinks(ctx context.Context, request *InsertLinksRequ
 	finishReason := string(choice.FinishReason)
 
 	if finishReason == "length" {
-		return nil, errors.AI(providerName, fmt.Errorf("response truncated: content too long"))
+		return nil, errors.AI(providerName, fmt.Errorf(
+			"response truncated: content too long (used %d/%d output tokens, input: %d tokens). "+
+				"Content size: %d chars. Try using a model with larger context window.",
+			chat.Usage.CompletionTokens, maxTokens, chat.Usage.PromptTokens, len(request.Content)))
 	}
 	if finishReason == "content_filter" {
 		return nil, errors.AI(providerName, fmt.Errorf("content filtered by safety system"))
