@@ -28,33 +28,49 @@ func (c *restyClient) GetPost(ctx context.Context, s *entities.Site, postID int)
 }
 
 func (c *restyClient) GetPosts(ctx context.Context, s *entities.Site) ([]*entities.Article, error) {
-	var wpPosts []wpPost
+	var allArticles []*entities.Article
+	page := 1
+	perPage := 50
 
-	resp, err := c.resty.R().
-		SetContext(ctx).
-		SetBasicAuth(s.WPUsername, s.WPPassword).
-		SetQueryParams(map[string]string{
-			"per_page": "100",
-			"orderby":  "date",
-			"order":    "desc",
-			"status":   "publish,draft,pending,private",
-		}).
-		SetResult(&wpPosts).
-		Get(c.getAPIURL(s.URL, "posts"))
-	if err != nil {
-		return nil, errors.WordPress("failed to make request", err)
+	for {
+		var wpPosts []wpPost
+
+		resp, err := c.resty.R().
+			SetContext(ctx).
+			SetBasicAuth(s.WPUsername, s.WPPassword).
+			SetQueryParams(map[string]string{
+				"per_page": fmt.Sprintf("%d", perPage),
+				"page":     fmt.Sprintf("%d", page),
+				"orderby":  "date",
+				"order":    "desc",
+				"status":   "publish,draft,pending,private",
+			}).
+			SetResult(&wpPosts).
+			Get(c.getAPIURL(s.URL, "posts"))
+		if err != nil {
+			return nil, errors.WordPress("failed to make request", err)
+		}
+
+		if resp.StatusCode() != 200 {
+			return nil, errors.WordPress(fmt.Sprintf("wordpress API returned status %d: %s", resp.StatusCode(), resp.String()), nil)
+		}
+
+		if len(wpPosts) == 0 {
+			break
+		}
+
+		for _, post := range wpPosts {
+			allArticles = append(allArticles, c.convertWPPostToArticle(post, s.ID))
+		}
+
+		if len(wpPosts) < perPage {
+			break
+		}
+
+		page++
 	}
 
-	if resp.StatusCode() != 200 {
-		return nil, errors.WordPress(fmt.Sprintf("wordpress API returned status %d: %s", resp.StatusCode(), resp.String()), nil)
-	}
-
-	articles := make([]*entities.Article, 0, len(wpPosts))
-	for _, post := range wpPosts {
-		articles = append(articles, c.convertWPPostToArticle(post, s.ID))
-	}
-
-	return articles, nil
+	return allArticles, nil
 }
 
 func (c *restyClient) CreatePost(ctx context.Context, s *entities.Site, article *entities.Article, opts *PostOptions) (int, error) {

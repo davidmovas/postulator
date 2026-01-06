@@ -39,7 +39,7 @@ func (c *restyClient) GetPages(ctx context.Context, s *entities.Site, opts *Page
 	params := make(map[string]string)
 
 	// Default values
-	perPage := 100
+	perPage := 25
 	page := 1
 
 	if opts != nil {
@@ -101,7 +101,7 @@ func (c *restyClient) GetPages(ctx context.Context, s *entities.Site, opts *Page
 func (c *restyClient) GetAllPages(ctx context.Context, s *entities.Site) ([]*WPPage, error) {
 	var allPages []*WPPage
 	page := 1
-	perPage := 100
+	perPage := 25
 
 	for {
 		opts := &PageListOptions{
