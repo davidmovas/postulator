@@ -217,7 +217,6 @@ type GenerateContentInput struct {
 	TopicID           *int64            `json:"topicId"`
 	CustomTopicTitle  string            `json:"customTopicTitle"`
 	PlaceholderValues map[string]string `json:"placeholderValues"`
-	UseWebSearch      bool              `json:"useWebSearch"`
 }
 
 // GenerateContentResult represents the result of AI content generation

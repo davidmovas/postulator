@@ -34,6 +34,9 @@ import {
     UpdateNodesToWP,
     ResetNode,
     ChangePublishStatus,
+    BatchChangePublishStatus,
+    DeleteNodeWithWP,
+    BatchDeleteNodesWithWP,
     GenerateSitemapStructure,
     CancelSitemapGeneration,
     StartPageGeneration,
@@ -66,6 +69,12 @@ import {
     SyncNodesInput,
     SyncNodesResult,
     ChangePublishStatusInput,
+    BatchChangePublishStatusInput,
+    BatchChangeStatusResponse,
+    DeleteNodeWithWPInput,
+    BatchDeleteNodesWithWPInput,
+    DeleteNodeResult,
+    BatchDeleteNodesResponse,
     SitemapStatus,
     NodeDesignStatus,
     NodeGenerationStatus,
@@ -82,6 +91,9 @@ import {
     mapImportNodesResult,
     mapScanSiteResult,
     mapSyncNodesResult,
+    mapBatchChangeStatusResponse,
+    mapDeleteNodeResult,
+    mapBatchDeleteNodesResponse,
     mapGenerateSitemapStructureResult,
     mapHistoryState,
     mapGenerationTask,
@@ -393,6 +405,40 @@ export const sitemapService = {
         unwrapResponse<string>(response);
     },
 
+    async batchChangePublishStatus(input: BatchChangePublishStatusInput): Promise<BatchChangeStatusResponse> {
+        const payload = new dto.BatchChangePublishStatusRequest({
+            siteId: input.siteId,
+            nodeIds: input.nodeIds,
+            newStatus: input.newStatus,
+        });
+
+        const response = await BatchChangePublishStatus(payload);
+        const data = unwrapResponse<dto.BatchChangeStatusResponse>(response);
+        return mapBatchChangeStatusResponse(data);
+    },
+
+    async deleteNodeWithWP(input: DeleteNodeWithWPInput): Promise<DeleteNodeResult> {
+        const payload = new dto.DeleteNodeWithWPRequest({
+            siteId: input.siteId,
+            nodeId: input.nodeId,
+        });
+
+        const response = await DeleteNodeWithWP(payload);
+        const data = unwrapResponse<dto.DeleteNodeResult>(response);
+        return mapDeleteNodeResult(data);
+    },
+
+    async batchDeleteNodesWithWP(input: BatchDeleteNodesWithWPInput): Promise<BatchDeleteNodesResponse> {
+        const payload = new dto.BatchDeleteNodesWithWPRequest({
+            siteId: input.siteId,
+            nodeIds: input.nodeIds,
+        });
+
+        const response = await BatchDeleteNodesWithWP(payload);
+        const data = unwrapResponse<dto.BatchDeleteNodesResponse>(response);
+        return mapBatchDeleteNodesResponse(data);
+    },
+
     async generateSitemapStructure(
         input: GenerateSitemapStructureInput
     ): Promise<GenerateSitemapStructureResult> {
@@ -464,7 +510,6 @@ export const sitemapService = {
                 writingStyle: input.contentSettings.writingStyle,
                 contentTone: input.contentSettings.contentTone,
                 customInstructions: input.contentSettings.customInstructions || "",
-                useWebSearch: input.contentSettings.useWebSearch || false,
                 includeLinks: input.contentSettings.includeLinks || false,
                 autoLinkMode: input.contentSettings.autoLinkMode || "none",
                 autoLinkProviderId: input.contentSettings.autoLinkProviderId,

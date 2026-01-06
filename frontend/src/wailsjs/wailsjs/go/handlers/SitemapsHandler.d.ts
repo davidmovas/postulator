@@ -4,6 +4,10 @@ import {dto} from '../models';
 
 export function AddNodeKeyword(arg1:number,arg2:string):Promise<dto.Response_string_>;
 
+export function BatchChangePublishStatus(arg1:dto.BatchChangePublishStatusRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_BatchChangeStatusResponse_>;
+
+export function BatchDeleteNodesWithWP(arg1:dto.BatchDeleteNodesWithWPRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_BatchDeleteNodesResponse_>;
+
 export function CancelPageGeneration(arg1:string):Promise<dto.Response_string_>;
 
 export function CancelSitemapGeneration():Promise<dto.Response_string_>;
@@ -17,6 +21,8 @@ export function CreateNode(arg1:dto.CreateNodeRequest):Promise<dto.Response_gith
 export function CreateSitemap(arg1:dto.CreateSitemapRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_Sitemap_>;
 
 export function DeleteNode(arg1:number):Promise<dto.Response_string_>;
+
+export function DeleteNodeWithWP(arg1:dto.DeleteNodeWithWPRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_DeleteNodeResult_>;
 
 export function DeleteSitemap(arg1:number):Promise<dto.Response_string_>;
 

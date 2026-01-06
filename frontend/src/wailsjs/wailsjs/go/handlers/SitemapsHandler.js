@@ -6,6 +6,14 @@ export function AddNodeKeyword(arg1, arg2) {
   return window['go']['handlers']['SitemapsHandler']['AddNodeKeyword'](arg1, arg2);
 }
 
+export function BatchChangePublishStatus(arg1) {
+  return window['go']['handlers']['SitemapsHandler']['BatchChangePublishStatus'](arg1);
+}
+
+export function BatchDeleteNodesWithWP(arg1) {
+  return window['go']['handlers']['SitemapsHandler']['BatchDeleteNodesWithWP'](arg1);
+}
+
 export function CancelPageGeneration(arg1) {
   return window['go']['handlers']['SitemapsHandler']['CancelPageGeneration'](arg1);
 }
@@ -32,6 +40,10 @@ export function CreateSitemap(arg1) {
 
 export function DeleteNode(arg1) {
   return window['go']['handlers']['SitemapsHandler']['DeleteNode'](arg1);
+}
+
+export function DeleteNodeWithWP(arg1) {
+  return window['go']['handlers']['SitemapsHandler']['DeleteNodeWithWP'](arg1);
 }
 
 export function DeleteSitemap(arg1) {

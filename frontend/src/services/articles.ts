@@ -229,7 +229,6 @@ export const articleService = {
             topicId: input.topicId,
             customTopicTitle: input.customTopicTitle || '',
             placeholderValues: input.placeholderValues,
-            useWebSearch: input.useWebSearch || false,
         });
 
         const response = await GenerateContent(payload);

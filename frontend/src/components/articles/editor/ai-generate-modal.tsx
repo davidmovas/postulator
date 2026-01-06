@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Sparkles, Globe } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import { Provider, Model } from "@/models/providers";
 import { Prompt, isV2Prompt, ContextConfig } from "@/models/prompts";
 import { ContextConfigEditor } from "@/components/prompts/context-config/context-config-editor";
@@ -63,7 +63,6 @@ export function AIGenerateModal({
     const [customTopicTitle, setCustomTopicTitle] = useState("");
     const [placeholderValues, setPlaceholderValues] = useState<Record<string, string>>({});
     const [contextOverrides, setContextOverrides] = useState<ContextConfig>({});
-    const [useWebSearch, setUseWebSearch] = useState(false);
 
     const [isLoading, setIsLoading] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -133,8 +132,6 @@ export function AIGenerateModal({
         return models.find(m => m.id === selectedProvider.model) || null;
     }, [selectedProvider, modelsMap]);
 
-    const supportsWebSearch = selectedModelInfo?.supportsWebSearch ?? false;
-
     // Get placeholders from selected prompt
     const selectedPrompt = useMemo(() => {
         if (!selectedPromptId || !prompts) return null;
@@ -160,16 +157,12 @@ export function AIGenerateModal({
         setCustomTopicTitle("");
         setPlaceholderValues({});
         setContextOverrides({});
-        setUseWebSearch(false);
         setError(null);
         onOpenChange(false);
     }, [onOpenChange]);
 
-    // Reset web search when provider changes and doesn't support it
     const handleProviderChange = useCallback((providerId: string) => {
         setSelectedProviderId(providerId);
-        // Reset web search - will be enabled again if user wants and model supports it
-        setUseWebSearch(false);
     }, []);
 
     const updatePlaceholderValue = (key: string, value: string) => {
@@ -213,7 +206,6 @@ export function AIGenerateModal({
                 topicId: topicMode === "existing" ? parseInt(selectedTopicId) : undefined,
                 customTopicTitle: topicMode === "custom" ? customTopicTitle.trim() : undefined,
                 placeholderValues: finalPlaceholderValues,
-                useWebSearch: supportsWebSearch && useWebSearch,
             };
 
             const result = await articleService.generateContent(input);
@@ -278,29 +270,6 @@ export function AIGenerateModal({
                                 </Select>
                             )}
                         </div>
-
-                        {/* Web Search Option */}
-                        {supportsWebSearch && (
-                            <div className="flex items-center space-x-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                                <Checkbox
-                                    id="useWebSearch"
-                                    checked={useWebSearch}
-                                    onCheckedChange={(checked) => setUseWebSearch(checked === true)}
-                                />
-                                <div className="flex-1">
-                                    <Label
-                                        htmlFor="useWebSearch"
-                                        className="flex items-center gap-2 cursor-pointer"
-                                    >
-                                        <Globe className="h-4 w-4 text-blue-500" />
-                                        <span className="font-medium">Enable Web Search</span>
-                                    </Label>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        Allow the AI to search the web for up-to-date information
-                                    </p>
-                                </div>
-                            </div>
-                        )}
 
                         {/* Prompt Selection */}
                         <div className="space-y-2">

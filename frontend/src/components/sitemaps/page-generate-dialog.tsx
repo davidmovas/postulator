@@ -96,7 +96,6 @@ export function PageGenerateDialog({
     const [publishAs, setPublishAs] = useState<PublishAs>("draft");
     const [contextOverrides, setContextOverrides] = useState<ContextConfig>({});
     const [customInstructions, setCustomInstructions] = useState("");
-    const [useWebSearch, setUseWebSearch] = useState(false);
     const [includeLinks, setIncludeLinks] = useState(false);
     const [autoLinkMode, setAutoLinkMode] = useState<AutoLinkMode>("none");
     const [maxIncomingLinks, setMaxIncomingLinks] = useState(5);
@@ -134,8 +133,6 @@ export function PageGenerateDialog({
         const models = modelsMap[selectedProvider.type] || [];
         return models.find(m => m.id === selectedProvider.model) || null;
     }, [selectedProvider, modelsMap]);
-
-    const supportsWebSearch = selectedModelInfo?.supportsWebSearch ?? false;
 
     // Get selected prompt
     const selectedPrompt = useMemo(() => {
@@ -284,7 +281,6 @@ export function PageGenerateDialog({
                 placeholders: {},
                 contentSettings: {
                     customInstructions: customInstructions || undefined,
-                    useWebSearch: supportsWebSearch && useWebSearch,
                     // Only include approved links if autoLinkMode is none
                     includeLinks: autoLinkMode === "none" ? includeLinks : undefined,
                     autoLinkMode,
@@ -408,8 +404,6 @@ export function PageGenerateDialog({
                                             value={providerId?.toString() || ""}
                                             onValueChange={(v) => {
                                                 setProviderId(Number(v));
-                                                // Reset web search when provider changes
-                                                setUseWebSearch(false);
                                             }}
                                         >
                                             <SelectTrigger>
@@ -444,29 +438,6 @@ export function PageGenerateDialog({
                                         </Select>
                                     </div>
                                 </div>
-
-                                {/* Web Search Option */}
-                                {supportsWebSearch && (
-                                    <div className="flex items-center space-x-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                                        <Checkbox
-                                            id="useWebSearch"
-                                            checked={useWebSearch}
-                                            onCheckedChange={(checked) => setUseWebSearch(checked === true)}
-                                        />
-                                        <div className="flex-1">
-                                            <Label
-                                                htmlFor="useWebSearch"
-                                                className="flex items-center gap-2 cursor-pointer"
-                                            >
-                                                <Globe className="h-4 w-4 text-blue-500" />
-                                                <span className="font-medium">Enable Web Search</span>
-                                            </Label>
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                                Allow the AI to search the web for up-to-date information
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">

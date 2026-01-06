@@ -248,7 +248,6 @@ func (h *ArticlesHandler) GenerateContent(input *dto.GenerateContentInput) *dto.
 		TopicID:           input.TopicID,
 		CustomTopicTitle:  input.CustomTopicTitle,
 		PlaceholderValues: input.PlaceholderValues,
-		UseWebSearch:      input.UseWebSearch,
 	}
 
 	result, err := h.service.GenerateContent(ctx.LongCtx(), domainInput)
