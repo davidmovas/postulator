@@ -303,6 +303,86 @@ export interface ChangePublishStatusInput {
 }
 
 // =========================================================================
+// Batch Operations Types
+// =========================================================================
+
+export interface BatchChangePublishStatusInput {
+    siteId: number;
+    nodeIds: number[];
+    newStatus: NodePublishStatus;
+}
+
+export interface BatchChangeStatusResult {
+    nodeId: number;
+    success: boolean;
+    error?: string;
+}
+
+export interface BatchChangeStatusResponse {
+    results: BatchChangeStatusResult[];
+    successCount: number;
+    failedCount: number;
+}
+
+export function mapBatchChangeStatusResponse(x: dto.BatchChangeStatusResponse): BatchChangeStatusResponse {
+    return {
+        results: (x.results || []).map((r) => ({
+            nodeId: r.nodeId,
+            success: r.success,
+            error: r.error || undefined,
+        })),
+        successCount: x.successCount,
+        failedCount: x.failedCount,
+    };
+}
+
+// =========================================================================
+// Delete Operations Types
+// =========================================================================
+
+export interface DeleteNodeWithWPInput {
+    siteId: number;
+    nodeId: number;
+}
+
+export interface BatchDeleteNodesWithWPInput {
+    siteId: number;
+    nodeIds: number[];
+}
+
+export interface DeleteNodeResult {
+    nodeId: number;
+    success: boolean;
+    error?: string;
+    childrenMoved: number;
+    deletedFromWP: boolean;
+}
+
+export interface BatchDeleteNodesResponse {
+    results: DeleteNodeResult[];
+    successCount: number;
+    failedCount: number;
+}
+
+export function mapDeleteNodeResult(x: dto.DeleteNodeResult): DeleteNodeResult {
+    return {
+        nodeId: x.nodeId,
+        success: x.success,
+        error: x.error || undefined,
+        childrenMoved: x.childrenMoved,
+        deletedFromWP: x.deletedFromWP,
+    };
+}
+
+export function mapBatchDeleteNodesResponse(x: dto.BatchDeleteNodesResponse): BatchDeleteNodesResponse {
+    return {
+        results: (x.results || []).map(mapDeleteNodeResult),
+        successCount: x.successCount,
+        failedCount: x.failedCount,
+    };
+}
+
+// =========================================================================
 // AI Generation Types
 // =========================================================================
 
@@ -382,7 +462,6 @@ export interface ContentSettings {
     writingStyle?: WritingStyle;
     contentTone?: ContentTone;
     customInstructions?: string;
-    useWebSearch?: boolean; // Enable web search for AI generation
     includeLinks?: boolean; // Include approved links from linking plan
     autoLinkMode?: AutoLinkMode; // Automatic link suggestion mode
     autoLinkProviderId?: number; // Provider for link suggestion (defaults to content provider)

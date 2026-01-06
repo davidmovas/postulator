@@ -468,6 +468,141 @@ export namespace dto {
 		    return a;
 		}
 	}
+	export class BatchChangePublishStatusRequest {
+	    siteId: number;
+	    nodeIds: number[];
+	    newStatus: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BatchChangePublishStatusRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.siteId = source["siteId"];
+	        this.nodeIds = source["nodeIds"];
+	        this.newStatus = source["newStatus"];
+	    }
+	}
+	export class BatchChangeStatusResult {
+	    nodeId: number;
+	    success: boolean;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BatchChangeStatusResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.nodeId = source["nodeId"];
+	        this.success = source["success"];
+	        this.error = source["error"];
+	    }
+	}
+	export class BatchChangeStatusResponse {
+	    results: BatchChangeStatusResult[];
+	    successCount: number;
+	    failedCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new BatchChangeStatusResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.results = this.convertValues(source["results"], BatchChangeStatusResult);
+	        this.successCount = source["successCount"];
+	        this.failedCount = source["failedCount"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class DeleteNodeResult {
+	    nodeId: number;
+	    success: boolean;
+	    error?: string;
+	    childrenMoved: number;
+	    deletedFromWP: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteNodeResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.nodeId = source["nodeId"];
+	        this.success = source["success"];
+	        this.error = source["error"];
+	        this.childrenMoved = source["childrenMoved"];
+	        this.deletedFromWP = source["deletedFromWP"];
+	    }
+	}
+	export class BatchDeleteNodesResponse {
+	    results: DeleteNodeResult[];
+	    successCount: number;
+	    failedCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new BatchDeleteNodesResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.results = this.convertValues(source["results"], DeleteNodeResult);
+	        this.successCount = source["successCount"];
+	        this.failedCount = source["failedCount"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class BatchDeleteNodesWithWPRequest {
+	    siteId: number;
+	    nodeIds: number[];
+	
+	    static createFrom(source: any = {}) {
+	        return new BatchDeleteNodesWithWPRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.siteId = source["siteId"];
+	        this.nodeIds = source["nodeIds"];
+	    }
+	}
 	export class Topic {
 	    id: number;
 	    title: string;
@@ -597,7 +732,6 @@ export namespace dto {
 	    writingStyle: string;
 	    contentTone: string;
 	    customInstructions: string;
-	    useWebSearch: boolean;
 	    includeLinks: boolean;
 	    autoLinkMode?: string;
 	    autoLinkProviderId?: number;
@@ -617,7 +751,6 @@ export namespace dto {
 	        this.writingStyle = source["writingStyle"];
 	        this.contentTone = source["contentTone"];
 	        this.customInstructions = source["customInstructions"];
-	        this.useWebSearch = source["useWebSearch"];
 	        this.includeLinks = source["includeLinks"];
 	        this.autoLinkMode = source["autoLinkMode"];
 	        this.autoLinkProviderId = source["autoLinkProviderId"];
@@ -863,6 +996,21 @@ export namespace dto {
 	        this.placeholders = source["placeholders"];
 	    }
 	}
+	
+	export class DeleteNodeWithWPRequest {
+	    siteId: number;
+	    nodeId: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteNodeWithWPRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.siteId = source["siteId"];
+	        this.nodeId = source["nodeId"];
+	    }
+	}
 	export class DistributeKeywordsRequest {
 	    sitemapId: number;
 	    keywords: string[];
@@ -934,7 +1082,6 @@ export namespace dto {
 	    topicId?: number;
 	    customTopicTitle: string;
 	    placeholderValues: Record<string, string>;
-	    useWebSearch: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new GenerateContentInput(source);
@@ -948,7 +1095,6 @@ export namespace dto {
 	        this.topicId = source["topicId"];
 	        this.customTopicTitle = source["customTopicTitle"];
 	        this.placeholderValues = source["placeholderValues"];
-	        this.useWebSearch = source["useWebSearch"];
 	    }
 	}
 	export class GenerateContentResult {
@@ -2234,6 +2380,74 @@ export namespace dto {
 		    return a;
 		}
 	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_BatchChangeStatusResponse_ {
+	    success: boolean;
+	    data?: BatchChangeStatusResponse;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_BatchChangeStatusResponse_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], BatchChangeStatusResponse);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_BatchDeleteNodesResponse_ {
+	    success: boolean;
+	    data?: BatchDeleteNodesResponse;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_BatchDeleteNodesResponse_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], BatchDeleteNodesResponse);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Response__github_com_davidmovas_postulator_internal_dto_BatchResult_ {
 	    success: boolean;
 	    data?: BatchResult;
@@ -2451,6 +2665,40 @@ export namespace dto {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
 	        this.data = this.convertValues(source["data"], DefaultPromptResponse);
+	        this.error = this.convertValues(source["error"], Error);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Response__github_com_davidmovas_postulator_internal_dto_DeleteNodeResult_ {
+	    success: boolean;
+	    data?: DeleteNodeResult;
+	    error?: Error;
+	
+	    static createFrom(source: any = {}) {
+	        return new Response__github_com_davidmovas_postulator_internal_dto_DeleteNodeResult_(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.data = this.convertValues(source["data"], DeleteNodeResult);
 	        this.error = this.convertValues(source["error"], Error);
 	    }
 	

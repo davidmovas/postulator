@@ -133,7 +133,6 @@ type ContentSettings struct {
 	WritingStyle            WritingStyle `json:"writingStyle"`                      // professional, casual, etc.
 	ContentTone             ContentTone  `json:"contentTone"`                       // informative, persuasive, etc.
 	CustomInstructions      string       `json:"customInstructions"`                // Additional instructions
-	UseWebSearch            bool         `json:"useWebSearch"`                      // Enable web search for AI generation
 	IncludeLinks            bool         `json:"includeLinks"`                      // Include approved links from linking plan
 	AutoLinkMode            AutoLinkMode `json:"autoLinkMode"`                      // Automatic link suggestion mode
 	AutoLinkProviderID      *int64       `json:"autoLinkProviderId,omitempty"`      // Provider for link suggestion (defaults to content provider)

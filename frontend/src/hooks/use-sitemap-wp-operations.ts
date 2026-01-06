@@ -254,6 +254,74 @@ export function useSitemapWPOperations({
         await loadData(true);
     }, [siteId, execute, loadData]);
 
+    // Batch publish multiple nodes
+    const handleBatchPublish = useCallback(async (nodeIds: number[]) => {
+        if (!siteId || nodeIds.length === 0) return;
+        const result = await execute(
+            () => sitemapService.batchChangePublishStatus({ siteId, nodeIds, newStatus: "published" }),
+            {
+                successTitle: "Batch Published",
+                successDescription: `${nodeIds.length} page(s) published`,
+                errorTitle: "Failed to batch publish",
+            }
+        );
+        if (result) {
+            await loadData(true);
+        }
+        return result;
+    }, [siteId, execute, loadData]);
+
+    // Batch unpublish multiple nodes
+    const handleBatchUnpublish = useCallback(async (nodeIds: number[]) => {
+        if (!siteId || nodeIds.length === 0) return;
+        const result = await execute(
+            () => sitemapService.batchChangePublishStatus({ siteId, nodeIds, newStatus: "draft" }),
+            {
+                successTitle: "Batch Unpublished",
+                successDescription: `${nodeIds.length} page(s) changed to draft`,
+                errorTitle: "Failed to batch unpublish",
+            }
+        );
+        if (result) {
+            await loadData(true);
+        }
+        return result;
+    }, [siteId, execute, loadData]);
+
+    // Delete single node with WP deletion
+    const handleDeleteNodeWithWP = useCallback(async (nodeId: number) => {
+        if (!siteId) return;
+        const result = await execute(
+            () => sitemapService.deleteNodeWithWP({ siteId, nodeId }),
+            {
+                successTitle: "Deleted from WordPress",
+                successDescription: "Page deleted successfully",
+                errorTitle: "Failed to delete from WordPress",
+            }
+        );
+        if (result) {
+            await loadData(true);
+        }
+        return result;
+    }, [siteId, execute, loadData]);
+
+    // Batch delete nodes with WP deletion
+    const handleBatchDeleteNodesWithWP = useCallback(async (nodeIds: number[]) => {
+        if (!siteId || nodeIds.length === 0) return;
+        const result = await execute(
+            () => sitemapService.batchDeleteNodesWithWP({ siteId, nodeIds }),
+            {
+                successTitle: "Batch Deleted from WordPress",
+                successDescription: `${nodeIds.length} page(s) deleted`,
+                errorTitle: "Failed to batch delete from WordPress",
+            }
+        );
+        if (result) {
+            await loadData(true);
+        }
+        return result;
+    }, [siteId, execute, loadData]);
+
     const handleGenerateContent = useCallback((nodes: SitemapNode[]) => {
         setContextMenuSelectedNodes(nodes);
         setPageGenerateDialogOpen(true);
@@ -300,6 +368,10 @@ export function useSitemapWPOperations({
         handleUpdateToWP,
         handlePublish,
         handleUnpublish,
+        handleBatchPublish,
+        handleBatchUnpublish,
+        handleDeleteNodeWithWP,
+        handleBatchDeleteNodesWithWP,
         handleGenerateContent,
         handlePauseGeneration,
         handleResumeGeneration,

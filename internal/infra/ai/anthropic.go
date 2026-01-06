@@ -54,7 +54,6 @@ func NewAnthropicClient(cfg AnthropicConfig) (*AnthropicClient, error) {
 }
 
 func (c *AnthropicClient) GenerateArticle(ctx context.Context, systemPrompt, userPrompt string, opts *GenerateArticleOptions) (*ArticleResult, error) {
-	// Note: opts.UseWebSearch is ignored as Anthropic doesn't support web search
 	// Create JSON schema instructions for the response
 	jsonInstructions := `
 You must respond with a valid JSON object in the following format:

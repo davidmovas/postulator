@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { SitemapNode } from "@/models/sitemaps";
-import { Plus, Pencil, Trash2, GitBranchPlus, ExternalLink, Upload, FileText, Globe, FileX } from "lucide-react";
+import { Plus, Pencil, Trash2, GitBranchPlus, ExternalLink, Upload, FileText, FileX, Trash, Globe } from "lucide-react";
 import { RiWordpressLine } from "@remixicon/react";
 import { cn } from "@/lib/utils";
 import { BrowserOpenURL } from "@/wailsjs/wailsjs/runtime/runtime";
@@ -28,6 +28,9 @@ interface CanvasContextMenuProps {
     onGenerateContent?: (nodes: SitemapNode[]) => void;
     onPublish?: (nodeId: number) => void;
     onUnpublish?: (nodeId: number) => void;
+    onBatchPublish?: (nodeIds: number[]) => void;
+    onBatchUnpublish?: (nodeIds: number[]) => void;
+    onDeleteFromWP?: (nodes: SitemapNode[]) => void;
 }
 
 export function CanvasContextMenu({
@@ -46,6 +49,9 @@ export function CanvasContextMenu({
     onGenerateContent,
     onPublish,
     onUnpublish,
+    onBatchPublish,
+    onBatchUnpublish,
+    onDeleteFromWP,
 }: CanvasContextMenuProps) {
     // Close on click outside or escape
     useEffect(() => {
@@ -95,6 +101,18 @@ export function CanvasContextMenu({
     const canUnpublish = selectedNode && !isMultiSelect &&
         selectedNode.wpPageId != null &&
         selectedNode.publishStatus === "published";
+
+    // Batch publish/unpublish - filter nodes that can be published or unpublished
+    const publishableNodes = targetNodes.filter(
+        (n) => n.wpPageId != null && (n.publishStatus === "draft" || n.publishStatus === "pending")
+    );
+    const unpublishableNodes = targetNodes.filter(
+        (n) => n.wpPageId != null && n.publishStatus === "published"
+    );
+    // Nodes that can be deleted from WordPress (have wpPageId and not root)
+    const deletableFromWPNodes = targetNodes.filter(
+        (n) => n.wpPageId != null && !n.isRoot
+    );
 
     const menuItems = selectedNode
         ? [
@@ -171,7 +189,7 @@ export function CanvasContextMenu({
                         },
                     ]
                   : []),
-              // Publish option for draft/pending nodes
+              // Single node publish option for draft/pending nodes
               ...(canPublish && onPublish
                   ? [
                         {
@@ -184,7 +202,20 @@ export function CanvasContextMenu({
                         },
                     ]
                   : []),
-              // Unpublish option for published nodes
+              // Batch publish for multi-select
+              ...(isMultiSelect && publishableNodes.length > 0 && onBatchPublish
+                  ? [
+                        {
+                            icon: Globe,
+                            label: `Publish (${publishableNodes.length})`,
+                            onClick: () => {
+                                onBatchPublish(publishableNodes.map((n) => n.id));
+                                onClose();
+                            },
+                        },
+                    ]
+                  : []),
+              // Single node unpublish option for published nodes
               ...(canUnpublish && onUnpublish
                   ? [
                         {
@@ -194,6 +225,36 @@ export function CanvasContextMenu({
                                 onUnpublish(selectedNode.id);
                                 onClose();
                             },
+                        },
+                    ]
+                  : []),
+              // Batch unpublish for multi-select
+              ...(isMultiSelect && unpublishableNodes.length > 0 && onBatchUnpublish
+                  ? [
+                        {
+                            icon: FileX,
+                            label: `Unpublish (${unpublishableNodes.length})`,
+                            onClick: () => {
+                                onBatchUnpublish(unpublishableNodes.map((n) => n.id));
+                                onClose();
+                            },
+                        },
+                    ]
+                  : []),
+              // Delete from WordPress option
+              ...(deletableFromWPNodes.length > 0 && onDeleteFromWP
+                  ? [
+                        {
+                            icon: Trash,
+                            label: isMultiSelect
+                                ? `Delete from WP (${deletableFromWPNodes.length})`
+                                : "Delete from WordPress",
+                            onClick: () => {
+                                onDeleteFromWP(deletableFromWPNodes);
+                                onClose();
+                            },
+                            destructive: true,
+                            separator: true,
                         },
                     ]
                   : []),

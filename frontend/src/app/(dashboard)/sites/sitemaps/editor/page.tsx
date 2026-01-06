@@ -61,6 +61,7 @@ import { GenerateDialog } from "@/components/sitemaps/generate-dialog";
 import { PageGenerateDialog } from "@/components/sitemaps/page-generate-dialog";
 import { SuggestLinksDialog } from "@/components/sitemaps/suggest-links-dialog";
 import { ApplyLinksDialog } from "@/components/sitemaps/apply-links-dialog";
+import { DeleteWPConfirmationDialog } from "@/components/sitemaps/delete-wp-confirmation-dialog";
 import { EditorHeader, EditorMode } from "@/components/sitemaps/editor-header";
 import { GenerationProgressPanel } from "@/components/sitemaps/generation-progress-panel";
 import { createNodesFromPaths } from "@/lib/sitemap-utils";
@@ -371,6 +372,9 @@ function SitemapEditorFlow() {
     // Links mode - node links dialog
     const [nodeLinksDialogOpen, setNodeLinksDialogOpen] = useState(false);
     const [selectedNodeForLinks, setSelectedNodeForLinks] = useState<number | null>(null);
+    // Delete from WordPress confirmation dialog
+    const [deleteWPDialogOpen, setDeleteWPDialogOpen] = useState(false);
+    const [nodesToDeleteFromWP, setNodesToDeleteFromWP] = useState<typeof sitemapNodes>([]);
 
     const handleUndo = useCallback(async () => {
         const success = await history.undo();
@@ -567,6 +571,23 @@ function SitemapEditorFlow() {
         }
     }, [pendingNavigation, router]);
 
+    // Handler to open delete from WordPress confirmation dialog
+    const handleOpenDeleteWPDialog = useCallback((nodes: typeof sitemapNodes) => {
+        setNodesToDeleteFromWP(nodes);
+        setDeleteWPDialogOpen(true);
+    }, []);
+
+    // Handler for confirming delete from WordPress
+    const handleConfirmDeleteFromWP = useCallback(async () => {
+        if (nodesToDeleteFromWP.length === 0) return;
+        const nodeIds = nodesToDeleteFromWP.map((n) => n.id);
+        if (nodeIds.length === 1) {
+            await wpOps.handleDeleteNodeWithWP(nodeIds[0]);
+        } else {
+            await wpOps.handleBatchDeleteNodesWithWP(nodeIds);
+        }
+    }, [nodesToDeleteFromWP, wpOps]);
+
     const handleBulkCreate = useCallback(async (paths: string[]) => {
         if (!sitemapId) return;
 
@@ -752,6 +773,9 @@ function SitemapEditorFlow() {
                 onGenerateContent={wpOps.handleGenerateContent}
                 onPublish={wpOps.handlePublish}
                 onUnpublish={wpOps.handleUnpublish}
+                onBatchPublish={wpOps.handleBatchPublish}
+                onBatchUnpublish={wpOps.handleBatchUnpublish}
+                onDeleteFromWP={handleOpenDeleteWPDialog}
             />
             <EdgeContextMenu
                 position={canvas.edgeContextMenuPosition}
@@ -916,6 +940,14 @@ function SitemapEditorFlow() {
                 hotkeys={hotkeys}
                 open={hotkeysDialogOpen}
                 onOpenChange={setHotkeysDialogOpen}
+            />
+
+            <DeleteWPConfirmationDialog
+                open={deleteWPDialogOpen}
+                onOpenChange={setDeleteWPDialogOpen}
+                nodes={nodesToDeleteFromWP}
+                allNodes={sitemapNodes}
+                onConfirm={handleConfirmDeleteFromWP}
             />
         </div>
     );
