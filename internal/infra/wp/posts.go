@@ -3,6 +3,7 @@ package wp
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/entities"
 	"github.com/davidmovas/postulator/pkg/errors"
@@ -49,6 +50,14 @@ func (c *restyClient) GetPosts(ctx context.Context, s *entities.Site) ([]*entiti
 			Get(c.getAPIURL(s.URL, "posts"))
 		if err != nil {
 			return nil, errors.WordPress("failed to make request", err)
+		}
+
+		if resp.StatusCode() == 400 {
+			respBody := resp.String()
+			if strings.Contains(strings.ToLower(respBody), "page number") ||
+			   strings.Contains(strings.ToLower(respBody), "larger than") {
+				break
+			}
 		}
 
 		if resp.StatusCode() != 200 {

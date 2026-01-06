@@ -85,6 +85,14 @@ func (c *restyClient) GetPages(ctx context.Context, s *entities.Site, opts *Page
 		return nil, errors.WordPress("failed to make request", err)
 	}
 
+	if resp.StatusCode() == 400 {
+		respBody := resp.String()
+		if strings.Contains(strings.ToLower(respBody), "page number") ||
+		   strings.Contains(strings.ToLower(respBody), "larger than") {
+			return []*WPPage{}, nil
+		}
+	}
+
 	if resp.StatusCode() != 200 {
 		return nil, errors.WordPress(fmt.Sprintf("wordpress API returned status %d: %s", resp.StatusCode(), resp.String()), nil)
 	}
