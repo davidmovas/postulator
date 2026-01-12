@@ -105,19 +105,14 @@ func (c *OpenAIClient) EstimateTokens(text string) int {
 	return (len(text) * 10) / 35
 }
 
-// CalculateAvailableOutputTokens determines how many output tokens are available
-// given the input prompt sizes and desired output tokens.
-// It ensures we don't exceed the model's context window or max output limits.
 func (c *OpenAIClient) CalculateAvailableOutputTokens(systemPrompt, userPrompt string, desiredOutput int) int {
 	inputTokens := c.EstimateTokens(systemPrompt) + c.EstimateTokens(userPrompt)
 
-	// Add 10% safety buffer for input estimation errors
-	inputWithBuffer := int(float64(inputTokens) * 1.1)
+	jsonSchemaOverhead := 2000
+	inputWithBuffer := int(float64(inputTokens)*1.25) + jsonSchemaOverhead
 
-	// Calculate available space in context window
 	availableInContext := c.contextWindow - inputWithBuffer
 
-	// Take the minimum of: available in context, model max output, desired output
 	maxPossible := availableInContext
 	if c.maxOutputTokens < maxPossible {
 		maxPossible = c.maxOutputTokens
@@ -126,7 +121,6 @@ func (c *OpenAIClient) CalculateAvailableOutputTokens(systemPrompt, userPrompt s
 		maxPossible = desiredOutput
 	}
 
-	// Ensure we have at least some tokens for output
 	if maxPossible < 100 {
 		maxPossible = 100
 	}
@@ -134,17 +128,17 @@ func (c *OpenAIClient) CalculateAvailableOutputTokens(systemPrompt, userPrompt s
 	return maxPossible
 }
 
-// ValidateRequest checks if the prompt will fit in the context window with room for output.
-// Returns an error if the prompt is too large.
 func (c *OpenAIClient) ValidateRequest(systemPrompt, userPrompt string, minRequiredOutput int) error {
 	inputTokens := c.EstimateTokens(systemPrompt) + c.EstimateTokens(userPrompt)
-	inputWithBuffer := int(float64(inputTokens) * 1.1)
+
+	jsonSchemaOverhead := 2000
+	inputWithBuffer := int(float64(inputTokens)*1.25) + jsonSchemaOverhead
 
 	available := c.contextWindow - inputWithBuffer
 
 	if available < minRequiredOutput {
-		return fmt.Errorf("prompt too large: estimated %d input tokens, only %d tokens available for output (need at least %d). Context window: %d",
-			inputTokens, available, minRequiredOutput, c.contextWindow)
+		return fmt.Errorf("prompt too large: estimated %d input tokens (with buffer: %d), only %d tokens available for output (need at least %d). Context window: %d",
+			inputTokens, inputWithBuffer, available, minRequiredOutput, c.contextWindow)
 	}
 
 	return nil
@@ -453,12 +447,24 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 }
 
 func (c *OpenAIClient) GenerateLinkSuggestions(ctx context.Context, request *LinkSuggestionRequest) (*LinkSuggestionResult, error) {
-	// Calculate dynamic token limits based on input size
-	// For link suggestions, we need room for links array and explanation
-	// Estimate: ~50 tokens per suggested link + 200 for explanation
-	// For 25 nodes, expect ~30-60 links = 1500-3000 tokens minimum
 	const minRequiredTokens = 2000
-	const desiredTokens = 16384 // Increased from 8192 to handle larger batches
+	const tokensPerLink = 60
+	const baseTokens = 4096
+
+	maxLinks := request.MaxOutgoing
+	if request.MaxIncoming > maxLinks {
+		maxLinks = request.MaxIncoming
+	}
+	if maxLinks == 0 {
+		maxLinks = 5
+	}
+
+	potentialLinks := len(request.Nodes) * maxLinks
+	desiredTokens := baseTokens + (potentialLinks * tokensPerLink)
+
+	if desiredTokens > c.maxOutputTokens {
+		desiredTokens = c.maxOutputTokens
+	}
 
 	systemPrompt := request.SystemPrompt
 	userPrompt := request.UserPrompt

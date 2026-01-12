@@ -3,6 +3,7 @@ package linking
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -328,6 +329,29 @@ func (a *Applier) processWorkItems(
 	return results
 }
 
+func (a *Applier) estimateInsertBatchSize(contentLen int, linksCount int, maxOutputTokens int) int {
+	estimatedContentTokens := (contentLen * 10) / 35
+
+	jsonOverhead := 2000
+	safetyBuffer := int(float64(estimatedContentTokens) * 0.3)
+
+	availableForContent := maxOutputTokens - jsonOverhead - safetyBuffer
+
+	if estimatedContentTokens > availableForContent/2 {
+		tokensPerLink := 100
+		maxLinks := (availableForContent - estimatedContentTokens) / tokensPerLink
+		if maxLinks < 1 {
+			maxLinks = 1
+		}
+		if maxLinks > linksCount {
+			maxLinks = linksCount
+		}
+		return maxLinks
+	}
+
+	return linksCount
+}
+
 func (a *Applier) applyLinksToNode(
 	ctx context.Context,
 	aiClient ai.Client,
@@ -341,7 +365,6 @@ func (a *Applier) applyLinksToNode(
 		return nil, len(links), fmt.Errorf("source node has no WordPress page ID")
 	}
 
-	// Get page content from WordPress
 	page, err := a.wpClient.GetPage(ctx, site, *sourceNode.WPPageID)
 	if err != nil {
 		return nil, len(links), fmt.Errorf("failed to get WordPress page: %w", err)
@@ -351,7 +374,6 @@ func (a *Applier) applyLinksToNode(
 		return nil, len(links), fmt.Errorf("page has no content")
 	}
 
-	// Build link targets for AI, tracking which links are valid
 	type linkWithTarget struct {
 		link   *PlannedLink
 		target ai.InsertLinkTarget
@@ -385,121 +407,151 @@ func (a *Applier) applyLinksToNode(
 
 	failedCount := len(links) - len(validLinks)
 
-	// Mark only valid links as applying
-	for _, vl := range validLinks {
-		if updateErr := a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusApplying, nil); updateErr != nil {
-			a.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to update link %d status to applying", vl.link.ID))
+	sort.Slice(validLinks, func(i, j int) bool {
+		ci := float64(0)
+		cj := float64(0)
+		if validLinks[i].link.Confidence != nil {
+			ci = *validLinks[i].link.Confidence
 		}
+		if validLinks[j].link.Confidence != nil {
+			cj = *validLinks[j].link.Confidence
+		}
+		return ci > cj
+	})
+
+	modelInfo := ai.GetModelInfo(entities.TypeOpenAI, aiClient.GetModelName())
+	maxOutputTokens := 128000
+	if modelInfo != nil && modelInfo.MaxOutputTokens > 0 {
+		maxOutputTokens = modelInfo.MaxOutputTokens
 	}
 
-	// Build AI request with valid targets only
-	linkTargets := make([]ai.InsertLinkTarget, len(validLinks))
-	for i, vl := range validLinks {
-		linkTargets[i] = vl.target
-	}
+	batchSize := a.estimateInsertBatchSize(len(page.Content), len(validLinks), maxOutputTokens)
 
-	// Build prompts from DB template or use defaults
-	systemPrompt, userPrompt := a.buildApplyPrompts(ctx, prompt, sourceNode, linkTargets, page.Content, DefaultLanguage)
+	allAppliedInfos := make([]*AppliedLinkInfo, 0)
+	currentContent := page.Content
+	totalBatches := (len(validLinks) + batchSize - 1) / batchSize
 
-	request := &ai.InsertLinksRequest{
-		Content:      page.Content,
-		PageTitle:    sourceNode.Title,
-		PagePath:     sourceNode.Path,
-		Links:        linkTargets,
-		Language:     DefaultLanguage,
-		SystemPrompt: systemPrompt,
-		UserPrompt:   userPrompt,
-	}
+	for batchStart := 0; batchStart < len(validLinks); batchStart += batchSize {
+		batchEnd := batchStart + batchSize
+		if batchEnd > len(validLinks) {
+			batchEnd = len(validLinks)
+		}
+		batchLinks := validLinks[batchStart:batchEnd]
+		batchNum := (batchStart / batchSize) + 1
 
-	a.logger.Infof("Inserting %d links into page %s", len(linkTargets), sourceNode.Title)
-
-	insertResult, err := aiClient.InsertLinks(ctx, request)
-	if err != nil {
-		errMsg := fmt.Sprintf("AI insertion failed: %v", err)
-		for _, vl := range validLinks {
-			if updateErr := a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusFailed, &errMsg); updateErr != nil {
-				a.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to update link %d status", vl.link.ID))
+		for _, vl := range batchLinks {
+			if updateErr := a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusApplying, nil); updateErr != nil {
+				a.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to update link %d status to applying", vl.link.ID))
 			}
 		}
-		return nil, len(links), fmt.Errorf("AI link insertion failed: %w", err)
-	}
 
-	// Log AI usage
-	if a.aiUsageService != nil {
-		if logErr := a.aiUsageService.LogFromResult(
-			ctx,
-			siteID,
-			aiusage.OpLinkInsertion,
-			aiClient,
-			insertResult.Usage,
-			0,
-			nil,
-			map[string]interface{}{
-				"source_node_id": sourceNode.ID,
-				"links_count":    len(linkTargets),
-				"links_applied":  insertResult.LinksApplied,
-			},
-		); logErr != nil {
-			a.logger.ErrorWithErr(logErr, "Failed to log AI usage")
+		linkTargets := make([]ai.InsertLinkTarget, len(batchLinks))
+		for i, vl := range batchLinks {
+			linkTargets[i] = vl.target
 		}
-	}
 
-	if insertResult.LinksApplied == 0 {
-		a.logger.Warnf("AI did not insert any links for node %d", sourceNode.ID)
-		for _, vl := range validLinks {
-			if updateErr := a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusApproved, nil); updateErr != nil {
-				a.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to reset link %d status to approved", vl.link.ID))
-			}
+		systemPrompt, userPrompt := a.buildApplyPrompts(ctx, prompt, sourceNode, linkTargets, currentContent, DefaultLanguage)
+
+		request := &ai.InsertLinksRequest{
+			Content:      currentContent,
+			PageTitle:    sourceNode.Title,
+			PagePath:     sourceNode.Path,
+			Links:        linkTargets,
+			Language:     DefaultLanguage,
+			SystemPrompt: systemPrompt,
+			UserPrompt:   userPrompt,
 		}
-		return nil, failedCount, nil
-	}
 
-	// Update WordPress page with new content
-	page.Content = insertResult.Content
-	if err := a.wpClient.UpdatePage(ctx, site, page); err != nil {
-		errMsg := fmt.Sprintf("failed to update WordPress: %v", err)
-		for _, vl := range validLinks {
-			if updateErr := a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusFailed, &errMsg); updateErr != nil {
-				a.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to update link %d status", vl.link.ID))
-			}
-		}
-		return nil, len(links), fmt.Errorf("failed to update WordPress page: %w", err)
-	}
-
-	a.logger.Infof("Successfully applied %d/%d links to page %s", insertResult.LinksApplied, len(validLinks), sourceNode.Title)
-
-	now := time.Now()
-	appliedCount := insertResult.LinksApplied
-	if appliedCount > len(validLinks) {
-		appliedCount = len(validLinks)
-	}
-
-	appliedInfos := make([]*AppliedLinkInfo, 0, appliedCount)
-
-	for i, vl := range validLinks {
-		if i < appliedCount {
-			vl.link.Status = LinkStatusApplied
-			vl.link.AppliedAt = &now
-			if updateErr := a.linkRepo.Update(ctx, vl.link); updateErr != nil {
-				a.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to update link %d", vl.link.ID))
-			}
-
-			anchor := ""
-			if vl.link.AnchorText != nil {
-				anchor = *vl.link.AnchorText
-			}
-			appliedInfos = append(appliedInfos, &AppliedLinkInfo{
-				LinkID:     vl.link.ID,
-				AnchorText: anchor,
-			})
+		if totalBatches > 1 {
+			a.logger.Infof("Inserting batch %d/%d (%d links) into page %s", batchNum, totalBatches, len(linkTargets), sourceNode.Title)
 		} else {
-			if updateErr := a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusApproved, nil); updateErr != nil {
-				a.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to reset link %d status to approved", vl.link.ID))
+			a.logger.Infof("Inserting %d links into page %s", len(linkTargets), sourceNode.Title)
+		}
+
+		insertResult, err := aiClient.InsertLinks(ctx, request)
+		if err != nil {
+			errMsg := fmt.Sprintf("AI insertion failed: %v", err)
+			for _, vl := range batchLinks {
+				if updateErr := a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusFailed, &errMsg); updateErr != nil {
+					a.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to update link %d status", vl.link.ID))
+				}
 			}
+			failedCount += len(batchLinks)
+			continue
+		}
+
+		if a.aiUsageService != nil {
+			if logErr := a.aiUsageService.LogFromResult(
+				ctx,
+				siteID,
+				aiusage.OpLinkInsertion,
+				aiClient,
+				insertResult.Usage,
+				0,
+				nil,
+				map[string]interface{}{
+					"source_node_id": sourceNode.ID,
+					"links_count":    len(linkTargets),
+					"links_applied":  insertResult.LinksApplied,
+					"batch_num":      batchNum,
+					"total_batches":  totalBatches,
+				},
+			); logErr != nil {
+				a.logger.ErrorWithErr(logErr, "Failed to log AI usage")
+			}
+		}
+
+		now := time.Now()
+		batchApplied := 0
+		for _, vl := range batchLinks {
+			linkInserted := strings.Contains(insertResult.Content, vl.target.TargetPath)
+
+			if linkInserted {
+				vl.link.Status = LinkStatusApplied
+				vl.link.AppliedAt = &now
+				if updateErr := a.linkRepo.Update(ctx, vl.link); updateErr != nil {
+					a.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to update link %d", vl.link.ID))
+				}
+
+				anchor := ""
+				if vl.link.AnchorText != nil {
+					anchor = *vl.link.AnchorText
+				}
+				allAppliedInfos = append(allAppliedInfos, &AppliedLinkInfo{
+					LinkID:     vl.link.ID,
+					AnchorText: anchor,
+				})
+				batchApplied++
+			} else {
+				if updateErr := a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusApproved, nil); updateErr != nil {
+					a.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to reset link %d status to approved", vl.link.ID))
+				}
+			}
+		}
+
+		if batchApplied > 0 {
+			currentContent = insertResult.Content
+		}
+
+		a.logger.Infof("Batch %d: applied %d/%d links", batchNum, batchApplied, len(batchLinks))
+	}
+
+	if len(allAppliedInfos) > 0 {
+		page.Content = currentContent
+		if err := a.wpClient.UpdatePage(ctx, site, page); err != nil {
+			errMsg := fmt.Sprintf("failed to update WordPress: %v", err)
+			for _, info := range allAppliedInfos {
+				if updateErr := a.linkRepo.UpdateStatus(ctx, info.LinkID, LinkStatusFailed, &errMsg); updateErr != nil {
+					a.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to update link %d status", info.LinkID))
+				}
+			}
+			return nil, len(links), fmt.Errorf("failed to update WordPress page: %w", err)
 		}
 	}
 
-	return appliedInfos, failedCount, nil
+	a.logger.Infof("Successfully applied %d/%d links to page %s", len(allAppliedInfos), len(validLinks), sourceNode.Title)
+
+	return allAppliedInfos, failedCount + (len(validLinks) - len(allAppliedInfos)), nil
 }
 
 // getApplyPrompt fetches the prompt for link insertion
