@@ -147,6 +147,9 @@ func (g *Generator) Generate(ctx context.Context, req GenerateRequest) (*Generat
 }
 
 func (g *Generator) buildPrompts(ctx context.Context, req GenerateRequest) (string, string, error) {
+	g.logger.Infof("=== [DEBUG] buildPrompts for node %d (%s) ===", req.Node.ID, req.Node.Title)
+	g.logger.Infof("  req.Node.Keywords: %v (len=%d)", req.Node.Keywords, len(req.Node.Keywords))
+
 	nodeCtx := NodeContext{
 		Title:       req.Node.Title,
 		Path:        req.Node.Path,
@@ -156,7 +159,8 @@ func (g *Generator) buildPrompts(ctx context.Context, req GenerateRequest) (stri
 		LinkTargets: req.LinkTargets,
 	}
 
-	// Apply content settings if provided
+	g.logger.Infof("  nodeCtx.Keywords: %v (len=%d)", nodeCtx.Keywords, len(nodeCtx.Keywords))
+
 	if req.ContentSettings != nil {
 		nodeCtx.WordCount = req.ContentSettings.WordCount
 		nodeCtx.WritingStyle = string(req.ContentSettings.WritingStyle)
@@ -172,8 +176,17 @@ func (g *Generator) buildPrompts(ctx context.Context, req GenerateRequest) (stri
 		})
 	}
 
-	// Build runtime data from node context
 	runtimeData := BuildPlaceholders(nodeCtx)
+
+	g.logger.Infof("  runtimeData['keywords']: %s (len=%d)", runtimeData["keywords"], len(runtimeData["keywords"]))
+	g.logger.Infof("  All runtimeData keys: %v", func() []string {
+		keys := make([]string, 0, len(runtimeData))
+		for k := range runtimeData {
+			keys = append(keys, k)
+		}
+		return keys
+	}())
+
 	for k, v := range req.Placeholders {
 		if _, exists := runtimeData[k]; !exists {
 			runtimeData[k] = v
@@ -186,18 +199,49 @@ func (g *Generator) buildPrompts(ctx context.Context, req GenerateRequest) (stri
 			return "", "", err
 		}
 
-		// Build context config overrides from ContentSettings
+		g.logger.Infof("  Using DB prompt ID=%d, name=%s", *req.PromptID, prompt.Name)
+
 		var overrides entities.ContextConfig
 		if req.ContentSettings != nil {
 			overrides = contentSettingsToOverrides(req.ContentSettings)
 		}
 
-		return g.promptSvc.RenderPromptWithOverrides(ctx, prompt, runtimeData, overrides)
+		sys, usr, err := g.promptSvc.RenderPromptWithOverrides(ctx, prompt, runtimeData, overrides)
+		if err == nil {
+			g.logger.Infof("  Final user prompt contains 'keywords': %v", contains(usr, "keywords") || contains(usr, "Keywords"))
+			g.logger.Infof("  User prompt preview (first 300 chars): %s", truncate(usr, 300))
+		}
+		return sys, usr, err
 	}
 
+	g.logger.Infof("  Using default builtin prompt")
 	renderer := NewDefaultPromptRenderer()
 	system, user := renderer.Render(runtimeData)
+	g.logger.Infof("  Final user prompt contains 'keywords': %v", contains(user, "keywords") || contains(user, "Keywords"))
+	g.logger.Infof("  User prompt preview (first 300 chars): %s", truncate(user, 300))
 	return system, user, nil
+}
+
+func contains(s, substr string) bool {
+	return len(s) > 0 && len(substr) > 0 && (
+		len(s) >= len(substr) && s[:len(substr)] == substr ||
+		len(s) > len(substr) && s[len(s)-len(substr):] == substr ||
+		false || // placeholder for string search
+		func() bool {
+			for i := 0; i <= len(s)-len(substr); i++ {
+				if s[i:i+len(substr)] == substr {
+					return true
+				}
+			}
+			return false
+		}())
+}
+
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
 
 // contentSettingsToOverrides converts ContentSettings to ContextConfig overrides

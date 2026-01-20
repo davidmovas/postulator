@@ -327,26 +327,6 @@ export function useSitemapWPOperations({
         setPageGenerateDialogOpen(true);
     }, []);
 
-    const handlePauseGeneration = useCallback(async () => {
-        if (!activeGenerationTask) return;
-        try {
-            await sitemapService.pausePageGeneration(activeGenerationTask.id);
-            setActiveGenerationTask((prev) => prev ? { ...prev, status: "paused" } : null);
-        } catch {
-            // Error handled silently
-        }
-    }, [activeGenerationTask]);
-
-    const handleResumeGeneration = useCallback(async () => {
-        if (!activeGenerationTask) return;
-        try {
-            await sitemapService.resumePageGeneration(activeGenerationTask.id);
-            setActiveGenerationTask((prev) => prev ? { ...prev, status: "running" } : null);
-        } catch {
-            // Error handled silently
-        }
-    }, [activeGenerationTask]);
-
     const handleCancelGeneration = useCallback(async () => {
         if (!activeGenerationTask) return;
         try {
@@ -373,8 +353,6 @@ export function useSitemapWPOperations({
         handleDeleteNodeWithWP,
         handleBatchDeleteNodesWithWP,
         handleGenerateContent,
-        handlePauseGeneration,
-        handleResumeGeneration,
         handleCancelGeneration,
     };
 }

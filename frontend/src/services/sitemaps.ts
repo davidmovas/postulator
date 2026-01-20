@@ -40,8 +40,6 @@ import {
     GenerateSitemapStructure,
     CancelSitemapGeneration,
     StartPageGeneration,
-    PausePageGeneration,
-    ResumePageGeneration,
     CancelPageGeneration,
     GetPageGenerationTask,
     ListActivePageGenerationTasks,
@@ -525,16 +523,6 @@ export const sitemapService = {
         const response = await StartPageGeneration(payload);
         const data = unwrapResponse<dto.GenerationTaskResponse>(response);
         return mapGenerationTask(data);
-    },
-
-    async pausePageGeneration(taskId: string): Promise<void> {
-        const response = await PausePageGeneration(taskId);
-        unwrapResponse<string>(response);
-    },
-
-    async resumePageGeneration(taskId: string): Promise<void> {
-        const response = await ResumePageGeneration(taskId);
-        unwrapResponse<string>(response);
     },
 
     async cancelPageGeneration(taskId: string): Promise<void> {

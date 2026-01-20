@@ -886,12 +886,33 @@ func (h *SitemapsHandler) StartPageGeneration(req *dto.StartPageGenerationReques
 		MaxConcurrency: req.MaxConcurrency,
 	}
 
-	// Map content settings from DTO to domain model
 	if req.ContentSettings != nil {
+		contextOverrides := convertContextOverrides(req.ContentSettings.ContextOverrides)
+
+		wordCount := req.ContentSettings.WordCount
+		writingStyle := req.ContentSettings.WritingStyle
+		contentTone := req.ContentSettings.ContentTone
+
+		if wordCount == "" {
+			if wc, ok := contextOverrides["wordCount"]; ok && wc.Enabled {
+				wordCount = wc.Value
+			}
+		}
+		if writingStyle == "" {
+			if ws, ok := contextOverrides["writingStyle"]; ok && ws.Enabled {
+				writingStyle = ws.Value
+			}
+		}
+		if contentTone == "" {
+			if ct, ok := contextOverrides["contentTone"]; ok && ct.Enabled {
+				contentTone = ct.Value
+			}
+		}
+
 		config.ContentSettings = &generation.ContentSettings{
-			WordCount:               req.ContentSettings.WordCount,
-			WritingStyle:            generation.WritingStyle(req.ContentSettings.WritingStyle),
-			ContentTone:             generation.ContentTone(req.ContentSettings.ContentTone),
+			WordCount:               wordCount,
+			WritingStyle:            generation.WritingStyle(writingStyle),
+			ContentTone:             generation.ContentTone(contentTone),
 			CustomInstructions:      req.ContentSettings.CustomInstructions,
 			IncludeLinks:            req.ContentSettings.IncludeLinks,
 			AutoLinkMode:            generation.AutoLinkMode(req.ContentSettings.AutoLinkMode),
@@ -900,7 +921,7 @@ func (h *SitemapsHandler) StartPageGeneration(req *dto.StartPageGenerationReques
 			AutoLinkApplyPromptID:   req.ContentSettings.AutoLinkApplyPromptID,
 			MaxIncomingLinks:        req.ContentSettings.MaxIncomingLinks,
 			MaxOutgoingLinks:        req.ContentSettings.MaxOutgoingLinks,
-			ContextOverrides:        convertContextOverrides(req.ContentSettings.ContextOverrides),
+			ContextOverrides:        contextOverrides,
 		}
 	}
 
@@ -910,20 +931,6 @@ func (h *SitemapsHandler) StartPageGeneration(req *dto.StartPageGenerationReques
 	}
 
 	return ok(h.taskToDTO(task))
-}
-
-func (h *SitemapsHandler) PausePageGeneration(taskID string) *dto.Response[string] {
-	if err := h.pageGenerationService.PauseGeneration(taskID); err != nil {
-		return fail[string](err)
-	}
-	return ok("Generation paused")
-}
-
-func (h *SitemapsHandler) ResumePageGeneration(taskID string) *dto.Response[string] {
-	if err := h.pageGenerationService.ResumeGeneration(taskID); err != nil {
-		return fail[string](err)
-	}
-	return ok("Generation resumed")
 }
 
 func (h *SitemapsHandler) CancelPageGeneration(taskID string) *dto.Response[string] {

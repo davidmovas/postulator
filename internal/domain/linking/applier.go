@@ -19,6 +19,7 @@ import (
 	"github.com/davidmovas/postulator/internal/infra/wp"
 	"github.com/davidmovas/postulator/pkg/logger"
 	"github.com/google/uuid"
+	"golang.org/x/net/html"
 )
 
 type Applier struct {
@@ -65,6 +66,11 @@ type ApplyConfig struct {
 	ProviderID int64
 	PromptID   *int64
 	LinkIDs    []int64
+}
+
+type linkWithTarget struct {
+	link   *PlannedLink
+	target ai.InsertLinkTarget
 }
 
 // calculateConcurrency determines optimal concurrency based on provider's RPM limits
@@ -374,10 +380,6 @@ func (a *Applier) applyLinksToNode(
 		return nil, len(links), fmt.Errorf("page has no content")
 	}
 
-	type linkWithTarget struct {
-		link   *PlannedLink
-		target ai.InsertLinkTarget
-	}
 	validLinks := make([]linkWithTarget, 0, len(links))
 
 	for _, link := range links {
@@ -501,10 +503,13 @@ func (a *Applier) applyLinksToNode(
 			}
 		}
 
+		linksVerified := a.verifyLinksInserted(insertResult.Content, batchLinks)
+
 		now := time.Now()
 		batchApplied := 0
-		for _, vl := range batchLinks {
-			linkInserted := strings.Contains(insertResult.Content, vl.target.TargetPath)
+
+		for i, vl := range batchLinks {
+			linkInserted := linksVerified[i]
 
 			if linkInserted {
 				vl.link.Status = LinkStatusApplied
@@ -523,6 +528,11 @@ func (a *Applier) applyLinksToNode(
 				})
 				batchApplied++
 			} else {
+				a.logger.Warnf("Link %d was not inserted (anchor: %s, target: %s)",
+					vl.link.ID,
+					getAnchorOrEmpty(vl.link.AnchorText),
+					vl.target.TargetPath)
+
 				if updateErr := a.linkRepo.UpdateStatus(ctx, vl.link.ID, LinkStatusApproved, nil); updateErr != nil {
 					a.logger.ErrorWithErr(updateErr, fmt.Sprintf("Failed to reset link %d status to approved", vl.link.ID))
 				}
@@ -620,4 +630,77 @@ func (a *Applier) buildApplyPrompts(
 	}
 
 	return sys, usr
+}
+
+func (a *Applier) verifyLinksInserted(content string, expectedLinks []linkWithTarget) []bool {
+	inserted := make([]bool, len(expectedLinks))
+
+	doc, err := html.Parse(strings.NewReader(content))
+	if err != nil {
+		a.logger.ErrorWithErr(err, "Failed to parse HTML for verification")
+		return inserted
+	}
+
+	foundLinks := extractAllLinks(doc)
+
+	for i, vl := range expectedLinks {
+		targetPath := vl.target.TargetPath
+		for _, link := range foundLinks {
+			if strings.Contains(link.Href, targetPath) {
+				inserted[i] = true
+				break
+			}
+		}
+	}
+
+	return inserted
+}
+
+type linkInfo struct {
+	Href string
+	Text string
+}
+
+func extractAllLinks(n *html.Node) []linkInfo {
+	var links []linkInfo
+
+	var f func(*html.Node)
+	f = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "a" {
+			for _, attr := range n.Attr {
+				if attr.Key == "href" {
+					text := getTextContent(n)
+					links = append(links, linkInfo{
+						Href: attr.Val,
+						Text: text,
+					})
+					break
+				}
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			f(c)
+		}
+	}
+	f(n)
+
+	return links
+}
+
+func getTextContent(n *html.Node) string {
+	if n.Type == html.TextNode {
+		return n.Data
+	}
+	var text string
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		text += getTextContent(c)
+	}
+	return text
+}
+
+func getAnchorOrEmpty(anchor *string) string {
+	if anchor == nil {
+		return ""
+	}
+	return *anchor
 }

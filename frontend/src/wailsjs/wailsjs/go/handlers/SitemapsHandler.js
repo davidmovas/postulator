@@ -122,10 +122,6 @@ export function MoveNode(arg1) {
   return window['go']['handlers']['SitemapsHandler']['MoveNode'](arg1);
 }
 
-export function PausePageGeneration(arg1) {
-  return window['go']['handlers']['SitemapsHandler']['PausePageGeneration'](arg1);
-}
-
 export function Redo(arg1) {
   return window['go']['handlers']['SitemapsHandler']['Redo'](arg1);
 }
@@ -136,10 +132,6 @@ export function RemoveNodeKeyword(arg1, arg2) {
 
 export function ResetNode(arg1) {
   return window['go']['handlers']['SitemapsHandler']['ResetNode'](arg1);
-}
-
-export function ResumePageGeneration(arg1) {
-  return window['go']['handlers']['SitemapsHandler']['ResumePageGeneration'](arg1);
 }
 
 export function ScanIntoSitemap(arg1) {

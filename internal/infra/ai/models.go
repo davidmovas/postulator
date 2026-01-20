@@ -46,6 +46,18 @@ var availableModels = map[entities.Type][]*entities.Model{
 			UsesCompletionTokens: true,
 			IsReasoningModel:     true,
 		},
+		// GPT-4.1 Mini - Best for content generation (no reasoning overhead)
+		{
+			ID:              "gpt-4.1-mini",
+			Name:            "GPT-4.1 Mini",
+			Provider:        entities.TypeOpenAI,
+			ContextWindow:   1000000,
+			MaxOutputTokens: 32768,
+			InputCost:       0.40,
+			OutputCost:      1.60,
+			RPM:             500,
+			TPM:             200000,
+		},
 		// GPT-4o Mini - Legacy fast model
 		{
 			ID:              "gpt-4o-mini",
@@ -69,19 +81,6 @@ var availableModels = map[entities.Type][]*entities.Model{
 			OutputCost:           8.00,
 			RPM:                  500,
 			TPM:                  30000,
-			UsesCompletionTokens: true,
-		},
-		// GPT-4.1 Mini - Fast large context model
-		{
-			ID:                   "gpt-4.1-mini",
-			Name:                 "GPT-4.1 Mini",
-			Provider:             entities.TypeOpenAI,
-			ContextWindow:        1000000,
-			MaxOutputTokens:      32768,
-			InputCost:            0.40,
-			OutputCost:           1.60,
-			RPM:                  500,
-			TPM:                  200000,
 			UsesCompletionTokens: true,
 		},
 	},

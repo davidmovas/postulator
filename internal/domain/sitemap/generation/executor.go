@@ -25,7 +25,6 @@ type Executor struct {
 	emitter     *EventEmitter
 	logger      *logger.Logger
 	cancelFuncs sync.Map
-	pauseChs    sync.Map
 }
 
 func NewExecutor(
@@ -73,17 +72,12 @@ func (e *Executor) Start(ctx context.Context, config GenerationConfig) (*Task, e
 
 	e.tasks.Store(taskID, task)
 
-	// Use a background context with long timeout for the goroutine
-	// This ensures the task continues even if the original request context is cancelled
 	taskCtx, cancel := context.WithTimeout(context.Background(), DefaultTaskTimeout)
 	e.cancelFuncs.Store(taskID, cancel)
 
-	pauseCh := make(chan struct{})
-	e.pauseChs.Store(taskID, pauseCh)
-
 	e.emitter.EmitTaskStarted(ctx, taskID, config.SitemapID, len(nodes))
 
-	go e.runTask(taskCtx, task, config, pauseCh)
+	go e.runTask(taskCtx, task, config)
 
 	return task, nil
 }
@@ -165,7 +159,7 @@ func (e *Executor) prepareNodes(ctx context.Context, config GenerationConfig) ([
 	return taskNodes, nil
 }
 
-func (e *Executor) runTask(ctx context.Context, task *Task, config GenerationConfig, pauseCh chan struct{}) {
+func (e *Executor) runTask(ctx context.Context, task *Task, config GenerationConfig) {
 	defer func() {
 		if r := recover(); r != nil {
 			e.logger.Errorf("Panic in task %s: %v", task.ID, r)
@@ -212,7 +206,6 @@ func (e *Executor) runTask(ctx context.Context, task *Task, config GenerationCon
 		}
 		e.logger.Infof("Processing depth %d with %d nodes: %v", depth, len(nodes), nodeIDs)
 
-		// Check for cancellation before processing depth level
 		select {
 		case <-ctx.Done():
 			task.SetStatus(TaskStatusCancelled)
@@ -221,19 +214,6 @@ func (e *Executor) runTask(ctx context.Context, task *Task, config GenerationCon
 		default:
 		}
 
-		// Check for pause
-		select {
-		case <-pauseCh:
-			task.SetStatus(TaskStatusPaused)
-			e.emitter.EmitTaskPaused(ctx, task.ID, task.ProcessedNodes, task.TotalNodes)
-			<-pauseCh
-			task.SetStatus(TaskStatusRunning)
-			remaining := task.TotalNodes - task.ProcessedNodes
-			e.emitter.EmitTaskResumed(ctx, task.ID, remaining)
-		default:
-		}
-
-		// Process nodes at this depth level in parallel
 		e.processNodesParallel(ctx, task, nodes, config, &wpPageIDMap, maxConcurrency)
 		e.logger.Infof("Completed processing depth %d", depth)
 	}
@@ -420,67 +400,57 @@ func (e *Executor) getAncestors(ctx context.Context, node *entities.SitemapNode)
 	return ancestors, nil
 }
 
-func (e *Executor) Pause(taskID string) error {
-	task, ok := e.tasks.Load(taskID)
-	if !ok {
-		return fmt.Errorf("task not found: %s", taskID)
-	}
-
-	t := task.(*Task)
-	if t.GetStatus() != TaskStatusRunning {
-		return fmt.Errorf("task is not running")
-	}
-
-	if pauseCh, ok := e.pauseChs.Load(taskID); ok {
-		pauseCh.(chan struct{}) <- struct{}{}
-	}
-
-	return nil
-}
-
-func (e *Executor) Resume(taskID string) error {
-	task, ok := e.tasks.Load(taskID)
-	if !ok {
-		return fmt.Errorf("task not found: %s", taskID)
-	}
-
-	t := task.(*Task)
-	if t.GetStatus() != TaskStatusPaused {
-		return fmt.Errorf("task is not paused")
-	}
-
-	if pauseCh, ok := e.pauseChs.Load(taskID); ok {
-		pauseCh.(chan struct{}) <- struct{}{}
-	}
-
-	return nil
-}
-
 func (e *Executor) Cancel(taskID string) error {
-	task, ok := e.tasks.Load(taskID)
+	taskVal, ok := e.tasks.Load(taskID)
 	if !ok {
 		return fmt.Errorf("task not found: %s", taskID)
 	}
 
-	t := task.(*Task)
+	task := taskVal.(*Task)
 
 	if cancelFunc, ok := e.cancelFuncs.Load(taskID); ok {
 		cancelFunc.(context.CancelFunc)()
 	}
 
-	e.resetPendingNodes(t)
+	go func() {
+		time.Sleep(60 * time.Second)
+
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cleanupCancel()
+
+		e.resetPendingNodesWithContext(cleanupCtx, task)
+		task.SetStatus(TaskStatusCancelled)
+	}()
+
 	return nil
 }
 
-func (e *Executor) resetPendingNodes(task *Task) {
-	ctx := context.Background()
+func (e *Executor) resetPendingNodesWithContext(ctx context.Context, task *Task) {
 	for _, node := range task.Nodes {
-		if node.Status == NodeStatusPending || node.Status == NodeStatusGenerating {
+		if node.Status != NodeStatusCompleted && node.Status != NodeStatusSkipped {
+			select {
+			case <-ctx.Done():
+				e.logger.Warn("Cleanup timeout reached, some nodes may not be reset")
+				return
+			default:
+			}
+
 			if err := e.sitemapSvc.UpdateNodeGenerationStatus(ctx, node.NodeID, entities.GenStatusNone, nil); err != nil {
-				e.logger.ErrorWithErr(err, fmt.Sprintf("Failed to reset node %d status", node.NodeID))
+				if !isContextCanceled(err) {
+					e.logger.ErrorWithErr(err, fmt.Sprintf("Failed to reset node %d status", node.NodeID))
+				}
+			}
+			if err := e.sitemapSvc.UpdateNodePublishStatus(ctx, node.NodeID, entities.PubStatusNone, nil); err != nil {
+				if !isContextCanceled(err) {
+					e.logger.ErrorWithErr(err, fmt.Sprintf("Failed to reset node %d publish status", node.NodeID))
+				}
 			}
 		}
 	}
+}
+
+func isContextCanceled(err error) bool {
+	return err != nil && (err == context.Canceled || err.Error() == "context canceled")
 }
 
 func (e *Executor) GetTask(taskID string) *Task {
@@ -494,7 +464,7 @@ func (e *Executor) ListActiveTasks() []*Task {
 	var activeTasks []*Task
 	e.tasks.Range(func(key, value interface{}) bool {
 		task := value.(*Task)
-		if task.Status == TaskStatusRunning || task.Status == TaskStatusPaused {
+		if task.Status == TaskStatusRunning {
 			activeTasks = append(activeTasks, task)
 		}
 		return true
@@ -509,7 +479,6 @@ func (e *Executor) CleanupCompletedTasks(olderThan time.Duration) {
 		if task.CompletedAt != nil && task.CompletedAt.Before(cutoff) {
 			e.tasks.Delete(key)
 			e.cancelFuncs.Delete(key)
-			e.pauseChs.Delete(key)
 		}
 		return true
 	})

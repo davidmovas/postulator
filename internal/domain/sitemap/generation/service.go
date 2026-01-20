@@ -19,8 +19,6 @@ import (
 
 type Service interface {
 	StartGeneration(ctx context.Context, config GenerationConfig) (*Task, error)
-	PauseGeneration(taskID string) error
-	ResumeGeneration(taskID string) error
 	CancelGeneration(taskID string) error
 	GetTask(taskID string) *Task
 	ListActiveTasks() []*Task
@@ -95,14 +93,6 @@ func (s *serviceImpl) StartGeneration(ctx context.Context, config GenerationConf
 		config.SitemapID, len(config.NodeIDs), config.ProviderID)
 
 	return s.executor.Start(ctx, config)
-}
-
-func (s *serviceImpl) PauseGeneration(taskID string) error {
-	return s.executor.Pause(taskID)
-}
-
-func (s *serviceImpl) ResumeGeneration(taskID string) error {
-	return s.executor.Resume(taskID)
 }
 
 func (s *serviceImpl) CancelGeneration(taskID string) error {

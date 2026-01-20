@@ -43,8 +43,19 @@ func (b *PromptBuilder) Build(req *BuildRequest) *BuildResult {
 	// Merge prompt's context config with overrides
 	effectiveConfig := b.mergeConfigs(prompt.ContextConfig, req.Overrides)
 
-	// Build system prompt from instructions
+	// Build system prompt from instructions and replace any legacy placeholders
 	systemPrompt := prompt.Instructions
+	for key, value := range req.RuntimeData {
+		placeholder := "{{" + key + "}}"
+		systemPrompt = strings.ReplaceAll(systemPrompt, placeholder, value)
+	}
+	systemPrompt = b.removeUnreplacedPlaceholders(systemPrompt)
+
+	if wordCount, ok := req.RuntimeData["wordCount"]; ok && wordCount != "" {
+		systemPrompt += "\n\nIMPORTANT: Generate approximately " + wordCount + " words of content."
+	} else if wordCount, ok = req.RuntimeData["word_count"]; ok && wordCount != "" {
+		systemPrompt += "\n\nIMPORTANT: Generate approximately " + wordCount + " words of content."
+	}
 
 	// Build user prompt from enabled context fields
 	userPrompt := b.buildUserPrompt(prompt.Category, effectiveConfig, req.RuntimeData)
@@ -180,6 +191,12 @@ func (b *PromptBuilder) buildLegacy(prompt *entities.Prompt, data map[string]str
 	// Remove any unreplaced placeholders (clean output)
 	systemPrompt = b.removeUnreplacedPlaceholders(systemPrompt)
 	userPrompt = b.removeUnreplacedPlaceholders(userPrompt)
+
+	if wordCount, ok := data["wordCount"]; ok && wordCount != "" {
+		systemPrompt += "\n\nIMPORTANT: Generate approximately " + wordCount + " words of content."
+	} else if wordCount, ok = data["word_count"]; ok && wordCount != "" {
+		systemPrompt += "\n\nIMPORTANT: Generate approximately " + wordCount + " words of content."
+	}
 
 	return &BuildResult{
 		SystemPrompt: systemPrompt,

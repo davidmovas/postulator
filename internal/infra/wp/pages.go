@@ -85,14 +85,6 @@ func (c *restyClient) GetPages(ctx context.Context, s *entities.Site, opts *Page
 		return nil, errors.WordPress("failed to make request", err)
 	}
 
-	if resp.StatusCode() == 400 {
-		respBody := resp.String()
-		if strings.Contains(strings.ToLower(respBody), "page number") ||
-		   strings.Contains(strings.ToLower(respBody), "larger than") {
-			return []*WPPage{}, nil
-		}
-	}
-
 	if resp.StatusCode() != 200 {
 		return nil, errors.WordPress(fmt.Sprintf("wordpress API returned status %d: %s", resp.StatusCode(), resp.String()), nil)
 	}
@@ -109,19 +101,22 @@ func (c *restyClient) GetPages(ctx context.Context, s *entities.Site, opts *Page
 func (c *restyClient) GetAllPages(ctx context.Context, s *entities.Site) ([]*WPPage, error) {
 	var allPages []*WPPage
 	page := 1
-	perPage := 25
+	perPage := 100
 
 	for {
 		opts := &PageListOptions{
 			Page:    page,
 			PerPage: perPage,
-			Status:  "any", // Get all statuses
+			Status:  "any",
 			OrderBy: "id",
 			Order:   "asc",
 		}
 
 		pages, err := c.GetPages(ctx, s, opts)
 		if err != nil {
+			if len(allPages) > 0 {
+				break
+			}
 			return nil, err
 		}
 
@@ -131,7 +126,6 @@ func (c *restyClient) GetAllPages(ctx context.Context, s *entities.Site) ([]*WPP
 
 		allPages = append(allPages, pages...)
 
-		// If we got fewer than perPage, we've reached the end
 		if len(pages) < perPage {
 			break
 		}

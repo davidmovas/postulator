@@ -27,8 +27,6 @@ import {
     CheckCircle2,
     Loader2,
     FileText,
-    Pause,
-    Play,
     XCircle,
     ExternalLink,
     ChevronDown,
@@ -165,7 +163,7 @@ export function PageGenerateDialog({
     useEffect(() => {
         let interval: NodeJS.Timeout | null = null;
 
-        if (task && (task.status === "running" || task.status === "paused")) {
+        if (task && task.status === "running") {
             interval = setInterval(async () => {
                 try {
                     const updatedTask = await sitemapService.getPageGenerationTask(task.id);
@@ -175,9 +173,7 @@ export function PageGenerateDialog({
                         updatedTask.status === "failed" ||
                         updatedTask.status === "cancelled") {
                         if (interval) clearInterval(interval);
-                        if (updatedTask.status === "completed") {
-                            onSuccess();
-                        }
+                        onSuccess();
                     }
                 } catch (err) {
                     console.error("Failed to fetch task status:", err);
@@ -271,7 +267,6 @@ export function PageGenerateDialog({
         }
 
         try {
-            // Pass contextOverrides directly to backend for proper enabled/disabled handling
             const result = await sitemapService.startPageGeneration({
                 sitemapId,
                 nodeIds: nodesToGenerate.map((n) => n.id),
@@ -281,7 +276,6 @@ export function PageGenerateDialog({
                 placeholders: {},
                 contentSettings: {
                     customInstructions: customInstructions || undefined,
-                    // Only include approved links if autoLinkMode is none
                     includeLinks: autoLinkMode === "none" ? includeLinks : undefined,
                     autoLinkMode,
                     autoLinkProviderId: autoLinkMode !== "none" ? providerId : undefined,
@@ -289,7 +283,6 @@ export function PageGenerateDialog({
                     autoLinkApplyPromptId: autoLinkMode === "after" ? linkApplyPromptId ?? undefined : undefined,
                     maxIncomingLinks: autoLinkMode !== "none" ? maxIncomingLinks : undefined,
                     maxOutgoingLinks: autoLinkMode !== "none" ? maxOutgoingLinks : undefined,
-                    // Pass context overrides directly - this allows proper enabled/disabled handling
                     contextOverrides,
                 },
             });
@@ -301,31 +294,12 @@ export function PageGenerateDialog({
         }
     };
 
-    const handlePause = async () => {
-        if (!task) return;
-        try {
-            await sitemapService.pausePageGeneration(task.id);
-            setTask({ ...task, status: "paused" });
-        } catch (err) {
-            console.error("Failed to pause:", err);
-        }
-    };
-
-    const handleResume = async () => {
-        if (!task) return;
-        try {
-            await sitemapService.resumePageGeneration(task.id);
-            setTask({ ...task, status: "running" });
-        } catch (err) {
-            console.error("Failed to resume:", err);
-        }
-    };
-
     const handleCancel = async () => {
         if (!task) return;
         try {
             await sitemapService.cancelPageGeneration(task.id);
             setTask({ ...task, status: "cancelled" });
+            setTimeout(() => onSuccess(), 1000);
         } catch (err) {
             console.error("Failed to cancel:", err);
         }
@@ -346,7 +320,7 @@ export function PageGenerateDialog({
         : 0;
 
     const canGenerate = providerId !== null && promptId !== null && nodesToGenerate.length > 0 && !isLoadingData;
-    const isRunning = task?.status === "running" || task?.status === "paused";
+    const isRunning = task?.status === "running";
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
@@ -439,24 +413,21 @@ export function PageGenerateDialog({
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>Publish As</Label>
-                                        <Select
-                                            value={publishAs}
-                                            onValueChange={(v) => setPublishAs(v as PublishAs)}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="draft">Draft</SelectItem>
-                                                <SelectItem value="pending">Pending Review</SelectItem>
-                                                <SelectItem value="publish">Published</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
+                                <div className="space-y-2">
+                                    <Label>Publish As</Label>
+                                    <Select
+                                        value={publishAs}
+                                        onValueChange={(v) => setPublishAs(v as PublishAs)}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="draft">Draft</SelectItem>
+                                            <SelectItem value="pending">Pending Review</SelectItem>
+                                            <SelectItem value="publish">Published</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
 
                                 {/* Context Settings - Dynamic based on prompt config */}
@@ -741,13 +712,6 @@ export function PageGenerateDialog({
                             </div>
                         )}
 
-                        {task.status === "paused" && (
-                            <div className="flex items-center justify-center gap-2 text-sm text-yellow-600">
-                                <Pause className="h-4 w-4" />
-                                Generation paused
-                            </div>
-                        )}
-
                         {task.status === "completed" && (
                             <div className="flex flex-col items-center gap-2 py-4">
                                 <CheckCircle2 className="h-12 w-12 text-green-500" />
@@ -862,23 +826,10 @@ export function PageGenerateDialog({
                         </>
                     )}
                     {isRunning && (
-                        <>
-                            {task?.status === "running" ? (
-                                <Button variant="outline" onClick={handlePause}>
-                                    <Pause className="mr-2 h-4 w-4" />
-                                    Pause
-                                </Button>
-                            ) : (
-                                <Button variant="outline" onClick={handleResume}>
-                                    <Play className="mr-2 h-4 w-4" />
-                                    Resume
-                                </Button>
-                            )}
-                            <Button variant="destructive" onClick={handleCancel}>
-                                <XCircle className="mr-2 h-4 w-4" />
-                                Cancel
-                            </Button>
-                        </>
+                        <Button variant="destructive" onClick={handleCancel}>
+                            <XCircle className="mr-2 h-4 w-4" />
+                            Cancel
+                        </Button>
                     )}
                     {(task?.status === "completed" ||
                         task?.status === "failed" ||

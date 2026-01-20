@@ -67,7 +67,7 @@ type SuggestResult struct {
 	Explanation  string
 }
 
-const maxNodesPerBatch = 25 // Limit to prevent token overflow in AI response
+const maxNodesPerBatch = 50 // Limit to prevent token overflow in AI response
 
 func (s *Suggester) Suggest(ctx context.Context, config SuggestConfig) (*SuggestResult, error) {
 	startTime := time.Now()
@@ -163,17 +163,19 @@ func (s *Suggester) Suggest(ctx context.Context, config SuggestConfig) (*Suggest
 
 		s.logger.Infof("Processing batch %d/%d with %d nodes", batchIdx+1, totalBatches, len(batchNodes))
 
-		// Emit progress before processing batch
 		s.emitter.EmitSuggestProgress(ctx, taskID, batchIdx+1, totalBatches, processedNodes, totalNodes, totalLinksCreated, len(batchNodes))
 
+		placeholders := s.buildPlaceholders(config, batchNodes, outgoingCount, incomingCount)
 		systemPrompt, userPrompt := s.buildPrompts(ctx, config, batchNodes, outgoingCount, incomingCount)
 
 		request := &ai.LinkSuggestionRequest{
-			Nodes:        s.buildAINodes(batchNodes, outgoingCount, incomingCount, config.ExistingLinks),
-			SystemPrompt: systemPrompt,
-			UserPrompt:   userPrompt,
-			MaxIncoming:  config.MaxIncoming,
-			MaxOutgoing:  config.MaxOutgoing,
+			Nodes:         s.buildAINodes(batchNodes, outgoingCount, incomingCount, config.ExistingLinks),
+			NodesInfo:     placeholders["nodes_info"],
+			HierarchyTree: placeholders["hierarchyTree"],
+			SystemPrompt:  systemPrompt,
+			UserPrompt:    userPrompt,
+			MaxIncoming:   config.MaxIncoming,
+			MaxOutgoing:   config.MaxOutgoing,
 		}
 
 		result, err := aiClient.GenerateLinkSuggestions(ctx, request)
@@ -354,10 +356,9 @@ func (s *Suggester) configToOverrides(config SuggestConfig) entities.ContextConf
 }
 
 func (s *Suggester) buildPlaceholders(config SuggestConfig, nodes []*entities.SitemapNode, outgoing, incoming map[int64]int) map[string]string {
-	// Build compact node list (optimized: only includes nodes in current batch)
-	nodesList := s.buildHierarchyTree(nodes, outgoing, incoming)
+	nodesInfo := s.buildNodesInfoList(nodes, outgoing, incoming)
+	hierarchyTree := s.buildHierarchyTree(nodes, outgoing, incoming)
 
-	// Build constraints section
 	var constraints strings.Builder
 	if config.MaxIncoming > 0 || config.MaxOutgoing > 0 {
 		constraints.WriteString("\nCONSTRAINTS:\n")
@@ -377,17 +378,41 @@ func (s *Suggester) buildPlaceholders(config SuggestConfig, nodes []*entities.Si
 
 	placeholders := map[string]string{
 		"nodes_count":    fmt.Sprintf("%d", len(nodes)),
-		"hierarchyTree":  nodesList, // Keep name for compatibility with existing prompts
+		"nodes_info":     nodesInfo,
+		"hierarchyTree":  hierarchyTree,
 		"constraints":    constraints.String(),
 		"feedback":       feedback,
+		"max_outgoing":   fmt.Sprintf("%d", config.MaxOutgoing),
+		"max_incoming":   fmt.Sprintf("%d", config.MaxIncoming),
 		"existing_links": fmt.Sprintf("%d", len(config.ExistingLinks)),
 	}
 
 	return placeholders
 }
 
-// buildHierarchyTree creates a hierarchical tree showing parent-child relationships
-// Optimized: sends only nodes in batch, with visual tree structure preserved
+func (s *Suggester) buildNodesInfoList(nodes []*entities.SitemapNode, outgoing, incoming map[int64]int) string {
+	var sb strings.Builder
+	sb.WriteString("PAGES LIST:\n")
+
+	for _, node := range nodes {
+		sb.WriteString(fmt.Sprintf("[ID:%d] \"%s\" /%s", node.ID, node.Title, node.Slug))
+
+		if len(node.Keywords) > 0 {
+			kw := node.Keywords
+			if len(kw) > 5 {
+				kw = kw[:5]
+			}
+			sb.WriteString(fmt.Sprintf(" | keywords: %s", strings.Join(kw, ", ")))
+		}
+
+		out := outgoing[node.ID]
+		in := incoming[node.ID]
+		sb.WriteString(fmt.Sprintf(" | links: %d→ %d←\n", out, in))
+	}
+
+	return sb.String()
+}
+
 func (s *Suggester) buildHierarchyTree(nodes []*entities.SitemapNode, outgoing, incoming map[int64]int) string {
 	if len(nodes) == 0 {
 		return ""

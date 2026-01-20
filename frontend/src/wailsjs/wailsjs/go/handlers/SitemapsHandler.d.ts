@@ -62,15 +62,11 @@ export function ListSitemaps(arg1:number):Promise<dto.Response___github_com_davi
 
 export function MoveNode(arg1:dto.MoveNodeRequest):Promise<dto.Response_string_>;
 
-export function PausePageGeneration(arg1:string):Promise<dto.Response_string_>;
-
 export function Redo(arg1:number):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_HistoryState_>;
 
 export function RemoveNodeKeyword(arg1:number,arg2:string):Promise<dto.Response_string_>;
 
 export function ResetNode(arg1:number):Promise<dto.Response_string_>;
-
-export function ResumePageGeneration(arg1:string):Promise<dto.Response_string_>;
 
 export function ScanIntoSitemap(arg1:dto.ScanIntoSitemapRequest):Promise<dto.Response_github_com_davidmovas_postulator_internal_dto_ScanSiteResponse_>;
 

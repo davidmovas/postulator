@@ -16,6 +16,10 @@ import (
 
 const providerName = "OpenAI"
 
+// debugMode controls whether to print detailed debug logs for AI requests
+// Set to true for local development, false for production builds
+const debugMode = true // TODO: Set to false before production build
+
 var _ Client = (*OpenAIClient)(nil)
 
 type ArticleContent struct {
@@ -97,9 +101,6 @@ func (c *OpenAIClient) GetModelName() string {
 	return c.modelName
 }
 
-// EstimateTokens estimates the number of tokens in a text string.
-// Uses a rough approximation of ~4 characters per token for English text.
-// For mixed content (HTML, JSON), uses ~3.5 chars per token to be more conservative.
 func (c *OpenAIClient) EstimateTokens(text string) int {
 	// Average ~3.5 chars per token for mixed content (code, HTML, etc.)
 	return (len(text) * 10) / 35
@@ -147,8 +148,8 @@ func (c *OpenAIClient) ValidateRequest(systemPrompt, userPrompt string, minRequi
 func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPrompt string, opts *GenerateArticleOptions) (*ArticleResult, error) {
 	// Calculate dynamic token limits based on input size
 	// Default desired output is 4096 for articles, but we'll calculate what's actually available
-	const desiredArticleTokens = 8192 // Desired output for a typical article
-	const minArticleTokens = 2000     // Minimum tokens needed for a reasonable article
+	const desiredArticleTokens = 16384 // Desired output for a typical article
+	const minArticleTokens = 2000      // Minimum tokens needed for a reasonable article
 
 	// Validate request first
 	if err := c.ValidateRequest(systemPrompt, userPrompt, minArticleTokens); err != nil {
@@ -193,9 +194,54 @@ func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPr
 		params.MaxTokens = openaiSDK.Int(int64(maxTokens))
 	}
 
-	inputEstimate := c.EstimateTokens(systemPrompt) + c.EstimateTokens(userPrompt)
-	fmt.Printf("[OpenAI] GenerateArticle: model=%s, inputEstimate=%d, maxTokens=%d, contextWindow=%d\n",
-		c.modelName, inputEstimate, maxTokens, c.contextWindow)
+	// ====== DETAILED DEBUG LOGGING ======
+	if debugMode {
+		inputEstimate := c.EstimateTokens(systemPrompt) + c.EstimateTokens(userPrompt)
+		systemTokens := c.EstimateTokens(systemPrompt)
+		userTokens := c.EstimateTokens(userPrompt)
+
+		var debugLog strings.Builder
+		debugLog.WriteString("\n")
+		debugLog.WriteString("╔═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString("║ [OPENAI DEBUG] GenerateArticle - REQUEST DETAILS\n")
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString(fmt.Sprintf("║ Model: %s\n", c.modelName))
+		debugLog.WriteString(fmt.Sprintf("║ Context Window: %d tokens\n", c.contextWindow))
+		debugLog.WriteString(fmt.Sprintf("║ Max Output Tokens (model limit): %d tokens\n", c.maxOutputTokens))
+		debugLog.WriteString(fmt.Sprintf("║ Desired Article Tokens: %d tokens\n", desiredArticleTokens))
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString("║ INPUT ANALYSIS:\n")
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString(fmt.Sprintf("║ System Prompt Length: %d chars → ~%d tokens (estimated)\n", len(systemPrompt), systemTokens))
+		debugLog.WriteString(fmt.Sprintf("║ User Prompt Length: %d chars → ~%d tokens (estimated)\n", len(userPrompt), userTokens))
+		debugLog.WriteString(fmt.Sprintf("║ TOTAL INPUT: %d chars → ~%d tokens (estimated)\n", len(systemPrompt)+len(userPrompt), inputEstimate))
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString("║ SYSTEM PROMPT (full):\n")
+		debugLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
+		debugLog.WriteString(fmt.Sprintf("║ %s\n", strings.ReplaceAll(systemPrompt, "\n", "\n║ ")))
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString("║ USER PROMPT PREVIEW (first 800 chars):\n")
+		debugLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
+		userPreview := userPrompt
+		if len(userPreview) > 800 {
+			userPreview = userPreview[:800] + "..."
+		}
+		debugLog.WriteString(fmt.Sprintf("║ %s\n", strings.ReplaceAll(userPreview, "\n", "\n║ ")))
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString("║ TOKEN CALCULATION:\n")
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		jsonSchemaOverhead := 2000
+		inputWithBuffer := int(float64(inputEstimate)*1.25) + jsonSchemaOverhead
+		availableInContext := c.contextWindow - inputWithBuffer
+		debugLog.WriteString(fmt.Sprintf("║ Input Estimate: %d tokens\n", inputEstimate))
+		debugLog.WriteString(fmt.Sprintf("║ Input with Buffer (×1.25): %d tokens\n", int(float64(inputEstimate)*1.25)))
+		debugLog.WriteString(fmt.Sprintf("║ JSON Schema Overhead: %d tokens\n", jsonSchemaOverhead))
+		debugLog.WriteString(fmt.Sprintf("║ Total Input + Overhead: %d tokens\n", inputWithBuffer))
+		debugLog.WriteString(fmt.Sprintf("║ Available in Context Window: %d tokens\n", availableInContext))
+		debugLog.WriteString(fmt.Sprintf("║ Max Tokens Set for Request: %d tokens\n", maxTokens))
+		debugLog.WriteString("╚═══════════════════════════════════════════════════════════════════════════════════\n")
+		fmt.Print(debugLog.String())
+	}
 
 	chat, err := c.client.Chat.Completions.New(ctx, params)
 	if err != nil {
@@ -207,13 +253,51 @@ func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPr
 	}
 
 	choice := chat.Choices[0]
+	finishReason := string(choice.FinishReason)
 
-	// Log response stats
-	fmt.Printf("[OpenAI] Response: promptTokens=%d, completionTokens=%d, finishReason=%s\n",
-		chat.Usage.PromptTokens, chat.Usage.CompletionTokens, choice.FinishReason)
+	// ====== DETAILED DEBUG LOGGING - RESPONSE ======
+	if debugMode {
+		inputEstimate := c.EstimateTokens(systemPrompt) + c.EstimateTokens(userPrompt)
+
+		var responseLog strings.Builder
+		responseLog.WriteString("\n")
+		responseLog.WriteString("╔═══════════════════════════════════════════════════════════════════════════════════\n")
+		responseLog.WriteString("║ [OPENAI DEBUG] GenerateArticle - RESPONSE DETAILS\n")
+		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		responseLog.WriteString("║ ACTUAL TOKEN USAGE (from API):\n")
+		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		responseLog.WriteString(fmt.Sprintf("║ Input Tokens (actual): %d tokens\n", chat.Usage.PromptTokens))
+		responseLog.WriteString(fmt.Sprintf("║ Output Tokens (actual): %d tokens\n", chat.Usage.CompletionTokens))
+		responseLog.WriteString(fmt.Sprintf("║ Total Tokens (actual): %d tokens\n", chat.Usage.TotalTokens))
+		responseLog.WriteString(fmt.Sprintf("║ Finish Reason: %s\n", finishReason))
+		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		responseLog.WriteString("║ COMPARISON (Estimated vs Actual):\n")
+		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		responseLog.WriteString(fmt.Sprintf("║ Input: Estimated %d → Actual %d (diff: %+d)\n",
+			inputEstimate, chat.Usage.PromptTokens, int(chat.Usage.PromptTokens)-inputEstimate))
+		responseLog.WriteString(fmt.Sprintf("║ Output: Max %d → Used %d (%.1f%% utilized)\n",
+			maxTokens, chat.Usage.CompletionTokens, float64(chat.Usage.CompletionTokens)/float64(maxTokens)*100))
+
+		if finishReason == "length" {
+			responseLog.WriteString("║ ⚠️  WARNING: Response truncated! Max tokens limit reached!\n")
+		}
+
+		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		responseLog.WriteString("║ RAW API RESPONSE PREVIEW (first 1000 chars):\n")
+		responseLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
+		rawContent := choice.Message.Content
+		rawPreview := rawContent
+		if len(rawPreview) > 1000 {
+			rawPreview = rawPreview[:1000] + "..."
+		}
+		responseLog.WriteString(fmt.Sprintf("║ Length: %d chars\n", len(rawContent)))
+		responseLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
+		responseLog.WriteString(fmt.Sprintf("║ %s\n", strings.ReplaceAll(rawPreview, "\n", "\n║ ")))
+		responseLog.WriteString("╚═══════════════════════════════════════════════════════════════════════════════════\n")
+		fmt.Print(responseLog.String())
+	}
 
 	// Check finish_reason for truncation
-	finishReason := string(choice.FinishReason)
 	if finishReason == "length" {
 		// Provide detailed error message with token usage info
 		return nil, errors.AI(providerName, fmt.Errorf(
@@ -252,6 +336,45 @@ func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPr
 	outputTokens := int(chat.Usage.CompletionTokens)
 	totalTokens := int(chat.Usage.TotalTokens)
 	cost := CalculateCost(entities.TypeOpenAI, c.modelName, inputTokens, outputTokens)
+
+	// ====== DETAILED DEBUG LOGGING - PARSED RESULT ======
+	if debugMode {
+		var resultLog strings.Builder
+		resultLog.WriteString("\n")
+		resultLog.WriteString("╔═══════════════════════════════════════════════════════════════════════════════════\n")
+		resultLog.WriteString("║ [OPENAI DEBUG] GenerateArticle - PARSED RESULT\n")
+		resultLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		resultLog.WriteString(fmt.Sprintf("║ Title: %s\n", article.Title))
+		resultLog.WriteString(fmt.Sprintf("║ Title Length: %d chars\n", len(article.Title)))
+		resultLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
+		resultLog.WriteString(fmt.Sprintf("║ Excerpt Length: %d chars\n", len(article.Excerpt)))
+		if article.Excerpt != "" {
+			excerptPreview := article.Excerpt
+			if len(excerptPreview) > 200 {
+				excerptPreview = excerptPreview[:200] + "..."
+			}
+			resultLog.WriteString(fmt.Sprintf("║ Excerpt: %s\n", strings.ReplaceAll(excerptPreview, "\n", " ")))
+		}
+		resultLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
+		resultLog.WriteString(fmt.Sprintf("║ Content Length: %d chars (~%d tokens)\n", len(article.Content), c.EstimateTokens(article.Content)))
+		resultLog.WriteString("║ Content Preview (first 600 chars):\n")
+		contentPreview := article.Content
+		if len(contentPreview) > 600 {
+			contentPreview = contentPreview[:600] + "..."
+		}
+		resultLog.WriteString(fmt.Sprintf("║ %s\n", strings.ReplaceAll(contentPreview, "\n", "\n║ ")))
+		resultLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		resultLog.WriteString("║ FINAL COST CALCULATION:\n")
+		resultLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		modelInfo := GetModelInfo(entities.TypeOpenAI, c.modelName)
+		if modelInfo != nil {
+			resultLog.WriteString(fmt.Sprintf("║ Input Tokens: %d × $%.2f/1M = $%.6f\n", inputTokens, modelInfo.InputCost, float64(inputTokens)/1_000_000*modelInfo.InputCost))
+			resultLog.WriteString(fmt.Sprintf("║ Output Tokens: %d × $%.2f/1M = $%.6f\n", outputTokens, modelInfo.OutputCost, float64(outputTokens)/1_000_000*modelInfo.OutputCost))
+		}
+		resultLog.WriteString(fmt.Sprintf("║ TOTAL COST: $%.6f\n", cost))
+		resultLog.WriteString("╚═══════════════════════════════════════════════════════════════════════════════════\n\n")
+		fmt.Print(resultLog.String())
+	}
 
 	return &ArticleResult{
 		Title:      article.Title,
@@ -403,9 +526,9 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 
 	// Use appropriate token limit parameter based on model
 	if c.usesCompletionTokens {
-		params.MaxCompletionTokens = openaiSDK.Int(8192)
+		params.MaxCompletionTokens = openaiSDK.Int(16384)
 	} else {
-		params.MaxTokens = openaiSDK.Int(8192)
+		params.MaxTokens = openaiSDK.Int(16384)
 	}
 
 	chat, err := c.client.Chat.Completions.New(ctx, params)
@@ -448,15 +571,15 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 
 func (c *OpenAIClient) GenerateLinkSuggestions(ctx context.Context, request *LinkSuggestionRequest) (*LinkSuggestionResult, error) {
 	const minRequiredTokens = 2000
-	const tokensPerLink = 60
-	const baseTokens = 4096
+	const tokensPerLink = 80
+	const baseTokens = 8192
 
 	maxLinks := request.MaxOutgoing
 	if request.MaxIncoming > maxLinks {
 		maxLinks = request.MaxIncoming
 	}
 	if maxLinks == 0 {
-		maxLinks = 5
+		maxLinks = 8
 	}
 
 	potentialLinks := len(request.Nodes) * maxLinks
@@ -485,10 +608,82 @@ func (c *OpenAIClient) GenerateLinkSuggestions(ctx context.Context, request *Lin
 	// Calculate actual available tokens dynamically
 	maxTokens := c.CalculateAvailableOutputTokens(systemPrompt, userPrompt, desiredTokens)
 
-	// Log for debugging
-	inputEstimate := c.EstimateTokens(systemPrompt) + c.EstimateTokens(userPrompt)
-	fmt.Printf("[OpenAI] LinkSuggestions: nodes=%d, inputEstimate=%d, maxTokens=%d, contextWindow=%d\n",
-		len(request.Nodes), inputEstimate, maxTokens, c.contextWindow)
+	// ====== DETAILED DEBUG LOGGING - LINK SUGGESTIONS REQUEST ======
+	if debugMode {
+		inputEstimate := c.EstimateTokens(systemPrompt) + c.EstimateTokens(userPrompt)
+		systemTokens := c.EstimateTokens(systemPrompt)
+		userTokens := c.EstimateTokens(userPrompt)
+
+		var debugLog strings.Builder
+		debugLog.WriteString("\n")
+		debugLog.WriteString("╔═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString("║ [OPENAI DEBUG] GenerateLinkSuggestions - REQUEST DETAILS\n")
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString(fmt.Sprintf("║ Model: %s\n", c.modelName))
+		debugLog.WriteString(fmt.Sprintf("║ Context Window: %d tokens\n", c.contextWindow))
+		debugLog.WriteString(fmt.Sprintf("║ Max Output Tokens (model limit): %d tokens\n", c.maxOutputTokens))
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString("║ LINK SUGGESTION TASK:\n")
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString(fmt.Sprintf("║ Nodes to Process: %d\n", len(request.Nodes)))
+		debugLog.WriteString(fmt.Sprintf("║ Max Outgoing Links: %d per page\n", request.MaxOutgoing))
+		debugLog.WriteString(fmt.Sprintf("║ Max Incoming Links: %d per page\n", request.MaxIncoming))
+		debugLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
+		debugLog.WriteString("║ NODES (first 10):\n")
+		maxNodesToShow := len(request.Nodes)
+		if maxNodesToShow > 10 {
+			maxNodesToShow = 10
+		}
+		for i := 0; i < maxNodesToShow; i++ {
+			node := request.Nodes[i]
+			keywords := ""
+			if len(node.Keywords) > 0 {
+				kw := node.Keywords
+				if len(kw) > 3 {
+					kw = kw[:3]
+				}
+				keywords = fmt.Sprintf(" [%s]", strings.Join(kw, ", "))
+			}
+			debugLog.WriteString(fmt.Sprintf("║   %d. [ID:%d] %s %s%s [%d→ %d←]\n",
+				i+1, node.ID, node.Title, node.Path, keywords, node.OutgoingCount, node.IncomingCount))
+		}
+		if len(request.Nodes) > 10 {
+			debugLog.WriteString(fmt.Sprintf("║   ... and %d more nodes\n", len(request.Nodes)-10))
+		}
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString("║ INPUT ANALYSIS:\n")
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString(fmt.Sprintf("║ System Prompt Length: %d chars → ~%d tokens (estimated)\n", len(systemPrompt), systemTokens))
+		debugLog.WriteString(fmt.Sprintf("║ User Prompt Length: %d chars → ~%d tokens (estimated)\n", len(userPrompt), userTokens))
+		debugLog.WriteString(fmt.Sprintf("║ TOTAL INPUT: %d chars → ~%d tokens (estimated)\n", len(systemPrompt)+len(userPrompt), inputEstimate))
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString("║ SYSTEM PROMPT (full):\n")
+		debugLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
+		debugLog.WriteString(fmt.Sprintf("║ %s\n", strings.ReplaceAll(systemPrompt, "\n", "\n║ ")))
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString("║ USER PROMPT PREVIEW (first 1500 chars):\n")
+		debugLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
+		userPreview := userPrompt
+		if len(userPreview) > 1500 {
+			userPreview = userPreview[:1500] + "..."
+		}
+		debugLog.WriteString(fmt.Sprintf("║ %s\n", strings.ReplaceAll(userPreview, "\n", "\n║ ")))
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString("║ TOKEN CALCULATION:\n")
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		jsonSchemaOverhead := 2000
+		inputWithBuffer := int(float64(inputEstimate)*1.25) + jsonSchemaOverhead
+		availableInContext := c.contextWindow - inputWithBuffer
+		debugLog.WriteString(fmt.Sprintf("║ Input Estimate: %d tokens\n", inputEstimate))
+		debugLog.WriteString(fmt.Sprintf("║ Input with Buffer (×1.25): %d tokens\n", int(float64(inputEstimate)*1.25)))
+		debugLog.WriteString(fmt.Sprintf("║ JSON Schema Overhead: %d tokens\n", jsonSchemaOverhead))
+		debugLog.WriteString(fmt.Sprintf("║ Total Input + Overhead: %d tokens\n", inputWithBuffer))
+		debugLog.WriteString(fmt.Sprintf("║ Available in Context Window: %d tokens\n", availableInContext))
+		debugLog.WriteString(fmt.Sprintf("║ Max Tokens Set for Request: %d tokens\n", maxTokens))
+		debugLog.WriteString(fmt.Sprintf("║ Desired Output Tokens: %d tokens\n", desiredTokens))
+		debugLog.WriteString("╚═══════════════════════════════════════════════════════════════════════════════════\n")
+		fmt.Print(debugLog.String())
+	}
 
 	schema := generateSchema[LinkSuggestionSchema]()
 
@@ -536,9 +731,36 @@ func (c *OpenAIClient) GenerateLinkSuggestions(ctx context.Context, request *Lin
 	choice := chat.Choices[0]
 	finishReason := choice.FinishReason
 
-	// Log response stats
-	fmt.Printf("[OpenAI] LinkSuggestions response: promptTokens=%d, completionTokens=%d, finishReason=%s\n",
-		chat.Usage.PromptTokens, chat.Usage.CompletionTokens, finishReason)
+	// ====== DETAILED DEBUG LOGGING - LINK SUGGESTIONS RESPONSE (PART 1) ======
+	if debugMode {
+		inputEstimate := c.EstimateTokens(systemPrompt) + c.EstimateTokens(userPrompt)
+
+		var responseLog strings.Builder
+		responseLog.WriteString("\n")
+		responseLog.WriteString("╔═══════════════════════════════════════════════════════════════════════════════════\n")
+		responseLog.WriteString("║ [OPENAI DEBUG] GenerateLinkSuggestions - RESPONSE DETAILS\n")
+		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		responseLog.WriteString("║ ACTUAL TOKEN USAGE (from API):\n")
+		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		responseLog.WriteString(fmt.Sprintf("║ Input Tokens (actual): %d tokens\n", chat.Usage.PromptTokens))
+		responseLog.WriteString(fmt.Sprintf("║ Output Tokens (actual): %d tokens\n", chat.Usage.CompletionTokens))
+		responseLog.WriteString(fmt.Sprintf("║ Total Tokens (actual): %d tokens\n", chat.Usage.TotalTokens))
+		responseLog.WriteString(fmt.Sprintf("║ Finish Reason: %s\n", finishReason))
+		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		responseLog.WriteString("║ COMPARISON (Estimated vs Actual):\n")
+		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		responseLog.WriteString(fmt.Sprintf("║ Input: Estimated %d → Actual %d (diff: %+d)\n",
+			inputEstimate, chat.Usage.PromptTokens, int(chat.Usage.PromptTokens)-inputEstimate))
+		responseLog.WriteString(fmt.Sprintf("║ Output: Max %d → Used %d (%.1f%% utilized)\n",
+			maxTokens, chat.Usage.CompletionTokens, float64(chat.Usage.CompletionTokens)/float64(maxTokens)*100))
+
+		if finishReason == "length" {
+			responseLog.WriteString("║ ⚠️  WARNING: Response truncated! Max tokens limit reached!\n")
+		}
+
+		responseLog.WriteString("╚═══════════════════════════════════════════════════════════════════════════════════\n")
+		fmt.Print(responseLog.String())
+	}
 
 	// Check for problematic finish reasons
 	if finishReason == "length" {
@@ -574,6 +796,52 @@ func (c *OpenAIClient) GenerateLinkSuggestions(ctx context.Context, request *Lin
 	totalTokens := int(chat.Usage.TotalTokens)
 	cost := CalculateCost(entities.TypeOpenAI, c.modelName, inputTokens, outputTokens)
 
+	// ====== DETAILED DEBUG LOGGING - LINK SUGGESTIONS RESULT ======
+	if debugMode {
+		var resultLog strings.Builder
+		resultLog.WriteString("\n")
+		resultLog.WriteString("╔═══════════════════════════════════════════════════════════════════════════════════\n")
+		resultLog.WriteString("║ [OPENAI DEBUG] GenerateLinkSuggestions - PARSED RESULT\n")
+		resultLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		resultLog.WriteString(fmt.Sprintf("║ Link Suggestions Generated: %d\n", len(result.Links)))
+		resultLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
+		resultLog.WriteString("║ SUGGESTED LINKS:\n")
+		maxLinksToShow := len(result.Links)
+		if maxLinksToShow > 20 {
+			maxLinksToShow = 20
+		}
+		for i := 0; i < maxLinksToShow; i++ {
+			link := result.Links[i]
+			resultLog.WriteString(fmt.Sprintf("║   %d. [ID:%d] → [ID:%d]\n", i+1, link.SourceNodeID, link.TargetNodeID))
+			if link.AnchorText != "" {
+				resultLog.WriteString(fmt.Sprintf("║      Anchor: \"%s\"\n", link.AnchorText))
+			}
+		}
+		if len(result.Links) > 20 {
+			resultLog.WriteString(fmt.Sprintf("║   ... and %d more links\n", len(result.Links)-20))
+		}
+		resultLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
+		if result.Explanation != "" {
+			resultLog.WriteString("║ EXPLANATION:\n")
+			explanation := result.Explanation
+			if len(explanation) > 500 {
+				explanation = explanation[:500] + "..."
+			}
+			resultLog.WriteString(fmt.Sprintf("║ %s\n", strings.ReplaceAll(explanation, "\n", "\n║ ")))
+			resultLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
+		}
+		resultLog.WriteString("║ FINAL COST CALCULATION:\n")
+		resultLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		modelInfo := GetModelInfo(entities.TypeOpenAI, c.modelName)
+		if modelInfo != nil {
+			resultLog.WriteString(fmt.Sprintf("║ Input Tokens: %d × $%.2f/1M = $%.6f\n", inputTokens, modelInfo.InputCost, float64(inputTokens)/1_000_000*modelInfo.InputCost))
+			resultLog.WriteString(fmt.Sprintf("║ Output Tokens: %d × $%.2f/1M = $%.6f\n", outputTokens, modelInfo.OutputCost, float64(outputTokens)/1_000_000*modelInfo.OutputCost))
+		}
+		resultLog.WriteString(fmt.Sprintf("║ TOTAL COST: $%.6f\n", cost))
+		resultLog.WriteString("╚═══════════════════════════════════════════════════════════════════════════════════\n\n")
+		fmt.Print(resultLog.String())
+	}
+
 	return &LinkSuggestionResult{
 		Links:       result.Links,
 		Explanation: result.Explanation,
@@ -599,51 +867,71 @@ func generateSchema[T any]() interface{} {
 func buildLinkSuggestionSystemPrompt() string {
 	return `You are an internal linking strategist for websites.
 
-TASK: Suggest links between pages to improve site structure and SEO.
+TASK: Suggest DIVERSE internal links between pages to improve site structure and SEO.
 
 GOALS (priority order):
 1. Connect semantically related pages (same topic, complementary content)
-2. Link from high-content pages to low-visibility pages
-3. Create logical navigation paths for users
-4. Balance link distribution (avoid orphan pages with no links)
+2. Create HORIZONTAL links between sibling pages (same level in hierarchy)
+3. Create CROSS-HIERARCHY links (connect different sections if semantically related)
+4. Link from high-content pages to low-visibility pages
+5. Create logical navigation paths for users
+6. Balance link distribution (avoid orphan pages with no links)
+
+LINK TYPES TO CREATE:
+- Vertical: Parent ↔ Child (natural hierarchy)
+- Horizontal: Sibling ↔ Sibling (same parent, related topics)
+- Cross-section: Different hierarchy branches (if semantically relevant)
+- Hub: Important pages should link to many relevant pages
 
 RULES:
 - Only suggest NEW links (respect existing outgoing/incoming counts shown)
 - One page should not link to another more than once
 - Anchor text should describe the target page naturally, not generic like "click here"
-- If anchor text is obvious from context, you can skip it
+- Generate MANY links (aim for at least 3-5 links per page on average)
+- Balance distribution - don't overload one page, spread links evenly
 
-OUTPUT: Return suggested links with sourceId, targetId, and optional anchorText.`
+OUTPUT: Return suggested links with sourceNodeId, targetNodeId, and anchorText.`
 }
 
 func buildLinkSuggestionUserPrompt(request *LinkSuggestionRequest) string {
 	var sb strings.Builder
-	sb.WriteString("PAGES:\n")
 
-	for _, node := range request.Nodes {
-		// Format: [ID:X] "Title" /path [kw: a,b] [X→ Y←]
-		sb.WriteString(fmt.Sprintf("[ID:%d] \"%s\" %s", node.ID, node.Title, node.Path))
-		if len(node.Keywords) > 0 {
-			kw := node.Keywords
-			if len(kw) > 3 {
-				kw = kw[:3]
+	if request.NodesInfo != "" {
+		sb.WriteString(request.NodesInfo)
+		sb.WriteString("\n")
+	}
+
+	if request.HierarchyTree != "" {
+		sb.WriteString(request.HierarchyTree)
+		sb.WriteString("\n")
+	}
+
+	if request.NodesInfo == "" && request.HierarchyTree == "" {
+		sb.WriteString("PAGES:\n")
+		for _, node := range request.Nodes {
+			sb.WriteString(fmt.Sprintf("[ID:%d] \"%s\" %s", node.ID, node.Title, node.Path))
+			if len(node.Keywords) > 0 {
+				kw := node.Keywords
+				if len(kw) > 3 {
+					kw = kw[:3]
+				}
+				sb.WriteString(fmt.Sprintf(" [kw: %s]", strings.Join(kw, ", ")))
 			}
-			sb.WriteString(fmt.Sprintf(" [kw: %s]", strings.Join(kw, ", ")))
+			sb.WriteString(fmt.Sprintf(" [%d→ %d←]\n", node.OutgoingCount, node.IncomingCount))
 		}
-		sb.WriteString(fmt.Sprintf(" [%d→ %d←]\n", node.OutgoingCount, node.IncomingCount))
 	}
 
 	if request.MaxOutgoing > 0 || request.MaxIncoming > 0 {
 		sb.WriteString("\nCONSTRAINTS:\n")
 		if request.MaxOutgoing > 0 {
-			sb.WriteString(fmt.Sprintf("- Max %d outgoing links per page\n", request.MaxOutgoing))
+			sb.WriteString(fmt.Sprintf("- Max %d outgoing links per page (IMPORTANT: aim close to this number!)\n", request.MaxOutgoing))
 		}
 		if request.MaxIncoming > 0 {
-			sb.WriteString(fmt.Sprintf("- Max %d incoming links per page\n", request.MaxIncoming))
+			sb.WriteString(fmt.Sprintf("- Max %d incoming links per page (IMPORTANT: aim close to this number!)\n", request.MaxIncoming))
 		}
 	}
 
-	sb.WriteString("\nSuggest links that make sense semantically. Use exact page IDs.")
+	sb.WriteString("\nSuggest MANY diverse links. Include vertical, horizontal, and cross-hierarchy links. Use exact page IDs.")
 	return sb.String()
 }
 
@@ -720,9 +1008,70 @@ func (c *OpenAIClient) InsertLinks(ctx context.Context, request *InsertLinksRequ
 		params.MaxTokens = openaiSDK.Int(int64(maxTokens))
 	}
 
-	inputEstimate := c.EstimateTokens(systemPrompt) + c.EstimateTokens(userPrompt)
-	fmt.Printf("[OpenAI] InsertLinks: model=%s, contentLen=%d, links=%d, inputEstimate=%d, maxTokens=%d\n",
-		c.modelName, len(request.Content), len(request.Links), inputEstimate, maxTokens)
+	// ====== DETAILED DEBUG LOGGING - INSERT LINKS REQUEST ======
+	if debugMode {
+		inputEstimate := c.EstimateTokens(systemPrompt) + c.EstimateTokens(userPrompt)
+		systemTokens := c.EstimateTokens(systemPrompt)
+		userTokens := c.EstimateTokens(userPrompt)
+
+		var debugLog strings.Builder
+		debugLog.WriteString("\n")
+		debugLog.WriteString("╔═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString("║ [OPENAI DEBUG] InsertLinks - REQUEST DETAILS\n")
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString(fmt.Sprintf("║ Model: %s\n", c.modelName))
+		debugLog.WriteString(fmt.Sprintf("║ Context Window: %d tokens\n", c.contextWindow))
+		debugLog.WriteString(fmt.Sprintf("║ Max Output Tokens (model limit): %d tokens\n", c.maxOutputTokens))
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString("║ LINK INSERTION TASK:\n")
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString(fmt.Sprintf("║ Page: \"%s\" %s\n", request.PageTitle, request.PagePath))
+		debugLog.WriteString(fmt.Sprintf("║ Content Length: %d chars (~%d tokens)\n", len(request.Content), c.EstimateTokens(request.Content)))
+		debugLog.WriteString(fmt.Sprintf("║ Links to Insert: %d\n", len(request.Links)))
+		debugLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
+		debugLog.WriteString("║ LINKS TO INSERT:\n")
+		for i, link := range request.Links {
+			debugLog.WriteString(fmt.Sprintf("║   %d. → %s \"%s\"\n", i+1, link.TargetPath, link.TargetTitle))
+			if link.AnchorText != nil && *link.AnchorText != "" {
+				debugLog.WriteString(fmt.Sprintf("║      Anchor: \"%s\"\n", *link.AnchorText))
+			} else {
+				debugLog.WriteString("║      Anchor: find suitable text\n")
+			}
+		}
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString("║ INPUT ANALYSIS:\n")
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString(fmt.Sprintf("║ System Prompt Length: %d chars → ~%d tokens (estimated)\n", len(systemPrompt), systemTokens))
+		debugLog.WriteString(fmt.Sprintf("║ User Prompt Length: %d chars → ~%d tokens (estimated)\n", len(userPrompt), userTokens))
+		debugLog.WriteString(fmt.Sprintf("║ TOTAL INPUT: %d chars → ~%d tokens (estimated)\n", len(systemPrompt)+len(userPrompt), inputEstimate))
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString("║ SYSTEM PROMPT (full):\n")
+		debugLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
+		debugLog.WriteString(fmt.Sprintf("║ %s\n", strings.ReplaceAll(systemPrompt, "\n", "\n║ ")))
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString("║ USER PROMPT PREVIEW (first 1500 chars):\n")
+		debugLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
+		userPreview := userPrompt
+		if len(userPreview) > 1500 {
+			userPreview = userPreview[:1500] + "..."
+		}
+		debugLog.WriteString(fmt.Sprintf("║ %s\n", strings.ReplaceAll(userPreview, "\n", "\n║ ")))
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		debugLog.WriteString("║ TOKEN CALCULATION:\n")
+		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		jsonSchemaOverhead := 2000
+		inputWithBuffer := int(float64(inputEstimate)*1.25) + jsonSchemaOverhead
+		availableInContext := c.contextWindow - inputWithBuffer
+		debugLog.WriteString(fmt.Sprintf("║ Input Estimate: %d tokens\n", inputEstimate))
+		debugLog.WriteString(fmt.Sprintf("║ Input with Buffer (×1.25): %d tokens\n", int(float64(inputEstimate)*1.25)))
+		debugLog.WriteString(fmt.Sprintf("║ JSON Schema Overhead: %d tokens\n", jsonSchemaOverhead))
+		debugLog.WriteString(fmt.Sprintf("║ Total Input + Overhead: %d tokens\n", inputWithBuffer))
+		debugLog.WriteString(fmt.Sprintf("║ Available in Context Window: %d tokens\n", availableInContext))
+		debugLog.WriteString(fmt.Sprintf("║ Max Tokens Set for Request: %d tokens\n", maxTokens))
+		debugLog.WriteString(fmt.Sprintf("║ Desired Output Tokens: %d tokens\n", desiredOutputTokens))
+		debugLog.WriteString("╚═══════════════════════════════════════════════════════════════════════════════════\n")
+		fmt.Print(debugLog.String())
+	}
 
 	chat, err := c.client.Chat.Completions.New(ctx, params)
 	if err != nil {
@@ -768,7 +1117,65 @@ func (c *OpenAIClient) InsertLinks(ctx context.Context, request *InsertLinksRequ
 	totalTokens := int(chat.Usage.TotalTokens)
 	cost := CalculateCost(entities.TypeOpenAI, c.modelName, inputTokens, outputTokens)
 
-	fmt.Printf("[OpenAI] InsertLinks success: linksApplied=%d, cost=$%.4f\n", result.LinksApplied, cost)
+	// ====== DETAILED DEBUG LOGGING - INSERT LINKS RESPONSE ======
+	if debugMode {
+		inputEstimate := c.EstimateTokens(systemPrompt) + c.EstimateTokens(userPrompt)
+
+		var responseLog strings.Builder
+		responseLog.WriteString("\n")
+		responseLog.WriteString("╔═══════════════════════════════════════════════════════════════════════════════════\n")
+		responseLog.WriteString("║ [OPENAI DEBUG] InsertLinks - RESPONSE DETAILS\n")
+		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		responseLog.WriteString("║ ACTUAL TOKEN USAGE (from API):\n")
+		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		responseLog.WriteString(fmt.Sprintf("║ Input Tokens (actual): %d tokens\n", chat.Usage.PromptTokens))
+		responseLog.WriteString(fmt.Sprintf("║ Output Tokens (actual): %d tokens\n", chat.Usage.CompletionTokens))
+		responseLog.WriteString(fmt.Sprintf("║ Total Tokens (actual): %d tokens\n", chat.Usage.TotalTokens))
+		responseLog.WriteString(fmt.Sprintf("║ Finish Reason: %s\n", finishReason))
+		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		responseLog.WriteString("║ COMPARISON (Estimated vs Actual):\n")
+		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		responseLog.WriteString(fmt.Sprintf("║ Input: Estimated %d → Actual %d (diff: %+d)\n",
+			inputEstimate, chat.Usage.PromptTokens, int(chat.Usage.PromptTokens)-inputEstimate))
+		responseLog.WriteString(fmt.Sprintf("║ Output: Max %d → Used %d (%.1f%% utilized)\n",
+			maxTokens, chat.Usage.CompletionTokens, float64(chat.Usage.CompletionTokens)/float64(maxTokens)*100))
+
+		if finishReason == "length" {
+			responseLog.WriteString("║ ⚠️  WARNING: Response truncated! Max tokens limit reached!\n")
+		}
+
+		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		responseLog.WriteString("║ LINK INSERTION RESULT:\n")
+		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		responseLog.WriteString(fmt.Sprintf("║ Links Requested: %d\n", len(request.Links)))
+		responseLog.WriteString(fmt.Sprintf("║ Links Applied: %d\n", result.LinksApplied))
+		successRate := float64(result.LinksApplied) / float64(len(request.Links)) * 100
+		responseLog.WriteString(fmt.Sprintf("║ Success Rate: %.1f%%\n", successRate))
+		responseLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
+		responseLog.WriteString(fmt.Sprintf("║ Original Content Length: %d chars\n", len(request.Content)))
+		responseLog.WriteString(fmt.Sprintf("║ Modified Content Length: %d chars\n", len(result.Content)))
+		deltaChars := len(result.Content) - len(request.Content)
+		responseLog.WriteString(fmt.Sprintf("║ Delta: %+d chars\n", deltaChars))
+		responseLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
+		responseLog.WriteString("║ Modified Content Preview (first 1000 chars):\n")
+		responseLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
+		modifiedPreview := result.Content
+		if len(modifiedPreview) > 1000 {
+			modifiedPreview = modifiedPreview[:1000] + "..."
+		}
+		responseLog.WriteString(fmt.Sprintf("║ %s\n", strings.ReplaceAll(modifiedPreview, "\n", "\n║ ")))
+		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		responseLog.WriteString("║ FINAL COST CALCULATION:\n")
+		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+		modelInfo := GetModelInfo(entities.TypeOpenAI, c.modelName)
+		if modelInfo != nil {
+			responseLog.WriteString(fmt.Sprintf("║ Input Tokens: %d × $%.2f/1M = $%.6f\n", inputTokens, modelInfo.InputCost, float64(inputTokens)/1_000_000*modelInfo.InputCost))
+			responseLog.WriteString(fmt.Sprintf("║ Output Tokens: %d × $%.2f/1M = $%.6f\n", outputTokens, modelInfo.OutputCost, float64(outputTokens)/1_000_000*modelInfo.OutputCost))
+		}
+		responseLog.WriteString(fmt.Sprintf("║ TOTAL COST: $%.6f\n", cost))
+		responseLog.WriteString("╚═══════════════════════════════════════════════════════════════════════════════════\n\n")
+		fmt.Print(responseLog.String())
+	}
 
 	return &InsertLinksResult{
 		Content:      result.Content,
