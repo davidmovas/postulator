@@ -55,7 +55,7 @@ func (c *restyClient) GetPosts(ctx context.Context, s *entities.Site) ([]*entiti
 		if resp.StatusCode() == 400 {
 			respBody := resp.String()
 			if strings.Contains(strings.ToLower(respBody), "page number") ||
-			   strings.Contains(strings.ToLower(respBody), "larger than") {
+				strings.Contains(strings.ToLower(respBody), "larger than") {
 				break
 			}
 		}

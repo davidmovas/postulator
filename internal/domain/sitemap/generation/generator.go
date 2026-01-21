@@ -223,8 +223,7 @@ func (g *Generator) buildPrompts(ctx context.Context, req GenerateRequest) (stri
 }
 
 func contains(s, substr string) bool {
-	return len(s) > 0 && len(substr) > 0 && (
-		len(s) >= len(substr) && s[:len(substr)] == substr ||
+	return len(s) > 0 && len(substr) > 0 && (len(s) >= len(substr) && s[:len(substr)] == substr ||
 		len(s) > len(substr) && s[len(s)-len(substr):] == substr ||
 		false || // placeholder for string search
 		func() bool {
