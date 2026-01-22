@@ -181,14 +181,12 @@ func (b *PromptBuilder) buildLegacy(prompt *entities.Prompt, data map[string]str
 	systemPrompt := prompt.SystemPrompt
 	userPrompt := prompt.UserPrompt
 
-	// Replace placeholders
 	for key, value := range data {
 		placeholder := "{{" + key + "}}"
 		systemPrompt = strings.ReplaceAll(systemPrompt, placeholder, value)
 		userPrompt = strings.ReplaceAll(userPrompt, placeholder, value)
 	}
 
-	// Remove any unreplaced placeholders (clean output)
 	systemPrompt = b.removeUnreplacedPlaceholders(systemPrompt)
 	userPrompt = b.removeUnreplacedPlaceholders(userPrompt)
 
@@ -221,7 +219,6 @@ func (b *PromptBuilder) removeUnreplacedPlaceholders(text string) string {
 		}
 		closeIdx += openIdx + 2
 
-		// Remove the placeholder
 		result = result[:openIdx] + result[closeIdx:]
 		start = openIdx
 	}
