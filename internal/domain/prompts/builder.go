@@ -223,7 +223,6 @@ func (b *PromptBuilder) removeUnreplacedPlaceholders(text string) string {
 		start = openIdx
 	}
 
-	// Clean up multiple newlines and spaces
 	for strings.Contains(result, "\n\n\n") {
 		result = strings.ReplaceAll(result, "\n\n\n", "\n\n")
 	}
@@ -234,12 +233,10 @@ func (b *PromptBuilder) removeUnreplacedPlaceholders(text string) string {
 	return strings.TrimSpace(result)
 }
 
-// GetDefaultContextConfig returns the default context config for a category
 func (b *PromptBuilder) GetDefaultContextConfig(category entities.PromptCategory) entities.ContextConfig {
 	return b.registry.GetDefaultContextConfig(category)
 }
 
-// GetFieldsByCategory returns all field definitions for a category
 func (b *PromptBuilder) GetFieldsByCategory(category entities.PromptCategory) []*entities.ContextFieldDefinition {
 	return b.registry.GetByCategory(category)
 }
