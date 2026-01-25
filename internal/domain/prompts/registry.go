@@ -213,18 +213,23 @@ func (r *ContextFieldRegistry) registerAllFields() {
 		Group:        "content",
 	})
 	r.register(&entities.ContextFieldDefinition{
-		Key:          "constraints",
-		Label:        "Link Constraints",
-		Description:  "Include max link limits (passed via runtime data)",
-		Type:         entities.ContextFieldTypeCheckbox,
-		DefaultValue: "true",
+		Key:          "maxOutgoing",
+		Label:        "Max Outgoing",
+		Description:  "Maximum outgoing links per page",
+		Type:         entities.ContextFieldTypeNumber,
+		DefaultValue: "5",
 		Categories:   []entities.PromptCategory{entities.PromptCategoryLinkSuggest},
-		Group:        "content",
+		Group:        "constraints",
 	})
-	// NOTE: maxIncoming/maxOutgoing are now included in the constraints placeholder
-	// and passed via runtime data, not as separate registry fields
-	// NOTE: feedback is a runtime-only field, not stored in prompt config
-	// It's passed at usage time via overrides
+	r.register(&entities.ContextFieldDefinition{
+		Key:          "maxIncoming",
+		Label:        "Max Incoming",
+		Description:  "Maximum incoming links per page",
+		Type:         entities.ContextFieldTypeNumber,
+		DefaultValue: "8",
+		Categories:   []entities.PromptCategory{entities.PromptCategoryLinkSuggest},
+		Group:        "constraints",
+	})
 
 	// =========================================================================
 	// LINK_APPLY Fields

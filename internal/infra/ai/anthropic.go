@@ -367,16 +367,8 @@ You must respond with a valid JSON object in the following format:
 
 Do not include any text before or after the JSON object. Only output the JSON.`
 
-	baseSystem := request.SystemPrompt
-	if baseSystem == "" {
-		baseSystem = buildLinkSuggestionSystemPrompt()
-	}
-	systemPrompt := baseSystem + "\n\n" + jsonInstructions
-
+	systemPrompt := request.SystemPrompt + "\n\n" + jsonInstructions
 	userPrompt := request.UserPrompt
-	if userPrompt == "" {
-		userPrompt = buildLinkSuggestionUserPrompt(request)
-	}
 
 	message, err := c.client.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:     anthropic.Model(c.model),
@@ -455,15 +447,8 @@ You must respond with a valid JSON object in the following format:
 
 Do not include any text before or after the JSON object. Only output the JSON.`
 
-	systemPrompt := request.SystemPrompt
-	if systemPrompt == "" {
-		systemPrompt = buildInsertLinksSystemPrompt(request.Language)
-	}
-	systemPrompt = systemPrompt + "\n\n" + jsonInstructions
+	systemPrompt := request.SystemPrompt + "\n\n" + jsonInstructions
 	userPrompt := request.UserPrompt
-	if userPrompt == "" {
-		userPrompt = buildInsertLinksUserPrompt(request)
-	}
 
 	fmt.Printf("[Anthropic] InsertLinks: model=%s, contentLen=%d, links=%d\n",
 		c.model, len(request.Content), len(request.Links))

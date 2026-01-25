@@ -470,7 +470,8 @@ func (a *Applier) applyLinksToNode(
 			a.logger.Infof("Inserting %d links into page %s", len(linkTargets), sourceNode.Title)
 		}
 
-		insertResult, err := aiClient.InsertLinks(ctx, request)
+		var insertResult *ai.InsertLinksResult
+		insertResult, err = aiClient.InsertLinks(ctx, request)
 		if err != nil {
 			errMsg := fmt.Sprintf("AI insertion failed: %v", err)
 			for _, vl := range batchLinks {
@@ -491,7 +492,7 @@ func (a *Applier) applyLinksToNode(
 				insertResult.Usage,
 				0,
 				nil,
-				map[string]interface{}{
+				map[string]any{
 					"source_node_id": sourceNode.ID,
 					"links_count":    len(linkTargets),
 					"links_applied":  insertResult.LinksApplied,
@@ -548,7 +549,7 @@ func (a *Applier) applyLinksToNode(
 
 	if len(allAppliedInfos) > 0 {
 		page.Content = currentContent
-		if err := a.wpClient.UpdatePage(ctx, site, page); err != nil {
+		if err = a.wpClient.UpdatePage(ctx, site, page); err != nil {
 			errMsg := fmt.Sprintf("failed to update WordPress: %v", err)
 			for _, info := range allAppliedInfos {
 				if updateErr := a.linkRepo.UpdateStatus(ctx, info.LinkID, LinkStatusFailed, &errMsg); updateErr != nil {
@@ -577,13 +578,13 @@ func (a *Applier) getApplyPrompt(ctx context.Context, promptID *int64) *entities
 	}
 
 	// Otherwise, get the first builtin prompt for link_apply category
-	prompts, err := a.promptSvc.ListPromptsByCategory(ctx, entities.PromptCategoryLinkApply)
+	pts, err := a.promptSvc.ListPromptsByCategory(ctx, entities.PromptCategoryLinkApply)
 	if err != nil {
-		a.logger.ErrorWithErr(err, "Failed to get builtin link_apply prompts")
+		a.logger.ErrorWithErr(err, "Failed to get builtin link_apply pts")
 		return nil
 	}
 
-	for _, p := range prompts {
+	for _, p := range pts {
 		if p.IsBuiltin {
 			return p
 		}
@@ -604,14 +605,14 @@ func (a *Applier) buildApplyPrompts(
 		return "", "" // Use defaults in AI client
 	}
 
-	// Build links list
+	// Build links list with explicit URL format for AI
 	var linksList strings.Builder
-	for _, link := range linkTargets {
-		anchor := "(auto)"
+	for i, link := range linkTargets {
+		anchor := "auto-select"
 		if link.AnchorText != nil && *link.AnchorText != "" {
 			anchor = *link.AnchorText
 		}
-		linksList.WriteString(fmt.Sprintf("→ %s \"%s\" (anchor: %s)\n", link.TargetPath, link.TargetTitle, anchor))
+		linksList.WriteString(fmt.Sprintf("%d. URL: %s | Anchor: \"%s\"\n", i+1, link.TargetPath, anchor))
 	}
 
 	runtimeData := map[string]string{
@@ -632,28 +633,141 @@ func (a *Applier) buildApplyPrompts(
 	return sys, usr
 }
 
+// TODO: Remove debug output after fixing link verification issues
 func (a *Applier) verifyLinksInserted(content string, expectedLinks []linkWithTarget) []bool {
 	inserted := make([]bool, len(expectedLinks))
 
+	var debug strings.Builder
+	debug.WriteString("\n")
+	debug.WriteString("╔═══════════════════════════════════════════════════════════════════════════════════\n")
+	debug.WriteString("║ [DEBUG] LINK VERIFICATION\n")
+	debug.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+	debug.WriteString(fmt.Sprintf("║ Content length: %d chars\n", len(content)))
+	debug.WriteString(fmt.Sprintf("║ Expected links: %d\n", len(expectedLinks)))
+	debug.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+
 	doc, err := html.Parse(strings.NewReader(content))
 	if err != nil {
+		debug.WriteString(fmt.Sprintf("║ ERROR: Failed to parse HTML: %v\n", err))
+		debug.WriteString("╚═══════════════════════════════════════════════════════════════════════════════════\n")
+		fmt.Print(debug.String())
 		a.logger.ErrorWithErr(err, "Failed to parse HTML for verification")
 		return inserted
 	}
 
 	foundLinks := extractAllLinks(doc)
+	debug.WriteString(fmt.Sprintf("║ Found %d links in content:\n", len(foundLinks)))
+	debug.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
+	for i, link := range foundLinks {
+		normalized := normalizePath(link.Href)
+		textPreview := link.Text
+		if len(textPreview) > 50 {
+			textPreview = textPreview[:50] + "..."
+		}
+		debug.WriteString(fmt.Sprintf("║   [%d] href=\"%s\"\n", i+1, link.Href))
+		debug.WriteString(fmt.Sprintf("║       normalized=\"%s\"\n", normalized))
+		debug.WriteString(fmt.Sprintf("║       text=\"%s\"\n", textPreview))
+	}
 
+	normalizedHrefs := make([]string, len(foundLinks))
+	for i, link := range foundLinks {
+		normalizedHrefs[i] = normalizePath(link.Href)
+	}
+
+	debug.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+	debug.WriteString("║ EXPECTED LINKS VERIFICATION:\n")
+	debug.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
+
+	matchedCount := 0
 	for i, vl := range expectedLinks {
-		targetPath := vl.target.TargetPath
-		for _, link := range foundLinks {
-			if strings.Contains(link.Href, targetPath) {
+		targetNorm := normalizePath(vl.target.TargetPath)
+		anchor := "(auto)"
+		if vl.link.AnchorText != nil && *vl.link.AnchorText != "" {
+			anchor = *vl.link.AnchorText
+		}
+
+		debug.WriteString(fmt.Sprintf("║ [%d] Target: \"%s\" -> \"%s\"\n", i+1, vl.target.TargetPath, vl.target.TargetTitle))
+		debug.WriteString(fmt.Sprintf("║     Normalized: \"%s\"\n", targetNorm))
+		debug.WriteString(fmt.Sprintf("║     Anchor: \"%s\"\n", anchor))
+
+		found := false
+		for j, hrefNorm := range normalizedHrefs {
+			if pathsMatch(hrefNorm, targetNorm) {
 				inserted[i] = true
+				found = true
+				matchedCount++
+				debug.WriteString(fmt.Sprintf("║     ✓ MATCHED with found link [%d]: \"%s\"\n", j+1, foundLinks[j].Href))
 				break
+			}
+		}
+
+		if !found {
+			debug.WriteString("║     ✗ NOT FOUND - checking why:\n")
+			for j, hrefNorm := range normalizedHrefs {
+				exact := hrefNorm == targetNorm
+				suffix := strings.HasSuffix(hrefNorm, targetNorm)
+				contains := strings.Contains(hrefNorm, targetNorm)
+				debug.WriteString(fmt.Sprintf("║       vs [%d] \"%s\": exact=%v suffix=%v contains=%v\n",
+					j+1, hrefNorm, exact, suffix, contains))
 			}
 		}
 	}
 
+	debug.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
+	debug.WriteString(fmt.Sprintf("║ RESULT: %d/%d links verified as inserted\n", matchedCount, len(expectedLinks)))
+	debug.WriteString("╚═══════════════════════════════════════════════════════════════════════════════════\n\n")
+	fmt.Print(debug.String())
+
 	return inserted
+}
+
+func normalizePath(path string) string {
+	path = strings.TrimSpace(path)
+
+	if idx := strings.Index(path, "://"); idx != -1 {
+		afterScheme := path[idx+3:]
+		if slashIdx := strings.Index(afterScheme, "/"); slashIdx != -1 {
+			path = afterScheme[slashIdx:]
+		} else {
+			path = "/"
+		}
+	}
+
+	path = strings.TrimPrefix(path, "./")
+	path = strings.TrimPrefix(path, "../")
+
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+
+	path = strings.TrimSuffix(path, "/")
+
+	if idx := strings.Index(path, "?"); idx != -1 {
+		path = path[:idx]
+	}
+	if idx := strings.Index(path, "#"); idx != -1 {
+		path = path[:idx]
+	}
+
+	path = strings.ToLower(path)
+
+	return path
+}
+
+func pathsMatch(href, target string) bool {
+	if href == target {
+		return true
+	}
+
+	if strings.HasSuffix(href, target) {
+		return true
+	}
+
+	if strings.Contains(href, target) {
+		return true
+	}
+
+	return false
 }
 
 type linkInfo struct {

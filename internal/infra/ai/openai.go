@@ -44,8 +44,8 @@ type OpenAIClient struct {
 	modelName            string
 	usesCompletionTokens bool
 	isReasoningModel     bool
-	contextWindow        int // Total context window size
-	maxOutputTokens      int // Maximum output tokens for the model
+	contextWindow        int
+	maxOutputTokens      int
 }
 
 func NewOpenAIClient(cfg Config) (*OpenAIClient, error) {
@@ -69,8 +69,8 @@ func NewOpenAIClient(cfg Config) (*OpenAIClient, error) {
 
 	usesCompletionTokens := false
 	isReasoningModel := false
-	contextWindow := 128000  // Default fallback
-	maxOutputTokens := 16384 // Default fallback
+	contextWindow := 128000      // Default fallback
+	maxOutputTokens := 16384 * 2 // Default fallback
 	if modelInfo := GetModelInfo(entities.TypeOpenAI, cfg.Model); modelInfo != nil {
 		usesCompletionTokens = modelInfo.UsesCompletionTokens
 		isReasoningModel = modelInfo.IsReasoningModel
@@ -146,10 +146,8 @@ func (c *OpenAIClient) ValidateRequest(systemPrompt, userPrompt string, minRequi
 }
 
 func (c *OpenAIClient) GenerateArticle(ctx context.Context, systemPrompt, userPrompt string, opts *GenerateArticleOptions) (*ArticleResult, error) {
-	// Calculate dynamic token limits based on input size
-	// Default desired output is 4096 for articles, but we'll calculate what's actually available
-	const desiredArticleTokens = 16384 // Desired output for a typical article
-	const minArticleTokens = 2000      // Minimum tokens needed for a reasonable article
+	const desiredArticleTokens = 16384 * 2
+	const minArticleTokens = 2000
 
 	// Validate request first
 	if err := c.ValidateRequest(systemPrompt, userPrompt, minArticleTokens); err != nil {
@@ -572,7 +570,7 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 func (c *OpenAIClient) GenerateLinkSuggestions(ctx context.Context, request *LinkSuggestionRequest) (*LinkSuggestionResult, error) {
 	const minRequiredTokens = 2000
 	const tokensPerLink = 80
-	const baseTokens = 8192
+	const baseTokens = 16384
 
 	maxLinks := request.MaxOutgoing
 	if request.MaxIncoming > maxLinks {
@@ -591,17 +589,11 @@ func (c *OpenAIClient) GenerateLinkSuggestions(ctx context.Context, request *Lin
 
 	systemPrompt := request.SystemPrompt
 	userPrompt := request.UserPrompt
-	if systemPrompt == "" {
-		systemPrompt = buildLinkSuggestionSystemPrompt()
-	}
-	if userPrompt == "" {
-		userPrompt = buildLinkSuggestionUserPrompt(request)
-	}
 
 	// Validate request first - check that prompt isn't too large
 	if err := c.ValidateRequest(systemPrompt, userPrompt, minRequiredTokens); err != nil {
 		return nil, errors.AI(providerName, fmt.Errorf(
-			"prompt too large for link suggestions (%d nodes): %w. Try reducing batch size or simplifying node data.",
+			"prompt too large for link suggestions (%d nodes): %w. Try reducing batch size or simplifying node data",
 			len(request.Nodes), err))
 	}
 
@@ -864,77 +856,6 @@ func generateSchema[T any]() interface{} {
 	return schema
 }
 
-func buildLinkSuggestionSystemPrompt() string {
-	return `You are an internal linking strategist for websites.
-
-TASK: Suggest DIVERSE internal links between pages to improve site structure and SEO.
-
-GOALS (priority order):
-1. Connect semantically related pages (same topic, complementary content)
-2. Create HORIZONTAL links between sibling pages (same level in hierarchy)
-3. Create CROSS-HIERARCHY links (connect different sections if semantically related)
-4. Link from high-content pages to low-visibility pages
-5. Create logical navigation paths for users
-6. Balance link distribution (avoid orphan pages with no links)
-
-LINK TYPES TO CREATE:
-- Vertical: Parent ↔ Child (natural hierarchy)
-- Horizontal: Sibling ↔ Sibling (same parent, related topics)
-- Cross-section: Different hierarchy branches (if semantically relevant)
-- Hub: Important pages should link to many relevant pages
-
-RULES:
-- Only suggest NEW links (respect existing outgoing/incoming counts shown)
-- One page should not link to another more than once
-- Anchor text should describe the target page naturally, not generic like "click here"
-- Generate MANY links (aim for at least 3-5 links per page on average)
-- Balance distribution - don't overload one page, spread links evenly
-
-OUTPUT: Return suggested links with sourceNodeId, targetNodeId, and anchorText.`
-}
-
-func buildLinkSuggestionUserPrompt(request *LinkSuggestionRequest) string {
-	var sb strings.Builder
-
-	if request.NodesInfo != "" {
-		sb.WriteString(request.NodesInfo)
-		sb.WriteString("\n")
-	}
-
-	if request.HierarchyTree != "" {
-		sb.WriteString(request.HierarchyTree)
-		sb.WriteString("\n")
-	}
-
-	if request.NodesInfo == "" && request.HierarchyTree == "" {
-		sb.WriteString("PAGES:\n")
-		for _, node := range request.Nodes {
-			sb.WriteString(fmt.Sprintf("[ID:%d] \"%s\" %s", node.ID, node.Title, node.Path))
-			if len(node.Keywords) > 0 {
-				kw := node.Keywords
-				if len(kw) > 3 {
-					kw = kw[:3]
-				}
-				sb.WriteString(fmt.Sprintf(" [kw: %s]", strings.Join(kw, ", ")))
-			}
-			sb.WriteString(fmt.Sprintf(" [%d→ %d←]\n", node.OutgoingCount, node.IncomingCount))
-		}
-	}
-
-	if request.MaxOutgoing > 0 || request.MaxIncoming > 0 {
-		sb.WriteString("\nCONSTRAINTS:\n")
-		if request.MaxOutgoing > 0 {
-			sb.WriteString(fmt.Sprintf("- Max %d outgoing links per page (IMPORTANT: aim close to this number!)\n", request.MaxOutgoing))
-		}
-		if request.MaxIncoming > 0 {
-			sb.WriteString(fmt.Sprintf("- Max %d incoming links per page (IMPORTANT: aim close to this number!)\n", request.MaxIncoming))
-		}
-	}
-
-	sb.WriteString("\nSuggest MANY diverse links. Include vertical, horizontal, and cross-hierarchy links. Use exact page IDs.")
-	return sb.String()
-}
-
 type InsertLinksContentSchema struct {
 	Content      string `json:"content" jsonschema_description:"Modified HTML content with links inserted"`
 	LinksApplied int    `json:"linksApplied" jsonschema_description:"Number of links successfully inserted"`
@@ -959,20 +880,12 @@ func (c *OpenAIClient) InsertLinks(ctx context.Context, request *InsertLinksRequ
 	}
 
 	systemPrompt := request.SystemPrompt
-	if systemPrompt == "" {
-		systemPrompt = buildInsertLinksSystemPrompt(request.Language)
-	}
 	userPrompt := request.UserPrompt
-	if userPrompt == "" {
-		userPrompt = buildInsertLinksUserPrompt(request)
-	}
 
-	// For InsertLinks, output should be at least as large as input content
-	// since we're returning modified HTML. Add 20% buffer for links and JSON wrapper.
 	contentTokenEstimate := c.EstimateTokens(request.Content)
 	desiredOutputTokens := int(float64(contentTokenEstimate) * 1.3)
-	if desiredOutputTokens < 4096 {
-		desiredOutputTokens = 4096
+	if desiredOutputTokens < 8192 {
+		desiredOutputTokens = 8192
 	}
 
 	// Validate request
@@ -1088,7 +1001,7 @@ func (c *OpenAIClient) InsertLinks(ctx context.Context, request *InsertLinksRequ
 	if finishReason == "length" {
 		return nil, errors.AI(providerName, fmt.Errorf(
 			"response truncated: content too long (used %d/%d output tokens, input: %d tokens). "+
-				"Content size: %d chars. Try using a model with larger context window.",
+				"Content size: %d chars. Try using a model with larger context window",
 			chat.Usage.CompletionTokens, maxTokens, chat.Usage.PromptTokens, len(request.Content)))
 	}
 	if finishReason == "content_filter" {
@@ -1140,10 +1053,6 @@ func (c *OpenAIClient) InsertLinks(ctx context.Context, request *InsertLinksRequ
 		responseLog.WriteString(fmt.Sprintf("║ Output: Max %d → Used %d (%.1f%% utilized)\n",
 			maxTokens, chat.Usage.CompletionTokens, float64(chat.Usage.CompletionTokens)/float64(maxTokens)*100))
 
-		if finishReason == "length" {
-			responseLog.WriteString("║ ⚠️  WARNING: Response truncated! Max tokens limit reached!\n")
-		}
-
 		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
 		responseLog.WriteString("║ LINK INSERTION RESULT:\n")
 		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
@@ -1187,51 +1096,4 @@ func (c *OpenAIClient) InsertLinks(ctx context.Context, request *InsertLinksRequ
 			CostUSD:      cost,
 		},
 	}, nil
-}
-
-func buildInsertLinksSystemPrompt(language string) string {
-	if language == "" {
-		language = "English"
-	}
-	return fmt.Sprintf(`You are a link insertion tool. Your ONLY job is to add <a> tags to existing HTML content.
-
-TASK: Insert the specified internal links into the content without modifying anything else.
-
-STRICT RULES:
-1. Return the EXACT same HTML, only adding <a href="...">...</a> tags
-2. Do NOT rewrite, rephrase, or change any text
-3. Do NOT change HTML structure, formatting, or whitespace
-4. Do NOT add links inside existing <a> tags (avoid nested links)
-5. Insert each link only ONCE per page (first suitable occurrence)
-6. Do NOT repeat the same link multiple times
-
-HOW TO INSERT:
-- If anchor text is provided: find that exact text (or close match) and wrap it with <a> tag
-- If no anchor text: find text that naturally describes the target page and wrap it
-- If no suitable text exists in content: skip that link (don't force it)
-
-Language for anchor text selection: %s
-
-OUTPUT: Return modified HTML and count of successfully inserted links.`, language)
-}
-
-func buildInsertLinksUserPrompt(request *InsertLinksRequest) string {
-	var sb strings.Builder
-
-	sb.WriteString(fmt.Sprintf("PAGE: \"%s\" %s\n\n", request.PageTitle, request.PagePath))
-
-	sb.WriteString("INSERT THESE LINKS:\n")
-	for i, link := range request.Links {
-		sb.WriteString(fmt.Sprintf("%d. → %s \"%s\"\n", i+1, link.TargetPath, link.TargetTitle))
-		if link.AnchorText != nil && *link.AnchorText != "" {
-			sb.WriteString(fmt.Sprintf("   Anchor: \"%s\"\n", *link.AnchorText))
-		} else {
-			sb.WriteString("   Anchor: find suitable text\n")
-		}
-	}
-
-	sb.WriteString("\nCONTENT:\n")
-	sb.WriteString(request.Content)
-
-	return sb.String()
 }

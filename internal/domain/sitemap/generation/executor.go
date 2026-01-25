@@ -91,7 +91,7 @@ func (e *Executor) prepareNodes(ctx context.Context, config GenerationConfig) ([
 		nodeMap := make(map[int64]*entities.SitemapNode)
 
 		for _, nodeID := range config.NodeIDs {
-			node, err := e.sitemapSvc.GetNode(ctx, nodeID)
+			node, err := e.sitemapSvc.GetNodeWithKeywords(ctx, nodeID)
 			if err != nil {
 				e.logger.ErrorWithErr(err, fmt.Sprintf("Failed to get node %d", nodeID))
 				continue
@@ -295,7 +295,7 @@ func (e *Executor) processNodesParallel(ctx context.Context, task *Task, nodes [
 }
 
 func (e *Executor) processNode(ctx context.Context, task *Task, taskNode *TaskNode, config GenerationConfig) error {
-	node, err := e.sitemapSvc.GetNode(ctx, taskNode.NodeID)
+	node, err := e.sitemapSvc.GetNodeWithKeywords(ctx, taskNode.NodeID)
 	if err != nil {
 		return fmt.Errorf("failed to get node: %w", err)
 	}

@@ -27,15 +27,8 @@ export interface ContextConfigEditorProps {
     config: ContextConfig;
     onChange: (config: ContextConfig) => void;
     disabled?: boolean;
-    /**
-     * Mode:
-     * - "edit" = for prompt creation/editing (show all fields, allow enabling/disabling)
-     * - "override" = for usage time (only show enabled fields from base config, allow value changes)
-     */
     mode?: "edit" | "override";
-    /** Base config from prompt (used in override mode) */
     baseConfig?: ContextConfig;
-    /** Compact display for inline usage */
     compact?: boolean;
 }
 
@@ -60,7 +53,6 @@ export function ContextConfigEditor({
                 setFields(response.fields);
                 setDefaultConfig(response.defaultConfig);
 
-                // Initialize config with defaults if empty (only in edit mode)
                 if (mode === "edit" && Object.keys(config).length === 0) {
                     onChange(response.defaultConfig);
                 }
@@ -73,15 +65,12 @@ export function ContextConfigEditor({
         loadFields();
     }, [category]);
 
-    // Sort fields: required first, then by group
     const sortedFields = useMemo(() => {
         const sorted = [...fields];
         sorted.sort((a, b) => {
-            // Required fields first
             if (a.required && !b.required) return -1;
             if (!a.required && b.required) return 1;
-            // Then by group order
-            const groupOrder = ["content", "site", "settings", "style", "advanced"];
+            const groupOrder = ["content", "constraints", "site", "settings", "style", "advanced"];
             const aIdx = groupOrder.indexOf(a.group || "content");
             const bIdx = groupOrder.indexOf(b.group || "content");
             return aIdx - bIdx;
@@ -89,16 +78,11 @@ export function ContextConfigEditor({
         return sorted;
     }, [fields]);
 
-    // In override mode, filter to only show enabled fields from base config
-    const visibleFields = useMemo(() => {
-        if (mode === "override" && baseConfig) {
-            return sortedFields.filter(field => {
-                const baseValue = baseConfig[field.key];
-                return field.required || baseValue?.enabled;
-            });
-        }
-        return sortedFields;
-    }, [sortedFields, mode, baseConfig]);
+    const { constraintFields, otherFields } = useMemo(() => {
+        const constraints = sortedFields.filter(f => f.group === "constraints");
+        const others = sortedFields.filter(f => f.group !== "constraints");
+        return { constraintFields: constraints, otherFields: others };
+    }, [sortedFields]);
 
     const updateField = (key: string, value: Partial<ContextFieldValue>) => {
         const currentValue = config[key] || defaultConfig[key] || { enabled: false };
@@ -109,7 +93,7 @@ export function ContextConfigEditor({
     };
 
     const getFieldValue = (key: string): ContextFieldValue | undefined => {
-        return config[key] || (mode === "override" ? baseConfig?.[key] : defaultConfig[key]);
+        return config[key] || baseConfig?.[key] || defaultConfig[key];
     };
 
     if (isLoading) {
@@ -120,7 +104,7 @@ export function ContextConfigEditor({
         );
     }
 
-    if (visibleFields.length === 0) {
+    if (sortedFields.length === 0) {
         return (
             <div className={compact ? "py-2" : "p-4"}>
                 <span className="text-sm text-muted-foreground">
@@ -130,13 +114,11 @@ export function ContextConfigEditor({
         );
     }
 
-    // Separate required and optional fields
-    const requiredFields = visibleFields.filter(f => f.required);
-    const optionalFields = visibleFields.filter(f => !f.required);
+    const requiredFields = otherFields.filter(f => f.required);
+    const optionalFields = otherFields.filter(f => !f.required);
 
     return (
         <div className={compact ? "space-y-3" : "space-y-4"}>
-            {/* Required Fields */}
             {requiredFields.length > 0 && (
                 <div className="space-y-3">
                     {!compact && (
@@ -163,12 +145,38 @@ export function ContextConfigEditor({
                 </div>
             )}
 
-            {/* Separator */}
-            {requiredFields.length > 0 && optionalFields.length > 0 && (
+            {requiredFields.length > 0 && (optionalFields.length > 0 || constraintFields.length > 0) && (
                 <Separator />
             )}
 
-            {/* Optional Fields */}
+            {constraintFields.length > 0 && (
+                <div className="space-y-2">
+                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Link Constraints
+                    </Label>
+                    <div className="grid grid-cols-2 gap-3">
+                        {constraintFields.map((field) => (
+                            <div key={field.key} className="space-y-1">
+                                <Label className="text-xs">{field.label}</Label>
+                                <Input
+                                    type="number"
+                                    min={0}
+                                    max={50}
+                                    value={getFieldValue(field.key)?.value ?? field.defaultValue ?? ""}
+                                    onChange={(e) => updateField(field.key, { enabled: true, value: e.target.value })}
+                                    disabled={disabled}
+                                    className="h-8"
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {constraintFields.length > 0 && optionalFields.length > 0 && (
+                <Separator />
+            )}
+
             {optionalFields.length > 0 && (
                 <div className="space-y-3">
                     {!compact && (
@@ -208,8 +216,6 @@ function ContextField({ field, value, onChange, disabled, compact, mode }: Conte
     const isEnabled = value?.enabled ?? false;
     const fieldValue = value?.value ?? field.defaultValue ?? "";
     const isRequired = field.required;
-
-    // Optional fields can be toggled in both modes, required fields are always enabled
     const canToggle = !isRequired;
 
     if (field.type === "checkbox") {
@@ -243,7 +249,7 @@ function ContextField({ field, value, onChange, disabled, compact, mode }: Conte
         );
     }
 
-    if (field.type === "input") {
+    if (field.type === "input" || field.type === "number") {
         return (
             <div className={`space-y-2 ${compact ? "py-1" : "py-1.5"}`}>
                 <div className="flex items-center gap-3">
@@ -265,11 +271,12 @@ function ContextField({ field, value, onChange, disabled, compact, mode }: Conte
                 {isEnabled && (
                     <Input
                         id={field.key}
+                        type={field.type === "number" ? "number" : "text"}
                         value={fieldValue}
                         onChange={(e) => onChange({ value: e.target.value })}
                         placeholder={field.defaultValue || field.description}
                         disabled={disabled}
-                        className={`ml-7 ${compact ? "h-8 text-sm" : ""}`}
+                        className={`ml-7 w-[calc(100%-1.75rem)] ${compact ? "h-8 text-sm" : ""}`}
                     />
                 )}
             </div>
@@ -317,14 +324,9 @@ function ContextField({ field, value, onChange, disabled, compact, mode }: Conte
         );
     }
 
-    // textarea type - typically not used in prompts, but support it
     return null;
 }
 
-/**
- * Compact inline display of enabled context fields as badges
- * Used to show current config at a glance
- */
 export function ContextConfigBadges({
     config,
     className = "",

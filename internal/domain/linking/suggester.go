@@ -67,7 +67,7 @@ type SuggestResult struct {
 	Explanation  string
 }
 
-const maxNodesPerBatch = 50 // Limit to prevent token overflow in AI response
+const maxNodesPerBatch = 100 // Limit to prevent token overflow in AI response
 
 func (s *Suggester) Suggest(ctx context.Context, config SuggestConfig) (*SuggestResult, error) {
 	startTime := time.Now()
@@ -392,22 +392,22 @@ func (s *Suggester) buildPlaceholders(config SuggestConfig, nodes []*entities.Si
 
 func (s *Suggester) buildNodesInfoList(nodes []*entities.SitemapNode, outgoing, incoming map[int64]int) string {
 	var sb strings.Builder
-	sb.WriteString("PAGES LIST:\n")
+	sb.WriteString("PAGES TO LINK:\n\n")
 
 	for _, node := range nodes {
-		sb.WriteString(fmt.Sprintf("[ID:%d] \"%s\" /%s", node.ID, node.Title, node.Slug))
+		sb.WriteString(fmt.Sprintf("[ID:%d] %s (/%s)\n", node.ID, node.Title, node.Slug))
 
 		if len(node.Keywords) > 0 {
 			kw := node.Keywords
 			if len(kw) > 5 {
 				kw = kw[:5]
 			}
-			sb.WriteString(fmt.Sprintf(" | keywords: %s", strings.Join(kw, ", ")))
+			sb.WriteString(fmt.Sprintf("  Keywords: %s\n", strings.Join(kw, ", ")))
 		}
 
 		out := outgoing[node.ID]
 		in := incoming[node.ID]
-		sb.WriteString(fmt.Sprintf(" | links: %d→ %d←\n", out, in))
+		sb.WriteString(fmt.Sprintf("  Current links: %d out, %d in\n\n", out, in))
 	}
 
 	return sb.String()
@@ -482,8 +482,6 @@ func (s *Suggester) writeCompactTreeNode(
 		connector = "└── "
 	}
 
-	// Write the node line - compact format
-	// Format: ├── [ID:X] "Title" /path [kw: a,b] [X→ Y←]
 	sb.WriteString(prefix)
 	sb.WriteString(connector)
 	sb.WriteString(fmt.Sprintf("[ID:%d] \"%s\" /%s", node.ID, node.Title, node.Slug))
@@ -497,8 +495,7 @@ func (s *Suggester) writeCompactTreeNode(
 		sb.WriteString(fmt.Sprintf(" [kw: %s]", strings.Join(kw, ", ")))
 	}
 
-	// Add link counts
-	sb.WriteString(fmt.Sprintf(" [%d→ %d←]", outgoing[node.ID], incoming[node.ID]))
+	sb.WriteString(fmt.Sprintf(" (%d out, %d in)", outgoing[node.ID], incoming[node.ID]))
 	sb.WriteString("\n")
 
 	// Process children

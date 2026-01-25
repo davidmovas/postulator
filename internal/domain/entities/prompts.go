@@ -19,6 +19,7 @@ const (
 	ContextFieldTypeCheckbox ContextFieldType = "checkbox"
 	ContextFieldTypeSelect   ContextFieldType = "select"
 	ContextFieldTypeInput    ContextFieldType = "input"
+	ContextFieldTypeNumber   ContextFieldType = "number"
 	ContextFieldTypeTextarea ContextFieldType = "textarea"
 )
 

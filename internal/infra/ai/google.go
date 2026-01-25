@@ -324,16 +324,8 @@ You must respond with a valid JSON object in the following format:
 
 Do not include any text before or after the JSON object. Only output the JSON.`
 
-	baseSystem := request.SystemPrompt
-	if baseSystem == "" {
-		baseSystem = buildLinkSuggestionSystemPrompt()
-	}
-	systemPrompt := baseSystem + "\n\n" + jsonInstructions
-
+	systemPrompt := request.SystemPrompt + "\n\n" + jsonInstructions
 	userPrompt := request.UserPrompt
-	if userPrompt == "" {
-		userPrompt = buildLinkSuggestionUserPrompt(request)
-	}
 
 	model.SystemInstruction = &genai.Content{
 		Parts: []genai.Part{genai.Text(systemPrompt)},
@@ -413,15 +405,8 @@ You must respond with a valid JSON object in the following format:
 
 Do not include any text before or after the JSON object. Only output the JSON.`
 
-	systemPrompt := request.SystemPrompt
-	if systemPrompt == "" {
-		systemPrompt = buildInsertLinksSystemPrompt(request.Language)
-	}
-	systemPrompt = systemPrompt + "\n\n" + jsonInstructions
+	systemPrompt := request.SystemPrompt + "\n\n" + jsonInstructions
 	userPrompt := request.UserPrompt
-	if userPrompt == "" {
-		userPrompt = buildInsertLinksUserPrompt(request)
-	}
 
 	model.SystemInstruction = &genai.Content{
 		Parts: []genai.Part{genai.Text(systemPrompt)},
