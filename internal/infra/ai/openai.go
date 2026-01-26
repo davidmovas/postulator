@@ -1030,7 +1030,6 @@ func (c *OpenAIClient) InsertLinks(ctx context.Context, request *InsertLinksRequ
 	totalTokens := int(chat.Usage.TotalTokens)
 	cost := CalculateCost(entities.TypeOpenAI, c.modelName, inputTokens, outputTokens)
 
-	// ====== DETAILED DEBUG LOGGING - INSERT LINKS RESPONSE ======
 	if debugMode {
 		inputEstimate := c.EstimateTokens(systemPrompt) + c.EstimateTokens(userPrompt)
 
