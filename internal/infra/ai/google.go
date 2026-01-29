@@ -393,14 +393,18 @@ func (c *GoogleClient) InsertLinks(ctx context.Context, request *InsertLinksRequ
 
 	model := c.client.GenerativeModel(c.model)
 
-	model.SetTemperature(0.3) // Lower for precise edits
-	model.SetMaxOutputTokens(16384)
+	model.SetTemperature(0.3)
+	model.SetMaxOutputTokens(4096)
 
 	jsonInstructions := `
 You must respond with a valid JSON object in the following format:
 {
-  "content": "The modified HTML content with links inserted",
-  "linksApplied": 3
+  "placements": [
+    {
+      "targetUrl": "/exact/url/from/input",
+      "anchorText": "exact text from the HTML content"
+    }
+  ]
 }
 
 Do not include any text before or after the JSON object. Only output the JSON.`
@@ -411,9 +415,6 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 	model.SystemInstruction = &genai.Content{
 		Parts: []genai.Part{genai.Text(systemPrompt)},
 	}
-
-	fmt.Printf("[Google] InsertLinks: model=%s, contentLen=%d, links=%d\n",
-		c.model, len(request.Content), len(request.Links))
 
 	resp, err := model.GenerateContent(ctx, genai.Text(userPrompt))
 	if err != nil {
@@ -436,11 +437,11 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 		return nil, errors.AI(googleProviderName, fmt.Errorf("no text content in response"))
 	}
 
-	var result InsertLinksContentSchema
+	var placementResp LinkPlacementResponse
 	jsonStr := extractJSON(responseText)
-	if err = json.Unmarshal([]byte(jsonStr), &result); err != nil {
+	if err = json.Unmarshal([]byte(jsonStr), &placementResp); err != nil {
 		sanitized := sanitizeJSON(jsonStr)
-		if err2 := json.Unmarshal([]byte(sanitized), &result); err2 != nil {
+		if err2 := json.Unmarshal([]byte(sanitized), &placementResp); err2 != nil {
 			preview := jsonStr
 			if len(preview) > 300 {
 				preview = preview[:300] + "..."
@@ -448,6 +449,8 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 			return nil, errors.AI(googleProviderName, fmt.Errorf("failed to parse response: %w, raw: %s", err, preview))
 		}
 	}
+
+	modifiedContent, linksApplied := applyLinkPlacements(request.Content, placementResp.Placements)
 
 	inputTokens := 0
 	outputTokens := 0
@@ -458,11 +461,9 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 	totalTokens := inputTokens + outputTokens
 	cost := CalculateCost(entities.TypeGoogle, c.model, inputTokens, outputTokens)
 
-	fmt.Printf("[Google] InsertLinks success: linksApplied=%d, cost=$%.4f\n", result.LinksApplied, cost)
-
 	return &InsertLinksResult{
-		Content:      result.Content,
-		LinksApplied: result.LinksApplied,
+		Content:      modifiedContent,
+		LinksApplied: linksApplied,
 		Usage: Usage{
 			InputTokens:  inputTokens,
 			OutputTokens: outputTokens,

@@ -441,8 +441,12 @@ func (c *AnthropicClient) InsertLinks(ctx context.Context, request *InsertLinksR
 	jsonInstructions := `
 You must respond with a valid JSON object in the following format:
 {
-  "content": "The modified HTML content with links inserted",
-  "linksApplied": 3
+  "placements": [
+    {
+      "targetUrl": "/exact/url/from/input",
+      "anchorText": "exact text from the HTML content"
+    }
+  ]
 }
 
 Do not include any text before or after the JSON object. Only output the JSON.`
@@ -450,12 +454,9 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 	systemPrompt := request.SystemPrompt + "\n\n" + jsonInstructions
 	userPrompt := request.UserPrompt
 
-	fmt.Printf("[Anthropic] InsertLinks: model=%s, contentLen=%d, links=%d\n",
-		c.model, len(request.Content), len(request.Links))
-
 	message, err := c.client.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:     anthropic.Model(c.model),
-		MaxTokens: 16384, // More tokens for full content with links
+		MaxTokens: 4096,
 		System: []anthropic.TextBlockParam{
 			{
 				Type: "text",
@@ -486,11 +487,11 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 		return nil, errors.AI(anthropicProviderName, fmt.Errorf("no text content in response"))
 	}
 
-	var result InsertLinksContentSchema
+	var placementResp LinkPlacementResponse
 	jsonStr := extractJSON(responseText)
-	if err = json.Unmarshal([]byte(jsonStr), &result); err != nil {
+	if err = json.Unmarshal([]byte(jsonStr), &placementResp); err != nil {
 		sanitized := sanitizeJSON(jsonStr)
-		if err2 := json.Unmarshal([]byte(sanitized), &result); err2 != nil {
+		if err2 := json.Unmarshal([]byte(sanitized), &placementResp); err2 != nil {
 			preview := jsonStr
 			if len(preview) > 300 {
 				preview = preview[:300] + "..."
@@ -499,16 +500,16 @@ Do not include any text before or after the JSON object. Only output the JSON.`
 		}
 	}
 
+	modifiedContent, linksApplied := applyLinkPlacements(request.Content, placementResp.Placements)
+
 	inputTokens := int(message.Usage.InputTokens)
 	outputTokens := int(message.Usage.OutputTokens)
 	totalTokens := inputTokens + outputTokens
 	cost := CalculateCost(entities.TypeAnthropic, c.model, inputTokens, outputTokens)
 
-	fmt.Printf("[Anthropic] InsertLinks success: linksApplied=%d, cost=$%.4f\n", result.LinksApplied, cost)
-
 	return &InsertLinksResult{
-		Content:      result.Content,
-		LinksApplied: result.LinksApplied,
+		Content:      modifiedContent,
+		LinksApplied: linksApplied,
 		Usage: Usage{
 			InputTokens:  inputTokens,
 			OutputTokens: outputTokens,

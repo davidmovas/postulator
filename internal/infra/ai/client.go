@@ -127,3 +127,14 @@ type InsertLinksResult struct {
 	LinksApplied int    // Number of links successfully inserted
 	Usage        Usage  // Token usage metrics
 }
+
+// LinkPlacement represents an AI instruction to wrap specific text with a link
+type LinkPlacement struct {
+	TargetURL  string `json:"targetUrl" jsonschema_description:"Exact URL path copied from the input"`
+	AnchorText string `json:"anchorText" jsonschema_description:"Exact text from the HTML content to wrap with a link"`
+}
+
+// LinkPlacementResponse is the structured output schema for instruction-based link insertion
+type LinkPlacementResponse struct {
+	Placements []LinkPlacement `json:"placements" jsonschema_description:"Link placement instructions"`
+}

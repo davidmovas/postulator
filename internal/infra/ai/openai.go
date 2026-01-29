@@ -856,11 +856,6 @@ func generateSchema[T any]() interface{} {
 	return schema
 }
 
-type InsertLinksContentSchema struct {
-	Content      string `json:"content" jsonschema_description:"Modified HTML content with links inserted"`
-	LinksApplied int    `json:"linksApplied" jsonschema_description:"Number of links successfully inserted"`
-}
-
 func (c *OpenAIClient) InsertLinks(ctx context.Context, request *InsertLinksRequest) (*InsertLinksResult, error) {
 	if len(request.Links) == 0 {
 		return &InsertLinksResult{
@@ -870,11 +865,11 @@ func (c *OpenAIClient) InsertLinks(ctx context.Context, request *InsertLinksRequ
 		}, nil
 	}
 
-	schema := generateSchema[InsertLinksContentSchema]()
+	schema := generateSchema[LinkPlacementResponse]()
 
 	schemaParam := openaiSDK.ResponseFormatJSONSchemaJSONSchemaParam{
-		Name:        "content_with_links",
-		Description: openaiSDK.String("HTML content with internal links inserted"),
+		Name:        "link_placements",
+		Description: openaiSDK.String("Link placement instructions"),
 		Schema:      schema,
 		Strict:      openaiSDK.Bool(true),
 	}
@@ -882,18 +877,12 @@ func (c *OpenAIClient) InsertLinks(ctx context.Context, request *InsertLinksRequ
 	systemPrompt := request.SystemPrompt
 	userPrompt := request.UserPrompt
 
-	contentTokenEstimate := c.EstimateTokens(request.Content)
-	desiredOutputTokens := int(float64(contentTokenEstimate) * 1.3)
-	if desiredOutputTokens < 8192 {
-		desiredOutputTokens = 8192
-	}
+	const desiredOutputTokens = 4096
 
-	// Validate request
-	if err := c.ValidateRequest(systemPrompt, userPrompt, contentTokenEstimate); err != nil {
+	if err := c.ValidateRequest(systemPrompt, userPrompt, 500); err != nil {
 		return nil, errors.AI(providerName, fmt.Errorf("content too large for link insertion: %w", err))
 	}
 
-	// Calculate actual available tokens
 	maxTokens := c.CalculateAvailableOutputTokens(systemPrompt, userPrompt, desiredOutputTokens)
 
 	messages := []openaiSDK.ChatCompletionMessageParamUnion{
@@ -912,78 +901,13 @@ func (c *OpenAIClient) InsertLinks(ctx context.Context, request *InsertLinksRequ
 	}
 
 	if !c.isReasoningModel {
-		params.Temperature = openaiSDK.Float(0.3) // Lower temperature for more precise edits
+		params.Temperature = openaiSDK.Float(0.3)
 	}
 
 	if c.usesCompletionTokens {
 		params.MaxCompletionTokens = openaiSDK.Int(int64(maxTokens))
 	} else {
 		params.MaxTokens = openaiSDK.Int(int64(maxTokens))
-	}
-
-	// ====== DETAILED DEBUG LOGGING - INSERT LINKS REQUEST ======
-	if debugMode {
-		inputEstimate := c.EstimateTokens(systemPrompt) + c.EstimateTokens(userPrompt)
-		systemTokens := c.EstimateTokens(systemPrompt)
-		userTokens := c.EstimateTokens(userPrompt)
-
-		var debugLog strings.Builder
-		debugLog.WriteString("\n")
-		debugLog.WriteString("╔═══════════════════════════════════════════════════════════════════════════════════\n")
-		debugLog.WriteString("║ [OPENAI DEBUG] InsertLinks - REQUEST DETAILS\n")
-		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
-		debugLog.WriteString(fmt.Sprintf("║ Model: %s\n", c.modelName))
-		debugLog.WriteString(fmt.Sprintf("║ Context Window: %d tokens\n", c.contextWindow))
-		debugLog.WriteString(fmt.Sprintf("║ Max Output Tokens (model limit): %d tokens\n", c.maxOutputTokens))
-		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
-		debugLog.WriteString("║ LINK INSERTION TASK:\n")
-		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
-		debugLog.WriteString(fmt.Sprintf("║ Page: \"%s\" %s\n", request.PageTitle, request.PagePath))
-		debugLog.WriteString(fmt.Sprintf("║ Content Length: %d chars (~%d tokens)\n", len(request.Content), c.EstimateTokens(request.Content)))
-		debugLog.WriteString(fmt.Sprintf("║ Links to Insert: %d\n", len(request.Links)))
-		debugLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
-		debugLog.WriteString("║ LINKS TO INSERT:\n")
-		for i, link := range request.Links {
-			debugLog.WriteString(fmt.Sprintf("║   %d. → %s \"%s\"\n", i+1, link.TargetPath, link.TargetTitle))
-			if link.AnchorText != nil && *link.AnchorText != "" {
-				debugLog.WriteString(fmt.Sprintf("║      Anchor: \"%s\"\n", *link.AnchorText))
-			} else {
-				debugLog.WriteString("║      Anchor: find suitable text\n")
-			}
-		}
-		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
-		debugLog.WriteString("║ INPUT ANALYSIS:\n")
-		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
-		debugLog.WriteString(fmt.Sprintf("║ System Prompt Length: %d chars → ~%d tokens (estimated)\n", len(systemPrompt), systemTokens))
-		debugLog.WriteString(fmt.Sprintf("║ User Prompt Length: %d chars → ~%d tokens (estimated)\n", len(userPrompt), userTokens))
-		debugLog.WriteString(fmt.Sprintf("║ TOTAL INPUT: %d chars → ~%d tokens (estimated)\n", len(systemPrompt)+len(userPrompt), inputEstimate))
-		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
-		debugLog.WriteString("║ SYSTEM PROMPT (full):\n")
-		debugLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
-		debugLog.WriteString(fmt.Sprintf("║ %s\n", strings.ReplaceAll(systemPrompt, "\n", "\n║ ")))
-		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
-		debugLog.WriteString("║ USER PROMPT PREVIEW (first 1500 chars):\n")
-		debugLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
-		userPreview := userPrompt
-		if len(userPreview) > 1500 {
-			userPreview = userPreview[:1500] + "..."
-		}
-		debugLog.WriteString(fmt.Sprintf("║ %s\n", strings.ReplaceAll(userPreview, "\n", "\n║ ")))
-		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
-		debugLog.WriteString("║ TOKEN CALCULATION:\n")
-		debugLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
-		jsonSchemaOverhead := 2000
-		inputWithBuffer := int(float64(inputEstimate)*1.25) + jsonSchemaOverhead
-		availableInContext := c.contextWindow - inputWithBuffer
-		debugLog.WriteString(fmt.Sprintf("║ Input Estimate: %d tokens\n", inputEstimate))
-		debugLog.WriteString(fmt.Sprintf("║ Input with Buffer (×1.25): %d tokens\n", int(float64(inputEstimate)*1.25)))
-		debugLog.WriteString(fmt.Sprintf("║ JSON Schema Overhead: %d tokens\n", jsonSchemaOverhead))
-		debugLog.WriteString(fmt.Sprintf("║ Total Input + Overhead: %d tokens\n", inputWithBuffer))
-		debugLog.WriteString(fmt.Sprintf("║ Available in Context Window: %d tokens\n", availableInContext))
-		debugLog.WriteString(fmt.Sprintf("║ Max Tokens Set for Request: %d tokens\n", maxTokens))
-		debugLog.WriteString(fmt.Sprintf("║ Desired Output Tokens: %d tokens\n", desiredOutputTokens))
-		debugLog.WriteString("╚═══════════════════════════════════════════════════════════════════════════════════\n")
-		fmt.Print(debugLog.String())
 	}
 
 	chat, err := c.client.Chat.Completions.New(ctx, params)
@@ -1000,9 +924,8 @@ func (c *OpenAIClient) InsertLinks(ctx context.Context, request *InsertLinksRequ
 
 	if finishReason == "length" {
 		return nil, errors.AI(providerName, fmt.Errorf(
-			"response truncated: content too long (used %d/%d output tokens, input: %d tokens). "+
-				"Content size: %d chars. Try using a model with larger context window",
-			chat.Usage.CompletionTokens, maxTokens, chat.Usage.PromptTokens, len(request.Content)))
+			"response truncated (used %d/%d output tokens, input: %d tokens)",
+			chat.Usage.CompletionTokens, maxTokens, chat.Usage.PromptTokens))
 	}
 	if finishReason == "content_filter" {
 		return nil, errors.AI(providerName, fmt.Errorf("content filtered by safety system"))
@@ -1013,10 +936,10 @@ func (c *OpenAIClient) InsertLinks(ctx context.Context, request *InsertLinksRequ
 		return nil, errors.AI(providerName, fmt.Errorf("empty response from API"))
 	}
 
-	var result InsertLinksContentSchema
-	if err = json.Unmarshal([]byte(content), &result); err != nil {
+	var placementResp LinkPlacementResponse
+	if err = json.Unmarshal([]byte(content), &placementResp); err != nil {
 		sanitized := sanitizeJSON(content)
-		if err2 := json.Unmarshal([]byte(sanitized), &result); err2 != nil {
+		if err2 := json.Unmarshal([]byte(sanitized), &placementResp); err2 != nil {
 			preview := content
 			if len(preview) > 300 {
 				preview = preview[:300] + "..."
@@ -1025,69 +948,16 @@ func (c *OpenAIClient) InsertLinks(ctx context.Context, request *InsertLinksRequ
 		}
 	}
 
+	modifiedContent, linksApplied := applyLinkPlacements(request.Content, placementResp.Placements)
+
 	inputTokens := int(chat.Usage.PromptTokens)
 	outputTokens := int(chat.Usage.CompletionTokens)
 	totalTokens := int(chat.Usage.TotalTokens)
 	cost := CalculateCost(entities.TypeOpenAI, c.modelName, inputTokens, outputTokens)
 
-	if debugMode {
-		inputEstimate := c.EstimateTokens(systemPrompt) + c.EstimateTokens(userPrompt)
-
-		var responseLog strings.Builder
-		responseLog.WriteString("\n")
-		responseLog.WriteString("╔═══════════════════════════════════════════════════════════════════════════════════\n")
-		responseLog.WriteString("║ [OPENAI DEBUG] InsertLinks - RESPONSE DETAILS\n")
-		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
-		responseLog.WriteString("║ ACTUAL TOKEN USAGE (from API):\n")
-		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
-		responseLog.WriteString(fmt.Sprintf("║ Input Tokens (actual): %d tokens\n", chat.Usage.PromptTokens))
-		responseLog.WriteString(fmt.Sprintf("║ Output Tokens (actual): %d tokens\n", chat.Usage.CompletionTokens))
-		responseLog.WriteString(fmt.Sprintf("║ Total Tokens (actual): %d tokens\n", chat.Usage.TotalTokens))
-		responseLog.WriteString(fmt.Sprintf("║ Finish Reason: %s\n", finishReason))
-		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
-		responseLog.WriteString("║ COMPARISON (Estimated vs Actual):\n")
-		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
-		responseLog.WriteString(fmt.Sprintf("║ Input: Estimated %d → Actual %d (diff: %+d)\n",
-			inputEstimate, chat.Usage.PromptTokens, int(chat.Usage.PromptTokens)-inputEstimate))
-		responseLog.WriteString(fmt.Sprintf("║ Output: Max %d → Used %d (%.1f%% utilized)\n",
-			maxTokens, chat.Usage.CompletionTokens, float64(chat.Usage.CompletionTokens)/float64(maxTokens)*100))
-
-		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
-		responseLog.WriteString("║ LINK INSERTION RESULT:\n")
-		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
-		responseLog.WriteString(fmt.Sprintf("║ Links Requested: %d\n", len(request.Links)))
-		responseLog.WriteString(fmt.Sprintf("║ Links Applied: %d\n", result.LinksApplied))
-		successRate := float64(result.LinksApplied) / float64(len(request.Links)) * 100
-		responseLog.WriteString(fmt.Sprintf("║ Success Rate: %.1f%%\n", successRate))
-		responseLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
-		responseLog.WriteString(fmt.Sprintf("║ Original Content Length: %d chars\n", len(request.Content)))
-		responseLog.WriteString(fmt.Sprintf("║ Modified Content Length: %d chars\n", len(result.Content)))
-		deltaChars := len(result.Content) - len(request.Content)
-		responseLog.WriteString(fmt.Sprintf("║ Delta: %+d chars\n", deltaChars))
-		responseLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
-		responseLog.WriteString("║ Modified Content Preview (first 1000 chars):\n")
-		responseLog.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
-		modifiedPreview := result.Content
-		if len(modifiedPreview) > 1000 {
-			modifiedPreview = modifiedPreview[:1000] + "..."
-		}
-		responseLog.WriteString(fmt.Sprintf("║ %s\n", strings.ReplaceAll(modifiedPreview, "\n", "\n║ ")))
-		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
-		responseLog.WriteString("║ FINAL COST CALCULATION:\n")
-		responseLog.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
-		modelInfo := GetModelInfo(entities.TypeOpenAI, c.modelName)
-		if modelInfo != nil {
-			responseLog.WriteString(fmt.Sprintf("║ Input Tokens: %d × $%.2f/1M = $%.6f\n", inputTokens, modelInfo.InputCost, float64(inputTokens)/1_000_000*modelInfo.InputCost))
-			responseLog.WriteString(fmt.Sprintf("║ Output Tokens: %d × $%.2f/1M = $%.6f\n", outputTokens, modelInfo.OutputCost, float64(outputTokens)/1_000_000*modelInfo.OutputCost))
-		}
-		responseLog.WriteString(fmt.Sprintf("║ TOTAL COST: $%.6f\n", cost))
-		responseLog.WriteString("╚═══════════════════════════════════════════════════════════════════════════════════\n\n")
-		fmt.Print(responseLog.String())
-	}
-
 	return &InsertLinksResult{
-		Content:      result.Content,
-		LinksApplied: result.LinksApplied,
+		Content:      modifiedContent,
+		LinksApplied: linksApplied,
 		Usage: Usage{
 			InputTokens:  inputTokens,
 			OutputTokens: outputTokens,

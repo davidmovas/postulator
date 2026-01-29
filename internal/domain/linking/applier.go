@@ -612,7 +612,7 @@ func (a *Applier) buildApplyPrompts(
 		if link.AnchorText != nil && *link.AnchorText != "" {
 			anchor = *link.AnchorText
 		}
-		linksList.WriteString(fmt.Sprintf("%d. URL: %s | Anchor: \"%s\"\n", i+1, link.TargetPath, anchor))
+		linksList.WriteString(fmt.Sprintf("%d. URL: %s | Title: \"%s\" | Suggested Anchor: \"%s\"\n", i+1, link.TargetPath, link.TargetTitle, anchor))
 	}
 
 	runtimeData := map[string]string{
@@ -633,90 +633,40 @@ func (a *Applier) buildApplyPrompts(
 	return sys, usr
 }
 
-// TODO: Remove debug output after fixing link verification issues
 func (a *Applier) verifyLinksInserted(content string, expectedLinks []linkWithTarget) []bool {
 	inserted := make([]bool, len(expectedLinks))
 
-	var debug strings.Builder
-	debug.WriteString("\n")
-	debug.WriteString("╔═══════════════════════════════════════════════════════════════════════════════════\n")
-	debug.WriteString("║ [DEBUG] LINK VERIFICATION\n")
-	debug.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
-	debug.WriteString(fmt.Sprintf("║ Content length: %d chars\n", len(content)))
-	debug.WriteString(fmt.Sprintf("║ Expected links: %d\n", len(expectedLinks)))
-	debug.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
-
 	doc, err := html.Parse(strings.NewReader(content))
 	if err != nil {
-		debug.WriteString(fmt.Sprintf("║ ERROR: Failed to parse HTML: %v\n", err))
-		debug.WriteString("╚═══════════════════════════════════════════════════════════════════════════════════\n")
-		fmt.Print(debug.String())
 		a.logger.ErrorWithErr(err, "Failed to parse HTML for verification")
 		return inserted
 	}
 
 	foundLinks := extractAllLinks(doc)
-	debug.WriteString(fmt.Sprintf("║ Found %d links in content:\n", len(foundLinks)))
-	debug.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
-	for i, link := range foundLinks {
-		normalized := normalizePath(link.Href)
-		textPreview := link.Text
-		if len(textPreview) > 50 {
-			textPreview = textPreview[:50] + "..."
-		}
-		debug.WriteString(fmt.Sprintf("║   [%d] href=\"%s\"\n", i+1, link.Href))
-		debug.WriteString(fmt.Sprintf("║       normalized=\"%s\"\n", normalized))
-		debug.WriteString(fmt.Sprintf("║       text=\"%s\"\n", textPreview))
-	}
 
 	normalizedHrefs := make([]string, len(foundLinks))
 	for i, link := range foundLinks {
 		normalizedHrefs[i] = normalizePath(link.Href)
 	}
 
-	debug.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
-	debug.WriteString("║ EXPECTED LINKS VERIFICATION:\n")
-	debug.WriteString("╠───────────────────────────────────────────────────────────────────────────────────\n")
-
 	matchedCount := 0
 	for i, vl := range expectedLinks {
 		targetNorm := normalizePath(vl.target.TargetPath)
-		anchor := "(auto)"
-		if vl.link.AnchorText != nil && *vl.link.AnchorText != "" {
-			anchor = *vl.link.AnchorText
-		}
 
-		debug.WriteString(fmt.Sprintf("║ [%d] Target: \"%s\" -> \"%s\"\n", i+1, vl.target.TargetPath, vl.target.TargetTitle))
-		debug.WriteString(fmt.Sprintf("║     Normalized: \"%s\"\n", targetNorm))
-		debug.WriteString(fmt.Sprintf("║     Anchor: \"%s\"\n", anchor))
-
-		found := false
-		for j, hrefNorm := range normalizedHrefs {
+		for _, hrefNorm := range normalizedHrefs {
 			if pathsMatch(hrefNorm, targetNorm) {
 				inserted[i] = true
-				found = true
 				matchedCount++
-				debug.WriteString(fmt.Sprintf("║     ✓ MATCHED with found link [%d]: \"%s\"\n", j+1, foundLinks[j].Href))
 				break
 			}
 		}
 
-		if !found {
-			debug.WriteString("║     ✗ NOT FOUND - checking why:\n")
-			for j, hrefNorm := range normalizedHrefs {
-				exact := hrefNorm == targetNorm
-				suffix := strings.HasSuffix(hrefNorm, targetNorm)
-				contains := strings.Contains(hrefNorm, targetNorm)
-				debug.WriteString(fmt.Sprintf("║       vs [%d] \"%s\": exact=%v suffix=%v contains=%v\n",
-					j+1, hrefNorm, exact, suffix, contains))
-			}
+		if !inserted[i] {
+			a.logger.Warnf("Link verification: target %s not found in content", vl.target.TargetPath)
 		}
 	}
 
-	debug.WriteString("╠═══════════════════════════════════════════════════════════════════════════════════\n")
-	debug.WriteString(fmt.Sprintf("║ RESULT: %d/%d links verified as inserted\n", matchedCount, len(expectedLinks)))
-	debug.WriteString("╚═══════════════════════════════════════════════════════════════════════════════════\n\n")
-	fmt.Print(debug.String())
+	a.logger.Infof("Link verification: %d/%d links confirmed", matchedCount, len(expectedLinks))
 
 	return inserted
 }
