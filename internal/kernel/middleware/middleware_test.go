@@ -47,7 +47,11 @@ func TestRecover(t *testing.T) {
 			if got := errors.Stack(err); len(got) == 0 {
 				t.Fatal("a recovered panic must carry a stack")
 			}
-			if details := err.(*errors.Error).Details["panic"]; details != tc.want {
+			var kernelErr *errors.Error
+			if !stderrors.As(err, &kernelErr) {
+				t.Fatalf("err = %v, want a kernel error", err)
+			}
+			if details := kernelErr.Details["panic"]; details != tc.want {
 				t.Fatalf("panic detail = %v, want %q", details, tc.want)
 			}
 		})

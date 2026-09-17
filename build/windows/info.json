@@ -7,7 +7,7 @@
 			"ProductVersion": "2.0.0",
 			"CompanyName": "Postulator",
 			"FileDescription": "Entity-graph driven WordPress content factory",
-			"LegalCopyright": "© 2026, Postulator",
+			"LegalCopyright": "(c) 2026, Postulator",
 			"ProductName": "Postulator",
 			"Comments": "Turns an entity graph into graph-compliant WordPress pages"
 		}
