@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -10,6 +11,27 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
+	cfg, err := app.DefaultConfig()
+	if err != nil {
+		return err
+	}
+
+	core, err := app.Open(context.Background(), cfg)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := core.Close(); closeErr != nil {
+			log.Print(closeErr)
+		}
+	}()
+
 	wails := application.New(application.Options{
 		Name:        "Postulator",
 		Description: "Entity-graph driven WordPress content factory",
@@ -31,7 +53,5 @@ func main() {
 		URL:              "/",
 	})
 
-	if err := wails.Run(); err != nil {
-		log.Fatal(err)
-	}
+	return wails.Run()
 }
