@@ -36,7 +36,7 @@ statements.
 
 **Phase 1B (the Wails contracts spike) is complete** on the `phase-1b` worktree. The plan
 is `docs/superpowers/plans/2026-09-17-phase-1b-wails-contracts.md`; its seven tasks landed
-one commit each, plus two line-ending fixes. The spike answered the three open contract
+one commit each, plus three line-ending fixes. The spike answered the three open contract
 questions and `docs/CONTRACTS.md` is final. `internal/application/events` owns the event
 names, payloads and envelope; `internal/transport/wails` holds the error conversion, the
 service wrapper, the health service and the event bridge; `internal/transport/wails/gen`
