@@ -12,8 +12,8 @@
 | Node | `22` | `.github/workflows/ci.yml` |
 | squirrel / zap / lumberjack | `v1.5.4` / `v1.27.0` / `v2.2.1` | `go.mod` |
 | ncruces/go-sqlite3 | `v0.30.1` | `go.mod` |
-| goose | `v3.26.0` | `go.mod` |
-| golang.org/x/sys | `v0.46.0` | `go.mod` |
+| goose | `v3.28.0` | `go.mod` |
+| golang.org/x/sys | `v0.47.0` | `go.mod` |
 
 `wails3 doctor` must pass before any Wails work. It verified WebView2 `153.0.4234.32`
 and NSIS `v3.12` on the development machine. golangci-lint has to be built by the same
@@ -65,7 +65,7 @@ Migrations are embedded SQL run by goose v3 at `Store.Open`. They live in
 Files are scaffolded with the goose CLI and renamed to the four-digit form:
 
 ```
-go run github.com/pressly/goose/v3/cmd/goose@v3.26.0 -s -dir internal/adapters/sqlite/migrations create <name> sql
+go run github.com/pressly/goose/v3/cmd/goose@v3.28.0 -s -dir internal/adapters/sqlite/migrations create <name> sql
 ```
 
 The CLI is never pointed at a Postulator database: its `sqlite3` dialect is backed by
