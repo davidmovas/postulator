@@ -6,8 +6,13 @@ The handoff point between sessions. Read this first.
 
 ## Where we are
 
-**Phase 0 is done pending review.** Tasks 0.1 through 0.9 are complete and committed,
-one commit per task. Task 0.10, the review, belongs to a separate agent and has not run.
+**Phase 0 is complete and reviewed.** Tasks 0.1 through 0.10 are done, one commit per
+task. The review ran on 2026-09-17: `task build`, `go vet ./...`, `golangci-lint run`
+(v2.13.2, 0 issues), `go test -race -cover ./...` and `go run ./cmd/covergate` are all
+green, the built binary opens its window, and the dependency rule was re-verified by
+planting a domain package that imports squirrel directly and again through
+`kernel/paging` — both were caught. Module coverage is 94.67%; every kernel package is
+at or above 95.9%.
 
 **Phase 1 is next:** infrastructure and the contracts spike, two Opus agents in
 parallel. One takes the SQLite store, migrations, unit of work and test helper plus the
@@ -84,3 +89,16 @@ and generics and rewrites the open sections of `docs/CONTRACTS.md` with the answ
 - `lefthook` is not installed on the development machine. Install it with
   `go install github.com/evilmartians/lefthook@latest && lefthook install`.
 - The frontend is a stub that prints the build info. It is replaced in Phase 11.
+
+## Fixes the review asks for before Phase 1 code lands
+
+- `errors.Wrap(nil, code, msg)` returns a typed nil. Returned straight out of a function
+  whose result is `error` it is not nil, and `CodeOf` on it dereferences a nil pointer.
+  Guard the nil receiver in `Error`, `Unwrap` and `CodeOf`, or have `Wrap` return
+  `error`. Adapters will write `return errors.Wrap(rows.Err(), External, …)`.
+- `internal/app` has no test of its own code: `HealthService.Ping`, `BuildInfo` and
+  `Build` are at 0% while `deps_test.go` only shells out to `go list`.
+- `frontend/package.json` pins `@wailsio/runtime` to `latest` and the build task runs
+  `npm install`. Pin the version and use `npm ci` so a CI build cannot drift.
+- `.github/workflows/ci.yml` installs Task `v3.45.6` while `release.yml`, this file and
+  `docs/CONVENTIONS.md` all say `v3.53.1`.
