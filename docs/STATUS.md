@@ -127,6 +127,25 @@ phase added is at or above 87.2%.
   `xdg` also stays an indirect dependency this way.
 - **No `//go:build windows` tags.** The application is Windows-only, `x/sys/windows`
   compiles nowhere else, and a tag would demand a second file that could only be a stub.
+- **DPAPI is called with constant application entropy.** A fixed 32-byte literal in
+  `adapters/secrets/dpapi` is passed to `CryptProtectData` and `CryptUnprotectData`, so
+  any other process running as the same user cannot unprotect our master key by handing
+  the blob straight back to DPAPI. The entropy is a compile-time literal, never derived
+  at runtime, because changing it orphans every key already on disk. It is part of the
+  on-disk format and is frozen from here on.
+- **The master key is written atomically.** `writeAtomically` writes `master.key.tmp`,
+  `Sync`s, closes and then renames over `master.key`, and removes the temporary file if
+  any step fails. A crash can therefore leave a stale `.tmp`, which the next write
+  truncates and which `Load` never reads.
+- **A key that cannot be unprotected reports `Locked`**, with the message
+  `master key cannot be unprotected; remove %APPDATA%\Postulator\master.key to reset`.
+  The file is never deleted automatically: the user decides whether to lose every stored
+  secret.
+- **A panic inside `Store.Do` rolls the transaction back and re-panics.** Leaving the
+  `*sql.Tx` open stranded the only writer connection, so every later write blocked until
+  its context expired. `Do` also reports `ctx.Err()` when a commit fails on a cancelled
+  context, because `sql.ErrTxDone` was surfacing as `Internal` whenever database/sql's own
+  rollback beat the commit.
 - **Adiantum, WAL and the busy timeout work together.** The Phase 0 open question is
   answered: `TestOpenAppliesPragmas` reports `journal_mode=wal`, `foreign_keys=1`,
   `busy_timeout=5000` and `synchronous=1` on both the plain and the encrypted store, and

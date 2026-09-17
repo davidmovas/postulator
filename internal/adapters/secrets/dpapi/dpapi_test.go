@@ -3,6 +3,9 @@ package dpapi_test
 import (
 	"bytes"
 	"testing"
+	"unsafe"
+
+	"golang.org/x/sys/windows"
 
 	"github.com/davidmovas/postulator/internal/adapters/secrets/dpapi"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -68,7 +71,33 @@ func TestTamperedBlobIsRejected(t *testing.T) {
 	if _, err = dpapi.Unprotect(protected); err == nil {
 		t.Fatal("a tampered blob must not unprotect")
 	}
-	if errors.CodeOf(err) != errors.Internal {
-		t.Errorf("code = %q, want %q", errors.CodeOf(err), errors.Internal)
+	if errors.CodeOf(err) != errors.Invalid {
+		t.Errorf("code = %q, want %q", errors.CodeOf(err), errors.Invalid)
+	}
+}
+
+func TestEntropyIsRequired(t *testing.T) {
+	t.Parallel()
+
+	plaintext := []byte("a secret worth protecting")
+
+	in := windows.DataBlob{Size: uint32(len(plaintext)), Data: &plaintext[0]}
+	var out windows.DataBlob
+	if err := windows.CryptProtectData(&in, nil, nil, 0, nil, windows.CRYPTPROTECT_UI_FORBIDDEN, &out); err != nil {
+		t.Fatalf("protect without entropy: %v", err)
+	}
+
+	foreign := make([]byte, out.Size)
+	copy(foreign, unsafe.Slice(out.Data, out.Size))
+	if _, err := windows.LocalFree(windows.Handle(unsafe.Pointer(out.Data))); err != nil {
+		t.Fatalf("free: %v", err)
+	}
+
+	recovered, err := dpapi.Unprotect(foreign)
+	if err == nil {
+		t.Fatalf("a blob protected without our entropy must not unprotect, got %q", recovered)
+	}
+	if !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("code = %q, want %q", errors.CodeOf(err), errors.Invalid)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/secrets/dpapi"
@@ -84,7 +85,7 @@ func TestLoadRejects(t *testing.T) {
 				}
 				return dir
 			},
-			want: errors.Internal,
+			want: errors.Locked,
 		},
 		{
 			name: "key file is a directory",
@@ -118,6 +119,19 @@ func TestLoadRejects(t *testing.T) {
 			want: errors.Internal,
 		},
 		{
+			name: "temporary file path is a directory",
+			dir: func(t *testing.T) string {
+				t.Helper()
+
+				dir := t.TempDir()
+				if err := os.Mkdir(filepath.Join(dir, masterkey.FileName+".tmp"), 0o700); err != nil {
+					t.Fatalf("create a directory in place of the temporary file: %v", err)
+				}
+				return dir
+			},
+			want: errors.Internal,
+		},
+		{
 			name: "directory cannot be created",
 			dir: func(t *testing.T) string {
 				t.Helper()
@@ -141,5 +155,72 @@ func TestLoadRejects(t *testing.T) {
 				t.Errorf("code = %q, want %q", errors.CodeOf(err), tc.want)
 			}
 		})
+	}
+}
+
+func TestLoadIgnoresAStaleTempFile(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	first, err := masterkey.Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	stale := filepath.Join(dir, masterkey.FileName+".tmp")
+	if err = os.WriteFile(stale, []byte("left over from a crash"), 0o600); err != nil {
+		t.Fatalf("write the stale temporary file: %v", err)
+	}
+
+	second, err := masterkey.Load(dir)
+	if err != nil {
+		t.Fatalf("Load with a stale temporary file present: %v", err)
+	}
+	if !bytes.Equal(first, second) {
+		t.Error("a stale temporary file must not change the stored key")
+	}
+}
+
+func TestCreateOverwritesAStaleTempFile(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	stale := filepath.Join(dir, masterkey.FileName+".tmp")
+	if err := os.WriteFile(stale, []byte("left over from a crash"), 0o600); err != nil {
+		t.Fatalf("write the stale temporary file: %v", err)
+	}
+
+	key, err := masterkey.Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(key) != masterkey.Length {
+		t.Fatalf("length = %d, want %d", len(key), masterkey.Length)
+	}
+
+	if _, err = os.Stat(stale); !os.IsNotExist(err) {
+		t.Error("the temporary file must not survive a successful write")
+	}
+}
+
+func TestLoadReportsAKeyItCannotUnprotect(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, masterkey.FileName), []byte("not protected"), 0o600); err != nil {
+		t.Fatalf("write a corrupt key file: %v", err)
+	}
+
+	_, err := masterkey.Load(dir)
+	if !errors.IsCode(err, errors.Locked) {
+		t.Fatalf("code = %q, want %q", errors.CodeOf(err), errors.Locked)
+	}
+	if !strings.Contains(err.Error(), `remove %APPDATA%\Postulator\master.key to reset`) {
+		t.Errorf("message = %q, want the reset instruction", err.Error())
+	}
+
+	if _, statErr := os.Stat(filepath.Join(dir, masterkey.FileName)); statErr != nil {
+		t.Error("the key file must never be deleted automatically")
 	}
 }
