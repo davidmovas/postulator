@@ -39,6 +39,7 @@
 6. **The master key directory comes from `os.UserConfigDir()`, not `github.com/adrg/xdg`.** On Windows `os.UserConfigDir()` returns `%APPDATA%`, which is the path section 9.2 names; `xdg.ConfigHome` resolves to `%LOCALAPPDATA%` (see `paths_windows.go`, `baseDirs.configHome = kf.localAppData`) and would put the key in the wrong place. `xdg` also stays an indirect dependency this way.
 7. **No `//go:build windows` tags.** The application is Windows-only, `golang.org/x/sys/windows` compiles nowhere else, and a tag would demand a second implementation file that would be a stub.
 8. **Deviation, task 2:** commit `634aedd` changed `errors.Wrap` to return `error` and deleted `errors.RetryAfter`, so `dbx.Convert` builds the busy case as `errors.New(code, message).WithInternal(err).WithRetry(BusyRetryAfter)` and the test reads `Retry.After` through `errors.As` instead.
+9. **Deviation, task 10:** the "protected blob does not contain the plaintext" assertion only runs for plaintexts of at least 8 bytes, because a one-byte `0x00` occurs naturally in every DPAPI blob header and the check was vacuous rather than failing.
 
 ## The adiantum open sequence
 
