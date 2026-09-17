@@ -34,9 +34,15 @@ probed the unit of work, the DSN and the recovery path; the four findings it rai
 in `0eafaa3`, `922a831`, `d190c30` and `055d35e`. Module coverage is 92.55% of 1221
 statements.
 
-**Phase 1B (the Wails contracts spike) runs in parallel** in a separate worktree on
-`phase-1b`: v3 errors, events and generics, then the open sections of
-`docs/CONTRACTS.md`. Phase 2 follows.
+**Phase 1B (the Wails contracts spike) is complete** on the `phase-1b` worktree. The plan
+is `docs/superpowers/plans/2026-09-17-phase-1b-wails-contracts.md`; its seven tasks landed
+one commit each, plus two line-ending fixes. The spike answered the three open contract
+questions and `docs/CONTRACTS.md` is final. `internal/application/events` owns the event
+names, payloads and envelope; `internal/transport/wails` holds the error conversion, the
+service wrapper, the health service and the event bridge; `internal/transport/wails/gen`
+renders `frontend/src/generated/events.ts` and a test fails when it is stale; and
+`frontend/src/lib` carries the error, event and paging helpers with `npm run typecheck`
+wired into `task build`. Phase 2 follows.
 
 ## What landed in Phase 0
 
@@ -156,19 +162,51 @@ statements.
   `busy_timeout=5000` and `synchronous=1` on both the plain and the encrypted store, and
   the reader pool is proven to refuse writes.
 
-## Open questions for Phase 1
+## Decisions taken in Phase 1B
 
-- The transport error format, the event envelope and whether the TypeScript generator
-  survives generics in exported signatures. All three are marked open in
-  `docs/CONTRACTS.md` and belong to Phase 1B.
+- **`ServiceOptions.MarshalError`, not `Options.MarshalError`.** `Bindings.Add` overwrites
+  each bound method's marshaller with the service-level hook, so the application-level one
+  never runs in beta.23. Services are registered with `application.NewServiceWithOptions`.
+- **The transport error is `{code, message, details?, retry:{afterMs}?}`** delivered as
+  the `cause` of the JavaScript rejection, not a JSON string in the message.
+  `wails.Convert` strips the internal chain first, because `CallError.Message` is
+  `err.Error()` and would otherwise leak the wrapped driver text.
+- **`details` is dropped for `INTERNAL`.** `middleware.Recover` puts the panic text in
+  `Details["panic"]`, and that must not reach the UI.
+- **Generics survive the TypeScript generator.** `paging.List[T]` generates `List<T>`, so
+  no concrete `XxxList` DTOs are needed. A custom `MarshalJSON` generates as `any`, which
+  is why `paging.Slice[T]` and `dto.Time` lose their shape and `frontend/src/lib/paging.ts`
+  restores it.
+- **`application.RegisterEvent` is not used.** It would duplicate the registry in a second
+  hand-written list and emit its typings into the gitignored `frontend/bindings`. Our own
+  generator owns `frontend/src/generated/events.ts`, and a Go test keeps it in sync.
+- **The generated TypeScript carries no header comment**, because the no-comments rule
+  covers TypeScript including generated files. Its provenance is the `src/generated/` path
+  and `docs/CONTRACTS.md`.
+- **Envelope timestamps are `kernel/dto.Time`**, not `time.Time`: seconds precision,
+  always UTC, matching every other DTO.
+- **The health service moved to `internal/transport/wails`** and now has the contract shape
+  `Ping(ctx, PingRequest) (BuildInfo, error)`, so the wrapper, the error hook and the
+  frontend helper are exercised in production rather than only in tests.
+- **`Services` is a method on `*app.Core`.** The composition root owns the Core and hands
+  services what they need; `internal/transport/wails` cannot import `internal/app` because
+  `internal/app` imports it, and the dependency rule allows only that direction.
+- **Live events are best-effort.** v3 buffers nothing for a missing window, so
+  `ListEvents(runId, sinceSeq, limit)` catch-up is mandatory.
+- **`.gitattributes` pins `frontend/src/generated/events.ts` and `go.mod` to LF.** Both are
+  rewritten by tools that emit LF; with `core.autocrlf=true` a fresh checkout would hand
+  back CRLF and the generated-file-in-sync test failed exactly that way.
 
 ## Known gaps
 
-- `internal/domain`, `internal/application`, `internal/runtime` and `internal/transport`
-  do not exist yet. The dependency-rule test skips each rule whose tree is absent and
-  starts enforcing it the day the first package lands. The domain+application coverage
-  gate reports itself skipped for the same reason, and fails loudly the moment those
-  trees hold source that the profile does not cover.
+- `EventBridge` has no publisher yet, so it is not wired into `cmd/postulator`. Phase 5 is
+  its first consumer: it declares the consumer-side interface and injects the v3
+  application's `Event` manager, which already satisfies `wails.Emitter` — asserted at
+  compile time in `eventbridge_test.go`.
+- `internal/domain` and `internal/runtime` do not exist yet. The dependency-rule test
+  skips each rule whose tree is absent and starts enforcing it the day the first package
+  lands. `internal/application` now holds source, so the domain+application coverage gate
+  is live rather than skipped.
 - `lefthook` is not installed on the development machine. Install it with
   `go install github.com/evilmartians/lefthook@latest && lefthook install`.
 - **`golangci-lint` on this machine must be run from `$(go env GOPATH)/bin`.** A scoop

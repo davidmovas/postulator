@@ -1,21 +1,8 @@
 # Contracts
 
 The rules every boundary obeys: Wails services to the frontend, and the tool registry to
-the agents. **Initial version.** The error envelope, the event envelope and the generics
-question are settled by the Phase 1 spike against Wails v3 and recorded here; Phase 11
-finalises the service catalogue.
-
-## Status of this document
-
-| Area | State |
-|---|---|
-| Pagination | Settled. `kernel/paging` ships and is tested. |
-| Timestamps and ids | Settled. RFC3339 UTC text, UUID v4 text. |
-| Error codes | Settled. `kernel/errors` ships with a frozen code set. |
-| Error wire format | **Open.** Phase 1 spike. |
-| Event envelope and generated `events.ts` | **Open.** Phase 1 spike, generator in Phase 11. |
-| Generics across the TypeScript generator | **Open.** Phase 1 spike. |
-| Service catalogue | **Open.** Phase 11. |
+the agents. Settled by the Phase 1 spike against Wails v3 `v3.0.0-beta.23`; Phase 11
+fills in the service catalogue without changing these shapes.
 
 ## Method shape
 
@@ -23,9 +10,14 @@ finalises the service catalogue.
 func (s *XService) Method(ctx context.Context, req ReqDTO) (RespDTO, error)
 ```
 
-One request struct in, one response struct out, always a context, always an error. No
-positional parameter lists: a field added to a struct is a compatible change, an extra
-argument is not.
+One request struct in, one response struct out, always a context, always an error. A
+field added to a struct is a compatible change, an extra argument is not. The generator
+strips the leading `context.Context`, so `Method(req)` is what TypeScript sees; a
+parameter named `_` is generated as `$0`, so name every parameter. Every method body is
+`return s.<field>(ctx, req)` where the field was built by `wails.Wrap(logger,
+"<service>.<method>", fn)`: it puts `ctx.ActorUser` in the context, runs
+`middleware.Audit` over `middleware.Recover`, and converts every failure with
+`wails.Convert`.
 
 ## DTOs
 
@@ -33,66 +25,112 @@ argument is not.
 - Timestamps are `kernel/dto.Time`: RFC3339 with a UTC offset, seconds precision, `null`
   when zero.
 - Ids are UUID v4 lowercase text.
-- A nil slice marshals as `[]`, never as `null` — `paging.Slice[T]` exists for this. The
-  frontend should never have to guard a list.
-- DTOs are declared in the transport layer and mapped by hand. Domain types do not carry
-  JSON tags.
+- A nil slice marshals as `[]`, never as `null` — `paging.Slice[T]` exists for this.
+- DTOs are declared in `internal/transport/wails` and mapped by hand. Domain types carry
+  no JSON tags.
+- Generics are allowed in exported signatures: `paging.List[T]` generates `List<T>` in
+  TypeScript. A Go type with a custom `MarshalJSON` generates as `any`, which is why
+  `Slice<T>` and `dto.Time` lose their shape; `frontend/src/lib/paging.ts` restores it
+  with `List<T>` and `listOf<T>()`.
+- A bound service type may not itself be generic.
 
 ## Errors
 
 Every error crossing a boundary is a `*kernel/errors.Error` with one of the frozen
 codes: `NOT_FOUND CONFLICT INVALID UNAUTHORIZED RATE_LIMITED BUDGET_EXCEEDED EXTERNAL
-INTERNAL CANCELLED NEEDS_HUMAN LOCKED`. A foreign error read through `CodeOf` reports
-`INTERNAL`, so the frontend always has a code to switch on.
+INTERNAL CANCELLED NEEDS_HUMAN LOCKED`. A foreign error reports `INTERNAL`.
 
-The transport encoding is the open question. The candidate is a JSON body
-`{"code","message","details"}` carried in the error string, with a `parseError` helper
-on the frontend. Phase 1 decides and this section is rewritten with the answer.
+Services are registered with `application.NewServiceWithOptions(instance,
+application.ServiceOptions{MarshalError: wails.MarshalError})`. The application-level
+`Options.MarshalError` is ignored by beta.23 and must not be used. The hook returns
 
-`details` never carries a secret, a stack trace or an internal driver message. Those go
-to `errors.log`.
+```json
+{"code":"NOT_FOUND","message":"site not found","details":{"siteId":"s1"},"retry":{"afterMs":2000}}
+```
+
+which Wails carries as the `cause` of the rejection, so the frontend reads it with
+`parseError(thrown)` from `frontend/src/lib/errors.ts` and gets
+`{code, message, details?, retry?}`. `details` and `retry` are omitted when empty, and
+`parseError` answers `{code:"INTERNAL", message:"unexpected internal error"}` whenever
+the cause is missing or unrecognised. `wails.Convert` rebuilds the error without its
+internal chain before it is returned, so the rejection's `message` never carries a driver
+string, and `details` is dropped entirely for `INTERNAL`, which keeps a recovered panic's
+text out of the UI. `details` never carries a secret, a stack trace or an internal driver
+message; those go to `errors.log`.
 
 ## Pagination
 
-Cursor pagination only. There is no offset anywhere in this codebase.
-
-Request: `kernel/dto.ListRequest{cursor, limit, sort?}`. Limit defaults to 50 and clamps
-at 500.
-
-Response: `{items, nextCursor?, prevCursor?, hasMore}`.
-
+Cursor pagination only; there is no offset anywhere in this codebase. Request is
+`kernel/dto.ListRequest{cursor, limit, sort?}`, limit defaulting to 50 and clamping at
+500; response is `kernel/paging.List[T]` → `{items, nextCursor?, prevCursor?, hasMore}`.
 The cursor is an opaque base64url string. It records the sort fields and direction it
 was issued for, and a cursor replayed against a different `ORDER BY` is rejected as
-`INVALID` rather than silently skipping or repeating rows. Clients treat it as opaque
-and pass it back unchanged.
+`INVALID`. Clients treat it as opaque and pass it back unchanged.
 
 ## Long-running work
 
-Any mutation that can exceed a second returns `{runId}` immediately. It never blocks the
-call.
+Any mutation that can exceed a second returns `{runId}` immediately. It never blocks.
+Control is `Get(runId)`, `Pause(runId)`, `Resume(runId)`, `Cancel(runId)`. Progress is
+read two ways and both are required:
 
-Progress is read two ways, and both are available:
-
-- `RunsService.ListEvents(runId, sinceSeq, limit)` — the durable log, gapless per run,
-  which is what a UI that was closed and reopened replays.
+- `RunsService.ListEvents(runId, sinceSeq, limit)` — the durable log, gapless per run.
 - Live events on the bus — the same records, pushed.
 
-Control is `Get(runId)`, `Pause(runId)`, `Resume(runId)`, `Cancel(runId)`.
+Live delivery is best-effort: v3 dispatches an event to the windows that exist at that
+instant and buffers nothing, so an event emitted while no window exists is dropped and a
+page reload discards the listener table. A client that has seen `seq` asks for
+everything after it on reconnect. This catch-up is mandatory, not an optimisation.
 
 ## Events
 
-One Go registry owns the event names and payload structs; the TypeScript is generated
-from it, never written by hand. The envelope is `{type, seq, runId?, at, payload}`.
+`internal/application/events` owns the names, the payload structs and the envelope;
+`frontend/src/generated/events.ts` is rendered from it by
+`go run ./internal/transport/wails/gen` (`task events`) and a Go test fails when the
+committed file is stale. The generated module is never edited by hand and carries no
+header comment, because this repository forbids comments in TypeScript.
+
+The envelope is
+
+```json
+{"type":"step.done","seq":42,"runId":"<uuid>","at":"2026-09-17T10:30:00Z","payload":{}}
+```
+
+`runId` is present on run events only. `seq` is per run and gapless for run events, and a
+per-process counter for application events. `at` is RFC3339 UTC.
+
+`internal/transport/wails.EventBridge` is the only emitter. `Publish(type, payload)`
+serves application events, `PublishRun(runId, seq, type, payload)` serves run events, and
+both reject an unknown name or a payload whose type does not match the registry.
+`application.RegisterEvent` is deliberately unused: it would need a second hand-written
+list no test can police, and its typings land in the gitignored `frontend/bindings`.
 
 Run events: `run.queued run.started run.paused run.resumed run.cancelled run.completed
 run.failed run.budget_exceeded item.started item.done item.failed item.needs_human
 step.started step.done step.failed step.retrying llm.usage`.
 
-Other events: `graph.changed{siteId}`, `pages.changed{siteId}`, `templates.changed`,
-`agent.delta`, `agent.tool.started`, `agent.tool.finished`, `agent.confirm.requested`,
-`app.locked`, `app.unlocked`.
+Application events: `graph.changed{siteId}`, `pages.changed{siteId}`,
+`templates.changed`, `agent.delta`, `agent.tool.started`, `agent.tool.finished`,
+`agent.confirm.requested`, `app.locked`, `app.unlocked`.
 
-`seq` is per run and gapless. A client that has seen `seq` asks for everything after it.
+The frontend subscribes with `on(type, handler)` from `frontend/src/lib/events.ts`,
+which narrows `payload` to the type the registry declares. Events only travel Go → JS;
+every frontend-initiated action is a bound method call.
+
+## Bindings generation
+
+`wails3 generate bindings -f '<build flags>' -clean=true -ts -i ./...` writes
+`frontend/bindings`, which is gitignored and regenerated by `task build` and `task
+bindings`. Output is deterministic. The TypeScript module name comes from the Go service
+type name, not from `ServiceName()`, so the Go type names are the catalogue names:
+`SitesService GraphService PagesService TemplatesService RunsService AgentService
+ImportService SchedulesService ReportsService SettingsService`. `ServiceName`,
+`ServiceStartup`, `ServiceShutdown` and `ServeHTTP` are excluded from bindings; every
+other exported method is public API, because `//wails:ignore` is a comment and comments
+are forbidden. A service closes its resources in `ServiceShutdown`, which runs in reverse
+registration order.
+
+`npm run typecheck` (`tsc --noEmit`) runs inside `task build` and covers `src` and the
+generated `bindings`.
 
 ## Agent tools
 
@@ -100,19 +138,13 @@ A tool is `{Def{Name, Description, Risk(read|write|dangerous), Schema}, Authoriz
 and every tool lives in its own file. `Binding{SiteID, ConversationID, RunID, Mode}`
 scopes every call.
 
-The guard chain runs in this order and the order matters:
-
-1. `fence` wraps tool output as untrusted data, so a tool result cannot inject
-   instructions into the model.
-2. `audit` writes the ledger row and emits the stream event.
-3. `capResult` truncates oversized JSON before it re-enters the model.
-4. `permission` checks the conversation allow-list and calls `Authorize`, denying with
-   `UNAUTHORIZED`.
+The guard chain runs in this order and the order matters: `fence` wraps tool output as
+untrusted data so a result cannot inject instructions into the model, `audit` writes the
+ledger row and emits the stream event, `capResult` truncates oversized JSON before it
+re-enters the model, and `permission` checks the conversation allow-list and calls
+`Authorize`, denying with `UNAUTHORIZED`.
 
 In `confirm` mode a `write` or `dangerous` tool does not execute. It writes a
-`PendingAction` row and returns `{status:"confirmationRequired", actionId, summary}`.
-Because the pending action is a row and not a goroutine, a confirmation survives a
-restart.
-
-Wails services call the use cases directly and typed. They never go through the
-registry.
+`PendingAction` row and returns `{status:"confirmationRequired", actionId, summary}`, so
+a confirmation survives a restart. Wails services call the use cases directly and typed;
+they never go through the registry.

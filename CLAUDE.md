@@ -40,6 +40,8 @@ Before an agent implements a module, it reads the Archond files that section 15 
 - **A cursor records the sort it was issued for.** Replaying one against a different `ORDER BY` is rejected as `Invalid` rather than silently skipping or repeating rows. Do not "fix" that by dropping the check.
 - **`kernel/dto` must not import `kernel/paging`.** It would drag squirrel into the closure of everything that touches a DTO, including domain, and the dependency test would fail somewhere unrelated. The duplicated limit constants are held in step by a test.
 - **golangci-lint must be built by the Go release the module targets.** A binary built with go1.26 refuses a `go 1.27` module outright, so install it with `go install`, not from an archive.
+- **Live events are dropped, not buffered.** v3 dispatches a custom event to the windows that exist at that instant; with no window, or across a page reload, it is gone. Any progress UI must replay `RunsService.ListEvents(runId, sinceSeq, limit)` on connect.
+- **`frontend/src/generated/events.ts` is generated and committed.** `task events` rewrites it and a Go test fails when it is stale. `frontend/bindings/` is the opposite: generated and gitignored, rewritten by every build. That file and `go.mod` are pinned to LF in `.gitattributes`, because `core.autocrlf` otherwise hands a fresh checkout CRLF that no generator ever writes and the in-sync test fails on a clean clone.
 - **The tuned lint rules and why**: `errcheck` runs with `check-blank` and `check-type-assertions` and no baseline, so `_ = f()` is a finding rather than an escape hatch. `govet` is `enable-all` with `shadow` non-strict, because strict mode reports every `if err := f(); err != nil`. `fieldalignment` is off: it orders struct fields by machine layout, and our field order is the JSON order we owe the frontend. `gocritic` runs diagnostic, style and performance with `hugeParam` off. `misspell` is US English and ignores `cancelled`, which is a domain status value.
 
 ## Standing rulings
@@ -49,6 +51,10 @@ Before an agent implements a module, it reads the Archond files that section 15 
 - **2026-09-17** — `.golangci.yml` carries no inline rationale, against the letter of task 0.8, because the no-comments-in-YAML rule outranks it. The rationale is the Footguns entry above.
 - **2026-09-17** — The Wails template is `vanilla` (Vanilla + TypeScript + Vite); beta.23 renamed `vanilla-ts`.
 - **2026-09-17 (review)** — `errors.Wrap` returns `error`, never `*Error`: the concrete pointer made `Wrap(nil, …)` a typed nil that is not nil once returned, and `CodeOf` dereferenced it. Chain enrichment off `New(...)` instead. The kernel exports nothing whose only caller is its own test.
+- **2026-09-17 (phase 1B)** — The error marshaller must be set per service with `application.NewServiceWithOptions`; `application.Options.MarshalError` is dead code in beta.23 because `Bindings.Add` overwrites each method's marshaller with the service option.
+- **2026-09-17 (phase 1B)** — A service method returns `wails.Convert(err)`, never the raw error: `CallError.Message` is `err.Error()`, so a wrapped driver message would cross into the webview.
+- **2026-09-17 (phase 1B)** — `application.RegisterEvent` is not used. The Go registry plus `go run ./internal/transport/wails/gen` owns the event typings; a second list would drift and its output lands in the gitignored `frontend/bindings`.
+- **2026-09-17 (phase 1B)** — `Services` is a method on `*app.Core`. `internal/transport/wails` cannot import `internal/app`, because `internal/app` imports it; the composition root is what hands a service its dependencies.
 
 ## Product guardrail
 
