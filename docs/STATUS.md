@@ -44,6 +44,11 @@ renders `frontend/src/generated/events.ts` and a test fails when it is stale; an
 `frontend/src/lib` carries the error, event and paging helpers with `npm run typecheck`
 wired into `task build`. Phase 2 follows.
 
+**1B reviewed: approved** on 2026-09-17. `go build`, `go vet`, `golangci-lint run` (0 issues),
+`go test -count=1 -race -covermode=atomic ./...`, `go run ./cmd/covergate` and `task build`
+(with `npm run typecheck`) are green; the generator is byte-deterministic and its in-sync test
+catches a stale module; no internal cause chain reaches the webview.
+
 ## What landed in Phase 0
 
 - The v1.6.2 codebase is gone: `internal/`, `pkg/`, `frontend/`, `main.go`, `Makefile`,
