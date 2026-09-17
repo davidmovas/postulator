@@ -12,13 +12,16 @@ tasks:
     summary: Installs frontend dependencies
     run: once
     dir: frontend
-    status:
-      - test -d node_modules
+    sources:
+      - package.json
+      - package-lock.json
+    generates:
+      - node_modules/.package-lock.json
     preconditions:
       - sh: npm version
         msg: "npm is required. It ships with Node.js: https://nodejs.org/en/download/"
     cmds:
-      - npm install
+      - npm ci
 
   build:frontend:
     summary: Builds the frontend bundle

@@ -58,7 +58,7 @@ func TestRun(t *testing.T) {
 				path = writeProfile(t, tc.profile)
 			}
 
-			err := run(path, gates{core: 80, total: 70})
+			err := run(path, t.TempDir(), gates{core: 80, total: 70})
 			if tc.wantErr && err == nil {
 				t.Fatal("run() must report a failure")
 			}

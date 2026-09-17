@@ -2,6 +2,8 @@ package main
 
 import (
 	"math"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -185,7 +187,7 @@ func TestEvaluate(t *testing.T) {
 				t.Fatalf("parse() error: %v", err)
 			}
 
-			report := evaluate(profile, thresholds)
+			report := evaluate(profile, thresholds, false)
 			if report.pass() != tc.wantPass {
 				t.Fatalf("pass() = %v, want %v: %s", report.pass(), tc.wantPass, report)
 			}
@@ -207,7 +209,7 @@ func TestReportRendersEveryGate(t *testing.T) {
 		t.Fatalf("parse() error: %v", err)
 	}
 
-	rendered := evaluate(profile, gates{core: 80, total: 70}).String()
+	rendered := evaluate(profile, gates{core: 80, total: 70}, true).String()
 	for _, want := range []string{"domain+application", "total", "80.0", "80.00%"} {
 		if !strings.Contains(rendered, want) {
 			t.Fatalf("report %q does not mention %q", rendered, want)
@@ -223,8 +225,71 @@ func TestSkippedGateIsRendered(t *testing.T) {
 		t.Fatalf("parse() error: %v", err)
 	}
 
-	rendered := evaluate(profile, gates{core: 80, total: 70}).String()
+	rendered := evaluate(profile, gates{core: 80, total: 70}, false).String()
 	if !strings.Contains(rendered, "no statements") {
 		t.Fatalf("report %q does not explain the skipped gate", rendered)
+	}
+}
+
+func TestCoreSourcePresent(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		files []string
+		want  bool
+	}{
+		{name: "empty tree", files: nil, want: false},
+		{name: "unrelated package", files: []string{"internal/kernel/id/id.go"}, want: false},
+		{name: "domain package", files: []string{"internal/domain/site/site.go"}, want: true},
+		{name: "application package", files: []string{"internal/application/sites/create.go"}, want: true},
+		{name: "domain with only tests", files: []string{"internal/domain/site/site_test.go"}, want: false},
+		{name: "domain test beside source", files: []string{"internal/domain/site/site_test.go", "internal/domain/site/site.go"}, want: true},
+		{name: "non go file", files: []string{"internal/domain/site/seed.json"}, want: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			root := t.TempDir()
+			for _, name := range tc.files {
+				path := filepath.Join(root, filepath.FromSlash(name))
+				if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+					t.Fatalf("mkdir: %v", err)
+				}
+				if err := os.WriteFile(path, []byte("package site\n"), 0o600); err != nil {
+					t.Fatalf("write: %v", err)
+				}
+			}
+
+			got, err := coreSourcePresent(root)
+			if err != nil {
+				t.Fatalf("coreSourcePresent() error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("coreSourcePresent() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestEvaluateFailsWhenCoreSourceIsUncovered(t *testing.T) {
+	t.Parallel()
+
+	profile, err := parse(strings.NewReader(profileText(module + "/internal/kernel/id/id.go:1.1,2.2 10 1")))
+	if err != nil {
+		t.Fatalf("parse() error: %v", err)
+	}
+
+	report := evaluate(profile, gates{core: 80, total: 70}, true)
+	if report.core.skipped {
+		t.Fatal("the gate must not be skipped when domain or application source exists")
+	}
+	if report.pass() {
+		t.Fatal("a populated core tree with no covered statements must fail the gate")
+	}
+	if !strings.Contains(report.String(), "source files exist") {
+		t.Fatalf("report %q does not explain the failure", report.String())
 	}
 }

@@ -2,13 +2,59 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
 
-var corePrefixes = []string{"internal/domain/", "internal/application/"}
+var coreTrees = []string{"internal/domain", "internal/application"}
+
+func corePrefixes() []string {
+	prefixes := make([]string, 0, len(coreTrees))
+	for _, tree := range coreTrees {
+		prefixes = append(prefixes, tree+"/")
+	}
+	return prefixes
+}
+
+func coreSourcePresent(root string) (bool, error) {
+	for _, tree := range coreTrees {
+		found, err := hasGoSource(filepath.Join(root, filepath.FromSlash(tree)))
+		if err != nil {
+			return false, err
+		}
+		if found {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func hasGoSource(dir string) (bool, error) {
+	found := false
+	err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		name := entry.Name()
+		if strings.HasSuffix(name, ".go") && !strings.HasSuffix(name, "_test.go") {
+			found = true
+			return fs.SkipAll
+		}
+		return nil
+	})
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return false, fmt.Errorf("scan %s: %w", dir, err)
+	}
+	return found, nil
+}
 
 type block struct {
 	file       string
@@ -42,13 +88,20 @@ type result struct {
 	tally     tally
 	threshold float64
 	skipped   bool
+	uncovered bool
 }
 
 func (r result) met() bool {
+	if r.uncovered {
+		return false
+	}
 	return r.skipped || r.tally.percent() >= r.threshold
 }
 
 func (r result) String() string {
+	if r.uncovered {
+		return fmt.Sprintf("%-20s source files exist but the profile reports no statements for them", r.name)
+	}
 	if r.skipped {
 		return fmt.Sprintf("%-20s no statements yet, gate of %.1f%% skipped", r.name, r.threshold)
 	}
@@ -155,12 +208,18 @@ func matches(file string, prefixes []string) bool {
 	return false
 }
 
-func evaluate(p profile, thresholds gates) report {
-	core := p.rate(corePrefixes)
+func evaluate(p profile, thresholds gates, coreSource bool) report {
+	core := p.rate(corePrefixes())
 	total := p.rate(nil)
 
 	return report{
-		core:  result{name: "domain+application", tally: core, threshold: thresholds.core, skipped: core.statements == 0},
+		core: result{
+			name:      "domain+application",
+			tally:     core,
+			threshold: thresholds.core,
+			skipped:   core.statements == 0 && !coreSource,
+			uncovered: core.statements == 0 && coreSource,
+		},
 		total: result{name: "total", tally: total, threshold: thresholds.total, skipped: total.statements == 0},
 	}
 }

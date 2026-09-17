@@ -74,6 +74,10 @@ internal/app         composition root; the only package that may import transpor
 `internal/app/deps_test.go` enforces this with `go list -deps`. `paging` is the only
 kernel package allowed to import squirrel; domain never sees a query builder.
 
+The squirrel rule is deliberately checked on **direct imports only**: application may
+reach squirrel transitively through `kernel/paging`, domain may not, and the domain
+closure test is what catches that transitive case.
+
 ## Naming
 
 - Packages are singular nouns (`site`, `graph`, `run`), never `utils`, `common` or

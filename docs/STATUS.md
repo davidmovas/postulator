@@ -14,6 +14,9 @@ planting a domain package that imports squirrel directly and again through
 `kernel/paging` — both were caught. Module coverage is 94.67%; every kernel package is
 at or above 95.9%.
 
+The fixes the review asked for landed on 2026-09-17 and are listed under Decisions
+below.
+
 **Phase 1 is next:** infrastructure and the contracts spike, two Opus agents in
 parallel. One takes the SQLite store, migrations, unit of work and test helper plus the
 secrets adapter (DPAPI, AES-GCM, adiantum); the other spikes Wails v3 on errors, events
@@ -67,6 +70,21 @@ and generics and rewrites the open sections of `docs/CONTRACTS.md` with the answ
 - **No comments in `.golangci.yml`.** The repository rule forbidding comments in YAML
   won over the plan's request for an inline rationale per tuned rule. The rationales are
   in `CLAUDE.md`.
+- **`errors.Wrap` returns `error`, not `*Error`.** Returning the concrete pointer meant
+  `Wrap(nil, ...)` handed back a typed nil that is not nil once it is returned as an
+  `error`, and `CodeOf` then dereferenced it. `Error`, `Unwrap`, `Is`, `CodeOf` and
+  `Stack` are nil-receiver safe as well. Enrichment chains now start from `New(...)`,
+  which cannot be nil.
+- **The kernel exports nothing that only its own tests call.** `errors.Codes`,
+  `errors.RetryAfter`, `paging.Order.String` and `log.RedactedKeys` are gone, and
+  `SortKey.Literal` is unexported as `literal` per the spec, with its table test moved
+  in-package.
+- **`@wailsio/runtime` is pinned to `3.0.0-beta.23`**, matching the CLI tag, and the
+  build task runs `npm ci` against the committed lockfile rather than `npm install`.
+- **covergate cross-checks the filesystem.** If `internal/domain` or
+  `internal/application` holds a non-test `.go` file but the profile reports no
+  statements for it, the gate fails instead of reporting itself skipped. That is the
+  case a narrowed `go test` package list would otherwise hide.
 - **Vite writes unhashed asset names with `emptyOutDir` off**, so the committed
   `frontend/dist/.gitkeep` survives a build. Without it `go build ./...` fails on a
   fresh clone, because `frontend/assets.go` embeds a directory the frontend build has
@@ -85,20 +103,8 @@ and generics and rewrites the open sections of `docs/CONTRACTS.md` with the answ
 - `internal/domain`, `internal/application`, `internal/adapters`, `internal/runtime` and
   `internal/transport` do not exist yet. The dependency-rule test skips each rule whose
   tree is absent and starts enforcing it the day the first package lands. The
-  domain+application coverage gate reports itself skipped for the same reason.
+  domain+application coverage gate reports itself skipped for the same reason, and
+  fails loudly the moment those trees hold source that the profile does not cover.
 - `lefthook` is not installed on the development machine. Install it with
   `go install github.com/evilmartians/lefthook@latest && lefthook install`.
 - The frontend is a stub that prints the build info. It is replaced in Phase 11.
-
-## Fixes the review asks for before Phase 1 code lands
-
-- `errors.Wrap(nil, code, msg)` returns a typed nil. Returned straight out of a function
-  whose result is `error` it is not nil, and `CodeOf` on it dereferences a nil pointer.
-  Guard the nil receiver in `Error`, `Unwrap` and `CodeOf`, or have `Wrap` return
-  `error`. Adapters will write `return errors.Wrap(rows.Err(), External, …)`.
-- `internal/app` has no test of its own code: `HealthService.Ping`, `BuildInfo` and
-  `Build` are at 0% while `deps_test.go` only shells out to `go list`.
-- `frontend/package.json` pins `@wailsio/runtime` to `latest` and the build task runs
-  `npm install`. Pin the version and use `npm ci` so a CI build cannot drift.
-- `.github/workflows/ci.yml` installs Task `v3.45.6` while `release.yml`, this file and
-  `docs/CONVENTIONS.md` all say `v3.53.1`.
