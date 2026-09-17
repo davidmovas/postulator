@@ -139,7 +139,7 @@ func TestExecutorRouting(t *testing.T) {
 func TestDoRejectsAClosedStore(t *testing.T) {
 	t.Parallel()
 
-	store, err := Open(filepath.Join(t.TempDir(), "postulator.db"), nil)
+	store, err := Open(Config{Path: filepath.Join(t.TempDir(), "postulator.db")})
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}

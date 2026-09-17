@@ -24,6 +24,11 @@ type Config struct {
 	KeyDir       string
 }
 
+func (c Config) recovery() string {
+	return "remove " + filepath.Join(c.KeyDir, masterkey.FileName) + " and " + c.DatabasePath +
+		" to reset the application state"
+}
+
 func DefaultConfig() (Config, error) {
 	base, err := os.UserConfigDir()
 	if err != nil {
@@ -49,12 +54,14 @@ func Open(ctx context.Context, cfg Config) (*Core, error) {
 		return nil, errors.New(errors.Invalid, "the key directory must not be empty")
 	}
 
-	key, err := masterkey.Load(cfg.KeyDir)
+	recovery := cfg.recovery()
+
+	key, err := masterkey.Load(masterkey.Config{Dir: cfg.KeyDir, Recovery: recovery})
 	if err != nil {
 		return nil, err
 	}
 
-	store, err := sqlite.Open(cfg.DatabasePath, key)
+	store, err := sqlite.Open(sqlite.Config{Path: cfg.DatabasePath, Key: key, Recovery: recovery})
 	if err != nil {
 		return nil, err
 	}

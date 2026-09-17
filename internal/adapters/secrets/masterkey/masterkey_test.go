@@ -17,7 +17,7 @@ func TestLoadCreatesAndReuses(t *testing.T) {
 
 	dir := filepath.Join(t.TempDir(), "Postulator")
 
-	first, err := masterkey.Load(dir)
+	first, err := masterkey.Load(masterkey.Config{Dir: dir})
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -36,7 +36,7 @@ func TestLoadCreatesAndReuses(t *testing.T) {
 		t.Fatal("the key file must not contain the raw key")
 	}
 
-	second, err := masterkey.Load(dir)
+	second, err := masterkey.Load(masterkey.Config{Dir: dir})
 	if err != nil {
 		t.Fatalf("Load again: %v", err)
 	}
@@ -48,11 +48,11 @@ func TestLoadCreatesAndReuses(t *testing.T) {
 func TestLoadGeneratesDistinctKeys(t *testing.T) {
 	t.Parallel()
 
-	first, err := masterkey.Load(t.TempDir())
+	first, err := masterkey.Load(masterkey.Config{Dir: t.TempDir()})
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	second, err := masterkey.Load(t.TempDir())
+	second, err := masterkey.Load(masterkey.Config{Dir: t.TempDir()})
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestLoadRejects(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			if _, err := masterkey.Load(tc.dir(t)); errors.CodeOf(err) != tc.want {
+			if _, err := masterkey.Load(masterkey.Config{Dir: tc.dir(t)}); errors.CodeOf(err) != tc.want {
 				t.Errorf("code = %q, want %q", errors.CodeOf(err), tc.want)
 			}
 		})
@@ -163,7 +163,7 @@ func TestLoadIgnoresAStaleTempFile(t *testing.T) {
 
 	dir := t.TempDir()
 
-	first, err := masterkey.Load(dir)
+	first, err := masterkey.Load(masterkey.Config{Dir: dir})
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -173,7 +173,7 @@ func TestLoadIgnoresAStaleTempFile(t *testing.T) {
 		t.Fatalf("write the stale temporary file: %v", err)
 	}
 
-	second, err := masterkey.Load(dir)
+	second, err := masterkey.Load(masterkey.Config{Dir: dir})
 	if err != nil {
 		t.Fatalf("Load with a stale temporary file present: %v", err)
 	}
@@ -191,7 +191,7 @@ func TestCreateOverwritesAStaleTempFile(t *testing.T) {
 		t.Fatalf("write the stale temporary file: %v", err)
 	}
 
-	key, err := masterkey.Load(dir)
+	key, err := masterkey.Load(masterkey.Config{Dir: dir})
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -212,12 +212,18 @@ func TestLoadReportsAKeyItCannotUnprotect(t *testing.T) {
 		t.Fatalf("write a corrupt key file: %v", err)
 	}
 
-	_, err := masterkey.Load(dir)
+	keyPath := filepath.Join(dir, masterkey.FileName)
+	dbPath := filepath.Join(dir, "postulator.db")
+	recovery := "remove " + keyPath + " and " + dbPath + " to reset the application state"
+
+	_, err := masterkey.Load(masterkey.Config{Dir: dir, Recovery: recovery})
 	if !errors.IsCode(err, errors.Locked) {
 		t.Fatalf("code = %q, want %q", errors.CodeOf(err), errors.Locked)
 	}
-	if !strings.Contains(err.Error(), `remove %APPDATA%\Postulator\master.key to reset`) {
-		t.Errorf("message = %q, want the reset instruction", err.Error())
+	for _, name := range []string{keyPath, dbPath} {
+		if !strings.Contains(err.Error(), name) {
+			t.Errorf("message = %q, want it to name %q", err.Error(), name)
+		}
 	}
 
 	if _, statErr := os.Stat(filepath.Join(dir, masterkey.FileName)); statErr != nil {

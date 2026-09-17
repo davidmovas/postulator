@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/ncruces/go-sqlite3"
 	"github.com/ncruces/go-sqlite3/driver"
 	_ "github.com/ncruces/go-sqlite3/embed"
 	_ "github.com/ncruces/go-sqlite3/vfs/adiantum"
@@ -21,24 +22,30 @@ const (
 	directoryMode = 0o700
 )
 
+type Config struct {
+	Path     string
+	Key      []byte
+	Recovery string
+}
+
 type Store struct {
 	writer *sql.DB
 	reader *sql.DB
 	path   string
 }
 
-func Open(path string, key []byte) (*Store, error) {
-	if path == "" {
+func Open(cfg Config) (*Store, error) {
+	if cfg.Path == "" {
 		return nil, errors.New(errors.Invalid, "database path must not be empty")
 	}
-	if key != nil && len(key) != keyLength {
+	if cfg.Key != nil && len(cfg.Key) != keyLength {
 		return nil, errors.New(errors.Invalid, "database key must be 32 bytes")
 	}
-	if err := os.MkdirAll(filepath.Dir(path), directoryMode); err != nil {
+	if err := os.MkdirAll(filepath.Dir(cfg.Path), directoryMode); err != nil {
 		return nil, errors.Wrap(err, errors.Internal, "create the database directory")
 	}
 
-	writer, err := driver.Open(dsn(path, key, false))
+	writer, err := driver.Open(dsn(cfg.Path, cfg.Key, false))
 	if err != nil {
 		return nil, dbx.Convert(err, "open the database for writing")
 	}
@@ -46,12 +53,15 @@ func Open(path string, key []byte) (*Store, error) {
 	writer.SetMaxIdleConns(1)
 	writer.SetConnMaxLifetime(0)
 
-	store := &Store{writer: writer, path: path}
+	store := &Store{writer: writer, path: cfg.Path}
 	if err = store.migrate(context.Background()); err != nil {
-		return nil, stderrors.Join(err, closeDB(writer, "close the writer after a failed migration"))
+		return nil, stderrors.Join(
+			unreadable(err, cfg.Recovery),
+			closeDB(writer, "close the writer after a failed migration"),
+		)
 	}
 
-	reader, err := driver.Open(dsn(path, key, true))
+	reader, err := driver.Open(dsn(cfg.Path, cfg.Key, true))
 	if err != nil {
 		converted := dbx.Convert(err, "open the database for reading")
 		return nil, stderrors.Join(converted, closeDB(writer, "close the writer after a failed reader open"))
@@ -97,6 +107,18 @@ func (s *Store) migrate(ctx context.Context) error {
 		return errors.Wrap(err, errors.Internal, "apply the migrations")
 	}
 	return nil
+}
+
+func unreadable(err error, recovery string) error {
+	if !stderrors.Is(err, sqlite3.NOTADB) {
+		return err
+	}
+
+	message := "the database file cannot be read"
+	if recovery != "" {
+		message += "; " + recovery
+	}
+	return errors.New(errors.Locked, message).WithInternal(err)
 }
 
 func closeDB(db *sql.DB, message string) error {

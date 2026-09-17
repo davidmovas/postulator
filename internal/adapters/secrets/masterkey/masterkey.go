@@ -15,18 +15,31 @@ const (
 	FileName = "master.key"
 	Length   = 32
 
-	tempSuffix       = ".tmp"
-	directoryMode    = 0o700
-	fileMode         = 0o600
-	resetInstruction = `master key cannot be unprotected; remove %APPDATA%\Postulator\master.key to reset`
+	tempSuffix    = ".tmp"
+	directoryMode = 0o700
+	fileMode      = 0o600
+
+	unreadableKey = "master key cannot be unprotected"
 )
 
-func Load(dir string) ([]byte, error) {
-	if dir == "" {
+type Config struct {
+	Dir      string
+	Recovery string
+}
+
+func (c Config) unreadable() string {
+	if c.Recovery == "" {
+		return unreadableKey
+	}
+	return unreadableKey + "; " + c.Recovery
+}
+
+func Load(cfg Config) ([]byte, error) {
+	if cfg.Dir == "" {
 		return nil, errors.New(errors.Invalid, "the master key directory must not be empty")
 	}
 
-	path := filepath.Join(dir, FileName)
+	path := filepath.Join(cfg.Dir, FileName)
 	protected, err := os.ReadFile(path)
 	if stderrors.Is(err, fs.ErrNotExist) {
 		return create(path)
@@ -37,7 +50,7 @@ func Load(dir string) ([]byte, error) {
 
 	key, err := dpapi.Unprotect(protected)
 	if err != nil {
-		return nil, errors.New(errors.Locked, resetInstruction).WithInternal(err)
+		return nil, errors.New(errors.Locked, cfg.unreadable()).WithInternal(err)
 	}
 	if len(key) != Length {
 		return nil, errors.New(errors.Internal, "the master key has the wrong length")

@@ -33,7 +33,7 @@ func OpenEncrypted(t testing.TB, key []byte) *sqlite.Store {
 func open(t testing.TB, key []byte) *sqlite.Store {
 	t.Helper()
 
-	store, err := sqlite.Open(filepath.Join(t.TempDir(), fileName), key)
+	store, err := sqlite.Open(sqlite.Config{Path: filepath.Join(t.TempDir(), fileName), Key: key})
 	if err != nil {
 		t.Fatalf("open the store: %v", err)
 	}

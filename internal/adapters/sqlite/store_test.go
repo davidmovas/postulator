@@ -2,7 +2,10 @@ package sqlite
 
 import (
 	"context"
+	"crypto/rand"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -11,7 +14,7 @@ import (
 func openStore(t *testing.T, key []byte) *Store {
 	t.Helper()
 
-	store, err := Open(filepath.Join(t.TempDir(), "postulator.db"), key)
+	store, err := Open(Config{Path: filepath.Join(t.TempDir(), "postulator.db"), Key: key})
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -110,7 +113,7 @@ func TestOpenRejectsBadArguments(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			store, err := Open(tc.path, tc.key)
+			store, err := Open(Config{Path: tc.path, Key: tc.key})
 			if store != nil {
 				t.Fatal("no store may be returned")
 			}
@@ -125,7 +128,7 @@ func TestOpenRejectsTheWrongKey(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "postulator.db")
-	first, err := Open(path, testKey())
+	first, err := Open(Config{Path: path, Key: testKey()})
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -136,15 +139,15 @@ func TestOpenRejectsTheWrongKey(t *testing.T) {
 	other := testKey()
 	other[0] ^= 0xff
 
-	second, err := Open(path, other)
+	second, err := Open(Config{Path: path, Key: other})
 	if err == nil {
 		if closeErr := second.Close(); closeErr != nil {
 			t.Errorf("close: %v", closeErr)
 		}
 		t.Fatal("a database opened with the wrong key must fail")
 	}
-	if errors.CodeOf(err) == "" {
-		t.Errorf("the failure must carry a kernel code, got %v", err)
+	if !errors.IsCode(err, errors.Locked) {
+		t.Errorf("code = %q, want %q", errors.CodeOf(err), errors.Locked)
 	}
 }
 
@@ -163,7 +166,7 @@ func TestPath(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "postulator.db")
-	store, err := Open(path, nil)
+	store, err := Open(Config{Path: path})
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -184,5 +187,51 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	store := openStore(t, nil)
 	if err := store.migrate(context.Background()); err != nil {
 		t.Fatalf("second migrate: %v", err)
+	}
+}
+
+func TestOpenReportsAFileThatIsNotADatabase(t *testing.T) {
+	t.Parallel()
+
+	junk := make([]byte, 64)
+	if _, err := rand.Read(junk); err != nil {
+		t.Fatalf("generate junk: %v", err)
+	}
+
+	path := filepath.Join(t.TempDir(), "postulator.db")
+	if err := os.WriteFile(path, junk, 0o600); err != nil {
+		t.Fatalf("write junk: %v", err)
+	}
+
+	const recovery = `remove C:\Postulator\master.key and C:\Postulator\postulator.db to reset the application state`
+
+	store, err := Open(Config{Path: path, Recovery: recovery})
+	if store != nil {
+		t.Fatal("no store may be returned")
+	}
+	if !errors.IsCode(err, errors.Locked) {
+		t.Fatalf("code = %q, want %q", errors.CodeOf(err), errors.Locked)
+	}
+	if !strings.Contains(err.Error(), recovery) {
+		t.Errorf("message = %q, want the recovery instruction", err.Error())
+	}
+}
+
+func TestOpenWithoutARecoveryInstruction(t *testing.T) {
+	t.Parallel()
+
+	junk := make([]byte, 64)
+	if _, err := rand.Read(junk); err != nil {
+		t.Fatalf("generate junk: %v", err)
+	}
+
+	path := filepath.Join(t.TempDir(), "postulator.db")
+	if err := os.WriteFile(path, junk, 0o600); err != nil {
+		t.Fatalf("write junk: %v", err)
+	}
+
+	_, err := Open(Config{Path: path})
+	if !errors.IsCode(err, errors.Locked) {
+		t.Errorf("code = %q, want %q", errors.CodeOf(err), errors.Locked)
 	}
 }

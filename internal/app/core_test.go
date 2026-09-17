@@ -1,7 +1,10 @@
 package app_test
 
 import (
+	"crypto/rand"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/app"
@@ -116,5 +119,52 @@ func TestDefaultConfig(t *testing.T) {
 	}
 	if filepath.Dir(cfg.DatabasePath) != cfg.KeyDir {
 		t.Errorf("the database and the key must share a directory, got %q and %q", cfg.DatabasePath, cfg.KeyDir)
+	}
+}
+
+func TestOpenNamesBothFilesWhenTheKeyCannotBeUnprotected(t *testing.T) {
+	t.Parallel()
+
+	home := t.TempDir()
+	cfg := app.Config{DatabasePath: filepath.Join(home, "postulator.db"), KeyDir: home}
+
+	keyPath := filepath.Join(home, "master.key")
+	if err := os.WriteFile(keyPath, []byte("not protected"), 0o600); err != nil {
+		t.Fatalf("write a corrupt key file: %v", err)
+	}
+
+	_, err := app.Open(t.Context(), cfg)
+	if !errors.IsCode(err, errors.Locked) {
+		t.Fatalf("code = %q, want %q", errors.CodeOf(err), errors.Locked)
+	}
+	for _, name := range []string{keyPath, cfg.DatabasePath} {
+		if !strings.Contains(err.Error(), name) {
+			t.Errorf("message = %q, want it to name %q", err.Error(), name)
+		}
+	}
+}
+
+func TestOpenNamesBothFilesWhenTheDatabaseIsUnreadable(t *testing.T) {
+	t.Parallel()
+
+	home := t.TempDir()
+	cfg := app.Config{DatabasePath: filepath.Join(home, "postulator.db"), KeyDir: home}
+
+	junk := make([]byte, 64)
+	if _, err := rand.Read(junk); err != nil {
+		t.Fatalf("generate junk: %v", err)
+	}
+	if err := os.WriteFile(cfg.DatabasePath, junk, 0o600); err != nil {
+		t.Fatalf("write junk: %v", err)
+	}
+
+	_, err := app.Open(t.Context(), cfg)
+	if !errors.IsCode(err, errors.Locked) {
+		t.Fatalf("code = %q, want %q", errors.CodeOf(err), errors.Locked)
+	}
+	for _, name := range []string{filepath.Join(home, "master.key"), cfg.DatabasePath} {
+		if !strings.Contains(err.Error(), name) {
+			t.Errorf("message = %q, want it to name %q", err.Error(), name)
+		}
 	}
 }
