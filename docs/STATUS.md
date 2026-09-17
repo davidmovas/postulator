@@ -29,6 +29,11 @@ issues), `go test -race -covermode=atomic ./...`, `go run ./cmd/covergate` and
 bytes are not the SQLite magic header. Module coverage is 92.50%; every package this
 phase added is at or above 87.2%.
 
+**1A reviewed: approved, 2026-09-17.** The independent review re-ran the full gate and
+probed the unit of work, the DSN and the recovery path; the four findings it raised landed
+in `0eafaa3`, `922a831`, `d190c30` and `055d35e`. Module coverage is 92.55% of 1221
+statements.
+
 **Phase 1B (the Wails contracts spike) runs in parallel** in a separate worktree on
 `phase-1b`: v3 errors, events and generics, then the open sections of
 `docs/CONTRACTS.md`. Phase 2 follows.
