@@ -40,6 +40,11 @@ tasks:
     cmds:
       - task: common:generate:bindings
 
+  events:
+    summary: Regenerates the TypeScript event module from the Go event registry
+    cmds:
+      - go run ./internal/transport/wails/gen
+
   test:
     summary: Runs the Go test suite with the race detector
     cmds:
