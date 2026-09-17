@@ -5,6 +5,8 @@ go 1.27
 require (
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/wailsapp/wails/v3 v3.0.0-beta.23
+	go.uber.org/zap v1.27.0
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
 require (
@@ -16,5 +18,6 @@ require (
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 )
