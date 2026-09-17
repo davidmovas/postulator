@@ -57,10 +57,10 @@ export function parseError(thrown: unknown): TransportError {
     }
 
     const parsed: TransportError = { code: candidate.code, message: candidate.message };
-    if (candidate.details !== undefined) {
+    if (typeof candidate.details === "object" && candidate.details !== null) {
         parsed.details = candidate.details;
     }
-    if (candidate.retry !== undefined && typeof candidate.retry.afterMs === "number") {
+    if (typeof candidate.retry === "object" && candidate.retry !== null && typeof candidate.retry.afterMs === "number") {
         parsed.retry = { afterMs: candidate.retry.afterMs };
     }
     return parsed;

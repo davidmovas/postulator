@@ -95,8 +95,10 @@ The envelope is
 {"type":"step.done","seq":42,"runId":"<uuid>","at":"2026-09-17T10:30:00Z","payload":{}}
 ```
 
-`runId` is present on run events only. `seq` is per run and gapless for run events, and a
-per-process counter for application events. `at` is RFC3339 UTC.
+`runId` is present on run events only. `seq` is per run and gapless for run events. For
+application events it is a counter held by the `EventBridge` instance, so it is
+process-wide only because the composition root constructs exactly one bridge per process;
+a second bridge would restart the numbering. `at` is RFC3339 UTC.
 
 `internal/transport/wails.EventBridge` is the only emitter. `Publish(type, payload)`
 serves application events, `PublishRun(runId, seq, type, payload)` serves run events, and
@@ -127,10 +129,8 @@ ImportService SchedulesService ReportsService SettingsService`. `ServiceName`,
 `ServiceStartup`, `ServiceShutdown` and `ServeHTTP` are excluded from bindings; every
 other exported method is public API, because `//wails:ignore` is a comment and comments
 are forbidden. A service closes its resources in `ServiceShutdown`, which runs in reverse
-registration order.
-
-`npm run typecheck` (`tsc --noEmit`) runs inside `task build` and covers `src` and the
-generated `bindings`.
+registration order. `npm run typecheck` (`tsc --noEmit`) runs inside `task build` and
+covers `src` and the generated `bindings`.
 
 ## Agent tools
 

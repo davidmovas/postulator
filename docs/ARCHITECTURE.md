@@ -101,7 +101,9 @@ Wails services are thin: DTO mapping and nothing else. Any mutation longer than 
 second returns `{runId}` immediately and progress arrives as events. The agent side
 adapts the same use cases into tools, with a guard chain of `fence → audit → capResult
 → permission`, and a write in confirm mode becomes a `PendingAction` row rather than a
-goroutine, so a confirmation survives a restart.
+goroutine, so a confirmation survives a restart. The composition root constructs exactly
+one `EventBridge` per process, because the application-event `seq` is a counter held by
+that instance and a second bridge would restart it.
 
 See `docs/CONTRACTS.md` for the wire shapes and `docs/superpowers/specs/` for the full
 design.

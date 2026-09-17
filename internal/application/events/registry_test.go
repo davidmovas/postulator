@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"reflect"
 	"regexp"
+	"strconv"
 	"testing"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
 
-func declaredTypes(t *testing.T) []string {
+func declaredTypes(t *testing.T) map[events.Type]string {
 	t.Helper()
 
 	file, err := parser.ParseFile(token.NewFileSet(), "type.go", nil, 0)
@@ -22,7 +23,7 @@ func declaredTypes(t *testing.T) []string {
 		t.Fatalf("parse type.go: %v", err)
 	}
 
-	var names []string
+	declared := make(map[events.Type]string)
 	for _, decl := range file.Decls {
 		group, ok := decl.(*ast.GenDecl)
 		if !ok || group.Tok != token.CONST {
@@ -37,15 +38,26 @@ func declaredTypes(t *testing.T) []string {
 			if !ok || ident.Name != "Type" {
 				continue
 			}
-			for _, name := range value.Names {
-				names = append(names, name.Name)
+			for index, name := range value.Names {
+				literal, ok := value.Values[index].(*ast.BasicLit)
+				if !ok || literal.Kind != token.STRING {
+					t.Fatalf("%s is not declared as a string literal", name.Name)
+				}
+				unquoted, err := strconv.Unquote(literal.Value)
+				if err != nil {
+					t.Fatalf("unquote %s: %v", name.Name, err)
+				}
+				if previous, ok := declared[events.Type(unquoted)]; ok {
+					t.Fatalf("%s and %s both declare the name %q", previous, name.Name, unquoted)
+				}
+				declared[events.Type(unquoted)] = name.Name
 			}
 		}
 	}
-	return names
+	return declared
 }
 
-func TestEveryDeclaredTypeIsRegistered(t *testing.T) {
+func TestTheRegistryHoldsExactlyTheDeclaredTypes(t *testing.T) {
 	t.Parallel()
 
 	declared := declaredTypes(t)
@@ -53,9 +65,23 @@ func TestEveryDeclaredTypeIsRegistered(t *testing.T) {
 		t.Fatal("no Type constants were found in type.go")
 	}
 
-	registry := events.NewRegistry()
-	if got, want := len(registry.Entries()), len(declared); got != want {
-		t.Fatalf("registry holds %d entries, type.go declares %d constants", got, want)
+	registered := make(map[events.Type]struct{})
+	for _, entry := range events.NewRegistry().Entries() {
+		if _, ok := registered[entry.Type]; ok {
+			t.Fatalf("the registry holds %q twice", entry.Type)
+		}
+		registered[entry.Type] = struct{}{}
+	}
+
+	for eventType, name := range declared {
+		if _, ok := registered[eventType]; !ok {
+			t.Errorf("the constant %s declares %q, which the registry does not hold", name, eventType)
+		}
+	}
+	for eventType := range registered {
+		if _, ok := declared[eventType]; !ok {
+			t.Errorf("the registry holds %q, which type.go does not declare", eventType)
+		}
 	}
 }
 
