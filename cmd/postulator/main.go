@@ -22,6 +22,16 @@ func run() error {
 		return err
 	}
 
+	logger, err := app.Logger()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := logger.Close(); closeErr != nil {
+			log.Print(closeErr)
+		}
+	}()
+
 	core, err := app.Open(context.Background(), cfg)
 	if err != nil {
 		return err
@@ -35,9 +45,7 @@ func run() error {
 	wails := application.New(application.Options{
 		Name:        "Postulator",
 		Description: "Entity-graph driven WordPress content factory",
-		Services: []application.Service{
-			application.NewService(app.NewHealthService()),
-		},
+		Services:    core.Services(logger),
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(frontend.Assets),
 		},

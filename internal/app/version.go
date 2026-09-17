@@ -5,13 +5,3 @@ var (
 	Commit    = "unknown"
 	BuildDate = "unknown"
 )
-
-type BuildInfo struct {
-	Version   string `json:"version"`
-	Commit    string `json:"commit"`
-	BuildDate string `json:"buildDate"`
-}
-
-func Build() BuildInfo {
-	return BuildInfo{Version: Version, Commit: Commit, BuildDate: BuildDate}
-}
