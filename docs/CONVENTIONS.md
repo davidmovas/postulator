@@ -6,12 +6,19 @@
 |---|---|---|
 | Go | `go 1.27` directive, toolchain `go1.27.0` resolved by `GOTOOLCHAIN=auto` | `go.mod`, `.github/workflows/ci.yml` |
 | Wails v3 CLI | `v3.0.0-beta.23` (latest v3 tag, 2026-09-16) | `go.mod` require, `.github/workflows/*.yml` |
-| golangci-lint | `v2.11.4` | `.github/workflows/ci.yml` |
-| lefthook | `v1.13.6` | `lefthook.yml` header is absent by the no-comments rule; the version lives in CI and in this table |
-| Task | `v3` (`go-task/task`) | `Taskfile.yml` `version: '3'` |
+| golangci-lint | `v2.13.2` | `.github/workflows/ci.yml` |
+| lefthook | latest; install with `go install github.com/evilmartians/lefthook@latest && lefthook install` | `lefthook.yml` |
+| Task | `v3.53.1` | `.github/workflows/*.yml` |
 | Node | `22` | `.github/workflows/ci.yml` |
+| squirrel / zap / lumberjack | `v1.5.4` / `v1.27.0` / `v2.2.1` | `go.mod` |
 
-`wails3 doctor` must pass before any Wails work. It verified WebView2 `153.0.4234.32` and NSIS `v3.12` on the development machine.
+`wails3 doctor` must pass before any Wails work. It verified WebView2 `153.0.4234.32`
+and NSIS `v3.12` on the development machine. golangci-lint has to be built by the same
+Go release the module targets: a binary built with go1.26 refuses a `go 1.27` module, so
+install it with `go install`, not from a prebuilt archive.
+
+The reasoning behind each tuned lint rule is in `CLAUDE.md`, not in `.golangci.yml`,
+because this repository forbids comments in YAML.
 
 ## Identifiers
 
