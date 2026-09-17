@@ -17,10 +17,21 @@ at or above 95.9%.
 The fixes the review asked for landed on 2026-09-17 and are listed under Decisions
 below.
 
-**Phase 1 is next:** infrastructure and the contracts spike, two Opus agents in
-parallel. One takes the SQLite store, migrations, unit of work and test helper plus the
-secrets adapter (DPAPI, AES-GCM, adiantum); the other spikes Wails v3 on errors, events
-and generics and rewrites the open sections of `docs/CONTRACTS.md` with the answers.
+**Phase 1A (infrastructure) is complete.** The plan is
+`docs/superpowers/plans/2026-09-17-phase-1a-sqlite-secrets.md`; its sixteen tasks landed
+one commit each. `internal/adapters/sqlite` holds the encrypted store, the embedded goose
+migrations, the unit of work, the test helper and the settings and secrets repositories;
+`internal/adapters/secrets` holds DPAPI, AES-GCM and the master key; `internal/app` opens
+and closes the whole thing at startup. `go build`, `go vet`, `golangci-lint run` (0
+issues), `go test -race -covermode=atomic ./...`, `go run ./cmd/covergate` and
+`task build` are green, and the built binary starts, writes
+`%APPDATA%\Postulator\master.key` and an adiantum-encrypted `postulator.db` whose first
+bytes are not the SQLite magic header. Module coverage is 92.50%; every package this
+phase added is at or above 87.2%.
+
+**Phase 1B (the Wails contracts spike) runs in parallel** in a separate worktree on
+`phase-1b`: v3 errors, events and generics, then the open sections of
+`docs/CONTRACTS.md`. Phase 2 follows.
 
 ## What landed in Phase 0
 
@@ -90,21 +101,54 @@ and generics and rewrites the open sections of `docs/CONTRACTS.md` with the answ
   fresh clone, because `frontend/assets.go` embeds a directory the frontend build has
   not created yet.
 
+## Decisions taken in Phase 1A
+
+- **Two pools over one file.** A writer `*sql.DB` capped at one connection with
+  `_txlock=immediate`, and a reader `*sql.DB` opened `mode=ro` with four connections. One
+  pool capped at a single connection would serialise reads behind long writes; an
+  uncapped pool would let two goroutines both begin write transactions and turn WAL's
+  single-writer rule into `SQLITE_BUSY` at commit time rather than at begin time.
+- **`execFrom` reads, `writeFrom` writes.** Both return the ambient `*sql.Tx` when
+  `Store.Do` is active, found through an unexported context key. Outside a transaction
+  `execFrom` returns the reader and `writeFrom` returns the writer. The spec sketched one
+  accessor; with two pools one accessor would make the reader dead code.
+- **Nested `Do` reuses the outer transaction** and opens no savepoint. SQLite has one
+  writer, and a nested savepoint would let an inner rollback be swallowed while the outer
+  commits — the partial write the unit of work exists to prevent.
+- **Migrations run through `goose.NewProvider`, not `goose.UpContext`.** `UpContext` reads
+  the package-level filesystem and dialect that `SetBaseFS`/`SetDialect` mutate, which
+  races when parallel tests open stores under `-race`.
+- **The adiantum key travels as the `hexkey` URI parameter.** The VFS reads it when it
+  opens the file, strictly before `journal_mode(WAL)` runs; the PRAGMA form would need SQL
+  quoting inside a `_pragma=` value, and a hex string starting with a digit is not a safe
+  bare pragma token.
+- **The master key lives at `%APPDATA%\Postulator\master.key` via `os.UserConfigDir()`.**
+  `xdg.ConfigHome` resolves to `%LOCALAPPDATA%` on Windows and would put it elsewhere;
+  `xdg` also stays an indirect dependency this way.
+- **No `//go:build windows` tags.** The application is Windows-only, `x/sys/windows`
+  compiles nowhere else, and a tag would demand a second file that could only be a stub.
+- **Adiantum, WAL and the busy timeout work together.** The Phase 0 open question is
+  answered: `TestOpenAppliesPragmas` reports `journal_mode=wal`, `foreign_keys=1`,
+  `busy_timeout=5000` and `synchronous=1` on both the plain and the encrypted store, and
+  the reader pool is proven to refuse writes.
+
 ## Open questions for Phase 1
 
 - The transport error format, the event envelope and whether the TypeScript generator
   survives generics in exported signatures. All three are marked open in
-  `docs/CONTRACTS.md`.
-- Whether the adiantum VFS and `ncruces/go-sqlite3` behave under the WAL and busy-timeout
-  pragmas the spec asks for.
+  `docs/CONTRACTS.md` and belong to Phase 1B.
 
 ## Known gaps
 
-- `internal/domain`, `internal/application`, `internal/adapters`, `internal/runtime` and
-  `internal/transport` do not exist yet. The dependency-rule test skips each rule whose
-  tree is absent and starts enforcing it the day the first package lands. The
-  domain+application coverage gate reports itself skipped for the same reason, and
-  fails loudly the moment those trees hold source that the profile does not cover.
+- `internal/domain`, `internal/application`, `internal/runtime` and `internal/transport`
+  do not exist yet. The dependency-rule test skips each rule whose tree is absent and
+  starts enforcing it the day the first package lands. The domain+application coverage
+  gate reports itself skipped for the same reason, and fails loudly the moment those
+  trees hold source that the profile does not cover.
 - `lefthook` is not installed on the development machine. Install it with
   `go install github.com/evilmartians/lefthook@latest && lefthook install`.
+- **`golangci-lint` on this machine must be run from `$(go env GOPATH)/bin`.** A scoop
+  shim earlier on `PATH` is v2.11.4 built with go1.26 and refuses a `go 1.27` module
+  outright. `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2`
+  puts the correct binary in `GOPATH/bin`; the shim still wins on `PATH`.
 - The frontend is a stub that prints the build info. It is replaced in Phase 11.

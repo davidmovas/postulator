@@ -11,6 +11,9 @@
 | Task | `v3.53.1` | `.github/workflows/*.yml` |
 | Node | `22` | `.github/workflows/ci.yml` |
 | squirrel / zap / lumberjack | `v1.5.4` / `v1.27.0` / `v2.2.1` | `go.mod` |
+| ncruces/go-sqlite3 | `v0.30.1` | `go.mod` |
+| goose | `v3.26.0` | `go.mod` |
+| golang.org/x/sys | `v0.46.0` | `go.mod` |
 
 `wails3 doctor` must pass before any Wails work. It verified WebView2 `153.0.4234.32`
 and NSIS `v3.12` on the development machine. golangci-lint has to be built by the same
@@ -39,6 +42,36 @@ RFC3339 with a UTC offset, in SQLite TEXT columns and in every DTO. `kernel/dto.
 is the only marshaller; it normalises to UTC on the way out and parses RFC3339 on the
 way in. Domain code uses `time.Time` and takes the current instant from
 `kernel/clock.Clock`, never from `time.Now()` directly.
+
+## Migrations
+
+Migrations are embedded SQL run by goose v3 at `Store.Open`. They live in
+`internal/adapters/sqlite/migrations` and are embedded with `//go:embed migrations/*.sql`.
+
+- Filenames are `NNNN_snake_case.sql`: four digits, zero-padded, gapless, never
+  renumbered once committed.
+- Every file carries both `-- +goose Up` and `-- +goose Down`. A migration that cannot be
+  reversed does not ship; the round-trip test applies up, down and up again for all of
+  them.
+- One concern per migration. The down section drops exactly what the up section created,
+  in reverse order.
+- Tables are `STRICT`. Identifiers are lowercase snake_case, keywords uppercase, one
+  column per line. Text primary keys are `TEXT PRIMARY KEY`; timestamps are
+  `TEXT NOT NULL` holding RFC3339 UTC.
+- No `IF NOT EXISTS` and no `IF EXISTS`: a database that is not in a known state must
+  fail loudly rather than drift.
+- `goose_db_version` belongs to goose and is never read from application code.
+
+Files are scaffolded with the goose CLI and renamed to the four-digit form:
+
+```
+go run github.com/pressly/goose/v3/cmd/goose@v3.26.0 -s -dir internal/adapters/sqlite/migrations create <name> sql
+```
+
+The CLI is never pointed at a Postulator database: its `sqlite3` dialect is backed by
+`modernc.org/sqlite`, which cannot read an adiantum-encrypted file. Migrations are applied
+only through `Store.Open`, which uses `goose.NewProvider` so that two stores opening in
+parallel tests cannot race on goose's package-level filesystem and dialect.
 
 ## Code rules
 

@@ -27,16 +27,16 @@ func NewSettingsRepo(store *Store, clk clock.Clock) *SettingsRepo {
 	return &SettingsRepo{store: store, clock: clk}
 }
 
-func (r *SettingsRepo) Get(ctx context.Context, key string) (json.RawMessage, bool, error) {
-	var value string
-	err := r.store.execFrom(ctx).QueryRowContext(ctx, selectSetting, key).Scan(&value)
+func (r *SettingsRepo) Get(ctx context.Context, key string) (value json.RawMessage, found bool, err error) {
+	var stored string
+	err = r.store.execFrom(ctx).QueryRowContext(ctx, selectSetting, key).Scan(&stored)
 	if dbx.IsNotFound(err) {
 		return nil, false, nil
 	}
 	if err != nil {
 		return nil, false, dbx.Convert(err, "read the setting "+key)
 	}
-	return json.RawMessage(value), true, nil
+	return json.RawMessage(stored), true, nil
 }
 
 func (r *SettingsRepo) Set(ctx context.Context, key string, value json.RawMessage) error {

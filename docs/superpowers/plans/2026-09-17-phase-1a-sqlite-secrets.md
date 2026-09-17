@@ -41,6 +41,7 @@
 8. **Deviation, task 2:** commit `634aedd` changed `errors.Wrap` to return `error` and deleted `errors.RetryAfter`, so `dbx.Convert` builds the busy case as `errors.New(code, message).WithInternal(err).WithRetry(BusyRetryAfter)` and the test reads `Retry.After` through `errors.As` instead.
 9. **Deviation, task 10:** the "protected blob does not contain the plaintext" assertion only runs for plaintexts of at least 8 bytes, because a one-byte `0x00` occurs naturally in every DPAPI blob header and the check was vacuous rather than failing.
 10. **Deviation, task 15:** `TestHealthService` is dropped from `core_test.go`; commit `634aedd` already added `internal/app/health_test.go` covering `Ping`, `BuildInfo`, `Build` and the ldflags sentinels, and a second copy would be duplicate coverage rather than a new assertion.
+11. **Deviation, task 16:** `SettingsRepo.Get` names its results (`value, found, err`) because gocritic's `unnamedResult` requires it of a multi-result signature carrying a bare `bool`. The lint run itself needs `$(go env GOPATH)/bin/golangci-lint.exe`: the scoop shim earlier on `PATH` is v2.11.4 built with go1.26 and refuses a `go 1.27` module, which is the footgun `CLAUDE.md` records.
 
 ## The adiantum open sequence
 
