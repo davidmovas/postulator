@@ -38,6 +38,7 @@
 5. **The adiantum key travels as the `hexkey` URI parameter, not as a `PRAGMA`.** `hbshVFS.OpenFilename` reads `hexkey` from the URI at file-open time, which is strictly before any SQL runs, so the key can never be ordered after `journal_mode(WAL)`; the PRAGMA form would have to be quoted inside a `_pragma=` query value and a 64-character hex string starting with a digit is not a safe bare pragma token.
 6. **The master key directory comes from `os.UserConfigDir()`, not `github.com/adrg/xdg`.** On Windows `os.UserConfigDir()` returns `%APPDATA%`, which is the path section 9.2 names; `xdg.ConfigHome` resolves to `%LOCALAPPDATA%` (see `paths_windows.go`, `baseDirs.configHome = kf.localAppData`) and would put the key in the wrong place. `xdg` also stays an indirect dependency this way.
 7. **No `//go:build windows` tags.** The application is Windows-only, `golang.org/x/sys/windows` compiles nowhere else, and a tag would demand a second implementation file that would be a stub.
+8. **Deviation, task 2:** commit `634aedd` changed `errors.Wrap` to return `error` and deleted `errors.RetryAfter`, so `dbx.Convert` builds the busy case as `errors.New(code, message).WithInternal(err).WithRetry(BusyRetryAfter)` and the test reads `Retry.After` through `errors.As` instead.
 
 ## The adiantum open sequence
 
