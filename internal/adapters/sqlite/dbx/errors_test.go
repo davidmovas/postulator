@@ -33,6 +33,7 @@ func TestClassify(t *testing.T) {
 		{name: "locked", err: sqlite3.LOCKED, want: errors.External},
 		{name: "interrupt", err: sqlite3.INTERRUPT, want: errors.Cancelled},
 		{name: "context cancelled", err: context.Canceled, want: errors.Cancelled},
+		{name: "context deadline exceeded", err: context.DeadlineExceeded, want: errors.Cancelled},
 		{name: "read only", err: sqlite3.READONLY, want: errors.Internal},
 		{name: "foreign error", err: io.EOF, want: errors.Internal},
 		{name: "wrapped unique", err: stderrors.Join(io.EOF, sqlite3.CONSTRAINT_UNIQUE), want: errors.Conflict},

@@ -6,6 +6,7 @@ import (
 	stderrors "errors"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -149,5 +150,92 @@ func TestDoRejectsAClosedStore(t *testing.T) {
 	err = store.Do(t.Context(), func(context.Context) error { return nil })
 	if !errors.IsCode(err, errors.Internal) {
 		t.Errorf("code = %q, want %q", errors.CodeOf(err), errors.Internal)
+	}
+}
+
+func TestDoRollsBackWhenFnPanics(t *testing.T) {
+	t.Parallel()
+
+	store := openStore(t, nil)
+	panicked := false
+
+	func() {
+		defer func() {
+			panicked = recover() != nil
+		}()
+
+		if err := store.Do(t.Context(), func(c context.Context) error {
+			if _, execErr := store.writeFrom(c).ExecContext(c, insertSetting, "a", "1"); execErr != nil {
+				return execErr
+			}
+			panic("the step exploded")
+		}); err != nil {
+			t.Errorf("Do returned instead of panicking: %v", err)
+		}
+	}()
+
+	if !panicked {
+		t.Fatal("the panic must reach the caller")
+	}
+
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+
+	if err := store.Do(ctx, func(c context.Context) error {
+		_, execErr := store.writeFrom(c).ExecContext(c, insertSetting, "b", "2")
+		return execErr
+	}); err != nil {
+		t.Fatalf("the writer must still be usable after a panic: %v", err)
+	}
+
+	if got := countSettings(t, store); got != 1 {
+		t.Errorf("rows = %d, want 1; the panicking transaction must have rolled back", got)
+	}
+}
+
+func TestDoWithACancelledContext(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		cancelIn func(cancel context.CancelFunc)
+	}{
+		{
+			name:     "cancelled before Do",
+			cancelIn: func(cancel context.CancelFunc) { cancel() },
+		},
+		{
+			name:     "cancelled inside fn",
+			cancelIn: func(context.CancelFunc) {},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			store := openStore(t, nil)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
+			tc.cancelIn(cancel)
+
+			err := store.Do(ctx, func(c context.Context) error {
+				if _, execErr := store.writeFrom(c).ExecContext(c, insertSetting, "a", "1"); execErr != nil {
+					return execErr
+				}
+				cancel()
+				return nil
+			})
+			if err == nil {
+				t.Fatal("a cancelled context must fail the unit of work")
+			}
+			if !errors.IsCode(err, errors.Cancelled) {
+				t.Errorf("code = %q, want %q", errors.CodeOf(err), errors.Cancelled)
+			}
+			if got := countSettings(t, store); got != 0 {
+				t.Errorf("rows = %d, want 0", got)
+			}
+		})
 	}
 }

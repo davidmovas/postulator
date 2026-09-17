@@ -25,7 +25,7 @@ func Classify(err error) errors.Code {
 		return errors.Invalid
 	case stderrors.Is(err, sqlite3.BUSY), stderrors.Is(err, sqlite3.LOCKED):
 		return errors.External
-	case stderrors.Is(err, context.Canceled), stderrors.Is(err, sqlite3.INTERRUPT):
+	case stderrors.Is(err, context.Canceled), stderrors.Is(err, context.DeadlineExceeded), stderrors.Is(err, sqlite3.INTERRUPT):
 		return errors.Cancelled
 	default:
 		return errors.Internal

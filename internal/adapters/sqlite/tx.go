@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	stderrors "errors"
+	"fmt"
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/dbx"
 )
@@ -49,6 +50,17 @@ func (s *Store) Do(ctx context.Context, fn func(context.Context) error) error {
 		return dbx.Convert(err, "begin the transaction")
 	}
 
+	defer func() {
+		recovered := recover()
+		if recovered == nil {
+			return
+		}
+		if rollback := tx.Rollback(); rollback != nil && !stderrors.Is(rollback, sql.ErrTxDone) {
+			panic(fmt.Errorf("%v (rolling back: %w)", recovered, rollback))
+		}
+		panic(recovered)
+	}()
+
 	if err = fn(withTx(ctx, tx)); err != nil {
 		rollback := tx.Rollback()
 		if rollback != nil && !stderrors.Is(rollback, sql.ErrTxDone) {
@@ -58,6 +70,9 @@ func (s *Store) Do(ctx context.Context, fn func(context.Context) error) error {
 	}
 
 	if err = tx.Commit(); err != nil {
+		if cancelled := ctx.Err(); cancelled != nil {
+			return dbx.Convert(cancelled, "commit the transaction")
+		}
 		return dbx.Convert(err, "commit the transaction")
 	}
 	return nil
