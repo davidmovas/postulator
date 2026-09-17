@@ -149,6 +149,9 @@ catches a stale module; no internal cause chain reaches the webview.
   the blob straight back to DPAPI. The entropy is a compile-time literal, never derived
   at runtime, because changing it orphans every key already on disk. It is part of the
   on-disk format and is frozen from here on.
+- **`sqlite.Open(Config{Path, Key, Recovery})` and `masterkey.Load(Config{Dir, Recovery})`
+  replace the spec's `Open(path, key)`/`Load(dir)`** so recovery messages carry resolved
+  paths.
 - **The master key is written atomically.** `writeAtomically` writes `master.key.tmp`,
   `Sync`s, closes and then renames over `master.key`, and removes the temporary file if
   any step fails. A crash can therefore leave a stale `.tmp`, which the next write
