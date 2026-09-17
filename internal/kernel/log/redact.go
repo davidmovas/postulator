@@ -12,10 +12,6 @@ const Mask = "***"
 
 var redacted = []string{"password", "apikey", "token", "authorization"}
 
-func RedactedKeys() []string {
-	return slices.Clone(redacted)
-}
-
 func isRedacted(key string) bool {
 	return slices.Contains(redacted, strings.ToLower(key))
 }

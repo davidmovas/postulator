@@ -48,6 +48,7 @@ Before an agent implements a module, it reads the Archond files that section 15 
 - **2026-09-17** — `paging.Cut` is a `Keyset` method, not the free function the spec sketched: the accessors already live on the keyset, and passing them per call is the one way to make a cursor disagree with its query.
 - **2026-09-17** — `.golangci.yml` carries no inline rationale, against the letter of task 0.8, because the no-comments-in-YAML rule outranks it. The rationale is the Footguns entry above.
 - **2026-09-17** — The Wails template is `vanilla` (Vanilla + TypeScript + Vite); beta.23 renamed `vanilla-ts`.
+- **2026-09-17 (review)** — `errors.Wrap` returns `error`, never `*Error`: the concrete pointer made `Wrap(nil, …)` a typed nil that is not nil once returned, and `CodeOf` dereferenced it. Chain enrichment off `New(...)` instead. The kernel exports nothing whose only caller is its own test.
 
 ## Product guardrail
 

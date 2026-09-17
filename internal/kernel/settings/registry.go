@@ -104,10 +104,10 @@ func (r *Registry) Apply(values *Values, stored map[string]json.RawMessage) ([]s
 
 		decoded, err := def.decode(stored[key])
 		if err != nil {
-			return unknown, errors.Wrap(err, errors.Invalid, "setting "+key+" is not readable").WithDetail("key", key)
+			return unknown, errors.New(errors.Invalid, "setting "+key+" is not readable").WithDetail("key", key).WithInternal(err)
 		}
 		if err = def.validate(decoded); err != nil {
-			return unknown, errors.Wrap(err, errors.Invalid, "setting "+key+" is out of range").WithDetail("key", key)
+			return unknown, errors.New(errors.Invalid, "setting "+key+" is out of range").WithDetail("key", key).WithInternal(err)
 		}
 		(*next)[def.slot] = decoded
 	}

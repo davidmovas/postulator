@@ -349,51 +349,6 @@ func TestEncodeRejectsUncoercibleValue(t *testing.T) {
 	}
 }
 
-func TestSortKindCoercion(t *testing.T) {
-	t.Parallel()
-
-	stamp := time.Date(2026, 1, 2, 3, 4, 5, 0, time.FixedZone("CET", 3600))
-
-	cases := []struct {
-		name string
-		key  paging.SortKey[row]
-		in   any
-		want any
-		ok   bool
-	}{
-		{name: "text from string", key: paging.TextKey[row]("n", "n", nil), in: "a", want: "a", ok: true},
-		{name: "text from bytes", key: paging.TextKey[row]("n", "n", nil), in: []byte("a"), want: "a", ok: true},
-		{name: "text from number", key: paging.TextKey[row]("n", "n", nil), in: 1, ok: false},
-		{name: "uuid", key: paging.UUIDKey[row]("i", "i", nil), in: "7c9e6679-7425-40de-944b-e07fc1f90ae7", want: "7c9e6679-7425-40de-944b-e07fc1f90ae7", ok: true},
-		{name: "enum", key: paging.EnumKey[row]("s", "s", nil), in: "planned", want: "planned", ok: true},
-		{name: "int from int", key: paging.IntKey[row]("s", "s", nil), in: 7, want: int64(7), ok: true},
-		{name: "int from float", key: paging.IntKey[row]("s", "s", nil), in: float64(7), want: int64(7), ok: true},
-		{name: "int from json number", key: paging.IntKey[row]("s", "s", nil), in: json.Number("7"), want: int64(7), ok: true},
-		{name: "int from string", key: paging.IntKey[row]("s", "s", nil), in: "7", ok: false},
-		{name: "float from float", key: paging.FloatKey[row]("w", "w", nil), in: 1.5, want: 1.5, ok: true},
-		{name: "float from int", key: paging.FloatKey[row]("w", "w", nil), in: 2, want: float64(2), ok: true},
-		{name: "bool", key: paging.BoolKey[row]("b", "b", nil), in: true, want: true, ok: true},
-		{name: "bool from string", key: paging.BoolKey[row]("b", "b", nil), in: "true", ok: false},
-		{name: "time from time", key: paging.TimeKey[row]("t", "t", nil), in: stamp, want: "2026-01-02T02:04:05Z", ok: true},
-		{name: "time from rfc3339", key: paging.TimeKey[row]("t", "t", nil), in: "2026-01-02T02:04:05Z", want: "2026-01-02T02:04:05Z", ok: true},
-		{name: "time from nonsense", key: paging.TimeKey[row]("t", "t", nil), in: "yesterday", ok: false},
-		{name: "nil is never coercible", key: paging.TextKey[row]("n", "n", nil), in: nil, ok: false},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			got, ok := tc.key.Literal(tc.in)
-			if ok != tc.ok {
-				t.Fatalf("Literal() ok = %v, want %v", ok, tc.ok)
-			}
-			if ok && got != tc.want {
-				t.Fatalf("Literal() = %#v, want %#v", got, tc.want)
-			}
-		})
-	}
-}
-
 func TestCut(t *testing.T) {
 	t.Parallel()
 
@@ -567,64 +522,6 @@ func TestListMarshalsCamelCase(t *testing.T) {
 	const want = `{"nextCursor":"n","prevCursor":"p","items":[],"hasMore":true}`
 	if string(encoded) != want {
 		t.Fatalf("Marshal() = %s, want %s", encoded, want)
-	}
-}
-
-func TestOrderString(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		order paging.Order
-		want  string
-	}{
-		{order: paging.Asc, want: "asc"},
-		{order: paging.Desc, want: "desc"},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.want, func(t *testing.T) {
-			t.Parallel()
-			if got := tc.order.String(); got != tc.want {
-				t.Fatalf("String() = %q, want %q", got, tc.want)
-			}
-		})
-	}
-}
-
-func TestSortKindCoercionWidening(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name string
-		key  paging.SortKey[row]
-		in   any
-		want any
-		ok   bool
-	}{
-		{name: "int from int32", key: paging.IntKey[row]("s", "s", nil), in: int32(3), want: int64(3), ok: true},
-		{name: "int from int64", key: paging.IntKey[row]("s", "s", nil), in: int64(3), want: int64(3), ok: true},
-		{name: "int from fractional json number", key: paging.IntKey[row]("s", "s", nil), in: json.Number("3.5"), ok: false},
-		{name: "float from float32", key: paging.FloatKey[row]("w", "w", nil), in: float32(0.5), want: float64(0.5), ok: true},
-		{name: "float from int32", key: paging.FloatKey[row]("w", "w", nil), in: int32(3), want: float64(3), ok: true},
-		{name: "float from int64", key: paging.FloatKey[row]("w", "w", nil), in: int64(3), want: float64(3), ok: true},
-		{name: "float from json number", key: paging.FloatKey[row]("w", "w", nil), in: json.Number("1.25"), want: 1.25, ok: true},
-		{name: "float from bad json number", key: paging.FloatKey[row]("w", "w", nil), in: json.Number("nope"), ok: false},
-		{name: "float from bool", key: paging.FloatKey[row]("w", "w", nil), in: true, ok: false},
-		{name: "time from bytes", key: paging.TimeKey[row]("t", "t", nil), in: []byte("2026-01-02T02:04:05Z"), ok: false},
-		{name: "unknown kind", key: paging.SortKey[row]{Kind: paging.SortKind(200), Field: "x", Column: "x"}, in: "x", ok: false},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			got, ok := tc.key.Literal(tc.in)
-			if ok != tc.ok {
-				t.Fatalf("Literal() ok = %v, want %v", ok, tc.ok)
-			}
-			if ok && got != tc.want {
-				t.Fatalf("Literal() = %#v, want %#v", got, tc.want)
-			}
-		})
 	}
 }
 

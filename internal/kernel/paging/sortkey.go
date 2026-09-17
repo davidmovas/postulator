@@ -56,7 +56,7 @@ func TimeKey[T any](field, column string, value func(T) any) SortKey[T] {
 	return newSortKey(Time, field, column, value)
 }
 
-func (s SortKey[T]) Literal(raw any) (any, bool) {
+func (s SortKey[T]) literal(raw any) (any, bool) {
 	switch s.Kind {
 	case Text, UUID, Enum:
 		return coerceString(raw)

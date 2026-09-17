@@ -15,10 +15,6 @@ const (
 	Desc Order = "desc"
 )
 
-func (o Order) String() string {
-	return string(o)
-}
-
 func (o Order) reversed() Order {
 	if o == Desc {
 		return Asc

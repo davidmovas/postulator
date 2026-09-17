@@ -19,19 +19,3 @@ const (
 func (c Code) String() string {
 	return string(c)
 }
-
-func Codes() []Code {
-	return []Code{
-		NotFound,
-		Conflict,
-		Invalid,
-		Unauthorized,
-		RateLimited,
-		BudgetExceeded,
-		External,
-		Internal,
-		Cancelled,
-		NeedsHuman,
-		Locked,
-	}
-}

@@ -36,7 +36,7 @@ func New(code Code, message string) *Error {
 	return newError(code, message, nil)
 }
 
-func Wrap(err error, code Code, message string) *Error {
+func Wrap(err error, code Code, message string) error {
 	if err == nil {
 		return nil
 	}
@@ -56,6 +56,9 @@ func newError(code Code, message string, internal error) *Error {
 }
 
 func (e *Error) Error() string {
+	if e == nil {
+		return ""
+	}
 	if e.internal == nil {
 		return e.Message
 	}
@@ -68,10 +71,16 @@ func (e *Error) Error() string {
 }
 
 func (e *Error) Unwrap() error {
+	if e == nil {
+		return nil
+	}
 	return e.internal
 }
 
 func (e *Error) Is(target error) bool {
+	if e == nil {
+		return false
+	}
 	var other *Error
 	if stderrors.As(target, &other) {
 		return e.Code == other.Code
@@ -109,7 +118,7 @@ func CodeOf(err error) Code {
 		return ""
 	}
 	var kernel *Error
-	if stderrors.As(err, &kernel) {
+	if stderrors.As(err, &kernel) && kernel != nil {
 		return kernel.Code
 	}
 	return Internal
@@ -122,17 +131,9 @@ func IsCode(err error, code Code) bool {
 	return CodeOf(err) == code
 }
 
-func RetryAfter(err error) (time.Duration, bool) {
-	var kernel *Error
-	if !stderrors.As(err, &kernel) || kernel.Retry == nil {
-		return 0, false
-	}
-	return kernel.Retry.After, true
-}
-
 func Stack(err error) []Frame {
 	var kernel *Error
-	if !stderrors.As(err, &kernel) || len(kernel.stack) == 0 {
+	if !stderrors.As(err, &kernel) || kernel == nil || len(kernel.stack) == 0 {
 		return nil
 	}
 

@@ -148,21 +148,6 @@ func TestUnredactedFieldsSurvive(t *testing.T) {
 	}
 }
 
-func TestRedactedKeys(t *testing.T) {
-	t.Parallel()
-
-	want := map[string]struct{}{"password": {}, "apikey": {}, "token": {}, "authorization": {}}
-	got := log.RedactedKeys()
-	if len(got) != len(want) {
-		t.Fatalf("RedactedKeys() = %v", got)
-	}
-	for _, key := range got {
-		if _, ok := want[strings.ToLower(key)]; !ok {
-			t.Fatalf("RedactedKeys() contains unexpected %q", key)
-		}
-	}
-}
-
 func TestLevels(t *testing.T) {
 	t.Parallel()
 

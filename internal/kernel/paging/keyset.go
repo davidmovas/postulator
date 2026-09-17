@@ -59,7 +59,7 @@ func (k Keyset[T]) Encode(item T) (Cursor, error) {
 
 	values := make([]any, 0, len(k.Keys))
 	for _, key := range k.Keys {
-		value, ok := key.Literal(key.Value(item))
+		value, ok := key.literal(key.Value(item))
 		if !ok {
 			return "", errors.New(errors.Internal, "sort key "+key.Field+" holds a value that cannot be encoded in a cursor")
 		}
@@ -98,7 +98,7 @@ func (k Keyset[T]) Position(c Cursor) (Position, error) {
 
 	coerced := make([]any, 0, len(k.Keys))
 	for i, key := range k.Keys {
-		value, ok := key.Literal(position.Values[i])
+		value, ok := key.literal(position.Values[i])
 		if !ok {
 			return Position{}, errors.New(errors.Invalid, "cursor value for "+key.Field+" does not match the sort key type")
 		}

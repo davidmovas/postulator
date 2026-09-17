@@ -108,11 +108,77 @@ func TestUnwrapReachesInternal(t *testing.T) {
 	}
 }
 
-func TestWrapNilReturnsNil(t *testing.T) {
+func TestWrapNilReturnsUntypedNil(t *testing.T) {
 	t.Parallel()
 
-	if got := errors.Wrap(nil, errors.External, "wp"); got != nil {
-		t.Fatalf("Wrap(nil) = %v, want nil", got)
+	wrapped := errors.Wrap(nil, errors.External, "wp")
+	if wrapped != nil {
+		t.Fatalf("Wrap(nil) = %v, want an untyped nil", wrapped)
+	}
+	if errors.CodeOf(wrapped) != "" {
+		t.Fatalf("CodeOf(Wrap(nil)) = %q, want the empty code", errors.CodeOf(wrapped))
+	}
+	if errors.IsCode(wrapped, errors.External) {
+		t.Fatal("IsCode(Wrap(nil)) must be false")
+	}
+
+	passedThrough := func() error { return errors.Wrap(nil, errors.External, "wp") }
+	if err := passedThrough(); err != nil {
+		t.Fatalf("a function returning Wrap(nil) reported %v, want nil", err)
+	}
+}
+
+func TestNilReceiverIsSafe(t *testing.T) {
+	t.Parallel()
+
+	var empty *errors.Error
+
+	cases := []struct {
+		name  string
+		check func(*testing.T)
+	}{
+		{name: "Error", check: func(t *testing.T) {
+			if got := empty.Error(); got != "" {
+				t.Fatalf("Error() = %q, want the empty string", got)
+			}
+		}},
+		{name: "Unwrap", check: func(t *testing.T) {
+			if got := empty.Unwrap(); got != nil {
+				t.Fatalf("Unwrap() = %v, want nil", got)
+			}
+		}},
+		{name: "Is", check: func(t *testing.T) {
+			if empty.Is(errors.New(errors.NotFound, "x")) {
+				t.Fatal("Is() on a nil receiver must be false")
+			}
+		}},
+		{name: "CodeOf", check: func(t *testing.T) {
+			if got := errors.CodeOf(empty); got != errors.Internal {
+				t.Fatalf("CodeOf() = %q, want %q", got, errors.Internal)
+			}
+		}},
+		{name: "IsCode", check: func(t *testing.T) {
+			if !errors.IsCode(empty, errors.Internal) {
+				t.Fatal("IsCode() must classify a nil kernel error as Internal")
+			}
+		}},
+		{name: "Stack", check: func(t *testing.T) {
+			if got := errors.Stack(empty); got != nil {
+				t.Fatalf("Stack() = %v, want nil", got)
+			}
+		}},
+		{name: "errors.Is", check: func(t *testing.T) {
+			if stderrors.Is(empty, io.EOF) {
+				t.Fatal("errors.Is() on a nil receiver must be false")
+			}
+		}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			tc.check(t)
+		})
 	}
 }
 
@@ -178,32 +244,6 @@ func TestWithInternalClones(t *testing.T) {
 	}
 }
 
-func TestRetryAfter(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name  string
-		err   error
-		want  time.Duration
-		known bool
-	}{
-		{name: "nil", err: nil, want: 0, known: false},
-		{name: "no retry", err: errors.New(errors.External, "wp"), want: 0, known: false},
-		{name: "foreign", err: io.EOF, want: 0, known: false},
-		{name: "with retry", err: errors.New(errors.RateLimited, "slow").WithRetry(time.Minute), want: time.Minute, known: true},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			got, ok := errors.RetryAfter(tc.err)
-			if ok != tc.known || got != tc.want {
-				t.Fatalf("RetryAfter() = (%v, %v), want (%v, %v)", got, ok, tc.want, tc.known)
-			}
-		})
-	}
-}
-
 func TestStack(t *testing.T) {
 	t.Parallel()
 
@@ -255,14 +295,6 @@ func TestCodesAreFrozen(t *testing.T) {
 	for code, text := range want {
 		if code.String() != text {
 			t.Fatalf("code %q renders as %q", text, code.String())
-		}
-	}
-	if len(errors.Codes()) != len(want) {
-		t.Fatalf("Codes() has %d entries, want %d", len(errors.Codes()), len(want))
-	}
-	for _, code := range errors.Codes() {
-		if _, ok := want[code]; !ok {
-			t.Fatalf("Codes() contains unexpected %q", code)
 		}
 	}
 }
