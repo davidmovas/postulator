@@ -260,3 +260,53 @@ func TestInsertLinksLeavesADocumentWithNoTargetsAlone(t *testing.T) {
 		t.Fatalf("InsertLinks = %+v", result)
 	}
 }
+
+func TestInsertLinksLeavesNonProseZonesAlone(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		body string
+		want string
+	}{
+		{
+			name: "a script body is never spliced",
+			body: `<script>var label = "coffee";</script><p>Nothing else.</p>`,
+			want: `<script>var label = "coffee";</script><p>Nothing else.</p>`,
+		},
+		{
+			name: "a stylesheet is never spliced",
+			body: `<style>.coffee { color: red; }</style><p>Nothing else.</p>`,
+			want: `<style>.coffee { color: red; }</style><p>Nothing else.</p>`,
+		},
+		{
+			name: "a textarea value is never spliced",
+			body: `<textarea>coffee</textarea><p>Nothing else.</p>`,
+			want: `<textarea>coffee</textarea><p>Nothing else.</p>`,
+		},
+		{
+			name: "a noscript fallback is never spliced",
+			body: `<noscript>coffee</noscript><p>Nothing else.</p>`,
+			want: `<noscript>coffee</noscript><p>Nothing else.</p>`,
+		},
+		{
+			name: "prose beside a script is still linked",
+			body: `<script>var label = "coffee";</script><p>We roast coffee.</p>`,
+			want: `<script>var label = "coffee";</script><p>We roast <a href="/coffee/">coffee</a>.</p>`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc := mustParse(t, tc.body)
+			content.InsertLinks(doc, contextOf(target("/coffee/", []string{"coffee"}, content.RelationDown, false)),
+				policy(template.LinkRules{MaxLinks: 5, MaxPerTarget: 1}))
+
+			if doc.HTML() != tc.want {
+				t.Fatalf("HTML =\n%s\nwant\n%s", doc.HTML(), tc.want)
+			}
+		})
+	}
+}

@@ -41,7 +41,10 @@ type InsertResult struct {
 	Decisions []Decision   `json:"decisions"`
 }
 
-var forbiddenZones = []string{"a", "h1", "h2", "h3", "h4", "h5", "h6", "code", "pre"}
+var forbiddenZones = []string{
+	"a", "h1", "h2", "h3", "h4", "h5", "h6", "code", "pre",
+	"script", "style", "textarea", "noscript", "template", "iframe", "svg", "math",
+}
 
 func InsertLinks(doc *Document, lc LinkContext, policy template.LinkPolicy) InsertResult {
 	result := InsertResult{
