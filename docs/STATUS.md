@@ -119,11 +119,11 @@ Module coverage is 87.6% of 14170 statements; `domain` + `application` sit at 86
 
 ## Final review
 
-Reviewed 2026-09-19 over phases 9-12; the gate is green. Two fixes landed: `cc69ace` fences a
-confirmed tool result, which reached the model as unfenced user text, and `98b7896` masks the
-credential the pending action view handed back. Open, none blocking a tag: `Confirm` replays
-through `tools.Registry.Call`, so the allow list, the tool call audit and the result cap of the
-guard chain are skipped and only `Authorize` runs; the master key is hex encoded into the SQLite
-DSN string, which `Lock()` cannot zero; a failed `ImportBackup` leaves the core locked until a
-restart; `export.opener.complete` would call a valid archive truncated if the tar stream were an
-exact multiple of `FrameSize`; `task package` is not byte reproducible, `BUILD_DATE` being `now`.
+Reviewed 2026-09-19 over phases 9-12; the gate is green. Three fixes landed: `cc69ace` fences a
+confirmed tool result, which reached the model as unfenced user text, `98b7896` masks the
+credential the pending action view handed back, and `01c72a4` runs a confirmed action through the
+allow list, the audit row and the result cap instead of calling the registry bare. Open, none
+blocking a tag: the master key is hex encoded into the SQLite DSN string, which `Lock()` cannot
+zero; a failed `ImportBackup` leaves the core locked until a restart; `export.opener.complete`
+would call a valid archive truncated if the tar stream were an exact multiple of `FrameSize`;
+`task package` is not byte reproducible, `BUILD_DATE` being `now`.
