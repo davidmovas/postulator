@@ -8,6 +8,10 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/davidmovas/postulator/internal/adapters/images"
+	"github.com/davidmovas/postulator/internal/adapters/images/localfile"
+	imageopenai "github.com/davidmovas/postulator/internal/adapters/images/openai"
+	"github.com/davidmovas/postulator/internal/adapters/images/wpmedia"
 	"github.com/davidmovas/postulator/internal/adapters/llm/catalog"
 	"github.com/davidmovas/postulator/internal/adapters/llm/gollemclient"
 	"github.com/davidmovas/postulator/internal/adapters/llm/ledger"
@@ -18,14 +22,20 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/secrets"
 	"github.com/davidmovas/postulator/internal/adapters/secrets/masterkey"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
+	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/adapters/wp/plugin"
+	"github.com/davidmovas/postulator/internal/adapters/wp/registry"
 	"github.com/davidmovas/postulator/internal/application/graph"
 	llmport "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/models"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/sites"
+	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/run"
+	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/settings"
@@ -76,6 +86,9 @@ type Core struct {
 	Steps           *run.Registry
 	Engine          *runtime.Engine
 	Runs            *runs.Service
+	Sync            *sync.Service
+	Reports         *reports.Service
+	WordPress       *registry.Registry
 }
 
 func Open(ctx context.Context, cfg Config, logger *zap.Logger) (*Core, error) {
@@ -134,14 +147,29 @@ func Open(ctx context.Context, cfg Config, logger *zap.Logger) (*Core, error) {
 	)
 	client := retry.New(limiter.New(book, modelCatalog), retry.Retries(values), retry.DefaultBackoff)
 
-	registry := run.NewRegistry()
-	if err = steps.Register(registry, steps.Deps{
-		Entities: entityRepo,
-		Edges:    edgeRepo,
-		Pages:    pageRepo,
-		Policies: templateService,
-		Profiles: modelProfiles,
-		LLM:      client,
+	wordpress := registry.New(siteRepo, secretStore, wp.FromSettings(values)...)
+
+	stepRegistry := run.NewRegistry()
+	if err = steps.Register(stepRegistry, steps.Deps{
+		Entities:      entityRepo,
+		Edges:         edgeRepo,
+		Pages:         pageRepo,
+		Links:         linkRepo,
+		Sites:         siteRepo,
+		SiteWriter:    siteRepo,
+		WordPress:     wordpress,
+		Policies:      templateService,
+		Profiles:      modelProfiles,
+		LLM:           client,
+		ImageProvider: imageopenai.New(secretStore, images.OpenAIModel(values)),
+		ImageSources: map[template.ImageSource]steps.ImageSource{
+			template.ImagesWPMedia: wpmedia.New(wordpress),
+			template.ImagesLocal:   localfile.New(images.LocalDir(values)),
+		},
+		UnitOfWork: store,
+		Publisher:  relay,
+		Clock:      now,
+		BatchSize:  steps.BatchSize(values),
 	}); err != nil {
 		return nil, stderrors.Join(err, store.Close())
 	}
@@ -165,7 +193,7 @@ func Open(ctx context.Context, cfg Config, logger *zap.Logger) (*Core, error) {
 		Profiles:   modelProfiles,
 		UnitOfWork: store,
 		Publisher:  relay,
-	}, registry, runtime.Settings(values), now, logger)
+	}, stepRegistry, runtime.Settings(values), now, logger)
 
 	core := &Core{
 		Store:           store,
@@ -182,9 +210,12 @@ func Open(ctx context.Context, cfg Config, logger *zap.Logger) (*Core, error) {
 		Profiles:        modelProfiles,
 		Ledger:          book,
 		Models:          models.New(modelCatalog, modelRepo, modelProfiles, book, secretStore, client, now),
-		Steps:           registry,
+		Steps:           stepRegistry,
 		Engine:          engine,
 		Runs:            runs.New(engine, runRepo, itemRepo, artifactRepo, eventRepo, templateService),
+		Sync:            sync.New(engine, siteRepo, wordpress, packer{}, now),
+		Reports:         reports.New(entityRepo, edgeRepo, pageRepo, linkRepo, runRepo, itemRepo, artifactRepo),
+		WordPress:       wordpress,
 	}
 	if err = core.Templates.EnsureSeeded(ctx); err != nil {
 		return nil, stderrors.Join(err, store.Close())
@@ -193,6 +224,12 @@ func Open(ctx context.Context, cfg Config, logger *zap.Logger) (*Core, error) {
 		return nil, stderrors.Join(err, store.Close())
 	}
 	return core, nil
+}
+
+type packer struct{}
+
+func (packer) Package() ([]byte, error) {
+	return plugin.Package()
 }
 
 func (c *Core) Close() error {
