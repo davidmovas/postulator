@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/content"
@@ -12,7 +13,9 @@ import (
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
+	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
+	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -33,8 +36,30 @@ type edgeReader interface {
 	ListBySite(ctx context.Context, siteID string) ([]graph.Edge, error)
 }
 
-type pageReader interface {
+type pageStore interface {
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.Page, error)
+	Get(ctx context.Context, id string) (pagemap.Page, error)
+	Update(ctx context.Context, page pagemap.Page) error
+}
+
+type linkStore interface {
+	ReplaceForPage(ctx context.Context, pageID string, links []pagemap.PageLink) error
+}
+
+type siteReader interface {
+	Get(ctx context.Context, id string) (site.Site, error)
+}
+
+type siteWriter interface {
+	Update(ctx context.Context, record site.Site) error
+}
+
+type siteClients interface {
+	Client(ctx context.Context, siteID string) (*wp.Client, error)
+}
+
+type unitOfWork interface {
+	Do(ctx context.Context, fn func(context.Context) error) error
 }
 
 type policyReader interface {
@@ -46,21 +71,29 @@ type profileResolver interface {
 }
 
 type Deps struct {
-	Entities entityReader
-	Edges    edgeReader
-	Pages    pageReader
-	Policies policyReader
-	Profiles profileResolver
-	LLM      llm.Client
+	Entities   entityReader
+	Edges      edgeReader
+	Pages      pageStore
+	Links      linkStore
+	Sites      siteReader
+	SiteWriter siteWriter
+	WordPress  siteClients
+	Policies   policyReader
+	Profiles   profileResolver
+	LLM        llm.Client
+	UnitOfWork unitOfWork
+	Clock      clock.Clock
 }
 
 func all(deps Deps) []run.StepDef {
 	return []run.StepDef{
 		ResolveContext(deps),
 		GenerateBody(deps),
+		GenerateMeta(deps),
 		InsertLinks(deps),
 		RepairLinks(deps),
 		Validate(deps),
+		Judge(deps),
 	}
 }
 
@@ -151,4 +184,28 @@ func maxTokens(spec template.TemplateSpec) int {
 
 func callMeta(sc *run.StepContext, step string) llm.CallMeta {
 	return llm.CallMeta{RunID: sc.Run.ID, ItemID: sc.Item.ID, Step: step}
+}
+
+func draftOf(sc *run.StepContext) (content.ContentDraft, error) {
+	artifact, err := sc.Artifact(run.ArtifactDraft)
+	if err != nil {
+		return content.ContentDraft{}, err
+	}
+
+	var decoded content.ContentDraft
+	if unmarshalErr := json.Unmarshal(artifact.Blob, &decoded); unmarshalErr != nil {
+		return content.ContentDraft{}, errors.Wrap(unmarshalErr, errors.Internal, "the stored draft is not readable")
+	}
+	return decoded, nil
+}
+
+func decodeArtifact[T any](sc *run.StepContext, kind run.ArtifactKind) (value T, found bool, err error) {
+	artifact, ok := sc.Artifacts[kind]
+	if !ok || artifact.Purged || len(artifact.Blob) == 0 {
+		return value, false, nil
+	}
+	if unmarshalErr := json.Unmarshal(artifact.Blob, &value); unmarshalErr != nil {
+		return value, false, errors.Wrap(unmarshalErr, errors.Internal, "the stored "+string(kind)+" is not readable")
+	}
+	return value, true, nil
 }

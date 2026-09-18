@@ -199,8 +199,8 @@ func TestTheShippedStepsRegisterInRecipeOrder(t *testing.T) {
 
 	names := registry.Names()
 	want := []string{
-		steps.NameResolveContext, steps.NameGenerateBody, steps.NameInsertLinks,
-		steps.NameRepairLinks, steps.NameValidate,
+		steps.NameResolveContext, steps.NameGenerateBody, steps.NameGenerateMeta, steps.NameInsertLinks,
+		steps.NameRepairLinks, steps.NameValidate, steps.NameJudge,
 	}
 	if len(names) != len(want) {
 		t.Fatalf("the registry holds %v", names)

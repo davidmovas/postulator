@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	port "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/content"
@@ -13,7 +14,9 @@ import (
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
+	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
+	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
@@ -43,6 +46,40 @@ type pageList struct {
 
 func (p pageList) ListBySite(context.Context, string) ([]pagemap.Page, error) {
 	return p.items, p.err
+}
+
+func (p pageList) Get(_ context.Context, id string) (pagemap.Page, error) {
+	if p.err != nil {
+		return pagemap.Page{}, p.err
+	}
+	for i := range p.items {
+		if p.items[i].ID == id {
+			return p.items[i], nil
+		}
+	}
+	return pagemap.Page{}, errors.New(errors.NotFound, "no such page")
+}
+
+func (p pageList) Update(context.Context, pagemap.Page) error {
+	return p.err
+}
+
+type siteStub struct {
+	record site.Site
+	err    error
+}
+
+func (s siteStub) Get(context.Context, string) (site.Site, error) {
+	if s.err != nil {
+		return site.Site{}, s.err
+	}
+	if s.record.ID == "" {
+		return site.Site{
+			ID: "site", Name: "Shop", BaseURL: "https://shop.example.com", Username: "editor",
+			Status: site.StatusActive,
+		}, nil
+	}
+	return s.record, nil
 }
 
 type policyStub struct {
@@ -107,9 +144,11 @@ func unitDeps() steps.Deps {
 			{ID: "page-parent", SiteID: "site", Path: "/coffee/", WPType: pagemap.WPPage, Status: pagemap.StatusPublished},
 			{ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", WPType: pagemap.WPPage, Status: pagemap.StatusPlanned},
 		}},
+		Sites:    siteStub{},
 		Policies: policyStub{},
 		Profiles: profileStub{},
 		LLM:      llmStub{reply: goodDraft},
+		Clock:    clock.NewFake(sqlitetest.Stamp),
 	}
 }
 
@@ -532,4 +571,22 @@ func TestMaxTokensFallsBackToTheTemplateLength(t *testing.T) {
 			}
 		})
 	}
+}
+
+type promptRecorder struct {
+	reply string
+	last  string
+	err   error
+}
+
+func (r *promptRecorder) Complete(_ context.Context, req port.Request) (port.Response, error) {
+	if r.err != nil {
+		return port.Response{}, r.err
+	}
+	r.last = req.System + "\n" + req.Messages[len(req.Messages)-1].Text
+	return port.Response{Text: r.reply, Usage: domainllm.Usage{Input: 1, Output: 2, Total: 3}}, nil
+}
+
+func (r *promptRecorder) Stream(context.Context, port.Request) (<-chan port.Delta, error) {
+	return nil, errors.New(errors.Internal, "the unit stub does not stream")
 }
