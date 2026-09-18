@@ -109,6 +109,21 @@ as retry → limiter → ledger → record/replay → gollemclient. Migrations 0
 it: `wp.NormalizePath` and `wp.InternalPath` now call `internal/domain/pagemap`. The full
 gate is green and every package this phase added is at or above 86%.
 
+**Phases 5 and 6 (the run engine and the content factory core) are complete.**
+`internal/domain/run` holds the vocabulary of section 7, the JSON checkpoint, the run,
+item, step-execution, artifact and event records and the step registry that validates a
+recipe before it is planned. Migration 0014 adds `runs`, `run_items`, `artifacts`,
+`step_execs` and `run_events`. `internal/runtime` is the engine: `advance` claims an item
+by compare-and-swap on its advance sequence, runs the step under its timeout, classifies
+the outcome and persists the item, the checkpoint, the execution, the artifacts and the
+appended events in one transaction; a sweep re-arms due and stalled items, reaps runs past
+their deadline and purges published artifact bodies. `internal/domain/content` holds the
+document, the link context, the link insertion with a decision per candidate, and the
+compliance and structure reports; `internal/runtime/steps` holds `resolve_context`,
+`generate_body`, `insert_links`, `repair_links` and `validate` with their prompts as
+embedded Go templates. `internal/application/runs` exposes the ten use cases and
+`internal/app` starts the engine after the recovery sweep. Phase 7 follows.
+
 ## What landed in Phase 0
 
 - The v1.6.2 codebase is gone: `internal/`, `pkg/`, `frontend/`, `main.go`, `Makefile`,
@@ -460,6 +475,43 @@ gate is green and every package this phase added is at or above 86%.
   `time.Since`**; the clock abstraction is for timestamps, not elapsed time. The
   record/replay key excludes `Request.Meta`, so a fixture survives a new run id.
 
+## Decisions taken in Phases 5 and 6
+
+- **One `Status` for runs and for items**, the seven values of section 7. Section 5.6
+  sketched two vocabularies; a single one keeps `Advanceable`, `Active` and `Terminal`
+  meaningful on both rows and is what the claim query filters on.
+- **`Classify` maps `NeedsHuman` to `exhausted`**, not to a class of its own. Exhausted is
+  the class whose default action is `pause`, and a run that needs a human is in exactly
+  that position: it cannot proceed without something outside the process.
+- **A recovered panic is a transient fault.** A step that panics is retried under its own
+  retry ceiling rather than killing the worker or failing the item outright; the engine
+  logs the fault without the panic text reaching the event payload.
+- **The claim, the step and the settle are three phases, two transactions.** The step runs
+  between them with no transaction open, because an LLM call must not hold the single
+  SQLite writer. The settle lands only against the advance sequence the claim took, so a
+  pause, a cancel or a reclaim while the step ran discards the transition — while still
+  recording the execution and its artifacts, which is what makes the input-hash reuse work.
+- **`advance_seq` is the only optimistic lock.** `Claim`, `Requeue` and `StopAll` each bump
+  it; `Persist` matches it. A lease is a hint for the sweep, never the lock itself.
+- **Artifacts are immutable and keyed by `(item, step, kind)`**, so a retry replaces its own
+  step's rows and a later step reads the newest earlier producer of a kind. A step
+  execution's `attempt` counts the rows already recorded, so a manual `RetryStep` cannot
+  collide with the unique index, and a step with no `Retry.Max` gets three attempts.
+- **`WakeAt` resolution is the sweep interval.** There is no per-item timer: a waiting item
+  is re-armed by the next sweep, which is also the path a crash recovers through.
+- **The template spec governs link shaping, the site policy governs the site-wide rules.**
+  `effectivePolicy` takes `LinkRules` from the resolved spec and `ForbidExternal`,
+  `ForbidSelf` and `AnchorStrategy` from the site's effective policy.
+- **`InsertLinks` counts an existing link to a target as placed** and re-runs to the same
+  document, which is what makes `repair_links` and a re-run of the whole item safe; a
+  property test runs two hundred random bodies through it twice. `Structure` never sees the
+  meta title, because it reads a body fragment, so `validate` adds the
+  `primary_missing_in_title` finding from the draft artifact instead.
+- **A report scores `1 - 0.25 per error - 0.05 per warning`, floored at zero**, and the
+  validation artifact carries the lower of the two scores. Prompts are
+  `{{define "<step>.system"}}` and `{{define "<step>.user"}}` in one embedded template per
+  step.
+
 ## Known gaps
 
 - Application events published before `cmd/postulator` connects the relay to the Wails
@@ -467,9 +519,8 @@ gate is green and every package this phase added is at or above 86%.
 - Backward paging exists in every repository (`paging.Request.Before`) but not at the
   use-case boundary, because `dto.ListRequest` carries one cursor; the client replays the
   cursor it used to reach the current page.
-- Step `params` keys in template recipes are unspecified until Phase 6 names them; the
-  seeds carry none.
-- `internal/runtime` does not exist yet; its dependency rule still skips.
+- Step `params` keys are `allowErrors` on `validate` and `iterations` on `repair_links`;
+  the shipped seeds still carry none, so both take their defaults.
 - `lefthook` is not installed on the development machine. Install it with
   `go install github.com/evilmartians/lefthook@latest && lefthook install`.
 - **`golangci-lint` on this machine must be run from `$(go env GOPATH)/bin`.** A scoop
@@ -489,9 +540,14 @@ gate is green and every package this phase added is at or above 86%.
 - The e2e suite carries its own small HTTP client rather than using `internal/adapters/wp`
   from track A, which had not landed when it was written. Switching it to the adapter is a
   follow-up that deletes `client` from `harness_test.go`.
-- Nothing writes `llm:<provider>:api_key` yet — that use case belongs to the Phase 11
-  settings surface — so `TestProvider` fails with `Unauthorized` until a key is stored by
-  hand. `ledger.List` likewise has no caller until the Phase 11 read models, and the
-  scripted `gollem.LLMClient` waits for the Phase 9 agent runner rather than ship dead.
+- `models.SetProviderKey` writes `llm:<provider>:api_key`; the Phase 11 settings surface
+  still has to call it. `ledger.List` likewise has no caller until the Phase 11 read models,
+  and the scripted `gollem.LLMClient` waits for the Phase 9 agent runner rather than ship
+  dead.
+- A run's deadline is the `runtime.DefaultRunDeadline` constant, not a setting: nothing in
+  the UI sets one yet, and a second knob with no reader would be dead configuration.
+- The artifact purge keys on a `publish_result` artifact, which only the Phase 7 publish
+  step produces; until then the sweep finds nothing to purge and a synthetic artifact is
+  what proves the query.
 - The docker e2e stack is never run in CI: `windows-latest` cannot run Linux containers,
   and the Ubuntu job exists only to lint and package the plugin.
