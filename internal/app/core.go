@@ -6,10 +6,19 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/davidmovas/postulator/internal/adapters/llm/catalog"
+	"github.com/davidmovas/postulator/internal/adapters/llm/gollemclient"
+	"github.com/davidmovas/postulator/internal/adapters/llm/ledger"
+	"github.com/davidmovas/postulator/internal/adapters/llm/limiter"
+	"github.com/davidmovas/postulator/internal/adapters/llm/profiles"
+	"github.com/davidmovas/postulator/internal/adapters/llm/recordreplay"
+	"github.com/davidmovas/postulator/internal/adapters/llm/retry"
 	"github.com/davidmovas/postulator/internal/adapters/secrets"
 	"github.com/davidmovas/postulator/internal/adapters/secrets/masterkey"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/application/graph"
+	llmport "github.com/davidmovas/postulator/internal/application/llm"
+	"github.com/davidmovas/postulator/internal/application/models"
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/templates"
@@ -53,6 +62,11 @@ type Core struct {
 	Graph           *graph.Service
 	Pages           *pages.Service
 	Templates       *templates.Service
+	LLM             llmport.Client
+	Catalog         *catalog.Catalog
+	Profiles        *profiles.Profiles
+	Ledger          *ledger.Ledger
+	Models          *models.Service
 }
 
 func Open(ctx context.Context, cfg Config) (*Core, error) {
@@ -90,6 +104,25 @@ func Open(ctx context.Context, cfg Config) (*Core, error) {
 	linkRepo := sqlite.NewPageLinkRepo(store)
 	templateRepo := sqlite.NewTemplateRepo(store)
 	policyRepo := sqlite.NewLinkPolicyRepo(store)
+	modelRepo := sqlite.NewModelCatalogRepo(store)
+	profileRepo := sqlite.NewModelProfileRepo(store)
+	callRepo := sqlite.NewLLMCallRepo(store)
+
+	modelCatalog, err := catalog.New(modelRepo)
+	if err != nil {
+		return nil, stderrors.Join(err, store.Close())
+	}
+
+	modelProfiles := profiles.New(profileRepo, siteRepo, modelCatalog, now)
+	book := ledger.New(
+		recordreplay.New(
+			gollemclient.New(gollemclient.NewFactory(secretStore, values), gollemclient.Timeout(values)),
+			recordreplay.Mode(values),
+			recordreplay.DefaultDir,
+		),
+		callRepo, modelCatalog, relay, now,
+	)
+	client := retry.New(limiter.New(book, modelCatalog), retry.Retries(values), retry.DefaultBackoff)
 
 	core := &Core{
 		Store:           store,
@@ -101,6 +134,11 @@ func Open(ctx context.Context, cfg Config) (*Core, error) {
 		Graph:           graph.New(entityRepo, edgeRepo, siteRepo, store, relay, now),
 		Pages:           pages.New(pageRepo, linkRepo, entityRepo, siteRepo, store, relay, now),
 		Templates:       templates.New(templateRepo, policyRepo, pageRepo, siteRepo, store, relay, now),
+		LLM:             client,
+		Catalog:         modelCatalog,
+		Profiles:        modelProfiles,
+		Ledger:          book,
+		Models:          models.New(modelCatalog, modelRepo, modelProfiles, book, client, now),
 	}
 	if err = core.Templates.EnsureSeeded(ctx); err != nil {
 		return nil, stderrors.Join(err, store.Close())

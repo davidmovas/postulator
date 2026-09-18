@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/app"
+	"github.com/davidmovas/postulator/internal/application/models"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -25,6 +26,14 @@ func TestOpenWiresTheUseCasesAndSeedsTheStarterTemplates(t *testing.T) {
 		}
 		if core.Events == nil || core.Sites == nil || core.Graph == nil || core.Pages == nil || core.Templates == nil {
 			t.Fatal("the core must carry the relay and the four services")
+		}
+		if core.LLM == nil || core.Catalog == nil || core.Profiles == nil || core.Ledger == nil || core.Models == nil {
+			t.Fatal("the core must carry the llm stack")
+		}
+
+		listed, err := core.Models.ListModels(t.Context(), models.ListModelsRequest{})
+		if err != nil || len(listed.Models) == 0 {
+			t.Errorf("round %d: catalog models = %d, %v; want the embedded catalog", round, len(listed.Models), err)
 		}
 
 		seeded, err := core.Templates.ListTemplates(t.Context(), templates.ListTemplatesRequest{Scope: "global"})
