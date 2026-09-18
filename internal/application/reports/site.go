@@ -94,7 +94,7 @@ func pageTotals(pages []pagemap.Page, incoming map[string]struct{}) PageTotals {
 		if page.EntityID == nil {
 			totals.Unmapped++
 		}
-		if page.Status == orphanStatus {
+		if page.Status == pagemap.StatusArchived {
 			continue
 		}
 		if _, linked := incoming[page.ID]; !linked {
@@ -127,7 +127,7 @@ func edgeTotals(edges []graph.Edge, entities []graph.Entity, outgoing map[string
 			totals.Realized++
 			continue
 		}
-		if string(edge.Kind) == relatedEdge && linked(outgoing, to, from) {
+		if edge.Kind == graph.EdgeRelated && linked(outgoing, to, from) {
 			totals.Realized++
 		}
 	}
@@ -186,5 +186,5 @@ func topEntities(entities []graph.Entity, index pagemap.Index) []EntityScore {
 		}
 		return strings.Compare(a.Name, b.Name)
 	})
-	return scored[:min(TopEntities, len(scored))]
+	return scored[:min(topEntitiesCap, len(scored))]
 }

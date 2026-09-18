@@ -62,10 +62,8 @@ type pipeline struct {
 	siteID  string
 	pageID  string
 	parent  int64
-	grand   int64
 	recipe  []template.StepSpec
 	llm     *scripted
-	spec    template.TemplateSpec
 	current *clock.Fake
 }
 
@@ -168,7 +166,7 @@ func newPipeline(t *testing.T, opts ...wptest.Option) *pipeline {
 
 	return &pipeline{
 		store: store, server: server, siteID: owner.ID, pageID: childPage.ID,
-		parent: nested[0].ID, grand: live[0].ID, recipe: guide.Spec.Recipe, spec: guide.Spec,
+		parent: nested[0].ID, recipe: guide.Spec.Recipe,
 		runs:  sqlite.NewRunRepo(store),
 		items: sqlite.NewRunItemRepo(store),
 		blobs: sqlite.NewArtifactRepo(store),

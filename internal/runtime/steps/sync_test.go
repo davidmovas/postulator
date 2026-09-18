@@ -392,3 +392,29 @@ func TestBatchSizeCarriesItsDefaultAndItsSetting(t *testing.T) {
 		t.Fatalf("BatchSize = %d, want 25", got)
 	}
 }
+
+func TestSyncSiteLeavesTypesTheCorePullNeverSaw(t *testing.T) {
+	t.Parallel()
+
+	h := newSyncHarness(t, 0, wptest.WithoutPlugin())
+	seedSite(t, h)
+
+	product := int64(4242)
+	stray := pagemap.Page{
+		ID: id.New(), SiteID: h.siteID, Path: "/shop/grinder/", Slug: "grinder",
+		WPType: pagemap.WPProduct, WPID: &product, Status: pagemap.StatusPublished,
+		CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+	}
+	if err := h.pages.Insert(t.Context(), stray); err != nil {
+		t.Fatalf("insert the product page: %v", err)
+	}
+
+	h.clock.Advance(time.Minute)
+	state := h.all(t)
+	if state.Archived != 0 {
+		t.Fatalf("state = %+v, want a core pull to leave a product alone", state)
+	}
+	if kept := h.byPath(t, "/shop/grinder/"); kept.Status != pagemap.StatusPublished {
+		t.Fatalf("the product page is %+v", kept)
+	}
+}

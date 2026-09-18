@@ -74,7 +74,7 @@ func Publish(deps Deps) run.StepDef {
 
 			content := string(body.Blob)
 			status := string(sc.Run.PublishMode)
-			written, err := write(ctx, client, itemType, writeRequest{
+			written, err := upsert(ctx, client, itemType, writeRequest{
 				existing: existing, found: found, title: draft.Title, content: content,
 				slug: sc.Page.Slug, status: status, parent: parent, featured: featured.FeaturedID,
 			})
@@ -194,7 +194,7 @@ type writeRequest struct {
 	found    bool
 }
 
-func write(ctx context.Context, client *wp.Client, itemType wp.ItemType, req writeRequest) (wp.Item, error) {
+func upsert(ctx context.Context, client *wp.Client, itemType wp.ItemType, req writeRequest) (wp.Item, error) {
 	if !req.found {
 		in := wp.CreateItem{
 			Title: req.title, Content: req.content, Slug: req.slug, Status: req.status,
@@ -246,7 +246,7 @@ func applySEO(ctx context.Context, client *wp.Client, sc *run.StepContext, wpID 
 	if err != nil {
 		return nil, nil, err
 	}
-	return result.Applied, []string{}, nil
+	return append(make([]string, 0, len(result.Applied)), result.Applied...), []string{}, nil
 }
 
 func noSEO() (applied, skipped []string, err error) {

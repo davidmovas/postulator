@@ -10,10 +10,8 @@ import (
 )
 
 const (
-	TopEntities  = 10
-	recentItems  = 20
-	orphanStatus = pagemap.StatusArchived
-	relatedEdge  = "related"
+	topEntitiesCap = 10
+	recentItems    = 20
 )
 
 type entityReader interface {

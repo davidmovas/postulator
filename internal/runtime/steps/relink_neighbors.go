@@ -93,7 +93,7 @@ func RelinkNeighbors(deps Deps) run.StepDef {
 				}
 
 				outcome, relinkErr := relinkOne(ctx, deps, client, neighborWork{
-					neighbor: neighbor, owner: hostOf(owner.BaseURL), index: index,
+					neighbor: neighbor, host: hostOf(owner.BaseURL), index: index,
 					target: backLink(sc.Page, entity, lc.Targets[i]),
 					policy: policy,
 				})
@@ -125,7 +125,7 @@ func RelinkNeighbors(deps Deps) run.StepDef {
 
 type neighborWork struct {
 	neighbor pagemap.Page
-	owner    string
+	host     string
 	index    pagemap.Index
 	target   content.LinkTarget
 	policy   template.LinkPolicy
@@ -228,7 +228,7 @@ func relinkOne(ctx context.Context, deps Deps, client *wp.Client, in neighborWor
 
 	outcome.Outcome = OutcomeLinked
 	outcome.Anchor = anchor
-	if adoptErr := adopt(ctx, deps, in.neighbor, in.index, in.owner, doc, hash); adoptErr != nil {
+	if adoptErr := adopt(ctx, deps, in.neighbor, in.index, in.host, doc, hash); adoptErr != nil {
 		return NeighborResult{}, adoptErr
 	}
 	return outcome, nil
@@ -259,18 +259,7 @@ func adopt(ctx context.Context, deps Deps, page pagemap.Page, index pagemap.Inde
 	next.LastSyncedAt = &now
 	next.UpdatedAt = now
 
-	links := observedLinks(page, index, host, doc.Links(), now)
-
-	apply := func(c context.Context) error {
-		if err := deps.Pages.Update(c, next); err != nil {
-			return err
-		}
-		return deps.Links.ReplaceForPage(c, page.ID, links)
-	}
-	if deps.UnitOfWork == nil {
-		return apply(ctx)
-	}
-	return deps.UnitOfWork.Do(ctx, apply)
+	return persist(ctx, deps, next, observedLinks(page, index, host, doc.Links(), now))
 }
 
 func observedLinks(page pagemap.Page, index pagemap.Index, host string, found []content.Link, at time.Time) []pagemap.PageLink {

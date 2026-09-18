@@ -110,7 +110,7 @@ func SyncSite(deps Deps) run.StepDef {
 			state.Done = next == ""
 
 			if state.Done {
-				if archiveErr := archiveAbsent(ctx, deps, owner.ID, state.StartedAt, &state); archiveErr != nil {
+				if archiveErr := archiveAbsent(ctx, deps, owner.ID, &state); archiveErr != nil {
 					return run.Result{}, archiveErr
 				}
 				if parentErr := linkParents(ctx, deps, owner.ID); parentErr != nil {
@@ -246,7 +246,7 @@ func pullCore(ctx context.Context, client *wp.Client, cursor string, limit int, 
 			return nil, "", listErr
 		}
 		if len(page.Items) == 0 {
-			position = coreCursor{Type: nextType(index), Page: 1}
+			position.Page = 1
 			continue
 		}
 
@@ -276,13 +276,6 @@ func typeIndex(name string) int {
 		}
 	}
 	return 0
-}
-
-func nextType(index int) string {
-	if index+1 < len(coreTypes) {
-		return string(coreTypes[index+1])
-	}
-	return string(coreTypes[len(coreTypes)-1])
 }
 
 func decodeCore(cursor string) (coreCursor, error) {
@@ -530,7 +523,7 @@ func resolveInto(links []pagemap.PageLink, index pagemap.Index) bool {
 	return changed
 }
 
-func archiveAbsent(ctx context.Context, deps Deps, siteID string, startedAt time.Time, state *SiteSyncResult) error {
+func archiveAbsent(ctx context.Context, deps Deps, siteID string, state *SiteSyncResult) error {
 	pages, err := deps.Pages.ListBySite(ctx, siteID)
 	if err != nil {
 		return err
@@ -540,10 +533,10 @@ func archiveAbsent(ctx context.Context, deps Deps, siteID string, startedAt time
 	stale := make([]pagemap.Page, 0)
 	for i := range pages {
 		page := pages[i]
-		if page.WPID == nil || page.Status == pagemap.StatusArchived {
+		if page.WPID == nil || page.Status == pagemap.StatusArchived || !covered(state.Source, page.WPType) {
 			continue
 		}
-		if page.LastSyncedAt != nil && !page.LastSyncedAt.Before(startedAt) {
+		if page.LastSyncedAt != nil && !page.LastSyncedAt.Before(state.StartedAt) {
 			continue
 		}
 		page.Status = pagemap.StatusArchived
@@ -620,6 +613,18 @@ func sameRef(current, wanted *string) bool {
 		return current == nil && wanted == nil
 	}
 	return *current == *wanted
+}
+
+func covered(source string, wpType pagemap.WPType) bool {
+	if source == SourcePlugin {
+		return true
+	}
+	for i := range coreTypes {
+		if string(coreTypes[i]) == string(wpType) {
+			return true
+		}
+	}
+	return false
 }
 
 func announcePages(deps Deps, siteID string) error {
