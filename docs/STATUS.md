@@ -145,7 +145,7 @@ cycles and reports cannibalization without writing; `Apply` refuses a preview ca
 coverage is 90.2% of 11201 statements.
 
 **Phases 9 and 10 (the agents and the schedules) are complete**, with the five findings of the 5-8
-milestone review fixed first. `internal/application/tools` registers ninety-one tools, one per file, over
+milestone review fixed first. `internal/application/tools` registers eighty-three tools, one per file, over
 every use case the UI exposes; `internal/domain/agent` and migration 0017 hold the conversation, the
 transcript, the pending action, the tool call ledger and the provider history blob;
 `internal/application/agent` owns the conversation, the turn and the confirmation, and
