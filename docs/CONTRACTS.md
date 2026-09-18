@@ -34,17 +34,25 @@ the composition root binds the two.
 | `TemplatesService` | `CreateTemplate UpdateTemplate DeleteTemplate GetTemplate ListTemplates SetOverride DeleteOverride ResolveForPage CreatePolicy UpdatePolicy DeletePolicy GetPolicy ListPolicies GetEffectivePolicy` |
 | `RunsService` | `Start Get List ListItems ListEvents GetArtifact Pause Resume Cancel RetryStep` |
 | `SyncService` | `SyncSite CheckPlugin SavePluginPackage` |
-| `ReportsService` | `SiteOverview PageReport RunReport` |
+| `ReportsService` | `SiteOverview PageReport RunReport JudgePage` |
 | `ImportService` | `Inspect Preview Apply Export SaveMapping ListMappings DeleteMapping` |
 | `ModelsService` | `ListModels UpsertModel DisableModel GetProfiles SetProfile TestProvider UsageSummary` |
 | `AgentService` | `CreateConversation SetMode Send Confirm Cancel ListConversations ListMessages ListPendingActions` |
 | `SchedulesService` | `Create Update Delete Get List Enable Disable RunNow` |
 | `ToolsService` | `List` |
-| `SettingsService` | `Schema Get Set SetProviderKey` |
+| `SettingsService` | `Schema Get Set SetProviderKey LockState Lock Unlock SetMasterPassword ExportBackup ImportBackup` |
 
-Ninety-six methods. Where a use case answers with bytes the service writes them to the
-path the request names and returns it, because the webview has no filesystem;
+A hundred and three methods. Where a use case answers with bytes the service writes them
+to the path the request names and returns it, because the webview has no filesystem;
 `SyncService.SavePluginPackage{path}` is the only such method.
+
+`ReportsService.JudgePage{pageId}` is synchronous: it pulls the live page, runs the shared
+judge rubric against it and answers with the report, one model call inside the request. The
+other three reports read what a run already recorded.
+
+Every method but the six lock and backup methods of `SettingsService` and `HealthService.Ping`
+answers `LOCKED` while a master password is set and the application has not been unlocked,
+because the service resolves its use case per call and the composition does not exist yet.
 
 `SettingsService.Schema` renders the `kernel/settings` declarations as
 `{key, group, type, default, min?, max?, enum?, nonEmpty?}`, which is what a settings
@@ -55,6 +63,18 @@ key is `NOT_FOUND`, a rejected value is `INVALID` and nothing is written. No set
 a secret: `SetProviderKey{provider, apiKey}` delegates to `models.SetProviderKey`, which
 puts the key in the encrypted store and answers with the provider name alone. It is the
 only method that accepts a credential.
+
+`LockState{}` answers `{locked, protected}`. `SetMasterPassword{current, new}` rewraps the
+master key, an empty `new` removes the password and returns to plain DPAPI, and a wrong
+`current` is `LOCKED`. `Unlock{password}` composes the store and every service and emits
+`app.unlocked`; `Lock{}` closes the store, zeroes the key and emits `app.locked`, and it
+refuses with `INVALID` while no password is set, because nothing could unlock it again.
+`ExportBackup{path, password}` writes one Argon2id and AES-256-GCM archive holding a
+consistent snapshot of the database and answers with its size; the master key is not in it.
+`ImportBackup{path, password}` decrypts and checks the whole archive first, then stops the
+engine, the scheduler and the agent, copies the snapshot into the encrypted database and
+composes the core again from what it restored. A wrong password or a truncated file is
+`INVALID` and nothing is touched.
 
 ## DTOs
 

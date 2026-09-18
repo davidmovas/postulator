@@ -236,13 +236,14 @@ Port `type ImageProvider interface { Generate(ctx, Prompt) (Image, error) }` for
 ## 10. Documentation and Orchestration Policy
 
 Docs (the only `.md` files allowed):
-- `CLAUDE.md` (≤ 60 lines, Archond `CLAUDE.md` style): numbered hard rules first, then workflow (layout, migrations, verification commands), then footguns with the story behind each rule, then a dated "standing rulings" list, and a one-line product-positioning guardrail at the end. Cross-links to `docs/` instead of duplicating them.
+- `CLAUDE.md` (≤ 60 lines, Archond `CLAUDE.md` style): numbered hard rules first, then workflow (layout, migrations, verification commands), then footguns one line each, then a dated "standing rulings" list, and a one-line product-positioning guardrail at the end. Cross-links to `docs/` instead of duplicating them.
 - `docs/VISION.md`: product, boundaries, non-goals.
 - `docs/ARCHITECTURE.md`: layers, dependency rule, key types, run engine protocol.
 - `docs/CONVENTIONS.md`: code rules, naming, testing rules, commit format.
 - `docs/CONTRACTS.md`: error format, events, pagination, long-running protocol, DTO rules.
 - `docs/ORCHESTRATION.md`: agent policy, limits, task cycle, model allocation.
-- `docs/STATUS.md`: living handoff log: done, in progress, next, decisions. Updated in every phase commit.
+- `docs/STATUS.md`: the handoff (≤ 150 lines): current state, how to run, the phase table, known gaps, next steps. Updated in every phase commit.
+- `docs/DECISIONS.md`: the decisions of every phase and the milestone reviews, moved verbatim out of STATUS as each phase ends.
 - `docs/superpowers/specs/2026-09-17-postulator-v2-design.md`, `docs/superpowers/plans/2026-09-17-postulator-v2-roadmap.md`, `docs/superpowers/plans/2026-MM-DD-phase-N-<name>.md`.
 
 Orchestration:

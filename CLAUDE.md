@@ -1,6 +1,6 @@
 # CLAUDE.md — Postulator v2 (session contract)
 
-Read [`docs/STATUS.md`](docs/STATUS.md) first; it says what landed and what is next. Then [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md), [`docs/CONTRACTS.md`](docs/CONTRACTS.md), [`docs/ORCHESTRATION.md`](docs/ORCHESTRATION.md), [`docs/VISION.md`](docs/VISION.md). The binding design is [`docs/superpowers/specs/2026-09-17-postulator-v2-design.md`](docs/superpowers/specs/2026-09-17-postulator-v2-design.md); the phase list is [`docs/superpowers/plans/2026-09-17-postulator-v2-roadmap.md`](docs/superpowers/plans/2026-09-17-postulator-v2-roadmap.md).
+Read [`docs/STATUS.md`](docs/STATUS.md) first; it says what landed and what is next, and [`docs/DECISIONS.md`](docs/DECISIONS.md) says why. Then [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md), [`docs/CONTRACTS.md`](docs/CONTRACTS.md), [`docs/ORCHESTRATION.md`](docs/ORCHESTRATION.md), [`docs/VISION.md`](docs/VISION.md). The binding design is [`docs/superpowers/specs/2026-09-17-postulator-v2-design.md`](docs/superpowers/specs/2026-09-17-postulator-v2-design.md); the phase list is [`docs/superpowers/plans/2026-09-17-postulator-v2-roadmap.md`](docs/superpowers/plans/2026-09-17-postulator-v2-roadmap.md).
 
 Windows-only Wails v3 desktop app. Go 1.27, CGO off, local SQLite, no server.
 
@@ -25,76 +25,35 @@ Dependency rule, enforced by `internal/app/deps_test.go`: domain sees only kerne
 
 ```
 task build                 bin/postulator.exe, builds the frontend and bindings first
-go test -race ./...
-golangci-lint run
+task package               the NSIS installer; task e2e:full the whole loop on docker
+go test -race ./...        golangci-lint run from $(go env GOPATH)/bin
 go run ./cmd/covergate     needs coverage.out from -coverprofile
 ```
 
-Before an agent implements a module, it reads the Archond files that section 15 of the spec names for it, and ports the shapes — never Asynq, Postgres, jet, pgx, fx, Fiber or credits.
-
 ## Footguns
 
-- **`frontend/dist/.gitkeep` is committed on purpose.** `frontend/assets.go` embeds `all:dist`, so `go build ./...` fails on a fresh clone if that directory is absent. Vite therefore runs with `emptyOutDir: false` and unhashed asset names — turn either back on and the placeholder is deleted on every build, which shows up as a dirty tree and a broken clone rather than as a frontend problem.
-- **`log.Logger.Close()` does not call `Sync()`.** Syncing stdout fails on Windows whenever the output is a pipe, which is every CI run. Lumberjack writes unbuffered, so closing the sinks is the whole job; adding a buffered sink means revisiting this.
-- **`middleware.Timeout` runs the next handler on its own goroutine** and re-panics on the caller's. Without that, a panic underneath it kills the process no matter where `Recover` sits in the chain.
-- **A cursor records the sort it was issued for.** Replaying one against a different `ORDER BY` is rejected as `Invalid` rather than silently skipping or repeating rows. Do not "fix" that by dropping the check.
-- **`kernel/dto` must not import `kernel/paging`.** It would drag squirrel into the closure of everything that touches a DTO, including domain, and the dependency test would fail somewhere unrelated. The duplicated limit constants are held in step by a test.
-- **golangci-lint must be built by the Go release the module targets.** A binary built with go1.26 refuses a `go 1.27` module outright, so install it with `go install`, not from an archive.
-- **Live events are dropped, not buffered.** v3 dispatches a custom event to the windows that exist at that instant; with no window, or across a page reload, it is gone. Any progress UI must replay `RunsService.ListEvents(runId, sinceSeq, limit)` on connect.
-- **`frontend/src/generated/events.ts` is generated and committed.** `task events` rewrites it and a Go test fails when it is stale. `frontend/bindings/` is the opposite: generated and gitignored, rewritten by every build. That file and `go.mod` are pinned to LF in `.gitattributes`, because `core.autocrlf` otherwise hands a fresh checkout CRLF that no generator ever writes and the in-sync test fails on a clean clone.
-- **The tuned lint rules and why**: `errcheck` runs with `check-blank` and `check-type-assertions` and no baseline, so `_ = f()` is a finding rather than an escape hatch. `govet` is `enable-all` with `shadow` non-strict, because strict mode reports every `if err := f(); err != nil`. `fieldalignment` is off: it orders struct fields by machine layout, and our field order is the JSON order we owe the frontend. `gocritic` runs diagnostic, style and performance with `hugeParam` off. `misspell` is US English and ignores `cancelled`, which is a domain status value.
-- **The WP-CLI image's `www-data` is uid 82, the WordPress image's is uid 33.** The compose `bootstrap` service therefore runs as `user: "33:33"`; without it WP-CLI cannot write `.htaccess` or install a plugin into the shared volume, and the failure reads as a WordPress permissions error rather than a container mismatch. The same container also needs the `WORDPRESS_DB_*` variables, because the official image's `wp-config.php` calls `getenv` at runtime instead of baking the values in, and application passwords need `WP_ENVIRONMENT_TYPE=local` to work over plain HTTP at all.
-- **`go test -tags e2e` is the only thing that compiles `internal/adapters/wp/e2e`.** `go build`, `go vet`, `golangci-lint run` and `cmd/covergate` all skip it silently, so `task lint:e2e` is not optional and `gofmt -l .` is what catches formatting there.
-
-- **WordPress `modified_gmt` has no timezone suffix**, so `time.Parse(time.RFC3339, ...)`
-  fails on it; `wp.parseWPTime` falls back to `2006-01-02T15:04:05` read as UTC. The
-  reverse is worse: core REST filters `modified_after` on the site-local `post_modified`
-  while returning `modified_gmt`, so an incremental core-REST sync of a non-UTC site can
-  miss or repeat items inside the offset. The plugin's `/content?since=` compares
-  `post_modified_gmt` and is the accurate path; that is one of the reasons the plugin
-  exists.
-- **WordPress sends `"meta": []`, not `{}`,** for a post type with no registered meta, so
-  decoding it straight into a map fails. `wp.metaBag` accepts the array, the object and
-  null.
-- **`wptest` must never import `wp`.** The fake is a second, independent implementation of
-  the WordPress contract; sharing the client's types or its hash would let one bug satisfy
-  both sides of every assertion.
+- **`frontend/dist/.gitkeep` is committed on purpose**: `frontend/assets.go` embeds `all:dist`, so Vite runs with `emptyOutDir: false` and unhashed names or a fresh clone stops building.
+- **`log.Logger.Close()` does not call `Sync()`**: syncing a pipe fails on Windows, and lumberjack writes unbuffered, so closing the sinks is the whole job.
+- **`middleware.Timeout` runs the next handler on its own goroutine** and re-panics on the caller's; without that a panic underneath it kills the process.
+- **Two rules that look like bugs and are not**: a cursor records the sort it was issued for and refuses another `ORDER BY`; `kernel/dto` keeps its own limit constants rather than importing `kernel/paging`, which would drag squirrel into every DTO.
+- **Live events are dropped, not buffered** — a progress UI replays `RunsService.ListEvents` — and `frontend/src/generated/events.ts` is generated, committed and checked by a test, while `frontend/bindings/` is generated and gitignored; both that file and `go.mod` are pinned to LF.
+- **golangci-lint must be built by the Go release the module targets** and run from `GOPATH/bin`; it runs `errcheck` with `check-blank`, `govet` `enable-all` with non-strict `shadow`, `fieldalignment` off because field order is the JSON order, `gocritic` without `hugeParam`, `misspell` US English ignoring `cancelled`.
+- **The WP-CLI image's `www-data` is uid 82, the WordPress image's is uid 33**, so the compose `bootstrap` service runs as `33:33`, needs the `WORDPRESS_DB_*` variables and `WP_ENVIRONMENT_TYPE=local` for application passwords over HTTP.
+- **`go test -tags e2e` is the only thing that compiles `internal/e2e` and `internal/adapters/wp/e2e`**; `task lint:e2e` is not optional and `gofmt -l .` is what catches formatting there.
+- **WordPress quirks**: `modified_gmt` has no timezone suffix and core REST filters `modified_after` on the site-local column, which is why the plugin's `/content?since=` exists; `"meta"` arrives as `[]`, not `{}`, for a post type with no registered meta, and `wp.metaBag` takes the array, the object and null.
+- **`wptest` must never import `wp`**: the fake is a second, independent implementation of the same contract.
+- **`VACUUM INTO` cannot write through the adiantum VFS** — it opens the target with no key — so snapshots and restores go through the SQLite online backup API with a plain `file:` URI.
 
 ## Standing rulings
 
-- **2026-09-17** — UUIDs come from the Go 1.27 standard library `uuid` package; `github.com/google/uuid` is not a dependency. `kernel/id.Valid` does its own canonical v4 check, because `uuid.Parse` also accepts braced, URN and unhyphenated text and any version.
-- **2026-09-17** — `paging.Cut` is a `Keyset` method, not the free function the spec sketched: the accessors already live on the keyset, and passing them per call is the one way to make a cursor disagree with its query.
-- **2026-09-17** — `.golangci.yml` carries no inline rationale, against the letter of task 0.8, because the no-comments-in-YAML rule outranks it. The rationale is the Footguns entry above.
-- **2026-09-17** — The Wails template is `vanilla` (Vanilla + TypeScript + Vite); beta.23 renamed `vanilla-ts`.
-- **2026-09-17 (review)** — `errors.Wrap` returns `error`, never `*Error`: the concrete pointer made `Wrap(nil, …)` a typed nil that is not nil once returned, and `CodeOf` dereferenced it. Chain enrichment off `New(...)` instead. The kernel exports nothing whose only caller is its own test.
-- **2026-09-17 (phase 1B)** — The error marshaller must be set per service with `application.NewServiceWithOptions`; `application.Options.MarshalError` is dead code in beta.23 because `Bindings.Add` overwrites each method's marshaller with the service option.
-- **2026-09-17 (phase 1B)** — A service method returns `wails.Convert(err)`, never the raw error: `CallError.Message` is `err.Error()`, so a wrapped driver message would cross into the webview.
-- **2026-09-17 (phase 1B)** — `application.RegisterEvent` is not used. The Go registry plus `go run ./internal/transport/wails/gen` owns the event typings; a second list would drift and its output lands in the gitignored `frontend/bindings`.
-- **2026-09-17 (phase 1B)** — `Services` is a method on `*app.Core`. `internal/transport/wails` cannot import `internal/app`, because `internal/app` imports it; the composition root is what hands a service its dependencies.
+Dated in full in [`docs/DECISIONS.md`](docs/DECISIONS.md); these are the ones that change how you write code here.
 
-- **2026-09-18 (phase 3A)** — `adapters/wp` is the one place in the codebase where page
-  numbers are legal. WordPress core REST has no keyset; `kernel/paging` is untouched by
-  it, and the plugin's own cursor is passed through opaque.
-- **2026-09-18 (phase 3A)** — `wp.ContentHash` is `hex(sha256(raw))` and is frozen. It is
-  not `domain/content.Document.Hash()`, and normalising it would silently break the
-  optimistic-concurrency check on `PUT /content/{id}/raw`.
-- **2026-09-18 (phase 3A)** — `wp-plugin/openapi.yaml` is the contract between the two
-  Phase 3 tracks. Neither track changes it alone.
-
-- **2026-09-18 (phase 3B)** — The companion plugin never removes a kses filter. It relies on the authenticated administrator's `unfiltered_html` and returns the hash of what is actually stored, so a filtered write is visible rather than silent. Multisite is unsupported for that reason.
-- **2026-09-18 (phase 3B)** — Every plugin write passes `wp_slash`, because `wp_insert_post` and `update_metadata` unslash what they are handed.
-- **2026-09-18 (phase 3B)** — `normalize_path` has no file-extension exception: collapse duplicate slashes, one leading and one trailing slash, then `strtolower`. Host comparison is exact and lowercase with no `www` stripping. One rule with no branches is how the PHP and Go sides stay in step.
-- **2026-09-18 (phase 3B)** — The `/content` cursor names its phase (`post`, then `term`), `nextCursor` is `null` at the end of the list, and an undecodable cursor is a `400` rather than a restart from the beginning.
-- **2026-09-18 (phase 3B)** — `/seo-meta/{id}` and `/content/{id}/raw` address posts only; post and term ids collide and the contract has no discriminator, so a term id is a `404`.
-- **2026-09-18 (phase 3B)** — `since` is validated as RFC3339 by regex before `strtotime`, which otherwise accepts `yesterday` and every other English phrase.
-
-- **2026-09-18 (phases 9-10)** — `github.com/robfig/cron/v3` joins `golang.org/x/net/html` as a third-party package the domain may import; `internal/app/deps_test.go` holds the allowance and a hand-written cron parser is not worth the bugs.
-- **2026-09-18 (phases 9-10)** — `internal/transport/agent` is the only package that may name gollem, which `deps_test.go` enforces. `RunSpec` and `RunResult` live in `internal/application/agent` because the consumer declares the interface it calls.
-- **2026-09-18 (phases 9-10)** — A tool's arguments are masked with `log.IsSensitiveKey` before they reach the tool call ledger, an event or a confirmation summary. Only `pending_actions.args` keeps them whole, because that row is the command the approval replays.
-
-- **2026-09-18 (phase 11)** — A Wails service declares the use-case interface it consumes and `Services` takes a `wails.Deps` from the composition root; the transport cannot import `internal/app`. A reflection table in `internal/transport/wails` calls every exported method of every service, so a method that bypasses `Wrap` fails the suite.
-- **2026-09-18 (phase 11)** — `SettingsService` is the only surface that accepts a credential. `SetProviderKey` is not bound on `ModelsService`, and `kernel/settings.Registry.Validate` exists so one write can be refused before it is persisted.
-- **2026-09-18 (phase 11)** — `docs/CONTRACTS.md` names the event families and links `frontend/src/generated/events.ts` rather than repeating the registry. The catalogue table is the list of bound services, and `frontend/src/smoke.ts` is the compile-time proof that it is usable; it is typechecked and never executed.
+- **2026-09-17** — UUIDs come from the Go 1.27 standard library; `kernel/id.Valid` does its own canonical v4 check. `paging.Cut` is a `Keyset` method. `errors.Wrap` returns `error`, never `*Error`. The kernel exports nothing whose only caller is its own test.
+- **2026-09-17 (phase 1B)** — A service method returns `wails.Convert(err)`, never the raw error; the error marshaller is set per service with `NewServiceWithOptions`; `application.RegisterEvent` is not used, the Go registry renders the typings.
+- **2026-09-18 (phase 3)** — `adapters/wp` is the one place page numbers are legal; `wp.ContentHash` is `hex(sha256(raw))` and frozen; `wp-plugin/openapi.yaml` is the contract neither side changes alone; the plugin never removes a kses filter and passes `wp_slash` on every write.
+- **2026-09-18 (phases 9-10)** — `robfig/cron/v3` and `x/net/html` are the only third-party packages the domain may import; `internal/transport/agent` is the only package that may name gollem; a tool call's arguments are masked before they reach a ledger, an event or a summary.
+- **2026-09-18 (phase 11)** — A Wails service declares the use-case interface it consumes and `Services` takes a `wails.Deps` from the composition root; `SettingsService` is the only surface that accepts a credential.
+- **2026-09-18 (phase 12)** — A Wails service resolves its use case per call through a `Source[T]`, which answers `Locked` while the core carries no composition; `app.Open` starts locked when `master.key.pw` exists; `app.Config.Provider` is the seam an end-to-end harness uses to compose the real application over `adapters/llm/fake`.
 
 ## Product guardrail
 
