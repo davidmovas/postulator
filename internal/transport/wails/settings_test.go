@@ -14,13 +14,17 @@ import (
 )
 
 type declarationsFake struct {
-	registry *settings.Registry
-	panics   bool
+	registry  *settings.Registry
+	describes error
+	panics    bool
 }
 
 func (d declarationsFake) Schema() ([]settings.Descriptor, error) {
 	if d.panics {
 		panic("the registry went away")
+	}
+	if d.describes != nil {
+		return nil, d.describes
 	}
 	return d.registry.Schema()
 }
@@ -243,4 +247,71 @@ func TestSettingsServiceConvertsEveryFailure(t *testing.T) {
 		Store:        &storeFake{stored: map[string]json.RawMessage{}},
 		Models:       &providerKeyFake{mode: panicking, fails: true},
 	}), panicBody)
+}
+
+func TestSettingsServiceReportsWhatItsCollaboratorsRefuse(t *testing.T) {
+	t.Parallel()
+
+	broken := errors.New(errors.External, "the settings table is unreadable")
+	registry := settings.New()
+	registry.Int("runs.workers", 2, settings.IntRange(1, 16))
+
+	cases := []struct {
+		name string
+		deps wails.SettingsDeps
+		call func(*wails.SettingsService) error
+	}{
+		{
+			name: "the declarations cannot be described",
+			deps: wails.SettingsDeps{
+				Declarations: declarationsFake{registry: registry, describes: broken},
+				Values:       registry.NewValues(),
+				Store:        &storeFake{stored: map[string]json.RawMessage{}},
+				Models:       &providerKeyFake{},
+			},
+			call: func(service *wails.SettingsService) error {
+				_, err := service.Schema(context.Background(), wails.SettingsSchemaRequest{})
+				return err
+			},
+		},
+		{
+			name: "the store cannot be read",
+			deps: wails.SettingsDeps{
+				Declarations: declarationsFake{registry: registry},
+				Values:       registry.NewValues(),
+				Store:        &storeFake{stored: map[string]json.RawMessage{}, fail: broken},
+				Models:       &providerKeyFake{},
+			},
+			call: func(service *wails.SettingsService) error {
+				_, err := service.Get(context.Background(), wails.GetSettingRequest{Key: "runs.workers"})
+				return err
+			},
+		},
+		{
+			name: "the store cannot be written",
+			deps: wails.SettingsDeps{
+				Declarations: declarationsFake{registry: registry},
+				Values:       registry.NewValues(),
+				Store:        &storeFake{stored: map[string]json.RawMessage{}, fail: broken},
+				Models:       &providerKeyFake{},
+			},
+			call: func(service *wails.SettingsService) error {
+				_, err := service.Set(context.Background(), wails.SetSettingRequest{
+					Key: "runs.workers", Value: json.RawMessage("4"),
+				})
+				return err
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tc.call(wails.NewSettingsService(zap.NewNop(), tc.deps))
+			if !errors.IsCode(err, errors.External) {
+				t.Fatalf("error = %v, want %s", err, errors.External)
+			}
+		})
+	}
 }
