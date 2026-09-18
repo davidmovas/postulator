@@ -115,7 +115,7 @@ func TestEveryServiceRefusesWhileTheApplicationIsLocked(t *testing.T) {
 		wails.NewTemplatesService(logger, refused[wails.TemplatesUseCase]()),
 		wails.NewRunsService(logger, refused[wails.RunsUseCase]()),
 		wails.NewSyncService(logger, refused[wails.SyncUseCase]()),
-		wails.NewReportsService(logger, refused[wails.ReportsUseCase]()),
+		wails.NewReportsService(logger, refused[wails.ReportsUseCase](), refused[wails.JudgeUseCase]()),
 		wails.NewImportService(logger, refused[wails.ImportsUseCase]()),
 		wails.NewModelsService(logger, refused[wails.ModelsUseCase]()),
 		wails.NewAgentService(logger, refused[wails.AgentUseCase]()),

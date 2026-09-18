@@ -227,6 +227,8 @@ func llmTypeOf(provider string) gollem.LLMType {
 		return gollem.LLMTypeClaude
 	case ProviderGemini:
 		return gollem.LLMTypeGemini
+	case ProviderGeminiOpenAI:
+		return gollem.LLMTypeOpenAI
 	default:
 		return gollem.LLMTypeOpenAI
 	}

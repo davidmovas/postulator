@@ -18,6 +18,8 @@ const (
 	ProviderOpenAI    = "openai"
 	ProviderAnthropic = "anthropic"
 	ProviderGemini    = "gemini"
+
+	ProviderGeminiOpenAI = "gemini-openai"
 )
 
 func SecretRef(provider string) string {
@@ -62,15 +64,13 @@ func (f *Factory) New(ctx context.Context, ref llm.ModelRef) (gollem.LLMClient, 
 func (f *Factory) build(ctx context.Context, ref llm.ModelRef) (gollem.LLMClient, error) {
 	switch ref.Provider {
 	case ProviderOpenAI:
-		key, err := f.key(ctx, ref.Provider)
-		if err != nil {
-			return nil, err
+		return f.compatible(ctx, ref, openaiBaseURL.Get(f.values))
+	case ProviderGeminiOpenAI:
+		base := geminiOpenAIBase.Get(f.values)
+		if base == "" {
+			base = DefaultGeminiOpenAIBaseURL
 		}
-		options := []openai.Option{openai.WithModel(ref.Model)}
-		if base := openaiBaseURL.Get(f.values); base != "" {
-			options = append(options, openai.WithBaseURL(base))
-		}
-		return wrap(openai.New(ctx, key, options...))
+		return f.compatible(ctx, ref, base)
 	case ProviderAnthropic:
 		key, err := f.key(ctx, ref.Provider)
 		if err != nil {
@@ -91,6 +91,19 @@ func (f *Factory) build(ctx context.Context, ref llm.ModelRef) (gollem.LLMClient
 	default:
 		return nil, errors.New(errors.Invalid, "this provider is not supported").WithDetail("provider", ref.Provider)
 	}
+}
+
+func (f *Factory) compatible(ctx context.Context, ref llm.ModelRef, base string) (gollem.LLMClient, error) {
+	key, err := f.key(ctx, ref.Provider)
+	if err != nil {
+		return nil, err
+	}
+
+	options := []openai.Option{openai.WithModel(ref.Model)}
+	if base != "" {
+		options = append(options, openai.WithBaseURL(base))
+	}
+	return wrap(openai.New(ctx, key, options...))
 }
 
 func wrap[T gollem.LLMClient](client T, err error) (gollem.LLMClient, error) {

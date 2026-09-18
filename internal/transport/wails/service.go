@@ -48,6 +48,7 @@ type Deps struct {
 	Runs      Source[RunsUseCase]
 	Sync      Source[SyncUseCase]
 	Reports   Source[ReportsUseCase]
+	Judge     Source[JudgeUseCase]
 	Imports   Source[ImportsUseCase]
 	Models    Source[ModelsUseCase]
 	Agent     Source[AgentUseCase]
@@ -65,7 +66,7 @@ func Services(logger *zap.Logger, build BuildInfo, deps Deps) []application.Serv
 		bind(NewTemplatesService(logger, deps.Templates)),
 		bind(NewRunsService(logger, deps.Runs)),
 		bind(NewSyncService(logger, deps.Sync)),
-		bind(NewReportsService(logger, deps.Reports)),
+		bind(NewReportsService(logger, deps.Reports, deps.Judge)),
 		bind(NewImportService(logger, deps.Imports)),
 		bind(NewModelsService(logger, deps.Models)),
 		bind(NewAgentService(logger, deps.Agent)),

@@ -1,14 +1,32 @@
 {
   "defaults": {
-    "writer": { "provider": "openai", "model": "gpt-5.6-terra" },
-    "editor": { "provider": "openai", "model": "gpt-5.6-luna" },
-    "linker": { "provider": "openai", "model": "gpt-5.6-luna" },
-    "judge": { "provider": "openai", "model": "gpt-5.6-terra" },
-    "chat": { "provider": "openai", "model": "gpt-5.6-sol" }
+    "writer": {
+      "provider": "openai",
+      "model": "gpt-5.6-terra"
+    },
+    "editor": {
+      "provider": "openai",
+      "model": "gpt-5.6-luna"
+    },
+    "linker": {
+      "provider": "openai",
+      "model": "gpt-5.6-luna"
+    },
+    "judge": {
+      "provider": "openai",
+      "model": "gpt-5.6-terra"
+    },
+    "chat": {
+      "provider": "openai",
+      "model": "gpt-5.6-sol"
+    }
   },
   "models": [
     {
-      "ref": { "provider": "openai", "model": "gpt-6-astra" },
+      "ref": {
+        "provider": "openai",
+        "model": "gpt-6-astra"
+      },
       "contextTokens": 1050000,
       "maxOutputTokens": 128000,
       "inputUsdPerM": 10.0,
@@ -20,7 +38,10 @@
       "reasoning": true
     },
     {
-      "ref": { "provider": "openai", "model": "gpt-5.6-sol" },
+      "ref": {
+        "provider": "openai",
+        "model": "gpt-5.6-sol"
+      },
       "contextTokens": 1050000,
       "maxOutputTokens": 128000,
       "inputUsdPerM": 4.0,
@@ -32,7 +53,10 @@
       "reasoning": true
     },
     {
-      "ref": { "provider": "openai", "model": "gpt-5.6-terra" },
+      "ref": {
+        "provider": "openai",
+        "model": "gpt-5.6-terra"
+      },
       "contextTokens": 1050000,
       "maxOutputTokens": 128000,
       "inputUsdPerM": 2.0,
@@ -44,7 +68,10 @@
       "reasoning": true
     },
     {
-      "ref": { "provider": "openai", "model": "gpt-5.6-luna" },
+      "ref": {
+        "provider": "openai",
+        "model": "gpt-5.6-luna"
+      },
       "contextTokens": 1050000,
       "maxOutputTokens": 128000,
       "inputUsdPerM": 0.2,
@@ -56,7 +83,10 @@
       "reasoning": true
     },
     {
-      "ref": { "provider": "anthropic", "model": "claude-fable-5-1" },
+      "ref": {
+        "provider": "anthropic",
+        "model": "claude-fable-5-1"
+      },
       "contextTokens": 1000000,
       "maxOutputTokens": 128000,
       "inputUsdPerM": 10.0,
@@ -68,7 +98,10 @@
       "reasoning": true
     },
     {
-      "ref": { "provider": "anthropic", "model": "claude-opus-5" },
+      "ref": {
+        "provider": "anthropic",
+        "model": "claude-opus-5"
+      },
       "contextTokens": 1000000,
       "maxOutputTokens": 128000,
       "inputUsdPerM": 5.0,
@@ -80,7 +113,10 @@
       "reasoning": true
     },
     {
-      "ref": { "provider": "anthropic", "model": "claude-sonnet-5" },
+      "ref": {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5"
+      },
       "contextTokens": 1000000,
       "maxOutputTokens": 128000,
       "inputUsdPerM": 2.0,
@@ -92,7 +128,10 @@
       "reasoning": true
     },
     {
-      "ref": { "provider": "anthropic", "model": "claude-haiku-4-5" },
+      "ref": {
+        "provider": "anthropic",
+        "model": "claude-haiku-4-5"
+      },
       "contextTokens": 200000,
       "maxOutputTokens": 64000,
       "inputUsdPerM": 1.0,
@@ -104,7 +143,10 @@
       "reasoning": true
     },
     {
-      "ref": { "provider": "gemini", "model": "gemini-3.5-flash" },
+      "ref": {
+        "provider": "gemini",
+        "model": "gemini-3.5-flash"
+      },
       "contextTokens": 1048576,
       "maxOutputTokens": 65536,
       "inputUsdPerM": 1.5,
@@ -116,7 +158,10 @@
       "reasoning": true
     },
     {
-      "ref": { "provider": "gemini", "model": "gemini-3.5-flash-lite" },
+      "ref": {
+        "provider": "gemini",
+        "model": "gemini-3.5-flash-lite"
+      },
       "contextTokens": 1048576,
       "maxOutputTokens": 65536,
       "inputUsdPerM": 0.3,
@@ -128,7 +173,10 @@
       "reasoning": true
     },
     {
-      "ref": { "provider": "gemini", "model": "gemini-2.5-flash" },
+      "ref": {
+        "provider": "gemini",
+        "model": "gemini-2.5-flash"
+      },
       "contextTokens": 1048576,
       "maxOutputTokens": 65536,
       "inputUsdPerM": 0.3,
@@ -140,7 +188,70 @@
       "reasoning": true
     },
     {
-      "ref": { "provider": "gemini", "model": "gemini-2.5-flash-lite" },
+      "ref": {
+        "provider": "gemini",
+        "model": "gemini-2.5-flash-lite"
+      },
+      "contextTokens": 1048576,
+      "maxOutputTokens": 65536,
+      "inputUsdPerM": 0.1,
+      "outputUsdPerM": 0.4,
+      "rpm": 60,
+      "tpm": 120000,
+      "supportsStructured": true,
+      "supportsImages": true,
+      "reasoning": true
+    },
+    {
+      "ref": {
+        "provider": "gemini-openai",
+        "model": "gemini-3.5-flash"
+      },
+      "contextTokens": 1048576,
+      "maxOutputTokens": 65536,
+      "inputUsdPerM": 1.5,
+      "outputUsdPerM": 9.0,
+      "rpm": 60,
+      "tpm": 120000,
+      "supportsStructured": true,
+      "supportsImages": true,
+      "reasoning": true
+    },
+    {
+      "ref": {
+        "provider": "gemini-openai",
+        "model": "gemini-3.5-flash-lite"
+      },
+      "contextTokens": 1048576,
+      "maxOutputTokens": 65536,
+      "inputUsdPerM": 0.3,
+      "outputUsdPerM": 2.5,
+      "rpm": 60,
+      "tpm": 120000,
+      "supportsStructured": true,
+      "supportsImages": true,
+      "reasoning": true
+    },
+    {
+      "ref": {
+        "provider": "gemini-openai",
+        "model": "gemini-2.5-flash"
+      },
+      "contextTokens": 1048576,
+      "maxOutputTokens": 65536,
+      "inputUsdPerM": 0.3,
+      "outputUsdPerM": 2.5,
+      "rpm": 60,
+      "tpm": 120000,
+      "supportsStructured": true,
+      "supportsImages": true,
+      "reasoning": true
+    },
+    {
+      "ref": {
+        "provider": "gemini-openai",
+        "model": "gemini-2.5-flash-lite"
+      },
       "contextTokens": 1048576,
       "maxOutputTokens": 65536,
       "inputUsdPerM": 0.1,

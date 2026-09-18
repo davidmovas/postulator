@@ -6,6 +6,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/davidmovas/postulator/internal/application/content"
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/transport/wails"
 )
@@ -24,12 +25,21 @@ func (f reportsFake) RunReport(context.Context, reports.RunReportRequest) (repor
 	return answer[reports.RunReportResponse](f.mode)
 }
 
+type judgeFake struct{ mode failure }
+
+func (f judgeFake) Judge(context.Context, content.JudgeRequest) (content.JudgeResponse, error) {
+	return answer[content.JudgeResponse](f.mode)
+}
+
 func TestReportsServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
-	assertMethodNames(t, wails.NewReportsService(zap.NewNop(), ready[wails.ReportsUseCase](reportsFake{})), []string{
-		"PageReport", "RunReport", "SiteOverview",
+	assertMethodNames(t, wails.NewReportsService(zap.NewNop(),
+		ready[wails.ReportsUseCase](reportsFake{}), ready[wails.JudgeUseCase](judgeFake{})), []string{
+		"JudgePage", "PageReport", "RunReport", "SiteOverview",
 	})
-	assertEveryMethodConverts(t, wails.NewReportsService(zap.NewNop(), ready[wails.ReportsUseCase](reportsFake{mode: missing})), missingBody)
-	assertEveryMethodConverts(t, wails.NewReportsService(zap.NewNop(), ready[wails.ReportsUseCase](reportsFake{mode: panicking})), panicBody)
+	assertEveryMethodConverts(t, wails.NewReportsService(zap.NewNop(),
+		ready[wails.ReportsUseCase](reportsFake{mode: missing}), ready[wails.JudgeUseCase](judgeFake{mode: missing})), missingBody)
+	assertEveryMethodConverts(t, wails.NewReportsService(zap.NewNop(),
+		ready[wails.ReportsUseCase](reportsFake{mode: panicking}), ready[wails.JudgeUseCase](judgeFake{mode: panicking})), panicBody)
 }

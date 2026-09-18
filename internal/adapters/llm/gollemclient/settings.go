@@ -8,7 +8,11 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/settings"
 )
 
-const DefaultTimeout = 2 * time.Minute
+const (
+	DefaultTimeout = 2 * time.Minute
+
+	DefaultGeminiOpenAIBaseURL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+)
 
 var (
 	timeoutSetting   = settings.Duration("llm.timeout", DefaultTimeout, settings.DurationRange(5*time.Second, 30*time.Minute))
@@ -16,6 +20,7 @@ var (
 	anthropicBaseURL = settings.String("llm.anthropic.baseUrl", "", baseURLValidator())
 	geminiProject    = settings.String("llm.gemini.projectId", "")
 	geminiLocation   = settings.String("llm.gemini.location", "")
+	geminiOpenAIBase = settings.String("llm.geminiOpenai.baseUrl", DefaultGeminiOpenAIBaseURL, baseURLValidator())
 )
 
 func baseURLValidator() settings.Validator[string] {

@@ -43,6 +43,7 @@ func (c *Core) Services(logger *log.Logger) []application.Service {
 		Runs:      live(c, func(c *Core) wails.RunsUseCase { return c.Runs }),
 		Sync:      live(c, func(c *Core) wails.SyncUseCase { return c.Sync }),
 		Reports:   live(c, func(c *Core) wails.ReportsUseCase { return c.Reports }),
+		Judge:     live(c, func(c *Core) wails.JudgeUseCase { return c.Content }),
 		Imports:   live(c, func(c *Core) wails.ImportsUseCase { return c.Imports }),
 		Models:    live(c, func(c *Core) wails.ModelsUseCase { return c.Models }),
 		Agent:     live(c, func(c *Core) wails.AgentUseCase { return c.Agent }),

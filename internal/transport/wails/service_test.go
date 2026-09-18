@@ -94,6 +94,7 @@ func serviceDeps() wails.Deps {
 		Runs:      ready[wails.RunsUseCase](runsFake{}),
 		Sync:      ready[wails.SyncUseCase](syncFake{}),
 		Reports:   ready[wails.ReportsUseCase](reportsFake{}),
+		Judge:     ready[wails.JudgeUseCase](judgeFake{}),
 		Imports:   ready[wails.ImportsUseCase](importsFake{}),
 		Models:    ready[wails.ModelsUseCase](modelsFake{}),
 		Agent:     ready[wails.AgentUseCase](agentFake{}),

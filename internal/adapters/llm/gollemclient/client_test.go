@@ -583,3 +583,44 @@ func TestClientWithoutATimeout(t *testing.T) {
 		t.Error("the answer is empty")
 	}
 }
+
+func TestGeminiThroughTheOpenAICompatibleEndpoint(t *testing.T) {
+	t.Parallel()
+
+	client, captured := newClient(t, gollemclient.ProviderGeminiOpenAI, "llm.geminiOpenai.baseUrl",
+		func(w http.ResponseWriter, _ *http.Request) {
+			writeJSON(t, w, openaiCompletion)
+		})
+
+	resp, err := client.Complete(t.Context(), port.Request{
+		Ref:       llm.ModelRef{Provider: gollemclient.ProviderGeminiOpenAI, Model: "gemini-3.5-flash"},
+		System:    "you write pages",
+		Messages:  []port.Message{{Role: port.RoleUser, Text: "write"}},
+		MaxTokens: 256,
+	})
+	if err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+	if resp.Text != "Koffein und Powder" {
+		t.Fatalf("text = %q, want the provider answer", resp.Text)
+	}
+	if !strings.Contains(captured.last(), `"gemini-3.5-flash"`) {
+		t.Fatalf("the request body is %s, want the gemini model", captured.last())
+	}
+}
+
+func TestGeminiOpenAIDefaultsToGoogleAI(t *testing.T) {
+	t.Parallel()
+
+	if !strings.HasPrefix(gollemclient.DefaultGeminiOpenAIBaseURL, "https://generativelanguage.googleapis.com/") {
+		t.Fatalf("the default base URL is %q", gollemclient.DefaultGeminiOpenAIBaseURL)
+	}
+
+	values := settings.Default().NewValues()
+	factory := gollemclient.NewFactory(vault{}, values)
+	if _, err := factory.New(t.Context(), llm.ModelRef{
+		Provider: gollemclient.ProviderGeminiOpenAI, Model: "gemini-3.5-flash",
+	}); !errors.IsCode(err, errors.Unauthorized) {
+		t.Fatalf("New without a key = %v, want %s", err, errors.Unauthorized)
+	}
+}
