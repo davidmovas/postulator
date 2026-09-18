@@ -17,7 +17,7 @@ import (
 )
 
 type tableStore interface {
-	Read(ctx context.Context, path string) (importmap.Table, error)
+	Read(ctx context.Context, path string, maxRows int) (importmap.Table, error)
 	Write(path string, table importmap.Table) error
 }
 
@@ -97,15 +97,7 @@ func (s *Service) requireSite(ctx context.Context, siteID string) error {
 }
 
 func (s *Service) table(ctx context.Context, path string) (importmap.Table, error) {
-	table, err := s.deps.Tables.Read(ctx, path)
-	if err != nil {
-		return importmap.Table{}, err
-	}
-	if len(table.Rows) > s.deps.MaxRows {
-		return importmap.Table{}, errors.New(errors.Invalid, "the import file carries more rows than the import.maxRows setting allows").
-			WithDetail("rows", len(table.Rows)).WithDetail("maxRows", s.deps.MaxRows)
-	}
-	return table, nil
+	return s.deps.Tables.Read(ctx, path, s.deps.MaxRows)
 }
 
 func (s *Service) announce(siteID string) error {

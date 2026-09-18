@@ -1,18 +1,16 @@
 package importer
 
 import (
-	"bytes"
-
 	"github.com/xuri/excelize/v2"
 
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
-func readWorkbook(body []byte) (rows [][]string, err error) {
-	file, err := excelize.OpenReader(bytes.NewReader(body))
+func readWorkbook(path string, add func([]string) error) (err error) {
+	file, err := excelize.OpenFile(path)
 	if err != nil {
-		return nil, errors.Wrap(err, errors.Invalid, "read the workbook")
+		return openFailed(err, path)
 	}
 	defer func() {
 		if closeErr := file.Close(); closeErr != nil && err == nil {
@@ -22,14 +20,32 @@ func readWorkbook(body []byte) (rows [][]string, err error) {
 
 	sheets := file.GetSheetList()
 	if len(sheets) == 0 {
-		return nil, errors.New(errors.Invalid, "the workbook has no sheet")
+		return errors.New(errors.Invalid, "the workbook has no sheet")
 	}
 
-	rows, err = file.GetRows(sheets[0])
+	rows, err := file.Rows(sheets[0])
 	if err != nil {
-		return nil, errors.Wrap(err, errors.Invalid, "read the first sheet")
+		return errors.Wrap(err, errors.Invalid, "read the first sheet")
 	}
-	return rows, nil
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = errors.Wrap(closeErr, errors.Internal, "close the sheet iterator")
+		}
+	}()
+
+	for rows.Next() {
+		row, columnsErr := rows.Columns()
+		if columnsErr != nil {
+			return errors.Wrap(columnsErr, errors.Invalid, "read a workbook row")
+		}
+		if addErr := add(row); addErr != nil {
+			return addErr
+		}
+	}
+	if err = rows.Error(); err != nil {
+		return errors.Wrap(err, errors.Invalid, "read the first sheet")
+	}
+	return nil
 }
 
 func Write(path string, table importmap.Table) (err error) {

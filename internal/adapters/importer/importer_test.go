@@ -100,7 +100,7 @@ func TestReadFindsTheHeaderAndTheRows(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			table, err := importer.Read(t.Context(), tc.path(t))
+			table, err := importer.Read(t.Context(), tc.path(t), 0)
 			if err != nil {
 				t.Fatalf("Read: %v", err)
 			}
@@ -154,7 +154,7 @@ func TestReadRefusesWhatItCannotParse(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := importer.Read(t.Context(), tc.path(t))
+			_, err := importer.Read(t.Context(), tc.path(t), 0)
 			if !errors.IsCode(err, tc.code) {
 				t.Fatalf("Read = %v, want %s", err, tc.code)
 			}
@@ -168,7 +168,7 @@ func TestReadStopsWhenTheContextIsDone(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	if _, err := importer.Read(ctx, write(t, "map.csv", "path\n/\n")); !errors.IsCode(err, errors.Cancelled) {
+	if _, err := importer.Read(ctx, write(t, "map.csv", "path\n/\n"), 0); !errors.IsCode(err, errors.Cancelled) {
 		t.Fatalf("Read = %v, want cancelled", err)
 	}
 }
@@ -185,7 +185,7 @@ func TestWriteProducesAWorkbookThatReadsBack(t *testing.T) {
 		t.Fatalf("Write: %v", err)
 	}
 
-	back, err := importer.Read(t.Context(), path)
+	back, err := importer.Read(t.Context(), path, 0)
 	if err != nil {
 		t.Fatalf("Read: %v", err)
 	}
@@ -231,7 +231,7 @@ func TestReaderIsTheAdapterTheUseCasesHold(t *testing.T) {
 		t.Fatalf("Write: %v", err)
 	}
 
-	table, err := reader.Read(t.Context(), path)
+	table, err := reader.Read(t.Context(), path, 0)
 	if err != nil {
 		t.Fatalf("Read: %v", err)
 	}
@@ -244,7 +244,7 @@ func TestTheDelimiterIsSniffedOutsideQuotes(t *testing.T) {
 	t.Parallel()
 
 	path := write(t, "map.csv", "\"path;with;semicolons\",title\n\"/a;b/\",Home\n")
-	table, err := importer.Read(t.Context(), path)
+	table, err := importer.Read(t.Context(), path, 0)
 	if err != nil {
 		t.Fatalf("Read: %v", err)
 	}
@@ -260,7 +260,7 @@ func TestReadKeepsRaggedRowsAndTrimsTrailingBlanks(t *testing.T) {
 	t.Parallel()
 
 	path := write(t, "map.csv", "path,title,keywords\n/,Home\n/services/,Services,,\n")
-	table, err := importer.Read(t.Context(), path)
+	table, err := importer.Read(t.Context(), path, 0)
 	if err != nil {
 		t.Fatalf("Read: %v", err)
 	}
@@ -269,5 +269,41 @@ func TestReadKeepsRaggedRowsAndTrimsTrailingBlanks(t *testing.T) {
 	}
 	if !slices.Equal(table.Rows[1], []string{"/services/", "Services"}) {
 		t.Fatalf("padded row = %v", table.Rows[1])
+	}
+}
+
+func TestReadStopsAtTheRowCap(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		path func(*testing.T) string
+		name string
+	}{
+		{
+			name: "separated values",
+			path: func(t *testing.T) string { return write(t, "cap.csv", "path\n/a/\n/b/\n/c/\n") },
+		},
+		{
+			name: "workbook",
+			path: func(t *testing.T) string {
+				return sheet(t, "cap.xlsx", [][]string{{"path"}, {"/a/"}, {"/b/"}, {"/c/"}})
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			path := tc.path(t)
+			if _, err := importer.Read(t.Context(), path, 2); !errors.IsCode(err, errors.Invalid) {
+				t.Fatalf("Read past the cap = %v, want invalid", err)
+			}
+
+			table, err := importer.Read(t.Context(), path, 3)
+			if err != nil || len(table.Rows) != 3 {
+				t.Fatalf("Read at the cap = %+v, %v", table, err)
+			}
+		})
 	}
 }

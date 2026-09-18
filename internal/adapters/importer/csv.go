@@ -1,17 +1,22 @@
 package importer
 
 import (
-	"bytes"
+	"bufio"
 	"encoding/csv"
+	stderrors "errors"
+	"io"
+	"os"
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
+const sniffWindow = 64 * 1024
+
 var delimiters = []rune{',', ';', '\t'}
 
-func sniff(body []byte) rune {
-	for line := range strings.SplitSeq(strings.ReplaceAll(string(body), "\r\n", "\n"), "\n") {
+func sniff(head []byte) rune {
+	for line := range strings.SplitSeq(strings.ReplaceAll(string(head), "\r\n", "\n"), "\n") {
 		if strings.TrimSpace(strings.TrimPrefix(line, "\ufeff")) == "" {
 			continue
 		}
@@ -39,16 +44,39 @@ func countOutsideQuotes(line string, delimiter rune) int {
 	return count
 }
 
-func readSeparated(body []byte) ([][]string, error) {
-	reader := csv.NewReader(bytes.NewReader(bytes.TrimPrefix(body, []byte("\ufeff"))))
-	reader.Comma = sniff(body)
+func readSeparated(path string, add func([]string) error) (err error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return openFailed(err, path)
+	}
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil && err == nil {
+			err = errors.Wrap(closeErr, errors.Internal, "close the separated values file")
+		}
+	}()
+
+	buffered := bufio.NewReaderSize(file, sniffWindow)
+	head, peekErr := buffered.Peek(sniffWindow)
+	if peekErr != nil && !stderrors.Is(peekErr, io.EOF) && !stderrors.Is(peekErr, bufio.ErrBufferFull) {
+		return errors.Wrap(peekErr, errors.Invalid, "read the separated values file")
+	}
+
+	reader := csv.NewReader(buffered)
+	reader.Comma = sniff(head)
 	reader.FieldsPerRecord = -1
 	reader.LazyQuotes = true
 	reader.TrimLeadingSpace = true
 
-	rows, err := reader.ReadAll()
-	if err != nil {
-		return nil, errors.Wrap(err, errors.Invalid, "read the separated values file")
+	for {
+		row, readErr := reader.Read()
+		if stderrors.Is(readErr, io.EOF) {
+			return nil
+		}
+		if readErr != nil {
+			return errors.Wrap(readErr, errors.Invalid, "read the separated values file")
+		}
+		if addErr := add(row); addErr != nil {
+			return addErr
+		}
 	}
-	return rows, nil
 }

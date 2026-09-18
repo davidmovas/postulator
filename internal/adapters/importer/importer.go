@@ -21,8 +21,8 @@ func New() Reader {
 	return Reader{}
 }
 
-func (Reader) Read(ctx context.Context, path string) (importmap.Table, error) {
-	return Read(ctx, path)
+func (Reader) Read(ctx context.Context, path string, maxRows int) (importmap.Table, error) {
+	return Read(ctx, path, maxRows)
 }
 
 func (Reader) Write(path string, table importmap.Table) error {
@@ -41,7 +41,7 @@ func Extension(path string) (string, error) {
 	return extension, nil
 }
 
-func Read(ctx context.Context, path string) (importmap.Table, error) {
+func Read(ctx context.Context, path string, maxRows int) (importmap.Table, error) {
 	extension, err := Extension(path)
 	if err != nil {
 		return importmap.Table{}, err
@@ -50,21 +50,43 @@ func Read(ctx context.Context, path string) (importmap.Table, error) {
 		return importmap.Table{}, errors.Wrap(err, errors.Cancelled, "read the import file")
 	}
 
-	body, err := os.ReadFile(path)
-	if err != nil {
-		return importmap.Table{}, openFailed(err, path)
-	}
-
-	var rows [][]string
+	collected := &collector{maxRows: maxRows, rows: make([][]string, 0)}
 	if extension == extensionXLSX {
-		rows, err = readWorkbook(body)
+		err = readWorkbook(path, collected.add)
 	} else {
-		rows, err = readSeparated(body)
+		err = readSeparated(path, collected.add)
 	}
 	if err != nil {
 		return importmap.Table{}, err
 	}
-	return table(rows, path)
+	if !collected.headed {
+		return importmap.Table{}, errors.New(errors.Invalid, "the import file has no header row").WithDetail("path", path)
+	}
+	return importmap.Table{Headers: collected.headers, Rows: collected.rows}, nil
+}
+
+type collector struct {
+	headers []string
+	rows    [][]string
+	maxRows int
+	headed  bool
+}
+
+func (c *collector) add(row []string) error {
+	trimmed := trimRow(row)
+	if blank(trimmed) {
+		return nil
+	}
+	if !c.headed {
+		c.headers, c.headed = trimmed, true
+		return nil
+	}
+	if c.maxRows > 0 && len(c.rows) >= c.maxRows {
+		return errors.New(errors.Invalid, "the import file carries more rows than the import.maxRows setting allows").
+			WithDetail("maxRows", c.maxRows)
+	}
+	c.rows = append(c.rows, trimmed)
+	return nil
 }
 
 func openFailed(cause error, path string) error {
@@ -72,28 +94,6 @@ func openFailed(cause error, path string) error {
 		return errors.New(errors.NotFound, "the import file does not exist").WithDetail("path", path).WithInternal(cause)
 	}
 	return errors.Wrap(cause, errors.Invalid, "read the import file")
-}
-
-func table(rows [][]string, path string) (importmap.Table, error) {
-	header := -1
-	for i, row := range rows {
-		if !blank(row) {
-			header = i
-			break
-		}
-	}
-	if header < 0 {
-		return importmap.Table{}, errors.New(errors.Invalid, "the import file has no header row").WithDetail("path", path)
-	}
-
-	out := importmap.Table{Headers: trimRow(rows[header]), Rows: make([][]string, 0, len(rows)-header)}
-	for _, row := range rows[header+1:] {
-		if blank(row) {
-			continue
-		}
-		out.Rows = append(out.Rows, trimRow(row))
-	}
-	return out, nil
 }
 
 func trimRow(row []string) []string {
