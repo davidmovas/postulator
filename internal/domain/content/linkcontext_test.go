@@ -50,7 +50,7 @@ func relatedEdge(id, from, to string, weight float64) graph.Edge {
 	}
 }
 
-func page(id, path string, entityID string) pagemap.Page {
+func page(id, path, entityID string) pagemap.Page {
 	record := pagemap.Page{
 		ID: id, SiteID: siteID, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPPage,
 		Status: pagemap.StatusPublished,
