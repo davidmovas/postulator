@@ -73,30 +73,34 @@ func NewConversationHistoryRepo(store *Store) *ConversationHistoryRepo {
 	return &ConversationHistoryRepo{store: store}
 }
 
-type StoredHistory struct {
-	Body    []byte
-	Version int
+type storedHistory struct {
+	body    []byte
+	version int
 }
 
-func (r *ConversationHistoryRepo) Load(ctx context.Context, conversationID string) (StoredHistory, error) {
-	return selectOne(ctx, r.store.execFrom(ctx), selectHistory, []any{conversationID}, scanStoredHistory,
+func (r *ConversationHistoryRepo) Load(ctx context.Context, conversationID string) (body []byte, version int, err error) {
+	stored, selectErr := selectOne(ctx, r.store.execFrom(ctx), selectHistory, []any{conversationID}, scanStoredHistory,
 		errors.New(errors.NotFound, "the conversation carries no history yet").
 			WithDetail("conversationId", conversationID), "read the conversation history")
+	if selectErr != nil {
+		return nil, 0, selectErr
+	}
+	return stored.body, stored.version, nil
 }
 
-func (r *ConversationHistoryRepo) Save(ctx context.Context, conversationID string, stored StoredHistory, now time.Time) error {
+func (r *ConversationHistoryRepo) Save(ctx context.Context, conversationID string, body []byte, version int, at time.Time) error {
 	_, err := execWrite(ctx, r.store.writeFrom(ctx), upsertHistory,
-		[]any{conversationID, string(stored.Body), stored.Version, formatTime(now)}, nil,
+		[]any{conversationID, string(body), version, formatTime(at)}, nil,
 		"save the conversation history")
 	return err
 }
 
-func scanStoredHistory(rows *sql.Rows) (StoredHistory, error) {
-	var stored StoredHistory
+func scanStoredHistory(rows *sql.Rows) (storedHistory, error) {
+	var stored storedHistory
 	var body string
-	if err := rows.Scan(&body, &stored.Version); err != nil {
-		return StoredHistory{}, err
+	if err := rows.Scan(&body, &stored.version); err != nil {
+		return storedHistory{}, err
 	}
-	stored.Body = []byte(body)
+	stored.body = []byte(body)
 	return stored, nil
 }

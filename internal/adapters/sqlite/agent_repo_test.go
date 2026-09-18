@@ -215,22 +215,21 @@ func TestToolCallsAndHistoryAreStoredPerConversation(t *testing.T) {
 		t.Fatalf("ByConversation = %+v, %v", rows, err)
 	}
 
-	if _, err = f.histories.Load(t.Context(), conversation.ID); !errors.IsCode(err, errors.NotFound) {
+	if _, _, err = f.histories.Load(t.Context(), conversation.ID); !errors.IsCode(err, errors.NotFound) {
 		t.Fatalf("Load of an empty history = %v", err)
 	}
 
-	stored := sqlite.StoredHistory{Body: []byte(`{"version":3}`), Version: 3}
-	if err = f.histories.Save(t.Context(), conversation.ID, stored, sqlitetest.Stamp); err != nil {
+	if err = f.histories.Save(t.Context(), conversation.ID, []byte(`{"version":3}`), 3, sqlitetest.Stamp); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
-	next := sqlite.StoredHistory{Body: []byte(`{"version":3,"messages":[]}`), Version: 3}
-	if err = f.histories.Save(t.Context(), conversation.ID, next, sqlitetest.Stamp.Add(time.Minute)); err != nil {
+	next := []byte(`{"version":3,"messages":[]}`)
+	if err = f.histories.Save(t.Context(), conversation.ID, next, 3, sqlitetest.Stamp.Add(time.Minute)); err != nil {
 		t.Fatalf("Save again: %v", err)
 	}
 
-	read, err := f.histories.Load(t.Context(), conversation.ID)
-	if err != nil || !bytes.Equal(read.Body, next.Body) || read.Version != 3 {
-		t.Fatalf("Load = %+v, %v", read, err)
+	read, version, err := f.histories.Load(t.Context(), conversation.ID)
+	if err != nil || !bytes.Equal(read, next) || version != 3 {
+		t.Fatalf("Load = %s, %d, %v", read, version, err)
 	}
 }
 

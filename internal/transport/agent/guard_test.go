@@ -1,0 +1,226 @@
+package agent_test
+
+import (
+	"context"
+	"encoding/json"
+	"strings"
+	"sync"
+	"testing"
+
+	"go.uber.org/zap/zaptest"
+
+	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
+	"github.com/davidmovas/postulator/internal/adapters/sqlite"
+	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
+	agentapp "github.com/davidmovas/postulator/internal/application/agent"
+	"github.com/davidmovas/postulator/internal/application/applicationtest"
+	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/tools"
+	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
+	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/kernel/clock"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
+	agentrunner "github.com/davidmovas/postulator/internal/transport/agent"
+)
+
+type recordingStream struct {
+	mu       sync.Mutex
+	deltas   []string
+	outcomes []agentapp.ToolOutcome
+	err      error
+}
+
+func (r *recordingStream) Delta(_ context.Context, _ int64, text string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.deltas = append(r.deltas, text)
+	return r.err
+}
+
+func (r *recordingStream) ToolStarted(context.Context, string, string, json.RawMessage) error {
+	return r.err
+}
+
+func (r *recordingStream) ToolFinished(_ context.Context, outcome agentapp.ToolOutcome) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.outcomes = append(r.outcomes, outcome)
+	return r.err
+}
+
+func (r *recordingStream) settled() []agentapp.ToolOutcome {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]agentapp.ToolOutcome(nil), r.outcomes...)
+}
+
+type bareRunner struct {
+	runner *agentrunner.Runner
+	model  *fake.Gollem
+	siteID string
+}
+
+func newBareRunner(t *testing.T, resultCap int) *bareRunner {
+	t.Helper()
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	sqlitetest.Page(t, store, owner.ID, "/coffee/")
+	sqlitetest.Page(t, store, owner.ID, "/coffee/espresso/")
+
+	now := clock.NewFake(sqlitetest.Stamp)
+	bus := &applicationtest.Recorder{}
+	model := fake.NewGollem()
+
+	registered := tools.New(tools.Deps{
+		Pages: pages.New(sqlite.NewPageRepo(store), sqlite.NewPageLinkRepo(store), sqlite.NewEntityRepo(store),
+			sqlite.NewSiteRepo(store), store, bus, now),
+		Actions:   sqlite.NewPendingActionRepo(store),
+		Publisher: bus,
+		Clock:     now,
+	})
+
+	return &bareRunner{
+		runner: agentrunner.New(agentrunner.Deps{
+			Factory:  staticFactory{client: model},
+			Registry: registered,
+			Catalog:  fixedCatalog{},
+			Clock:    now,
+			Logger:   zaptest.NewLogger(t),
+		}, agentrunner.Config{MaxToolResultBytes: resultCap}),
+		model: model, siteID: owner.ID,
+	}
+}
+
+func (b *bareRunner) spec(input string, allowed []string, stream agentapp.Stream) agentapp.RunSpec {
+	return agentapp.RunSpec{
+		Binding: tools.Binding{
+			SiteID: b.siteID, ConversationID: "conversation-1", Mode: domainagent.ModeAutonomous,
+		},
+		Ref:       domainllm.ModelRef{Provider: "openai", Model: "chat"},
+		Context:   agentapp.SiteContext{SiteName: "Shop", Mode: string(domainagent.ModeAutonomous)},
+		Input:     input,
+		MessageID: "message-1",
+		Allowed:   allowed,
+		Stream:    stream,
+		LoopLimit: 4,
+	}
+}
+
+func TestAToolOutsideTheAllowListIsDenied(t *testing.T) {
+	t.Parallel()
+
+	b := newBareRunner(t, 0)
+	stream := &recordingStream{}
+
+	if _, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_tree{}\nFAKE: done",
+		[]string{"sites_list"}, stream)); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	settled := stream.settled()
+	if len(settled) != 1 || settled[0].Status != string(domainagent.CallDenied) {
+		t.Fatalf("the outcomes are %+v", settled)
+	}
+	if !strings.Contains(settled[0].Error, "not open to this conversation") {
+		t.Fatalf("the denial reads %q", settled[0].Error)
+	}
+}
+
+func TestAnOversizedToolResultIsCappedBeforeItReachesTheModel(t *testing.T) {
+	t.Parallel()
+
+	b := newBareRunner(t, 120)
+	stream := &recordingStream{}
+
+	if _, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_tree{}\nFAKE: done", nil, stream)); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	settled := stream.settled()
+	if len(settled) != 1 {
+		t.Fatalf("the outcomes are %+v", settled)
+	}
+
+	result := decode(t, settled[0].Result)
+	if result["truncated"] != true || result["preview"] == nil {
+		t.Fatalf("the capped result is %v", result)
+	}
+	if result["untrustedContent"] != nil {
+		t.Fatal("the cap runs inside the fence, so the fence wraps what the model finally sees")
+	}
+}
+
+func TestTheFenceWrapsTheModelCopyAndTheLedgerKeepsTheRaw(t *testing.T) {
+	t.Parallel()
+
+	b := newBareRunner(t, 0)
+	stream := &recordingStream{}
+
+	if _, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_tree{}\nFAKE: done", nil, stream)); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	settled := stream.settled()
+	if len(settled) != 1 {
+		t.Fatalf("the outcomes are %+v", settled)
+	}
+	if outcome := decode(t, settled[0].Result); outcome["untrustedContent"] != nil || outcome["roots"] == nil {
+		t.Fatalf("the audited result is %v; the audit records what the tool answered", outcome)
+	}
+
+	history, err := b.model.Sessions()[0].History()
+	if err != nil {
+		t.Fatalf("read the model history: %v", err)
+	}
+
+	fenced := false
+	for _, message := range history.Messages {
+		for _, content := range message.Contents {
+			if strings.Contains(string(content.Data), "untrustedContent") {
+				fenced = true
+			}
+		}
+	}
+	if !fenced {
+		t.Fatal("the model was handed a tool result that was not fenced as untrusted data")
+	}
+}
+
+func TestARunNeedsAnInputAModelAndALoopLimit(t *testing.T) {
+	t.Parallel()
+
+	b := newBareRunner(t, 0)
+
+	cases := []struct {
+		name   string
+		mutate func(*agentapp.RunSpec)
+	}{
+		{name: "no input", mutate: func(s *agentapp.RunSpec) { s.Input = "  " }},
+		{name: "no loop limit", mutate: func(s *agentapp.RunSpec) { s.LoopLimit = 0 }},
+		{name: "no model", mutate: func(s *agentapp.RunSpec) { s.Ref = domainllm.ModelRef{} }},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			spec := b.spec("FAKE: hello", nil, &recordingStream{})
+			tc.mutate(&spec)
+			if _, err := b.runner.Run(t.Context(), spec); !errors.IsCode(err, errors.Invalid) {
+				t.Fatalf("Run = %v, want invalid", err)
+			}
+		})
+	}
+}
+
+func TestAStreamFailureStopsTheTurn(t *testing.T) {
+	t.Parallel()
+
+	b := newBareRunner(t, 0)
+	stream := &recordingStream{err: errors.New(errors.External, "the bus is gone")}
+
+	if _, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_tree{}\nFAKE: done", nil, stream)); err == nil {
+		t.Fatal("a turn whose audit cannot be written must not report success")
+	}
+}

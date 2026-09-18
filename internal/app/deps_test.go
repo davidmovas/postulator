@@ -21,7 +21,10 @@ const (
 	pagingPackage   = "internal/kernel/paging"
 )
 
-const squirrel = "github.com/Masterminds/squirrel"
+const (
+	squirrel = "github.com/Masterminds/squirrel"
+	gollem   = "github.com/gollem-dev/gollem"
+)
 
 func repoRoot(t *testing.T) string {
 	t.Helper()
@@ -167,6 +170,29 @@ func TestOnlyPagingUsesTheQueryBuilder(t *testing.T) {
 		for _, imported := range imports {
 			if imported == squirrel {
 				t.Errorf("%s imports the query builder; only %s may", pkg, pagingPackage)
+			}
+		}
+	}
+}
+
+func TestTheAgentFrameworkStaysAtTheEdge(t *testing.T) {
+	t.Parallel()
+
+	for _, dep := range transitiveDeps(t, applicationTree) {
+		if dep == gollem || strings.HasPrefix(dep, gollem+"/") {
+			t.Errorf("application depends on %s; only internal/transport/agent may name the agent framework", dep)
+		}
+	}
+
+	for pkg, imports := range directImports(t) {
+		if ownPackage(pkg, appTree) || pkg == modulePath+"/internal/transport/agent" ||
+			ownPackage(pkg, adaptersTree) {
+			continue
+		}
+		for _, imported := range imports {
+			if imported == gollem || strings.HasPrefix(imported, gollem+"/") {
+				t.Errorf("%s imports %s; the agent framework belongs to internal/transport/agent and the llm adapters",
+					pkg, imported)
 			}
 		}
 	}
