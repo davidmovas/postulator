@@ -13,7 +13,6 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/events"
-	port "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
@@ -49,41 +48,6 @@ const (
 	repairSentence = `{"sentence":"It sits in our drinks range next to every other coffee we sell."}`
 )
 
-type scripted struct {
-	client  *fake.Client
-	replies map[string]string
-}
-
-func (s *scripted) directive(req port.Request) port.Request {
-	reply, ok := s.replies[req.Meta.Step]
-	if !ok {
-		return req
-	}
-	req.Messages = append(append([]port.Message(nil), req.Messages...),
-		port.Message{Role: port.RoleUser, Text: fake.JSONDirective + reply})
-	return req
-}
-
-func (s *scripted) Complete(ctx context.Context, req port.Request) (port.Response, error) {
-	return s.client.Complete(ctx, s.directive(req))
-}
-
-func (s *scripted) Stream(ctx context.Context, req port.Request) (<-chan port.Delta, error) {
-	return s.client.Stream(ctx, s.directive(req))
-}
-
-func (s *scripted) callsTo(step string) int {
-	requests := s.client.Requests()
-
-	total := 0
-	for i := range requests {
-		if requests[i].Meta.Step == step {
-			total++
-		}
-	}
-	return total
-}
-
 type stubProfiles struct{}
 
 func (stubProfiles) Resolve(context.Context, string, domainllm.Role, map[domainllm.Role]domainllm.ModelRef) (domainllm.ModelRef, error) {
@@ -114,7 +78,7 @@ type factory struct {
 	items  *sqlite.RunItemRepo
 	blobs  *sqlite.ArtifactRepo
 	log    *sqlite.RunEventRepo
-	llm    *scripted
+	llm    *fake.Scripted
 	bus    *recorder
 	siteID string
 	pageID string
@@ -229,10 +193,10 @@ func newFactory(t *testing.T, draft string) *factory {
 		items: sqlite.NewRunItemRepo(store),
 		blobs: sqlite.NewArtifactRepo(store),
 		log:   sqlite.NewRunEventRepo(store),
-		llm: &scripted{client: fake.New(), replies: map[string]string{
+		llm: fake.NewScripted(map[string]string{
 			steps.NameGenerateBody: draft,
 			steps.NameRepairLinks:  repairSentence,
-		}},
+		}),
 		bus:    &recorder{},
 		siteID: owner.ID,
 		pageID: childPage.ID,

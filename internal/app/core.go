@@ -61,6 +61,7 @@ const (
 type Config struct {
 	DatabasePath string
 	KeyDir       string
+	Provider     llmport.Client
 }
 
 func (c Config) recovery() string {
@@ -187,12 +188,12 @@ func (c *Core) compose(ctx context.Context, key []byte) error {
 	templateService := templates.New(templateRepo, policyRepo, pageRepo, siteRepo, store, relay, now)
 	modelProfiles := profiles.New(profileRepo, siteRepo, modelCatalog, now)
 	providers := gollemclient.NewFactory(secretStore, values)
+	provider := cfg.Provider
+	if provider == nil {
+		provider = gollemclient.New(providers, gollemclient.Timeout(values))
+	}
 	book := ledger.New(
-		recordreplay.New(
-			gollemclient.New(providers, gollemclient.Timeout(values)),
-			recordreplay.Mode(values),
-			recordreplay.DefaultDir,
-		),
+		recordreplay.New(provider, recordreplay.Mode(values), recordreplay.DefaultDir),
 		callRepo, modelCatalog, relay, now,
 	)
 	client := retry.New(limiter.New(book, modelCatalog), retry.Retries(values), retry.DefaultBackoff)

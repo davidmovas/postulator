@@ -64,7 +64,7 @@ type pipeline struct {
 	pageID  string
 	parent  int64
 	recipe  []template.StepSpec
-	llm     *scripted
+	llm     *fake.Scripted
 	current *clock.Fake
 }
 
@@ -173,12 +173,12 @@ func newPipeline(t *testing.T, opts ...wptest.Option) *pipeline {
 		blobs: sqlite.NewArtifactRepo(store),
 		pages: pageRepo,
 		links: sqlite.NewPageLinkRepo(store),
-		llm: &scripted{client: fake.New(), replies: map[string]string{
+		llm: fake.NewScripted(map[string]string{
 			steps.NameGenerateBody: guideDraft,
 			steps.NameGenerateMeta: guideMeta,
 			steps.NameJudge:        guideJudge,
 			steps.NameRepairLinks:  repairSentence,
-		}},
+		}),
 		current: clock.NewFake(at),
 	}
 }

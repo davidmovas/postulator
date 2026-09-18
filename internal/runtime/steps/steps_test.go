@@ -75,10 +75,10 @@ func TestAPlannedPageIsWrittenAndLinkedIntoItsGraph(t *testing.T) {
 		t.Fatalf("report = %+v", report)
 	}
 
-	if f.llm.callsTo(steps.NameGenerateBody) != 1 {
-		t.Fatalf("the writer was called %d times", f.llm.callsTo(steps.NameGenerateBody))
+	if f.llm.CallsTo(steps.NameGenerateBody) != 1 {
+		t.Fatalf("the writer was called %d times", f.llm.CallsTo(steps.NameGenerateBody))
 	}
-	if f.llm.callsTo(steps.NameRepairLinks) != 0 {
+	if f.llm.CallsTo(steps.NameRepairLinks) != 0 {
 		t.Fatalf("the linker ran although nothing was missing")
 	}
 
@@ -148,7 +148,7 @@ func TestAMissingAnchorIsRepairedByTheLinker(t *testing.T) {
 	if !strings.Contains(body, "It sits in our drinks range") {
 		t.Fatalf("the repaired sentence is missing:\n%s", body)
 	}
-	if calls := f.llm.callsTo(steps.NameRepairLinks); calls == 0 {
+	if calls := f.llm.CallsTo(steps.NameRepairLinks); calls == 0 {
 		t.Fatal("the linker never ran although two anchors were missing")
 	}
 
@@ -184,7 +184,7 @@ func TestAPageWithNoEntityFailsItsItem(t *testing.T) {
 	if !strings.Contains(items[0].Error, "not mapped to an entity") {
 		t.Fatalf("the item failed with %q", items[0].Error)
 	}
-	if f.llm.callsTo(steps.NameGenerateBody) != 0 {
+	if f.llm.CallsTo(steps.NameGenerateBody) != 0 {
 		t.Fatal("the writer ran for a page with no entity")
 	}
 }
