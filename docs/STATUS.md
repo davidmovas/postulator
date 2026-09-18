@@ -89,6 +89,16 @@ dependency-free PHP files; `cmd/pluginzip` packages it byte-deterministically;
 SEO modes. Track A's Go adapter is a separate worktree and this suite depends on nothing
 from it.
 
+**3B reviewed: approved** on 2026-09-18. The independent review re-ran the Go gate, both
+lint passes, deterministic packaging and all three SEO modes; its findings landed in
+`0d13d9f`, `06e85f3` and `19e928a`. The blocking one was a stored XSS: a payload in
+`_postulator_seo_title` closed `<title>` and executed, because `pre_get_document_title`
+short-circuits `wp_get_document_title()` before core's `esc_html`. `since` was inclusive
+against a contract that freezes it exclusive, and a slug-less draft synthesised a path that
+collided with a published page of the same title. All three are re-verified by e2e cases;
+the suite is 31 tests, green in `none`, `yoast` and `rankmath`, with no PHP diagnostics
+from the plugin under `WORDPRESS_DEBUG=1`.
+
 ## What landed in Phase 0
 
 - The v1.6.2 codebase is gone: `internal/`, `pkg/`, `frontend/`, `main.go`, `Makefile`,
