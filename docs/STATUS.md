@@ -122,7 +122,17 @@ document, the link context, the link insertion with a decision per candidate, an
 compliance and structure reports; `internal/runtime/steps` holds `resolve_context`,
 `generate_body`, `insert_links`, `repair_links` and `validate` with their prompts as
 embedded Go templates. `internal/application/runs` exposes the ten use cases and
-`internal/app` starts the engine after the recovery sweep. Phase 7 follows.
+`internal/app` starts the engine after the recovery sweep.
+
+**Phase 7 (the remaining steps, the WordPress sync and the site reports) is complete.**
+`internal/runtime/steps` holds all twelve page steps plus `sync_site`; `internal/adapters/images` adds the
+local folder, the WordPress media library and the OpenAI image adapters; `internal/adapters/wp/registry`
+builds and caches one client per site and probes its plugin; `internal/adapters/wp/plugin` packs the
+companion from an embedded tree and `cmd/pluginzip` is a thin caller; `internal/application/sync` queues a
+site-scoped sync run, checks the plugin and hands back the zip; `internal/application/reports` answers the
+site overview, the page report and the run report; `internal/app` composes all of it. The full gate is
+green, module coverage is 90.0% of 10315 statements and every package this phase added is at or above
+86.8%. Phase 8 follows.
 
 ## What landed in Phase 0
 
@@ -511,6 +521,36 @@ embedded Go templates. `internal/application/runs` exposes the ten use cases and
   validation artifact carries the lower of the two scores. Prompts are
   `{{define "<step>.system"}}` and `{{define "<step>.user"}}` in one embedded template per
   step.
+
+## Decisions taken in Phase 7
+
+- **A sync run has no target page.** `run.Kind.PageScoped()` is false for `sync` and `import`, and the
+  engine then claims an item without resolving a page or a template spec; the item's `page_id` names the
+  site. A synthetic page row per site would have leaked into every page listing instead.
+- **A step that returns `wait` with a `WakeAt` that is not in the future is re-dispatched at once**, not at
+  the next sweep. That is what makes `sync_site` a batch loop whose cursor is persisted after every batch,
+  so a crash resumes from the last one rather than from the beginning.
+- **`report` does not write `Run.Stats`**, against the letter of the phase brief. The engine recomputes the
+  stats on every settle from the item counts and the ledger, so a second writer could only disagree with
+  it; the aggregate lives in the `final_report` artifact.
+- **Image failures are recorded, not raised.** `generate_images` puts `no_image_source`, `images_failed` or
+  `image_upload_failed` into the `images` artifact and carries on, because a missing stock folder must not
+  fail a page. `judge` swallows its own model failure the same way, except on a cancelled context.
+- **`publish` looks up by `Page.WPID` first and by slug plus parent second**, passing the five editable
+  statuses, because core REST lists only published pages by default. A create whose response was lost is
+  therefore reconciled by the next attempt rather than duplicated.
+- **`relink_neighbors` writes a neighbour only when a link was actually inserted**, never on
+  `already_linked`, and a `409` becomes a `relink_conflict` warning finding of class `needs_human` on an
+  item that still completes. Without the plugin every neighbour is `skipped`.
+- **The sync reconciles in one pass and repairs in a second.** Parent ids and link targets that arrive in a
+  later batch are resolved once the pull is done, because a batch only knows the pages it has already seen.
+- **The core-REST pull covers `page` and `post` only**, and therefore never archives a `product` or a
+  `product_cat` row; the plugin's `/content` listing covers all four. Neither path passes `since`: a full
+  pull is what makes "absent from the site" mean archived, which is the answer to the `modified_after` gap.
+- **`wp-plugin` is a Go package.** `//go:embed` cannot reach a parent directory, so the companion tree is
+  embedded at its own root and `internal/adapters/wp/plugin` packs it deterministically from an `fs.FS`.
+- **The client registry caches by `site.UpdatedAt`.** One rate limiter and one manifest cache per site are
+  worth keeping; a changed base URL or a rotated password bumps `UpdatedAt` and the next call rebuilds.
 
 ## Known gaps
 
