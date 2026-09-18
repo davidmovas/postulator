@@ -6,7 +6,10 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/application/llm"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
+	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -21,6 +24,7 @@ type entityStore interface {
 	List(ctx context.Context, q graphdomain.EntityQuery, page paging.Request) (paging.List[graphdomain.Entity], error)
 	ListBySite(ctx context.Context, siteID string) ([]graphdomain.Entity, error)
 	SetScore(ctx context.Context, id string, score float64) error
+	SetCanonicalPage(ctx context.Context, id string, pageID *string, updatedAt time.Time) error
 }
 
 type edgeStore interface {
@@ -36,21 +40,49 @@ type siteReader interface {
 	Get(ctx context.Context, id string) (site.Site, error)
 }
 
+type pageStore interface {
+	ListBySite(ctx context.Context, siteID string) ([]pagemap.Page, error)
+	Update(ctx context.Context, p pagemap.Page) error
+}
+
+type profileResolver interface {
+	Resolve(ctx context.Context, siteID string, role domainllm.Role, templateProfiles map[domainllm.Role]domainllm.ModelRef) (domainllm.ModelRef, error)
+}
+
 type unitOfWork interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
+}
+
+type Deps struct {
+	Entities   entityStore
+	Edges      edgeStore
+	Sites      siteReader
+	Pages      pageStore
+	Profiles   profileResolver
+	LLM        llm.Client
+	UnitOfWork unitOfWork
+	Publisher  application.Publisher
+	Clock      clock.Clock
 }
 
 type Service struct {
 	entities  entityStore
 	edges     edgeStore
 	sites     siteReader
+	pages     pageStore
+	profiles  profileResolver
+	llm       llm.Client
 	uow       unitOfWork
 	publisher application.Publisher
 	clock     clock.Clock
 }
 
-func New(entities entityStore, edges edgeStore, sites siteReader, uow unitOfWork, publisher application.Publisher, clk clock.Clock) *Service {
-	return &Service{entities: entities, edges: edges, sites: sites, uow: uow, publisher: publisher, clock: clk}
+func New(deps Deps) *Service {
+	return &Service{
+		entities: deps.Entities, edges: deps.Edges, sites: deps.Sites, pages: deps.Pages,
+		profiles: deps.Profiles, llm: deps.LLM, uow: deps.UnitOfWork, publisher: deps.Publisher,
+		clock: deps.Clock,
+	}
 }
 
 func (s *Service) now() time.Time {

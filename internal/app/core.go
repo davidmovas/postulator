@@ -212,8 +212,11 @@ func Open(ctx context.Context, cfg Config, logger *zap.Logger) (*Core, error) {
 		UnknownSettings: unknown,
 		Events:          relay,
 		Sites:           sites.New(siteRepo, secretStore, store, now),
-		Graph:           graph.New(entityRepo, edgeRepo, siteRepo, store, relay, now),
-		Pages:           pages.New(pageRepo, linkRepo, entityRepo, siteRepo, store, relay, now),
+		Graph: graph.New(graph.Deps{
+			Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Pages: pageRepo,
+			Profiles: modelProfiles, LLM: client, UnitOfWork: store, Publisher: relay, Clock: now,
+		}),
+		Pages: pages.New(pageRepo, linkRepo, entityRepo, siteRepo, store, relay, now),
 		Imports: imports.New(imports.Deps{
 			Tables:     importer.New(),
 			Entities:   entityRepo,

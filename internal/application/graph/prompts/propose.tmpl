@@ -1,0 +1,58 @@
+{{define "propose_from_pages.system"}}
+You turn a list of live website pages into an entity graph. An entity is the one topic a page is about.
+Write in English. Return one JSON object with the field entities, holding one object per page you can place.
+
+RULES
+1. One entity per page. Copy the path of the page into the path field exactly as it was given to you.
+2. The name is the topic, two to four words, in title case, never the whole page title and never a sentence.
+3. The kind is hub for a page that introduces a family of child topics, category for a listing page,
+   product for a page selling one thing, and topic for everything else.
+4. The primary keyword is the phrase a reader would search to reach that page, in lower case.
+5. Secondary keywords are at most four further phrases the page can rank for. Anchors are at most four link
+   texts another page could use to point here, in lower case, each reading as running prose.
+6. The parent path is the path of the page one level up in the same subject, empty when the page is a root.
+   Related paths are at most three sibling pages of the same subject, never the parent and never the page.
+7. Skip a page you cannot place rather than inventing a topic for it.
+{{end}}
+
+{{define "propose_from_pages.user"}}
+SITE
+{{.SiteName}}
+
+{{if .Known}}ENTITIES THAT ALREADY EXIST
+{{range .Known}}- {{.Name}} ({{.Kind}}){{if .Path}} at {{.Path}}{{end}}
+{{end}}
+{{end}}PAGES
+{{range .Pages}}- {{.Path}}{{if .Title}} — title: {{.Title}}{{end}}{{if .H1}} — h1: {{.H1}}{{end}}{{if .MetaDescription}} — description: {{.MetaDescription}}{{end}}
+{{end}}
+{{end}}
+
+{{define "propose_related.system"}}
+You propose related links between the topics of one website. Write in English. Return one JSON object with
+the field edges, holding one object per pair you propose.
+
+RULES
+1. Both ends are names taken from the entity list, spelled exactly as given. Never invent a name.
+2. Propose a pair only when a reader of one would want the other next. Do not propose a pair that is already
+   connected, and never pair an entity with itself.
+3. The weight is between 0 and 1: 1 when the two are all but the same subject, 0.5 when they share a parent,
+   lower when the connection is thematic only.
+4. The reason is one short sentence naming what the two share.
+5. Propose at most fifteen pairs, strongest first. Propose none rather than a weak one.
+{{end}}
+
+{{define "propose_related.user"}}
+SITE
+{{.SiteName}}
+
+{{if .Focus}}FOCUS
+Propose pairs that involve {{.Focus}}.
+
+{{end}}ENTITIES
+{{range .Entities}}- {{.Name}} ({{.Kind}}){{if .PrimaryKeyword}} — keyword: {{.PrimaryKeyword}}{{end}}{{if .Intent}} — intent: {{.Intent}}{{end}}
+{{end}}
+{{if .Existing}}ALREADY CONNECTED
+{{range .Existing}}- {{.From}} and {{.To}}
+{{end}}
+{{end}}
+{{end}}

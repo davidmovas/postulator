@@ -37,6 +37,8 @@ func registered() []string {
 		"graph_delete_edge",
 		"graph_load",
 		"graph_recompute_scores",
+		"graph_propose_from_pages",
+		"graph_propose_related",
 		"pages_list",
 		"pages_get",
 		"pages_create",
@@ -91,6 +93,7 @@ func registered() []string {
 		"models_set_provider_key",
 		"models_test_provider",
 		"models_usage_summary",
+		"content_judge_page",
 	}
 }
 

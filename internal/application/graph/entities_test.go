@@ -32,7 +32,11 @@ func newHarness(t *testing.T) harness {
 	recorder := &applicationtest.Recorder{}
 	clk := clock.NewFake(time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC))
 	return harness{
-		service:  graph.New(sqlite.NewEntityRepo(store), sqlite.NewEdgeRepo(store), sqlite.NewSiteRepo(store), store, recorder, clk),
+		service: graph.New(graph.Deps{
+			Entities: sqlite.NewEntityRepo(store), Edges: sqlite.NewEdgeRepo(store),
+			Sites: sqlite.NewSiteRepo(store), Pages: sqlite.NewPageRepo(store),
+			UnitOfWork: store, Publisher: recorder, Clock: clk,
+		}),
 		store:    store,
 		recorder: recorder,
 		clock:    clk,

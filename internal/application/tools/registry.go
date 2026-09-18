@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/application"
+	"github.com/davidmovas/postulator/internal/application/content"
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/imports"
@@ -40,6 +41,7 @@ type Deps struct {
 	Reports   *reports.Service
 	Imports   *imports.Service
 	Models    *models.Service
+	Content   *content.Service
 	Actions   actionStore
 	Publisher application.Publisher
 	Clock     clock.Clock

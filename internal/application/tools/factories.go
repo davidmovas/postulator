@@ -20,6 +20,8 @@ func factories() []factory {
 		graphDeleteEdge,
 		graphLoad,
 		graphRecomputeScores,
+		graphProposeFromPages,
+		graphProposeRelated,
 		pagesList,
 		pagesGet,
 		pagesCreate,
@@ -74,5 +76,6 @@ func factories() []factory {
 		modelsSetProviderKey,
 		modelsTestProvider,
 		modelsUsageSummary,
+		contentJudgePage,
 	}
 }
