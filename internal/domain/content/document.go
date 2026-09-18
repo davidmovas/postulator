@@ -124,6 +124,22 @@ func (d *Document) Words() []string {
 	return strings.Fields(d.Text())
 }
 
+func (d *Document) AppendSentence(paragraphIndex int, sentence string) error {
+	trimmed := strings.TrimSpace(sentence)
+	if trimmed == "" {
+		return errors.New(errors.Invalid, "there is no sentence to append")
+	}
+
+	paragraphs := d.Paragraphs()
+	if paragraphIndex < 0 || paragraphIndex >= len(paragraphs) {
+		return errors.New(errors.Invalid, "the body has no paragraph at that position").
+			WithDetail("paragraphIndex", paragraphIndex)
+	}
+
+	paragraphs[paragraphIndex].AppendChild(&html.Node{Type: html.TextNode, Data: " " + trimmed})
+	return nil
+}
+
 func (d *Document) Hash() string {
 	sum := sha256.Sum256([]byte(d.normalized()))
 	return hex.EncodeToString(sum[:])

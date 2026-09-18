@@ -170,6 +170,10 @@ func splice(node *html.Node, start, end int, href string) {
 	}
 }
 
+func FindFold(haystack, needle string) (start, end int, found bool) {
+	return findFold(haystack, needle)
+}
+
 func findFold(haystack, needle string) (start, end int, found bool) {
 	target := []rune(needle)
 	if len(target) == 0 {

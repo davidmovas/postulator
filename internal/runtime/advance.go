@@ -542,15 +542,24 @@ func (e *Engine) settleRun(ctx context.Context, box *outbox, record run.Run, now
 }
 
 func (e *Engine) expire(ctx context.Context, box *outbox, record run.Run, now time.Time) error {
-	if _, err := e.deps.Items.StopAll(ctx, record.ID, stoppable, run.StatusCancelled, "", now); err != nil {
+	current, err := e.deps.Runs.Get(ctx, record.ID)
+	if err != nil {
+		return err
+	}
+	if current.Status.Terminal() {
+		return nil
+	}
+	record = current
+
+	if _, err = e.deps.Items.StopAll(ctx, record.ID, stoppable, run.StatusCancelled, "", now); err != nil {
 		return err
 	}
 
 	record.Status = run.StatusFailed
 	record.Error = "the run passed its deadline before every item finished"
 	record.FinishedAt = &now
-	if err := e.deps.Runs.Update(ctx, record); err != nil {
-		return err
+	if updateErr := e.deps.Runs.Update(ctx, record); updateErr != nil {
+		return updateErr
 	}
 
 	box.add(ctx, record.ID, events.RunFailed, events.RunFailedPayload{

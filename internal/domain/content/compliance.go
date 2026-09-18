@@ -151,6 +151,10 @@ func allowedAnchor(target LinkTarget, anchor string) bool {
 	return false
 }
 
+func ScoreOf(items []Finding) float64 {
+	return scoreOf(items)
+}
+
 func scoreOf(items []Finding) float64 {
 	score := 1.0
 	for _, item := range items {
