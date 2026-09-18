@@ -65,6 +65,9 @@ jobs:
       - name: Package installer
         run: task package VERSION=${{ steps.meta.outputs.version }}
 
+      - name: Package companion plugin
+        run: task plugin:zip
+
       - name: List build output
         run: Get-ChildItem -Path bin -Recurse
 
@@ -77,3 +80,4 @@ jobs:
           files: |
             bin/postulator.exe
             bin/postulator-amd64-installer.exe
+            bin/postulator-companion.zip
