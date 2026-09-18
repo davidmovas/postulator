@@ -31,7 +31,7 @@ func Seal(password string, plaintext []byte) ([]byte, error) {
 		return nil, errors.Wrap(err, errors.Internal, "generate the master password salt")
 	}
 
-	sealed, err := aesgcm.Seal(derive(password, salt), plaintext)
+	sealed, err := aesgcm.Seal(Derive(password, salt), plaintext)
 	if err != nil {
 		return nil, err
 	}
@@ -52,13 +52,13 @@ func Open(password string, envelope []byte) ([]byte, error) {
 		return nil, errors.New(errors.Invalid, "the master password envelope is not readable")
 	}
 
-	opened, err := aesgcm.Open(derive(password, envelope[len(Version):header]), envelope[header:])
+	opened, err := aesgcm.Open(Derive(password, envelope[len(Version):header]), envelope[header:])
 	if err != nil {
 		return nil, errors.New(errors.Locked, "the master password is not correct").WithInternal(err)
 	}
 	return opened, nil
 }
 
-func derive(password string, salt []byte) []byte {
+func Derive(password string, salt []byte) []byte {
 	return argon2.IDKey([]byte(password), salt, timeCost, memoryCost, parallelism, aesgcm.KeyLength)
 }

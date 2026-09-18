@@ -76,7 +76,7 @@ func SetPassword(cfg Config, key []byte, password string) error {
 	if err = os.MkdirAll(cfg.Dir, directoryMode); err != nil {
 		return errors.Wrap(err, errors.Internal, "create the master key directory")
 	}
-	if err = writeAtomically(filepath.Join(cfg.Dir, ProtectedFileName), envelope); err != nil {
+	if err := writeAtomically(filepath.Join(cfg.Dir, ProtectedFileName), envelope); err != nil {
 		return err
 	}
 	return discard(filepath.Join(cfg.Dir, FileName))
@@ -97,7 +97,7 @@ func ClearPassword(cfg Config, key []byte) error {
 	if err = os.MkdirAll(cfg.Dir, directoryMode); err != nil {
 		return errors.Wrap(err, errors.Internal, "create the master key directory")
 	}
-	if err = writeAtomically(filepath.Join(cfg.Dir, FileName), protected); err != nil {
+	if err := writeAtomically(filepath.Join(cfg.Dir, FileName), protected); err != nil {
 		return err
 	}
 	return discard(filepath.Join(cfg.Dir, ProtectedFileName))
