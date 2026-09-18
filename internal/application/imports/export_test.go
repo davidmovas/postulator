@@ -194,18 +194,42 @@ func TestExportRefusesWhatItCannotWrite(t *testing.T) {
 func TestTheClientSamplesStillImport(t *testing.T) {
 	t.Parallel()
 
-	for _, name := range []string{"sitemap-import-example.csv", "sitemap-import-example.xlsx"} {
-		t.Run(name, func(t *testing.T) {
+	cases := []struct {
+		name     string
+		detected []importmap.Field
+		pages    int
+		entities int
+		edges    int
+	}{
+		{
+			name:     "sitemap-import-example.csv",
+			detected: []importmap.Field{importmap.FieldPath, importmap.FieldTitle, importmap.FieldKeywords},
+			pages:    10,
+		},
+		{
+			name: "sitemap-import-example.xlsx",
+			detected: []importmap.Field{
+				importmap.FieldPath, importmap.FieldTitle, importmap.FieldKeywords, importmap.FieldPrimaryKeyword,
+				importmap.FieldEntity, importmap.FieldParentEntity, importmap.FieldAnchors, importmap.FieldPageKind,
+			},
+			pages:    8,
+			entities: 8,
+			edges:    7,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
 			h := newHarness(t)
-			path := filepath.Join("..", "..", "..", "examples", name)
+			path := filepath.Join("..", "..", "..", "examples", tc.name)
 
 			seen, err := h.service.Inspect(t.Context(), imports.InspectRequest{SiteID: h.siteID, Path: path})
 			if err != nil {
 				t.Fatalf("Inspect: %v", err)
 			}
-			for _, field := range []importmap.Field{importmap.FieldPath, importmap.FieldTitle, importmap.FieldKeywords} {
+			for _, field := range tc.detected {
 				if seen.Detected.Columns[string(field)] == "" {
 					t.Fatalf("%s is not detected in %v", field, seen.Headers)
 				}
@@ -215,11 +239,14 @@ func TestTheClientSamplesStillImport(t *testing.T) {
 			if len(applied.Report.Errors) != 0 {
 				t.Fatalf("errors = %+v", applied.Report.Errors)
 			}
-			if applied.Counts.PagesCreated < 10 {
-				t.Fatalf("pages created = %d", applied.Counts.PagesCreated)
+			if applied.Counts.PagesCreated < tc.pages {
+				t.Fatalf("pages created = %d, want at least %d", applied.Counts.PagesCreated, tc.pages)
 			}
-			if applied.Counts.EntitiesCreated != 0 {
-				t.Fatalf("the sample names no entity but created %d", applied.Counts.EntitiesCreated)
+			if applied.Counts.EntitiesCreated != tc.entities {
+				t.Fatalf("entities created = %d, want %d", applied.Counts.EntitiesCreated, tc.entities)
+			}
+			if applied.Counts.EdgesCreated != tc.edges {
+				t.Fatalf("edges created = %d, want %d", applied.Counts.EdgesCreated, tc.edges)
 			}
 		})
 	}
