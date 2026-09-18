@@ -1,6 +1,7 @@
 package wails_test
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -85,7 +86,7 @@ func TestSavePluginPackageWritesTheArchive(t *testing.T) {
 			if readErr != nil {
 				t.Fatalf("read back the archive: %v", readErr)
 			}
-			if string(written) != string(packaged.body) {
+			if !bytes.Equal(written, packaged.body) {
 				t.Errorf("archive = %q, want %q", written, packaged.body)
 			}
 		})

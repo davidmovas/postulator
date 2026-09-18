@@ -59,12 +59,12 @@ func assertEveryMethodConverts(t *testing.T, service any, want string, skip ...s
 				t.Errorf("%s returned %+v beside its error, want the zero response", method.Name, results[0].Interface())
 			}
 
-			err, _ := results[1].Interface().(error)
-			if err == nil {
+			err, failed := results[1].Interface().(error)
+			if !failed || err == nil {
 				t.Fatalf("%s returned no error", method.Name)
 			}
 			if got := string(wails.MarshalError(err)); got != want {
-				t.Fatalf("%s marshalled %s, want %s", method.Name, got, want)
+				t.Fatalf("%s converted to %s, want %s", method.Name, got, want)
 			}
 		})
 	}
