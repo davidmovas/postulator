@@ -1,0 +1,34 @@
+{
+  "name": "Hub",
+  "pageKind": "hub",
+  "spec": {
+    "sections": [
+      {"heading": "Overview", "intent": "Define the topic, say who it is for and state what the reader will be able to decide after reading the hub", "targetWords": 250, "required": true, "keywordRules": {"include": [], "primaryInHeading": true}},
+      {"heading": "Key Areas", "intent": "Introduce every child topic in its own short paragraph that links to the child page with a descriptive anchor", "targetWords": 700, "required": true, "keywordRules": {"include": [], "primaryInHeading": false}},
+      {"heading": "How to Choose", "intent": "Give the decision criteria a reader should weigh before going deeper into one child topic", "targetWords": 400, "required": true, "keywordRules": {"include": [], "primaryInHeading": false}},
+      {"heading": "Common Questions", "intent": "Answer the five questions people ask most about the topic, one short paragraph each, phrased as the reader would search", "targetWords": 350, "required": true, "keywordRules": {"include": [], "primaryInHeading": false}},
+      {"heading": "Related Topics", "intent": "Point to approved sibling topics with one sentence each explaining the connection", "targetWords": 150, "required": false, "keywordRules": {"include": [], "primaryInHeading": false}}
+    ],
+    "tone": "Authoritative and plain; second person; short paragraphs; no superlatives, no marketing claims, no filler transitions",
+    "length": {"min": 1600, "max": 2400},
+    "keywordRules": {"primaryInTitle": true, "primaryInH1": true, "primaryInFirstParagraph": true, "maxDensity": 0.025},
+    "linkRules": {"upDepth": 1, "downLinks": true, "siblingMinWeight": 0.5, "maxLinks": 20, "maxPerTarget": 1, "parentLinkWithinParagraphs": 2, "childrenSection": true},
+    "metaRules": {"titlePattern": "{primaryKeyword}: The Complete Guide | {siteName}", "descriptionMax": 155},
+    "images": {"featured": true, "inline": 0, "source": "ai"},
+    "modelProfiles": {},
+    "recipe": [
+      {"name": "resolve_context", "enabled": true},
+      {"name": "generate_body", "enabled": true},
+      {"name": "generate_meta", "enabled": true},
+      {"name": "insert_links", "enabled": true},
+      {"name": "repair_links", "enabled": true},
+      {"name": "generate_images", "enabled": true},
+      {"name": "validate", "enabled": true},
+      {"name": "judge", "enabled": true},
+      {"name": "publish", "enabled": true},
+      {"name": "relink_neighbors", "enabled": true},
+      {"name": "sync_back", "enabled": true},
+      {"name": "report", "enabled": true}
+    ]
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "Comparison",
+  "pageKind": "comparison",
+  "spec": {
+    "sections": [
+      {"heading": "Overview", "intent": "Name the options being compared, who each is for and the verdict in one sentence", "targetWords": 150, "required": true, "keywordRules": {"include": [], "primaryInHeading": true}},
+      {"heading": "Comparison at a Glance", "intent": "A table with one row per criterion and one column per option; criteria are the ones buyers use to decide", "targetWords": 250, "required": true, "keywordRules": {"include": [], "primaryInHeading": false}},
+      {"heading": "Detailed Differences", "intent": "One subsection per criterion explaining where the options differ and why it matters, citing the supplied data", "targetWords": 600, "required": true, "keywordRules": {"include": [], "primaryInHeading": false}},
+      {"heading": "Which One Should You Choose", "intent": "A recommendation per reader situation, each linking to the option's own page", "targetWords": 250, "required": true, "keywordRules": {"include": [], "primaryInHeading": false}},
+      {"heading": "Frequently Asked Questions", "intent": "Answer the questions readers ask when they are still undecided between the options", "targetWords": 200, "required": true, "keywordRules": {"include": [], "primaryInHeading": false}}
+    ],
+    "tone": "Even-handed and specific; state trade-offs rather than winners; every claim tied to a criterion in the table",
+    "length": {"min": 1200, "max": 1800},
+    "keywordRules": {"primaryInTitle": true, "primaryInH1": true, "primaryInFirstParagraph": true, "maxDensity": 0.02},
+    "linkRules": {"upDepth": 2, "downLinks": false, "siblingMinWeight": 0.7, "maxLinks": 10, "maxPerTarget": 1, "parentLinkWithinParagraphs": 2, "childrenSection": false},
+    "metaRules": {"titlePattern": "{primaryKeyword}: Which Is Better? | {siteName}", "descriptionMax": 155},
+    "images": {"featured": true, "inline": 1, "source": "ai"},
+    "modelProfiles": {},
+    "recipe": [
+      {"name": "resolve_context", "enabled": true},
+      {"name": "generate_body", "enabled": true},
+      {"name": "generate_meta", "enabled": true},
+      {"name": "insert_links", "enabled": true},
+      {"name": "repair_links", "enabled": true},
+      {"name": "generate_images", "enabled": true},
+      {"name": "validate", "enabled": true},
+      {"name": "judge", "enabled": true},
+      {"name": "publish", "enabled": true},
+      {"name": "relink_neighbors", "enabled": true},
+      {"name": "sync_back", "enabled": true},
+      {"name": "report", "enabled": true}
+    ]
+  }
+}
