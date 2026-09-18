@@ -416,3 +416,57 @@ func TestKeyWithEmptySegmentIsRejected(t *testing.T) {
 	}()
 	settings.New().Int("runs..workers", 1)
 }
+
+func TestValidateChecksOneDeclaredKey(t *testing.T) {
+	t.Parallel()
+
+	registry := settings.New()
+	registry.Int("runs.workers", 2, settings.IntRange(1, 16))
+	registry.Enum("llm.mode", "live", []string{"live", "replay"})
+
+	cases := []struct {
+		name  string
+		key   string
+		value string
+		want  errors.Code
+	}{
+		{name: "a value in range", key: "runs.workers", value: `4`, want: ""},
+		{name: "a declared enum member", key: "llm.mode", value: `"replay"`, want: ""},
+		{name: "an undeclared key", key: "runs.nope", value: `4`, want: errors.NotFound},
+		{name: "a value of the wrong type", key: "runs.workers", value: `"four"`, want: errors.Invalid},
+		{name: "a value out of range", key: "runs.workers", value: `99`, want: errors.Invalid},
+		{name: "a value outside the enum", key: "llm.mode", value: `"record"`, want: errors.Invalid},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := registry.Validate(tc.key, json.RawMessage(tc.value))
+			if tc.want == "" {
+				if err != nil {
+					t.Fatalf("Validate() = %v, want no error", err)
+				}
+				return
+			}
+			if !errors.IsCode(err, tc.want) {
+				t.Fatalf("Validate() = %v, want code %s", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateDoesNotChangeTheLiveValues(t *testing.T) {
+	t.Parallel()
+
+	registry := settings.New()
+	workers := registry.Int("runs.workers", 2, settings.IntRange(1, 16))
+	values := registry.NewValues()
+
+	if err := registry.Validate("runs.workers", json.RawMessage(`8`)); err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+	if got := workers.Get(values); got != 2 {
+		t.Fatalf("Get() = %d, want the default 2 until Apply runs", got)
+	}
+}

@@ -116,6 +116,25 @@ func (r *Registry) Apply(values *Values, stored map[string]json.RawMessage) ([]s
 	return unknown, nil
 }
 
+func (r *Registry) Validate(key string, raw json.RawMessage) error {
+	r.mu.RLock()
+	def, known := r.byKey[key]
+	r.mu.RUnlock()
+
+	if !known {
+		return errors.New(errors.NotFound, "setting "+key+" is not declared").WithDetail("key", key)
+	}
+
+	decoded, err := def.decode(raw)
+	if err != nil {
+		return errors.New(errors.Invalid, "setting "+key+" is not readable").WithDetail("key", key).WithInternal(err)
+	}
+	if err = def.validate(decoded); err != nil {
+		return errors.New(errors.Invalid, "setting "+key+" is out of range").WithDetail("key", key).WithInternal(err)
+	}
+	return nil
+}
+
 type Descriptor struct {
 	Default  json.RawMessage `json:"default"`
 	Min      any             `json:"min,omitempty"`
