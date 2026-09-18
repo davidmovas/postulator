@@ -225,7 +225,7 @@ func TestModeAndRoleValidate(t *testing.T) {
 	if agent.Role("oracle").Valid() {
 		t.Error("an unknown role must not validate")
 	}
-	if !agent.CallStatus(agent.CallDenied).Valid() || agent.CallStatus("maybe").Valid() {
+	if !agent.CallDenied.Valid() || agent.CallStatus("maybe").Valid() {
 		t.Error("the call statuses are ok, denied and error")
 	}
 }

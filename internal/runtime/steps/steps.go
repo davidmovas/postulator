@@ -7,6 +7,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/application"
+	appcontent "github.com/davidmovas/postulator/internal/application/content"
 	"github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/content"
@@ -73,6 +74,10 @@ type profileResolver interface {
 	Resolve(ctx context.Context, siteID string, role domainllm.Role, templateProfiles map[domainllm.Role]domainllm.ModelRef) (domainllm.ModelRef, error)
 }
 
+type judgeService interface {
+	Assess(ctx context.Context, req appcontent.AssessRequest) (appcontent.AssessResponse, error)
+}
+
 type Deps struct {
 	Entities      entityReader
 	Edges         edgeReader
@@ -83,6 +88,7 @@ type Deps struct {
 	WordPress     siteClients
 	Policies      policyReader
 	Profiles      profileResolver
+	Content       judgeService
 	LLM           llm.Client
 	ImageProvider ImageProvider
 	ImageSources  map[template.ImageSource]ImageSource

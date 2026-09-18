@@ -3,38 +3,16 @@ package steps
 import (
 	"context"
 	"strconv"
-	"strings"
 
-	port "github.com/davidmovas/postulator/internal/application/llm"
+	appcontent "github.com/davidmovas/postulator/internal/application/content"
 	"github.com/davidmovas/postulator/internal/domain/content"
-	"github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
-	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
-	"github.com/davidmovas/postulator/internal/domain/template"
 )
 
-const (
-	NameJudge = "judge"
+const NameJudge = appcontent.NameJudge
 
-	judgeTokens = 1024
-)
-
-type JudgeReport struct {
-	Score       float64  `json:"score" description:"The overall quality of the page between 0 and 1"`
-	Issues      []string `json:"issues" description:"What is wrong with the page, worst first, one sentence each"`
-	Suggestions []string `json:"suggestions" description:"What would raise the score, one sentence each"`
-}
-
-type judgePrompt struct {
-	Page    pagemap.Page
-	Entity  graph.Entity
-	Spec    template.TemplateSpec
-	Body    string
-	Meta    Meta
-	HasMeta bool
-	Targets []content.LinkTarget
-}
+type JudgeReport = appcontent.JudgeReport
 
 func Judge(deps Deps) run.StepDef {
 	return run.StepDef{
@@ -69,7 +47,7 @@ func Judge(deps Deps) run.StepDef {
 	}
 }
 
-func judgement(ctx context.Context, deps Deps, sc *run.StepContext) (JudgeReport, int, error) {
+func judgement(ctx context.Context, deps Deps, sc *run.StepContext) (report JudgeReport, tokens int, err error) {
 	doc, err := bodyOf(sc)
 	if err != nil {
 		return JudgeReport{}, 0, err
@@ -78,11 +56,7 @@ func judgement(ctx context.Context, deps Deps, sc *run.StepContext) (JudgeReport
 	if err != nil {
 		return JudgeReport{}, 0, err
 	}
-	ref, err := deps.Profiles.Resolve(ctx, sc.Run.SiteID, domainllm.RoleJudge, sc.Spec.ModelProfiles)
-	if err != nil {
-		return JudgeReport{}, 0, err
-	}
-	meta, hasMeta, err := decodeArtifact[Meta](sc, run.ArtifactMeta)
+	snippet, hasSnippet, err := decodeArtifact[Meta](sc, run.ArtifactMeta)
 	if err != nil {
 		return JudgeReport{}, 0, err
 	}
@@ -92,40 +66,10 @@ func judgement(ctx context.Context, deps Deps, sc *run.StepContext) (JudgeReport
 		targets = lc.Targets
 	}
 
-	system, user, err := render(NameJudge, judgePrompt{
-		Page: sc.Page, Entity: entity, Spec: sc.Spec, Body: doc.HTML(),
-		Meta: meta, HasMeta: hasMeta, Targets: targets,
+	assessed, err := deps.Content.Assess(ctx, appcontent.AssessRequest{
+		SiteID: sc.Run.SiteID, Page: sc.Page, Entity: entity, Spec: sc.Spec, Body: doc.HTML(),
+		Snippet:    appcontent.Snippet{Title: snippet.Title, Description: snippet.Description},
+		HasSnippet: hasSnippet, Targets: targets, Call: callMeta(sc, NameJudge),
 	})
-	if err != nil {
-		return JudgeReport{}, 0, err
-	}
-
-	report, usage, err := port.Structured[JudgeReport](ctx, deps.LLM, port.Request{
-		Ref:       ref,
-		System:    system,
-		Messages:  []port.Message{{Role: port.RoleUser, Text: user}},
-		MaxTokens: judgeTokens,
-		Meta:      callMeta(sc, NameJudge),
-	})
-	if err != nil {
-		return JudgeReport{}, usage.Total, err
-	}
-	return settleJudgement(report), usage.Total, nil
-}
-
-func settleJudgement(report JudgeReport) JudgeReport {
-	report.Score = min(max(report.Score, 0), 1)
-	report.Issues = trimmed(report.Issues)
-	report.Suggestions = trimmed(report.Suggestions)
-	return report
-}
-
-func trimmed(lines []string) []string {
-	out := make([]string, 0, len(lines))
-	for _, line := range lines {
-		if text := strings.TrimSpace(line); text != "" {
-			out = append(out, text)
-		}
-	}
-	return out
+	return assessed.Report, assessed.Tokens, err
 }

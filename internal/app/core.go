@@ -26,6 +26,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/plugin"
 	"github.com/davidmovas/postulator/internal/adapters/wp/registry"
+	"github.com/davidmovas/postulator/internal/application/content"
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/imports"
 	llmport "github.com/davidmovas/postulator/internal/application/llm"
@@ -81,6 +82,7 @@ type Core struct {
 	Pages           *pages.Service
 	Imports         *imports.Service
 	Templates       *templates.Service
+	Content         *content.Service
 	LLM             llmport.Client
 	Catalog         *catalog.Catalog
 	Profiles        *profiles.Profiles
@@ -151,6 +153,10 @@ func Open(ctx context.Context, cfg Config, logger *zap.Logger) (*Core, error) {
 	client := retry.New(limiter.New(book, modelCatalog), retry.Retries(values), retry.DefaultBackoff)
 
 	wordpress := registry.New(siteRepo, secretStore, wp.FromSettings(values)...)
+	contentService := content.New(content.Deps{
+		Pages: pageRepo, Entities: entityRepo, Edges: edgeRepo, Specs: templateService,
+		Policies: templateService, Profiles: modelProfiles, Raw: rawContent{clients: wordpress}, LLM: client,
+	})
 
 	stepRegistry := run.NewRegistry()
 	if err = steps.Register(stepRegistry, steps.Deps{
@@ -163,6 +169,7 @@ func Open(ctx context.Context, cfg Config, logger *zap.Logger) (*Core, error) {
 		WordPress:     wordpress,
 		Policies:      templateService,
 		Profiles:      modelProfiles,
+		Content:       contentService,
 		LLM:           client,
 		ImageProvider: imageopenai.New(secretStore, images.OpenAIModel(values)),
 		ImageSources: map[template.ImageSource]steps.ImageSource{
@@ -221,6 +228,7 @@ func Open(ctx context.Context, cfg Config, logger *zap.Logger) (*Core, error) {
 			MaxRows:    imports.MaxRows(values),
 		}),
 		Templates: templateService,
+		Content:   contentService,
 		LLM:       client,
 		Catalog:   modelCatalog,
 		Profiles:  modelProfiles,

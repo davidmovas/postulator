@@ -43,8 +43,7 @@ func runJudge(t *testing.T, deps steps.Deps) steps.JudgeReport {
 func TestJudgeScoresThePage(t *testing.T) {
 	t.Parallel()
 
-	deps := unitDeps()
-	deps.LLM = llmStub{reply: `{"score":0.8,"issues":["The body is thin."," "],"suggestions":["Add a worked example."]}`}
+	deps := judgeDeps(llmStub{reply: `{"score":0.8,"issues":["The body is thin."," "],"suggestions":["Add a worked example."]}`})
 
 	report := runJudge(t, deps)
 	if report.Score != 0.8 {
@@ -74,8 +73,7 @@ func TestJudgeClampsTheScore(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			deps := unitDeps()
-			deps.LLM = llmStub{reply: tc.reply}
+			deps := judgeDeps(llmStub{reply: tc.reply})
 			if got := runJudge(t, deps).Score; got != tc.want {
 				t.Fatalf("score = %v, want %v", got, tc.want)
 			}
@@ -86,8 +84,7 @@ func TestJudgeClampsTheScore(t *testing.T) {
 func TestJudgeNeverFailsTheItem(t *testing.T) {
 	t.Parallel()
 
-	deps := unitDeps()
-	deps.LLM = llmStub{err: errors.New(errors.External, "the judge is unreachable")}
+	deps := judgeDeps(llmStub{err: errors.New(errors.External, "the judge is unreachable")})
 
 	report := runJudge(t, deps)
 	if report.Score != 0 {
@@ -101,8 +98,7 @@ func TestJudgeNeverFailsTheItem(t *testing.T) {
 func TestJudgeStillReportsACancelledContext(t *testing.T) {
 	t.Parallel()
 
-	deps := unitDeps()
-	deps.LLM = llmStub{err: errors.New(errors.Cancelled, "the call was cancelled")}
+	deps := judgeDeps(llmStub{err: errors.New(errors.Cancelled, "the call was cancelled")})
 
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
@@ -116,8 +112,7 @@ func TestJudgeCarriesTheRubricAndTheSnippet(t *testing.T) {
 	t.Parallel()
 
 	recorder := &promptRecorder{reply: `{"score":1}`}
-	deps := unitDeps()
-	deps.LLM = recorder
+	deps := judgeDeps(recorder)
 
 	runJudge(t, deps)
 	for _, want := range []string{"RUBRIC", "espresso | Shop", judgeBody} {

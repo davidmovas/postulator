@@ -13,6 +13,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	appcontent "github.com/davidmovas/postulator/internal/application/content"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
@@ -214,6 +215,7 @@ func (p *pipeline) start(t *testing.T) *runtime.Engine {
 		WordPress:     oneClient{client: syncClient(t, p.server)},
 		Policies:      specs,
 		Profiles:      stubProfiles{},
+		Content:       appcontent.New(appcontent.Deps{Profiles: stubProfiles{}, LLM: p.llm}),
 		LLM:           p.llm,
 		ImageProvider: &drawing{},
 		UnitOfWork:    p.store,

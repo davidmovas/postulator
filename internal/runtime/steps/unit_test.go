@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
+	appcontent "github.com/davidmovas/postulator/internal/application/content"
 	port "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/content"
@@ -124,6 +125,13 @@ func (l llmStub) Complete(context.Context, port.Request) (port.Response, error) 
 
 func (l llmStub) Stream(context.Context, port.Request) (<-chan port.Delta, error) {
 	return nil, errors.New(errors.Internal, "the unit stub does not stream")
+}
+
+func judgeDeps(client port.Client) steps.Deps {
+	deps := unitDeps()
+	deps.LLM = client
+	deps.Content = appcontent.New(appcontent.Deps{Profiles: deps.Profiles, LLM: client})
+	return deps
 }
 
 func unitDeps() steps.Deps {
