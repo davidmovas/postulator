@@ -139,3 +139,69 @@ func TestProductCategoriesCarryNoModificationDate(t *testing.T) {
 		t.Errorf("category = %v", categories[0])
 	}
 }
+
+func TestTheWooCommerceRoutesGuardTheirIds(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	seeded := server.Seed(wptest.Item{Type: wptest.TypeProductCategory, Title: "Koffein"})[0]
+
+	response, payload := call(t, server, http.MethodGet, "/wp-json/wc/v3/products/categories/"+itoa(seeded.ID), nil, true)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", response.StatusCode)
+	}
+
+	var category struct {
+		Slug string `json:"slug"`
+	}
+	decode(t, payload, &category)
+	if category.Slug != "koffein" {
+		t.Errorf("slug = %q, want koffein", category.Slug)
+	}
+
+	cases := []struct {
+		name   string
+		method string
+		path   string
+		body   []byte
+		status int
+	}{
+		{name: "product zero", method: http.MethodGet, path: "/wp-json/wc/v3/products/0", status: http.StatusNotFound},
+		{name: "missing product", method: http.MethodGet, path: "/wp-json/wc/v3/products/404", status: http.StatusNotFound},
+		{name: "a category is not a product", method: http.MethodGet, path: "/wp-json/wc/v3/products/" + itoa(seeded.ID), status: http.StatusNotFound},
+		{name: "missing product category", method: http.MethodGet, path: "/wp-json/wc/v3/products/categories/404", status: http.StatusNotFound},
+		{name: "update a missing product", method: http.MethodPost, path: "/wp-json/wc/v3/products/404", body: []byte(`{"status":"draft"}`), status: http.StatusNotFound},
+		{name: "update with a malformed id", method: http.MethodPost, path: "/wp-json/wc/v3/products/none", body: []byte(`{"status":"draft"}`), status: http.StatusNotFound},
+		{name: "update with a broken body", method: http.MethodPost, path: "/wp-json/wc/v3/products/" + itoa(seeded.ID), body: []byte("not json"), status: http.StatusBadRequest},
+		{name: "invalid window", method: http.MethodGet, path: "/wp-json/wc/v3/products?per_page=0", status: http.StatusBadRequest},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, _ := call(t, server, tc.method, tc.path, tc.body, true)
+			if got.StatusCode != tc.status {
+				t.Errorf("status = %d, want %d", got.StatusCode, tc.status)
+			}
+		})
+	}
+}
+
+func TestUpdatingAProductRenamesAndReslugsIt(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	seeded := server.Seed(wptest.Item{Type: wptest.TypeProduct, Title: "Powder"})[0]
+
+	_, payload := call(t, server, http.MethodPost, "/wp-json/wc/v3/products/"+itoa(seeded.ID), []byte(`{"name":"Koffein Powder","slug":"koffein-powder"}`), true)
+
+	var updated struct {
+		Name string `json:"name"`
+		Slug string `json:"slug"`
+	}
+	decode(t, payload, &updated)
+	if updated.Name != "Koffein Powder" || updated.Slug != "koffein-powder" {
+		t.Errorf("updated = %+v", updated)
+	}
+}

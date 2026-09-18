@@ -79,3 +79,112 @@ func TestCategoriesListAndCreateWithUniqueSlugs(t *testing.T) {
 		t.Errorf("the store holds %d categories", len(server.Categories()))
 	}
 }
+
+func TestMediaCanBeReadBackAndGuardsItsInput(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	_, payload := send(t, newUpload(t, server, "koffein.png", "image/png", []byte{0x89}))
+
+	var uploaded struct {
+		ID int64 `json:"id"`
+	}
+	decode(t, payload, &uploaded)
+
+	response, body := call(t, server, http.MethodGet, "/wp-json/wp/v2/media/"+itoa(uploaded.ID), nil, true)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", response.StatusCode)
+	}
+
+	var read struct {
+		MimeType string `json:"mime_type"`
+	}
+	decode(t, body, &read)
+	if read.MimeType != "image/png" {
+		t.Errorf("mime_type = %q, want image/png", read.MimeType)
+	}
+
+	cases := []struct {
+		name   string
+		method string
+		path   string
+		body   []byte
+	}{
+		{name: "read a missing upload", method: http.MethodGet, path: "/wp-json/wp/v2/media/404"},
+		{name: "describe a missing upload", method: http.MethodPost, path: "/wp-json/wp/v2/media/404", body: []byte(`{"alt_text":"x"}`)},
+		{name: "read a malformed id", method: http.MethodGet, path: "/wp-json/wp/v2/media/none"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			missing, _ := call(t, server, tc.method, tc.path, tc.body, true)
+			if missing.StatusCode != http.StatusNotFound {
+				t.Errorf("status = %d, want 404", missing.StatusCode)
+			}
+		})
+	}
+}
+
+func TestAnUploadNeedsADispositionAndBytes(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+
+	response, _ := call(t, server, http.MethodPost, "/wp-json/wp/v2/media", []byte{0x89}, true)
+	if response.StatusCode != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400 without a Content-Disposition", response.StatusCode)
+	}
+
+	response, _ = send(t, newUpload(t, server, "koffein.png", "image/png", nil))
+	if response.StatusCode != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400 without any bytes", response.StatusCode)
+	}
+}
+
+func TestACategoryCanBeReadBackAndGuardsItsInput(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	seeded := server.SeedCategory(wptest.Category{Name: "Koffein"})
+
+	response, payload := call(t, server, http.MethodGet, "/wp-json/wp/v2/categories/"+itoa(seeded.ID), nil, true)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", response.StatusCode)
+	}
+
+	var category struct {
+		Slug string `json:"slug"`
+	}
+	decode(t, payload, &category)
+	if category.Slug != "koffein" {
+		t.Errorf("slug = %q, want koffein", category.Slug)
+	}
+
+	cases := []struct {
+		name   string
+		method string
+		path   string
+		body   []byte
+		status int
+	}{
+		{name: "missing term", method: http.MethodGet, path: "/wp-json/wp/v2/categories/404", status: http.StatusNotFound},
+		{name: "malformed id", method: http.MethodGet, path: "/wp-json/wp/v2/categories/none", status: http.StatusNotFound},
+		{name: "no name", method: http.MethodPost, path: "/wp-json/wp/v2/categories", body: []byte(`{}`), status: http.StatusBadRequest},
+		{name: "broken body", method: http.MethodPost, path: "/wp-json/wp/v2/categories", body: []byte("not json"), status: http.StatusBadRequest},
+		{name: "page past the end", method: http.MethodGet, path: "/wp-json/wp/v2/categories?page=9", status: http.StatusBadRequest},
+		{name: "invalid window", method: http.MethodGet, path: "/wp-json/wp/v2/categories?per_page=0", status: http.StatusBadRequest},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, _ := call(t, server, tc.method, tc.path, tc.body, true)
+			if got.StatusCode != tc.status {
+				t.Errorf("status = %d, want %d", got.StatusCode, tc.status)
+			}
+		})
+	}
+}

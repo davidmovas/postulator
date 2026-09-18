@@ -223,3 +223,72 @@ func TestDeleteTrashesUnlessItIsForced(t *testing.T) {
 		t.Error("a forced delete removes the item")
 	}
 }
+
+func TestUpdateCanTouchEveryField(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	seeded := server.Seed(wptest.Item{Type: wptest.TypePost, Title: "Powder"})[0]
+
+	body := []byte(`{"title":"Koffein","content":"<p>c</p>","excerpt":"e","template":"wide","menu_order":3,"featured_media":7,"categories":[1,2],"tags":[3],"meta":{"_postulator_title":"m"},"slug":"koffein-neu"}`)
+	_, payload := call(t, server, http.MethodPost, "/wp-json/wp/v2/posts/"+itoa(seeded.ID), body, true)
+
+	var updated struct {
+		Slug          string          `json:"slug"`
+		Template      string          `json:"template"`
+		MenuOrder     int             `json:"menu_order"`
+		FeaturedMedia int64           `json:"featured_media"`
+		Categories    []int64         `json:"categories"`
+		Tags          []int64         `json:"tags"`
+		Meta          json.RawMessage `json:"meta"`
+		Excerpt       struct {
+			Raw string `json:"raw"`
+		} `json:"excerpt"`
+	}
+	decode(t, payload, &updated)
+
+	if updated.Slug != "koffein-neu" || updated.Template != "wide" || updated.MenuOrder != 3 || updated.FeaturedMedia != 7 {
+		t.Errorf("updated = %+v", updated)
+	}
+	if len(updated.Categories) != 2 || len(updated.Tags) != 1 || updated.Excerpt.Raw != "e" {
+		t.Errorf("updated = %+v", updated)
+	}
+	if string(updated.Meta) == "[]" {
+		t.Error("meta must be an object once a key is set")
+	}
+}
+
+func TestTheCoreRoutesGuardTheirIdsAndBodies(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein"})[0]
+
+	cases := []struct {
+		name   string
+		method string
+		path   string
+		body   []byte
+		status int
+	}{
+		{name: "malformed id", method: http.MethodGet, path: "/wp-json/wp/v2/pages/none", status: http.StatusNotFound},
+		{name: "a page is not a post", method: http.MethodGet, path: "/wp-json/wp/v2/posts/" + itoa(seeded.ID), status: http.StatusNotFound},
+		{name: "create with a broken body", method: http.MethodPost, path: "/wp-json/wp/v2/pages", body: []byte("not json"), status: http.StatusBadRequest},
+		{name: "update a missing page", method: http.MethodPost, path: "/wp-json/wp/v2/pages/404", body: []byte(`{"status":"draft"}`), status: http.StatusNotFound},
+		{name: "update with a malformed id", method: http.MethodPost, path: "/wp-json/wp/v2/pages/none", body: []byte(`{"status":"draft"}`), status: http.StatusNotFound},
+		{name: "delete a missing page", method: http.MethodDelete, path: "/wp-json/wp/v2/pages/404", status: http.StatusNotFound},
+		{name: "delete with a malformed id", method: http.MethodDelete, path: "/wp-json/wp/v2/pages/none", status: http.StatusNotFound},
+		{name: "invalid page number", method: http.MethodGet, path: "/wp-json/wp/v2/pages?page=0", status: http.StatusBadRequest},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			response, _ := call(t, server, tc.method, tc.path, tc.body, true)
+			if response.StatusCode != tc.status {
+				t.Errorf("status = %d, want %d", response.StatusCode, tc.status)
+			}
+		})
+	}
+}

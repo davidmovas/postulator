@@ -304,3 +304,18 @@ func send(t *testing.T, request *http.Request) (response *http.Response, payload
 	}
 	return response, payload
 }
+
+func TestTheFakeClockAdvancesWithEveryStoredItem(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	before := server.Now()
+	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein"})[0]
+
+	if !server.Now().After(before) {
+		t.Error("storing an item must advance the clock")
+	}
+	if !seeded.Modified.Equal(server.Now()) {
+		t.Errorf("modified = %s, clock = %s", seeded.Modified, server.Now())
+	}
+}

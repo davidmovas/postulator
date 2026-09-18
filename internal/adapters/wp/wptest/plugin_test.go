@@ -398,3 +398,38 @@ func TestABrokenSiteCanReportTheWrongHash(t *testing.T) {
 		t.Error("the broken site must not report the correct hash")
 	}
 }
+
+func TestThePluginRoutesRejectBadInput(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein", Content: "<p>x</p>"})[0]
+
+	cases := []struct {
+		name   string
+		method string
+		path   string
+		body   []byte
+		status int
+	}{
+		{name: "cursor that is not base64", method: http.MethodGet, path: "/wp-json/postulator/v1/content?cursor=!!!", status: http.StatusBadRequest},
+		{name: "cursor that is not json", method: http.MethodGet, path: "/wp-json/postulator/v1/content?cursor=bm90anNvbg", status: http.StatusBadRequest},
+		{name: "seo meta with a broken body", method: http.MethodPut, path: "/wp-json/postulator/v1/seo-meta/" + itoa(seeded.ID), body: []byte("not json"), status: http.StatusBadRequest},
+		{name: "seo meta for a malformed id", method: http.MethodPut, path: "/wp-json/postulator/v1/seo-meta/0", body: []byte(`{"title":"x"}`), status: http.StatusNotFound},
+		{name: "raw read for a malformed id", method: http.MethodGet, path: "/wp-json/postulator/v1/content/0/raw", status: http.StatusNotFound},
+		{name: "raw write for a malformed id", method: http.MethodPut, path: "/wp-json/postulator/v1/content/0/raw", body: []byte(`{"content":"x"}`), status: http.StatusNotFound},
+		{name: "raw write without content", method: http.MethodPut, path: "/wp-json/postulator/v1/content/" + itoa(seeded.ID) + "/raw", body: []byte(`{}`), status: http.StatusBadRequest},
+		{name: "raw write with a broken body", method: http.MethodPut, path: "/wp-json/postulator/v1/content/" + itoa(seeded.ID) + "/raw", body: []byte("not json"), status: http.StatusBadRequest},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			response, _ := call(t, server, tc.method, tc.path, tc.body, true)
+			if response.StatusCode != tc.status {
+				t.Errorf("status = %d, want %d", response.StatusCode, tc.status)
+			}
+		})
+	}
+}

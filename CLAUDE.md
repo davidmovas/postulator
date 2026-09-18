@@ -44,6 +44,20 @@ Before an agent implements a module, it reads the Archond files that section 15 
 - **`frontend/src/generated/events.ts` is generated and committed.** `task events` rewrites it and a Go test fails when it is stale. `frontend/bindings/` is the opposite: generated and gitignored, rewritten by every build. That file and `go.mod` are pinned to LF in `.gitattributes`, because `core.autocrlf` otherwise hands a fresh checkout CRLF that no generator ever writes and the in-sync test fails on a clean clone.
 - **The tuned lint rules and why**: `errcheck` runs with `check-blank` and `check-type-assertions` and no baseline, so `_ = f()` is a finding rather than an escape hatch. `govet` is `enable-all` with `shadow` non-strict, because strict mode reports every `if err := f(); err != nil`. `fieldalignment` is off: it orders struct fields by machine layout, and our field order is the JSON order we owe the frontend. `gocritic` runs diagnostic, style and performance with `hugeParam` off. `misspell` is US English and ignores `cancelled`, which is a domain status value.
 
+- **WordPress `modified_gmt` has no timezone suffix**, so `time.Parse(time.RFC3339, ...)`
+  fails on it; `wp.parseWPTime` falls back to `2006-01-02T15:04:05` read as UTC. The
+  reverse is worse: core REST filters `modified_after` on the site-local `post_modified`
+  while returning `modified_gmt`, so an incremental core-REST sync of a non-UTC site can
+  miss or repeat items inside the offset. The plugin's `/content?since=` compares
+  `post_modified_gmt` and is the accurate path; that is one of the reasons the plugin
+  exists.
+- **WordPress sends `"meta": []`, not `{}`,** for a post type with no registered meta, so
+  decoding it straight into a map fails. `wp.metaBag` accepts the array, the object and
+  null.
+- **`wptest` must never import `wp`.** The fake is a second, independent implementation of
+  the WordPress contract; sharing the client's types or its hash would let one bug satisfy
+  both sides of every assertion.
+
 ## Standing rulings
 
 - **2026-09-17** — UUIDs come from the Go 1.27 standard library `uuid` package; `github.com/google/uuid` is not a dependency. `kernel/id.Valid` does its own canonical v4 check, because `uuid.Parse` also accepts braced, URN and unhyphenated text and any version.
@@ -56,6 +70,14 @@ Before an agent implements a module, it reads the Archond files that section 15 
 - **2026-09-17 (phase 1B)** — `application.RegisterEvent` is not used. The Go registry plus `go run ./internal/transport/wails/gen` owns the event typings; a second list would drift and its output lands in the gitignored `frontend/bindings`.
 - **2026-09-17 (phase 1B)** — `Services` is a method on `*app.Core`. `internal/transport/wails` cannot import `internal/app`, because `internal/app` imports it; the composition root is what hands a service its dependencies.
 
+- **2026-09-18 (phase 3A)** — `adapters/wp` is the one place in the codebase where page
+  numbers are legal. WordPress core REST has no keyset; `kernel/paging` is untouched by
+  it, and the plugin's own cursor is passed through opaque.
+- **2026-09-18 (phase 3A)** — `wp.ContentHash` is `hex(sha256(raw))` and is frozen. It is
+  not `domain/content.Document.Hash()`, and normalising it would silently break the
+  optimistic-concurrency check on `PUT /content/{id}/raw`.
+- **2026-09-18 (phase 3A)** — `wp-plugin/openapi.yaml` is the contract between the two
+  Phase 3 tracks. Neither track changes it alone.
 ## Product guardrail
 
 Postulator turns an entity graph into graph-compliant WordPress pages; reject features that do not serve that loop.

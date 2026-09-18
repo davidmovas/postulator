@@ -62,6 +62,14 @@ cases, each publishing one event after its transaction commits; `internal/app` w
 seeds the templates at `Open` and relays events to the single `EventBridge` once
 `cmd/postulator` connects it. Phase 3 (WordPress) and Phase 4 (LLM) follow.
 
+**Phase 3A (the WordPress Go adapter) is complete** on the `phase-3a` worktree. The plan
+is `docs/superpowers/plans/2026-09-18-phase-3a-wp-adapter.md`; its thirteen tasks landed
+one commit each. `wp-plugin/openapi.yaml` freezes the `postulator/v1` contract that track
+B implements in PHP; `internal/adapters/wp` holds the stdlib client for core REST,
+WooCommerce and the plugin namespace, with proxy, retry, rate limiting and error mapping;
+`internal/adapters/wp/wptest` is the in-memory fake that Phases 6, 7 and 12 test against.
+The sync use case is not in this track and follows once Phase 2 lands.
+
 ## What landed in Phase 0
 
 - The v1.6.2 codebase is gone: `internal/`, `pkg/`, `frontend/`, `main.go`, `Makefile`,
@@ -271,6 +279,69 @@ seeds the templates at `Open` and relays events to the single `EventBridge` once
   nullable-column helpers in `page_repo.go`, the view helpers next to their use cases),
   because the `unused` linter refuses a helper committed ahead of its caller.
 
+## Decisions taken in Phase 3A
+
+- **WordPress page numbers, not our cursors.** Core REST is offset-based and exposes no
+  keyset, so `ListItems` takes `ListQuery{Page, PerPage}` and returns
+  `ItemPage{Total, TotalPages, Page, HasMore}`. Synthesising a cursor would claim a
+  stability `LIMIT/OFFSET` does not have and would hide the `400
+  rest_post_invalid_page_number` that is the real end-of-list signal. The plugin
+  namespace is the one surface with a keyset, and its cursor is opaque end to end: the
+  Go client never decodes, validates or builds one.
+- **`contentHash` is `hex(sha256(raw post_content))` with no normalisation**, so Go's
+  `wp.ContentHash` and PHP's `hash('sha256', $post->post_content)` agree byte for byte.
+  It is deliberately not `domain/content.Document.Hash()`, which hashes normalised HTML
+  for drift detection; this one is a compare-and-swap token and must be exact. `wptest`
+  implements it a second time rather than importing it, and both are pinned against the
+  same externally computed digest.
+- **`wptest` shares no type, no JSON shape and no hash with `wp`.** A fake that imports
+  the client's decoding cannot disagree with it, which is the only thing that makes it
+  worth having. Its own tests drive it with plain `net/http`.
+- **Reads send `context=edit`.** Without it WordPress returns the theme's rendering
+  instead of the stored post, and relink would write rendered HTML back into
+  `post_content`.
+- **`CreateItem` re-reads the created id.** WordPress rewrites a colliding slug to
+  `-2` and computes `link` from the permalink structure, so the create response is the
+  only truth about both, and one extra GET buys a slug and a link that are true.
+- **Tri-state fields are a `map[string]any`.** `omitempty` erases a legitimate
+  `parent: 0`, so `UpdateItem` builds the body key by key: `nil` keeps, `&0` moves to the
+  top level, `&id` reparents; `nil` categories keep and `[]int64{}` clears.
+- **The generic write methods are core-only.** `CreateItem`, `UpdateItem` and
+  `DeleteItem` report `Invalid` for `product` and `product_cat`; `UpdateProduct` is the
+  one write path into a shop, and it names WooCommerce's own fields.
+- **The no-redirect client is not an option.** `Probe` gets its own `*http.Client` over
+  the shared transport; letting a caller switch redirect-following off for ordinary calls
+  would break every site that 301s a REST path to its trailing-slash form. `Probe` never
+  follows a redirect: an http-to-https upgrade is `ProbeUpgradeRequired` plus a warning,
+  and a redirect to `wp-login.php` or `/wp-admin` is `Unauthorized`.
+- **Retries wrap the rate limiter, not the other way round.** A retry is a new request
+  against the same site and pays the same budget; the backoff sleep happens before the
+  limiter grants, so a token is never held idle. `Retry-After` wins over the backoff and
+  is parsed as both delta-seconds and HTTP-date. The backoff is deterministic and has no
+  jitter: one desktop process against one site is not a herd.
+- **A cancelled caller context is `Cancelled`, our own timeout is `External`.** Retrying
+  a context the caller cancelled can only fail the same way.
+- **`AllowInsecure` unlocks the `http` scheme and nothing else.** `TLSClientConfig` is
+  never set in this package, and there is no option that could set it.
+- **An empty `wp.proxyUrl` means no proxy**, not `http.ProxyFromEnvironment`: a stale
+  `HTTPS_PROXY` must not silently route WordPress credentials through a host the user
+  never configured here.
+- **The manifest is cached per client, and only a 404 is cached as absent.** A 5xx or a
+  transport failure is re-probed, so a site that was briefly down is not written off for
+  the life of the client. Plugin methods then fail with `Invalid` and
+  `Details["code"] == "plugin_missing"` without a request, which is how a caller degrades
+  to core REST.
+- **A log line carries method, path, status, durationMs and the error codes, never a
+  body, a query string or a header.** `kernel/log` redacts by field key, which protects
+  nothing if a body is logged as one blob.
+- **Path normalisation is one algorithm with a temporary home.** Strip scheme and host
+  after deciding internal-ness by exact lowercase host equality, strip query and
+  fragment, never percent-decode, collapse duplicate slashes, force exactly one leading
+  and one trailing slash, ASCII-lowercase the whole path, and make no exception for a
+  file extension. `wp.NormalizePath` holds it for now; the canonical home is
+  `internal/domain/pagemap.NormalizePath` from Phase 2, and a follow-up task replaces
+  the adapter's body with a call into the domain once Phase 2 merges.
+
 ## Known gaps
 
 - Application events published before `cmd/postulator` connects the relay to the Wails
@@ -288,3 +359,12 @@ seeds the templates at `Open` and relays events to the single `EventBridge` once
   outright. `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2`
   puts the correct binary in `GOPATH/bin`; the shim still wins on `PATH`.
 - The frontend is a stub that prints the build info. It is replaced in Phase 11.
+- Phase 3A ships no sync use case: `internal/application` gains its WordPress consumer
+  only after Phase 2 lands the page map and the repositories. Nothing in `internal/app`
+  constructs a `wp.Client` yet, so `wp.timeout`, `wp.retries`, `wp.rateLimitPerSecond`
+  and `wp.proxyUrl` are declared and validated but not yet read at startup.
+- `wp.NormalizePath` duplicates what `internal/domain/pagemap.NormalizePath` will own
+  once Phase 2 merges. A follow-up task then replaces the adapter's body with a call into
+  the domain — adapters may import domain — and moves the table test with it.
+  `wp.InternalPath` stays in the adapter, because deciding whether a host is this site's
+  host is adapter knowledge.
