@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
+	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -29,6 +30,20 @@ func Site(t testing.TB, store *sqlite.Store, name string) site.Site {
 	record.SecretRef = site.SecretRef(record.ID)
 	if err := sqlite.NewSiteRepo(store).Insert(t.Context(), record); err != nil {
 		t.Fatalf("insert the site fixture: %v", err)
+	}
+	return record
+}
+
+func Entity(t testing.TB, store *sqlite.Store, siteID, name string) graph.Entity {
+	t.Helper()
+
+	record := graph.Entity{
+		ID: id.New(), SiteID: siteID, Name: name, Kind: graph.KindTopic, PrimaryKeyword: name,
+		SecondaryKeywords: []string{}, Anchors: []graph.Anchor{{Text: name, Source: graph.AnchorUser, Weight: 1}},
+		Source: graph.SourceUser, CreatedAt: Stamp, UpdatedAt: Stamp,
+	}
+	if err := sqlite.NewEntityRepo(store).Insert(t.Context(), record); err != nil {
+		t.Fatalf("insert the entity fixture: %v", err)
 	}
 	return record
 }
