@@ -2,6 +2,7 @@ package wptest
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"time"
 )
@@ -18,6 +19,7 @@ const (
 type fault struct {
 	retryAfter time.Duration
 	status     int
+	afterWrite bool
 }
 
 func (s *Server) FailNext(status, times int) {
@@ -26,6 +28,15 @@ func (s *Server) FailNext(status, times int) {
 
 	for range times {
 		s.faults = append(s.faults, fault{status: status})
+	}
+}
+
+func (s *Server) FailAfterNext(status, times int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for range times {
+		s.faults = append(s.faults, fault{status: status, afterWrite: true})
 	}
 }
 
@@ -56,6 +67,9 @@ func (s *Server) injectFaults(next http.Handler) http.Handler {
 			return
 		}
 
+		if injected.afterWrite {
+			next.ServeHTTP(httptest.NewRecorder(), r)
+		}
 		if injected.retryAfter > 0 {
 			w.Header().Set("Retry-After", strconv.Itoa(int(injected.retryAfter.Seconds())))
 		}

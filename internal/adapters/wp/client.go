@@ -1,6 +1,7 @@
 package wp
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -18,6 +19,8 @@ const (
 	coreNamespace   = "/wp-json/wp/v2"
 	wooNamespace    = "/wp-json/wc/v3"
 	pluginNamespace = "/wp-json/postulator/v1"
+
+	redacted = "***"
 )
 
 type Config struct {
@@ -25,6 +28,15 @@ type Config struct {
 	Username      string
 	AppPassword   string
 	AllowInsecure bool
+}
+
+func (c Config) String() string {
+	return fmt.Sprintf("wp.Config{BaseURL:%q Username:%q AppPassword:%s AllowInsecure:%t}",
+		c.BaseURL, c.Username, redacted, c.AllowInsecure)
+}
+
+func (c Config) GoString() string {
+	return c.String()
 }
 
 type Client struct {
@@ -84,6 +96,18 @@ func New(cfg Config, opts ...Option) (*Client, error) {
 		password:  cfg.AppPassword,
 		retries:   resolved.retries,
 	}, nil
+}
+
+func (c *Client) String() string {
+	if c == nil {
+		return "wp.Client(nil)"
+	}
+	return fmt.Sprintf("wp.Client{BaseURL:%q Username:%q AppPassword:%s Retries:%d}",
+		c.base.String(), c.username, redacted, c.retries)
+}
+
+func (c *Client) GoString() string {
+	return c.String()
 }
 
 func keepRedirect(*http.Request, []*http.Request) error {

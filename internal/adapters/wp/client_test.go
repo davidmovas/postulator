@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -341,5 +343,61 @@ func TestTheDefaultBackoffGrowsAndIsCapped(t *testing.T) {
 				t.Errorf("defaultBackoff(%d) = %s, want %s", tc.attempt, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestFormattingNeverRevealsTheApplicationPassword(t *testing.T) {
+	t.Parallel()
+
+	const password = "s3cret app pass"
+
+	cfg := Config{BaseURL: "https://example.com", Username: "editor", AppPassword: password}
+	client, err := New(cfg)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	boxedConfig, boxedPointer, boxedClient := any(cfg), any(&cfg), any(client)
+
+	cases := []struct {
+		name      string
+		formatted string
+	}{
+		{name: "config with v", formatted: fmt.Sprintf("%v", boxedConfig)},
+		{name: "config with plus v", formatted: fmt.Sprintf("%+v", boxedConfig)},
+		{name: "config with sharp v", formatted: fmt.Sprintf("%#v", boxedConfig)},
+		{name: "config with s", formatted: fmt.Sprintf("%s", boxedConfig)},
+		{name: "config through sprint", formatted: fmt.Sprint(boxedConfig)},
+		{name: "config pointer with plus v", formatted: fmt.Sprintf("%+v", boxedPointer)},
+		{name: "client with v", formatted: fmt.Sprintf("%v", boxedClient)},
+		{name: "client with plus v", formatted: fmt.Sprintf("%+v", boxedClient)},
+		{name: "client with sharp v", formatted: fmt.Sprintf("%#v", boxedClient)},
+		{name: "client with s", formatted: fmt.Sprintf("%s", boxedClient)},
+		{name: "client through sprint", formatted: fmt.Sprint(boxedClient)},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if strings.Contains(tc.formatted, password) {
+				t.Errorf("the application password reached %s: %s", tc.name, tc.formatted)
+			}
+			if !strings.Contains(tc.formatted, "AppPassword:"+redacted) {
+				t.Errorf("%s does not mark the password as redacted: %s", tc.name, tc.formatted)
+			}
+			if !strings.Contains(tc.formatted, "editor") {
+				t.Errorf("%s dropped the fields that are not secret: %s", tc.name, tc.formatted)
+			}
+		})
+	}
+}
+
+func TestANilClientFormatsWithoutPanicking(t *testing.T) {
+	t.Parallel()
+
+	var client *Client
+	if got := fmt.Sprintf("%v", any(client)); got != "wp.Client(nil)" {
+		t.Errorf("formatted = %q", got)
 	}
 }

@@ -63,12 +63,26 @@ func (c *Client) do(ctx context.Context, req request) (*http.Response, []byte, e
 		if result.err == nil {
 			return result.resp, result.body, nil
 		}
-		if !retryable(result.err) {
+		if !retryAllowed(req.method, result) {
 			return nil, nil, result.err
 		}
 		last = result.err
 	}
 	return nil, nil, last
+}
+
+func retryAllowed(method string, result attempt) bool {
+	if !retryable(result.err) {
+		return false
+	}
+	if idempotent(method) {
+		return true
+	}
+	return result.status == 0
+}
+
+func idempotent(method string) bool {
+	return method == http.MethodGet || method == http.MethodHead
 }
 
 func (c *Client) send(ctx context.Context, client *http.Client, req request, target string) attempt {

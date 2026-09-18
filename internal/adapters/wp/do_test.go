@@ -173,3 +173,34 @@ func detailOf(t *testing.T, err error, key string) string {
 	}
 	return value
 }
+
+func TestAWriteThatReachedTheSiteIsNeverRepeated(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	server.FailAfterNext(http.StatusInternalServerError, 1)
+
+	_, err := newClient(t, server).CreateItem(t.Context(), wp.TypePage, wp.CreateItem{Title: "Koffein"})
+	if !errors.IsCode(err, errors.External) {
+		t.Fatalf("code = %q, want %q", errors.CodeOf(err), errors.External)
+	}
+	if got := len(server.Items()); got != 1 {
+		t.Errorf("the site holds %d pages, want 1; a write WordPress already applied must not be sent again", got)
+	}
+}
+
+func TestAReadThatFailedIsRepeated(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein"})
+	server.FailNext(http.StatusInternalServerError, 2)
+	server.ResetRequests()
+
+	if _, err := newClient(t, server).GetItem(t.Context(), wp.TypePage, seeded[0].ID); err != nil {
+		t.Fatalf("GetItem: %v", err)
+	}
+	if got := len(server.Requests()); got != 3 {
+		t.Errorf("the site saw %d requests, want 1 attempt and 2 retries", got)
+	}
+}

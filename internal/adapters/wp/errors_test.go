@@ -38,6 +38,10 @@ func TestClassifyMapsWordPressStatusesToKernelCodes(t *testing.T) {
 		{name: "not found", status: http.StatusNotFound, body: `{"code":"rest_post_invalid_id"}`, want: errors.NotFound},
 		{name: "conflict", status: http.StatusConflict, body: `{"code":"hash_mismatch","currentHash":"abc"}`, want: errors.Conflict},
 		{name: "rate limited", status: http.StatusTooManyRequests, header: http.Header{"Retry-After": {"5"}}, body: `{"code":"too_many_requests"}`, want: errors.RateLimited},
+		{name: "method not allowed", status: http.StatusMethodNotAllowed, body: `{"code":"rest_no_route"}`, want: errors.Invalid},
+		{name: "gone", status: http.StatusGone, body: "", want: errors.Invalid},
+		{name: "payload too large", status: http.StatusRequestEntityTooLarge, body: `{"code":"rest_upload_too_large"}`, want: errors.Invalid},
+		{name: "unprocessable", status: http.StatusUnprocessableEntity, body: `{"code":"rest_invalid_param"}`, want: errors.Invalid},
 		{name: "server error", status: http.StatusInternalServerError, body: "<html>fatal</html>", want: errors.External},
 		{name: "gateway error", status: http.StatusBadGateway, body: "", want: errors.External},
 		{name: "unexpected redirect", status: http.StatusFound, body: "", want: errors.External},
@@ -98,6 +102,40 @@ func TestClassifyAttachesRetryInformation(t *testing.T) {
 	failed := classify(response(t, http.StatusServiceUnavailable, nil), nil)
 	if got := delayFor(failed, 250*time.Millisecond); got != 250*time.Millisecond {
 		t.Errorf("retry = %s, want the fallback backoff", got)
+	}
+
+	patient := classify(response(t, http.StatusServiceUnavailable, http.Header{"Retry-After": {"11"}}), nil)
+	if got := delayFor(patient, 250*time.Millisecond); got != 11*time.Second {
+		t.Errorf("retry = %s, want the 11s the site asked for", got)
+	}
+
+	dated := classify(response(t, http.StatusBadGateway, http.Header{"Retry-After": {time.Now().Add(time.Minute).UTC().Format(http.TimeFormat)}}), nil)
+	if got := delayFor(dated, time.Millisecond); got <= time.Millisecond || got > time.Minute {
+		t.Errorf("retry = %s, want a positive delay of at most a minute", got)
+	}
+}
+
+func TestAnUnmappedClientErrorIsInvalidAndNeverRetried(t *testing.T) {
+	t.Parallel()
+
+	statuses := []int{
+		http.StatusMethodNotAllowed,
+		http.StatusGone,
+		http.StatusRequestEntityTooLarge,
+		http.StatusUnprocessableEntity,
+	}
+
+	for _, status := range statuses {
+		err := classify(response(t, status, http.Header{"Retry-After": {"30"}}), []byte(`{"code":"rest_no_route","message":"No route was found"}`))
+		if !errors.IsCode(err, errors.Invalid) {
+			t.Errorf("status %d code = %q, want %q", status, errors.CodeOf(err), errors.Invalid)
+		}
+		if retryable(err) {
+			t.Errorf("status %d must never be retried", status)
+		}
+		if got := detailString(err, "code"); got != "rest_no_route" {
+			t.Errorf("status %d code detail = %q", status, got)
+		}
 	}
 }
 

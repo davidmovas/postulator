@@ -54,10 +54,11 @@ func classify(resp *http.Response, body []byte) error {
 	case resp.StatusCode == http.StatusTooManyRequests:
 		return recode(base, errors.RateLimited, "WordPress is rate limiting this site").
 			WithRetry(retryAfter(resp.Header.Get("Retry-After")))
-	case resp.StatusCode == http.StatusBadRequest:
-		return recode(base, errors.Invalid, "WordPress rejected the request")
 	case resp.StatusCode >= http.StatusInternalServerError:
-		return recode(base, errors.External, "the WordPress site returned a server error").WithRetry(0)
+		return recode(base, errors.External, "the WordPress site returned a server error").
+			WithRetry(retryAfter(resp.Header.Get("Retry-After")))
+	case resp.StatusCode >= http.StatusBadRequest:
+		return recode(base, errors.Invalid, "WordPress rejected the request")
 	default:
 		return base
 	}
