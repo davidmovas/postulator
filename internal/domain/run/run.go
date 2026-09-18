@@ -54,6 +54,11 @@ type Budget struct {
 	MaxTokens int     `json:"maxTokens"`
 }
 
+type Estimate struct {
+	Tokens int     `json:"tokens"`
+	USD    float64 `json:"usd"`
+}
+
 type Stats struct {
 	Items  int     `json:"items"`
 	Done   int     `json:"done"`

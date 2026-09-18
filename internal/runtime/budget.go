@@ -16,21 +16,16 @@ const (
 	inputShareOfOutput  = 0.5
 )
 
-type Estimate struct {
-	Tokens int     `json:"tokens"`
-	USD    float64 `json:"usd"`
-}
-
-func (e *Engine) EstimateRun(ctx context.Context, record run.Run, spec template.TemplateSpec) (Estimate, error) {
+func (e *Engine) EstimateRun(ctx context.Context, record run.Run, spec template.TemplateSpec) (run.Estimate, error) {
 	output := int(float64(targetWords(spec)) * tokensPerWord)
 	input := promptOverhead + int(float64(output)*inputShareOfOutput)
 	usage := llm.Usage{Input: input, Output: output, Total: input + output}
 
-	var estimate Estimate
+	var estimate run.Estimate
 	for _, step := range run.Enabled(record.Recipe) {
 		def, known := e.registry.Lookup(step.Name)
 		if !known {
-			return Estimate{}, errors.New(errors.NotFound, "the recipe names the unknown step "+step.Name).
+			return run.Estimate{}, errors.New(errors.NotFound, "the recipe names the unknown step "+step.Name).
 				WithDetail("step", step.Name)
 		}
 		if def.Role == "" {
@@ -39,11 +34,11 @@ func (e *Engine) EstimateRun(ctx context.Context, record run.Run, spec template.
 
 		ref, err := e.deps.Profiles.Resolve(ctx, record.SiteID, def.Role, spec.ModelProfiles)
 		if err != nil {
-			return Estimate{}, err
+			return run.Estimate{}, err
 		}
 		info, err := e.deps.Catalog.Lookup(ctx, ref)
 		if err != nil {
-			return Estimate{}, err
+			return run.Estimate{}, err
 		}
 
 		estimate.Tokens += usage.Total
