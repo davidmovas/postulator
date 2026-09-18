@@ -73,10 +73,6 @@ func SyncSite(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			if state.StartedAt.IsZero() {
-				state.StartedAt = deps.now()
-			}
-
 			owner, err := deps.Sites.Get(ctx, sc.Run.SiteID)
 			if err != nil {
 				return run.Result{}, err
@@ -90,9 +86,17 @@ func SyncSite(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			state.Source = SourceCore
+
+			source := SourceCore
 			if bulk {
-				state.Source = SourcePlugin
+				source = SourcePlugin
+			}
+			if state.Source != "" && state.Source != source {
+				state = SiteSyncResult{}
+			}
+			state.Source = source
+			if state.StartedAt.IsZero() {
+				state.StartedAt = deps.now()
 			}
 
 			batch, next, err := pull(ctx, client, state, batchSize(deps), hostOf(owner.BaseURL))
@@ -427,7 +431,6 @@ func merge(current pagemap.Page, known bool, item pulledItem, siteID string,
 	next.MetaDescription = item.Meta.Description
 	next.Canonical = item.Meta.Canonical
 	next.Status = statusFor(item.Status)
-	next.ContentHash = item.ContentHash
 	next.Drift = drifted
 	next.LastSyncedAt = &now
 	next.UpdatedAt = now

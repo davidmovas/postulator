@@ -208,8 +208,8 @@ func TestSyncSitePullsThroughThePluginAndThroughCore(t *testing.T) {
 			if child.WPID == nil || child.Title != "Espresso" || child.H1 != "Espresso" {
 				t.Fatalf("the child page is %+v", child)
 			}
-			if child.Status != pagemap.StatusPublished || child.ContentHash == "" {
-				t.Fatalf("the child page is %+v", child)
+			if child.Status != pagemap.StatusPublished || child.ContentHash != "" {
+				t.Fatalf("the child page is %+v; a page we never wrote carries no hash of ours", child)
 			}
 			parent := h.byPath(t, "/coffee/")
 			if child.ParentPageID == nil || *child.ParentPageID != parent.ID {
@@ -250,7 +250,7 @@ func TestSyncSiteAdoptsTheManifest(t *testing.T) {
 	}
 }
 
-func TestSyncSiteFlagsDriftAndArchivesWhatIsGone(t *testing.T) {
+func TestSyncSiteFlagsDriftOnlyOverOurOwnHashAndArchivesWhatIsGone(t *testing.T) {
 	t.Parallel()
 
 	h := newSyncHarness(t, 0)
@@ -259,11 +259,23 @@ func TestSyncSiteFlagsDriftAndArchivesWhatIsGone(t *testing.T) {
 
 	child := h.byPath(t, "/coffee/espresso/")
 	filter := h.byPath(t, "/coffee/filter/")
-	if child.Drift {
-		t.Fatalf("the first sync must not report drift: %+v", child)
+	hub := h.byPath(t, "/coffee/")
+	if child.Drift || child.ContentHash != "" {
+		t.Fatalf("the first sync must neither claim the content nor report drift: %+v", child)
+	}
+
+	stored, ok := h.server.Lookup(*child.WPID)
+	if !ok {
+		t.Fatal("the child page is not on the site")
+	}
+	ours := child
+	ours.ContentHash = wp.ContentHash(stored.Content)
+	if err := h.pages.Update(t.Context(), ours); err != nil {
+		t.Fatalf("claim the child page: %v", err)
 	}
 
 	h.server.Rewrite(*child.WPID, `<h1>Espresso</h1><p>Edited by a human.</p>`)
+	h.server.Rewrite(*hub.WPID, `<h1>Coffee</h1><p>Edited by a human too.</p>`)
 	if !h.server.Delete(*filter.WPID) {
 		t.Fatal("the filter page could not be removed from the site")
 	}
@@ -275,11 +287,35 @@ func TestSyncSiteFlagsDriftAndArchivesWhatIsGone(t *testing.T) {
 	if state.Drifted != 1 || state.Archived != 1 {
 		t.Fatalf("state = %+v", state)
 	}
-	if drifted := h.byPath(t, "/coffee/espresso/"); !drifted.Drift {
-		t.Fatalf("the edited page is %+v", drifted)
+	drifted := h.byPath(t, "/coffee/espresso/")
+	if !drifted.Drift || drifted.ContentHash != ours.ContentHash {
+		t.Fatalf("the edited page is %+v; the hash we published stands until we publish again", drifted)
+	}
+	if unclaimed := h.byPath(t, "/coffee/"); unclaimed.Drift {
+		t.Fatalf("a page we never published cannot drift: %+v", unclaimed)
 	}
 	if archived := h.byPath(t, "/coffee/filter/"); archived.Status != pagemap.StatusArchived {
 		t.Fatalf("the deleted page is %+v", archived)
+	}
+}
+
+func TestSyncSiteRestartsWhenTheCursorSourceChanges(t *testing.T) {
+	t.Parallel()
+
+	h := newSyncHarness(t, 1, wptest.WithoutPlugin())
+	seedSite(t, h)
+	if err := run.Set(h.check, "sync", steps.SiteSyncResult{
+		Source: steps.SourcePlugin, Cursor: "a plugin cursor", Batches: 4, Pulled: 9,
+	}); err != nil {
+		t.Fatalf("plant the plugin checkpoint: %v", err)
+	}
+
+	state, _ := h.once(t)
+	if state.Source != steps.SourceCore || state.Batches != 1 || state.Pulled != 1 {
+		t.Fatalf("state = %+v; a cursor issued by the other source restarts the pull", state)
+	}
+	if state.StartedAt.IsZero() {
+		t.Fatalf("the restarted pull needs its own window: %+v", state)
 	}
 }
 
