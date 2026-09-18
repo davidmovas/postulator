@@ -3,6 +3,7 @@ package wails_test
 import (
 	"context"
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -29,7 +30,7 @@ func answer[T any](mode failure) (T, error) {
 	return zero, errors.New(errors.NotFound, "no record carries that id").WithDetail("id", "nope")
 }
 
-func assertEveryMethodConverts(t *testing.T, service any, want string) {
+func assertEveryMethodConverts(t *testing.T, service any, want string, skip ...string) {
 	t.Helper()
 
 	value := reflect.ValueOf(service)
@@ -39,6 +40,9 @@ func assertEveryMethodConverts(t *testing.T, service any, want string) {
 
 	for index := range value.NumMethod() {
 		method := value.Type().Method(index)
+		if slices.Contains(skip, method.Name) {
+			continue
+		}
 		t.Run(method.Name, func(t *testing.T) {
 			signature := method.Type
 			if signature.NumIn() != 3 || signature.NumOut() != 2 {
