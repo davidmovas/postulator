@@ -601,6 +601,12 @@ coverage is 90.2% of 11201 statements. Phase 9 follows.
   what proves the query.
 - The docker e2e stack is never run in CI: `windows-latest` cannot run Linux containers,
   and the Ubuntu job exists only to lint and package the plugin.
+- **Media uploaded by `generate_images` is orphaned when the item later fails.** The step
+  uploads to the WordPress media library before `publish` runs, and nothing deletes the
+  attachment if `validate`, `judge` or `publish` then stops the item. Accepted: an upload
+  is cheap, a delete needs `force=true` to skip the trash, and a sweep that removes media
+  a human may already have reused elsewhere is the worse failure. The library is the place
+  to clean it up.
 
 ## Decisions taken in Phase 8
 
