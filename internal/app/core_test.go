@@ -36,7 +36,7 @@ func TestOpenWiresTheUseCasesAndSeedsTheStarterTemplates(t *testing.T) {
 		if core.Steps == nil || core.Engine == nil || core.Runs == nil {
 			t.Fatal("the core must carry the run engine")
 		}
-		if names := core.Steps.Names(); len(names) != 10 || names[0] != "resolve_context" {
+		if names := core.Steps.Names(); len(names) != 12 || names[0] != "resolve_context" {
 			t.Fatalf("round %d: the step registry holds %v", round, names)
 		}
 		if _, err := core.Runs.List(t.Context(), runs.ListRequest{}); err != nil {

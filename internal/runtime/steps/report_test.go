@@ -1,0 +1,93 @@
+package steps_test
+
+import (
+	"encoding/json"
+	"testing"
+
+	"github.com/davidmovas/postulator/internal/domain/run"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/runtime/steps"
+)
+
+const (
+	storedValidation = `{"pageId":"page-child","score":0.7,` +
+		`"compliance":{"items":[{"severity":"error","code":"target_missing","message":"no link"}],"score":0.75},` +
+		`"structure":{"items":[{"severity":"warn","code":"thin","message":"short"}],"score":0.95}}`
+	storedJudge  = `{"score":0.5,"issues":["thin"],"suggestions":["add an example"]}`
+	storedRelink = `{"neighbors":[],"findings":[{"severity":"warn","code":"relink_conflict","message":"changed"}],` +
+		`"linked":0,"conflicts":1}`
+	storedPublish = `{"wpId":7,"url":"/coffee/espresso/","status":"draft"}`
+	storedSync    = `{"wpId":7,"status":"draft","links":2,"source":"plugin"}`
+	storedImages  = `{"featuredId":3,"images":[{"role":"featured","wpId":3}]}`
+)
+
+func runReport(t *testing.T, artifacts map[run.ArtifactKind][]byte) steps.FinalReport {
+	t.Helper()
+
+	result, err := steps.Report(unitDeps()).Run(t.Context(), unitContext(t, artifacts))
+	if err != nil {
+		t.Fatalf("Report: %v", err)
+	}
+	if len(result.Artifacts) != 1 || result.Artifacts[0].Kind != run.ArtifactFinalReport {
+		t.Fatalf("Report produced %+v", result.Artifacts)
+	}
+
+	var report steps.FinalReport
+	if err = json.Unmarshal(result.Artifacts[0].Blob, &report); err != nil {
+		t.Fatalf("decode the final report: %v", err)
+	}
+	return report
+}
+
+func TestReportAggregatesEveryArtifact(t *testing.T) {
+	t.Parallel()
+
+	report := runReport(t, map[run.ArtifactKind][]byte{
+		run.ArtifactValidationReport: []byte(storedValidation),
+		run.ArtifactJudgeReport:      []byte(storedJudge),
+		run.ArtifactPublishResult:    []byte(storedPublish),
+		run.ArtifactRelinkResult:     []byte(storedRelink),
+		run.ArtifactSyncResult:       []byte(storedSync),
+		run.ArtifactImages:           []byte(storedImages),
+	})
+
+	if report.PageID != "page-child" || report.Path != "/coffee/espresso/" {
+		t.Fatalf("report = %+v", report)
+	}
+	if report.Validation == nil || report.Judge == nil || report.Publish == nil ||
+		report.Relink == nil || report.Sync == nil || report.Images == nil {
+		t.Fatalf("report = %+v", report)
+	}
+	if report.Score != 0.5 {
+		t.Errorf("score = %v, want the lower of the validation and the judge", report.Score)
+	}
+	if len(report.Findings) != 3 {
+		t.Fatalf("findings = %+v", report.Findings)
+	}
+	if report.Errors != 1 || report.Warnings != 2 {
+		t.Errorf("errors = %d, warnings = %d", report.Errors, report.Warnings)
+	}
+}
+
+func TestReportSurvivesAnEmptyItem(t *testing.T) {
+	t.Parallel()
+
+	report := runReport(t, nil)
+	if report.Score != 1 || len(report.Findings) != 0 {
+		t.Fatalf("report = %+v", report)
+	}
+	if report.Validation != nil || report.Judge != nil || report.Publish != nil {
+		t.Fatalf("report = %+v", report)
+	}
+}
+
+func TestReportRefusesAnUnreadableArtifact(t *testing.T) {
+	t.Parallel()
+
+	_, err := steps.Report(unitDeps()).Run(t.Context(), unitContext(t, map[run.ArtifactKind][]byte{
+		run.ArtifactValidationReport: []byte(`not json`),
+	}))
+	if !errors.IsCode(err, errors.Internal) {
+		t.Fatalf("code = %q, want %q (err %v)", errors.CodeOf(err), errors.Internal, err)
+	}
+}

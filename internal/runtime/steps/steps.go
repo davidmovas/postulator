@@ -99,6 +99,8 @@ func all(deps Deps) []run.StepDef {
 		Judge(deps),
 		Publish(deps),
 		RelinkNeighbors(deps),
+		SyncBack(deps),
+		Report(deps),
 	}
 }
 
