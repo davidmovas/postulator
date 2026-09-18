@@ -25,6 +25,8 @@ func NewRegistry() Registry {
 		{Type: AgentToolStarted, Payload: AgentToolStartedPayload{}},
 		{Type: AgentToolFinished, Payload: AgentToolFinishedPayload{}},
 		{Type: AgentConfirmRequested, Payload: AgentConfirmRequestedPayload{}},
+		{Type: AgentConfirmResolved, Payload: AgentConfirmResolvedPayload{}},
+		{Type: AgentDone, Payload: AgentDonePayload{}},
 		{Type: AppLocked, Payload: AppLockedPayload{}},
 		{Type: AppUnlocked, Payload: AppUnlockedPayload{}},
 		{Type: RunQueued, Payload: RunQueuedPayload{}, Run: true},

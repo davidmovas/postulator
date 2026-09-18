@@ -1,6 +1,8 @@
 export type EventType =
     | "agent.confirm.requested"
+    | "agent.confirm.resolved"
     | "agent.delta"
+    | "agent.done"
     | "agent.tool.finished"
     | "agent.tool.started"
     | "app.locked"
@@ -27,10 +29,21 @@ export type EventType =
     | "templates.changed";
 
 export interface AgentConfirmRequestedPayload {
+    conversationId: string;
     confirmationId: string;
     tool: string;
     args: unknown;
     risk: string;
+    summary: string;
+}
+
+export interface AgentConfirmResolvedPayload {
+    conversationId: string;
+    confirmationId: string;
+    tool: string;
+    status: string;
+    result: unknown;
+    error: string;
 }
 
 export interface AgentDeltaPayload {
@@ -40,11 +53,24 @@ export interface AgentDeltaPayload {
     text: string;
 }
 
+export interface AgentDonePayload {
+    conversationId: string;
+    messageId: string;
+    text: string;
+    error: string;
+    inputTokens: number;
+    outputTokens: number;
+    usd: number;
+}
+
 export interface AgentToolFinishedPayload {
     conversationId: string;
     callId: string;
     tool: string;
     result: unknown;
+    status: string;
+    error: string;
+    durationMs: number;
 }
 
 export interface AgentToolStartedPayload {
@@ -173,7 +199,9 @@ export interface TemplatesChangedPayload {}
 
 export interface EventPayloads {
     "agent.confirm.requested": AgentConfirmRequestedPayload;
+    "agent.confirm.resolved": AgentConfirmResolvedPayload;
     "agent.delta": AgentDeltaPayload;
+    "agent.done": AgentDonePayload;
     "agent.tool.finished": AgentToolFinishedPayload;
     "agent.tool.started": AgentToolStartedPayload;
     "app.locked": AppLockedPayload;

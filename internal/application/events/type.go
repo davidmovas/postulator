@@ -10,6 +10,8 @@ const (
 	AgentToolStarted      Type = "agent.tool.started"
 	AgentToolFinished     Type = "agent.tool.finished"
 	AgentConfirmRequested Type = "agent.confirm.requested"
+	AgentConfirmResolved  Type = "agent.confirm.resolved"
+	AgentDone             Type = "agent.done"
 	AppLocked             Type = "app.locked"
 	AppUnlocked           Type = "app.unlocked"
 

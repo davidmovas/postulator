@@ -26,18 +26,42 @@ type AgentToolStartedPayload struct {
 	Args           json.RawMessage `json:"args"`
 }
 
+type AgentDonePayload struct {
+	ConversationID string  `json:"conversationId"`
+	MessageID      string  `json:"messageId"`
+	Text           string  `json:"text"`
+	Error          string  `json:"error"`
+	InputTokens    int     `json:"inputTokens"`
+	OutputTokens   int     `json:"outputTokens"`
+	USD            float64 `json:"usd"`
+}
+
 type AgentToolFinishedPayload struct {
 	ConversationID string          `json:"conversationId"`
 	CallID         string          `json:"callId"`
 	Tool           string          `json:"tool"`
 	Result         json.RawMessage `json:"result"`
+	Status         string          `json:"status"`
+	Error          string          `json:"error"`
+	DurationMs     int64           `json:"durationMs"`
 }
 
 type AgentConfirmRequestedPayload struct {
+	ConversationID string          `json:"conversationId"`
 	ConfirmationID string          `json:"confirmationId"`
 	Tool           string          `json:"tool"`
 	Args           json.RawMessage `json:"args"`
 	Risk           string          `json:"risk"`
+	Summary        string          `json:"summary"`
+}
+
+type AgentConfirmResolvedPayload struct {
+	ConversationID string          `json:"conversationId"`
+	ConfirmationID string          `json:"confirmationId"`
+	Tool           string          `json:"tool"`
+	Status         string          `json:"status"`
+	Result         json.RawMessage `json:"result"`
+	Error          string          `json:"error"`
 }
 
 type AppLockedPayload struct{}
