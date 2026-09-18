@@ -125,5 +125,9 @@ func resumeText(tool string, result json.RawMessage, failure string) string {
 	if failure != "" {
 		return "The confirmed tool " + tool + " failed: " + failure
 	}
-	return "The confirmed tool " + tool + " ran. Its result was: " + string(result)
+	fenced, err := json.Marshal(map[string]any{UntrustedMarker: true, UntrustedData: result})
+	if err != nil {
+		return "The confirmed tool " + tool + " ran and answered something that cannot be read back."
+	}
+	return "The confirmed tool " + tool + " ran. Its result is " + string(fenced)
 }

@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	untrustedMarker = "untrustedContent"
-	untrustedData   = "data"
+	untrustedMarker = agentapp.UntrustedMarker
+	untrustedData   = agentapp.UntrustedData
 
 	truncatedKey  = "truncated"
 	previewKey    = "preview"

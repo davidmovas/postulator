@@ -9,6 +9,11 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
 
+const (
+	UntrustedMarker = "untrustedContent"
+	UntrustedData   = "data"
+)
+
 type SiteContext struct {
 	SiteName  string
 	Mode      string
