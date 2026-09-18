@@ -160,3 +160,69 @@ func TestPublishReportsWhatItCannotDo(t *testing.T) {
 		})
 	}
 }
+
+func TestPublishFallsBackWhenTheStoredIdIsGone(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Status: "draft"})
+
+	sc := publishContext(t)
+	ghost := int64(9999)
+	sc.Page.WPID = &ghost
+
+	published := runPublish(t, deps, sc)
+	if published.Created || published.WPID != seeded[0].ID {
+		t.Fatalf("publish = %+v, want the slug lookup to find %d", published, seeded[0].ID)
+	}
+}
+
+func TestPublishReparentsUnderTheParentPage(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	parent := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Coffee", Slug: "coffee"})
+	wpID := parent[0].ID
+
+	deps.Pages = pageList{items: []pagemap.Page{
+		{
+			ID: "page-parent", SiteID: "site", Path: "/coffee/", Slug: "coffee", WPType: pagemap.WPPage,
+			Status: pagemap.StatusPublished, WPID: &wpID,
+		},
+	}}
+
+	sc := publishContext(t)
+	sc.Page.ParentPageID = pointer("page-parent")
+
+	published := runPublish(t, deps, sc)
+	stored, ok := server.Lookup(published.WPID)
+	if !ok || stored.Parent != wpID {
+		t.Fatalf("the draft is %+v, want it under %d", stored, wpID)
+	}
+}
+
+func TestPublishSkipsTheSEOMetaWithoutAMetaArtifact(t *testing.T) {
+	t.Parallel()
+
+	deps, _ := imageDeps(t)
+	sc := publishContext(t)
+	delete(sc.Artifacts, run.ArtifactMeta)
+
+	published := runPublish(t, deps, sc)
+	if len(published.SEOApplied) != 0 || !slices.Contains(published.Skipped, steps.CodeSEOMetaSkipped) {
+		t.Fatalf("publish = %+v", published)
+	}
+}
+
+func TestPublishRecordsAPublishedPage(t *testing.T) {
+	t.Parallel()
+
+	deps, _ := imageDeps(t)
+	sc := publishContext(t)
+	sc.Run.PublishMode = run.PublishLive
+
+	published := runPublish(t, deps, sc)
+	if published.Status != "publish" {
+		t.Fatalf("publish = %+v", published)
+	}
+}

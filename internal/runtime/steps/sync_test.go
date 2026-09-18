@@ -2,6 +2,8 @@ package steps_test
 
 import (
 	"encoding/json"
+	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -16,17 +18,27 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
+	"github.com/davidmovas/postulator/internal/kernel/settings"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
 
 type busRecorder struct {
 	types []events.Type
 	err   error
+	mu    sync.Mutex
 }
 
 func (b *busRecorder) Publish(eventType events.Type, _ any) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	b.types = append(b.types, eventType)
 	return b.err
+}
+
+func (b *busRecorder) seen() []events.Type {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return slices.Clone(b.types)
 }
 
 type syncHarness struct {
@@ -215,8 +227,8 @@ func TestSyncSitePullsThroughThePluginAndThroughCore(t *testing.T) {
 				t.Fatalf("the links of the child are %+v", links)
 			}
 
-			if len(h.bus.types) != 1 || h.bus.types[0] != events.PagesChanged {
-				t.Fatalf("the bus saw %v", h.bus.types)
+			if seen := h.bus.seen(); len(seen) != 1 || seen[0] != events.PagesChanged {
+				t.Fatalf("the bus saw %v", h.bus.seen())
 			}
 		})
 	}
@@ -290,8 +302,8 @@ func TestSyncSiteResumesFromItsCursor(t *testing.T) {
 	if !state.Done || state.Pulled != 3 || state.Batches < 2 {
 		t.Fatalf("state = %+v", state)
 	}
-	if len(h.bus.types) != 1 {
-		t.Fatalf("the bus saw %v, want one pages.changed at the end", h.bus.types)
+	if seen := h.bus.seen(); len(seen) != 1 {
+		t.Fatalf("the bus saw %v, want one pages.changed at the end", seen)
 	}
 }
 
@@ -309,5 +321,74 @@ func TestSyncSiteReportsWhatItCannotDo(t *testing.T) {
 	}
 	if _, err := steps.SyncSite(h.deps).Run(t.Context(), sc); !errors.IsCode(err, errors.External) {
 		t.Fatalf("code = %q, want %q (err %v)", errors.CodeOf(err), errors.External, err)
+	}
+}
+
+func TestSyncSiteResolvesALinkWhoseTargetArrivesLater(t *testing.T) {
+	t.Parallel()
+
+	h := newSyncHarness(t, 1)
+	h.server.Seed(wptest.Item{
+		Type: wptest.TypePage, Title: "Espresso", Slug: "espresso",
+		Content: `<h1>Espresso</h1><p>Part of <a href="/coffee/">coffee</a>.</p>`,
+	})
+	h.server.Seed(wptest.Item{
+		Type: wptest.TypePage, Title: "Coffee", Slug: "coffee", Content: `<h1>Coffee</h1><p>All of it.</p>`,
+	})
+
+	state := h.all(t)
+	if state.Pulled != 2 || state.Batches < 2 {
+		t.Fatalf("state = %+v", state)
+	}
+
+	child := h.byPath(t, "/espresso/")
+	parent := h.byPath(t, "/coffee/")
+	links, err := h.links.ListForPage(t.Context(), child.ID)
+	if err != nil {
+		t.Fatalf("list the links: %v", err)
+	}
+	if len(links) != 1 || links[0].ToPageID == nil || *links[0].ToPageID != parent.ID {
+		t.Fatalf("the links of the child are %+v, want the target resolved after the second batch", links)
+	}
+}
+
+func TestSyncSiteRefusesAnUnreadableCursor(t *testing.T) {
+	t.Parallel()
+
+	h := newSyncHarness(t, 0, wptest.WithoutPlugin())
+	seedSite(t, h)
+
+	broken := run.NewCheckpoint()
+	if err := run.Set(broken, "sync", steps.SiteSyncResult{Source: steps.SourceCore, Cursor: "{{{"}); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	h.check = broken
+
+	sc := &run.StepContext{
+		Run:       run.Run{ID: "run", SiteID: h.siteID, Kind: run.KindSync},
+		Item:      run.Item{ID: "item", RunID: "run", PageID: h.siteID},
+		Artifacts: map[run.ArtifactKind]run.Artifact{},
+		Check:     broken,
+	}
+	if _, err := steps.SyncSite(h.deps).Run(t.Context(), sc); !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("code = %q, want %q (err %v)", errors.CodeOf(err), errors.Invalid, err)
+	}
+}
+
+func TestBatchSizeCarriesItsDefaultAndItsSetting(t *testing.T) {
+	t.Parallel()
+
+	values := settings.Default().NewValues()
+	if got := steps.BatchSize(values); got != steps.DefaultBatchSize {
+		t.Fatalf("BatchSize = %d, want %d", got, steps.DefaultBatchSize)
+	}
+
+	if _, err := settings.Default().Apply(values, map[string]json.RawMessage{
+		"sync.batchSize": json.RawMessage(`25`),
+	}); err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	if got := steps.BatchSize(values); got != 25 {
+		t.Fatalf("BatchSize = %d, want 25", got)
 	}
 }

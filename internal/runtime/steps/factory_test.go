@@ -3,6 +3,7 @@ package steps_test
 import (
 	"context"
 	"encoding/json"
+	"sync"
 	"testing"
 	"time"
 
@@ -97,9 +98,12 @@ func (stubCatalog) Lookup(context.Context, domainllm.ModelRef) (domainllm.ModelI
 
 type recorder struct {
 	types []events.Type
+	mu    sync.Mutex
 }
 
 func (r *recorder) PublishRun(_ string, _ int64, eventType events.Type, _ any) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.types = append(r.types, eventType)
 	return nil
 }
