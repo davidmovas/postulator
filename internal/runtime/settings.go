@@ -7,48 +7,52 @@ import (
 )
 
 const (
-	DefaultWorkers       = 2
-	DefaultPerSite       = 1
-	DefaultSweepInterval = 5 * time.Second
-	DefaultRetentionDays = 30
-	DefaultStepTimeout   = 5 * time.Minute
-	DefaultLeaseDuration = 10 * time.Minute
-	DefaultRunDeadline   = 6 * time.Hour
-	DefaultRetryBackoff  = time.Second
-	maxRetryBackoff      = 5 * time.Minute
-	sweepBatch           = 100
-	dispatchBatch        = 100
-	queueCapacity        = 256
+	DefaultWorkers            = 2
+	DefaultPerSite            = 1
+	DefaultSweepInterval      = 5 * time.Second
+	DefaultRetentionDays      = 30
+	DefaultEventRetentionDays = 90
+	DefaultStepTimeout        = 5 * time.Minute
+	DefaultLeaseDuration      = 10 * time.Minute
+	DefaultRunDeadline        = 6 * time.Hour
+	DefaultRetryBackoff       = time.Second
+	maxRetryBackoff           = 5 * time.Minute
+	sweepBatch                = 100
+	dispatchBatch             = 100
+	queueCapacity             = 256
 )
 
 var (
-	workersSetting       = settings.Int("runs.workers", DefaultWorkers, settings.IntRange(1, 16))
-	perSiteSetting       = settings.Int("runs.perSite", DefaultPerSite, settings.IntRange(1, 8))
-	sweepSetting         = settings.Duration("runs.sweepInterval", DefaultSweepInterval, settings.DurationRange(time.Second, 5*time.Minute))
-	retentionSetting     = settings.Int("runs.artifactRetentionDays", DefaultRetentionDays, settings.IntRange(1, 365))
-	stepTimeoutSetting   = settings.Duration("runs.stepTimeout", DefaultStepTimeout, settings.DurationRange(10*time.Second, time.Hour))
-	leaseDurationSetting = settings.Duration("runs.leaseDuration", DefaultLeaseDuration, settings.DurationRange(30*time.Second, 2*time.Hour))
+	workersSetting        = settings.Int("runs.workers", DefaultWorkers, settings.IntRange(1, 16))
+	perSiteSetting        = settings.Int("runs.perSite", DefaultPerSite, settings.IntRange(1, 8))
+	sweepSetting          = settings.Duration("runs.sweepInterval", DefaultSweepInterval, settings.DurationRange(time.Second, 5*time.Minute))
+	retentionSetting      = settings.Int("runs.artifactRetentionDays", DefaultRetentionDays, settings.IntRange(1, 365))
+	eventRetentionSetting = settings.Int("runs.eventRetentionDays", DefaultEventRetentionDays, settings.IntRange(1, 365))
+	stepTimeoutSetting    = settings.Duration("runs.stepTimeout", DefaultStepTimeout, settings.DurationRange(10*time.Second, time.Hour))
+	leaseDurationSetting  = settings.Duration("runs.leaseDuration", DefaultLeaseDuration, settings.DurationRange(30*time.Second, 2*time.Hour))
 )
 
 type Config struct {
-	Workers       int
-	PerSite       int
-	SweepInterval time.Duration
-	RetentionDays int
-	StepTimeout   time.Duration
-	LeaseDuration time.Duration
-	RunDeadline   time.Duration
+	Workers            int
+	PerSite            int
+	SweepInterval      time.Duration
+	RetentionDays      int
+	EventRetentionDays int
+	StepTimeout        time.Duration
+	LeaseDuration      time.Duration
+	RunDeadline        time.Duration
 }
 
 func Settings(values *settings.Values) Config {
 	return Config{
-		Workers:       workersSetting.Get(values),
-		PerSite:       perSiteSetting.Get(values),
-		SweepInterval: sweepSetting.Get(values),
-		RetentionDays: retentionSetting.Get(values),
-		StepTimeout:   stepTimeoutSetting.Get(values),
-		LeaseDuration: leaseDurationSetting.Get(values),
-		RunDeadline:   DefaultRunDeadline,
+		Workers:            workersSetting.Get(values),
+		PerSite:            perSiteSetting.Get(values),
+		SweepInterval:      sweepSetting.Get(values),
+		RetentionDays:      retentionSetting.Get(values),
+		EventRetentionDays: eventRetentionSetting.Get(values),
+		StepTimeout:        stepTimeoutSetting.Get(values),
+		LeaseDuration:      leaseDurationSetting.Get(values),
+		RunDeadline:        DefaultRunDeadline,
 	}
 }
 
@@ -64,6 +68,9 @@ func (c Config) normalized() Config {
 	}
 	if c.RetentionDays <= 0 {
 		c.RetentionDays = DefaultRetentionDays
+	}
+	if c.EventRetentionDays <= 0 {
+		c.EventRetentionDays = DefaultEventRetentionDays
 	}
 	if c.StepTimeout <= 0 {
 		c.StepTimeout = DefaultStepTimeout

@@ -209,13 +209,14 @@ func TestSettingsCarryTheDeclaredDefaults(t *testing.T) {
 
 	cfg := runtime.Settings(settings.Default().NewValues())
 	want := runtime.Config{
-		Workers:       runtime.DefaultWorkers,
-		PerSite:       runtime.DefaultPerSite,
-		SweepInterval: runtime.DefaultSweepInterval,
-		RetentionDays: runtime.DefaultRetentionDays,
-		StepTimeout:   runtime.DefaultStepTimeout,
-		LeaseDuration: runtime.DefaultLeaseDuration,
-		RunDeadline:   runtime.DefaultRunDeadline,
+		Workers:            runtime.DefaultWorkers,
+		PerSite:            runtime.DefaultPerSite,
+		SweepInterval:      runtime.DefaultSweepInterval,
+		RetentionDays:      runtime.DefaultRetentionDays,
+		EventRetentionDays: runtime.DefaultEventRetentionDays,
+		StepTimeout:        runtime.DefaultStepTimeout,
+		LeaseDuration:      runtime.DefaultLeaseDuration,
+		RunDeadline:        runtime.DefaultRunDeadline,
 	}
 	if cfg != want {
 		t.Fatalf("Settings = %+v, want %+v", cfg, want)
@@ -223,7 +224,7 @@ func TestSettingsCarryTheDeclaredDefaults(t *testing.T) {
 
 	for _, key := range []string{
 		"runs.workers", "runs.perSite", "runs.sweepInterval", "runs.artifactRetentionDays",
-		"runs.stepTimeout", "runs.leaseDuration",
+		"runs.eventRetentionDays", "runs.stepTimeout", "runs.leaseDuration",
 	} {
 		if !settings.Default().Has(key) {
 			t.Errorf("the setting %q is not declared", key)

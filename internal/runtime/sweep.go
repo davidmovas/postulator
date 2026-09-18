@@ -79,15 +79,23 @@ func (e *Engine) reap(ctx context.Context) error {
 }
 
 func (e *Engine) purge(ctx context.Context) error {
-	cutoff := e.now().Add(-e.retention())
-
-	purged, err := e.deps.Artifacts.PurgePublishedBefore(ctx, cutoff)
+	purged, err := e.deps.Artifacts.PurgePublishedBefore(ctx, e.now().Add(-e.retention()))
 	if err != nil {
 		return err
 	}
 	if purged > 0 {
 		e.logger.Info("purged the bodies of published artifacts past their retention window",
 			zap.Int64("count", purged),
+		)
+	}
+
+	dropped, err := e.deps.Events.PurgeTerminalBefore(ctx, e.now().Add(-e.eventRetention()))
+	if err != nil {
+		return err
+	}
+	if dropped > 0 {
+		e.logger.Info("purged the events of finished runs past their retention window",
+			zap.Int64("count", dropped),
 		)
 	}
 	return nil

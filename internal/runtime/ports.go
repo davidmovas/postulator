@@ -48,6 +48,7 @@ type execStore interface {
 
 type eventStore interface {
 	Append(ctx context.Context, runID, eventType string, at time.Time, payload []byte) (run.Event, error)
+	PurgeTerminalBefore(ctx context.Context, cutoff time.Time) (int64, error)
 }
 
 type pageReader interface {

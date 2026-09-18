@@ -15,6 +15,8 @@ const (
 	insertEvent  = `INSERT INTO run_events (id, run_id, seq, type, at, payload) VALUES (?, ?, ?, ?, ?, ?)`
 	nextEventSeq = `SELECT coalesce(max(seq), 0) + 1 FROM run_events WHERE run_id = ?`
 	selectEvents = `SELECT ` + eventColumns + ` FROM run_events WHERE run_id = ? AND seq > ? ORDER BY seq LIMIT ?`
+	purgeEvents  = `DELETE FROM run_events WHERE at <= ? AND run_id IN (
+			SELECT id FROM runs WHERE status IN ('completed', 'failed', 'cancelled') AND coalesce(finished_at, created_at) <= ?)`
 )
 
 type RunEventRepo struct {
@@ -48,6 +50,12 @@ func (r *RunEventRepo) Append(ctx context.Context, runID, eventType string, at t
 func (r *RunEventRepo) List(ctx context.Context, runID string, sinceSeq int64, limit int) ([]run.Event, error) {
 	return selectAll(ctx, r.store.execFrom(ctx), selectEvents, []any{runID, sinceSeq, limit}, scanEvent,
 		"list the run events")
+}
+
+func (r *RunEventRepo) PurgeTerminalBefore(ctx context.Context, cutoff time.Time) (int64, error) {
+	stamp := formatTime(cutoff)
+	return execWrite(ctx, r.store.writeFrom(ctx), purgeEvents, []any{stamp, stamp}, nil,
+		"purge the events of finished runs")
 }
 
 func scanEvent(rows *sql.Rows) (run.Event, error) {

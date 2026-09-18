@@ -249,3 +249,7 @@ func (e *Engine) Recover(ctx context.Context) error {
 func (e *Engine) retention() time.Duration {
 	return time.Duration(e.cfg.RetentionDays) * 24 * time.Hour
 }
+
+func (e *Engine) eventRetention() time.Duration {
+	return time.Duration(e.cfg.EventRetentionDays) * 24 * time.Hour
+}

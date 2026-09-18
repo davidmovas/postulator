@@ -495,3 +495,51 @@ func TestRunEventLogIsGapless(t *testing.T) {
 		t.Fatalf("Append without a type = %v", err)
 	}
 }
+
+func TestRunEventRepoPurgesTheEventsOfFinishedRuns(t *testing.T) {
+	t.Parallel()
+
+	fixture := newRunFixture(t, 1)
+	other := fixture.run
+	other.ID = id.New()
+	other.Status = run.StatusRunning
+	if err := fixture.runs.Insert(t.Context(), other); err != nil {
+		t.Fatalf("insert the second run: %v", err)
+	}
+
+	for _, runID := range []string{fixture.run.ID, other.ID} {
+		for _, eventType := range []string{"run.started", "run.progress"} {
+			if _, err := fixture.log.Append(t.Context(), runID, eventType, sqlitetest.Stamp, []byte(`{}`)); err != nil {
+				t.Fatalf("append an event: %v", err)
+			}
+		}
+	}
+
+	at := sqlitetest.Stamp
+	finished := fixture.run
+	finished.Status = run.StatusCompleted
+	finished.FinishedAt = &at
+	if err := fixture.runs.Update(t.Context(), finished); err != nil {
+		t.Fatalf("finish the run: %v", err)
+	}
+
+	dropped, err := fixture.log.PurgeTerminalBefore(t.Context(), sqlitetest.Stamp.Add(-time.Hour))
+	if err != nil || dropped != 0 {
+		t.Fatalf("PurgeTerminalBefore before the cutoff = %d, %v", dropped, err)
+	}
+
+	dropped, err = fixture.log.PurgeTerminalBefore(t.Context(), sqlitetest.Stamp.Add(time.Hour))
+	if err != nil || dropped != 2 {
+		t.Fatalf("PurgeTerminalBefore = %d, %v, want 2", dropped, err)
+	}
+
+	gone, err := fixture.log.List(t.Context(), fixture.run.ID, 0, 10)
+	if err != nil || len(gone) != 0 {
+		t.Fatalf("the finished run still holds %d events, %v", len(gone), err)
+	}
+
+	kept, err := fixture.log.List(t.Context(), other.ID, 0, 10)
+	if err != nil || len(kept) != 2 {
+		t.Fatalf("the running run holds %d events, %v, want 2", len(kept), err)
+	}
+}
