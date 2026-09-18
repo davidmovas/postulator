@@ -268,7 +268,7 @@ Track B implements PHP against this file, so it lands first and nothing in it ch
 - Consumes: nothing.
 - Produces: the frozen `postulator/v1` wire contract — routes `GET /manifest`, `GET /content`, `PUT /seo-meta/{id}`, `GET /content/{id}/raw`, `PUT /content/{id}/raw`; the error body `{"code","message"}`; the conflict body `{"code":"hash_mismatch","message","currentHash"}`; the SEO meta key table for Yoast, Rank Math and no plugin.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `internal/adapters/wp/contract_test.go`:
 
@@ -390,12 +390,12 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test and watch it fail**
+- [x] **Step 2: Run the test and watch it fail**
 
 Run: `go test -count=1 ./internal/adapters/wp/...`
 Expected: FAIL — `read the plugin contract: open ..\..\..\wp-plugin\openapi.yaml: The system cannot find the path specified.`
 
-- [ ] **Step 3: Write the contract**
+- [x] **Step 3: Write the contract**
 
 Create `wp-plugin/openapi.yaml`:
 
@@ -919,12 +919,12 @@ components:
           description: The hash of the content that is now stored.
 ```
 
-- [ ] **Step 4: Run the test and watch it pass**
+- [x] **Step 4: Run the test and watch it pass**
 
 Run: `go test -count=1 ./internal/adapters/wp/...`
 Expected: PASS, both tests green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add wp-plugin/openapi.yaml internal/adapters/wp/contract_test.go
@@ -954,7 +954,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
   - constants `DefaultTimeout`, `DefaultRetries`, `DefaultRateLimitPerSecond`; namespace constants `rootPath`, `coreNamespace`, `wooNamespace`, `pluginNamespace`
   - `func (c *Client) resolve(namespace, path string, query url.Values) string`
 
-- [ ] **Step 1: Add the two pre-approved modules**
+- [x] **Step 1: Add the two pre-approved modules**
 
 ```bash
 go get golang.org/x/net@v0.58.0
@@ -964,7 +964,7 @@ go mod tidy
 
 Expected: `go.mod` gains `golang.org/x/net v0.58.0` and `golang.org/x/time v0.15.0` in the direct require block. Both are already in the module cache and neither pulls a new transitive requirement: `x/net` requires `golang.org/x/crypto v0.55.0` and `golang.org/x/sys v0.47.0`, which are the versions already pinned.
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 Create `internal/adapters/wp/client_test.go`:
 
@@ -1363,12 +1363,12 @@ func TestContentHashDoesNotNormalise(t *testing.T) {
 }
 ```
 
-- [ ] **Step 3: Run the tests and watch them fail**
+- [x] **Step 3: Run the tests and watch them fail**
 
 Run: `go test -count=1 ./internal/adapters/wp/...`
 Expected: FAIL — `undefined: New`, `undefined: Config`, `undefined: ContentHash`.
 
-- [ ] **Step 4: Write the implementation**
+- [x] **Step 4: Write the implementation**
 
 Create `internal/adapters/wp/hash.go`:
 
@@ -1719,19 +1719,19 @@ func FromSettings(values *settings.Values) []Option {
 }
 ```
 
-- [ ] **Step 5: Run the tests and watch them pass**
+- [x] **Step 5: Run the tests and watch them pass**
 
 Run: `go test -count=1 -race ./internal/adapters/wp/...`
 Expected: PASS.
 
-- [ ] **Step 6: Run the gate**
+- [x] **Step 6: Run the gate**
 
 ```bash
 go build ./... && go vet ./... && "$(go env GOPATH)/bin/golangci-lint.exe" run && go test -count=1 -race ./...
 ```
 Expected: all green, 0 lint issues.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add go.mod go.sum internal/adapters/wp
@@ -1761,7 +1761,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
   - constants `DefaultUser`, `DefaultPassword`, `TypePage`, `TypePost`, `TypeProduct`, `TypeProductCategory`
   - unexported for later tasks: `s.respond`, `s.fail`, `s.lock`-guarded store, `slugify`, `uniqueSlug`, `itemPath`, `contentHash`, `s.tick`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `internal/adapters/wp/wptest/state_test.go`:
 
@@ -2099,12 +2099,12 @@ func TestASlugIsUniquePerParentForHierarchicalTypes(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests and watch them fail**
+- [x] **Step 2: Run the tests and watch them fail**
 
 Run: `go test -count=1 ./internal/adapters/wp/wptest/...`
 Expected: FAIL — `no Go files in ...\wptest`.
 
-- [ ] **Step 3: Write the state**
+- [x] **Step 3: Write the state**
 
 Create `internal/adapters/wp/wptest/state.go`:
 
@@ -2649,19 +2649,19 @@ func (s *Server) ResetRequests() {
 
 `handler()` registers only the routes this task fully serves. Tasks 5, 6 and 10 add their `s.routeX(mux)` lines to this same function together with the files that define them, so an empty registration function never exists. Each of those tasks also introduces its own namespace constant; this task declares only `rootPath` and `pluginNamespaceName`.
 
-- [ ] **Step 4: Run the tests and watch them pass**
+- [x] **Step 4: Run the tests and watch them pass**
 
 Run: `go test -count=1 -race ./internal/adapters/wp/...`
 Expected: PASS.
 
-- [ ] **Step 5: Run the gate**
+- [x] **Step 5: Run the gate**
 
 ```bash
 go build ./... && go vet ./... && "$(go env GOPATH)/bin/golangci-lint.exe" run && go test -count=1 -race ./...
 ```
 Expected: all green.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/adapters/wp/wptest
@@ -2689,7 +2689,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
   - `func (c *Client) Probe(ctx context.Context) (ProbeResult, error)`
   - the shared test helper `newClient(t *testing.T, server *wptest.Server, opts ...wp.Option) *wp.Client`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `internal/adapters/wp/errors_test.go`:
 
@@ -3174,12 +3174,12 @@ func TestProbeRejectsSomethingThatIsNotWordPress(t *testing.T) {
 
 with `"time"` in the import block.
 
-- [ ] **Step 2: Run the tests and watch them fail**
+- [x] **Step 2: Run the tests and watch them fail**
 
 Run: `go test -count=1 ./internal/adapters/wp/...`
 Expected: FAIL — `undefined: classify`, `undefined: (*wp.Client).Probe`.
 
-- [ ] **Step 3: Write the error boundary**
+- [x] **Step 3: Write the error boundary**
 
 Create `internal/adapters/wp/errors.go`:
 
@@ -3323,7 +3323,7 @@ func detailString(err error, key string) string {
 }
 ```
 
-- [ ] **Step 4: Write the pipeline**
+- [x] **Step 4: Write the pipeline**
 
 Create `internal/adapters/wp/do.go`:
 
@@ -3483,7 +3483,7 @@ func decodeJSON(body []byte, out any) error {
 }
 ```
 
-- [ ] **Step 5: Write `Probe`**
+- [x] **Step 5: Write `Probe`**
 
 Create `internal/adapters/wp/probe.go`:
 
@@ -3598,19 +3598,19 @@ func loginRedirect(path string) bool {
 }
 ```
 
-- [ ] **Step 6: Run the tests and watch them pass**
+- [x] **Step 6: Run the tests and watch them pass**
 
 Run: `go test -count=1 -race ./internal/adapters/wp/...`
 Expected: PASS.
 
-- [ ] **Step 7: Run the gate**
+- [x] **Step 7: Run the gate**
 
 ```bash
 go build ./... && go vet ./... && "$(go env GOPATH)/bin/golangci-lint.exe" run && go test -count=1 -race ./...
 ```
 Expected: all green.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add internal/adapters/wp
@@ -3634,7 +3634,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
   - `const coreNamespace = "/wp-json/wp/v2"`
   - `func (s *Server) itemPayload(stored *Item) map[string]any`, `func narrowFields(item map[string]any, fields string) map[string]any`, `func pathID(r *http.Request) (int64, bool)`, `func splitList(value string) []string`, `func parseQueryTime(value string) time.Time`, `func stringField`, `func intField`, `func intListField`, `func metaField`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `internal/adapters/wp/wptest/core_test.go`:
 
@@ -3876,12 +3876,12 @@ func itoa(id int64) string {
 
 with `"strconv"` in that file's import block.
 
-- [ ] **Step 2: Run the tests and watch them fail**
+- [x] **Step 2: Run the tests and watch them fail**
 
 Run: `go test -count=1 ./internal/adapters/wp/wptest/...`
 Expected: FAIL — every core route answers 404 because nothing registers it.
 
-- [ ] **Step 3: Write the core handlers**
+- [x] **Step 3: Write the core handlers**
 
 Create `internal/adapters/wp/wptest/core.go`:
 
@@ -4326,12 +4326,12 @@ func (s *Server) handler() http.Handler {
 }
 ```
 
-- [ ] **Step 4: Run the tests and watch them pass**
+- [x] **Step 4: Run the tests and watch them pass**
 
 Run: `go test -count=1 -race ./internal/adapters/wp/...`
 Expected: PASS.
 
-- [ ] **Step 5: Run the gate and commit**
+- [x] **Step 5: Run the gate and commit**
 
 ```bash
 go build ./... && go vet ./... && "$(go env GOPATH)/bin/golangci-lint.exe" run && go test -count=1 -race ./...
@@ -4357,7 +4357,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
   - `func (s *Server) Uploads() []Upload`, `type Upload struct { Filename, MimeType, Alt, Title string; Bytes []byte; ID int64 }`
   - `func (s *Server) Categories() []Category`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `internal/adapters/wp/wptest/woo_test.go`:
 
@@ -4624,12 +4624,12 @@ func send(t *testing.T, request *http.Request) (*http.Response, []byte) {
 }
 ```
 
-- [ ] **Step 2: Run the tests and watch them fail**
+- [x] **Step 2: Run the tests and watch them fail**
 
 Run: `go test -count=1 ./internal/adapters/wp/wptest/...`
 Expected: FAIL — every WooCommerce, category and media route answers 404.
 
-- [ ] **Step 3: Write the WooCommerce handlers**
+- [x] **Step 3: Write the WooCommerce handlers**
 
 Create `internal/adapters/wp/wptest/woo.go`:
 
@@ -4841,7 +4841,7 @@ func objectIDList(body map[string]any, key string) []int64 {
 }
 ```
 
-- [ ] **Step 4: Write the category handlers**
+- [x] **Step 4: Write the category handlers**
 
 Create `internal/adapters/wp/wptest/category.go`:
 
@@ -4982,7 +4982,7 @@ func categoryPayload(stored *Category) map[string]any {
 }
 ```
 
-- [ ] **Step 5: Write the media handlers**
+- [x] **Step 5: Write the media handlers**
 
 Create `internal/adapters/wp/wptest/media.go`:
 
@@ -5143,7 +5143,7 @@ func dispositionFilename(header string) string {
 }
 ```
 
-- [ ] **Step 6: Register the three route sets**
+- [x] **Step 6: Register the three route sets**
 
 Extend `handler()` in `server.go`:
 
@@ -5160,12 +5160,12 @@ func (s *Server) handler() http.Handler {
 }
 ```
 
-- [ ] **Step 7: Run the tests and watch them pass**
+- [x] **Step 7: Run the tests and watch them pass**
 
 Run: `go test -count=1 -race ./internal/adapters/wp/...`
 Expected: PASS.
 
-- [ ] **Step 8: Run the gate and commit**
+- [x] **Step 8: Run the gate and commit**
 
 ```bash
 go build ./... && go vet ./... && "$(go env GOPATH)/bin/golangci-lint.exe" run && go test -count=1 -race ./...
@@ -5193,7 +5193,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
   - `func (c *Client) GetItem(ctx context.Context, itemType ItemType, id int64) (Item, error)`
   - the wire payloads `itemPayload`, `productPayload`, `productCategoryRef`, `productCategoryPayload`, `renderedText`, `metaBag`, and `parseWPTime`, `newPage`, `headerInt`, `endOfList`, `resourcePath`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `internal/adapters/wp/items_test.go`:
 
@@ -5445,12 +5445,12 @@ func TestTheReadMethodsRejectTheUnknownAndTheMissing(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test and watch it fail**
+- [x] **Step 2: Run the test and watch it fail**
 
 Run: `go test -count=1 ./internal/adapters/wp/...`
 Expected: FAIL — `undefined: wp.TypePage`, `undefined: (*wp.Client).ListItems`.
 
-- [ ] **Step 3: Write the types and the wire decoding**
+- [x] **Step 3: Write the types and the wire decoding**
 
 Create `internal/adapters/wp/item.go`:
 
@@ -5805,7 +5805,7 @@ func decodeItem(itemType ItemType, body []byte) (Item, error) {
 }
 ```
 
-- [ ] **Step 4: Write the read methods**
+- [x] **Step 4: Write the read methods**
 
 Create `internal/adapters/wp/items.go`:
 
@@ -5901,12 +5901,12 @@ func endOfList(err error) bool {
 }
 ```
 
-- [ ] **Step 5: Run the test and watch it pass**
+- [x] **Step 5: Run the test and watch it pass**
 
 Run: `go test -count=1 -race ./internal/adapters/wp/...`
 Expected: PASS.
 
-- [ ] **Step 6: Run the gate and commit**
+- [x] **Step 6: Run the gate and commit**
 
 ```bash
 go build ./... && go vet ./... && "$(go env GOPATH)/bin/golangci-lint.exe" run && go test -count=1 -race ./...
@@ -5933,7 +5933,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
   - `func (c *Client) DeleteItem(ctx context.Context, itemType ItemType, id int64, force bool) error`
   - `func encodeJSON(payload any) ([]byte, error)`, `const contentTypeJSON = "application/json"`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `internal/adapters/wp/write_test.go`:
 
@@ -6148,12 +6148,12 @@ func TestTheGenericWriteMethodsCoverPagesAndPostsOnly(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test and watch it fail**
+- [x] **Step 2: Run the test and watch it fail**
 
 Run: `go test -count=1 ./internal/adapters/wp/...`
 Expected: FAIL — `undefined: wp.CreateItem`.
 
-- [ ] **Step 3: Write the payload types**
+- [x] **Step 3: Write the payload types**
 
 Append to `internal/adapters/wp/item.go`:
 
@@ -6271,7 +6271,7 @@ func (in UpdateItem) payload() map[string]any {
 }
 ```
 
-- [ ] **Step 4: Write the encoder and the three methods**
+- [x] **Step 4: Write the encoder and the three methods**
 
 Append to `internal/adapters/wp/do.go`:
 
@@ -6386,12 +6386,12 @@ func coreOnly(itemType ItemType) error {
 }
 ```
 
-- [ ] **Step 5: Run the test and watch it pass**
+- [x] **Step 5: Run the test and watch it pass**
 
 Run: `go test -count=1 -race ./internal/adapters/wp/...`
 Expected: PASS.
 
-- [ ] **Step 6: Run the gate and commit**
+- [x] **Step 6: Run the gate and commit**
 
 ```bash
 go build ./... && go vet ./... && "$(go env GOPATH)/bin/golangci-lint.exe" run && go test -count=1 -race ./...
@@ -6418,7 +6418,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
   - `func (c *Client) ListProducts(ctx context.Context, query ListQuery) (ProductPage, error)`, `func (c *Client) GetProduct(ctx context.Context, id int64) (Product, error)`, `func (c *Client) UpdateProduct(ctx context.Context, id int64, in UpdateProduct) (Product, error)`, `func (c *Client) ListProductCategories(ctx context.Context, query ListQuery) (ProductCategoryPage, error)`
   - `func (q ListQuery) termValues() url.Values`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `internal/adapters/wp/media_test.go`:
 
@@ -6653,12 +6653,12 @@ func TestProductCategoriesAreListed(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests and watch them fail**
+- [x] **Step 2: Run the tests and watch them fail**
 
 Run: `go test -count=1 ./internal/adapters/wp/...`
 Expected: FAIL — `undefined: wp.Media`, `undefined: wp.Product`.
 
-- [ ] **Step 3: Write the media client**
+- [x] **Step 3: Write the media client**
 
 Create `internal/adapters/wp/media.go`:
 
@@ -6782,7 +6782,7 @@ func safeFilename(name string) string {
 }
 ```
 
-- [ ] **Step 4: Write the category client**
+- [x] **Step 4: Write the category client**
 
 Create `internal/adapters/wp/category.go`:
 
@@ -6918,7 +6918,7 @@ func (q ListQuery) termValues() url.Values {
 }
 ```
 
-- [ ] **Step 5: Write the WooCommerce client**
+- [x] **Step 5: Write the WooCommerce client**
 
 Create `internal/adapters/wp/woo.go`:
 
@@ -7122,12 +7122,12 @@ func (c *Client) ListProductCategories(ctx context.Context, query ListQuery) (Pr
 }
 ```
 
-- [ ] **Step 6: Run the tests and watch them pass**
+- [x] **Step 6: Run the tests and watch them pass**
 
 Run: `go test -count=1 -race ./internal/adapters/wp/...`
 Expected: PASS.
 
-- [ ] **Step 7: Run the gate and commit**
+- [x] **Step 7: Run the gate and commit**
 
 ```bash
 go build ./... && go vet ./... && "$(go env GOPATH)/bin/golangci-lint.exe" run && go test -count=1 -race ./...
@@ -7155,7 +7155,7 @@ This is the half of the contract from task 1 that lives in Go. It follows D14 po
   - `var seoKeys map[string]map[string]string`, `var seoFieldOrder []string`
   - `func (s *Server) contentItem(stored *Item) map[string]any`, `func internalTarget(host, href string) (string, bool)`, `func normalisePath(value string) string`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `internal/adapters/wp/wptest/plugin_test.go`:
 
@@ -7545,12 +7545,12 @@ func TestATermStillAppearsInTheContentListing(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test and watch it fail**
+- [x] **Step 2: Run the test and watch it fail**
 
 Run: `go test -count=1 ./internal/adapters/wp/wptest/...`
 Expected: FAIL — every plugin route answers Go's default 404.
 
-- [ ] **Step 3: Write the plugin handlers**
+- [x] **Step 3: Write the plugin handlers**
 
 Create `internal/adapters/wp/wptest/plugin.go`:
 
@@ -8015,7 +8015,7 @@ func afterCursor(stored *Item, after cursor) bool {
 }
 ```
 
-- [ ] **Step 4: Add the corrupt-hash fault**
+- [x] **Step 4: Add the corrupt-hash fault**
 
 Add the field `brokenHash bool` to `Server` in `server.go`, and the option to `fault.go`:
 
@@ -8046,7 +8046,7 @@ func TestABrokenSiteCanReportTheWrongHash(t *testing.T) {
 }
 ```
 
-- [ ] **Step 5: Register the plugin routes**
+- [x] **Step 5: Register the plugin routes**
 
 Extend `handler()` in `server.go` with `s.routePlugin(mux)`, so the final form is:
 
@@ -8064,12 +8064,12 @@ func (s *Server) handler() http.Handler {
 }
 ```
 
-- [ ] **Step 6: Run the tests and watch them pass**
+- [x] **Step 6: Run the tests and watch them pass**
 
 Run: `go test -count=1 -race ./internal/adapters/wp/...`
 Expected: PASS.
 
-- [ ] **Step 7: Run the gate and commit**
+- [x] **Step 7: Run the gate and commit**
 
 ```bash
 go build ./... && go vet ./... && "$(go env GOPATH)/bin/golangci-lint.exe" run && go test -count=1 -race ./...
@@ -8091,7 +8091,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Consumes: nothing.
 - Produces: `func NormalizePath(rawPath string) string`, `func InternalPath(siteHost, href string) (string, bool)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `internal/adapters/wp/link_test.go`:
 
@@ -8181,12 +8181,12 @@ func TestInternalPath(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test and watch it fail**
+- [x] **Step 2: Run the test and watch it fail**
 
 Run: `go test -count=1 ./internal/adapters/wp/...`
 Expected: FAIL — `undefined: wp.NormalizePath`.
 
-- [ ] **Step 3: Write the normaliser**
+- [x] **Step 3: Write the normaliser**
 
 Create `internal/adapters/wp/link.go`:
 
@@ -8253,12 +8253,12 @@ func InternalPath(siteHost, href string) (string, bool) {
 }
 ```
 
-- [ ] **Step 4: Run the test and watch it pass**
+- [x] **Step 4: Run the test and watch it pass**
 
 Run: `go test -count=1 -race ./internal/adapters/wp/...`
 Expected: PASS.
 
-- [ ] **Step 5: Run the gate and commit**
+- [x] **Step 5: Run the gate and commit**
 
 ```bash
 go build ./... && go vet ./... && "$(go env GOPATH)/bin/golangci-lint.exe" run && go test -count=1 -race ./...
@@ -8293,7 +8293,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
   - `func (c *Client) GetRaw(ctx context.Context, id int64) (RawContent, error)`
   - `func (c *Client) PutRaw(ctx context.Context, id int64, content, expectedHash string) (string, error)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `internal/adapters/wp/plugin_test.go`:
 
@@ -8643,12 +8643,12 @@ func detailOf(t *testing.T, err error, key string) string {
 }
 ```
 
-- [ ] **Step 2: Run the test and watch it fail**
+- [x] **Step 2: Run the test and watch it fail**
 
 Run: `go test -count=1 ./internal/adapters/wp/...`
 Expected: FAIL — `undefined: wp.ContentQuery`.
 
-- [ ] **Step 3: Give the client its manifest cache**
+- [x] **Step 3: Give the client its manifest cache**
 
 Add the three fields to `Client` in `client.go`, below `retries`, and `"sync"` to that file's import block. They arrive now rather than in task 2 because `Manifest` is declared in this task, and a struct field of a type that does not exist yet does not compile.
 
@@ -8659,7 +8659,7 @@ Add the three fields to `Client` in `client.go`, below `retries`, and `"sync"` t
 }
 ```
 
-- [ ] **Step 4: Write the plugin client**
+- [x] **Step 4: Write the plugin client**
 
 Create `internal/adapters/wp/plugin.go`:
 
@@ -9050,12 +9050,12 @@ func rawPath(id int64) string {
 }
 ```
 
-- [ ] **Step 5: Run the test and watch it pass**
+- [x] **Step 5: Run the test and watch it pass**
 
 Run: `go test -count=1 -race ./internal/adapters/wp/...`
 Expected: PASS.
 
-- [ ] **Step 6: Close the contract loop**
+- [x] **Step 6: Close the contract loop**
 
 Add to `internal/adapters/wp/contract_test.go` the assertion that the client and the document agree on the route set:
 
@@ -9103,7 +9103,7 @@ func TestTheClientHitsOnlyDocumentedPluginRoutes(t *testing.T) {
 
 with `"strconv"`, `"github.com/davidmovas/postulator/internal/adapters/wp"` and `"github.com/davidmovas/postulator/internal/adapters/wp/wptest"` added to that file's imports.
 
-- [ ] **Step 7: Run the gate and commit**
+- [x] **Step 7: Run the gate and commit**
 
 ```bash
 go build ./... && go vet ./... && "$(go env GOPATH)/bin/golangci-lint.exe" run && go test -count=1 -race ./...
@@ -9124,7 +9124,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Consumes: everything above.
 - Produces: no new production code. The deliverable is the guarantee and the handoff record.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `internal/adapters/wp/log_test.go`:
 
@@ -9310,12 +9310,12 @@ func TestALogLineCarriesTheRequestShapeAndTheWordPressCode(t *testing.T) {
 
 with `"maps"` in the import block.
 
-- [ ] **Step 2: Run the tests and watch them fail or pass**
+- [x] **Step 2: Run the tests and watch them fail or pass**
 
 Run: `go test -count=1 -race ./internal/adapters/wp/ -run TestTheApplicationPassword -v`
 Expected: these tests describe behaviour the pipeline already has, so they may pass on the first run. That is the point of writing them last: they are a regression fence around a property, not a driver for new code. If either fails, the leak is real and `logAttempt` is what has to change — never the test.
 
-- [ ] **Step 3: Measure the coverage of the two packages**
+- [x] **Step 3: Measure the coverage of the two packages**
 
 ```bash
 go test -count=1 -race -covermode=atomic -coverprofile=wp.out ./internal/adapters/wp/...
@@ -9323,7 +9323,7 @@ go tool cover -func=wp.out | tail -1
 ```
 Expected: `total:` at or above **85.0%**. If it is below, the gap is real behaviour that no test drives; add the missing case rather than lowering the bar. The branches most likely to be missing are the option validation paths in `transport.go`, the `default` arms of `decodeItems`/`decodeItem`, and `classify`'s unexpected-status arm.
 
-- [ ] **Step 4: Run the whole gate**
+- [x] **Step 4: Run the whole gate**
 
 ```bash
 go build ./...
@@ -9336,7 +9336,7 @@ rm wp.out coverage.out
 ```
 Expected: build and vet silent, lint reports 0 issues, every test passes under `-race`, covergate passes, `gofmt -l` prints nothing. `task build` is deliberately not run: this track touched no file under `frontend/`.
 
-- [ ] **Step 5: Record the phase in the handoff documents**
+- [x] **Step 5: Record the phase in the handoff documents**
 
 Append to `docs/STATUS.md`, directly after the Phase 1B paragraph in **Where we are**:
 
@@ -9462,7 +9462,7 @@ Add to the **Standing rulings** list of `CLAUDE.md`:
   Phase 3 tracks. Neither track changes it alone.
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/adapters/wp docs/STATUS.md CLAUDE.md
@@ -9502,3 +9502,57 @@ git status --porcelain
 - **Wiring into `internal/app`.** Nothing constructs a `wp.Client` yet, because nothing has a site row to construct one from. `wp.FromSettings` is the seam the composition root will use, and the caller will fetch the application password through the `SecretStore` port and hand it over in `Config.AppPassword`.
 - **Per-site overrides of timeout, retries, rate limit and proxy.** Site defaults live in `domain/site` and arrive as extra `Option`s or `Config` fields later.
 - **The PHP plugin and the docker end-to-end compose.** That is track B, working against `wp-plugin/openapi.yaml`.
+
+## Deviations
+
+Every place the delivered code differs from the tasks above, recorded so a reader of the
+plan is never surprised by the tree.
+
+- **`userAgent` and `maxBodyBytes` live in `do.go`, not `client.go`.** Their only users
+  arrive with the request pipeline, and a per-task green lint forbids a constant whose
+  consumer is a later task.
+- **The manifest cache fields (`manifestMu`, `manifest`, `manifestGone`) are added to
+  `Client` in task 12**, not task 2: a struct field cannot name a type that does not
+  exist yet.
+- **`wptest.Server.uploadOrder` is declared in task 6** for the same reason.
+- **`Manifest(ctx)` is a public method beside `Capabilities(ctx)`**, and it is the one
+  that owns the mutex and the cache; `Capabilities` projects it. `requirePlugin` is the
+  unexported guard every other plugin method calls first.
+- **`encodeJSON` and `contentTypeJSON` were added to `do.go`** in task 8 as the one
+  encoder every write path shares, rather than each method marshalling for itself.
+- **`ListQuery.termValues()` was added in task 9.** Core categories are terms: they have
+  no `status` and no `modified_after`, so sending the item query at them would put
+  parameters on the wire that WordPress ignores at best.
+- **Lint shaped several signatures.** Named results on multi-return helpers
+  (`route`, `listWindow`, `redirectTarget`, and the test helpers), `http.NoBody` instead
+  of a nil body, index-based ranges over payload slices, `err :=` inside `if`, and the
+  conversions `Category(p)`, `ProductCategory(p)`, `ProductCategoryRef(ref)`,
+  `Manifest(payload)` and `ContentLink(link)` where staticcheck proved the wire struct and
+  the public struct identical.
+- **`TestRetryAfterIsWaitedForRatherThanTheBackoff` injects 30s against a 2s context**
+  (the task wrote 5s against 300ms): under `-race` with the whole suite in parallel the
+  first request occasionally missed the shorter deadline.
+- **The fake-server link fixture is `/Koffein//`, not `//koffein//`** (commit `06a2fe0`).
+  `url.Parse` reads a leading `//` as a network-path reference, so the original fixture
+  tested host comparison rather than the slash collapsing it was written for. The
+  replacement exercises collapsing and ASCII lowercasing together.
+- **Task 13 added table tests for the fake's error paths** — bad ids, broken bodies,
+  unreadable cursors, missing uploads — to lift `wptest` from 84.7% to 96.3%.
+
+### Review fixes, 2026-09-18
+
+- **`Config` and `*Client` carry redacting `String()`/`GoString()`.** `%v`, `%+v`, `%#v`,
+  `%s` and `fmt.Sprint` of either printed the application password verbatim, so any
+  debug line or wrapped error could leak it.
+- **A write that reached WordPress is never repeated.** `retryAllowed` replaces the bare
+  `retryable` check in `do`: `GET` and `HEAD` retry as before, while `POST`, `PUT`,
+  `PATCH` and `DELETE` retry only when no response arrived at all (`status == 0`).
+  `wptest.FailAfterNext` injects a failure *after* the handler has already changed the
+  state, which is what makes the duplicate-write case testable.
+- **A 5xx honours `Retry-After`** (delta-seconds and HTTP-date) instead of always
+  deferring to our backoff.
+- **Every unmapped 4xx is `Invalid`** with the WordPress code in `Details` and is never
+  retried, so 405, 410, 413 and 422 stop being treated as transient.
+- **The contract test pins property names**, not just words, so renaming a field in
+  `openapi.yaml` fails the build.
+- **`RawContent.type` no longer offers `product_cat`**, matching the post-only routes.

@@ -368,3 +368,7 @@ The sync use case is not in this track and follows once Phase 2 lands.
   the domain — adapters may import domain — and moves the table test with it.
   `wp.InternalPath` stays in the adapter, because deciding whether a host is this site's
   host is adapter knowledge.
+- Core REST filters `modified_after` on the site-local `post_modified` while returning
+  the UTC `modified_gmt`, so the sync use case (Phase 7) must page through the plugin's
+  `/content?since=` or convert the bound with the site timezone before it trusts an
+  incremental core-REST window.

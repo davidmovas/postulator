@@ -104,6 +104,20 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 		{name: "rank math key", snippet: "rank_math_title"},
 		{name: "fallback key", snippet: "_postulator_title"},
 		{name: "basic auth", snippet: "scheme: basic"},
+		{name: "content hash property", snippet: "\n        contentHash:\n"},
+		{name: "next cursor property", snippet: "\n        nextCursor:\n"},
+		{name: "capabilities property", snippet: "\n        capabilities:\n"},
+		{name: "seo plugin property", snippet: "\n        seoPlugin:\n"},
+		{name: "current hash property", snippet: "\n        currentHash:\n"},
+		{name: "applied property", snippet: "\n        applied:\n"},
+		{name: "links property", snippet: "\n        links:\n"},
+		{name: "meta property", snippet: "\n        meta:\n"},
+		{name: "heading property", snippet: "\n        h1:\n"},
+		{name: "path property", snippet: "\n        path:\n"},
+		{name: "modified property", snippet: "\n        modified:\n"},
+		{name: "expected hash property", snippet: "\n        expectedHash:\n"},
+		{name: "anchor property", snippet: "\n        anchor:\n"},
+		{name: "href property", snippet: "\n        href:\n"},
 	}
 
 	document := contractDocument(t)

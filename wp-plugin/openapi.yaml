@@ -481,11 +481,12 @@ components:
           format: int64
         type:
           type: string
+          description: >-
+            A taxonomy term never appears here; the raw routes are post-only.
           enum:
             - page
             - post
             - product
-            - product_cat
         content:
           type: string
           description: The stored post_content, unmodified.
