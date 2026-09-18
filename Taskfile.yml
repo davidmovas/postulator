@@ -93,6 +93,12 @@ tasks:
     cmds:
       - go test -tags e2e -count=1 ./internal/adapters/wp/e2e/...
 
+  e2e:full:
+    summary: Runs the whole loop against the docker WordPress stack
+    cmds:
+      - task: e2e:up
+      - go test -tags e2e -count=1 -timeout 20m ./internal/e2e/...
+
   plugin:lint:
     summary: Runs php -l over every companion plugin source file
     cmds:
@@ -109,4 +115,4 @@ tasks:
   lint:e2e:
     summary: Lints the build-tagged end-to-end sources
     cmds:
-      - golangci-lint run --build-tags e2e ./internal/adapters/wp/e2e/...
+      - golangci-lint run --build-tags e2e ./internal/adapters/wp/e2e/... ./internal/e2e/...

@@ -21,7 +21,7 @@ func scriptedRequest(step string) port.Request {
 func TestScriptedAnswersPerStep(t *testing.T) {
 	t.Parallel()
 
-	client := fake.NewScripted(map[string]string{"generate_body": `{"h1":"Steaks"}`})
+	client := fake.NewScripted(fake.Reply{Step: "generate_body", Text: `{"h1":"Steaks"}`})
 
 	scripted, err := client.Complete(t.Context(), scriptedRequest("generate_body"))
 	if err != nil {
@@ -51,7 +51,7 @@ func TestScriptedAnswersPerStep(t *testing.T) {
 func TestScriptedStreams(t *testing.T) {
 	t.Parallel()
 
-	client := fake.NewScripted(map[string]string{"chat": "hello there"})
+	client := fake.NewScripted(fake.Reply{Step: "chat", Text: "hello there"})
 
 	deltas, err := client.Stream(t.Context(), scriptedRequest("chat"))
 	if err != nil {
@@ -64,5 +64,34 @@ func TestScriptedStreams(t *testing.T) {
 	}
 	if text != "hello there" {
 		t.Fatalf("the stream carried %q", text)
+	}
+}
+
+func TestScriptedPicksTheReplyThatMatchesThePrompt(t *testing.T) {
+	t.Parallel()
+
+	client := fake.NewScripted(
+		fake.Reply{Step: "generate_body", Match: "/steaks/", Text: `{"h1":"Steaks"}`},
+		fake.Reply{Step: "generate_body", Match: "/pasta/", Text: `{"h1":"Pasta"}`},
+		fake.Reply{Step: "generate_body", Text: `{"h1":"Anything"}`},
+	)
+
+	cases := map[string]string{
+		"write the page /steaks/": `{"h1":"Steaks"}`,
+		"write the page /pasta/":  `{"h1":"Pasta"}`,
+		"write the page /soups/":  `{"h1":"Anything"}`,
+	}
+
+	for prompt, want := range cases {
+		req := scriptedRequest("generate_body")
+		req.Messages = []port.Message{{Role: port.RoleUser, Text: prompt}}
+
+		got, err := client.Complete(t.Context(), req)
+		if err != nil {
+			t.Fatalf("Complete %q: %v", prompt, err)
+		}
+		if got.Text != want {
+			t.Fatalf("%q answered %q, want %q", prompt, got.Text, want)
+		}
 	}
 }

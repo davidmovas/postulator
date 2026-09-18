@@ -173,12 +173,12 @@ func newPipeline(t *testing.T, opts ...wptest.Option) *pipeline {
 		blobs: sqlite.NewArtifactRepo(store),
 		pages: pageRepo,
 		links: sqlite.NewPageLinkRepo(store),
-		llm: fake.NewScripted(map[string]string{
-			steps.NameGenerateBody: guideDraft,
-			steps.NameGenerateMeta: guideMeta,
-			steps.NameJudge:        guideJudge,
-			steps.NameRepairLinks:  repairSentence,
-		}),
+		llm: fake.NewScripted(
+			fake.Reply{Step: steps.NameGenerateBody, Text: guideDraft},
+			fake.Reply{Step: steps.NameGenerateMeta, Text: guideMeta},
+			fake.Reply{Step: steps.NameJudge, Text: guideJudge},
+			fake.Reply{Step: steps.NameRepairLinks, Text: repairSentence},
+		),
 		current: clock.NewFake(at),
 	}
 }

@@ -193,10 +193,10 @@ func newFactory(t *testing.T, draft string) *factory {
 		items: sqlite.NewRunItemRepo(store),
 		blobs: sqlite.NewArtifactRepo(store),
 		log:   sqlite.NewRunEventRepo(store),
-		llm: fake.NewScripted(map[string]string{
-			steps.NameGenerateBody: draft,
-			steps.NameRepairLinks:  repairSentence,
-		}),
+		llm: fake.NewScripted(
+			fake.Reply{Step: steps.NameGenerateBody, Text: draft},
+			fake.Reply{Step: steps.NameRepairLinks, Text: repairSentence},
+		),
 		bus:    &recorder{},
 		siteID: owner.ID,
 		pageID: childPage.ID,
