@@ -1,0 +1,16 @@
+export {
+    AgentService as Agent,
+    GraphService as Graph,
+    HealthService as Health,
+    ImportService as Import,
+    ModelsService as Models,
+    PagesService as Pages,
+    ReportsService as Reports,
+    RunsService as Runs,
+    SchedulesService as Schedules,
+    SettingsService as Settings,
+    SitesService as Sites,
+    SyncService as Sync,
+    TemplatesService as Templates,
+    ToolsService as Tools,
+} from "../../bindings/github.com/davidmovas/postulator/internal/transport/wails/index.js";

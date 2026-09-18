@@ -57,6 +57,17 @@ jobs:
             exit 1
           fi
 
+      - name: Generate the TypeScript bindings
+        run: task bindings
+
+      - name: Install the frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Typecheck the frontend against the bindings
+        working-directory: frontend
+        run: npm run typecheck
+
       - name: Build application
         run: task build
 
