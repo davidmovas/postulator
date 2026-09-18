@@ -25,7 +25,10 @@ func fieldOf(t *testing.T, err error) string {
 	if !stderrors.As(err, &kernel) {
 		t.Fatalf("error %v is not a kernel error", err)
 	}
-	field, _ := kernel.Details["field"].(string)
+	field, ok := kernel.Details["field"].(string)
+	if !ok {
+		t.Fatalf("error %v carries no field detail", err)
+	}
 	return field
 }
 
