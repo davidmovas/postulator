@@ -71,18 +71,20 @@ type profileResolver interface {
 }
 
 type Deps struct {
-	Entities   entityReader
-	Edges      edgeReader
-	Pages      pageStore
-	Links      linkStore
-	Sites      siteReader
-	SiteWriter siteWriter
-	WordPress  siteClients
-	Policies   policyReader
-	Profiles   profileResolver
-	LLM        llm.Client
-	UnitOfWork unitOfWork
-	Clock      clock.Clock
+	Entities      entityReader
+	Edges         edgeReader
+	Pages         pageStore
+	Links         linkStore
+	Sites         siteReader
+	SiteWriter    siteWriter
+	WordPress     siteClients
+	Policies      policyReader
+	Profiles      profileResolver
+	LLM           llm.Client
+	ImageProvider ImageProvider
+	ImageSources  map[template.ImageSource]ImageSource
+	UnitOfWork    unitOfWork
+	Clock         clock.Clock
 }
 
 func all(deps Deps) []run.StepDef {
@@ -92,6 +94,7 @@ func all(deps Deps) []run.StepDef {
 		GenerateMeta(deps),
 		InsertLinks(deps),
 		RepairLinks(deps),
+		GenerateImages(deps),
 		Validate(deps),
 		Judge(deps),
 	}

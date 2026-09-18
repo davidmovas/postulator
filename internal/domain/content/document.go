@@ -136,6 +136,50 @@ func (d *Document) AppendSentence(paragraphIndex int, sentence string) error {
 	return nil
 }
 
+func (d *Document) sectionHeadings() []*html.Node {
+	out := make([]*html.Node, 0)
+	for child := d.root.FirstChild; child != nil; child = child.NextSibling {
+		if child.Type == html.ElementNode && slices.Contains(sectionElements, child.Data) {
+			out = append(out, child)
+		}
+	}
+	return out
+}
+
+func (d *Document) InsertAfterSection(index int, fragment string) error {
+	if index < 0 {
+		return errors.New(errors.Invalid, "a section index must not be negative").
+			WithDetail("sectionIndex", index)
+	}
+
+	trimmed := strings.TrimSpace(fragment)
+	if trimmed == "" {
+		return errors.New(errors.Invalid, "there is no markup to insert")
+	}
+
+	parsed, err := Parse(trimmed)
+	if err != nil {
+		return err
+	}
+
+	nodes := make([]*html.Node, 0)
+	for child := parsed.root.FirstChild; child != nil; {
+		next := child.NextSibling
+		parsed.root.RemoveChild(child)
+		nodes = append(nodes, child)
+		child = next
+	}
+	headings := d.sectionHeadings()
+	var before *html.Node
+	if index+1 < len(headings) {
+		before = headings[index+1]
+	}
+	for _, node := range nodes {
+		d.root.InsertBefore(node, before)
+	}
+	return nil
+}
+
 func (d *Document) Hash() string {
 	sum := sha256.Sum256([]byte(d.normalized()))
 	return hex.EncodeToString(sum[:])
@@ -162,6 +206,8 @@ func (d *Document) normalized() string {
 	}
 	return strings.TrimSpace(builder.String())
 }
+
+var sectionElements = []string{"h2", "h3", "h4", "h5", "h6"}
 
 var blockElements = []string{
 	"address", "article", "aside", "blockquote", "br", "dd", "div", "dl", "dt", "figcaption", "figure",

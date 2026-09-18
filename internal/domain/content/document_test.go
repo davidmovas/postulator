@@ -186,3 +186,81 @@ func TestAssembleRefusesAnIncompleteDraft(t *testing.T) {
 		})
 	}
 }
+
+func TestInsertAfterSection(t *testing.T) {
+	t.Parallel()
+
+	const body = "<h1>Espresso</h1><h2>About</h2><p>One.</p><h2>Brewing</h2><p>Two.</p>"
+	const figure = `<figure><img src="/a.png" alt="a"/></figure>`
+
+	cases := []struct {
+		name  string
+		body  string
+		index int
+		want  string
+	}{
+		{
+			name:  "between the first and the second section",
+			body:  body,
+			index: 0,
+			want:  `<h1>Espresso</h1><h2>About</h2><p>One.</p><figure><img src="/a.png" alt="a"/></figure><h2>Brewing</h2><p>Two.</p>`,
+		},
+		{
+			name:  "after the last section it lands at the end",
+			body:  body,
+			index: 1,
+			want:  `<h1>Espresso</h1><h2>About</h2><p>One.</p><h2>Brewing</h2><p>Two.</p><figure><img src="/a.png" alt="a"/></figure>`,
+		},
+		{
+			name:  "a body without headings takes it at the end",
+			body:  "<p>One.</p>",
+			index: 0,
+			want:  `<p>One.</p><figure><img src="/a.png" alt="a"/></figure>`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc, err := content.Parse(tc.body)
+			if err != nil {
+				t.Fatalf("Parse: %v", err)
+			}
+			if err = doc.InsertAfterSection(tc.index, figure); err != nil {
+				t.Fatalf("InsertAfterSection: %v", err)
+			}
+			if got := doc.HTML(); got != tc.want {
+				t.Errorf("HTML =\n%s\nwant\n%s", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestInsertAfterSectionRefusesNonsense(t *testing.T) {
+	t.Parallel()
+
+	doc, err := content.Parse("<p>One.</p>")
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+
+	cases := []struct {
+		name     string
+		index    int
+		fragment string
+	}{
+		{name: "a negative section", index: -1, fragment: "<p>x</p>"},
+		{name: "nothing to insert", index: 0, fragment: "   "},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if err := doc.InsertAfterSection(tc.index, tc.fragment); !errors.IsCode(err, errors.Invalid) {
+				t.Fatalf("code = %q, want %q (err %v)", errors.CodeOf(err), errors.Invalid, err)
+			}
+		})
+	}
+}
