@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -224,5 +225,48 @@ func TestPublishRecordsAPublishedPage(t *testing.T) {
 	published := runPublish(t, deps, sc)
 	if published.Status != "publish" {
 		t.Fatalf("publish = %+v", published)
+	}
+}
+
+func TestPublishWarnsOverADriftedPage(t *testing.T) {
+	t.Parallel()
+
+	deps, _ := imageDeps(t)
+	sc := publishContext(t)
+	sc.Page.Drift = true
+
+	published := runPublish(t, deps, sc)
+	if published.WPID == 0 {
+		t.Fatalf("publish over drift = %+v, want the page written", published)
+	}
+	if len(published.Findings) != 1 || published.Findings[0].Code != steps.CodePublishOverDrift {
+		t.Fatalf("findings = %+v", published.Findings)
+	}
+	if published.Findings[0].Severity != content.SeverityWarn ||
+		published.Findings[0].Details["class"] != steps.ClassNeedsHuman {
+		t.Fatalf("the drift finding = %+v", published.Findings[0])
+	}
+}
+
+func TestPublishRefusesADriftedPage(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	sc := publishContext(t)
+	sc.Page.Drift = true
+	sc.Params[steps.ParamRefuseDrift] = true
+
+	result, err := steps.Publish(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+	if result.Next != run.TransitionPause || result.Reason != run.PauseNeedsHuman {
+		t.Fatalf("Publish over drift = %q / %q, want a pause for a human", result.Next, result.Reason)
+	}
+	if len(result.Artifacts) != 0 {
+		t.Fatalf("a refused publish produced %+v", result.Artifacts)
+	}
+	if len(server.Items()) != 0 {
+		t.Fatalf("the site holds %d items, want none", len(server.Items()))
 	}
 }

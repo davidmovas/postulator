@@ -6,16 +6,19 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 const (
-	NamePublish = "publish"
+	NamePublish      = "publish"
+	ParamRefuseDrift = "refuseDrift"
 
-	CapabilitySEOMeta  = "seo_meta"
-	CodeSEOMetaSkipped = "seo_meta_skipped"
+	CapabilitySEOMeta    = "seo_meta"
+	CodeSEOMetaSkipped   = "seo_meta_skipped"
+	CodePublishOverDrift = "publish_over_drift"
 
 	publishTimeout = 2 * time.Minute
 	lookupPerPage  = 100
@@ -24,13 +27,14 @@ const (
 var editableStatuses = []string{"publish", "future", "draft", "pending", "private"}
 
 type PublishResult struct {
-	URL         string   `json:"url"`
-	Status      string   `json:"status"`
-	ContentHash string   `json:"contentHash"`
-	SEOApplied  []string `json:"seoApplied"`
-	Skipped     []string `json:"skipped"`
-	WPID        int64    `json:"wpId"`
-	Created     bool     `json:"created"`
+	URL         string            `json:"url"`
+	Status      string            `json:"status"`
+	ContentHash string            `json:"contentHash"`
+	SEOApplied  []string          `json:"seoApplied"`
+	Skipped     []string          `json:"skipped"`
+	Findings    []content.Finding `json:"findings"`
+	WPID        int64             `json:"wpId"`
+	Created     bool              `json:"created"`
 }
 
 func Publish(deps Deps) run.StepDef {
@@ -72,10 +76,22 @@ func Publish(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			content := string(body.Blob)
+			findings := make([]content.Finding, 0, 1)
+			if sc.Page.Drift {
+				if sc.BoolParam(ParamRefuseDrift) {
+					return run.Result{
+						Next:    run.TransitionPause,
+						Reason:  run.PauseNeedsHuman,
+						Message: "a human edited " + sc.Page.Path + " on the site since it was last published",
+					}, nil
+				}
+				findings = append(findings, driftFinding(sc.Page))
+			}
+
+			rendered := string(body.Blob)
 			status := string(sc.Run.PublishMode)
 			written, err := upsert(ctx, client, itemType, writeRequest{
-				existing: existing, found: found, title: draft.Title, content: content,
+				existing: existing, found: found, title: draft.Title, content: rendered,
 				slug: sc.Page.Slug, status: status, parent: parent, featured: featured.FeaturedID,
 			})
 			if err != nil {
@@ -84,8 +100,8 @@ func Publish(deps Deps) run.StepDef {
 
 			result := PublishResult{
 				WPID: written.ID, URL: written.Link, Status: written.Status,
-				ContentHash: wp.ContentHash(content), Created: !found,
-				SEOApplied: make([]string, 0), Skipped: make([]string, 0),
+				ContentHash: wp.ContentHash(rendered), Created: !found,
+				SEOApplied: make([]string, 0), Skipped: make([]string, 0), Findings: findings,
 			}
 			applied, skipped, err := applySEO(ctx, client, sc, written.ID)
 			if err != nil {
@@ -107,6 +123,15 @@ func Publish(deps Deps) run.StepDef {
 				Message:   verb(found) + " " + sc.Page.Path + " as " + strconv.FormatInt(written.ID, 10),
 			}, nil
 		},
+	}
+}
+
+func driftFinding(page pagemap.Page) content.Finding {
+	return content.Finding{
+		Severity: content.SeverityWarn,
+		Code:     CodePublishOverDrift,
+		Message:  "the page " + page.Path + " changed on the site since it was last published",
+		Details:  map[string]any{"class": ClassNeedsHuman, "pageId": page.ID, "path": page.Path},
 	}
 }
 

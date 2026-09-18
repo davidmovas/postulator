@@ -25,7 +25,7 @@
       {"name": "generate_images", "enabled": true},
       {"name": "validate", "enabled": true},
       {"name": "judge", "enabled": true},
-      {"name": "publish", "enabled": true},
+      {"name": "publish", "enabled": true, "params": {"refuseDrift": true}},
       {"name": "relink_neighbors", "enabled": true},
       {"name": "sync_back", "enabled": true},
       {"name": "report", "enabled": true}
