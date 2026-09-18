@@ -25,6 +25,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0001_app_meta.sql", "0002_settings.sql", "0003_secrets.sql",
 		"0004_sites.sql", "0005_link_policies.sql", "0006_templates.sql", "0007_entities.sql",
 		"0008_edges.sql", "0009_pages.sql", "0010_template_overrides.sql",
+		"0011_model_catalog.sql", "0012_model_profiles.sql", "0013_llm_calls.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -57,15 +58,15 @@ func TestMigrationsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("version after up: %v", err)
 	}
-	if version != 10 {
-		t.Fatalf("version after up = %d, want 10", version)
+	if version != 13 {
+		t.Fatalf("version after up = %d, want 13", version)
 	}
 
 	if _, err = provider.DownTo(t.Context(), 0); err != nil {
 		t.Fatalf("down: %v", err)
 	}
 
-	for _, table := range []string{"app_meta", "settings", "secrets", "sites", "link_policies", "templates", "entities", "entity_anchors", "edges", "pages", "page_links", "template_overrides"} {
+	for _, table := range []string{"app_meta", "settings", "secrets", "sites", "link_policies", "templates", "entities", "entity_anchors", "edges", "pages", "page_links", "template_overrides", "model_catalog", "model_profiles", "llm_calls"} {
 		var name string
 		scanErr := store.writer.QueryRowContext(t.Context(),
 			`SELECT name FROM sqlite_schema WHERE type = 'table' AND name = ?`, table).Scan(&name)
@@ -82,8 +83,8 @@ func TestMigrationsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("version after the second up: %v", err)
 	}
-	if version != 10 {
-		t.Errorf("version after the second up = %d, want 10", version)
+	if version != 13 {
+		t.Errorf("version after the second up = %d, want 13", version)
 	}
 }
 
