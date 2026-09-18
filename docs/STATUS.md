@@ -363,13 +363,12 @@ from the plugin under `WORDPRESS_DEBUG=1`.
 - **A log line carries method, path, status, durationMs and the error codes, never a
   body, a query string or a header.** `kernel/log` redacts by field key, which protects
   nothing if a body is logged as one blob.
-- **Path normalisation is one algorithm with a temporary home.** Strip scheme and host
-  after deciding internal-ness by exact lowercase host equality, strip query and
-  fragment, never percent-decode, collapse duplicate slashes, force exactly one leading
-  and one trailing slash, ASCII-lowercase the whole path, and make no exception for a
-  file extension. `wp.NormalizePath` holds it for now; the canonical home is
-  `internal/domain/pagemap.NormalizePath` from Phase 2, and a follow-up task replaces
-  the adapter's body with a call into the domain once Phase 2 merges.
+- **Path normalisation is one algorithm and the domain owns it.** Decide internal-ness by
+  exact lowercase host equality, strip scheme, host, query and fragment, never
+  percent-decode, collapse duplicate slashes, force exactly one leading and one trailing
+  slash, lowercase the whole path, and make no exception for a file extension.
+  `wp.NormalizePath` and `wp.InternalPath` are now one-line calls into
+  `internal/domain/pagemap`.
 
 ## Decisions taken in Phase 3B
 
@@ -439,11 +438,6 @@ from the plugin under `WORDPRESS_DEBUG=1`.
   only after Phase 2 lands the page map and the repositories. Nothing in `internal/app`
   constructs a `wp.Client` yet, so `wp.timeout`, `wp.retries`, `wp.rateLimitPerSecond`
   and `wp.proxyUrl` are declared and validated but not yet read at startup.
-- `wp.NormalizePath` duplicates what `internal/domain/pagemap.NormalizePath` will own
-  once Phase 2 merges. A follow-up task then replaces the adapter's body with a call into
-  the domain — adapters may import domain — and moves the table test with it.
-  `wp.InternalPath` stays in the adapter, because deciding whether a host is this site's
-  host is adapter knowledge.
 - Core REST filters `modified_after` on the site-local `post_modified` while returning
   the UTC `modified_gmt`, so the sync use case (Phase 7) must page through the plugin's
   `/content?since=` or convert the bound with the site timezone before it trusts an
