@@ -18,3 +18,5 @@ coverage.html
 *.db
 *.db-wal
 *.db-shm
+
+docker/e2e/.env.generated

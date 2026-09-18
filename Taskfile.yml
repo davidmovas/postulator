@@ -61,3 +61,34 @@ tasks:
     cmds:
       - go test -race -coverprofile=coverage.out -covermode=atomic ./...
       - go run ./cmd/covergate -profile coverage.out
+
+  e2e:up:
+    summary: Starts the docker WordPress stack and provisions e2e credentials
+    dir: docker/e2e
+    env:
+      E2E_SEO: '{{.E2E_SEO | default "none"}}'
+      E2E_WOO: '{{.E2E_WOO | default "1"}}'
+    cmds:
+      - docker compose up -d --wait db wordpress
+      - docker compose run --rm bootstrap
+
+  e2e:down:
+    summary: Stops the docker WordPress stack and removes its volumes
+    dir: docker/e2e
+    cmds:
+      - docker compose down -v --remove-orphans
+      - cmd: powershell -NoProfile -Command "if (Test-Path .env.generated) { Remove-Item -Force .env.generated }"
+        platforms: [windows]
+      - cmd: rm -f .env.generated
+        platforms: [linux, darwin]
+
+  e2e:reset:
+    summary: Recreates the docker WordPress stack from scratch
+    cmds:
+      - task: e2e:down
+      - task: e2e:up
+
+  e2e:test:
+    summary: Runs the docker end-to-end suite
+    cmds:
+      - go test -tags e2e -count=1 ./internal/adapters/wp/e2e/...

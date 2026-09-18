@@ -1,0 +1,79 @@
+name: postulator-e2e
+
+services:
+  db:
+    image: mariadb:11.4.12
+    environment:
+      MARIADB_ROOT_PASSWORD: postulator-root
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD: wordpress
+    volumes:
+      - db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  wordpress:
+    image: wordpress:7.0.1-php8.3-apache
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8089:80"
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WP_ENVIRONMENT_TYPE: local
+    volumes:
+      - wp:/var/www/html
+      - ../../wp-plugin/postulator-companion:/var/www/html/wp-content/plugins/postulator-companion
+    healthcheck:
+      test: ["CMD-SHELL", "php -r 'exit(@file_get_contents(\"http://127.0.0.1/wp-login.php\") === false ? 1 : 0);'"]
+      interval: 5s
+      timeout: 10s
+      retries: 40
+
+  bootstrap:
+    image: wordpress:cli-2.12.0-php8.3
+    profiles:
+      - tools
+    user: "33:33"
+    depends_on:
+      db:
+        condition: service_healthy
+      wordpress:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WP_ENVIRONMENT_TYPE: local
+      E2E_SITE_URL: http://localhost:8089
+      E2E_ADMIN_USER: ${E2E_ADMIN_USER:-postulator}
+      E2E_ADMIN_EMAIL: ${E2E_ADMIN_EMAIL:-postulator@example.test}
+      E2E_ADMIN_PASSWORD: ${E2E_ADMIN_PASSWORD:-postulator-admin}
+      E2E_SEO: ${E2E_SEO:-none}
+      E2E_WOO: ${E2E_WOO:-1}
+    entrypoint: ["/bin/sh", "/e2e/bootstrap.sh"]
+    volumes:
+      - wp:/var/www/html
+      - ../../wp-plugin/postulator-companion:/var/www/html/wp-content/plugins/postulator-companion
+      - ./:/e2e
+
+  phplint:
+    image: wordpress:7.0.1-php8.3-apache
+    profiles:
+      - tools
+    entrypoint: ["/bin/sh"]
+    volumes:
+      - ../../wp-plugin:/plugin:ro
+
+volumes:
+  db:
+  wp:
