@@ -70,6 +70,14 @@ WooCommerce and the plugin namespace, with proxy, retry, rate limiting and error
 `internal/adapters/wp/wptest` is the in-memory fake that Phases 6, 7 and 12 test against.
 The sync use case is not in this track and follows once Phase 2 lands.
 
+**3A reviewed: approved** on 2026-09-18. The independent review re-ran the full gate
+(`go build`, `go vet`, `golangci-lint` 0 issues, `go test -count=1 -race
+-covermode=atomic ./...`, `covergate`, `gofmt -l .`), repeated the adapter suite under
+`-race` for flakes, probed the application password through errors, details, log lines
+and every `fmt` verb of `Config` and `Client`, and confirmed the contract test now fails
+on a renamed field in `openapi.yaml`. Its four findings landed in `4f547fa` and
+`f07b29b`. Coverage is 87.0% for `internal/adapters/wp` and 95.6% for `wptest`.
+
 ## What landed in Phase 0
 
 - The v1.6.2 codebase is gone: `internal/`, `pkg/`, `frontend/`, `main.go`, `Makefile`,
