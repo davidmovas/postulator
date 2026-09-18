@@ -3,12 +3,14 @@ package wails_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"go.uber.org/zap"
 
 	kernelctx "github.com/davidmovas/postulator/internal/kernel/ctx"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/kernel/settings"
 	"github.com/davidmovas/postulator/internal/transport/wails"
 )
 
@@ -81,12 +83,60 @@ func TestWrapConvertsEveryFailure(t *testing.T) {
 	}
 }
 
-func TestServicesBindsTheHealthService(t *testing.T) {
+func serviceDeps() wails.Deps {
+	registry := settings.New()
+
+	return wails.Deps{
+		Sites:     sitesFake{},
+		Graph:     graphFake{},
+		Pages:     pagesFake{},
+		Templates: templatesFake{},
+		Runs:      runsFake{},
+		Sync:      syncFake{},
+		Reports:   reportsFake{},
+		Imports:   importsFake{},
+		Models:    modelsFake{},
+		Agent:     agentFake{},
+		Schedules: schedulesFake{},
+		Tools:     catalogFake{},
+		Settings: wails.SettingsDeps{
+			Declarations: declarationsFake{registry: registry},
+			Values:       registry.NewValues(),
+			Store:        &storeFake{stored: map[string]json.RawMessage{}},
+			Models:       &providerKeyFake{},
+		},
+	}
+}
+
+func TestServicesBindsEveryBoundedContext(t *testing.T) {
 	t.Parallel()
 
-	services := wails.Services(zap.NewNop(), wails.BuildInfo{Version: "2.0.0", Commit: "abc1234", BuildDate: "2026-09-17T10:30:00Z"})
-	if len(services) != 1 {
-		t.Fatalf("Services() returned %d services, want 1", len(services))
+	build := wails.BuildInfo{Version: "2.0.0", Commit: "abc1234", BuildDate: "2026-09-17T10:30:00Z"}
+	services := wails.Services(zap.NewNop(), build, serviceDeps())
+
+	want := []string{
+		"*wails.HealthService",
+		"*wails.SitesService",
+		"*wails.GraphService",
+		"*wails.PagesService",
+		"*wails.TemplatesService",
+		"*wails.RunsService",
+		"*wails.SyncService",
+		"*wails.ReportsService",
+		"*wails.ImportService",
+		"*wails.ModelsService",
+		"*wails.AgentService",
+		"*wails.SchedulesService",
+		"*wails.ToolsService",
+		"*wails.SettingsService",
+	}
+	if len(services) != len(want) {
+		t.Fatalf("Services() returned %d services, want %d", len(services), len(want))
+	}
+	for index, name := range want {
+		if got := fmt.Sprintf("%T", services[index].Instance()); got != name {
+			t.Errorf("Services()[%d] is %s, want %s", index, got, name)
+		}
 	}
 
 	health, ok := services[0].Instance().(*wails.HealthService)
@@ -94,12 +144,12 @@ func TestServicesBindsTheHealthService(t *testing.T) {
 		t.Fatalf("Services()[0] is %T, want *wails.HealthService", services[0].Instance())
 	}
 
-	build, err := health.Ping(context.Background(), wails.PingRequest{})
+	stamped, err := health.Ping(context.Background(), wails.PingRequest{})
 	if err != nil {
 		t.Fatalf("Ping() error: %v", err)
 	}
-	if build.Version != "2.0.0" || build.Commit != "abc1234" || build.BuildDate != "2026-09-17T10:30:00Z" {
-		t.Fatalf("Ping() = %+v, want the injected build stamps", build)
+	if stamped != build {
+		t.Fatalf("Ping() = %+v, want the injected build stamps", stamped)
 	}
 }
 

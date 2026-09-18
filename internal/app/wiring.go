@@ -22,5 +22,24 @@ func (c *Core) Services(logger *log.Logger) []application.Service {
 		Version:   Version,
 		Commit:    Commit,
 		BuildDate: BuildDate,
+	}, wails.Deps{
+		Sites:     c.Sites,
+		Graph:     c.Graph,
+		Pages:     c.Pages,
+		Templates: c.Templates,
+		Runs:      c.Runs,
+		Sync:      c.Sync,
+		Reports:   c.Reports,
+		Imports:   c.Imports,
+		Models:    c.Models,
+		Agent:     c.Agent,
+		Schedules: c.Schedules,
+		Tools:     c.Tools,
+		Settings: wails.SettingsDeps{
+			Declarations: c.Declarations,
+			Values:       c.Settings,
+			Store:        c.SettingsStore,
+			Models:       c.Models,
+		},
 	})
 }

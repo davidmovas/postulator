@@ -80,6 +80,8 @@ type Core struct {
 	Store           *sqlite.Store
 	Secrets         *secrets.Store
 	Settings        *settings.Values
+	Declarations    *settings.Registry
+	SettingsStore   *sqlite.SettingsRepo
 	UnknownSettings []string
 	Events          *EventRelay
 	Sites           *sites.Service
@@ -126,7 +128,9 @@ func Open(ctx context.Context, cfg Config, logger *zap.Logger) (*Core, error) {
 	}
 
 	now := clock.System{}
-	values, unknown, err := LoadSettings(ctx, sqlite.NewSettingsRepo(store, now), settings.Default())
+	declarations := settings.Default()
+	settingsStore := sqlite.NewSettingsRepo(store, now)
+	values, unknown, err := LoadSettings(ctx, settingsStore, declarations)
 	if err != nil {
 		return nil, stderrors.Join(err, store.Close())
 	}
@@ -282,6 +286,8 @@ func Open(ctx context.Context, cfg Config, logger *zap.Logger) (*Core, error) {
 		Store:           store,
 		Secrets:         secretStore,
 		Settings:        values,
+		Declarations:    declarations,
+		SettingsStore:   settingsStore,
 		UnknownSettings: unknown,
 		Events:          relay,
 		Sites:           sitesService,

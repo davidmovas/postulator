@@ -54,8 +54,8 @@ func TestServicesCarryTheInjectedStamps(t *testing.T) {
 	})
 
 	services := core.Services(logger)
-	if len(services) != 1 {
-		t.Fatalf("Services returned %d services, want 1", len(services))
+	if len(services) != 14 {
+		t.Fatalf("Services returned %d services, want one per bounded context and health", len(services))
 	}
 
 	health, ok := services[0].Instance().(*wails.HealthService)
@@ -69,5 +69,34 @@ func TestServicesCarryTheInjectedStamps(t *testing.T) {
 	}
 	if build.Version != app.Version || build.Commit != app.Commit || build.BuildDate != app.BuildDate {
 		t.Fatalf("Ping = %+v, want the ldflags stamps %q/%q/%q", build, app.Version, app.Commit, app.BuildDate)
+	}
+
+	settingsService, ok := services[13].Instance().(*wails.SettingsService)
+	if !ok {
+		t.Fatalf("Services()[13] is %T, want *wails.SettingsService", services[13].Instance())
+	}
+
+	described, err := settingsService.Schema(context.Background(), wails.SettingsSchemaRequest{})
+	if err != nil {
+		t.Fatalf("Schema: %v", err)
+	}
+	if len(described.Settings) == 0 {
+		t.Fatal("the settings service describes no declaration, want the kernel registry")
+	}
+
+	stored, err := settingsService.Set(context.Background(), wails.SetSettingRequest{
+		Key:   described.Settings[0].Key,
+		Value: described.Settings[0].Default,
+	})
+	if err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+
+	read, err := settingsService.Get(context.Background(), wails.GetSettingRequest{Key: stored.Key})
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if string(read.Value) != string(described.Settings[0].Default) || read.IsDefault {
+		t.Fatalf("Get = %+v, want the value the write persisted", read)
 	}
 }
