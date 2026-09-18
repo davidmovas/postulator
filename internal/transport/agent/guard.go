@@ -11,6 +11,7 @@ import (
 	"github.com/gollem-dev/gollem"
 
 	agentapp "github.com/davidmovas/postulator/internal/application/agent"
+	"github.com/davidmovas/postulator/internal/application/tools"
 	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -85,7 +86,7 @@ func (g *guard) fence() gollem.ToolMiddleware {
 func (g *guard) audit() gollem.ToolMiddleware {
 	return func(next gollem.ToolHandler) gollem.ToolHandler {
 		return func(ctx context.Context, req *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
-			args := encode(req.Tool.Arguments)
+			args := tools.Redact(encode(req.Tool.Arguments))
 			if g.stream != nil {
 				g.note(g.stream.ToolStarted(ctx, req.Tool.ID, req.Tool.Name, args))
 			}

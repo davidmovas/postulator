@@ -12,14 +12,14 @@ const Mask = "***"
 
 var redacted = []string{"password", "apikey", "token", "authorization"}
 
-func isRedacted(key string) bool {
+func IsSensitiveKey(key string) bool {
 	return slices.Contains(redacted, strings.ToLower(key))
 }
 
 func redact(fields []zapcore.Field) []zapcore.Field {
 	var out []zapcore.Field
 	for i, field := range fields {
-		if !isRedacted(field.Key) {
+		if !IsSensitiveKey(field.Key) {
 			continue
 		}
 		if out == nil {

@@ -127,7 +127,7 @@ func (r *Registry) proposal(def Def) func(context.Context, Binding, json.RawMess
 		}
 		if publishErr := r.deps.Publisher.Publish(events.AgentConfirmRequested, events.AgentConfirmRequestedPayload{
 			ConversationID: b.ConversationID, ConfirmationID: action.ID, Tool: def.Name,
-			Args: action.Args, Risk: string(def.Risk), Summary: action.Summary,
+			Args: Redact(action.Args), Risk: string(def.Risk), Summary: action.Summary,
 		}); publishErr != nil {
 			return nil, publishErr
 		}
@@ -145,7 +145,7 @@ func Summary(def Def, args json.RawMessage) string {
 		summary = def.Name
 	}
 
-	compact := strings.TrimSpace(string(args))
+	compact := strings.TrimSpace(string(Redact(args)))
 	if compact == "" || compact == "{}" || compact == "null" {
 		return summary
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -316,5 +317,49 @@ func TestSummaryCarriesTheArguments(t *testing.T) {
 	}
 	if got := tools.Summary(tools.Def{Name: "bare"}, nil); got != "bare" {
 		t.Fatalf("Summary without a description = %q", got)
+	}
+}
+
+func TestASecretNeverReachesTheSummaryOrTheEvent(t *testing.T) {
+	t.Parallel()
+
+	actions := &actionRecorder{}
+	bus := &busRecorder{}
+	registry := newRegistry(actions, bus)
+	binding := tools.Binding{ConversationID: "conversation-1", Mode: agent.ModeConfirm}
+
+	args := json.RawMessage(`{"provider":"openai","apiKey":"sk-live-secret","nested":[{"password":"hunter2"}]}`)
+	for _, tool := range registry.Build(binding) {
+		if tool.Def.Name != "models_set_provider_key" {
+			continue
+		}
+		if _, err := tool.Run(t.Context(), binding, args); err != nil {
+			t.Fatalf("a proposed call = %v", err)
+		}
+	}
+
+	if len(actions.actions) != 1 {
+		t.Fatalf("the stored actions are %+v", actions.actions)
+	}
+	if strings.Contains(actions.actions[0].Summary, "sk-live-secret") {
+		t.Fatalf("the summary carries the key: %q", actions.actions[0].Summary)
+	}
+	if !strings.Contains(string(actions.actions[0].Args), "sk-live-secret") {
+		t.Fatal("the stored action must keep the arguments it will replay")
+	}
+
+	payload, ok := bus.payloads[0].(events.AgentConfirmRequestedPayload)
+	if !ok || strings.Contains(string(payload.Args), "sk-live-secret") {
+		t.Fatalf("the event carries the key: %s", payload.Args)
+	}
+	if strings.Contains(string(payload.Args), "hunter2") {
+		t.Fatalf("a nested secret survived the redaction: %s", payload.Args)
+	}
+
+	if got := string(tools.Redact(json.RawMessage("not json"))); got != "not json" {
+		t.Fatalf("Redact of something unreadable = %s", got)
+	}
+	if got := string(tools.Redact(nil)); got != "" {
+		t.Fatalf("Redact of nothing = %q", got)
 	}
 }
