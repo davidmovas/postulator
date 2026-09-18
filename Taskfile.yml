@@ -100,3 +100,8 @@ tasks:
         platforms: [windows]
       - cmd: find wp-plugin -name "*.php" -print0 | xargs -0 -n1 php -l
         platforms: [linux, darwin]
+
+  plugin:zip:
+    summary: Packages the companion plugin deterministically
+    cmds:
+      - go run ./cmd/pluginzip -source wp-plugin/postulator-companion -out {{.BIN_DIR}}/postulator-companion.zip
