@@ -590,7 +590,9 @@ package these phases added is at or above 88%. Phase 11 follows.
   shim earlier on `PATH` is v2.11.4 built with go1.26 and refuses a `go 1.27` module
   outright. `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2`
   puts the correct binary in `GOPATH/bin`; the shim still wins on `PATH`.
-- The frontend is a stub that prints the build info. It is replaced in Phase 11.
+- The frontend is still the stub that prints the build info. Phase 11 shipped the typed surface it will
+  be built on — the generated bindings, `lib/api.ts`, `lib/events.ts` and the `smoke.ts` script — but no
+  screen of the real UI.
 - Phase 3A ships no sync use case: `internal/application` gains its WordPress consumer
   only after Phase 2 lands the page map and the repositories. Nothing in `internal/app`
   constructs a `wp.Client` yet, so `wp.timeout`, `wp.retries`, `wp.rateLimitPerSecond`
@@ -603,10 +605,8 @@ package these phases added is at or above 88%. Phase 11 follows.
 - The e2e suite carries its own small HTTP client rather than using `internal/adapters/wp`
   from track A, which had not landed when it was written. Switching it to the adapter is a
   follow-up that deletes `client` from `harness_test.go`.
-- `models.SetProviderKey` writes `llm:<provider>:api_key`; the Phase 11 settings surface
-  still has to call it. `ledger.List` likewise has no caller until the Phase 11 read models,
-  and the scripted `gollem.LLMClient` waits for the Phase 9 agent runner rather than ship
-  dead.
+- `ledger.List` still has no caller: `ModelsService.UsageSummary` answers from the aggregate, and a
+  per-call ledger screen is what would read the list.
 - A run's deadline is the `runtime.DefaultRunDeadline` constant, not a setting: nothing in
   the UI sets one yet, and a second knob with no reader would be dead configuration.
 - The artifact purge keys on a `publish_result` artifact, which only the Phase 7 publish
@@ -688,6 +688,27 @@ package these phases added is at or above 88%. Phase 11 follows.
 - **A skipped schedule is rearmed.** A schedule whose previous run is still going, or whose target query
   matches nothing, still moves its `next_run_at` forward, because a skip that leaves the time in the past
   is a hot loop.
+
+## Decisions taken in Phase 11
+
+- **A Wails service declares the interface it consumes.** The rule that the consumer owns the interface is
+  what makes the boundary testable: a fake use case returns one code, a reflection table calls every
+  exported method, and a method that skipped the wrapper fails that table rather than reaching production.
+- **`Services` takes its dependencies.** `internal/transport/wails` cannot import the composition root, so
+  `wails.Deps` carries the use cases and `*app.Core` fills it. The fields are exported and their types are
+  not, which is exactly the visibility the root needs.
+- **`SettingsService` is the one surface that owns a credential.** `SetProviderKey` lives there and not on
+  `ModelsService`, so there is a single path for secret input; `models.SetProviderKey` is still the use
+  case behind it and the response names the provider alone.
+- **`kernel/settings.Registry.Validate` is new.** `Apply` checks a whole map and swaps the live values in
+  one go, which is the wrong shape for refusing one bad write; `Set` validates, persists, then re-applies
+  so the running process sees the change without a restart.
+- **A use case that answers with bytes gets a path at the transport.** The webview has no filesystem, so
+  `SyncService.SavePluginPackage{path}` writes the archive and returns where it landed.
+- **The event list in `docs/CONTRACTS.md` is a pointer, not a copy.** The registry renders
+  `frontend/src/generated/events.ts`; a second hand-maintained list in prose is the one that goes stale.
+- **`ToolsService` exposes `List` only.** The UI shows what the agent can do; it never calls a tool through
+  the registry, because a Wails service calls the use case directly and typed.
 
 ## Milestone review 5–8
 

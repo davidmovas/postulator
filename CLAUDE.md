@@ -92,6 +92,10 @@ Before an agent implements a module, it reads the Archond files that section 15 
 - **2026-09-18 (phases 9-10)** — `internal/transport/agent` is the only package that may name gollem, which `deps_test.go` enforces. `RunSpec` and `RunResult` live in `internal/application/agent` because the consumer declares the interface it calls.
 - **2026-09-18 (phases 9-10)** — A tool's arguments are masked with `log.IsSensitiveKey` before they reach the tool call ledger, an event or a confirmation summary. Only `pending_actions.args` keeps them whole, because that row is the command the approval replays.
 
+- **2026-09-18 (phase 11)** — A Wails service declares the use-case interface it consumes and `Services` takes a `wails.Deps` from the composition root; the transport cannot import `internal/app`. A reflection table in `internal/transport/wails` calls every exported method of every service, so a method that bypasses `Wrap` fails the suite.
+- **2026-09-18 (phase 11)** — `SettingsService` is the only surface that accepts a credential. `SetProviderKey` is not bound on `ModelsService`, and `kernel/settings.Registry.Validate` exists so one write can be refused before it is persisted.
+- **2026-09-18 (phase 11)** — `docs/CONTRACTS.md` names the event families and links `frontend/src/generated/events.ts` rather than repeating the registry. The catalogue table is the list of bound services, and `frontend/src/smoke.ts` is the compile-time proof that it is usable; it is typechecked and never executed.
+
 ## Product guardrail
 
 Postulator turns an entity graph into graph-compliant WordPress pages; reject features that do not serve that loop.
