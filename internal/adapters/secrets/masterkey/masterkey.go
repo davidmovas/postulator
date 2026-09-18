@@ -39,10 +39,18 @@ func Load(cfg Config) ([]byte, error) {
 		return nil, errors.New(errors.Invalid, "the master key directory must not be empty")
 	}
 
-	path := filepath.Join(cfg.Dir, FileName)
-	protected, err := os.ReadFile(path)
+	protected, err := os.ReadFile(filepath.Join(cfg.Dir, FileName))
 	if stderrors.Is(err, fs.ErrNotExist) {
-		return create(path)
+		wrapped, protectedErr := Protected(cfg)
+		if protectedErr != nil {
+			return nil, protectedErr
+		}
+		if wrapped {
+			return nil, errors.New(errors.Locked, "the master key is wrapped with a master password")
+		}
+	}
+	if stderrors.Is(err, fs.ErrNotExist) {
+		return create(filepath.Join(cfg.Dir, FileName))
 	}
 	if err != nil {
 		return nil, errors.Wrap(err, errors.Internal, "read the master key")
