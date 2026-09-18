@@ -94,6 +94,14 @@ func registered() []string {
 		"models_test_provider",
 		"models_usage_summary",
 		"content_judge_page",
+		"schedules_create",
+		"schedules_update",
+		"schedules_delete",
+		"schedules_get",
+		"schedules_list",
+		"schedules_enable",
+		"schedules_disable",
+		"schedules_run_now",
 	}
 }
 

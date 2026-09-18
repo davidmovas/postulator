@@ -16,6 +16,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/runs"
+	"github.com/davidmovas/postulator/internal/application/schedules"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/application/templates"
@@ -42,6 +43,7 @@ type Deps struct {
 	Imports   *imports.Service
 	Models    *models.Service
 	Content   *content.Service
+	Schedules *schedules.Service
 	Actions   actionStore
 	Publisher application.Publisher
 	Clock     clock.Clock

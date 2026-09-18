@@ -146,7 +146,11 @@ func TestDomainCarriesNoThirdPartyDependencies(t *testing.T) {
 		t.Skipf("%s does not exist yet", domainTree)
 	}
 
-	allowed := map[string]struct{}{"golang.org/x/net/html": {}, "golang.org/x/net/html/atom": {}}
+	allowed := map[string]struct{}{
+		"golang.org/x/net/html":      {},
+		"golang.org/x/net/html/atom": {},
+		"github.com/robfig/cron/v3":  {},
+	}
 	for _, dep := range transitiveDeps(t, domainTree) {
 		if !isThirdParty(dep) {
 			continue

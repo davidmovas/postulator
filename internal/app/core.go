@@ -35,6 +35,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/runs"
+	"github.com/davidmovas/postulator/internal/application/schedules"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/application/templates"
@@ -45,6 +46,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/settings"
 	"github.com/davidmovas/postulator/internal/runtime"
+	"github.com/davidmovas/postulator/internal/runtime/scheduler"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 	agentrunner "github.com/davidmovas/postulator/internal/transport/agent"
 )
@@ -99,6 +101,8 @@ type Core struct {
 	WordPress       *registry.Registry
 	Tools           *tools.Registry
 	Agent           *agent.Service
+	Schedules       *schedules.Service
+	Scheduler       *scheduler.Scheduler
 }
 
 func Open(ctx context.Context, cfg Config, logger *zap.Logger) (*Core, error) {
@@ -235,11 +239,18 @@ func Open(ctx context.Context, cfg Config, logger *zap.Logger) (*Core, error) {
 	syncService := sync.New(engine, siteRepo, wordpress, packer{}, now)
 	reportsService := reports.New(entityRepo, edgeRepo, pageRepo, linkRepo, runRepo, itemRepo, artifactRepo)
 
+	scheduleRepo := sqlite.NewScheduleRepo(store)
+	schedulesService := schedules.New(schedules.Deps{
+		Schedules: scheduleRepo, Pages: pageRepo, Sites: siteRepo, Runs: runsService,
+		RunReader: runRepo, Clock: now,
+	})
+
 	actionRepo := sqlite.NewPendingActionRepo(store)
 	toolRegistry := tools.New(tools.Deps{
 		Sites: sitesService, Graph: graphService, Pages: pagesService, Templates: templateService,
 		Runs: runsService, Sync: syncService, Reports: reportsService, Imports: importsService,
-		Models: modelsService, Content: contentService, Actions: actionRepo, Publisher: relay, Clock: now,
+		Models: modelsService, Content: contentService, Schedules: schedulesService,
+		Actions: actionRepo, Publisher: relay, Clock: now,
 	})
 
 	agentService := agent.New(agent.Deps{
@@ -292,11 +303,17 @@ func Open(ctx context.Context, cfg Config, logger *zap.Logger) (*Core, error) {
 		WordPress:       wordpress,
 		Tools:           toolRegistry,
 		Agent:           agentService,
+		Schedules:       schedulesService,
+		Scheduler:       scheduler.New(schedulesService, scheduler.TickInterval(values), logger),
 	}
 	if err = core.Templates.EnsureSeeded(ctx); err != nil {
 		return nil, stderrors.Join(err, store.Close())
 	}
 	if err = engine.Start(ctx); err != nil {
+		return nil, stderrors.Join(err, store.Close())
+	}
+	if err = core.Scheduler.Start(ctx); err != nil {
+		engine.Stop()
 		return nil, stderrors.Join(err, store.Close())
 	}
 	return core, nil
@@ -309,6 +326,7 @@ func (packer) Package() ([]byte, error) {
 }
 
 func (c *Core) Close() error {
+	c.Scheduler.Stop()
 	c.Agent.Close()
 	c.Engine.Stop()
 	return c.Store.Close()

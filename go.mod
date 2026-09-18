@@ -8,6 +8,7 @@ require (
 	github.com/gollem-dev/gollem v0.28.4
 	github.com/ncruces/go-sqlite3 v0.30.1
 	github.com/pressly/goose/v3 v3.28.0
+	github.com/robfig/cron/v3 v3.0.1
 	github.com/sashabaranov/go-openai v1.41.2
 	github.com/wailsapp/wails/v3 v3.0.0-beta.23
 	github.com/xuri/excelize/v2 v2.11.0

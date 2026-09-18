@@ -77,5 +77,13 @@ func factories() []factory {
 		modelsTestProvider,
 		modelsUsageSummary,
 		contentJudgePage,
+		schedulesCreate,
+		schedulesUpdate,
+		schedulesDelete,
+		schedulesGet,
+		schedulesList,
+		schedulesEnable,
+		schedulesDisable,
+		schedulesRunNow,
 	}
 }
