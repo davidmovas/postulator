@@ -18,8 +18,8 @@ current as work lands.
 | 6 ✅ | Content factory core | **Fable** | 5 | `domain/content` (Document, LinkContext, InsertLinks, Compliance, Structure), steps `resolve_context, generate_body, insert_links, repair_links, validate` |
 | 7 ✅ | Remaining steps + site metrics | Opus ×2 | 3, 6 | `generate_meta, generate_images, judge, publish, relink_neighbors, sync_back, report`; `application/reports` site-level metrics |
 | 8 ✅ | Import | Opus ×1 | 2 | xlsx/csv, mappings, preview, apply |
-| 9 | Agents | Opus ×2 | 4, 5, 7 | tool registry over all use cases, gollem agent, confirmations, conversations, streaming events; AI-backed use cases `graph.ProposeFromPages` (entities, edges, anchors proposed from synced pages, status `proposed`), `graph.ProposeRelated`, `content.Judge` (page audit on demand) registered as tools |
-| 10 | Schedules | Opus ×1 | 5 | `domain/schedule`, ticker, use cases, tools |
+| 9 ✅ | Agents | Opus ×2 | 4, 5, 7 | tool registry over all use cases, gollem agent, confirmations, conversations, streaming events; AI-backed use cases `graph.ProposeFromPages` (entities, edges, anchors proposed from synced pages, status `proposed`), `graph.ProposeRelated`, `content.Judge` (page audit on demand) registered as tools |
+| 10 ✅ | Schedules | Opus ×1 | 5 | `domain/schedule`, ticker, use cases, tools |
 | 11 | Wails services + events + TS generation | Opus ×2 | 7, 8, 9, 10 | all services, event bridge, generator, CONTRACTS.md final |
 | 12 | Hardening + release | Opus ×1 | 11 | e2e runs, coverage, export/backup, master password, retention job, v2.0.0 |
 

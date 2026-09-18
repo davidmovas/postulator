@@ -88,6 +88,10 @@ Before an agent implements a module, it reads the Archond files that section 15 
 - **2026-09-18 (phase 3B)** — `/seo-meta/{id}` and `/content/{id}/raw` address posts only; post and term ids collide and the contract has no discriminator, so a term id is a `404`.
 - **2026-09-18 (phase 3B)** — `since` is validated as RFC3339 by regex before `strtotime`, which otherwise accepts `yesterday` and every other English phrase.
 
+- **2026-09-18 (phases 9-10)** — `github.com/robfig/cron/v3` joins `golang.org/x/net/html` as a third-party package the domain may import; `internal/app/deps_test.go` holds the allowance and a hand-written cron parser is not worth the bugs.
+- **2026-09-18 (phases 9-10)** — `internal/transport/agent` is the only package that may name gollem, which `deps_test.go` enforces. `RunSpec` and `RunResult` live in `internal/application/agent` because the consumer declares the interface it calls.
+- **2026-09-18 (phases 9-10)** — A tool's arguments are masked with `log.IsSensitiveKey` before they reach the tool call ledger, an event or a confirmation summary. Only `pending_actions.args` keeps them whole, because that row is the command the approval replays.
+
 ## Product guardrail
 
 Postulator turns an entity graph into graph-compliant WordPress pages; reject features that do not serve that loop.

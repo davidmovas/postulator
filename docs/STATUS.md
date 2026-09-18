@@ -142,7 +142,20 @@ separated-values file with a sniffed delimiter, and writes the export workbook; 
 three mapping use cases, and `internal/app` composes it as `Core.Imports`. The preview normalises paths,
 fills the gaps, merges repeats, deduplicates entity names without case, resolves edges by name, checks for
 cycles and reports cannibalization without writing; `Apply` refuses a preview carrying an error. Module
-coverage is 90.2% of 11201 statements. Phase 9 follows.
+coverage is 90.2% of 11201 statements.
+
+**Phases 9 and 10 (the agents and the schedules) are complete**, with the five findings of the 5-8
+milestone review fixed first. `internal/application/tools` registers ninety-one tools, one per file, over
+every use case the UI exposes; `internal/domain/agent` and migration 0017 hold the conversation, the
+transcript, the pending action, the tool call ledger and the provider history blob;
+`internal/application/agent` owns the conversation, the turn and the confirmation, and
+`internal/transport/agent` is the only package that names gollem — it adapts the tools, runs the guard
+chain, streams the answer and writes the turn to the spend ledger. `internal/application/content` audits a
+live page on the shared judge rubric and `internal/application/graph` proposes entities, anchors and edges
+from the pages a site already serves. `internal/domain/schedule`, migration 0018,
+`internal/application/schedules` and the `internal/runtime/scheduler` ticker start a run on a cron
+expression or an interval. The full gate is green, module coverage is 87.5% of 13356 statements and every
+package these phases added is at or above 88%. Phase 11 follows.
 
 ## What landed in Phase 0
 
@@ -601,6 +614,11 @@ coverage is 90.2% of 11201 statements. Phase 9 follows.
   what proves the query.
 - The docker e2e stack is never run in CI: `windows-latest` cannot run Linux containers,
   and the Ubuntu job exists only to lint and package the plugin.
+- A pending action keeps the arguments it will replay, so a confirmation for a tool that carries a
+  credential holds that credential in the encrypted database until the action is settled. The event, the
+  summary and the tool call ledger carry it masked.
+- An agent tool that addresses a record by id relies on the use case to scope the write, exactly as the
+  Wails services do, so an id from another site reaches it. The use cases are where that is closed.
 - **Media uploaded by `generate_images` is orphaned when the item later fails.** The step
   uploads to the WordPress media library before `publish` runs, and nothing deletes the
   attachment if `validate`, `judge` or `publish` then stops the item. Accepted: an upload
@@ -629,6 +647,42 @@ coverage is 90.2% of 11201 statements. Phase 9 follows.
 - **`examples/sitemap-import-example.json` and `examples/sitemap.json` are gone.** JSON import is out of
   scope; the csv and xlsx samples stay and a test proves `AutoDetect` still opens both.
 
+## Decisions taken in Phases 9 and 10
+
+- **A run item targets a site or a page.** `run_items.target_id` carries no foreign key and `site_id`
+  cascades from `sites`, so a sync item can name its site and a page delete leaves the run history
+  standing. The engine reads the site off the item instead of joining the run.
+- **The checkpoint is an input to a step**, so it belongs in the input hash. Without it a step that asks to
+  wait reuses its own first execution on the next dispatch, and a multi-batch `sync_site` completed after
+  one page of the pull.
+- **A refused publish writes no `publish_result` artifact.** That artifact means the item reached
+  WordPress, and the retention sweep purges drafts on the strength of it.
+- **One judge rubric.** `application/content` owns the prompt, the report and the structured call; the run
+  step hands it the draft it already holds and the on-demand audit hands it the live page. Two copies would
+  drift and then disagree about the same page.
+- **A site scoped tool takes its site from the binding**, `siteId` is removed from the schema the model
+  sees, and `Authorize` denies the tool in a conversation that names no site.
+- **The seven requests that carry a Go map take a tool-local argument type.** `NewTool` derives its schema
+  with the rules of `llm.Structured`, which refuse a map; a spreadsheet mapping reads better to a model as
+  a list of pairs and a template specification as one JSON object anyway.
+- **`RunSpec` and `RunResult` are declared by `application/agent`**, against the letter of section 9.4: the
+  consumer declares the interface it calls, and the runner is the implementation. Only the system prompt
+  template stayed at the transport edge.
+- **The gollem history is stored as its own blob** beside the message transcript. The transcript is ours
+  and the UI reads it; the blob is the provider's replayable context and gollem owns its shape and version.
+- **The audit records what the tool answered and the fence wraps the copy the model reads**, which is why
+  the fence is the outermost middleware and the audit sits under it. A tool call's arguments are masked by
+  the logger's rule before they reach the ledger, the event or the summary; only the pending action keeps
+  them whole, because that row is the command it will replay.
+- **A tool call that cannot be audited fails the turn**, not the call: gollem hands a middleware error
+  back to the model rather than aborting, so the guard keeps the first failure and the runner raises it.
+- **`github.com/robfig/cron/v3` is the second third-party package the domain may import**, on the same
+  ground as `golang.org/x/net/html`: a hand-written cron parser would be more code and less correct.
+  `internal/app/deps_test.go` carries the allowance.
+- **A skipped schedule is rearmed.** A schedule whose previous run is still going, or whose target query
+  matches nothing, still moves its `next_run_at` forward, because a skip that leaves the time in the past
+  is a hot loop.
+
 ## Milestone review 5–8
 
 Reviewed 2026-09-18. The gate is green: `go build`, `go vet`, `golangci-lint` (0 issues), `gofmt -l .`,
@@ -638,9 +692,9 @@ of eight racers, `run_events.seq` stays gapless under three concurrent items, `S
 every in-flight step has and leaks no goroutine, and `Cancel` reaches a blocked step. Three fixes landed:
 `280537c` (link insertion spliced anchors into `<script>`, `<style>` and `<textarea>`), `d851450` (a run
 could target a page of another site and publish it through the first site's client) and `fb944b3`.
-Known gaps it leaves open: **a sync run cannot be enqueued at all** — `run_items.page_id` is a NOT NULL
-foreign key into `pages`, and `sync.SyncSite` puts the site id there (migration `0014`, `sync/service.go`);
-`publish` clears `Page.Drift` without warning that a human edited the page (`steps/publish.go`);
-`generate_images` uploads media outside publish/relink/sync_back and orphans it if the item later fails;
-the sync cursor is not tagged with the source that issued it; and the import reads the whole file before
-`import.maxRows` applies.
+The five gaps it left open were closed at the head of Phase 9: `14226fd` rebuilds `run_items` around a
+`target_id` with no foreign key and a cascading `site_id`, so a sync run can be enqueued at all;
+`bd774fe` keys the step reuse on the checkpoint, which is what a batch loop reads; `2826efb` refuses a
+publish over a page a human edited; `739fbb2` tags the sync cursor with its source and stops claiming a
+content hash the sync did not write; and `8821e67` applies `import.maxRows` while the rows are read. The
+orphaned media is listed under Known gaps instead, as an accepted cost.
