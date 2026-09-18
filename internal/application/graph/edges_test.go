@@ -4,6 +4,7 @@ import (
 	stderrors "errors"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/graph"
@@ -83,7 +84,9 @@ func TestApproveRejectDeleteAndList(t *testing.T) {
 	mid := h.entity(t, "Mid", "topic")
 	leaf := h.entity(t, "Leaf", "topic")
 	h.edge(t, mid.ID, hub.ID, "parent", "approved")
+	h.clock.Advance(time.Minute)
 	leafMid := h.edge(t, leaf.ID, mid.ID, "parent", "proposed")
+	h.clock.Advance(time.Minute)
 	closing := h.edge(t, hub.ID, leaf.ID, "parent", "proposed")
 	h.recorder.Reset()
 
