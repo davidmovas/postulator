@@ -20,6 +20,13 @@ type linkRecorder struct {
 	err    error
 }
 
+func (r *linkRecorder) ListForPage(_ context.Context, pageID string) ([]pagemap.PageLink, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	return r.byPage[pageID], nil
+}
+
 func (r *linkRecorder) ReplaceForPage(_ context.Context, pageID string, links []pagemap.PageLink) error {
 	if r.err != nil {
 		return r.err

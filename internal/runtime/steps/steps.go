@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/content"
@@ -39,11 +40,13 @@ type edgeReader interface {
 type pageStore interface {
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.Page, error)
 	Get(ctx context.Context, id string) (pagemap.Page, error)
+	Insert(ctx context.Context, page pagemap.Page) error
 	Update(ctx context.Context, page pagemap.Page) error
 }
 
 type linkStore interface {
 	ReplaceForPage(ctx context.Context, pageID string, links []pagemap.PageLink) error
+	ListForPage(ctx context.Context, pageID string) ([]pagemap.PageLink, error)
 }
 
 type siteReader interface {
@@ -84,7 +87,9 @@ type Deps struct {
 	ImageProvider ImageProvider
 	ImageSources  map[template.ImageSource]ImageSource
 	UnitOfWork    unitOfWork
+	Publisher     application.Publisher
 	Clock         clock.Clock
+	BatchSize     int
 }
 
 func all(deps Deps) []run.StepDef {
@@ -101,6 +106,7 @@ func all(deps Deps) []run.StepDef {
 		RelinkNeighbors(deps),
 		SyncBack(deps),
 		Report(deps),
+		SyncSite(deps),
 	}
 }
 

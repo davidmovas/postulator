@@ -12,8 +12,6 @@ import (
 	wpplugin "github.com/davidmovas/postulator/wp-plugin"
 )
 
-const Filename = "postulator-companion.zip"
-
 var epoch = time.Date(1980, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 func Package() ([]byte, error) {

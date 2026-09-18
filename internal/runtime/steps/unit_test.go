@@ -64,6 +64,10 @@ func (p pageList) Update(context.Context, pagemap.Page) error {
 	return p.err
 }
 
+func (p pageList) Insert(context.Context, pagemap.Page) error {
+	return p.err
+}
+
 type siteStub struct {
 	record site.Site
 	err    error

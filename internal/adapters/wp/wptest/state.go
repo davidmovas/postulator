@@ -3,6 +3,7 @@ package wptest
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -208,6 +209,18 @@ func (s *Server) rewrite(id int64, content string) bool {
 	}
 	stored.Content = content
 	stored.Modified = s.tick()
+	return true
+}
+
+func (s *Server) Delete(id int64) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.items[id]; !ok {
+		return false
+	}
+	delete(s.items, id)
+	s.order = slices.DeleteFunc(s.order, func(other int64) bool { return other == id })
 	return true
 }
 

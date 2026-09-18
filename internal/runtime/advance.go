@@ -97,10 +97,16 @@ func (e *Engine) claim(parent context.Context, itemID string) (*claim, error) {
 			return e.expire(ctx, out, record, now)
 		}
 
-		resolved, err := e.deps.Specs.ResolveForPage(ctx, templates.ResolveForPageRequest{PageID: item.PageID})
-		if err != nil {
-			return e.abandon(ctx, out, record, item, run.Classify(err), now)
+		scoped := record.Kind.PageScoped()
+
+		var resolved templates.ResolveForPageResponse
+		if scoped {
+			resolved, err = e.deps.Specs.ResolveForPage(ctx, templates.ResolveForPageRequest{PageID: item.PageID})
+			if err != nil {
+				return e.abandon(ctx, out, record, item, run.Classify(err), now)
+			}
 		}
+
 		def, err := run.Plan(e.registry, record.Kind, record.Recipe, e.cfg.RunDeadline)
 		if err != nil {
 			return e.abandon(ctx, out, record, item, run.Classify(err), now)
@@ -115,10 +121,14 @@ func (e *Engine) claim(parent context.Context, itemID string) (*claim, error) {
 			return e.abandon(ctx, out, record, item, fault, now)
 		}
 
-		page, err := e.deps.Pages.Get(ctx, item.PageID)
-		if err != nil {
-			return e.abandon(ctx, out, record, item, run.Classify(err), now)
+		var page pagemap.Page
+		if scoped {
+			page, err = e.deps.Pages.Get(ctx, item.PageID)
+			if err != nil {
+				return e.abandon(ctx, out, record, item, run.Classify(err), now)
+			}
 		}
+
 		stored, err := e.deps.Artifacts.ByItem(ctx, item.ID)
 		if err != nil {
 			return err
@@ -233,6 +243,7 @@ func (e *Engine) outcomeOf(held *claim, result run.Result, stepErr error) outcom
 		}
 		out.status = run.StatusWaiting
 		out.wakeAt = &wakeAt
+		out.again = !wakeAt.After(e.now())
 	case run.TransitionPause:
 		reason := result.Reason
 		if reason == "" {

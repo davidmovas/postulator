@@ -32,6 +32,21 @@ func (k Kind) Valid() bool {
 	}
 }
 
+func (k Kind) PageScoped() bool {
+	switch k {
+	case KindGenerate, KindRelink, KindAudit, KindCustom:
+		return true
+	default:
+		return false
+	}
+}
+
+const StepSyncSite = "sync_site"
+
+func SyncRecipe() []template.StepSpec {
+	return []template.StepSpec{{Name: StepSyncSite, Enabled: true}}
+}
+
 type PublishMode string
 
 const (
