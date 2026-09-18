@@ -59,7 +59,7 @@ func (s *Service) turn(ctx context.Context, conversation domainagent.Conversatio
 		Context:       built,
 		Input:         input,
 		MessageID:     id.New(),
-		Allowed:       s.deps.Registry.Names(),
+		Allowed:       s.allowed(),
 		LoopLimit:     s.deps.LoopLimit,
 		HistoryBudget: s.deps.HistoryBudget,
 	}

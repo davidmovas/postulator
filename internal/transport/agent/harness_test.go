@@ -81,7 +81,8 @@ func newHarness(t *testing.T) *harness {
 	return built
 }
 
-func build(t *testing.T, store *sqlite.Store, model *fake.Gollem, bus *applicationtest.Recorder) *harness {
+func build(t *testing.T, store *sqlite.Store, model *fake.Gollem, bus *applicationtest.Recorder,
+	allowed ...string) *harness {
 	t.Helper()
 
 	now := clock.NewFake(sqlitetest.Stamp)
@@ -130,6 +131,7 @@ func build(t *testing.T, store *sqlite.Store, model *fake.Gollem, bus *applicati
 		Runner:    runner,
 		Publisher: bus,
 		Clock:     now,
+		Allowed:   allowed,
 	})
 	t.Cleanup(service.Close)
 

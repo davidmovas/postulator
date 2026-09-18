@@ -20,11 +20,11 @@ const (
 	untrustedMarker = agentapp.UntrustedMarker
 	untrustedData   = agentapp.UntrustedData
 
-	truncatedKey  = "truncated"
-	previewKey    = "preview"
-	totalBytesKey = "totalBytes"
+	truncatedKey  = agentapp.TruncatedKey
+	previewKey    = agentapp.PreviewKey
+	totalBytesKey = agentapp.TotalBytesKey
 
-	minPreviewBytes = 256
+	minPreviewBytes = agentapp.MinPreviewBytes
 )
 
 type guard struct {

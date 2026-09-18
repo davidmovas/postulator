@@ -91,6 +91,9 @@ func (r *Registry) Call(ctx context.Context, b Binding, name string, args json.R
 	}
 
 	tool := build(r.deps)
+	if b.Mode == agent.ModeConfirm && !b.Approved && tool.Def.Risk.NeedsConfirmation() {
+		tool.Run = r.proposal(tool.Def)
+	}
 	if tool.Authorize != nil {
 		if err := tool.Authorize(ctx, b); err != nil {
 			return nil, err

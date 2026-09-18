@@ -12,6 +12,12 @@ import (
 const (
 	UntrustedMarker = "untrustedContent"
 	UntrustedData   = "data"
+
+	TruncatedKey  = "truncated"
+	PreviewKey    = "preview"
+	TotalBytesKey = "totalBytes"
+
+	MinPreviewBytes = 256
 )
 
 type SiteContext struct {

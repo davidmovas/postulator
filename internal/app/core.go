@@ -312,6 +312,7 @@ func (c *Core) compose(ctx context.Context, key []byte) error {
 		Clock:         now,
 		LoopLimit:     agent.LoopLimit(values),
 		HistoryBudget: agent.HistoryBudgetChars(values),
+		MaxToolResult: agent.MaxToolResultBytes(values),
 	})
 
 	c.key = key

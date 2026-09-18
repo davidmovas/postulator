@@ -3,12 +3,15 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/tools"
 	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
 func (s *Service) Confirm(ctx context.Context, req ConfirmRequest) (ConfirmResponse, error) {
@@ -68,15 +71,18 @@ func (s *Service) execute(ctx context.Context, action domainagent.PendingAction)
 		return ConfirmResponse{}, err
 	}
 
-	binding := tools.Binding{
-		SiteID: siteOf(conversation), ConversationID: conversation.ID, Mode: domainagent.ModeAutonomous,
-	}
-	outcome, callErr := s.deps.Registry.Call(ctx, binding, action.Tool, action.Args)
+	started := time.Now()
+	outcome, callErr := s.replay(ctx, conversation, action)
+	elapsed := time.Since(started).Milliseconds()
 
 	status, encoded, failure := settleCall(outcome, callErr)
+	encoded = capped(encoded, s.deps.MaxToolResult)
 	if _, err = s.deps.Actions.Transition(ctx, action.ID, domainagent.ActionApproved, status, encoded,
 		failure, s.now()); err != nil {
 		return ConfirmResponse{}, err
+	}
+	if auditErr := s.audit(ctx, action, failure, errors.IsCode(callErr, errors.Unauthorized), elapsed); auditErr != nil {
+		return ConfirmResponse{}, auditErr
 	}
 
 	settled, err := s.deps.Actions.Get(ctx, action.ID)
@@ -98,6 +104,65 @@ func (s *Service) execute(ctx context.Context, action domainagent.PendingAction)
 		return ConfirmResponse{}, err
 	}
 	return ConfirmResponse{Action: actionView(settled)}, nil
+}
+
+func (s *Service) allowed() []string {
+	if len(s.deps.Allowed) > 0 {
+		return slices.Clone(s.deps.Allowed)
+	}
+	return s.deps.Registry.Names()
+}
+
+func (s *Service) replay(ctx context.Context, conversation domainagent.Conversation,
+	action domainagent.PendingAction) (any, error) {
+	if len(s.deps.Allowed) > 0 && !slices.Contains(s.deps.Allowed, action.Tool) {
+		return nil, errors.New(errors.Unauthorized, "the tool "+action.Tool+" is not open to this conversation").
+			WithDetail("tool", action.Tool)
+	}
+
+	return s.deps.Registry.Call(ctx, tools.Binding{
+		SiteID: siteOf(conversation), ConversationID: conversation.ID,
+		Mode: conversation.Mode, Approved: true,
+	}, action.Tool, action.Args)
+}
+
+func (s *Service) audit(ctx context.Context, action domainagent.PendingAction, failure string,
+	denied bool, elapsed int64) error {
+	call, err := domainagent.NewToolCall(domainagent.ToolCall{
+		ID: id.New(), ConversationID: action.ConversationID, CallID: action.ID, Tool: action.Tool,
+		Args: tools.Redact(action.Args), Status: callStatus(failure, denied), DurationMS: elapsed,
+		Error: failure, CreatedAt: s.now(),
+	})
+	if err != nil {
+		return err
+	}
+	return s.deps.Calls.Insert(ctx, call)
+}
+
+func callStatus(failure string, denied bool) domainagent.CallStatus {
+	switch {
+	case denied:
+		return domainagent.CallDenied
+	case failure != "":
+		return domainagent.CallError
+	default:
+		return domainagent.CallOK
+	}
+}
+
+func capped(encoded json.RawMessage, limit int) json.RawMessage {
+	if limit <= 0 || len(encoded) <= limit {
+		return encoded
+	}
+
+	preview := min(max(limit/2, MinPreviewBytes), len(encoded))
+	shortened, err := json.Marshal(map[string]any{
+		TruncatedKey: true, TotalBytesKey: len(encoded), PreviewKey: string(encoded[:preview]),
+	})
+	if err != nil {
+		return encoded
+	}
+	return shortened
 }
 
 func (s *Service) raced(ctx context.Context, actionID string) (ConfirmResponse, error) {

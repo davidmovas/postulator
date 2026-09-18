@@ -74,8 +74,10 @@ type Deps struct {
 	Turns         *Turns
 	Publisher     application.Publisher
 	Clock         clock.Clock
+	Allowed       []string
 	LoopLimit     int
 	HistoryBudget int
+	MaxToolResult int
 }
 
 type Service struct {
@@ -91,6 +93,9 @@ func New(deps Deps) *Service {
 	}
 	if deps.HistoryBudget <= 0 {
 		deps.HistoryBudget = DefaultHistoryBudgetChars
+	}
+	if deps.MaxToolResult <= 0 {
+		deps.MaxToolResult = DefaultMaxToolResultBytes
 	}
 	return &Service{deps: deps}
 }

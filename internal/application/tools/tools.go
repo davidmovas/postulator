@@ -43,6 +43,7 @@ type Binding struct {
 	ConversationID string
 	RunID          string
 	Mode           agent.Mode
+	Approved       bool
 }
 
 type Tool struct {
