@@ -179,29 +179,111 @@ function post_item( \WP_Post $post ): array {
 	);
 }
 
-function collect( array $types, string $since_gmt, ?array $cursor, int $limit ): array {
-	$items = array();
+function query_terms_page( string $since_gmt, ?array $cursor, int $limit ): array {
+	global $wpdb;
 
-	$rows = query_posts_page( $types, $since_gmt, $cursor, $limit );
-	foreach ( $rows as $row ) {
-		$post = get_post( (int) $row['ID'] );
-		if ( $post instanceof \WP_Post ) {
-			$items[] = post_item( $post );
-		}
+	$sql  = "SELECT t.term_id AS term_id FROM {$wpdb->term_taxonomy} tt
+		INNER JOIN {$wpdb->terms} t ON t.term_id = tt.term_id
+		WHERE tt.taxonomy = %s";
+	$args = array( 'product_cat' );
+
+	if ( null !== $cursor && isset( $cursor['i'] ) ) {
+		$sql   .= ' AND t.term_id > %d';
+		$args[] = (int) $cursor['i'];
 	}
-	if ( count( $rows ) < $limit ) {
+
+	$sql   .= ' ORDER BY t.term_id ASC LIMIT %d';
+	$args[] = $limit;
+
+	$rows = $wpdb->get_results( $wpdb->prepare( $sql, $args ), ARRAY_A );
+	if ( ! is_array( $rows ) ) {
+		return array();
+	}
+
+	$selected = array();
+	foreach ( $rows as $row ) {
+		$term_id  = (int) $row['term_id'];
+		$modified = term_modified( $term_id );
+		if ( '' !== $since_gmt && rfc3339( $since_gmt ) > $modified ) {
+			continue;
+		}
+		$selected[] = array(
+			'term_id'      => $term_id,
+			'modified_gmt' => $modified,
+		);
+	}
+	return array( 'rows' => $selected, 'scanned' => count( $rows ), 'last' => empty( $rows ) ? 0 : (int) end( $rows )['term_id'] );
+}
+
+function term_item( \WP_Term $term, string $modified ): array {
+	$description = (string) $term->description;
+	$link        = get_term_link( $term );
+
+	return array(
+		'id'          => (int) $term->term_id,
+		'type'        => (string) $term->taxonomy,
+		'slug'        => (string) $term->slug,
+		'path'        => is_string( $link ) ? url_to_path( $link ) : '/',
+		'parent'      => (int) $term->parent,
+		'status'      => 'publish',
+		'modified'    => $modified,
+		'contentHash' => content_hash( $description ),
+		'title'       => (string) $term->name,
+		'h1'          => '',
+		'meta'        => read_term_seo( $term ),
+		'links'       => array(),
+	);
+}
+
+function collect( array $types, string $since_gmt, ?array $cursor, int $limit ): array {
+	$post_types = array_values( array_diff( $types, TERM_TYPES ) );
+	$term_types = array_values( array_intersect( $types, TERM_TYPES ) );
+
+	$items = array();
+	$phase = null !== $cursor ? (string) $cursor['p'] : ( empty( $post_types ) ? 'term' : 'post' );
+	$state = $cursor;
+
+	if ( 'post' === $phase ) {
+		$rows = empty( $post_types ) ? array() : query_posts_page( $post_types, $since_gmt, $state, $limit );
+		foreach ( $rows as $row ) {
+			$post = get_post( (int) $row['ID'] );
+			if ( $post instanceof \WP_Post ) {
+				$items[] = post_item( $post );
+			}
+		}
+		if ( count( $rows ) === $limit ) {
+			$last = end( $rows );
+			return array(
+				'items'      => $items,
+				'nextCursor' => encode_cursor(
+					array(
+						'p' => 'post',
+						'm' => (string) $last['post_modified_gmt'],
+						'i' => (int) $last['ID'],
+					)
+				),
+			);
+		}
+		$state = null;
+	}
+
+	$remaining = $limit - count( $items );
+	if ( empty( $term_types ) || $remaining < 1 ) {
 		return array( 'items' => $items, 'nextCursor' => null );
 	}
 
-	$last = end( $rows );
-	return array(
-		'items'      => $items,
-		'nextCursor' => encode_cursor(
-			array(
-				'p' => 'post',
-				'm' => (string) $last['post_modified_gmt'],
-				'i' => (int) $last['ID'],
-			)
-		),
-	);
+	$page = query_terms_page( $since_gmt, $state, $remaining );
+	foreach ( $page['rows'] as $row ) {
+		$term = get_term( (int) $row['term_id'] );
+		if ( $term instanceof \WP_Term ) {
+			$items[] = term_item( $term, (string) $row['modified_gmt'] );
+		}
+	}
+	if ( $page['scanned'] === $remaining ) {
+		return array(
+			'items'      => $items,
+			'nextCursor' => encode_cursor( array( 'p' => 'term', 'i' => (int) $page['last'] ) ),
+		);
+	}
+	return array( 'items' => $items, 'nextCursor' => null );
 }

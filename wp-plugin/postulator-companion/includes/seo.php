@@ -47,3 +47,25 @@ function read_post_seo( int $post_id ): array {
 		'canonical'   => (string) get_post_meta( $post_id, $map['canonical'], true ),
 	);
 }
+
+function read_term_seo( \WP_Term $term ): array {
+	$plugin = detect_plugin();
+
+	if ( 'yoast' === $plugin ) {
+		$all = get_option( 'wpseo_taxonomy_meta', array() );
+		$row = is_array( $all ) && isset( $all[ $term->taxonomy ][ $term->term_id ] ) ? $all[ $term->taxonomy ][ $term->term_id ] : array();
+
+		return array(
+			'title'       => isset( $row['wpseo_title'] ) ? (string) $row['wpseo_title'] : '',
+			'description' => isset( $row['wpseo_desc'] ) ? (string) $row['wpseo_desc'] : '',
+			'canonical'   => isset( $row['wpseo_canonical'] ) ? (string) $row['wpseo_canonical'] : '',
+		);
+	}
+
+	$map = META_KEYS[ $plugin ];
+	return array(
+		'title'       => (string) get_term_meta( $term->term_id, $map['title'], true ),
+		'description' => (string) get_term_meta( $term->term_id, $map['description'], true ),
+		'canonical'   => (string) get_term_meta( $term->term_id, $map['canonical'], true ),
+	);
+}
