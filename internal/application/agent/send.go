@@ -9,6 +9,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/tools"
 	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
@@ -21,6 +22,10 @@ func (s *Service) Send(ctx context.Context, req SendRequest) (SendResponse, erro
 	conversation, err := s.conversation(ctx, req.ConversationID)
 	if err != nil {
 		return SendResponse{}, err
+	}
+	if s.deps.Turns.Running(conversation.ID) {
+		return SendResponse{}, errors.New(errors.Conflict, "this conversation is already answering").
+			WithDetail("conversationId", conversation.ID)
 	}
 
 	asked, err := s.append(ctx, conversation.ID, domainagent.Message{

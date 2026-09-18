@@ -120,7 +120,9 @@ step.started step.done step.failed step.retrying llm.usage`.
 
 Application events: `graph.changed{siteId}`, `pages.changed{siteId}`,
 `templates.changed`, `agent.delta`, `agent.tool.started`, `agent.tool.finished`,
-`agent.confirm.requested`, `app.locked`, `app.unlocked`.
+`agent.confirm.requested`, `agent.confirm.resolved`, `agent.done`, `app.locked`,
+`app.unlocked`. Every agent payload carries `conversationId`, because a window may hold
+more than one conversation at a time.
 
 The frontend subscribes with `on(type, handler)` from `frontend/src/lib/events.ts`,
 which narrows `payload` to the type the registry declares. Events only travel Go → JS;
@@ -156,3 +158,10 @@ In `confirm` mode a `write` or `dangerous` tool does not execute. It writes a
 `PendingAction` row and returns `{status:"confirmationRequired", actionId, summary}`, so
 a confirmation survives a restart. Wails services call the use cases directly and typed;
 they never go through the registry.
+
+A tool that works inside one site declares `Authorize` and takes its site from the
+binding, so `siteId` is removed from the schema the model sees and no conversation can
+reach another site through it. `NewTool` derives that schema from the request type with
+the reflection rules of `application/llm.Structured`, which do not cover a Go map: the
+handful of requests that carry one take a tool-local argument type instead. The audit
+middleware records what the tool answered; the fence wraps the copy the model reads.
