@@ -75,6 +75,7 @@ type ResolveForPageRequest struct {
 
 type ResolveForPageResponse struct {
 	TemplateID string                `json:"templateId"`
+	SiteID     string                `json:"siteId"`
 	Version    int                   `json:"version"`
 	Spec       template.TemplateSpec `json:"spec"`
 }

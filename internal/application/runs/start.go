@@ -49,6 +49,10 @@ func (s *Service) Start(ctx context.Context, req StartRequest) (StartResponse, e
 		if resolveErr != nil {
 			return StartResponse{}, resolveErr
 		}
+		if resolved.SiteID != siteID {
+			return StartResponse{}, invalid("a target page belongs to another site", "pageIds").
+				WithDetail("pageId", pageID).WithDetail("siteId", resolved.SiteID)
+		}
 		if i > 0 {
 			continue
 		}

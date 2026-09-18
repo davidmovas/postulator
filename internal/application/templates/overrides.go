@@ -129,5 +129,5 @@ func (s *Service) ResolveForPage(ctx context.Context, req ResolveForPageRequest)
 	if err != nil {
 		return ResolveForPageResponse{}, err
 	}
-	return ResolveForPageResponse{TemplateID: base.ID, Version: base.Version, Spec: spec}, nil
+	return ResolveForPageResponse{TemplateID: base.ID, SiteID: page.SiteID, Version: base.Version, Spec: spec}, nil
 }

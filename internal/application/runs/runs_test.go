@@ -67,6 +67,7 @@ func (f *fakeEngine) RetryStep(_ context.Context, itemID string) error {
 
 type fakeSpecs struct {
 	spec    template.TemplateSpec
+	siteID  string
 	version int
 	seen    []string
 	err     error
@@ -77,7 +78,9 @@ func (f *fakeSpecs) ResolveForPage(_ context.Context, req templates.ResolveForPa
 		return templates.ResolveForPageResponse{}, f.err
 	}
 	f.seen = append(f.seen, req.PageID)
-	return templates.ResolveForPageResponse{TemplateID: "template-1", Version: f.version, Spec: f.spec}, nil
+	return templates.ResolveForPageResponse{
+		TemplateID: "template-1", SiteID: f.siteID, Version: f.version, Spec: f.spec,
+	}, nil
 }
 
 type fixture struct {
@@ -105,6 +108,7 @@ func newFixture(t *testing.T) *fixture {
 
 	engine := &fakeEngine{estimate: run.Estimate{Tokens: 4200, USD: 0.12}}
 	specs := &fakeSpecs{
+		siteID:  "s",
 		version: 2,
 		spec: template.TemplateSpec{
 			Recipe: []template.StepSpec{{Name: "generate_body", Enabled: true}},
@@ -157,6 +161,7 @@ func TestStartResolvesEveryTargetAndEstimates(t *testing.T) {
 	t.Parallel()
 
 	fixture := newFixture(t)
+	fixture.specs.siteID = fixture.siteID
 	ctx := kctx.WithActor(t.Context(), kctx.ActorAgent)
 
 	resp, err := fixture.service.Start(ctx, runs.StartRequest{
@@ -240,6 +245,12 @@ func TestStartRejectsBadRequests(t *testing.T) {
 			name:    "the engine refuses the recipe",
 			request: runs.StartRequest{SiteID: "s", PageIDs: []string{"p"}},
 			prepare: func(f *fixture) { f.engine.enqueueErr = errors.New(errors.Invalid, "broken recipe") },
+			want:    errors.Invalid,
+		},
+		{
+			name:    "a target page belongs to another site",
+			request: runs.StartRequest{SiteID: "s", PageIDs: []string{"p"}},
+			prepare: func(f *fixture) { f.specs.siteID = "other" },
 			want:    errors.Invalid,
 		},
 	}
