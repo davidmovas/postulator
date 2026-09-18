@@ -156,3 +156,13 @@ func decodeJSON(body []byte, out any) error {
 	}
 	return nil
 }
+
+const contentTypeJSON = "application/json"
+
+func encodeJSON(payload any) ([]byte, error) {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, errors.New(errors.Invalid, "the WordPress request body cannot be encoded").WithInternal(err)
+	}
+	return body, nil
+}

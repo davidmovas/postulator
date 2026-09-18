@@ -346,3 +346,115 @@ func decodeItem(itemType ItemType, body []byte) (Item, error) {
 		return Item{}, errors.New(errors.Invalid, "unknown WordPress content type").WithDetail("type", string(itemType))
 	}
 }
+
+type CreateItem struct {
+	Parent        *int64
+	FeaturedMedia *int64
+	Meta          map[string]any
+	Title         string
+	Content       string
+	Slug          string
+	Status        string
+	Excerpt       string
+	Template      string
+	Categories    []int64
+	Tags          []int64
+	MenuOrder     int
+}
+
+func (in CreateItem) payload() map[string]any {
+	status := in.Status
+	if status == "" {
+		status = "draft"
+	}
+
+	payload := map[string]any{
+		"title":   in.Title,
+		"content": in.Content,
+		"status":  status,
+	}
+	if in.Slug != "" {
+		payload["slug"] = in.Slug
+	}
+	if in.Parent != nil {
+		payload["parent"] = *in.Parent
+	}
+	if in.Excerpt != "" {
+		payload["excerpt"] = in.Excerpt
+	}
+	if in.MenuOrder != 0 {
+		payload["menu_order"] = in.MenuOrder
+	}
+	if in.Template != "" {
+		payload["template"] = in.Template
+	}
+	if len(in.Categories) > 0 {
+		payload["categories"] = in.Categories
+	}
+	if len(in.Tags) > 0 {
+		payload["tags"] = in.Tags
+	}
+	if in.FeaturedMedia != nil {
+		payload["featured_media"] = *in.FeaturedMedia
+	}
+	if len(in.Meta) > 0 {
+		payload["meta"] = in.Meta
+	}
+	return payload
+}
+
+type UpdateItem struct {
+	Title         *string
+	Content       *string
+	Slug          *string
+	Status        *string
+	Parent        *int64
+	Excerpt       *string
+	MenuOrder     *int
+	Template      *string
+	FeaturedMedia *int64
+	Meta          map[string]any
+	Categories    []int64
+	Tags          []int64
+}
+
+func (in UpdateItem) payload() map[string]any {
+	payload := make(map[string]any)
+	if in.Title != nil {
+		payload["title"] = *in.Title
+	}
+	if in.Content != nil {
+		payload["content"] = *in.Content
+	}
+	if in.Slug != nil {
+		payload["slug"] = *in.Slug
+	}
+	if in.Status != nil {
+		payload["status"] = *in.Status
+	}
+	if in.Parent != nil {
+		payload["parent"] = *in.Parent
+	}
+	if in.Excerpt != nil {
+		payload["excerpt"] = *in.Excerpt
+	}
+	if in.MenuOrder != nil {
+		payload["menu_order"] = *in.MenuOrder
+	}
+	if in.Template != nil {
+		payload["template"] = *in.Template
+	}
+	if in.FeaturedMedia != nil {
+		payload["featured_media"] = *in.FeaturedMedia
+	}
+	if in.Categories != nil {
+		payload["categories"] = in.Categories
+	}
+	if in.Tags != nil {
+		payload["tags"] = in.Tags
+	}
+	if len(in.Meta) > 0 {
+		payload["meta"] = in.Meta
+	}
+	return payload
+}
