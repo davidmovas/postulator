@@ -418,3 +418,37 @@ func TestSyncSiteLeavesTypesTheCorePullNeverSaw(t *testing.T) {
 		t.Fatalf("the product page is %+v", kept)
 	}
 }
+
+func TestSyncSiteArchivesNothingUntilThePullIsComplete(t *testing.T) {
+	t.Parallel()
+
+	h := newSyncHarness(t, 1)
+	seedSite(t, h)
+	h.all(t)
+
+	gone := h.byPath(t, "/coffee/filter/")
+	if !h.server.Delete(*gone.WPID) {
+		t.Fatal("the filter page could not be removed from the site")
+	}
+
+	h.clock.Advance(time.Minute)
+	h.restart(t)
+
+	for range 20 {
+		state, _ := h.once(t)
+		if !state.Done {
+			if state.Archived != 0 {
+				t.Fatalf("a partial pull archived %d pages: %+v", state.Archived, state)
+			}
+			if page := h.byPath(t, "/coffee/filter/"); page.Status == pagemap.StatusArchived {
+				t.Fatal("a partial pull archived the page that had not been paged through yet")
+			}
+			continue
+		}
+		if state.Archived != 1 {
+			t.Fatalf("the completed pull archived %d pages, want 1", state.Archived)
+		}
+		return
+	}
+	t.Fatal("the sync never finished")
+}
