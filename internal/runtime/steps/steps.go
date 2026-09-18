@@ -97,6 +97,7 @@ func all(deps Deps) []run.StepDef {
 		GenerateImages(deps),
 		Validate(deps),
 		Judge(deps),
+		Publish(deps),
 	}
 }
 

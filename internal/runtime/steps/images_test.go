@@ -56,8 +56,13 @@ func (o oneClient) Client(context.Context, string) (*wp.Client, error) {
 
 func imageDeps(t *testing.T) (steps.Deps, *wptest.Server) {
 	t.Helper()
+	return imageDepsWith(t)
+}
 
-	server := wptest.New(t)
+func imageDepsWith(t *testing.T, opts ...wptest.Option) (steps.Deps, *wptest.Server) {
+	t.Helper()
+
+	server := wptest.New(t, opts...)
 	client, err := wp.New(wp.Config{
 		BaseURL:       server.URL(),
 		Username:      wptest.DefaultUser,
