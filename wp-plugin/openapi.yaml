@@ -1,0 +1,517 @@
+openapi: 3.1.0
+info:
+  title: Postulator companion plugin
+  version: 1.0.0
+  summary: The REST namespace the Postulator companion plugin adds to a WordPress site.
+  description: >-
+    Every route lives under the WordPress REST namespace postulator/v1 and is
+    authenticated with the same WordPress application password as core REST.
+    The plugin requires the edit_posts capability on every route. A site that
+    does not have the plugin installed answers every route with the WordPress
+    404 body {"code":"rest_no_route"}, which is how a client detects its
+    absence and degrades to core REST.
+servers:
+  - url: https://{site}/wp-json/postulator/v1
+    variables:
+      site:
+        default: example.com
+        description: Host and optional subdirectory of the WordPress installation.
+security:
+  - applicationPassword: []
+paths:
+  /manifest:
+    get:
+      operationId: getManifest
+      summary: Report the plugin version, its capabilities and the detected SEO plugin.
+      responses:
+        "200":
+          description: The plugin is installed and the caller may use the namespace.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Manifest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NoRoute"
+  /content:
+    get:
+      operationId: listContent
+      summary: List content in keyset order for incremental synchronisation.
+      parameters:
+        - name: since
+          in: query
+          required: false
+          description: >-
+            Exclusive lower bound on post_modified_gmt, RFC3339 with a UTC
+            offset. An item modified at exactly this instant is not returned.
+          schema:
+            type: string
+            format: date-time
+        - name: cursor
+          in: query
+          required: false
+          description: >-
+            Opaque keyset cursor over (post_modified_gmt, ID) exactly as the
+            previous page returned it in nextCursor. Clients never decode,
+            validate or construct one.
+          schema:
+            type: string
+        - name: types
+          in: query
+          required: false
+          description: Comma separated content types; all four are listed when absent.
+          schema:
+            type: string
+            default: page,post,product,product_cat
+        - name: limit
+          in: query
+          required: false
+          description: >-
+            Maximum number of items in one page. The value is clamped, never
+            rejected: a value above 500 becomes 500, and an absent value or a
+            value of zero or less becomes 100.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+      responses:
+        "200":
+          description: One page of content ordered by (post_modified_gmt, ID) ascending.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NoRoute"
+  /seo-meta/{id}:
+    put:
+      operationId: setSeoMeta
+      summary: Write SEO meta through whichever SEO plugin the site runs.
+      description: Post-only; a taxonomy term id answers 404 with the code not_found.
+      parameters:
+        - $ref: "#/components/parameters/PostID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SeoMetaRequest"
+      responses:
+        "200":
+          description: The fields that were written and the plugin they were written for.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeoMetaResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /content/{id}/raw:
+    get:
+      operationId: getRawContent
+      summary: Read the stored post_content together with its hash.
+      description: Post-only; a taxonomy term id answers 404 with the code not_found.
+      parameters:
+        - $ref: "#/components/parameters/PostID"
+      responses:
+        "200":
+          description: The raw post_content and the hash a later write must present.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawContent"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: putRawContent
+      summary: Replace post_content under optimistic concurrency control.
+      description: Post-only; a taxonomy term id answers 404 with the code not_found.
+      parameters:
+        - $ref: "#/components/parameters/PostID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RawUpdateRequest"
+      responses:
+        "200":
+          description: The content was replaced; the new hash is returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawUpdateResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+components:
+  securitySchemes:
+    applicationPassword:
+      type: http
+      scheme: basic
+      description: >-
+        The WordPress user name and an application password created for that
+        user, sent as HTTP Basic credentials on every request.
+  parameters:
+    PostID:
+      name: id
+      in: path
+      required: true
+      description: WordPress post, page, product or product category id.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+  responses:
+    BadRequest:
+      description: The request parameters were rejected.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: No usable credentials were presented.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: The authenticated user lacks the edit_posts capability.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: >-
+        No post with that id exists, or the id names a taxonomy term. These
+        routes are post-only: a term has neither post_content nor SEO post
+        meta, so a term id answers 404 with the code not_found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NoRoute:
+      description: >-
+        The companion plugin is not installed or not active, so WordPress has
+        no route for this path.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: >-
+        The stored content no longer hashes to expectedHash, so the write was
+        refused and nothing changed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/HashConflict"
+  schemas:
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Machine readable error code, WordPress style.
+          examples:
+            - rest_no_route
+            - rest_forbidden
+            - not_found
+            - hash_mismatch
+        message:
+          type: string
+          description: Human readable message, never a stack trace.
+    HashConflict:
+      type: object
+      required:
+        - code
+        - message
+        - currentHash
+      properties:
+        code:
+          type: string
+          const: hash_mismatch
+        message:
+          type: string
+        currentHash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: The hash the stored content has right now.
+    Manifest:
+      type: object
+      required:
+        - version
+        - capabilities
+        - seoPlugin
+        - wpVersion
+        - site
+      properties:
+        version:
+          type: string
+          examples:
+            - 1.0.0
+        capabilities:
+          type: array
+          description: >-
+            For version 1.0.0 this is exactly bulk, seo_meta, content_hash and
+            raw, in that order.
+          items:
+            type: string
+            enum:
+              - bulk
+              - seo_meta
+              - content_hash
+              - raw
+        seoPlugin:
+          type: string
+          enum:
+            - yoast
+            - rankmath
+            - none
+        wpVersion:
+          type: string
+          examples:
+            - 6.9.1
+        site:
+          type: string
+          format: uri
+    ContentPage:
+      type: object
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentItem"
+        nextCursor:
+          type:
+            - string
+            - "null"
+          description: >-
+            Opaque cursor for the next page. The key is always present and its
+            value is null on the last page.
+    ContentItem:
+      type: object
+      required:
+        - id
+        - type
+        - slug
+        - path
+        - parent
+        - status
+        - modified
+        - contentHash
+        - title
+      properties:
+        id:
+          type: integer
+          format: int64
+        type:
+          type: string
+          enum:
+            - page
+            - post
+            - product
+            - product_cat
+        slug:
+          type: string
+        path:
+          type: string
+          description: >-
+            Site relative path with exactly one leading and one trailing
+            slash, with no exception for a file extension. Duplicate slashes
+            are collapsed, query and fragment are stripped, the whole path is
+            ASCII-lowercased, and nothing is percent-decoded. The root is a
+            single slash.
+          examples:
+            - /koffein/powder/
+        parent:
+          type: integer
+          format: int64
+          description: Parent id, 0 at the top level.
+        status:
+          type: string
+          examples:
+            - publish
+            - draft
+        modified:
+          type: string
+          format: date-time
+          description: >-
+            post_modified_gmt as RFC3339 with a UTC offset. For a product_cat
+            the value comes from term meta the plugin maintains, because a
+            taxonomy term has no modification column of its own.
+        contentHash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: >-
+            Lowercase hex sha256 of the raw post_content bytes, computed as
+            hash('sha256', $post->post_content). No trimming, no newline
+            conversion and no HTML normalisation is applied, so the client can
+            reproduce it byte for byte.
+        title:
+          type: string
+        h1:
+          type: string
+          description: First h1 of the rendered content, empty when there is none.
+        meta:
+          $ref: "#/components/schemas/ContentMeta"
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentLink"
+    ContentMeta:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        canonical:
+          type: string
+    ContentLink:
+      type: object
+      required:
+        - href
+        - anchor
+      properties:
+        href:
+          type: string
+          description: >-
+            Site relative path of an internal anchor, normalised by the same
+            rules as path, including the ASCII lowercasing. A link counts as
+            internal when its host equals the site host exactly, compared in
+            lowercase, with no www stripping and with the scheme ignored; a
+            relative href is always internal. External links are not listed.
+          examples:
+            - /koffein/
+        anchor:
+          type: string
+          description: Anchor text with markup stripped.
+    SeoMetaRequest:
+      type: object
+      description: >-
+        Fields left out or empty are not written. The plugin stores them under
+        the key set of the SEO plugin it detected: Yoast uses
+        _yoast_wpseo_title, _yoast_wpseo_metadesc, _yoast_wpseo_canonical,
+        _yoast_wpseo_opengraph-title and _yoast_wpseo_opengraph-description;
+        Rank Math uses rank_math_title, rank_math_description,
+        rank_math_canonical_url, rank_math_facebook_title and
+        rank_math_facebook_description; with no SEO plugin the values go to
+        _postulator_title, _postulator_description, _postulator_canonical,
+        _postulator_og_title and _postulator_og_description, which the plugin
+        renders into the document head itself.
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        canonical:
+          type: string
+        ogTitle:
+          type: string
+        ogDescription:
+          type: string
+    SeoMetaResult:
+      type: object
+      required:
+        - applied
+        - seoPlugin
+      properties:
+        applied:
+          type: array
+          description: >-
+            The request field names that were written, in the order title,
+            description, canonical, ogTitle, ogDescription.
+          items:
+            type: string
+            enum:
+              - title
+              - description
+              - canonical
+              - ogTitle
+              - ogDescription
+        seoPlugin:
+          type: string
+          enum:
+            - yoast
+            - rankmath
+            - none
+    RawContent:
+      type: object
+      required:
+        - id
+        - type
+        - content
+        - contentHash
+      properties:
+        id:
+          type: integer
+          format: int64
+        type:
+          type: string
+          enum:
+            - page
+            - post
+            - product
+            - product_cat
+        content:
+          type: string
+          description: The stored post_content, unmodified.
+        contentHash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+    RawUpdateRequest:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+        expectedHash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: >-
+            The hash the caller last read. When present it must equal the hash
+            of the stored content or the write is refused with 409. When
+            absent the write is unconditional.
+    RawUpdateResult:
+      type: object
+      required:
+        - contentHash
+      properties:
+        contentHash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: The hash of the content that is now stored.
