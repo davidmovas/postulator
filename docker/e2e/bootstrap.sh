@@ -46,6 +46,8 @@ case "$SEO" in
 		;;
 	rankmath)
 		wp plugin install seo-by-rank-math --activate
+		wp option update rank_math_is_configured 1
+		wp option update rank_math_registration_skip 1
 		;;
 	*)
 		echo "E2E_SEO must be none, yoast or rankmath" >&2
