@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"path"
 	"slices"
+	"strconv"
+	"strings"
 )
 
 type Upload struct {
@@ -18,6 +20,7 @@ type Upload struct {
 }
 
 func (s *Server) routeMedia(mux *http.ServeMux) {
+	mux.HandleFunc("GET "+coreNamespace+"/media", s.handleMediaList)
 	mux.HandleFunc("POST "+coreNamespace+"/media", s.handleMediaUpload)
 	mux.HandleFunc("GET "+coreNamespace+"/media/{id}", s.handleMediaGet)
 	mux.HandleFunc("POST "+coreNamespace+"/media/{id}", s.handleMediaUpdate)
@@ -151,4 +154,53 @@ func dispositionFilename(header string) string {
 		return ""
 	}
 	return path.Base(name)
+}
+
+func (s *Server) handleMediaList(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	page, perPage, bad := listWindow(query)
+	if bad != "" {
+		s.fail(w, http.StatusBadRequest, "rest_invalid_param", "Invalid parameter(s): "+bad)
+		return
+	}
+	search := strings.ToLower(strings.TrimSpace(query.Get("search")))
+
+	s.mu.Lock()
+	matched := make([]*upload, 0, len(s.uploadOrder))
+	for _, id := range s.uploadOrder {
+		stored := s.uploads[id]
+		if search != "" && !mediaMatches(stored, search) {
+			continue
+		}
+		matched = append(matched, stored)
+	}
+
+	total := len(matched)
+	totalPages := (total + perPage - 1) / perPage
+	if total > 0 && page > totalPages {
+		s.mu.Unlock()
+		s.fail(w, http.StatusBadRequest, "rest_post_invalid_page_number", "The page number requested is larger than the number of pages available.")
+		return
+	}
+
+	start := min((page-1)*perPage, total)
+	end := min(start+perPage, total)
+	payload := make([]map[string]any, 0, end-start)
+	for _, stored := range matched[start:end] {
+		payload = append(payload, s.uploadPayload(stored))
+	}
+	s.mu.Unlock()
+
+	w.Header().Set("X-WP-Total", strconv.Itoa(total))
+	w.Header().Set("X-WP-TotalPages", strconv.Itoa(totalPages))
+	s.respond(w, http.StatusOK, payload)
+}
+
+func mediaMatches(stored *upload, search string) bool {
+	for _, field := range []string{stored.Filename, stored.Title, stored.Alt} {
+		if strings.Contains(strings.ToLower(field), search) {
+			return true
+		}
+	}
+	return false
 }

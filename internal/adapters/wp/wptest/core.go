@@ -201,6 +201,7 @@ func (s *Server) decodeBody(w http.ResponseWriter, r *http.Request) (map[string]
 
 func (s *Server) filter(itemType string, query url.Values) []*Item {
 	statuses := splitList(query.Get("status"))
+	slugs := splitList(query.Get("slug"))
 	after := parseQueryTime(query.Get("modified_after"))
 
 	matched := make([]*Item, 0, len(s.order))
@@ -210,6 +211,9 @@ func (s *Server) filter(itemType string, query url.Values) []*Item {
 			continue
 		}
 		if len(statuses) > 0 && !slices.Contains(statuses, stored.Status) {
+			continue
+		}
+		if len(slugs) > 0 && !slices.Contains(slugs, stored.Slug) {
 			continue
 		}
 		if !after.IsZero() && !stored.Modified.After(after) {

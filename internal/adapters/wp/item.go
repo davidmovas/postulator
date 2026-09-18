@@ -77,28 +77,37 @@ type ItemPage = Page[Item]
 
 type ListQuery struct {
 	ModifiedAfter *time.Time
+	Slug          string
 	Status        []string
 	Fields        []string
 	Page          int
 	PerPage       int
 }
 
-func (q ListQuery) pageNumber() int {
-	if q.Page < 1 {
+func pageNumber(value int) int {
+	if value < 1 {
 		return 1
 	}
-	return q.Page
+	return value
+}
+
+func perPageSize(value int) int {
+	switch {
+	case value < 1:
+		return defaultPerPage
+	case value > maxPerPage:
+		return maxPerPage
+	default:
+		return value
+	}
+}
+
+func (q ListQuery) pageNumber() int {
+	return pageNumber(q.Page)
 }
 
 func (q ListQuery) perPageSize() int {
-	switch {
-	case q.PerPage < 1:
-		return defaultPerPage
-	case q.PerPage > maxPerPage:
-		return maxPerPage
-	default:
-		return q.PerPage
-	}
+	return perPageSize(q.PerPage)
 }
 
 func (q ListQuery) values(itemType ItemType) url.Values {
@@ -113,6 +122,9 @@ func (q ListQuery) values(itemType ItemType) url.Values {
 
 	if q.ModifiedAfter != nil && itemType != TypeProductCategory {
 		query.Set("modified_after", q.ModifiedAfter.UTC().Format(wpTimeLayout))
+	}
+	if q.Slug != "" {
+		query.Set("slug", q.Slug)
 	}
 	if len(q.Status) > 0 {
 		if itemType.core() {

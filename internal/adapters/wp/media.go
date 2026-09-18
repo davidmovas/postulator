@@ -3,7 +3,9 @@ package wp
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -114,4 +116,51 @@ func safeFilename(name string) string {
 		return ""
 	}
 	return strings.NewReplacer(`"`, "", "\r", "", "\n", "").Replace(base)
+}
+
+type MediaQuery struct {
+	Search  string
+	Page    int
+	PerPage int
+}
+
+func (q MediaQuery) values() url.Values {
+	query := url.Values{}
+	query.Set("context", "edit")
+	query.Set("page", strconv.Itoa(pageNumber(q.Page)))
+	query.Set("per_page", strconv.Itoa(perPageSize(q.PerPage)))
+	query.Set("orderby", "id")
+	query.Set("order", "asc")
+	if q.Search != "" {
+		query.Set("search", q.Search)
+	}
+	return query
+}
+
+type MediaPage = Page[MediaItem]
+
+func (c *Client) ListMedia(ctx context.Context, query MediaQuery) (MediaPage, error) {
+	resp, body, err := c.do(ctx, request{
+		method:    http.MethodGet,
+		namespace: coreNamespace,
+		path:      "/media",
+		query:     query.values(),
+	})
+	if err != nil {
+		if endOfList(err) {
+			return MediaPage{Page: pageNumber(query.Page)}, nil
+		}
+		return MediaPage{}, err
+	}
+
+	var payload []mediaPayload
+	if decodeErr := decodeJSON(body, &payload); decodeErr != nil {
+		return MediaPage{}, decodeErr
+	}
+
+	items := make([]MediaItem, 0, len(payload))
+	for index := range payload {
+		items = append(items, payload[index].mediaItem())
+	}
+	return newPage(resp, pageNumber(query.Page), items), nil
 }

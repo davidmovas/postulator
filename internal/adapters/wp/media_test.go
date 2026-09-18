@@ -116,3 +116,75 @@ func TestCategoriesAreListedAndCreated(t *testing.T) {
 		t.Errorf("code = %q, want %q", errors.CodeOf(err), errors.Invalid)
 	}
 }
+
+func TestListMediaSearchesTheLibrary(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	client := newClient(t, server)
+
+	for _, name := range []string{"espresso-cup.png", "kettle.png", "espresso-machine.png"} {
+		if _, err := client.UploadMedia(t.Context(), wp.Media{
+			Filename: name, ContentType: "image/png", Bytes: []byte{0x89}, Alt: name,
+		}); err != nil {
+			t.Fatalf("UploadMedia %s: %v", name, err)
+		}
+	}
+
+	cases := []struct {
+		name   string
+		query  wp.MediaQuery
+		want   int
+		total  int
+		remain bool
+	}{
+		{name: "everything", query: wp.MediaQuery{}, want: 3, total: 3},
+		{name: "by term", query: wp.MediaQuery{Search: "espresso"}, want: 2, total: 2},
+		{name: "nothing matches", query: wp.MediaQuery{Search: "tea"}, want: 0},
+		{name: "one per page", query: wp.MediaQuery{PerPage: 1}, want: 1, total: 3, remain: true},
+		{name: "past the end", query: wp.MediaQuery{PerPage: 1, Page: 9}, want: 0},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := client.ListMedia(t.Context(), tc.query)
+			if err != nil {
+				t.Fatalf("ListMedia: %v", err)
+			}
+			if len(got.Items) != tc.want {
+				t.Fatalf("ListMedia returned %d items, want %d", len(got.Items), tc.want)
+			}
+			if tc.total != 0 && got.Total != tc.total {
+				t.Errorf("Total = %d, want %d", got.Total, tc.total)
+			}
+			if got.HasMore != tc.remain {
+				t.Errorf("HasMore = %t, want %t", got.HasMore, tc.remain)
+			}
+			for _, item := range got.Items {
+				if item.ID == 0 || item.SourceURL == "" {
+					t.Errorf("item = %+v", item)
+				}
+			}
+		})
+	}
+}
+
+func TestListItemsFiltersBySlug(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	server.Seed(
+		wptest.Item{Type: wptest.TypePage, Title: "Espresso"},
+		wptest.Item{Type: wptest.TypePage, Title: "Kettle"},
+	)
+
+	got, err := newClient(t, server).ListItems(t.Context(), wp.TypePage, wp.ListQuery{Slug: "espresso"})
+	if err != nil {
+		t.Fatalf("ListItems: %v", err)
+	}
+	if len(got.Items) != 1 || got.Items[0].Slug != "espresso" {
+		t.Fatalf("ListItems by slug = %+v", got.Items)
+	}
+}

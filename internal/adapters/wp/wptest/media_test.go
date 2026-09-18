@@ -188,3 +188,50 @@ func TestACategoryCanBeReadBackAndGuardsItsInput(t *testing.T) {
 		})
 	}
 }
+
+func TestTheMediaLibraryIsSearchable(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	for _, name := range []string{"espresso-cup.png", "kettle.png"} {
+		response, _ := send(t, newUpload(t, server, name, "image/png", []byte{0x89}))
+		if response.StatusCode != http.StatusCreated {
+			t.Fatalf("upload %s: status %d", name, response.StatusCode)
+		}
+	}
+
+	var listed []struct {
+		SourceURL string `json:"source_url"`
+		ID        int64  `json:"id"`
+	}
+	response, payload := call(t, server, http.MethodGet, "/wp-json/wp/v2/media?search=espresso", nil, true)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", response.StatusCode)
+	}
+	decode(t, payload, &listed)
+	if len(listed) != 1 {
+		t.Fatalf("the search returned %d items, want 1", len(listed))
+	}
+	if response.Header.Get("X-WP-Total") != "1" {
+		t.Errorf("X-WP-Total = %q, want 1", response.Header.Get("X-WP-Total"))
+	}
+}
+
+func TestTheSlugFilterNarrowsAListing(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	server.Seed(
+		wptest.Item{Type: wptest.TypePage, Title: "Espresso"},
+		wptest.Item{Type: wptest.TypePage, Title: "Kettle"},
+	)
+
+	var listed []struct {
+		Slug string `json:"slug"`
+	}
+	_, payload := call(t, server, http.MethodGet, "/wp-json/wp/v2/pages?slug=kettle", nil, true)
+	decode(t, payload, &listed)
+	if len(listed) != 1 || listed[0].Slug != "kettle" {
+		t.Fatalf("the slug filter returned %+v", listed)
+	}
+}
