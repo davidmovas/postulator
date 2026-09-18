@@ -3,6 +3,7 @@ package agent
 import (
 	"encoding/json"
 
+	"github.com/davidmovas/postulator/internal/application/tools"
 	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
@@ -57,7 +58,7 @@ func messageView(m domainagent.Message) Message {
 
 func actionView(a domainagent.PendingAction) PendingAction {
 	return PendingAction{
-		ID: a.ID, ConversationID: a.ConversationID, Tool: a.Tool, Args: a.Args, Summary: a.Summary,
+		ID: a.ID, ConversationID: a.ConversationID, Tool: a.Tool, Args: tools.Redact(a.Args), Summary: a.Summary,
 		Status: string(a.Status), Result: a.Result, Error: a.Error,
 		CreatedAt: dto.NewTime(a.CreatedAt), UpdatedAt: dto.NewTime(a.UpdatedAt),
 	}
