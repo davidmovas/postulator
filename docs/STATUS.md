@@ -49,6 +49,19 @@ wired into `task build`. Phase 2 follows.
 (with `npm run typecheck`) are green; the generator is byte-deterministic and its in-sync test
 catches a stale module; no internal cause chain reaches the webview.
 
+**Phase 2 (domain core) is complete.** The plan is
+`docs/superpowers/plans/2026-09-18-phase-2-domain-core.md`; its twenty-seven tasks landed
+one commit each. `internal/domain/{llm,site,graph,pagemap,template}` hold the pure model:
+the entity graph with breadth-first parents, cycle detection and PageRank scores, the
+path-keyed page map with its tree, index and cannibalization verdict, the template spec
+with RFC 7396 resolution and five embedded starter templates. Migrations 0004–0010 add
+`sites`, `link_policies`, `templates`, `entities`, `entity_anchors`, `edges`, `pages`,
+`page_links` and `template_overrides`; `internal/adapters/sqlite` holds one keyset-paged
+repository per aggregate; `internal/application/{sites,graph,pages,templates}` hold the use
+cases, each publishing one event after its transaction commits; `internal/app` wires them,
+seeds the templates at `Open` and relays events to the single `EventBridge` once
+`cmd/postulator` connects it. Phase 3 (WordPress) and Phase 4 (LLM) follow.
+
 ## What landed in Phase 0
 
 - The v1.6.2 codebase is gone: `internal/`, `pkg/`, `frontend/`, `main.go`, `Makefile`,
@@ -205,16 +218,69 @@ catches a stale module; no internal cause chain reaches the webview.
   rewritten by tools that emit LF; with `core.autocrlf=true` a fresh checkout would hand
   back CRLF and the generated-file-in-sync test failed exactly that way.
 
+## Decisions taken in Phase 2
+
+- **`Parents(id, depth)` is breadth-first, deduplicated, nearest level first**, name-then-id
+  within a level; `Related` returns `[]Neighbor{Entity, Weight}` by weight descending.
+- **`Score` is unweighted PageRank over approved edges only**, related edges counted both
+  ways, damping 0.85, 30 iterations, scaled so the maximum is 1.0.
+- **`Resolve(base TemplateSpec, siteOverride, pageOverride json.RawMessage)`** is RFC 7396
+  over JSON; overrides are stored as merge-patch documents, arrays replace wholesale, and
+  `TemplateSpec` plus the `llm` catalog types carry JSON tags. A deliberate deviation from
+  spec §5.4, approved 2026-09-18; the spec copy is amended.
+- **Anchors live in `entity_anchors`** and are loaded in one `IN` query per page, never N+1;
+  `EntityRepo.Update` rewrites them.
+- **Template overrides are keyed by `(template_id, scope, coalesce(site_id, page_id))`**
+  through an expression unique index; the repository upserts by lookup.
+- **One event per transaction, after commit**, through a `changed(siteID)` helper per
+  service. `DeleteEntity`, `Unmap`, `SetCanonical` and page `Delete` publish both graph and
+  pages because they touch both aggregates.
+- **Cannibalization runs on `pages.Create`, on a path change in `Update`, and on
+  `MapToEntity`**; never on `SetCanonical`. It lives in `domain/pagemap` and keeps the graph
+  parameter because the keyword check needs the other entities.
+- **The path is the hierarchy's source of truth**; `parent_page_id` is a maintained cache.
+  `NormalizePath` is the single canonical normaliser (scheme and host stripped, no
+  percent-decoding, duplicate slashes collapsed, one leading and one trailing slash,
+  lowercased, no file-extension exception; whitespace, control characters and dot segments
+  refused), `InternalPath(href, siteHost)` classifies link targets, `Create` adopts direct
+  children, and a path change with descendants is refused.
+- **Filter and sort types live in the domain packages** (`site.Query`, `graph.EntityQuery`,
+  `graph.EdgeQuery`, `pagemap.Query`, `template.Query`, `template.PolicyQuery`).
+- **Use-case lists embed `dto.ListRequest` and page forward only**; backward paging is a
+  repository capability (`paging.Request.Before`). The kernel is untouched.
+- **Request and response structs are camelCase JSON views owned by the use cases**;
+  `docs/CONTRACTS.md` records that transport maps only where the wire shape must differ.
+- **Repositories carry no clock**; use cases stamp second-truncated times.
+- **`Site.Username` exists**; the WordPress application password lives only in the secret
+  store under `site:<id>:wp_password`, written on `Create` when given and rotated or removed
+  by `Update`.
+- **`app.EventRelay` holds the single `EventBridge`**, connected from `cmd/postulator`
+  after `application.New`; publishes before `Connect` are dropped.
+- **Seeds pin no models and carry no step params.** `EnsureSeeded` also seeds one global
+  `Default` link policy; `GetEffectivePolicy` falls back to it.
+- **Cyclic foreign keys are real** (`entities.canonical_page_id → pages`,
+  `sites.default_template_id → templates`, `sites.default_link_policy_id → link_policies`);
+  the migration order is sites → link_policies → templates → entities → edges → pages →
+  template_overrides, and `TestSchemaCascades` proves the cascade map with rows present.
+- **Parent edges weigh 1**, `related` edges store the lower id first, `AddEdge` checks
+  acyclicity as if approved and `ApproveEdge` checks again.
+- **Repository writes map `UNIQUE` to `CONFLICT` with a table-specific message and zero
+  affected rows to `NOT_FOUND`**; foreign-key failures stay `INVALID`.
+- **`SetCanonical` maps an unmapped page** and refuses one mapped elsewhere.
+- **Helpers live in the file of their first caller** (`escapeLike` in `entity_repo.go`, the
+  nullable-column helpers in `page_repo.go`, the view helpers next to their use cases),
+  because the `unused` linter refuses a helper committed ahead of its caller.
+
 ## Known gaps
 
-- `EventBridge` has no publisher yet, so it is not wired into `cmd/postulator`. Phase 5 is
-  its first consumer: it declares the consumer-side interface and injects the v3
-  application's `Event` manager, which already satisfies `wails.Emitter` — asserted at
-  compile time in `eventbridge_test.go`.
-- `internal/domain` and `internal/runtime` do not exist yet. The dependency-rule test
-  skips each rule whose tree is absent and starts enforcing it the day the first package
-  lands. `internal/application` now holds source, so the domain+application coverage gate
-  is live rather than skipped.
+- Application events published before `cmd/postulator` connects the relay to the Wails
+  event manager are dropped, by design: nothing listens before the window exists.
+- Backward paging exists in every repository (`paging.Request.Before`) but not at the
+  use-case boundary, because `dto.ListRequest` carries one cursor; the client replays the
+  cursor it used to reach the current page.
+- Step `params` keys in template recipes are unspecified until Phase 6 names them; the
+  seeds carry none.
+- `internal/runtime` does not exist yet; its dependency rule still skips.
 - `lefthook` is not installed on the development machine. Install it with
   `go install github.com/evilmartians/lefthook@latest && lefthook install`.
 - **`golangci-lint` on this machine must be run from `$(go env GOPATH)/bin`.** A scoop

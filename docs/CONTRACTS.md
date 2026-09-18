@@ -26,8 +26,11 @@ parameter named `_` is generated as `$0`, so name every parameter. Every method 
   when zero.
 - Ids are UUID v4 lowercase text.
 - A nil slice marshals as `[]`, never as `null` — `paging.Slice[T]` exists for this.
-- DTOs are declared in `internal/transport/wails` and mapped by hand. Domain types carry
-  no JSON tags.
+- Request and response structs are declared by the application use cases
+  (`internal/application/<context>`) with camelCase JSON tags and `kernel/dto.Time`
+  timestamps; a Wails service passes them through unchanged and maps only where the wire
+  shape must differ. Domain types carry no JSON tags, except `template.TemplateSpec` and
+  the `llm` catalog types, whose persisted form is JSON.
 - Generics are allowed in exported signatures: `paging.List[T]` generates `List<T>` in
   TypeScript. A Go type with a custom `MarshalJSON` generates as `any`, which is why
   `Slice<T>` and `dto.Time` lose their shape; `frontend/src/lib/paging.ts` restores it
@@ -66,6 +69,11 @@ Cursor pagination only; there is no offset anywhere in this codebase. Request is
 The cursor is an opaque base64url string. It records the sort fields and direction it
 was issued for, and a cursor replayed against a different `ORDER BY` is rejected as
 `INVALID`. Clients treat it as opaque and pass it back unchanged.
+
+A use case's list request embeds `kernel/dto.ListRequest`; `cursor` is always the
+`nextCursor` of the previous page (forward paging), `sort.field` is `createdAt` by default
+and `name` or `path` where a context offers it. A client that needs the previous page
+replays the cursor it used to reach the current one.
 
 ## Long-running work
 
