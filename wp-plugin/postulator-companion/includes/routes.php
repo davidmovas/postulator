@@ -34,6 +34,23 @@ function register_routes(): void {
 			'permission_callback' => __NAMESPACE__ . '\\permission_check',
 		)
 	);
+
+	register_rest_route(
+		NAMESPACE_PATH,
+		'/content/(?P<id>\d+)/raw',
+		array(
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => __NAMESPACE__ . '\\raw_get',
+				'permission_callback' => __NAMESPACE__ . '\\permission_check',
+			),
+			array(
+				'methods'             => \WP_REST_Server::EDITABLE,
+				'callback'            => __NAMESPACE__ . '\\raw_update',
+				'permission_callback' => __NAMESPACE__ . '\\permission_check',
+			),
+		)
+	);
 }
 
 function manifest(): \WP_REST_Response {
@@ -154,4 +171,61 @@ function seo_meta_update( \WP_REST_Request $request ) {
 		),
 		200
 	);
+}
+
+function raw_get( \WP_REST_Request $request ) {
+	$post = editable_post( $request );
+	if ( is_wp_error( $post ) ) {
+		return $post;
+	}
+
+	$content = (string) $post->post_content;
+	return new \WP_REST_Response(
+		array(
+			'id'          => (int) $post->ID,
+			'type'        => (string) $post->post_type,
+			'content'     => $content,
+			'contentHash' => content_hash( $content ),
+		),
+		200
+	);
+}
+
+function raw_update( \WP_REST_Request $request ) {
+	$post = editable_post( $request );
+	if ( is_wp_error( $post ) ) {
+		return $post;
+	}
+
+	$body = $request->get_json_params();
+	if ( ! is_array( $body ) || ! array_key_exists( 'content', $body ) || ! is_string( $body['content'] ) ) {
+		return invalid( 'invalid_body', 'content is required and must be a string' );
+	}
+
+	$current  = (string) $post->post_content;
+	$expected = isset( $body['expectedHash'] ) && is_string( $body['expectedHash'] ) ? $body['expectedHash'] : '';
+	if ( '' !== $expected && ! hash_equals( content_hash( $current ), $expected ) ) {
+		return new \WP_REST_Response(
+			array(
+				'code'        => 'hash_mismatch',
+				'message'     => 'the stored content does not match expectedHash',
+				'currentHash' => content_hash( $current ),
+			),
+			409
+		);
+	}
+
+	$updated = wp_update_post(
+		array(
+			'ID'           => (int) $post->ID,
+			'post_content' => wp_slash( (string) $body['content'] ),
+		),
+		true
+	);
+	if ( is_wp_error( $updated ) ) {
+		return failed( $updated->get_error_message() );
+	}
+
+	$stored = (string) get_post_field( 'post_content', (int) $post->ID, 'raw' );
+	return new \WP_REST_Response( array( 'contentHash' => content_hash( $stored ) ), 200 );
 }
