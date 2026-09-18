@@ -39,6 +39,7 @@ type Server struct {
 	uploads       map[int64]*upload
 	order         []int64
 	categoryOrder []int64
+	uploadOrder   []int64
 	requests      []Request
 	faults        []fault
 	clock         time.Time
@@ -107,6 +108,9 @@ func (s *Server) handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET "+rootPath, s.handleRoot)
 	s.routeCore(mux)
+	s.routeCategories(mux)
+	s.routeMedia(mux)
+	s.routeWoo(mux)
 
 	return s.record(s.redirectRoot(s.injectFaults(s.authenticate(mux))))
 }

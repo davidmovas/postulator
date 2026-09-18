@@ -275,3 +275,32 @@ func TestASlugIsUniquePerParentForHierarchicalTypes(t *testing.T) {
 func itoa(id int64) string {
 	return strconv.FormatInt(id, 10)
 }
+
+func newUpload(t *testing.T, server *wptest.Server, filename, contentType string, payload []byte) *http.Request {
+	t.Helper()
+
+	request, err := http.NewRequestWithContext(t.Context(), http.MethodPost, server.URL()+"/wp-json/wp/v2/media", bytes.NewReader(payload))
+	if err != nil {
+		t.Fatalf("build the upload: %v", err)
+	}
+	request.SetBasicAuth(wptest.DefaultUser, wptest.DefaultPassword)
+	request.Header.Set("Content-Type", contentType)
+	request.Header.Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	return request
+}
+
+func send(t *testing.T, request *http.Request) (response *http.Response, payload []byte) {
+	t.Helper()
+
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatalf("send the request: %v", err)
+	}
+	defer func() { _ = response.Body.Close() }()
+
+	payload, err = io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatalf("read the response: %v", err)
+	}
+	return response, payload
+}
