@@ -7,6 +7,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
@@ -44,6 +45,19 @@ func Entity(t testing.TB, store *sqlite.Store, siteID, name string) graph.Entity
 	}
 	if err := sqlite.NewEntityRepo(store).Insert(t.Context(), record); err != nil {
 		t.Fatalf("insert the entity fixture: %v", err)
+	}
+	return record
+}
+
+func Page(t testing.TB, store *sqlite.Store, siteID, path string) pagemap.Page {
+	t.Helper()
+
+	record := pagemap.Page{
+		ID: id.New(), SiteID: siteID, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPPage,
+		Title: path, H1: path, Status: pagemap.StatusPlanned, CreatedAt: Stamp, UpdatedAt: Stamp,
+	}
+	if err := sqlite.NewPageRepo(store).Insert(t.Context(), record); err != nil {
+		t.Fatalf("insert the page fixture: %v", err)
 	}
 	return record
 }
