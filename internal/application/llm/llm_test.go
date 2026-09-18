@@ -56,8 +56,10 @@ func TestRequestValidate(t *testing.T) {
 		{name: "a role must be known", mutate: func(r *llm.Request) { r.Messages[0].Role = "system" }, wantErr: true},
 		{name: "a message must not be empty", mutate: func(r *llm.Request) { r.Messages[0].Text = "" }, wantErr: true},
 		{
-			name:    "the last message comes from the user",
-			mutate:  func(r *llm.Request) { r.Messages = append(r.Messages, llm.Message{Role: llm.RoleAssistant, Text: "hi"}) },
+			name: "the last message comes from the user",
+			mutate: func(r *llm.Request) {
+				r.Messages = append(r.Messages, llm.Message{Role: llm.RoleAssistant, Text: "hi"})
+			},
 			wantErr: true,
 		},
 		{name: "the ceiling is not negative", mutate: func(r *llm.Request) { r.MaxTokens = -1 }, wantErr: true},
