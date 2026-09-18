@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/davidmovas/postulator/internal/adapters/sqlite/dbx"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -15,6 +16,7 @@ const (
 	selectDone = `SELECT ` + execColumns + ` FROM step_execs
 		WHERE item_id = ? AND step = ? AND status = 'done' AND input_hash = ? ORDER BY attempt DESC LIMIT 1`
 	selectExecsByItem = `SELECT ` + execColumns + ` FROM step_execs WHERE item_id = ? ORDER BY started_at, id`
+	countExecsByStep  = `SELECT count(*) FROM step_execs WHERE item_id = ? AND step = ?`
 )
 
 type StepExecRepo struct {
@@ -42,6 +44,15 @@ func (r *StepExecRepo) Insert(ctx context.Context, exec run.StepExec) error {
 func (r *StepExecRepo) Done(ctx context.Context, itemID, step, inputHash string) (run.StepExec, error) {
 	return selectOne(ctx, r.store.execFrom(ctx), selectDone, []any{itemID, step, inputHash}, scanExec,
 		errors.New(errors.NotFound, "the step has no completed attempt with this input"), "read the step execution")
+}
+
+func (r *StepExecRepo) CountByStep(ctx context.Context, itemID, step string) (int, error) {
+	var total int
+	row := r.store.execFrom(ctx).QueryRowContext(ctx, countExecsByStep, itemID, step)
+	if err := row.Scan(&total); err != nil {
+		return 0, dbx.Convert(err, "count the attempts of the step")
+	}
+	return total, nil
 }
 
 func (r *StepExecRepo) ByItem(ctx context.Context, itemID string) ([]run.StepExec, error) {

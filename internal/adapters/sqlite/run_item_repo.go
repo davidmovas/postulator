@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/Masterminds/squirrel"
@@ -36,7 +37,7 @@ const (
 		wake_at = NULL, updated_at = ? WHERE id = ? AND advance_seq = ? AND status = ?`
 	countItemsByStatus = `SELECT status, count(*) FROM run_items WHERE run_id = ? GROUP BY status`
 	stopItemsOfRun     = `UPDATE run_items SET status = ?, pause_reason = ?, advance_seq = advance_seq + 1,
-		lease_until = NULL, wake_at = NULL, updated_at = ?, finished_at = ? WHERE run_id = ? AND status IN ('pending', 'running', 'waiting', 'paused')`
+		lease_until = NULL, wake_at = NULL, updated_at = ?, finished_at = ? WHERE run_id = ? AND status IN `
 	resumeItemsOfRun = `UPDATE run_items SET status = 'pending', pause_reason = '', advance_seq = advance_seq + 1,
 		lease_until = NULL, wake_at = NULL, updated_at = ? WHERE run_id = ? AND status = 'paused'`
 )
@@ -144,13 +145,25 @@ func (r *RunItemRepo) Counts(ctx context.Context, runID string) (map[run.Status]
 	return counts, nil
 }
 
-func (r *RunItemRepo) StopAll(ctx context.Context, runID string, status run.Status, reason run.PauseReason, now time.Time) (int64, error) {
+func (r *RunItemRepo) StopAll(ctx context.Context, runID string, from []run.Status, to run.Status, reason run.PauseReason, now time.Time) (int64, error) {
+	if len(from) == 0 {
+		return 0, nil
+	}
+
 	finished := any(nil)
-	if status.Terminal() {
+	if to.Terminal() {
 		finished = formatTime(now)
 	}
-	return execWrite(ctx, r.store.writeFrom(ctx), stopItemsOfRun,
-		[]any{string(status), string(reason), formatTime(now), finished, runID}, nil, "stop the run items")
+
+	args := []any{string(to), string(reason), formatTime(now), finished, runID}
+	placeholders := make([]string, 0, len(from))
+	for _, status := range from {
+		placeholders = append(placeholders, "?")
+		args = append(args, string(status))
+	}
+
+	query := stopItemsOfRun + "(" + strings.Join(placeholders, ", ") + ")"
+	return execWrite(ctx, r.store.writeFrom(ctx), query, args, nil, "stop the run items")
 }
 
 func (r *RunItemRepo) ResumeAll(ctx context.Context, runID string, now time.Time) (int64, error) {

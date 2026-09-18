@@ -316,7 +316,8 @@ func TestRunItemSweepQueries(t *testing.T) {
 		t.Fatalf("Runnable after the sweep = %+v, %v", woken, wokenErr)
 	}
 
-	stopped, err := fixture.items.StopAll(t.Context(), fixture.run.ID, run.StatusPaused, run.PauseUser, sqlitetest.Stamp)
+	active := []run.Status{run.StatusPending, run.StatusRunning, run.StatusWaiting, run.StatusPaused}
+	stopped, err := fixture.items.StopAll(t.Context(), fixture.run.ID, active, run.StatusPaused, run.PauseUser, sqlitetest.Stamp)
 	if err != nil || stopped != 3 {
 		t.Fatalf("StopAll = %d, %v", stopped, err)
 	}
@@ -325,7 +326,7 @@ func TestRunItemSweepQueries(t *testing.T) {
 		t.Fatalf("ResumeAll = %d, %v", resumed, err)
 	}
 
-	cancelled, err := fixture.items.StopAll(t.Context(), fixture.run.ID, run.StatusCancelled, "", sqlitetest.Stamp)
+	cancelled, err := fixture.items.StopAll(t.Context(), fixture.run.ID, active, run.StatusCancelled, "", sqlitetest.Stamp)
 	if err != nil || cancelled != 3 {
 		t.Fatalf("StopAll to a terminal status = %d, %v", cancelled, err)
 	}

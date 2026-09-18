@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -68,6 +69,7 @@ type Result struct {
 type StepDef struct {
 	Run      func(ctx context.Context, sc *StepContext) (Result, error)
 	Name     string
+	Role     llm.Role
 	Requires []ArtifactKind
 	Produces []ArtifactKind
 	Retry    RetryPolicy
@@ -108,6 +110,8 @@ func (r *Registry) Register(def StepDef) error {
 		return invalid("step "+def.Name+" declares a retry ceiling outside 0.."+strconv.Itoa(MaxRetryAttempts), "retry.max")
 	case def.Timeout < 0:
 		return invalid("step "+def.Name+" declares a negative timeout", "timeout")
+	case def.Role != "" && !def.Role.Valid():
+		return invalid("step "+def.Name+" names the unknown model role "+string(def.Role), "role")
 	}
 	if _, exists := r.byName[def.Name]; exists {
 		return errors.New(errors.Conflict, "step "+def.Name+" is already registered").WithDetail("name", def.Name)
