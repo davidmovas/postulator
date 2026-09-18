@@ -145,14 +145,18 @@ func TestOverrides(t *testing.T) {
 		t.Errorf("models = %d, want %d after one addition and one removal", len(after), len(known))
 	}
 
-	if err = repo.Delete(ctx, existing); err != nil {
-		t.Fatalf("Delete: %v", err)
+	revived := override(existing, true, 9)
+	revived.Info.ContextTokens = 128000
+	revived.Info.MaxOutputTokens = 8192
+	if err = repo.Upsert(ctx, revived); err != nil {
+		t.Fatalf("Upsert revive: %v", err)
 	}
-	if _, err = built.Lookup(ctx, existing); err != nil {
-		t.Errorf("Lookup after the override was removed: %v", err)
+	info, err = built.Lookup(ctx, existing)
+	if err != nil {
+		t.Fatalf("Lookup after the model was switched back on: %v", err)
 	}
-	if err = repo.Delete(ctx, existing); !errors.IsCode(err, errors.NotFound) {
-		t.Errorf("Delete twice error = %v, want %s", err, errors.NotFound)
+	if info.InputUSDPerM != 9 {
+		t.Errorf("revived model = %+v, want the new override values", info)
 	}
 }
 

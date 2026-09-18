@@ -31,6 +31,9 @@ func NewLLMCallRepo(store *Store) *LLMCallRepo {
 }
 
 func (r *LLMCallRepo) Insert(ctx context.Context, call llm.Call) error {
+	if err := call.Validate(); err != nil {
+		return err
+	}
 	_, err := execWrite(ctx, r.store.writeFrom(ctx), insertCall, []any{
 		call.ID, call.RunID, call.ItemID, call.Step, call.ConversationID, call.Ref.Provider, call.Ref.Model,
 		call.Usage.Input, call.Usage.Output, call.USD, call.Latency.Milliseconds(), string(call.Status),

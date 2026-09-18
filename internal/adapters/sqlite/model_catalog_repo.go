@@ -5,7 +5,6 @@ import (
 	"database/sql"
 
 	"github.com/davidmovas/postulator/internal/domain/llm"
-	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 const (
@@ -25,7 +24,6 @@ const (
 			enabled = excluded.enabled,
 			updated_at = excluded.updated_at`
 	selectModels = `SELECT ` + modelColumns + ` FROM model_catalog ORDER BY provider, model`
-	deleteModel  = `DELETE FROM model_catalog WHERE provider = ? AND model = ?`
 )
 
 type ModelCatalogRepo struct {
@@ -36,10 +34,6 @@ func NewModelCatalogRepo(store *Store) *ModelCatalogRepo {
 	return &ModelCatalogRepo{store: store}
 }
 
-func modelNotFound(ref llm.ModelRef) *errors.Error {
-	return errors.New(errors.NotFound, "the model catalog has no override for this model").WithDetail("model", ref.String())
-}
-
 func (r *ModelCatalogRepo) Upsert(ctx context.Context, override llm.ModelOverride) error {
 	info := override.Info
 	_, err := execWrite(ctx, r.store.writeFrom(ctx), upsertModel, []any{
@@ -48,11 +42,6 @@ func (r *ModelCatalogRepo) Upsert(ctx context.Context, override llm.ModelOverrid
 		boolInt(override.Enabled), formatTime(override.CreatedAt), formatTime(override.UpdatedAt),
 	}, nil, "store the model override")
 	return err
-}
-
-func (r *ModelCatalogRepo) Delete(ctx context.Context, ref llm.ModelRef) error {
-	affected, err := execWrite(ctx, r.store.writeFrom(ctx), deleteModel, []any{ref.Provider, ref.Model}, nil, "remove the model override")
-	return requireAffected(affected, err, modelNotFound(ref))
 }
 
 func (r *ModelCatalogRepo) List(ctx context.Context) ([]llm.ModelOverride, error) {

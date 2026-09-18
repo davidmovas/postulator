@@ -6,14 +6,12 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/llm"
-	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 const (
 	upsertProfile = `INSERT INTO model_profiles (role, provider, model, updated_at) VALUES (?, ?, ?, ?)
 		ON CONFLICT (role) DO UPDATE SET provider = excluded.provider, model = excluded.model, updated_at = excluded.updated_at`
 	selectProfiles = `SELECT role, provider, model FROM model_profiles ORDER BY role`
-	deleteProfile  = `DELETE FROM model_profiles WHERE role = ?`
 )
 
 type ModelProfileRepo struct {
@@ -24,19 +22,10 @@ func NewModelProfileRepo(store *Store) *ModelProfileRepo {
 	return &ModelProfileRepo{store: store}
 }
 
-func profileNotFound(role llm.Role) *errors.Error {
-	return errors.New(errors.NotFound, "no global model profile is set for this role").WithDetail("role", string(role))
-}
-
 func (r *ModelProfileRepo) Set(ctx context.Context, role llm.Role, ref llm.ModelRef, at time.Time) error {
 	_, err := execWrite(ctx, r.store.writeFrom(ctx), upsertProfile,
 		[]any{string(role), ref.Provider, ref.Model, formatTime(at)}, nil, "store the model profile")
 	return err
-}
-
-func (r *ModelProfileRepo) Delete(ctx context.Context, role llm.Role) error {
-	affected, err := execWrite(ctx, r.store.writeFrom(ctx), deleteProfile, []any{string(role)}, nil, "remove the model profile")
-	return requireAffected(affected, err, profileNotFound(role))
 }
 
 func (r *ModelProfileRepo) List(ctx context.Context) (map[llm.Role]llm.ModelRef, error) {

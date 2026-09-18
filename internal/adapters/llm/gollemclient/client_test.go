@@ -493,21 +493,15 @@ func TestSettings(t *testing.T) {
 func TestCompleteHonoursTheTimeout(t *testing.T) {
 	t.Parallel()
 
-	release := make(chan struct{})
-	t.Cleanup(func() { close(release) })
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		select {
-		case <-release:
-		case <-r.Context().Done():
-		}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(300 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
 	}))
 	t.Cleanup(server.Close)
 
 	values := newValues(t, map[string]string{"llm.openai.baseUrl": server.URL})
 	factory := gollemclient.NewFactory(vault{gollemclient.SecretRef(gollemclient.ProviderOpenAI): "key"}, values)
-	client := gollemclient.New(factory, 50*time.Millisecond)
+	client := gollemclient.New(factory, 20*time.Millisecond)
 
 	_, err := client.Complete(t.Context(), port.Request{Ref: openaiRef(), Messages: []port.Message{{Role: port.RoleUser, Text: "write"}}})
 	if !errors.IsCode(err, errors.External) {

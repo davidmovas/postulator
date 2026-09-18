@@ -13,7 +13,6 @@ import (
 type profileStore interface {
 	List(ctx context.Context) (map[llm.Role]llm.ModelRef, error)
 	Set(ctx context.Context, role llm.Role, ref llm.ModelRef, at time.Time) error
-	Delete(ctx context.Context, role llm.Role) error
 }
 
 type siteReader interface {
@@ -78,10 +77,6 @@ func (p *Profiles) Set(ctx context.Context, role llm.Role, ref llm.ModelRef) err
 		return errors.New(errors.Invalid, "a model profile must name a provider and a model").WithDetail("role", string(role))
 	}
 	return p.store.Set(ctx, role, ref, p.clock.Now().UTC().Truncate(time.Second))
-}
-
-func (p *Profiles) Clear(ctx context.Context, role llm.Role) error {
-	return p.store.Delete(ctx, role)
 }
 
 func pick(profiles map[llm.Role]llm.ModelRef, role llm.Role) (llm.ModelRef, bool) {

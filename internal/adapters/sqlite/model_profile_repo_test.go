@@ -7,7 +7,6 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/domain/llm"
-	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 func TestModelProfileRepo(t *testing.T) {
@@ -46,18 +45,7 @@ func TestModelProfileRepo(t *testing.T) {
 		t.Fatalf("profiles = %v, want the writer replaced", profiles)
 	}
 
-	if err = repo.Delete(ctx, llm.RoleJudge); err != nil {
-		t.Fatalf("Delete: %v", err)
-	}
-	if err = repo.Delete(ctx, llm.RoleJudge); !errors.IsCode(err, errors.NotFound) {
-		t.Fatalf("Delete twice error = %v, want %s", err, errors.NotFound)
-	}
-
-	profiles, err = repo.List(ctx)
-	if err != nil {
-		t.Fatalf("List last: %v", err)
-	}
-	if len(profiles) != 1 {
-		t.Errorf("profiles = %v, want only the writer", profiles)
+	if profiles[llm.RoleJudge].Model != "claude-haiku-4-5" {
+		t.Errorf("profiles = %v, want the judge kept", profiles)
 	}
 }

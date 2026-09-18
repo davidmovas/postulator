@@ -163,7 +163,7 @@ func TestResolveFailures(t *testing.T) {
 	}
 }
 
-func TestSetGlobalAndClear(t *testing.T) {
+func TestSetGlobalProfile(t *testing.T) {
 	t.Parallel()
 
 	resolver, _ := newProfiles(t)
@@ -187,12 +187,5 @@ func TestSetGlobalAndClear(t *testing.T) {
 	}
 	if global[llm.RoleChat] != chat {
 		t.Errorf("global = %v, want the chat profile", global)
-	}
-
-	if err = resolver.Clear(ctx, llm.RoleChat); err != nil {
-		t.Fatalf("Clear: %v", err)
-	}
-	if global, err = resolver.Global(ctx); err != nil || len(global) != 0 {
-		t.Errorf("global after clear = %v, %v, want empty", global, err)
 	}
 }

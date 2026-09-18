@@ -9,11 +9,11 @@ current as work lands.
 
 | # | Phase | Agents | Depends on | Key deliverables |
 |---|---|---|---|---|
-| 0 | Wipe + scaffold + docs | Opus ×1 | — | branch, Go 1.27, Wails v3, Vite stub, kernel, CI, docs, CLAUDE.md |
-| 1 | Infra + contracts spike | Opus ×2 (parallel) | 0 | sqlite store/migrations/UoW/testhelper, secrets (DPAPI, AES-GCM), adiantum; spike on v3 errors/events/generics → CONTRACTS.md |
-| 2 | Schema + domain graph/pagemap/template/settings + repos + use cases | **Fable** | 1 | migrations 0001–0006, domain packages with tests, repositories, application commands/queries, seed templates |
-| 3 | WordPress | Opus ×2 (parallel: Go adapter+wptest+sync / PHP plugin+docker e2e) | 2 | `adapters/wp`, `wptest`, sync use case, `wp-plugin/`, `docker/e2e` compose |
-| 4 | LLM layer | Opus ×1 | 2 | port, gollem client, catalog, profiles, ledger, limiter, retry, record/replay |
+| 0 ✅ | Wipe + scaffold + docs | Opus ×1 | — | branch, Go 1.27, Wails v3, Vite stub, kernel, CI, docs, CLAUDE.md |
+| 1 ✅ | Infra + contracts spike | Opus ×2 (parallel) | 0 | sqlite store/migrations/UoW/testhelper, secrets (DPAPI, AES-GCM), adiantum; spike on v3 errors/events/generics → CONTRACTS.md |
+| 2 ✅ | Schema + domain graph/pagemap/template/settings + repos + use cases | **Fable** | 1 | migrations 0001–0006, domain packages with tests, repositories, application commands/queries, seed templates |
+| 3 ✅ | WordPress | Opus ×2 (parallel: Go adapter+wptest+sync / PHP plugin+docker e2e) | 2 | `adapters/wp`, `wptest`, sync use case, `wp-plugin/`, `docker/e2e` compose |
+| 4 ✅ | LLM layer | Opus ×1 | 2 | port, gollem client, catalog, profiles, ledger, limiter, retry, record/replay |
 | 5 | Run engine | **Fable** | 2, 4 | `domain/run`, `runtime` engine/worker/checkpoint/eventlog/recovery/budget, migrations for runs |
 | 6 | Content factory core | **Fable** | 5 | `domain/content` (Document, LinkContext, InsertLinks, Compliance, Structure), steps `resolve_context, generate_body, insert_links, repair_links, validate` |
 | 7 | Remaining steps + site metrics | Opus ×2 | 3, 6 | `generate_meta, generate_images, judge, publish, relink_neighbors, sync_back, report`; `application/reports` site-level metrics |
