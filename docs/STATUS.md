@@ -80,9 +80,9 @@ Module coverage is 87.6% of 14170 statements; `domain` + `application` sit at 86
   which had not landed when it was written. `internal/e2e` goes through the real adapter.
 - `content.Assess` has no Wails method; `ReportsService.JudgePage` binds `content.Judge` and runs
   it synchronously, and `PageReport` still reads what a run already recorded.
-- `internal/application/agent` is exercised only through `internal/transport/agent`, so the
-  profile reports it at 0% without `-coverpkg`; the aggregate gate still passes and the
-  behaviour is covered, but the package has no test of its own.
+- `internal/application/agent` is exercised mostly through `internal/transport/agent`, so the
+  profile under-reports it without `-coverpkg`; the aggregate gate still passes and the behaviour
+  is covered. The package now carries its own tests over the confirmation fence and the views.
 - `ledger.List` has no caller: `ModelsService.UsageSummary` answers from the aggregate, and a
   per-call ledger screen is what would read the list.
 - A run's deadline is the `runtime.DefaultRunDeadline` constant, not a setting: nothing in the UI
@@ -116,3 +116,14 @@ Module coverage is 87.6% of 14170 statements; `domain` + `application` sit at 86
    the companion plugin archive from that tag.
 3. Close the gaps above that the UI reaches: the ledger screen, the page audit screen, the run
    deadline setting.
+
+## Final review
+
+Reviewed 2026-09-19 over phases 9-12; the gate is green. Two fixes landed: `cc69ace` fences a
+confirmed tool result, which reached the model as unfenced user text, and `98b7896` masks the
+credential the pending action view handed back. Open, none blocking a tag: `Confirm` replays
+through `tools.Registry.Call`, so the allow list, the tool call audit and the result cap of the
+guard chain are skipped and only `Authorize` runs; the master key is hex encoded into the SQLite
+DSN string, which `Lock()` cannot zero; a failed `ImportBackup` leaves the core locked until a
+restart; `export.opener.complete` would call a valid archive truncated if the tar stream were an
+exact multiple of `FrameSize`; `task package` is not byte reproducible, `BUILD_DATE` being `now`.
