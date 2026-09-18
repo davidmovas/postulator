@@ -43,6 +43,8 @@ Before an agent implements a module, it reads the Archond files that section 15 
 - **Live events are dropped, not buffered.** v3 dispatches a custom event to the windows that exist at that instant; with no window, or across a page reload, it is gone. Any progress UI must replay `RunsService.ListEvents(runId, sinceSeq, limit)` on connect.
 - **`frontend/src/generated/events.ts` is generated and committed.** `task events` rewrites it and a Go test fails when it is stale. `frontend/bindings/` is the opposite: generated and gitignored, rewritten by every build. That file and `go.mod` are pinned to LF in `.gitattributes`, because `core.autocrlf` otherwise hands a fresh checkout CRLF that no generator ever writes and the in-sync test fails on a clean clone.
 - **The tuned lint rules and why**: `errcheck` runs with `check-blank` and `check-type-assertions` and no baseline, so `_ = f()` is a finding rather than an escape hatch. `govet` is `enable-all` with `shadow` non-strict, because strict mode reports every `if err := f(); err != nil`. `fieldalignment` is off: it orders struct fields by machine layout, and our field order is the JSON order we owe the frontend. `gocritic` runs diagnostic, style and performance with `hugeParam` off. `misspell` is US English and ignores `cancelled`, which is a domain status value.
+- **The WP-CLI image's `www-data` is uid 82, the WordPress image's is uid 33.** The compose `bootstrap` service therefore runs as `user: "33:33"`; without it WP-CLI cannot write `.htaccess` or install a plugin into the shared volume, and the failure reads as a WordPress permissions error rather than a container mismatch. The same container also needs the `WORDPRESS_DB_*` variables, because the official image's `wp-config.php` calls `getenv` at runtime instead of baking the values in, and application passwords need `WP_ENVIRONMENT_TYPE=local` to work over plain HTTP at all.
+- **`go test -tags e2e` is the only thing that compiles `internal/adapters/wp/e2e`.** `go build`, `go vet`, `golangci-lint run` and `cmd/covergate` all skip it silently, so `task lint:e2e` is not optional and `gofmt -l .` is what catches formatting there.
 
 - **WordPress `modified_gmt` has no timezone suffix**, so `time.Parse(time.RFC3339, ...)`
   fails on it; `wp.parseWPTime` falls back to `2006-01-02T15:04:05` read as UTC. The
@@ -78,6 +80,14 @@ Before an agent implements a module, it reads the Archond files that section 15 
   optimistic-concurrency check on `PUT /content/{id}/raw`.
 - **2026-09-18 (phase 3A)** — `wp-plugin/openapi.yaml` is the contract between the two
   Phase 3 tracks. Neither track changes it alone.
+
+- **2026-09-18 (phase 3B)** — The companion plugin never removes a kses filter. It relies on the authenticated administrator's `unfiltered_html` and returns the hash of what is actually stored, so a filtered write is visible rather than silent. Multisite is unsupported for that reason.
+- **2026-09-18 (phase 3B)** — Every plugin write passes `wp_slash`, because `wp_insert_post` and `update_metadata` unslash what they are handed.
+- **2026-09-18 (phase 3B)** — `normalize_path` has no file-extension exception: collapse duplicate slashes, one leading and one trailing slash, then `strtolower`. Host comparison is exact and lowercase with no `www` stripping. One rule with no branches is how the PHP and Go sides stay in step.
+- **2026-09-18 (phase 3B)** — The `/content` cursor names its phase (`post`, then `term`), `nextCursor` is `null` at the end of the list, and an undecodable cursor is a `400` rather than a restart from the beginning.
+- **2026-09-18 (phase 3B)** — `/seo-meta/{id}` and `/content/{id}/raw` address posts only; post and term ids collide and the contract has no discriminator, so a term id is a `404`.
+- **2026-09-18 (phase 3B)** — `since` is validated as RFC3339 by regex before `strtotime`, which otherwise accepts `yesterday` and every other English phrase.
+
 ## Product guardrail
 
 Postulator turns an entity graph into graph-compliant WordPress pages; reject features that do not serve that loop.

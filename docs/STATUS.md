@@ -78,6 +78,17 @@ and every `fmt` verb of `Config` and `Client`, and confirmed the contract test n
 on a renamed field in `openapi.yaml`. Its four findings landed in `4f547fa` and
 `f07b29b`. Coverage is 87.0% for `internal/adapters/wp` and 95.6% for `wptest`.
 
+**Phase 3B (the WordPress companion plugin and the docker e2e harness) is complete** on
+the `phase-3b` worktree. The plan is
+`docs/superpowers/plans/2026-09-18-phase-3b-wp-plugin-e2e.md`; its tasks landed one commit
+each. `wp-plugin/postulator-companion` serves `/wp-json/postulator/v1` (manifest, keyset
+content listing, SEO meta writes, raw read and compare-and-swap write) in seven
+dependency-free PHP files; `cmd/pluginzip` packages it byte-deterministically;
+`docker/e2e` runs a pinned WordPress stack that provisions itself; and
+`internal/adapters/wp/e2e` holds build-tagged Go tests that pass against it in all three
+SEO modes. Track A's Go adapter is a separate worktree and this suite depends on nothing
+from it.
+
 ## What landed in Phase 0
 
 - The v1.6.2 codebase is gone: `internal/`, `pkg/`, `frontend/`, `main.go`, `Makefile`,
@@ -350,6 +361,53 @@ on a renamed field in `openapi.yaml`. Its four findings landed in `4f547fa` and
   `internal/domain/pagemap.NormalizePath` from Phase 2, and a follow-up task replaces
   the adapter's body with a call into the domain once Phase 2 merges.
 
+## Decisions taken in Phase 3B
+
+- **The plugin never removes a kses filter.** `kses_init()` re-runs on `set_current_user`,
+  and an administrator holds `unfiltered_html`, so core removes the filters itself before
+  a REST callback runs. The raw write returns the hash of what is **actually stored**, not
+  of what was sent, so any alteration is visible to the caller instead of silent.
+- **Every write passes `wp_slash`.** `wp_insert_post` and `update_metadata` both unslash,
+  so without it a single backslash or escaped quote is eaten on every save. A dedicated
+  e2e case writes a Windows path and an escaped quote and asserts byte equality.
+- **`normalize_path` is the only place a path is produced.** Collapse duplicate slashes,
+  force one leading and one trailing slash with no file-extension exception, then
+  `strtolower`. Host comparison is exact and lowercase with no `www` stripping, query and
+  fragment are dropped, and nothing is percent-decoded.
+- **The listing has two phases.** Posts keyset on `(post_modified_gmt, ID)`, then
+  `product_cat` terms on `term_id`; the cursor names its phase. `nextCursor` is `null` at
+  the end of the list and an undecodable cursor is a `400`, never a silent restart.
+- **A term's `modified` is plugin-maintained.** WordPress has no such field, so
+  `_postulator_modified` (RFC3339 UTC) is written on `created_term`/`edited_term` and
+  backfilled once on first read.
+- **A draft reports the permalink it will have**, computed from a clone with
+  `post_status = publish`, rather than the `?page_id=` URL `get_permalink` returns for a
+  draft. A tool whose whole model is paths cannot report `/` for every unpublished page.
+- **`since` is strict RFC3339**, validated by regex before `strtotime`, because
+  `strtotime` cheerfully accepts `yesterday`.
+- **Write routes are post-only.** Post ids and term ids collide, and the contract has no
+  discriminator, so `/seo-meta/{id}` and `/content/{id}/raw` resolve through `get_post()`
+  and a term id is a `404`. Term SEO is still read in `/content`, from Yoast's
+  `wpseo_taxonomy_meta` option or Rank Math's term meta.
+- **The 409 is a `WP_REST_Response`, not a `WP_Error`.** `WP_Error` can only carry extra
+  fields under `data`, and `currentHash` must be top-level next to `code` and `message`.
+- **With no SEO plugin the head is replaced, not appended.** `pre_get_document_title` and
+  `get_canonical_url` make a duplicate `<title>` or canonical impossible; the e2e suite
+  asserts a count of exactly one of each.
+- **`cmd/pluginzip` is Go, not `zip` or `ZipArchive`.** Neither exists reliably on Windows
+  and neither is deterministic without argument archaeology. Sorted names, the ZIP epoch
+  and mode 0644 make two runs byte-identical.
+- **WordPress is pinned to 7.0.1, not the 6.9.2 the plan named.** WooCommerce 11.1
+  requires WordPress 7.0, so 6.9.2 could not install it and `product`/`product_cat` would
+  have gone untested.
+- **Application passwords need `WP_ENVIRONMENT_TYPE=local` over plain HTTP**, and the
+  WP-CLI container needs the `WORDPRESS_DB_*` variables because the official image's
+  `wp-config.php` reads them at runtime rather than baking them in.
+- **Rank Math is supported.** It keeps its entire front end silent until the setup wizard
+  is past: the meta keys wrote and read back correctly while the rendered page carried
+  core's title and no description. `rank_math_is_configured` and
+  `rank_math_registration_skip` are the two gates, and the bootstrap sets both.
+
 ## Known gaps
 
 - Application events published before `cmd/postulator` connects the relay to the Wails
@@ -380,3 +438,9 @@ on a renamed field in `openapi.yaml`. Its four findings landed in `4f547fa` and
   the UTC `modified_gmt`, so the sync use case (Phase 7) must page through the plugin's
   `/content?since=` or convert the bound with the site timezone before it trusts an
   incremental core-REST window.
+
+- The e2e suite carries its own small HTTP client rather than using `internal/adapters/wp`
+  from track A, which had not landed when it was written. Switching it to the adapter is a
+  follow-up that deletes `client` from `harness_test.go`.
+- The docker e2e stack is never run in CI: `windows-latest` cannot run Linux containers,
+  and the Ubuntu job exists only to lint and package the plugin.

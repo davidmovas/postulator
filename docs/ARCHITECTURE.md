@@ -105,5 +105,31 @@ goroutine, so a confirmation survives a restart. The composition root constructs
 one `EventBridge` per process, because the application-event `seq` is a counter held by
 that instance and a second bridge would restart it.
 
+## WordPress companion plugin
+
+`wp-plugin/postulator-companion` (PHP ≥ 8.1, WP ≥ 6.4, no dependencies) serves
+`/wp-json/postulator/v1`; every permission callback requires `edit_posts`, reads included.
+The password must belong to an **administrator** — raw writes rely on `unfiltered_html`
+rather than removing kses filters, so **multisite is unsupported in v2.0**.
+
+| Route | Purpose |
+|---|---|
+| `GET /manifest` | version, capabilities, detected SEO plugin, WP version, site URL |
+| `GET /content` | keyset page over posts then `product_cat` terms: hash, links, h1, meta |
+| `PUT /seo-meta/{id}` | writes the SEO fields present in the body; posts only |
+| `GET`/`PUT /content/{id}/raw` | raw `post_content` and its sha256; the write is a compare-and-swap returning `409 hash_mismatch` on a stale hash |
+
+| Field | Yoast | Rank Math | none |
+|---|---|---|---|
+| title | `_yoast_wpseo_title` | `rank_math_title` | `_postulator_seo_title` |
+| description | `_yoast_wpseo_metadesc` | `rank_math_description` | `_postulator_seo_description` |
+| canonical | `_yoast_wpseo_canonical` | `rank_math_canonical_url` | `_postulator_canonical` |
+| ogTitle | `_yoast_wpseo_opengraph-title` | `rank_math_facebook_title` | `_postulator_og_title` |
+| ogDescription | `_yoast_wpseo_opengraph-description` | `rank_math_facebook_description` | `_postulator_og_description` |
+
+With no SEO plugin it replaces core's head values instead of adding tags, through
+`pre_get_document_title`, `get_canonical_url` and `wp_head` for description and OG; a
+theme that hardcodes `<title>` is out of scope.
+
 See `docs/CONTRACTS.md` for the wire shapes and `docs/superpowers/specs/` for the full
 design.

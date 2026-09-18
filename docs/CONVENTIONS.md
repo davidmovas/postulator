@@ -155,3 +155,19 @@ go run ./cmd/covergate
 
 All five must be green before a phase is declared done, and `docs/STATUS.md` is updated
 in the same commit.
+
+## Docker end-to-end
+
+`docker/e2e/compose.yaml` pins WordPress 7.0.1 (PHP 8.3), MariaDB 11.4.12 and WP-CLI 2.12.0
+on `127.0.0.1:8089`; `task e2e:up` provisions the site and writes `.env.generated`.
+
+```
+task e2e:up                E2E_SEO=none|yoast|rankmath, E2E_WOO=0|1
+go test -tags e2e -count=1 ./internal/adapters/wp/e2e/...
+task e2e:down              e2e:reset does both
+```
+
+The suite is all `_test.go` behind `//go:build e2e`: it adds nothing to the coverage
+profile and the default lint never sees it, so use `task lint:e2e` and `gofmt -l .`.
+`task plugin:lint` uses the pinned image's `php` on Windows and a local `php` on CI,
+which also packages the plugin and never starts the stack.
