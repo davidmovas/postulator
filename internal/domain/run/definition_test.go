@@ -2,6 +2,7 @@ package run_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -210,12 +211,12 @@ func TestInputHashIsStableAndSensitive(t *testing.T) {
 	params := map[string]any{"allowErrors": true}
 	required := []run.Artifact{{Kind: run.ArtifactLinkContext, Hash: "aaa"}, {Kind: run.ArtifactDraft, Hash: "bbb"}}
 
-	first, err := run.InputHash("validate", params, required, 3)
+	first, err := run.InputHash("validate", params, required, 3, nil)
 	if err != nil {
 		t.Fatalf("InputHash: %v", err)
 	}
 
-	reordered, err := run.InputHash("validate", params, []run.Artifact{required[1], required[0]}, 3)
+	reordered, err := run.InputHash("validate", params, []run.Artifact{required[1], required[0]}, 3, nil)
 	if err != nil {
 		t.Fatalf("InputHash: %v", err)
 	}
@@ -228,6 +229,7 @@ func TestInputHashIsStableAndSensitive(t *testing.T) {
 		step     string
 		params   map[string]any
 		required []run.Artifact
+		check    run.Checkpoint
 		version  int
 	}{
 		{name: "another step", step: "generate_body", params: params, required: required, version: 3},
@@ -237,12 +239,16 @@ func TestInputHashIsStableAndSensitive(t *testing.T) {
 			required: []run.Artifact{{Kind: run.ArtifactLinkContext, Hash: "ccc"}}, version: 3,
 		},
 		{name: "another template version", step: "validate", params: params, required: required, version: 4},
+		{
+			name: "another checkpoint", step: "validate", params: params, required: required, version: 3,
+			check: run.Checkpoint{"sync": json.RawMessage(`{"batches":2}`)},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			other, hashErr := run.InputHash(tc.step, tc.params, tc.required, tc.version)
+			other, hashErr := run.InputHash(tc.step, tc.params, tc.required, tc.version, tc.check)
 			if hashErr != nil {
 				t.Fatalf("InputHash: %v", hashErr)
 			}
@@ -252,7 +258,7 @@ func TestInputHashIsStableAndSensitive(t *testing.T) {
 		})
 	}
 
-	if _, err = run.InputHash("validate", map[string]any{"chan": make(chan int)}, nil, 1); !errors.IsCode(err, errors.Internal) {
+	if _, err = run.InputHash("validate", map[string]any{"chan": make(chan int)}, nil, 1, nil); !errors.IsCode(err, errors.Internal) {
 		t.Fatalf("InputHash of unencodable parameters = %v", err)
 	}
 }

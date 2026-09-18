@@ -150,7 +150,7 @@ func (e *Engine) claim(parent context.Context, itemID string) (*claim, error) {
 
 		available := artifactsByKind(def, index, stored)
 		params := run.ParamsFor(record.Recipe, step.Name)
-		inputHash, err := run.InputHash(step.Name, params, required(step, available), resolved.Version)
+		inputHash, err := run.InputHash(step.Name, params, required(step, available), resolved.Version, claimed.Checkpoint)
 		if err != nil {
 			return err
 		}

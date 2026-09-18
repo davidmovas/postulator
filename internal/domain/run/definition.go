@@ -204,10 +204,15 @@ func ParamsFor(recipe []template.StepSpec, step string) map[string]any {
 	return nil
 }
 
-func InputHash(step string, params map[string]any, required []Artifact, templateVersion int) (string, error) {
+func InputHash(step string, params map[string]any, required []Artifact, templateVersion int,
+	check Checkpoint) (string, error) {
 	encodedParams, err := json.Marshal(params)
 	if err != nil {
 		return "", errors.Wrap(err, errors.Internal, "encode the step parameters for the input hash")
+	}
+	encodedCheck, err := check.Encode()
+	if err != nil {
+		return "", err
 	}
 
 	hashes := make([]string, 0, len(required))
@@ -217,7 +222,8 @@ func InputHash(step string, params map[string]any, required []Artifact, template
 	slices.Sort(hashes)
 
 	digest := sha256.New()
-	for _, part := range append([]string{step, string(encodedParams), strconv.Itoa(templateVersion)}, hashes...) {
+	prefix := []string{step, string(encodedParams), strconv.Itoa(templateVersion), encodedCheck}
+	for _, part := range append(prefix, hashes...) {
 		digest.Write([]byte(part))
 		digest.Write([]byte{0})
 	}
