@@ -16,7 +16,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
-type tableReader interface {
+type tableStore interface {
 	Read(ctx context.Context, path string) (importmap.Table, error)
 	Write(path string, table importmap.Table) error
 }
@@ -60,7 +60,7 @@ type unitOfWork interface {
 }
 
 type Deps struct {
-	Tables     tableReader
+	Tables     tableStore
 	Entities   entityStore
 	Edges      edgeStore
 	Pages      pageStore

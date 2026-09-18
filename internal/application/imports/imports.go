@@ -2,6 +2,7 @@ package imports
 
 import (
 	"context"
+	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -71,7 +72,7 @@ func (s *Service) Apply(ctx context.Context, req ApplyRequest) (ApplyResponse, e
 			WithDetail("errors", computed.report.Errors)
 	}
 
-	counts := Counts{Skipped: computed.report.Skipped}
+	var counts Counts
 	err = s.deps.UnitOfWork.Do(ctx, func(c context.Context) error {
 		written, writeErr := s.write(c, &computed)
 		if writeErr != nil {
@@ -152,11 +153,22 @@ func (s *Service) remember(ctx context.Context, req ApplyRequest) error {
 
 func (s *Service) save(ctx context.Context, view Mapping) (importmap.Mapping, error) {
 	mapping := view.domain()
+	now := s.now()
+	mapping.CreatedAt, mapping.UpdatedAt = now, now
+
+	if mapping.ID == "" {
+		previous, err := s.named(ctx, mapping.SiteID, mapping.Name)
+		if err != nil {
+			return importmap.Mapping{}, err
+		}
+		mapping.ID = previous.ID
+		if previous.ID != "" {
+			mapping.CreatedAt = previous.CreatedAt
+		}
+	}
 	if mapping.ID == "" {
 		mapping.ID = id.New()
 	}
-	now := s.now()
-	mapping.CreatedAt, mapping.UpdatedAt = now, now
 
 	ready, err := importmap.NewMapping(mapping)
 	if err != nil {
@@ -166,6 +178,22 @@ func (s *Service) save(ctx context.Context, view Mapping) (importmap.Mapping, er
 		return importmap.Mapping{}, err
 	}
 	return ready, nil
+}
+
+func (s *Service) named(ctx context.Context, siteID, name string) (importmap.Mapping, error) {
+	if siteID == "" || name == "" {
+		return importmap.Mapping{}, nil
+	}
+	saved, err := s.deps.Mappings.ListBySite(ctx, siteID)
+	if err != nil {
+		return importmap.Mapping{}, err
+	}
+	for i := range saved {
+		if strings.EqualFold(saved[i].Name, name) {
+			return saved[i], nil
+		}
+	}
+	return importmap.Mapping{}, nil
 }
 
 func (s *Service) SaveMapping(ctx context.Context, req SaveMappingRequest) (SaveMappingResponse, error) {

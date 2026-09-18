@@ -115,6 +115,9 @@ type siteState struct {
 	entities []graph.Entity
 	edges    []graph.Edge
 	pages    []pagemap.Page
+	byName   map[string]graph.Entity
+	byPath   map[string]pagemap.Page
+	edgeKeys map[string]struct{}
 }
 
 func (s *Service) state(ctx context.Context, siteID string) (siteState, error) {
@@ -130,7 +133,22 @@ func (s *Service) state(ctx context.Context, siteID string) (siteState, error) {
 	if err != nil {
 		return siteState{}, err
 	}
-	return siteState{siteID: siteID, entities: entities, edges: edges, pages: pages}, nil
+	state := siteState{
+		siteID: siteID, entities: entities, edges: edges, pages: pages,
+		byName:   make(map[string]graph.Entity, len(entities)),
+		byPath:   make(map[string]pagemap.Page, len(pages)),
+		edgeKeys: make(map[string]struct{}, len(edges)),
+	}
+	for i := range entities {
+		state.byName[key(entities[i].Name)] = entities[i]
+	}
+	for i := range pages {
+		state.byPath[pages[i].Path] = pages[i]
+	}
+	for i := range edges {
+		state.edgeKeys[edgeKey(edges[i])] = struct{}{}
+	}
+	return state, nil
 }
 
 func (s *Service) templateFor(ctx context.Context, siteID, pageKind string) (*string, error) {
@@ -205,13 +223,13 @@ func read(binding importmap.Binding, table importmap.Table, p *plan) *drafts {
 	return sheet
 }
 
-func fillGaps(sheet *drafts, known map[string]pagemap.Page, p *plan) {
+func fillGaps(sheet *drafts, state siteState, p *plan) {
 	for _, path := range sheet.sortedPaths() {
 		for parent := pagemap.ParentPath(path); parent != ""; parent = pagemap.ParentPath(parent) {
 			if _, planned := sheet.pages[parent]; planned {
 				continue
 			}
-			if _, exists := known[parent]; exists {
+			if _, exists := state.byPath[parent]; exists {
 				continue
 			}
 			draft, _ := sheet.page(parent, 0)
@@ -223,11 +241,6 @@ func fillGaps(sheet *drafts, known map[string]pagemap.Page, p *plan) {
 }
 
 func resolveEntities(sheet *drafts, state siteState, now time.Time, p *plan) (map[string]graph.Entity, error) {
-	existing := make(map[string]graph.Entity, len(state.entities))
-	for i := range state.entities {
-		existing[key(state.entities[i].Name)] = state.entities[i]
-	}
-
 	resolved := make(map[string]graph.Entity, len(sheet.order))
 	for _, at := range sheet.order {
 		draft := sheet.entities[at]
@@ -239,7 +252,7 @@ func resolveEntities(sheet *drafts, state siteState, now time.Time, p *plan) (ma
 			kind = ""
 		}
 
-		current, found := existing[at]
+		current, found := state.byName[at]
 		if !found {
 			if kind == "" {
 				kind = graph.KindTopic
@@ -283,22 +296,15 @@ func resolveEntities(sheet *drafts, state siteState, now time.Time, p *plan) (ma
 }
 
 func resolveEdges(sheet *drafts, state siteState, resolved map[string]graph.Entity, now time.Time, p *plan) {
-	existing := make(map[string]graph.Entity, len(state.entities))
-	for i := range state.entities {
-		existing[key(state.entities[i].Name)] = state.entities[i]
-	}
 	lookup := func(name string) (graph.Entity, bool) {
 		if entity, ok := resolved[key(name)]; ok {
 			return entity, true
 		}
-		entity, ok := existing[key(name)]
+		entity, ok := state.byName[key(name)]
 		return entity, ok
 	}
 
-	seen := make(map[string]struct{}, len(state.edges))
-	for i := range state.edges {
-		seen[edgeKey(state.edges[i])] = struct{}{}
-	}
+	seen := maps.Clone(state.edgeKeys)
 
 	add := func(from, to graph.Entity, kind graph.EdgeKind) {
 		edge, err := graph.NewEdge(graph.Edge{
@@ -379,11 +385,6 @@ func checkAcyclic(state siteState, resolved map[string]graph.Entity, p *plan) er
 }
 
 func (s *Service) resolvePages(ctx context.Context, sheet *drafts, state siteState, resolved map[string]graph.Entity, now time.Time, p *plan) error {
-	known := make(map[string]pagemap.Page, len(state.pages))
-	for i := range state.pages {
-		known[state.pages[i].Path] = state.pages[i]
-	}
-
 	templates := make(map[string]*string)
 	for _, path := range sheet.sortedPaths() {
 		draft := sheet.pages[path]
@@ -415,7 +416,7 @@ func (s *Service) resolvePages(ctx context.Context, sheet *drafts, state siteSta
 			entityID = &entity.ID
 		}
 
-		current, exists := known[path]
+		current, exists := state.byPath[path]
 		if !exists {
 			page, err := pagemap.NewPage(pagemap.Page{
 				ID: id.New(), SiteID: state.siteID, Path: path, WPType: wpTypeOr(wpType),
@@ -536,12 +537,7 @@ func (s *Service) plan(ctx context.Context, siteID string, table importmap.Table
 	now := s.now()
 	p := plan{}
 	sheet := read(binding, table, &p)
-
-	known := make(map[string]pagemap.Page, len(state.pages))
-	for i := range state.pages {
-		known[state.pages[i].Path] = state.pages[i]
-	}
-	fillGaps(sheet, known, &p)
+	fillGaps(sheet, state, &p)
 
 	resolved, err := resolveEntities(sheet, state, now, &p)
 	if err != nil {

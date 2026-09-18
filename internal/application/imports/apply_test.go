@@ -269,3 +269,33 @@ func TestSaveMappingRefusesWhatCannotBeImported(t *testing.T) {
 		t.Fatalf("SaveMapping = %v, want an invalid error", err)
 	}
 }
+
+func TestApplySavesTheMappingUnderTheSameNameTwice(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	path := h.file(t, "graph.csv", graphSheet)
+	req := imports.ApplyRequest{
+		SiteID:  h.siteID,
+		Path:    path,
+		Mapping: graphMapping(h),
+		Options: imports.ApplyOptions{SaveMappingAs: "the client sheet"},
+	}
+	if _, err := h.service.Apply(t.Context(), req); err != nil {
+		t.Fatalf("the first Apply: %v", err)
+	}
+	if _, err := h.service.Apply(t.Context(), req); err != nil {
+		t.Fatalf("the second Apply: %v", err)
+	}
+
+	listed, err := h.service.ListMappings(t.Context(), imports.ListMappingsRequest{SiteID: h.siteID})
+	if err != nil {
+		t.Fatalf("ListMappings: %v", err)
+	}
+	if len(listed.Mappings) != 1 {
+		t.Fatalf("mappings = %+v, want the one name reused", listed.Mappings)
+	}
+	if len(h.entities(t)) != 3 || len(h.pages(t)) != 3 {
+		t.Fatal("the second apply rolled the site back")
+	}
+}
