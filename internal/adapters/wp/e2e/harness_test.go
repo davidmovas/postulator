@@ -154,19 +154,19 @@ func newClient(t *testing.T) (*client, environment) {
 	}, env
 }
 
-func (c *client) request(t *testing.T, method, path string, payload any) (int, []byte) {
+func (c *client) request(t *testing.T, method, path string, payload any) (status int, body []byte) {
 	t.Helper()
 
-	var body io.Reader
+	var sent io.Reader
 	if payload != nil {
 		encoded, err := json.Marshal(payload)
 		if err != nil {
 			t.Fatalf("encode %s %s: %v", method, path, err)
 		}
-		body = bytes.NewReader(encoded)
+		sent = bytes.NewReader(encoded)
 	}
 
-	request, err := http.NewRequest(method, c.base+path, body)
+	request, err := http.NewRequest(method, c.base+path, sent)
 	if err != nil {
 		t.Fatalf("build %s %s: %v", method, path, err)
 	}
@@ -281,8 +281,8 @@ func walkContent(t *testing.T, c *client, types string, limit int, visit func(co
 			query += "&cursor=" + url.QueryEscape(cursor)
 		}
 		page := listContent(t, c, query)
-		for _, item := range page.Items {
-			if visit(item) {
+		for i := range page.Items {
+			if visit(page.Items[i]) {
 				return
 			}
 		}

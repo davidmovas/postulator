@@ -77,3 +77,33 @@ jobs:
         with:
           name: postulator
           path: bin/postulator.exe
+
+  plugin:
+    name: Companion plugin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install Task
+        run: go install github.com/go-task/task/v3/cmd/task@${{ env.TASK_VERSION }}
+
+      - name: Show the PHP version
+        run: php -v
+
+      - name: Lint the plugin
+        run: task plugin:lint
+
+      - name: Package the plugin
+        run: task plugin:zip
+
+      - name: Upload the plugin package
+        uses: actions/upload-artifact@v4
+        with:
+          name: postulator-companion
+          path: bin/postulator-companion.zip

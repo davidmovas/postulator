@@ -105,3 +105,8 @@ tasks:
     summary: Packages the companion plugin deterministically
     cmds:
       - go run ./cmd/pluginzip -source wp-plugin/postulator-companion -out {{.BIN_DIR}}/postulator-companion.zip
+
+  lint:e2e:
+    summary: Lints the build-tagged end-to-end sources
+    cmds:
+      - golangci-lint run --build-tags e2e ./internal/adapters/wp/e2e/...
