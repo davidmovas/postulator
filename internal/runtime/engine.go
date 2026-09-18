@@ -35,10 +35,10 @@ type Engine struct {
 	clock    clock.Clock
 	logger   *zap.Logger
 
-	queue chan string
-	nudge chan struct{}
-	stop  chan struct{}
-	wg    sync.WaitGroup
+	queue  chan string
+	wakeup chan struct{}
+	stop   chan struct{}
+	wg     sync.WaitGroup
 
 	running atomic.Bool
 
@@ -57,7 +57,7 @@ func New(deps Deps, registry *run.Registry, cfg Config, clk clock.Clock, logger 
 		clock:    clk,
 		logger:   logger,
 		queue:    make(chan string, queueCapacity),
-		nudge:    make(chan struct{}, 1),
+		wakeup:   make(chan struct{}, 1),
 		stop:     make(chan struct{}),
 		inflight: make(map[string]string),
 		load:     make(map[string]int),
@@ -89,7 +89,7 @@ func (e *Engine) Start(ctx context.Context) error {
 	if err := e.Recover(ctx); err != nil {
 		return err
 	}
-	e.Nudge()
+	e.nudge()
 	return nil
 }
 
@@ -120,9 +120,9 @@ func (e *Engine) Stop() {
 	e.wg.Wait()
 }
 
-func (e *Engine) Nudge() {
+func (e *Engine) nudge() {
 	select {
-	case e.nudge <- struct{}{}:
+	case e.wakeup <- struct{}{}:
 	default:
 	}
 }
@@ -172,14 +172,14 @@ func (e *Engine) keeper(ctx context.Context) {
 			return
 		case <-ticker.C:
 			e.sweepAndFill(ctx)
-		case <-e.nudge:
+		case <-e.wakeup:
 			e.sweepAndFill(ctx)
 		}
 	}
 }
 
 func (e *Engine) sweepAndFill(ctx context.Context) {
-	if err := e.Sweep(ctx); err != nil {
+	if err := e.sweep(ctx); err != nil {
 		e.logger.Warn("the run engine sweep failed", zap.Error(err))
 	}
 	if err := e.fill(ctx); err != nil {
@@ -192,8 +192,19 @@ func (e *Engine) fill(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	sites := make(map[string]string, len(items))
 	for i := range items {
-		e.dispatch(ctx, items[i].ID)
+		siteID, known := sites[items[i].RunID]
+		if !known {
+			record, runErr := e.deps.Runs.Get(ctx, items[i].RunID)
+			if runErr != nil {
+				continue
+			}
+			siteID = record.SiteID
+			sites[items[i].RunID] = siteID
+		}
+		e.offer(items[i].ID, siteID)
 	}
 	return nil
 }
@@ -203,6 +214,10 @@ func (e *Engine) dispatch(ctx context.Context, itemID string) {
 	if !ok {
 		return
 	}
+	e.offer(itemID, siteID)
+}
+
+func (e *Engine) offer(itemID, siteID string) {
 	if !e.reserve(itemID, siteID) {
 		return
 	}

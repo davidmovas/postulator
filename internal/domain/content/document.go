@@ -38,10 +38,6 @@ func Parse(fragment string) (*Document, error) {
 	return &Document{root: root}, nil
 }
 
-func (d *Document) Root() *html.Node {
-	return d.root
-}
-
 func (d *Document) nodes() iter.Seq[*html.Node] {
 	return func(yield func(*html.Node) bool) {
 		var walk func(*html.Node) bool

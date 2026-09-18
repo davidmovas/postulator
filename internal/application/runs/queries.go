@@ -11,8 +11,6 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
-const maxEvents = 500
-
 func (s *Service) Get(ctx context.Context, req GetRequest) (GetResponse, error) {
 	record, err := s.runs.Get(ctx, req.RunID)
 	if err != nil {
@@ -75,8 +73,8 @@ func (s *Service) ListEvents(ctx context.Context, req ListEventsRequest) (ListEv
 	switch {
 	case limit <= 0:
 		limit = dto.DefaultLimit
-	case limit > maxEvents:
-		limit = maxEvents
+	case limit > dto.MaxLimit:
+		limit = dto.MaxLimit
 	}
 
 	stored, err := s.events.List(ctx, runID, req.SinceSeq, limit)

@@ -52,7 +52,7 @@ func InsertLinks(doc *Document, lc LinkContext, policy template.LinkPolicy) Inse
 
 	maxLinks := policy.Rules.MaxLinks
 	perTarget := max(policy.Rules.MaxPerTarget, 1)
-	placed := len(graphLinks(doc, lc))
+	placed := countGraphLinks(doc, lc)
 
 	for _, target := range lc.Targets {
 		existing := existingFor(doc, target)
@@ -239,14 +239,14 @@ func existingFor(doc *Document, target LinkTarget) []*html.Node {
 	return out
 }
 
-func graphLinks(doc *Document, lc LinkContext) []Link {
-	out := make([]Link, 0)
+func countGraphLinks(doc *Document, lc LinkContext) int {
+	total := 0
 	for _, link := range doc.Links() {
 		if _, ok := lc.ByURL(strings.TrimSpace(link.Href)); ok {
-			out = append(out, link)
+			total++
 		}
 	}
-	return out
+	return total
 }
 
 func sameHref(href, url string) bool {

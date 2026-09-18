@@ -33,7 +33,7 @@ func InsertLinks(deps Deps) run.StepDef {
 			result := content.InsertLinks(doc, lc, policy)
 
 			checkpoint := run.NewCheckpoint()
-			if setErr := run.Set(checkpoint, CheckpointLinks, result); setErr != nil {
+			if setErr := run.Set(checkpoint, checkpointLinks, result); setErr != nil {
 				return run.Result{}, setErr
 			}
 

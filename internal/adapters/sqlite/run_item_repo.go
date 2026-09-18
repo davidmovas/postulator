@@ -42,7 +42,7 @@ const (
 		lease_until = NULL, wake_at = NULL, updated_at = ? WHERE run_id = ? AND status = 'paused'`
 )
 
-var ErrNotClaimed = errors.New(errors.Conflict, "the run item moved on before it could be claimed")
+var errNotClaimed = errors.New(errors.Conflict, "the run item moved on before it could be claimed")
 
 type RunItemRepo struct {
 	store *Store
@@ -81,7 +81,7 @@ func (r *RunItemRepo) Claim(ctx context.Context, id string, expectSeq int64, lea
 		return run.Item{}, err
 	}
 	if affected == 0 {
-		return run.Item{}, ErrNotClaimed
+		return run.Item{}, errNotClaimed
 	}
 	return r.Get(ctx, id)
 }

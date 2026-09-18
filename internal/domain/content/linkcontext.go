@@ -36,16 +36,6 @@ type LinkContext struct {
 	Targets  []LinkTarget `json:"targets"`
 }
 
-func (c LinkContext) Required() []LinkTarget {
-	out := make([]LinkTarget, 0, len(c.Targets))
-	for _, target := range c.Targets {
-		if target.Required {
-			out = append(out, target)
-		}
-	}
-	return out
-}
-
 func (c LinkContext) Phrases() []string {
 	out := make([]string, 0, len(c.Targets))
 	for _, target := range c.Targets {

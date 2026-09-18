@@ -115,9 +115,6 @@ func TestParseRefusesNothingButReportsBadInput(t *testing.T) {
 	if empty := mustParse(t, ""); empty.HTML() != "" || empty.Text() != "" {
 		t.Errorf("the empty document = %q", empty.HTML())
 	}
-	if len(mustParse(t, "<p>x</p>").Root().Attr) != 0 {
-		t.Error("the synthetic root carries no attributes")
-	}
 }
 
 func TestAttrAndTextOf(t *testing.T) {

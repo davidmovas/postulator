@@ -34,6 +34,8 @@ type claim struct {
 
 type outcome struct {
 	wakeAt     *time.Time
+	startedAt  time.Time
+	duration   time.Duration
 	checkpoint run.Checkpoint
 	artifacts  []run.Artifact
 	fault      *run.Fault
@@ -54,9 +56,11 @@ func (e *Engine) advance(parent context.Context, itemID string) (bool, error) {
 		return false, err
 	}
 
+	started := e.clock.Now().UTC()
 	if reused, ok, reuseErr := e.reuse(parent, held); reuseErr != nil {
 		return false, reuseErr
 	} else if ok {
+		reused.startedAt = started
 		return e.settle(parent, held, reused)
 	}
 
@@ -64,7 +68,10 @@ func (e *Engine) advance(parent context.Context, itemID string) (bool, error) {
 	result, stepErr := e.execute(ctx, held)
 	done()
 
-	return e.settle(parent, held, e.outcomeOf(held, result, stepErr))
+	out := e.outcomeOf(held, result, stepErr)
+	out.startedAt = started
+	out.duration = e.clock.Now().UTC().Sub(started)
+	return e.settle(parent, held, out)
 }
 
 func (e *Engine) claim(parent context.Context, itemID string) (*claim, error) {
@@ -381,10 +388,15 @@ func (e *Engine) record(ctx context.Context, held *claim, out outcome, now time.
 		return err
 	}
 
+	startedAt := out.startedAt
+	if startedAt.IsZero() {
+		startedAt = now
+	}
+
 	return e.deps.Execs.Insert(ctx, run.StepExec{
 		ID: id.New(), RunID: held.record.ID, ItemID: held.item.ID, Step: held.step.Name,
 		Attempt: attempt + 1, Status: status, InputHash: held.inputHash,
-		Tokens: out.tokens, USD: out.usd, StartedAt: now, FinishedAt: &now, Error: message,
+		Tokens: out.tokens, USD: out.usd, StartedAt: startedAt, FinishedAt: &now, Error: message,
 	})
 }
 
@@ -419,7 +431,7 @@ func (e *Engine) announce(ctx context.Context, box *outbox, held *claim, out out
 		})
 	default:
 		box.add(ctx, runID, events.StepDone, events.StepDonePayload{
-			RunID: runID, ItemID: itemID, Step: step, DurationMs: 0,
+			RunID: runID, ItemID: itemID, Step: step, DurationMs: out.duration.Milliseconds(),
 		})
 	}
 

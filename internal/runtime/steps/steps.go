@@ -17,12 +17,11 @@ import (
 )
 
 const (
-	CheckpointLinks = "links"
+	checkpointLinks = "links"
 
 	wordsPerToken     = 1.6
 	tokenHeadroom     = 512
 	fallbackMaxTokens = 2048
-	stepTimeout       = 4 * time.Minute
 	pureStepTimeout   = 30 * time.Second
 )
 
@@ -55,7 +54,7 @@ type Deps struct {
 	LLM      llm.Client
 }
 
-func All(deps Deps) []run.StepDef {
+func all(deps Deps) []run.StepDef {
 	return []run.StepDef{
 		ResolveContext(deps),
 		GenerateBody(deps),
@@ -66,7 +65,7 @@ func All(deps Deps) []run.StepDef {
 }
 
 func Register(registry *run.Registry, deps Deps) error {
-	for _, def := range All(deps) {
+	for _, def := range all(deps) {
 		if err := registry.Register(def); err != nil {
 			return err
 		}

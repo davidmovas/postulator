@@ -61,7 +61,7 @@ func (e *Engine) Enqueue(ctx context.Context, record run.Run) (run.Run, error) {
 		return run.Run{}, err
 	}
 
-	e.Nudge()
+	e.nudge()
 	return validated, nil
 }
 
@@ -129,7 +129,7 @@ func (e *Engine) Resume(ctx context.Context, runID string) error {
 		return err
 	}
 
-	e.Nudge()
+	e.nudge()
 	return nil
 }
 
@@ -217,7 +217,7 @@ func (e *Engine) RetryStep(ctx context.Context, itemID string) error {
 		return err
 	}
 
-	e.Nudge()
+	e.nudge()
 	return nil
 }
 
@@ -238,12 +238,12 @@ func (e *Engine) Wake(ctx context.Context, itemID string) error {
 		return errors.New(errors.Conflict, "the item moved on before it could be woken").WithDetail("itemId", itemID)
 	}
 
-	e.Nudge()
+	e.nudge()
 	return nil
 }
 
 func (e *Engine) Recover(ctx context.Context) error {
-	return e.Sweep(ctx)
+	return e.sweep(ctx)
 }
 
 func (e *Engine) retention() time.Duration {

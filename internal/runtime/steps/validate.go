@@ -50,7 +50,7 @@ func Validate(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			links, _, err := run.Get[content.InsertResult](sc.Check, CheckpointLinks)
+			links, _, err := run.Get[content.InsertResult](sc.Check, checkpointLinks)
 			if err != nil {
 				return run.Result{}, err
 			}

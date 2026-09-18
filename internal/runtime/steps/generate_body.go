@@ -28,7 +28,6 @@ func GenerateBody(deps Deps) run.StepDef {
 		Requires: []run.ArtifactKind{run.ArtifactLinkContext},
 		Produces: []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML},
 		Retry:    run.RetryPolicy{Max: 3},
-		Timeout:  stepTimeout,
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			lc, err := linkContextOf(sc)
 			if err != nil {

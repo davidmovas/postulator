@@ -48,13 +48,13 @@ const (
 	warnPenalty  = 0.05
 )
 
-type LinkClass string
+type linkClass string
 
 const (
-	ClassGraph           LinkClass = "graph"
-	ClassSelf            LinkClass = "self"
-	ClassExternal        LinkClass = "external"
-	ClassUnknownInternal LinkClass = "unknown_internal"
+	classGraph           linkClass = "graph"
+	classSelf            linkClass = "self"
+	classExternal        linkClass = "external"
+	classUnknownInternal linkClass = "unknown_internal"
 )
 
 func Compliance(doc *Document, lc LinkContext, policy template.LinkPolicy, pageID string) Report {
@@ -79,7 +79,7 @@ func Compliance(doc *Document, lc LinkContext, policy template.LinkPolicy, pageI
 	for _, link := range links {
 		href := strings.TrimSpace(link.Href)
 		switch classify(href, lc) {
-		case ClassGraph:
+		case classGraph:
 			target, _ := lc.ByURL(href)
 			if !allowedAnchor(target, link.Anchor) {
 				report.Items = append(report.Items, Finding{
@@ -88,7 +88,7 @@ func Compliance(doc *Document, lc LinkContext, policy template.LinkPolicy, pageI
 					Details: map[string]any{"href": href, "anchor": link.Anchor},
 				})
 			}
-		case ClassSelf:
+		case classSelf:
 			if policy.ForbidSelf {
 				report.Items = append(report.Items, Finding{
 					Severity: SeverityError, Code: CodeSelfLink,
@@ -96,7 +96,7 @@ func Compliance(doc *Document, lc LinkContext, policy template.LinkPolicy, pageI
 					Details: map[string]any{"href": href},
 				})
 			}
-		case ClassExternal:
+		case classExternal:
 			if policy.ForbidExternal {
 				report.Items = append(report.Items, Finding{
 					Severity: SeverityError, Code: CodeExternalLink,
@@ -104,7 +104,7 @@ func Compliance(doc *Document, lc LinkContext, policy template.LinkPolicy, pageI
 					Details: map[string]any{"href": href},
 				})
 			}
-		case ClassUnknownInternal:
+		case classUnknownInternal:
 			report.Items = append(report.Items, Finding{
 				Severity: SeverityWarn, Code: CodeUnknownInternal,
 				Message: "the page links to " + href + ", which the entity graph does not sanction",
@@ -125,20 +125,20 @@ func Compliance(doc *Document, lc LinkContext, policy template.LinkPolicy, pageI
 	return report
 }
 
-func classify(href string, lc LinkContext) LinkClass {
+func classify(href string, lc LinkContext) linkClass {
 	switch {
 	case href == "":
-		return ClassUnknownInternal
+		return classUnknownInternal
 	case lc.PageURL != "" && href == lc.PageURL:
-		return ClassSelf
+		return classSelf
 	}
 	if _, ok := lc.ByURL(href); ok {
-		return ClassGraph
+		return classGraph
 	}
 	if _, internal := pagemap.InternalPath(href, ""); !internal {
-		return ClassExternal
+		return classExternal
 	}
-	return ClassUnknownInternal
+	return classUnknownInternal
 }
 
 func allowedAnchor(target LinkTarget, anchor string) bool {

@@ -150,8 +150,14 @@ func TestBuildLinkContextOnAMultiParentDAG(t *testing.T) {
 		t.Fatalf("the sibling = %+v", lc.Targets[5])
 	}
 
-	if required := lc.Required(); len(required) != 2 {
-		t.Fatalf("Required = %v", urls(required))
+	required := 0
+	for _, target := range lc.Targets {
+		if target.Required {
+			required++
+		}
+	}
+	if required != 2 {
+		t.Fatalf("required targets = %d, want the two parents", required)
 	}
 	if phrases := lc.Phrases(); len(phrases) != 6 || phrases[0] != "drinks" {
 		t.Fatalf("Phrases = %v", phrases)

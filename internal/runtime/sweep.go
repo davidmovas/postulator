@@ -8,7 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
 
-func (e *Engine) Sweep(ctx context.Context) error {
+func (e *Engine) sweep(ctx context.Context) error {
 	if err := e.rearm(ctx); err != nil {
 		return err
 	}
