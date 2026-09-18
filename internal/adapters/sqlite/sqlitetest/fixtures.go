@@ -9,6 +9,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/site"
+	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
@@ -58,6 +59,17 @@ func Page(t testing.TB, store *sqlite.Store, siteID, path string) pagemap.Page {
 	}
 	if err := sqlite.NewPageRepo(store).Insert(t.Context(), record); err != nil {
 		t.Fatalf("insert the page fixture: %v", err)
+	}
+	return record
+}
+
+func Template(t testing.TB, store *sqlite.Store, name string) template.Template {
+	t.Helper()
+
+	seed := template.Seed()[3]
+	record := template.Template{ID: id.New(), Scope: template.ScopeGlobal, Name: name, PageKind: seed.PageKind, Version: 1, Spec: seed.Spec, CreatedAt: Stamp, UpdatedAt: Stamp}
+	if err := sqlite.NewTemplateRepo(store).Insert(t.Context(), record); err != nil {
+		t.Fatalf("insert the template fixture: %v", err)
 	}
 	return record
 }
