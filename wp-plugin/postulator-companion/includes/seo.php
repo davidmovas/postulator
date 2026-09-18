@@ -69,3 +69,22 @@ function read_term_seo( \WP_Term $term ): array {
 		'canonical'   => (string) get_term_meta( $term->term_id, $map['canonical'], true ),
 	);
 }
+
+function write_post_seo( int $post_id, array $fields ): array {
+	$map     = META_KEYS[ detect_plugin() ];
+	$applied = array();
+
+	foreach ( $map as $field => $key ) {
+		if ( ! array_key_exists( $field, $fields ) ) {
+			continue;
+		}
+		$value = $fields[ $field ];
+		if ( '' === $value ) {
+			delete_post_meta( $post_id, $key );
+		} else {
+			update_post_meta( $post_id, $key, wp_slash( $value ) );
+		}
+		$applied[] = $field;
+	}
+	return $applied;
+}

@@ -24,6 +24,16 @@ function register_routes(): void {
 			'permission_callback' => __NAMESPACE__ . '\\permission_check',
 		)
 	);
+
+	register_rest_route(
+		NAMESPACE_PATH,
+		'/seo-meta/(?P<id>\d+)',
+		array(
+			'methods'             => \WP_REST_Server::EDITABLE,
+			'callback'            => __NAMESPACE__ . '\\seo_meta_update',
+			'permission_callback' => __NAMESPACE__ . '\\permission_check',
+		)
+	);
 }
 
 function manifest(): \WP_REST_Response {
@@ -103,6 +113,44 @@ function content_list( \WP_REST_Request $request ) {
 		array(
 			'items'      => array_values( $page['items'] ),
 			'nextCursor' => $page['nextCursor'],
+		),
+		200
+	);
+}
+
+function editable_post( \WP_REST_Request $request ) {
+	$post = get_post( (int) $request['id'] );
+	if ( ! $post instanceof \WP_Post || in_array( $post->post_status, array( 'auto-draft', 'trash' ), true ) ) {
+		return not_found( 'no post with that id' );
+	}
+	if ( ! current_user_can( 'edit_post', $post->ID ) ) {
+		return forbidden( 'editing this post is not allowed' );
+	}
+	return $post;
+}
+
+function seo_meta_update( \WP_REST_Request $request ) {
+	$post = editable_post( $request );
+	if ( is_wp_error( $post ) ) {
+		return $post;
+	}
+
+	$body = $request->get_json_params();
+	if ( ! is_array( $body ) ) {
+		return invalid( 'invalid_body', 'a JSON object body is required' );
+	}
+
+	$fields = array();
+	foreach ( array_keys( META_KEYS['none'] ) as $field ) {
+		if ( array_key_exists( $field, $body ) ) {
+			$fields[ $field ] = is_scalar( $body[ $field ] ) ? (string) $body[ $field ] : '';
+		}
+	}
+
+	return new \WP_REST_Response(
+		array(
+			'applied'   => write_post_seo( (int) $post->ID, $fields ),
+			'seoPlugin' => detect_plugin(),
 		),
 		200
 	);
