@@ -37,7 +37,7 @@ type runReader interface {
 
 type itemReader interface {
 	ByRun(ctx context.Context, runID string) ([]run.Item, error)
-	ByPage(ctx context.Context, pageID string, limit int) ([]run.Item, error)
+	ByTarget(ctx context.Context, targetID string, limit int) ([]run.Item, error)
 }
 
 type artifactReader interface {

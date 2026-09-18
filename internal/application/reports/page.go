@@ -21,7 +21,7 @@ func (s *Service) PageReport(ctx context.Context, req PageReportRequest) (PageRe
 		return PageReportResponse{}, err
 	}
 
-	items, err := s.items.ByPage(ctx, pageID, recentItems)
+	items, err := s.items.ByTarget(ctx, pageID, recentItems)
 	if err != nil {
 		return PageReportResponse{}, err
 	}
@@ -81,7 +81,7 @@ func (s *Service) RunReport(ctx context.Context, req RunReportRequest) (RunRepor
 			return RunReportResponse{}, artifactErr
 		}
 		report.Items = append(report.Items, ItemReport{
-			ItemID: items[i].ID, PageID: items[i].PageID, Status: string(items[i].Status),
+			ItemID: items[i].ID, PageID: items[i].TargetID, Status: string(items[i].Status),
 			Error: items[i].Error, Report: latest(artifacts, run.ArtifactFinalReport),
 		})
 	}

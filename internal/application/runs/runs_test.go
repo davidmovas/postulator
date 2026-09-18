@@ -147,7 +147,7 @@ func (f *fixture) seedRun(t *testing.T, status run.Status) (run.Run, run.Item) {
 	}
 
 	item := run.Item{
-		ID: id.New(), RunID: record.ID, PageID: f.pages[0], Status: run.StatusCompleted,
+		ID: id.New(), RunID: record.ID, SiteID: record.SiteID, TargetID: f.pages[0], Status: run.StatusCompleted,
 		CurrentStep: "generate_body", Checkpoint: run.NewCheckpoint(),
 		CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 	}
@@ -307,7 +307,7 @@ func TestGetAndListReadTheSnapshots(t *testing.T) {
 	if err != nil || len(items.Items) != 1 || items.Items[0].ID != item.ID {
 		t.Fatalf("ListItems = %+v, %v", items, err)
 	}
-	if items.Items[0].CurrentStep != "generate_body" || items.Items[0].PageID != fixture.pages[0] {
+	if items.Items[0].CurrentStep != "generate_body" || items.Items[0].TargetID != fixture.pages[0] {
 		t.Fatalf("ListItems = %+v", items.Items[0])
 	}
 }

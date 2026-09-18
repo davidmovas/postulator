@@ -101,7 +101,7 @@ func (e *Engine) claim(parent context.Context, itemID string) (*claim, error) {
 
 		var resolved templates.ResolveForPageResponse
 		if scoped {
-			resolved, err = e.deps.Specs.ResolveForPage(ctx, templates.ResolveForPageRequest{PageID: item.PageID})
+			resolved, err = e.deps.Specs.ResolveForPage(ctx, templates.ResolveForPageRequest{PageID: item.TargetID})
 			if err != nil {
 				return e.abandon(ctx, out, record, item, run.Classify(err), now)
 			}
@@ -123,7 +123,7 @@ func (e *Engine) claim(parent context.Context, itemID string) (*claim, error) {
 
 		var page pagemap.Page
 		if scoped {
-			page, err = e.deps.Pages.Get(ctx, item.PageID)
+			page, err = e.deps.Pages.Get(ctx, item.TargetID)
 			if err != nil {
 				return e.abandon(ctx, out, record, item, run.Classify(err), now)
 			}

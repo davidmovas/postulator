@@ -91,7 +91,7 @@ func (h *syncHarness) once(t *testing.T) (steps.SiteSyncResult, run.Result) {
 
 	sc := &run.StepContext{
 		Run:       run.Run{ID: "run", SiteID: h.siteID, Kind: run.KindSync},
-		Item:      run.Item{ID: "item", RunID: "run", PageID: h.siteID},
+		Item:      run.Item{ID: "item", RunID: "run", SiteID: h.siteID, TargetID: h.siteID},
 		Params:    map[string]any{},
 		Artifacts: map[run.ArtifactKind]run.Artifact{},
 		Check:     h.check.Clone(),
@@ -315,7 +315,7 @@ func TestSyncSiteReportsWhatItCannotDo(t *testing.T) {
 
 	sc := &run.StepContext{
 		Run:       run.Run{ID: "run", SiteID: h.siteID, Kind: run.KindSync},
-		Item:      run.Item{ID: "item", RunID: "run", PageID: h.siteID},
+		Item:      run.Item{ID: "item", RunID: "run", SiteID: h.siteID, TargetID: h.siteID},
 		Artifacts: map[run.ArtifactKind]run.Artifact{},
 		Check:     run.NewCheckpoint(),
 	}
@@ -366,7 +366,7 @@ func TestSyncSiteRefusesAnUnreadableCursor(t *testing.T) {
 
 	sc := &run.StepContext{
 		Run:       run.Run{ID: "run", SiteID: h.siteID, Kind: run.KindSync},
-		Item:      run.Item{ID: "item", RunID: "run", PageID: h.siteID},
+		Item:      run.Item{ID: "item", RunID: "run", SiteID: h.siteID, TargetID: h.siteID},
 		Artifacts: map[run.ArtifactKind]run.Artifact{},
 		Check:     broken,
 	}

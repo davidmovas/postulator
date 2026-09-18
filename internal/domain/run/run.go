@@ -149,7 +149,8 @@ func NewRun(r Run) (Run, error) {
 type Item struct {
 	ID          string
 	RunID       string
-	PageID      string
+	SiteID      string
+	TargetID    string
 	Status      Status
 	CurrentStep string
 	Attempts    int
@@ -177,8 +178,10 @@ func NewItem(i Item) (Item, error) {
 		return Item{}, invalid("item id must not be empty", "id")
 	case i.RunID == "":
 		return Item{}, invalid("item run id must not be empty", "runId")
-	case i.PageID == "":
-		return Item{}, invalid("item page id must not be empty", "pageId")
+	case i.SiteID == "":
+		return Item{}, invalid("item site id must not be empty", "siteId")
+	case i.TargetID == "":
+		return Item{}, invalid("item target id must not be empty", "targetId")
 	case !i.Status.Valid():
 		return Item{}, invalid("item status is not recognized", "status")
 	case i.CurrentStep == "":

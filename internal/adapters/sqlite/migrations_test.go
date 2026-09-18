@@ -26,7 +26,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0004_sites.sql", "0005_link_policies.sql", "0006_templates.sql", "0007_entities.sql",
 		"0008_edges.sql", "0009_pages.sql", "0010_template_overrides.sql",
 		"0011_model_catalog.sql", "0012_model_profiles.sql", "0013_llm_calls.sql",
-		"0014_runs.sql", "0015_import_mappings.sql",
+		"0014_runs.sql", "0015_import_mappings.sql", "0016_run_items_target.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -59,8 +59,8 @@ func TestMigrationsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("version after up: %v", err)
 	}
-	if version != 15 {
-		t.Fatalf("version after up = %d, want 15", version)
+	if version != 16 {
+		t.Fatalf("version after up = %d, want 16", version)
 	}
 
 	if _, err = provider.DownTo(t.Context(), 0); err != nil {
@@ -84,8 +84,8 @@ func TestMigrationsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("version after the second up: %v", err)
 	}
-	if version != 15 {
-		t.Errorf("version after the second up = %d, want 15", version)
+	if version != 16 {
+		t.Errorf("version after the second up = %d, want 16", version)
 	}
 }
 
@@ -198,7 +198,7 @@ func TestRunSchemaCascades(t *testing.T) {
 	exec(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at)
 	exec(`INSERT INTO pages (id, site_id, path, slug, wp_type, status, created_at, updated_at) VALUES ('pg1', 's1', '/shoes/', 'shoes', 'page', 'planned', ?, ?)`, at, at)
 	exec(`INSERT INTO runs (id, site_id, kind, status, targets, recipe, publish_mode, created_by, deadline_at, created_at) VALUES ('r1', 's1', 'generate', 'pending', '["pg1"]', '[]', 'draft', 'user', ?, ?)`, at, at)
-	exec(`INSERT INTO run_items (id, run_id, page_id, status, current_step, created_at, updated_at) VALUES ('i1', 'r1', 'pg1', 'pending', 'resolve_context', ?, ?)`, at, at)
+	exec(`INSERT INTO run_items (id, run_id, site_id, target_id, status, current_step, created_at, updated_at) VALUES ('i1', 'r1', 's1', 'pg1', 'pending', 'resolve_context', ?, ?)`, at, at)
 	exec(`INSERT INTO artifacts (id, run_id, item_id, step, kind, blob, size, hash, created_at) VALUES ('a1', 'r1', 'i1', 'generate_body', 'body_html', x'3c703e', 3, 'hash', ?)`, at)
 	exec(`INSERT INTO step_execs (id, run_id, item_id, step, attempt, status, input_hash, artifact_id, started_at) VALUES ('x1', 'r1', 'i1', 'generate_body', 1, 'done', 'ih', 'a1', ?)`, at)
 	exec(`INSERT INTO run_events (id, run_id, seq, type, at, payload) VALUES ('v1', 'r1', 1, 'run.queued', ?, '{}')`, at)
@@ -217,6 +217,11 @@ func TestRunSchemaCascades(t *testing.T) {
 	var artifact sql.NullString
 	if err := store.reader.QueryRowContext(t.Context(), `SELECT artifact_id FROM step_execs WHERE id = 'x1'`).Scan(&artifact); err != nil || artifact.Valid {
 		t.Errorf("artifact reference after artifact delete = %v, %v; want NULL", artifact, err)
+	}
+
+	exec(`DELETE FROM pages WHERE id = 'pg1'`)
+	if got := count("run_items"); got != 1 {
+		t.Errorf("run_items after page delete = %d, want the item kept as run history", got)
 	}
 
 	exec(`DELETE FROM sites WHERE id = 's1'`)

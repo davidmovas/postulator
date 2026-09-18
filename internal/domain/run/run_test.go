@@ -80,7 +80,7 @@ func TestNewRunRejects(t *testing.T) {
 func TestNewItem(t *testing.T) {
 	t.Parallel()
 
-	item, err := run.NewItem(run.Item{ID: "item-1", RunID: "run-1", PageID: "page-1", CurrentStep: "resolve_context"})
+	item, err := run.NewItem(run.Item{ID: "item-1", RunID: "run-1", SiteID: "site-1", TargetID: "page-1", CurrentStep: "resolve_context"})
 	if err != nil {
 		t.Fatalf("NewItem: %v", err)
 	}
@@ -92,13 +92,14 @@ func TestNewItem(t *testing.T) {
 		name string
 		item run.Item
 	}{
-		{name: "no id", item: run.Item{RunID: "r", PageID: "p", CurrentStep: "s"}},
-		{name: "no run", item: run.Item{ID: "i", PageID: "p", CurrentStep: "s"}},
-		{name: "no page", item: run.Item{ID: "i", RunID: "r", CurrentStep: "s"}},
-		{name: "no step", item: run.Item{ID: "i", RunID: "r", PageID: "p"}},
-		{name: "unknown status", item: run.Item{ID: "i", RunID: "r", PageID: "p", CurrentStep: "s", Status: "hmm"}},
-		{name: "negative attempts", item: run.Item{ID: "i", RunID: "r", PageID: "p", CurrentStep: "s", Attempts: -1}},
-		{name: "unknown pause", item: run.Item{ID: "i", RunID: "r", PageID: "p", CurrentStep: "s", PauseReason: "hmm"}},
+		{name: "no id", item: run.Item{RunID: "r", SiteID: "s1", TargetID: "p", CurrentStep: "s"}},
+		{name: "no run", item: run.Item{ID: "i", SiteID: "s1", TargetID: "p", CurrentStep: "s"}},
+		{name: "no site", item: run.Item{ID: "i", RunID: "r", TargetID: "p", CurrentStep: "s"}},
+		{name: "no target", item: run.Item{ID: "i", RunID: "r", SiteID: "s1", CurrentStep: "s"}},
+		{name: "no step", item: run.Item{ID: "i", RunID: "r", SiteID: "s1", TargetID: "p"}},
+		{name: "unknown status", item: run.Item{ID: "i", RunID: "r", SiteID: "s1", TargetID: "p", CurrentStep: "s", Status: "hmm"}},
+		{name: "negative attempts", item: run.Item{ID: "i", RunID: "r", SiteID: "s1", TargetID: "p", CurrentStep: "s", Attempts: -1}},
+		{name: "unknown pause", item: run.Item{ID: "i", RunID: "r", SiteID: "s1", TargetID: "p", CurrentStep: "s", PauseReason: "hmm"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

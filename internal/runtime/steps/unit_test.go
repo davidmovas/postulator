@@ -170,7 +170,7 @@ func unitContext(t *testing.T, artifacts map[run.ArtifactKind][]byte) *run.StepC
 
 	return &run.StepContext{
 		Run:  run.Run{ID: "run", SiteID: "site", Kind: run.KindGenerate},
-		Item: run.Item{ID: "item", RunID: "run", PageID: "page-child"},
+		Item: run.Item{ID: "item", RunID: "run", SiteID: "site", TargetID: "page-child"},
 		Page: pagemap.Page{
 			ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", Title: "Espresso",
 			WPType: pagemap.WPPage, Status: pagemap.StatusPlanned, EntityID: pointer("child"),

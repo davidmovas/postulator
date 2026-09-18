@@ -193,18 +193,8 @@ func (e *Engine) fill(ctx context.Context) error {
 		return err
 	}
 
-	sites := make(map[string]string, len(items))
 	for i := range items {
-		siteID, known := sites[items[i].RunID]
-		if !known {
-			record, runErr := e.deps.Runs.Get(ctx, items[i].RunID)
-			if runErr != nil {
-				continue
-			}
-			siteID = record.SiteID
-			sites[items[i].RunID] = siteID
-		}
-		e.offer(items[i].ID, siteID)
+		e.offer(items[i].ID, items[i].SiteID)
 	}
 	return nil
 }
@@ -234,11 +224,7 @@ func (e *Engine) siteOf(ctx context.Context, itemID string) (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	record, err := e.deps.Runs.Get(ctx, item.RunID)
-	if err != nil {
-		return "", false
-	}
-	return record.SiteID, true
+	return item.SiteID, true
 }
 
 func (e *Engine) reserve(itemID, siteID string) bool {

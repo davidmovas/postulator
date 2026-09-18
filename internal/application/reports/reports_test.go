@@ -171,7 +171,7 @@ func (f *fixture) withRun(t *testing.T, status run.Status, blobs map[run.Artifac
 
 	finished := sqlitetest.Stamp.Add(time.Minute)
 	item := run.Item{
-		ID: id.New(), RunID: record.ID, PageID: f.pages["/coffee/espresso/"].ID, Status: status,
+		ID: id.New(), RunID: record.ID, SiteID: f.siteID, TargetID: f.pages["/coffee/espresso/"].ID, Status: status,
 		CurrentStep: "report", Checkpoint: run.NewCheckpoint(),
 		CreatedAt: sqlitetest.Stamp, UpdatedAt: finished, FinishedAt: &finished,
 	}

@@ -14,24 +14,25 @@ import (
 )
 
 const (
-	itemColumns = `id, run_id, page_id, status, current_step, attempts, advance_seq, checkpoint, lease_until,
-		wake_at, pause_reason, error, created_at, updated_at, finished_at`
-	insertItem = `INSERT INTO run_items (` + itemColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	itemColumns = `id, run_id, site_id, target_id, status, current_step, attempts, advance_seq, checkpoint,
+		lease_until, wake_at, pause_reason, error, created_at, updated_at, finished_at`
+	insertItem = `INSERT INTO run_items (` + itemColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	selectItem = `SELECT ` + itemColumns + ` FROM run_items WHERE id = ?`
 	claimItem  = `UPDATE run_items SET status = 'running', advance_seq = advance_seq + 1, lease_until = ?,
 		wake_at = NULL, updated_at = ? WHERE id = ? AND advance_seq = ?
 		AND status IN ('pending', 'running', 'waiting')`
 	persistItem = `UPDATE run_items SET status = ?, current_step = ?, attempts = ?, checkpoint = ?, lease_until = ?,
 		wake_at = ?, pause_reason = ?, error = ?, updated_at = ?, finished_at = ? WHERE id = ? AND advance_seq = ?`
-	selectItemsByRun  = `SELECT ` + itemColumns + ` FROM run_items WHERE run_id = ? ORDER BY created_at, id`
-	selectItemsByPage = `SELECT ` + itemColumns + ` FROM run_items WHERE page_id = ?
+	selectItemsByRun    = `SELECT ` + itemColumns + ` FROM run_items WHERE run_id = ? ORDER BY created_at, id`
+	selectItemsByTarget = `SELECT ` + itemColumns + ` FROM run_items WHERE target_id = ?
 		ORDER BY created_at DESC, id DESC LIMIT ?`
 	selectDueItems = `SELECT ` + itemColumns + ` FROM run_items
 		WHERE status = 'waiting' AND wake_at IS NOT NULL AND wake_at <= ? ORDER BY wake_at, id LIMIT ?`
 	selectStalledItems = `SELECT ` + itemColumns + ` FROM run_items
 		WHERE status = 'running' AND lease_until IS NOT NULL AND lease_until <= ? ORDER BY lease_until, id LIMIT ?`
-	selectRunnableItems = `SELECT i.id, i.run_id, i.page_id, i.status, i.current_step, i.attempts, i.advance_seq,
-		i.checkpoint, i.lease_until, i.wake_at, i.pause_reason, i.error, i.created_at, i.updated_at, i.finished_at
+	selectRunnableItems = `SELECT i.id, i.run_id, i.site_id, i.target_id, i.status, i.current_step, i.attempts,
+		i.advance_seq, i.checkpoint, i.lease_until, i.wake_at, i.pause_reason, i.error, i.created_at, i.updated_at,
+		i.finished_at
 		FROM run_items i JOIN runs r ON r.id = i.run_id
 		WHERE r.status IN ('pending', 'running') AND i.status = 'pending'
 		AND (i.lease_until IS NULL OR i.lease_until <= ?) ORDER BY i.created_at, i.id LIMIT ?`
@@ -65,8 +66,8 @@ func (r *RunItemRepo) Insert(ctx context.Context, item run.Item) error {
 	}
 
 	_, err = execWrite(ctx, r.store.writeFrom(ctx), insertItem, []any{
-		item.ID, item.RunID, item.PageID, string(item.Status), item.CurrentStep, item.Attempts, item.AdvanceSeq,
-		checkpoint, nullTime(item.LeaseUntil), nullTime(item.WakeAt), string(item.PauseReason), item.Error,
+		item.ID, item.RunID, item.SiteID, item.TargetID, string(item.Status), item.CurrentStep, item.Attempts,
+		item.AdvanceSeq, checkpoint, nullTime(item.LeaseUntil), nullTime(item.WakeAt), string(item.PauseReason), item.Error,
 		formatTime(item.CreatedAt), formatTime(item.UpdatedAt), nullTime(item.FinishedAt),
 	}, errors.New(errors.Conflict, "a run item with this id already exists"), "insert the run item")
 	return err
@@ -109,9 +110,9 @@ func (r *RunItemRepo) ByRun(ctx context.Context, runID string) ([]run.Item, erro
 	return selectAll(ctx, r.store.execFrom(ctx), selectItemsByRun, []any{runID}, scanItem, "list the run items")
 }
 
-func (r *RunItemRepo) ByPage(ctx context.Context, pageID string, limit int) ([]run.Item, error) {
-	return selectAll(ctx, r.store.execFrom(ctx), selectItemsByPage, []any{pageID, limit}, scanItem,
-		"list the run items of the page")
+func (r *RunItemRepo) ByTarget(ctx context.Context, targetID string, limit int) ([]run.Item, error) {
+	return selectAll(ctx, r.store.execFrom(ctx), selectItemsByTarget, []any{targetID, limit}, scanItem,
+		"list the run items of the target")
 }
 
 func (r *RunItemRepo) Due(ctx context.Context, now time.Time, limit int) ([]run.Item, error) {
@@ -240,7 +241,7 @@ func scanItem(rows *sql.Rows) (run.Item, error) {
 		finishedAt           sql.NullString
 	)
 	if err := rows.Scan(
-		&item.ID, &item.RunID, &item.PageID, &status, &item.CurrentStep, &item.Attempts, &item.AdvanceSeq,
+		&item.ID, &item.RunID, &item.SiteID, &item.TargetID, &status, &item.CurrentStep, &item.Attempts, &item.AdvanceSeq,
 		&checkpoint, &leaseUntil, &wakeAt, &pauseReason, &item.Error, &createdAt, &updatedAt, &finishedAt,
 	); err != nil {
 		return run.Item{}, err

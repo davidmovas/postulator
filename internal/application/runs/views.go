@@ -34,7 +34,8 @@ type Run struct {
 type Item struct {
 	ID          string   `json:"id"`
 	RunID       string   `json:"runId"`
-	PageID      string   `json:"pageId"`
+	SiteID      string   `json:"siteId"`
+	TargetID    string   `json:"targetId"`
 	Status      string   `json:"status"`
 	CurrentStep string   `json:"currentStep"`
 	Attempts    int      `json:"attempts"`
@@ -103,7 +104,8 @@ func itemView(item run.Item) Item {
 	return Item{
 		ID:          item.ID,
 		RunID:       item.RunID,
-		PageID:      item.PageID,
+		SiteID:      item.SiteID,
+		TargetID:    item.TargetID,
 		Status:      string(item.Status),
 		CurrentStep: item.CurrentStep,
 		Attempts:    item.Attempts,

@@ -66,7 +66,7 @@ func (f runFixture) insertItem(t *testing.T, pageID, step string) run.Item {
 	t.Helper()
 
 	item := run.Item{
-		ID: id.New(), RunID: f.run.ID, PageID: pageID, Status: run.StatusPending, CurrentStep: step,
+		ID: id.New(), RunID: f.run.ID, SiteID: f.run.SiteID, TargetID: pageID, Status: run.StatusPending, CurrentStep: step,
 		Checkpoint: run.NewCheckpoint(), CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 	}
 	if err := f.items.Insert(t.Context(), item); err != nil {

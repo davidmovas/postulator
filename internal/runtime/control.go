@@ -40,10 +40,10 @@ func (e *Engine) Enqueue(ctx context.Context, record run.Run) (run.Run, error) {
 		if insertErr := e.deps.Runs.Insert(c, validated); insertErr != nil {
 			return insertErr
 		}
-		for _, pageID := range validated.Targets {
+		for _, targetID := range validated.Targets {
 			item, itemErr := run.NewItem(run.Item{
-				ID: id.New(), RunID: validated.ID, PageID: pageID, CurrentStep: first,
-				CreatedAt: now, UpdatedAt: now,
+				ID: id.New(), RunID: validated.ID, SiteID: validated.SiteID, TargetID: targetID,
+				CurrentStep: first, CreatedAt: now, UpdatedAt: now,
 			})
 			if itemErr != nil {
 				return itemErr
