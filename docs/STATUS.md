@@ -100,16 +100,14 @@ the suite is 31 tests, green in `none`, `yoast` and `rankmath`, with no PHP diag
 from the plugin under `WORDPRESS_DEBUG=1`.
 
 **Phase 4 (the LLM layer) is complete.** `internal/application/llm` declares the port —
-`Client`, `Request`, `Response`, `Delta` and the generic `Structured[T]` — and imports no
-provider library. `internal/adapters/llm` holds `gollemclient` over gollem v0.28.4,
-`catalog` (embedded `models.json` merged with the `model_catalog` table), `profiles`,
-`ledger`, `limiter`, `retry`, `recordreplay` and the scripted `fake`.
-`internal/application/models` adds the seven use cases and `internal/app` composes the
-client as retry → limiter → ledger → record/replay → gollemclient. Migrations 0011–0013
-add `model_catalog`, `model_profiles` and `llm_calls`. The follow-up from Phase 3A also
-landed: `wp.NormalizePath` and `wp.InternalPath` now call `internal/domain/pagemap`.
-Build, vet, `golangci-lint run` (0 issues), `go test -race` and `covergate` are green;
-every package this phase added is at or above 86%.
+`Client`, `Request`, `Response`, `Delta`, `Structured[T]` — and imports no provider
+library. `internal/adapters/llm` holds `gollemclient` over gollem v0.28.4, `catalog`,
+`profiles`, `ledger`, `limiter`, `retry`, `recordreplay` and the scripted `fake`;
+`internal/application/models` adds the seven use cases; `internal/app` composes the client
+as retry → limiter → ledger → record/replay → gollemclient. Migrations 0011–0013 add
+`model_catalog`, `model_profiles` and `llm_calls`, and the Phase 3A follow-up landed with
+it: `wp.NormalizePath` and `wp.InternalPath` now call `internal/domain/pagemap`. The full
+gate is green and every package this phase added is at or above 86%.
 
 ## What landed in Phase 0
 
@@ -435,36 +433,32 @@ every package this phase added is at or above 86%.
   schema by reflection from `json`, `description` and `enum:"a,b"` tags, refuses recursive
   types, maps and channels before the first call, appends one JSON instruction to the
   system prompt and repairs exactly one decode failure by feeding the decoder error back.
-  `gollemclient` turns that schema into a `gollem.Parameter` and sets
-  `ContentTypeJSON` + `WithSessionResponseSchema`, so the constraint is provider-native.
-- **Usage comes from `gollem.Response.InputToken` and `OutputToken`**, on the completion
-  and on the last streamed chunk; gollem exposes no finish reason, so `stop` and `length`
-  are derived from the token ceiling and `content_filter` from `gollem.ErrProhibitedContent`.
-- **`Delta` carries an `Err`**, mirroring `gollem.Response.Error`. Without it a provider
-  failure after the first chunk would close the channel silently.
-- **gollem v0.28.4 drops the OpenAI session system prompt**, so the adapter sends it as a
-  `RoleSystem` history message for that provider only. Its Claude `Session.Stream` is not
-  a stream at all: it calls the non-streaming Messages API and emits one chunk.
-- **Gemini is Vertex-only.** `llm/gemini.New` takes a project and a location, exposes no
-  API key and no endpoint override, and silently ignores `WithGoogleCloudOptions`. The
-  settings are therefore `llm.gemini.projectId` and `llm.gemini.location`, not the
-  `llm.gemini.baseUrl` the phase brief named, and Gemini has no httptest coverage.
-- **`go-openai` rejects a temperature other than 1 for any `gpt-5*` or o-series model**
-  before the request leaves the process. Set `Temperature` only for models outside those
-  prefixes.
-- **The embedded catalog carries only models whose price was read off a vendor page**
-  on 2026-09-18: OpenAI `gpt-6-astra`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`;
-  Anthropic `claude-fable-5-1`, `claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5`;
-  Google `gemini-3.5-flash`, `gemini-3.5-flash-lite`, `gemini-2.5-flash`,
-  `gemini-2.5-flash-lite`. Models with tiered or promotional pricing are left out, because
-  `ModelInfo` holds one flat rate per direction.
-- **Rate limits are not published per model**, so every entry carries one conservative
-  `rpm`/`tpm`; the `model_catalog` table is how a user corrects it.
-- **An override row is the whole entry.** Disabling is `enabled = 0` and re-enabling is
-  another upsert, so neither repository has a delete.
+  `gollemclient` turns it into a `gollem.Parameter` with `ContentTypeJSON` and
+  `WithSessionResponseSchema`, so the constraint is provider-native.
+- **Usage is `gollem.Response.InputToken`/`OutputToken`**, on the completion and on the
+  last streamed chunk. gollem exposes no finish reason, so `stop` and `length` come from
+  the token ceiling and `content_filter` from `gollem.ErrProhibitedContent`. `Delta`
+  carries an `Err` like `gollem.Response.Error`; without it a failure after the first
+  chunk would close the channel silently.
+- **Three gollem v0.28.4 limits are worked around or accepted.** Its OpenAI session drops
+  the system prompt, so the adapter sends it as a `RoleSystem` history message for that
+  provider only. Its Claude `Session.Stream` calls the non-streaming Messages API and
+  emits one chunk. Its Gemini client is Vertex-only — no API key, no endpoint override,
+  and `WithGoogleCloudOptions` is ignored — so the settings are `llm.gemini.projectId` and
+  `llm.gemini.location` rather than the `llm.gemini.baseUrl` the brief named, and Gemini
+  has no httptest coverage. `go-openai` also rejects a temperature other than 1 for any
+  `gpt-5*` or o-series model before the request leaves the process.
+- **The embedded catalog carries only models whose price was read off a vendor page** on
+  2026-09-18: OpenAI `gpt-6-astra` and `gpt-5.6-{sol,terra,luna}`; Anthropic
+  `claude-fable-5-1`, `claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5`; Google
+  `gemini-3.5-flash{,-lite}` and `gemini-2.5-flash{,-lite}`. Tiered and promotional prices
+  are left out, because `ModelInfo` holds one flat rate per direction; rate limits are not
+  published per model, so every entry carries one conservative `rpm`/`tpm` and
+  `model_catalog` is the correction. An override row is the whole entry, so disabling is
+  `enabled = 0`, re-enabling is another upsert, and neither repository has a delete.
 - **The ledger stamps `created_at` from `kernel/clock` and measures latency with
-  `time.Since`.** The clock abstraction exists for timestamps, not for elapsed time.
-- **The record/replay key excludes `Request.Meta`**, so a fixture survives a new run id.
+  `time.Since`**; the clock abstraction is for timestamps, not elapsed time. The
+  record/replay key excludes `Request.Meta`, so a fixture survives a new run id.
 
 ## Known gaps
 
@@ -495,13 +489,9 @@ every package this phase added is at or above 86%.
 - The e2e suite carries its own small HTTP client rather than using `internal/adapters/wp`
   from track A, which had not landed when it was written. Switching it to the adapter is a
   follow-up that deletes `client` from `harness_test.go`.
-- Nothing writes `llm:<provider>:api_key` yet: the secret reference is fixed by
-  `gollemclient.SecretRef` and read at client construction, but the use case that stores a
-  key belongs to the settings surface in Phase 11, so `TestProvider` fails with
-  `Unauthorized` until one is written by hand.
-- `ledger.List` has no caller outside its own test; the run and conversation read models
-  in Phase 11 are what it was built for.
-- The scripted `gollem.LLMClient` for the agent runtime is not here. It would be dead code
-  until Phase 9, which is where the agent runner and its tool loop land.
+- Nothing writes `llm:<provider>:api_key` yet — that use case belongs to the Phase 11
+  settings surface — so `TestProvider` fails with `Unauthorized` until a key is stored by
+  hand. `ledger.List` likewise has no caller until the Phase 11 read models, and the
+  scripted `gollem.LLMClient` waits for the Phase 9 agent runner rather than ship dead.
 - The docker e2e stack is never run in CI: `windows-latest` cannot run Linux containers,
   and the Ubuntu job exists only to lint and package the plugin.
