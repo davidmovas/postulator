@@ -12,6 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/images/localfile"
 	imageopenai "github.com/davidmovas/postulator/internal/adapters/images/openai"
 	"github.com/davidmovas/postulator/internal/adapters/images/wpmedia"
+	"github.com/davidmovas/postulator/internal/adapters/importer"
 	"github.com/davidmovas/postulator/internal/adapters/llm/catalog"
 	"github.com/davidmovas/postulator/internal/adapters/llm/gollemclient"
 	"github.com/davidmovas/postulator/internal/adapters/llm/ledger"
@@ -26,6 +27,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp/plugin"
 	"github.com/davidmovas/postulator/internal/adapters/wp/registry"
 	"github.com/davidmovas/postulator/internal/application/graph"
+	"github.com/davidmovas/postulator/internal/application/imports"
 	llmport "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/models"
 	"github.com/davidmovas/postulator/internal/application/pages"
@@ -77,6 +79,7 @@ type Core struct {
 	Sites           *sites.Service
 	Graph           *graph.Service
 	Pages           *pages.Service
+	Imports         *imports.Service
 	Templates       *templates.Service
 	LLM             llmport.Client
 	Catalog         *catalog.Catalog
@@ -204,18 +207,31 @@ func Open(ctx context.Context, cfg Config, logger *zap.Logger) (*Core, error) {
 		Sites:           sites.New(siteRepo, secretStore, store, now),
 		Graph:           graph.New(entityRepo, edgeRepo, siteRepo, store, relay, now),
 		Pages:           pages.New(pageRepo, linkRepo, entityRepo, siteRepo, store, relay, now),
-		Templates:       templateService,
-		LLM:             client,
-		Catalog:         modelCatalog,
-		Profiles:        modelProfiles,
-		Ledger:          book,
-		Models:          models.New(modelCatalog, modelRepo, modelProfiles, book, secretStore, client, now),
-		Steps:           stepRegistry,
-		Engine:          engine,
-		Runs:            runs.New(engine, runRepo, itemRepo, artifactRepo, eventRepo, templateService),
-		Sync:            sync.New(engine, siteRepo, wordpress, packer{}, now),
-		Reports:         reports.New(entityRepo, edgeRepo, pageRepo, linkRepo, runRepo, itemRepo, artifactRepo),
-		WordPress:       wordpress,
+		Imports: imports.New(imports.Deps{
+			Tables:     importer.New(),
+			Entities:   entityRepo,
+			Edges:      edgeRepo,
+			Pages:      pageRepo,
+			Templates:  templateRepo,
+			Mappings:   sqlite.NewImportMappingRepo(store),
+			Sites:      siteRepo,
+			UnitOfWork: store,
+			Publisher:  relay,
+			Clock:      now,
+			MaxRows:    imports.MaxRows(values),
+		}),
+		Templates: templateService,
+		LLM:       client,
+		Catalog:   modelCatalog,
+		Profiles:  modelProfiles,
+		Ledger:    book,
+		Models:    models.New(modelCatalog, modelRepo, modelProfiles, book, secretStore, client, now),
+		Steps:     stepRegistry,
+		Engine:    engine,
+		Runs:      runs.New(engine, runRepo, itemRepo, artifactRepo, eventRepo, templateService),
+		Sync:      sync.New(engine, siteRepo, wordpress, packer{}, now),
+		Reports:   reports.New(entityRepo, edgeRepo, pageRepo, linkRepo, runRepo, itemRepo, artifactRepo),
+		WordPress: wordpress,
 	}
 	if err = core.Templates.EnsureSeeded(ctx); err != nil {
 		return nil, stderrors.Join(err, store.Close())
