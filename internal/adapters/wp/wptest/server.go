@@ -47,6 +47,7 @@ type Server struct {
 	password      string
 	seoPlugin     string
 	redirect      Redirect
+	pendingEdit   *edit
 	nextID        int64
 	noPlugin      bool
 	brokenHash    bool

@@ -433,3 +433,58 @@ func TestThePluginRoutesRejectBadInput(t *testing.T) {
 		})
 	}
 }
+
+func TestAnEditJustBeforeARawWriteIsAConflict(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Coffee", Content: "<p>One.</p>"})
+	path := "/wp-json/postulator/v1/content/" + itoa(seeded[0].ID) + "/raw"
+
+	var read struct {
+		ContentHash string `json:"contentHash"`
+	}
+	_, payload := call(t, server, http.MethodGet, path, nil, true)
+	decode(t, payload, &read)
+
+	server.EditBeforeNextRawWrite(seeded[0].ID, "<p>Edited by a human.</p>")
+
+	response, body := call(t, server, http.MethodPut, path,
+		[]byte(`{"content":"<p>Two.</p>","expectedHash":"`+read.ContentHash+`"}`), true)
+	if response.StatusCode != http.StatusConflict {
+		t.Fatalf("status = %d, want 409", response.StatusCode)
+	}
+
+	var conflict struct {
+		Code        string `json:"code"`
+		CurrentHash string `json:"currentHash"`
+	}
+	decode(t, body, &conflict)
+	if conflict.Code != "hash_mismatch" || conflict.CurrentHash == read.ContentHash {
+		t.Fatalf("conflict = %+v", conflict)
+	}
+
+	stored, _ := server.Lookup(seeded[0].ID)
+	if stored.Content != "<p>Edited by a human.</p>" {
+		t.Fatalf("the refused write landed: %q", stored.Content)
+	}
+}
+
+func TestRewriteReplacesTheStoredContent(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Coffee", Content: "<p>One.</p>"})
+
+	if !server.Rewrite(seeded[0].ID, "<p>Two.</p>") {
+		t.Fatal("Rewrite reported that the item is absent")
+	}
+	if server.Rewrite(9999, "<p>Three.</p>") {
+		t.Fatal("Rewrite reported that an absent item exists")
+	}
+
+	stored, _ := server.Lookup(seeded[0].ID)
+	if stored.Content != "<p>Two.</p>" || !stored.Modified.After(seeded[0].Modified) {
+		t.Fatalf("the item holds %+v", stored)
+	}
+}

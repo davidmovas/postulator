@@ -251,6 +251,7 @@ func (s *Server) handleRawPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	expected := stringField(body, "expectedHash")
+	_, _ = s.takePendingEdit()
 
 	s.mu.Lock()
 	stored, found := s.items[id]

@@ -98,6 +98,7 @@ func all(deps Deps) []run.StepDef {
 		Validate(deps),
 		Judge(deps),
 		Publish(deps),
+		RelinkNeighbors(deps),
 	}
 }
 

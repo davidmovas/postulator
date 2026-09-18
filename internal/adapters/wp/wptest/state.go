@@ -190,6 +190,46 @@ func (s *Server) SeedCategory(category Category) Category {
 	return stored
 }
 
+type edit struct {
+	content string
+	id      int64
+}
+
+func (s *Server) Rewrite(id int64, content string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.rewrite(id, content)
+}
+
+func (s *Server) rewrite(id int64, content string) bool {
+	stored, ok := s.items[id]
+	if !ok {
+		return false
+	}
+	stored.Content = content
+	stored.Modified = s.tick()
+	return true
+}
+
+func (s *Server) EditBeforeNextRawWrite(id int64, content string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.pendingEdit = &edit{id: id, content: content}
+}
+
+func (s *Server) takePendingEdit() (edit, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.pendingEdit == nil {
+		return edit{}, false
+	}
+	pending := *s.pendingEdit
+	s.pendingEdit = nil
+	s.rewrite(pending.id, pending.content)
+	return pending, true
+}
+
 func (s *Server) Lookup(id int64) (Item, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -13,6 +13,8 @@ import (
 )
 
 const (
+	CodePluginMissing = "plugin_missing"
+
 	defaultContentLimit = 100
 	maxContentLimit     = 500
 )
@@ -200,7 +202,11 @@ type seoResultPayload struct {
 
 func pluginMissing() error {
 	return errors.New(errors.Invalid, "the Postulator companion plugin is not installed on this site").
-		WithDetail("code", "plugin_missing")
+		WithDetail("code", CodePluginMissing)
+}
+
+func IsPluginMissing(err error) bool {
+	return errors.IsCode(err, errors.Invalid) && detailString(err, "code") == CodePluginMissing
 }
 
 func (c *Client) Manifest(ctx context.Context) (Manifest, error) {
