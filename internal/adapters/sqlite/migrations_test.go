@@ -26,7 +26,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0004_sites.sql", "0005_link_policies.sql", "0006_templates.sql", "0007_entities.sql",
 		"0008_edges.sql", "0009_pages.sql", "0010_template_overrides.sql",
 		"0011_model_catalog.sql", "0012_model_profiles.sql", "0013_llm_calls.sql",
-		"0014_runs.sql", "0015_import_mappings.sql", "0016_run_items_target.sql",
+		"0014_runs.sql", "0015_import_mappings.sql", "0016_run_items_target.sql", "0017_agent.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -59,15 +59,15 @@ func TestMigrationsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("version after up: %v", err)
 	}
-	if version != 16 {
-		t.Fatalf("version after up = %d, want 16", version)
+	if version != 17 {
+		t.Fatalf("version after up = %d, want 17", version)
 	}
 
 	if _, err = provider.DownTo(t.Context(), 0); err != nil {
 		t.Fatalf("down: %v", err)
 	}
 
-	for _, table := range []string{"app_meta", "settings", "secrets", "sites", "link_policies", "templates", "entities", "entity_anchors", "edges", "pages", "page_links", "template_overrides", "model_catalog", "model_profiles", "llm_calls", "runs", "run_items", "artifacts", "step_execs", "run_events"} {
+	for _, table := range []string{"app_meta", "settings", "secrets", "sites", "link_policies", "templates", "entities", "entity_anchors", "edges", "pages", "page_links", "template_overrides", "model_catalog", "model_profiles", "llm_calls", "runs", "run_items", "artifacts", "step_execs", "run_events", "conversations", "messages", "conversation_histories", "pending_actions", "tool_calls"} {
 		var name string
 		scanErr := store.writer.QueryRowContext(t.Context(),
 			`SELECT name FROM sqlite_schema WHERE type = 'table' AND name = ?`, table).Scan(&name)
@@ -84,8 +84,8 @@ func TestMigrationsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("version after the second up: %v", err)
 	}
-	if version != 16 {
-		t.Errorf("version after the second up = %d, want 16", version)
+	if version != 17 {
+		t.Errorf("version after the second up = %d, want 17", version)
 	}
 }
 
