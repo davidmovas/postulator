@@ -80,8 +80,8 @@ func (s *Service) SetProviderKey(ctx context.Context, req SetProviderKeyRequest)
 			WithDetail("provider", provider)
 	}
 
-	if err = s.secrets.Put(ctx, llm.SecretRef(provider), key); err != nil {
-		return SetProviderKeyResponse{}, err
+	if putErr := s.secrets.Put(ctx, llm.SecretRef(provider), key); putErr != nil {
+		return SetProviderKeyResponse{}, putErr
 	}
 	return SetProviderKeyResponse{Provider: provider}, nil
 }
