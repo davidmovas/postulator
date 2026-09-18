@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"go.uber.org/zap/zaptest"
+
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/transport/wails"
 )
@@ -31,7 +33,7 @@ func TestServicesCarryTheInjectedStamps(t *testing.T) {
 	core, err := app.Open(t.Context(), app.Config{
 		DatabasePath: filepath.Join(home, "postulator.db"),
 		KeyDir:       home,
-	})
+	}, zaptest.NewLogger(t))
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}

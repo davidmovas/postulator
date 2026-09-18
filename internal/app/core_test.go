@@ -7,8 +7,11 @@ import (
 	"strings"
 	"testing"
 
+	"go.uber.org/zap/zaptest"
+
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/application/models"
+	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -20,7 +23,7 @@ func TestOpenWiresTheUseCasesAndSeedsTheStarterTemplates(t *testing.T) {
 	cfg := app.Config{DatabasePath: filepath.Join(home, "postulator.db"), KeyDir: home}
 
 	for round := range 2 {
-		core, err := app.Open(t.Context(), cfg)
+		core, err := app.Open(t.Context(), cfg, zaptest.NewLogger(t))
 		if err != nil {
 			t.Fatalf("Open round %d: %v", round, err)
 		}
@@ -29,6 +32,15 @@ func TestOpenWiresTheUseCasesAndSeedsTheStarterTemplates(t *testing.T) {
 		}
 		if core.LLM == nil || core.Catalog == nil || core.Profiles == nil || core.Ledger == nil || core.Models == nil {
 			t.Fatal("the core must carry the llm stack")
+		}
+		if core.Steps == nil || core.Engine == nil || core.Runs == nil {
+			t.Fatal("the core must carry the run engine")
+		}
+		if names := core.Steps.Names(); len(names) != 5 || names[0] != "resolve_context" {
+			t.Fatalf("round %d: the step registry holds %v", round, names)
+		}
+		if _, err := core.Runs.List(t.Context(), runs.ListRequest{}); err != nil {
+			t.Fatalf("round %d: ListRuns: %v", round, err)
 		}
 
 		listed, err := core.Models.ListModels(t.Context(), models.ListModelsRequest{})
@@ -61,7 +73,7 @@ func TestOpenAndClose(t *testing.T) {
 	core, err := app.Open(t.Context(), app.Config{
 		DatabasePath: filepath.Join(home, "postulator.db"),
 		KeyDir:       home,
-	})
+	}, zaptest.NewLogger(t))
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -95,7 +107,7 @@ func TestOpenReopensTheSameDatabase(t *testing.T) {
 	home := t.TempDir()
 	cfg := app.Config{DatabasePath: filepath.Join(home, "postulator.db"), KeyDir: home}
 
-	first, err := app.Open(t.Context(), cfg)
+	first, err := app.Open(t.Context(), cfg, zaptest.NewLogger(t))
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -106,7 +118,7 @@ func TestOpenReopensTheSameDatabase(t *testing.T) {
 		t.Fatalf("Close: %v", err)
 	}
 
-	second, err := app.Open(t.Context(), cfg)
+	second, err := app.Open(t.Context(), cfg, zaptest.NewLogger(t))
 	if err != nil {
 		t.Fatalf("Open again: %v", err)
 	}
@@ -140,7 +152,7 @@ func TestOpenRejectsAnIncompleteConfig(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			if _, err := app.Open(t.Context(), tc.cfg); !errors.IsCode(err, errors.Invalid) {
+			if _, err := app.Open(t.Context(), tc.cfg, zaptest.NewLogger(t)); !errors.IsCode(err, errors.Invalid) {
 				t.Errorf("code = %q, want %q", errors.CodeOf(err), errors.Invalid)
 			}
 		})
@@ -176,7 +188,7 @@ func TestOpenNamesBothFilesWhenTheKeyCannotBeUnprotected(t *testing.T) {
 		t.Fatalf("write a corrupt key file: %v", err)
 	}
 
-	_, err := app.Open(t.Context(), cfg)
+	_, err := app.Open(t.Context(), cfg, zaptest.NewLogger(t))
 	if !errors.IsCode(err, errors.Locked) {
 		t.Fatalf("code = %q, want %q", errors.CodeOf(err), errors.Locked)
 	}
@@ -201,7 +213,7 @@ func TestOpenNamesBothFilesWhenTheDatabaseIsUnreadable(t *testing.T) {
 		t.Fatalf("write junk: %v", err)
 	}
 
-	_, err := app.Open(t.Context(), cfg)
+	_, err := app.Open(t.Context(), cfg, zaptest.NewLogger(t))
 	if !errors.IsCode(err, errors.Locked) {
 		t.Fatalf("code = %q, want %q", errors.CodeOf(err), errors.Locked)
 	}

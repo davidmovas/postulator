@@ -33,7 +33,7 @@ func run() error {
 		}
 	}()
 
-	core, err := app.Open(context.Background(), cfg)
+	core, err := app.Open(context.Background(), cfg, logger.Logger)
 	if err != nil {
 		return err
 	}

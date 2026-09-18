@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"go.uber.org/zap"
+
 	"github.com/davidmovas/postulator/internal/adapters/llm/catalog"
 	"github.com/davidmovas/postulator/internal/adapters/llm/gollemclient"
 	"github.com/davidmovas/postulator/internal/adapters/llm/ledger"
@@ -20,11 +22,15 @@ import (
 	llmport "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/models"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/settings"
+	"github.com/davidmovas/postulator/internal/runtime"
+	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
 
 const (
@@ -67,9 +73,12 @@ type Core struct {
 	Profiles        *profiles.Profiles
 	Ledger          *ledger.Ledger
 	Models          *models.Service
+	Steps           *run.Registry
+	Engine          *runtime.Engine
+	Runs            *runs.Service
 }
 
-func Open(ctx context.Context, cfg Config) (*Core, error) {
+func Open(ctx context.Context, cfg Config, logger *zap.Logger) (*Core, error) {
 	if cfg.DatabasePath == "" {
 		return nil, errors.New(errors.Invalid, "the database path must not be empty")
 	}
@@ -113,6 +122,7 @@ func Open(ctx context.Context, cfg Config) (*Core, error) {
 		return nil, stderrors.Join(err, store.Close())
 	}
 
+	templateService := templates.New(templateRepo, policyRepo, pageRepo, siteRepo, store, relay, now)
 	modelProfiles := profiles.New(profileRepo, siteRepo, modelCatalog, now)
 	book := ledger.New(
 		recordreplay.New(
@@ -124,6 +134,39 @@ func Open(ctx context.Context, cfg Config) (*Core, error) {
 	)
 	client := retry.New(limiter.New(book, modelCatalog), retry.Retries(values), retry.DefaultBackoff)
 
+	registry := run.NewRegistry()
+	if err = steps.Register(registry, steps.Deps{
+		Entities: entityRepo,
+		Edges:    edgeRepo,
+		Pages:    pageRepo,
+		Policies: templateService,
+		Profiles: modelProfiles,
+		LLM:      client,
+	}); err != nil {
+		return nil, stderrors.Join(err, store.Close())
+	}
+
+	runRepo := sqlite.NewRunRepo(store)
+	itemRepo := sqlite.NewRunItemRepo(store)
+	artifactRepo := sqlite.NewArtifactRepo(store)
+	execRepo := sqlite.NewStepExecRepo(store)
+	eventRepo := sqlite.NewRunEventRepo(store)
+
+	engine := runtime.New(runtime.Deps{
+		Runs:       runRepo,
+		Items:      itemRepo,
+		Artifacts:  artifactRepo,
+		Execs:      execRepo,
+		Events:     eventRepo,
+		Pages:      pageRepo,
+		Specs:      templateService,
+		Spend:      callRepo,
+		Catalog:    modelCatalog,
+		Profiles:   modelProfiles,
+		UnitOfWork: store,
+		Publisher:  relay,
+	}, registry, runtime.Settings(values), now, logger)
+
 	core := &Core{
 		Store:           store,
 		Secrets:         secretStore,
@@ -133,19 +176,26 @@ func Open(ctx context.Context, cfg Config) (*Core, error) {
 		Sites:           sites.New(siteRepo, secretStore, store, now),
 		Graph:           graph.New(entityRepo, edgeRepo, siteRepo, store, relay, now),
 		Pages:           pages.New(pageRepo, linkRepo, entityRepo, siteRepo, store, relay, now),
-		Templates:       templates.New(templateRepo, policyRepo, pageRepo, siteRepo, store, relay, now),
+		Templates:       templateService,
 		LLM:             client,
 		Catalog:         modelCatalog,
 		Profiles:        modelProfiles,
 		Ledger:          book,
 		Models:          models.New(modelCatalog, modelRepo, modelProfiles, book, secretStore, client, now),
+		Steps:           registry,
+		Engine:          engine,
+		Runs:            runs.New(engine, runRepo, itemRepo, artifactRepo, eventRepo, templateService),
 	}
 	if err = core.Templates.EnsureSeeded(ctx); err != nil {
+		return nil, stderrors.Join(err, store.Close())
+	}
+	if err = engine.Start(ctx); err != nil {
 		return nil, stderrors.Join(err, store.Close())
 	}
 	return core, nil
 }
 
 func (c *Core) Close() error {
+	c.Engine.Stop()
 	return c.Store.Close()
 }

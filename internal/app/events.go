@@ -27,3 +27,11 @@ func (r *EventRelay) Publish(eventType events.Type, payload any) error {
 	}
 	return bridge.Publish(eventType, payload)
 }
+
+func (r *EventRelay) PublishRun(runID string, seq int64, eventType events.Type, payload any) error {
+	bridge := r.bridge.Load()
+	if bridge == nil {
+		return nil
+	}
+	return bridge.PublishRun(runID, seq, eventType, payload)
+}
