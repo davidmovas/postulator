@@ -458,3 +458,16 @@ func (in UpdateItem) payload() map[string]any {
 	}
 	return payload
 }
+
+func (q ListQuery) termValues() url.Values {
+	query := url.Values{}
+	query.Set("context", "edit")
+	query.Set("page", strconv.Itoa(q.pageNumber()))
+	query.Set("per_page", strconv.Itoa(q.perPageSize()))
+	query.Set("orderby", "id")
+	query.Set("order", "asc")
+	if len(q.Fields) > 0 {
+		query.Set("_fields", strings.Join(withID(q.Fields), ","))
+	}
+	return query
+}
