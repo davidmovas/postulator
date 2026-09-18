@@ -26,6 +26,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0004_sites.sql", "0005_link_policies.sql", "0006_templates.sql", "0007_entities.sql",
 		"0008_edges.sql", "0009_pages.sql", "0010_template_overrides.sql",
 		"0011_model_catalog.sql", "0012_model_profiles.sql", "0013_llm_calls.sql",
+		"0014_runs.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -58,15 +59,15 @@ func TestMigrationsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("version after up: %v", err)
 	}
-	if version != 13 {
-		t.Fatalf("version after up = %d, want 13", version)
+	if version != 14 {
+		t.Fatalf("version after up = %d, want 14", version)
 	}
 
 	if _, err = provider.DownTo(t.Context(), 0); err != nil {
 		t.Fatalf("down: %v", err)
 	}
 
-	for _, table := range []string{"app_meta", "settings", "secrets", "sites", "link_policies", "templates", "entities", "entity_anchors", "edges", "pages", "page_links", "template_overrides", "model_catalog", "model_profiles", "llm_calls"} {
+	for _, table := range []string{"app_meta", "settings", "secrets", "sites", "link_policies", "templates", "entities", "entity_anchors", "edges", "pages", "page_links", "template_overrides", "model_catalog", "model_profiles", "llm_calls", "runs", "run_items", "artifacts", "step_execs", "run_events"} {
 		var name string
 		scanErr := store.writer.QueryRowContext(t.Context(),
 			`SELECT name FROM sqlite_schema WHERE type = 'table' AND name = ?`, table).Scan(&name)
@@ -83,8 +84,8 @@ func TestMigrationsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("version after the second up: %v", err)
 	}
-	if version != 13 {
-		t.Errorf("version after the second up = %d, want 13", version)
+	if version != 14 {
+		t.Errorf("version after the second up = %d, want 14", version)
 	}
 }
 
@@ -168,6 +169,58 @@ func TestSchemaCascades(t *testing.T) {
 
 	exec(`DELETE FROM sites WHERE id = 's1'`)
 	for _, table := range []string{"entities", "pages", "page_links", "link_policies", "template_overrides"} {
+		if got := count(table); got != 0 {
+			t.Errorf("%s after site delete = %d", table, got)
+		}
+	}
+}
+
+func TestRunSchemaCascades(t *testing.T) {
+	t.Parallel()
+
+	store := openStore(t, nil)
+	exec := func(query string, args ...any) {
+		t.Helper()
+		if _, err := store.writer.ExecContext(t.Context(), query, args...); err != nil {
+			t.Fatalf("%s: %v", query, err)
+		}
+	}
+	count := func(table string) int {
+		t.Helper()
+		var n int
+		if err := store.reader.QueryRowContext(t.Context(), "SELECT count(*) FROM "+table).Scan(&n); err != nil {
+			t.Fatalf("count %s: %v", table, err)
+		}
+		return n
+	}
+	const at = "2026-09-18T09:00:00Z"
+
+	exec(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at)
+	exec(`INSERT INTO pages (id, site_id, path, slug, wp_type, status, created_at, updated_at) VALUES ('pg1', 's1', '/shoes/', 'shoes', 'page', 'planned', ?, ?)`, at, at)
+	exec(`INSERT INTO runs (id, site_id, kind, status, targets, recipe, publish_mode, created_by, deadline_at, created_at) VALUES ('r1', 's1', 'generate', 'pending', '["pg1"]', '[]', 'draft', 'user', ?, ?)`, at, at)
+	exec(`INSERT INTO run_items (id, run_id, page_id, status, current_step, created_at, updated_at) VALUES ('i1', 'r1', 'pg1', 'pending', 'resolve_context', ?, ?)`, at, at)
+	exec(`INSERT INTO artifacts (id, run_id, item_id, step, kind, blob, size, hash, created_at) VALUES ('a1', 'r1', 'i1', 'generate_body', 'body_html', x'3c703e', 3, 'hash', ?)`, at)
+	exec(`INSERT INTO step_execs (id, run_id, item_id, step, attempt, status, input_hash, artifact_id, started_at) VALUES ('x1', 'r1', 'i1', 'generate_body', 1, 'done', 'ih', 'a1', ?)`, at)
+	exec(`INSERT INTO run_events (id, run_id, seq, type, at, payload) VALUES ('v1', 'r1', 1, 'run.queued', ?, '{}')`, at)
+
+	if _, err := store.writer.ExecContext(t.Context(), `INSERT INTO run_events (id, run_id, seq, type, at, payload) VALUES ('v2', 'r1', 1, 'run.started', ?, '{}')`, at); err == nil {
+		t.Fatal("a run event sequence must be unique per run")
+	}
+	if _, err := store.writer.ExecContext(t.Context(), `INSERT INTO artifacts (id, run_id, item_id, step, kind, blob, size, hash, created_at) VALUES ('a2', 'r1', 'i1', 'generate_body', 'body_html', x'3c703e', 3, 'hash', ?)`, at); err == nil {
+		t.Fatal("one artifact per item, step and kind")
+	}
+	if _, err := store.writer.ExecContext(t.Context(), `INSERT INTO step_execs (id, run_id, item_id, step, attempt, status, input_hash, started_at) VALUES ('x2', 'r1', 'i1', 'generate_body', 1, 'started', 'ih', ?)`, at); err == nil {
+		t.Fatal("one step execution per item, step and attempt")
+	}
+
+	exec(`DELETE FROM artifacts WHERE id = 'a1'`)
+	var artifact sql.NullString
+	if err := store.reader.QueryRowContext(t.Context(), `SELECT artifact_id FROM step_execs WHERE id = 'x1'`).Scan(&artifact); err != nil || artifact.Valid {
+		t.Errorf("artifact reference after artifact delete = %v, %v; want NULL", artifact, err)
+	}
+
+	exec(`DELETE FROM sites WHERE id = 's1'`)
+	for _, table := range []string{"runs", "run_items", "artifacts", "step_execs", "run_events"} {
 		if got := count(table); got != 0 {
 			t.Errorf("%s after site delete = %d", table, got)
 		}
