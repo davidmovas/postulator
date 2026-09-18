@@ -299,3 +299,11 @@ func producing(name string, kind run.ArtifactKind, requires []run.ArtifactKind, 
 func faulty(code errors.Code, message string) error {
 	return errors.New(code, message)
 }
+
+func pageRepoOf(h *harness) *sqlite.PageRepo {
+	return sqlite.NewPageRepo(h.store)
+}
+
+func systemClock() clock.Clock {
+	return clock.System{}
+}
