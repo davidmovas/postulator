@@ -7,6 +7,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -297,5 +298,41 @@ func TestApplySavesTheMappingUnderTheSameNameTwice(t *testing.T) {
 	}
 	if len(h.entities(t)) != 3 || len(h.pages(t)) != 3 {
 		t.Fatal("the second apply rolled the site back")
+	}
+}
+
+func TestApplyLinksEveryCreatedPageToItsParentPath(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	path := h.file(t, "tree.csv", "path,title\n/menu/,Menu\n/menu/mains/,Mains\n/menu/mains/steaks/,Steaks\n")
+
+	applied := h.apply(t, path, h.mapping(map[string]string{"path": "path", "title": "title"}))
+	if len(applied.Report.Errors) != 0 {
+		t.Fatalf("errors = %+v", applied.Report.Errors)
+	}
+
+	pages := h.pages(t)
+
+	byPath := make(map[string]pagemap.Page, len(pages))
+	for i := range pages {
+		byPath[pages[i].Path] = pages[i]
+	}
+
+	for child, parent := range map[string]string{
+		"/menu/":              "/",
+		"/menu/mains/":        "/menu/",
+		"/menu/mains/steaks/": "/menu/mains/",
+	} {
+		page, ok := byPath[child]
+		if !ok {
+			t.Fatalf("the import created no %s", child)
+		}
+		if page.ParentPageID == nil || *page.ParentPageID != byPath[parent].ID {
+			t.Fatalf("%s carries the parent %v, want %s", child, page.ParentPageID, parent)
+		}
+	}
+	if root, ok := byPath["/"]; !ok || root.ParentPageID != nil {
+		t.Fatalf("the top of the tree carries a parent: %+v", root)
 	}
 }

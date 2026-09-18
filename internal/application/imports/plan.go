@@ -498,6 +498,28 @@ func checkCannibalization(state siteState, resolved map[string]graph.Entity, p *
 	return nil
 }
 
+func linkParents(state siteState, p *plan) {
+	byPath := make(map[string]string, len(state.pages)+len(p.pages))
+	for i := range state.pages {
+		byPath[state.pages[i].Path] = state.pages[i].ID
+	}
+	for i := range p.pages {
+		byPath[p.pages[i].page.Path] = p.pages[i].page.ID
+	}
+
+	for i := range p.pages {
+		planned := &p.pages[i]
+		if planned.page.ParentPageID != nil {
+			continue
+		}
+		parentID, found := byPath[pagemap.ParentPath(planned.page.Path)]
+		if !found || parentID == planned.page.ID {
+			continue
+		}
+		planned.page.ParentPageID = &parentID
+	}
+}
+
 func markCanonical(state siteState, resolved map[string]graph.Entity, p *plan) {
 	final := make(map[string]pagemap.Page, len(state.pages)+len(p.pages))
 	for i := range state.pages {
@@ -553,6 +575,7 @@ func (s *Service) plan(ctx context.Context, siteID string, table importmap.Table
 	if err := checkCannibalization(state, resolved, &p); err != nil {
 		return plan{}, err
 	}
+	linkParents(state, &p)
 	markCanonical(state, resolved, &p)
 	p.report.settle()
 	return p, nil
