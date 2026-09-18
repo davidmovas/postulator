@@ -118,6 +118,12 @@ function decode_cursor( string $cursor ): ?array {
 	if ( ! is_array( $state ) || ! isset( $state['p'] ) || ! in_array( $state['p'], array( 'post', 'term' ), true ) ) {
 		return null;
 	}
+	if ( ! isset( $state['i'] ) || ! is_int( $state['i'] ) || $state['i'] < 0 ) {
+		return null;
+	}
+	if ( 'post' === $state['p'] && ( ! isset( $state['m'] ) || ! is_string( $state['m'] ) || '' === $state['m'] ) ) {
+		return null;
+	}
 	return $state;
 }
 
@@ -153,9 +159,19 @@ function permalink_path( \WP_Post $post ): string {
 
 	$publishable              = clone $post;
 	$publishable->post_status = 'publish';
-	if ( '' === (string) $publishable->post_name ) {
-		$publishable->post_name = sanitize_title( (string) $publishable->post_title, (int) $publishable->ID );
+
+	$name = (string) $publishable->post_name;
+	if ( '' === $name ) {
+		$name = sanitize_title( (string) $publishable->post_title );
 	}
+	$publishable->post_name = wp_unique_post_slug(
+		$name,
+		(int) $publishable->ID,
+		'publish',
+		(string) $publishable->post_type,
+		(int) $publishable->post_parent
+	);
+
 	return url_to_path( (string) get_permalink( $publishable ) );
 }
 

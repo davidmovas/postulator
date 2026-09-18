@@ -5,6 +5,7 @@ package e2e_test
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -242,9 +243,11 @@ func createPage(t *testing.T, c *client, spec pageSpec) int {
 	}
 	body := map[string]any{
 		"title":   spec.title,
-		"slug":    spec.slug,
 		"content": spec.content,
 		"status":  status,
+	}
+	if spec.slug != "" {
+		body["slug"] = spec.slug
 	}
 	if spec.parent != 0 {
 		body["parent"] = spec.parent
@@ -326,4 +329,8 @@ func findBySlug(t *testing.T, c *client, types, slug string) contentItem {
 		t.Fatalf("slug %q was not listed under types=%s", slug, types)
 	}
 	return found
+}
+
+func base64URL(payload string) string {
+	return url.QueryEscape(base64.RawURLEncoding.EncodeToString([]byte(payload)))
 }

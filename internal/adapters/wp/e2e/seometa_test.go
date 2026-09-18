@@ -175,3 +175,27 @@ func TestSEOMetaEscapesRenderedHead(t *testing.T) {
 		t.Errorf("rendered page has %d canonical tags, want exactly 1", got)
 	}
 }
+
+func TestSEOMetaRejectsANonStringValue(t *testing.T) {
+	c, _ := newClient(t)
+
+	slug := uniqueSlug("nonstring")
+	id := createPage(t, c, pageSpec{title: "NonString", slug: slug, content: "<p>n</p>"})
+	writeSEO(t, c, id, map[string]string{"description": "must survive"})
+
+	status, body := c.request(t, http.MethodPut,
+		fmt.Sprintf("/wp-json/postulator/v1/seo-meta/%d", id),
+		map[string]any{"description": []string{"a", "b"}})
+
+	if status != http.StatusBadRequest {
+		t.Fatalf("status %d, want 400, body %s", status, body)
+	}
+	if !strings.Contains(string(body), `"invalid_param"`) {
+		t.Errorf("body %s does not carry the invalid_param code", body)
+	}
+
+	item := findItem(t, c, "page", id)
+	if item.Meta.Description != "must survive" {
+		t.Fatalf("meta.description = %q; a rejected write must not delete the key", item.Meta.Description)
+	}
+}

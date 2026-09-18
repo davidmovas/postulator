@@ -261,3 +261,62 @@ func TestContentSinceIsExclusive(t *testing.T) {
 		t.Fatalf("since=%s (one second before modified) did not return the item", oneSecondEarlier)
 	}
 }
+
+func TestContentGivesDraftsAUniquePath(t *testing.T) {
+	c, _ := newClient(t)
+
+	slug := uniqueSlug("dev5-target")
+	title := strings.ReplaceAll(slug, "-", " ")
+
+	publishedID := createPage(t, c, pageSpec{title: title, slug: slug, content: "<p>live</p>"})
+	draftID := createPage(t, c, pageSpec{title: title, content: "<p>draft</p>", status: "draft"})
+
+	published := findItem(t, c, "page", publishedID)
+	draft := findItem(t, c, "page", draftID)
+
+	if draft.Status != "draft" {
+		t.Fatalf("draft status = %q, want draft", draft.Status)
+	}
+	if draft.Slug != "" {
+		t.Fatalf("draft slug = %q, want empty so the path has to be synthesised", draft.Slug)
+	}
+	if published.Path != "/"+slug+"/" {
+		t.Fatalf("published path = %q, want /%s/", published.Path, slug)
+	}
+	if draft.Path == published.Path {
+		t.Fatalf("draft and published page both report %q; the synthesised draft slug must be unique", draft.Path)
+	}
+	if !strings.HasPrefix(draft.Path, "/") || !strings.HasSuffix(draft.Path, "/") {
+		t.Errorf("draft path = %q, want one leading and one trailing slash", draft.Path)
+	}
+}
+
+func TestContentRejectsMalformedParameters(t *testing.T) {
+	c, _ := newClient(t)
+
+	cases := []struct {
+		name  string
+		query string
+		code  string
+	}{
+		{name: "array types", query: "types[]=page", code: "invalid_param"},
+		{name: "array since", query: "since[]=2026-01-01T00:00:00Z", code: "invalid_param"},
+		{name: "array cursor", query: "cursor[]=x", code: "invalid_param"},
+		{name: "cursor without a phase", query: "cursor=" + base64URL(`{"i":1}`), code: "invalid_cursor"},
+		{name: "post cursor without modified", query: "cursor=" + base64URL(`{"p":"post","i":1}`), code: "invalid_cursor"},
+		{name: "post cursor with a string id", query: "cursor=" + base64URL(`{"p":"post","m":"2026-01-01 00:00:00","i":"1"}`), code: "invalid_cursor"},
+		{name: "term cursor without an id", query: "cursor=" + base64URL(`{"p":"term"}`), code: "invalid_cursor"},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			status, body := c.request(t, http.MethodGet, "/wp-json/postulator/v1/content?"+testCase.query, nil)
+			if status != http.StatusBadRequest {
+				t.Fatalf("status %d, want 400, body %s", status, body)
+			}
+			if !strings.Contains(string(body), `"`+testCase.code+`"`) {
+				t.Fatalf("body %s does not carry the %s code", body, testCase.code)
+			}
+		})
+	}
+}

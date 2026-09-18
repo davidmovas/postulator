@@ -104,19 +104,41 @@ function clamp_limit( $limit ): int {
 	return min( $value, MAX_LIMIT );
 }
 
+function text_param( \WP_REST_Request $request, string $name ) {
+	$value = $request->get_param( $name );
+	if ( null === $value ) {
+		return '';
+	}
+	if ( ! is_string( $value ) ) {
+		return invalid( 'invalid_param', $name . ' must be a string' );
+	}
+	return trim( $value );
+}
+
 function content_list( \WP_REST_Request $request ) {
-	$types = parse_types( (string) $request->get_param( 'types' ) );
+	$raw_types = text_param( $request, 'types' );
+	if ( is_wp_error( $raw_types ) ) {
+		return $raw_types;
+	}
+	$types = parse_types( $raw_types );
 	if ( is_wp_error( $types ) ) {
 		return $types;
 	}
 
-	$since = parse_since( (string) $request->get_param( 'since' ) );
+	$raw_since = text_param( $request, 'since' );
+	if ( is_wp_error( $raw_since ) ) {
+		return $raw_since;
+	}
+	$since = parse_since( $raw_since );
 	if ( is_wp_error( $since ) ) {
 		return $since;
 	}
 
-	$raw_cursor = (string) $request->get_param( 'cursor' );
-	$cursor     = null;
+	$raw_cursor = text_param( $request, 'cursor' );
+	if ( is_wp_error( $raw_cursor ) ) {
+		return $raw_cursor;
+	}
+	$cursor = null;
 	if ( '' !== $raw_cursor ) {
 		$cursor = decode_cursor( $raw_cursor );
 		if ( null === $cursor ) {
@@ -159,9 +181,13 @@ function seo_meta_update( \WP_REST_Request $request ) {
 
 	$fields = array();
 	foreach ( array_keys( META_KEYS['none'] ) as $field ) {
-		if ( array_key_exists( $field, $body ) ) {
-			$fields[ $field ] = is_scalar( $body[ $field ] ) ? (string) $body[ $field ] : '';
+		if ( ! array_key_exists( $field, $body ) ) {
+			continue;
 		}
+		if ( ! is_string( $body[ $field ] ) ) {
+			return invalid( 'invalid_param', $field . ' must be a string' );
+		}
+		$fields[ $field ] = $body[ $field ];
 	}
 
 	return new \WP_REST_Response(

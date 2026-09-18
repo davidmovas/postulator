@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -173,5 +174,28 @@ func TestRawRequiresAuthentication(t *testing.T) {
 	status, body := anonymous.request(t, http.MethodGet, rawPath(id), nil)
 	if status != http.StatusUnauthorized {
 		t.Fatalf("status %d, want 401, body %s", status, body)
+	}
+}
+
+func TestRawRejectsATermID(t *testing.T) {
+	c, env := newClient(t)
+	requireWoo(t, env)
+
+	term := findBySlug(t, c, "product_cat", "postulator-koffein")
+
+	for _, method := range []string{http.MethodGet, http.MethodPut} {
+		t.Run(method, func(t *testing.T) {
+			var payload map[string]string
+			if method == http.MethodPut {
+				payload = map[string]string{"content": "<p>x</p>"}
+			}
+			status, body := c.request(t, method, rawPath(term.ID), payload)
+			if status != http.StatusNotFound {
+				t.Fatalf("term id %d: status %d, want 404, body %s", term.ID, status, body)
+			}
+			if !strings.Contains(string(body), `"not_found"`) {
+				t.Errorf("body %s does not carry the not_found code", body)
+			}
+		})
 	}
 }
