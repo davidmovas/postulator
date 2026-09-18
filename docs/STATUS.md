@@ -58,7 +58,7 @@ task e2e:down              stops the stack and drops its volumes
 | 11 | Wails services, event bridge, TypeScript generation | done |
 | 12 | Master password, backup, retention, e2e, release | done |
 
-Module coverage is 88% of 14k statements; `domain` + `application` sit at 92%.
+Module coverage is 87.6% of 14170 statements; `domain` + `application` sit at 86.1%.
 
 ## Known gaps
 
@@ -80,6 +80,9 @@ Module coverage is 88% of 14k statements; `domain` + `application` sit at 92%.
   which had not landed when it was written. `internal/e2e` goes through the real adapter.
 - `content.Assess` has no Wails method; `ReportsService.JudgePage` binds `content.Judge` and runs
   it synchronously, and `PageReport` still reads what a run already recorded.
+- `internal/application/agent` is exercised only through `internal/transport/agent`, so the
+  profile reports it at 0% without `-coverpkg`; the aggregate gate still passes and the
+  behaviour is covered, but the package has no test of its own.
 - `ledger.List` has no caller: `ModelsService.UsageSummary` answers from the aggregate, and a
   per-call ledger screen is what would read the list.
 - A run's deadline is the `runtime.DefaultRunDeadline` constant, not a setting: nothing in the UI

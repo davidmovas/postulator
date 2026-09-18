@@ -50,9 +50,9 @@ to the path the request names and returns it, because the webview has no filesys
 judge rubric against it and answers with the report, one model call inside the request. The
 other three reports read what a run already recorded.
 
-Every method but the six lock and backup methods of `SettingsService` and `HealthService.Ping`
+Every method but `HealthService.Ping` and the four lock methods of `SettingsService`
 answers `LOCKED` while a master password is set and the application has not been unlocked,
-because the service resolves its use case per call and the composition does not exist yet.
+because a service resolves its use case per call and the composition does not exist yet.
 
 `SettingsService.Schema` renders the `kernel/settings` declarations as
 `{key, group, type, default, min?, max?, enum?, nonEmpty?}`, which is what a settings

@@ -105,6 +105,20 @@ goroutine, so a confirmation survives a restart. The composition root constructs
 one `EventBridge` per process, because the application-event `seq` is a counter held by
 that instance and a second bridge would restart it.
 
+## The locked core
+
+`app.Open` reads `%APPDATA%/Postulator/master.key`, or refuses when `master.key.pw` says a
+master password wraps it. A locked `Core` carries the event relay and an empty `kit`: no
+store, no services, no engine. `Unlock` derives the key with Argon2id, unwraps the DPAPI
+blob, opens the store and composes the whole application into that `kit`; `Lock` stops the
+engine, the scheduler and the agent, closes the store, zeroes the key and puts the zero
+`kit` back. Because the Wails services are bound once, before any of that exists, each one
+resolves its use case per call through a `Source[T]` that refuses with `LOCKED` while the
+`kit` is empty. A backup is the same composition in reverse: the store copies itself into a
+plain snapshot through the SQLite online backup API, the archive seals it under the export
+password, and a restore copies it back into the encrypted database and composes the core
+again from what it read.
+
 ## WordPress companion plugin
 
 `wp-plugin/postulator-companion` (PHP ≥ 8.1, WP ≥ 6.4, no dependencies) serves

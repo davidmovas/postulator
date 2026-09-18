@@ -163,11 +163,17 @@ on `127.0.0.1:8089`; `task e2e:up` provisions the site and writes `.env.generate
 
 ```
 task e2e:up                E2E_SEO=none|yoast|rankmath, E2E_WOO=0|1
-go test -tags e2e -count=1 ./internal/adapters/wp/e2e/...
+task e2e:test              the plugin contract, ./internal/adapters/wp/e2e/...
+task e2e:full              the whole loop, ./internal/e2e/...
 task e2e:down              e2e:reset does both
 ```
 
-The suite is all `_test.go` behind `//go:build e2e`: it adds nothing to the coverage
+`internal/e2e` composes the real application over `adapters/llm/fake`, syncs the docker
+site, imports `examples/sitemap-import-example.xlsx`, generates five guide pages as drafts
+and reads the result back through the companion plugin. It deletes everything under
+`/menu/` on the site before it starts, so it can be run again without resetting the stack.
+
+Both suites are `_test.go` behind `//go:build e2e`: it adds nothing to the coverage
 profile and the default lint never sees it, so use `task lint:e2e` and `gofmt -l .`.
 `task plugin:lint` uses the pinned image's `php` on Windows and a local `php` on CI,
 which also packages the plugin and never starts the stack.
