@@ -8,8 +8,42 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/app"
+	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
+
+func TestOpenWiresTheUseCasesAndSeedsTheStarterTemplates(t *testing.T) {
+	t.Parallel()
+
+	home := t.TempDir()
+	cfg := app.Config{DatabasePath: filepath.Join(home, "postulator.db"), KeyDir: home}
+
+	for round := range 2 {
+		core, err := app.Open(t.Context(), cfg)
+		if err != nil {
+			t.Fatalf("Open round %d: %v", round, err)
+		}
+		if core.Events == nil || core.Sites == nil || core.Graph == nil || core.Pages == nil || core.Templates == nil {
+			t.Fatal("the core must carry the relay and the four services")
+		}
+
+		seeded, err := core.Templates.ListTemplates(t.Context(), templates.ListTemplatesRequest{Scope: "global"})
+		if err != nil {
+			t.Fatalf("ListTemplates: %v", err)
+		}
+		if len(seeded.Items) != 5 {
+			t.Errorf("round %d: seeded templates = %d, want 5", round, len(seeded.Items))
+		}
+		policies, err := core.Templates.ListPolicies(t.Context(), templates.ListPoliciesRequest{Scope: "global"})
+		if err != nil || len(policies.Items) != 1 {
+			t.Errorf("round %d: seeded policies = %d, %v; want 1", round, len(policies.Items), err)
+		}
+
+		if err = core.Close(); err != nil {
+			t.Fatalf("Close: %v", err)
+		}
+	}
+}
 
 func TestOpenAndClose(t *testing.T) {
 	t.Parallel()

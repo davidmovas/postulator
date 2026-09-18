@@ -9,6 +9,10 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/secrets"
 	"github.com/davidmovas/postulator/internal/adapters/secrets/masterkey"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
+	"github.com/davidmovas/postulator/internal/application/graph"
+	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/sites"
+	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/settings"
@@ -44,6 +48,11 @@ type Core struct {
 	Secrets         *secrets.Store
 	Settings        *settings.Values
 	UnknownSettings []string
+	Events          *EventRelay
+	Sites           *sites.Service
+	Graph           *graph.Service
+	Pages           *pages.Service
+	Templates       *templates.Service
 }
 
 func Open(ctx context.Context, cfg Config) (*Core, error) {
@@ -72,12 +81,31 @@ func Open(ctx context.Context, cfg Config) (*Core, error) {
 		return nil, stderrors.Join(err, store.Close())
 	}
 
-	return &Core{
+	secretStore := secrets.NewStore(sqlite.NewSecretsRepo(store, now), key)
+	relay := &EventRelay{}
+	siteRepo := sqlite.NewSiteRepo(store)
+	entityRepo := sqlite.NewEntityRepo(store)
+	edgeRepo := sqlite.NewEdgeRepo(store)
+	pageRepo := sqlite.NewPageRepo(store)
+	linkRepo := sqlite.NewPageLinkRepo(store)
+	templateRepo := sqlite.NewTemplateRepo(store)
+	policyRepo := sqlite.NewLinkPolicyRepo(store)
+
+	core := &Core{
 		Store:           store,
-		Secrets:         secrets.NewStore(sqlite.NewSecretsRepo(store, now), key),
+		Secrets:         secretStore,
 		Settings:        values,
 		UnknownSettings: unknown,
-	}, nil
+		Events:          relay,
+		Sites:           sites.New(siteRepo, secretStore, store, now),
+		Graph:           graph.New(entityRepo, edgeRepo, siteRepo, store, relay, now),
+		Pages:           pages.New(pageRepo, linkRepo, entityRepo, siteRepo, store, relay, now),
+		Templates:       templates.New(templateRepo, policyRepo, pageRepo, siteRepo, store, relay, now),
+	}
+	if err = core.Templates.EnsureSeeded(ctx); err != nil {
+		return nil, stderrors.Join(err, store.Close())
+	}
+	return core, nil
 }
 
 func (c *Core) Close() error {

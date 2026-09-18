@@ -8,6 +8,7 @@ import (
 
 	"github.com/davidmovas/postulator/frontend"
 	"github.com/davidmovas/postulator/internal/app"
+	"github.com/davidmovas/postulator/internal/kernel/clock"
 )
 
 func main() {
@@ -50,6 +51,9 @@ func run() error {
 			Handler: application.AssetFileServerFS(frontend.Assets),
 		},
 	})
+	if connectErr := core.Events.Connect(wails.Event, clock.System{}); connectErr != nil {
+		return connectErr
+	}
 
 	wails.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            "Postulator",
