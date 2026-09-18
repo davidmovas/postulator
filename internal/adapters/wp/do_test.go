@@ -159,3 +159,17 @@ func TestACancelledContextStopsTheCall(t *testing.T) {
 		t.Errorf("code = %q, want %q", errors.CodeOf(err), errors.Cancelled)
 	}
 }
+
+func detailOf(t *testing.T, err error, key string) string {
+	t.Helper()
+
+	var kernel *errors.Error
+	if !stderrors.As(err, &kernel) || kernel == nil {
+		return ""
+	}
+	value, ok := kernel.Details[key].(string)
+	if !ok {
+		return ""
+	}
+	return value
+}

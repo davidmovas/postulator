@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -37,6 +38,10 @@ type Client struct {
 	username  string
 	password  string
 	retries   int
+
+	manifestMu   sync.Mutex
+	manifest     *Manifest
+	manifestGone bool
 }
 
 func New(cfg Config, opts ...Option) (*Client, error) {

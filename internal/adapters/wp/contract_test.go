@@ -4,8 +4,12 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 )
 
 var httpMethods = []string{"get", "put", "post", "delete", "patch"}
@@ -111,5 +115,45 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 				t.Errorf("the contract does not carry %q", tc.snippet)
 			}
 		})
+	}
+}
+
+func TestTheClientHitsOnlyDocumentedPluginRoutes(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein", Content: "<p>x</p>"})
+	client := newClient(t, server)
+
+	if _, err := client.Capabilities(t.Context()); err != nil {
+		t.Fatalf("Capabilities: %v", err)
+	}
+	if _, err := client.ListContent(t.Context(), wp.ContentQuery{}); err != nil {
+		t.Fatalf("ListContent: %v", err)
+	}
+	if _, err := client.SetSEOMeta(t.Context(), seeded[0].ID, wp.SEOMeta{Title: "x"}); err != nil {
+		t.Fatalf("SetSEOMeta: %v", err)
+	}
+	raw, err := client.GetRaw(t.Context(), seeded[0].ID)
+	if err != nil {
+		t.Fatalf("GetRaw: %v", err)
+	}
+	if _, err = client.PutRaw(t.Context(), seeded[0].ID, "<p>y</p>", raw.ContentHash); err != nil {
+		t.Fatalf("PutRaw: %v", err)
+	}
+
+	documented := documentedRoutes(t)
+	id := strconv.FormatInt(seeded[0].ID, 10)
+	replacer := strings.NewReplacer("/"+id+"/", "/{id}/", "/"+id, "/{id}")
+
+	for _, recorded := range server.Requests() {
+		route, found := strings.CutPrefix(recorded.Path, "/wp-json/postulator/v1")
+		if !found {
+			continue
+		}
+		route = replacer.Replace(route)
+		if _, ok := documented[route]; !ok {
+			t.Errorf("the client called %s, which the contract does not document", route)
+		}
 	}
 }
