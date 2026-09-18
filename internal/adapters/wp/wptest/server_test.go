@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 	"testing"
 	"time"
 
@@ -269,4 +270,8 @@ func TestASlugIsUniquePerParentForHierarchicalTypes(t *testing.T) {
 	if children[1].Slug != "powder" {
 		t.Errorf("a different type may reuse the slug, got %q", children[1].Slug)
 	}
+}
+
+func itoa(id int64) string {
+	return strconv.FormatInt(id, 10)
 }

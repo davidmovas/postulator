@@ -106,6 +106,7 @@ func (s *Server) URL() string {
 func (s *Server) handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET "+rootPath, s.handleRoot)
+	s.routeCore(mux)
 
 	return s.record(s.redirectRoot(s.injectFaults(s.authenticate(mux))))
 }

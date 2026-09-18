@@ -133,9 +133,9 @@ func TestRetryAfterIsWaitedForRatherThanTheBackoff(t *testing.T) {
 	t.Parallel()
 
 	server := wptest.New(t)
-	server.RateLimitNext(5 * time.Second)
+	server.RateLimitNext(30 * time.Second)
 
-	ctx, cancel := context.WithTimeout(t.Context(), 300*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 
 	_, err := newClient(t, server, wp.WithRetries(1)).Probe(ctx)
