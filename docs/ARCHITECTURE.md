@@ -108,9 +108,8 @@ that instance and a second bridge would restart it.
 ## WordPress companion plugin
 
 `wp-plugin/postulator-companion` (PHP ≥ 8.1, WP ≥ 6.4, no dependencies) serves
-`/wp-json/postulator/v1`; every permission callback requires `edit_posts`, reads included.
-The password must belong to an **administrator** — raw writes rely on `unfiltered_html`
-rather than removing kses filters, so **multisite is unsupported in v2.0**.
+`/wp-json/postulator/v1`; every permission callback requires `edit_posts`, and the password
+must belong to an **administrator**, so **multisite is unsupported in v2.0**.
 
 | Route | Purpose |
 |---|---|
@@ -127,9 +126,8 @@ rather than removing kses filters, so **multisite is unsupported in v2.0**.
 | ogTitle | `_yoast_wpseo_opengraph-title` | `rank_math_facebook_title` | `_postulator_og_title` |
 | ogDescription | `_yoast_wpseo_opengraph-description` | `rank_math_facebook_description` | `_postulator_og_description` |
 
-With no SEO plugin it replaces core's head values instead of adding tags, through
-`pre_get_document_title`, `get_canonical_url` and `wp_head` for description and OG; a
-theme that hardcodes `<title>` is out of scope.
+Raw writes rely on that role's `unfiltered_html` rather than removing kses filters. With no
+SEO plugin the head is replaced, not appended, and every value is escaped on the way out.
 
 See `docs/CONTRACTS.md` for the wire shapes and `docs/superpowers/specs/` for the full
 design.

@@ -278,13 +278,13 @@ func TestContentGivesDraftsAUniquePath(t *testing.T) {
 		t.Fatalf("draft status = %q, want draft", draft.Status)
 	}
 	if draft.Slug != "" {
-		t.Fatalf("draft slug = %q, want empty so the path has to be synthesised", draft.Slug)
+		t.Fatalf("draft slug = %q, want empty so the path has to be synthesized", draft.Slug)
 	}
 	if published.Path != "/"+slug+"/" {
 		t.Fatalf("published path = %q, want /%s/", published.Path, slug)
 	}
 	if draft.Path == published.Path {
-		t.Fatalf("draft and published page both report %q; the synthesised draft slug must be unique", draft.Path)
+		t.Fatalf("draft and published page both report %q; the synthesized draft slug must be unique", draft.Path)
 	}
 	if !strings.HasPrefix(draft.Path, "/") || !strings.HasSuffix(draft.Path, "/") {
 		t.Errorf("draft path = %q, want one leading and one trailing slash", draft.Path)
