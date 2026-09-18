@@ -21,7 +21,7 @@ const (
 )
 
 func SecretRef(provider string) string {
-	return "llm:" + provider + ":api_key"
+	return llm.SecretRef(provider)
 }
 
 type secretReader interface {

@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"time"
 
@@ -37,17 +38,52 @@ type prober interface {
 	Complete(ctx context.Context, req port.Request) (port.Response, error)
 }
 
+type secretStore interface {
+	Put(ctx context.Context, ref, value string) error
+}
+
 type Service struct {
 	catalog   catalogReader
 	overrides catalogWriter
 	profiles  profileStore
 	spend     spendReader
+	secrets   secretStore
 	llm       prober
 	clock     clock.Clock
 }
 
-func New(catalog catalogReader, overrides catalogWriter, profiles profileStore, spend spendReader, client prober, clk clock.Clock) *Service {
-	return &Service{catalog: catalog, overrides: overrides, profiles: profiles, spend: spend, llm: client, clock: clk}
+func New(catalog catalogReader, overrides catalogWriter, profiles profileStore, spend spendReader, secrets secretStore, client prober, clk clock.Clock) *Service {
+	return &Service{
+		catalog: catalog, overrides: overrides, profiles: profiles, spend: spend,
+		secrets: secrets, llm: client, clock: clk,
+	}
+}
+
+func (s *Service) SetProviderKey(ctx context.Context, req SetProviderKeyRequest) (SetProviderKeyResponse, error) {
+	provider := strings.TrimSpace(req.Provider)
+	key := strings.TrimSpace(req.APIKey)
+	switch {
+	case provider == "":
+		return SetProviderKeyResponse{}, errors.New(errors.Invalid, "a provider key needs a provider").
+			WithDetail("field", "provider")
+	case key == "":
+		return SetProviderKeyResponse{}, errors.New(errors.Invalid, "a provider key must not be empty").
+			WithDetail("field", "apiKey")
+	}
+
+	known, err := s.catalog.List(ctx)
+	if err != nil {
+		return SetProviderKeyResponse{}, err
+	}
+	if !slices.ContainsFunc(known, func(info llm.ModelInfo) bool { return info.Ref.Provider == provider }) {
+		return SetProviderKeyResponse{}, errors.New(errors.NotFound, "the catalog holds no model of this provider").
+			WithDetail("provider", provider)
+	}
+
+	if err = s.secrets.Put(ctx, llm.SecretRef(provider), key); err != nil {
+		return SetProviderKeyResponse{}, err
+	}
+	return SetProviderKeyResponse{Provider: provider}, nil
 }
 
 func (s *Service) now() time.Time {

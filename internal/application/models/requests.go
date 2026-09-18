@@ -49,6 +49,15 @@ type GetProfilesResponse struct {
 	Profiles []Profile `json:"profiles"`
 }
 
+type SetProviderKeyRequest struct {
+	Provider string `json:"provider"`
+	APIKey   string `json:"apiKey"`
+}
+
+type SetProviderKeyResponse struct {
+	Provider string `json:"provider"`
+}
+
 type TestProviderRequest struct {
 	Provider string `json:"provider"`
 	Model    string `json:"model"`

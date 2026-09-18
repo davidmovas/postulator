@@ -138,7 +138,7 @@ func Open(ctx context.Context, cfg Config) (*Core, error) {
 		Catalog:         modelCatalog,
 		Profiles:        modelProfiles,
 		Ledger:          book,
-		Models:          models.New(modelCatalog, modelRepo, modelProfiles, book, client, now),
+		Models:          models.New(modelCatalog, modelRepo, modelProfiles, book, secretStore, client, now),
 	}
 	if err = core.Templates.EnsureSeeded(ctx); err != nil {
 		return nil, stderrors.Join(err, store.Close())

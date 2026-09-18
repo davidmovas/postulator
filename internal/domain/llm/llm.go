@@ -37,6 +37,10 @@ func (r ModelRef) String() string {
 	return r.Provider + ":" + r.Model
 }
 
+func SecretRef(provider string) string {
+	return "llm:" + provider + ":api_key"
+}
+
 type ModelInfo struct {
 	Ref                ModelRef `json:"ref"`
 	ContextTokens      int      `json:"contextTokens"`

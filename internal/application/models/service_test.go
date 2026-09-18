@@ -113,11 +113,25 @@ func (p *prober) Complete(_ context.Context, req port.Request) (port.Response, e
 	return port.Response{Text: "pong", Usage: llm.Usage{Input: 1, Output: 1, Total: 2}}, nil
 }
 
+type vault struct {
+	stored map[string]string
+	err    error
+}
+
+func (v *vault) Put(_ context.Context, ref, value string) error {
+	if v.err != nil {
+		return v.err
+	}
+	v.stored[ref] = value
+	return nil
+}
+
 type harness struct {
 	service  *models.Service
 	catalog  *catalog
 	profiles *profiles
 	prober   *prober
+	secrets  *vault
 }
 
 func newHarness(t *testing.T, book spend) harness {
@@ -126,11 +140,14 @@ func newHarness(t *testing.T, book spend) harness {
 	known := newCatalog()
 	people := &profiles{global: map[llm.Role]llm.ModelRef{}, resolved: map[llm.Role]llm.ModelRef{}}
 	probe := &prober{}
+	keys := &vault{stored: map[string]string{}}
 	return harness{
-		service:  models.New(known, known, people, book, probe, clock.NewFake(time.Date(2026, 9, 18, 10, 0, 0, 0, time.UTC))),
+		service: models.New(known, known, people, book, keys, probe,
+			clock.NewFake(time.Date(2026, 9, 18, 10, 0, 0, 0, time.UTC))),
 		catalog:  known,
 		profiles: people,
 		prober:   probe,
+		secrets:  keys,
 	}
 }
 
@@ -334,5 +351,58 @@ func TestUsageSummaryPropagatesTheStoreError(t *testing.T) {
 	h := newHarness(t, spend{err: errors.New(errors.Internal, "disk")})
 	if _, err := h.service.UsageSummary(t.Context(), models.UsageSummaryRequest{RunID: "run-1"}); !errors.IsCode(err, errors.Internal) {
 		t.Fatalf("UsageSummary error = %v, want %s", err, errors.Internal)
+	}
+}
+
+func TestSetProviderKey(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t, spend{})
+	resp, err := h.service.SetProviderKey(t.Context(), models.SetProviderKeyRequest{
+		Provider: "openai", APIKey: "  sk-secret  ",
+	})
+	if err != nil {
+		t.Fatalf("SetProviderKey: %v", err)
+	}
+	if resp.Provider != "openai" {
+		t.Fatalf("SetProviderKey = %+v", resp)
+	}
+	if h.secrets.stored[llm.SecretRef("openai")] != "sk-secret" {
+		t.Fatalf("the secret store holds %v", h.secrets.stored)
+	}
+
+	cases := []struct {
+		name    string
+		request models.SetProviderKeyRequest
+		prepare func(harness)
+		want    errors.Code
+	}{
+		{name: "no provider", request: models.SetProviderKeyRequest{APIKey: "k"}, want: errors.Invalid},
+		{name: "no key", request: models.SetProviderKeyRequest{Provider: "openai"}, want: errors.Invalid},
+		{
+			name:    "a provider the catalog does not know",
+			request: models.SetProviderKeyRequest{Provider: "acme", APIKey: "k"},
+			want:    errors.NotFound,
+		},
+		{
+			name:    "the secret store refuses",
+			request: models.SetProviderKeyRequest{Provider: "openai", APIKey: "k"},
+			prepare: func(h harness) { h.secrets.err = errors.New(errors.Locked, "the vault is locked") },
+			want:    errors.Locked,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			local := newHarness(t, spend{})
+			if tc.prepare != nil {
+				tc.prepare(local)
+			}
+			if _, err := local.service.SetProviderKey(t.Context(), tc.request); !errors.IsCode(err, tc.want) {
+				t.Fatalf("SetProviderKey = %v, want %s", err, tc.want)
+			}
+		})
 	}
 }
