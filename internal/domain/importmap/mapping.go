@@ -12,10 +12,10 @@ const (
 )
 
 type Options struct {
-	PathPrefixStrip  string
-	KeywordSeparator string
-	AnchorSeparator  string
-	ListSeparator    string
+	PathPrefixStrip  string `json:"pathPrefixStrip,omitempty"`
+	KeywordSeparator string `json:"keywordSeparator,omitempty"`
+	AnchorSeparator  string `json:"anchorSeparator,omitempty"`
+	ListSeparator    string `json:"listSeparator,omitempty"`
 }
 
 func DefaultOptions() Options {
