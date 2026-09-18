@@ -27,9 +27,9 @@ func (f reportsFake) RunReport(context.Context, reports.RunReportRequest) (repor
 func TestReportsServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
-	assertMethodNames(t, wails.NewReportsService(zap.NewNop(), reportsFake{}), []string{
+	assertMethodNames(t, wails.NewReportsService(zap.NewNop(), ready[wails.ReportsUseCase](reportsFake{})), []string{
 		"PageReport", "RunReport", "SiteOverview",
 	})
-	assertEveryMethodConverts(t, wails.NewReportsService(zap.NewNop(), reportsFake{mode: missing}), missingBody)
-	assertEveryMethodConverts(t, wails.NewReportsService(zap.NewNop(), reportsFake{mode: panicking}), panicBody)
+	assertEveryMethodConverts(t, wails.NewReportsService(zap.NewNop(), ready[wails.ReportsUseCase](reportsFake{mode: missing})), missingBody)
+	assertEveryMethodConverts(t, wails.NewReportsService(zap.NewNop(), ready[wails.ReportsUseCase](reportsFake{mode: panicking})), panicBody)
 }

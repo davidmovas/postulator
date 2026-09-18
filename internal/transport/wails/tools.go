@@ -10,7 +10,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/middleware"
 )
 
-type toolCatalog interface {
+type ToolCatalog interface {
 	Names() []string
 	Lookup(name string) (tools.Def, bool)
 }
@@ -32,16 +32,21 @@ type ToolsService struct {
 	list middleware.Handler[ListToolsRequest, ListToolsResponse]
 }
 
-func NewToolsService(logger *zap.Logger, catalog toolCatalog) *ToolsService {
+func NewToolsService(logger *zap.Logger, catalog Source[ToolCatalog]) *ToolsService {
 	return &ToolsService{list: Wrap(logger, "tools.list", listTools(catalog))}
 }
 
-func listTools(catalog toolCatalog) middleware.Handler[ListToolsRequest, ListToolsResponse] {
+func listTools(catalog Source[ToolCatalog]) middleware.Handler[ListToolsRequest, ListToolsResponse] {
 	return func(_ context.Context, _ ListToolsRequest) (ListToolsResponse, error) {
-		names := catalog.Names()
+		live, err := catalog()
+		if err != nil {
+			return ListToolsResponse{}, err
+		}
+
+		names := live.Names()
 		listed := make([]Tool, 0, len(names))
 		for _, name := range names {
-			def, known := catalog.Lookup(name)
+			def, known := live.Lookup(name)
 			if !known {
 				continue
 			}

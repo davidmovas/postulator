@@ -10,7 +10,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
-type sitesUseCase interface {
+type SitesUseCase interface {
 	Create(ctx context.Context, req sites.CreateRequest) (sites.CreateResponse, error)
 	Update(ctx context.Context, req sites.UpdateRequest) (sites.UpdateResponse, error)
 	Delete(ctx context.Context, req sites.DeleteRequest) (sites.DeleteResponse, error)
@@ -26,13 +26,13 @@ type SitesService struct {
 	list   middleware.Handler[sites.ListRequest, paging.List[sites.Site]]
 }
 
-func NewSitesService(logger *zap.Logger, useCase sitesUseCase) *SitesService {
+func NewSitesService(logger *zap.Logger, useCase Source[SitesUseCase]) *SitesService {
 	return &SitesService{
-		create: Wrap(logger, "sites.create", useCase.Create),
-		update: Wrap(logger, "sites.update", useCase.Update),
-		remove: Wrap(logger, "sites.delete", useCase.Delete),
-		get:    Wrap(logger, "sites.get", useCase.Get),
-		list:   Wrap(logger, "sites.list", useCase.List),
+		create: Wrap(logger, "sites.create", call(useCase, SitesUseCase.Create)),
+		update: Wrap(logger, "sites.update", call(useCase, SitesUseCase.Update)),
+		remove: Wrap(logger, "sites.delete", call(useCase, SitesUseCase.Delete)),
+		get:    Wrap(logger, "sites.get", call(useCase, SitesUseCase.Get)),
+		list:   Wrap(logger, "sites.list", call(useCase, SitesUseCase.List)),
 	}
 }
 

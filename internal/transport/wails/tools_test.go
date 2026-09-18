@@ -41,7 +41,7 @@ func TestToolsServiceListsTheAgentCapabilities(t *testing.T) {
 		},
 	}
 
-	listed, err := wails.NewToolsService(zap.NewNop(), catalog).List(context.Background(), wails.ListToolsRequest{})
+	listed, err := wails.NewToolsService(zap.NewNop(), ready[wails.ToolCatalog](catalog)).List(context.Background(), wails.ListToolsRequest{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -64,6 +64,6 @@ func TestToolsServiceListsTheAgentCapabilities(t *testing.T) {
 func TestToolsServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
-	assertMethodNames(t, wails.NewToolsService(zap.NewNop(), catalogFake{}), []string{"List"})
-	assertEveryMethodConverts(t, wails.NewToolsService(zap.NewNop(), catalogFake{panics: true}), panicBody)
+	assertMethodNames(t, wails.NewToolsService(zap.NewNop(), ready[wails.ToolCatalog](catalogFake{})), []string{"List"})
+	assertEveryMethodConverts(t, wails.NewToolsService(zap.NewNop(), ready[wails.ToolCatalog](catalogFake{panics: true})), panicBody)
 }

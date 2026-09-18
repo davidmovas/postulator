@@ -10,7 +10,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
-type runsUseCase interface {
+type RunsUseCase interface {
 	Start(ctx context.Context, req runs.StartRequest) (runs.StartResponse, error)
 	Get(ctx context.Context, req runs.GetRequest) (runs.GetResponse, error)
 	List(ctx context.Context, req runs.ListRequest) (paging.List[runs.Run], error)
@@ -36,18 +36,18 @@ type RunsService struct {
 	retryStep   middleware.Handler[runs.RetryStepRequest, runs.RetryStepResponse]
 }
 
-func NewRunsService(logger *zap.Logger, useCase runsUseCase) *RunsService {
+func NewRunsService(logger *zap.Logger, useCase Source[RunsUseCase]) *RunsService {
 	return &RunsService{
-		start:       Wrap(logger, "runs.start", useCase.Start),
-		get:         Wrap(logger, "runs.get", useCase.Get),
-		list:        Wrap(logger, "runs.list", useCase.List),
-		listItems:   Wrap(logger, "runs.listItems", useCase.ListItems),
-		listEvents:  Wrap(logger, "runs.listEvents", useCase.ListEvents),
-		getArtifact: Wrap(logger, "runs.getArtifact", useCase.GetArtifact),
-		pause:       Wrap(logger, "runs.pause", useCase.Pause),
-		resume:      Wrap(logger, "runs.resume", useCase.Resume),
-		cancel:      Wrap(logger, "runs.cancel", useCase.Cancel),
-		retryStep:   Wrap(logger, "runs.retryStep", useCase.RetryStep),
+		start:       Wrap(logger, "runs.start", call(useCase, RunsUseCase.Start)),
+		get:         Wrap(logger, "runs.get", call(useCase, RunsUseCase.Get)),
+		list:        Wrap(logger, "runs.list", call(useCase, RunsUseCase.List)),
+		listItems:   Wrap(logger, "runs.listItems", call(useCase, RunsUseCase.ListItems)),
+		listEvents:  Wrap(logger, "runs.listEvents", call(useCase, RunsUseCase.ListEvents)),
+		getArtifact: Wrap(logger, "runs.getArtifact", call(useCase, RunsUseCase.GetArtifact)),
+		pause:       Wrap(logger, "runs.pause", call(useCase, RunsUseCase.Pause)),
+		resume:      Wrap(logger, "runs.resume", call(useCase, RunsUseCase.Resume)),
+		cancel:      Wrap(logger, "runs.cancel", call(useCase, RunsUseCase.Cancel)),
+		retryStep:   Wrap(logger, "runs.retryStep", call(useCase, RunsUseCase.RetryStep)),
 	}
 }
 

@@ -56,9 +56,9 @@ func (f pagesFake) ReplaceLinks(context.Context, pages.ReplaceLinksRequest) (pag
 func TestPagesServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
-	assertMethodNames(t, wails.NewPagesService(zap.NewNop(), pagesFake{}), []string{
+	assertMethodNames(t, wails.NewPagesService(zap.NewNop(), ready[wails.PagesUseCase](pagesFake{})), []string{
 		"Create", "Delete", "Get", "List", "MapToEntity", "ReplaceLinks", "SetCanonical", "Tree", "Unmap", "Update",
 	})
-	assertEveryMethodConverts(t, wails.NewPagesService(zap.NewNop(), pagesFake{mode: missing}), missingBody)
-	assertEveryMethodConverts(t, wails.NewPagesService(zap.NewNop(), pagesFake{mode: panicking}), panicBody)
+	assertEveryMethodConverts(t, wails.NewPagesService(zap.NewNop(), ready[wails.PagesUseCase](pagesFake{mode: missing})), missingBody)
+	assertEveryMethodConverts(t, wails.NewPagesService(zap.NewNop(), ready[wails.PagesUseCase](pagesFake{mode: panicking})), panicBody)
 }

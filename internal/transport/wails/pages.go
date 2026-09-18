@@ -10,7 +10,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
-type pagesUseCase interface {
+type PagesUseCase interface {
 	Create(ctx context.Context, req pages.CreateRequest) (pages.CreateResponse, error)
 	Update(ctx context.Context, req pages.UpdateRequest) (pages.UpdateResponse, error)
 	Delete(ctx context.Context, req pages.DeleteRequest) (pages.DeleteResponse, error)
@@ -36,18 +36,18 @@ type PagesService struct {
 	replaceLinks middleware.Handler[pages.ReplaceLinksRequest, pages.ReplaceLinksResponse]
 }
 
-func NewPagesService(logger *zap.Logger, useCase pagesUseCase) *PagesService {
+func NewPagesService(logger *zap.Logger, useCase Source[PagesUseCase]) *PagesService {
 	return &PagesService{
-		create:       Wrap(logger, "pages.create", useCase.Create),
-		update:       Wrap(logger, "pages.update", useCase.Update),
-		remove:       Wrap(logger, "pages.delete", useCase.Delete),
-		get:          Wrap(logger, "pages.get", useCase.Get),
-		list:         Wrap(logger, "pages.list", useCase.List),
-		tree:         Wrap(logger, "pages.tree", useCase.Tree),
-		mapToEntity:  Wrap(logger, "pages.mapToEntity", useCase.MapToEntity),
-		unmap:        Wrap(logger, "pages.unmap", useCase.Unmap),
-		setCanonical: Wrap(logger, "pages.setCanonical", useCase.SetCanonical),
-		replaceLinks: Wrap(logger, "pages.replaceLinks", useCase.ReplaceLinks),
+		create:       Wrap(logger, "pages.create", call(useCase, PagesUseCase.Create)),
+		update:       Wrap(logger, "pages.update", call(useCase, PagesUseCase.Update)),
+		remove:       Wrap(logger, "pages.delete", call(useCase, PagesUseCase.Delete)),
+		get:          Wrap(logger, "pages.get", call(useCase, PagesUseCase.Get)),
+		list:         Wrap(logger, "pages.list", call(useCase, PagesUseCase.List)),
+		tree:         Wrap(logger, "pages.tree", call(useCase, PagesUseCase.Tree)),
+		mapToEntity:  Wrap(logger, "pages.mapToEntity", call(useCase, PagesUseCase.MapToEntity)),
+		unmap:        Wrap(logger, "pages.unmap", call(useCase, PagesUseCase.Unmap)),
+		setCanonical: Wrap(logger, "pages.setCanonical", call(useCase, PagesUseCase.SetCanonical)),
+		replaceLinks: Wrap(logger, "pages.replaceLinks", call(useCase, PagesUseCase.ReplaceLinks)),
 	}
 }
 

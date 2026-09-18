@@ -47,9 +47,9 @@ func (f modelsFake) SetProviderKey(context.Context, models.SetProviderKeyRequest
 func TestModelsServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
-	assertMethodNames(t, wails.NewModelsService(zap.NewNop(), modelsFake{}), []string{
+	assertMethodNames(t, wails.NewModelsService(zap.NewNop(), ready[wails.ModelsUseCase](modelsFake{})), []string{
 		"DisableModel", "GetProfiles", "ListModels", "SetProfile", "TestProvider", "UpsertModel", "UsageSummary",
 	})
-	assertEveryMethodConverts(t, wails.NewModelsService(zap.NewNop(), modelsFake{mode: missing}), missingBody)
-	assertEveryMethodConverts(t, wails.NewModelsService(zap.NewNop(), modelsFake{mode: panicking}), panicBody)
+	assertEveryMethodConverts(t, wails.NewModelsService(zap.NewNop(), ready[wails.ModelsUseCase](modelsFake{mode: missing})), missingBody)
+	assertEveryMethodConverts(t, wails.NewModelsService(zap.NewNop(), ready[wails.ModelsUseCase](modelsFake{mode: panicking})), panicBody)
 }

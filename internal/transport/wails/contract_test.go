@@ -6,6 +6,8 @@ import (
 	"slices"
 	"testing"
 
+	"go.uber.org/zap"
+
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/transport/wails"
 )
@@ -20,6 +22,7 @@ const (
 const (
 	missingBody = `{"code":"NOT_FOUND","message":"no record carries that id","details":{"id":"nope"}}`
 	panicBody   = `{"code":"INTERNAL","message":"handler panicked"}`
+	lockedBody  = `{"code":"LOCKED","message":"the application is locked"}`
 )
 
 func answer[T any](mode failure) (T, error) {
@@ -85,5 +88,49 @@ func assertMethodNames(t *testing.T, service any, want []string) {
 		if got[index] != name {
 			t.Fatalf("%T exposes %v, want %v", service, got, want)
 		}
+	}
+}
+
+func ready[T any](useCase T) wails.Source[T] {
+	return func() (T, error) {
+		return useCase, nil
+	}
+}
+
+func refused[T any]() wails.Source[T] {
+	return func() (T, error) {
+		var zero T
+		return zero, errors.New(errors.Locked, "the application is locked")
+	}
+}
+
+func TestEveryServiceRefusesWhileTheApplicationIsLocked(t *testing.T) {
+	t.Parallel()
+
+	logger := zap.NewNop()
+	services := []any{
+		wails.NewSitesService(logger, refused[wails.SitesUseCase]()),
+		wails.NewGraphService(logger, refused[wails.GraphUseCase]()),
+		wails.NewPagesService(logger, refused[wails.PagesUseCase]()),
+		wails.NewTemplatesService(logger, refused[wails.TemplatesUseCase]()),
+		wails.NewRunsService(logger, refused[wails.RunsUseCase]()),
+		wails.NewSyncService(logger, refused[wails.SyncUseCase]()),
+		wails.NewReportsService(logger, refused[wails.ReportsUseCase]()),
+		wails.NewImportService(logger, refused[wails.ImportsUseCase]()),
+		wails.NewModelsService(logger, refused[wails.ModelsUseCase]()),
+		wails.NewAgentService(logger, refused[wails.AgentUseCase]()),
+		wails.NewSchedulesService(logger, refused[wails.SchedulesUseCase]()),
+		wails.NewToolsService(logger, refused[wails.ToolCatalog]()),
+		wails.NewSettingsService(logger, wails.SettingsDeps{
+			Access: refused[wails.SettingsAccess](),
+			Backup: refused[wails.BackupControl](),
+			Lock:   &lockFake{locked: true, protected: true},
+		}),
+	}
+
+	for _, service := range services {
+		t.Run(reflect.TypeOf(service).String(), func(t *testing.T) {
+			assertEveryMethodConverts(t, service, lockedBody, "Lock", "LockState", "SetMasterPassword", "Unlock")
+		})
 	}
 }

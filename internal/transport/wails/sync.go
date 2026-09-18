@@ -15,7 +15,7 @@ import (
 
 const packageFileMode = 0o600
 
-type syncUseCase interface {
+type SyncUseCase interface {
 	SyncSite(ctx context.Context, req sync.SyncSiteRequest) (sync.SyncSiteResponse, error)
 	CheckPlugin(ctx context.Context, req sync.CheckPluginRequest) (sync.CheckPluginResponse, error)
 	PluginPackage(ctx context.Context, req sync.PluginPackageRequest) (sync.PluginPackageResponse, error)
@@ -37,23 +37,28 @@ type SyncService struct {
 	savePluginPackage middleware.Handler[SavePluginPackageRequest, SavePluginPackageResponse]
 }
 
-func NewSyncService(logger *zap.Logger, useCase syncUseCase) *SyncService {
+func NewSyncService(logger *zap.Logger, useCase Source[SyncUseCase]) *SyncService {
 	return &SyncService{
-		syncSite:          Wrap(logger, "sync.syncSite", useCase.SyncSite),
-		checkPlugin:       Wrap(logger, "sync.checkPlugin", useCase.CheckPlugin),
+		syncSite:          Wrap(logger, "sync.syncSite", call(useCase, SyncUseCase.SyncSite)),
+		checkPlugin:       Wrap(logger, "sync.checkPlugin", call(useCase, SyncUseCase.CheckPlugin)),
 		savePluginPackage: Wrap(logger, "sync.savePluginPackage", savePluginPackage(useCase)),
 	}
 }
 
-func savePluginPackage(useCase syncUseCase) middleware.Handler[SavePluginPackageRequest, SavePluginPackageResponse] {
+func savePluginPackage(useCase Source[SyncUseCase]) middleware.Handler[SavePluginPackageRequest, SavePluginPackageResponse] {
 	return func(c context.Context, req SavePluginPackageRequest) (SavePluginPackageResponse, error) {
+		live, err := useCase()
+		if err != nil {
+			return SavePluginPackageResponse{}, err
+		}
+
 		target := strings.TrimSpace(req.Path)
 		if target == "" {
 			return SavePluginPackageResponse{}, errors.New(errors.Invalid, "the destination path must not be empty").
 				WithDetail("field", "path")
 		}
 
-		packaged, err := useCase.PluginPackage(c, sync.PluginPackageRequest{})
+		packaged, err := live.PluginPackage(c, sync.PluginPackageRequest{})
 		if err != nil {
 			return SavePluginPackageResponse{}, err
 		}

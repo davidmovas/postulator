@@ -9,7 +9,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/middleware"
 )
 
-type modelsUseCase interface {
+type ModelsUseCase interface {
 	ListModels(ctx context.Context, req models.ListModelsRequest) (models.ListModelsResponse, error)
 	UpsertModel(ctx context.Context, req models.UpsertModelRequest) (models.UpsertModelResponse, error)
 	DisableModel(ctx context.Context, req models.DisableModelRequest) (models.DisableModelResponse, error)
@@ -29,15 +29,15 @@ type ModelsService struct {
 	usageSummary middleware.Handler[models.UsageSummaryRequest, models.UsageSummaryResponse]
 }
 
-func NewModelsService(logger *zap.Logger, useCase modelsUseCase) *ModelsService {
+func NewModelsService(logger *zap.Logger, useCase Source[ModelsUseCase]) *ModelsService {
 	return &ModelsService{
-		listModels:   Wrap(logger, "models.listModels", useCase.ListModels),
-		upsertModel:  Wrap(logger, "models.upsertModel", useCase.UpsertModel),
-		disableModel: Wrap(logger, "models.disableModel", useCase.DisableModel),
-		getProfiles:  Wrap(logger, "models.getProfiles", useCase.GetProfiles),
-		setProfile:   Wrap(logger, "models.setProfile", useCase.SetProfile),
-		testProvider: Wrap(logger, "models.testProvider", useCase.TestProvider),
-		usageSummary: Wrap(logger, "models.usageSummary", useCase.UsageSummary),
+		listModels:   Wrap(logger, "models.listModels", call(useCase, ModelsUseCase.ListModels)),
+		upsertModel:  Wrap(logger, "models.upsertModel", call(useCase, ModelsUseCase.UpsertModel)),
+		disableModel: Wrap(logger, "models.disableModel", call(useCase, ModelsUseCase.DisableModel)),
+		getProfiles:  Wrap(logger, "models.getProfiles", call(useCase, ModelsUseCase.GetProfiles)),
+		setProfile:   Wrap(logger, "models.setProfile", call(useCase, ModelsUseCase.SetProfile)),
+		testProvider: Wrap(logger, "models.testProvider", call(useCase, ModelsUseCase.TestProvider)),
+		usageSummary: Wrap(logger, "models.usageSummary", call(useCase, ModelsUseCase.UsageSummary)),
 	}
 }
 

@@ -10,7 +10,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
-type schedulesUseCase interface {
+type SchedulesUseCase interface {
 	Create(ctx context.Context, req schedules.CreateRequest) (schedules.CreateResponse, error)
 	Update(ctx context.Context, req schedules.UpdateRequest) (schedules.UpdateResponse, error)
 	Delete(ctx context.Context, req schedules.DeleteRequest) (schedules.DeleteResponse, error)
@@ -32,16 +32,16 @@ type SchedulesService struct {
 	runNow  middleware.Handler[schedules.RunNowRequest, schedules.RunNowResponse]
 }
 
-func NewSchedulesService(logger *zap.Logger, useCase schedulesUseCase) *SchedulesService {
+func NewSchedulesService(logger *zap.Logger, useCase Source[SchedulesUseCase]) *SchedulesService {
 	return &SchedulesService{
-		create:  Wrap(logger, "schedules.create", useCase.Create),
-		update:  Wrap(logger, "schedules.update", useCase.Update),
-		remove:  Wrap(logger, "schedules.delete", useCase.Delete),
-		get:     Wrap(logger, "schedules.get", useCase.Get),
-		list:    Wrap(logger, "schedules.list", useCase.List),
-		enable:  Wrap(logger, "schedules.enable", useCase.Enable),
-		disable: Wrap(logger, "schedules.disable", useCase.Disable),
-		runNow:  Wrap(logger, "schedules.runNow", useCase.RunNow),
+		create:  Wrap(logger, "schedules.create", call(useCase, SchedulesUseCase.Create)),
+		update:  Wrap(logger, "schedules.update", call(useCase, SchedulesUseCase.Update)),
+		remove:  Wrap(logger, "schedules.delete", call(useCase, SchedulesUseCase.Delete)),
+		get:     Wrap(logger, "schedules.get", call(useCase, SchedulesUseCase.Get)),
+		list:    Wrap(logger, "schedules.list", call(useCase, SchedulesUseCase.List)),
+		enable:  Wrap(logger, "schedules.enable", call(useCase, SchedulesUseCase.Enable)),
+		disable: Wrap(logger, "schedules.disable", call(useCase, SchedulesUseCase.Disable)),
+		runNow:  Wrap(logger, "schedules.runNow", call(useCase, SchedulesUseCase.RunNow)),
 	}
 }
 

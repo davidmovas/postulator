@@ -9,7 +9,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/middleware"
 )
 
-type importsUseCase interface {
+type ImportsUseCase interface {
 	Inspect(ctx context.Context, req imports.InspectRequest) (imports.InspectResponse, error)
 	Preview(ctx context.Context, req imports.PreviewRequest) (imports.PreviewResponse, error)
 	Apply(ctx context.Context, req imports.ApplyRequest) (imports.ApplyResponse, error)
@@ -29,15 +29,15 @@ type ImportService struct {
 	deleteMapping middleware.Handler[imports.DeleteMappingRequest, imports.DeleteMappingResponse]
 }
 
-func NewImportService(logger *zap.Logger, useCase importsUseCase) *ImportService {
+func NewImportService(logger *zap.Logger, useCase Source[ImportsUseCase]) *ImportService {
 	return &ImportService{
-		inspect:       Wrap(logger, "import.inspect", useCase.Inspect),
-		preview:       Wrap(logger, "import.preview", useCase.Preview),
-		apply:         Wrap(logger, "import.apply", useCase.Apply),
-		export:        Wrap(logger, "import.export", useCase.Export),
-		saveMapping:   Wrap(logger, "import.saveMapping", useCase.SaveMapping),
-		listMappings:  Wrap(logger, "import.listMappings", useCase.ListMappings),
-		deleteMapping: Wrap(logger, "import.deleteMapping", useCase.DeleteMapping),
+		inspect:       Wrap(logger, "import.inspect", call(useCase, ImportsUseCase.Inspect)),
+		preview:       Wrap(logger, "import.preview", call(useCase, ImportsUseCase.Preview)),
+		apply:         Wrap(logger, "import.apply", call(useCase, ImportsUseCase.Apply)),
+		export:        Wrap(logger, "import.export", call(useCase, ImportsUseCase.Export)),
+		saveMapping:   Wrap(logger, "import.saveMapping", call(useCase, ImportsUseCase.SaveMapping)),
+		listMappings:  Wrap(logger, "import.listMappings", call(useCase, ImportsUseCase.ListMappings)),
+		deleteMapping: Wrap(logger, "import.deleteMapping", call(useCase, ImportsUseCase.DeleteMapping)),
 	}
 }
 

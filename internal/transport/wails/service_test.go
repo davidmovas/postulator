@@ -87,23 +87,27 @@ func serviceDeps() wails.Deps {
 	registry := settings.New()
 
 	return wails.Deps{
-		Sites:     sitesFake{},
-		Graph:     graphFake{},
-		Pages:     pagesFake{},
-		Templates: templatesFake{},
-		Runs:      runsFake{},
-		Sync:      syncFake{},
-		Reports:   reportsFake{},
-		Imports:   importsFake{},
-		Models:    modelsFake{},
-		Agent:     agentFake{},
-		Schedules: schedulesFake{},
-		Tools:     catalogFake{},
+		Sites:     ready[wails.SitesUseCase](sitesFake{}),
+		Graph:     ready[wails.GraphUseCase](graphFake{}),
+		Pages:     ready[wails.PagesUseCase](pagesFake{}),
+		Templates: ready[wails.TemplatesUseCase](templatesFake{}),
+		Runs:      ready[wails.RunsUseCase](runsFake{}),
+		Sync:      ready[wails.SyncUseCase](syncFake{}),
+		Reports:   ready[wails.ReportsUseCase](reportsFake{}),
+		Imports:   ready[wails.ImportsUseCase](importsFake{}),
+		Models:    ready[wails.ModelsUseCase](modelsFake{}),
+		Agent:     ready[wails.AgentUseCase](agentFake{}),
+		Schedules: ready[wails.SchedulesUseCase](schedulesFake{}),
+		Tools:     ready[wails.ToolCatalog](catalogFake{}),
 		Settings: wails.SettingsDeps{
-			Declarations: declarationsFake{registry: registry},
-			Values:       registry.NewValues(),
-			Store:        &storeFake{stored: map[string]json.RawMessage{}},
-			Models:       &providerKeyFake{},
+			Access: ready(wails.SettingsAccess{
+				Declarations: declarationsFake{registry: registry},
+				Values:       registry.NewValues(),
+				Store:        &storeFake{stored: map[string]json.RawMessage{}},
+				Models:       &providerKeyFake{},
+			}),
+			Backup: ready[wails.BackupControl](&backupFake{}),
+			Lock:   &lockFake{},
 		},
 	}
 }

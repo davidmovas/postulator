@@ -36,9 +36,9 @@ func (f sitesFake) List(context.Context, sites.ListRequest) (paging.List[sites.S
 func TestSitesServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
-	assertMethodNames(t, wails.NewSitesService(zap.NewNop(), sitesFake{}), []string{
+	assertMethodNames(t, wails.NewSitesService(zap.NewNop(), ready[wails.SitesUseCase](sitesFake{})), []string{
 		"Create", "Delete", "Get", "List", "Update",
 	})
-	assertEveryMethodConverts(t, wails.NewSitesService(zap.NewNop(), sitesFake{mode: missing}), missingBody)
-	assertEveryMethodConverts(t, wails.NewSitesService(zap.NewNop(), sitesFake{mode: panicking}), panicBody)
+	assertEveryMethodConverts(t, wails.NewSitesService(zap.NewNop(), ready[wails.SitesUseCase](sitesFake{mode: missing})), missingBody)
+	assertEveryMethodConverts(t, wails.NewSitesService(zap.NewNop(), ready[wails.SitesUseCase](sitesFake{mode: panicking})), panicBody)
 }

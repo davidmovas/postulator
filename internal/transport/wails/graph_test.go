@@ -76,11 +76,11 @@ func (f graphFake) ProposeRelated(context.Context, graph.ProposeRelatedRequest) 
 func TestGraphServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
-	assertMethodNames(t, wails.NewGraphService(zap.NewNop(), graphFake{}), []string{
+	assertMethodNames(t, wails.NewGraphService(zap.NewNop(), ready[wails.GraphUseCase](graphFake{})), []string{
 		"AddEdge", "ApproveEdge", "CreateEntity", "DeleteEdge", "DeleteEntity", "GetEntity",
 		"ListEdges", "ListEntities", "LoadGraph", "ProposeFromPages", "ProposeRelated",
 		"RecomputeScores", "RejectEdge", "SetAnchors", "UpdateEntity",
 	})
-	assertEveryMethodConverts(t, wails.NewGraphService(zap.NewNop(), graphFake{mode: missing}), missingBody)
-	assertEveryMethodConverts(t, wails.NewGraphService(zap.NewNop(), graphFake{mode: panicking}), panicBody)
+	assertEveryMethodConverts(t, wails.NewGraphService(zap.NewNop(), ready[wails.GraphUseCase](graphFake{mode: missing})), missingBody)
+	assertEveryMethodConverts(t, wails.NewGraphService(zap.NewNop(), ready[wails.GraphUseCase](graphFake{mode: panicking})), panicBody)
 }

@@ -5,6 +5,7 @@ import (
 	stderrors "errors"
 	"os"
 	"path/filepath"
+	stdsync "sync"
 
 	"go.uber.org/zap"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/llm/recordreplay"
 	"github.com/davidmovas/postulator/internal/adapters/llm/retry"
 	"github.com/davidmovas/postulator/internal/adapters/secrets"
+	"github.com/davidmovas/postulator/internal/adapters/secrets/export"
 	"github.com/davidmovas/postulator/internal/adapters/secrets/masterkey"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/wp"
@@ -77,13 +79,22 @@ func DefaultConfig() (Config, error) {
 }
 
 type Core struct {
+	cfg    Config
+	logger *zap.Logger
+	mu     stdsync.RWMutex
+	key    []byte
+	Events *EventRelay
+	kit
+}
+
+type kit struct {
+	Archive         *export.Archive
 	Store           *sqlite.Store
 	Secrets         *secrets.Store
 	Settings        *settings.Values
 	Declarations    *settings.Registry
 	SettingsStore   *sqlite.SettingsRepo
 	UnknownSettings []string
-	Events          *EventRelay
 	Sites           *sites.Service
 	Graph           *graph.Service
 	Pages           *pages.Service
@@ -115,16 +126,37 @@ func Open(ctx context.Context, cfg Config, logger *zap.Logger) (*Core, error) {
 		return nil, errors.New(errors.Invalid, "the key directory must not be empty")
 	}
 
-	recovery := cfg.recovery()
+	core := &Core{cfg: cfg, logger: logger, Events: &EventRelay{}}
 
-	key, err := masterkey.Load(masterkey.Config{Dir: cfg.KeyDir, Recovery: recovery})
+	protected, err := masterkey.Protected(core.keyConfig())
 	if err != nil {
 		return nil, err
 	}
+	if protected {
+		return core, nil
+	}
+
+	key, err := masterkey.Load(core.keyConfig())
+	if err != nil {
+		return nil, err
+	}
+	if err := core.compose(ctx, key); err != nil {
+		return nil, err
+	}
+	return core, nil
+}
+
+func (c *Core) keyConfig() masterkey.Config {
+	return masterkey.Config{Dir: c.cfg.KeyDir, Recovery: c.cfg.recovery()}
+}
+
+func (c *Core) compose(ctx context.Context, key []byte) error {
+	cfg, logger, relay := c.cfg, c.logger, c.Events
+	recovery := cfg.recovery()
 
 	store, err := sqlite.Open(sqlite.Config{Path: cfg.DatabasePath, Key: key, Recovery: recovery})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	now := clock.System{}
@@ -132,11 +164,10 @@ func Open(ctx context.Context, cfg Config, logger *zap.Logger) (*Core, error) {
 	settingsStore := sqlite.NewSettingsRepo(store, now)
 	values, unknown, err := LoadSettings(ctx, settingsStore, declarations)
 	if err != nil {
-		return nil, stderrors.Join(err, store.Close())
+		return stderrors.Join(err, store.Close())
 	}
 
 	secretStore := secrets.NewStore(sqlite.NewSecretsRepo(store, now), key)
-	relay := &EventRelay{}
 	siteRepo := sqlite.NewSiteRepo(store)
 	entityRepo := sqlite.NewEntityRepo(store)
 	edgeRepo := sqlite.NewEdgeRepo(store)
@@ -150,7 +181,7 @@ func Open(ctx context.Context, cfg Config, logger *zap.Logger) (*Core, error) {
 
 	modelCatalog, err := catalog.New(modelRepo)
 	if err != nil {
-		return nil, stderrors.Join(err, store.Close())
+		return stderrors.Join(err, store.Close())
 	}
 
 	templateService := templates.New(templateRepo, policyRepo, pageRepo, siteRepo, store, relay, now)
@@ -195,7 +226,7 @@ func Open(ctx context.Context, cfg Config, logger *zap.Logger) (*Core, error) {
 		Clock:      now,
 		BatchSize:  steps.BatchSize(values),
 	}); err != nil {
-		return nil, stderrors.Join(err, store.Close())
+		return stderrors.Join(err, store.Close())
 	}
 
 	runRepo := sqlite.NewRunRepo(store)
@@ -282,14 +313,15 @@ func Open(ctx context.Context, cfg Config, logger *zap.Logger) (*Core, error) {
 		HistoryBudget: agent.HistoryBudgetChars(values),
 	})
 
-	core := &Core{
+	c.key = key
+	c.kit = kit{
+		Archive:         export.New(store, now),
 		Store:           store,
 		Secrets:         secretStore,
 		Settings:        values,
 		Declarations:    declarations,
 		SettingsStore:   settingsStore,
 		UnknownSettings: unknown,
-		Events:          relay,
 		Sites:           sitesService,
 		Graph:           graphService,
 		Pages:           pagesService,
@@ -312,17 +344,18 @@ func Open(ctx context.Context, cfg Config, logger *zap.Logger) (*Core, error) {
 		Schedules:       schedulesService,
 		Scheduler:       scheduler.New(schedulesService, scheduler.TickInterval(values), logger),
 	}
-	if err = core.Templates.EnsureSeeded(ctx); err != nil {
-		return nil, stderrors.Join(err, store.Close())
+
+	if err = templateService.EnsureSeeded(ctx); err != nil {
+		return stderrors.Join(err, c.abandon(store))
 	}
 	if err = engine.Start(ctx); err != nil {
-		return nil, stderrors.Join(err, store.Close())
+		return stderrors.Join(err, c.abandon(store))
 	}
-	if err = core.Scheduler.Start(ctx); err != nil {
+	if err = c.Scheduler.Start(ctx); err != nil {
 		engine.Stop()
-		return nil, stderrors.Join(err, store.Close())
+		return stderrors.Join(err, c.abandon(store))
 	}
-	return core, nil
+	return nil
 }
 
 type packer struct{}
@@ -332,8 +365,7 @@ func (packer) Package() ([]byte, error) {
 }
 
 func (c *Core) Close() error {
-	c.Scheduler.Stop()
-	c.Agent.Close()
-	c.Engine.Stop()
-	return c.Store.Close()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.shutdown()
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
-type graphUseCase interface {
+type GraphUseCase interface {
 	LoadGraph(ctx context.Context, req graph.LoadGraphRequest) (graph.LoadGraphResponse, error)
 	CreateEntity(ctx context.Context, req graph.CreateEntityRequest) (graph.CreateEntityResponse, error)
 	UpdateEntity(ctx context.Context, req graph.UpdateEntityRequest) (graph.UpdateEntityResponse, error)
@@ -46,23 +46,23 @@ type GraphService struct {
 	proposeRelated   middleware.Handler[graph.ProposeRelatedRequest, graph.ProposeRelatedResponse]
 }
 
-func NewGraphService(logger *zap.Logger, useCase graphUseCase) *GraphService {
+func NewGraphService(logger *zap.Logger, useCase Source[GraphUseCase]) *GraphService {
 	return &GraphService{
-		loadGraph:        Wrap(logger, "graph.loadGraph", useCase.LoadGraph),
-		createEntity:     Wrap(logger, "graph.createEntity", useCase.CreateEntity),
-		updateEntity:     Wrap(logger, "graph.updateEntity", useCase.UpdateEntity),
-		deleteEntity:     Wrap(logger, "graph.deleteEntity", useCase.DeleteEntity),
-		getEntity:        Wrap(logger, "graph.getEntity", useCase.GetEntity),
-		listEntities:     Wrap(logger, "graph.listEntities", useCase.ListEntities),
-		setAnchors:       Wrap(logger, "graph.setAnchors", useCase.SetAnchors),
-		addEdge:          Wrap(logger, "graph.addEdge", useCase.AddEdge),
-		approveEdge:      Wrap(logger, "graph.approveEdge", useCase.ApproveEdge),
-		rejectEdge:       Wrap(logger, "graph.rejectEdge", useCase.RejectEdge),
-		deleteEdge:       Wrap(logger, "graph.deleteEdge", useCase.DeleteEdge),
-		listEdges:        Wrap(logger, "graph.listEdges", useCase.ListEdges),
-		recomputeScores:  Wrap(logger, "graph.recomputeScores", useCase.RecomputeScores),
-		proposeFromPages: Wrap(logger, "graph.proposeFromPages", useCase.ProposeFromPages),
-		proposeRelated:   Wrap(logger, "graph.proposeRelated", useCase.ProposeRelated),
+		loadGraph:        Wrap(logger, "graph.loadGraph", call(useCase, GraphUseCase.LoadGraph)),
+		createEntity:     Wrap(logger, "graph.createEntity", call(useCase, GraphUseCase.CreateEntity)),
+		updateEntity:     Wrap(logger, "graph.updateEntity", call(useCase, GraphUseCase.UpdateEntity)),
+		deleteEntity:     Wrap(logger, "graph.deleteEntity", call(useCase, GraphUseCase.DeleteEntity)),
+		getEntity:        Wrap(logger, "graph.getEntity", call(useCase, GraphUseCase.GetEntity)),
+		listEntities:     Wrap(logger, "graph.listEntities", call(useCase, GraphUseCase.ListEntities)),
+		setAnchors:       Wrap(logger, "graph.setAnchors", call(useCase, GraphUseCase.SetAnchors)),
+		addEdge:          Wrap(logger, "graph.addEdge", call(useCase, GraphUseCase.AddEdge)),
+		approveEdge:      Wrap(logger, "graph.approveEdge", call(useCase, GraphUseCase.ApproveEdge)),
+		rejectEdge:       Wrap(logger, "graph.rejectEdge", call(useCase, GraphUseCase.RejectEdge)),
+		deleteEdge:       Wrap(logger, "graph.deleteEdge", call(useCase, GraphUseCase.DeleteEdge)),
+		listEdges:        Wrap(logger, "graph.listEdges", call(useCase, GraphUseCase.ListEdges)),
+		recomputeScores:  Wrap(logger, "graph.recomputeScores", call(useCase, GraphUseCase.RecomputeScores)),
+		proposeFromPages: Wrap(logger, "graph.proposeFromPages", call(useCase, GraphUseCase.ProposeFromPages)),
+		proposeRelated:   Wrap(logger, "graph.proposeRelated", call(useCase, GraphUseCase.ProposeRelated)),
 	}
 }
 

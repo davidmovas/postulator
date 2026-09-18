@@ -43,9 +43,9 @@ func (f importsFake) DeleteMapping(context.Context, imports.DeleteMappingRequest
 func TestImportServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
-	assertMethodNames(t, wails.NewImportService(zap.NewNop(), importsFake{}), []string{
+	assertMethodNames(t, wails.NewImportService(zap.NewNop(), ready[wails.ImportsUseCase](importsFake{})), []string{
 		"Apply", "DeleteMapping", "Export", "Inspect", "ListMappings", "Preview", "SaveMapping",
 	})
-	assertEveryMethodConverts(t, wails.NewImportService(zap.NewNop(), importsFake{mode: missing}), missingBody)
-	assertEveryMethodConverts(t, wails.NewImportService(zap.NewNop(), importsFake{mode: panicking}), panicBody)
+	assertEveryMethodConverts(t, wails.NewImportService(zap.NewNop(), ready[wails.ImportsUseCase](importsFake{mode: missing})), missingBody)
+	assertEveryMethodConverts(t, wails.NewImportService(zap.NewNop(), ready[wails.ImportsUseCase](importsFake{mode: panicking})), panicBody)
 }

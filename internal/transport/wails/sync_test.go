@@ -37,11 +37,11 @@ func (f syncFake) PluginPackage(context.Context, sync.PluginPackageRequest) (syn
 func TestSyncServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
-	assertMethodNames(t, wails.NewSyncService(zap.NewNop(), syncFake{}), []string{
+	assertMethodNames(t, wails.NewSyncService(zap.NewNop(), ready[wails.SyncUseCase](syncFake{})), []string{
 		"CheckPlugin", "SavePluginPackage", "SyncSite",
 	})
-	assertEveryMethodConverts(t, wails.NewSyncService(zap.NewNop(), syncFake{mode: missing}), missingBody, "SavePluginPackage")
-	assertEveryMethodConverts(t, wails.NewSyncService(zap.NewNop(), syncFake{mode: panicking}), panicBody, "SavePluginPackage")
+	assertEveryMethodConverts(t, wails.NewSyncService(zap.NewNop(), ready[wails.SyncUseCase](syncFake{mode: missing})), missingBody, "SavePluginPackage")
+	assertEveryMethodConverts(t, wails.NewSyncService(zap.NewNop(), ready[wails.SyncUseCase](syncFake{mode: panicking})), panicBody, "SavePluginPackage")
 }
 
 func TestSavePluginPackageWritesTheArchive(t *testing.T) {
@@ -69,7 +69,7 @@ func TestSavePluginPackageWritesTheArchive(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			service := wails.NewSyncService(zap.NewNop(), packaged)
+			service := wails.NewSyncService(zap.NewNop(), ready[wails.SyncUseCase](packaged))
 
 			saved, err := service.SavePluginPackage(context.Background(), wails.SavePluginPackageRequest{Path: tc.path()})
 			if err != nil {
@@ -128,7 +128,7 @@ func TestSavePluginPackageRefusesADestinationItCannotUse(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			service := wails.NewSyncService(zap.NewNop(), tc.useCase)
+			service := wails.NewSyncService(zap.NewNop(), ready[wails.SyncUseCase](tc.useCase))
 
 			_, err := service.SavePluginPackage(context.Background(), wails.SavePluginPackageRequest{Path: tc.path})
 			if err == nil {

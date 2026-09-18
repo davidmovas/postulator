@@ -48,9 +48,9 @@ func (f schedulesFake) RunNow(context.Context, schedules.RunNowRequest) (schedul
 func TestSchedulesServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
-	assertMethodNames(t, wails.NewSchedulesService(zap.NewNop(), schedulesFake{}), []string{
+	assertMethodNames(t, wails.NewSchedulesService(zap.NewNop(), ready[wails.SchedulesUseCase](schedulesFake{})), []string{
 		"Create", "Delete", "Disable", "Enable", "Get", "List", "RunNow", "Update",
 	})
-	assertEveryMethodConverts(t, wails.NewSchedulesService(zap.NewNop(), schedulesFake{mode: missing}), missingBody)
-	assertEveryMethodConverts(t, wails.NewSchedulesService(zap.NewNop(), schedulesFake{mode: panicking}), panicBody)
+	assertEveryMethodConverts(t, wails.NewSchedulesService(zap.NewNop(), ready[wails.SchedulesUseCase](schedulesFake{mode: missing})), missingBody)
+	assertEveryMethodConverts(t, wails.NewSchedulesService(zap.NewNop(), ready[wails.SchedulesUseCase](schedulesFake{mode: panicking})), panicBody)
 }

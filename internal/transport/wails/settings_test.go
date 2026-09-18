@@ -82,26 +82,31 @@ func (p *providerKeyFake) SetProviderKey(_ context.Context, req models.SetProvid
 	return models.SetProviderKeyResponse{Provider: req.Provider}, nil
 }
 
-func settingsHarness(t *testing.T) (deps wails.SettingsDeps, workers *settings.Setting[int], store *storeFake, keys *providerKeyFake) {
+func settingsHarness(t *testing.T) (deps wails.SettingsDeps, workers *settings.Setting[int], store *storeFake, keys *providerKeyFake, live *settings.Values) {
 	t.Helper()
 
 	registry := settings.New()
 	workers = registry.Int("runs.workers", 2, settings.IntRange(1, 16))
 	store = &storeFake{stored: map[string]json.RawMessage{}}
 	keys = &providerKeyFake{}
+	live = registry.NewValues()
 
 	return wails.SettingsDeps{
-		Declarations: declarationsFake{registry: registry},
-		Values:       registry.NewValues(),
-		Store:        store,
-		Models:       keys,
-	}, workers, store, keys
+		Access: ready(wails.SettingsAccess{
+			Declarations: declarationsFake{registry: registry},
+			Values:       live,
+			Store:        store,
+			Models:       keys,
+		}),
+		Backup: ready[wails.BackupControl](&backupFake{}),
+		Lock:   &lockFake{},
+	}, workers, store, keys, live
 }
 
 func TestSettingsServiceDescribesEveryDeclaration(t *testing.T) {
 	t.Parallel()
 
-	deps, _, _, _ := settingsHarness(t)
+	deps, _, _, _, _ := settingsHarness(t)
 
 	described, err := wails.NewSettingsService(zap.NewNop(), deps).Schema(context.Background(), wails.SettingsSchemaRequest{})
 	if err != nil {
@@ -118,7 +123,7 @@ func TestSettingsServiceDescribesEveryDeclaration(t *testing.T) {
 func TestSettingsServiceReadsTheStoredValueOrTheDefault(t *testing.T) {
 	t.Parallel()
 
-	deps, _, store, _ := settingsHarness(t)
+	deps, _, store, _, _ := settingsHarness(t)
 	service := wails.NewSettingsService(zap.NewNop(), deps)
 
 	unset, err := service.Get(context.Background(), wails.GetSettingRequest{Key: "runs.workers"})
@@ -146,7 +151,7 @@ func TestSettingsServiceReadsTheStoredValueOrTheDefault(t *testing.T) {
 func TestSettingsServiceWritesAndRefreshesTheLiveValue(t *testing.T) {
 	t.Parallel()
 
-	deps, workers, store, _ := settingsHarness(t)
+	deps, workers, store, _, live := settingsHarness(t)
 	service := wails.NewSettingsService(zap.NewNop(), deps)
 
 	written, err := service.Set(context.Background(), wails.SetSettingRequest{Key: "runs.workers", Value: json.RawMessage("8")})
@@ -159,7 +164,7 @@ func TestSettingsServiceWritesAndRefreshesTheLiveValue(t *testing.T) {
 	if string(store.stored["runs.workers"]) != "8" {
 		t.Errorf("stored = %s, want 8", store.stored["runs.workers"])
 	}
-	if got := workers.Get(deps.Values); got != 8 {
+	if got := workers.Get(live); got != 8 {
 		t.Errorf("the live value is %d, want the 8 that was just written", got)
 	}
 }
@@ -167,7 +172,7 @@ func TestSettingsServiceWritesAndRefreshesTheLiveValue(t *testing.T) {
 func TestSettingsServiceRefusesAValueTheDeclarationRejects(t *testing.T) {
 	t.Parallel()
 
-	deps, workers, store, _ := settingsHarness(t)
+	deps, workers, store, _, live := settingsHarness(t)
 	service := wails.NewSettingsService(zap.NewNop(), deps)
 
 	cases := []struct {
@@ -195,7 +200,7 @@ func TestSettingsServiceRefusesAValueTheDeclarationRejects(t *testing.T) {
 			if len(store.stored) != 0 {
 				t.Fatalf("stored = %v, want nothing written", store.stored)
 			}
-			if got := workers.Get(deps.Values); got != 2 {
+			if got := workers.Get(live); got != 2 {
 				t.Fatalf("the live value is %d, want the untouched default", got)
 			}
 		})
@@ -205,7 +210,7 @@ func TestSettingsServiceRefusesAValueTheDeclarationRejects(t *testing.T) {
 func TestSettingsServiceDelegatesTheProviderKey(t *testing.T) {
 	t.Parallel()
 
-	deps, _, _, keys := settingsHarness(t)
+	deps, _, _, keys, _ := settingsHarness(t)
 
 	written, err := wails.NewSettingsService(zap.NewNop(), deps).SetProviderKey(context.Background(),
 		models.SetProviderKeyRequest{Provider: "openai", APIKey: "sk-secret"})
@@ -235,17 +240,28 @@ func TestSettingsServiceConvertsEveryFailure(t *testing.T) {
 	registry.Int("runs.workers", 2, settings.IntRange(1, 16))
 
 	assertMethodNames(t, wails.NewSettingsService(zap.NewNop(), wails.SettingsDeps{
-		Declarations: declarationsFake{registry: registry},
-		Values:       registry.NewValues(),
-		Store:        &storeFake{stored: map[string]json.RawMessage{}},
-		Models:       &providerKeyFake{},
-	}), []string{"Get", "Schema", "Set", "SetProviderKey"})
+		Access: ready(wails.SettingsAccess{
+			Declarations: declarationsFake{registry: registry},
+			Values:       registry.NewValues(),
+			Store:        &storeFake{stored: map[string]json.RawMessage{}},
+			Models:       &providerKeyFake{},
+		}),
+		Backup: ready[wails.BackupControl](&backupFake{}),
+		Lock:   &lockFake{},
+	}), []string{
+		"ExportBackup", "Get", "ImportBackup", "Lock", "LockState",
+		"Schema", "Set", "SetMasterPassword", "SetProviderKey", "Unlock",
+	})
 
 	assertEveryMethodConverts(t, wails.NewSettingsService(zap.NewNop(), wails.SettingsDeps{
-		Declarations: declarationsFake{registry: registry, panics: true},
-		Values:       registry.NewValues(),
-		Store:        &storeFake{stored: map[string]json.RawMessage{}},
-		Models:       &providerKeyFake{mode: panicking, fails: true},
+		Access: ready(wails.SettingsAccess{
+			Declarations: declarationsFake{registry: registry, panics: true},
+			Values:       registry.NewValues(),
+			Store:        &storeFake{stored: map[string]json.RawMessage{}},
+			Models:       &providerKeyFake{mode: panicking, fails: true},
+		}),
+		Backup: ready[wails.BackupControl](&backupFake{mode: panicking, fails: true}),
+		Lock:   &lockFake{mode: panicking, fails: true},
 	}), panicBody)
 }
 
@@ -264,10 +280,14 @@ func TestSettingsServiceReportsWhatItsCollaboratorsRefuse(t *testing.T) {
 		{
 			name: "the declarations cannot be described",
 			deps: wails.SettingsDeps{
-				Declarations: declarationsFake{registry: registry, describes: broken},
-				Values:       registry.NewValues(),
-				Store:        &storeFake{stored: map[string]json.RawMessage{}},
-				Models:       &providerKeyFake{},
+				Access: ready(wails.SettingsAccess{
+					Declarations: declarationsFake{registry: registry, describes: broken},
+					Values:       registry.NewValues(),
+					Store:        &storeFake{stored: map[string]json.RawMessage{}},
+					Models:       &providerKeyFake{},
+				}),
+				Backup: ready[wails.BackupControl](&backupFake{}),
+				Lock:   &lockFake{},
 			},
 			call: func(service *wails.SettingsService) error {
 				_, err := service.Schema(context.Background(), wails.SettingsSchemaRequest{})
@@ -277,10 +297,14 @@ func TestSettingsServiceReportsWhatItsCollaboratorsRefuse(t *testing.T) {
 		{
 			name: "the store cannot be read",
 			deps: wails.SettingsDeps{
-				Declarations: declarationsFake{registry: registry},
-				Values:       registry.NewValues(),
-				Store:        &storeFake{stored: map[string]json.RawMessage{}, fail: broken},
-				Models:       &providerKeyFake{},
+				Access: ready(wails.SettingsAccess{
+					Declarations: declarationsFake{registry: registry},
+					Values:       registry.NewValues(),
+					Store:        &storeFake{stored: map[string]json.RawMessage{}, fail: broken},
+					Models:       &providerKeyFake{},
+				}),
+				Backup: ready[wails.BackupControl](&backupFake{}),
+				Lock:   &lockFake{},
 			},
 			call: func(service *wails.SettingsService) error {
 				_, err := service.Get(context.Background(), wails.GetSettingRequest{Key: "runs.workers"})
@@ -290,10 +314,14 @@ func TestSettingsServiceReportsWhatItsCollaboratorsRefuse(t *testing.T) {
 		{
 			name: "the store cannot be written",
 			deps: wails.SettingsDeps{
-				Declarations: declarationsFake{registry: registry},
-				Values:       registry.NewValues(),
-				Store:        &storeFake{stored: map[string]json.RawMessage{}, fail: broken},
-				Models:       &providerKeyFake{},
+				Access: ready(wails.SettingsAccess{
+					Declarations: declarationsFake{registry: registry},
+					Values:       registry.NewValues(),
+					Store:        &storeFake{stored: map[string]json.RawMessage{}, fail: broken},
+					Models:       &providerKeyFake{},
+				}),
+				Backup: ready[wails.BackupControl](&backupFake{}),
+				Lock:   &lockFake{},
 			},
 			call: func(service *wails.SettingsService) error {
 				_, err := service.Set(context.Background(), wails.SetSettingRequest{
@@ -313,5 +341,166 @@ func TestSettingsServiceReportsWhatItsCollaboratorsRefuse(t *testing.T) {
 				t.Fatalf("error = %v, want %s", err, errors.External)
 			}
 		})
+	}
+}
+
+type lockFake struct {
+	mode      failure
+	fails     bool
+	locked    bool
+	protected bool
+	current   string
+	next      string
+	password  string
+}
+
+func (l *lockFake) Locked() bool {
+	return l.locked
+}
+
+func (l *lockFake) Protected() (bool, error) {
+	if l.fails {
+		_, err := answer[bool](l.mode)
+		return false, err
+	}
+	return l.protected, nil
+}
+
+func (l *lockFake) Lock() error {
+	if l.fails {
+		_, err := answer[bool](l.mode)
+		return err
+	}
+	l.locked = true
+	return nil
+}
+
+func (l *lockFake) Unlock(_ context.Context, password string) error {
+	if l.fails {
+		_, err := answer[bool](l.mode)
+		return err
+	}
+	l.password = password
+	l.locked = false
+	return nil
+}
+
+func (l *lockFake) SetMasterPassword(_ context.Context, current, next string) error {
+	if l.fails {
+		_, err := answer[bool](l.mode)
+		return err
+	}
+	l.current, l.next = current, next
+	l.protected = next != ""
+	return nil
+}
+
+type backupFake struct {
+	mode    failure
+	fails   bool
+	written string
+	read    string
+}
+
+func (b *backupFake) ExportBackup(_ context.Context, path, password string) (int64, error) {
+	if b.fails {
+		return answer[int64](b.mode)
+	}
+	b.written = path + "|" + password
+	return 4096, nil
+}
+
+func (b *backupFake) ImportBackup(_ context.Context, path, password string) error {
+	if b.fails {
+		_, err := answer[int64](b.mode)
+		return err
+	}
+	b.read = path + "|" + password
+	return nil
+}
+
+func lockHarness(t *testing.T) (*wails.SettingsService, *lockFake, *backupFake) {
+	t.Helper()
+
+	registry := settings.New()
+	registry.Int("runs.workers", 2, settings.IntRange(1, 16))
+	guard := &lockFake{protected: true, locked: true}
+	backup := &backupFake{}
+
+	return wails.NewSettingsService(zap.NewNop(), wails.SettingsDeps{
+		Access: ready(wails.SettingsAccess{
+			Declarations: declarationsFake{registry: registry},
+			Values:       registry.NewValues(),
+			Store:        &storeFake{stored: map[string]json.RawMessage{}},
+			Models:       &providerKeyFake{},
+		}),
+		Backup: ready[wails.BackupControl](backup),
+		Lock:   guard,
+	}), guard, backup
+}
+
+func TestSettingsServiceDrivesTheLock(t *testing.T) {
+	t.Parallel()
+
+	service, guard, _ := lockHarness(t)
+
+	state, err := service.LockState(context.Background(), wails.LockStateRequest{})
+	if err != nil {
+		t.Fatalf("LockState: %v", err)
+	}
+	if !state.Locked || !state.Protected {
+		t.Fatalf("LockState = %+v, want a locked and protected application", state)
+	}
+
+	state, err = service.Unlock(context.Background(), wails.UnlockRequest{Password: "hunter2"})
+	if err != nil {
+		t.Fatalf("Unlock: %v", err)
+	}
+	if state.Locked || guard.password != "hunter2" {
+		t.Fatalf("Unlock = %+v with the password %q", state, guard.password)
+	}
+
+	state, err = service.Lock(context.Background(), wails.LockRequest{})
+	if err != nil {
+		t.Fatalf("Lock: %v", err)
+	}
+	if !state.Locked {
+		t.Fatalf("Lock = %+v, want a locked application", state)
+	}
+
+	state, err = service.SetMasterPassword(context.Background(),
+		wails.SetMasterPasswordRequest{Current: "hunter2", New: ""})
+	if err != nil {
+		t.Fatalf("SetMasterPassword: %v", err)
+	}
+	if state.Protected || guard.current != "hunter2" || guard.next != "" {
+		t.Fatalf("SetMasterPassword = %+v after %q -> %q", state, guard.current, guard.next)
+	}
+}
+
+func TestSettingsServiceCarriesTheBackupPathAndPassword(t *testing.T) {
+	t.Parallel()
+
+	service, _, backup := lockHarness(t)
+
+	written, err := service.ExportBackup(context.Background(),
+		wails.ExportBackupRequest{Path: "  C:/backups/postulator.pstx  ", Password: "hunter2"})
+	if err != nil {
+		t.Fatalf("ExportBackup: %v", err)
+	}
+	if written.Path != "C:/backups/postulator.pstx" || written.Bytes != 4096 {
+		t.Fatalf("ExportBackup = %+v", written)
+	}
+	if backup.written != "C:/backups/postulator.pstx|hunter2" {
+		t.Fatalf("the archive received %q", backup.written)
+	}
+
+	restored, err := service.ImportBackup(context.Background(),
+		wails.ImportBackupRequest{Path: "C:/backups/postulator.pstx", Password: "hunter2"})
+	if err != nil {
+		t.Fatalf("ImportBackup: %v", err)
+	}
+	if restored.Path != "C:/backups/postulator.pstx" || backup.read != "C:/backups/postulator.pstx|hunter2" {
+		t.Fatalf("ImportBackup = %+v, the archive received %q", restored, backup.read)
 	}
 }

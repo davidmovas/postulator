@@ -10,7 +10,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
-type agentUseCase interface {
+type AgentUseCase interface {
 	CreateConversation(ctx context.Context, req agent.CreateConversationRequest) (agent.CreateConversationResponse, error)
 	SetMode(ctx context.Context, req agent.SetModeRequest) (agent.SetModeResponse, error)
 	Send(ctx context.Context, req agent.SendRequest) (agent.SendResponse, error)
@@ -32,16 +32,16 @@ type AgentService struct {
 	listPendingActions middleware.Handler[agent.ListPendingActionsRequest, paging.List[agent.PendingAction]]
 }
 
-func NewAgentService(logger *zap.Logger, useCase agentUseCase) *AgentService {
+func NewAgentService(logger *zap.Logger, useCase Source[AgentUseCase]) *AgentService {
 	return &AgentService{
-		createConversation: Wrap(logger, "agent.createConversation", useCase.CreateConversation),
-		setMode:            Wrap(logger, "agent.setMode", useCase.SetMode),
-		send:               Wrap(logger, "agent.send", useCase.Send),
-		confirm:            Wrap(logger, "agent.confirm", useCase.Confirm),
-		cancel:             Wrap(logger, "agent.cancel", useCase.Cancel),
-		listConversations:  Wrap(logger, "agent.listConversations", useCase.ListConversations),
-		listMessages:       Wrap(logger, "agent.listMessages", useCase.ListMessages),
-		listPendingActions: Wrap(logger, "agent.listPendingActions", useCase.ListPendingActions),
+		createConversation: Wrap(logger, "agent.createConversation", call(useCase, AgentUseCase.CreateConversation)),
+		setMode:            Wrap(logger, "agent.setMode", call(useCase, AgentUseCase.SetMode)),
+		send:               Wrap(logger, "agent.send", call(useCase, AgentUseCase.Send)),
+		confirm:            Wrap(logger, "agent.confirm", call(useCase, AgentUseCase.Confirm)),
+		cancel:             Wrap(logger, "agent.cancel", call(useCase, AgentUseCase.Cancel)),
+		listConversations:  Wrap(logger, "agent.listConversations", call(useCase, AgentUseCase.ListConversations)),
+		listMessages:       Wrap(logger, "agent.listMessages", call(useCase, AgentUseCase.ListMessages)),
+		listPendingActions: Wrap(logger, "agent.listPendingActions", call(useCase, AgentUseCase.ListPendingActions)),
 	}
 }
 

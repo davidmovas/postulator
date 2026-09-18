@@ -39,3 +39,26 @@ func snapshotURI(path string) string {
 	location := url.URL{Path: filepath.ToSlash(path)}
 	return "file:" + location.EscapedPath()
 }
+
+func (s *Store) Restore(ctx context.Context, path string) error {
+	if path == "" {
+		return errors.New(errors.Invalid, "the snapshot path must not be empty")
+	}
+
+	conn, err := s.writer.Conn(ctx)
+	if err != nil {
+		return dbx.Convert(err, "reserve the writer for the restore")
+	}
+
+	copied := conn.Raw(func(driverConn any) error {
+		raw, ok := driverConn.(sqlitedriver.Conn)
+		if !ok {
+			return errors.New(errors.Internal, "the connection does not carry a sqlite handle")
+		}
+		return raw.Raw().Restore("main", snapshotURI(path))
+	})
+	return stderrors.Join(
+		dbx.Convert(copied, "copy the snapshot into the database"),
+		dbx.Convert(conn.Close(), "release the writer after the restore"),
+	)
+}

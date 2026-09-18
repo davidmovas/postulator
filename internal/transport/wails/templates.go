@@ -10,7 +10,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
-type templatesUseCase interface {
+type TemplatesUseCase interface {
 	CreateTemplate(ctx context.Context, req templates.CreateTemplateRequest) (templates.CreateTemplateResponse, error)
 	UpdateTemplate(ctx context.Context, req templates.UpdateTemplateRequest) (templates.UpdateTemplateResponse, error)
 	DeleteTemplate(ctx context.Context, req templates.DeleteTemplateRequest) (templates.DeleteTemplateResponse, error)
@@ -44,22 +44,22 @@ type TemplatesService struct {
 	getEffectivePolicy middleware.Handler[templates.GetEffectivePolicyRequest, templates.GetEffectivePolicyResponse]
 }
 
-func NewTemplatesService(logger *zap.Logger, useCase templatesUseCase) *TemplatesService {
+func NewTemplatesService(logger *zap.Logger, useCase Source[TemplatesUseCase]) *TemplatesService {
 	return &TemplatesService{
-		createTemplate:     Wrap(logger, "templates.createTemplate", useCase.CreateTemplate),
-		updateTemplate:     Wrap(logger, "templates.updateTemplate", useCase.UpdateTemplate),
-		deleteTemplate:     Wrap(logger, "templates.deleteTemplate", useCase.DeleteTemplate),
-		getTemplate:        Wrap(logger, "templates.getTemplate", useCase.GetTemplate),
-		listTemplates:      Wrap(logger, "templates.listTemplates", useCase.ListTemplates),
-		setOverride:        Wrap(logger, "templates.setOverride", useCase.SetOverride),
-		deleteOverride:     Wrap(logger, "templates.deleteOverride", useCase.DeleteOverride),
-		resolveForPage:     Wrap(logger, "templates.resolveForPage", useCase.ResolveForPage),
-		createPolicy:       Wrap(logger, "templates.createPolicy", useCase.CreatePolicy),
-		updatePolicy:       Wrap(logger, "templates.updatePolicy", useCase.UpdatePolicy),
-		deletePolicy:       Wrap(logger, "templates.deletePolicy", useCase.DeletePolicy),
-		getPolicy:          Wrap(logger, "templates.getPolicy", useCase.GetPolicy),
-		listPolicies:       Wrap(logger, "templates.listPolicies", useCase.ListPolicies),
-		getEffectivePolicy: Wrap(logger, "templates.getEffectivePolicy", useCase.GetEffectivePolicy),
+		createTemplate:     Wrap(logger, "templates.createTemplate", call(useCase, TemplatesUseCase.CreateTemplate)),
+		updateTemplate:     Wrap(logger, "templates.updateTemplate", call(useCase, TemplatesUseCase.UpdateTemplate)),
+		deleteTemplate:     Wrap(logger, "templates.deleteTemplate", call(useCase, TemplatesUseCase.DeleteTemplate)),
+		getTemplate:        Wrap(logger, "templates.getTemplate", call(useCase, TemplatesUseCase.GetTemplate)),
+		listTemplates:      Wrap(logger, "templates.listTemplates", call(useCase, TemplatesUseCase.ListTemplates)),
+		setOverride:        Wrap(logger, "templates.setOverride", call(useCase, TemplatesUseCase.SetOverride)),
+		deleteOverride:     Wrap(logger, "templates.deleteOverride", call(useCase, TemplatesUseCase.DeleteOverride)),
+		resolveForPage:     Wrap(logger, "templates.resolveForPage", call(useCase, TemplatesUseCase.ResolveForPage)),
+		createPolicy:       Wrap(logger, "templates.createPolicy", call(useCase, TemplatesUseCase.CreatePolicy)),
+		updatePolicy:       Wrap(logger, "templates.updatePolicy", call(useCase, TemplatesUseCase.UpdatePolicy)),
+		deletePolicy:       Wrap(logger, "templates.deletePolicy", call(useCase, TemplatesUseCase.DeletePolicy)),
+		getPolicy:          Wrap(logger, "templates.getPolicy", call(useCase, TemplatesUseCase.GetPolicy)),
+		listPolicies:       Wrap(logger, "templates.listPolicies", call(useCase, TemplatesUseCase.ListPolicies)),
+		getEffectivePolicy: Wrap(logger, "templates.getEffectivePolicy", call(useCase, TemplatesUseCase.GetEffectivePolicy)),
 	}
 }
 

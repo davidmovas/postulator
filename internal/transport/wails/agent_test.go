@@ -48,10 +48,10 @@ func (f agentFake) ListPendingActions(context.Context, agent.ListPendingActionsR
 func TestAgentServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
-	assertMethodNames(t, wails.NewAgentService(zap.NewNop(), agentFake{}), []string{
+	assertMethodNames(t, wails.NewAgentService(zap.NewNop(), ready[wails.AgentUseCase](agentFake{})), []string{
 		"Cancel", "Confirm", "CreateConversation", "ListConversations", "ListMessages",
 		"ListPendingActions", "Send", "SetMode",
 	})
-	assertEveryMethodConverts(t, wails.NewAgentService(zap.NewNop(), agentFake{mode: missing}), missingBody)
-	assertEveryMethodConverts(t, wails.NewAgentService(zap.NewNop(), agentFake{mode: panicking}), panicBody)
+	assertEveryMethodConverts(t, wails.NewAgentService(zap.NewNop(), ready[wails.AgentUseCase](agentFake{mode: missing})), missingBody)
+	assertEveryMethodConverts(t, wails.NewAgentService(zap.NewNop(), ready[wails.AgentUseCase](agentFake{mode: panicking})), panicBody)
 }

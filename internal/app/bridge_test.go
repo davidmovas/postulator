@@ -135,7 +135,7 @@ func TestTheEventBridgeCarriesARunFromTheEngineToTheWindow(t *testing.T) {
 	}
 
 	siteID, pageID := plannedPage(t, core)
-	service := wails.NewRunsService(zaptest.NewLogger(t), core.Runs)
+	service := wails.NewRunsService(zaptest.NewLogger(t), ready[wails.RunsUseCase](core.Runs))
 
 	started, err := service.Start(t.Context(), runs.StartRequest{
 		SiteID:  siteID,
@@ -191,5 +191,11 @@ func TestTheEventBridgeCarriesARunFromTheEngineToTheWindow(t *testing.T) {
 	if len(tail.Events) != len(logged.Events)-1 || tail.Events[0].Seq != live[1].Seq {
 		t.Fatalf("the catch-up from seq %d returned %d events starting at %d",
 			live[0].Seq, len(tail.Events), tail.Events[0].Seq)
+	}
+}
+
+func ready[T any](useCase T) wails.Source[T] {
+	return func() (T, error) {
+		return useCase, nil
 	}
 }

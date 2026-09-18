@@ -9,7 +9,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/middleware"
 )
 
-type reportsUseCase interface {
+type ReportsUseCase interface {
 	SiteOverview(ctx context.Context, req reports.SiteOverviewRequest) (reports.SiteOverviewResponse, error)
 	PageReport(ctx context.Context, req reports.PageReportRequest) (reports.PageReportResponse, error)
 	RunReport(ctx context.Context, req reports.RunReportRequest) (reports.RunReportResponse, error)
@@ -21,11 +21,11 @@ type ReportsService struct {
 	runReport    middleware.Handler[reports.RunReportRequest, reports.RunReportResponse]
 }
 
-func NewReportsService(logger *zap.Logger, useCase reportsUseCase) *ReportsService {
+func NewReportsService(logger *zap.Logger, useCase Source[ReportsUseCase]) *ReportsService {
 	return &ReportsService{
-		siteOverview: Wrap(logger, "reports.siteOverview", useCase.SiteOverview),
-		pageReport:   Wrap(logger, "reports.pageReport", useCase.PageReport),
-		runReport:    Wrap(logger, "reports.runReport", useCase.RunReport),
+		siteOverview: Wrap(logger, "reports.siteOverview", call(useCase, ReportsUseCase.SiteOverview)),
+		pageReport:   Wrap(logger, "reports.pageReport", call(useCase, ReportsUseCase.PageReport)),
+		runReport:    Wrap(logger, "reports.runReport", call(useCase, ReportsUseCase.RunReport)),
 	}
 }
 

@@ -23,23 +23,36 @@ func Wrap[In, Out any](logger *zap.Logger, operation string, next middleware.Han
 	}
 }
 
+type Source[T any] func() (T, error)
+
+func call[T, In, Out any](source Source[T], method func(T, context.Context, In) (Out, error)) middleware.Handler[In, Out] {
+	return func(c context.Context, in In) (Out, error) {
+		live, err := source()
+		if err != nil {
+			var zero Out
+			return zero, err
+		}
+		return method(live, c, in)
+	}
+}
+
 func bind[T any](instance *T) application.Service {
 	return application.NewServiceWithOptions(instance, application.ServiceOptions{MarshalError: MarshalError})
 }
 
 type Deps struct {
-	Sites     sitesUseCase
-	Graph     graphUseCase
-	Pages     pagesUseCase
-	Templates templatesUseCase
-	Runs      runsUseCase
-	Sync      syncUseCase
-	Reports   reportsUseCase
-	Imports   importsUseCase
-	Models    modelsUseCase
-	Agent     agentUseCase
-	Schedules schedulesUseCase
-	Tools     toolCatalog
+	Sites     Source[SitesUseCase]
+	Graph     Source[GraphUseCase]
+	Pages     Source[PagesUseCase]
+	Templates Source[TemplatesUseCase]
+	Runs      Source[RunsUseCase]
+	Sync      Source[SyncUseCase]
+	Reports   Source[ReportsUseCase]
+	Imports   Source[ImportsUseCase]
+	Models    Source[ModelsUseCase]
+	Agent     Source[AgentUseCase]
+	Schedules Source[SchedulesUseCase]
+	Tools     Source[ToolCatalog]
 	Settings  SettingsDeps
 }
 

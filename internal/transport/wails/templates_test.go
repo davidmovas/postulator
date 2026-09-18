@@ -72,11 +72,11 @@ func (f templatesFake) GetEffectivePolicy(context.Context, templates.GetEffectiv
 func TestTemplatesServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
-	assertMethodNames(t, wails.NewTemplatesService(zap.NewNop(), templatesFake{}), []string{
+	assertMethodNames(t, wails.NewTemplatesService(zap.NewNop(), ready[wails.TemplatesUseCase](templatesFake{})), []string{
 		"CreatePolicy", "CreateTemplate", "DeleteOverride", "DeletePolicy", "DeleteTemplate",
 		"GetEffectivePolicy", "GetPolicy", "GetTemplate", "ListPolicies", "ListTemplates",
 		"ResolveForPage", "SetOverride", "UpdatePolicy", "UpdateTemplate",
 	})
-	assertEveryMethodConverts(t, wails.NewTemplatesService(zap.NewNop(), templatesFake{mode: missing}), missingBody)
-	assertEveryMethodConverts(t, wails.NewTemplatesService(zap.NewNop(), templatesFake{mode: panicking}), panicBody)
+	assertEveryMethodConverts(t, wails.NewTemplatesService(zap.NewNop(), ready[wails.TemplatesUseCase](templatesFake{mode: missing})), missingBody)
+	assertEveryMethodConverts(t, wails.NewTemplatesService(zap.NewNop(), ready[wails.TemplatesUseCase](templatesFake{mode: panicking})), panicBody)
 }
