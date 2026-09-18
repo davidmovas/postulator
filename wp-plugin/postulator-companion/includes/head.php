@@ -23,7 +23,7 @@ function filter_document_title( $title ) {
 		return $title;
 	}
 	$own = (string) get_post_meta( $id, META_KEYS['none']['title'], true );
-	return '' === $own ? $title : $own;
+	return '' === $own ? $title : esc_html( $own );
 }
 
 function filter_canonical_url( $canonical, $post ) {
@@ -31,7 +31,7 @@ function filter_canonical_url( $canonical, $post ) {
 		return $canonical;
 	}
 	$own = (string) get_post_meta( (int) $post->ID, META_KEYS['none']['canonical'], true );
-	return '' === $own ? $canonical : $own;
+	return '' === $own ? $canonical : esc_url_raw( $own );
 }
 
 function print_head_tags(): void {

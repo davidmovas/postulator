@@ -132,3 +132,46 @@ func TestSEOMetaRejectsATermID(t *testing.T) {
 		t.Fatalf("term id %d: status %d, want 404, body %s", term.ID, status, body)
 	}
 }
+
+func TestSEOMetaEscapesRenderedHead(t *testing.T) {
+	c, env := newClient(t)
+
+	if env.seo != "none" {
+		t.Skipf("head rendering belongs to the companion only when no SEO plugin is active, mode is %q", env.seo)
+	}
+
+	slug := uniqueSlug("xss")
+	id := createPage(t, c, pageSpec{title: "XSS", slug: slug, content: "<p>x</p>"})
+
+	payload := `Pwn</title><script>alert(1)</script>`
+	attrPayload := `a" onload="alert(1)" x="<b>`
+	writeSEO(t, c, id, map[string]string{
+		"title":         payload,
+		"description":   attrPayload,
+		"canonical":     env.baseURL + `/" onmouseover="alert(1)`,
+		"ogTitle":       attrPayload,
+		"ogDescription": attrPayload,
+	})
+
+	item := findItem(t, c, "page", id)
+	html := c.fetchPage(t, env.baseURL+item.Path)
+
+	if strings.Contains(html, "<script>alert(1)</script>") {
+		t.Fatalf("rendered page carries an unescaped script tag")
+	}
+	if !strings.Contains(html, "&lt;script&gt;") {
+		t.Errorf("rendered page does not carry the escaped script text")
+	}
+	if strings.Contains(html, `onload="alert(1)"`) {
+		t.Errorf("rendered page carries an unescaped onload attribute")
+	}
+	if strings.Contains(html, `onmouseover="alert(1)"`) {
+		t.Errorf("rendered page carries an unescaped onmouseover attribute")
+	}
+	if got := strings.Count(html, "<title>"); got != 1 {
+		t.Errorf("rendered page has %d title tags, want exactly 1", got)
+	}
+	if got := strings.Count(html, `rel="canonical"`); got != 1 {
+		t.Errorf("rendered page has %d canonical tags, want exactly 1", got)
+	}
+}

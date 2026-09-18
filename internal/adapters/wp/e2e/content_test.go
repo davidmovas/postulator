@@ -218,3 +218,46 @@ func TestContentReportsNullCursorAtEndOfList(t *testing.T) {
 		t.Fatalf("nextCursor = %q, want null at the end of the list", *page.NextCursor)
 	}
 }
+
+func TestContentSinceIsExclusive(t *testing.T) {
+	c, _ := newClient(t)
+
+	id := createPage(t, c, pageSpec{title: "Exclusive", slug: uniqueSlug("exclusive"), content: "<p>e</p>"})
+	item := findItem(t, c, "page", id)
+
+	atItsOwnModified := listContent(t, c, "types=page&limit=500&since="+url.QueryEscape(item.Modified))
+	for _, listed := range atItsOwnModified.Items {
+		if listed.ID == id {
+			t.Fatalf("since=%s returned the item whose modified equals it; since must be exclusive", item.Modified)
+		}
+	}
+
+	before, err := time.Parse(time.RFC3339, item.Modified)
+	if err != nil {
+		t.Fatalf("parse modified %q: %v", item.Modified, err)
+	}
+	oneSecondEarlier := before.Add(-time.Second).Format(time.RFC3339)
+
+	found := false
+	walkContent(t, c, "page", 500, func(listed contentItem) bool {
+		if listed.ID == id {
+			found = true
+			return true
+		}
+		return false
+	})
+	if !found {
+		t.Fatalf("page %d is not listed at all", id)
+	}
+
+	page := listContent(t, c, "types=page&limit=500&since="+url.QueryEscape(oneSecondEarlier))
+	found = false
+	for _, listed := range page.Items {
+		if listed.ID == id {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("since=%s (one second before modified) did not return the item", oneSecondEarlier)
+	}
+}

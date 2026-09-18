@@ -129,7 +129,7 @@ function query_posts_page( array $types, string $since_gmt, ?array $cursor, int 
 	$args         = $types;
 
 	if ( '' !== $since_gmt ) {
-		$sql   .= ' AND post_modified_gmt >= %s';
+		$sql   .= ' AND post_modified_gmt > %s';
 		$args[] = $since_gmt;
 	}
 	if ( null !== $cursor && isset( $cursor['m'], $cursor['i'] ) ) {
@@ -204,7 +204,7 @@ function query_terms_page( string $since_gmt, ?array $cursor, int $limit ): arra
 	foreach ( $rows as $row ) {
 		$term_id  = (int) $row['term_id'];
 		$modified = term_modified( $term_id );
-		if ( '' !== $since_gmt && rfc3339( $since_gmt ) > $modified ) {
+		if ( '' !== $since_gmt && rfc3339( $since_gmt ) >= $modified ) {
 			continue;
 		}
 		$selected[] = array(
