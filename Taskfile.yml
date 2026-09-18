@@ -92,3 +92,11 @@ tasks:
     summary: Runs the docker end-to-end suite
     cmds:
       - go test -tags e2e -count=1 ./internal/adapters/wp/e2e/...
+
+  plugin:lint:
+    summary: Runs php -l over every companion plugin source file
+    cmds:
+      - cmd: docker compose -f docker/e2e/compose.yaml run --rm --no-deps -T phplint -c 'find /plugin -name "*.php" -print0 | xargs -0 -n1 php -l'
+        platforms: [windows]
+      - cmd: find wp-plugin -name "*.php" -print0 | xargs -0 -n1 php -l
+        platforms: [linux, darwin]
