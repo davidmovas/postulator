@@ -10,6 +10,7 @@ require (
 	github.com/pressly/goose/v3 v3.28.0
 	github.com/sashabaranov/go-openai v1.41.2
 	github.com/wailsapp/wails/v3 v3.0.0-beta.23
+	github.com/xuri/excelize/v2 v2.11.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/net v0.58.0
 	golang.org/x/sys v0.47.0
@@ -56,7 +57,6 @@ require (
 	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/tiendc/go-deepcopy v1.7.2 // indirect
 	github.com/xuri/efp v0.0.1 // indirect
-	github.com/xuri/excelize/v2 v2.11.0 // indirect
 	github.com/xuri/nfp v0.0.2-0.20250530014748-2ddeb826f9a9 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.68.0 // indirect
