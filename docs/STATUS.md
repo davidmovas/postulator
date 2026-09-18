@@ -134,6 +134,16 @@ site overview, the page report and the run report; `internal/app` composes all o
 green, module coverage is 90.0% of 10315 statements and every package this phase added is at or above
 86.8%. Phase 8 follows.
 
+**Phase 8 (the import and the export of the client page map) is complete.**
+`internal/domain/importmap` holds the fourteen canonical fields, the saved mapping and the header alias
+table behind `AutoDetect`; `internal/adapters/importer` reads the first sheet with excelize and a
+separated-values file with a sniffed delimiter, and writes the export workbook; migration 0015 adds
+`import_mappings`; `internal/application/imports` holds `Inspect`, `Preview`, `Apply`, `Export` and the
+three mapping use cases, and `internal/app` composes it as `Core.Imports`. The preview normalises paths,
+fills the gaps, merges repeats, deduplicates entity names without case, resolves edges by name, checks for
+cycles and reports cannibalization without writing; `Apply` refuses a preview carrying an error. Module
+coverage is 90.2% of 11201 statements. Phase 9 follows.
+
 ## What landed in Phase 0
 
 - The v1.6.2 codebase is gone: `internal/`, `pkg/`, `frontend/`, `main.go`, `Makefile`,
@@ -591,3 +601,24 @@ green, module coverage is 90.0% of 10315 statements and every package this phase
   what proves the query.
 - The docker e2e stack is never run in CI: `windows-latest` cannot run Linux containers,
   and the Ubuntu job exists only to lint and package the plugin.
+
+## Decisions taken in Phase 8
+
+- **The mapping, the fields and the auto-detection live in `internal/domain/importmap`**, not in
+  `adapters/importer` as section 9.6 sketched: `application/imports` must name those types and the
+  dependency rule forbids it from importing an adapter. The adapter is the file reader and writer only.
+- **The migration is `0015`, not `0016`** — the tree ended at `0014_runs.sql`.
+- **A header folds every non-alphanumeric run to one space**, unlike the Archond mapper that drops them,
+  and a miss retries with the spaces removed. Otherwise the export's own `primary_keyword` header would not
+  survive a round trip through its own alias table.
+- **Cannibalization is a warning, never an error**, as are an unrecognised entity kind, WordPress type or
+  page kind, which fall back. Only an unknown parent or related entity, a self-edge, a cycle and an
+  unreadable path are errors, and `Apply` refuses while any of them stands.
+- **`page_kind` resolves to a template**, preferring a site-scoped one over the global one of that kind: it
+  is the only field with nowhere else to land, and read-but-unused would be a hole.
+- **An existing entity keeps its spelling and its primary keyword.** The import unions the keywords and the
+  anchors and overrides the kind only when the row names one; it never renames what the operator curated.
+- **`SaveMappingAs` reuses the mapping already saved under that name**, because the unique index is on
+  `(site_id, name)` and a second import would otherwise roll back on a constraint nobody sees.
+- **`examples/sitemap-import-example.json` and `examples/sitemap.json` are gone.** JSON import is out of
+  scope; the csv and xlsx samples stay and a test proves `AutoDetect` still opens both.
