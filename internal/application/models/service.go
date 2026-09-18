@@ -103,8 +103,8 @@ func (s *Service) DisableModel(ctx context.Context, req DisableModelRequest) (Di
 	}
 
 	now := s.now()
-	if err = s.overrides.Upsert(ctx, llm.ModelOverride{Info: info, Enabled: false, CreatedAt: now, UpdatedAt: now}); err != nil {
-		return DisableModelResponse{}, err
+	if upsertErr := s.overrides.Upsert(ctx, llm.ModelOverride{Info: info, Enabled: false, CreatedAt: now, UpdatedAt: now}); upsertErr != nil {
+		return DisableModelResponse{}, upsertErr
 	}
 	return DisableModelResponse{}, nil
 }

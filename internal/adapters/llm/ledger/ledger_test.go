@@ -49,9 +49,9 @@ func newLedger(t *testing.T) (*ledger.Ledger, *sqlite.LLMCallRepo, *recorder) {
 	t.Helper()
 
 	repo := sqlite.NewLLMCallRepo(sqlitetest.Open(t))
-	events := &recorder{}
-	book := ledger.New(fake.New(), repo, catalog{}, events, clock.NewFake(time.Date(2026, 9, 18, 10, 0, 0, 0, time.UTC)))
-	return book, repo, events
+	published := &recorder{}
+	book := ledger.New(fake.New(), repo, catalog{}, published, clock.NewFake(time.Date(2026, 9, 18, 10, 0, 0, 0, time.UTC)))
+	return book, repo, published
 }
 
 func request(model, prompt string) port.Request {

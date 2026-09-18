@@ -85,7 +85,7 @@ func TestLLMCallRepo(t *testing.T) {
 		t.Errorf("first item = %+v, want the stored latency and reference", first.Items[0])
 	}
 
-	second, err := repo.List(ctx, llm.CallQuery{RunID: "run-1"}, paging.Request{Limit: 2, After: first.Cursors.Next})
+	second, err := repo.List(ctx, llm.CallQuery{RunID: "run-1"}, paging.Request{Limit: 2, After: first.Next})
 	if err != nil {
 		t.Fatalf("List page two: %v", err)
 	}

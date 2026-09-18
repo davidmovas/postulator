@@ -100,7 +100,6 @@ type draft struct {
 	Draft    bool      `json:"draft"`
 	Note     *string   `json:"note,omitempty"`
 	Internal string    `json:"-"`
-	hidden   string
 }
 
 type node struct {

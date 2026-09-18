@@ -67,8 +67,8 @@ func (c *Client) Complete(ctx context.Context, req port.Request) (port.Response,
 		if err != nil {
 			return port.Response{}, err
 		}
-		if err = c.save(req, resp); err != nil {
-			return port.Response{}, err
+		if saveErr := c.save(req, resp); saveErr != nil {
+			return port.Response{}, saveErr
 		}
 		return resp, nil
 	default:
