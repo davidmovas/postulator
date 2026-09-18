@@ -622,3 +622,19 @@ coverage is 90.2% of 11201 statements. Phase 9 follows.
   `(site_id, name)` and a second import would otherwise roll back on a constraint nobody sees.
 - **`examples/sitemap-import-example.json` and `examples/sitemap.json` are gone.** JSON import is out of
   scope; the csv and xlsx samples stay and a test proves `AutoDetect` still opens both.
+
+## Milestone review 5–8
+
+Reviewed 2026-09-18. The gate is green: `go build`, `go vet`, `golangci-lint` (0 issues), `gofmt -l .`,
+`go test -count=1 -race ./...`, `go test -race -count=3 ./internal/runtime/...` and `covergate`
+(92.96% domain+application, 90.16% of 11214). Probes confirmed the `advance_seq` CAS admits one claimer
+of eight racers, `run_events.seq` stays gapless under three concurrent items, `Stop()` returns only after
+every in-flight step has and leaks no goroutine, and `Cancel` reaches a blocked step. Three fixes landed:
+`280537c` (link insertion spliced anchors into `<script>`, `<style>` and `<textarea>`), `d851450` (a run
+could target a page of another site and publish it through the first site's client) and `fb944b3`.
+Known gaps it leaves open: **a sync run cannot be enqueued at all** — `run_items.page_id` is a NOT NULL
+foreign key into `pages`, and `sync.SyncSite` puts the site id there (migration `0014`, `sync/service.go`);
+`publish` clears `Page.Drift` without warning that a human edited the page (`steps/publish.go`);
+`generate_images` uploads media outside publish/relink/sync_back and orphans it if the item later fails;
+the sync cursor is not tagged with the source that issued it; and the import reads the whole file before
+`import.maxRows` applies.
