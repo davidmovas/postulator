@@ -37,3 +37,13 @@ function detect_plugin(): string {
 	}
 	return 'none';
 }
+
+function read_post_seo( int $post_id ): array {
+	$map = META_KEYS[ detect_plugin() ];
+
+	return array(
+		'title'       => (string) get_post_meta( $post_id, $map['title'], true ),
+		'description' => (string) get_post_meta( $post_id, $map['description'], true ),
+		'canonical'   => (string) get_post_meta( $post_id, $map['canonical'], true ),
+	);
+}
