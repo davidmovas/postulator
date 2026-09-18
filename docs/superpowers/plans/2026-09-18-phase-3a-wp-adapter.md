@@ -7251,7 +7251,7 @@ func TestContentCarriesPathsHashesHeadingsAndInternalLinks(t *testing.T) {
 		Type:    wptest.TypePage,
 		Title:   "Powder",
 		Parent:  parent.ID,
-		Content: `<h1>Powder</h1><p>Koffein ist ein Alkaloid.</p><p><a href="//koffein//">Koffein</a> and <a href="https://example.com/x">away</a> and <a href="mailto:a@b.c">mail</a></p>`,
+		Content: `<h1>Powder</h1><p>Koffein ist ein Alkaloid.</p><p><a href="/Koffein//">Koffein</a> and <a href="https://example.com/x">away</a> and <a href="mailto:a@b.c">mail</a></p>`,
 	})
 
 	_, payload := call(t, server, http.MethodGet, "/wp-json/postulator/v1/content?types=page", nil, true)

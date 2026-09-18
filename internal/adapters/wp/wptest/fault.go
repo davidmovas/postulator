@@ -82,3 +82,7 @@ func redirectTarget(mode Redirect, host, base string) (location string, status i
 		return "", 0
 	}
 }
+
+func WithBrokenContentHash() Option {
+	return func(s *Server) { s.brokenHash = true }
+}

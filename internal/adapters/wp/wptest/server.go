@@ -49,6 +49,7 @@ type Server struct {
 	redirect      Redirect
 	nextID        int64
 	noPlugin      bool
+	brokenHash    bool
 	noNamespaces  bool
 	mu            sync.Mutex
 }
@@ -111,6 +112,7 @@ func (s *Server) handler() http.Handler {
 	s.routeCategories(mux)
 	s.routeMedia(mux)
 	s.routeWoo(mux)
+	s.routePlugin(mux)
 
 	return s.record(s.redirectRoot(s.injectFaults(s.authenticate(mux))))
 }
