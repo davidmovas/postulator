@@ -1,7 +1,8 @@
-import type { Site } from "../bindings/github.com/davidmovas/postulator/internal/application/sites/models.js";
+import type { Page } from "../bindings/github.com/davidmovas/postulator/internal/application/pages/models.js";
 import type { Event as RunEvent } from "../bindings/github.com/davidmovas/postulator/internal/application/runs/models.js";
+import type { Site } from "../bindings/github.com/davidmovas/postulator/internal/application/sites/models.js";
 
-import { Agent, Runs, Sites } from "./lib/api.js";
+import { Agent, Pages, Runs, Sites } from "./lib/api.js";
 import { parseError } from "./lib/errors.js";
 import { on } from "./lib/events.js";
 import { listOf, page } from "./lib/paging.js";
@@ -11,6 +12,11 @@ const catchUpLimit = 200;
 export async function firstSite(): Promise<Site | undefined> {
     const listed = listOf<Site>(await Sites.List(page(25)));
     return listed.items[0];
+}
+
+export async function plannedPages(siteId: string): Promise<Page[]> {
+    const listed = listOf<Page>(await Pages.List({ ...page(50), siteId, status: "planned" }));
+    return listed.items;
 }
 
 export async function generate(siteId: string, pageIds: string[]): Promise<string> {
@@ -64,7 +70,12 @@ export async function smoke(): Promise<void> {
     const conversation = await Agent.CreateConversation({ siteId: site.id, mode: "confirm" });
     await ask(conversation.conversation.id, "plan the pages under the running shoes hub");
 
-    const runId = await generate(site.id, []);
+    const planned = await plannedPages(site.id);
+    if (planned.length === 0) {
+        return;
+    }
+
+    const runId = await generate(site.id, planned.map((candidate) => candidate.id));
 
     let seen = 0;
     const stop = follow(runId, (seq) => {

@@ -1,5 +1,4 @@
-import { HealthService } from "../bindings/github.com/davidmovas/postulator/internal/transport/wails";
-
+import { Health } from "./lib/api.js";
 import { parseError } from "./lib/errors.js";
 
 const versionElement = document.getElementById("version") as HTMLElement;
@@ -8,7 +7,7 @@ const builtElement = document.getElementById("built") as HTMLElement;
 const statusElement = document.getElementById("status") as HTMLElement;
 
 async function load(): Promise<void> {
-    const build = await HealthService.Ping({});
+    const build = await Health.Ping({});
     versionElement.innerText = build.version;
     commitElement.innerText = build.commit;
     builtElement.innerText = build.buildDate;

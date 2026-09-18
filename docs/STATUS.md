@@ -605,6 +605,9 @@ package these phases added is at or above 88%. Phase 11 follows.
 - The e2e suite carries its own small HTTP client rather than using `internal/adapters/wp`
   from track A, which had not landed when it was written. Switching it to the adapter is a
   follow-up that deletes `client` from `harness_test.go`.
+- `content.Assess` and `content.Judge` have no Wails method: the on-demand audit reaches them through the
+  agent tool and `ReportsService.PageReport` reads the result. A screen that audits a page on a button
+  press is what would bind them.
 - `ledger.List` still has no caller: `ModelsService.UsageSummary` answers from the aggregate, and a
   per-call ledger screen is what would read the list.
 - A run's deadline is the `runtime.DefaultRunDeadline` constant, not a setting: nothing in
