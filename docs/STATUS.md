@@ -614,6 +614,12 @@ package these phases added is at or above 88%. Phase 11 follows.
   what proves the query.
 - The docker e2e stack is never run in CI: `windows-latest` cannot run Linux containers,
   and the Ubuntu job exists only to lint and package the plugin.
+- **Migration 0016 runs outside goose's transaction.** Rebuilding `run_items` means dropping it, and a
+  drop with foreign keys on performs an implicit delete that would cascade into `artifacts` and
+  `step_execs`; the pragma that turns them off is a no-op inside a transaction. The statements are wrapped
+  in an explicit `BEGIN`/`COMMIT`, so the rebuild itself is atomic, but a crash in the one statement
+  between that commit and goose recording the version leaves a database the next start cannot migrate. The
+  recovery is the reset the startup error already names.
 - A pending action keeps the arguments it will replay, so a confirmation for a tool that carries a
   credential holds that credential in the encrypted database until the action is settled. The event, the
   summary and the tool call ledger carry it masked.
