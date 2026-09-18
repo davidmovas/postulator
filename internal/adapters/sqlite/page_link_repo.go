@@ -13,6 +13,7 @@ const (
 	insertLink         = `INSERT INTO page_links (` + linkColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 	deleteLinksForPage = `DELETE FROM page_links WHERE from_page_id = ?`
 	selectLinksForPage = `SELECT ` + linkColumns + ` FROM page_links WHERE from_page_id = ? ORDER BY observed_at, id`
+	selectLinksBySite  = `SELECT ` + linkColumns + ` FROM page_links WHERE site_id = ? ORDER BY from_page_id, id`
 )
 
 type PageLinkRepo struct {
@@ -46,6 +47,10 @@ func (r *PageLinkRepo) ReplaceForPage(ctx context.Context, pageID string, links 
 
 func (r *PageLinkRepo) ListForPage(ctx context.Context, pageID string) ([]pagemap.PageLink, error) {
 	return selectAll(ctx, r.store.execFrom(ctx), selectLinksForPage, []any{pageID}, scanPageLink, "list the page links")
+}
+
+func (r *PageLinkRepo) ListBySite(ctx context.Context, siteID string) ([]pagemap.PageLink, error) {
+	return selectAll(ctx, r.store.execFrom(ctx), selectLinksBySite, []any{siteID}, scanPageLink, "list the site links")
 }
 
 func scanPageLink(rows *sql.Rows) (pagemap.PageLink, error) {

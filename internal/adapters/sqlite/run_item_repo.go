@@ -23,8 +23,10 @@ const (
 		AND status IN ('pending', 'running', 'waiting')`
 	persistItem = `UPDATE run_items SET status = ?, current_step = ?, attempts = ?, checkpoint = ?, lease_until = ?,
 		wake_at = ?, pause_reason = ?, error = ?, updated_at = ?, finished_at = ? WHERE id = ? AND advance_seq = ?`
-	selectItemsByRun = `SELECT ` + itemColumns + ` FROM run_items WHERE run_id = ? ORDER BY created_at, id`
-	selectDueItems   = `SELECT ` + itemColumns + ` FROM run_items
+	selectItemsByRun  = `SELECT ` + itemColumns + ` FROM run_items WHERE run_id = ? ORDER BY created_at, id`
+	selectItemsByPage = `SELECT ` + itemColumns + ` FROM run_items WHERE page_id = ?
+		ORDER BY created_at DESC, id DESC LIMIT ?`
+	selectDueItems = `SELECT ` + itemColumns + ` FROM run_items
 		WHERE status = 'waiting' AND wake_at IS NOT NULL AND wake_at <= ? ORDER BY wake_at, id LIMIT ?`
 	selectStalledItems = `SELECT ` + itemColumns + ` FROM run_items
 		WHERE status = 'running' AND lease_until IS NOT NULL AND lease_until <= ? ORDER BY lease_until, id LIMIT ?`
@@ -105,6 +107,11 @@ func (r *RunItemRepo) Persist(ctx context.Context, item run.Item, expectSeq int6
 
 func (r *RunItemRepo) ByRun(ctx context.Context, runID string) ([]run.Item, error) {
 	return selectAll(ctx, r.store.execFrom(ctx), selectItemsByRun, []any{runID}, scanItem, "list the run items")
+}
+
+func (r *RunItemRepo) ByPage(ctx context.Context, pageID string, limit int) ([]run.Item, error) {
+	return selectAll(ctx, r.store.execFrom(ctx), selectItemsByPage, []any{pageID, limit}, scanItem,
+		"list the run items of the page")
 }
 
 func (r *RunItemRepo) Due(ctx context.Context, now time.Time, limit int) ([]run.Item, error) {
