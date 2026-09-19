@@ -1,4 +1,5 @@
 import { copy } from "../copy/index.js";
+import { EmptyState, PendingActionsIcon } from "../ui/index.js";
 
 export interface NotBuiltProps {
     screen: string;
@@ -7,12 +8,13 @@ export interface NotBuiltProps {
 
 export function NotBuilt({ screen, wave }: NotBuiltProps) {
     return (
-        <section className="m-6 max-w-xl rounded-panel border border-base-700 bg-base-850 p-5">
-            <h2 className="text-ink-100 text-sm font-semibold">
-                {screen} — {copy.notBuilt.title}
-            </h2>
-            <p className="text-ink-300 mt-2 text-sm">{copy.notBuilt.body}</p>
-            <p className="text-ink-400 mt-1 text-xs">{copy.notBuilt.wave(wave)}</p>
-        </section>
+        <div className="p-6">
+            <EmptyState
+                icon={PendingActionsIcon}
+                title={`${screen} — ${copy.notBuilt.title}`}
+                body={`${copy.notBuilt.body} ${copy.notBuilt.wave(wave)}`}
+                className="max-w-lg"
+            />
+        </div>
     );
 }

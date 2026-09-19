@@ -48,6 +48,7 @@ export const copy = {
         inbox: "Inbox",
     },
     shell: {
+        sections: "Sections",
         siteSwitcher: "Switch site",
         noSiteSelected: "No site selected",
         search: "Search",

@@ -1,9 +1,11 @@
-import { PanelRightClose, PanelRightOpen, X } from "lucide-react";
 import { useState } from "react";
 import { Outlet, useLocation } from "react-router";
 
 import { copy } from "../copy/index.js";
 import { dismissToast, useToasts } from "../data/toasts.js";
+import type { ToastTone } from "../data/toasts.js";
+import { IconButton, RightPanelCloseIcon, RightPanelOpenIcon, Toast, ToastRegion } from "../ui/index.js";
+import type { Tone } from "../ui/index.js";
 import { NotBuilt } from "./not-built.js";
 import { Rail } from "./rail.js";
 import { StatusBar } from "./statusbar.js";
@@ -12,6 +14,12 @@ import { TitleBar } from "./titlebar.js";
 const dockWidthKey = "postulator.dock.width";
 const minimumDockWidth = 280;
 const maximumDockWidth = 640;
+
+const toastTone: Readonly<Record<ToastTone, Tone>> = {
+    danger: "danger",
+    warning: "warn",
+    info: "info",
+};
 
 export function siteIdOf(pathname: string): string | null {
     const matched = /^\/s\/([^/]+)/.exec(pathname);
@@ -27,38 +35,25 @@ function storedDockWidth(): number {
     return Math.min(Math.max(parsed, minimumDockWidth), maximumDockWidth);
 }
 
-function ToastRegion() {
+function Toasts() {
     const toasts = useToasts();
     if (toasts.length === 0) {
         return null;
     }
     return (
-        <div className="pointer-events-none fixed bottom-8 right-4 z-50 flex w-80 flex-col gap-2">
+        <ToastRegion>
             {toasts.map((toast) => (
-                <div
+                <Toast
                     key={toast.id}
-                    className={`pointer-events-auto flex items-start gap-2 rounded-panel border px-3 py-2 text-xs shadow-lg ${
-                        toast.tone === "danger"
-                            ? "border-bad-500 bg-base-800 text-ink-100"
-                            : toast.tone === "warning"
-                              ? "border-warn-500 bg-base-800 text-ink-100"
-                              : "border-base-600 bg-base-800 text-ink-200"
-                    }`}
-                >
-                    <span className="flex-1">{toast.message}</span>
-                    <button
-                        type="button"
-                        aria-label={copy.app.dismiss}
-                        className="text-ink-400 hover:text-ink-100"
-                        onClick={() => {
-                            dismissToast(toast.id);
-                        }}
-                    >
-                        <X size={13} />
-                    </button>
-                </div>
+                    tone={toastTone[toast.tone]}
+                    message={toast.message}
+                    dismissLabel={copy.app.dismiss}
+                    onDismiss={() => {
+                        dismissToast(toast.id);
+                    }}
+                />
             ))}
-        </div>
+        </ToastRegion>
     );
 }
 
@@ -75,7 +70,7 @@ export function Shell() {
     };
 
     return (
-        <div className="flex h-full flex-col">
+        <div className="flex h-full flex-col bg-canvas">
             <TitleBar siteId={siteId} />
             <div className="flex min-h-0 flex-1">
                 <Rail siteId={siteId} />
@@ -84,28 +79,28 @@ export function Shell() {
                 </main>
                 {dockOpen ? (
                     <aside
-                        className="flex shrink-0 flex-col border-l border-base-700 bg-base-900"
+                        aria-label={copy.shell.agentDock}
+                        className="flex shrink-0 flex-col border-l border-hairline bg-panel"
                         style={{ width: `${dockWidth}px` }}
                     >
-                        <div className="flex h-8 items-center justify-between border-b border-base-700 px-2">
-                            <span className="text-xs text-ink-300">{copy.shell.agentDock}</span>
-                            <div className="flex items-center gap-1">
-                                <button
-                                    type="button"
-                                    className="text-ink-400 hover:text-ink-100"
-                                    aria-label={copy.shell.collapseDock}
-                                    onClick={() => {
-                                        setDockOpen(false);
-                                    }}
-                                >
-                                    <PanelRightClose size={15} />
-                                </button>
-                            </div>
-                        </div>
+                        <header className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-hairline px-2">
+                            <span className="text-2xs font-semibold tracking-label text-ink-faint uppercase">
+                                {copy.shell.agentDock}
+                            </span>
+                            <IconButton
+                                icon={RightPanelCloseIcon}
+                                label={copy.shell.collapseDock}
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                    setDockOpen(false);
+                                }}
+                            />
+                        </header>
                         <input
                             type="range"
                             aria-label={copy.shell.agentDock}
-                            className="mx-2 mt-2 accent-accent-500"
+                            className="mx-2 mt-2 accent-accent"
                             min={minimumDockWidth}
                             max={maximumDockWidth}
                             value={dockWidth}
@@ -118,20 +113,21 @@ export function Shell() {
                         </div>
                     </aside>
                 ) : (
-                    <button
-                        type="button"
-                        className="w-8 shrink-0 border-l border-base-700 bg-base-900 text-ink-400 hover:text-ink-100"
-                        aria-label={copy.shell.expandDock}
-                        onClick={() => {
-                            setDockOpen(true);
-                        }}
-                    >
-                        <PanelRightOpen size={15} className="mx-auto" />
-                    </button>
+                    <div className="flex w-8 shrink-0 justify-center border-l border-hairline bg-panel pt-2">
+                        <IconButton
+                            icon={RightPanelOpenIcon}
+                            label={copy.shell.expandDock}
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                setDockOpen(true);
+                            }}
+                        />
+                    </div>
                 )}
             </div>
             <StatusBar siteId={siteId} />
-            <ToastRegion />
+            <Toasts />
         </div>
     );
 }
