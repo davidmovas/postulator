@@ -41,10 +41,8 @@ func (k Kind) PageScoped() bool {
 	}
 }
 
-const StepSyncSite = "sync_site"
-
 func SyncRecipe() []template.StepSpec {
-	return []template.StepSpec{{Name: StepSyncSite, Enabled: true}}
+	return []template.StepSpec{{Name: string(StepSyncSite), Enabled: true}}
 }
 
 type PublishMode string

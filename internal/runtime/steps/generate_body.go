@@ -12,7 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/template"
 )
 
-const NameGenerateBody = "generate_body"
+const NameGenerateBody = string(run.StepGenerateBody)
 
 type bodyPrompt struct {
 	Page    pagemap.Page

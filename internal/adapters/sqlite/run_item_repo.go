@@ -3,7 +3,6 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"strings"
 	"time"
 
 	"github.com/Masterminds/squirrel"
@@ -164,13 +163,11 @@ func (r *RunItemRepo) StopAll(ctx context.Context, runID string, from []run.Stat
 	}
 
 	args := []any{string(to), string(reason), formatTime(now), finished, runID}
-	placeholders := make([]string, 0, len(from))
 	for _, status := range from {
-		placeholders = append(placeholders, "?")
 		args = append(args, string(status))
 	}
 
-	query := stopItemsOfRun + "(" + strings.Join(placeholders, ", ") + ")"
+	query := stopItemsOfRun + "(" + placeholders(len(from)) + ")"
 	return execWrite(ctx, r.store.writeFrom(ctx), query, args, nil, "stop the run items")
 }
 

@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	NameGenerateImages = "generate_images"
+	NameGenerateImages = string(run.StepGenerateImages)
 
 	RoleFeatured = "featured"
 	RoleInline   = "inline"

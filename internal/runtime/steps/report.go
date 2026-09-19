@@ -8,7 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
 
-const NameReport = "report"
+const NameReport = string(run.StepReport)
 
 type FinalReport struct {
 	Validation *ValidationReport `json:"validation,omitempty"`

@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	NameGenerateMeta = "generate_meta"
+	NameGenerateMeta = string(run.StepGenerateMeta)
 
 	metaTokens         = 512
 	primaryPlaceholder = "{primaryKeyword}"

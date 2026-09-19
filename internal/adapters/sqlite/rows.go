@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/Masterminds/squirrel"
@@ -66,6 +67,13 @@ func execWrite(ctx context.Context, exec executor, query string, args []any, con
 
 	affected, err := result.RowsAffected()
 	return dbx.From(affected, err).WrapErr(convert).Unwrap()
+}
+
+func placeholders(count int) string {
+	if count <= 0 {
+		return ""
+	}
+	return "?" + strings.Repeat(", ?", count-1)
 }
 
 func requireAffected(affected int64, err error, notFound *errors.Error) error {

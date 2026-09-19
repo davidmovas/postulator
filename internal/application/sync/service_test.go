@@ -101,7 +101,7 @@ func TestSyncSiteQueuesASiteScopedRun(t *testing.T) {
 	if q.queued.Kind != run.KindSync || len(q.queued.Targets) != 1 || q.queued.Targets[0] != siteID {
 		t.Fatalf("queued = %+v", q.queued)
 	}
-	if len(q.queued.Recipe) != 1 || q.queued.Recipe[0].Name != run.StepSyncSite || !q.queued.Recipe[0].Enabled {
+	if len(q.queued.Recipe) != 1 || q.queued.Recipe[0].Name != string(run.StepSyncSite) || !q.queued.Recipe[0].Enabled {
 		t.Fatalf("recipe = %+v", q.queued.Recipe)
 	}
 	if q.queued.CreatedBy != kctx.ActorAgent {

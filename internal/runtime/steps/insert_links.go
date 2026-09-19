@@ -7,7 +7,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
 
-const NameInsertLinks = "insert_links"
+const NameInsertLinks = string(run.StepInsertLinks)
 
 func InsertLinks(deps Deps) run.StepDef {
 	return run.StepDef{

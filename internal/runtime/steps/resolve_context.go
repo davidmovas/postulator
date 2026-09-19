@@ -10,7 +10,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
 
-const NameResolveContext = "resolve_context"
+const NameResolveContext = string(run.StepResolveContext)
 
 func ResolveContext(deps Deps) run.StepDef {
 	return run.StepDef{

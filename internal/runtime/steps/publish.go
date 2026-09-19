@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	NamePublish      = "publish"
+	NamePublish      = string(run.StepPublish)
 	ParamRefuseDrift = "refuseDrift"
 
 	CapabilitySEOMeta    = "seo_meta"

@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	NameRepairLinks   = "repair_links"
+	NameRepairLinks   = string(run.StepRepairLinks)
 	ParamIterations   = "iterations"
 	defaultIterations = 2
 	maxIterations     = 4

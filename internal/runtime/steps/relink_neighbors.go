@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	NameRelinkNeighbors = "relink_neighbors"
+	NameRelinkNeighbors = string(run.StepRelinkNeighbors)
 
 	OutcomeLinked    = "linked"
 	OutcomeUnchanged = "unchanged"

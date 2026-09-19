@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	NameValidate     = "validate"
+	NameValidate     = string(run.StepValidate)
 	ParamAllowErrors = "allowErrors"
 
 	CodeTitleMissingKeyword = "primary_missing_in_title"

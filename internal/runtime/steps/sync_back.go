@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	NameSyncBack = "sync_back"
+	NameSyncBack = string(run.StepSyncBack)
 
 	syncBackTimeout = 2 * time.Minute
 )

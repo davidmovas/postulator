@@ -2,6 +2,7 @@ package sqlite_test
 
 import (
 	"encoding/json"
+	"slices"
 	"testing"
 	"time"
 
@@ -541,5 +542,75 @@ func TestRunEventRepoPurgesTheEventsOfFinishedRuns(t *testing.T) {
 	kept, err := fixture.log.List(t.Context(), other.ID, 0, 10)
 	if err != nil || len(kept) != 2 {
 		t.Fatalf("the running run holds %d events, %v, want 2", len(kept), err)
+	}
+}
+
+func TestThePurgeTouchesExactlyTheKindsTheDomainDeclaresPurgeable(t *testing.T) {
+	t.Parallel()
+
+	fixture := newRunFixture(t, 1)
+	item := fixture.insertItem(t, fixture.pages[0], "publish")
+
+	kinds := run.ArtifactKinds()
+	seeded := make([]run.Artifact, 0, len(kinds))
+	for _, kind := range kinds {
+		artifact, err := run.NewArtifact(run.Artifact{
+			ID: id.New(), RunID: fixture.run.ID, ItemID: item.ID, Step: "seed", Kind: kind,
+			Blob: []byte("payload"), CreatedAt: sqlitetest.Stamp,
+		})
+		if err != nil {
+			t.Fatalf("NewArtifact(%s): %v", kind, err)
+		}
+		seeded = append(seeded, artifact)
+	}
+	if err := fixture.blobs.ReplaceStep(t.Context(), item.ID, "seed", seeded); err != nil {
+		t.Fatalf("ReplaceStep: %v", err)
+	}
+
+	purgeable := run.PurgeableArtifactKinds()
+	affected, err := fixture.blobs.PurgePublishedBefore(t.Context(), sqlitetest.Stamp.Add(time.Hour))
+	if err != nil || affected != int64(len(purgeable)) {
+		t.Fatalf("PurgePublishedBefore = %d, %v; want %d", affected, err, len(purgeable))
+	}
+
+	stored, err := fixture.blobs.ByItem(t.Context(), item.ID)
+	if err != nil {
+		t.Fatalf("ByItem: %v", err)
+	}
+	for i := range stored {
+		want := slices.Contains(purgeable, stored[i].Kind)
+		if stored[i].Purged != want {
+			t.Fatalf("%s purged = %v, want %v", stored[i].Kind, stored[i].Purged, want)
+		}
+		if want && (len(stored[i].Blob) != 0 || stored[i].Size != 0) {
+			t.Fatalf("%s was marked purged but kept its blob: %+v", stored[i].Kind, stored[i])
+		}
+	}
+}
+
+func TestThePurgeSparesAnItemThatNeverPublished(t *testing.T) {
+	t.Parallel()
+
+	fixture := newRunFixture(t, 1)
+	item := fixture.insertItem(t, fixture.pages[0], "generate_body")
+
+	body, err := run.NewArtifact(run.Artifact{
+		ID: id.New(), RunID: fixture.run.ID, ItemID: item.ID, Step: "generate_body",
+		Kind: run.ArtifactBodyHTML, Blob: []byte("<p>kept</p>"), CreatedAt: sqlitetest.Stamp,
+	})
+	if err != nil {
+		t.Fatalf("NewArtifact: %v", err)
+	}
+	if err = fixture.blobs.ReplaceStep(t.Context(), item.ID, "generate_body", []run.Artifact{body}); err != nil {
+		t.Fatalf("ReplaceStep: %v", err)
+	}
+
+	affected, err := fixture.blobs.PurgePublishedBefore(t.Context(), sqlitetest.Stamp.Add(time.Hour))
+	if err != nil || affected != 0 {
+		t.Fatalf("PurgePublishedBefore = %d, %v", affected, err)
+	}
+	stored, err := fixture.blobs.Get(t.Context(), body.ID)
+	if err != nil || stored.Purged {
+		t.Fatalf("an unpublished body must survive: %+v, %v", stored, err)
 	}
 }

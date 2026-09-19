@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	NameSyncSite = run.StepSyncSite
+	NameSyncSite = string(run.StepSyncSite)
 
 	CapabilityBulk = "bulk"
 

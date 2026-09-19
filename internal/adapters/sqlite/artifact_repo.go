@@ -15,10 +15,12 @@ const (
 	deleteStepArtifacts = `DELETE FROM artifacts WHERE item_id = ? AND step = ?`
 	selectArtifact      = `SELECT ` + artifactColumns + ` FROM artifacts WHERE id = ?`
 	selectItemArtifacts = `SELECT ` + artifactColumns + ` FROM artifacts WHERE item_id = ? ORDER BY created_at, id`
-	purgeArtifacts      = `UPDATE artifacts SET blob = x'', size = 0, purged = 1
-		WHERE purged = 0 AND kind IN ('body_html', 'draft', 'images') AND created_at <= ? AND item_id IN (
-			SELECT item_id FROM artifacts WHERE kind = 'publish_result')`
+	selectPurgedKinds   = `SELECT item_id, kind FROM artifacts WHERE purged = 1 AND item_id IN `
 )
+
+var purgeArtifacts = `UPDATE artifacts SET blob = x'', size = 0, purged = 1
+		WHERE purged = 0 AND kind IN (` + placeholders(len(run.PurgeableArtifactKinds())) + `) AND created_at <= ? AND item_id IN (
+			SELECT item_id FROM artifacts WHERE kind = ?)`
 
 type ArtifactRepo struct {
 	store *Store
@@ -62,8 +64,55 @@ func (r *ArtifactRepo) ByItem(ctx context.Context, itemID string) ([]run.Artifac
 		"list the artifacts of the run item")
 }
 
+func (r *ArtifactRepo) PurgedByItems(ctx context.Context, itemIDs []string) (map[string][]run.ArtifactKind, error) {
+	purged := make(map[string][]run.ArtifactKind, len(itemIDs))
+	if len(itemIDs) == 0 {
+		return purged, nil
+	}
+
+	args := make([]any, 0, len(itemIDs))
+	for _, itemID := range itemIDs {
+		args = append(args, itemID)
+	}
+
+	query := selectPurgedKinds + "(" + placeholders(len(itemIDs)) + ") ORDER BY item_id, created_at, id"
+	rows, err := selectAll(ctx, r.store.execFrom(ctx), query, args, scanPurgedKind,
+		"list the purged artifacts of the run items")
+	if err != nil {
+		return nil, err
+	}
+
+	for _, row := range rows {
+		purged[row.itemID] = append(purged[row.itemID], row.kind)
+	}
+	return purged, nil
+}
+
+type purgedKind struct {
+	itemID string
+	kind   run.ArtifactKind
+}
+
+func scanPurgedKind(rows *sql.Rows) (purgedKind, error) {
+	var (
+		itemID string
+		kind   string
+	)
+	if err := rows.Scan(&itemID, &kind); err != nil {
+		return purgedKind{}, err
+	}
+	return purgedKind{itemID: itemID, kind: run.ArtifactKind(kind)}, nil
+}
+
 func (r *ArtifactRepo) PurgePublishedBefore(ctx context.Context, cutoff time.Time) (int64, error) {
-	return execWrite(ctx, r.store.writeFrom(ctx), purgeArtifacts, []any{formatTime(cutoff)}, nil,
+	purgeable := run.PurgeableArtifactKinds()
+	args := make([]any, 0, len(purgeable)+2)
+	for _, kind := range purgeable {
+		args = append(args, string(kind))
+	}
+	args = append(args, formatTime(cutoff), string(run.ArtifactPublishResult))
+
+	return execWrite(ctx, r.store.writeFrom(ctx), purgeArtifacts, args, nil,
 		"purge the published artifact blobs")
 }
 
