@@ -45,16 +45,17 @@ func (s *Service) LinkAudit(ctx context.Context, req LinkAuditRequest) (LinkAudi
 		return LinkAuditResponse{}, err
 	}
 
-	response := LinkAuditResponse{SiteID: siteID, Policy: state.view, Pages: make([]PageAudit, 0, state.index.Len())}
-	for _, page := range state.index.Pages() {
-		if page.Status == pagemap.StatusArchived {
+	pages := state.index.Pages()
+	response := LinkAuditResponse{SiteID: siteID, Policy: state.view, Pages: make([]PageAudit, 0, len(pages))}
+	for i := range pages {
+		if pages[i].Status == pagemap.StatusArchived {
 			continue
 		}
-		templateID, rules, skip, rulesErr := s.rulesFor(ctx, page)
+		templateID, rules, skip, rulesErr := s.rulesFor(ctx, pages[i])
 		if rulesErr != nil {
 			return LinkAuditResponse{}, rulesErr
 		}
-		detail := auditPage(&state, page, templateID, rules, skip)
+		detail := auditPage(&state, pages[i], templateID, rules, skip)
 		response.Pages = append(response.Pages, detail.summary)
 		tally(&response.Totals, detail.summary)
 	}
@@ -221,7 +222,8 @@ func auditPage(state *siteLinks, page pagemap.Page, templateID string, rules tem
 	summary := &detail.summary
 	summary.Targets = len(detail.required)
 	summary.OffGraph = len(detail.extra)
-	for _, row := range detail.required {
+	for i := range detail.required {
+		row := &detail.required[i]
 		if row.Required {
 			summary.Required++
 		}

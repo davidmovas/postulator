@@ -21,15 +21,13 @@ func (c LinkClass) OffGraph() bool {
 
 func (c LinkContext) ClassifyLink(link pagemap.PageLink, host string) LinkClass {
 	if link.ToPageID != nil {
-		switch {
-		case *link.ToPageID == c.PageID:
+		if *link.ToPageID == c.PageID {
 			return ClassSelf
-		default:
-			if _, ok := c.ByPageID(*link.ToPageID); ok {
-				return ClassGraph
-			}
-			return ClassUnknownInternal
 		}
+		if _, ok := c.ByPageID(*link.ToPageID); ok {
+			return ClassGraph
+		}
+		return ClassUnknownInternal
 	}
 
 	path, internal := pagemap.InternalPath(link.ToURL, host)
