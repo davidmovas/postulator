@@ -146,7 +146,7 @@ export const copy = {
             plugin: "Open the site",
             sync: "Open the page map",
             graph: "Open the graph",
-            canonicals: "Open the page map",
+            canonicals: "Show the entities without a page",
             template: "Open templates",
         },
         done: {

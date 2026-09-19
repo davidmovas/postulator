@@ -219,7 +219,7 @@ export function useReadiness(siteId: string | null): Readiness {
                         : copy.onboarding.todo.canonicals,
                 done: !blocked && entityRows.length > 0 && orphanRows.length === 0,
                 blocked,
-                to: sitePath(resolvedSiteId, "pages"),
+                to: `${sitePath(resolvedSiteId, "graph")}?lens=noPage`,
                 action: copy.onboarding.actions.canonicals,
             },
             {
