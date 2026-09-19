@@ -59,7 +59,7 @@ task e2e:down              stops the stack and drops its volumes
 | 11 | Wails services, event bridge, TypeScript generation | done |
 | 12 | Master password, backup, retention, e2e, release | done |
 
-Module coverage is 87.6% of 14170 statements; `domain` + `application` sit at 86.1%.
+Module coverage is 87.5% of 14265 statements; `domain` + `application` sit at 86.0%.
 
 ## Known gaps
 
