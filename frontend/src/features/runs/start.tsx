@@ -40,6 +40,7 @@ export interface StartRunDialogProps {
     onOpenChange: (open: boolean) => void;
     siteId: string;
     preselect?: readonly string[];
+    initialKind?: string;
     onStarted: (runId: string) => void;
 }
 
@@ -48,13 +49,14 @@ export function StartRunDialog({
     onOpenChange,
     siteId,
     preselect,
+    initialKind,
     onStarted,
 }: StartRunDialogProps): ReactElement {
     const [prefix, setPrefix] = useState("");
     const [applied, setApplied] = useState("");
     const [selected, setSelected] = useState<readonly string[]>([]);
     const [publishMode, setPublishMode] = useState<string>(publishModes[0]);
-    const [kind, setKind] = useState<string>(kindGenerate);
+    const [kind, setKind] = useState<string>(initialKind ?? kindGenerate);
     const [templateId, setTemplateId] = useState<string>(templateAuto);
     const [cap, setCap] = useState(defaultCap);
     const [estimate, setEstimate] = useState<Estimate | null>(null);
@@ -80,7 +82,7 @@ export function StartRunDialog({
         setApplied("");
         setSelected(preselect ?? []);
         setPublishMode(publishModes[0]);
-        setKind(kindGenerate);
+        setKind(initialKind ?? kindGenerate);
         setTemplateId(templateAuto);
         setCap(defaultCap);
         setEstimate(null);
