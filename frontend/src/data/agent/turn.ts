@@ -7,7 +7,7 @@ import type {
     AgentToolStartedPayload,
 } from "../../generated/events.js";
 
-export type TurnStatus = "idle" | "streaming" | "awaiting-confirm" | "done" | "error";
+export type TurnStatus = "idle" | "streaming" | "awaiting-confirm" | "done" | "error" | "stalled";
 
 export type ToolCallStatus = "running" | "ok" | "error";
 
@@ -234,7 +234,7 @@ export function applyDone(payload: AgentDonePayload): void {
     publish(held);
 }
 
-export function resetTurn(conversationId: string): void {
+function markStalled(conversationId: string): void {
     const held = turns.get(conversationId);
     if (held === undefined) {
         return;
@@ -245,7 +245,7 @@ export function resetTurn(conversationId: string): void {
         chunks: held.turn.chunks,
         tools: held.turn.tools,
         confirm: null,
-        status: "idle",
+        status: "stalled",
         error: null,
         usage: held.turn.usage,
     };
@@ -266,7 +266,7 @@ export function stalledConversationIds(now: number): string[] {
 
 export function sweepStalled(now: number): void {
     for (const conversationId of stalledConversationIds(now)) {
-        resetTurn(conversationId);
+        markStalled(conversationId);
         stallHandlers.forEach((handler) => {
             handler(conversationId);
         });

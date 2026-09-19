@@ -1,5 +1,6 @@
 account_tree
 add
+add_comment
 add_link
 ads_click
 alarm
@@ -12,14 +13,17 @@ attach_file
 auto_delete
 block
 bolt
+build
 calculate
 call_split
 campaign
 cancel
 category
 center_focus_weak
+chat
 check
 check_circle
+check_small
 chevron_right
 close
 cloud_done
@@ -32,6 +36,10 @@ dashboard_customize
 delete
 delete_forever
 description
+desktop_windows
+devices
+drag_indicator
+edit
 edit_note
 error
 extension
@@ -39,6 +47,7 @@ extension_off
 filter_alt
 filter_list
 fit_screen
+forum
 gavel
 help
 history
@@ -46,6 +55,7 @@ history_toggle_off
 hourglass_empty
 hourglass_top
 hub
+inbox
 info
 inventory_2
 key
@@ -61,6 +71,7 @@ lock_open
 monitoring
 more_horiz
 north_east
+open_in_browser
 open_in_full
 open_in_new
 pause
@@ -69,6 +80,7 @@ pending_actions
 play_arrow
 play_circle
 polyline
+preview
 progress_activity
 public
 radio_button_checked
@@ -79,6 +91,7 @@ right_panel_close
 right_panel_open
 schedule
 search
+send
 settings
 shield
 smart_toy
@@ -92,6 +105,7 @@ sync_alt
 sync_problem
 table_chart
 table_rows
+tablet
 task_alt
 topic
 travel_explore

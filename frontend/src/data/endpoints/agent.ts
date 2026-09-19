@@ -4,6 +4,8 @@ import type { Conversation, Message, PendingAction } from "../types.js";
 
 export const createConversation = one(Agent.CreateConversation);
 export const setConversationMode = one(Agent.SetMode);
+export const renameConversation = one(Agent.RenameConversation);
+export const deleteConversation = one(Agent.DeleteConversation);
 export const sendMessage = one(Agent.Send);
 export const confirmAction = one(Agent.Confirm);
 export const cancelTurn = one(Agent.Cancel);
