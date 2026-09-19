@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -148,14 +149,32 @@ func TestRelinkRecordsAConflictWithoutFailingTheItem(t *testing.T) {
 func TestRelinkSkipsWithoutThePlugin(t *testing.T) {
 	t.Parallel()
 
-	deps, _, _, _ := relinkDeps(t, parentBody, wptest.WithoutPlugin())
+	deps, server, _, wpID := relinkDeps(t, parentBody, wptest.WithoutPlugin())
 
 	relinked := runRelink(t, deps)
 	if len(relinked.Neighbors) != 1 || relinked.Neighbors[0].Outcome != steps.OutcomeSkipped {
 		t.Fatalf("relinked = %+v", relinked)
 	}
-	if relinked.Linked != 0 || relinked.Conflicts != 0 {
+	if relinked.Linked != 0 || relinked.Conflicts != 0 || relinked.Skipped != 1 {
 		t.Fatalf("relinked = %+v", relinked)
+	}
+	if relinked.Neighbors[0].Detail != steps.ReasonNoPlugin {
+		t.Errorf("detail = %q, want %q", relinked.Neighbors[0].Detail, steps.ReasonNoPlugin)
+	}
+	if len(relinked.Findings) != 1 || relinked.Findings[0].Code != steps.CodeRelinkSkipped {
+		t.Fatalf("findings = %+v, want one %q warning", relinked.Findings, steps.CodeRelinkSkipped)
+	}
+	if relinked.Findings[0].Severity != content.SeverityWarn ||
+		relinked.Findings[0].Details["reason"] != steps.ReasonNoPlugin {
+		t.Errorf("the skipped finding = %+v", relinked.Findings[0])
+	}
+
+	stored, ok := server.Lookup(wpID)
+	if !ok {
+		t.Fatalf("the neighbor %d is gone from the site", wpID)
+	}
+	if stored.Content != parentBody {
+		t.Errorf("the neighbor content is %q, want the stored content untouched", stored.Content)
 	}
 }
 

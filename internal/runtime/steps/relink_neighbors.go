@@ -26,7 +26,11 @@ const (
 	OutcomeSkipped   = "skipped"
 
 	CodeRelinkConflict = "relink_conflict"
+	CodeRelinkSkipped  = "relink_skipped"
 	ClassNeedsHuman    = "needs_human"
+
+	ReasonNeighborGone       = "the neighbor is no longer on the site"
+	ReasonNeighborUnreadable = "the stored content of the neighbor could not be read as HTML"
 
 	relinkTimeout = 5 * time.Minute
 )
@@ -45,6 +49,7 @@ type RelinkResult struct {
 	Findings  []content.Finding `json:"findings"`
 	Linked    int               `json:"linked"`
 	Conflicts int               `json:"conflicts"`
+	Skipped   int               `json:"skipped"`
 }
 
 func RelinkNeighbors(deps Deps) run.StepDef {
@@ -108,6 +113,9 @@ func RelinkNeighbors(deps Deps) run.StepDef {
 				case OutcomeConflict:
 					result.Conflicts++
 					result.Findings = append(result.Findings, conflictFinding(outcome))
+				case OutcomeSkipped:
+					result.Skipped++
+					result.Findings = append(result.Findings, skippedFinding(outcome))
 				}
 			}
 
@@ -129,6 +137,20 @@ type neighborWork struct {
 	index    pagemap.Index
 	target   content.LinkTarget
 	policy   template.LinkPolicy
+}
+
+// skippedFinding records a neighbor the step could not even try: without the companion plugin
+// there is no way to read the stored content, and writing the rendered HTML back in its place
+// would replace the human's markup with WordPress's output. The run says so rather than lying.
+func skippedFinding(outcome NeighborResult) content.Finding {
+	return content.Finding{
+		Severity: content.SeverityWarn,
+		Code:     CodeRelinkSkipped,
+		Message:  "the neighbor " + outcome.Path + " was not relinked: " + outcome.Detail,
+		Details: map[string]any{
+			"pageId": outcome.PageID, "wpId": outcome.WPID, "reason": outcome.Detail,
+		},
+	}
 }
 
 func conflictFinding(outcome NeighborResult) content.Finding {
@@ -184,19 +206,19 @@ func relinkOne(ctx context.Context, deps Deps, client *wp.Client, in neighborWor
 
 	raw, err := client.GetRaw(ctx, *in.neighbor.WPID)
 	if err != nil {
-		if wp.IsPluginMissing(err) || errors.IsCode(err, errors.NotFound) {
-			outcome.Outcome = OutcomeSkipped
-			outcome.Detail = err.Error()
-			return outcome, nil
+		switch {
+		case wp.IsPluginMissing(err):
+			return skip(outcome, ReasonNoPlugin), nil
+		case errors.IsCode(err, errors.NotFound):
+			return skip(outcome, ReasonNeighborGone), nil
+		default:
+			return NeighborResult{}, err
 		}
-		return NeighborResult{}, err
 	}
 
 	doc, err := content.Parse(raw.Content)
 	if err != nil {
-		outcome.Outcome = OutcomeSkipped
-		outcome.Detail = err.Error()
-		return outcome, nil
+		return skip(outcome, ReasonNeighborUnreadable), nil
 	}
 
 	lc := content.LinkContext{
@@ -232,6 +254,12 @@ func relinkOne(ctx context.Context, deps Deps, client *wp.Client, in neighborWor
 		return NeighborResult{}, adoptErr
 	}
 	return outcome, nil
+}
+
+func skip(outcome NeighborResult, reason string) NeighborResult {
+	outcome.Outcome = OutcomeSkipped
+	outcome.Detail = reason
+	return outcome
 }
 
 func insertedAnchor(placement content.InsertResult) (anchor string, inserted bool) {
