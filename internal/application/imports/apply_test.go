@@ -87,12 +87,12 @@ func TestApplyIsIdempotent(t *testing.T) {
 		t.Fatal("the second apply changed the site")
 	}
 	for i := range again.Report.Entities {
-		if again.Report.Entities[i].Action != imports.ActionSkip {
+		if again.Report.Entities[i].Action != string(imports.ActionSkip) {
 			t.Fatalf("entity = %+v, want a skip", again.Report.Entities[i])
 		}
 	}
 	for i := range again.Report.Edges {
-		if again.Report.Edges[i].Action != imports.ActionSkip {
+		if again.Report.Edges[i].Action != string(imports.ActionSkip) {
 			t.Fatalf("edge = %+v, want a skip", again.Report.Edges[i])
 		}
 	}

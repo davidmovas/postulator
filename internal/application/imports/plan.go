@@ -41,12 +41,13 @@ type plan struct {
 	canonical []canonical
 }
 
-func (p *plan) warn(row int, field, code, message string) {
-	p.report.Warnings = append(p.report.Warnings, Finding{Row: row, Field: field, Code: code, Message: message})
-}
-
-func (p *plan) fail(row int, field, code, message string) {
-	p.report.Errors = append(p.report.Errors, Finding{Row: row, Field: field, Code: code, Message: message})
+func (p *plan) note(row int, field string, code FindingCode, message string) {
+	finding := Finding{Row: row, Field: field, Code: string(code), Message: message}
+	if code.Blocking() {
+		p.report.Errors = append(p.report.Errors, finding)
+		return
+	}
+	p.report.Warnings = append(p.report.Warnings, finding)
 }
 
 func (p *plan) broken() bool {
@@ -181,7 +182,7 @@ func read(binding importmap.Binding, table importmap.Table, p *plan) *drafts {
 
 		name, path := binding.Text(row, importmap.FieldEntity), binding.Path(row)
 		if name == "" && path == "" {
-			p.warn(number, "", CodeNoTarget, "the row names neither a path nor an entity")
+			p.note(number, "", CodeNoTarget, "the row names neither a path nor an entity")
 			p.report.Skipped++
 			continue
 		}
@@ -202,13 +203,13 @@ func read(binding importmap.Binding, table importmap.Table, p *plan) *drafts {
 
 		normalized, err := pagemap.NormalizePath(path)
 		if err != nil {
-			p.fail(number, string(importmap.FieldPath), CodeBadPath, "the path cannot be read: "+path)
+			p.note(number, string(importmap.FieldPath), CodeBadPath, "the path cannot be read: "+path)
 			continue
 		}
 
 		draft, known := sheet.page(normalized, number)
 		if known {
-			p.warn(number, string(importmap.FieldPath), CodeDuplicatePath, "the path repeats an earlier row and was merged: "+normalized)
+			p.note(number, string(importmap.FieldPath), CodeDuplicatePath, "the path repeats an earlier row and was merged: "+normalized)
 		}
 		draft.merge(pageDraft{
 			title:     binding.Text(row, importmap.FieldTitle),
@@ -235,7 +236,7 @@ func fillGaps(sheet *drafts, state siteState, p *plan) {
 			draft, _ := sheet.page(parent, 0)
 			draft.generated = true
 			draft.title = titleFrom(parent)
-			p.warn(0, string(importmap.FieldPath), CodeIntermediatePath, "the missing intermediate path was created: "+parent)
+			p.note(0, string(importmap.FieldPath), CodeIntermediatePath, "the missing intermediate path was created: "+parent)
 		}
 	}
 }
@@ -247,7 +248,7 @@ func resolveEntities(sheet *drafts, state siteState, now time.Time, p *plan) (ma
 
 		kind := graph.Kind(strings.ToLower(draft.kind))
 		if draft.kind != "" && !kind.Valid() {
-			p.warn(draft.row, string(importmap.FieldEntityKind), CodeUnknownEntityKind,
+			p.note(draft.row, string(importmap.FieldEntityKind), CodeUnknownEntityKind,
 				"the entity kind is not recognized and was read as a topic: "+draft.kind)
 			kind = ""
 		}
@@ -314,9 +315,9 @@ func resolveEdges(sheet *drafts, state siteState, resolved map[string]graph.Enti
 		if err != nil {
 			return
 		}
-		view := PreviewEdge{From: from.Name, To: to.Name, Kind: string(kind), Action: ActionCreate}
+		view := PreviewEdge{From: from.Name, To: to.Name, Kind: string(kind), Action: string(ActionCreate)}
 		if _, known := seen[edgeKey(edge)]; known {
-			view.Action = ActionSkip
+			view.Action = string(ActionSkip)
 			p.report.Edges = append(p.report.Edges, view)
 			return
 		}
@@ -332,10 +333,10 @@ func resolveEdges(sheet *drafts, state siteState, resolved map[string]graph.Enti
 		if draft.parent != "" {
 			switch to, ok := lookup(draft.parent); {
 			case !ok:
-				p.fail(draft.row, string(importmap.FieldParentEntity), CodeUnknownParent,
+				p.note(draft.row, string(importmap.FieldParentEntity), CodeUnknownParent,
 					"the parent entity is not in the file and not on the site: "+draft.parent)
 			case to.ID == from.ID:
-				p.fail(draft.row, string(importmap.FieldParentEntity), CodeSelfEdge,
+				p.note(draft.row, string(importmap.FieldParentEntity), CodeSelfEdge,
 					"the entity names itself as its parent: "+draft.name)
 			default:
 				add(from, to, graph.EdgeParent)
@@ -345,10 +346,10 @@ func resolveEdges(sheet *drafts, state siteState, resolved map[string]graph.Enti
 		for _, name := range draft.related {
 			switch to, ok := lookup(name); {
 			case !ok:
-				p.fail(draft.row, string(importmap.FieldRelated), CodeUnknownRelated,
+				p.note(draft.row, string(importmap.FieldRelated), CodeUnknownRelated,
 					"the related entity is not in the file and not on the site: "+name)
 			case to.ID == from.ID:
-				p.fail(draft.row, string(importmap.FieldRelated), CodeSelfEdge,
+				p.note(draft.row, string(importmap.FieldRelated), CodeSelfEdge,
 					"the entity names itself as related: "+draft.name)
 			default:
 				add(from, to, graph.EdgeRelated)
@@ -379,7 +380,7 @@ func checkAcyclic(state siteState, resolved map[string]graph.Entity, p *plan) er
 		return err
 	}
 	if cycleErr := g.ValidateAcyclic(); cycleErr != nil {
-		p.fail(0, string(importmap.FieldParentEntity), CodeCycle, cycleErr.Error())
+		p.note(0, string(importmap.FieldParentEntity), CodeCycle, cycleErr.Error())
 	}
 	return nil
 }
@@ -391,7 +392,7 @@ func (s *Service) resolvePages(ctx context.Context, sheet *drafts, state siteSta
 
 		wpType := pagemap.WPType(strings.ToLower(draft.wpType))
 		if draft.wpType != "" && !wpType.Valid() {
-			p.warn(draft.row, string(importmap.FieldWPType), CodeUnknownWPType,
+			p.note(draft.row, string(importmap.FieldWPType), CodeUnknownWPType,
 				"the wordpress type is not recognized and was read as a page: "+draft.wpType)
 			wpType = ""
 		}
@@ -403,7 +404,7 @@ func (s *Service) resolvePages(ctx context.Context, sheet *drafts, state siteSta
 				return err
 			}
 			if found == nil {
-				p.warn(draft.row, string(importmap.FieldPageKind), CodeUnknownPageKind,
+				p.note(draft.row, string(importmap.FieldPageKind), CodeUnknownPageKind,
 					"no template carries this page kind: "+draft.pageKind)
 			}
 			templates[key(draft.pageKind)] = found
@@ -491,7 +492,7 @@ func checkCannibalization(state siteState, resolved map[string]graph.Entity, p *
 		}
 		for _, evidence := range pagemap.Cannibalization(planned.page, entity, index, g).Evidence {
 			p.report.Cannibalization = append(p.report.Cannibalization, conflictView(evidence))
-			p.warn(0, string(importmap.FieldPath), CodeCannibalization,
+			p.note(0, string(importmap.FieldPath), CodeCannibalization,
 				"the page "+planned.page.Path+" overlaps "+evidence.Path+" ("+string(evidence.Reason)+")")
 		}
 	}

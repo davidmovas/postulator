@@ -122,10 +122,10 @@ func (h harness) pages(t *testing.T) []pagemap.Page {
 	return listed
 }
 
-func findings(list []imports.Finding, code string) []imports.Finding {
+func findings(list []imports.Finding, code imports.FindingCode) []imports.Finding {
 	out := make([]imports.Finding, 0, len(list))
 	for i := range list {
-		if list[i].Code == code {
+		if list[i].Code == string(code) {
 			out = append(out, list[i])
 		}
 	}

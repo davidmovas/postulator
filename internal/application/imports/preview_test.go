@@ -102,7 +102,7 @@ func TestPreviewReadsTheGraphWithoutWriting(t *testing.T) {
 	}
 
 	hosting, found := entity(report, "Hosting")
-	if !found || hosting.Action != imports.ActionCreate || hosting.Kind != "topic" {
+	if !found || hosting.Action != string(imports.ActionCreate) || hosting.Kind != "topic" {
 		t.Fatalf("hosting = %+v", hosting)
 	}
 	if len(hosting.Keywords) != 2 || hosting.Keywords[0] != "hosting" || hosting.Keywords[1] != "servers" {
@@ -122,7 +122,7 @@ func TestPreviewFlagsWhatTheSheetGetsWrong(t *testing.T) {
 	cases := []struct {
 		name     string
 		sheet    string
-		code     string
+		code     imports.FindingCode
 		errored  bool
 		expected int
 	}{
@@ -286,7 +286,7 @@ func TestPreviewFallsBackOnUnknownVocabulary(t *testing.T) {
 			string(importmap.FieldPageKind):   "page type",
 		}))
 
-	for _, code := range []string{imports.CodeUnknownEntityKind, imports.CodeUnknownWPType, imports.CodeUnknownPageKind} {
+	for _, code := range []imports.FindingCode{imports.CodeUnknownEntityKind, imports.CodeUnknownWPType, imports.CodeUnknownPageKind} {
 		if len(findings(report.Warnings, code)) != 1 {
 			t.Fatalf("%s findings = %+v", code, report.Warnings)
 		}
@@ -310,5 +310,38 @@ func TestPreviewRefusesAMappingTheFileDoesNotCarry(t *testing.T) {
 	})
 	if !errors.IsCode(err, errors.Invalid) {
 		t.Fatalf("Preview = %v, want an invalid error", err)
+	}
+}
+
+func TestTheFindingCodesDeclareWhichOnesBlockAnApply(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		code     imports.FindingCode
+		blocking bool
+	}{
+		{code: imports.CodeBadPath, blocking: true},
+		{code: imports.CodeNoTarget, blocking: false},
+		{code: imports.CodeDuplicatePath, blocking: false},
+		{code: imports.CodeIntermediatePath, blocking: false},
+		{code: imports.CodeUnknownParent, blocking: true},
+		{code: imports.CodeUnknownRelated, blocking: true},
+		{code: imports.CodeSelfEdge, blocking: true},
+		{code: imports.CodeCycle, blocking: true},
+		{code: imports.CodeCannibalization, blocking: false},
+		{code: imports.CodeUnknownEntityKind, blocking: false},
+		{code: imports.CodeUnknownPageKind, blocking: false},
+		{code: imports.CodeUnknownWPType, blocking: false},
+		{code: imports.FindingCode("invented"), blocking: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(string(tc.code), func(t *testing.T) {
+			t.Parallel()
+
+			if got := tc.code.Blocking(); got != tc.blocking {
+				t.Fatalf("%s.Blocking() = %v, want %v", tc.code, got, tc.blocking)
+			}
+		})
 	}
 }

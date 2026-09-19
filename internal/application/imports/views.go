@@ -1,32 +1,46 @@
 package imports
 
 import (
+	"slices"
+
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
 
-const (
-	ActionCreate = "create"
-	ActionUpdate = "update"
-	ActionSkip   = "skip"
-)
+type Action string
 
 const (
-	CodeBadPath           = "bad_path"
-	CodeNoTarget          = "no_target"
-	CodeDuplicatePath     = "duplicate_path"
-	CodeIntermediatePath  = "intermediate_path"
-	CodeUnknownParent     = "unknown_parent"
-	CodeUnknownRelated    = "unknown_related"
-	CodeSelfEdge          = "self_edge"
-	CodeCycle             = "cycle"
-	CodeCannibalization   = "cannibalization"
-	CodeUnknownEntityKind = "unknown_entity_kind"
-	CodeUnknownPageKind   = "unknown_page_kind"
-	CodeUnknownWPType     = "unknown_wp_type"
+	ActionCreate Action = "create"
+	ActionUpdate Action = "update"
+	ActionSkip   Action = "skip"
 )
+
+type FindingCode string
+
+const (
+	CodeBadPath           FindingCode = "bad_path"
+	CodeNoTarget          FindingCode = "no_target"
+	CodeDuplicatePath     FindingCode = "duplicate_path"
+	CodeIntermediatePath  FindingCode = "intermediate_path"
+	CodeUnknownParent     FindingCode = "unknown_parent"
+	CodeUnknownRelated    FindingCode = "unknown_related"
+	CodeSelfEdge          FindingCode = "self_edge"
+	CodeCycle             FindingCode = "cycle"
+	CodeCannibalization   FindingCode = "cannibalization"
+	CodeUnknownEntityKind FindingCode = "unknown_entity_kind"
+	CodeUnknownPageKind   FindingCode = "unknown_page_kind"
+	CodeUnknownWPType     FindingCode = "unknown_wp_type"
+)
+
+var blockingFindingCodes = []FindingCode{
+	CodeBadPath, CodeUnknownParent, CodeUnknownRelated, CodeSelfEdge, CodeCycle,
+}
+
+func (c FindingCode) Blocking() bool {
+	return slices.Contains(blockingFindingCodes, c)
+}
 
 type Options struct {
 	PathPrefixStrip  string `json:"pathPrefixStrip,omitempty"`
@@ -170,7 +184,7 @@ func (r *PreviewReport) settle() {
 	}
 }
 
-func entityView(e graph.Entity, action string) PreviewEntity {
+func entityView(e graph.Entity, action Action) PreviewEntity {
 	keywords := e.SecondaryKeywords
 	if keywords == nil {
 		keywords = []string{}
@@ -181,11 +195,11 @@ func entityView(e graph.Entity, action string) PreviewEntity {
 		PrimaryKeyword: e.PrimaryKeyword,
 		Keywords:       keywords,
 		Anchors:        anchorTexts(e.Anchors),
-		Action:         action,
+		Action:         string(action),
 	}
 }
 
-func pageView(p pagemap.Page, draft *pageDraft, action string) PreviewPage {
+func pageView(p pagemap.Page, draft *pageDraft, action Action) PreviewPage {
 	return PreviewPage{
 		Path:            p.Path,
 		Title:           p.Title,
@@ -195,7 +209,7 @@ func pageView(p pagemap.Page, draft *pageDraft, action string) PreviewPage {
 		WPType:          string(p.WPType),
 		PageKind:        draft.pageKind,
 		Entity:          draft.entity,
-		Action:          action,
+		Action:          string(action),
 		Generated:       draft.generated,
 	}
 }
