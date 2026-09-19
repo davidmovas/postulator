@@ -28,11 +28,11 @@ the composition root binds the two.
 | Service | Methods |
 |---|---|
 | `HealthService` | `Ping` |
-| `SitesService` | `Create Update Delete Get List` |
+| `SitesService` | `Create Update Delete Get List TestConnection` |
 | `GraphService` | `LoadGraph CreateEntity UpdateEntity DeleteEntity GetEntity ListEntities SetAnchors AddEdge ApproveEdge RejectEdge DeleteEdge ListEdges RecomputeScores ProposeFromPages ProposeRelated` |
 | `PagesService` | `Create Update Delete Get List Tree MapToEntity Unmap SetCanonical ReplaceLinks` |
 | `TemplatesService` | `CreateTemplate UpdateTemplate DeleteTemplate GetTemplate ListTemplates SetOverride DeleteOverride ResolveForPage CreatePolicy UpdatePolicy DeletePolicy GetPolicy ListPolicies GetEffectivePolicy` |
-| `RunsService` | `Start Get List ListItems ListEvents GetArtifact Pause Resume Cancel RetryStep` |
+| `RunsService` | `Start Estimate Get List ListItems ListEvents GetArtifact ListArtifacts Pause Resume Cancel RetryStep` |
 | `SyncService` | `SyncSite CheckPlugin SavePluginPackage` |
 | `ReportsService` | `SiteOverview PageReport RunReport JudgePage` |
 | `ImportService` | `Inspect Preview Apply Export SaveMapping ListMappings DeleteMapping` |
@@ -40,9 +40,9 @@ the composition root binds the two.
 | `AgentService` | `CreateConversation SetMode Send Confirm Cancel ListConversations ListMessages ListPendingActions` |
 | `SchedulesService` | `Create Update Delete Get List Enable Disable RunNow` |
 | `ToolsService` | `List` |
-| `SettingsService` | `Schema Get Set SetProviderKey LockState Lock Unlock SetMasterPassword ExportBackup ImportBackup` |
+| `SettingsService` | `Schema Get Set SetProviderKey ProviderKeys DeleteProviderKey LockState Lock Unlock SetMasterPassword ExportBackup ImportBackup` |
 
-A hundred and three methods. Where a use case answers with bytes the service writes them
+A hundred and eight methods. Where a use case answers with bytes the service writes them
 to the path the request names and returns it, because the webview has no filesystem;
 `SyncService.SavePluginPackage{path}` is the only such method.
 
@@ -163,8 +163,8 @@ unused.
 The names and their payloads are the `EventType` union and the `EventPayloads` map in
 [`frontend/src/generated/events.ts`](../frontend/src/generated/events.ts), which is the
 registry rendered. Run events are the `run.* item.* step.*` families plus `llm.usage`;
-application events are `graph.changed pages.changed templates.changed app.locked
-app.unlocked` and the agent family `agent.delta agent.tool.started agent.tool.finished
+application events are `graph.changed pages.changed templates.changed sites.changed
+schedules.changed settings.changed app.locked app.unlocked` and the agent family `agent.delta agent.tool.started agent.tool.finished
 agent.confirm.requested agent.confirm.resolved agent.done`, whose payloads all carry
 `conversationId` because a window may hold more than one conversation. The frontend
 subscribes with `on(type, handler)` from `frontend/src/lib/events.ts`, which narrows

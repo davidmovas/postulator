@@ -27,8 +27,10 @@ The last gate run on 2026-09-19: `task events`, `task bindings`, `gofmt -l .`,
 green. `task package` and `task e2e:full` were last run on 2026-09-18, when `bin/postulator.exe`
 opened its window and answered `health.ping`.
 
-The frontend is still the Vite stub. Phase 11 shipped the typed surface it will be built on —
-the generated bindings, `lib/api.ts`, `lib/events.ts` and `smoke.ts` — but no screen.
+The frontend is a React application being built on that surface. Its toolchain, typed data layer,
+event bridge, run-event replay, app shell, router and lock gate landed in `0a9a97e`, with vitest
+over the data layer wired into CI. The design system and the feature screens are next; the graph
+canvas is deliberately a stub.
 
 ## How to run
 
