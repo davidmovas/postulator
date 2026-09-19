@@ -81,7 +81,13 @@ parallel tests cannot race on goose's package-level filesystem and dialect.
    the smallest interface it uses; producers return concrete types.
 3. No stubs, no `TODO`, no placeholder implementations. Unfinished work is not merged.
 4. No hardcoded values that belong to data: model prices, templates, event names and
-   step names live in registries, catalogs or seed files.
+   step names live in registries, catalogs or seed files. The step names and the artifact
+   kinds are const blocks in `internal/domain/run`, and their **declaration order is the
+   contract**: `run.StepNames` is the order the pipeline runs and the order the frontend's
+   progress indicator counts through, and `run.ArtifactKinds` is the order of the review
+   drawer's tabs. Reordering either const block reorders the UI, because
+   `frontend/src/generated/vocab.ts` is rendered from them by `task vocab` in declaration
+   order and a Go test fails when the committed file is stale.
 5. Bad code is rewritten, not patched.
 6. JSON is camelCase on every boundary: `siteId`, `nextCursor`, `createdAt`.
 7. Cursor (keyset) pagination everywhere. Offset pagination does not exist in this

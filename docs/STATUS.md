@@ -21,7 +21,14 @@ artifacts a run item holds without their blobs, and `RunsService.Estimate` price
 is enqueued. `sites.changed`, `schedules.changed` and `settings.changed` join the three `*.changed`
 events, and a run's deadline is the `runs.deadline` setting rather than a constant.
 
-The last gate run on 2026-09-19: `task events`, `task bindings`, `gofmt -l .`,
+`RunsService.ListItems` carries `retryable` and `retryBlockedReason` since 2026-09-19, computed
+from the current step's `Requires` against the item's purged artifacts; `inputs_expired` is the
+only value the reason takes and `Engine.RetryStep` refuses with the same fact before it touches
+the item. `frontend/src/generated/vocab.ts` is the second generated TypeScript module: `task vocab`
+renders every string union, the five sort field lists and five derived groupings from the Go const
+blocks in declaration order, and a byte-comparing test fails when it is stale.
+
+The last gate run on 2026-09-19: `task events`, `task vocab`, `task bindings`, `gofmt -l .`,
 `task check:go:comments`, `go vet`, `golangci-lint` (v2.13.2, 0 issues),
 `go test -count=1 -race -covermode=atomic ./...`, `go run ./cmd/covergate` and `task build` are
 green. `task package` and `task e2e:full` were last run on 2026-09-18, when `bin/postulator.exe`
@@ -35,6 +42,8 @@ canvas is deliberately a stub.
 ## How to run
 
 ```
+task vocab                 frontend/src/generated/vocab.ts from the Go const blocks
+task events                frontend/src/generated/events.ts from the Go event registry
 task build                 bin/postulator.exe, builds the frontend and the bindings first
 task package               the NSIS installer in bin/
 task plugin:zip            bin/postulator-companion.zip
@@ -84,7 +93,12 @@ Module coverage is 87.6% of 14439 statements; `domain` + `application` sit at 86
   `go install github.com/evilmartians/lefthook@latest && lefthook install`.
 - **`golangci-lint` on this machine must be run from `$(go env GOPATH)/bin`.** A scoop shim
   earlier on `PATH` is v2.11.4 built with go1.26 and refuses a `go 1.27` module outright.
-- The frontend is the stub described above.
+- The frontend is the stub described above. `frontend/src/domain/vocab.ts` is the hand-written
+  vocabulary the generated module replaces; its consumers are repointed by the frontend work.
+- Nothing purges an artifact for an item that never published, so every failed or unpublished item
+  stays retryable. The dead end `retryable` reports is narrow by construction: a published item
+  past its retention window whose current step consumes `body_html`, `draft` or `images`. No
+  shipped recipe puts such a step after `publish`, so only a custom recipe reaches it today.
 - Core REST filters `modified_after` on the site-local `post_modified` while returning the UTC
   `modified_gmt`; the sync uses the plugin's `/content?since=`, which compares `post_modified_gmt`.
 - `internal/adapters/wp/e2e` carries its own small HTTP client rather than `internal/adapters/wp`,

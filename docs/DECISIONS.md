@@ -591,3 +591,52 @@ each of these exists because a screen could not be drawn without it.
   `Engine.EstimateRun`; only `Start` mints the id, after the estimate, so an `Estimate` leaves
   nothing behind. It takes `StartRequest` rather than a request of its own, which is what makes
   "the same inputs" a compile-time fact instead of a convention.
+- **`retryable` is computed against the step's `Requires`, and `RetryStep` refuses up front.**
+  `StepContext.Artifact` failed a purged input with `NOT_FOUND` from inside the step, so a retry
+  offered by the screen died halfway through the pipeline; nothing regenerates a purged artifact.
+  `run.ExpiredInputs` intersects the current step's `Requires` with the item's purged kinds, and
+  both callers read it: `RunsService.ListItems` carries `retryable` with `retryBlockedReason`, and
+  `Engine.RetryStep` refuses before it touches the item, naming the step and the expired kinds in
+  the details of a `NOT_FOUND`. The existing `CONFLICT` for a running or pending item is unchanged.
+  `inputs_expired` is the only value the reason takes and is frozen the way the eleven error codes
+  are; the frontend disables the control and points at a fresh run over the page rather than
+  offering a retry and explaining the failure afterwards.
+- **The purgeable artifact kinds are declared data, and the sweep binds them.** `body_html`,
+  `draft` and `images` were literals inside the purge SQL, which made the retention rule
+  unreadable from Go and impossible to generate from. `run.PurgeableArtifactKinds` is the
+  declaration; `ArtifactRepo.PurgePublishedBefore` binds it as parameters rather than interpolating
+  it, and `frontend/src/generated/vocab.ts` derives `purgeableArtifactKinds` from
+  `ArtifactKind.Purgeable`. A repository test seeds one artifact of every kind and asserts the
+  sweep touches exactly the declared set.
+- **The step names are a const block in `domain/run`, in pipeline order.** Every step named itself
+  with a literal in `internal/runtime/steps`, so nothing said what order they run in or that
+  `sync_site` belongs to the same vocabulary. `run.StepNames` is that order — the order
+  `steps.Register` uses and the order the shipped seeds enable — and
+  `TestTheShippedStepsRegisterInRecipeOrder` reads it, so reordering one without the other fails.
+  The hand-written `frontend/src/domain/vocab.ts` had listed `generate_images` before
+  `insert_links` and `repair_links` after `relink_neighbors`, which no recipe does; the generated
+  module corrects that, and a progress indicator counting through it is honest.
+- **Which import finding codes block an Apply is declared beside the codes.** The split was a
+  condition in the preview: each call site chose `warn` or `fail`. A single `note` now routes by
+  `FindingCode.Blocking`, whose declaration is `blockingFindingCodes`, so a code added later cannot
+  default into the wrong half and the import screen enables its Apply button from the generated
+  `blockingImportFindingCodes` rather than from a list retyped in TypeScript.
+- **`kernel/settings` declares its types and its groups.** `Kind.String` built the type names
+  inside a switch and `Schema` cut the group off the key, so neither vocabulary existed as data.
+  `settings.Type` is what `Kind.String` renders and `settings.GroupOf` is what `Schema` reports;
+  `TestEverySettingBelongsToADeclaredGroup` in `internal/app`, the one package that composes every
+  registration, fails when a setting is declared under a group `settings.Groups` does not name.
+- **`frontend/src/generated/vocab.ts` is rendered from the Go const blocks by `task vocab`.** Every
+  string union crossed the boundary as a bare `string` and was retyped in TypeScript, where a
+  rename in Go drifted silently into a UI switching on a value that no longer exists. The generator
+  parses the sources with `go/ast` rather than reflecting over a map, because the order is
+  semantic: artifact kinds are the review drawer's tab order, step names are what make "step 4 of
+  12" honest, run statuses are active then terminal, and tool risks ascend by severity. The five
+  derived groupings call the real Go predicates — `Status.Active`, `Status.Terminal`,
+  `ArtifactKind.Purgeable`, `Risk.NeedsConfirmation`, `FindingCode.Blocking` — so a behaviour and
+  its exported list cannot disagree. Sort fields are package-qualified because four packages call
+  the type `Sort`; `template.Sort` covers both templates and policies, so five Go types serve six
+  frontend lists and the sixth is not synthesised. Edges, run items, conversations, messages,
+  pending actions and schedules declare no sort and therefore generate nothing. A byte-comparing
+  test fails when the committed file is stale, and `.gitattributes` pins it to LF beside
+  `events.ts` for the reason recorded there.
