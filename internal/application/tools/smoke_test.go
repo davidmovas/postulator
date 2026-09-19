@@ -113,7 +113,11 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding) {
 	book := ledger.New(client, callRepo, built, bus, now)
 	modelProfiles := profiles.New(sqlite.NewModelProfileRepo(store), siteRepo, built, now)
 	templateService := templates.New(templateRepo, sqlite.NewLinkPolicyRepo(store), pageRepo, siteRepo, store, bus, now)
-	reportsService := reports.New(entityRepo, edgeRepo, pageRepo, linkRepo, runRepo, itemRepo, artifactRepo)
+	reportsService := reports.New(reports.Deps{
+		Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,
+		Runs: runRepo, Items: itemRepo, Artifacts: artifactRepo,
+		Sites: siteRepo, Specs: templateService, Policies: templateService,
+	})
 
 	return tools.New(tools.Deps{
 		Sites: sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, stubProbe{}, bus, now),

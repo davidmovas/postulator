@@ -7,11 +7,14 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
+	"github.com/davidmovas/postulator/internal/application/applicationtest"
 	"github.com/davidmovas/postulator/internal/application/reports"
+	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
+	"github.com/davidmovas/postulator/internal/kernel/clock"
 	kctx "github.com/davidmovas/postulator/internal/kernel/ctx"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -39,10 +42,17 @@ func newFixture(t *testing.T) *fixture {
 	runRepo := sqlite.NewRunRepo(store)
 	itemRepo := sqlite.NewRunItemRepo(store)
 	artifactRepo := sqlite.NewArtifactRepo(store)
+	siteRepo := sqlite.NewSiteRepo(store)
+	templateService := templates.New(sqlite.NewTemplateRepo(store), sqlite.NewLinkPolicyRepo(store),
+		pageRepo, siteRepo, store, &applicationtest.Recorder{}, clock.NewFake(sqlitetest.Stamp))
 
 	f := &fixture{
 		store: store, siteID: owner.ID, pages: make(map[string]pagemap.Page),
-		service: reports.New(entityRepo, edgeRepo, pageRepo, linkRepo, runRepo, itemRepo, artifactRepo),
+		service: reports.New(reports.Deps{
+			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,
+			Runs: runRepo, Items: itemRepo, Artifacts: artifactRepo,
+			Sites: siteRepo, Specs: templateService, Policies: templateService,
+		}),
 	}
 
 	parentPage := f.page(t, pageRepo, "/coffee/", pagemap.StatusPublished)

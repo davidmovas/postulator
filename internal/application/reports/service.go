@@ -3,9 +3,11 @@ package reports
 import (
 	"context"
 
+	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
+	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -44,6 +46,31 @@ type artifactReader interface {
 	ByItem(ctx context.Context, itemID string) ([]run.Artifact, error)
 }
 
+type siteReader interface {
+	Get(ctx context.Context, id string) (site.Site, error)
+}
+
+type specResolver interface {
+	ResolveForPage(ctx context.Context, req templates.ResolveForPageRequest) (templates.ResolveForPageResponse, error)
+}
+
+type policyReader interface {
+	GetEffectivePolicy(ctx context.Context, req templates.GetEffectivePolicyRequest) (templates.GetEffectivePolicyResponse, error)
+}
+
+type Deps struct {
+	Entities  entityReader
+	Edges     edgeReader
+	Pages     pageReader
+	Links     linkReader
+	Runs      runReader
+	Items     itemReader
+	Artifacts artifactReader
+	Sites     siteReader
+	Specs     specResolver
+	Policies  policyReader
+}
+
 type Service struct {
 	entities  entityReader
 	edges     edgeReader
@@ -52,13 +79,16 @@ type Service struct {
 	runs      runReader
 	items     itemReader
 	artifacts artifactReader
+	sites     siteReader
+	specs     specResolver
+	policies  policyReader
 }
 
-func New(entities entityReader, edges edgeReader, pages pageReader, links linkReader,
-	runs runReader, items itemReader, artifacts artifactReader) *Service {
+func New(deps Deps) *Service {
 	return &Service{
-		entities: entities, edges: edges, pages: pages, links: links,
-		runs: runs, items: items, artifacts: artifacts,
+		entities: deps.Entities, edges: deps.Edges, pages: deps.Pages, links: deps.Links,
+		runs: deps.Runs, items: deps.Items, artifacts: deps.Artifacts,
+		sites: deps.Sites, specs: deps.Specs, policies: deps.Policies,
 	}
 }
 

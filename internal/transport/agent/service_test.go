@@ -45,18 +45,23 @@ func blocked(t *testing.T) (*agentapp.Service, string, *blockingRunner) {
 	owner := sqlitetest.Site(t, store, "shop")
 	now := clock.NewFake(sqlitetest.Stamp)
 	runner := &blockingRunner{release: make(chan struct{}), entered: make(chan struct{})}
+	siteRepo := sqlite.NewSiteRepo(store)
+	pageRepo := sqlite.NewPageRepo(store)
+	templateService := templates.New(sqlite.NewTemplateRepo(store), sqlite.NewLinkPolicyRepo(store),
+		pageRepo, siteRepo, store, &applicationtest.Recorder{}, now)
 
 	service := agentapp.New(agentapp.Deps{
 		Conversations: sqlite.NewConversationRepo(store),
 		Messages:      sqlite.NewMessageRepo(store),
 		Actions:       sqlite.NewPendingActionRepo(store),
 		Calls:         sqlite.NewToolCallRepo(store),
-		Sites:         sqlite.NewSiteRepo(store),
-		Reports: reports.New(sqlite.NewEntityRepo(store), sqlite.NewEdgeRepo(store), sqlite.NewPageRepo(store),
-			sqlite.NewPageLinkRepo(store), sqlite.NewRunRepo(store), sqlite.NewRunItemRepo(store),
-			sqlite.NewArtifactRepo(store)),
-		Templates: templates.New(sqlite.NewTemplateRepo(store), sqlite.NewLinkPolicyRepo(store),
-			sqlite.NewPageRepo(store), sqlite.NewSiteRepo(store), store, &applicationtest.Recorder{}, now),
+		Sites:         siteRepo,
+		Reports: reports.New(reports.Deps{
+			Entities: sqlite.NewEntityRepo(store), Edges: sqlite.NewEdgeRepo(store), Pages: pageRepo,
+			Links: sqlite.NewPageLinkRepo(store), Runs: sqlite.NewRunRepo(store), Items: sqlite.NewRunItemRepo(store),
+			Artifacts: sqlite.NewArtifactRepo(store), Sites: siteRepo, Specs: templateService, Policies: templateService,
+		}),
+		Templates: templateService,
 		Profiles:  chatProfiles{},
 		Registry:  tools.New(tools.Deps{Clock: now}),
 		Runner:    runner,

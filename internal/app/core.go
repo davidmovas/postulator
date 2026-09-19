@@ -273,7 +273,11 @@ func (c *Core) compose(ctx context.Context, key []byte) error {
 	modelsService := models.New(modelCatalog, modelRepo, modelProfiles, book, secretStore, client, relay, now)
 	runsService := runs.New(engine, runRepo, itemRepo, artifactRepo, eventRepo, templateService, stepRegistry)
 	syncService := sync.New(engine, siteRepo, wordpress, packer{}, now)
-	reportsService := reports.New(entityRepo, edgeRepo, pageRepo, linkRepo, runRepo, itemRepo, artifactRepo)
+	reportsService := reports.New(reports.Deps{
+		Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,
+		Runs: runRepo, Items: itemRepo, Artifacts: artifactRepo,
+		Sites: siteRepo, Specs: templateService, Policies: templateService,
+	})
 
 	scheduleRepo := sqlite.NewScheduleRepo(store)
 	schedulesService := schedules.New(schedules.Deps{
