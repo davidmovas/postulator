@@ -22,7 +22,9 @@ is enqueued. `sites.changed`, `schedules.changed` and `settings.changed` join th
 events, and a run's deadline is the `runs.deadline` setting rather than a constant.
 `ReportsService.LinkAudit` and `LinkAuditPage` answer, per mapped page, the links the graph asks
 it to carry and whether a stored link satisfies each one; `reports_link_audit` and
-`reports_link_audit_page` hand the same reads to the agent, eighty-five tools in all.
+`reports_link_audit_page` hand the same reads to the agent, eighty-five tools in all. An edge
+carries a `reason` since migration 0019: the related proposer keeps the model's sentence, the
+page proposer derives one from the page paths, and `AddEdge` accepts one.
 
 `RunsService.ListItems` carries `retryable` and `retryBlockedReason` since 2026-09-19, computed
 from the current step's `Requires` against the item's purged artifacts; `inputs_expired` is the

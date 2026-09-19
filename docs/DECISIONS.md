@@ -680,3 +680,11 @@ counters.
 - **Four more vocabularies are generated.** `linkRelations`, `linkClasses` with the derived
   `offGraphLinkClasses` over `LinkClass.OffGraph`, `linkBlockedReasons` and
   `linkAuditSkipReasons`, so the screen never retypes a value the audit switches on.
+- **An edge keeps why it was proposed.** `ProposeRelated` asked the model for a one-sentence
+  reason and dropped it, so the review queue had nothing to show beside a weight. Migration 0019
+  adds `edges.reason TEXT NOT NULL DEFAULT ''`; `NewEdge` trims it and refuses more than two
+  hundred characters, the proposers clip before that cap so a talkative model loses words rather
+  than an edge (`propose` swallows a `NewEdge` error), and `ProposeFromPages` derives its reason
+  from the page paths, which is the only evidence that step holds. `AddEdgeRequest.Reason` is
+  optional, so `graph_add_edge` offers it to the agent without requiring it. The migration test
+  demands `STRICT` only of a file that creates a table, because an `ALTER TABLE` carries none.
