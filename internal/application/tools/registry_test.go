@@ -79,6 +79,8 @@ func registered() []string {
 		"reports_site_overview",
 		"reports_page",
 		"reports_run",
+		"reports_link_audit",
+		"reports_link_audit_page",
 		"imports_inspect",
 		"imports_preview",
 		"imports_apply",

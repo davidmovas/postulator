@@ -61,6 +61,8 @@ func factories() []factory {
 		reportsSiteOverview,
 		reportsPage,
 		reportsRun,
+		reportsLinkAudit,
+		reportsLinkAuditPage,
 		importsInspect,
 		importsPreview,
 		importsApply,
