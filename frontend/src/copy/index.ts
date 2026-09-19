@@ -858,6 +858,41 @@ export const copy = {
             remove: "Remove the edge",
             reason: "Why",
         },
+        ai: {
+            menu: "Model",
+            menuLabel: "Ask the model",
+            fromPages: "Propose entities from the pages",
+            related: "Propose related edges",
+            relatedFor: (name: string) => `Propose related edges for ${name}`,
+            recompute: "Recompute the scores",
+            fromPagesTitle: "Propose entities from the pages",
+            fromPagesBody: (unmapped: number, calls: number) =>
+                unmapped === 0
+                    ? "Every page is already mapped to an entity. There is nothing to propose from."
+                    : `${unmapped === 1 ? "1 page has" : `${unmapped} pages have`} no entity. The model reads them in batches of 40, so this is ${calls === 1 ? "1 model call" : `about ${calls} model calls`}, one after another, and the window waits for all of them. Each batch is saved as it lands; cancelling keeps what was already proposed.`,
+            relatedTitle: "Propose related edges",
+            relatedBody: (total: number) =>
+                `The model reads all ${total} entities in one call and suggests which pairs belong together. Every suggestion arrives as a proposed edge with a reason, for you to approve or reject.`,
+            relatedForBody: (name: string) => `The model reads every entity and suggests which ones belong beside ${name}. Every suggestion arrives as a proposed edge with a reason, for you to approve or reject.`,
+            scope: "Scope",
+            wholeSite: "The whole site",
+            onlySelection: (name: string) => `Only pairs with ${name}`,
+            start: "Start",
+            cancel: "Cancel",
+            running: "Working",
+            elapsed: (seconds: number) => `${seconds}s`,
+            stop: "Stop and keep what landed",
+            cancelled: "Stopped. Whatever had landed is kept.",
+            fromPagesDone: (entities: number, edges: number, skipped: number) =>
+                `${entities} ${entities === 1 ? "entity" : "entities"} and ${edges} ${edges === 1 ? "edge" : "edges"} proposed${skipped > 0 ? `, ${skipped} skipped` : ""}`,
+            relatedDone: (edges: number, skipped: number) =>
+                `${edges} related ${edges === 1 ? "edge" : "edges"} proposed${skipped > 0 ? `, ${skipped} skipped` : ""}`,
+            tokens: (tokens: number) => `${tokens} tokens`,
+            nothingProposed: "The model proposed nothing new.",
+            recomputed: (changed: number) => (changed === 0 ? "Scores are unchanged." : `${changed} ${changed === 1 ? "score" : "scores"} changed.`),
+            close: "Close",
+            review: "Review the proposals",
+        },
         queue: {
             open: "Review",
             title: (count: number) => (count === 1 ? "1 proposed edge" : `${count} proposed edges`),

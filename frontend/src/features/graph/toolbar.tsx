@@ -1,8 +1,22 @@
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import type { KeyboardEvent, ReactElement } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { copy } from "../../copy/index.js";
-import { AddIcon, AddLinkIcon, Button, CloseIcon, cx, HubIcon, PolylineIcon, SearchIcon, TableRowsIcon, toneClasses } from "../../ui/index.js";
+import {
+    AddIcon,
+    AddLinkIcon,
+    Button,
+    CalculateIcon,
+    CloseIcon,
+    cx,
+    HubIcon,
+    PolylineIcon,
+    SearchIcon,
+    Stars2Icon,
+    TableRowsIcon,
+    toneClasses,
+} from "../../ui/index.js";
 import type { IconComponent } from "../../ui/index.js";
 import { entityIcon, kindTone } from "./labels.js";
 import type { GraphIndex } from "./model/index.js";
@@ -152,18 +166,62 @@ export function SearchBox({ index, onPick, focusKey }: SearchBoxProps): ReactEle
     );
 }
 
+interface ModelMenuProps {
+    selectedName: string | null;
+    recomputing: boolean;
+    onProposeFromPages: () => void;
+    onProposeRelated: () => void;
+    onRecompute: () => void;
+}
+
+const menuItem =
+    "flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1 text-xs text-ink-soft outline-none data-[highlighted]:bg-inset data-[highlighted]:text-ink data-[disabled]:cursor-default data-[disabled]:opacity-50";
+
+function ModelMenu({ selectedName, recomputing, onProposeFromPages, onProposeRelated, onRecompute }: ModelMenuProps): ReactElement {
+    return (
+        <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild={true}>
+                <Button size="sm" variant="secondary" icon={Stars2Icon} aria-label={copy.graph.ai.menuLabel} busy={recomputing}>
+                    {copy.graph.ai.menu}
+                </Button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+                <DropdownMenu.Content align="start" sideOffset={4} className="z-30 min-w-56 rounded-md border border-edge bg-raised p-1 data-[state=open]:animate-fade-in">
+                    <DropdownMenu.Item className={menuItem} onSelect={onProposeFromPages}>
+                        <Stars2Icon size={14} />
+                        {copy.graph.ai.fromPages}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item className={menuItem} onSelect={onProposeRelated}>
+                        <PolylineIcon size={14} />
+                        {selectedName === null ? copy.graph.ai.related : copy.graph.ai.relatedFor(selectedName)}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Separator className="my-1 h-px bg-hairline" />
+                    <DropdownMenu.Item className={menuItem} disabled={recomputing} onSelect={onRecompute}>
+                        <CalculateIcon size={14} />
+                        {copy.graph.ai.recompute}
+                    </DropdownMenu.Item>
+                </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+        </DropdownMenu.Root>
+    );
+}
+
 export interface ToolbarProps {
     index: GraphIndex;
     view: GraphView;
     selectedId: string | null;
     connectFrom: string | null;
     reviewing: boolean;
+    recomputing: boolean;
     onView: (view: GraphView) => void;
     onPick: (id: string) => void;
     onCreate: () => void;
     onConnect: () => void;
     onStopConnect: () => void;
     onReview: () => void;
+    onProposeFromPages: () => void;
+    onProposeRelated: () => void;
+    onRecompute: () => void;
     focusSearch: number;
 }
 
@@ -173,15 +231,20 @@ export function Toolbar({
     selectedId,
     connectFrom,
     reviewing,
+    recomputing,
     onView,
     onPick,
     onCreate,
     onConnect,
     onStopConnect,
     onReview,
+    onProposeFromPages,
+    onProposeRelated,
+    onRecompute,
     focusSearch,
 }: ToolbarProps): ReactElement {
     const proposed = index.counts.proposedEdges;
+    const selectedName = selectedId === null ? null : (index.byId.get(selectedId)?.name ?? null);
     return (
         <header className="flex h-8 shrink-0 items-center justify-between gap-3 border-b border-hairline px-3">
             <div className="flex min-w-0 items-center gap-2">
@@ -199,6 +262,13 @@ export function Toolbar({
                         {copy.graph.connect.stop}
                     </Button>
                 )}
+                <ModelMenu
+                    selectedName={selectedName}
+                    recomputing={recomputing}
+                    onProposeFromPages={onProposeFromPages}
+                    onProposeRelated={onProposeRelated}
+                    onRecompute={onRecompute}
+                />
                 <span className="h-4 w-px bg-hairline" aria-hidden={true} />
                 <SearchBox index={index} onPick={onPick} focusKey={focusSearch} />
             </div>

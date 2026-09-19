@@ -4,7 +4,8 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import { copy } from "../../copy/index.js";
 import { react } from "../../data/errors.js";
-import { useGraph } from "../../data/hooks/graph.js";
+import { useGraph, useRecomputeScores } from "../../data/hooks/graph.js";
+import { pushToast } from "../../data/toasts.js";
 import { AddLinkIcon, Banner, Button, EmptyState, HubIcon, PublicIcon, SkeletonRows, UploadFileIcon } from "../../ui/index.js";
 import { PlanPageDialog } from "../pages/create.js";
 import type { EntityIndex } from "../pages/entities.js";
@@ -13,10 +14,12 @@ import { EntityContextMenu } from "./actions/context-menu.js";
 import type { MenuTarget } from "./actions/context-menu.js";
 import { CreateEntityDrawer } from "./actions/create-entity.js";
 import { DeleteEntityDialog } from "./actions/delete-entity.js";
+import { ProposeFromPagesDialog, ProposeRelatedDialog } from "./actions/propose.js";
 import { Controls } from "./canvas/controls.js";
 import { Legend } from "./canvas/legend.js";
-import { GraphMap } from "./canvas/map.js";
-import type { MapHandle } from "./canvas/map.js";
+import { GraphMap, pulseMs } from "./canvas/map.js";
+import type { MapHandle, Pulse } from "./canvas/map.js";
+import { diffIndex } from "./model/diff.js";
 import { Inspector } from "./inspector/panel.js";
 import { LensBar } from "./lens-bar.js";
 import { collapseToDepth, defaultFold, expandAll, liftMore, reveal, toggle, visibleRows } from "./model/fold.js";
@@ -55,9 +58,25 @@ export function GraphScreen(): ReactElement {
     const [planning, setPlanning] = useState<string | null>(null);
     const [menu, setMenu] = useState<MenuTarget | null>(null);
     const [hoverEdge, setHoverEdge] = useState<string | null>(null);
+    const [proposing, setProposing] = useState<"pages" | "related" | null>(null);
+    const [pulse, setPulse] = useState<Pulse | null>(null);
     const map = useRef<MapHandle | null>(null);
+    const recompute = useRecomputeScores();
 
     const index = useMemo(() => buildGraphIndex(graph.data?.entities ?? [], graph.data?.edges ?? []), [graph.data]);
+    const previous = useRef(index);
+
+    useEffect(() => {
+        const before = previous.current;
+        previous.current = index;
+        if (before === index || before.counts.total === 0 || before.entities[0]?.siteId !== index.entities[0]?.siteId) {
+            return;
+        }
+        const diff = diffIndex(before, index);
+        if (diff.touched.length > 0) {
+            setPulse({ ids: new Set(diff.touched), until: Date.now() + pulseMs });
+        }
+    }, [index]);
     const fold: FoldState = useMemo(() => session.fold ?? defaultFold(index), [session.fold, index]);
     const entityIndex: EntityIndex = useMemo(
         () => ({ entities: index.entities, byId: index.byId, complete: true, loading: graph.isPending }),
@@ -152,6 +171,24 @@ export function GraphScreen(): ReactElement {
         setFold(toggle(fold, id));
     };
 
+    const recomputeScores = (): void => {
+        const held = index;
+        recompute.mutate(
+            { request: { siteId } },
+            {
+                onSuccess: (answered) => {
+                    const scores = answered.scores ?? {};
+                    const changed = Object.entries(scores).filter(([id, score]) => held.byId.get(id)?.score !== score).length;
+                    pushToast("info", copy.graph.ai.recomputed(changed));
+                },
+            },
+        );
+    };
+
+    const openQueue = (): void => {
+        patchSession({ queue: true });
+    };
+
     if (siteId === "") {
         return (
             <div className="flex h-full items-start justify-center p-6">
@@ -193,9 +230,17 @@ export function GraphScreen(): ReactElement {
                 }}
                 onStopConnect={stopConnect}
                 reviewing={session.queue}
+                recomputing={recompute.isPending}
                 onReview={() => {
                     patchSession({ queue: !session.queue });
                 }}
+                onProposeFromPages={() => {
+                    setProposing("pages");
+                }}
+                onProposeRelated={() => {
+                    setProposing("related");
+                }}
+                onRecompute={recomputeScores}
                 focusSearch={focusSearch}
             />
             <LensBar query={query} counts={counts} onChange={change} />
@@ -233,6 +278,15 @@ export function GraphScreen(): ReactElement {
                                     <>
                                         <Button
                                             variant="primary"
+                                            size="sm"
+                                            onClick={() => {
+                                                setProposing("pages");
+                                            }}
+                                        >
+                                            {copy.graph.empty.propose}
+                                        </Button>
+                                        <Button
+                                            variant="secondary"
                                             size="sm"
                                             onClick={() => {
                                                 setCreating({ parentId: null });
@@ -279,6 +333,7 @@ export function GraphScreen(): ReactElement {
                                 matched={matched}
                                 showRelated={session.showRelated}
                                 highlightEdgeId={hoverEdge}
+                                pulse={pulse}
                                 revealVersion={revealVersion}
                                 onSelect={select}
                                 onPick={pick}
@@ -402,6 +457,28 @@ export function GraphScreen(): ReactElement {
                         select(null);
                     }
                 }}
+            />
+            <ProposeFromPagesDialog
+                open={proposing === "pages"}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setProposing(null);
+                    }
+                }}
+                siteId={siteId}
+                onReview={openQueue}
+            />
+            <ProposeRelatedDialog
+                open={proposing === "related"}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setProposing(null);
+                    }
+                }}
+                siteId={siteId}
+                index={index}
+                selectedId={entityId}
+                onReview={openQueue}
             />
             <PlanPageDialog
                 open={planning !== null}

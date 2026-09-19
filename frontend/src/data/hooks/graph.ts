@@ -185,27 +185,33 @@ export function useRejectEdge() {
     return useEdgeDecision((request) => rejectEdge(request), "rejected");
 }
 
+export interface BatchInput<Request> {
+    request: Request;
+    signal?: AbortSignal;
+}
+
 function useGraphBatch<Request extends { siteId: string }, Answer>(
-    call: (request: Request) => Promise<Answer>,
+    call: (request: Request, signal?: AbortSignal) => Promise<Answer>,
 ) {
     const client = useQueryClient();
     return useMutation({
-        mutationFn: call,
-        onSettled: (_answered, _thrown, request) => {
+        mutationFn: (input: BatchInput<Request>) => call(input.request, input.signal),
+        onSettled: (_answered, _thrown, input) => {
             void client.invalidateQueries({ queryKey: keys.graph.root() });
-            void client.invalidateQueries({ queryKey: keys.reports.site(request.siteId) });
+            void client.invalidateQueries({ queryKey: keys.pages.lists() });
+            void client.invalidateQueries({ queryKey: keys.reports.site(input.request.siteId) });
         },
     });
 }
 
 export function useProposeFromPages() {
-    return useGraphBatch((request: Parameters<typeof proposeFromPages>[0]) => proposeFromPages(request));
+    return useGraphBatch((request: Parameters<typeof proposeFromPages>[0], signal?: AbortSignal) => proposeFromPages(request, signal));
 }
 
 export function useProposeRelated() {
-    return useGraphBatch((request: Parameters<typeof proposeRelated>[0]) => proposeRelated(request));
+    return useGraphBatch((request: Parameters<typeof proposeRelated>[0], signal?: AbortSignal) => proposeRelated(request, signal));
 }
 
 export function useRecomputeScores() {
-    return useGraphBatch((request: Parameters<typeof recomputeScores>[0]) => recomputeScores(request));
+    return useGraphBatch((request: Parameters<typeof recomputeScores>[0], signal?: AbortSignal) => recomputeScores(request, signal));
 }

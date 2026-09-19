@@ -68,6 +68,7 @@ export interface GraphMapProps {
     matched: ReadonlySet<string> | null;
     showRelated: boolean;
     highlightEdgeId: string | null;
+    pulse: Pulse | null;
     revealVersion: number;
     onSelect: (id: string | null) => void;
     onPick: (id: string) => void;
@@ -86,6 +87,13 @@ export interface MapHandle {
     zoomBy(factor: number): void;
 }
 
+export interface Pulse {
+    ids: ReadonlySet<string>;
+    until: number;
+}
+
+export const pulseMs = 3000;
+
 function fontsOf(palette: Palette): Fonts {
     return {
         label: `500 12px ${palette.fontSans}`,
@@ -103,6 +111,7 @@ export function GraphMap({
     matched,
     showRelated,
     highlightEdgeId,
+    pulse,
     revealVersion,
     onSelect,
     onPick,
@@ -163,8 +172,23 @@ export function GraphMap({
     const grid = useMemo(() => new HitGrid(layout.nodes, hitCell), [layout]);
     const rowById = useMemo(() => new Map(rows.map((row) => [row.id, row])), [rows]);
 
-    const latest = useRef({ index, rows, fold, selectedId, matched, showRelated, highlightEdgeId, layout, grid, rowById, measures, palette, fonts });
-    latest.current = { index, rows, fold, selectedId, matched, showRelated, highlightEdgeId, layout, grid, rowById, measures, palette, fonts };
+    const latest = useRef({ index, rows, fold, selectedId, matched, showRelated, highlightEdgeId, pulse, layout, grid, rowById, measures, palette, fonts });
+    latest.current = { index, rows, fold, selectedId, matched, showRelated, highlightEdgeId, pulse, layout, grid, rowById, measures, palette, fonts };
+
+    useEffect(() => {
+        if (pulse === null) {
+            return undefined;
+        }
+        const timer = window.setInterval(() => {
+            host.current?.redraw();
+            if (Date.now() >= pulse.until) {
+                window.clearInterval(timer);
+            }
+        }, 80);
+        return () => {
+            window.clearInterval(timer);
+        };
+    }, [pulse]);
 
     const commitView = useCallback(
         (next: Viewport): void => {
@@ -222,7 +246,9 @@ export function GraphMap({
 
     const draw = useCallback((context: CanvasRenderingContext2D, area: Size): void => {
         const { layout: placed, grid: hits, rowById: byRow, measures: sizes, palette: colors, fonts: faces, index: graph } = latest.current;
-        const { selectedId: selected, matched: lit, showRelated: allRelated, highlightEdgeId: highlighted } = latest.current;
+        const { selectedId: selected, matched: lit, showRelated: allRelated, highlightEdgeId: highlighted, pulse: pulsing } = latest.current;
+        const now = Date.now();
+        const glow = pulsing !== null && now < pulsing.until ? (pulsing.until - now) / pulseMs : 0;
         if (colors === null || faces === null) {
             return;
         }
@@ -386,6 +412,16 @@ export function GraphMap({
             } else {
                 context.fillStyle = isSelected ? colors.accentSoft : isHovered ? colors.raised : colors.inset;
                 context.fill();
+            }
+            if (glow > 0 && pulsing !== null && pulsing.ids.has(node.id)) {
+                context.save();
+                context.globalAlpha = glow * 0.9;
+                context.strokeStyle = colors.accent;
+                context.lineWidth = 3 + (1 - glow) * 6;
+                roundRect(context, node.x - 3, node.y - 3, node.width + 6, node.height + 6, 9);
+                context.stroke();
+                context.restore();
+                roundRect(context, node.x, node.y, node.width, node.height, 6);
             }
             const isLitEnd = litEnds.has(node.id);
             context.lineWidth = isSelected || isLitEnd ? 1.5 : 1;
