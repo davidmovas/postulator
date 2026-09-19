@@ -32,6 +32,11 @@ type itemStore interface {
 
 type artifactStore interface {
 	ByItem(ctx context.Context, itemID string) ([]run.Artifact, error)
+	PurgedByItems(ctx context.Context, itemIDs []string) (map[string][]run.ArtifactKind, error)
+}
+
+type stepDefs interface {
+	Lookup(name string) (run.StepDef, bool)
 }
 
 type eventStore interface {
@@ -49,10 +54,14 @@ type Service struct {
 	artifacts artifactStore
 	events    eventStore
 	specs     specResolver
+	steps     stepDefs
 }
 
-func New(engine engine, runs runStore, items itemStore, artifacts artifactStore, events eventStore, specs specResolver) *Service {
-	return &Service{engine: engine, runs: runs, items: items, artifacts: artifacts, events: events, specs: specs}
+func New(engine engine, runs runStore, items itemStore, artifacts artifactStore, events eventStore,
+	specs specResolver, steps stepDefs) *Service {
+	return &Service{
+		engine: engine, runs: runs, items: items, artifacts: artifacts, events: events, specs: specs, steps: steps,
+	}
 }
 
 func invalid(message, field string) *errors.Error {

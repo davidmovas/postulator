@@ -57,7 +57,48 @@ func (s *Service) ListItems(ctx context.Context, req ListItemsRequest) (paging.L
 	if err != nil {
 		return paging.List[Item]{}, err
 	}
-	return application.MapList(list, itemView), nil
+
+	blocked, err := s.retryBlocks(ctx, list.Items)
+	if err != nil {
+		return paging.List[Item]{}, err
+	}
+	return application.MapList(list, func(item run.Item) Item {
+		return itemView(item, blocked[item.ID])
+	}), nil
+}
+
+func (s *Service) retryBlocks(ctx context.Context, items []run.Item) (map[string]run.RetryBlockedReason, error) {
+	blocked := make(map[string]run.RetryBlockedReason, len(items))
+	if len(items) == 0 {
+		return blocked, nil
+	}
+
+	consumed := false
+	ids := make([]string, 0, len(items))
+	for i := range items {
+		ids = append(ids, items[i].ID)
+		if def, known := s.steps.Lookup(items[i].CurrentStep); known && len(def.Requires) > 0 {
+			consumed = true
+		}
+	}
+	if !consumed {
+		return blocked, nil
+	}
+
+	purged, err := s.artifacts.PurgedByItems(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	for i := range items {
+		def, known := s.steps.Lookup(items[i].CurrentStep)
+		if !known {
+			continue
+		}
+		if reason := run.RetryBlocked(def.Requires, purged[items[i].ID]); reason != "" {
+			blocked[items[i].ID] = reason
+		}
+	}
+	return blocked, nil
 }
 
 func (s *Service) ListEvents(ctx context.Context, req ListEventsRequest) (ListEventsResponse, error) {

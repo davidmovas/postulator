@@ -271,7 +271,7 @@ func (c *Core) compose(ctx context.Context, key []byte) error {
 		MaxRows:    imports.MaxRows(values),
 	})
 	modelsService := models.New(modelCatalog, modelRepo, modelProfiles, book, secretStore, client, relay, now)
-	runsService := runs.New(engine, runRepo, itemRepo, artifactRepo, eventRepo, templateService)
+	runsService := runs.New(engine, runRepo, itemRepo, artifactRepo, eventRepo, templateService, stepRegistry)
 	syncService := sync.New(engine, siteRepo, wordpress, packer{}, now)
 	reportsService := reports.New(entityRepo, edgeRepo, pageRepo, linkRepo, runRepo, itemRepo, artifactRepo)
 

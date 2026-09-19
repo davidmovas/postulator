@@ -122,7 +122,7 @@ func newFixture(t *testing.T) *fixture {
 	logRepo := sqlite.NewRunEventRepo(store)
 
 	return &fixture{
-		service: runs.New(engine, runRepo, itemRepo, blobRepo, logRepo, specs),
+		service: runs.New(engine, runRepo, itemRepo, blobRepo, logRepo, specs, stepRegistry(t)),
 		engine:  engine,
 		specs:   specs,
 		runs:    runRepo,
@@ -132,6 +132,26 @@ func newFixture(t *testing.T) *fixture {
 		siteID:  site.ID,
 		pages:   pages,
 	}
+}
+
+func stepRegistry(t *testing.T) *run.Registry {
+	t.Helper()
+
+	nothing := func(context.Context, *run.StepContext) (run.Result, error) { return run.Result{}, nil }
+	registry := run.NewRegistry()
+	defs := []run.StepDef{
+		{Name: string(run.StepResolveContext), Run: nothing, Produces: []run.ArtifactKind{run.ArtifactLinkContext}},
+		{Name: string(run.StepGenerateBody), Run: nothing, Requires: []run.ArtifactKind{run.ArtifactLinkContext}},
+		{Name: string(run.StepPublish), Run: nothing,
+			Requires: []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML}},
+		{Name: string(run.StepSyncBack), Run: nothing, Requires: []run.ArtifactKind{run.ArtifactPublishResult}},
+	}
+	for _, def := range defs {
+		if err := registry.Register(def); err != nil {
+			t.Fatalf("register %s: %v", def.Name, err)
+		}
+	}
+	return registry
 }
 
 func (f *fixture) seedRun(t *testing.T, status run.Status) (run.Run, run.Item) {
@@ -705,4 +725,115 @@ func TestControlRejectsBadRequests(t *testing.T) {
 			t.Fatalf("the engine failure = %v", err)
 		}
 	}
+}
+
+func TestListItemsReportsWhetherTheStepCanStillBeRetried(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		step     string
+		purged   []run.ArtifactKind
+		kept     []run.ArtifactKind
+		wantable bool
+		reason   string
+	}{
+		{
+			name:     "a step that consumes nothing",
+			step:     string(run.StepResolveContext),
+			kept:     []run.ArtifactKind{run.ArtifactBodyHTML},
+			purged:   []run.ArtifactKind{run.ArtifactDraft},
+			wantable: true,
+		},
+		{
+			name:     "every input still in the database",
+			step:     string(run.StepPublish),
+			kept:     []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML},
+			wantable: true,
+		},
+		{
+			name:     "an input purged after the page was published",
+			step:     string(run.StepPublish),
+			kept:     []run.ArtifactKind{run.ArtifactDraft},
+			purged:   []run.ArtifactKind{run.ArtifactBodyHTML},
+			wantable: false,
+			reason:   "inputs_expired",
+		},
+		{
+			name:     "a purged artifact the step does not consume",
+			step:     string(run.StepSyncBack),
+			kept:     []run.ArtifactKind{run.ArtifactPublishResult},
+			purged:   []run.ArtifactKind{run.ArtifactBodyHTML, run.ArtifactDraft},
+			wantable: true,
+		},
+		{
+			name:     "a step the registry does not know",
+			step:     "invented",
+			purged:   []run.ArtifactKind{run.ArtifactBodyHTML},
+			wantable: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			fixture := newFixture(t)
+			record, item := fixture.seedRun(t, run.StatusCompleted)
+			fixture.setStep(t, item, tc.step)
+			fixture.seedArtifacts(t, record, item, tc.kept, tc.purged)
+
+			list, err := fixture.service.ListItems(t.Context(), runs.ListItemsRequest{RunID: record.ID})
+			if err != nil || len(list.Items) != 1 {
+				t.Fatalf("ListItems = %+v, %v", list, err)
+			}
+
+			view := list.Items[0]
+			if view.Retryable != tc.wantable {
+				t.Fatalf("Retryable = %v, want %v", view.Retryable, tc.wantable)
+			}
+			if view.RetryBlockedReason != tc.reason {
+				t.Fatalf("RetryBlockedReason = %q, want %q", view.RetryBlockedReason, tc.reason)
+			}
+		})
+	}
+}
+
+func (f *fixture) setStep(t *testing.T, item run.Item, step string) {
+	t.Helper()
+
+	item.CurrentStep = step
+	persisted, err := f.items.Persist(t.Context(), item, item.AdvanceSeq)
+	if err != nil || !persisted {
+		t.Fatalf("persist the current step = %v, %v", persisted, err)
+	}
+}
+
+func (f *fixture) seedArtifacts(t *testing.T, record run.Run, item run.Item, kept, purged []run.ArtifactKind) {
+	t.Helper()
+
+	artifacts := make([]run.Artifact, 0, len(kept)+len(purged))
+	for _, kind := range kept {
+		artifacts = append(artifacts, f.artifact(t, record, item, kind, false))
+	}
+	for _, kind := range purged {
+		artifacts = append(artifacts, f.artifact(t, record, item, kind, true))
+	}
+	if err := f.blobs.ReplaceStep(t.Context(), item.ID, "seed", artifacts); err != nil {
+		t.Fatalf("seed the artifacts: %v", err)
+	}
+}
+
+func (f *fixture) artifact(t *testing.T, record run.Run, item run.Item, kind run.ArtifactKind, purged bool) run.Artifact {
+	t.Helper()
+
+	artifact, err := run.NewArtifact(run.Artifact{
+		ID: id.New(), RunID: record.ID, ItemID: item.ID, Step: "seed", Kind: kind,
+		Blob: []byte("payload"), CreatedAt: sqlitetest.Stamp,
+	})
+	if err != nil {
+		t.Fatalf("NewArtifact(%s): %v", kind, err)
+	}
+	artifact.Purged = purged
+	return artifact
 }

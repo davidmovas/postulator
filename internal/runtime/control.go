@@ -172,6 +172,9 @@ func (e *Engine) RetryStep(ctx context.Context, itemID string) error {
 			return errors.New(errors.Conflict, "the item has not stopped, so there is nothing to retry").
 				WithDetail("itemId", itemID)
 		}
+		if err = e.refuseExpiredInputs(c, item); err != nil {
+			return err
+		}
 
 		record, err := e.deps.Runs.Get(c, item.RunID)
 		if err != nil {
@@ -219,6 +222,34 @@ func (e *Engine) RetryStep(ctx context.Context, itemID string) error {
 
 	e.nudge()
 	return nil
+}
+
+func (e *Engine) refuseExpiredInputs(ctx context.Context, item run.Item) error {
+	def, known := e.registry.Lookup(item.CurrentStep)
+	if !known || len(def.Requires) == 0 {
+		return nil
+	}
+
+	artifacts, err := e.deps.Artifacts.ByItem(ctx, item.ID)
+	if err != nil {
+		return err
+	}
+
+	expired := run.ExpiredInputs(def.Requires, run.PurgedKinds(artifacts))
+	if len(expired) == 0 {
+		return nil
+	}
+
+	kinds := make([]string, 0, len(expired))
+	for _, kind := range expired {
+		kinds = append(kinds, string(kind))
+	}
+	return errors.New(errors.NotFound, "step "+item.CurrentStep+
+		" reads artifacts the retention sweep purged after the page was published; re-run the page instead of retrying the step").
+		WithDetail("itemId", item.ID).
+		WithDetail("step", item.CurrentStep).
+		WithDetail("kinds", kinds).
+		WithDetail("reason", string(run.RetryBlockedInputsExpired))
 }
 
 func (e *Engine) Wake(ctx context.Context, itemID string) error {
