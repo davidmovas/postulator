@@ -60,6 +60,9 @@ jobs:
       - name: Generate the TypeScript bindings
         run: task bindings
 
+      - name: Use an npm that honours the release-age gate
+        run: npm install -g npm@11.19.1
+
       - name: Install the frontend dependencies
         working-directory: frontend
         run: npm ci

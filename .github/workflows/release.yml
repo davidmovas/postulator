@@ -35,6 +35,9 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Use an npm that honours the release-age gate
+        run: npm install -g npm@11.19.1
+
       - name: Install Task
         run: go install github.com/go-task/task/v3/cmd/task@${{ env.TASK_VERSION }}
 
