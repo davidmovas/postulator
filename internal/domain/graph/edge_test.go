@@ -1,6 +1,7 @@
 package graph_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -33,6 +34,7 @@ func TestNewEdgeNormalises(t *testing.T) {
 	related := validEdge()
 	related.Kind = graph.EdgeRelated
 	related.Weight = 0.7
+	related.Reason = "  share one subject  "
 	normalised, err := graph.NewEdge(related)
 	if err != nil {
 		t.Fatalf("NewEdge: %v", err)
@@ -42,6 +44,19 @@ func TestNewEdgeNormalises(t *testing.T) {
 	}
 	if normalised.Weight != 0.7 {
 		t.Errorf("related weight = %v, want 0.7", normalised.Weight)
+	}
+	if normalised.Reason != "share one subject" {
+		t.Errorf("reason = %q, want it trimmed", normalised.Reason)
+	}
+
+	long := validEdge()
+	long.Reason = strings.Repeat("é", graph.EdgeReasonMax)
+	kept, err := graph.NewEdge(long)
+	if err != nil {
+		t.Fatalf("NewEdge with a reason at the cap: %v", err)
+	}
+	if kept.Reason != long.Reason {
+		t.Errorf("a reason at the cap must survive")
 	}
 }
 
@@ -62,6 +77,7 @@ func TestNewEdgeRejects(t *testing.T) {
 		{name: "unknown status", mutate: func(e *graph.Edge) { e.Status = "maybe" }, field: "status"},
 		{name: "weight above one", mutate: func(e *graph.Edge) { e.Kind = graph.EdgeRelated; e.Weight = 1.01 }, field: "weight"},
 		{name: "weight below zero", mutate: func(e *graph.Edge) { e.Kind = graph.EdgeRelated; e.Weight = -0.1 }, field: "weight"},
+		{name: "reason too long", mutate: func(e *graph.Edge) { e.Reason = strings.Repeat("x", graph.EdgeReasonMax+1) }, field: "reason"},
 	}
 
 	for _, tc := range cases {

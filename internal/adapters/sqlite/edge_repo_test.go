@@ -15,7 +15,10 @@ import (
 
 func edgeBetween(t *testing.T, siteID, from, to string, kind graph.EdgeKind, status graph.EdgeStatus, at time.Time) graph.Edge {
 	t.Helper()
-	edge, err := graph.NewEdge(graph.Edge{ID: id.New(), SiteID: siteID, FromEntityID: from, ToEntityID: to, Kind: kind, Weight: 0.6, Source: graph.SourceAI, Status: status, CreatedAt: at})
+	edge, err := graph.NewEdge(graph.Edge{
+		ID: id.New(), SiteID: siteID, FromEntityID: from, ToEntityID: to, Kind: kind, Weight: 0.6,
+		Source: graph.SourceAI, Status: status, Reason: "share one subject", CreatedAt: at,
+	})
 	if err != nil {
 		t.Fatalf("NewEdge: %v", err)
 	}
@@ -49,6 +52,9 @@ func TestEdgeRepoRoundTrip(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Get = %+v\nwant %+v", got, want)
+	}
+	if got.Reason != "share one subject" {
+		t.Errorf("reason = %q, want the stored reason", got.Reason)
 	}
 
 	again := edgeBetween(t, owner.ID, child.ID, hub.ID, graph.EdgeParent, graph.StatusApproved, sqlitetest.Stamp)

@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	edgeColumns       = `id, site_id, from_entity_id, to_entity_id, kind, weight, source, status, created_at`
-	insertEdge        = `INSERT INTO edges (` + edgeColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	edgeColumns       = `id, site_id, from_entity_id, to_entity_id, kind, weight, source, status, reason, created_at`
+	insertEdge        = `INSERT INTO edges (` + edgeColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	updateEdgeStatus  = `UPDATE edges SET status = ? WHERE id = ?`
 	deleteEdge        = `DELETE FROM edges WHERE id = ?`
 	selectEdge        = `SELECT ` + edgeColumns + ` FROM edges WHERE id = ?`
@@ -39,7 +39,7 @@ func edgeConflict(e *graph.Edge) *errors.Error {
 
 func (r *EdgeRepo) Insert(ctx context.Context, e graph.Edge) error {
 	_, err := execWrite(ctx, r.store.writeFrom(ctx), insertEdge, []any{
-		e.ID, e.SiteID, e.FromEntityID, e.ToEntityID, string(e.Kind), e.Weight, string(e.Source), string(e.Status), formatTime(e.CreatedAt),
+		e.ID, e.SiteID, e.FromEntityID, e.ToEntityID, string(e.Kind), e.Weight, string(e.Source), string(e.Status), e.Reason, formatTime(e.CreatedAt),
 	}, edgeConflict(&e), "insert the edge")
 	return err
 }
@@ -108,7 +108,7 @@ func scanEdge(rows *sql.Rows) (graph.Edge, error) {
 		kind, source, status string
 		createdAt            string
 	)
-	if err := rows.Scan(&e.ID, &e.SiteID, &e.FromEntityID, &e.ToEntityID, &kind, &e.Weight, &source, &status, &createdAt); err != nil {
+	if err := rows.Scan(&e.ID, &e.SiteID, &e.FromEntityID, &e.ToEntityID, &kind, &e.Weight, &source, &status, &e.Reason, &createdAt); err != nil {
 		return graph.Edge{}, err
 	}
 	e.Kind = graph.EdgeKind(kind)

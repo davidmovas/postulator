@@ -1,6 +1,12 @@
 package graph
 
-import "time"
+import (
+	"strings"
+	"time"
+	"unicode/utf8"
+)
+
+const EdgeReasonMax = 200
 
 type EdgeKind string
 
@@ -44,10 +50,12 @@ type Edge struct {
 	Weight       float64
 	Source       Source
 	Status       EdgeStatus
+	Reason       string
 	CreatedAt    time.Time
 }
 
 func NewEdge(e Edge) (Edge, error) {
+	e.Reason = strings.TrimSpace(e.Reason)
 	switch {
 	case e.ID == "":
 		return Edge{}, invalid("edge id must not be empty", "id")
@@ -65,6 +73,8 @@ func NewEdge(e Edge) (Edge, error) {
 		return Edge{}, invalid("edge status is not recognized", "status")
 	case e.Weight < 0 || e.Weight > 1:
 		return Edge{}, invalid("edge weight must be between 0 and 1", "weight")
+	case utf8.RuneCountInString(e.Reason) > EdgeReasonMax:
+		return Edge{}, invalid("edge reason must be at most 200 characters", "reason")
 	}
 
 	if e.Kind == EdgeParent {
