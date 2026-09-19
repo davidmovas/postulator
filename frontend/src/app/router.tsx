@@ -1,6 +1,9 @@
 import { createHashRouter, Navigate } from "react-router";
 
 import { copy } from "../copy/index.js";
+import { OnboardingScreen } from "../features/onboarding/index.js";
+import { PagesScreen } from "../features/pages/index.js";
+import { SitesScreen } from "../features/sites/index.js";
 import { NotBuilt } from "./not-built.js";
 import { Shell } from "./shell.js";
 
@@ -14,16 +17,16 @@ export const router = createHashRouter([
         element: <Shell />,
         children: [
             { index: true, element: <Navigate to="/sites" replace /> },
-            { path: "onboarding", element: panel("Onboarding", "wave 3, agent 1") },
-            { path: "sites", element: panel(copy.nav.sites, "wave 3, agent 1") },
+            { path: "onboarding", element: <OnboardingScreen /> },
+            { path: "sites", element: <SitesScreen /> },
             {
                 path: "s/:siteId",
                 children: [
                     { index: true, element: <Navigate to="overview" replace /> },
                     { path: "overview", element: panel(copy.nav.overview, "wave 3, agent 7") },
                     { path: "graph", element: panel(copy.nav.graph, "wave 3, agent 3") },
-                    { path: "pages", element: panel(copy.nav.pages, "wave 3, agent 2") },
-                    { path: "pages/:pageId", element: panel("Page detail", "wave 3, agent 2") },
+                    { path: "pages", element: <PagesScreen /> },
+                    { path: "pages/:pageId", element: <PagesScreen /> },
                     { path: "runs", element: panel(copy.nav.runs, "wave 3, agent 5") },
                     { path: "runs/:runId", element: panel("Run detail", "wave 3, agent 5") },
                     { path: "runs/:runId/items/:itemId", element: panel("Review drawer", "wave 3, agent 5") },
