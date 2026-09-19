@@ -234,8 +234,6 @@ func TestSyncSitePullsThroughThePluginAndThroughCore(t *testing.T) {
 	}
 }
 
-// Core REST hands back /?page_id=42 for anything that is not published yet, so without this
-// every draft on the site would be pulled in at the front page and overwrite its row.
 func TestSyncSiteRebuildsTheDraftPathsCoreRESTWillNotGive(t *testing.T) {
 	t.Parallel()
 

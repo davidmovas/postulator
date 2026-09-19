@@ -234,8 +234,6 @@ func (v vault) Get(context.Context, string) (string, error) {
 	return v.password, nil
 }
 
-// A client who installs the companion plugin after we told them to must not be stuck on the
-// degraded path until the application restarts: a plugin check re-asks the site.
 func TestCheckPluginReprobesASiteThatGainedThePlugin(t *testing.T) {
 	t.Parallel()
 

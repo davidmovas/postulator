@@ -157,33 +157,31 @@ func newClient(t *testing.T) (*client, environment) {
 	}, env
 }
 
-// companion holds the one manifest probe this suite makes: every test in it speaks to the
-// companion plugin, so a site without the plugin is a skip rather than a wall of failures.
-var companion struct {
+var companionProbe struct {
 	once    sync.Once
 	err     error
 	present bool
 }
 
 func pluginIsActive(env environment) (bool, error) {
-	companion.once.Do(func() {
+	companionProbe.once.Do(func() {
 		request, err := http.NewRequest(http.MethodGet, env.baseURL+"/wp-json/postulator/v1/manifest", http.NoBody)
 		if err != nil {
-			companion.err = err
+			companionProbe.err = err
 			return
 		}
 		request.SetBasicAuth(env.user, env.pass)
 
 		response, err := (&http.Client{Timeout: 60 * time.Second}).Do(request)
 		if err != nil {
-			companion.err = err
+			companionProbe.err = err
 			return
 		}
 		defer response.Body.Close()
 
-		companion.present = response.StatusCode == http.StatusOK
+		companionProbe.present = response.StatusCode == http.StatusOK
 	})
-	return companion.present, companion.err
+	return companionProbe.present, companionProbe.err
 }
 
 func skipWithoutPlugin(t *testing.T, env environment) {

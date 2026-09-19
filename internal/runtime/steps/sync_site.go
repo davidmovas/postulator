@@ -314,11 +314,7 @@ func fromCore(item wp.Item, itemType wp.ItemType, host string) (pulledItem, bool
 		return pulledItem{}, false
 	}
 
-	if uglyPermalink(item.Link) {
-		// WordPress answers with /?page_id=42 for anything not yet published, so the permalink
-		// says nothing about where the item lives. The companion plugin reports the path a draft
-		// would have once published; over core REST the sync rebuilds it from the parent chain,
-		// and leaving it empty here is what asks reconcile to do that.
+	if queryPermalink(item.Link) {
 		path = ""
 	}
 
@@ -334,7 +330,7 @@ func fromCore(item wp.Item, itemType wp.ItemType, host string) (pulledItem, bool
 	return pulled, true
 }
 
-func uglyPermalink(link string) bool {
+func queryPermalink(link string) bool {
 	parsed, err := url.Parse(strings.TrimSpace(link))
 	if err != nil {
 		return false
@@ -342,10 +338,7 @@ func uglyPermalink(link string) bool {
 	return parsed.RawQuery != ""
 }
 
-// placeItems gives a path to the items whose permalink carried none. WordPress hands out the ugly
-// form for every draft, and without this every draft would land on the site's front page and
-// overwrite whatever the map already holds there.
-func placeItems(batch []pulledItem, byWPID map[int64]pagemap.Page) []pulledItem {
+func resolveDraftPaths(batch []pulledItem, byWPID map[int64]pagemap.Page) []pulledItem {
 	known := make(map[int64]string, len(byWPID)+len(batch))
 	for wpID := range byWPID {
 		known[wpID] = byWPID[wpID].Path
@@ -359,7 +352,7 @@ func placeItems(batch []pulledItem, byWPID map[int64]pagemap.Page) []pulledItem 
 	out := make([]pulledItem, 0, len(batch))
 	for i := range batch {
 		if batch[i].Path == "" {
-			path, ok := rebuildPath(batch[i], known)
+			path, ok := draftPath(batch[i], known)
 			if !ok {
 				continue
 			}
@@ -370,10 +363,7 @@ func placeItems(batch []pulledItem, byWPID map[int64]pagemap.Page) []pulledItem 
 	return out
 }
 
-// rebuildPath reads the path a draft would have once it is published. An item whose parent is
-// not on the map is left out rather than invented at the root, where it would collide with
-// whatever already lives under that slug.
-func rebuildPath(item pulledItem, known map[int64]string) (string, bool) {
+func draftPath(item pulledItem, known map[int64]string) (string, bool) {
 	if item.Slug == "" {
 		return "", false
 	}
@@ -436,7 +426,7 @@ func reconcile(ctx context.Context, deps Deps, owner site.Site, batch []pulledIt
 		}
 	}
 
-	batch = placeItems(batch, byWPID)
+	batch = resolveDraftPaths(batch, byWPID)
 	if len(batch) == 0 {
 		return nil
 	}

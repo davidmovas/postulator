@@ -22,6 +22,13 @@ import (
 )
 
 const (
+	ReasonNoPlugin           = "the site has no Postulator companion plugin"
+	ReasonNoSEOWriter        = "the companion plugin on this site cannot write SEO meta"
+	ReasonNeighborGone       = "the neighbor is no longer on the site"
+	ReasonNeighborUnreadable = "the stored content of the neighbor could not be read as HTML"
+)
+
+const (
 	checkpointLinks = "links"
 
 	wordsPerToken     = 1.6

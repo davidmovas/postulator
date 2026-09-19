@@ -247,9 +247,6 @@ func (s *Server) itemPayload(stored *Item) map[string]any {
 	}
 }
 
-// permalink mirrors what WordPress hands back: a draft has no published address yet, so
-// get_permalink returns the ugly ?page_id= form and the pretty path appears only once the
-// post is published. The companion plugin is what knows where a draft would land.
 func (s *Server) permalink(stored *Item) string {
 	switch stored.Status {
 	case "draft", "pending", "future", "auto-draft":

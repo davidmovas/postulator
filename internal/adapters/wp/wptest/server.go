@@ -235,8 +235,6 @@ func (s *Server) ResetRequests() {
 	s.requests = nil
 }
 
-// EnablePlugin turns the companion routes on for a server that started without them, so a
-// test can play out a client installing the plugin while the application is already running.
 func (s *Server) EnablePlugin() {
 	s.mu.Lock()
 	defer s.mu.Unlock()

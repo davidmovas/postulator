@@ -29,9 +29,6 @@ const (
 	CodeRelinkSkipped  = "relink_skipped"
 	ClassNeedsHuman    = "needs_human"
 
-	ReasonNeighborGone       = "the neighbor is no longer on the site"
-	ReasonNeighborUnreadable = "the stored content of the neighbor could not be read as HTML"
-
 	relinkTimeout = 5 * time.Minute
 )
 
@@ -139,9 +136,6 @@ type neighborWork struct {
 	policy   template.LinkPolicy
 }
 
-// skippedFinding records a neighbor the step could not even try: without the companion plugin
-// there is no way to read the stored content, and writing the rendered HTML back in its place
-// would replace the human's markup with WordPress's output. The run says so rather than lying.
 func skippedFinding(outcome NeighborResult) content.Finding {
 	return content.Finding{
 		Severity: content.SeverityWarn,

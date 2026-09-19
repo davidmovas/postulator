@@ -140,37 +140,35 @@ func loadEnvironment(t *testing.T) environment {
 	return env
 }
 
-// companion holds the one manifest probe this package makes. The full loop needs the plugin
-// and the degraded loop needs its absence, so each of them skips on the stack it cannot use.
-var companion struct {
+var companionProbe struct {
 	once    sync.Once
 	err     error
 	present bool
 }
 
 func pluginIsActive(env environment) (bool, error) {
-	companion.once.Do(func() {
+	companionProbe.once.Do(func() {
 		request, err := http.NewRequest(http.MethodGet, env.baseURL+"/wp-json/postulator/v1/manifest", http.NoBody)
 		if err != nil {
-			companion.err = err
+			companionProbe.err = err
 			return
 		}
 		request.SetBasicAuth(env.user, env.pass)
 
 		response, err := (&http.Client{Timeout: 60 * time.Second}).Do(request)
 		if err != nil {
-			companion.err = err
+			companionProbe.err = err
 			return
 		}
 		defer func() {
 			if closeErr := response.Body.Close(); closeErr != nil {
-				companion.err = closeErr
+				companionProbe.err = closeErr
 			}
 		}()
 
-		companion.present = response.StatusCode == http.StatusOK
+		companionProbe.present = response.StatusCode == http.StatusOK
 	})
-	return companion.present, companion.err
+	return companionProbe.present, companionProbe.err
 }
 
 func requirePlugin(t *testing.T, env environment, want bool) {

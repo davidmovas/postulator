@@ -80,8 +80,6 @@ func (r *Registry) Probe(ctx context.Context, record site.Site) (site.PluginStat
 		return site.PluginState{}, err
 	}
 
-	// A plugin check is a deliberate re-ask, so it never answers from the manifest this client
-	// happens to hold: a site that gained the plugin since the last probe reports it at once.
 	client.InvalidateManifest()
 
 	capabilities, err := client.Capabilities(ctx)

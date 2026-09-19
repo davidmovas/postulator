@@ -30,9 +30,7 @@ import (
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
 
-// degraded runs over the three pages that sit two levels down, so every draft has both a
-// parent and a grandparent to link to.
-var degraded = []target{
+var degradedTargets = []target{
 	{path: "/menu/main-courses/steaks/", keyword: "grilled steaks"},
 	{path: "/menu/main-courses/seafood/", keyword: "fresh seafood"},
 	{path: "/menu/main-courses/pasta/", keyword: "handmade pasta"},
@@ -44,8 +42,6 @@ const (
 
 	newsPath = "/menu-news/"
 
-	// the paths of rows the core pull cannot see: WooCommerce is installed on the stack, but
-	// core REST lists neither products nor product categories.
 	productPath      = "/product/postulator-powder/"
 	productTermPath  = "/product-category/postulator-koffein/"
 	vanishedPagePath = "/menu/gone/"
@@ -53,10 +49,6 @@ const (
 
 var hrefPattern = regexp.MustCompile(`href="([^"]*)"`)
 
-// TestTheWholeLoopDegradesWithoutThePlugin drives the whole product loop against a live
-// WordPress that carries the companion plugin deactivated, which is the shape of a client who
-// refuses to install it. Everything the plugin answers has to degrade, and none of it may
-// fail the run, lose the work silently or write over what a human wrote.
 func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 	live := newSite(t)
 	requirePlugin(t, live.env, false)
@@ -88,13 +80,12 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 	}
 	assertPluginCallsAreRefusedAsInvalid(t, core, siteID, int64(menuID))
 
-	seedUnseeable(t, core, siteID)
+	seedRowsTheCorePullCannotSee(t, core, siteID)
 
-	// the site map arrives through core REST
 	firstSync := runSync(t, core, siteID)
 	stored := pagesByPath(t, core.Pages, siteID)
 	assertCorePull(t, core, siteID, stored)
-	assertNothingUnseeableWasArchived(t, stored)
+	assertNothingUnseenWasArchived(t, stored)
 
 	secondSync := runSync(t, core, siteID)
 	assertSameMap(t, stored, pagesByPath(t, core.Pages, siteID))
@@ -113,8 +104,8 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 	}
 
 	stored = pagesByPath(t, core.Pages, siteID)
-	targets := make([]string, 0, len(degraded))
-	for _, planned := range degraded {
+	targets := make([]string, 0, len(degradedTargets))
+	for _, planned := range degradedTargets {
 		page, ok := stored[planned.path]
 		if !ok || page.Status != string(pagemap.StatusPlanned) {
 			t.Fatalf("the import left %s as %+v, want a planned page", planned.path, page)
@@ -122,8 +113,7 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 		targets = append(targets, page.ID)
 	}
 
-	// the neighbors as a human left them, to compare against once the run has finished
-	untouched := map[int]string{
+	contentBeforeTheRun := map[int]string{
 		menuID:  live.storedContent(t, "pages", menuID),
 		mainsID: live.storedContent(t, "pages", mainsID),
 	}
@@ -145,11 +135,11 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list the run items: %v", err)
 	}
-	if len(items.Items) != len(degraded) {
-		t.Fatalf("the run carries %d items, want %d", len(items.Items), len(degraded))
+	if len(items.Items) != len(degradedTargets) {
+		t.Fatalf("the run carries %d items, want %d", len(items.Items), len(degradedTargets))
 	}
 
-	drafts := make(map[string]int64, len(degraded))
+	drafts := make(map[string]int64, len(degradedTargets))
 	for i := range items.Items {
 		item := items.Items[i]
 		if item.Status != string(run.StatusCompleted) {
@@ -173,10 +163,10 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 		}
 	}
 
-	if len(drafts) != len(degraded) {
-		t.Fatalf("the run wrote %d drafts, want %d: %v", len(drafts), len(degraded), drafts)
+	if len(drafts) != len(degradedTargets) {
+		t.Fatalf("the run wrote %d drafts, want %d: %v", len(drafts), len(degradedTargets), drafts)
 	}
-	for _, planned := range degraded {
+	for _, planned := range degradedTargets {
 		wpID, ok := drafts[planned.path]
 		if !ok {
 			t.Fatalf("no draft was written for %s", planned.path)
@@ -185,7 +175,7 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 		assertNoSEOMetaOnTheSite(t, live, int(wpID))
 	}
 
-	for wpID, before := range untouched {
+	for wpID, before := range contentBeforeTheRun {
 		if after := live.storedContent(t, "pages", wpID); after != before {
 			t.Fatalf("the stored content of %d changed; a degraded relink must leave it alone.\n"+
 				"before: %q\nafter:  %q", wpID, before, after)
@@ -193,7 +183,7 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 	}
 
 	after := pagesByPath(t, core.Pages, siteID)
-	for _, planned := range degraded {
+	for _, planned := range degradedTargets {
 		page, ok := after[planned.path]
 		if !ok || page.WPID == nil || page.Status != string(pagemap.StatusExists) {
 			t.Fatalf("the read back left %s as %+v, want an existing page with a wordpress id",
@@ -209,7 +199,7 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 	if overview.Pages.Total != len(after) {
 		t.Fatalf("the overview counts %d pages, the store holds %d", overview.Pages.Total, len(after))
 	}
-	if overview.Pages.ByStatus[string(pagemap.StatusExists)] < len(degraded) {
+	if overview.Pages.ByStatus[string(pagemap.StatusExists)] < len(degradedTargets) {
 		t.Fatalf("the overview reports %+v, want the run's pages", overview.Pages.ByStatus)
 	}
 	if overview.Edges.Approved == 0 || overview.Edges.Realized == 0 ||
@@ -233,8 +223,6 @@ func runSync(t *testing.T, core *app.Core, siteID string) string {
 	return synced.RunID
 }
 
-// assertPluginCallsAreRefusedAsInvalid checks that every call the companion plugin answers
-// fails as a plugin_missing refusal the caller can read, never as an unexplained failure.
 func assertPluginCallsAreRefusedAsInvalid(t *testing.T, core *app.Core, siteID string, wpID int64) {
 	t.Helper()
 
@@ -272,10 +260,7 @@ func assertPluginCallsAreRefusedAsInvalid(t *testing.T, core *app.Core, siteID s
 	}
 }
 
-// seedUnseeable writes the rows a core pull cannot see. The products come from WooCommerce,
-// which the stack installs and core REST does not list, and the vanished page stands for a
-// page the sync really should archive, so the assertion proves the sweep ran at all.
-func seedUnseeable(t *testing.T, core *app.Core, siteID string) {
+func seedRowsTheCorePullCannotSee(t *testing.T, core *app.Core, siteID string) {
 	t.Helper()
 
 	repo := sqlite.NewPageRepo(core.Store)
@@ -323,7 +308,6 @@ func assertCorePull(t *testing.T, core *app.Core, siteID string, stored map[stri
 		t.Fatalf("%s hangs off %v, want the row of %s", child.Path, child.ParentPageID, parent.Path)
 	}
 
-	// the links were parsed here, out of the content core REST returned
 	links := linksOf(t, core.Pages, stored[newsPath].ID)
 	if len(links) != 1 || links[0].ToURL != "/menu/" {
 		t.Fatalf("%s carries the links %+v, want the one to /menu/", newsPath, links)
@@ -333,7 +317,7 @@ func assertCorePull(t *testing.T, core *app.Core, siteID string, stored map[stri
 	}
 }
 
-func assertNothingUnseeableWasArchived(t *testing.T, stored map[string]pages.Page) {
+func assertNothingUnseenWasArchived(t *testing.T, stored map[string]pages.Page) {
 	t.Helper()
 
 	for _, path := range []string{productPath, productTermPath} {
@@ -388,7 +372,6 @@ func assertSEOWasSkippedNotLost(t *testing.T, core *app.Core, itemID string, fin
 		t.Fatalf("the skipped finding of %s is %+v", final.Path, warning)
 	}
 
-	// the meta is still on record, so the operator can see what the site refused to take
 	stored, err := core.Runs.GetArtifact(t.Context(), runs.GetArtifactRequest{
 		ItemID: itemID, Kind: string(run.ArtifactMeta),
 	})
@@ -506,14 +489,11 @@ func bodyLinksTo(body, path string) bool {
 type coreItem struct {
 	ID      int    `json:"id"`
 	Slug    string `json:"slug"`
-	Status  string `json:"status"`
 	Content struct {
 		Raw string `json:"raw"`
 	} `json:"content"`
 }
 
-// coreList reads every page or post the editor can see, the way the adapter does, so the test
-// can look at what WordPress really stored without going through the companion plugin.
 func (s *site) coreList(t *testing.T, kind string) []coreItem {
 	t.Helper()
 
@@ -566,9 +546,6 @@ func (s *site) publishPost(t *testing.T, title, slug, body string) int {
 	return created.ID
 }
 
-// clearCore removes what an earlier degraded run left behind, through core REST, so the test
-// can be run again without resetting the docker stack. A draft has no readable permalink, so
-// the sweep goes by slug rather than by path.
 func (s *site) clearCore(t *testing.T) {
 	t.Helper()
 
