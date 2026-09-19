@@ -2,8 +2,10 @@ package graph_test
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
@@ -136,6 +138,19 @@ func TestProposeFromPagesBuildsTheGraph(t *testing.T) {
 			t.Fatalf("edge %+v must be proposed by the model", out.Edges[i])
 		}
 	}
+	reasons := make([]string, 0, len(out.Edges))
+	for i := range out.Edges {
+		reasons = append(reasons, out.Edges[i].Reason)
+	}
+	for _, want := range []string{
+		"/coffee/espresso/ sits one level under /coffee/",
+		"/coffee/filter/ sits one level under /coffee/",
+		"/coffee/espresso/ and /coffee/filter/ are sibling pages of one subject",
+	} {
+		if !slices.Contains(reasons, want) {
+			t.Errorf("the reasons %q do not carry %q", reasons, want)
+		}
+	}
 
 	mapped, err := f.pages.Get(t.Context(), hub.ID)
 	if err != nil || mapped.EntityID == nil {
@@ -237,6 +252,9 @@ func TestProposeRelatedConnectsExistingEntities(t *testing.T) {
 	if out.Edges[0].Status != string(graphdomain.StatusProposed) || out.Edges[0].Weight != 0.7 {
 		t.Fatalf("edge = %+v", out.Edges[0])
 	}
+	if out.Edges[0].Reason != "both are brewing methods" {
+		t.Fatalf("the model's reason was not kept: %+v", out.Edges[0])
+	}
 
 	f.model.replies = []string{reply}
 	again, err := f.service.ProposeRelated(t.Context(), appgraph.ProposeRelatedRequest{SiteID: f.siteID})
@@ -245,6 +263,27 @@ func TestProposeRelatedConnectsExistingEntities(t *testing.T) {
 	}
 	if len(again.Edges) != 0 || again.Skipped != 3 {
 		t.Fatalf("a pair that is already connected must not be proposed again: %+v", again)
+	}
+}
+
+func TestProposeRelatedClipsATalkativeReason(t *testing.T) {
+	t.Parallel()
+
+	long := strings.Repeat("é", 500)
+	reply := `{"edges":[{"from":"Espresso","to":"Filter Coffee","weight":0.6,"reason":"` + long + `"}]}`
+	f := newProposeFixture(t, &scriptedModel{replies: []string{reply}}, fixedProfiles{})
+	sqlitetest.Entity(t, f.store, f.siteID, "Espresso")
+	sqlitetest.Entity(t, f.store, f.siteID, "Filter Coffee")
+
+	out, err := f.service.ProposeRelated(t.Context(), appgraph.ProposeRelatedRequest{SiteID: f.siteID})
+	if err != nil {
+		t.Fatalf("ProposeRelated: %v", err)
+	}
+	if len(out.Edges) != 1 || out.Skipped != 0 {
+		t.Fatalf("a long reason must cost words, not the edge: %+v", out)
+	}
+	if got := utf8.RuneCountInString(out.Edges[0].Reason); got != graphdomain.EdgeReasonMax {
+		t.Fatalf("reason length = %d, want %d", got, graphdomain.EdgeReasonMax)
 	}
 }
 

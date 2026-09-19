@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/davidmovas/postulator/internal/application/llm"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
@@ -369,17 +370,23 @@ func (s *Service) connect(ctx context.Context, siteID string, proposal pagesProp
 			continue
 		}
 
-		if parent, ok := state.byPath[strings.TrimSpace(proposed.ParentPath)]; ok {
-			if err := s.propose(ctx, siteID, from, parent, graphdomain.EdgeParent, 1, state, out, now); err != nil {
-				return err
+		path := strings.TrimSpace(proposed.Path)
+		if parentPath := strings.TrimSpace(proposed.ParentPath); parentPath != "" {
+			if parent, ok := state.byPath[parentPath]; ok {
+				reason := parentReason(path, parentPath)
+				if err := s.propose(ctx, siteID, from, parent, graphdomain.EdgeParent, 1, reason, state, out, now); err != nil {
+					return err
+				}
 			}
 		}
-		for _, path := range proposed.RelatedPaths {
-			related, ok := state.byPath[strings.TrimSpace(path)]
+		for _, raw := range proposed.RelatedPaths {
+			relatedPath := strings.TrimSpace(raw)
+			related, ok := state.byPath[relatedPath]
 			if !ok {
 				continue
 			}
-			if err := s.propose(ctx, siteID, from, related, graphdomain.EdgeRelated, 0.5, state, out, now); err != nil {
+			reason := relatedReason(path, relatedPath)
+			if err := s.propose(ctx, siteID, from, related, graphdomain.EdgeRelated, 0.5, reason, state, out, now); err != nil {
 				return err
 			}
 		}
@@ -388,10 +395,10 @@ func (s *Service) connect(ctx context.Context, siteID string, proposal pagesProp
 }
 
 func (s *Service) propose(ctx context.Context, siteID, from, to string, kind graphdomain.EdgeKind,
-	weight float64, state *siteGraph, out *ProposeFromPagesResponse, now time.Time) error {
+	weight float64, reason string, state *siteGraph, out *ProposeFromPagesResponse, now time.Time) error {
 	edge, err := graphdomain.NewEdge(graphdomain.Edge{
 		ID: id.New(), SiteID: siteID, FromEntityID: from, ToEntityID: to, Kind: kind, Weight: weight,
-		Source: graphdomain.SourceAI, Status: graphdomain.StatusProposed, CreatedAt: now,
+		Source: graphdomain.SourceAI, Status: graphdomain.StatusProposed, Reason: clip(reason), CreatedAt: now,
 	})
 	if err != nil {
 		return nil
@@ -426,7 +433,8 @@ func (s *Service) applyRelated(ctx context.Context, siteID string, proposal rela
 			edge, err := graphdomain.NewEdge(graphdomain.Edge{
 				ID: id.New(), SiteID: siteID, FromEntityID: from, ToEntityID: to,
 				Kind: graphdomain.EdgeRelated, Weight: weightOf(proposed.Weight),
-				Source: graphdomain.SourceAI, Status: graphdomain.StatusProposed, CreatedAt: now,
+				Source: graphdomain.SourceAI, Status: graphdomain.StatusProposed, Reason: clip(proposed.Reason),
+				CreatedAt: now,
 			})
 			if err != nil || connected(state.edges, edge) {
 				out.Skipped++
@@ -496,6 +504,23 @@ func proposedAnchors(texts []string) []graphdomain.Anchor {
 
 func weightOf(raw float64) float64 {
 	return min(max(raw, relatedWeightMin), 1)
+}
+
+func clip(reason string) string {
+	trimmed := strings.TrimSpace(reason)
+	if utf8.RuneCountInString(trimmed) <= graphdomain.EdgeReasonMax {
+		return trimmed
+	}
+	runes := []rune(trimmed)
+	return strings.TrimSpace(string(runes[:graphdomain.EdgeReasonMax]))
+}
+
+func parentReason(path, parentPath string) string {
+	return path + " sits one level under " + parentPath
+}
+
+func relatedReason(path, relatedPath string) string {
+	return path + " and " + relatedPath + " are sibling pages of one subject"
 }
 
 func fold(name string) string {

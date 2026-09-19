@@ -3,6 +3,7 @@ package graph_test
 import (
 	stderrors "errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,11 +15,47 @@ import (
 
 func (h harness) edge(t *testing.T, from, to, kind, status string) graph.Edge {
 	t.Helper()
-	added, err := h.service.AddEdge(t.Context(), graph.AddEdgeRequest{SiteID: h.siteID, FromEntityID: from, ToEntityID: to, Kind: kind, Weight: 0.7, Status: status})
+	added, err := h.service.AddEdge(t.Context(), graph.AddEdgeRequest{
+		SiteID: h.siteID, FromEntityID: from, ToEntityID: to, Kind: kind, Weight: 0.7, Status: status,
+		Reason: "share one subject",
+	})
 	if err != nil {
 		t.Fatalf("AddEdge %s -> %s: %v", from, to, err)
 	}
 	return added.Edge
+}
+
+func TestAddEdgeKeepsItsReason(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	hub := h.entity(t, "Hub", "hub")
+	leaf := h.entity(t, "Leaf", "topic")
+
+	added := h.edge(t, leaf.ID, hub.ID, "parent", "proposed")
+	if added.Reason != "share one subject" {
+		t.Fatalf("AddEdge answered the reason %q", added.Reason)
+	}
+	listed, err := h.service.ListEdges(t.Context(), graph.ListEdgesRequest{SiteID: h.siteID})
+	if err != nil || len(listed.Items) != 1 || listed.Items[0].Reason != "share one subject" {
+		t.Fatalf("ListEdges = %+v, %v", listed, err)
+	}
+	approved, err := h.service.ApproveEdge(t.Context(), graph.ApproveEdgeRequest{ID: added.ID})
+	if err != nil || approved.Edge.Reason != "share one subject" {
+		t.Fatalf("ApproveEdge = %+v, %v", approved, err)
+	}
+
+	_, err = h.service.AddEdge(t.Context(), graph.AddEdgeRequest{
+		SiteID: h.siteID, FromEntityID: hub.ID, ToEntityID: leaf.ID, Kind: "related", Weight: 0.5,
+		Reason: strings.Repeat("x", 201),
+	})
+	if !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("a reason over the cap = %v, want INVALID", err)
+	}
+	var refused *errors.Error
+	if !stderrors.As(err, &refused) || refused.Details["field"] != "reason" {
+		t.Fatalf("the refusal names the field %v", err)
+	}
 }
 
 func TestAddEdgeAndCycles(t *testing.T) {

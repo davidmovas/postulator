@@ -29,6 +29,7 @@ func edgeView(e graphdomain.Edge) Edge {
 		Weight:       e.Weight,
 		Source:       string(e.Source),
 		Status:       string(e.Status),
+		Reason:       e.Reason,
 		CreatedAt:    dto.NewTime(e.CreatedAt),
 	}
 }
@@ -125,6 +126,7 @@ func (s *Service) AddEdge(ctx context.Context, req AddEdgeRequest) (AddEdgeRespo
 		Weight:       req.Weight,
 		Source:       source,
 		Status:       status,
+		Reason:       req.Reason,
 		CreatedAt:    s.now(),
 	})
 	if err != nil {

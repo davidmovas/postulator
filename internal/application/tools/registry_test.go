@@ -197,6 +197,17 @@ func TestSchemaIsDerivedFromTheRequest(t *testing.T) {
 	if slices.Contains(def.Schema.Required, "siteId") {
 		t.Error("the bound site must not be required of the model")
 	}
+
+	edge, known := registry.Lookup("graph_add_edge")
+	if !known {
+		t.Fatal("graph_add_edge is not registered")
+	}
+	if edge.Schema.Properties["reason"] == nil || edge.Schema.Properties["reason"].Type != llm.SchemaString {
+		t.Fatalf("the reason property is %+v", edge.Schema.Properties["reason"])
+	}
+	if slices.Contains(edge.Schema.Required, "reason") {
+		t.Error("a reason is offered, never required")
+	}
 	if _, unknown := registry.Lookup("no_such_tool"); unknown {
 		t.Error("Lookup answered for a tool that is not registered")
 	}

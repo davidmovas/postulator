@@ -36,6 +36,7 @@ type Edge struct {
 	Weight       float64  `json:"weight"`
 	Source       string   `json:"source"`
 	Status       string   `json:"status"`
+	Reason       string   `json:"reason"`
 	CreatedAt    dto.Time `json:"createdAt"`
 }
 

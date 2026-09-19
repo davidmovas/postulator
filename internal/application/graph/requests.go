@@ -69,6 +69,7 @@ type AddEdgeRequest struct {
 	Weight       float64 `json:"weight"`
 	Source       string  `json:"source,omitempty"`
 	Status       string  `json:"status,omitempty"`
+	Reason       string  `json:"reason,omitempty" description:"Why the two belong together, one short sentence"`
 }
 
 type AddEdgeResponse struct {
