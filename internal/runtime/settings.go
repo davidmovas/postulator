@@ -30,6 +30,7 @@ var (
 	eventRetentionSetting = settings.Int("runs.eventRetentionDays", DefaultEventRetentionDays, settings.IntRange(1, 365))
 	stepTimeoutSetting    = settings.Duration("runs.stepTimeout", DefaultStepTimeout, settings.DurationRange(10*time.Second, time.Hour))
 	leaseDurationSetting  = settings.Duration("runs.leaseDuration", DefaultLeaseDuration, settings.DurationRange(30*time.Second, 2*time.Hour))
+	deadlineSetting       = settings.Duration("runs.deadline", DefaultRunDeadline, settings.DurationRange(5*time.Minute, 7*24*time.Hour))
 )
 
 type Config struct {
@@ -52,7 +53,7 @@ func Settings(values *settings.Values) Config {
 		EventRetentionDays: eventRetentionSetting.Get(values),
 		StepTimeout:        stepTimeoutSetting.Get(values),
 		LeaseDuration:      leaseDurationSetting.Get(values),
-		RunDeadline:        DefaultRunDeadline,
+		RunDeadline:        deadlineSetting.Get(values),
 	}
 }
 

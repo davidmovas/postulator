@@ -224,7 +224,7 @@ func TestSettingsCarryTheDeclaredDefaults(t *testing.T) {
 
 	for _, key := range []string{
 		"runs.workers", "runs.perSite", "runs.sweepInterval", "runs.artifactRetentionDays",
-		"runs.eventRetentionDays", "runs.stepTimeout", "runs.leaseDuration",
+		"runs.eventRetentionDays", "runs.stepTimeout", "runs.leaseDuration", "runs.deadline",
 	} {
 		if !settings.Default().Has(key) {
 			t.Errorf("the setting %q is not declared", key)
