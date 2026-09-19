@@ -231,7 +231,7 @@ func (s *Server) itemPayload(stored *Item) map[string]any {
 		"type":           stored.Type,
 		"slug":           stored.Slug,
 		"status":         stored.Status,
-		"link":           s.http.URL + s.itemPath(stored),
+		"link":           s.permalink(stored),
 		"parent":         stored.Parent,
 		"menu_order":     stored.MenuOrder,
 		"template":       stored.Template,
@@ -245,6 +245,25 @@ func (s *Server) itemPayload(stored *Item) map[string]any {
 		"excerpt":        renderedField(stored.Excerpt),
 		"meta":           metaPayload(stored.Meta),
 	}
+}
+
+// permalink mirrors what WordPress hands back: a draft has no published address yet, so
+// get_permalink returns the ugly ?page_id= form and the pretty path appears only once the
+// post is published. The companion plugin is what knows where a draft would land.
+func (s *Server) permalink(stored *Item) string {
+	switch stored.Status {
+	case "draft", "pending", "future", "auto-draft":
+		return s.http.URL + "/?" + permalinkKey(stored.Type) + "=" + strconv.FormatInt(stored.ID, 10)
+	default:
+		return s.http.URL + s.itemPath(stored)
+	}
+}
+
+func permalinkKey(itemType string) string {
+	if itemType == TypePage {
+		return "page_id"
+	}
+	return "p"
 }
 
 func applyUpdate(stored *Item, body map[string]any) {

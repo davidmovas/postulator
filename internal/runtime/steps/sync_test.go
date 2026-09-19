@@ -234,6 +234,35 @@ func TestSyncSitePullsThroughThePluginAndThroughCore(t *testing.T) {
 	}
 }
 
+// Core REST hands back /?page_id=42 for anything that is not published yet, so without this
+// every draft on the site would be pulled in at the front page and overwrite its row.
+func TestSyncSiteRebuildsTheDraftPathsCoreRESTWillNotGive(t *testing.T) {
+	t.Parallel()
+
+	h := newSyncHarness(t, 0, wptest.WithoutPlugin())
+	h.server.Seed(
+		wptest.Item{Type: wptest.TypePage, Title: "Home", Slug: "home", Content: `<p>Welcome.</p>`},
+		wptest.Item{Type: wptest.TypePost, Title: "News", Slug: "news", Status: "draft", Content: `<p>Soon.</p>`},
+		wptest.Item{Type: wptest.TypePost, Title: "Notes", Slug: "notes", Status: "pending", Content: `<p>Later.</p>`},
+	)
+
+	state := h.all(t)
+	if state.Source != steps.SourceCore || state.Created != 3 {
+		t.Fatalf("state = %+v, want three pages created through core", state)
+	}
+
+	news := h.byPath(t, "/news/")
+	if news.WPType != pagemap.WPPost || news.Status != pagemap.StatusExists || news.Title != "News" {
+		t.Fatalf("the draft post is %+v", news)
+	}
+	if notes := h.byPath(t, "/notes/"); notes.Title != "Notes" {
+		t.Fatalf("the pending post is %+v; two drafts must not share one row", notes)
+	}
+	if home := h.byPath(t, "/home/"); home.Title != "Home" {
+		t.Fatalf("the published page is %+v; a draft landed on top of it", home)
+	}
+}
+
 func TestSyncSiteAdoptsTheManifest(t *testing.T) {
 	t.Parallel()
 

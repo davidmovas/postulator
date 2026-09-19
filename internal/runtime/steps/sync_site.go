@@ -3,7 +3,9 @@ package steps
 import (
 	"context"
 	"encoding/json"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
@@ -61,6 +63,7 @@ type pulledItem struct {
 	Meta        wp.ContentMeta
 	Links       []wp.ContentLink
 	WPID        int64
+	ParentWPID  int64
 }
 
 func SyncSite(deps Deps) run.StepDef {
@@ -311,16 +314,84 @@ func fromCore(item wp.Item, itemType wp.ItemType, host string) (pulledItem, bool
 		return pulledItem{}, false
 	}
 
+	if uglyPermalink(item.Link) {
+		// WordPress answers with /?page_id=42 for anything not yet published, so the permalink
+		// says nothing about where the item lives. The companion plugin reports the path a draft
+		// would have once published; over core REST the sync rebuilds it from the parent chain,
+		// and leaving it empty here is what asks reconcile to do that.
+		path = ""
+	}
+
 	pulled := pulledItem{
-		WPID: item.ID, Type: pagemap.WPType(itemType), Path: path, Slug: item.Slug,
-		Status: item.Status, Title: item.Title, ContentHash: wp.ContentHash(item.Content),
-		Modified: item.Modified,
+		WPID: item.ID, ParentWPID: item.Parent, Type: pagemap.WPType(itemType), Path: path,
+		Slug: item.Slug, Status: item.Status, Title: item.Title,
+		ContentHash: wp.ContentHash(item.Content), Modified: item.Modified,
 	}
 	if doc, err := content.Parse(item.Content); err == nil {
 		pulled.H1 = headingOne(doc)
 		pulled.Links = internalLinks(doc, host)
 	}
 	return pulled, true
+}
+
+func uglyPermalink(link string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(link))
+	if err != nil {
+		return false
+	}
+	return parsed.RawQuery != ""
+}
+
+// placeItems gives a path to the items whose permalink carried none. WordPress hands out the ugly
+// form for every draft, and without this every draft would land on the site's front page and
+// overwrite whatever the map already holds there.
+func placeItems(batch []pulledItem, byWPID map[int64]pagemap.Page) []pulledItem {
+	known := make(map[int64]string, len(byWPID)+len(batch))
+	for wpID := range byWPID {
+		known[wpID] = byWPID[wpID].Path
+	}
+	for i := range batch {
+		if batch[i].Path != "" {
+			known[batch[i].WPID] = batch[i].Path
+		}
+	}
+
+	out := make([]pulledItem, 0, len(batch))
+	for i := range batch {
+		if batch[i].Path == "" {
+			path, ok := rebuildPath(batch[i], known)
+			if !ok {
+				continue
+			}
+			batch[i].Path = path
+		}
+		out = append(out, batch[i])
+	}
+	return out
+}
+
+// rebuildPath reads the path a draft would have once it is published. An item whose parent is
+// not on the map is left out rather than invented at the root, where it would collide with
+// whatever already lives under that slug.
+func rebuildPath(item pulledItem, known map[int64]string) (string, bool) {
+	if item.Slug == "" {
+		return "", false
+	}
+
+	base := "/"
+	if item.ParentWPID != 0 {
+		parent, ok := known[item.ParentWPID]
+		if !ok {
+			return "", false
+		}
+		base = parent
+	}
+
+	path, err := pagemap.NormalizePath(base + item.Slug + "/")
+	if err != nil {
+		return "", false
+	}
+	return path, true
 }
 
 func headingOne(doc *content.Document) string {
@@ -363,6 +434,11 @@ func reconcile(ctx context.Context, deps Deps, owner site.Site, batch []pulledIt
 		if pages[i].WPID != nil {
 			byWPID[*pages[i].WPID] = pages[i]
 		}
+	}
+
+	batch = placeItems(batch, byWPID)
+	if len(batch) == 0 {
+		return nil
 	}
 
 	now := deps.now()
