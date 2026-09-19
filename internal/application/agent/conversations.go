@@ -61,6 +61,42 @@ func (s *Service) SetMode(ctx context.Context, req SetModeRequest) (SetModeRespo
 	return SetModeResponse{Conversation: conversationView(current)}, nil
 }
 
+func (s *Service) RenameConversation(ctx context.Context, req RenameConversationRequest) (RenameConversationResponse, error) {
+	conversationID := strings.TrimSpace(req.ConversationID)
+	if conversationID == "" {
+		return RenameConversationResponse{}, invalid("a conversation is needed", "conversationId")
+	}
+	title := domainagent.Title(req.Title)
+	if title == "" {
+		return RenameConversationResponse{}, invalid("a conversation needs a title", "title")
+	}
+
+	current, err := s.deps.Conversations.Get(ctx, conversationID)
+	if err != nil {
+		return RenameConversationResponse{}, err
+	}
+
+	current.Title = title
+	current.UpdatedAt = s.now()
+	if updateErr := s.deps.Conversations.Update(ctx, current); updateErr != nil {
+		return RenameConversationResponse{}, updateErr
+	}
+	return RenameConversationResponse{Conversation: conversationView(current)}, nil
+}
+
+func (s *Service) DeleteConversation(ctx context.Context, req DeleteConversationRequest) (DeleteConversationResponse, error) {
+	conversationID := strings.TrimSpace(req.ConversationID)
+	if conversationID == "" {
+		return DeleteConversationResponse{}, invalid("a conversation is needed", "conversationId")
+	}
+
+	s.deps.Turns.Cancel(conversationID)
+	if err := s.deps.Conversations.Delete(ctx, conversationID); err != nil {
+		return DeleteConversationResponse{}, err
+	}
+	return DeleteConversationResponse{}, nil
+}
+
 func (s *Service) ListConversations(ctx context.Context, req ListConversationsRequest) (paging.List[Conversation], error) {
 	found, err := s.deps.Conversations.List(ctx, domainagent.ConversationQuery{
 		SiteID: strings.TrimSpace(req.SiteID), Desc: true,

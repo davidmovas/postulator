@@ -37,12 +37,12 @@ the composition root binds the two.
 | `ReportsService` | `SiteOverview LinkAudit LinkAuditPage PageReport RunReport JudgePage` |
 | `ImportService` | `Inspect Preview Apply Export SaveMapping ListMappings DeleteMapping` |
 | `ModelsService` | `ListModels UpsertModel DisableModel GetProfiles SetProfile TestProvider UsageSummary` |
-| `AgentService` | `CreateConversation SetMode Send Confirm Cancel ListConversations ListMessages ListPendingActions` |
+| `AgentService` | `CreateConversation SetMode RenameConversation DeleteConversation Send Confirm Cancel ListConversations ListMessages ListPendingActions` |
 | `SchedulesService` | `Create Update Delete Get List Enable Disable RunNow` |
 | `ToolsService` | `List` |
 | `SettingsService` | `Schema Get Set SetProviderKey ProviderKeys DeleteProviderKey LockState Lock Unlock SetMasterPassword ExportBackup ImportBackup` |
 
-A hundred and ten methods. Where a use case answers with bytes the service writes them
+A hundred and twelve methods. Where a use case answers with bytes the service writes them
 to the path the request names and returns it, because the webview has no filesystem;
 `SyncService.SavePluginPackage{path}` is the only such method.
 
@@ -180,7 +180,10 @@ action is a bound method call.
 ## Agent chat
 
 `CreateConversation{siteId?, title?, mode}` opens a conversation in `confirm` or
-`autonomous` mode and `SetMode` switches it. `Send{conversationId, text}` returns the
+`autonomous` mode and `SetMode` switches it; `RenameConversation{conversationId, title}`
+retitles it and `DeleteConversation{conversationId}` stops a turn in flight and drops the
+conversation with its messages, pending actions, tool calls and history. An untitled
+conversation takes its first message as its title. `Send{conversationId, text}` returns the
 message id at once and the turn runs behind it: `agent.delta` carries the streamed text,
 `agent.tool.started` and `agent.tool.finished` the tool calls, `agent.done` the end of the
 turn, and `Cancel{conversationId}` stops one in flight. In `confirm` mode a `write` or

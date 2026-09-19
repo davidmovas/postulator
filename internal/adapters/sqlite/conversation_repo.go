@@ -16,6 +16,7 @@ const (
 	insertConversation  = `INSERT INTO conversations (` + conversationColumns + `) VALUES (?, ?, ?, ?, ?, ?)`
 	updateConversation  = `UPDATE conversations SET title = ?, mode = ?, updated_at = ? WHERE id = ?`
 	selectConversation  = `SELECT ` + conversationColumns + ` FROM conversations WHERE id = ?`
+	deleteConversation  = `DELETE FROM conversations WHERE id = ?`
 )
 
 type ConversationRepo struct {
@@ -41,6 +42,11 @@ func (r *ConversationRepo) Update(ctx context.Context, c agent.Conversation) err
 	affected, err := execWrite(ctx, r.store.writeFrom(ctx), updateConversation,
 		[]any{c.Title, string(c.Mode), formatTime(c.UpdatedAt), c.ID}, nil, "update the conversation")
 	return requireAffected(affected, err, conversationNotFound(c.ID))
+}
+
+func (r *ConversationRepo) Delete(ctx context.Context, id string) error {
+	affected, err := execWrite(ctx, r.store.writeFrom(ctx), deleteConversation, []any{id}, nil, "delete the conversation")
+	return requireAffected(affected, err, conversationNotFound(id))
 }
 
 func (r *ConversationRepo) Get(ctx context.Context, id string) (agent.Conversation, error) {

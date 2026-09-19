@@ -35,6 +35,14 @@ func (s *Service) Send(ctx context.Context, req SendRequest) (SendResponse, erro
 		return SendResponse{}, err
 	}
 
+	if conversation.Title == "" {
+		conversation.Title = domainagent.Title(text)
+		conversation.UpdatedAt = s.now()
+		if titleErr := s.deps.Conversations.Update(ctx, conversation); titleErr != nil {
+			return SendResponse{}, titleErr
+		}
+	}
+
 	if turnErr := s.turn(ctx, conversation, text); turnErr != nil {
 		return SendResponse{}, turnErr
 	}

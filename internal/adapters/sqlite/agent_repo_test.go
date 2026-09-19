@@ -233,6 +233,65 @@ func TestToolCallsAndHistoryAreStoredPerConversation(t *testing.T) {
 	}
 }
 
+func TestDeletingAConversationTakesItsRows(t *testing.T) {
+	t.Parallel()
+
+	f := newAgentFixture(t)
+	conversation := f.conversationOf(t, agent.ModeConfirm)
+	kept := f.conversationOf(t, agent.ModeConfirm)
+
+	for _, conversationID := range []string{conversation.ID, kept.ID} {
+		message, err := agent.NewMessage(agent.Message{
+			ID: id.New(), ConversationID: conversationID, Seq: 1, Role: agent.RoleUser, Text: "hello",
+			CreatedAt: sqlitetest.Stamp,
+		})
+		if err != nil {
+			t.Fatalf("NewMessage: %v", err)
+		}
+		if _, err = f.messages.Append(t.Context(), message); err != nil {
+			t.Fatalf("Append: %v", err)
+		}
+	}
+	action, err := agent.NewPendingAction(agent.PendingAction{
+		ID: id.New(), ConversationID: conversation.ID, Tool: "runs.start", Summary: "start a run",
+		CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+	})
+	if err != nil {
+		t.Fatalf("NewPendingAction: %v", err)
+	}
+	if err = f.actions.Insert(t.Context(), action); err != nil {
+		t.Fatalf("Insert the action: %v", err)
+	}
+	if err = f.histories.Save(t.Context(), conversation.ID, []byte(`{"version":3}`), 3, sqlitetest.Stamp); err != nil {
+		t.Fatalf("Save the history: %v", err)
+	}
+
+	if err = f.conversation.Delete(t.Context(), conversation.ID); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+
+	if _, err = f.conversation.Get(t.Context(), conversation.ID); !errors.IsCode(err, errors.NotFound) {
+		t.Fatalf("the conversation survived its deletion: %v", err)
+	}
+	rows, err := f.messages.ByConversation(t.Context(), conversation.ID)
+	if err != nil || len(rows) != 0 {
+		t.Fatalf("the messages survived the conversation: %+v, %v", rows, err)
+	}
+	if _, err = f.actions.Get(t.Context(), action.ID); !errors.IsCode(err, errors.NotFound) {
+		t.Fatalf("the action survived the conversation: %v", err)
+	}
+	if _, _, err = f.histories.Load(t.Context(), conversation.ID); !errors.IsCode(err, errors.NotFound) {
+		t.Fatalf("the history survived the conversation: %v", err)
+	}
+	others, err := f.messages.ByConversation(t.Context(), kept.ID)
+	if err != nil || len(others) != 1 {
+		t.Fatalf("the other conversation lost its messages: %+v, %v", others, err)
+	}
+	if err = f.conversation.Delete(t.Context(), conversation.ID); !errors.IsCode(err, errors.NotFound) {
+		t.Fatalf("Delete of a deleted conversation = %v", err)
+	}
+}
+
 func TestDeletingASiteTakesItsConversations(t *testing.T) {
 	t.Parallel()
 

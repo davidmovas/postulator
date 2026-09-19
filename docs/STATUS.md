@@ -14,7 +14,7 @@ import, the agent, the schedules, the fourteen bound services and their TypeScri
 master password locks and unlocks the whole core, a backup of the database round trips through
 one encrypted archive, and the sweep retires artifacts and run events on their own windows.
 
-The bound surface is a hundred and ten methods since 2026-09-19: `SettingsService.ProviderKeys`
+The bound surface is a hundred and twelve methods since 2026-09-19: `SettingsService.ProviderKeys`
 and `DeleteProviderKey` report and revoke an LLM key as a boolean, `SitesService.TestConnection`
 probes a site before it is saved and after it is edited, `RunsService.ListArtifacts` names the
 artifacts a run item holds without their blobs, and `RunsService.Estimate` prices a run before it

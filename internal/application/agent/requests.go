@@ -113,6 +113,21 @@ type SetModeResponse struct {
 	Conversation Conversation `json:"conversation"`
 }
 
+type RenameConversationRequest struct {
+	ConversationID string `json:"conversationId"`
+	Title          string `json:"title"`
+}
+
+type RenameConversationResponse struct {
+	Conversation Conversation `json:"conversation"`
+}
+
+type DeleteConversationRequest struct {
+	ConversationID string `json:"conversationId"`
+}
+
+type DeleteConversationResponse struct{}
+
 type CancelRequest struct {
 	ConversationID string `json:"conversationId"`
 }

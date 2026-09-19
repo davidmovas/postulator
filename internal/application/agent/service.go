@@ -20,6 +20,7 @@ import (
 type conversationStore interface {
 	Insert(ctx context.Context, c domainagent.Conversation) error
 	Update(ctx context.Context, c domainagent.Conversation) error
+	Delete(ctx context.Context, id string) error
 	Get(ctx context.Context, id string) (domainagent.Conversation, error)
 	List(ctx context.Context, q domainagent.ConversationQuery, page paging.Request) (paging.List[domainagent.Conversation], error)
 }
