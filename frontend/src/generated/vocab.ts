@@ -35,6 +35,20 @@ export type Source = (typeof sources)[number];
 export const anchorSources = ["user", "ai"] as const;
 export type AnchorSource = (typeof anchorSources)[number];
 
+export const linkRelations = ["up", "down", "sibling"] as const;
+export type LinkRelation = (typeof linkRelations)[number];
+
+export const linkClasses = ["graph", "self", "external", "unknown_internal"] as const;
+export type LinkClass = (typeof linkClasses)[number];
+
+export const offGraphLinkClasses: readonly LinkClass[] = ["self", "external", "unknown_internal"];
+
+export const linkBlockedReasons = ["no_canonical_page"] as const;
+export type LinkBlockedReason = (typeof linkBlockedReasons)[number];
+
+export const linkAuditSkipReasons = ["unmapped", "no_template"] as const;
+export type LinkAuditSkipReason = (typeof linkAuditSkipReasons)[number];
+
 export const runKinds = ["generate", "relink", "audit", "sync", "import", "custom"] as const;
 export type RunKind = (typeof runKinds)[number];
 

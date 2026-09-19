@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/application/tools"
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
 
@@ -37,6 +38,21 @@ func catalog() []vocabulary {
 		{export: "edgeStatuses", tsType: "EdgeStatus", pkg: "internal/domain/graph", typeName: "EdgeStatus"},
 		{export: "sources", tsType: "Source", pkg: "internal/domain/graph", typeName: "Source"},
 		{export: "anchorSources", tsType: "AnchorSource", pkg: "internal/domain/graph", typeName: "AnchorSource"},
+		{export: "linkRelations", tsType: "LinkRelation", pkg: "internal/domain/content", typeName: "Relation"},
+		{
+			export: "linkClasses", tsType: "LinkClass", pkg: "internal/domain/content", typeName: "LinkClass",
+			derived: []derivation{
+				{export: "offGraphLinkClasses", keep: func(value string) bool { return content.LinkClass(value).OffGraph() }},
+			},
+		},
+		{
+			export: "linkBlockedReasons", tsType: "LinkBlockedReason", pkg: "internal/domain/content",
+			typeName: "BlockedReason",
+		},
+		{
+			export: "linkAuditSkipReasons", tsType: "LinkAuditSkipReason", pkg: "internal/application/reports",
+			typeName: "SkipReason",
+		},
 		{export: "runKinds", tsType: "RunKind", pkg: "internal/domain/run", typeName: "Kind"},
 		{
 			export: "runStatuses", tsType: "RunStatus", pkg: "internal/domain/run", typeName: "Status",
