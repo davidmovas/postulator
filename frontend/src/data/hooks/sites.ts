@@ -5,6 +5,7 @@ import {
     deleteSite,
     getSite,
     listSites,
+    testConnection,
     updateSite,
 } from "../endpoints/sites.js";
 import { keys } from "../keys.js";
@@ -49,6 +50,12 @@ export function useUpdateSite() {
             client.setQueryData(keys.sites.detail(answered.site.id), answered);
             void client.invalidateQueries({ queryKey: keys.sites.lists() });
         },
+    });
+}
+
+export function useTestConnection() {
+    return useMutation({
+        mutationFn: (request: Parameters<typeof testConnection>[0]) => testConnection(request),
     });
 }
 

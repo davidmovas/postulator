@@ -118,6 +118,7 @@ export const keys = {
     models: {
         root: () => [scope, "models"] as const,
         catalog: () => [scope, "models", "catalog"] as const,
+        providerKeys: () => [scope, "models", "providerKeys"] as const,
         profilesAll: () => [scope, "models", "profiles"] as const,
         profiles: (siteId: string | undefined) => [scope, "models", "profiles", siteId ?? "global"] as const,
         usageAll: () => [scope, "models", "usage"] as const,

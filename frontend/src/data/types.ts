@@ -29,6 +29,7 @@ export type Site = Wire<SitesModels.Site>;
 export type SiteDefaults = Wire<SitesModels.Defaults>;
 export type SitePlugin = Wire<SitesModels.Plugin>;
 export type SiteFilter = ListFilter<SitesModels.ListRequest>;
+export type Reachability = Wire<SitesModels.Reachability>;
 
 export type Page = Wire<PagesModels.Page>;
 export type PageLink = Wire<PagesModels.PageLink>;
@@ -79,6 +80,7 @@ export type ModelRef = Wire<LlmModels.ModelRef>;
 export type RoleProfile = Wire<CatalogModels.Profile>;
 export type TokenUsage = Wire<CatalogModels.Usage>;
 export type UsageSummary = Wire<CatalogModels.UsageSummaryResponse>;
+export type ProviderKey = Wire<CatalogModels.ProviderKey>;
 
 export type ImportMapping = Wire<ImportModels.Mapping>;
 export type ImportOptions = Wire<ImportModels.Options>;

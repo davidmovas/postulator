@@ -5,6 +5,7 @@ import {
     getSetting,
     importBackup,
     lock,
+    providerKeys,
     setMasterPassword,
     setProviderKey,
     setSetting,
@@ -29,6 +30,13 @@ export function useSetting(key: string | null) {
         queryKey: keys.settings.value(key ?? ""),
         queryFn: ({ signal }) => getSetting({ key: key ?? "" }, signal),
         enabled: key !== null && key !== "",
+    });
+}
+
+export function useProviderKeys() {
+    return useUnlockedQuery({
+        queryKey: keys.models.providerKeys(),
+        queryFn: ({ signal }) => providerKeys({}, signal),
     });
 }
 
