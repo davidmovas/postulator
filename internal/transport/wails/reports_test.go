@@ -25,6 +25,14 @@ func (f reportsFake) RunReport(context.Context, reports.RunReportRequest) (repor
 	return answer[reports.RunReportResponse](f.mode)
 }
 
+func (f reportsFake) LinkAudit(context.Context, reports.LinkAuditRequest) (reports.LinkAuditResponse, error) {
+	return answer[reports.LinkAuditResponse](f.mode)
+}
+
+func (f reportsFake) LinkAuditPage(context.Context, reports.LinkAuditPageRequest) (reports.LinkAuditPageResponse, error) {
+	return answer[reports.LinkAuditPageResponse](f.mode)
+}
+
 type judgeFake struct{ mode failure }
 
 func (f judgeFake) Judge(context.Context, content.JudgeRequest) (content.JudgeResponse, error) {
@@ -36,7 +44,7 @@ func TestReportsServiceConvertsEveryFailure(t *testing.T) {
 
 	assertMethodNames(t, wails.NewReportsService(zap.NewNop(),
 		ready[wails.ReportsUseCase](reportsFake{}), ready[wails.JudgeUseCase](judgeFake{})), []string{
-		"JudgePage", "PageReport", "RunReport", "SiteOverview",
+		"JudgePage", "LinkAudit", "LinkAuditPage", "PageReport", "RunReport", "SiteOverview",
 	})
 	assertEveryMethodConverts(t, wails.NewReportsService(zap.NewNop(),
 		ready[wails.ReportsUseCase](reportsFake{mode: missing}), ready[wails.JudgeUseCase](judgeFake{mode: missing})), missingBody)
