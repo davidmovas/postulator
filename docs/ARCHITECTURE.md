@@ -17,7 +17,7 @@ internal/runtime      the run engine and its step catalog
 internal/transport    wails services and event bridge, agent runner and tools
 internal/app          composition root, manual wiring, no DI container
 wp-plugin             the WordPress companion plugin
-frontend              Vite + TypeScript stub, generated bindings
+frontend              React + Tailwind over the generated bindings; src/canvas is the 2D engine under the graph map
 ```
 
 ## The dependency rule

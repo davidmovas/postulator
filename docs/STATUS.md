@@ -41,8 +41,17 @@ opened its window and answered `health.ping`.
 
 The frontend is a React application being built on that surface. Its toolchain, typed data layer,
 event bridge, run-event replay, app shell, router and lock gate landed in `0a9a97e`, with vitest
-over the data layer wired into CI. The design system and the feature screens are next; the graph
-canvas is deliberately a stub.
+over the data layer wired into CI; the design system, the sites, pages, runs and templates screens
+followed. The graph screen (`/s/:siteId/graph`) draws the topical map on an own Canvas 2D engine
+(`frontend/src/canvas`): a folding left-to-right tree over the parent edges, related arcs, badges
+for the problems a node carries, three levels of detail by zoom, lenses, search, an outline view, an
+inspector that edits an entity, its anchors and its canonical page, connect and drag-to-reparent
+with the cycle refusal shown, a proposal queue with keyboard and bulk decisions, the model actions
+with a real cancel, a pulse on what changed, and a link-proof overlay. The Linking screen
+(`/s/:siteId/links`) reads `LinkAudit` and `LinkAuditPage`: meters, a filter rail, the pages worst
+first, a panel naming every link a page owes and carries, and a relink run over the selection.
+Not built yet: the overview, reports, schedules, import, settings and the agent dock; every one of
+them is a `NotBuilt` panel in `router.tsx`.
 
 ## How to run
 
@@ -98,8 +107,14 @@ Module coverage is 87.6% of 14439 statements; `domain` + `application` sit at 86
   `go install github.com/evilmartians/lefthook@latest && lefthook install`.
 - **`golangci-lint` on this machine must be run from `$(go env GOPATH)/bin`.** A scoop shim
   earlier on `PATH` is v2.11.4 built with go1.26 and refuses a `go 1.27` module outright.
-- The frontend is the stub described above. `frontend/src/domain/vocab.ts` is the hand-written
-  vocabulary the generated module replaces; its consumers are repointed by the frontend work.
+- `ProposeFromPages` is one bound call that makes one model call per forty unmapped pages, so a
+  site with thousands of unmapped pages holds the window's call for minutes. The dialog says how
+  many calls it will make, counts the seconds, and its stop aborts the call so earlier batches stay;
+  turning it into a run with progress events is the proper fix.
+- "Ask the agent about this entity" is not offered anywhere yet: the agent dock is not built, and a
+  half-wired entry point would be a hole. Agent writes already reach the map through `graph.changed`.
+- The map cannot be seen from this machine's automation, so its rendering has been checked by
+  tests over the pure modules and by reading the code, not by looking at a window.
 - Nothing purges an artifact for an item that never published, so every failed or unpublished item
   stays retryable. The dead end `retryable` reports is narrow by construction: a published item
   past its retention window whose current step consumes `body_html`, `draft` or `images`. No

@@ -67,7 +67,7 @@ internal/transport/
   agent/         gollem agent, tools from registry, confirmations, conversations
 internal/app/                   composition root
 wp-plugin/                      PHP companion plugin (postulator-companion), zip packaging
-frontend/                       Vite + TS stub, generated bindings
+frontend/                       React + Tailwind over the generated bindings; src/canvas is the 2D engine, src/features the screens
 examples/                       import samples
 docs/                           see section 10
 testdata/                       llm fixtures, wp fixtures
