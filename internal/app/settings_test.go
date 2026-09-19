@@ -81,3 +81,26 @@ func TestLoadSettingsPropagatesTheSourceFailure(t *testing.T) {
 		t.Fatal("the source failure must reach the caller")
 	}
 }
+
+func TestEverySettingBelongsToADeclaredGroup(t *testing.T) {
+	t.Parallel()
+
+	schema, err := settings.Default().Schema()
+	if err != nil {
+		t.Fatalf("Schema: %v", err)
+	}
+	if len(schema) == 0 {
+		t.Fatal("the composed application declares no setting")
+	}
+
+	declared := settings.Groups()
+	for _, descriptor := range schema {
+		group := settings.GroupOf(descriptor.Key)
+		if !slices.Contains(declared, group) {
+			t.Fatalf("setting %s belongs to the undeclared group %q; declare it in kernel/settings", descriptor.Key, group)
+		}
+		if descriptor.Group != string(group) {
+			t.Fatalf("descriptor %s reports the group %q", descriptor.Key, descriptor.Group)
+		}
+	}
+}

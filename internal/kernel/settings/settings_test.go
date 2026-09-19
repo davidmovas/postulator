@@ -470,3 +470,53 @@ func TestValidateDoesNotChangeTheLiveValues(t *testing.T) {
 		t.Fatalf("Get() = %d, want the default 2 until Apply runs", got)
 	}
 }
+
+func TestEveryKindRendersADeclaredType(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		kind settings.Kind
+		want settings.Type
+	}{
+		{kind: settings.KindBool, want: settings.TypeBool},
+		{kind: settings.KindInt, want: settings.TypeInt},
+		{kind: settings.KindString, want: settings.TypeString},
+		{kind: settings.KindEnum, want: settings.TypeEnum},
+		{kind: settings.KindDuration, want: settings.TypeDuration},
+	}
+
+	for _, tc := range cases {
+		if tc.kind.String() != string(tc.want) {
+			t.Fatalf("Kind.String() = %q, want %q", tc.kind.String(), tc.want)
+		}
+	}
+
+	if settings.Kind(200).String() != "unknown" {
+		t.Fatalf("an unregistered kind must render as unknown, got %q", settings.Kind(200).String())
+	}
+}
+
+func TestTheDeclaredGroupsAreDistinctAndNonEmpty(t *testing.T) {
+	t.Parallel()
+
+	groups := settings.Groups()
+	if len(groups) == 0 {
+		t.Fatal("no setting group is declared")
+	}
+
+	seen := make(map[settings.Group]struct{}, len(groups))
+	for _, group := range groups {
+		if group == "" {
+			t.Fatal("a setting group must not be empty")
+		}
+		if _, duplicate := seen[group]; duplicate {
+			t.Fatalf("%s is declared twice", group)
+		}
+		seen[group] = struct{}{}
+	}
+
+	groups[0] = settings.Group("mutated")
+	if settings.Groups()[0] == settings.Group("mutated") {
+		t.Fatal("Groups hands out the declaration itself")
+	}
+}

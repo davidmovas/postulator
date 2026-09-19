@@ -3,6 +3,7 @@ package settings
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -18,21 +19,51 @@ const (
 	KindDuration
 )
 
+type Type string
+
+const (
+	TypeBool     Type = "bool"
+	TypeInt      Type = "int"
+	TypeString   Type = "string"
+	TypeEnum     Type = "enum"
+	TypeDuration Type = "duration"
+)
+
+const unknownType = "unknown"
+
+var types = []Type{TypeBool, TypeInt, TypeString, TypeEnum, TypeDuration}
+
 func (k Kind) String() string {
-	switch k {
-	case KindBool:
-		return "bool"
-	case KindInt:
-		return "int"
-	case KindString:
-		return "string"
-	case KindEnum:
-		return "enum"
-	case KindDuration:
-		return "duration"
-	default:
-		return "unknown"
+	if int(k) >= len(types) {
+		return unknownType
 	}
+	return string(types[k])
+}
+
+type Group string
+
+const (
+	GroupAgent     Group = "agent"
+	GroupImages    Group = "images"
+	GroupImport    Group = "import"
+	GroupLLM       Group = "llm"
+	GroupRuns      Group = "runs"
+	GroupSchedules Group = "schedules"
+	GroupSync      Group = "sync"
+	GroupWP        Group = "wp"
+)
+
+var groups = []Group{
+	GroupAgent, GroupImages, GroupImport, GroupLLM, GroupRuns, GroupSchedules, GroupSync, GroupWP,
+}
+
+func Groups() []Group {
+	return slices.Clone(groups)
+}
+
+func GroupOf(key string) Group {
+	group, _, _ := strings.Cut(key, ".")
+	return Group(group)
 }
 
 type definition struct {

@@ -158,10 +158,9 @@ func (r *Registry) Schema() ([]Descriptor, error) {
 			return nil, errors.Wrap(err, errors.Internal, "describe setting "+def.key)
 		}
 
-		group, _, _ := strings.Cut(def.key, ".")
 		descriptors = append(descriptors, Descriptor{
 			Key:      def.key,
-			Group:    group,
+			Group:    string(GroupOf(def.key)),
 			Type:     def.kind.String(),
 			Default:  encoded,
 			Min:      def.constraints.Min,
