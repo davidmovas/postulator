@@ -172,8 +172,8 @@ func (e *Engine) RetryStep(ctx context.Context, itemID string) error {
 			return errors.New(errors.Conflict, "the item has not stopped, so there is nothing to retry").
 				WithDetail("itemId", itemID)
 		}
-		if err = e.refuseExpiredInputs(c, item); err != nil {
-			return err
+		if refusal := e.refuseExpiredInputs(c, item); refusal != nil {
+			return refusal
 		}
 
 		record, err := e.deps.Runs.Get(c, item.RunID)
