@@ -20,6 +20,9 @@ const (
 	CodeSEOMetaSkipped   = "seo_meta_skipped"
 	CodePublishOverDrift = "publish_over_drift"
 
+	ReasonNoPlugin    = "the site has no Postulator companion plugin"
+	ReasonNoSEOWriter = "the companion plugin on this site cannot write SEO meta"
+
 	publishTimeout = 2 * time.Minute
 	lookupPerPage  = 100
 )
@@ -103,12 +106,13 @@ func Publish(deps Deps) run.StepDef {
 				ContentHash: wp.ContentHash(rendered), Created: !found,
 				SEOApplied: make([]string, 0), Skipped: make([]string, 0), Findings: findings,
 			}
-			applied, skipped, err := applySEO(ctx, client, sc, written.ID)
+			seo, err := applySEO(ctx, client, sc, written.ID)
 			if err != nil {
 				return run.Result{}, err
 			}
-			result.SEOApplied = applied
-			result.Skipped = skipped
+			result.SEOApplied = seo.applied
+			result.Skipped = seo.skipped
+			result.Findings = append(result.Findings, seo.findings...)
 
 			if recordErr := record(ctx, deps, sc, written, result); recordErr != nil {
 				return run.Result{}, recordErr
@@ -241,24 +245,33 @@ func upsert(ctx context.Context, client *wp.Client, itemType wp.ItemType, req wr
 	return client.UpdateItem(ctx, itemType, req.existing.ID, in)
 }
 
-func applySEO(ctx context.Context, client *wp.Client, sc *run.StepContext, wpID int64) (applied, skipped []string, err error) {
+// seoWrite is what the publish step learned about the SEO meta of the page it just wrote: what
+// landed, what was skipped, and the warning that says so when meta was generated and could not
+// be written. A site without the companion plugin takes the skip rather than failing the item.
+type seoWrite struct {
+	applied  []string
+	skipped  []string
+	findings []content.Finding
+}
+
+func applySEO(ctx context.Context, client *wp.Client, sc *run.StepContext, wpID int64) (seoWrite, error) {
 	meta, found, err := decodeArtifact[Meta](sc, run.ArtifactMeta)
 	if err != nil {
-		return nil, nil, err
+		return seoWrite{}, err
 	}
 	if !found {
-		return noSEO()
+		return quietlySkippedSEO(), nil
 	}
 
 	capabilities, err := client.Capabilities(ctx)
 	if err != nil {
-		if errors.IsCode(err, errors.Invalid) {
-			return noSEO()
+		if wp.IsPluginMissing(err) {
+			return skippedSEO(sc.Page, ReasonNoPlugin), nil
 		}
-		return nil, nil, err
+		return seoWrite{}, err
 	}
 	if !capabilities.Has(CapabilitySEOMeta) {
-		return noSEO()
+		return skippedSEO(sc.Page, ReasonNoSEOWriter), nil
 	}
 
 	result, err := client.SetSEOMeta(ctx, wpID, wp.SEOMeta{
@@ -269,13 +282,35 @@ func applySEO(ctx context.Context, client *wp.Client, sc *run.StepContext, wpID 
 		OGDescription: meta.OGDescription,
 	})
 	if err != nil {
-		return nil, nil, err
+		if wp.IsPluginMissing(err) {
+			return skippedSEO(sc.Page, ReasonNoPlugin), nil
+		}
+		return seoWrite{}, err
 	}
-	return append(make([]string, 0, len(result.Applied)), result.Applied...), []string{}, nil
+	return seoWrite{
+		applied:  append(make([]string, 0, len(result.Applied)), result.Applied...),
+		skipped:  []string{},
+		findings: nil,
+	}, nil
 }
 
-func noSEO() (applied, skipped []string, err error) {
-	return []string{}, []string{CodeSEOMetaSkipped}, nil
+// quietlySkippedSEO is the recipe that generated no meta at all: nothing was written because
+// nothing was asked for, so the result records the skip without warning about a loss.
+func quietlySkippedSEO() seoWrite {
+	return seoWrite{applied: []string{}, skipped: []string{CodeSEOMetaSkipped}}
+}
+
+func skippedSEO(page pagemap.Page, reason string) seoWrite {
+	return seoWrite{
+		applied: []string{},
+		skipped: []string{CodeSEOMetaSkipped},
+		findings: []content.Finding{{
+			Severity: content.SeverityWarn,
+			Code:     CodeSEOMetaSkipped,
+			Message:  "the SEO meta of " + page.Path + " was generated but not written: " + reason,
+			Details:  map[string]any{"pageId": page.ID, "path": page.Path, "reason": reason},
+		}},
+	}
 }
 
 func record(ctx context.Context, deps Deps, sc *run.StepContext, written wp.Item, result PublishResult) error {

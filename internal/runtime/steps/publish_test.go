@@ -107,6 +107,15 @@ func TestPublishSkipsTheSEOMetaWithoutThePlugin(t *testing.T) {
 	if !slices.Contains(published.Skipped, steps.CodeSEOMetaSkipped) {
 		t.Fatalf("skipped = %v, want %q", published.Skipped, steps.CodeSEOMetaSkipped)
 	}
+	if len(published.Findings) != 1 || published.Findings[0].Code != steps.CodeSEOMetaSkipped {
+		t.Fatalf("findings = %+v, want one %q warning", published.Findings, steps.CodeSEOMetaSkipped)
+	}
+	if published.Findings[0].Severity != content.SeverityWarn {
+		t.Errorf("the skipped finding = %+v, want a warning", published.Findings[0])
+	}
+	if published.Findings[0].Details["reason"] != steps.ReasonNoPlugin {
+		t.Errorf("the skipped finding = %+v, want the reason %q", published.Findings[0], steps.ReasonNoPlugin)
+	}
 }
 
 func TestPublishReportsWhatItCannotDo(t *testing.T) {
@@ -212,6 +221,9 @@ func TestPublishSkipsTheSEOMetaWithoutAMetaArtifact(t *testing.T) {
 	published := runPublish(t, deps, sc)
 	if len(published.SEOApplied) != 0 || !slices.Contains(published.Skipped, steps.CodeSEOMetaSkipped) {
 		t.Fatalf("publish = %+v", published)
+	}
+	if len(published.Findings) != 0 {
+		t.Errorf("findings = %+v, want none: no meta was generated, so none was lost", published.Findings)
 	}
 }
 
