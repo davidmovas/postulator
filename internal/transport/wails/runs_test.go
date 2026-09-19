@@ -17,6 +17,10 @@ func (f runsFake) Start(context.Context, runs.StartRequest) (runs.StartResponse,
 	return answer[runs.StartResponse](f.mode)
 }
 
+func (f runsFake) Estimate(context.Context, runs.StartRequest) (runs.EstimateResponse, error) {
+	return answer[runs.EstimateResponse](f.mode)
+}
+
 func (f runsFake) Get(context.Context, runs.GetRequest) (runs.GetResponse, error) {
 	return answer[runs.GetResponse](f.mode)
 }
@@ -61,8 +65,8 @@ func TestRunsServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
 	assertMethodNames(t, wails.NewRunsService(zap.NewNop(), ready[wails.RunsUseCase](runsFake{})), []string{
-		"Cancel", "Get", "GetArtifact", "List", "ListArtifacts", "ListEvents", "ListItems",
-		"Pause", "Resume", "RetryStep", "Start",
+		"Cancel", "Estimate", "Get", "GetArtifact", "List", "ListArtifacts", "ListEvents",
+		"ListItems", "Pause", "Resume", "RetryStep", "Start",
 	})
 	assertEveryMethodConverts(t, wails.NewRunsService(zap.NewNop(), ready[wails.RunsUseCase](runsFake{mode: missing})), missingBody)
 	assertEveryMethodConverts(t, wails.NewRunsService(zap.NewNop(), ready[wails.RunsUseCase](runsFake{mode: panicking})), panicBody)

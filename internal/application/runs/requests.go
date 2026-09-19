@@ -21,6 +21,10 @@ type StartResponse struct {
 	Estimate run.Estimate `json:"estimate"`
 }
 
+type EstimateResponse struct {
+	Estimate run.Estimate `json:"estimate"`
+}
+
 type GetRequest struct {
 	RunID string `json:"runId"`
 }

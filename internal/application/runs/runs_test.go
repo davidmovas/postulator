@@ -198,6 +198,91 @@ func TestStartResolvesEveryTargetAndEstimates(t *testing.T) {
 	}
 }
 
+func TestEstimateAnswersTheCostWithoutEnqueuingAnything(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	fixture.specs.siteID = fixture.siteID
+
+	request := runs.StartRequest{
+		SiteID:  fixture.siteID,
+		PageIDs: []string{fixture.pages[0], fixture.pages[1], fixture.pages[0], "  "},
+		Budget:  run.Budget{MaxUSD: 1},
+	}
+
+	answered, err := fixture.service.Estimate(t.Context(), request)
+	if err != nil {
+		t.Fatalf("Estimate: %v", err)
+	}
+	if answered.Estimate.USD != 0.12 || answered.Estimate.Tokens != 4200 {
+		t.Fatalf("Estimate = %+v", answered)
+	}
+	if fixture.engine.queued.ID != "" {
+		t.Fatalf("Estimate enqueued %+v", fixture.engine.queued)
+	}
+	if len(fixture.specs.seen) != 2 {
+		t.Fatalf("the template was resolved for %v", fixture.specs.seen)
+	}
+
+	encoded, marshalErr := json.Marshal(answered)
+	if marshalErr != nil {
+		t.Fatalf("Marshal: %v", marshalErr)
+	}
+	if string(encoded) != `{"estimate":{"tokens":4200,"usd":0.12}}` {
+		t.Fatalf("Estimate = %s", encoded)
+	}
+
+	started, err := fixture.service.Start(t.Context(), request)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if started.Estimate != answered.Estimate {
+		t.Fatalf("Start estimated %+v, Estimate answered %+v", started.Estimate, answered.Estimate)
+	}
+}
+
+func TestEstimateRefusesWhatStartRefuses(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		request runs.StartRequest
+		prepare func(*fixture)
+		want    errors.Code
+	}{
+		{name: "no site", request: runs.StartRequest{PageIDs: []string{"p"}}, want: errors.Invalid},
+		{name: "no pages", request: runs.StartRequest{SiteID: "s"}, want: errors.Invalid},
+		{
+			name:    "unknown kind",
+			request: runs.StartRequest{SiteID: "s", PageIDs: []string{"p"}, Kind: "dance"},
+			want:    errors.Invalid,
+		},
+		{
+			name:    "the engine refuses to estimate",
+			request: runs.StartRequest{SiteID: "s", PageIDs: []string{"p"}},
+			prepare: func(f *fixture) { f.engine.failWith = errors.New(errors.NotFound, "unknown step") },
+			want:    errors.NotFound,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			fixture := newFixture(t)
+			if tc.prepare != nil {
+				tc.prepare(fixture)
+			}
+			if _, err := fixture.service.Estimate(t.Context(), tc.request); !errors.IsCode(err, tc.want) {
+				t.Fatalf("Estimate = %v, want %s", err, tc.want)
+			}
+			if fixture.engine.queued.ID != "" {
+				t.Fatalf("Estimate enqueued %+v", fixture.engine.queued)
+			}
+		})
+	}
+}
+
 func TestStartRejectsBadRequests(t *testing.T) {
 	t.Parallel()
 

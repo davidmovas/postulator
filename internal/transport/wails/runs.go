@@ -12,6 +12,7 @@ import (
 
 type RunsUseCase interface {
 	Start(ctx context.Context, req runs.StartRequest) (runs.StartResponse, error)
+	Estimate(ctx context.Context, req runs.StartRequest) (runs.EstimateResponse, error)
 	Get(ctx context.Context, req runs.GetRequest) (runs.GetResponse, error)
 	List(ctx context.Context, req runs.ListRequest) (paging.List[runs.Run], error)
 	ListItems(ctx context.Context, req runs.ListItemsRequest) (paging.List[runs.Item], error)
@@ -26,6 +27,7 @@ type RunsUseCase interface {
 
 type RunsService struct {
 	start         middleware.Handler[runs.StartRequest, runs.StartResponse]
+	estimate      middleware.Handler[runs.StartRequest, runs.EstimateResponse]
 	get           middleware.Handler[runs.GetRequest, runs.GetResponse]
 	list          middleware.Handler[runs.ListRequest, paging.List[runs.Run]]
 	listItems     middleware.Handler[runs.ListItemsRequest, paging.List[runs.Item]]
@@ -41,6 +43,7 @@ type RunsService struct {
 func NewRunsService(logger *zap.Logger, useCase Source[RunsUseCase]) *RunsService {
 	return &RunsService{
 		start:         Wrap(logger, "runs.start", call(useCase, RunsUseCase.Start)),
+		estimate:      Wrap(logger, "runs.estimate", call(useCase, RunsUseCase.Estimate)),
 		get:           Wrap(logger, "runs.get", call(useCase, RunsUseCase.Get)),
 		list:          Wrap(logger, "runs.list", call(useCase, RunsUseCase.List)),
 		listItems:     Wrap(logger, "runs.listItems", call(useCase, RunsUseCase.ListItems)),
@@ -56,6 +59,10 @@ func NewRunsService(logger *zap.Logger, useCase Source[RunsUseCase]) *RunsServic
 
 func (s *RunsService) Start(c context.Context, req runs.StartRequest) (runs.StartResponse, error) {
 	return s.start(c, req)
+}
+
+func (s *RunsService) Estimate(c context.Context, req runs.StartRequest) (runs.EstimateResponse, error) {
+	return s.estimate(c, req)
 }
 
 func (s *RunsService) Get(c context.Context, req runs.GetRequest) (runs.GetResponse, error) {
