@@ -2,9 +2,9 @@ import type { ReactElement } from "react";
 import { Link } from "react-router";
 
 import { copy } from "../../copy/index.js";
-import { isOneOf } from "../../generated/vocab.js";
+import { cannibalizationReasons, isOneOf } from "../../generated/vocab.js";
 import { ArrowRightAltIcon, cx, toneClasses, WarningIcon } from "../../ui/index.js";
-import { cannibalizationReasons, conflictOf } from "./conflict.js";
+import { conflictOf } from "./conflict.js";
 
 function reasonOf(reason: string): string {
     return isOneOf(cannibalizationReasons, reason)

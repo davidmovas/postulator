@@ -24,9 +24,14 @@ type vocabulary struct {
 func catalog() []vocabulary {
 	return []vocabulary{
 		{export: "siteStatuses", tsType: "SiteStatus", pkg: "internal/domain/site", typeName: "Status"},
+		{export: "siteReaches", tsType: "SiteReach", pkg: "internal/domain/site", typeName: "Reach"},
 		{export: "pageStatuses", tsType: "PageStatus", pkg: "internal/domain/pagemap", typeName: "Status"},
 		{export: "pageWpTypes", tsType: "PageWpType", pkg: "internal/domain/pagemap", typeName: "WPType"},
 		{export: "linkOrigins", tsType: "LinkOrigin", pkg: "internal/domain/pagemap", typeName: "LinkOrigin"},
+		{
+			export: "cannibalizationReasons", tsType: "CannibalizationReason", pkg: "internal/domain/pagemap",
+			typeName: "Reason",
+		},
 		{export: "entityKinds", tsType: "EntityKind", pkg: "internal/domain/graph", typeName: "Kind"},
 		{export: "edgeKinds", tsType: "EdgeKind", pkg: "internal/domain/graph", typeName: "EdgeKind"},
 		{export: "edgeStatuses", tsType: "EdgeStatus", pkg: "internal/domain/graph", typeName: "EdgeStatus"},

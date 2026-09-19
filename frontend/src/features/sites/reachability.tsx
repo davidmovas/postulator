@@ -2,6 +2,8 @@ import type { ReactElement } from "react";
 
 import { copy } from "../../copy/index.js";
 import type { Reachability } from "../../data/types.js";
+import type { SiteReach } from "../../generated/vocab.js";
+import { isOneOf, siteReaches } from "../../generated/vocab.js";
 import {
     Banner,
     Button,
@@ -12,26 +14,22 @@ import {
 } from "../../ui/index.js";
 import type { IconComponent, Tone } from "../../ui/index.js";
 
-export const reachValues = ["ok", "upgradeRequired", "unauthorized", "unreachable"] as const;
-
-export type Reach = (typeof reachValues)[number];
-
-const tones: Readonly<Record<Reach, Tone>> = {
+const tones: Readonly<Record<SiteReach, Tone>> = {
     ok: "ok",
     upgradeRequired: "warn",
     unauthorized: "danger",
     unreachable: "danger",
 };
 
-const icons: Readonly<Record<Reach, IconComponent>> = {
+const icons: Readonly<Record<SiteReach, IconComponent>> = {
     ok: CloudDoneIcon,
     upgradeRequired: ShieldIcon,
     unauthorized: KeyOffIcon,
     unreachable: CloudOffIcon,
 };
 
-function reachOf(raw: string): Reach | null {
-    return (reachValues as readonly string[]).includes(raw) ? (raw as Reach) : null;
+function reachOf(raw: string): SiteReach | null {
+    return isOneOf(siteReaches, raw) ? raw : null;
 }
 
 export interface ReachabilityReportProps {

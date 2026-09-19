@@ -1,13 +1,5 @@
 import { failure } from "../../data/errors.js";
 
-export const cannibalizationReasons = [
-    "path_conflict",
-    "same_entity_canonical",
-    "same_primary_keyword",
-] as const;
-
-export type CannibalizationReason = (typeof cannibalizationReasons)[number];
-
 export interface Offender {
     pageId: string;
     path: string;

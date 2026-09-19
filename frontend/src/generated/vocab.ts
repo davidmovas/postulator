@@ -1,6 +1,9 @@
 export const siteStatuses = ["active", "paused", "error"] as const;
 export type SiteStatus = (typeof siteStatuses)[number];
 
+export const siteReaches = ["ok", "upgradeRequired", "unauthorized", "unreachable"] as const;
+export type SiteReach = (typeof siteReaches)[number];
+
 export const pageStatuses = ["planned", "exists", "published", "archived"] as const;
 export type PageStatus = (typeof pageStatuses)[number];
 
@@ -9,6 +12,13 @@ export type PageWpType = (typeof pageWpTypes)[number];
 
 export const linkOrigins = ["generated", "observed"] as const;
 export type LinkOrigin = (typeof linkOrigins)[number];
+
+export const cannibalizationReasons = [
+    "same_primary_keyword",
+    "same_entity_canonical",
+    "path_conflict",
+] as const;
+export type CannibalizationReason = (typeof cannibalizationReasons)[number];
 
 export const entityKinds = ["hub", "product", "topic", "category", "custom"] as const;
 export type EntityKind = (typeof entityKinds)[number];
