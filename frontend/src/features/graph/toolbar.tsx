@@ -2,7 +2,7 @@ import type { KeyboardEvent, ReactElement } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { copy } from "../../copy/index.js";
-import { AddIcon, AddLinkIcon, Button, CloseIcon, cx, HubIcon, SearchIcon, TableRowsIcon, toneClasses } from "../../ui/index.js";
+import { AddIcon, AddLinkIcon, Button, CloseIcon, cx, HubIcon, PolylineIcon, SearchIcon, TableRowsIcon, toneClasses } from "../../ui/index.js";
 import type { IconComponent } from "../../ui/index.js";
 import { entityIcon, kindTone } from "./labels.js";
 import type { GraphIndex } from "./model/index.js";
@@ -157,15 +157,31 @@ export interface ToolbarProps {
     view: GraphView;
     selectedId: string | null;
     connectFrom: string | null;
+    reviewing: boolean;
     onView: (view: GraphView) => void;
     onPick: (id: string) => void;
     onCreate: () => void;
     onConnect: () => void;
     onStopConnect: () => void;
+    onReview: () => void;
     focusSearch: number;
 }
 
-export function Toolbar({ index, view, selectedId, connectFrom, onView, onPick, onCreate, onConnect, onStopConnect, focusSearch }: ToolbarProps): ReactElement {
+export function Toolbar({
+    index,
+    view,
+    selectedId,
+    connectFrom,
+    reviewing,
+    onView,
+    onPick,
+    onCreate,
+    onConnect,
+    onStopConnect,
+    onReview,
+    focusSearch,
+}: ToolbarProps): ReactElement {
+    const proposed = index.counts.proposedEdges;
     return (
         <header className="flex h-8 shrink-0 items-center justify-between gap-3 border-b border-hairline px-3">
             <div className="flex min-w-0 items-center gap-2">
@@ -187,6 +203,12 @@ export function Toolbar({ index, view, selectedId, connectFrom, onView, onPick, 
                 <SearchBox index={index} onPick={onPick} focusKey={focusSearch} />
             </div>
             <div className="flex shrink-0 items-center gap-2">
+                {proposed > 0 || reviewing ? (
+                    <Button size="sm" variant={reviewing ? "primary" : "secondary"} icon={PolylineIcon} aria-pressed={reviewing} onClick={onReview}>
+                        {copy.graph.queue.open}
+                        <span className={cx("ml-1 rounded-sm px-1 font-mono text-2xs", reviewing ? "bg-on-accent/20" : "bg-info-soft text-info")}>{proposed}</span>
+                    </Button>
+                ) : null}
                 <span className="font-mono text-2xs text-ink-faint">{copy.graph.total(index.counts.total)}</span>
                 <div className="flex shrink-0 items-center gap-0.5 rounded-md bg-inset p-0.5">
                     <ViewButton view="map" current={view} label={copy.graph.views.map} icon={HubIcon} onSelect={onView} />

@@ -67,6 +67,7 @@ export interface GraphMapProps {
     selectedId: string | null;
     matched: ReadonlySet<string> | null;
     showRelated: boolean;
+    highlightEdgeId: string | null;
     revealVersion: number;
     onSelect: (id: string | null) => void;
     onPick: (id: string) => void;
@@ -101,6 +102,7 @@ export function GraphMap({
     selectedId,
     matched,
     showRelated,
+    highlightEdgeId,
     revealVersion,
     onSelect,
     onPick,
@@ -161,8 +163,8 @@ export function GraphMap({
     const grid = useMemo(() => new HitGrid(layout.nodes, hitCell), [layout]);
     const rowById = useMemo(() => new Map(rows.map((row) => [row.id, row])), [rows]);
 
-    const latest = useRef({ index, rows, fold, selectedId, matched, showRelated, layout, grid, rowById, measures, palette, fonts });
-    latest.current = { index, rows, fold, selectedId, matched, showRelated, layout, grid, rowById, measures, palette, fonts };
+    const latest = useRef({ index, rows, fold, selectedId, matched, showRelated, highlightEdgeId, layout, grid, rowById, measures, palette, fonts });
+    latest.current = { index, rows, fold, selectedId, matched, showRelated, highlightEdgeId, layout, grid, rowById, measures, palette, fonts };
 
     const commitView = useCallback(
         (next: Viewport): void => {
@@ -200,7 +202,7 @@ export function GraphMap({
             return;
         }
         host.current?.redraw();
-    }, [layout, fitAll, selectedId, matched, showRelated, palette]);
+    }, [layout, fitAll, selectedId, matched, showRelated, highlightEdgeId, palette]);
 
     useEffect(() => {
         if (selectedId === null || view.current === null) {
@@ -220,7 +222,7 @@ export function GraphMap({
 
     const draw = useCallback((context: CanvasRenderingContext2D, area: Size): void => {
         const { layout: placed, grid: hits, rowById: byRow, measures: sizes, palette: colors, fonts: faces, index: graph } = latest.current;
-        const { selectedId: selected, matched: lit, showRelated: allRelated } = latest.current;
+        const { selectedId: selected, matched: lit, showRelated: allRelated, highlightEdgeId: highlighted } = latest.current;
         if (colors === null || faces === null) {
             return;
         }
@@ -324,6 +326,23 @@ export function GraphMap({
             }
         }
 
+        const litEnds = new Set<string>();
+        const litEdge = highlighted === null ? undefined : graph.edgeById.get(highlighted);
+        if (litEdge !== undefined) {
+            litEnds.add(litEdge.fromEntityId);
+            litEnds.add(litEdge.toEntityId);
+            const from = placed.byId.get(litEdge.fromEntityId);
+            const to = placed.byId.get(litEdge.toEntityId);
+            if (from !== undefined && to !== undefined) {
+                const dash = litEdge.status === "proposed" ? [4, 3] : [];
+                if (litEdge.kind === "parent") {
+                    connector(context, { x: to.x + to.width, y: to.y + nodeHeight / 2 }, { x: from.x, y: from.y + nodeHeight / 2 }, colors.accent, 2, dash);
+                } else {
+                    arc(context, { x: from.x + from.width / 2, y: from.y + nodeHeight }, { x: to.x + to.width / 2, y: to.y + nodeHeight }, colors.accent, 2, dash);
+                }
+            }
+        }
+
         for (const node of nodes) {
             const row = byRow.get(node.id);
             const size = sizes.get(node.id);
@@ -368,8 +387,11 @@ export function GraphMap({
                 context.fillStyle = isSelected ? colors.accentSoft : isHovered ? colors.raised : colors.inset;
                 context.fill();
             }
-            context.lineWidth = isSelected ? 1.5 : 1;
-            if (flags?.noPage) {
+            const isLitEnd = litEnds.has(node.id);
+            context.lineWidth = isSelected || isLitEnd ? 1.5 : 1;
+            if (isLitEnd) {
+                context.strokeStyle = colors.accent;
+            } else if (flags?.noPage) {
                 context.strokeStyle = colors.danger;
                 context.setLineDash([4, 3]);
             } else if (graph.placementProposed.has(node.id)) {

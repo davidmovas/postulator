@@ -29,6 +29,8 @@ export { ProgressBar } from "./progress.js";
 export type { ProgressBarProps } from "./progress.js";
 export { Select } from "./select.js";
 export type { SelectOption, SelectProps } from "./select.js";
+export { Sheet } from "./sheet.js";
+export type { SheetProps } from "./sheet.js";
 export { Skeleton, SkeletonRows } from "./skeleton.js";
 export type { SkeletonProps, SkeletonRowsProps } from "./skeleton.js";
 export { Spinner } from "./spinner.js";

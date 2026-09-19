@@ -28,6 +28,7 @@ import { readQuery, searchOf, writeQuery } from "./model/params.js";
 import type { GraphQuery } from "./model/params.js";
 import { pruneRows } from "./model/prune.js";
 import { OutlineView } from "./outline/view.js";
+import { ProposalQueue } from "./queue/sheet.js";
 import { useGraphSession } from "./state.js";
 import { Toolbar } from "./toolbar.js";
 
@@ -53,6 +54,7 @@ export function GraphScreen(): ReactElement {
     const [deleting, setDeleting] = useState<string | null>(null);
     const [planning, setPlanning] = useState<string | null>(null);
     const [menu, setMenu] = useState<MenuTarget | null>(null);
+    const [hoverEdge, setHoverEdge] = useState<string | null>(null);
     const map = useRef<MapHandle | null>(null);
 
     const index = useMemo(() => buildGraphIndex(graph.data?.entities ?? [], graph.data?.edges ?? []), [graph.data]);
@@ -190,6 +192,10 @@ export function GraphScreen(): ReactElement {
                     }
                 }}
                 onStopConnect={stopConnect}
+                reviewing={session.queue}
+                onReview={() => {
+                    patchSession({ queue: !session.queue });
+                }}
                 focusSearch={focusSearch}
             />
             <LensBar query={query} counts={counts} onChange={change} />
@@ -272,6 +278,7 @@ export function GraphScreen(): ReactElement {
                                 selectedId={entityId}
                                 matched={matched}
                                 showRelated={session.showRelated}
+                                highlightEdgeId={hoverEdge}
                                 revealVersion={revealVersion}
                                 onSelect={select}
                                 onPick={pick}
@@ -337,6 +344,18 @@ export function GraphScreen(): ReactElement {
                                 onDelete={setDeleting}
                             />
                         </>
+                    )}
+                    {empty || graph.isPending ? null : (
+                        <ProposalQueue
+                            index={index}
+                            open={session.queue}
+                            onClose={() => {
+                                patchSession({ queue: false });
+                                setHoverEdge(null);
+                            }}
+                            onHover={setHoverEdge}
+                            onReveal={revealEntity}
+                        />
                     )}
                 </div>
                 {empty || graph.isPending ? null : (

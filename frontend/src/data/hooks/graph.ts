@@ -25,6 +25,7 @@ import type { EntitySort } from "../sorts.js";
 import type { Edge, EdgeFilter, Entity, EntityFilter } from "../types.js";
 
 type EdgePages = InfiniteData<List<Edge>, Cursor | undefined>;
+type FullGraph = Awaited<ReturnType<typeof loadGraph>>;
 
 export function useGraph(siteId: string | null) {
     return useUnlockedQuery({
@@ -138,14 +139,30 @@ function patchEdgeStatus(client: QueryClient, id: string, status: string): void 
     });
 }
 
+function patchFullStatus(client: QueryClient, id: string, status: string): void {
+    client.setQueriesData<FullGraph>({ queryKey: keys.graph.fulls() }, (held) => {
+        if (held === undefined) {
+            return held;
+        }
+        return { ...held, edges: (held.edges ?? []).map((edge) => (edge.id === id ? { ...edge, status } : edge)) };
+    });
+}
+
 function useEdgeDecision(call: (request: { id: string }) => Promise<{ edge: Edge }>, status: string) {
     const client = useQueryClient();
     return useMutation({
         mutationFn: call,
         onMutate: async (request: { id: string }) => {
-            await client.cancelQueries({ queryKey: keys.graph.edgeLists() });
-            const snapshot = client.getQueriesData<EdgePages>({ queryKey: keys.graph.edgeLists() });
+            await Promise.all([
+                client.cancelQueries({ queryKey: keys.graph.edgeLists() }),
+                client.cancelQueries({ queryKey: keys.graph.fulls() }),
+            ]);
+            const snapshot = [
+                ...client.getQueriesData<EdgePages>({ queryKey: keys.graph.edgeLists() }),
+                ...client.getQueriesData<FullGraph>({ queryKey: keys.graph.fulls() }),
+            ];
             patchEdgeStatus(client, request.id, status);
+            patchFullStatus(client, request.id, status);
             return { snapshot };
         },
         onError: (_thrown, _request, context) => {

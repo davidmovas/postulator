@@ -9,9 +9,17 @@ export interface GraphSession {
     showRelated: boolean;
     legend: boolean;
     minimap: boolean;
+    queue: boolean;
 }
 
-const emptySession: GraphSession = Object.freeze({ fold: null, order: "score", showRelated: false, legend: true, minimap: true });
+const emptySession: GraphSession = Object.freeze({
+    fold: null,
+    order: "score",
+    showRelated: false,
+    legend: true,
+    minimap: true,
+    queue: false,
+});
 
 const sessions = new Map<string, GraphSession>();
 const sessionListeners = new Set<() => void>();
