@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -147,12 +148,55 @@ func newClient(t *testing.T) (*client, environment) {
 	t.Helper()
 
 	env := loadEnvironment(t)
+	skipWithoutPlugin(t, env)
 	return &client{
 		base: env.baseURL,
 		user: env.user,
 		pass: env.pass,
 		http: &http.Client{Timeout: 60 * time.Second},
 	}, env
+}
+
+// companion holds the one manifest probe this suite makes: every test in it speaks to the
+// companion plugin, so a site without the plugin is a skip rather than a wall of failures.
+var companion struct {
+	once    sync.Once
+	err     error
+	present bool
+}
+
+func pluginIsActive(env environment) (bool, error) {
+	companion.once.Do(func() {
+		request, err := http.NewRequest(http.MethodGet, env.baseURL+"/wp-json/postulator/v1/manifest", http.NoBody)
+		if err != nil {
+			companion.err = err
+			return
+		}
+		request.SetBasicAuth(env.user, env.pass)
+
+		response, err := (&http.Client{Timeout: 60 * time.Second}).Do(request)
+		if err != nil {
+			companion.err = err
+			return
+		}
+		defer response.Body.Close()
+
+		companion.present = response.StatusCode == http.StatusOK
+	})
+	return companion.present, companion.err
+}
+
+func skipWithoutPlugin(t *testing.T, env environment) {
+	t.Helper()
+
+	present, err := pluginIsActive(env)
+	if err != nil {
+		t.Fatalf("ask %s for the companion manifest: %v", env.baseURL, err)
+	}
+	if !present {
+		t.Skipf("the companion plugin is not active on %s, and this suite is its contract; "+
+			"provision the stack with E2E_PLUGIN=1 (the default) to run it", env.baseURL)
+	}
 }
 
 func (c *client) request(t *testing.T, method, path string, payload any) (status int, body []byte) {
