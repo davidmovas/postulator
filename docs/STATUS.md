@@ -14,10 +14,18 @@ import, the agent, the schedules, the fourteen bound services and their TypeScri
 master password locks and unlocks the whole core, a backup of the database round trips through
 one encrypted archive, and the sweep retires artifacts and run events on their own windows.
 
-The last gate run on 2026-09-18: `go build`, `go vet`, `golangci-lint` (v2.13.2, 0 issues),
-`go test -count=1 -race -covermode=atomic ./...`, `go run ./cmd/covergate`, `gofmt -l .`,
-`task build`, `task package` and `task e2e:full` are green, and `bin/postulator.exe` opens its
-window and answers `health.ping`.
+The bound surface is a hundred and eight methods since 2026-09-19: `SettingsService.ProviderKeys`
+and `DeleteProviderKey` report and revoke an LLM key as a boolean, `SitesService.TestConnection`
+probes a site before it is saved and after it is edited, `RunsService.ListArtifacts` names the
+artifacts a run item holds without their blobs, and `RunsService.Estimate` prices a run before it
+is enqueued. `sites.changed`, `schedules.changed` and `settings.changed` join the three `*.changed`
+events, and a run's deadline is the `runs.deadline` setting rather than a constant.
+
+The last gate run on 2026-09-19: `task events`, `task bindings`, `gofmt -l .`,
+`task check:go:comments`, `go vet`, `golangci-lint` (v2.13.2, 0 issues),
+`go test -count=1 -race -covermode=atomic ./...`, `go run ./cmd/covergate` and `task build` are
+green. `task package` and `task e2e:full` were last run on 2026-09-18, when `bin/postulator.exe`
+opened its window and answered `health.ping`.
 
 The frontend is still the Vite stub. Phase 11 shipped the typed surface it will be built on —
 the generated bindings, `lib/api.ts`, `lib/events.ts` and `smoke.ts` — but no screen.
@@ -59,7 +67,7 @@ task e2e:down              stops the stack and drops its volumes
 | 11 | Wails services, event bridge, TypeScript generation | done |
 | 12 | Master password, backup, retention, e2e, release | done |
 
-Module coverage is 87.5% of 14265 statements; `domain` + `application` sit at 86.0%.
+Module coverage is 87.57% of 14439 statements; `domain` + `application` sit at 86.09%.
 
 ## Known gaps
 
@@ -86,8 +94,15 @@ Module coverage is 87.5% of 14265 statements; `domain` + `application` sit at 86
   is covered. The package now carries its own tests over the confirmation fence and the views.
 - `ledger.List` has no caller: `ModelsService.UsageSummary` answers from the aggregate, and a
   per-call ledger screen is what would read the list.
-- A run's deadline is the `runtime.DefaultRunDeadline` constant, not a setting: nothing in the UI
-  sets one yet, and a second knob with no reader would be dead configuration.
+- `settings.changed` is published by `models.SetProviderKey` and `models.DeleteProviderKey` only.
+  `SettingsService.Set` writes a declared value at the transport, which is the one layer that does
+  not publish, so a second window on the settings screen does not learn that `runs.workers`
+  changed. Closing that needs an application settings use case, which the service does not have.
+- `SitesService.TestConnection` builds a throwaway `wp.Client` for the candidate rather than the
+  one `registry.Client` caches, because a candidate has no row to key the cache on; a test
+  therefore neither warms nor invalidates the cached client.
+- `TestConnection` reports `hasPlugin` from the REST namespaces the root advertises, not from the
+  plugin manifest. `SyncService.CheckPlugin` is what reads the manifest and writes the site row.
 - The docker e2e stack is never run in CI: `windows-latest` cannot run Linux containers, and the
   Ubuntu job exists only to lint and package the plugin. Every suite is run by hand before a tag:
   `task e2e:test` and `task e2e:full` on a default stack, then `task e2e:full:noplugin`.
@@ -125,8 +140,8 @@ Module coverage is 87.5% of 14265 statements; `domain` + `application` sit at 86
 1. Build the real frontend on the bound services and the generated events.
 2. Tag `v2.0.0` when the UI lands; `release.yml` publishes the executable, the NSIS installer and
    the companion plugin archive from that tag.
-3. Close the gaps above that the UI reaches: the ledger screen, the page audit screen, the run
-   deadline setting.
+3. Close the gaps above that the UI reaches: the ledger screen, the page audit screen, and
+   `settings.changed` for a declared value, which needs an application settings use case.
 
 ## Final review
 

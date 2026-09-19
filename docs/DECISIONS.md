@@ -534,3 +534,60 @@ orphaned media is listed under Known gaps instead, as an accepted cost.
   separated by `|`, which is what `importmap.DefaultAnchorSeparator` reads.
 - **Docs split in two.** `docs/STATUS.md` is the handoff and stays under 150 lines; every
   "Decisions taken in Phase N" and "Milestone review" section lives here, moved verbatim.
+
+## Decisions taken on 2026-09-19 for the frontend surface
+
+Six additions the React frontend needs, and nothing else. The Go backend was finished and green;
+each of these exists because a screen could not be drawn without it.
+
+- **A provider key is reported as a boolean, never as a value.** `SetProviderKey` was write-only,
+  so the settings screen could not mark a provider configured and had no way to revoke one.
+  `ProviderKeys` answers one row per provider the catalog names, `{provider, configured}`, and
+  `DeleteProviderKey` takes a provider name. Neither carries a key, so the phase 11 ruling holds:
+  `SetProviderKey` is still the only method that accepts a credential. `secrets.Store.Has` was
+  added rather than reading the secret back, because presence is answerable from the vault row and
+  unsealing a key to discover that it exists is a plaintext no one asked for. Both new methods
+  refuse a provider the catalog does not know, exactly as `SetProviderKey` does, and a revoke of a
+  key that is already gone succeeds: the screen offers revoke from a listing that may be stale.
+- **A connection test reuses `wp.Client.Probe` and adds no second HTTP path.** The probe already
+  classifies the four outcomes a site form has to render — a REST root that is not WordPress, a
+  redirect from http to https, a redirect to the login page, and refused credentials — so
+  `TestConnection` maps them onto `site.Reach` rather than asking the site again.
+- **A connection test builds a throwaway client.** `registry.Client` caches per site id, updated-at
+  and base URL; a candidate has none of those, and the create form has to test credentials before
+  there is a row. The registry therefore constructs a one-off `wp.Client` and leaves the cache
+  alone. An existing site with no password in the request falls back to the stored secret and
+  reports `unauthorized` when there is none, because "you never entered a password" is one of the
+  four things the button is there to tell you.
+- **`site.Candidate` redacts its password.** It is the one domain value that carries a credential,
+  and it crosses two package boundaries to reach the adapter. `String` and `GoString` print `***`
+  on the same ground as `wp.Config`: rule 8 is about what a formatted value can leak, not only
+  about what a logger is asked to write.
+- **`ListArtifacts` is a read beside `GetArtifact`, not a change to it.** A review drawer had to
+  probe all eleven kinds and swallow `NOT_FOUND` to find its tabs. The listing carries `purged` and
+  `expiresAt` because the sweep retires the blob of `body_html`, `draft` and `images` once the page
+  published and leaves the row with `size` 0: without those two fields the drawer cannot tell an
+  artifact that never existed from one whose body expired, and `size` alone lies. `GetArtifact`
+  already answers a purged row rather than `NOT_FOUND` and was not touched; the eleven codes stay
+  frozen.
+- **The three new events are published from the application layer, and `settings.changed` from
+  `models`.** `sites.changed` and `schedules.changed` go where `graph.changed` and `pages.changed`
+  go, in the service that owns the write, so the agent and the UI announce the same change through
+  one path; the schedule rearm publishes too, because a tick that moves `next_run_at` is exactly
+  the change a list is stale about. `settings.changed` has no application settings use case to live
+  in — `SettingsService` reads the `kernel/settings` registry directly — so it is published where a
+  settings-shaped write does exist in the application layer, the provider key. A declared value
+  written through `SettingsService.Set` announces nothing; that is recorded as a gap rather than
+  papered over by publishing from the transport.
+- **`runs.deadline` replaces the constant.** `runtime.DefaultRunDeadline` stays as the declared
+  default and as what `normalized()` falls back to for a hand-built `Config`, but `Settings` now
+  reads the setting into `Config.RunDeadline`, which is what `Enqueue` adds to a run's `createdAt`.
+  It is bounded to five minutes and seven days: a run over a large site legitimately takes days,
+  and a deadline shorter than a step timeout would fail every run.
+- **`Estimate` is an exposure, not new arithmetic.** `Start` answered the estimate together with
+  the `runId`, so the run existed by the time its cost was known and the budget dialog
+  `docs/VISION.md` asks for could not be shown. `Start` and `Estimate` share `plan()`, which
+  validates the request and resolves the template, and both hand the same `run.Run` to
+  `Engine.EstimateRun`; only `Start` mints the id, after the estimate, so an `Estimate` leaves
+  nothing behind. It takes `StartRequest` rather than a request of its own, which is what makes
+  "the same inputs" a compile-time fact instead of a convention.
