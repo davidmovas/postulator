@@ -16,6 +16,8 @@ import { EntityContextMenu } from "./actions/context-menu.js";
 import type { MenuTarget } from "./actions/context-menu.js";
 import { CreateEntityDrawer } from "./actions/create-entity.js";
 import { DeleteEntityDialog } from "./actions/delete-entity.js";
+import { MoveEntityDialog } from "./actions/move-entity.js";
+import type { MoveRequest } from "./actions/move-entity.js";
 import { ProposeFromPagesDialog, ProposeRelatedDialog } from "./actions/propose.js";
 import { Controls } from "./canvas/controls.js";
 import { Legend } from "./canvas/legend.js";
@@ -62,6 +64,7 @@ export function GraphScreen(): ReactElement {
     const [hoverEdge, setHoverEdge] = useState<string | null>(null);
     const [proposing, setProposing] = useState<"pages" | "related" | null>(null);
     const [pulse, setPulse] = useState<Pulse | null>(null);
+    const [moving, setMoving] = useState<MoveRequest | null>(null);
     const map = useRef<MapHandle | null>(null);
     const recompute = useRecomputeScores();
     const audit = useLinkAudit(query.proof && siteId !== "" ? siteId : null);
@@ -365,6 +368,9 @@ export function GraphScreen(): ReactElement {
                                 }}
                                 onConnect={startConnect}
                                 onDelete={setDeleting}
+                                onReparent={(childId, parentId) => {
+                                    setMoving({ childId, parentId });
+                                }}
                                 ref={(handle) => {
                                     map.current = handle;
                                 }}
@@ -464,6 +470,14 @@ export function GraphScreen(): ReactElement {
                     if (deleting === entityId) {
                         select(null);
                     }
+                }}
+            />
+            <MoveEntityDialog
+                siteId={siteId}
+                index={index}
+                move={moving}
+                onClose={() => {
+                    setMoving(null);
                 }}
             />
             <ProposeFromPagesDialog

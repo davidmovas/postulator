@@ -58,6 +58,9 @@ interface Drag {
     view: Viewport;
     moved: boolean;
     target: Placed | null;
+    mode: "pan" | "node";
+    cursor: Point;
+    over: string | null;
 }
 
 export interface GraphMapProps {
@@ -80,6 +83,7 @@ export interface GraphMapProps {
     onCreateChild: (id: string | null) => void;
     onConnect: (id: string) => void;
     onDelete: (id: string) => void;
+    onReparent: (childId: string, parentId: string) => void;
     minimap: boolean;
     ref?: (handle: MapHandle | null) => void;
 }
@@ -124,6 +128,7 @@ export function GraphMap({
     onCreateChild,
     onConnect,
     onDelete,
+    onReparent,
     minimap,
     ref,
 }: GraphMapProps): ReactElement {
@@ -496,17 +501,75 @@ export function GraphMap({
             }
             context.globalAlpha = 1;
         }
+
+        const dragging = drag.current;
+        if (dragging !== null && dragging.mode === "node" && dragging.moved && dragging.target !== null) {
+            const ghost = dragging.target;
+            const size = sizes.get(ghost.id);
+            const held = graph.byId.get(ghost.id);
+            if (dragging.over !== null) {
+                const target = placed.byId.get(dragging.over);
+                if (target !== undefined) {
+                    context.setLineDash([4, 3]);
+                    context.strokeStyle = colors.accent;
+                    context.lineWidth = 2;
+                    roundRect(context, target.x - 3, target.y - 3, target.width + 6, target.height + 6, 9);
+                    context.stroke();
+                    context.setLineDash([]);
+                }
+            }
+            context.globalAlpha = 0.85;
+            roundRect(context, dragging.cursor.x + 10, dragging.cursor.y + 10, ghost.width, ghost.height, 6);
+            context.fillStyle = colors.raised;
+            context.fill();
+            context.strokeStyle = colors.accent;
+            context.lineWidth = 1;
+            context.stroke();
+            if (size !== undefined && held !== undefined) {
+                drawIcon(context, entityIcon(held.kind), dragging.cursor.x + 10 + padding, dragging.cursor.y + 10 + (nodeHeight - iconSize) / 2, iconSize, toneColor(colors, kindTone(held.kind)));
+                context.fillStyle = colors.ink;
+                context.font = faces.label;
+                context.textBaseline = "middle";
+                context.fillText(size.text, dragging.cursor.x + 10 + padding + iconSize + 6, dragging.cursor.y + 10 + nodeHeight / 2 + 0.5);
+            }
+            context.globalAlpha = 1;
+        }
         context.restore();
     }, []);
 
     const worldOf = (pointer: Point): Point => toWorld(view.current ?? { x: 0, y: 0, k: 1 }, pointer);
+
+    const droppable = (childId: string, overId: string): boolean => {
+        const graph = latest.current.index;
+        if (overId === childId || graph.placementParent.get(childId) === overId) {
+            return false;
+        }
+        let current: string | undefined = overId;
+        while (current !== undefined) {
+            if (current === childId) {
+                return false;
+            }
+            current = graph.placementParent.get(current);
+        }
+        return true;
+    };
 
     const onPointerDown = (pointer: PointerInfo): void => {
         if (pointer.button !== 0 || view.current === null) {
             return;
         }
         const world = worldOf(pointer);
-        drag.current = { start: pointer, view: view.current, moved: false, target: latest.current.grid.at(world.x, world.y) };
+        const target = latest.current.grid.at(world.x, world.y);
+        const row = target === null ? undefined : latest.current.rowById.get(target.id);
+        drag.current = {
+            start: pointer,
+            view: view.current,
+            moved: false,
+            target,
+            mode: row?.kind === "entity" ? "node" : "pan",
+            cursor: world,
+            over: null,
+        };
     };
 
     const onPointerMove = (pointer: PointerInfo): void => {
@@ -518,7 +581,16 @@ export function GraphMap({
                 return;
             }
             dragging.moved = true;
-            commitView(panBy(dragging.view, dx, dy));
+            if (dragging.mode === "pan") {
+                commitView(panBy(dragging.view, dx, dy));
+                return;
+            }
+            const world = worldOf(pointer);
+            dragging.cursor = world;
+            const hit = latest.current.grid.at(world.x, world.y);
+            const row = hit === null ? undefined : latest.current.rowById.get(hit.id);
+            dragging.over = dragging.target !== null && row?.kind === "entity" && droppable(dragging.target.id, row.id) ? row.id : null;
+            host.current?.redraw();
             return;
         }
         const world = worldOf(pointer);
@@ -533,7 +605,16 @@ export function GraphMap({
     const onPointerUp = (pointer: PointerInfo): void => {
         const dragging = drag.current;
         drag.current = null;
-        if (dragging === null || dragging.moved) {
+        if (dragging === null) {
+            return;
+        }
+        if (dragging.moved) {
+            if (dragging.mode === "node") {
+                host.current?.redraw();
+                if (dragging.target !== null && dragging.over !== null) {
+                    onReparent(dragging.target.id, dragging.over);
+                }
+            }
             return;
         }
         const target = dragging.target;
@@ -624,6 +705,11 @@ export function GraphMap({
             event.preventDefault();
             onToggle(selected);
         } else if (event.key === "Escape") {
+            if (drag.current !== null) {
+                drag.current = null;
+                host.current?.redraw();
+                return;
+            }
             onSelect(null);
         } else if (event.key === "f" || event.key === "F") {
             fitAll();

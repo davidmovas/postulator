@@ -859,6 +859,16 @@ export const copy = {
             cancel: "Keep it",
             deleted: (name: string) => `${name} deleted`,
         },
+        move: {
+            title: (child: string, parent: string) => `Move ${child} under ${parent}?`,
+            fromParent: (previous: string) => `Adds the parent edge and removes the one to ${previous}.`,
+            fromRoot: "Adds the parent edge. The entity was a root.",
+            keepBoth: "Keep the current parent too",
+            confirm: "Move it",
+            cancel: "Cancel",
+            moved: (child: string, parent: string) => `${child} moved under ${parent}`,
+            dropHint: "Drop on the new parent. Esc cancels.",
+        },
         menu: {
             label: "Entity actions",
             addChild: "Add a child",
