@@ -6,8 +6,8 @@ import { absoluteTime, tokens, usd } from "../../../domain/format.js";
 import type { TurnUsage } from "../../../data/agent/turn.js";
 import type { Timestamp } from "../../../data/wire.js";
 import { ArrowDownwardIcon, Button, cx, SmartToyIcon, Spinner, toneClasses } from "../../../ui/index.js";
+import { ActionCard } from "../cards/action-card.js";
 import type { CardBusy } from "../cards/card.js";
-import { ConfirmationCard } from "../cards/card.js";
 import { outcomeOf } from "../cards/outcome.js";
 import { familyIcon, toolStatusLabel, toolStatusTone } from "../labels.js";
 import { familyOf, resultSummary, verbOf } from "./model/tools.js";
@@ -172,12 +172,12 @@ export function Transcript({ rows, settling, lastUserText, onApprove, onReject, 
                             return <ToolRow key={row.id} row={row} />;
                         case "confirm": {
                             const tool = row.action?.tool ?? row.live?.tool ?? "";
-                            const risk = row.live?.risk ?? "write";
                             return (
-                                <ConfirmationCard
+                                <ActionCard
                                     key={row.id}
                                     tool={tool}
-                                    risk={risk}
+                                    args={row.action?.args ?? row.live?.args ?? null}
+                                    risk={row.live?.risk ?? null}
                                     status={row.action?.status ?? "pending"}
                                     createdAt={row.action?.createdAt ?? null}
                                     outcome={row.action === null ? null : outcomeOf(row.action)}

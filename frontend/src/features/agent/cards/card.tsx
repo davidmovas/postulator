@@ -5,7 +5,7 @@ import { copy } from "../../../copy/index.js";
 import type { Timestamp } from "../../../data/wire.js";
 import { absoluteTime, relativeTime } from "../../../domain/format.js";
 import { Button, cx, GavelIcon, ShieldIcon, StatusBadge, toneClasses, WarningIcon } from "../../../ui/index.js";
-import { familyOf, verbOf } from "../conversation/model/tools.js";
+import { familyOf } from "../conversation/model/tools.js";
 import { familyIcon, familyLabel, riskLabel, riskTone } from "../labels.js";
 
 export type CardBusy = "approve" | "reject" | null;
@@ -16,6 +16,7 @@ export interface ConfirmationCardProps {
     status: string;
     createdAt: Timestamp;
     outcome: string | null;
+    title: ReactNode;
     lines?: ReactNode;
     busy: CardBusy;
     focus?: boolean;
@@ -30,6 +31,7 @@ export function ConfirmationCard({
     status,
     createdAt,
     outcome,
+    title,
     lines,
     busy,
     focus = false,
@@ -94,10 +96,12 @@ export function ConfirmationCard({
                 </span>
             </div>
             <div className="flex flex-col gap-2.5 p-3">
-                <div className="flex items-center gap-2">
-                    <FamilyIcon size={16} className={cx("shrink-0", pending ? classes.ink : "text-ink-faint")} />
-                    <span className="text-2xs font-semibold tracking-label text-ink-faint uppercase">{familyLabel(family)}</span>
-                    <span className="text-sm font-semibold text-ink">{verbOf(tool)}</span>
+                <div className="flex items-start gap-2">
+                    <FamilyIcon size={16} className={cx("mt-0.5 shrink-0", pending ? classes.ink : "text-ink-faint")} />
+                    <div className="flex min-w-0 flex-col">
+                        <span className="text-2xs font-semibold tracking-label text-ink-faint uppercase">{familyLabel(family)}</span>
+                        <span className="text-sm leading-snug font-semibold text-ink">{title}</span>
+                    </div>
                 </div>
                 {lines === undefined ? null : <div className="flex flex-col gap-1.5">{lines}</div>}
                 {dangerous && pending ? (
