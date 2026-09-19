@@ -3,10 +3,12 @@ import { Link } from "react-router";
 
 import { failure } from "../../data/errors.js";
 import { usePageReport } from "../../data/hooks/reports.js";
+import { isBrowsable, openExternal } from "../../data/host.js";
 import { copy } from "../../copy/index.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
 import {
     ChevronRightIcon,
+    OpenInNewIcon,
     Panel,
     PanelHeader,
     Skeleton,
@@ -51,29 +53,19 @@ export function PageReportPanel({ pageId, siteId }: PageReportPanelProps): React
         );
     }
 
-    if (report.isError) {
-        const reported = failure(report.error);
+    const held = report.data;
+    if (held === undefined) {
+        const reported = report.isError ? failure(report.error) : null;
+        const problem = reported === null || reported.code === "NOT_FOUND" ? null : reported.message;
         return (
             <Panel>
                 <PanelHeader title={copy.pages.detail.report} />
                 <div className="flex flex-col gap-1 p-3">
-                    <p className="text-sm text-ink">
-                        {reported.code === "NOT_FOUND" ? copy.pages.detail.noReport : reported.message}
-                    </p>
-                    {reported.code === "NOT_FOUND" ? (
+                    <p className="text-sm text-ink">{problem ?? copy.pages.detail.noReport}</p>
+                    {problem === null ? (
                         <p className="text-xs text-ink-dim">{copy.pages.detail.noReportBody}</p>
                     ) : null}
                 </div>
-            </Panel>
-        );
-    }
-
-    const held = report.data;
-    if (held === undefined) {
-        return (
-            <Panel>
-                <PanelHeader title={copy.pages.detail.report} />
-                <p className="p-3 text-xs text-ink-dim">{copy.pages.detail.noReport}</p>
             </Panel>
         );
     }
@@ -127,7 +119,23 @@ export function PageReportPanel({ pageId, siteId }: PageReportPanelProps): React
                         <span className="text-2xs tracking-label text-ink-faint uppercase">
                             {copy.pages.detail.liveUrl}
                         </span>
-                        <span className="truncate font-mono text-xs text-ink-soft select-all">{publishUrl}</span>
+                        {isBrowsable(publishUrl) ? (
+                            <button
+                                type="button"
+                                title={copy.app.openExternal}
+                                onClick={() => {
+                                    void openExternal(publishUrl);
+                                }}
+                                className="flex min-w-0 items-center gap-1 text-left font-mono text-xs text-accent hover:underline"
+                            >
+                                <span className="truncate">{publishUrl}</span>
+                                <OpenInNewIcon size={12} className="shrink-0" />
+                            </button>
+                        ) : (
+                            <span className="truncate font-mono text-xs text-ink-soft select-all">
+                                {publishUrl}
+                            </span>
+                        )}
                     </div>
                 )}
             </div>

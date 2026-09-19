@@ -231,14 +231,14 @@ function install(client: QueryClient): (() => void)[] {
             invalidateAll(
                 client,
                 keys.agent.pendingAll(),
-                keys.agent.messages({ conversationId: envelope.payload.conversationId }),
+                keys.agent.messagesOf(envelope.payload.conversationId),
             );
         }),
         on("agent.done", (envelope) => {
             applyDone(envelope.payload);
             invalidateAll(
                 client,
-                keys.agent.messages({ conversationId: envelope.payload.conversationId }),
+                keys.agent.messagesOf(envelope.payload.conversationId),
                 keys.agent.conversationsAll(),
                 keys.models.usage({ conversationId: envelope.payload.conversationId }),
                 keys.sites.root(),
@@ -255,7 +255,7 @@ export function EventBridge(): null {
     useEffect(() => {
         const stops = install(client);
         const stopStallWatch = onStall((conversationId) => {
-            invalidate(client, keys.agent.messages({ conversationId }));
+            invalidate(client, keys.agent.messagesOf(conversationId));
         });
 
         const wake = (): void => {

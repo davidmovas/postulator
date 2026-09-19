@@ -3,8 +3,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { flatten } from "../call.js";
 import {
     cancelRun,
+    estimateRun,
     getArtifact,
     getRun,
+    listArtifacts,
     listRunItems,
     listRuns,
     pauseRun,
@@ -25,7 +27,7 @@ import { terminalRunStatuses } from "../../generated/vocab.js";
 
 export function useRuns(filter: RunFilter = {}, sort: RunSort | null = null, limit?: number) {
     return useUnlockedInfinite<RunFilter, Run>({
-        queryKey: keys.runs.list(filter, sort),
+        queryKey: keys.runs.list(filter, sort, limit),
         fetch: listRuns,
         filters: filter,
         sort,
@@ -43,7 +45,7 @@ export function useRun(runId: string | null) {
 
 export function useRunItems(runId: string | null, status?: string, limit?: number) {
     return useUnlockedInfinite<{ runId: string; status?: string }, RunItem>({
-        queryKey: keys.runs.items(runId ?? "", status),
+        queryKey: keys.runs.items(runId ?? "", status, limit),
         fetch: listRunItems,
         filters: { runId: runId ?? "", status },
         sort: null,
@@ -58,6 +60,14 @@ export function useArtifact(itemId: string | null, kind: string) {
         queryFn: ({ signal }) => getArtifact({ itemId: itemId ?? "", kind }, signal),
         enabled: itemId !== null && itemId !== "",
         retry: false,
+    });
+}
+
+export function useArtifacts(itemId: string | null) {
+    return useUnlockedQuery({
+        queryKey: keys.runs.artifactsOf(itemId ?? ""),
+        queryFn: ({ signal }) => listArtifacts({ itemId: itemId ?? "" }, signal),
+        enabled: itemId !== null && itemId !== "",
     });
 }
 
@@ -100,6 +110,13 @@ export function useStartRun() {
             void catchUpNow(answered.runId);
             void client.invalidateQueries({ queryKey: keys.runs.lists() });
         },
+    });
+}
+
+export function useEstimateRun() {
+    return useMutation({
+        mutationFn: (request: Parameters<typeof estimateRun>[0]) => estimateRun(request),
+        retry: false,
     });
 }
 

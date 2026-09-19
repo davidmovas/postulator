@@ -1,4 +1,4 @@
-import { Dialogs } from "@wailsio/runtime";
+import { Browser, Dialogs } from "@wailsio/runtime";
 
 export interface HostFilter {
     displayName: string;
@@ -47,4 +47,22 @@ export async function pickSaveFile(options: HostPickOptions = {}): Promise<strin
         CanCreateDirectories: true,
     });
     return normalise(picked);
+}
+
+const browsable: ReadonlySet<string> = new Set<string>(["http:", "https:"]);
+
+export function isBrowsable(url: string): boolean {
+    try {
+        return browsable.has(new URL(url).protocol);
+    } catch {
+        return false;
+    }
+}
+
+export async function openExternal(url: string): Promise<boolean> {
+    if (!isBrowsable(url)) {
+        return false;
+    }
+    await Browser.OpenURL(url);
+    return true;
 }

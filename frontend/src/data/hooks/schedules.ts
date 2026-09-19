@@ -21,7 +21,7 @@ type SchedulePages = InfiniteData<List<Schedule>, Cursor | undefined>;
 
 export function useSchedules(filter: ScheduleFilter = {}, limit?: number) {
     return useUnlockedInfinite<ScheduleFilter, Schedule>({
-        queryKey: keys.schedules.list(filter),
+        queryKey: keys.schedules.list(filter, limit),
         fetch: listSchedules,
         filters: filter,
         sort: null,

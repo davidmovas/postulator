@@ -23,6 +23,7 @@ export const copy = {
         save: "Save",
         cancel: "Cancel",
         loadMore: "Load more",
+        openExternal: "Open in your browser",
     },
     lock: {
         title: "Postulator is locked",

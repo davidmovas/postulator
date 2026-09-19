@@ -7,6 +7,8 @@ export type { Code, TransportError } from "../lib/errors.js";
 
 export const messages: Readonly<Record<Code, string>> = Object.freeze({ ...errorMessages });
 
+export const codes: readonly Code[] = Object.freeze(Object.keys(messages) as Code[]);
+
 const minimumRetryDelayMs = 250;
 const defaultRetryDelayMs = 1000;
 

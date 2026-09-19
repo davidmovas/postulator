@@ -6,6 +6,7 @@ export const getSetting = one(Settings.Get);
 export const setSetting = one(Settings.Set);
 export const setProviderKey = one(Settings.SetProviderKey);
 export const providerKeys = one(Settings.ProviderKeys);
+export const deleteProviderKey = one(Settings.DeleteProviderKey);
 export const lockState = one(Settings.LockState);
 export const lock = one(Settings.Lock);
 export const unlock = one(Settings.Unlock);

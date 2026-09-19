@@ -29,7 +29,6 @@ import type { EntityIndex } from "./entities.js";
 import { statusTone } from "./labels.js";
 import { PageLinks } from "./links.js";
 import { PageMapping } from "./mapping.js";
-import { usePageDetailRefresh } from "./refresh.js";
 import { PageReportPanel } from "./report.js";
 
 const wpTypeOptions: readonly SelectOption<string>[] = pageWpTypes.map((value) => ({ value, label: value }));
@@ -85,10 +84,10 @@ function DriftNotice({ page }: DriftNoticeProps): ReactElement {
             tone="warn"
             icon={SyncProblemIcon}
             title={copy.pages.drift.title}
-            body={copy.pages.drift.body}
-            actions={
-                <div className="flex w-full flex-col gap-1">
-                    <p className="text-xs text-ink-soft">{copy.pages.drift.decision}</p>
+            body={
+                <div className="flex flex-col gap-1">
+                    <p>{copy.pages.drift.body}</p>
+                    <p>{copy.pages.drift.decision}</p>
                     <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 font-mono text-2xs text-ink-faint">
                         <dt>{copy.pages.drift.lastWritten}</dt>
                         <dd title={absoluteTime(page.lastSyncedAt)}>{relativeTime(page.lastSyncedAt)}</dd>
@@ -109,7 +108,6 @@ interface MetaFormProps {
 
 function MetaForm({ page, siteId, search }: MetaFormProps): ReactElement {
     const update = useUpdatePage();
-    const refresh = usePageDetailRefresh();
     const [draft, setDraft] = useState<Draft>(() => draftOf(page));
 
     useEffect(() => {
@@ -150,11 +148,7 @@ function MetaForm({ page, siteId, search }: MetaFormProps): ReactElement {
         if (draft.status !== original.status) {
             request.status = draft.status;
         }
-        update.mutate(request, {
-            onSuccess: () => {
-                refresh(page.id);
-            },
-        });
+        update.mutate(request);
     };
 
     return (

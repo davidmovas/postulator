@@ -24,7 +24,7 @@ import type {
 
 export function useConversations(filter: ConversationFilter = {}, limit?: number) {
     return useUnlockedInfinite<ConversationFilter, Conversation>({
-        queryKey: keys.agent.conversations(filter),
+        queryKey: keys.agent.conversations(filter, limit),
         fetch: listConversations,
         filters: filter,
         sort: null,
@@ -35,7 +35,7 @@ export function useConversations(filter: ConversationFilter = {}, limit?: number
 export function useMessages(conversationId: string | null, limit?: number) {
     const filter: MessageFilter = { conversationId: conversationId ?? "" };
     return useUnlockedInfinite<MessageFilter, Message>({
-        queryKey: keys.agent.messages(filter),
+        queryKey: keys.agent.messages(filter, limit),
         fetch: listMessages,
         filters: filter,
         sort: null,
@@ -46,7 +46,7 @@ export function useMessages(conversationId: string | null, limit?: number) {
 
 export function usePendingActions(filter: PendingActionFilter = {}, limit?: number) {
     return useUnlockedInfinite<PendingActionFilter, PendingAction>({
-        queryKey: keys.agent.pending(filter),
+        queryKey: keys.agent.pending(filter, limit),
         fetch: listPendingActions,
         filters: filter,
         sort: null,
@@ -81,7 +81,7 @@ export function useSendMessage() {
         onSuccess: (answered, request) => {
             beginTurn(request.conversationId, answered.messageId);
             void client.invalidateQueries({
-                queryKey: keys.agent.messages({ conversationId: request.conversationId }),
+                queryKey: keys.agent.messagesOf(request.conversationId),
             });
         },
     });
@@ -104,7 +104,7 @@ export function useCancelTurn() {
         mutationFn: (request: Parameters<typeof cancelTurn>[0]) => cancelTurn(request),
         onSettled: (_answered, _thrown, request) => {
             void client.invalidateQueries({
-                queryKey: keys.agent.messages({ conversationId: request.conversationId }),
+                queryKey: keys.agent.messagesOf(request.conversationId),
             });
         },
     });

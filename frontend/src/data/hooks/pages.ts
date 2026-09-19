@@ -12,6 +12,7 @@ import {
     unmapPage,
     updatePage,
 } from "../endpoints/pages.js";
+import { quietMeta } from "../client.js";
 import { keys } from "../keys.js";
 import { useUnlockedInfinite, useUnlockedQuery } from "../query.js";
 import type { PageSort } from "../sorts.js";
@@ -19,7 +20,7 @@ import type { Page, PageFilter } from "../types.js";
 
 export function usePages(filter: PageFilter, sort: PageSort | null = null, limit?: number) {
     return useUnlockedInfinite<PageFilter, Page>({
-        queryKey: keys.pages.list(filter, sort),
+        queryKey: keys.pages.list(filter, sort, limit),
         fetch: listPages,
         filters: filter,
         sort,
@@ -50,10 +51,12 @@ function usePageWrite<Request, Answer extends { page: Page }>(
     const client = useQueryClient();
     return useMutation({
         mutationFn: call,
+        meta: quietMeta(["CONFLICT"]),
         onSuccess: (answered) => {
-            client.setQueryData(keys.pages.detail(answered.page.id), answered);
+            void client.invalidateQueries({ queryKey: keys.pages.detail(answered.page.id) });
             void client.invalidateQueries({ queryKey: keys.pages.lists() });
             void client.invalidateQueries({ queryKey: keys.pages.tree(answered.page.siteId) });
+            void client.invalidateQueries({ queryKey: keys.graph.entityAll() });
         },
     });
 }
@@ -79,7 +82,7 @@ export function useSetCanonicalPage() {
     return useMutation({
         mutationFn: (request: Parameters<typeof setCanonicalPage>[0]) => setCanonicalPage(request),
         onSuccess: (answered) => {
-            client.setQueryData(keys.pages.detail(answered.page.id), answered);
+            void client.invalidateQueries({ queryKey: keys.pages.detail(answered.page.id) });
             void client.invalidateQueries({ queryKey: keys.pages.lists() });
             void client.invalidateQueries({ queryKey: keys.graph.root() });
         },

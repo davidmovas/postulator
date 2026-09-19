@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
+    deleteProviderKey,
     exportBackup,
     getSetting,
     importBackup,
@@ -58,6 +59,16 @@ export function useSetProviderKey() {
     const client = useQueryClient();
     return useMutation({
         mutationFn: (request: Parameters<typeof setProviderKey>[0]) => setProviderKey(request),
+        onSuccess: () => {
+            void client.invalidateQueries({ queryKey: keys.models.root() });
+        },
+    });
+}
+
+export function useDeleteProviderKey() {
+    const client = useQueryClient();
+    return useMutation({
+        mutationFn: (request: Parameters<typeof deleteProviderKey>[0]) => deleteProviderKey(request),
         onSuccess: () => {
             void client.invalidateQueries({ queryKey: keys.models.root() });
         },

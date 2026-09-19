@@ -17,6 +17,7 @@ export function usePageReport(pageId: string | null) {
         queryKey: keys.reports.page(pageId ?? ""),
         queryFn: ({ signal }) => pageReport({ pageId: pageId ?? "" }, signal),
         enabled: pageId !== null && pageId !== "",
+        quiet: ["NOT_FOUND"],
     });
 }
 

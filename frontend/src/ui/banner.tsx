@@ -18,7 +18,7 @@ const toneIcon: Readonly<Record<Tone, IconComponent>> = {
 export interface BannerProps {
     tone: Tone;
     title: string;
-    body?: string;
+    body?: ReactNode;
     icon?: IconComponent;
     actions?: ReactNode;
     className?: string;
@@ -35,7 +35,7 @@ export function Banner({ tone, title, body, icon, actions, className }: BannerPr
             <Icon size={19} className={cx("mt-px shrink-0", classes.ink)} />
             <div className="flex min-w-0 flex-col gap-1.5">
                 <p className={cx("text-sm font-semibold", classes.ink)}>{title}</p>
-                {body === undefined ? null : <p className="text-xs text-ink-soft">{body}</p>}
+                {body === undefined ? null : <div className="text-xs text-ink-soft">{body}</div>}
                 {actions === undefined ? null : <div className="mt-0.5 flex flex-wrap gap-2">{actions}</div>}
             </div>
         </div>

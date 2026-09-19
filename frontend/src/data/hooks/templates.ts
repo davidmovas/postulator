@@ -27,7 +27,7 @@ export function useTemplates(
     limit?: number,
 ) {
     return useUnlockedInfinite<TemplateFilter, Template>({
-        queryKey: keys.templates.list(filter, sort),
+        queryKey: keys.templates.list(filter, sort, limit),
         fetch: listTemplates,
         filters: filter,
         sort,
@@ -109,7 +109,7 @@ export function useDeleteOverride() {
 
 export function usePolicies(filter: PolicyFilter = {}, sort: PolicySort | null = null, limit?: number) {
     return useUnlockedInfinite<PolicyFilter, LinkPolicy>({
-        queryKey: keys.policies.list(filter, sort),
+        queryKey: keys.policies.list(filter, sort, limit),
         fetch: listPolicies,
         filters: filter,
         sort,

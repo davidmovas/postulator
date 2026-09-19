@@ -1,10 +1,11 @@
 import type { ReactElement } from "react";
 import { Link } from "react-router";
 
+import { isBrowsable, openExternal } from "../../data/host.js";
 import type { PageLink } from "../../data/types.js";
 import { copy } from "../../copy/index.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
-import { LinkIcon, Panel, PanelHeader, PublicIcon, toneClasses } from "../../ui/index.js";
+import { LinkIcon, OpenInNewIcon, Panel, PanelHeader, PublicIcon, toneClasses } from "../../ui/index.js";
 import { originIcon, originTone } from "./labels.js";
 
 export interface PageLinksProps {
@@ -39,12 +40,26 @@ export function PageLinks({ links, siteId, search }: PageLinksProps): ReactEleme
                                     <Icon size={13} className={tone.ink} />
                                 </span>
                                 {held.toPageId === null ? (
-                                    <span className="flex min-w-0 flex-1 items-center gap-1">
-                                        <PublicIcon size={12} className="shrink-0 text-ink-faint" />
-                                        <span className="truncate font-mono text-xs text-ink-soft">
-                                            {held.toUrl}
+                                    isBrowsable(held.toUrl) ? (
+                                        <button
+                                            type="button"
+                                            title={copy.app.openExternal}
+                                            onClick={() => {
+                                                void openExternal(held.toUrl);
+                                            }}
+                                            className="flex min-w-0 flex-1 items-center gap-1 text-left text-accent hover:underline"
+                                        >
+                                            <OpenInNewIcon size={12} className="shrink-0" />
+                                            <span className="truncate font-mono text-xs">{held.toUrl}</span>
+                                        </button>
+                                    ) : (
+                                        <span className="flex min-w-0 flex-1 items-center gap-1">
+                                            <PublicIcon size={12} className="shrink-0 text-ink-faint" />
+                                            <span className="truncate font-mono text-xs text-ink-soft">
+                                                {held.toUrl}
+                                            </span>
                                         </span>
-                                    </span>
+                                    )
                                 ) : (
                                     <Link
                                         to={`/s/${siteId}/pages/${held.toPageId}${search}`}

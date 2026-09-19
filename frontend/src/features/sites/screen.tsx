@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { copy } from "../../copy/index.js";
 import { flatten } from "../../data/call.js";
 import { useSites } from "../../data/hooks/sites.js";
+import { isBrowsable, openExternal } from "../../data/host.js";
 import type { SiteSort } from "../../data/sorts.js";
 import type { Site, SiteFilter } from "../../data/types.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
@@ -16,6 +17,8 @@ import {
     EmptyState,
     ExtensionIcon,
     ExtensionOffIcon,
+    IconButton,
+    OpenInNewIcon,
     Panel,
     PanelHeader,
     Select,
@@ -179,8 +182,22 @@ export function SitesScreen(): ReactElement {
                                             }}
                                         >
                                             <TableCell>{row.name}</TableCell>
-                                            <TableCell mono={true} muted={true}>
-                                                {row.baseUrl}
+                                            <TableCell mono={true} muted={true} title={row.baseUrl}>
+                                                <span className="flex min-w-0 items-center gap-1">
+                                                    <span className="truncate">{row.baseUrl}</span>
+                                                    {isBrowsable(row.baseUrl) ? (
+                                                        <IconButton
+                                                            icon={OpenInNewIcon}
+                                                            label={copy.app.openExternal}
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                void openExternal(row.baseUrl);
+                                                            }}
+                                                        />
+                                                    ) : null}
+                                                </span>
                                             </TableCell>
                                             <TableCell>
                                                 <StatusBadge tone={siteStatusTone(row.status)}>
@@ -208,10 +225,12 @@ export function SitesScreen(): ReactElement {
                                                     </StatusBadge>
                                                 )}
                                             </TableCell>
-                                            <TableCell align="right" muted={true}>
-                                                <span title={absoluteTime(row.createdAt)}>
-                                                    {relativeTime(row.createdAt)}
-                                                </span>
+                                            <TableCell
+                                                align="right"
+                                                muted={true}
+                                                title={absoluteTime(row.createdAt)}
+                                            >
+                                                {relativeTime(row.createdAt)}
                                             </TableCell>
                                         </TableRow>
                                     ))

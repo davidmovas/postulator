@@ -5,6 +5,7 @@ import { Link } from "react-router";
 import { copy } from "../../copy/index.js";
 import { react } from "../../data/errors.js";
 import { useTestConnection } from "../../data/hooks/sites.js";
+import { isBrowsable, openExternal } from "../../data/host.js";
 import type { Reachability, Site } from "../../data/types.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
 import {
@@ -13,6 +14,7 @@ import {
     DeleteIcon,
     EditNoteIcon,
     IconButton,
+    OpenInNewIcon,
     Panel,
     PanelHeader,
     SpaceDashboardIcon,
@@ -87,7 +89,21 @@ export function SiteDetail({ site, onEdit, onDelete }: SiteDetailProps): ReactEl
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3">
                 <dl className="flex flex-col gap-1.5">
                     <Row label={copy.sites.columns.baseUrl}>
-                        <span className="font-mono text-xs">{site.baseUrl}</span>
+                        {isBrowsable(site.baseUrl) ? (
+                            <button
+                                type="button"
+                                title={copy.app.openExternal}
+                                onClick={() => {
+                                    void openExternal(site.baseUrl);
+                                }}
+                                className="flex min-w-0 items-center gap-1 font-mono text-xs text-accent hover:underline"
+                            >
+                                <span className="truncate">{site.baseUrl}</span>
+                                <OpenInNewIcon size={12} className="shrink-0" />
+                            </button>
+                        ) : (
+                            <span className="font-mono text-xs">{site.baseUrl}</span>
+                        )}
                     </Row>
                     <Row label={copy.sites.field.username}>
                         <span className="font-mono text-xs">{site.username}</span>

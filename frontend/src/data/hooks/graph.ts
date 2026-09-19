@@ -36,7 +36,7 @@ export function useGraph(siteId: string | null) {
 
 export function useEntities(filter: EntityFilter, sort: EntitySort | null = null, limit?: number) {
     return useUnlockedInfinite<EntityFilter, Entity>({
-        queryKey: keys.graph.entities(filter, sort),
+        queryKey: keys.graph.entities(filter, sort, limit),
         fetch: listEntities,
         filters: filter,
         sort,
@@ -47,7 +47,7 @@ export function useEntities(filter: EntityFilter, sort: EntitySort | null = null
 
 export function useEdges(filter: EdgeFilter, limit?: number) {
     return useUnlockedInfinite<EdgeFilter, Edge>({
-        queryKey: keys.graph.edges(filter),
+        queryKey: keys.graph.edges(filter, limit),
         fetch: listEdges,
         filters: filter,
         sort: null,

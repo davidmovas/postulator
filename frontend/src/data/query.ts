@@ -9,20 +9,22 @@ import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-qu
 
 import type { Cursor, List, Sort } from "../lib/paging.js";
 import type { Paged } from "./call.js";
-import { infiniteGcTimeMs } from "./client.js";
+import { infiniteGcTimeMs, quietMeta } from "./client.js";
+import type { Code } from "./errors.js";
 import { useLockGate } from "./lock.js";
 
 export type UnlockedQueryOptions<TQueryFnData, TData> = Omit<
     UseQueryOptions<TQueryFnData, Error, TData, QueryKey>,
-    "enabled"
-> & { enabled?: boolean };
+    "enabled" | "meta"
+> & { enabled?: boolean; quiet?: readonly Code[] };
 
 export function useUnlockedQuery<TQueryFnData, TData = TQueryFnData>(
     options: UnlockedQueryOptions<TQueryFnData, TData>,
 ): UseQueryResult<TData, Error> {
     const gate = useLockGate();
+    const { quiet, ...rest } = options;
     const enabled = (options.enabled ?? true) && gate.ready && !gate.locked;
-    return useQuery({ ...options, enabled });
+    return useQuery({ ...rest, enabled, meta: quiet === undefined ? undefined : quietMeta(quiet) });
 }
 
 export function nextPageParam<T>(last: List<T>): Cursor | undefined {
@@ -36,6 +38,7 @@ export interface UnlockedInfiniteOptions<F, Item> {
     sort?: Sort | null;
     limit?: number;
     enabled?: boolean;
+    quiet?: readonly Code[];
 }
 
 export function useUnlockedInfinite<F, Item>(
@@ -46,6 +49,7 @@ export function useUnlockedInfinite<F, Item>(
     return useInfiniteQuery({
         queryKey: options.queryKey,
         enabled,
+        meta: options.quiet === undefined ? undefined : quietMeta(options.quiet),
         initialPageParam: undefined as Cursor | undefined,
         queryFn: ({ pageParam, signal }) =>
             options.fetch(

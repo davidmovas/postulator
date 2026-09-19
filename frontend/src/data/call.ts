@@ -19,6 +19,10 @@ interface RawList {
     hasMore: boolean;
 }
 
+export function clampLimit(limit: number | undefined): number {
+    return limit === undefined || limit <= 0 ? defaultLimit : Math.min(limit, maxLimit);
+}
+
 function settle<Res>(pending: CancellablePromise<Res>, signal?: AbortSignal): Promise<Res> {
     return signal === undefined ? pending : pending.cancelOn(signal);
 }
@@ -36,7 +40,7 @@ export function listed<Req, Item>(fn: Bound<Req, unknown>): Paged<Omit<Req, keyo
         signal?: AbortSignal,
     ): Promise<List<Wire<Item>>> => {
         const { cursor, limit, sort, ...filters } = args;
-        const clamped = limit === undefined || limit <= 0 ? defaultLimit : Math.min(limit, maxLimit);
+        const clamped = clampLimit(limit);
         const request: ListRequest & Record<string, unknown> = { ...filters, limit: clamped };
         if (cursor !== undefined) {
             request.cursor = cursor;

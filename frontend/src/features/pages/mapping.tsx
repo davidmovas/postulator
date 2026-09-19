@@ -20,7 +20,6 @@ import {
 import { ConflictNotice } from "./conflict-notice.js";
 import type { EntityIndex } from "./entities.js";
 import { entityIcon } from "./labels.js";
-import { usePageDetailRefresh } from "./refresh.js";
 
 const noEntity = "none";
 
@@ -36,13 +35,7 @@ export function PageMapping({ page, siteId, index, search }: PageMappingProps): 
     const map = useMapPageToEntity();
     const unmap = useUnmapPage();
     const canonical = useSetCanonicalPage();
-    const refresh = usePageDetailRefresh();
     const [choice, setChoice] = useState(page.entityId ?? noEntity);
-    const settle = {
-        onSuccess: () => {
-            refresh(page.id);
-        },
-    };
 
     useEffect(() => {
         setChoice(page.entityId ?? noEntity);
@@ -111,7 +104,7 @@ export function PageMapping({ page, siteId, index, search }: PageMappingProps): 
                             disabled={page.entityId === null}
                             busy={unmap.isPending}
                             onClick={() => {
-                                unmap.mutate({ pageId: page.id }, settle);
+                                unmap.mutate({ pageId: page.id });
                             }}
                         >
                             {copy.pages.detail.unmap}
@@ -122,7 +115,7 @@ export function PageMapping({ page, siteId, index, search }: PageMappingProps): 
                             disabled={!changed}
                             busy={map.isPending}
                             onClick={() => {
-                                map.mutate({ pageId: page.id, entityId: choice }, settle);
+                                map.mutate({ pageId: page.id, entityId: choice });
                             }}
                         >
                             {page.entityId === null ? copy.pages.detail.map : copy.pages.detail.change}
@@ -160,7 +153,7 @@ export function PageMapping({ page, siteId, index, search }: PageMappingProps): 
                                 variant="primary"
                                 busy={canonical.isPending}
                                 onClick={() => {
-                                    canonical.mutate({ entityId: entity.id, pageId: page.id }, settle);
+                                    canonical.mutate({ entityId: entity.id, pageId: page.id });
                                 }}
                             >
                                 {copy.pages.detail.makeCanonical}

@@ -1,9 +1,10 @@
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 
 import { isCancellation } from "./call.js";
-import type { Code } from "./errors.js";
-import { failure, react, retryAfterOf } from "./errors.js";
+import type { Code, Reaction } from "./errors.js";
+import { codes, failure, react, retryAfterOf } from "./errors.js";
 import { markLocked } from "./lock.js";
+import type { ToastTone } from "./toasts.js";
 import { pushToast } from "./toasts.js";
 
 const maxRateLimitedRetries = 5;
@@ -47,45 +48,88 @@ export function retryDelay(attempt: number, thrown: unknown): number {
     return Math.min(baseRetryDelayMs * 2 ** attempt, maxRetryDelayMs);
 }
 
-function announce(client: QueryClient | null, thrown: unknown): void {
-    const reaction = react(thrown);
+export type QuietMeta = { quiet: readonly Code[] };
+
+export type Announcement =
+    | { kind: "none" }
+    | { kind: "locked" }
+    | { kind: "toast"; tone: ToastTone; message: string; afterMs: number | null };
+
+const silence: ReadonlySet<Code> = new Set<Code>();
+
+export function quietMeta(expected: readonly Code[]): QuietMeta {
+    return { quiet: expected };
+}
+
+export function quietOf(meta: Record<string, unknown> | undefined): ReadonlySet<Code> {
+    const declared = meta?.["quiet"];
+    if (!Array.isArray(declared)) {
+        return silence;
+    }
+    const expected = new Set<Code>();
+    for (const held of declared) {
+        if (typeof held === "string" && (codes as readonly string[]).includes(held)) {
+            expected.add(held as Code);
+        }
+    }
+    return expected;
+}
+
+function toastOf(reaction: Reaction): { tone: ToastTone; message: string; afterMs: number | null } | null {
     switch (reaction.kind) {
-        case "silent":
-        case "field":
-            return;
-        case "unlock":
-            if (client !== null) {
-                markLocked(client);
-            }
-            return;
         case "throttle":
-            pushToast("warning", reaction.message, reaction.afterMs);
-            return;
+            return { tone: "warning", message: reaction.message, afterMs: reaction.afterMs };
         case "refetch":
-        case "form":
-            pushToast("info", reaction.message);
-            return;
+            return { tone: "info", message: reaction.message, afterMs: null };
         case "credentials":
         case "budget":
         case "review":
         case "external":
-            pushToast("warning", reaction.message);
-            return;
+            return { tone: "warning", message: reaction.message, afterMs: null };
         case "fatal":
-            pushToast("danger", reaction.message);
-            return;
+            return { tone: "danger", message: reaction.message, afterMs: null };
         default:
-            return;
+            return null;
+    }
+}
+
+export function announcementOf(thrown: unknown, expected: ReadonlySet<Code>): Announcement {
+    const reaction = react(thrown);
+    if (reaction.kind === "unlock") {
+        return { kind: "locked" };
+    }
+    const toast = toastOf(reaction);
+    if (toast === null || expected.has(failure(thrown).code)) {
+        return { kind: "none" };
+    }
+    return { kind: "toast", ...toast };
+}
+
+function announce(client: QueryClient | null, thrown: unknown, meta: Record<string, unknown> | undefined): void {
+    const announcement = announcementOf(thrown, quietOf(meta));
+    if (announcement.kind === "locked") {
+        if (client !== null) {
+            markLocked(client);
+        }
+        return;
+    }
+    if (announcement.kind === "toast") {
+        pushToast(announcement.tone, announcement.message, announcement.afterMs);
     }
 }
 
 export function createQueryClient(): QueryClient {
     let client: QueryClient | null = null;
-    const handle = (thrown: unknown): void => {
-        announce(client, thrown);
-    };
-    const queryCache = new QueryCache({ onError: handle });
-    const mutationCache = new MutationCache({ onError: handle });
+    const queryCache = new QueryCache({
+        onError: (thrown, query) => {
+            announce(client, thrown, query.meta);
+        },
+    });
+    const mutationCache = new MutationCache({
+        onError: (thrown, _variables, _context, mutation) => {
+            announce(client, thrown, mutation.meta);
+        },
+    });
     client = new QueryClient({
         queryCache,
         mutationCache,

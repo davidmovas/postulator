@@ -90,7 +90,7 @@ export function SortableHeader({
     );
 }
 
-export interface TableRowProps extends Omit<HTMLAttributes<HTMLDivElement>, "role" | "style"> {
+export interface TableRowProps extends Omit<HTMLAttributes<HTMLDivElement>, "role"> {
     selected?: boolean;
     interactive?: boolean;
 }
@@ -99,6 +99,7 @@ export function TableRow({
     selected = false,
     interactive = false,
     className,
+    style,
     children,
     ...rest
 }: TableRowProps): ReactElement {
@@ -107,7 +108,7 @@ export function TableRow({
         <div
             role="row"
             aria-selected={interactive ? selected : undefined}
-            style={{ gridTemplateColumns: columns }}
+            style={{ gridTemplateColumns: columns, ...style }}
             className={cx(
                 "grid h-7 shrink-0 items-center gap-3 border-b border-inset px-3 text-sm transition-colors duration-100",
                 interactive && "cursor-pointer",
@@ -128,6 +129,7 @@ export interface TableCellProps {
     mono?: boolean;
     align?: "left" | "right";
     muted?: boolean;
+    title?: string;
     className?: string;
 }
 
@@ -136,11 +138,13 @@ export function TableCell({
     mono = false,
     align = "left",
     muted = false,
+    title,
     className,
 }: TableCellProps): ReactElement {
     return (
         <div
             role="cell"
+            title={title}
             className={cx(
                 "min-w-0 truncate",
                 mono && "font-mono text-xs",

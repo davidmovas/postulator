@@ -15,7 +15,7 @@ import type { Site, SiteFilter } from "../types.js";
 
 export function useSites(filter: SiteFilter = {}, sort: SiteSort | null = null, limit?: number) {
     return useUnlockedInfinite<SiteFilter, Site>({
-        queryKey: keys.sites.list(filter, sort),
+        queryKey: keys.sites.list(filter, sort, limit),
         fetch: listSites,
         filters: filter,
         sort,

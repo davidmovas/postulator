@@ -115,8 +115,8 @@ function BranchRow({ row, selected, entityName, onToggle, onOpen }: BranchRowPro
                     </span>
                 ) : null}
             </TableCell>
-            <TableCell mono={true} muted={true}>
-                <span title={absoluteTime(page.lastSyncedAt)}>{relativeTime(page.lastSyncedAt)}</span>
+            <TableCell mono={true} muted={true} title={absoluteTime(page.lastSyncedAt)}>
+                {relativeTime(page.lastSyncedAt)}
             </TableCell>
         </TableRow>
     );

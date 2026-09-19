@@ -1,4 +1,5 @@
 import type { Sort } from "../lib/paging.js";
+import { clampLimit } from "./call.js";
 import { sortSegment } from "./sorts.js";
 import type {
     ConversationFilter,
@@ -15,6 +16,10 @@ import type {
 } from "./types.js";
 
 const scope = "pc";
+
+function limitSegment(limit: number | undefined): string {
+    return String(clampLimit(limit));
+}
 
 export interface UsageScope {
     runId?: string;
@@ -38,16 +43,16 @@ export const keys = {
     sites: {
         root: () => [scope, "sites"] as const,
         lists: () => [scope, "sites", "list"] as const,
-        list: (filter: SiteFilter, sort: Sort | null) =>
-            [scope, "sites", "list", filter, sortSegment(sort)] as const,
+        list: (filter: SiteFilter, sort: Sort | null, limit?: number) =>
+            [scope, "sites", "list", filter, sortSegment(sort), limitSegment(limit)] as const,
         details: () => [scope, "sites", "detail"] as const,
         detail: (id: string) => [scope, "sites", "detail", id] as const,
     },
     pages: {
         root: () => [scope, "pages"] as const,
         lists: () => [scope, "pages", "list"] as const,
-        list: (filter: PageFilter, sort: Sort | null) =>
-            [scope, "pages", "list", filter, sortSegment(sort)] as const,
+        list: (filter: PageFilter, sort: Sort | null, limit?: number) =>
+            [scope, "pages", "list", filter, sortSegment(sort), limitSegment(limit)] as const,
         details: () => [scope, "pages", "detail"] as const,
         detail: (id: string) => [scope, "pages", "detail", id] as const,
         trees: () => [scope, "pages", "tree"] as const,
@@ -56,20 +61,21 @@ export const keys = {
     graph: {
         root: () => [scope, "graph"] as const,
         entityLists: () => [scope, "graph", "entities"] as const,
-        entities: (filter: EntityFilter, sort: Sort | null) =>
-            [scope, "graph", "entities", filter, sortSegment(sort)] as const,
+        entities: (filter: EntityFilter, sort: Sort | null, limit?: number) =>
+            [scope, "graph", "entities", filter, sortSegment(sort), limitSegment(limit)] as const,
         entityAll: () => [scope, "graph", "entity"] as const,
         entity: (id: string) => [scope, "graph", "entity", id] as const,
         edgeLists: () => [scope, "graph", "edges"] as const,
-        edges: (filter: EdgeFilter) => [scope, "graph", "edges", filter] as const,
+        edges: (filter: EdgeFilter, limit?: number) =>
+            [scope, "graph", "edges", filter, limitSegment(limit)] as const,
         fulls: () => [scope, "graph", "full"] as const,
         full: (siteId: string) => [scope, "graph", "full", siteId] as const,
     },
     templates: {
         root: () => [scope, "templates"] as const,
         lists: () => [scope, "templates", "list"] as const,
-        list: (filter: TemplateFilter, sort: Sort | null) =>
-            [scope, "templates", "list", filter, sortSegment(sort)] as const,
+        list: (filter: TemplateFilter, sort: Sort | null, limit?: number) =>
+            [scope, "templates", "list", filter, sortSegment(sort), limitSegment(limit)] as const,
         details: () => [scope, "templates", "detail"] as const,
         detail: (id: string) => [scope, "templates", "detail", id] as const,
         resolvedAll: () => [scope, "templates", "resolved"] as const,
@@ -78,8 +84,8 @@ export const keys = {
     policies: {
         root: () => [scope, "policies"] as const,
         lists: () => [scope, "policies", "list"] as const,
-        list: (filter: PolicyFilter, sort: Sort | null) =>
-            [scope, "policies", "list", filter, sortSegment(sort)] as const,
+        list: (filter: PolicyFilter, sort: Sort | null, limit?: number) =>
+            [scope, "policies", "list", filter, sortSegment(sort), limitSegment(limit)] as const,
         details: () => [scope, "policies", "detail"] as const,
         detail: (id: string) => [scope, "policies", "detail", id] as const,
         effectives: () => [scope, "policies", "effective"] as const,
@@ -88,32 +94,37 @@ export const keys = {
     runs: {
         root: () => [scope, "runs"] as const,
         lists: () => [scope, "runs", "list"] as const,
-        list: (filter: RunFilter, sort: Sort | null) =>
-            [scope, "runs", "list", filter, sortSegment(sort)] as const,
+        list: (filter: RunFilter, sort: Sort | null, limit?: number) =>
+            [scope, "runs", "list", filter, sortSegment(sort), limitSegment(limit)] as const,
         details: () => [scope, "runs", "detail"] as const,
         detail: (runId: string) => [scope, "runs", "detail", runId] as const,
         itemLists: () => [scope, "runs", "items"] as const,
         itemsOf: (runId: string) => [scope, "runs", "items", runId] as const,
-        items: (runId: string, status: string | undefined) =>
-            [scope, "runs", "items", runId, status ?? "any"] as const,
+        items: (runId: string, status: string | undefined, limit?: number) =>
+            [scope, "runs", "items", runId, status ?? "any", limitSegment(limit)] as const,
         artifactsOf: (itemId: string) => [scope, "runs", "artifact", itemId] as const,
         artifact: (itemId: string, kind: string) => [scope, "runs", "artifact", itemId, kind] as const,
     },
     schedules: {
         root: () => [scope, "schedules"] as const,
         lists: () => [scope, "schedules", "list"] as const,
-        list: (filter: ScheduleFilter) => [scope, "schedules", "list", filter] as const,
+        list: (filter: ScheduleFilter, limit?: number) =>
+            [scope, "schedules", "list", filter, limitSegment(limit)] as const,
         details: () => [scope, "schedules", "detail"] as const,
         detail: (id: string) => [scope, "schedules", "detail", id] as const,
     },
     agent: {
         root: () => [scope, "agent"] as const,
         conversationsAll: () => [scope, "agent", "conversations"] as const,
-        conversations: (filter: ConversationFilter) => [scope, "agent", "conversations", filter] as const,
+        conversations: (filter: ConversationFilter, limit?: number) =>
+            [scope, "agent", "conversations", filter, limitSegment(limit)] as const,
         messagesAll: () => [scope, "agent", "messages"] as const,
-        messages: (filter: MessageFilter) => [scope, "agent", "messages", filter] as const,
+        messagesOf: (conversationId: string) => [scope, "agent", "messages", { conversationId }] as const,
+        messages: (filter: MessageFilter, limit?: number) =>
+            [scope, "agent", "messages", filter, limitSegment(limit)] as const,
         pendingAll: () => [scope, "agent", "pending"] as const,
-        pending: (filter: PendingActionFilter) => [scope, "agent", "pending", filter] as const,
+        pending: (filter: PendingActionFilter, limit?: number) =>
+            [scope, "agent", "pending", filter, limitSegment(limit)] as const,
     },
     models: {
         root: () => [scope, "models"] as const,

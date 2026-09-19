@@ -81,11 +81,11 @@ function PageRow({ page, selected, entityName, onOpen }: PageRowProps): ReactEle
                     </span>
                 ) : null}
             </TableCell>
-            <TableCell mono={true} muted={true}>
-                <span title={absoluteTime(page.lastSyncedAt)}>{relativeTime(page.lastSyncedAt)}</span>
+            <TableCell mono={true} muted={true} title={absoluteTime(page.lastSyncedAt)}>
+                {relativeTime(page.lastSyncedAt)}
             </TableCell>
-            <TableCell mono={true} muted={true}>
-                <span title={absoluteTime(page.createdAt)}>{relativeTime(page.createdAt)}</span>
+            <TableCell mono={true} muted={true} title={absoluteTime(page.createdAt)}>
+                {relativeTime(page.createdAt)}
             </TableCell>
         </TableRow>
     );
