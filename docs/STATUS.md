@@ -34,6 +34,7 @@ $(go env GOPATH)/bin/golangci-lint.exe run
 task e2e:up                the docker WordPress stack on http://localhost:8089
 task e2e:test              the plugin suite against it
 task e2e:full              the whole loop: sync, import, five drafts, relink, backup
+task e2e:full:noplugin     the same loop against a stack with the plugin deactivated
 task lint:e2e              the build-tagged sources, which `golangci-lint run` skips
 task e2e:down              stops the stack and drops its volumes
 ```
@@ -88,7 +89,17 @@ Module coverage is 87.6% of 14170 statements; `domain` + `application` sit at 86
 - A run's deadline is the `runtime.DefaultRunDeadline` constant, not a setting: nothing in the UI
   sets one yet, and a second knob with no reader would be dead configuration.
 - The docker e2e stack is never run in CI: `windows-latest` cannot run Linux containers, and the
-  Ubuntu job exists only to lint and package the plugin. Both suites are run by hand before a tag.
+  Ubuntu job exists only to lint and package the plugin. Every suite is run by hand before a tag:
+  `task e2e:test` and `task e2e:full` on a default stack, then `task e2e:full:noplugin`.
+- The degraded path, the client who refuses the companion plugin, is covered against a live
+  WordPress by `TestTheWholeLoopDegradesWithoutThePlugin`: the plugin check reports it absent,
+  every plugin-only call is refused as `plugin_missing`, the map arrives through core REST
+  without archiving the products core cannot see, and the loop generates, publishes and reads
+  back. Two things are simply unavailable there and say so rather than failing the item: the SEO
+  meta is skipped with a warning finding, and the neighbor relink stands down, because the only
+  content core REST offers to write back is WordPress's rendered output and writing that would
+  replace what a human wrote. A core pull also rebuilds the path of every draft, which core REST
+  reports as `/?page_id=42`; the companion plugin is what knows where a draft would land.
 - **Migration 0016 runs outside goose's transaction.** Rebuilding `run_items` means dropping it,
   and a drop with foreign keys on performs an implicit delete that would cascade into `artifacts`
   and `step_execs`. The statements are wrapped in an explicit `BEGIN`/`COMMIT`, so the rebuild is

@@ -162,16 +162,21 @@ in the same commit.
 on `127.0.0.1:8089`; `task e2e:up` provisions the site and writes `.env.generated`.
 
 ```
-task e2e:up                E2E_SEO=none|yoast|rankmath, E2E_WOO=0|1
+task e2e:up                E2E_SEO=none|yoast|rankmath, E2E_WOO=0|1, E2E_PLUGIN=0|1
 task e2e:test              the plugin contract, ./internal/adapters/wp/e2e/...
 task e2e:full              the whole loop, ./internal/e2e/...
+task e2e:full:noplugin     e2e:up with E2E_PLUGIN=0, then the degraded loop
 task e2e:down              e2e:reset does both
 ```
 
+`E2E_PLUGIN=0` leaves the companion plugin installed but deactivated: the client who refuses
+to install it. `e2e:test` then skips, being that plugin's contract, and the two loop tests in
+`internal/e2e` each skip the stack they cannot use, so both targets stay green either way.
+
 `internal/e2e` composes the real application over `adapters/llm/fake`, syncs the docker
-site, imports `examples/sitemap-import-example.xlsx`, generates five guide pages as drafts
-and reads the result back through the companion plugin. It deletes everything under
-`/menu/` on the site before it starts, so it can be run again without resetting the stack.
+site, imports `examples/sitemap-import-example.xlsx` and generates guide pages as drafts. It
+deletes everything under `/menu/` on the site before it starts, so it can be run again
+without resetting the stack.
 
 Both suites are `_test.go` behind `//go:build e2e`: it adds nothing to the coverage
 profile and the default lint never sees it, so use `task lint:e2e` and `gofmt -l .`.
