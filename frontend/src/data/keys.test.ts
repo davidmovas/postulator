@@ -60,3 +60,14 @@ describe("the conversation handle invalidates every message page", () => {
         expect(isPrefix(keys.agent.messagesOf("c2"), keys.agent.messages(filter, 25))).toBe(false);
     });
 });
+
+describe("a preview link lives outside the page cache", () => {
+    test("no page invalidation reaches a live preview link", () => {
+        expect(isPrefix(keys.pages.root(), keys.previews.link("p1", "exists"))).toBe(false);
+        expect(isPrefix(keys.previews.root(), keys.previews.link("p1", "exists"))).toBe(true);
+    });
+
+    test("a page that changes status resolves to a fresh link", () => {
+        expect(keys.previews.link("p1", "exists")).not.toEqual(keys.previews.link("p1", "published"));
+    });
+});

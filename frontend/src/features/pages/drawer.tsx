@@ -31,6 +31,7 @@ import type { EntityIndex } from "./entities.js";
 import { statusTone } from "./labels.js";
 import { PageLinks } from "./links.js";
 import { PageMapping } from "./mapping.js";
+import { PreviewPanel } from "./preview/preview-panel.js";
 import { PageReportPanel } from "./report.js";
 import { TemplatePanel } from "./template.js";
 
@@ -399,6 +400,7 @@ export function PageDrawer({ pageId, siteId, index, search, onClose }: PageDrawe
                         <p className="font-mono text-xs text-ink-faint select-all">{page.path}</p>
                     </div>
                     {page.drift ? <DriftNotice page={page} /> : null}
+                    <PreviewPanel page={page} siteId={siteId} />
                     <PageMapping page={page} siteId={siteId} index={index} search={search} />
                     <TemplatePanel page={page} siteId={siteId} />
                     <MetaForm page={page} siteId={siteId} search={search} />

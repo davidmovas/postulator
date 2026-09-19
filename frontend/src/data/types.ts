@@ -34,6 +34,7 @@ export type Reachability = Wire<SitesModels.Reachability>;
 export type Page = Wire<PagesModels.Page>;
 export type PageLink = Wire<PagesModels.PageLink>;
 export type PageTreeNode = Wire<PagesModels.TreeNode>;
+export type PreviewLink = Wire<PagesModels.PreviewLinkResponse>;
 export type PageLinkInput = Wire<PagesModels.LinkInput>;
 export type PageFilter = ListFilter<PagesModels.ListRequest>;
 

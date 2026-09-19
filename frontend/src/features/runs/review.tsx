@@ -23,6 +23,7 @@ import {
 } from "../../ui/index.js";
 import type { TabDefinition } from "../../ui/index.js";
 import { askAgent } from "../agent/dock-state.js";
+import { PreviewButton } from "../pages/preview/preview-button.js";
 import { countdown, dueMs, remainingMs, retryState, waitingUntil } from "./authority.js";
 import type { ItemView } from "./authority.js";
 import {
@@ -160,6 +161,7 @@ export function ReviewDrawer({
                             {blocked === null ? "" : copy.runs.retryBlockedBody}
                         </span>
                         <div className="flex shrink-0 gap-2">
+                            <PreviewButton pageId={item.targetId} siteId={item.siteId} />
                             <Button
                                 size="sm"
                                 variant="ghost"

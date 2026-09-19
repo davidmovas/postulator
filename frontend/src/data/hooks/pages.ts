@@ -7,6 +7,7 @@ import {
     listPages,
     mapPageToEntity,
     pageTree,
+    previewLink,
     replacePageLinks,
     setCanonicalPage,
     unmapPage,
@@ -108,5 +109,19 @@ export function useDeletePage() {
             void client.invalidateQueries({ queryKey: keys.pages.lists() });
             void client.invalidateQueries({ queryKey: keys.pages.trees() });
         },
+    });
+}
+
+export const previewLinkStaleMs = 50 * 60_000;
+
+export function usePreviewLink(page: Pick<Page, "id" | "status"> | null) {
+    return useUnlockedQuery({
+        queryKey: keys.previews.link(page?.id ?? "", page?.status ?? ""),
+        queryFn: ({ signal }) => previewLink({ pageId: page?.id ?? "" }, signal),
+        enabled: page !== null && page.id !== "" && page.status !== "planned" && page.status !== "archived",
+        staleTime: previewLinkStaleMs,
+        gcTime: previewLinkStaleMs,
+        refetchOnWindowFocus: false,
+        refetchOnMount: false,
     });
 }

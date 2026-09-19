@@ -74,3 +74,20 @@ export function react(thrown: unknown): Reaction {
             return { kind: "fatal", message: messages.INTERNAL };
     }
 }
+
+const pluginCodes: ReadonlySet<string> = new Set(["plugin_missing", "plugin_outdated"]);
+
+export function pluginCodeOf(reported: TransportError): string | null {
+    if (reported.code !== "INVALID") {
+        return null;
+    }
+    const held = reported.details?.["code"];
+    return typeof held === "string" && pluginCodes.has(held) ? held : null;
+}
+
+export function needsPlugin(thrown: unknown): boolean {
+    if (thrown === null || thrown === undefined) {
+        return false;
+    }
+    return pluginCodeOf(parseError(thrown)) !== null;
+}

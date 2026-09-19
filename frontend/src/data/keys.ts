@@ -58,6 +58,10 @@ export const keys = {
         trees: () => [scope, "pages", "tree"] as const,
         tree: (siteId: string) => [scope, "pages", "tree", siteId] as const,
     },
+    previews: {
+        root: () => [scope, "preview"] as const,
+        link: (pageId: string, status: string) => [scope, "preview", pageId, status] as const,
+    },
     graph: {
         root: () => [scope, "graph"] as const,
         entityLists: () => [scope, "graph", "entities"] as const,

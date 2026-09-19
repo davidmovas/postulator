@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import type { Code } from "../lib/errors.js";
-import { messages, react } from "./errors.js";
+import { failure, messages, needsPlugin, pluginCodeOf, react } from "./errors.js";
 
 function rejection(code: Code, message = "", extra: Record<string, unknown> = {}): unknown {
     return new Error("rejected", { cause: { code, message, ...extra } });
@@ -71,5 +71,29 @@ describe("the error reaction map", () => {
 
     test("treats an unrecognised rejection as INTERNAL", () => {
         expect(react(new Error("no cause at all"))).toEqual({ kind: "fatal", message: messages.INTERNAL });
+    });
+});
+
+describe("a site that cannot issue a preview", () => {
+    test("reads the plugin code off an INVALID refusal", () => {
+        const missing = rejection("INVALID", "the plugin is not installed", { details: { code: "plugin_missing" } });
+        const outdated = rejection("INVALID", "too old", { details: { code: "plugin_outdated", capability: "preview" } });
+        expect(pluginCodeOf(failure(missing))).toBe("plugin_missing");
+        expect(pluginCodeOf(failure(outdated))).toBe("plugin_outdated");
+        expect(needsPlugin(missing)).toBe(true);
+        expect(needsPlugin(outdated)).toBe(true);
+    });
+
+    test("ignores every other refusal", () => {
+        expect(needsPlugin(rejection("INVALID", "no page", { details: { field: "pageId" } }))).toBe(false);
+        expect(needsPlugin(rejection("EXTERNAL", "down", { details: { code: "plugin_missing" } }))).toBe(false);
+        expect(needsPlugin(rejection("INVALID", "odd", { details: { code: "something_else" } }))).toBe(false);
+        expect(needsPlugin(null)).toBe(false);
+    });
+
+    test("never toasts, because the refusal carries no field", () => {
+        expect(react(rejection("INVALID", "the plugin is not installed", { details: { code: "plugin_missing" } })).kind).toBe(
+            "form",
+        );
     });
 });
