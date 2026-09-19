@@ -3,7 +3,9 @@ import { createHashRouter, Navigate } from "react-router";
 import { copy } from "../copy/index.js";
 import { OnboardingScreen } from "../features/onboarding/index.js";
 import { PagesScreen } from "../features/pages/index.js";
+import { RunDetailScreen, RunsScreen } from "../features/runs/index.js";
 import { SitesScreen } from "../features/sites/index.js";
+import { TemplateEditorScreen, TemplatesScreen } from "../features/templates/index.js";
 import { NotBuilt } from "./not-built.js";
 import { Shell } from "./shell.js";
 
@@ -27,11 +29,11 @@ export const router = createHashRouter([
                     { path: "graph", element: panel(copy.nav.graph, "wave 3, agent 3") },
                     { path: "pages", element: <PagesScreen /> },
                     { path: "pages/:pageId", element: <PagesScreen /> },
-                    { path: "runs", element: panel(copy.nav.runs, "wave 3, agent 5") },
-                    { path: "runs/:runId", element: panel("Run detail", "wave 3, agent 5") },
-                    { path: "runs/:runId/items/:itemId", element: panel("Review drawer", "wave 3, agent 5") },
-                    { path: "templates", element: panel(copy.nav.templates, "wave 3, agent 4") },
-                    { path: "templates/:templateId", element: panel("Template editor", "wave 3, agent 4") },
+                    { path: "runs", element: <RunsScreen /> },
+                    { path: "runs/:runId", element: <RunDetailScreen /> },
+                    { path: "runs/:runId/items/:itemId", element: <RunDetailScreen /> },
+                    { path: "templates", element: <TemplatesScreen /> },
+                    { path: "templates/:templateId", element: <TemplateEditorScreen /> },
                     { path: "schedules", element: panel(copy.nav.schedules, "wave 3, agent 7") },
                     { path: "import", element: panel(copy.nav.importExport, "wave 3, agent 8") },
                     { path: "reports", element: panel(copy.nav.reports, "wave 3, agent 7") },
