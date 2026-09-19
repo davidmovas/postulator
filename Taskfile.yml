@@ -50,9 +50,21 @@ tasks:
     cmds:
       - go test -race -cover ./...
 
-  lint:
-    summary: Runs go vet and golangci-lint
+  check:go:comments:
+    summary: Fails when Go sources carry comments, which CLAUDE.md rule 1 forbids
     cmds:
+      - cmd: |
+          matches=$(git grep -nIE --untracked '^[[:space:]]*(//|/\*)|[^:[:space:]"][[:space:]]+//' -- '*.go' | grep -vE '//(go:|nolint:)' | grep -vE '"[^"]*//' || true)
+          if [ -n "$matches" ]; then
+            echo "$matches"
+            echo "Go sources must carry no comments (CLAUDE.md rule 1); //go: and //nolint: directives are the only exception"
+            exit 1
+          fi
+
+  lint:
+    summary: Runs the comment check, go vet and golangci-lint
+    cmds:
+      - task: check:go:comments
       - go vet ./...
       - golangci-lint run
 

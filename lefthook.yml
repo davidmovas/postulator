@@ -9,6 +9,15 @@ pre-commit:
       glob: "*.go"
       run: goimports -local github.com/davidmovas/postulator -l -w {staged_files}
       stage_fixed: true
+    comments:
+      glob: "*.go"
+      run: |
+        matches=$(grep -nE '^[[:space:]]*(//|/\*)|[^:[:space:]"][[:space:]]+//' {staged_files} | grep -vE '//(go:|nolint:)' | grep -vE '"[^"]*//' || true)
+        if [ -n "$matches" ]; then
+          echo "$matches"
+          echo "Go sources must carry no comments (CLAUDE.md rule 1); //go: and //nolint: directives are the only exception"
+          exit 1
+        fi
     lint:
       glob: "*.go"
       run: golangci-lint run --new-from-rev=HEAD~1 {staged_files}
