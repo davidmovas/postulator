@@ -9,6 +9,7 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "jsx": "react-jsx",
+    "target": "ES2022",
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "strict": true,
     "noUnusedLocals": true,
