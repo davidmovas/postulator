@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -137,6 +138,57 @@ func loadEnvironment(t *testing.T) environment {
 		t.Fatalf("%s does not carry the site, the user and the application password", path)
 	}
 	return env
+}
+
+// companion holds the one manifest probe this package makes. The full loop needs the plugin
+// and the degraded loop needs its absence, so each of them skips on the stack it cannot use.
+var companion struct {
+	once    sync.Once
+	err     error
+	present bool
+}
+
+func pluginIsActive(env environment) (bool, error) {
+	companion.once.Do(func() {
+		request, err := http.NewRequest(http.MethodGet, env.baseURL+"/wp-json/postulator/v1/manifest", http.NoBody)
+		if err != nil {
+			companion.err = err
+			return
+		}
+		request.SetBasicAuth(env.user, env.pass)
+
+		response, err := (&http.Client{Timeout: 60 * time.Second}).Do(request)
+		if err != nil {
+			companion.err = err
+			return
+		}
+		defer func() {
+			if closeErr := response.Body.Close(); closeErr != nil {
+				companion.err = closeErr
+			}
+		}()
+
+		companion.present = response.StatusCode == http.StatusOK
+	})
+	return companion.present, companion.err
+}
+
+func requirePlugin(t *testing.T, env environment, want bool) {
+	t.Helper()
+
+	present, err := pluginIsActive(env)
+	if err != nil {
+		t.Fatalf("ask %s for the companion manifest: %v", env.baseURL, err)
+	}
+	if present == want {
+		return
+	}
+	if want {
+		t.Skipf("the companion plugin is not active on %s; provision the stack with E2E_PLUGIN=1 "+
+			"(the default) to run the full loop", env.baseURL)
+	}
+	t.Skipf("the companion plugin is active on %s; provision the stack with E2E_PLUGIN=0 "+
+		"(`task e2e:full:noplugin`) to run the degraded loop", env.baseURL)
 }
 
 type link struct {

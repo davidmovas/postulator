@@ -50,6 +50,7 @@ func recipe() []template.StepSpec {
 
 func TestTheWholeLoopReachesTheDockerSite(t *testing.T) {
 	live := newSite(t)
+	requirePlugin(t, live.env, true)
 	live.clear(t)
 
 	menuID := live.publish(t, "Our Menu", "menu", menuBody, 0)
