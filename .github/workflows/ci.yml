@@ -75,6 +75,9 @@ jobs:
       - name: Build application
         run: task build
 
+      - name: Check for Go comments
+        run: task check:go:comments
+
       - name: Vet
         run: go vet ./...
 
