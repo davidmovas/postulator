@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -62,6 +63,7 @@ func (s *Server) routePlugin(mux *http.ServeMux) {
 	mux.HandleFunc("PUT "+pluginNamespace+"/seo-meta/{id}", s.handleSEOMeta)
 	mux.HandleFunc("GET "+pluginNamespace+"/content/{id}/raw", s.handleRawGet)
 	mux.HandleFunc("PUT "+pluginNamespace+"/content/{id}/raw", s.handleRawPut)
+	mux.HandleFunc("POST "+pluginNamespace+"/content/{id}/preview", s.handlePreview)
 }
 
 func (s *Server) pluginMissing(w http.ResponseWriter) bool {
@@ -82,11 +84,12 @@ func (s *Server) handleManifest(w http.ResponseWriter, _ *http.Request) {
 
 	s.mu.Lock()
 	plugin := s.seoPlugin
+	capabilities := slices.Clone(s.capabilities)
 	s.mu.Unlock()
 
 	s.respond(w, http.StatusOK, map[string]any{
-		"version":      "1.0.0",
-		"capabilities": []string{"bulk", "seo_meta", "content_hash", "raw"},
+		"version":      "1.1.0",
+		"capabilities": capabilities,
 		"seoPlugin":    plugin,
 		"wpVersion":    "6.9.1",
 		"site":         s.http.URL,
@@ -456,4 +459,52 @@ func afterCursor(stored *Item, after cursor) bool {
 		return true
 	}
 	return stored.Modified.Equal(bound) && stored.ID > after.ID
+}
+
+const previewLifetime = time.Hour
+
+func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
+	if s.pluginMissing(w) {
+		return
+	}
+
+	id, ok := pathID(r)
+	if !ok {
+		s.fail(w, http.StatusNotFound, "not_found", "No content with that id exists.")
+		return
+	}
+
+	s.mu.Lock()
+	stored, found := s.items[id]
+	if !found || !postType(stored.Type) {
+		s.mu.Unlock()
+		s.fail(w, http.StatusNotFound, "not_found", "No content with that id exists.")
+		return
+	}
+	s.previewSeq++
+	token := fmt.Sprintf("%032x", s.previewSeq)
+	expires := s.clock.Add(previewLifetime).UTC().Truncate(time.Second)
+	stored.PreviewHash = contentHash(token)
+	stored.PreviewExpires = expires
+	link := s.previewURL(stored, token)
+	broken := s.brokenExpiry
+	s.mu.Unlock()
+
+	reported := expires.Format(time.RFC3339)
+	if broken {
+		reported = "soon"
+	}
+	s.respond(w, http.StatusOK, map[string]any{"url": link, "expiresAt": reported})
+}
+
+func (s *Server) previewURL(stored *Item, token string) string {
+	parsed, err := url.Parse(s.permalink(stored))
+	if err != nil {
+		return s.http.URL
+	}
+	query := parsed.Query()
+	query.Set("preview", "true")
+	query.Set("postulator_preview", token)
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
 }

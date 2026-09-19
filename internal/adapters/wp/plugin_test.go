@@ -2,6 +2,9 @@ package wp_test
 
 import (
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,10 +29,10 @@ func TestCapabilitiesAreFetchedOnceAndCached(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Capabilities: %v", err)
 	}
-	if first.SEOPlugin != "rankmath" || first.Version != "1.0.0" || first.Site != server.URL() {
+	if first.SEOPlugin != "rankmath" || first.Version != "1.1.0" || first.Site != server.URL() {
 		t.Errorf("capabilities = %+v", first)
 	}
-	if !first.Has("raw") || !first.Has("seo_meta") || first.Has("telepathy") {
+	if !first.Has("raw") || !first.Has("seo_meta") || !first.Has(wp.CapabilityPreview) || first.Has("telepathy") {
 		t.Errorf("names = %v", first.Names)
 	}
 
@@ -64,6 +67,7 @@ func TestEveryPluginMethodDegradesWhenThePluginIsAbsent(t *testing.T) {
 			_, err := client.PutRaw(t.Context(), seeded[0].ID, "x", "")
 			return err
 		}},
+		{name: "preview", call: func() error { _, err := client.PreviewLink(t.Context(), seeded[0].ID); return err }},
 	}
 
 	for _, tc := range calls {
@@ -321,6 +325,73 @@ func TestThePostOnlyRoutesReportATermAsMissing(t *testing.T) {
 	}
 	if _, err := client.SetSEOMeta(t.Context(), term.ID, wp.SEOMeta{Title: "x"}); !errors.IsCode(err, errors.NotFound) {
 		t.Errorf("seo meta code = %q, want %q", errors.CodeOf(err), errors.NotFound)
+	}
+	if _, err := client.PreviewLink(t.Context(), term.ID); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("preview code = %q, want %q", errors.CodeOf(err), errors.NotFound)
+	}
+}
+
+func TestPreviewLinkIssuesTheURLAndTheExpiry(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	draft := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein", Status: "draft"})[0]
+	client := newClient(t, server)
+
+	link, err := client.PreviewLink(t.Context(), draft.ID)
+	if err != nil {
+		t.Fatalf("PreviewLink: %v", err)
+	}
+	parsed, err := url.Parse(link.URL)
+	if err != nil {
+		t.Fatalf("parse %s: %v", link.URL, err)
+	}
+	if !strings.HasPrefix(link.URL, server.URL()) || parsed.Query().Get("preview") != "true" ||
+		parsed.Query().Get("postulator_preview") == "" {
+		t.Errorf("url = %q", link.URL)
+	}
+	stored, _ := server.Lookup(draft.ID)
+	if !link.ExpiresAt.Equal(stored.PreviewExpires) {
+		t.Errorf("expires = %s, want %s", link.ExpiresAt, stored.PreviewExpires)
+	}
+
+	last, _ := server.LastRequest()
+	if last.Method != http.MethodPost || last.Path != "/wp-json/postulator/v1/content/"+strconv.FormatInt(draft.ID, 10)+"/preview" {
+		t.Errorf("last request = %s %s", last.Method, last.Path)
+	}
+}
+
+func TestPreviewLinkRefusesAPluginWithoutTheCapability(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t, wptest.WithCapabilities("bulk", "seo_meta", "content_hash", "raw"))
+	draft := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein", Status: "draft"})[0]
+	client := newClient(t, server)
+
+	_, err := client.PreviewLink(t.Context(), draft.ID)
+	if !errors.IsCode(err, errors.Invalid) || !wp.IsPluginOutdated(err) {
+		t.Fatalf("PreviewLink = %v, want a plugin_outdated refusal", err)
+	}
+	if got := detailOf(t, err, "capability"); got != wp.CapabilityPreview {
+		t.Errorf("capability = %q, want %q", got, wp.CapabilityPreview)
+	}
+	if wp.IsPluginMissing(err) {
+		t.Errorf("an outdated plugin reads as a missing one")
+	}
+	if got := len(server.Requests()); got != 1 {
+		t.Errorf("the client sent %d requests, want the manifest alone", got)
+	}
+}
+
+func TestPreviewLinkRefusesAnUnreadableExpiry(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t, wptest.WithBrokenPreviewExpiry())
+	draft := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein", Status: "draft"})[0]
+	client := newClient(t, server)
+
+	if _, err := client.PreviewLink(t.Context(), draft.ID); !errors.IsCode(err, errors.External) {
+		t.Fatalf("PreviewLink = %v, want an external failure", err)
 	}
 }
 

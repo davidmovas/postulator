@@ -100,3 +100,7 @@ func redirectTarget(mode Redirect, host, base string) (location string, status i
 func WithBrokenContentHash() Option {
 	return func(s *Server) { s.brokenHash = true }
 }
+
+func WithBrokenPreviewExpiry() Option {
+	return func(s *Server) { s.brokenExpiry = true }
+}

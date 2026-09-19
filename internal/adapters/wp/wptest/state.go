@@ -21,22 +21,24 @@ const (
 var startInstant = time.Date(2026, time.September, 18, 10, 0, 0, 0, time.UTC)
 
 type Item struct {
-	Modified      time.Time
-	Meta          map[string]string
-	Type          string
-	Title         string
-	H1            string
-	Content       string
-	Excerpt       string
-	Slug          string
-	Status        string
-	Template      string
-	Categories    []int64
-	Tags          []int64
-	ID            int64
-	Parent        int64
-	MenuOrder     int
-	FeaturedMedia int64
+	Modified       time.Time
+	PreviewExpires time.Time
+	PreviewHash    string
+	Meta           map[string]string
+	Type           string
+	Title          string
+	H1             string
+	Content        string
+	Excerpt        string
+	Slug           string
+	Status         string
+	Template       string
+	Categories     []int64
+	Tags           []int64
+	ID             int64
+	Parent         int64
+	MenuOrder      int
+	FeaturedMedia  int64
 }
 
 type Category struct {

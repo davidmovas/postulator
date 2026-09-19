@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Postulator companion plugin
-  version: 1.0.0
+  version: 1.1.0
   summary: The REST namespace the Postulator companion plugin adds to a WordPress site.
   description: >-
     Every route lives under the WordPress REST namespace postulator/v1 and is
@@ -170,6 +170,38 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+  /content/{id}/preview:
+    post:
+      operationId: createPreviewLink
+      summary: Issue a signed, expiring public link that renders the post through the theme without a login.
+      description: >-
+        Post-only; a taxonomy term id answers 404 with the code not_found. Each
+        call mints a new random token, stores its sha256 under the post meta
+        key _postulator_preview_hash beside _postulator_preview_expires, and
+        answers the permalink with preview=true and the token in the
+        postulator_preview query argument. The previous link of the same post
+        stops working at that instant. A front-end request whose token matches
+        and has not expired renders a draft, pending, future or private post
+        as published for that one request, with nocache headers,
+        DONOTCACHEPAGE and a noindex robots directive; a wrong, missing or
+        expired token renders the 404 page. A post that is already public
+        renders as usual, whatever the token says. Issuing a link changes
+        neither post_modified_gmt nor post_content.
+      parameters:
+        - $ref: "#/components/parameters/PostID"
+      responses:
+        "200":
+          description: The link and the instant it stops working.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreviewLink"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   securitySchemes:
     applicationPassword:
@@ -278,12 +310,13 @@ components:
         version:
           type: string
           examples:
-            - 1.0.0
+            - 1.1.0
         capabilities:
           type: array
           description: >-
-            For version 1.0.0 this is exactly bulk, seo_meta, content_hash and
-            raw, in that order.
+            For version 1.1.0 this is exactly bulk, seo_meta, content_hash, raw
+            and preview, in that order. A 1.0.0 plugin lists the first four and
+            has no preview route.
           items:
             type: string
             enum:
@@ -291,6 +324,7 @@ components:
               - seo_meta
               - content_hash
               - raw
+              - preview
         seoPlugin:
           type: string
           enum:
@@ -516,3 +550,20 @@ components:
           type: string
           pattern: "^[0-9a-f]{64}$"
           description: The hash of the content that is now stored.
+    PreviewLink:
+      type: object
+      required:
+        - url
+        - expiresAt
+      properties:
+        url:
+          type: string
+          format: uri
+          description: >-
+            The permalink with preview=true and postulator_preview=<token>
+            appended. The token is 32 lowercase hex characters and is stored
+            only as its sha256.
+        expiresAt:
+          type: string
+          format: date-time
+          description: RFC3339 UTC instant one hour after issue; the link answers 404 after it.

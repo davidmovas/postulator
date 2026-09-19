@@ -51,6 +51,16 @@ function register_routes(): void {
 			),
 		)
 	);
+
+	register_rest_route(
+		NAMESPACE_PATH,
+		'/content/(?P<id>\d+)/preview',
+		array(
+			'methods'             => \WP_REST_Server::CREATABLE,
+			'callback'            => __NAMESPACE__ . '\\preview_create',
+			'permission_callback' => __NAMESPACE__ . '\\permission_check',
+		)
+	);
 }
 
 function manifest(): \WP_REST_Response {
@@ -254,4 +264,17 @@ function raw_update( \WP_REST_Request $request ) {
 
 	$stored = (string) get_post_field( 'post_content', (int) $post->ID, 'raw' );
 	return new \WP_REST_Response( array( 'contentHash' => content_hash( $stored ) ), 200 );
+}
+
+function preview_create( \WP_REST_Request $request ) {
+	$post = editable_post( $request );
+	if ( is_wp_error( $post ) ) {
+		return $post;
+	}
+
+	$issued = issue_preview( $post );
+	if ( is_wp_error( $issued ) ) {
+		return $issued;
+	}
+	return new \WP_REST_Response( $issued, 200 );
 }

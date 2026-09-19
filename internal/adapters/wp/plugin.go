@@ -13,11 +13,18 @@ import (
 )
 
 const (
-	CodePluginMissing = "plugin_missing"
+	CodePluginMissing  = "plugin_missing"
+	CodePluginOutdated = "plugin_outdated"
+	CapabilityPreview  = "preview"
 
 	defaultContentLimit = 100
 	maxContentLimit     = 500
 )
+
+type PreviewLink struct {
+	ExpiresAt time.Time
+	URL       string
+}
 
 type Manifest struct {
 	Version      string
@@ -209,6 +216,16 @@ func IsPluginMissing(err error) bool {
 	return errors.IsCode(err, errors.Invalid) && detailString(err, "code") == CodePluginMissing
 }
 
+func pluginOutdated(capability string) error {
+	return errors.New(errors.Invalid, "the Postulator companion plugin on this site is too old for this; update it").
+		WithDetail("code", CodePluginOutdated).
+		WithDetail("capability", capability)
+}
+
+func IsPluginOutdated(err error) bool {
+	return errors.IsCode(err, errors.Invalid) && detailString(err, "code") == CodePluginOutdated
+}
+
 func (c *Client) Manifest(ctx context.Context) (Manifest, error) {
 	c.manifestMu.Lock()
 	defer c.manifestMu.Unlock()
@@ -265,6 +282,17 @@ func (c *Client) Capabilities(ctx context.Context) (Capabilities, error) {
 func (c *Client) requirePlugin(ctx context.Context) error {
 	_, err := c.Manifest(ctx)
 	return err
+}
+
+func (c *Client) requireCapability(ctx context.Context, name string) error {
+	capabilities, err := c.Capabilities(ctx)
+	if err != nil {
+		return err
+	}
+	if !capabilities.Has(name) {
+		return pluginOutdated(name)
+	}
+	return nil
 }
 
 func (c *Client) ListContent(ctx context.Context, query ContentQuery) (ContentPage, error) {
@@ -389,4 +417,41 @@ func (c *Client) PutRaw(ctx context.Context, id int64, content, expectedHash str
 
 func rawPath(id int64) string {
 	return resourcePath("/content", id) + "/raw"
+}
+
+func previewPath(id int64) string {
+	return resourcePath("/content", id) + "/preview"
+}
+
+type previewPayload struct {
+	URL       string `json:"url"`
+	ExpiresAt string `json:"expiresAt"`
+}
+
+func (c *Client) PreviewLink(ctx context.Context, id int64) (PreviewLink, error) {
+	if err := c.requireCapability(ctx, CapabilityPreview); err != nil {
+		return PreviewLink{}, err
+	}
+
+	_, body, err := c.do(ctx, request{method: http.MethodPost, namespace: pluginNamespace, path: previewPath(id)})
+	if err != nil {
+		return PreviewLink{}, err
+	}
+
+	var payload previewPayload
+	if err := decodeJSON(body, &payload); err != nil {
+		return PreviewLink{}, err
+	}
+
+	expires, err := time.Parse(time.RFC3339, payload.ExpiresAt)
+	if err != nil {
+		return PreviewLink{}, errors.New(errors.External, "the site reported a preview expiry that is not a timestamp").
+			WithDetail("id", id)
+	}
+	parsed, err := url.Parse(payload.URL)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		return PreviewLink{}, errors.New(errors.External, "the site issued a preview link that is not an absolute address").
+			WithDetail("id", id)
+	}
+	return PreviewLink{URL: payload.URL, ExpiresAt: expires.UTC()}, nil
 }

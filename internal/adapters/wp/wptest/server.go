@@ -48,9 +48,12 @@ type Server struct {
 	seoPlugin     string
 	redirect      Redirect
 	pendingEdit   *edit
+	capabilities  []string
 	nextID        int64
+	previewSeq    int64
 	noPlugin      bool
 	brokenHash    bool
+	brokenExpiry  bool
 	noNamespaces  bool
 	mu            sync.Mutex
 }
@@ -72,6 +75,10 @@ func WithoutPlugin() Option {
 	return func(s *Server) { s.noPlugin = true }
 }
 
+func WithCapabilities(names ...string) Option {
+	return func(s *Server) { s.capabilities = slices.Clone(names) }
+}
+
 func WithoutNamespaces() Option {
 	return func(s *Server) { s.noNamespaces = true }
 }
@@ -84,14 +91,15 @@ func New(t testing.TB, opts ...Option) *Server {
 	t.Helper()
 
 	server := &Server{
-		t:          t,
-		items:      make(map[int64]*Item),
-		categories: make(map[int64]*Category),
-		uploads:    make(map[int64]*upload),
-		clock:      startInstant.Add(-time.Second),
-		user:       DefaultUser,
-		password:   DefaultPassword,
-		seoPlugin:  "yoast",
+		t:            t,
+		items:        make(map[int64]*Item),
+		categories:   make(map[int64]*Category),
+		uploads:      make(map[int64]*upload),
+		clock:        startInstant.Add(-time.Second),
+		user:         DefaultUser,
+		password:     DefaultPassword,
+		seoPlugin:    "yoast",
+		capabilities: []string{"bulk", "seo_meta", "content_hash", "raw", "preview"},
 	}
 	for _, opt := range opts {
 		opt(server)

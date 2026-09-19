@@ -1,8 +1,14 @@
 package wptest_test
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
+	"net/url"
+	"slices"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 )
@@ -27,8 +33,8 @@ func TestTheManifestReportsTheFrozenCapabilities(t *testing.T) {
 	}
 	decode(t, payload, &manifest)
 
-	want := []string{"bulk", "seo_meta", "content_hash", "raw"}
-	if manifest.Version != "1.0.0" || len(manifest.Capabilities) != len(want) {
+	want := []string{"bulk", "seo_meta", "content_hash", "raw", "preview"}
+	if manifest.Version != "1.1.0" || len(manifest.Capabilities) != len(want) {
 		t.Fatalf("manifest = %+v", manifest)
 	}
 	for index, capability := range want {
@@ -58,6 +64,7 @@ func TestASiteWithoutThePluginHasNoRoutes(t *testing.T) {
 		{name: "seo meta", method: http.MethodPut, path: "/wp-json/postulator/v1/seo-meta/" + itoa(seeded[0].ID), body: []byte(`{"title":"x"}`)},
 		{name: "raw read", method: http.MethodGet, path: "/wp-json/postulator/v1/content/" + itoa(seeded[0].ID) + "/raw"},
 		{name: "raw write", method: http.MethodPut, path: "/wp-json/postulator/v1/content/" + itoa(seeded[0].ID) + "/raw", body: []byte(`{"content":"x"}`)},
+		{name: "preview", method: http.MethodPost, path: "/wp-json/postulator/v1/content/" + itoa(seeded[0].ID) + "/preview"},
 	}
 
 	for _, tc := range cases {
@@ -486,5 +493,129 @@ func TestRewriteReplacesTheStoredContent(t *testing.T) {
 	stored, _ := server.Lookup(seeded[0].ID)
 	if stored.Content != "<p>Two.</p>" || !stored.Modified.After(seeded[0].Modified) {
 		t.Fatalf("the item holds %+v", stored)
+	}
+}
+
+type issuedPreview struct {
+	URL       string `json:"url"`
+	ExpiresAt string `json:"expiresAt"`
+}
+
+func issue(t *testing.T, server *wptest.Server, id int64) issuedPreview {
+	t.Helper()
+
+	response, payload := call(t, server, http.MethodPost, "/wp-json/postulator/v1/content/"+itoa(id)+"/preview", nil, true)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200, body %s", response.StatusCode, payload)
+	}
+	var issued issuedPreview
+	decode(t, payload, &issued)
+	return issued
+}
+
+func tokenIn(t *testing.T, link string) (token string, query url.Values) {
+	t.Helper()
+
+	parsed, err := url.Parse(link)
+	if err != nil {
+		t.Fatalf("parse %s: %v", link, err)
+	}
+	return parsed.Query().Get("postulator_preview"), parsed.Query()
+}
+
+func TestTheManifestCanNameFewerCapabilities(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t, wptest.WithCapabilities("bulk", "seo_meta", "content_hash", "raw"))
+	_, payload := call(t, server, http.MethodGet, "/wp-json/postulator/v1/manifest", nil, true)
+
+	var manifest struct {
+		Capabilities []string `json:"capabilities"`
+	}
+	decode(t, payload, &manifest)
+	if !slices.Equal(manifest.Capabilities, []string{"bulk", "seo_meta", "content_hash", "raw"}) {
+		t.Fatalf("capabilities = %v", manifest.Capabilities)
+	}
+}
+
+func TestPreviewIssuesATokenAndStoresOnlyItsHash(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	draft := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein", Status: "draft"})[0]
+	before, _ := server.Lookup(draft.ID)
+
+	issued := issue(t, server, draft.ID)
+	token, query := tokenIn(t, issued.URL)
+	if len(token) != 32 || strings.Trim(token, "0123456789abcdef") != "" {
+		t.Fatalf("token = %q, want 32 lowercase hex characters", token)
+	}
+	if query.Get("preview") != "true" || query.Get("page_id") != itoa(draft.ID) {
+		t.Errorf("query = %v, want the draft permalink with preview=true", query)
+	}
+	if !strings.HasPrefix(issued.URL, server.URL()) {
+		t.Errorf("url = %q, want it under %s", issued.URL, server.URL())
+	}
+
+	expires, err := time.Parse(time.RFC3339, issued.ExpiresAt)
+	if err != nil {
+		t.Fatalf("expiresAt %q: %v", issued.ExpiresAt, err)
+	}
+	stored, _ := server.Lookup(draft.ID)
+	sum := sha256.Sum256([]byte(token))
+	if stored.PreviewHash != hex.EncodeToString(sum[:]) {
+		t.Errorf("stored hash = %q, want the sha256 of the token", stored.PreviewHash)
+	}
+	if !stored.PreviewExpires.Equal(expires) || !expires.Equal(server.Now().Add(time.Hour).Truncate(time.Second)) {
+		t.Errorf("expires = %s, stored %s, want an hour after %s", expires, stored.PreviewExpires, server.Now())
+	}
+	if !stored.Modified.Equal(before.Modified) || stored.Content != before.Content {
+		t.Errorf("issuing a link changed the item")
+	}
+}
+
+func TestPreviewRotatesOnEachCall(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	draft := server.Seed(wptest.Item{Type: wptest.TypePost, Title: "Koffein", Status: "draft"})[0]
+
+	first, _ := tokenIn(t, issue(t, server, draft.ID).URL)
+	second, query := tokenIn(t, issue(t, server, draft.ID).URL)
+	if first == second {
+		t.Fatalf("two calls issued the same token %q", first)
+	}
+	if query.Get("p") != itoa(draft.ID) {
+		t.Errorf("query = %v, want the post permalink", query)
+	}
+	stored, _ := server.Lookup(draft.ID)
+	sum := sha256.Sum256([]byte(second))
+	if stored.PreviewHash != hex.EncodeToString(sum[:]) {
+		t.Errorf("the stored hash does not follow the second token")
+	}
+}
+
+func TestPreviewRefusesATermAndAnUnknownID(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	term := server.Seed(wptest.Item{Type: wptest.TypeProductCategory, Title: "Koffein"})[0]
+
+	for _, id := range []int64{term.ID, 424242} {
+		response, payload := call(t, server, http.MethodPost, "/wp-json/postulator/v1/content/"+itoa(id)+"/preview", nil, true)
+		if response.StatusCode != http.StatusNotFound || !strings.Contains(string(payload), "not_found") {
+			t.Errorf("id %d: status %d, body %s", id, response.StatusCode, payload)
+		}
+	}
+}
+
+func TestPreviewCanReportAnUnreadableExpiry(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t, wptest.WithBrokenPreviewExpiry())
+	draft := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein", Status: "draft"})[0]
+
+	if issued := issue(t, server, draft.ID); issued.ExpiresAt != "soon" {
+		t.Fatalf("expiresAt = %q, want the broken value", issued.ExpiresAt)
 	}
 }

@@ -53,10 +53,11 @@ func TestThePluginContractDocumentsEveryRoute(t *testing.T) {
 	t.Parallel()
 
 	want := map[string][]string{
-		"/manifest":         {"get"},
-		"/content":          {"get"},
-		"/seo-meta/{id}":    {"put"},
-		"/content/{id}/raw": {"get", "put"},
+		"/manifest":             {"get"},
+		"/content":              {"get"},
+		"/seo-meta/{id}":        {"put"},
+		"/content/{id}/raw":     {"get", "put"},
+		"/content/{id}/preview": {"post"},
 	}
 
 	routes := documentedRoutes(t)
@@ -118,6 +119,11 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 		{name: "expected hash property", snippet: "\n        expectedHash:\n"},
 		{name: "anchor property", snippet: "\n        anchor:\n"},
 		{name: "href property", snippet: "\n        href:\n"},
+		{name: "preview link schema", snippet: "\n    PreviewLink:\n"},
+		{name: "expires at property", snippet: "\n        expiresAt:\n"},
+		{name: "preview query argument", snippet: "postulator_preview"},
+		{name: "preview capability", snippet: "\n              - preview\n"},
+		{name: "plugin version", snippet: "\n  version: 1.1.0\n"},
 	}
 
 	document := contractDocument(t)
@@ -154,6 +160,9 @@ func TestTheClientHitsOnlyDocumentedPluginRoutes(t *testing.T) {
 	}
 	if _, err = client.PutRaw(t.Context(), seeded[0].ID, "<p>y</p>", raw.ContentHash); err != nil {
 		t.Fatalf("PutRaw: %v", err)
+	}
+	if _, err = client.PreviewLink(t.Context(), seeded[0].ID); err != nil {
+		t.Fatalf("PreviewLink: %v", err)
 	}
 
 	documented := documentedRoutes(t)
