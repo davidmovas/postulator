@@ -24,6 +24,7 @@ func factories() []factory {
 		graphProposeRelated,
 		pagesList,
 		pagesGet,
+		pagesPreviewLink,
 		pagesCreate,
 		pagesUpdate,
 		pagesDelete,

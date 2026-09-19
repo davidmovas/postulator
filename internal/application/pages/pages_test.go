@@ -29,12 +29,19 @@ type harness struct {
 func newHarness(t *testing.T) harness {
 	t.Helper()
 
+	return newPreviewHarness(t, &recordingIssuer{})
+}
+
+func newPreviewHarness(t *testing.T, issuer *recordingIssuer) harness {
+	t.Helper()
+
 	store := sqlitetest.Open(t)
 	owner := sqlitetest.Site(t, store, "shop")
 	recorder := &applicationtest.Recorder{}
 	clk := clock.NewFake(time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC))
 	return harness{
-		service:  pages.New(sqlite.NewPageRepo(store), sqlite.NewPageLinkRepo(store), sqlite.NewEntityRepo(store), sqlite.NewSiteRepo(store), store, recorder, clk),
+		service: pages.New(sqlite.NewPageRepo(store), sqlite.NewPageLinkRepo(store), sqlite.NewEntityRepo(store),
+			sqlite.NewSiteRepo(store), store, recorder, clk, issuer),
 		store:    store,
 		recorder: recorder,
 		clock:    clk,

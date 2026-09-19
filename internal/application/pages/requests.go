@@ -110,3 +110,13 @@ type ReplaceLinksRequest struct {
 type ReplaceLinksResponse struct {
 	Links []PageLink `json:"links"`
 }
+
+type PreviewLinkRequest struct {
+	PageID string `json:"pageId"`
+}
+
+type PreviewLinkResponse struct {
+	URL       string   `json:"url"`
+	ExpiresAt dto.Time `json:"expiresAt"`
+	Kind      string   `json:"kind"`
+}

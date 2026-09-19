@@ -45,6 +45,13 @@ func (stubProbe) TestConnection(context.Context, site.Candidate) (site.Reachabil
 	return site.Reachability{Reach: site.ReachOK}, nil
 }
 
+type stubPreview struct{}
+
+func (stubPreview) IssuePreview(context.Context, string, int64) (pages.IssuedPreview, error) {
+	return pages.IssuedPreview{}, errors.New(errors.Invalid, "no site in this test issues a preview").
+		WithDetail("code", "plugin_missing")
+}
+
 type stubEngine struct{}
 
 func (stubEngine) Enqueue(_ context.Context, record domainrun.Run) (domainrun.Run, error) {
@@ -125,7 +132,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding) {
 			Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Pages: pageRepo,
 			Profiles: modelProfiles, LLM: book, UnitOfWork: store, Publisher: bus, Clock: now,
 		}),
-		Pages:     pages.New(pageRepo, linkRepo, entityRepo, siteRepo, store, bus, now),
+		Pages:     pages.New(pageRepo, linkRepo, entityRepo, siteRepo, store, bus, now, stubPreview{}),
 		Templates: templateService,
 		Runs:      runs.New(stubEngine{}, runRepo, itemRepo, artifactRepo, sqlite.NewRunEventRepo(store), templateService, domainrun.NewRegistry()),
 		Sync:      sync.New(stubEngine{}, siteRepo, stubProbe{}, stubPacker{}, now),

@@ -42,6 +42,7 @@ func registered() []string {
 		"graph_propose_related",
 		"pages_list",
 		"pages_get",
+		"pages_preview_link",
 		"pages_create",
 		"pages_update",
 		"pages_delete",
@@ -154,6 +155,25 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 		}
 		seen[name] = struct{}{}
 	}
+}
+
+func TestAPreviewLinkIsApprovedBeforeItIsIssued(t *testing.T) {
+	t.Parallel()
+
+	registry := newRegistry(&actionRecorder{}, &busRecorder{})
+	for _, tool := range registry.Build(tools.Binding{Mode: agent.ModeAutonomous}) {
+		if tool.Def.Name != "pages_preview_link" {
+			continue
+		}
+		if tool.Def.Risk != tools.RiskWrite {
+			t.Fatalf("pages_preview_link risk = %s, want write: it hands a draft to anyone holding the link", tool.Def.Risk)
+		}
+		if tool.Def.Schema.Properties["pageId"] == nil {
+			t.Fatalf("pages_preview_link schema = %+v, want a pageId", tool.Def.Schema)
+		}
+		return
+	}
+	t.Fatal("pages_preview_link is not registered")
 }
 
 func TestEveryToolCarriesADefinitionAndASchema(t *testing.T) {

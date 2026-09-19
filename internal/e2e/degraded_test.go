@@ -190,7 +190,13 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 				planned.path, page)
 		}
 		assertLinksUpInTheMap(t, core.Pages, after, page)
+
+		_, previewErr := core.Pages.PreviewLink(t.Context(), pages.PreviewLinkRequest{PageID: page.ID})
+		if !wp.IsPluginMissing(previewErr) {
+			t.Fatalf("the preview of the draft %s = %v, want the plugin_missing refusal", planned.path, previewErr)
+		}
 	}
+	assertPublishedPreviews(t, core, live, after["/menu/"])
 
 	overview, err := core.Reports.SiteOverview(t.Context(), reports.SiteOverviewRequest{SiteID: siteID})
 	if err != nil {
@@ -247,6 +253,7 @@ func assertPluginCallsAreRefusedAsInvalid(t *testing.T, core *app.Core, siteID s
 			_, callErr := client.PutRaw(t.Context(), wpID, "<p>never written</p>", "")
 			return callErr
 		},
+		"preview": func() error { _, callErr := client.PreviewLink(t.Context(), wpID); return callErr },
 	}
 
 	for name, call := range calls {

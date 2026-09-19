@@ -29,6 +29,7 @@ func catalog() []vocabulary {
 		{export: "pageStatuses", tsType: "PageStatus", pkg: "internal/domain/pagemap", typeName: "Status"},
 		{export: "pageWpTypes", tsType: "PageWpType", pkg: "internal/domain/pagemap", typeName: "WPType"},
 		{export: "linkOrigins", tsType: "LinkOrigin", pkg: "internal/domain/pagemap", typeName: "LinkOrigin"},
+		{export: "previewKinds", tsType: "PreviewKind", pkg: "internal/application/pages", typeName: "PreviewKind"},
 		{
 			export: "cannibalizationReasons", tsType: "CannibalizationReason", pkg: "internal/domain/pagemap",
 			typeName: "Reason",

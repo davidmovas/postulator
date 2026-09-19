@@ -49,6 +49,10 @@ func (f pagesFake) SetCanonical(context.Context, pages.SetCanonicalRequest) (pag
 	return answer[pages.SetCanonicalResponse](f.mode)
 }
 
+func (f pagesFake) PreviewLink(context.Context, pages.PreviewLinkRequest) (pages.PreviewLinkResponse, error) {
+	return answer[pages.PreviewLinkResponse](f.mode)
+}
+
 func (f pagesFake) ReplaceLinks(context.Context, pages.ReplaceLinksRequest) (pages.ReplaceLinksResponse, error) {
 	return answer[pages.ReplaceLinksResponse](f.mode)
 }
@@ -57,7 +61,7 @@ func TestPagesServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
 	assertMethodNames(t, wails.NewPagesService(zap.NewNop(), ready[wails.PagesUseCase](pagesFake{})), []string{
-		"Create", "Delete", "Get", "List", "MapToEntity", "ReplaceLinks", "SetCanonical", "Tree", "Unmap", "Update",
+		"Create", "Delete", "Get", "List", "MapToEntity", "PreviewLink", "ReplaceLinks", "SetCanonical", "Tree", "Unmap", "Update",
 	})
 	assertEveryMethodConverts(t, wails.NewPagesService(zap.NewNop(), ready[wails.PagesUseCase](pagesFake{mode: missing})), missingBody)
 	assertEveryMethodConverts(t, wails.NewPagesService(zap.NewNop(), ready[wails.PagesUseCase](pagesFake{mode: panicking})), panicBody)

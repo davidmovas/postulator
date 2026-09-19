@@ -23,6 +23,7 @@ import (
 	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
 	agentrunner "github.com/davidmovas/postulator/internal/transport/agent"
 )
 
@@ -49,6 +50,13 @@ func (p chatProfiles) Resolve(context.Context, string, domainllm.Role, map[domai
 		return domainllm.ModelRef{}, p.err
 	}
 	return domainllm.ModelRef{Provider: "openai", Model: "chat"}, nil
+}
+
+type stubPreview struct{}
+
+func (stubPreview) IssuePreview(context.Context, string, int64) (pages.IssuedPreview, error) {
+	return pages.IssuedPreview{}, errors.New(errors.Invalid, "no site in this test issues a preview").
+		WithDetail("code", "plugin_missing")
 }
 
 type fixedCatalog struct{}
@@ -98,7 +106,7 @@ func build(t *testing.T, store *sqlite.Store, model *fake.Gollem, bus *applicati
 		pageRepo, siteRepo, store, bus, now)
 	registered := tools.New(tools.Deps{
 		Sites:     sites.New(siteRepo, nil, store, nil, bus, now),
-		Pages:     pages.New(pageRepo, linkRepo, entityRepo, siteRepo, store, bus, now),
+		Pages:     pages.New(pageRepo, linkRepo, entityRepo, siteRepo, store, bus, now, stubPreview{}),
 		Templates: templateService,
 		Reports: reports.New(reports.Deps{
 			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,

@@ -74,7 +74,7 @@ func newBareRunner(t *testing.T, resultCap int) *bareRunner {
 
 	registered := tools.New(tools.Deps{
 		Pages: pages.New(sqlite.NewPageRepo(store), sqlite.NewPageLinkRepo(store), sqlite.NewEntityRepo(store),
-			sqlite.NewSiteRepo(store), store, bus, now),
+			sqlite.NewSiteRepo(store), store, bus, now, stubPreview{}),
 		Actions:   sqlite.NewPendingActionRepo(store),
 		Publisher: bus,
 		Clock:     now,

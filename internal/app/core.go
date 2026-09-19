@@ -256,7 +256,7 @@ func (c *Core) compose(ctx context.Context, key []byte) error {
 		Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Pages: pageRepo,
 		Profiles: modelProfiles, LLM: client, UnitOfWork: store, Publisher: relay, Clock: now,
 	})
-	pagesService := pages.New(pageRepo, linkRepo, entityRepo, siteRepo, store, relay, now)
+	pagesService := pages.New(pageRepo, linkRepo, entityRepo, siteRepo, store, relay, now, previewIssuer{clients: wordpress})
 	importsService := imports.New(imports.Deps{
 		Tables:     importer.New(),
 		Entities:   entityRepo,

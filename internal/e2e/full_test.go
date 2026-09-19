@@ -4,6 +4,7 @@ package e2e_test
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -179,6 +180,12 @@ func TestTheWholeLoopReachesTheDockerSite(t *testing.T) {
 			t.Fatalf("the draft %s carries no seo meta: %+v", planned.path, draft.Meta)
 		}
 	}
+
+	stored = pagesByPath(t, core.Pages, siteID)
+	for _, planned := range generated {
+		assertDraftPreviews(t, core, live, stored[planned.path], drafts[planned.path].Title)
+	}
+	assertPublishedPreviews(t, core, live, stored["/menu/"])
 
 	for path, child := range map[string]string{
 		"/menu/":              "/menu/drinks/",
@@ -376,5 +383,52 @@ func (s *site) clear(t *testing.T) {
 		}
 		s.call(t, http.MethodDelete, "/wp-json/wp/v2/pages/"+strconv.Itoa(listed[i].ID)+"?force=true",
 			nil, http.StatusOK, nil)
+	}
+}
+
+func (s *site) anonymousGet(t *testing.T, target string) (status int, body string) {
+	t.Helper()
+
+	response, err := s.http.Get(target)
+	if err != nil {
+		t.Fatalf("GET %s: %v", target, err)
+	}
+	defer response.Body.Close()
+
+	raw, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatalf("read GET %s: %v", target, err)
+	}
+	return response.StatusCode, string(raw)
+}
+
+func assertDraftPreviews(t *testing.T, core *app.Core, live *site, page pages.Page, title string) {
+	t.Helper()
+
+	link, err := core.Pages.PreviewLink(t.Context(), pages.PreviewLinkRequest{PageID: page.ID})
+	if err != nil {
+		t.Fatalf("preview %s: %v", page.Path, err)
+	}
+	if link.Kind != string(pages.PreviewIssued) || link.ExpiresAt.Std().IsZero() {
+		t.Fatalf("preview %s = %+v, want an issued link with an expiry", page.Path, link)
+	}
+	status, body := live.anonymousGet(t, link.URL)
+	if status != http.StatusOK || !strings.Contains(body, title) {
+		t.Fatalf("the preview of %s answered %d without the draft's title %q", page.Path, status, title)
+	}
+}
+
+func assertPublishedPreviews(t *testing.T, core *app.Core, live *site, page pages.Page) {
+	t.Helper()
+
+	link, err := core.Pages.PreviewLink(t.Context(), pages.PreviewLinkRequest{PageID: page.ID})
+	if err != nil {
+		t.Fatalf("preview %s: %v", page.Path, err)
+	}
+	if link.Kind != string(pages.PreviewPublic) || link.URL != live.env.baseURL+page.Path {
+		t.Fatalf("preview %s = %+v, want its public address", page.Path, link)
+	}
+	if status, _ := live.anonymousGet(t, link.URL); status != http.StatusOK {
+		t.Fatalf("the public address of %s answered %d", page.Path, status)
 	}
 }

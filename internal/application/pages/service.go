@@ -50,10 +50,15 @@ type Service struct {
 	uow       unitOfWork
 	publisher application.Publisher
 	clock     clock.Clock
+	preview   previewIssuer
 }
 
-func New(pages pageStore, links linkStore, entities entityStore, sites siteReader, uow unitOfWork, publisher application.Publisher, clk clock.Clock) *Service {
-	return &Service{pages: pages, links: links, entities: entities, sites: sites, uow: uow, publisher: publisher, clock: clk}
+func New(pages pageStore, links linkStore, entities entityStore, sites siteReader, uow unitOfWork,
+	publisher application.Publisher, clk clock.Clock, preview previewIssuer) *Service {
+	return &Service{
+		pages: pages, links: links, entities: entities, sites: sites, uow: uow, publisher: publisher, clock: clk,
+		preview: preview,
+	}
 }
 
 func (s *Service) now() time.Time {

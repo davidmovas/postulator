@@ -21,6 +21,7 @@ type PagesUseCase interface {
 	Unmap(ctx context.Context, req pages.UnmapRequest) (pages.UnmapResponse, error)
 	SetCanonical(ctx context.Context, req pages.SetCanonicalRequest) (pages.SetCanonicalResponse, error)
 	ReplaceLinks(ctx context.Context, req pages.ReplaceLinksRequest) (pages.ReplaceLinksResponse, error)
+	PreviewLink(ctx context.Context, req pages.PreviewLinkRequest) (pages.PreviewLinkResponse, error)
 }
 
 type PagesService struct {
@@ -34,6 +35,7 @@ type PagesService struct {
 	unmap        middleware.Handler[pages.UnmapRequest, pages.UnmapResponse]
 	setCanonical middleware.Handler[pages.SetCanonicalRequest, pages.SetCanonicalResponse]
 	replaceLinks middleware.Handler[pages.ReplaceLinksRequest, pages.ReplaceLinksResponse]
+	previewLink  middleware.Handler[pages.PreviewLinkRequest, pages.PreviewLinkResponse]
 }
 
 func NewPagesService(logger *zap.Logger, useCase Source[PagesUseCase]) *PagesService {
@@ -48,6 +50,7 @@ func NewPagesService(logger *zap.Logger, useCase Source[PagesUseCase]) *PagesSer
 		unmap:        Wrap(logger, "pages.unmap", call(useCase, PagesUseCase.Unmap)),
 		setCanonical: Wrap(logger, "pages.setCanonical", call(useCase, PagesUseCase.SetCanonical)),
 		replaceLinks: Wrap(logger, "pages.replaceLinks", call(useCase, PagesUseCase.ReplaceLinks)),
+		previewLink:  Wrap(logger, "pages.previewLink", call(useCase, PagesUseCase.PreviewLink)),
 	}
 }
 
@@ -89,4 +92,8 @@ func (s *PagesService) SetCanonical(c context.Context, req pages.SetCanonicalReq
 
 func (s *PagesService) ReplaceLinks(c context.Context, req pages.ReplaceLinksRequest) (pages.ReplaceLinksResponse, error) {
 	return s.replaceLinks(c, req)
+}
+
+func (s *PagesService) PreviewLink(c context.Context, req pages.PreviewLinkRequest) (pages.PreviewLinkResponse, error) {
+	return s.previewLink(c, req)
 }

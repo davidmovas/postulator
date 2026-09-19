@@ -13,6 +13,9 @@ export type PageWpType = (typeof pageWpTypes)[number];
 export const linkOrigins = ["generated", "observed"] as const;
 export type LinkOrigin = (typeof linkOrigins)[number];
 
+export const previewKinds = ["public", "preview"] as const;
+export type PreviewKind = (typeof previewKinds)[number];
+
 export const cannibalizationReasons = [
     "same_primary_keyword",
     "same_entity_canonical",
