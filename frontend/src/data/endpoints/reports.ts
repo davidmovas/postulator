@@ -5,3 +5,5 @@ export const siteOverview = one(Reports.SiteOverview);
 export const pageReport = one(Reports.PageReport);
 export const runReport = one(Reports.RunReport);
 export const judgePage = one(Reports.JudgePage);
+export const linkAudit = one(Reports.LinkAudit);
+export const linkAuditPage = one(Reports.LinkAuditPage);

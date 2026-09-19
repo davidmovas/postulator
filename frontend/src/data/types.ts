@@ -102,6 +102,13 @@ export type DepthBucket = Wire<ReportsModels.DepthBucket>;
 export type EntityTotals = Wire<ReportsModels.EntityTotals>;
 export type PageTotals = Wire<ReportsModels.PageTotals>;
 export type EdgeTotals = Wire<ReportsModels.EdgeTotals>;
+export type LinkAudit = Wire<ReportsModels.LinkAuditResponse>;
+export type LinkAuditPage = Wire<ReportsModels.LinkAuditPageResponse>;
+export type PageAudit = Wire<ReportsModels.PageAudit>;
+export type RequiredLink = Wire<ReportsModels.RequiredLink>;
+export type ExtraLink = Wire<ReportsModels.ExtraLink>;
+export type LinkTotals = Wire<ReportsModels.LinkTotals>;
+export type LinkPolicySummary = Wire<ReportsModels.LinkPolicySummary>;
 export type JudgeResult = Wire<ContentModels.JudgeResponse>;
 export type JudgeReport = Wire<ContentModels.JudgeReport>;
 
