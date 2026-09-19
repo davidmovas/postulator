@@ -48,3 +48,5 @@ export { Toast, ToastRegion } from "./toast.js";
 export type { ToastProps, ToastRegionProps } from "./toast.js";
 export { toneClasses } from "./tone.js";
 export type { Tone, ToneClasses } from "./tone.js";
+export { VirtualRows } from "./virtual-rows.js";
+export type { VirtualRowsProps } from "./virtual-rows.js";

@@ -2,7 +2,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ReactElement, ReactNode, UIEvent } from "react";
 import { Fragment, useLayoutEffect, useRef } from "react";
 
-import { cx } from "../../ui/index.js";
+import { cx } from "./cx.js";
 
 const offsets = new Map<string, number>();
 

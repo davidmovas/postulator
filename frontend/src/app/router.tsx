@@ -1,6 +1,7 @@
 import { createHashRouter, Navigate } from "react-router";
 
 import { copy } from "../copy/index.js";
+import { GraphScreen } from "../features/graph/index.js";
 import { OnboardingScreen } from "../features/onboarding/index.js";
 import { PagesScreen } from "../features/pages/index.js";
 import { RunDetailScreen, RunsScreen } from "../features/runs/index.js";
@@ -26,7 +27,8 @@ export const router = createHashRouter([
                 children: [
                     { index: true, element: <Navigate to="overview" replace /> },
                     { path: "overview", element: panel(copy.nav.overview, "wave 3, agent 7") },
-                    { path: "graph", element: panel(copy.nav.graph, "wave 3, agent 3") },
+                    { path: "graph", element: <GraphScreen /> },
+                    { path: "graph/:entityId", element: <GraphScreen /> },
                     { path: "pages", element: <PagesScreen /> },
                     { path: "pages/:pageId", element: <PagesScreen /> },
                     { path: "runs", element: <RunsScreen /> },

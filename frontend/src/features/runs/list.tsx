@@ -28,7 +28,7 @@ import { defaultQuery, filterOf, narrowed, nextSort, readQuery, searchOf, writeQ
 import type { RunsQuery } from "./params.js";
 import { StartRunDialog } from "./start.js";
 import { statusPaused } from "./statuses.js";
-import { VirtualRows } from "./virtual-rows.js";
+import { VirtualRows } from "../../ui/index.js";
 
 const columns =
     "96px 116px minmax(120px,1.6fr) 92px minmax(90px,1fr) minmax(90px,1fr) minmax(90px,1fr)";

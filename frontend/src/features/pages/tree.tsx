@@ -28,7 +28,7 @@ import { statusTone } from "./labels.js";
 import type { PagesQuery } from "./params.js";
 import { branchIds, countNodes, flattenTree, pathTo } from "./tree-model.js";
 import type { TreeRow } from "./tree-model.js";
-import { VirtualRows } from "./virtual-rows.js";
+import { VirtualRows } from "../../ui/index.js";
 
 const columns = "minmax(200px,3fr) 92px minmax(96px,1.5fr) 56px 84px";
 const rowHeight = 28;

@@ -23,7 +23,7 @@ import type { RetryNotice } from "./log-view.js";
 import type { PageIndex } from "./page-index.js";
 import { pathOf } from "./page-index.js";
 import { StepCell } from "./step-cell.js";
-import { VirtualRows } from "./virtual-rows.js";
+import { VirtualRows } from "../../ui/index.js";
 
 const columns = "minmax(140px,2fr) 108px minmax(160px,2.2fr) 44px minmax(120px,1.6fr) 96px";
 const rowHeight = 28;

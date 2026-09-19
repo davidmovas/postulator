@@ -1,8 +1,11 @@
 account_tree
 add
+add_link
 ads_click
 alarm
+alt_route
 arrow_downward
+arrow_range
 arrow_right_alt
 arrow_upward
 attach_file
@@ -14,6 +17,7 @@ call_split
 campaign
 cancel
 category
+center_focus_weak
 check
 check_circle
 chevron_right
@@ -46,6 +50,7 @@ info
 inventory_2
 key
 key_off
+keyboard
 keyboard_arrow_down
 keyboard_arrow_up
 lightbulb
@@ -55,6 +60,7 @@ lock
 lock_open
 monitoring
 more_horiz
+north_east
 open_in_full
 open_in_new
 pause
@@ -76,8 +82,10 @@ search
 settings
 shield
 smart_toy
+sort
 space_dashboard
 star_shine
+stars_2
 stop_circle
 sync
 sync_alt
@@ -88,9 +96,12 @@ task_alt
 topic
 travel_explore
 tune
+unfold_less
 unfold_more
 upload_file
 verified
 visibility
 visibility_off
 warning
+zoom_in
+zoom_out

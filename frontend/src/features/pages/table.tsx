@@ -26,7 +26,7 @@ import type { EntityIndex } from "./entities.js";
 import { statusTone } from "./labels.js";
 import { defaultQuery, filterOf, narrowed, nextSort } from "./params.js";
 import type { PagesQuery } from "./params.js";
-import { VirtualRows } from "./virtual-rows.js";
+import { VirtualRows } from "../../ui/index.js";
 
 const columns = "minmax(120px,2.4fr) minmax(96px,2fr) 76px 92px minmax(96px,1.5fr) 56px 84px 84px";
 const rowHeight = 28;
