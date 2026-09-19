@@ -43,11 +43,12 @@ export interface OutlineViewProps {
     selectedId: string | null;
     matched: ReadonlySet<string> | null;
     onSelect: (id: string | null) => void;
+    onPick: (id: string) => void;
     onToggle: (id: string) => void;
     onLiftMore: (parentId: string, count: number) => void;
 }
 
-export function OutlineView({ siteId, index, rows, selectedId, matched, onSelect, onToggle, onLiftMore }: OutlineViewProps): ReactElement {
+export function OutlineView({ siteId, index, rows, selectedId, matched, onSelect, onPick, onToggle, onLiftMore }: OutlineViewProps): ReactElement {
     const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
         const nav = navKeys[event.key];
         if (nav !== undefined) {
@@ -102,7 +103,7 @@ export function OutlineView({ siteId, index, rows, selectedId, matched, onSelect
                 selected={held.id === selectedId}
                 className={cx(dim && "opacity-40")}
                 onClick={() => {
-                    onSelect(held.id);
+                    onPick(held.id);
                 }}
             >
                 <TableCell>

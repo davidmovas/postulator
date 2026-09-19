@@ -5,7 +5,14 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 import { copy } from "../../copy/index.js";
 import { react } from "../../data/errors.js";
 import { useGraph } from "../../data/hooks/graph.js";
-import { Banner, Button, EmptyState, HubIcon, PublicIcon, SkeletonRows, UploadFileIcon } from "../../ui/index.js";
+import { AddLinkIcon, Banner, Button, EmptyState, HubIcon, PublicIcon, SkeletonRows, UploadFileIcon } from "../../ui/index.js";
+import { PlanPageDialog } from "../pages/create.js";
+import type { EntityIndex } from "../pages/entities.js";
+import { ConnectDrawer } from "./actions/connect.js";
+import { EntityContextMenu } from "./actions/context-menu.js";
+import type { MenuTarget } from "./actions/context-menu.js";
+import { CreateEntityDrawer } from "./actions/create-entity.js";
+import { DeleteEntityDialog } from "./actions/delete-entity.js";
 import { Controls } from "./canvas/controls.js";
 import { Legend } from "./canvas/legend.js";
 import { GraphMap } from "./canvas/map.js";
@@ -24,6 +31,10 @@ import { OutlineView } from "./outline/view.js";
 import { useGraphSession } from "./state.js";
 import { Toolbar } from "./toolbar.js";
 
+interface Creating {
+    parentId: string | null;
+}
+
 export function GraphScreen(): ReactElement {
     const params = useParams();
     const navigate = useNavigate();
@@ -36,10 +47,20 @@ export function GraphScreen(): ReactElement {
     const [session, patchSession] = useGraphSession(siteId);
     const [revealVersion, setRevealVersion] = useState(0);
     const [focusSearch, setFocusSearch] = useState(0);
+    const [creating, setCreating] = useState<Creating | null>(null);
+    const [connectFrom, setConnectFrom] = useState<string | null>(null);
+    const [connectTo, setConnectTo] = useState<string | null>(null);
+    const [deleting, setDeleting] = useState<string | null>(null);
+    const [planning, setPlanning] = useState<string | null>(null);
+    const [menu, setMenu] = useState<MenuTarget | null>(null);
     const map = useRef<MapHandle | null>(null);
 
     const index = useMemo(() => buildGraphIndex(graph.data?.entities ?? [], graph.data?.edges ?? []), [graph.data]);
     const fold: FoldState = useMemo(() => session.fold ?? defaultFold(index), [session.fold, index]);
+    const entityIndex: EntityIndex = useMemo(
+        () => ({ entities: index.entities, byId: index.byId, complete: true, loading: graph.isPending }),
+        [index, graph.isPending],
+    );
 
     useEffect(() => {
         if (session.fold === null && graph.data !== undefined && index.counts.total > 0) {
@@ -63,6 +84,17 @@ export function GraphScreen(): ReactElement {
             void navigate(id === null ? `/s/${siteId}/graph${search}` : `/s/${siteId}/graph/${id}${search}`, { replace: true });
         },
         [navigate, siteId, search],
+    );
+
+    const pick = useCallback(
+        (id: string): void => {
+            if (connectFrom !== null && id !== connectFrom) {
+                setConnectTo(id);
+                return;
+            }
+            select(id);
+        },
+        [connectFrom, select],
     );
 
     const revealEntity = useCallback(
@@ -92,8 +124,30 @@ export function GraphScreen(): ReactElement {
         }
     }, [entityId, index, visible, fold, session.order, setFold]);
 
+    useEffect(() => {
+        if (connectFrom !== null && !index.byId.has(connectFrom)) {
+            setConnectFrom(null);
+            setConnectTo(null);
+        }
+    }, [connectFrom, index]);
+
     const onLens = (lens: Lens): void => {
         change({ ...query, lens });
+    };
+
+    const startConnect = (id: string): void => {
+        setConnectFrom(id);
+        setConnectTo(null);
+        select(id);
+    };
+
+    const stopConnect = (): void => {
+        setConnectFrom(null);
+        setConnectTo(null);
+    };
+
+    const toggleNode = (id: string): void => {
+        setFold(toggle(fold, id));
     };
 
     if (siteId === "") {
@@ -106,6 +160,7 @@ export function GraphScreen(): ReactElement {
 
     const failure = graph.error === null ? null : react(graph.error);
     const empty = graph.data !== undefined && index.counts.total === 0;
+    const connecting = connectFrom === null ? undefined : index.byId.get(connectFrom);
 
     return (
         <div
@@ -120,13 +175,38 @@ export function GraphScreen(): ReactElement {
             <Toolbar
                 index={index}
                 view={query.view}
+                selectedId={entityId}
+                connectFrom={connectFrom}
                 onView={(view) => {
                     change({ ...query, view });
                 }}
                 onPick={revealEntity}
+                onCreate={() => {
+                    setCreating({ parentId: entityId });
+                }}
+                onConnect={() => {
+                    if (entityId !== null) {
+                        startConnect(entityId);
+                    }
+                }}
+                onStopConnect={stopConnect}
                 focusSearch={focusSearch}
             />
             <LensBar query={query} counts={counts} onChange={change} />
+            {connecting === undefined ? null : (
+                <div className="border-b border-hairline px-3 py-2">
+                    <Banner
+                        tone="info"
+                        icon={AddLinkIcon}
+                        title={copy.graph.connect.picking(connecting.name)}
+                        actions={
+                            <Button size="sm" variant="ghost" onClick={stopConnect}>
+                                {copy.graph.connect.stop}
+                            </Button>
+                        }
+                    />
+                </div>
+            )}
             <div className="flex min-h-0 flex-1">
                 <div className="relative flex min-w-0 flex-1 flex-col">
                     {graph.isPending ? (
@@ -144,16 +224,27 @@ export function GraphScreen(): ReactElement {
                                 title={copy.graph.empty.title}
                                 body={copy.graph.empty.body}
                                 actions={
-                                    <Button
-                                        variant="secondary"
-                                        size="sm"
-                                        icon={UploadFileIcon}
-                                        onClick={() => {
-                                            void navigate(`/s/${siteId}/import`);
-                                        }}
-                                    >
-                                        {copy.graph.empty.import}
-                                    </Button>
+                                    <>
+                                        <Button
+                                            variant="primary"
+                                            size="sm"
+                                            onClick={() => {
+                                                setCreating({ parentId: null });
+                                            }}
+                                        >
+                                            {copy.graph.empty.add}
+                                        </Button>
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            icon={UploadFileIcon}
+                                            onClick={() => {
+                                                void navigate(`/s/${siteId}/import`);
+                                            }}
+                                        >
+                                            {copy.graph.empty.import}
+                                        </Button>
+                                    </>
                                 }
                             />
                         </div>
@@ -165,9 +256,8 @@ export function GraphScreen(): ReactElement {
                             selectedId={entityId}
                             matched={matched}
                             onSelect={select}
-                            onToggle={(id) => {
-                                setFold(toggle(fold, id));
-                            }}
+                            onPick={pick}
+                            onToggle={toggleNode}
                             onLiftMore={(parentId, count) => {
                                 setFold(liftMore(fold, parentId, count));
                             }}
@@ -184,12 +274,29 @@ export function GraphScreen(): ReactElement {
                                 showRelated={session.showRelated}
                                 revealVersion={revealVersion}
                                 onSelect={select}
-                                onToggle={(id) => {
-                                    setFold(toggle(fold, id));
-                                }}
+                                onPick={pick}
+                                onToggle={toggleNode}
                                 onLiftMore={(parentId, count) => {
                                     setFold(liftMore(fold, parentId, count));
                                 }}
+                                onContextMenu={(id, at) => {
+                                    if (id === null) {
+                                        setMenu(null);
+                                        return;
+                                    }
+                                    const row = rows.find((held) => held.id === id);
+                                    setMenu({
+                                        id,
+                                        at,
+                                        expanded: row?.kind === "entity" && row.expanded,
+                                        hasChildren: row?.kind === "entity" && row.childCount > 0,
+                                    });
+                                }}
+                                onCreateChild={(parentId) => {
+                                    setCreating({ parentId });
+                                }}
+                                onConnect={startConnect}
+                                onDelete={setDeleting}
                                 ref={(handle) => {
                                     map.current = handle;
                                 }}
@@ -216,13 +323,79 @@ export function GraphScreen(): ReactElement {
                                     patchSession({ legend: !session.legend });
                                 }}
                             />
+                            <EntityContextMenu
+                                target={menu}
+                                onClose={() => {
+                                    setMenu(null);
+                                }}
+                                onAddChild={(id) => {
+                                    setCreating({ parentId: id });
+                                }}
+                                onConnect={startConnect}
+                                onToggle={toggleNode}
+                                onCenter={revealEntity}
+                                onDelete={setDeleting}
+                            />
                         </>
                     )}
                 </div>
                 {empty || graph.isPending ? null : (
-                    <Inspector siteId={siteId} index={index} selectedId={entityId} onSelect={select} onReveal={revealEntity} onLens={onLens} />
+                    <Inspector
+                        siteId={siteId}
+                        index={index}
+                        selectedId={entityId}
+                        onSelect={select}
+                        onReveal={revealEntity}
+                        onLens={onLens}
+                        onConnect={startConnect}
+                        onDelete={setDeleting}
+                        onPlanPage={setPlanning}
+                    />
                 )}
             </div>
+            <CreateEntityDrawer
+                open={creating !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setCreating(null);
+                    }
+                }}
+                siteId={siteId}
+                index={index}
+                parentId={creating?.parentId ?? null}
+                onCreated={select}
+            />
+            <ConnectDrawer
+                siteId={siteId}
+                index={index}
+                fromId={connectFrom}
+                toId={connectTo}
+                onClose={stopConnect}
+            />
+            <DeleteEntityDialog
+                index={index}
+                entityId={deleting}
+                onClose={() => {
+                    setDeleting(null);
+                }}
+                onDeleted={() => {
+                    if (deleting === entityId) {
+                        select(null);
+                    }
+                }}
+            />
+            <PlanPageDialog
+                open={planning !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setPlanning(null);
+                    }
+                }}
+                siteId={siteId}
+                index={entityIndex}
+                search=""
+                initialEntityId={planning ?? undefined}
+            />
         </div>
     );
 }

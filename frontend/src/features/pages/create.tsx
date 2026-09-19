@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { react } from "../../data/errors.js";
@@ -41,6 +41,7 @@ export interface PlanPageDialogProps {
     siteId: string;
     index: EntityIndex;
     search: string;
+    initialEntityId?: string;
 }
 
 export function PlanPageDialog({
@@ -49,6 +50,7 @@ export function PlanPageDialog({
     siteId,
     index,
     search,
+    initialEntityId,
 }: PlanPageDialogProps): ReactElement {
     const navigate = useNavigate();
     const create = useCreatePage();
@@ -56,14 +58,20 @@ export function PlanPageDialog({
     const [title, setTitle] = useState("");
     const [wpType, setWpType] = useState<string>(pageWpTypes[0]);
     const [status, setStatus] = useState<string>(pageStatuses[0]);
-    const [entityId, setEntityId] = useState(noEntity);
+    const [entityId, setEntityId] = useState(initialEntityId ?? noEntity);
+
+    useEffect(() => {
+        if (open) {
+            setEntityId(initialEntityId ?? noEntity);
+        }
+    }, [open, initialEntityId]);
 
     const reset = (): void => {
         setPath("");
         setTitle("");
         setWpType(pageWpTypes[0]);
         setStatus(pageStatuses[0]);
-        setEntityId(noEntity);
+        setEntityId(initialEntityId ?? noEntity);
         create.reset();
     };
 

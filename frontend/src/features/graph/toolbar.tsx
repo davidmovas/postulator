@@ -2,7 +2,7 @@ import type { KeyboardEvent, ReactElement } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { copy } from "../../copy/index.js";
-import { cx, HubIcon, SearchIcon, TableRowsIcon, toneClasses } from "../../ui/index.js";
+import { AddIcon, AddLinkIcon, Button, CloseIcon, cx, HubIcon, SearchIcon, TableRowsIcon, toneClasses } from "../../ui/index.js";
 import type { IconComponent } from "../../ui/index.js";
 import { entityIcon, kindTone } from "./labels.js";
 import type { GraphIndex } from "./model/index.js";
@@ -37,6 +37,10 @@ function ViewButton({ view, current, label, icon: Icon, onSelect }: ViewButtonPr
             {label}
         </button>
     );
+}
+
+function Key({ children }: { children: string }): ReactElement {
+    return <kbd className="ml-1 rounded-sm border border-edge bg-raised px-1 font-mono text-2xs text-ink-dim">{children}</kbd>;
 }
 
 export interface SearchBoxProps {
@@ -111,10 +115,7 @@ export function SearchBox({ index, onPick, focusKey }: SearchBoxProps): ReactEle
                 />
             </label>
             {open && query.trim() !== "" ? (
-                <ul
-                    role="listbox"
-                    className="absolute top-7 left-0 z-20 w-72 overflow-hidden rounded-md border border-edge bg-raised py-1"
-                >
+                <ul role="listbox" className="absolute top-7 left-0 z-20 w-72 overflow-hidden rounded-md border border-edge bg-raised py-1">
                     {hits.length === 0 ? (
                         <li className="px-2 py-1 text-xs text-ink-dim">{copy.graph.search.noHits}</li>
                     ) : (
@@ -154,15 +155,35 @@ export function SearchBox({ index, onPick, focusKey }: SearchBoxProps): ReactEle
 export interface ToolbarProps {
     index: GraphIndex;
     view: GraphView;
+    selectedId: string | null;
+    connectFrom: string | null;
     onView: (view: GraphView) => void;
     onPick: (id: string) => void;
+    onCreate: () => void;
+    onConnect: () => void;
+    onStopConnect: () => void;
     focusSearch: number;
 }
 
-export function Toolbar({ index, view, onView, onPick, focusSearch }: ToolbarProps): ReactElement {
+export function Toolbar({ index, view, selectedId, connectFrom, onView, onPick, onCreate, onConnect, onStopConnect, focusSearch }: ToolbarProps): ReactElement {
     return (
         <header className="flex h-8 shrink-0 items-center justify-between gap-3 border-b border-hairline px-3">
             <div className="flex min-w-0 items-center gap-2">
+                <Button size="sm" variant="primary" icon={AddIcon} onClick={onCreate}>
+                    {copy.graph.inspector.title}
+                    <Key>N</Key>
+                </Button>
+                {connectFrom === null ? (
+                    <Button size="sm" variant="secondary" icon={AddLinkIcon} disabled={selectedId === null} onClick={onConnect}>
+                        {copy.graph.connect.start}
+                        <Key>E</Key>
+                    </Button>
+                ) : (
+                    <Button size="sm" variant="secondary" icon={CloseIcon} className="text-info" onClick={onStopConnect}>
+                        {copy.graph.connect.stop}
+                    </Button>
+                )}
+                <span className="h-4 w-px bg-hairline" aria-hidden={true} />
                 <SearchBox index={index} onPick={onPick} focusKey={focusSearch} />
             </div>
             <div className="flex shrink-0 items-center gap-2">

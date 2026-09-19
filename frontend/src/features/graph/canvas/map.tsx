@@ -69,9 +69,13 @@ export interface GraphMapProps {
     showRelated: boolean;
     revealVersion: number;
     onSelect: (id: string | null) => void;
+    onPick: (id: string) => void;
     onToggle: (id: string) => void;
     onLiftMore: (parentId: string, count: number) => void;
     onContextMenu?: (id: string | null, screen: Point) => void;
+    onCreateChild: (id: string | null) => void;
+    onConnect: (id: string) => void;
+    onDelete: (id: string) => void;
     minimap: boolean;
     ref?: (handle: MapHandle | null) => void;
 }
@@ -99,9 +103,13 @@ export function GraphMap({
     showRelated,
     revealVersion,
     onSelect,
+    onPick,
     onToggle,
     onLiftMore,
     onContextMenu,
+    onCreateChild,
+    onConnect,
+    onDelete,
     minimap,
     ref,
 }: GraphMapProps): ReactElement {
@@ -481,7 +489,7 @@ export function GraphMap({
             onToggle(target.id);
             return;
         }
-        onSelect(target.id);
+        onPick(target.id);
     };
 
     const onDoubleClick = (pointer: PointerInfo): void => {
@@ -545,13 +553,20 @@ export function GraphMap({
             }
             return;
         }
-        if (event.key === " " && latest.current.selectedId !== null) {
+        const selected = latest.current.selectedId;
+        if (event.key === " " && selected !== null) {
             event.preventDefault();
-            onToggle(latest.current.selectedId);
+            onToggle(selected);
         } else if (event.key === "Escape") {
             onSelect(null);
         } else if (event.key === "f" || event.key === "F") {
             fitAll();
+        } else if (event.key === "n" || event.key === "N") {
+            onCreateChild(selected);
+        } else if ((event.key === "e" || event.key === "E") && selected !== null) {
+            onConnect(selected);
+        } else if (event.key === "Delete" && selected !== null) {
+            onDelete(selected);
         } else if (event.key === "+" || event.key === "=") {
             const current = view.current;
             if (current !== null) {
