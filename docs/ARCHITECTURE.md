@@ -17,7 +17,7 @@ internal/runtime      the run engine and its step catalog
 internal/transport    wails services and event bridge, agent runner and tools
 internal/app          composition root, manual wiring, no DI container
 wp-plugin             the WordPress companion plugin
-frontend              React + Tailwind over the generated bindings; src/canvas is the 2D engine under the graph map
+frontend              React + Tailwind over the generated bindings; src/canvas is the 2D engine under the graph map, src/features/agent the dock, the agent screens and the confirmation cards
 ```
 
 ## The dependency rule
@@ -131,6 +131,7 @@ must belong to an **administrator**, so **multisite is unsupported in v2.0**.
 | `GET /content` | keyset page over posts then `product_cat` terms: hash, links, h1, meta |
 | `PUT /seo-meta/{id}` | writes the SEO fields present in the body; posts only |
 | `GET`/`PUT /content/{id}/raw` | raw `post_content` and its sha256; the write is a compare-and-swap returning `409 hash_mismatch` on a stale hash |
+| `POST /content/{id}/preview` | an hour-long link that renders a draft through the theme; the token is kept only as its sha256, and `posts_results` flips that one post to `publish` for that request, uncached and noindex (since 1.1.0) |
 
 | Field | Yoast | Rank Math | none |
 |---|---|---|---|

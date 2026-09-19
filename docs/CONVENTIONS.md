@@ -184,6 +184,10 @@ site, imports `examples/sitemap-import-example.xlsx` and generates guide pages a
 deletes everything under `/menu/` on the site before it starts, so it can be run again
 without resetting the stack.
 
+A test that needs WordPress state no route can set, such as an expired preview token, runs
+`wp` through the compose `bootstrap` service with `--no-deps --entrypoint wp`, which carries
+the database variables and the site volume; it skips when the environment names another site.
+
 Both suites are `_test.go` behind `//go:build e2e`: it adds nothing to the coverage
 profile and the default lint never sees it, so use `task lint:e2e` and `gofmt -l .`.
 `task plugin:lint` uses the pinned image's `php` on Windows and a local `php` on CI,

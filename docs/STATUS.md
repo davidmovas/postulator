@@ -14,7 +14,7 @@ import, the agent, the schedules, the fourteen bound services and their TypeScri
 master password locks and unlocks the whole core, a backup of the database round trips through
 one encrypted archive, and the sweep retires artifacts and run events on their own windows.
 
-The bound surface is a hundred and twelve methods since 2026-09-19: `SettingsService.ProviderKeys`
+The bound surface is a hundred and thirteen methods since 2026-09-19: `SettingsService.ProviderKeys`
 and `DeleteProviderKey` report and revoke an LLM key as a boolean, `SitesService.TestConnection`
 probes a site before it is saved and after it is edited, `RunsService.ListArtifacts` names the
 artifacts a run item holds without their blobs, and `RunsService.Estimate` prices a run before it
@@ -22,9 +22,14 @@ is enqueued. `sites.changed`, `schedules.changed` and `settings.changed` join th
 events, and a run's deadline is the `runs.deadline` setting rather than a constant.
 `ReportsService.LinkAudit` and `LinkAuditPage` answer, per mapped page, the links the graph asks
 it to carry and whether a stored link satisfies each one; `reports_link_audit` and
-`reports_link_audit_page` hand the same reads to the agent, eighty-five tools in all. An edge
+`reports_link_audit_page` hand the same reads to the agent. An edge
 carries a `reason` since migration 0019: the related proposer keeps the model's sentence, the
 page proposer derives one from the page paths, and `AddEdge` accepts one.
+`AgentService.RenameConversation` and `DeleteConversation` manage a conversation, and a first
+message titles an untitled one. `PagesService.PreviewLink` answers where a page can be seen as the
+site's theme renders it: a published page's public address, or an hour-long link the companion
+plugin 1.1.0 signs for a draft; `pages_preview_link` hands it to the agent as a `write` tool,
+eighty-six tools in all.
 
 `RunsService.ListItems` carries `retryable` and `retryBlockedReason` since 2026-09-19, computed
 from the current step's `Requires` against the item's purged artifacts; `inputs_expired` is the
@@ -34,10 +39,11 @@ renders every string union, the five sort field lists and six derived groupings 
 blocks in declaration order, and a byte-comparing test fails when it is stale.
 
 The last gate run on 2026-09-19: `task events`, `task vocab`, `task bindings`, `gofmt -l .`,
-`task check:go:comments`, `go vet`, `golangci-lint` (v2.13.2, 0 issues),
-`go test -count=1 -race -covermode=atomic ./...`, `go run ./cmd/covergate` and `task build` are
-green. `task package` and `task e2e:full` were last run on 2026-09-18, when `bin/postulator.exe`
-opened its window and answered `health.ping`.
+`task check:go:comments`, `go vet`, `golangci-lint` (v2.13.2, 0 issues, the build-tagged sources
+included), `go test -count=1 -race -covermode=atomic ./...`, `go run ./cmd/covergate`,
+`npm run typecheck`, `vitest`, `task build`, `task plugin:lint`, `task e2e:test`, `task e2e:full`
+and `task e2e:full:noplugin` are green. `task package` was last run on 2026-09-18, when
+`bin/postulator.exe` opened its window and answered `health.ping`.
 
 The frontend is a React application being built on that surface. Its toolchain, typed data layer,
 event bridge, run-event replay, app shell, router and lock gate landed in `0a9a97e`, with vitest
@@ -50,8 +56,17 @@ with the cycle refusal shown, a proposal queue with keyboard and bulk decisions,
 with a real cancel, a pulse on what changed, and a link-proof overlay. The Linking screen
 (`/s/:siteId/links`) reads `LinkAudit` and `LinkAuditPage`: meters, a filter rail, the pages worst
 first, a panel naming every link a page owes and carries, and a relink run over the selection.
-Not built yet: the overview, reports, schedules, import, settings and the agent dock; every one of
-them is a `NotBuilt` panel in `router.tsx`.
+The agent (`frontend/src/features/agent`) is a dock on every screen bound to the site in the route,
+toggled with Ctrl+J and resized by its edge, plus `/agent` for every conversation grouped by site
+and `/agent/inbox` for the actions waiting on approval. The transcript streams text and tool calls,
+and a write stops at a confirmation card that describes the action in sentences, one describer per
+tool family, `dangerous` visibly apart. "Ask the agent about this" sits on the graph inspector, the
+page drawer, the template editor and the run review. The template editor starts blank or from a
+copy, edits a page's own changes through `?page=`, types the two step settings, sets the site
+default and draws the page a template asks for. A page drawer and the run review open the page on
+the site: a published page by its address, a draft through the plugin's link in a frame with
+desktop, tablet and phone widths. Not built yet: the overview, reports, schedules, import and
+settings; every one of them is a `NotBuilt` panel in `router.tsx`.
 
 ## How to run
 
@@ -111,10 +126,15 @@ Module coverage is 87.6% of 14439 statements; `domain` + `application` sit at 86
   site with thousands of unmapped pages holds the window's call for minutes. The dialog says how
   many calls it will make, counts the seconds, and its stop aborts the call so earlier batches stay;
   turning it into a run with progress events is the proper fix.
-- "Ask the agent about this entity" is not offered anywhere yet: the agent dock is not built, and a
-  half-wired entry point would be a hole. Agent writes already reach the map through `graph.changed`.
-- The map cannot be seen from this machine's automation, so its rendering has been checked by
-  tests over the pure modules and by reading the code, not by looking at a window.
+- The map, the agent dock and screens, the confirmation cards, the template skeleton and the
+  preview frame cannot be seen from this machine's automation, so their rendering has been checked
+  by tests over the pure modules, the typecheck and by reading the code, not by looking at a window.
+- A preview link rotates on every issue, so two windows previewing one draft invalidate each
+  other's frame; each holds its link fifty minutes and "New link" recovers it. A security plugin
+  or host header that refuses framing blanks the frame without telling the parent; "Open in your
+  browser" sits beside it.
+- A turn's streamed text is not persisted, so a window opened mid-turn sees the answer only when
+  `agent.done` lands; a turn silent for ninety seconds is shown as stalled with the saved rows.
 - Nothing purges an artifact for an item that never published, so every failed or unpublished item
   stays retryable. The dead end `retryable` reports is narrow by construction: a published item
   past its retention window whose current step consumes `body_html`, `draft` or `images`. No
@@ -160,7 +180,10 @@ Module coverage is 87.6% of 14439 statements; `domain` + `application` sit at 86
   meta is skipped with a warning finding, and the neighbor relink stands down, because the only
   content core REST offers to write back is WordPress's rendered output and writing that would
   replace what a human wrote. A core pull also rebuilds the path of every draft, which core REST
-  reports as `/?page_id=42`; the companion plugin is what knows where a draft would land.
+  reports as `/?page_id=42`; the companion plugin is what knows where a draft would land. A draft
+  cannot be previewed there: `PagesService.PreviewLink` answers `INVALID` with `details.code =
+  plugin_missing`, the refusal every plugin-only call carries, while a published page still gets
+  its address, and the UI offers WordPress's own draft address, which asks for a login.
 - **Migration 0016 runs outside goose's transaction.** Rebuilding `run_items` means dropping it,
   and a drop with foreign keys on performs an implicit delete that would cascade into `artifacts`
   and `step_execs`. The statements are wrapped in an explicit `BEGIN`/`COMMIT`, so the rebuild is
@@ -183,10 +206,12 @@ Module coverage is 87.6% of 14439 statements; `domain` + `application` sit at 86
 
 ## Next steps
 
-1. Build the real frontend on the bound services and the generated events.
-2. Tag `v2.0.0` when the UI lands; `release.yml` publishes the executable, the NSIS installer and
-   the companion plugin archive from that tag.
-3. Close the gaps above that the UI reaches: the ledger screen and `settings.changed` for a
+1. Build the remaining screens: the overview, reports, schedules, import and settings.
+2. Walk the agent dock, the inbox, the cards, the template editor and the page preview in the
+   built window, which no automation here can see.
+3. Tag `v2.0.0` when the UI lands; `release.yml` publishes the executable, the NSIS installer and
+   the companion plugin archive, now 1.1.0, from that tag.
+4. Close the gaps above that the UI reaches: the ledger screen and `settings.changed` for a
    declared value, which needs an application settings use case.
 
 ## Final review

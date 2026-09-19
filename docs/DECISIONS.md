@@ -688,3 +688,82 @@ counters.
   from the page paths, which is the only evidence that step holds. `AddEdgeRequest.Reason` is
   optional, so `graph_add_edge` offers it to the agent without requiring it. The migration test
   demands `STRICT` only of a file that creates a table, because an `ALTER TABLE` carries none.
+
+## Decisions taken on 2026-09-19 for the agent surface and templates
+
+The agent had a finished data layer and no screen: the dock, `/agent`, `/agent/inbox` and every
+confirmation were `NotBuilt` panels. Templates had an editor that could not start from nothing,
+could not edit a page's own changes and showed no page.
+
+- **The dock is primary and bound to the site in the route.** It remembers the conversation
+  chosen per site in `localStorage` and falls back to the site's newest; `/agent/:id` is the same
+  view, wide. One agent, many conversations: no personas and no per-conversation allow list.
+- **Context reaches the agent as text the user can read.** "Ask the agent about this" prefills
+  the composer with the record's name and id; the system prompt already tells the model to pass
+  ids exactly as given. A hidden context field would be a second, unseen input to a turn.
+- **Three Go additions and no more.** `RenameConversation`, `DeleteConversation`, which cancels a
+  turn in flight before the foreign keys of migration 0017 take the messages, pending actions,
+  tool calls and history with it, and a first message titling an untitled conversation, because
+  every conversation the UI starts is untitled and a list of untitled rows is useless.
+- **`ListMessages` is the transcript; the live turn is an overlay.** `Send` answers the user
+  message's id while every stream event carries the assistant's, so the overlay is deduped by the
+  saved row id and by `callId`, never by the id `Send` returned. `agent.confirm.requested`'s
+  `confirmationId` is the pending action's id, so a live card and a listed one are the same card.
+- **A turn that stops reporting is `stalled`, not idle.** It keeps what it streamed, says so and
+  offers to ask again; the saved rows are refetched behind it.
+- **A confirmation card is described per tool family, never as JSON.** One describer per family
+  turns arguments into sentences with records named rather than numbered; a schema walk is the
+  fallback for a tool nobody described. A test asserts every confirmable tool has its own
+  describer and that no line carries JSON; a masked secret reads "kept hidden". `dangerous` is a
+  red border, a gavel and a warning, not a colour change.
+- **A template card speaks the editor's sentences.** `templates_create`'s spec and
+  `templates_set_override`'s patch cross as JSON strings; the card parses them with the editor's
+  own draft reader and `sentencesOf`, and an update is described as the merge patch against the
+  current template, so the client reads what changes rather than a whole document.
+- **Templates start blank or as a copy.** The blank draft mirrors the seeds' rule groups with one
+  required section, no images and every step on but `generate_images`, and satisfies
+  `template.Validate`. A page's own changes are edited in place through `?page=`, where "follow"
+  returns a value to what the site says. Only the two step settings a step reads, `allowErrors`
+  and `iterations`, are typed; any other is kept and named. The site default is set from the list
+  and the editor through `SitesService.Update.defaults`.
+- **The skeleton is computed, not generated.** The editor's preview draws the page a template
+  asks for from the draft alone: title pattern, H1, sections sized by their share of the words,
+  the parent link window, image slots and the length verdict. It costs nothing and cannot
+  misrepresent a model's output.
+
+## Decisions taken on 2026-09-19 for the page preview
+
+The client could not see a generated page the way the site's theme renders it: a run writes
+drafts, and WordPress shows a draft only to a logged-in editor.
+
+- **A published page never touches the plugin.** `PagesService.PreviewLink{pageId}` answers the
+  site's base URL and the page path with `kind: "public"` and no expiry.
+- **A draft gets a signed link from the companion plugin, version 1.1.0.** `POST
+  /content/{id}/preview` mints 16 random bytes, stores only their sha256 beside an expiry an hour
+  away, and answers the permalink with `preview=true` and the token. Storing the hash means a
+  second call cannot hand the first link back, so every call rotates it; reuse would need the
+  token in a plain column.
+- **The theme renders the draft for that one request.** A `posts_results` filter on the main
+  singular query flips the one post's status to `publish` in memory when the token matches and
+  has not expired, with no-cache headers, `DONOTCACHEPAGE`, a noindex robots directive, the
+  canonical redirect off and comments closed. The query runs with `cache_results` off so a
+  persistent object cache never keeps the flipped status. A wrong or expired token changes
+  nothing, and WordPress answers an anonymous visitor with its 404. No filter is removed, and
+  issuing a link writes post meta only, so it never registers as drift.
+- **`plugin_outdated` sits beside `plugin_missing`.** Both are `INVALID` with `details.code`; a
+  1.0.0 plugin lacks the `preview` capability and would otherwise answer `rest_no_route`, which
+  reads like a missing post. The use case returns the adapter's refusal unchanged, the frontend
+  keys on `details.code`, and an `INVALID` without a field never toasts.
+- **The application reaches the plugin through a consumer interface.** `pages.previewIssuer` is
+  bridged in `internal/app` over the site registry, as `content.rawReader` is, because the
+  application may not import an adapter.
+- **The frontend holds a link fifty minutes and keys it outside the pages root.** `bridge.tsx`
+  invalidates `keys.pages.root()` on unlock and after every agent turn, and a refetch would
+  rotate the link under an open frame; the key carries the page status, so a page that gets
+  published resolves to its public address.
+- **`pages_preview_link` is a `write` tool.** It changes nothing in the store, but it hands a
+  draft to anyone holding the link for an hour, so confirm mode asks first.
+- **The frame is best effort.** Nothing in the app sets a frame policy, but a security plugin or a
+  host header can refuse to be framed and a parent cannot detect it, so "Open in your browser"
+  sits beside the frame. Without the plugin a draft offers WordPress's own `?page_id=` address,
+  which asks the client to log in.

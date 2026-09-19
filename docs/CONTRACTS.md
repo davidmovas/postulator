@@ -30,7 +30,7 @@ the composition root binds the two.
 | `HealthService` | `Ping` |
 | `SitesService` | `Create Update Delete Get List TestConnection` |
 | `GraphService` | `LoadGraph CreateEntity UpdateEntity DeleteEntity GetEntity ListEntities SetAnchors AddEdge ApproveEdge RejectEdge DeleteEdge ListEdges RecomputeScores ProposeFromPages ProposeRelated` |
-| `PagesService` | `Create Update Delete Get List Tree MapToEntity Unmap SetCanonical ReplaceLinks` |
+| `PagesService` | `Create Update Delete Get List Tree MapToEntity Unmap SetCanonical ReplaceLinks PreviewLink` |
 | `TemplatesService` | `CreateTemplate UpdateTemplate DeleteTemplate GetTemplate ListTemplates SetOverride DeleteOverride ResolveForPage CreatePolicy UpdatePolicy DeletePolicy GetPolicy ListPolicies GetEffectivePolicy` |
 | `RunsService` | `Start Estimate Get List ListItems ListEvents GetArtifact ListArtifacts Pause Resume Cancel RetryStep` |
 | `SyncService` | `SyncSite CheckPlugin SavePluginPackage` |
@@ -42,7 +42,7 @@ the composition root binds the two.
 | `ToolsService` | `List` |
 | `SettingsService` | `Schema Get Set SetProviderKey ProviderKeys DeleteProviderKey LockState Lock Unlock SetMasterPassword ExportBackup ImportBackup` |
 
-A hundred and twelve methods. Where a use case answers with bytes the service writes them
+A hundred and thirteen methods. Where a use case answers with bytes the service writes them
 to the path the request names and returns it, because the webview has no filesystem;
 `SyncService.SavePluginPackage{path}` is the only such method.
 
@@ -176,6 +176,16 @@ agent.confirm.requested agent.confirm.resolved agent.done`, whose payloads all c
 subscribes with `on(type, handler)` from `frontend/src/lib/events.ts`, which narrows
 `payload` to the declared type. Events only travel Go → JS; every frontend-initiated
 action is a bound method call.
+
+## Page preview
+
+`PagesService.PreviewLink{pageId}` answers `{url, expiresAt, kind}`. `kind` is `public` for a
+published page, whose `url` is the site's base URL and the page path and whose `expiresAt` is
+null, and no site call is made; it is `preview` for any other page on the site, whose `url` is an
+hour-long signed link the companion plugin issued and rotates on every call. A page without a
+WordPress id answers `INVALID` with `details.field = wpId`, an archived one with `details.field =
+status`. A site that cannot issue a link answers `INVALID` with `details.code` set to
+`plugin_missing` or, for a plugin older than 1.1.0, `plugin_outdated` with `details.capability`.
 
 ## Agent chat
 
