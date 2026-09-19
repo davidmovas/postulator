@@ -58,6 +58,20 @@ type SetProviderKeyResponse struct {
 	Provider string `json:"provider"`
 }
 
+type ProviderKeysRequest struct{}
+
+type ProviderKeysResponse struct {
+	Providers []ProviderKey `json:"providers"`
+}
+
+type DeleteProviderKeyRequest struct {
+	Provider string `json:"provider"`
+}
+
+type DeleteProviderKeyResponse struct {
+	Provider string `json:"provider"`
+}
+
 type TestProviderRequest struct {
 	Provider string `json:"provider"`
 	Model    string `json:"model"`

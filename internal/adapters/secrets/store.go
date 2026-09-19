@@ -47,6 +47,16 @@ func (s *Store) Get(ctx context.Context, ref string) (string, error) {
 	return string(plaintext), nil
 }
 
+func (s *Store) Has(ctx context.Context, ref string) (bool, error) {
+	if _, err := s.vault.Get(ctx, ref); err != nil {
+		if errors.IsCode(err, errors.NotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
 func (s *Store) Delete(ctx context.Context, ref string) error {
 	return s.vault.Delete(ctx, ref)
 }

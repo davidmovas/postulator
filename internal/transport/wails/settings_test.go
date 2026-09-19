@@ -72,6 +72,7 @@ type providerKeyFake struct {
 	mode    failure
 	fails   bool
 	written string
+	removed string
 }
 
 func (p *providerKeyFake) SetProviderKey(_ context.Context, req models.SetProviderKeyRequest) (models.SetProviderKeyResponse, error) {
@@ -80,6 +81,25 @@ func (p *providerKeyFake) SetProviderKey(_ context.Context, req models.SetProvid
 	}
 	p.written = req.APIKey
 	return models.SetProviderKeyResponse{Provider: req.Provider}, nil
+}
+
+func (p *providerKeyFake) ProviderKeys(context.Context, models.ProviderKeysRequest) (models.ProviderKeysResponse, error) {
+	if p.fails {
+		return answer[models.ProviderKeysResponse](p.mode)
+	}
+	return models.ProviderKeysResponse{Providers: []models.ProviderKey{
+		{Provider: "anthropic"},
+		{Provider: "openai", Configured: p.written != ""},
+	}}, nil
+}
+
+func (p *providerKeyFake) DeleteProviderKey(_ context.Context, req models.DeleteProviderKeyRequest) (models.DeleteProviderKeyResponse, error) {
+	if p.fails {
+		return answer[models.DeleteProviderKeyResponse](p.mode)
+	}
+	p.removed = req.Provider
+	p.written = ""
+	return models.DeleteProviderKeyResponse{Provider: req.Provider}, nil
 }
 
 func settingsHarness(t *testing.T) (deps wails.SettingsDeps, workers *settings.Setting[int], store *storeFake, keys *providerKeyFake, live *settings.Values) {
@@ -233,6 +253,48 @@ func TestSettingsServiceDelegatesTheProviderKey(t *testing.T) {
 	}
 }
 
+func TestSettingsServiceReportsAndRevokesProviderKeysWithoutTheirValues(t *testing.T) {
+	t.Parallel()
+
+	deps, _, _, keys, _ := settingsHarness(t)
+	service := wails.NewSettingsService(zap.NewNop(), deps)
+
+	if _, err := service.SetProviderKey(context.Background(),
+		models.SetProviderKeyRequest{Provider: "openai", APIKey: "sk-secret"}); err != nil {
+		t.Fatalf("SetProviderKey: %v", err)
+	}
+
+	reported, err := service.ProviderKeys(context.Background(), models.ProviderKeysRequest{})
+	if err != nil {
+		t.Fatalf("ProviderKeys: %v", err)
+	}
+
+	encoded, marshalErr := json.Marshal(reported)
+	if marshalErr != nil {
+		t.Fatalf("Marshal: %v", marshalErr)
+	}
+	if string(encoded) != `{"providers":[{"provider":"anthropic","configured":false},{"provider":"openai","configured":true}]}` {
+		t.Fatalf("ProviderKeys = %s, want booleans alone", encoded)
+	}
+
+	revoked, err := service.DeleteProviderKey(context.Background(),
+		models.DeleteProviderKeyRequest{Provider: "openai"})
+	if err != nil {
+		t.Fatalf("DeleteProviderKey: %v", err)
+	}
+	if revoked.Provider != "openai" || keys.removed != "openai" {
+		t.Fatalf("DeleteProviderKey = %+v, the use case received %q", revoked, keys.removed)
+	}
+
+	reported, err = service.ProviderKeys(context.Background(), models.ProviderKeysRequest{})
+	if err != nil {
+		t.Fatalf("ProviderKeys: %v", err)
+	}
+	if reported.Providers[1].Configured {
+		t.Fatalf("ProviderKeys = %+v, want openai unconfigured after the revoke", reported.Providers)
+	}
+}
+
 func TestSettingsServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
@@ -249,8 +311,8 @@ func TestSettingsServiceConvertsEveryFailure(t *testing.T) {
 		Backup: ready[wails.BackupControl](&backupFake{}),
 		Lock:   &lockFake{},
 	}), []string{
-		"ExportBackup", "Get", "ImportBackup", "Lock", "LockState",
-		"Schema", "Set", "SetMasterPassword", "SetProviderKey", "Unlock",
+		"DeleteProviderKey", "ExportBackup", "Get", "ImportBackup", "Lock", "LockState",
+		"ProviderKeys", "Schema", "Set", "SetMasterPassword", "SetProviderKey", "Unlock",
 	})
 
 	assertEveryMethodConverts(t, wails.NewSettingsService(zap.NewNop(), wails.SettingsDeps{

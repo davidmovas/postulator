@@ -33,6 +33,11 @@ type Usage struct {
 	Total  int `json:"total"`
 }
 
+type ProviderKey struct {
+	Provider   string `json:"provider"`
+	Configured bool   `json:"configured"`
+}
+
 func modelView(info llm.ModelInfo) Model {
 	return Model{
 		Provider:           info.Ref.Provider,

@@ -25,15 +25,17 @@ type SettingsStore interface {
 	All(ctx context.Context) (map[string]json.RawMessage, error)
 }
 
-type ProviderKeyWriter interface {
+type ProviderKeyAccess interface {
 	SetProviderKey(ctx context.Context, req models.SetProviderKeyRequest) (models.SetProviderKeyResponse, error)
+	ProviderKeys(ctx context.Context, req models.ProviderKeysRequest) (models.ProviderKeysResponse, error)
+	DeleteProviderKey(ctx context.Context, req models.DeleteProviderKeyRequest) (models.DeleteProviderKeyResponse, error)
 }
 
 type SettingsAccess struct {
 	Declarations SettingsDeclarations
 	Values       *settings.Values
 	Store        SettingsStore
-	Models       ProviderKeyWriter
+	Models       ProviderKeyAccess
 }
 
 type LockControl interface {
@@ -123,6 +125,8 @@ type SettingsService struct {
 	get               middleware.Handler[GetSettingRequest, GetSettingResponse]
 	set               middleware.Handler[SetSettingRequest, SetSettingResponse]
 	setProviderKey    middleware.Handler[models.SetProviderKeyRequest, models.SetProviderKeyResponse]
+	providerKeys      middleware.Handler[models.ProviderKeysRequest, models.ProviderKeysResponse]
+	deleteProviderKey middleware.Handler[models.DeleteProviderKeyRequest, models.DeleteProviderKeyResponse]
 	lockState         middleware.Handler[LockStateRequest, LockStateResponse]
 	lock              middleware.Handler[LockRequest, LockStateResponse]
 	unlock            middleware.Handler[UnlockRequest, LockStateResponse]
@@ -137,6 +141,8 @@ func NewSettingsService(logger *zap.Logger, deps SettingsDeps) *SettingsService 
 		get:               Wrap(logger, "settings.get", readSetting(deps)),
 		set:               Wrap(logger, "settings.set", writeSetting(deps)),
 		setProviderKey:    Wrap(logger, "settings.setProviderKey", writeProviderKey(deps)),
+		providerKeys:      Wrap(logger, "settings.providerKeys", readProviderKeys(deps)),
+		deleteProviderKey: Wrap(logger, "settings.deleteProviderKey", removeProviderKey(deps)),
 		lockState:         Wrap(logger, "settings.lockState", readLockState(deps)),
 		lock:              Wrap(logger, "settings.lock", lockApplication(deps)),
 		unlock:            Wrap(logger, "settings.unlock", unlockApplication(deps)),
@@ -218,6 +224,26 @@ func writeProviderKey(deps SettingsDeps) middleware.Handler[models.SetProviderKe
 			return models.SetProviderKeyResponse{}, err
 		}
 		return access.Models.SetProviderKey(c, req)
+	}
+}
+
+func readProviderKeys(deps SettingsDeps) middleware.Handler[models.ProviderKeysRequest, models.ProviderKeysResponse] {
+	return func(c context.Context, req models.ProviderKeysRequest) (models.ProviderKeysResponse, error) {
+		access, err := deps.Access()
+		if err != nil {
+			return models.ProviderKeysResponse{}, err
+		}
+		return access.Models.ProviderKeys(c, req)
+	}
+}
+
+func removeProviderKey(deps SettingsDeps) middleware.Handler[models.DeleteProviderKeyRequest, models.DeleteProviderKeyResponse] {
+	return func(c context.Context, req models.DeleteProviderKeyRequest) (models.DeleteProviderKeyResponse, error) {
+		access, err := deps.Access()
+		if err != nil {
+			return models.DeleteProviderKeyResponse{}, err
+		}
+		return access.Models.DeleteProviderKey(c, req)
 	}
 }
 
@@ -320,6 +346,14 @@ func (s *SettingsService) Set(c context.Context, req SetSettingRequest) (SetSett
 
 func (s *SettingsService) SetProviderKey(c context.Context, req models.SetProviderKeyRequest) (models.SetProviderKeyResponse, error) {
 	return s.setProviderKey(c, req)
+}
+
+func (s *SettingsService) ProviderKeys(c context.Context, req models.ProviderKeysRequest) (models.ProviderKeysResponse, error) {
+	return s.providerKeys(c, req)
+}
+
+func (s *SettingsService) DeleteProviderKey(c context.Context, req models.DeleteProviderKeyRequest) (models.DeleteProviderKeyResponse, error) {
+	return s.deleteProviderKey(c, req)
 }
 
 func (s *SettingsService) LockState(c context.Context, req LockStateRequest) (LockStateResponse, error) {

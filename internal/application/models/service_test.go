@@ -2,7 +2,10 @@ package models_test
 
 import (
 	"context"
+	"encoding/json"
+	"reflect"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -128,6 +131,25 @@ func (v *vault) Put(_ context.Context, ref, value string) error {
 	return nil
 }
 
+func (v *vault) Has(_ context.Context, ref string) (bool, error) {
+	if v.err != nil {
+		return false, v.err
+	}
+	_, held := v.stored[ref]
+	return held, nil
+}
+
+func (v *vault) Delete(_ context.Context, ref string) error {
+	if v.err != nil {
+		return v.err
+	}
+	if _, held := v.stored[ref]; !held {
+		return errors.New(errors.NotFound, "the vault holds no secret under that reference")
+	}
+	delete(v.stored, ref)
+	return nil
+}
+
 type harness struct {
 	service  *models.Service
 	catalog  *catalog
@@ -153,6 +175,102 @@ func newHarness(t *testing.T, book spend) harness {
 		prober:   probe,
 		secrets:  keys,
 		events:   recorder,
+	}
+}
+
+func TestProviderKeysReportsWhichProvidersAreConfiguredAndNeverTheKey(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t, spend{})
+	if _, err := h.service.UpsertModel(t.Context(), models.UpsertModelRequest{
+		Provider: "anthropic", Model: "claude-sonnet-5", ContextTokens: 1000000, MaxOutputTokens: 128000,
+		InputUSDPerM: 2, OutputUSDPerM: 10, RPM: 60, TPM: 120000,
+	}); err != nil {
+		t.Fatalf("UpsertModel: %v", err)
+	}
+	if _, err := h.service.SetProviderKey(t.Context(), models.SetProviderKeyRequest{
+		Provider: "openai", APIKey: "sk-secret",
+	}); err != nil {
+		t.Fatalf("SetProviderKey: %v", err)
+	}
+
+	answered, err := h.service.ProviderKeys(t.Context(), models.ProviderKeysRequest{})
+	if err != nil {
+		t.Fatalf("ProviderKeys: %v", err)
+	}
+
+	want := []models.ProviderKey{
+		{Provider: "anthropic", Configured: false},
+		{Provider: "openai", Configured: true},
+	}
+	if !reflect.DeepEqual(answered.Providers, want) {
+		t.Fatalf("ProviderKeys = %+v, want %+v", answered.Providers, want)
+	}
+
+	encoded, marshalErr := json.Marshal(answered)
+	if marshalErr != nil {
+		t.Fatalf("Marshal: %v", marshalErr)
+	}
+	if strings.Contains(string(encoded), "sk-secret") {
+		t.Fatalf("the response carries the key: %s", encoded)
+	}
+	if string(encoded) != `{"providers":[{"provider":"anthropic","configured":false},{"provider":"openai","configured":true}]}` {
+		t.Fatalf("response = %s", encoded)
+	}
+}
+
+func TestDeleteProviderKeyRevokesTheStoredKey(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t, spend{})
+	if _, err := h.service.SetProviderKey(t.Context(), models.SetProviderKeyRequest{
+		Provider: "openai", APIKey: "sk-secret",
+	}); err != nil {
+		t.Fatalf("SetProviderKey: %v", err)
+	}
+
+	h.events.Reset()
+	removed, err := h.service.DeleteProviderKey(t.Context(), models.DeleteProviderKeyRequest{Provider: " openai "})
+	if err != nil {
+		t.Fatalf("DeleteProviderKey: %v", err)
+	}
+	if removed.Provider != "openai" {
+		t.Fatalf("DeleteProviderKey = %+v", removed)
+	}
+	if _, held := h.secrets.stored[llm.SecretRef("openai")]; held {
+		t.Fatalf("the vault still holds %v", h.secrets.stored)
+	}
+
+	recorded := h.events.Events()
+	if len(recorded) != 1 || recorded[0].Type != events.SettingsChanged {
+		t.Fatalf("recorded %+v, want one %q event", recorded, events.SettingsChanged)
+	}
+
+	if _, err = h.service.DeleteProviderKey(t.Context(), models.DeleteProviderKeyRequest{Provider: "openai"}); err != nil {
+		t.Fatalf("revoking a key that is already gone must succeed: %v", err)
+	}
+
+	cases := []struct {
+		name    string
+		request models.DeleteProviderKeyRequest
+		want    errors.Code
+	}{
+		{name: "no provider", request: models.DeleteProviderKeyRequest{Provider: "  "}, want: errors.Invalid},
+		{
+			name:    "a provider the catalog does not know",
+			request: models.DeleteProviderKeyRequest{Provider: "acme"},
+			want:    errors.NotFound,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := h.service.DeleteProviderKey(t.Context(), tc.request); !errors.IsCode(err, tc.want) {
+				t.Fatalf("DeleteProviderKey = %v, want %s", err, tc.want)
+			}
+		})
 	}
 }
 

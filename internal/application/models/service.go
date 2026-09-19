@@ -42,6 +42,8 @@ type prober interface {
 
 type secretStore interface {
 	Put(ctx context.Context, ref, value string) error
+	Has(ctx context.Context, ref string) (bool, error)
+	Delete(ctx context.Context, ref string) error
 }
 
 type Service struct {
@@ -78,13 +80,8 @@ func (s *Service) SetProviderKey(ctx context.Context, req SetProviderKeyRequest)
 			WithDetail("field", "apiKey")
 	}
 
-	known, err := s.catalog.List(ctx)
-	if err != nil {
+	if err := s.requireProvider(ctx, provider); err != nil {
 		return SetProviderKeyResponse{}, err
-	}
-	if !slices.ContainsFunc(known, func(info llm.ModelInfo) bool { return info.Ref.Provider == provider }) {
-		return SetProviderKeyResponse{}, errors.New(errors.NotFound, "the catalog holds no model of this provider").
-			WithDetail("provider", provider)
 	}
 
 	if putErr := s.secrets.Put(ctx, llm.SecretRef(provider), key); putErr != nil {
@@ -94,6 +91,62 @@ func (s *Service) SetProviderKey(ctx context.Context, req SetProviderKeyRequest)
 		return SetProviderKeyResponse{}, publishErr
 	}
 	return SetProviderKeyResponse{Provider: provider}, nil
+}
+
+func (s *Service) ProviderKeys(ctx context.Context, _ ProviderKeysRequest) (ProviderKeysResponse, error) {
+	known, err := s.catalog.List(ctx)
+	if err != nil {
+		return ProviderKeysResponse{}, err
+	}
+
+	named := make([]string, 0, len(known))
+	for _, info := range known {
+		if !slices.Contains(named, info.Ref.Provider) {
+			named = append(named, info.Ref.Provider)
+		}
+	}
+	slices.Sort(named)
+
+	out := make([]ProviderKey, 0, len(named))
+	for _, provider := range named {
+		configured, hasErr := s.secrets.Has(ctx, llm.SecretRef(provider))
+		if hasErr != nil {
+			return ProviderKeysResponse{}, hasErr
+		}
+		out = append(out, ProviderKey{Provider: provider, Configured: configured})
+	}
+	return ProviderKeysResponse{Providers: out}, nil
+}
+
+func (s *Service) DeleteProviderKey(ctx context.Context, req DeleteProviderKeyRequest) (DeleteProviderKeyResponse, error) {
+	provider := strings.TrimSpace(req.Provider)
+	if provider == "" {
+		return DeleteProviderKeyResponse{}, errors.New(errors.Invalid, "a provider key needs a provider").
+			WithDetail("field", "provider")
+	}
+	if err := s.requireProvider(ctx, provider); err != nil {
+		return DeleteProviderKeyResponse{}, err
+	}
+
+	if err := s.secrets.Delete(ctx, llm.SecretRef(provider)); err != nil && !errors.IsCode(err, errors.NotFound) {
+		return DeleteProviderKeyResponse{}, err
+	}
+	if publishErr := s.settingsChanged(); publishErr != nil {
+		return DeleteProviderKeyResponse{}, publishErr
+	}
+	return DeleteProviderKeyResponse{Provider: provider}, nil
+}
+
+func (s *Service) requireProvider(ctx context.Context, provider string) error {
+	known, err := s.catalog.List(ctx)
+	if err != nil {
+		return err
+	}
+	if !slices.ContainsFunc(known, func(info llm.ModelInfo) bool { return info.Ref.Provider == provider }) {
+		return errors.New(errors.NotFound, "the catalog holds no model of this provider").
+			WithDetail("provider", provider)
+	}
+	return nil
 }
 
 func (s *Service) now() time.Time {

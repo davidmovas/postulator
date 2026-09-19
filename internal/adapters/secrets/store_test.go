@@ -77,6 +77,43 @@ func TestStoreRoundTrip(t *testing.T) {
 	}
 }
 
+func TestStoreReportsWhetherASecretIsHeldWithoutOpeningIt(t *testing.T) {
+	t.Parallel()
+
+	vault := newMemoryVault()
+	store := NewStore(vault, testKey())
+	if err := store.Put(t.Context(), "llm:openai:api_key", "sk-secret"); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+
+	cases := []struct {
+		name string
+		ref  string
+		want bool
+	}{
+		{name: "a reference the vault holds", ref: "llm:openai:api_key", want: true},
+		{name: "a reference the vault does not hold", ref: "llm:anthropic:api_key"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			held, err := store.Has(t.Context(), tc.ref)
+			if err != nil {
+				t.Fatalf("Has: %v", err)
+			}
+			if held != tc.want {
+				t.Fatalf("Has(%q) = %v, want %v", tc.ref, held, tc.want)
+			}
+		})
+	}
+
+	if _, err := NewStore(vault, bytes.Repeat([]byte{0x01}, aesgcm.KeyLength)).Has(t.Context(), "llm:openai:api_key"); err != nil {
+		t.Fatalf("Has must not open the secret it reports: %v", err)
+	}
+}
+
 func TestStoreRejects(t *testing.T) {
 	t.Parallel()
 
