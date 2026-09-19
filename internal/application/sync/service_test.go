@@ -2,9 +2,13 @@ package sync_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
+	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/adapters/wp/registry"
+	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
@@ -219,5 +223,50 @@ func TestPluginPackageHandsBackTheArchive(t *testing.T) {
 	broken := newService(newSites(), &queue{}, prober{}, packer{err: errors.New(errors.Internal, "no tree")})
 	if _, err = broken.PluginPackage(t.Context(), sync.PluginPackageRequest{}); !errors.IsCode(err, errors.Internal) {
 		t.Fatalf("code = %q, want %q", errors.CodeOf(err), errors.Internal)
+	}
+}
+
+type vault struct {
+	password string
+}
+
+func (v vault) Get(context.Context, string) (string, error) {
+	return v.password, nil
+}
+
+// A client who installs the companion plugin after we told them to must not be stuck on the
+// degraded path until the application restarts: a plugin check re-asks the site.
+func TestCheckPluginReprobesASiteThatGainedThePlugin(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t, wptest.WithoutPlugin())
+	store := newSites()
+	store.record.BaseURL = server.URL()
+	store.record.Username = wptest.DefaultUser
+	store.record.AllowInsecure = true
+
+	held := registry.New(store, vault{password: wptest.DefaultPassword}, wp.WithRateLimit(0))
+	service := sync.New(&queue{}, store, held, packer{}, clock.NewFake(sqlitetest.Stamp))
+
+	absent, err := service.CheckPlugin(t.Context(), sync.CheckPluginRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("CheckPlugin without the plugin: %v", err)
+	}
+	if absent.Plugin.Installed || len(absent.Plugin.Capabilities) != 0 {
+		t.Fatalf("plugin = %+v, want an absent plugin and no capabilities", absent.Plugin)
+	}
+
+	server.EnablePlugin()
+
+	present, err := service.CheckPlugin(t.Context(), sync.CheckPluginRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("CheckPlugin after the plugin was installed: %v", err)
+	}
+	if !present.Plugin.Installed || present.Plugin.Version != "1.0.0" {
+		t.Fatalf("plugin = %+v, want the companion reported as installed", present.Plugin)
+	}
+	if !slices.Contains(present.Plugin.Capabilities, "bulk") ||
+		!slices.Contains(present.Plugin.Capabilities, "seo_meta") {
+		t.Errorf("capabilities = %v, want the companion capabilities", present.Plugin.Capabilities)
 	}
 }

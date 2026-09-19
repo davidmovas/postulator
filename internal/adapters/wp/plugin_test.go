@@ -323,3 +323,46 @@ func TestThePostOnlyRoutesReportATermAsMissing(t *testing.T) {
 		t.Errorf("seo meta code = %q, want %q", errors.CodeOf(err), errors.NotFound)
 	}
 }
+
+func TestInvalidateManifestReprobesASiteThatGainedThePlugin(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t, wptest.WithoutPlugin())
+	client := newClient(t, server)
+
+	if _, err := client.Capabilities(t.Context()); !wp.IsPluginMissing(err) {
+		t.Fatalf("Capabilities without the plugin = %v, want a plugin_missing failure", err)
+	}
+
+	server.EnablePlugin()
+	if _, err := client.Capabilities(t.Context()); !wp.IsPluginMissing(err) {
+		t.Fatalf("Capabilities = %v, want the cached plugin_missing failure until it is invalidated", err)
+	}
+
+	client.InvalidateManifest()
+	capabilities, err := client.Capabilities(t.Context())
+	if err != nil {
+		t.Fatalf("Capabilities after the plugin was installed: %v", err)
+	}
+	if !capabilities.Has("bulk") || !capabilities.Has("seo_meta") {
+		t.Errorf("names = %v, want the companion capabilities", capabilities.Names)
+	}
+}
+
+func TestInvalidateManifestDropsAManifestThatWasRead(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	client := newClient(t, server)
+
+	if _, err := client.Capabilities(t.Context()); err != nil {
+		t.Fatalf("Capabilities: %v", err)
+	}
+	client.InvalidateManifest()
+	if _, err := client.Capabilities(t.Context()); err != nil {
+		t.Fatalf("Capabilities again: %v", err)
+	}
+	if got := len(server.Requests()); got != 2 {
+		t.Errorf("the client asked for the manifest %d times, want 2", got)
+	}
+}

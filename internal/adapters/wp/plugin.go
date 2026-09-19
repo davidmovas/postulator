@@ -239,6 +239,17 @@ func (c *Client) Manifest(ctx context.Context) (Manifest, error) {
 	return manifest, nil
 }
 
+// InvalidateManifest drops the cached manifest, including the memory of a 404, so the next
+// caller probes the site again. A client who installs the companion plugin after we asked them
+// to would otherwise keep the degraded path for the life of this client.
+func (c *Client) InvalidateManifest() {
+	c.manifestMu.Lock()
+	defer c.manifestMu.Unlock()
+
+	c.manifest = nil
+	c.manifestGone = false
+}
+
 func (c *Client) Capabilities(ctx context.Context) (Capabilities, error) {
 	manifest, err := c.Manifest(ctx)
 	if err != nil {
