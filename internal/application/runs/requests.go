@@ -61,6 +61,14 @@ type GetArtifactResponse struct {
 	Artifact Artifact `json:"artifact"`
 }
 
+type ListArtifactsRequest struct {
+	ItemID string `json:"itemId"`
+}
+
+type ListArtifactsResponse struct {
+	Artifacts []ArtifactSummary `json:"artifacts"`
+}
+
 type PauseRequest struct {
 	RunID  string `json:"runId"`
 	Reason string `json:"reason,omitempty"`

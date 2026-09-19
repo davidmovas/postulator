@@ -69,6 +69,19 @@ type Artifact struct {
 	CreatedAt dto.Time `json:"createdAt"`
 }
 
+type ArtifactSummary struct {
+	ID        string   `json:"id"`
+	RunID     string   `json:"runId"`
+	ItemID    string   `json:"itemId"`
+	Step      string   `json:"step"`
+	Kind      string   `json:"kind"`
+	Size      int      `json:"size"`
+	Hash      string   `json:"hash"`
+	Purged    bool     `json:"purged"`
+	ExpiresAt dto.Time `json:"expiresAt"`
+	CreatedAt dto.Time `json:"createdAt"`
+}
+
 func timeOf(at *time.Time) dto.Time {
 	if at == nil {
 		return dto.Time{}
@@ -125,6 +138,21 @@ func eventView(event run.Event) Event {
 		Type:    event.Type,
 		At:      dto.NewTime(event.At),
 		Payload: event.Payload,
+	}
+}
+
+func artifactSummaryView(artifact run.Artifact) ArtifactSummary {
+	return ArtifactSummary{
+		ID:        artifact.ID,
+		RunID:     artifact.RunID,
+		ItemID:    artifact.ItemID,
+		Step:      artifact.Step,
+		Kind:      string(artifact.Kind),
+		Size:      artifact.Size,
+		Hash:      artifact.Hash,
+		Purged:    artifact.Purged,
+		ExpiresAt: timeOf(artifact.ExpiresAt),
+		CreatedAt: dto.NewTime(artifact.CreatedAt),
 	}
 }
 

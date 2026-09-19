@@ -89,6 +89,24 @@ func (s *Service) ListEvents(ctx context.Context, req ListEventsRequest) (ListEv
 	return ListEventsResponse{Events: out}, nil
 }
 
+func (s *Service) ListArtifacts(ctx context.Context, req ListArtifactsRequest) (ListArtifactsResponse, error) {
+	itemID := strings.TrimSpace(req.ItemID)
+	if itemID == "" {
+		return ListArtifactsResponse{}, invalid("an artifact listing needs a run item", "itemId")
+	}
+
+	stored, err := s.artifacts.ByItem(ctx, itemID)
+	if err != nil {
+		return ListArtifactsResponse{}, err
+	}
+
+	out := make([]ArtifactSummary, 0, len(stored))
+	for i := range stored {
+		out = append(out, artifactSummaryView(stored[i]))
+	}
+	return ListArtifactsResponse{Artifacts: out}, nil
+}
+
 func (s *Service) GetArtifact(ctx context.Context, req GetArtifactRequest) (GetArtifactResponse, error) {
 	itemID := strings.TrimSpace(req.ItemID)
 	if itemID == "" {

@@ -37,6 +37,10 @@ func (f runsFake) GetArtifact(context.Context, runs.GetArtifactRequest) (runs.Ge
 	return answer[runs.GetArtifactResponse](f.mode)
 }
 
+func (f runsFake) ListArtifacts(context.Context, runs.ListArtifactsRequest) (runs.ListArtifactsResponse, error) {
+	return answer[runs.ListArtifactsResponse](f.mode)
+}
+
 func (f runsFake) Pause(context.Context, runs.PauseRequest) (runs.PauseResponse, error) {
 	return answer[runs.PauseResponse](f.mode)
 }
@@ -57,7 +61,7 @@ func TestRunsServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
 	assertMethodNames(t, wails.NewRunsService(zap.NewNop(), ready[wails.RunsUseCase](runsFake{})), []string{
-		"Cancel", "Get", "GetArtifact", "List", "ListEvents", "ListItems",
+		"Cancel", "Get", "GetArtifact", "List", "ListArtifacts", "ListEvents", "ListItems",
 		"Pause", "Resume", "RetryStep", "Start",
 	})
 	assertEveryMethodConverts(t, wails.NewRunsService(zap.NewNop(), ready[wails.RunsUseCase](runsFake{mode: missing})), missingBody)

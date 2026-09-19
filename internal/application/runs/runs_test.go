@@ -3,6 +3,7 @@ package runs_test
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -439,6 +440,111 @@ func TestGetArtifactReadsTheLatestOfItsKind(t *testing.T) {
 				t.Fatalf("GetArtifact = %v, want %s", err, tc.want)
 			}
 		})
+	}
+}
+
+func TestListArtifactsReportsWhatExistsWithoutItsBlob(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	record, item := fixture.seedRun(t, run.StatusCompleted)
+	expires := sqlitetest.Stamp.Add(720 * time.Hour)
+
+	body, err := run.NewArtifact(run.Artifact{
+		ID: id.New(), RunID: record.ID, ItemID: item.ID, Step: "generate_body",
+		Kind: run.ArtifactBodyHTML, Blob: []byte("<p>draft</p>"), CreatedAt: sqlitetest.Stamp,
+	})
+	if err != nil {
+		t.Fatalf("NewArtifact: %v", err)
+	}
+	body.ExpiresAt = &expires
+
+	report, err := run.NewArtifact(run.Artifact{
+		ID: id.New(), RunID: record.ID, ItemID: item.ID, Step: "report",
+		Kind: run.ArtifactFinalReport, Blob: []byte(`{"ok":true}`), CreatedAt: sqlitetest.Stamp.Add(time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("NewArtifact: %v", err)
+	}
+
+	purged, err := run.NewArtifact(run.Artifact{
+		ID: id.New(), RunID: record.ID, ItemID: item.ID, Step: "generate_body",
+		Kind: run.ArtifactDraft, Blob: []byte("gone"), CreatedAt: sqlitetest.Stamp,
+	})
+	if err != nil {
+		t.Fatalf("NewArtifact: %v", err)
+	}
+	purged.Blob, purged.Size, purged.Purged, purged.ExpiresAt = nil, 0, true, &expires
+
+	if err = fixture.blobs.ReplaceStep(t.Context(), item.ID, "generate_body", []run.Artifact{body, purged}); err != nil {
+		t.Fatalf("ReplaceStep: %v", err)
+	}
+	if err = fixture.blobs.ReplaceStep(t.Context(), item.ID, "report", []run.Artifact{report}); err != nil {
+		t.Fatalf("ReplaceStep: %v", err)
+	}
+
+	listed, err := fixture.service.ListArtifacts(t.Context(), runs.ListArtifactsRequest{ItemID: " " + item.ID + " "})
+	if err != nil {
+		t.Fatalf("ListArtifacts: %v", err)
+	}
+	if len(listed.Artifacts) != 3 {
+		t.Fatalf("ListArtifacts = %+v, want the three rows the item holds", listed.Artifacts)
+	}
+
+	byKind := make(map[string]runs.ArtifactSummary, len(listed.Artifacts))
+	for _, summary := range listed.Artifacts {
+		byKind[summary.Kind] = summary
+	}
+
+	written := byKind["body_html"]
+	if written.Step != "generate_body" || written.Size != body.Size || written.Hash != body.Hash || written.Purged {
+		t.Fatalf("body_html = %+v", written)
+	}
+	if written.ExpiresAt.String() != "2026-10-18T09:00:00Z" || written.CreatedAt.String() == "" {
+		t.Fatalf("body_html = %+v", written)
+	}
+	if byKind["draft"].Size != 0 || !byKind["draft"].Purged {
+		t.Fatalf("draft = %+v, want a purged row that still reports itself", byKind["draft"])
+	}
+	if byKind["final_report"].Purged || byKind["final_report"].ExpiresAt.String() != "" {
+		t.Fatalf("final_report = %+v, want a row that never expires", byKind["final_report"])
+	}
+
+	encoded, marshalErr := json.Marshal(listed)
+	if marshalErr != nil {
+		t.Fatalf("Marshal: %v", marshalErr)
+	}
+	if strings.Contains(string(encoded), "draft</p>") || strings.Contains(string(encoded), "content") {
+		t.Fatalf("the listing carries a blob: %s", encoded)
+	}
+	for _, key := range []string{`"kind"`, `"size"`, `"hash"`, `"purged"`, `"expiresAt"`, `"createdAt"`} {
+		if !strings.Contains(string(encoded), key) {
+			t.Errorf("view lacks %s: %s", key, encoded)
+		}
+	}
+}
+
+func TestListArtifactsAnswersAnEmptyListAndRefusesAnUnnamedItem(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	_, item := fixture.seedRun(t, run.StatusCompleted)
+
+	listed, err := fixture.service.ListArtifacts(t.Context(), runs.ListArtifactsRequest{ItemID: item.ID})
+	if err != nil {
+		t.Fatalf("ListArtifacts: %v", err)
+	}
+
+	encoded, marshalErr := json.Marshal(listed)
+	if marshalErr != nil {
+		t.Fatalf("Marshal: %v", marshalErr)
+	}
+	if string(encoded) != `{"artifacts":[]}` {
+		t.Fatalf("ListArtifacts = %s, want an empty array", encoded)
+	}
+
+	if _, err = fixture.service.ListArtifacts(t.Context(), runs.ListArtifactsRequest{}); !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("ListArtifacts = %v, want %s", err, errors.Invalid)
 	}
 }
 

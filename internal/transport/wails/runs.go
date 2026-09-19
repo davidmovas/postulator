@@ -17,6 +17,7 @@ type RunsUseCase interface {
 	ListItems(ctx context.Context, req runs.ListItemsRequest) (paging.List[runs.Item], error)
 	ListEvents(ctx context.Context, req runs.ListEventsRequest) (runs.ListEventsResponse, error)
 	GetArtifact(ctx context.Context, req runs.GetArtifactRequest) (runs.GetArtifactResponse, error)
+	ListArtifacts(ctx context.Context, req runs.ListArtifactsRequest) (runs.ListArtifactsResponse, error)
 	Pause(ctx context.Context, req runs.PauseRequest) (runs.PauseResponse, error)
 	Resume(ctx context.Context, req runs.ResumeRequest) (runs.ResumeResponse, error)
 	Cancel(ctx context.Context, req runs.CancelRequest) (runs.CancelResponse, error)
@@ -24,30 +25,32 @@ type RunsUseCase interface {
 }
 
 type RunsService struct {
-	start       middleware.Handler[runs.StartRequest, runs.StartResponse]
-	get         middleware.Handler[runs.GetRequest, runs.GetResponse]
-	list        middleware.Handler[runs.ListRequest, paging.List[runs.Run]]
-	listItems   middleware.Handler[runs.ListItemsRequest, paging.List[runs.Item]]
-	listEvents  middleware.Handler[runs.ListEventsRequest, runs.ListEventsResponse]
-	getArtifact middleware.Handler[runs.GetArtifactRequest, runs.GetArtifactResponse]
-	pause       middleware.Handler[runs.PauseRequest, runs.PauseResponse]
-	resume      middleware.Handler[runs.ResumeRequest, runs.ResumeResponse]
-	cancel      middleware.Handler[runs.CancelRequest, runs.CancelResponse]
-	retryStep   middleware.Handler[runs.RetryStepRequest, runs.RetryStepResponse]
+	start         middleware.Handler[runs.StartRequest, runs.StartResponse]
+	get           middleware.Handler[runs.GetRequest, runs.GetResponse]
+	list          middleware.Handler[runs.ListRequest, paging.List[runs.Run]]
+	listItems     middleware.Handler[runs.ListItemsRequest, paging.List[runs.Item]]
+	listEvents    middleware.Handler[runs.ListEventsRequest, runs.ListEventsResponse]
+	getArtifact   middleware.Handler[runs.GetArtifactRequest, runs.GetArtifactResponse]
+	listArtifacts middleware.Handler[runs.ListArtifactsRequest, runs.ListArtifactsResponse]
+	pause         middleware.Handler[runs.PauseRequest, runs.PauseResponse]
+	resume        middleware.Handler[runs.ResumeRequest, runs.ResumeResponse]
+	cancel        middleware.Handler[runs.CancelRequest, runs.CancelResponse]
+	retryStep     middleware.Handler[runs.RetryStepRequest, runs.RetryStepResponse]
 }
 
 func NewRunsService(logger *zap.Logger, useCase Source[RunsUseCase]) *RunsService {
 	return &RunsService{
-		start:       Wrap(logger, "runs.start", call(useCase, RunsUseCase.Start)),
-		get:         Wrap(logger, "runs.get", call(useCase, RunsUseCase.Get)),
-		list:        Wrap(logger, "runs.list", call(useCase, RunsUseCase.List)),
-		listItems:   Wrap(logger, "runs.listItems", call(useCase, RunsUseCase.ListItems)),
-		listEvents:  Wrap(logger, "runs.listEvents", call(useCase, RunsUseCase.ListEvents)),
-		getArtifact: Wrap(logger, "runs.getArtifact", call(useCase, RunsUseCase.GetArtifact)),
-		pause:       Wrap(logger, "runs.pause", call(useCase, RunsUseCase.Pause)),
-		resume:      Wrap(logger, "runs.resume", call(useCase, RunsUseCase.Resume)),
-		cancel:      Wrap(logger, "runs.cancel", call(useCase, RunsUseCase.Cancel)),
-		retryStep:   Wrap(logger, "runs.retryStep", call(useCase, RunsUseCase.RetryStep)),
+		start:         Wrap(logger, "runs.start", call(useCase, RunsUseCase.Start)),
+		get:           Wrap(logger, "runs.get", call(useCase, RunsUseCase.Get)),
+		list:          Wrap(logger, "runs.list", call(useCase, RunsUseCase.List)),
+		listItems:     Wrap(logger, "runs.listItems", call(useCase, RunsUseCase.ListItems)),
+		listEvents:    Wrap(logger, "runs.listEvents", call(useCase, RunsUseCase.ListEvents)),
+		getArtifact:   Wrap(logger, "runs.getArtifact", call(useCase, RunsUseCase.GetArtifact)),
+		listArtifacts: Wrap(logger, "runs.listArtifacts", call(useCase, RunsUseCase.ListArtifacts)),
+		pause:         Wrap(logger, "runs.pause", call(useCase, RunsUseCase.Pause)),
+		resume:        Wrap(logger, "runs.resume", call(useCase, RunsUseCase.Resume)),
+		cancel:        Wrap(logger, "runs.cancel", call(useCase, RunsUseCase.Cancel)),
+		retryStep:     Wrap(logger, "runs.retryStep", call(useCase, RunsUseCase.RetryStep)),
 	}
 }
 
@@ -73,6 +76,10 @@ func (s *RunsService) ListEvents(c context.Context, req runs.ListEventsRequest) 
 
 func (s *RunsService) GetArtifact(c context.Context, req runs.GetArtifactRequest) (runs.GetArtifactResponse, error) {
 	return s.getArtifact(c, req)
+}
+
+func (s *RunsService) ListArtifacts(c context.Context, req runs.ListArtifactsRequest) (runs.ListArtifactsResponse, error) {
+	return s.listArtifacts(c, req)
 }
 
 func (s *RunsService) Pause(c context.Context, req runs.PauseRequest) (runs.PauseResponse, error) {
