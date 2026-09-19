@@ -23,22 +23,22 @@ type JudgeUseCase interface {
 }
 
 type ReportsService struct {
-	siteOverview middleware.Handler[reports.SiteOverviewRequest, reports.SiteOverviewResponse]
-	pageReport   middleware.Handler[reports.PageReportRequest, reports.PageReportResponse]
-	runReport    middleware.Handler[reports.RunReportRequest, reports.RunReportResponse]
-	linkAudit    middleware.Handler[reports.LinkAuditRequest, reports.LinkAuditResponse]
-	linkAuditPage  middleware.Handler[reports.LinkAuditPageRequest, reports.LinkAuditPageResponse]
-	judgePage    middleware.Handler[content.JudgeRequest, content.JudgeResponse]
+	siteOverview  middleware.Handler[reports.SiteOverviewRequest, reports.SiteOverviewResponse]
+	pageReport    middleware.Handler[reports.PageReportRequest, reports.PageReportResponse]
+	runReport     middleware.Handler[reports.RunReportRequest, reports.RunReportResponse]
+	linkAudit     middleware.Handler[reports.LinkAuditRequest, reports.LinkAuditResponse]
+	linkAuditPage middleware.Handler[reports.LinkAuditPageRequest, reports.LinkAuditPageResponse]
+	judgePage     middleware.Handler[content.JudgeRequest, content.JudgeResponse]
 }
 
 func NewReportsService(logger *zap.Logger, useCase Source[ReportsUseCase], judge Source[JudgeUseCase]) *ReportsService {
 	return &ReportsService{
-		siteOverview: Wrap(logger, "reports.siteOverview", call(useCase, ReportsUseCase.SiteOverview)),
-		pageReport:   Wrap(logger, "reports.pageReport", call(useCase, ReportsUseCase.PageReport)),
-		runReport:    Wrap(logger, "reports.runReport", call(useCase, ReportsUseCase.RunReport)),
-		linkAudit:    Wrap(logger, "reports.linkAudit", call(useCase, ReportsUseCase.LinkAudit)),
-		linkAuditPage:  Wrap(logger, "reports.linkAuditPage", call(useCase, ReportsUseCase.LinkAuditPage)),
-		judgePage:    Wrap(logger, "reports.judgePage", call(judge, JudgeUseCase.Judge)),
+		siteOverview:  Wrap(logger, "reports.siteOverview", call(useCase, ReportsUseCase.SiteOverview)),
+		pageReport:    Wrap(logger, "reports.pageReport", call(useCase, ReportsUseCase.PageReport)),
+		runReport:     Wrap(logger, "reports.runReport", call(useCase, ReportsUseCase.RunReport)),
+		linkAudit:     Wrap(logger, "reports.linkAudit", call(useCase, ReportsUseCase.LinkAudit)),
+		linkAuditPage: Wrap(logger, "reports.linkAuditPage", call(useCase, ReportsUseCase.LinkAuditPage)),
+		judgePage:     Wrap(logger, "reports.judgePage", call(judge, JudgeUseCase.Judge)),
 	}
 }
 
