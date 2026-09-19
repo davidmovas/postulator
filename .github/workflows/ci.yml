@@ -68,6 +68,10 @@ jobs:
         working-directory: frontend
         run: npm run typecheck
 
+      - name: Test the frontend data layer
+        working-directory: frontend
+        run: npm run test:run
+
       - name: Build application
         run: task build
 

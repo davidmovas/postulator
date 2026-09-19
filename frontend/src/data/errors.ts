@@ -1,0 +1,74 @@
+import { errorMessages } from "../copy/index.js";
+import type { Code, TransportError } from "../lib/errors.js";
+import { parseError } from "../lib/errors.js";
+import { isCancellation } from "./call.js";
+
+export type { Code, TransportError } from "../lib/errors.js";
+
+export const messages: Readonly<Record<Code, string>> = Object.freeze({ ...errorMessages });
+
+const minimumRetryDelayMs = 250;
+const defaultRetryDelayMs = 1000;
+
+export type Reaction =
+    | { kind: "silent" }
+    | { kind: "unlock" }
+    | { kind: "field"; field: string; message: string }
+    | { kind: "form"; message: string }
+    | { kind: "throttle"; afterMs: number; message: string }
+    | { kind: "refetch"; message: string }
+    | { kind: "credentials"; message: string }
+    | { kind: "budget"; message: string }
+    | { kind: "review"; message: string }
+    | { kind: "external"; message: string }
+    | { kind: "fatal"; message: string };
+
+export function failure(thrown: unknown): TransportError {
+    return parseError(thrown);
+}
+
+export function fieldOf(reported: TransportError): string | null {
+    const held = reported.details?.["field"];
+    return typeof held === "string" && held !== "" ? held : null;
+}
+
+export function retryAfterOf(reported: TransportError): number {
+    const requested = reported.retry?.afterMs ?? defaultRetryDelayMs;
+    return Math.max(requested, minimumRetryDelayMs);
+}
+
+export function react(thrown: unknown): Reaction {
+    if (isCancellation(thrown)) {
+        return { kind: "silent" };
+    }
+    const reported = parseError(thrown);
+    switch (reported.code) {
+        case "CANCELLED":
+            return { kind: "silent" };
+        case "LOCKED":
+            return { kind: "unlock" };
+        case "INVALID": {
+            const message = reported.message === "" ? messages.INVALID : reported.message;
+            const field = fieldOf(reported);
+            return field === null ? { kind: "form", message } : { kind: "field", field, message };
+        }
+        case "RATE_LIMITED":
+            return { kind: "throttle", afterMs: retryAfterOf(reported), message: messages.RATE_LIMITED };
+        case "NOT_FOUND":
+            return { kind: "refetch", message: messages.NOT_FOUND };
+        case "CONFLICT":
+            return { kind: "refetch", message: messages.CONFLICT };
+        case "UNAUTHORIZED":
+            return { kind: "credentials", message: messages.UNAUTHORIZED };
+        case "BUDGET_EXCEEDED":
+            return { kind: "budget", message: messages.BUDGET_EXCEEDED };
+        case "NEEDS_HUMAN":
+            return { kind: "review", message: messages.NEEDS_HUMAN };
+        case "EXTERNAL":
+            return { kind: "external", message: messages.EXTERNAL };
+        case "INTERNAL":
+            return { kind: "fatal", message: messages.INTERNAL };
+        default:
+            return { kind: "fatal", message: messages.INTERNAL };
+    }
+}

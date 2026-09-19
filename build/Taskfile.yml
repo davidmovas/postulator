@@ -34,10 +34,35 @@ tasks:
           BUILD_FLAGS:
             ref: .BUILD_FLAGS
     cmds:
+      - task: check:frontend:imports
       - npm run typecheck
       - npm run {{if eq .DEV "true"}}build:dev{{else}}build{{end}} -q
     env:
       PRODUCTION: '{{if eq .DEV "true"}}false{{else}}true{{end}}'
+
+  check:frontend:imports:
+    summary: Fails the build when feature code reaches past the data layer
+    internal: true
+    run: once
+    dir: frontend
+    cmds:
+      - silent: true
+        cmd: |
+          fail=0
+          ban() {
+            if git grep -qIE --untracked -e "$2" -- src/features; then
+              echo "frontend import rule broken: $1"
+              git grep -nIE --untracked -e "$2" -- src/features
+              fail=1
+            fi
+          }
+          ban "src/features must reach the bindings through src/lib/api.ts, never by name" 'bindings'
+          ban "src/features must use data/ hooks, never src/lib/api.ts" 'lib/api'
+          ban "src/features must use data/errors.ts, never src/lib/errors.ts" 'lib/errors'
+          ban "src/features must not touch @wailsio/runtime; the data layer owns the transport" '@wailsio/runtime'
+          ban "src/features must not use the bare identifier any; tsconfig sets noImplicitAny false so tsc will not catch it" '(:|<|,|\||&|\(|\[|=>)[[:space:]]*any([^A-Za-z0-9_$]|$)'
+          ban "src/features must not use the bare identifier any; tsconfig sets noImplicitAny false so tsc will not catch it" '(^|[^A-Za-z0-9_$])as[[:space:]]+any([^A-Za-z0-9_$]|$)'
+          exit $fail
 
   generate:bindings:
     summary: Generates TypeScript bindings for the frontend
