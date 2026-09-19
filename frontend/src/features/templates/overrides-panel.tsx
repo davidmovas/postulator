@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router";
 
 import { failure } from "../../data/errors.js";
 import { usePage } from "../../data/hooks/pages.js";
@@ -12,6 +13,7 @@ import {
     DeleteIcon,
     Dialog,
     Drawer,
+    EditIcon,
     Panel,
     PanelHeader,
     SectionLabel,
@@ -96,6 +98,8 @@ interface PageOverrideRowProps {
 }
 
 function PageOverrideRow({ override, base, site, onRemove, removing }: PageOverrideRowProps): ReactElement {
+    const params = useParams();
+    const navigate = useNavigate();
     const detail = usePage(override.targetId);
     const [open, setOpen] = useState(false);
     const patch = useMemo(() => patchObject(override.patch), [override.patch]);
@@ -107,6 +111,16 @@ function PageOverrideRow({ override, base, site, onRemove, removing }: PageOverr
             <div className="flex items-start justify-between gap-2">
                 <span className="min-w-0 truncate font-mono text-xs text-ink">{path}</span>
                 <div className="flex shrink-0 gap-1">
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        icon={EditIcon}
+                        onClick={() => {
+                            void navigate(`/s/${params.siteId ?? ""}/templates/${override.templateId}?page=${override.targetId}`);
+                        }}
+                    >
+                        {copy.pages.detail.templateEdit}
+                    </Button>
                     <Button
                         size="sm"
                         variant="ghost"

@@ -49,7 +49,6 @@ export function TemplatesScreen(): ReactElement {
                     <Button
                         variant="primary"
                         icon={AddIcon}
-                        disabled={groups.all.length === 0}
                         onClick={() => {
                             setCreating(true);
                         }}
@@ -74,6 +73,9 @@ export function TemplatesScreen(): ReactElement {
                         sort={query.sort}
                         onSortChange={(sort) => {
                             change({ ...query, sort });
+                        }}
+                        onCreate={() => {
+                            setCreating(true);
                         }}
                     />
                     {groups.all.length === 0 ? null : (

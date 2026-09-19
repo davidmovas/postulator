@@ -1,8 +1,10 @@
 import type { ReactElement } from "react";
-import { useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import { failure } from "../../data/errors.js";
+import { usePage } from "../../data/hooks/pages.js";
+import { useSite, useUpdateSite } from "../../data/hooks/sites.js";
 import {
     useDeleteOverride,
     useDeleteTemplate,
@@ -25,13 +27,16 @@ import {
     StatusBadge,
     TabPanel,
     Tabs,
+    VerifiedIcon,
 } from "../../ui/index.js";
 import type { TabDefinition } from "../../ui/index.js";
 import { askAgent } from "../agent/dock-state.js";
 import { fieldErrorOf, formErrorOf } from "./controls.js";
 import { ModelsForm } from "./models-form.js";
 import { OverridesPanel } from "./overrides-panel.js";
+import type { Layer } from "./patch.js";
 import { layered, patchBetween, patchObject } from "./patch.js";
+import { PagePreview } from "./preview/view.js";
 import type { LayerView } from "./provenance.js";
 import { RecipeForm } from "./recipe-form.js";
 import { ContentForm, LinksForm, MetaForm } from "./rules-form.js";
@@ -42,7 +47,7 @@ import { draftOf, specOf } from "./spec.js";
 
 type EditorTab = "sections" | "content" | "links" | "meta" | "models" | "recipe";
 
-type EditLayer = "global" | "site";
+type AsideTab = "preview" | "overrides";
 
 const tabs: readonly TabDefinition<EditorTab>[] = [
     { value: "sections", label: copy.templates.editor.tabs.sections },
@@ -53,11 +58,22 @@ const tabs: readonly TabDefinition<EditorTab>[] = [
     { value: "recipe", label: copy.templates.editor.tabs.recipe },
 ];
 
+const asideTabs: readonly TabDefinition<AsideTab>[] = [
+    { value: "preview", label: copy.templates.editor.aside.preview },
+    { value: "overrides", label: copy.templates.editor.aside.overrides },
+];
+
+const layerHints: Readonly<Record<Layer, string>> = {
+    global: copy.templates.layer.globalHint,
+    site: copy.templates.layer.siteHint,
+    page: copy.templates.layer.pageHint,
+};
+
 interface LayerButtonProps {
-    layer: EditLayer;
-    current: EditLayer;
+    layer: Layer;
+    current: Layer;
     label: string;
-    onSelect: (layer: EditLayer) => void;
+    onSelect: (layer: Layer) => void;
 }
 
 function LayerButton({ layer, current, label, onSelect }: LayerButtonProps): ReactElement {
@@ -82,19 +98,30 @@ function LayerButton({ layer, current, label, onSelect }: LayerButtonProps): Rea
 export function TemplateEditorScreen(): ReactElement {
     const params = useParams();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const siteId = params.siteId ?? "";
     const templateId = params.templateId ?? "";
+    const pageId = searchParams.get("page");
     const detail = useTemplate(templateId);
+    const page = usePage(pageId);
+    const site = useSite(siteId === "" ? null : siteId);
+    const updateSite = useUpdateSite();
     const update = useUpdateTemplate();
     const override = useSetOverride();
     const dropOverride = useDeleteOverride();
     const remove = useDeleteTemplate();
 
-    const [layer, setLayer] = useState<EditLayer>("global");
+    const [layer, setLayer] = useState<Layer>(pageId === null ? "global" : "page");
     const [tab, setTab] = useState<EditorTab>("sections");
+    const [asideTab, setAsideTab] = useState<AsideTab>("preview");
     const [confirming, setConfirming] = useState(false);
     const [identity, setIdentity] = useState<{ key: string; name: string; pageKind: string } | null>(null);
     const [edited, setEdited] = useState<{ key: string; draft: SpecDraft } | null>(null);
+
+    useEffect(() => {
+        setLayer(pageId === null ? "global" : "page");
+        setEdited(null);
+    }, [pageId]);
 
     const template = detail.data?.template;
     const overrides = useMemo(() => detail.data?.overrides ?? [], [detail.data]);
@@ -102,17 +129,30 @@ export function TemplateEditorScreen(): ReactElement {
         () => overrides.find((held) => held.scope === "site" && held.targetId === siteId) ?? null,
         [overrides, siteId],
     );
+    const pageOverride = useMemo(
+        () => (pageId === null ? null : (overrides.find((held) => held.scope === "page" && held.targetId === pageId) ?? null)),
+        [overrides, pageId],
+    );
     const pageOverrides = useMemo(() => overrides.filter((held) => held.scope === "page"), [overrides]);
     const sitePatch = useMemo(() => patchObject(siteOverride?.patch), [siteOverride]);
+    const pagePatch = useMemo(() => patchObject(pageOverride?.patch), [pageOverride]);
     const base = useMemo(() => (template === undefined ? null : draftOf(template.spec)), [template]);
+    const siteResolved = useMemo(() => (base === null ? null : layered(base, sitePatch)), [base, sitePatch]);
 
-    const key = `${template?.id ?? ""}|${template?.updatedAt ?? ""}|${layer}|${siteOverride?.updatedAt ?? ""}`;
+    const key = `${template?.id ?? ""}|${template?.updatedAt ?? ""}|${layer}|${siteOverride?.updatedAt ?? ""}|${pageId ?? ""}|${pageOverride?.updatedAt ?? ""}`;
     const start = useMemo(() => {
-        if (base === null) {
+        if (base === null || siteResolved === null) {
             return null;
         }
-        return layer === "global" ? base : layered(base, sitePatch);
-    }, [base, layer, sitePatch]);
+        switch (layer) {
+            case "global":
+                return base;
+            case "site":
+                return siteResolved;
+            default:
+                return layered(siteResolved, pagePatch);
+        }
+    }, [base, siteResolved, layer, pagePatch]);
 
     const draft = edited !== null && edited.key === key ? edited.draft : start;
     const identityDraft =
@@ -127,7 +167,8 @@ export function TemplateEditorScreen(): ReactElement {
     const dirty = specDirty || (layer === "global" && identityDirty);
 
     const pending = update.isPending || override.isPending || dropOverride.isPending;
-    const thrown = layer === "global" ? update.error : override.error;
+    const thrown = layer === "global" ? update.error : (override.error ?? dropOverride.error);
+    const isDefault = site.data?.site.defaults.templateId === templateId;
 
     const edit = (patch: Partial<SpecDraft>): void => {
         if (draft === null) {
@@ -141,10 +182,11 @@ export function TemplateEditorScreen(): ReactElement {
         setIdentity(null);
         update.reset();
         override.reset();
+        dropOverride.reset();
     };
 
     const save = (): void => {
-        if (template === undefined || draft === null || base === null) {
+        if (template === undefined || draft === null || base === null || siteResolved === null) {
             return;
         }
         if (layer === "global") {
@@ -156,14 +198,25 @@ export function TemplateEditorScreen(): ReactElement {
             });
             return;
         }
-        const patch = patchBetween(base, draft);
+        const against = layer === "site" ? base : siteResolved;
+        const held = layer === "site" ? siteOverride : pageOverride;
+        const targetId = layer === "site" ? siteId : (pageId ?? "");
+        const patch = patchBetween(against, draft);
         if (patch === undefined) {
-            if (siteOverride !== null) {
-                dropOverride.mutate({ id: siteOverride.id });
+            if (held !== null) {
+                dropOverride.mutate({ id: held.id });
             }
             return;
         }
-        override.mutate({ templateId: template.id, scope: "site", targetId: siteId, patch });
+        override.mutate({ templateId: template.id, scope: layer, targetId, patch });
+    };
+
+    const makeDefault = (): void => {
+        const held = site.data?.site;
+        if (held === undefined || template === undefined) {
+            return;
+        }
+        updateSite.mutate({ id: held.id, defaults: { ...held.defaults, templateId: template.id } });
     };
 
     if (detail.isPending) {
@@ -174,7 +227,7 @@ export function TemplateEditorScreen(): ReactElement {
         );
     }
 
-    if (template === undefined || draft === null || base === null || start === null) {
+    if (template === undefined || draft === null || base === null || start === null || siteResolved === null) {
         return (
             <div className="p-4">
                 <Banner
@@ -198,7 +251,10 @@ export function TemplateEditorScreen(): ReactElement {
         );
     }
 
-    const layers: LayerView = { editing: layer, site: sitePatch, page: null, base };
+    const layers: LayerView =
+        layer === "page"
+            ? { editing: "page", site: null, page: pagePatch, base: siteResolved }
+            : { editing: layer, site: sitePatch, page: null, base };
     const formError = formErrorOf(thrown);
 
     return (
@@ -222,23 +278,30 @@ export function TemplateEditorScreen(): ReactElement {
                 <span className="shrink-0 font-mono text-2xs text-ink-faint">
                     {copy.templates.versionLabel(template.version)}
                 </span>
+                {pageId === null ? null : (
+                    <StatusBadge tone="info" dot={false} className="min-w-0">
+                        <span className="truncate font-mono">{copy.templates.editor.forPage(page.data?.page.path ?? copy.templates.overrides.unknownPage)}</span>
+                    </StatusBadge>
+                )}
+                {isDefault ? (
+                    <StatusBadge tone="accent" icon={VerifiedIcon}>
+                        {copy.templates.editor.isDefault}
+                    </StatusBadge>
+                ) : site.data === undefined ? null : (
+                    <Button size="sm" variant="ghost" busy={updateSite.isPending} onClick={makeDefault}>
+                        {copy.templates.editor.makeDefault}
+                    </Button>
+                )}
                 <div className="ml-auto flex shrink-0 items-center gap-2">
                     {dirty ? (
                         <span className="text-2xs text-warn">{copy.templates.editor.unsaved}</span>
                     ) : null}
                     <div className="flex items-center gap-0.5 rounded-md bg-inset p-0.5">
-                        <LayerButton
-                            layer="global"
-                            current={layer}
-                            label={copy.templates.layer.global}
-                            onSelect={setLayer}
-                        />
-                        <LayerButton
-                            layer="site"
-                            current={layer}
-                            label={copy.templates.layer.site}
-                            onSelect={setLayer}
-                        />
+                        <LayerButton layer="global" current={layer} label={copy.templates.layer.global} onSelect={setLayer} />
+                        <LayerButton layer="site" current={layer} label={copy.templates.layer.site} onSelect={setLayer} />
+                        {pageId === null ? null : (
+                            <LayerButton layer="page" current={layer} label={copy.templates.layer.page} onSelect={setLayer} />
+                        )}
                     </div>
                     <Button
                         size="sm"
@@ -271,9 +334,7 @@ export function TemplateEditorScreen(): ReactElement {
             <div className="flex min-h-0 flex-1">
                 <div className="flex min-w-0 flex-1 flex-col">
                     <div className="flex shrink-0 flex-col gap-2 border-b border-hairline px-3 py-2">
-                        <p className="text-xs text-ink-dim">
-                            {layer === "global" ? copy.templates.layer.globalHint : copy.templates.layer.siteHint}
-                        </p>
+                        <p className="text-xs text-ink-dim">{layerHints[layer]}</p>
                         {formError === null ? null : <p className="text-xs text-danger">{formError}</p>}
                         {layer === "global" ? (
                             <div className="grid grid-cols-2 gap-2">
@@ -337,8 +398,15 @@ export function TemplateEditorScreen(): ReactElement {
                         </TabPanel>
                     </Tabs>
                 </div>
-                <aside className="w-80 shrink-0 overflow-auto border-l border-hairline p-3">
-                    <OverridesPanel base={base} siteOverride={siteOverride} pageOverrides={pageOverrides} />
+                <aside className="flex w-80 shrink-0 flex-col border-l border-hairline">
+                    <Tabs className="min-h-0 flex-1" label={copy.templates.editor.aside.preview} value={asideTab} onValueChange={setAsideTab} tabs={asideTabs}>
+                        <TabPanel value="preview" className="p-3">
+                            <PagePreview draft={draft} />
+                        </TabPanel>
+                        <TabPanel value="overrides" className="p-3">
+                            <OverridesPanel base={base} siteOverride={siteOverride} pageOverrides={pageOverrides} />
+                        </TabPanel>
+                    </Tabs>
                 </aside>
             </div>
             <Dialog

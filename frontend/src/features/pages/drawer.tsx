@@ -32,6 +32,7 @@ import { statusTone } from "./labels.js";
 import { PageLinks } from "./links.js";
 import { PageMapping } from "./mapping.js";
 import { PageReportPanel } from "./report.js";
+import { TemplatePanel } from "./template.js";
 
 const wpTypeOptions: readonly SelectOption<string>[] = pageWpTypes.map((value) => ({ value, label: value }));
 const statusOptions: readonly SelectOption<string>[] = pageStatuses.map((value) => ({ value, label: value }));
@@ -399,6 +400,7 @@ export function PageDrawer({ pageId, siteId, index, search, onClose }: PageDrawe
                     </div>
                     {page.drift ? <DriftNotice page={page} /> : null}
                     <PageMapping page={page} siteId={siteId} index={index} search={search} />
+                    <TemplatePanel page={page} siteId={siteId} />
                     <MetaForm page={page} siteId={siteId} search={search} />
                     <PageLinks links={detail.data?.links ?? []} siteId={siteId} search={search} />
                     <PageReportPanel pageId={page.id} siteId={siteId} />

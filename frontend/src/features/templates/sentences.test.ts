@@ -92,6 +92,41 @@ describe("sentencesOf", () => {
         ).toStrictEqual(["skips Score the page"]);
     });
 
+    it("reads the settings a step carries", () => {
+        const checked = draftFromJson({
+            ...base,
+            recipe: [
+                { name: "resolve_context", enabled: true },
+                { name: "generate_body", enabled: true },
+                { name: "validate", enabled: true },
+                { name: "repair_links", enabled: true },
+                { name: "judge", enabled: true },
+            ],
+        });
+        expect(
+            sentencesOf(checked, {
+                recipe: [
+                    { name: "resolve_context", enabled: true },
+                    { name: "generate_body", enabled: true },
+                    { name: "validate", enabled: true, params: { allowErrors: true } },
+                    { name: "repair_links", enabled: true, params: { iterations: 3 } },
+                    { name: "judge", enabled: true },
+                ],
+            }),
+        ).toStrictEqual(["repairs the links up to 3 times", "lets a page through the checks with errors"]);
+        expect(
+            sentencesOf(checked, {
+                recipe: [
+                    { name: "resolve_context", enabled: true },
+                    { name: "generate_body", enabled: true },
+                    { name: "validate", enabled: true, params: { allowErrors: false } },
+                    { name: "repair_links", enabled: true, params: { iterations: 1 } },
+                    { name: "judge", enabled: true },
+                ],
+            }),
+        ).toStrictEqual(["repairs the links once", "stops a page at the checks when it has errors"]);
+    });
+
     it("reads a pinned and an unpinned role", () => {
         expect(sentencesOf(draft, { modelProfiles: { writer: { provider: "anthropic", model: "opus" } } })).toStrictEqual(
             ["uses anthropic opus for the writer"],

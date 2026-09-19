@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router";
 
 import { flatten } from "../../data/call.js";
-import { useSite } from "../../data/hooks/sites.js";
+import { useSite, useUpdateSite } from "../../data/hooks/sites.js";
 import { useTemplates } from "../../data/hooks/templates.js";
 import type { Template } from "../../data/types.js";
 import type { TemplateSort } from "../../data/sorts.js";
@@ -66,10 +66,12 @@ function GroupRow({ label, body }: GroupRowProps): ReactElement {
 interface TemplateRowProps {
     template: Template;
     isDefault: boolean;
+    settingDefault: boolean;
     onOpen: (id: string) => void;
+    onMakeDefault: (id: string) => void;
 }
 
-function TemplateRow({ template, isDefault, onOpen }: TemplateRowProps): ReactElement {
+function TemplateRow({ template, isDefault, settingDefault, onOpen, onMakeDefault }: TemplateRowProps): ReactElement {
     const draft = useMemo(() => draftOf(template.spec), [template.spec]);
     return (
         <TableRow
@@ -86,13 +88,26 @@ function TemplateRow({ template, isDefault, onOpen }: TemplateRowProps): ReactEl
             }}
         >
             <TableCell>
-                <span className="flex min-w-0 items-center gap-1.5">
+                <span className="group flex min-w-0 items-center gap-1.5">
                     <span className="truncate">{template.name}</span>
                     {isDefault ? (
                         <StatusBadge tone="accent" dot={false} className="shrink-0">
                             {copy.templates.siteDefault}
                         </StatusBadge>
-                    ) : null}
+                    ) : (
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            busy={settingDefault}
+                            className="shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                onMakeDefault(template.id);
+                            }}
+                        >
+                            {copy.templates.editor.makeDefault}
+                        </Button>
+                    )}
                 </span>
             </TableCell>
             <TableCell mono={true} muted={true}>
@@ -136,16 +151,34 @@ export interface TemplateListProps {
     groups: TemplateGroups;
     sort: TemplateSort | null;
     onSortChange: (sort: TemplateSort | null) => void;
+    onCreate: () => void;
 }
 
-export function TemplateList({ siteId, groups, sort, onSortChange }: TemplateListProps): ReactElement {
+export function TemplateList({ siteId, groups, sort, onSortChange, onCreate }: TemplateListProps): ReactElement {
     const navigate = useNavigate();
     const site = useSite(siteId);
+    const updateSite = useUpdateSite();
     const defaultId = site.data?.site.defaults.templateId ?? null;
 
     const open = (id: string): void => {
         void navigate(`/s/${siteId}/templates/${id}`);
     };
+
+    const makeDefault = (templateId: string): void => {
+        const held = site.data?.site;
+        if (held === undefined) {
+            return;
+        }
+        updateSite.mutate({ id: held.id, defaults: { ...held.defaults, templateId } });
+    };
+
+    const rowProps = (template: Template) => ({
+        template,
+        isDefault: template.id === defaultId,
+        settingDefault: updateSite.isPending && updateSite.variables?.defaults?.templateId === template.id,
+        onOpen: open,
+        onMakeDefault: makeDefault,
+    });
 
     const toggle = (field: TemplateSort["field"]): void => {
         if (sort === null || sort.field !== field) {
@@ -171,13 +204,18 @@ export function TemplateList({ siteId, groups, sort, onSortChange }: TemplateLis
                     title={copy.templates.nothingToCopy}
                     body={copy.empty.templates}
                     actions={
-                        <Button
-                            onClick={() => {
-                                askAgent(copy.agent.ask.newTemplate);
-                            }}
-                        >
-                            {copy.templates.askAgent}
-                        </Button>
+                        <>
+                            <Button variant="primary" onClick={onCreate}>
+                                {copy.templates.newTemplate}
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    askAgent(copy.agent.ask.newTemplate);
+                                }}
+                            >
+                                {copy.templates.askAgent}
+                            </Button>
+                        </>
                     }
                 />
             </div>
@@ -215,12 +253,7 @@ export function TemplateList({ siteId, groups, sort, onSortChange }: TemplateLis
                     <>
                         <GroupRow label={copy.templates.groups.global} body={copy.templates.groups.globalBody} />
                         {groups.globalRows.map((template) => (
-                            <TemplateRow
-                                key={template.id}
-                                template={template}
-                                isDefault={template.id === defaultId}
-                                onOpen={open}
-                            />
+                            <TemplateRow key={template.id} {...rowProps(template)} />
                         ))}
                         {groups.globals.hasNextPage ? (
                             <LoadMoreRow
@@ -236,12 +269,7 @@ export function TemplateList({ siteId, groups, sort, onSortChange }: TemplateLis
                     <>
                         <GroupRow label={copy.templates.groups.site} body={copy.templates.groups.siteBody} />
                         {groups.localRows.map((template) => (
-                            <TemplateRow
-                                key={template.id}
-                                template={template}
-                                isDefault={template.id === defaultId}
-                                onOpen={open}
-                            />
+                            <TemplateRow key={template.id} {...rowProps(template)} />
                         ))}
                         {groups.locals.hasNextPage ? (
                             <LoadMoreRow

@@ -7,14 +7,48 @@ import type { Template } from "../../data/types.js";
 import { copy } from "../../copy/index.js";
 import { templateScopes } from "../../generated/vocab.js";
 import type { SelectOption } from "../../ui/index.js";
-import { AddIcon, Dialog, Field, Input, Select } from "../../ui/index.js";
+import { AddIcon, cx, Dialog, Field, Input, Select } from "../../ui/index.js";
+import { blankDraft } from "./blank.js";
 import { fieldErrorOf, formErrorOf } from "./controls.js";
 import { scopeLabel } from "./labels.js";
+import { specOf } from "./spec.js";
+
+type Start = "blank" | "copy";
 
 const scopeOptions: readonly SelectOption<string>[] = templateScopes.map((value) => ({
     value,
     label: scopeLabel(value),
 }));
+
+interface StartButtonProps {
+    value: Start;
+    current: Start;
+    label: string;
+    disabled?: boolean;
+    onSelect: (value: Start) => void;
+}
+
+function StartButton({ value, current, label, disabled = false, onSelect }: StartButtonProps): ReactElement {
+    const active = value === current;
+    return (
+        <button
+            type="button"
+            role="radio"
+            aria-checked={active}
+            disabled={disabled}
+            onClick={() => {
+                onSelect(value);
+            }}
+            className={cx(
+                "inline-flex h-6 flex-1 items-center justify-center rounded-md px-2 text-xs font-medium transition-colors duration-100",
+                active ? "bg-raised text-ink" : "text-ink-dim hover:bg-inset hover:text-ink",
+                disabled && "cursor-not-allowed opacity-50",
+            )}
+        >
+            {label}
+        </button>
+    );
+}
 
 export interface CreateTemplateDialogProps {
     open: boolean;
@@ -31,6 +65,7 @@ export function CreateTemplateDialog({
 }: CreateTemplateDialogProps): ReactElement {
     const navigate = useNavigate();
     const create = useCreateTemplate();
+    const [start, setStart] = useState<Start>("blank");
     const [sourceId, setSourceId] = useState("");
     const [name, setName] = useState("");
     const [pageKind, setPageKind] = useState("");
@@ -41,6 +76,7 @@ export function CreateTemplateDialog({
             return;
         }
         const first = templates[0];
+        setStart(first === undefined ? "blank" : "copy");
         setSourceId(first?.id ?? "");
         setName(first?.name ?? "");
         setPageKind(first?.pageKind ?? "");
@@ -51,7 +87,8 @@ export function CreateTemplateDialog({
     const source = templates.find((template) => template.id === sourceId) ?? null;
 
     const submit = (): void => {
-        if (source === null) {
+        const spec = start === "blank" ? specOf(blankDraft()) : source?.spec;
+        if (spec === undefined) {
             return;
         }
         create.mutate(
@@ -60,7 +97,7 @@ export function CreateTemplateDialog({
                 siteId: scope === "site" ? siteId : null,
                 name,
                 pageKind,
-                spec: source.spec,
+                spec,
             },
             {
                 onSuccess: (answered) => {
@@ -84,27 +121,43 @@ export function CreateTemplateDialog({
             onConfirm={submit}
         >
             <div className="mt-1 flex flex-col gap-2.5">
-                <Field label={copy.templates.create.copyFrom} hint={copy.templates.create.copyFromHint}>
-                    {(control) => (
-                        <Select
-                            id={control.id}
-                            aria-describedby={control["aria-describedby"]}
-                            value={sourceId}
-                            placeholder={copy.templates.nothingToCopy}
-                            disabled={templates.length === 0}
-                            options={templates.map((template) => ({
-                                value: template.id,
-                                label: `${template.name} · ${template.pageKind}`,
-                            }))}
-                            onValueChange={(next) => {
-                                setSourceId(next);
-                                const picked = templates.find((template) => template.id === next);
-                                setName(picked?.name ?? "");
-                                setPageKind(picked?.pageKind ?? "");
-                            }}
-                        />
+                <Field label={copy.templates.create.startFrom} hint={start === "blank" ? copy.templates.create.startBlankHint : copy.templates.create.copyFromHint}>
+                    {() => (
+                        <div role="radiogroup" className="flex items-center gap-0.5 rounded-md bg-inset p-0.5">
+                            <StartButton value="blank" current={start} label={copy.templates.create.startBlank} onSelect={setStart} />
+                            <StartButton
+                                value="copy"
+                                current={start}
+                                label={copy.templates.create.startCopy}
+                                disabled={templates.length === 0}
+                                onSelect={setStart}
+                            />
+                        </div>
                     )}
                 </Field>
+                {start === "copy" ? (
+                    <Field label={copy.templates.create.copyFrom}>
+                        {(control) => (
+                            <Select
+                                id={control.id}
+                                aria-describedby={control["aria-describedby"]}
+                                value={sourceId}
+                                placeholder={copy.templates.nothingToCopy}
+                                disabled={templates.length === 0}
+                                options={templates.map((template) => ({
+                                    value: template.id,
+                                    label: `${template.name} · ${template.pageKind}`,
+                                }))}
+                                onValueChange={(next) => {
+                                    setSourceId(next);
+                                    const picked = templates.find((template) => template.id === next);
+                                    setName(picked?.name ?? "");
+                                    setPageKind(picked?.pageKind ?? "");
+                                }}
+                            />
+                        )}
+                    </Field>
+                ) : null}
                 <Field
                     label={copy.templates.create.name}
                     required={true}

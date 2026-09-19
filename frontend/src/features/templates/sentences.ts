@@ -142,7 +142,27 @@ function recipeSentences(base: SpecDraft, after: SpecDraft): string[] {
     if (on.length > 0) {
         out.push(said.stepsOn(joined(on)));
     }
+    out.push(...paramSentences(base, after));
     return out.length === 0 ? [said.recipe] : out;
+}
+
+function paramSentences(base: SpecDraft, after: SpecDraft): string[] {
+    const before = new Map(base.recipe.map((step) => [step.name, step.params]));
+    const out: string[] = [];
+    for (const step of after.recipe) {
+        const held = step.params;
+        const was = before.get(step.name) ?? null;
+        if (held === null) {
+            continue;
+        }
+        if (step.name === "validate" && typeof held["allowErrors"] === "boolean" && was?.["allowErrors"] !== held["allowErrors"]) {
+            out.push(said.allowErrors(held["allowErrors"]));
+        }
+        if (step.name === "repair_links" && typeof held["iterations"] === "number" && was?.["iterations"] !== held["iterations"]) {
+            out.push(said.repairIterations(held["iterations"]));
+        }
+    }
+    return out;
 }
 
 function sectionSentences(after: SpecDraft): string[] {

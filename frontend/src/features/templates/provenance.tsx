@@ -9,7 +9,7 @@ import { layerAt } from "./patch.js";
 import type { SpecDraft } from "./spec.js";
 
 export interface LayerView {
-    editing: "global" | "site";
+    editing: Layer;
     site: JsonObject | null;
     page: JsonObject | null;
     base: SpecDraft;
@@ -60,19 +60,22 @@ export function LayerField({
     if (layer === "global") {
         return <div className={className}>{children}</div>;
     }
+    const fromPage = layers.editing === "page";
     return (
-        <div className={cx("border-l-2 border-accent-border pl-2.5", className)}>
+        <div className={cx("border-l-2 pl-2.5", fromPage ? "border-info-border" : "border-accent-border", className)}>
             {children}
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-2xs">
-                <span className="font-semibold text-accent">{layerName[layer]}</span>
-                <span className="text-ink-faint">{copy.templates.layer.templateSays(templateValue)}</span>
+                <span className={cx("font-semibold", fromPage ? "text-info" : "text-accent")}>{layerName[layer]}</span>
+                <span className="text-ink-faint">
+                    {fromPage ? copy.templates.layer.siteSays(templateValue) : copy.templates.layer.templateSays(templateValue)}
+                </span>
                 <button
                     type="button"
                     onClick={onFollow}
                     className="inline-flex items-center gap-0.5 font-medium text-ink-dim underline-offset-2 hover:text-ink hover:underline"
                 >
                     <RestartAltIcon size={12} className="shrink-0" />
-                    {copy.templates.layer.follow}
+                    {fromPage ? copy.templates.layer.followSite : copy.templates.layer.follow}
                 </button>
             </div>
         </div>
