@@ -5,8 +5,10 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 import { copy } from "../../copy/index.js";
 import { react } from "../../data/errors.js";
 import { useGraph, useRecomputeScores } from "../../data/hooks/graph.js";
+import { useLinkAudit } from "../../data/hooks/reports.js";
 import { pushToast } from "../../data/toasts.js";
 import { AddLinkIcon, Banner, Button, EmptyState, HubIcon, PublicIcon, SkeletonRows, UploadFileIcon } from "../../ui/index.js";
+import { tintByEntity } from "../links/model/audit.js";
 import { PlanPageDialog } from "../pages/create.js";
 import type { EntityIndex } from "../pages/entities.js";
 import { ConnectDrawer } from "./actions/connect.js";
@@ -62,6 +64,9 @@ export function GraphScreen(): ReactElement {
     const [pulse, setPulse] = useState<Pulse | null>(null);
     const map = useRef<MapHandle | null>(null);
     const recompute = useRecomputeScores();
+    const audit = useLinkAudit(query.proof && siteId !== "" ? siteId : null);
+    const auditPages = useMemo(() => (query.proof ? (audit.data?.pages ?? null) : null), [query.proof, audit.data]);
+    const tint = useMemo(() => (auditPages === null ? null : tintByEntity(auditPages)), [auditPages]);
 
     const index = useMemo(() => buildGraphIndex(graph.data?.entities ?? [], graph.data?.edges ?? []), [graph.data]);
     const previous = useRef(index);
@@ -243,7 +248,7 @@ export function GraphScreen(): ReactElement {
                 onRecompute={recomputeScores}
                 focusSearch={focusSearch}
             />
-            <LensBar query={query} counts={counts} onChange={change} />
+            <LensBar query={query} counts={counts} proofBusy={query.proof && audit.isPending} onChange={change} />
             {connecting === undefined ? null : (
                 <div className="border-b border-hairline px-3 py-2">
                     <Banner
@@ -334,6 +339,7 @@ export function GraphScreen(): ReactElement {
                                 showRelated={session.showRelated}
                                 highlightEdgeId={hoverEdge}
                                 pulse={pulse}
+                                tint={tint}
                                 revealVersion={revealVersion}
                                 onSelect={select}
                                 onPick={pick}
@@ -381,6 +387,7 @@ export function GraphScreen(): ReactElement {
                             />
                             <Legend
                                 open={session.legend}
+                                proof={tint !== null}
                                 onToggle={() => {
                                     patchSession({ legend: !session.legend });
                                 }}
@@ -424,6 +431,7 @@ export function GraphScreen(): ReactElement {
                         onConnect={startConnect}
                         onDelete={setDeleting}
                         onPlanPage={setPlanning}
+                        audit={auditPages}
                     />
                 )}
             </div>

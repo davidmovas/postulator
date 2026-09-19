@@ -9,9 +9,10 @@ export interface GraphQuery {
     lens: Lens;
     kinds: readonly string[];
     isolate: boolean;
+    proof: boolean;
 }
 
-export const defaultQuery: GraphQuery = { view: "map", lens: "all", kinds: [], isolate: false };
+export const defaultQuery: GraphQuery = { view: "map", lens: "all", kinds: [], isolate: false, proof: false };
 
 export function readQuery(params: URLSearchParams): GraphQuery {
     const lens = params.get("lens") ?? "";
@@ -24,6 +25,7 @@ export function readQuery(params: URLSearchParams): GraphQuery {
         lens: isLens(lens) ? lens : "all",
         kinds,
         isolate: params.get("isolate") === "1",
+        proof: params.get("proof") === "1",
     };
 }
 
@@ -40,6 +42,9 @@ export function writeQuery(query: GraphQuery): URLSearchParams {
     }
     if (query.isolate) {
         params.set("isolate", "1");
+    }
+    if (query.proof) {
+        params.set("proof", "1");
     }
     return params;
 }

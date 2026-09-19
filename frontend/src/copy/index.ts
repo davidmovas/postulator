@@ -675,6 +675,9 @@ export const copy = {
             anyKind: "Every kind",
             isolate: "Isolate",
             isolateHint: "Hide everything the lens does not match and keep the path to each match.",
+            proof: "Link proof",
+            proofHint: "Colour every entity by whether its page carries the links the graph asks for.",
+            proofLoading: "Auditing the links",
             hint: {
                 all: "Every entity of the site.",
                 noPage: "Entities without a canonical page. Nothing can link to them until they get one.",
@@ -710,6 +713,11 @@ export const copy = {
             extraParent: "A second parent",
             proposedBadge: "Proposed edges waiting on it",
             order: "Children are ordered by score, strongest first.",
+            proof: "Link proof",
+            proofOk: "Every link the graph asks for is in place",
+            proofWarn: "An optional link is missing",
+            proofDanger: "A required link is missing or a target has no page",
+            proofMuted: "Not audited, no page or no template",
         },
         node: {
             more: (shown: number, hidden: number) => `${shown} shown, ${hidden} more`,
@@ -772,6 +780,13 @@ export const copy = {
             moreChildren: (count: number) => `${count} more in the map`,
             noRelations: "No edges yet.",
             created: "Created",
+            links: "Links",
+            linksOpen: "Open in Links",
+            linksRow: (satisfied: number, targets: number) => `${satisfied} of ${targets} in place`,
+            linksMissing: (missing: number, required: number) =>
+                required > 0 ? `${missing} missing, ${required} required` : `${missing} missing`,
+            linksBlocked: (count: number) => `${count} blocked`,
+            linksOff: "Turn on the link proof to see how its pages link.",
         },
         form: {
             name: "Name",

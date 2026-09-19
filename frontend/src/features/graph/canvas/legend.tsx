@@ -33,10 +33,11 @@ function Line({ className, dashed }: { className: string; dashed?: boolean }): R
 
 export interface LegendProps {
     open: boolean;
+    proof: boolean;
     onToggle: () => void;
 }
 
-export function Legend({ open, onToggle }: LegendProps): ReactElement {
+export function Legend({ open, proof, onToggle }: LegendProps): ReactElement {
     return (
         <section
             aria-label={copy.graph.legend.title}
@@ -54,6 +55,14 @@ export function Legend({ open, onToggle }: LegendProps): ReactElement {
             </header>
             {open ? (
                 <div className="flex flex-col gap-3 px-3 pb-3">
+                    {proof ? (
+                        <ul className="flex flex-col gap-1">
+                            <Row swatch={<Pill className="border-ok bg-ok-soft" />} label={copy.graph.legend.proofOk} />
+                            <Row swatch={<Pill className="border-warn bg-warn-soft" />} label={copy.graph.legend.proofWarn} />
+                            <Row swatch={<Pill className="border-danger bg-danger-soft" />} label={copy.graph.legend.proofDanger} />
+                            <Row swatch={<Pill className="border-hairline bg-muted-soft" />} label={copy.graph.legend.proofMuted} />
+                        </ul>
+                    ) : null}
                     <ul className="flex flex-col gap-1">
                         {entityKinds.map((kind) => {
                             const Icon = entityIcon(kind);

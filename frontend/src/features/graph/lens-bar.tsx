@@ -2,7 +2,7 @@ import type { ReactElement } from "react";
 
 import { copy } from "../../copy/index.js";
 import { entityKinds } from "../../generated/vocab.js";
-import { cx, Switch, toneClasses } from "../../ui/index.js";
+import { Button, cx, LinkIcon, Switch, toneClasses } from "../../ui/index.js";
 import { entityIcon, kindTone, lensHint, lensLabel, lensTone } from "./labels.js";
 import type { Lens } from "./model/lens.js";
 import { lenses } from "./model/lens.js";
@@ -11,10 +11,11 @@ import type { GraphQuery } from "./model/params.js";
 export interface LensBarProps {
     query: GraphQuery;
     counts: Record<Lens, number>;
+    proofBusy: boolean;
     onChange: (query: GraphQuery) => void;
 }
 
-export function LensBar({ query, counts, onChange }: LensBarProps): ReactElement {
+export function LensBar({ query, counts, proofBusy, onChange }: LensBarProps): ReactElement {
     const toggleKind = (kind: string): void => {
         const held = new Set(query.kinds);
         if (held.has(kind)) {
@@ -79,6 +80,19 @@ export function LensBar({ query, counts, onChange }: LensBarProps): ReactElement
                 })}
             </div>
             <span className="flex-1" />
+            <Button
+                size="sm"
+                variant={query.proof ? "primary" : "ghost"}
+                icon={LinkIcon}
+                aria-pressed={query.proof}
+                title={copy.graph.lens.proofHint}
+                busy={proofBusy}
+                onClick={() => {
+                    onChange({ ...query, proof: !query.proof });
+                }}
+            >
+                {copy.graph.lens.proof}
+            </Button>
             <Switch
                 label={copy.graph.lens.isolate}
                 title={copy.graph.lens.isolateHint}

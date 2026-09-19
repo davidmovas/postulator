@@ -13,6 +13,7 @@ import { centerOn, fit, panBy, toWorld, visibleWorld, zoomAt } from "../../../ca
 import type { Point, Size, Viewport } from "../../../canvas/viewport.js";
 import { copy } from "../../../copy/index.js";
 import { CallSplitIcon, LinkOffIcon } from "../../../ui/index.js";
+import type { Severity } from "../../links/model/audit.js";
 import { entityIcon, kindTone } from "../labels.js";
 import type { FoldState, VisibleRow } from "../model/fold.js";
 import { childLimit, treeOf } from "../model/fold.js";
@@ -69,6 +70,7 @@ export interface GraphMapProps {
     showRelated: boolean;
     highlightEdgeId: string | null;
     pulse: Pulse | null;
+    tint: ReadonlyMap<string, Severity> | null;
     revealVersion: number;
     onSelect: (id: string | null) => void;
     onPick: (id: string) => void;
@@ -112,6 +114,7 @@ export function GraphMap({
     showRelated,
     highlightEdgeId,
     pulse,
+    tint,
     revealVersion,
     onSelect,
     onPick,
@@ -172,8 +175,8 @@ export function GraphMap({
     const grid = useMemo(() => new HitGrid(layout.nodes, hitCell), [layout]);
     const rowById = useMemo(() => new Map(rows.map((row) => [row.id, row])), [rows]);
 
-    const latest = useRef({ index, rows, fold, selectedId, matched, showRelated, highlightEdgeId, pulse, layout, grid, rowById, measures, palette, fonts });
-    latest.current = { index, rows, fold, selectedId, matched, showRelated, highlightEdgeId, pulse, layout, grid, rowById, measures, palette, fonts };
+    const latest = useRef({ index, rows, fold, selectedId, matched, showRelated, highlightEdgeId, pulse, tint, layout, grid, rowById, measures, palette, fonts });
+    latest.current = { index, rows, fold, selectedId, matched, showRelated, highlightEdgeId, pulse, tint, layout, grid, rowById, measures, palette, fonts };
 
     useEffect(() => {
         if (pulse === null) {
@@ -226,7 +229,7 @@ export function GraphMap({
             return;
         }
         host.current?.redraw();
-    }, [layout, fitAll, selectedId, matched, showRelated, highlightEdgeId, palette]);
+    }, [layout, fitAll, selectedId, matched, showRelated, highlightEdgeId, tint, palette]);
 
     useEffect(() => {
         if (selectedId === null || view.current === null) {
@@ -246,7 +249,7 @@ export function GraphMap({
 
     const draw = useCallback((context: CanvasRenderingContext2D, area: Size): void => {
         const { layout: placed, grid: hits, rowById: byRow, measures: sizes, palette: colors, fonts: faces, index: graph } = latest.current;
-        const { selectedId: selected, matched: lit, showRelated: allRelated, highlightEdgeId: highlighted, pulse: pulsing } = latest.current;
+        const { selectedId: selected, matched: lit, showRelated: allRelated, highlightEdgeId: highlighted, pulse: pulsing, tint: proof } = latest.current;
         const now = Date.now();
         const glow = pulsing !== null && now < pulsing.until ? (pulsing.until - now) / pulseMs : 0;
         if (colors === null || faces === null) {
@@ -256,6 +259,8 @@ export function GraphMap({
         if (current === null) {
             return;
         }
+        const proofFill: Readonly<Record<Severity, string>> = { ok: colors.okSoft, warn: colors.warnSoft, danger: colors.dangerSoft, muted: colors.mutedSoft };
+        const proofStroke: Readonly<Record<Severity, string>> = { ok: colors.ok, warn: colors.warn, danger: colors.danger, muted: colors.hairline };
         const detail = detailOf(current.k);
         const seen = visibleWorld(current, area);
         const reach = { x: seen.x - 640, y: seen.y - rowHeight * 2, width: seen.width + 1280, height: seen.height + rowHeight * 4 };
@@ -403,14 +408,15 @@ export function GraphMap({
             const tone = toneColor(colors, kindTone(held?.kind ?? ""));
             const showLabel = labelled(detail, node.depth, row.childCount, isSelected);
 
+            const grade: Severity | null = proof === null ? null : (proof.get(node.id) ?? "muted");
             roundRect(context, node.x, node.y, node.width, node.height, 6);
             if (!showLabel) {
-                context.fillStyle = tone;
+                context.fillStyle = grade === null ? tone : proofStroke[grade];
                 context.globalAlpha = dim ? 0.15 : 0.4;
                 context.fill();
                 context.globalAlpha = 1;
             } else {
-                context.fillStyle = isSelected ? colors.accentSoft : isHovered ? colors.raised : colors.inset;
+                context.fillStyle = grade !== null ? proofFill[grade] : isSelected ? colors.accentSoft : isHovered ? colors.raised : colors.inset;
                 context.fill();
             }
             if (glow > 0 && pulsing !== null && pulsing.ids.has(node.id)) {
@@ -427,6 +433,8 @@ export function GraphMap({
             context.lineWidth = isSelected || isLitEnd ? 1.5 : 1;
             if (isLitEnd) {
                 context.strokeStyle = colors.accent;
+            } else if (grade !== null && !isSelected) {
+                context.strokeStyle = proofStroke[grade];
             } else if (flags?.noPage) {
                 context.strokeStyle = colors.danger;
                 context.setLineDash([4, 3]);

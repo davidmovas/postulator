@@ -1,9 +1,13 @@
 import type { ReactElement } from "react";
 import { useMemo } from "react";
 
+import { Link } from "react-router";
+
 import { copy } from "../../../copy/index.js";
+import type { PageAudit } from "../../../data/types.js";
 import { relativeTime } from "../../../domain/format.js";
-import { Button, CloseIcon, DeleteIcon, IconButton, SectionLabel, toneClasses } from "../../../ui/index.js";
+import { Button, CloseIcon, cx, DeleteIcon, IconButton, SectionLabel, toneClasses } from "../../../ui/index.js";
+import { severityOf } from "../../links/model/audit.js";
 import { entityIcon, formatScore, kindTone } from "../labels.js";
 import type { GraphIndex } from "../model/index.js";
 import type { Lens } from "../model/lens.js";
@@ -23,9 +27,60 @@ export interface InspectorProps {
     onConnect: (id: string) => void;
     onDelete: (id: string) => void;
     onPlanPage: (id: string) => void;
+    audit: readonly PageAudit[] | null;
 }
 
-export function Inspector({ siteId, index, selectedId, onSelect, onReveal, onLens, onConnect, onDelete, onPlanPage }: InspectorProps): ReactElement {
+interface AuditRowsProps {
+    siteId: string;
+    entityId: string;
+    audit: readonly PageAudit[] | null;
+}
+
+function AuditRows({ siteId, entityId, audit }: AuditRowsProps): ReactElement {
+    const rows = audit === null ? null : audit.filter((row) => row.entityId === entityId);
+    return (
+        <section className="flex flex-col gap-1">
+            <div className="flex items-baseline justify-between">
+                <SectionLabel>{copy.graph.inspector.links}</SectionLabel>
+                <Link to={`/s/${siteId}/links?entity=${entityId}`} className="text-2xs">
+                    {copy.graph.inspector.linksOpen}
+                </Link>
+            </div>
+            {rows === null ? (
+                <p className="text-2xs text-ink-faint">{copy.graph.inspector.linksOff}</p>
+            ) : rows.length === 0 ? (
+                <p className="text-2xs text-ink-faint">{copy.graph.legend.proofMuted}</p>
+            ) : (
+                <ul className="flex flex-col gap-1">
+                    {rows.map((row) => {
+                        const severity = severityOf(row);
+                        return (
+                            <li key={row.pageId} className="flex flex-col gap-0.5 text-xs">
+                                <Link to={`/s/${siteId}/links/${row.pageId}`} className="flex min-w-0 items-center gap-2 text-ink-soft hover:text-ink">
+                                    <span className={cx("h-1.5 w-1.5 shrink-0 rounded-full", toneClasses[severity].solid)} aria-hidden={true} />
+                                    <span className="truncate font-mono">{row.path}</span>
+                                </Link>
+                                <span className="pl-3.5 text-2xs text-ink-dim">
+                                    {row.skipReason !== ""
+                                        ? (copy.links.cell.skipped[row.skipReason] ?? row.skipReason)
+                                        : [
+                                              copy.graph.inspector.linksRow(row.satisfied, row.targets),
+                                              row.missing > 0 ? copy.graph.inspector.linksMissing(row.missing, row.missingRequired) : null,
+                                              row.blocked > 0 ? copy.graph.inspector.linksBlocked(row.blocked) : null,
+                                          ]
+                                              .filter((part) => part !== null)
+                                              .join(" · ")}
+                                </span>
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+        </section>
+    );
+}
+
+export function Inspector({ siteId, index, selectedId, onSelect, onReveal, onLens, onConnect, onDelete, onPlanPage, audit }: InspectorProps): ReactElement {
     const entity = selectedId === null ? undefined : index.byId.get(selectedId);
     const rank = useMemo(() => {
         if (entity === undefined) {
@@ -94,6 +149,8 @@ export function Inspector({ siteId, index, selectedId, onSelect, onReveal, onLen
                     <p className="text-2xs text-ink-faint">{copy.graph.inspector.anchorsHint}</p>
                     <AnchorsEditor entity={entity} />
                 </section>
+
+                <AuditRows siteId={siteId} entityId={entity.id} audit={audit} />
 
                 <section className="flex flex-col gap-1">
                     <SectionLabel>{copy.graph.inspector.relations}</SectionLabel>
