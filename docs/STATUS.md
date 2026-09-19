@@ -14,18 +14,21 @@ import, the agent, the schedules, the fourteen bound services and their TypeScri
 master password locks and unlocks the whole core, a backup of the database round trips through
 one encrypted archive, and the sweep retires artifacts and run events on their own windows.
 
-The bound surface is a hundred and eight methods since 2026-09-19: `SettingsService.ProviderKeys`
+The bound surface is a hundred and ten methods since 2026-09-19: `SettingsService.ProviderKeys`
 and `DeleteProviderKey` report and revoke an LLM key as a boolean, `SitesService.TestConnection`
 probes a site before it is saved and after it is edited, `RunsService.ListArtifacts` names the
 artifacts a run item holds without their blobs, and `RunsService.Estimate` prices a run before it
 is enqueued. `sites.changed`, `schedules.changed` and `settings.changed` join the three `*.changed`
 events, and a run's deadline is the `runs.deadline` setting rather than a constant.
+`ReportsService.LinkAudit` and `LinkAuditPage` answer, per mapped page, the links the graph asks
+it to carry and whether a stored link satisfies each one; `reports_link_audit` and
+`reports_link_audit_page` hand the same reads to the agent, eighty-five tools in all.
 
 `RunsService.ListItems` carries `retryable` and `retryBlockedReason` since 2026-09-19, computed
 from the current step's `Requires` against the item's purged artifacts; `inputs_expired` is the
 only value the reason takes and `Engine.RetryStep` refuses with the same fact before it touches
 the item. `frontend/src/generated/vocab.ts` is the second generated TypeScript module: `task vocab`
-renders every string union, the five sort field lists and five derived groupings from the Go const
+renders every string union, the five sort field lists and six derived groupings from the Go const
 blocks in declaration order, and a byte-comparing test fails when it is stale.
 
 The last gate run on 2026-09-19: `task events`, `task vocab`, `task bindings`, `gofmt -l .`,
@@ -110,6 +113,16 @@ Module coverage is 87.6% of 14439 statements; `domain` + `application` sit at 86
   is covered. The package now carries its own tests over the confirmation fence and the views.
 - `ledger.List` has no caller: `ModelsService.UsageSummary` answers from the aggregate, and a
   per-call ledger screen is what would read the list.
+- `content.Compliance` classifies an absolute link to the site's own host as `external`, because
+  it passes an empty host; the link audit takes the host from the site's base URL and classifies
+  the same link as `graph`. A run's validation and the Linking screen can therefore disagree on
+  an absolute own-host link until the step learns the host too.
+- The link audit rebinds "self" to the audited page. A second page mapped to the same entity is
+  audited with that entity's targets, and its link to the entity's canonical page reads as
+  `unknown_internal`, not `self`; `Compliance` would call it `self`.
+- `LinkAudit` resolves the template of every mapped page, one `ResolveForPage` each, so a site of
+  five thousand mapped pages costs about two seconds. The frontend caches it for thirty seconds
+  and refreshes on events, not on focus.
 - `settings.changed` is published by `models.SetProviderKey` and `models.DeleteProviderKey` only.
   `SettingsService.Set` writes a declared value at the transport, which is the one layer that does
   not publish, so a second window on the settings screen does not learn that `runs.workers`
@@ -156,8 +169,8 @@ Module coverage is 87.6% of 14439 statements; `domain` + `application` sit at 86
 1. Build the real frontend on the bound services and the generated events.
 2. Tag `v2.0.0` when the UI lands; `release.yml` publishes the executable, the NSIS installer and
    the companion plugin archive from that tag.
-3. Close the gaps above that the UI reaches: the ledger screen, the page audit screen, and
-   `settings.changed` for a declared value, which needs an application settings use case.
+3. Close the gaps above that the UI reaches: the ledger screen and `settings.changed` for a
+   declared value, which needs an application settings use case.
 
 ## Final review
 

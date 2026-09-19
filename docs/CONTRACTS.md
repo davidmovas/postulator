@@ -34,7 +34,7 @@ the composition root binds the two.
 | `TemplatesService` | `CreateTemplate UpdateTemplate DeleteTemplate GetTemplate ListTemplates SetOverride DeleteOverride ResolveForPage CreatePolicy UpdatePolicy DeletePolicy GetPolicy ListPolicies GetEffectivePolicy` |
 | `RunsService` | `Start Estimate Get List ListItems ListEvents GetArtifact ListArtifacts Pause Resume Cancel RetryStep` |
 | `SyncService` | `SyncSite CheckPlugin SavePluginPackage` |
-| `ReportsService` | `SiteOverview PageReport RunReport JudgePage` |
+| `ReportsService` | `SiteOverview LinkAudit LinkAuditPage PageReport RunReport JudgePage` |
 | `ImportService` | `Inspect Preview Apply Export SaveMapping ListMappings DeleteMapping` |
 | `ModelsService` | `ListModels UpsertModel DisableModel GetProfiles SetProfile TestProvider UsageSummary` |
 | `AgentService` | `CreateConversation SetMode Send Confirm Cancel ListConversations ListMessages ListPendingActions` |
@@ -42,13 +42,19 @@ the composition root binds the two.
 | `ToolsService` | `List` |
 | `SettingsService` | `Schema Get Set SetProviderKey ProviderKeys DeleteProviderKey LockState Lock Unlock SetMasterPassword ExportBackup ImportBackup` |
 
-A hundred and eight methods. Where a use case answers with bytes the service writes them
+A hundred and ten methods. Where a use case answers with bytes the service writes them
 to the path the request names and returns it, because the webview has no filesystem;
 `SyncService.SavePluginPackage{path}` is the only such method.
 
 `ReportsService.JudgePage{pageId}` is synchronous: it pulls the live page, runs the shared
-judge rubric against it and answers with the report, one model call inside the request. The
-other three reports read what a run already recorded.
+judge rubric against it and answers with the report, one model call inside the request.
+`PageReport` and `RunReport` read what a run already recorded; `SiteOverview`,
+`LinkAudit{siteId}` and `LinkAuditPage{pageId}` read the graph and the page map. The audit
+plans every mapped page's link targets with the rules of the page's resolved template and the
+site's effective policy, exactly as `resolve_context` does, and answers one summary row per
+non-archived page; the page detail names each target, whether a stored link satisfies it and
+with which anchor, and every stored link the graph did not ask for. Both are unpaged reads of
+one site, like `Tree` and `LoadGraph`.
 
 Every method but `HealthService.Ping` and the four lock methods of `SettingsService`
 answers `LOCKED` while a master password is set and the application has not been unlocked,

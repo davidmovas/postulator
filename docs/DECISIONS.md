@@ -640,3 +640,43 @@ each of these exists because a screen could not be drawn without it.
   pending actions and schedules declare no sort and therefore generate nothing. A byte-comparing
   test fails when the committed file is stale, and `.gitattributes` pins it to LF beside
   `events.ts` for the reason recorded there.
+
+## Decisions taken on 2026-09-19 for the linking screen
+
+The Linking screen shows, per page, the links the graph asks for and whether they exist. Nothing
+read that: `Pages.Get` answers one page's links and `SiteOverview` reduces a site to two
+counters.
+
+- **Two reads, not one.** A denormalised required-link row is about 380 bytes; a site of five
+  thousand pages with eight targets each would push about 18 MB through the WebView2 bridge in
+  one answer and hold forty thousand rows nobody looks at at once. `LinkAudit{siteId}` answers
+  the policy, the totals and one summary row per non-archived page, about 1.6 MB for that site,
+  and `LinkAuditPage{pageId}` answers one page's required and extra links, about 4 KB. Both are
+  computed by the same pure `auditPage` over the same loaded state, and a test asserts the
+  detail's summary row equals the site row. Neither is a list, so the cursor rule is untouched.
+- **`content.PlanLinks` wraps the traversal rather than adding a second one.** `BuildLinkContext`
+  silently dropped a target whose entity has no canonical page, and the screen has to name
+  exactly those. `PlanLinks` walks parents, children and siblings once and answers the context
+  beside the blocked targets; `BuildLinkContext` is its context, so the `link_context` artifact
+  and every step are unchanged.
+- **The rules come from the page's resolved template.** `resolve_context` builds its policy from
+  the page's `TemplateSpec.LinkRules` and takes only `ForbidExternal`, `ForbidSelf` and
+  `AnchorStrategy` from the site's effective policy; the audit does the same, one `ResolveForPage`
+  per mapped page, so the screen and the run agree. A page whose template cannot be resolved is
+  reported as `no_template` rather than failing the site.
+- **A stored link is classified by its resolved page id first.** `page_links` rows carry
+  `ToPageID` when the sync or the relink resolved the href, and a path otherwise; `ClassifyLink`
+  trusts the id, then `pagemap.InternalPath` against the site host from the site's base URL.
+  `Compliance` keeps its href-based classifier with an empty host; the divergence on an absolute
+  own-host link is recorded in `STATUS.md`.
+- **Self is the audited page.** `LinkContext.PageID` is the entity's canonical page, so a second
+  page mapped to the same entity would read the canonical page as itself. The audit rebinds
+  `PageID` and `PageURL` to the page being audited.
+- **A self-link does not reach a page.** `linkSets` no longer counts a link from a page to itself
+  as incoming, so a page whose only inbound link is its own is an orphan in both the overview and
+  the audit, which agree by construction.
+- **`reports.New` takes a `Deps` struct.** Ten readers is where `graph`, `content` and `imports`
+  switched; the audit added the site, the spec resolver and the policy reader to the seven.
+- **Four more vocabularies are generated.** `linkRelations`, `linkClasses` with the derived
+  `offGraphLinkClasses` over `LinkClass.OffGraph`, `linkBlockedReasons` and
+  `linkAuditSkipReasons`, so the screen never retypes a value the audit switches on.
