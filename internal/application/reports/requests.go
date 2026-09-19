@@ -3,6 +3,7 @@ package reports
 import (
 	"encoding/json"
 
+	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
 
@@ -93,4 +94,97 @@ type RunReportResponse struct {
 	Status string       `json:"status"`
 	Stats  RunStats     `json:"stats"`
 	Items  []ItemReport `json:"items"`
+}
+
+type SkipReason string
+
+const (
+	SkipUnmapped   SkipReason = "unmapped"
+	SkipNoTemplate SkipReason = "no_template"
+)
+
+type LinkAuditRequest struct {
+	SiteID string `json:"siteId"`
+}
+
+type LinkPolicySummary struct {
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	ForbidExternal bool   `json:"forbidExternal"`
+	ForbidSelf     bool   `json:"forbidSelf"`
+	AnchorStrategy string `json:"anchorStrategy"`
+}
+
+type LinkTotals struct {
+	Pages           int `json:"pages"`
+	Audited         int `json:"audited"`
+	Targets         int `json:"targets"`
+	Required        int `json:"required"`
+	Satisfied       int `json:"satisfied"`
+	Missing         int `json:"missing"`
+	MissingRequired int `json:"missingRequired"`
+	Blocked         int `json:"blocked"`
+	OffGraph        int `json:"offGraph"`
+	Orphans         int `json:"orphans"`
+}
+
+type PageAudit struct {
+	PageID          string `json:"pageId"`
+	Path            string `json:"path"`
+	Status          string `json:"status"`
+	EntityID        string `json:"entityId"`
+	EntityName      string `json:"entityName"`
+	SkipReason      string `json:"skipReason"`
+	Targets         int    `json:"targets"`
+	Required        int    `json:"required"`
+	Satisfied       int    `json:"satisfied"`
+	Missing         int    `json:"missing"`
+	MissingRequired int    `json:"missingRequired"`
+	Blocked         int    `json:"blocked"`
+	OffGraph        int    `json:"offGraph"`
+	Inbound         int    `json:"inbound"`
+	Orphan          bool   `json:"orphan"`
+}
+
+type LinkAuditResponse struct {
+	SiteID string            `json:"siteId"`
+	Policy LinkPolicySummary `json:"policy"`
+	Totals LinkTotals        `json:"totals"`
+	Pages  []PageAudit       `json:"pages"`
+}
+
+type LinkAuditPageRequest struct {
+	PageID string `json:"pageId"`
+}
+
+type RequiredLink struct {
+	Relation         string   `json:"relation"`
+	Required         bool     `json:"required"`
+	TargetEntityID   string   `json:"targetEntityId"`
+	TargetEntityName string   `json:"targetEntityName"`
+	TargetPageID     string   `json:"targetPageId"`
+	TargetPath       string   `json:"targetPath"`
+	Satisfied        bool     `json:"satisfied"`
+	Anchor           string   `json:"anchor"`
+	AnchorAllowed    bool     `json:"anchorAllowed"`
+	AnchorsAllowed   []string `json:"anchorsAllowed"`
+	Weight           float64  `json:"weight"`
+	Depth            int      `json:"depth"`
+	BlockedReason    string   `json:"blockedReason"`
+}
+
+type ExtraLink struct {
+	ToURL    string `json:"toUrl"`
+	ToPageID string `json:"toPageId"`
+	Anchor   string `json:"anchor"`
+	Kind     string `json:"kind"`
+	Origin   string `json:"origin"`
+}
+
+type LinkAuditPageResponse struct {
+	Page       PageAudit          `json:"page"`
+	TemplateID string             `json:"templateId"`
+	Rules      template.LinkRules `json:"rules"`
+	Required   []RequiredLink     `json:"required"`
+	Extra      []ExtraLink        `json:"extra"`
 }

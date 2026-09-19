@@ -46,9 +46,9 @@ func (s *Service) SiteOverview(ctx context.Context, req SiteOverviewRequest) (Si
 	}, nil
 }
 
-func linkSets(links []pagemap.PageLink) (outgoing map[string]map[string]struct{}, incoming map[string]struct{}) {
+func linkSets(links []pagemap.PageLink) (outgoing map[string]map[string]struct{}, incoming map[string]int) {
 	outgoing = make(map[string]map[string]struct{})
-	incoming = make(map[string]struct{})
+	incoming = make(map[string]int)
 	for i := range links {
 		if links[i].ToPageID == nil {
 			continue
@@ -59,7 +59,9 @@ func linkSets(links []pagemap.PageLink) (outgoing map[string]map[string]struct{}
 			outgoing[links[i].FromPageID] = targets
 		}
 		targets[*links[i].ToPageID] = struct{}{}
-		incoming[*links[i].ToPageID] = struct{}{}
+		if *links[i].ToPageID != links[i].FromPageID {
+			incoming[*links[i].ToPageID]++
+		}
 	}
 	return outgoing, incoming
 }
@@ -86,7 +88,7 @@ func canonical(entity graph.Entity, index pagemap.Index) (pagemap.Page, bool) {
 	return index.ByID(*entity.CanonicalPageID)
 }
 
-func pageTotals(pages []pagemap.Page, incoming map[string]struct{}) PageTotals {
+func pageTotals(pages []pagemap.Page, incoming map[string]int) PageTotals {
 	totals := PageTotals{Total: len(pages), ByStatus: make(map[string]int)}
 	for i := range pages {
 		page := &pages[i]
@@ -97,7 +99,7 @@ func pageTotals(pages []pagemap.Page, incoming map[string]struct{}) PageTotals {
 		if page.Status == pagemap.StatusArchived {
 			continue
 		}
-		if _, linked := incoming[page.ID]; !linked {
+		if incoming[page.ID] == 0 {
 			totals.Orphans++
 		}
 	}

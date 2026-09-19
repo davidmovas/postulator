@@ -21,12 +21,14 @@ import (
 )
 
 type fixture struct {
-	service *reports.Service
-	store   *sqlite.Store
-	siteID  string
-	pages   map[string]pagemap.Page
-	runID   string
-	itemID  string
+	service    *reports.Service
+	store      *sqlite.Store
+	siteID     string
+	templateID string
+	pages      map[string]pagemap.Page
+	entities   map[string]graph.Entity
+	runID      string
+	itemID     string
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -45,9 +47,18 @@ func newFixture(t *testing.T) *fixture {
 	siteRepo := sqlite.NewSiteRepo(store)
 	templateService := templates.New(sqlite.NewTemplateRepo(store), sqlite.NewLinkPolicyRepo(store),
 		pageRepo, siteRepo, store, &applicationtest.Recorder{}, clock.NewFake(sqlitetest.Stamp))
+	if err := templateService.EnsureSeeded(t.Context()); err != nil {
+		t.Fatalf("seed the templates: %v", err)
+	}
+	hub := sqlitetest.Template(t, store, "Hub fixture")
+	owner.Defaults.TemplateID = &hub.ID
+	if err := siteRepo.Update(t.Context(), owner); err != nil {
+		t.Fatalf("give the site a default template: %v", err)
+	}
 
 	f := &fixture{
-		store: store, siteID: owner.ID, pages: make(map[string]pagemap.Page),
+		store: store, siteID: owner.ID, templateID: hub.ID,
+		pages: make(map[string]pagemap.Page), entities: make(map[string]graph.Entity),
 		service: reports.New(reports.Deps{
 			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,
 			Runs: runRepo, Items: itemRepo, Artifacts: artifactRepo,
@@ -124,6 +135,7 @@ func (f *fixture) entity(t *testing.T, repo *sqlite.EntityRepo, name string, sco
 	if err := repo.SetScore(t.Context(), record.ID, score); err != nil {
 		t.Fatalf("score the entity %s: %v", name, err)
 	}
+	f.entities[name] = record
 	return record
 }
 
