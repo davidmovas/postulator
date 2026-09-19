@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/application"
+	"github.com/davidmovas/postulator/internal/application/events"
 	port "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
@@ -49,14 +51,19 @@ type Service struct {
 	spend     spendReader
 	secrets   secretStore
 	llm       prober
+	publisher application.Publisher
 	clock     clock.Clock
 }
 
-func New(catalog catalogReader, overrides catalogWriter, profiles profileStore, spend spendReader, secrets secretStore, client prober, clk clock.Clock) *Service {
+func New(catalog catalogReader, overrides catalogWriter, profiles profileStore, spend spendReader, secrets secretStore, client prober, publisher application.Publisher, clk clock.Clock) *Service {
 	return &Service{
 		catalog: catalog, overrides: overrides, profiles: profiles, spend: spend,
-		secrets: secrets, llm: client, clock: clk,
+		secrets: secrets, llm: client, publisher: publisher, clock: clk,
 	}
+}
+
+func (s *Service) settingsChanged() error {
+	return s.publisher.Publish(events.SettingsChanged, events.SettingsChangedPayload{})
 }
 
 func (s *Service) SetProviderKey(ctx context.Context, req SetProviderKeyRequest) (SetProviderKeyResponse, error) {
@@ -82,6 +89,9 @@ func (s *Service) SetProviderKey(ctx context.Context, req SetProviderKeyRequest)
 
 	if putErr := s.secrets.Put(ctx, llm.SecretRef(provider), key); putErr != nil {
 		return SetProviderKeyResponse{}, putErr
+	}
+	if publishErr := s.settingsChanged(); publishErr != nil {
+		return SetProviderKeyResponse{}, publishErr
 	}
 	return SetProviderKeyResponse{Provider: provider}, nil
 }

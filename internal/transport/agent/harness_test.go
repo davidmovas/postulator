@@ -97,7 +97,7 @@ func build(t *testing.T, store *sqlite.Store, model *fake.Gollem, bus *applicati
 	templateService := templates.New(sqlite.NewTemplateRepo(store), sqlite.NewLinkPolicyRepo(store),
 		pageRepo, siteRepo, store, bus, now)
 	registered := tools.New(tools.Deps{
-		Sites:     sites.New(siteRepo, nil, store, now),
+		Sites:     sites.New(siteRepo, nil, store, bus, now),
 		Pages:     pages.New(pageRepo, linkRepo, entityRepo, siteRepo, store, bus, now),
 		Templates: templateService,
 		Reports: reports.New(entityRepo, edgeRepo, pageRepo, linkRepo, sqlite.NewRunRepo(store),

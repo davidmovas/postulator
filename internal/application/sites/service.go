@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/application"
+	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
@@ -32,18 +33,23 @@ type unitOfWork interface {
 }
 
 type Service struct {
-	store   siteStore
-	secrets secretStore
-	uow     unitOfWork
-	clock   clock.Clock
+	store     siteStore
+	secrets   secretStore
+	uow       unitOfWork
+	publisher application.Publisher
+	clock     clock.Clock
 }
 
-func New(store siteStore, secrets secretStore, uow unitOfWork, clk clock.Clock) *Service {
-	return &Service{store: store, secrets: secrets, uow: uow, clock: clk}
+func New(store siteStore, secrets secretStore, uow unitOfWork, publisher application.Publisher, clk clock.Clock) *Service {
+	return &Service{store: store, secrets: secrets, uow: uow, publisher: publisher, clock: clk}
 }
 
 func (s *Service) now() time.Time {
 	return s.clock.Now().UTC().Truncate(time.Second)
+}
+
+func (s *Service) changed(siteID string) error {
+	return s.publisher.Publish(events.SitesChanged, events.SitesChangedPayload{SiteID: siteID})
 }
 
 func (s *Service) Create(ctx context.Context, req CreateRequest) (CreateResponse, error) {
@@ -82,6 +88,9 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (CreateResponse
 	if err != nil {
 		return CreateResponse{}, err
 	}
+	if publishErr := s.changed(record.ID); publishErr != nil {
+		return CreateResponse{}, publishErr
+	}
 	return CreateResponse{Site: view(record)}, nil
 }
 
@@ -113,6 +122,9 @@ func (s *Service) Update(ctx context.Context, req UpdateRequest) (UpdateResponse
 	})
 	if err != nil {
 		return UpdateResponse{}, err
+	}
+	if publishErr := s.changed(updated.ID); publishErr != nil {
+		return UpdateResponse{}, publishErr
 	}
 	return UpdateResponse{Site: view(updated)}, nil
 }
@@ -175,6 +187,9 @@ func (s *Service) Delete(ctx context.Context, req DeleteRequest) (DeleteResponse
 	})
 	if err != nil {
 		return DeleteResponse{}, err
+	}
+	if publishErr := s.changed(req.ID); publishErr != nil {
+		return DeleteResponse{}, publishErr
 	}
 	return DeleteResponse{}, nil
 }

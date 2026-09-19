@@ -12,6 +12,16 @@ type PagesChangedPayload struct {
 
 type TemplatesChangedPayload struct{}
 
+type SitesChangedPayload struct {
+	SiteID string `json:"siteId"`
+}
+
+type SchedulesChangedPayload struct {
+	SiteID string `json:"siteId"`
+}
+
+type SettingsChangedPayload struct{}
+
 type AgentDeltaPayload struct {
 	ConversationID string `json:"conversationId"`
 	MessageID      string `json:"messageId"`

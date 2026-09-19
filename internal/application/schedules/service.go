@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/application"
+	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	domainrun "github.com/davidmovas/postulator/internal/domain/run"
@@ -47,6 +49,7 @@ type Deps struct {
 	Sites     siteReader
 	Runs      runStarter
 	RunReader runReader
+	Publisher application.Publisher
 	Clock     clock.Clock
 }
 
@@ -60,6 +63,10 @@ func New(deps Deps) *Service {
 
 func (s *Service) now() time.Time {
 	return s.deps.Clock.Now().UTC().Truncate(time.Second)
+}
+
+func (s *Service) changed(siteID string) error {
+	return s.deps.Publisher.Publish(events.SchedulesChanged, events.SchedulesChangedPayload{SiteID: siteID})
 }
 
 func invalid(message, field string) *errors.Error {

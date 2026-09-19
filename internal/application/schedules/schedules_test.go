@@ -7,6 +7,8 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
+	"github.com/davidmovas/postulator/internal/application/applicationtest"
+	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/schedules"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -69,6 +71,7 @@ type fixture struct {
 	store    *sqlite.Store
 	runner   *runStub
 	clock    *clock.Fake
+	events   *applicationtest.Recorder
 	siteID   string
 	entityID string
 	pageIDs  []string
@@ -102,13 +105,102 @@ func newFixture(t *testing.T) *fixture {
 		ids = append(ids, page.ID)
 	}
 
+	recorder := &applicationtest.Recorder{}
 	return &fixture{
 		service: schedules.New(schedules.Deps{
 			Schedules: sqlite.NewScheduleRepo(store), Pages: pageRepo, Sites: sqlite.NewSiteRepo(store),
-			Runs: runner, RunReader: runner, Clock: fake,
+			Runs: runner, RunReader: runner, Publisher: recorder, Clock: fake,
 		}),
-		store: store, runner: runner, clock: fake, siteID: owner.ID, entityID: entity.ID, pageIDs: ids,
+		store: store, runner: runner, clock: fake, events: recorder,
+		siteID: owner.ID, entityID: entity.ID, pageIDs: ids,
 	}
+}
+
+func TestEveryScheduleWriteAnnouncesTheSiteItChanged(t *testing.T) {
+	t.Parallel()
+
+	f := newFixture(t)
+	created := f.create(t, nil)
+
+	cases := []struct {
+		name string
+		call func(t *testing.T) error
+	}{
+		{
+			name: "create",
+			call: func(t *testing.T) error {
+				f.create(t, func(req *schedules.CreateRequest) { req.Name = "second" })
+				return nil
+			},
+		},
+		{
+			name: "update",
+			call: func(t *testing.T) error {
+				_, err := f.service.Update(t.Context(), schedules.UpdateRequest{ID: created.ID, Name: strPtr("renamed")})
+				return err
+			},
+		},
+		{
+			name: "disable",
+			call: func(t *testing.T) error {
+				_, err := f.service.Disable(t.Context(), schedules.DisableRequest{ID: created.ID})
+				return err
+			},
+		},
+		{
+			name: "enable",
+			call: func(t *testing.T) error {
+				_, err := f.service.Enable(t.Context(), schedules.EnableRequest{ID: created.ID})
+				return err
+			},
+		},
+		{
+			name: "run now",
+			call: func(t *testing.T) error {
+				_, err := f.service.RunNow(t.Context(), schedules.RunNowRequest{ID: created.ID})
+				return err
+			},
+		},
+		{
+			name: "delete",
+			call: func(t *testing.T) error {
+				_, err := f.service.Delete(t.Context(), schedules.DeleteRequest{ID: created.ID})
+				return err
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			f.events.Reset()
+			if err := tc.call(t); err != nil {
+				t.Fatalf("%s: %v", tc.name, err)
+			}
+
+			recorded := f.events.Events()
+			found := false
+			for _, recording := range recorded {
+				if recording.Type != events.SchedulesChanged {
+					continue
+				}
+				payload, ok := recording.Payload.(events.SchedulesChangedPayload)
+				if !ok {
+					t.Fatalf("payload = %T, want events.SchedulesChangedPayload", recording.Payload)
+				}
+				if payload.SiteID != f.siteID {
+					t.Fatalf("siteId = %q, want %q", payload.SiteID, f.siteID)
+				}
+				found = true
+			}
+			if !found {
+				t.Fatalf("recorded %+v, want a %q event", recorded, events.SchedulesChanged)
+			}
+		})
+	}
+}
+
+func strPtr(value string) *string {
+	return &value
 }
 
 func (f *fixture) create(t *testing.T, mutate func(*schedules.CreateRequest)) schedules.Schedule {

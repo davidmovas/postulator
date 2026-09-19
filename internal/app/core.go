@@ -251,7 +251,7 @@ func (c *Core) compose(ctx context.Context, key []byte) error {
 		Publisher:  relay,
 	}, stepRegistry, runtime.Settings(values), now, logger)
 
-	sitesService := sites.New(siteRepo, secretStore, store, now)
+	sitesService := sites.New(siteRepo, secretStore, store, relay, now)
 	graphService := graph.New(graph.Deps{
 		Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Pages: pageRepo,
 		Profiles: modelProfiles, LLM: client, UnitOfWork: store, Publisher: relay, Clock: now,
@@ -270,7 +270,7 @@ func (c *Core) compose(ctx context.Context, key []byte) error {
 		Clock:      now,
 		MaxRows:    imports.MaxRows(values),
 	})
-	modelsService := models.New(modelCatalog, modelRepo, modelProfiles, book, secretStore, client, now)
+	modelsService := models.New(modelCatalog, modelRepo, modelProfiles, book, secretStore, client, relay, now)
 	runsService := runs.New(engine, runRepo, itemRepo, artifactRepo, eventRepo, templateService)
 	syncService := sync.New(engine, siteRepo, wordpress, packer{}, now)
 	reportsService := reports.New(entityRepo, edgeRepo, pageRepo, linkRepo, runRepo, itemRepo, artifactRepo)
@@ -278,7 +278,7 @@ func (c *Core) compose(ctx context.Context, key []byte) error {
 	scheduleRepo := sqlite.NewScheduleRepo(store)
 	schedulesService := schedules.New(schedules.Deps{
 		Schedules: scheduleRepo, Pages: pageRepo, Sites: siteRepo, Runs: runsService,
-		RunReader: runRepo, Clock: now,
+		RunReader: runRepo, Publisher: relay, Clock: now,
 	})
 
 	actionRepo := sqlite.NewPendingActionRepo(store)

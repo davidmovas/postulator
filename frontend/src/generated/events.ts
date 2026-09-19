@@ -22,6 +22,9 @@ export type EventType =
     | "run.queued"
     | "run.resumed"
     | "run.started"
+    | "schedules.changed"
+    | "settings.changed"
+    | "sites.changed"
     | "step.done"
     | "step.failed"
     | "step.retrying"
@@ -166,6 +169,16 @@ export interface RunStartedPayload {
     runId: string;
 }
 
+export interface SchedulesChangedPayload {
+    siteId: string;
+}
+
+export interface SettingsChangedPayload {}
+
+export interface SitesChangedPayload {
+    siteId: string;
+}
+
 export interface StepDonePayload {
     runId: string;
     itemId: string;
@@ -221,6 +234,9 @@ export interface EventPayloads {
     "run.queued": RunQueuedPayload;
     "run.resumed": RunResumedPayload;
     "run.started": RunStartedPayload;
+    "schedules.changed": SchedulesChangedPayload;
+    "settings.changed": SettingsChangedPayload;
+    "sites.changed": SitesChangedPayload;
     "step.done": StepDonePayload;
     "step.failed": StepFailedPayload;
     "step.retrying": StepRetryingPayload;

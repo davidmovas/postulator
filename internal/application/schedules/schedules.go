@@ -63,6 +63,9 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (CreateResponse
 	if insertErr := s.deps.Schedules.Insert(ctx, created); insertErr != nil {
 		return CreateResponse{}, insertErr
 	}
+	if publishErr := s.changed(created.SiteID); publishErr != nil {
+		return CreateResponse{}, publishErr
+	}
 	return CreateResponse{Schedule: view(created)}, nil
 }
 
@@ -123,14 +126,21 @@ func (s *Service) Update(ctx context.Context, req UpdateRequest) (UpdateResponse
 	if updateErr := s.deps.Schedules.Update(ctx, armed); updateErr != nil {
 		return UpdateResponse{}, updateErr
 	}
+	if publishErr := s.changed(armed.SiteID); publishErr != nil {
+		return UpdateResponse{}, publishErr
+	}
 	return UpdateResponse{Schedule: view(armed)}, nil
 }
 
 func (s *Service) Delete(ctx context.Context, req DeleteRequest) (DeleteResponse, error) {
-	if strings.TrimSpace(req.ID) == "" {
-		return DeleteResponse{}, invalid("a schedule is needed", "id")
+	current, err := s.require(ctx, req.ID)
+	if err != nil {
+		return DeleteResponse{}, err
 	}
-	return DeleteResponse{}, s.deps.Schedules.Delete(ctx, req.ID)
+	if deleteErr := s.deps.Schedules.Delete(ctx, current.ID); deleteErr != nil {
+		return DeleteResponse{}, deleteErr
+	}
+	return DeleteResponse{}, s.changed(current.SiteID)
 }
 
 func (s *Service) Get(ctx context.Context, req GetRequest) (GetResponse, error) {
@@ -183,6 +193,9 @@ func (s *Service) switchTo(ctx context.Context, scheduleID string, enabled bool)
 	}
 	if updateErr := s.deps.Schedules.Update(ctx, armed); updateErr != nil {
 		return schedule.Schedule{}, updateErr
+	}
+	if publishErr := s.changed(armed.SiteID); publishErr != nil {
+		return schedule.Schedule{}, publishErr
 	}
 	return armed, nil
 }

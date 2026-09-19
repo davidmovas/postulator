@@ -9,6 +9,8 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/secrets"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
+	"github.com/davidmovas/postulator/internal/application/applicationtest"
+	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/site"
@@ -22,6 +24,7 @@ type harness struct {
 	store   *sqlite.Store
 	secrets *secrets.Store
 	clock   *clock.Fake
+	events  *applicationtest.Recorder
 }
 
 func newHarness(t *testing.T) harness {
@@ -30,11 +33,88 @@ func newHarness(t *testing.T) harness {
 	store := sqlitetest.Open(t)
 	clk := clock.NewFake(time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC))
 	vault := secrets.NewStore(sqlite.NewSecretsRepo(store, clk), sqlitetest.Key())
+	recorder := &applicationtest.Recorder{}
 	return harness{
-		service: sites.New(sqlite.NewSiteRepo(store), vault, store, clk),
+		service: sites.New(sqlite.NewSiteRepo(store), vault, store, recorder, clk),
 		store:   store,
 		secrets: vault,
 		clock:   clk,
+		events:  recorder,
+	}
+}
+
+func TestEveryWriteAnnouncesTheSiteItChanged(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	created, err := h.service.Create(t.Context(), sites.CreateRequest{
+		Name: "Shop", BaseURL: "https://shop.example.com", Username: "editor", Password: "abcd efgh",
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	cases := []struct {
+		name string
+		call func() error
+	}{
+		{
+			name: "create",
+			call: func() error { return nil },
+		},
+		{
+			name: "update",
+			call: func() error {
+				_, updateErr := h.service.Update(t.Context(), sites.UpdateRequest{ID: created.Site.ID, Name: ptr("Shop 2")})
+				return updateErr
+			},
+		},
+		{
+			name: "delete",
+			call: func() error {
+				_, deleteErr := h.service.Delete(t.Context(), sites.DeleteRequest{ID: created.Site.ID})
+				return deleteErr
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			h.events.Reset()
+			if err := tc.call(); err != nil {
+				t.Fatalf("%s: %v", tc.name, err)
+			}
+			if tc.name == "create" {
+				h.events.Reset()
+				again, createErr := h.service.Create(t.Context(), sites.CreateRequest{
+					Name: "Other", BaseURL: "https://other.example.com", Username: "editor",
+				})
+				if createErr != nil {
+					t.Fatalf("Create: %v", createErr)
+				}
+				assertSiteChanged(t, h.events.Events(), again.Site.ID)
+				return
+			}
+			assertSiteChanged(t, h.events.Events(), created.Site.ID)
+		})
+	}
+}
+
+func assertSiteChanged(t *testing.T, recorded []applicationtest.Event, siteID string) {
+	t.Helper()
+
+	if len(recorded) != 1 {
+		t.Fatalf("recorded %+v, want one event", recorded)
+	}
+	if recorded[0].Type != events.SitesChanged {
+		t.Fatalf("type = %q, want %q", recorded[0].Type, events.SitesChanged)
+	}
+	payload, ok := recorded[0].Payload.(events.SitesChangedPayload)
+	if !ok {
+		t.Fatalf("payload = %T, want events.SitesChangedPayload", recorded[0].Payload)
+	}
+	if payload.SiteID != siteID {
+		t.Fatalf("siteId = %q, want %q", payload.SiteID, siteID)
 	}
 }
 

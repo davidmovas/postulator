@@ -147,5 +147,8 @@ func (s *Service) rearm(ctx context.Context, current schedule.Schedule, now time
 	if err != nil {
 		return err
 	}
-	return s.deps.Schedules.Update(ctx, armed)
+	if updateErr := s.deps.Schedules.Update(ctx, armed); updateErr != nil {
+		return updateErr
+	}
+	return s.changed(armed.SiteID)
 }

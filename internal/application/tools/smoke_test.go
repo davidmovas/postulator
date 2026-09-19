@@ -112,7 +112,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding) {
 	reportsService := reports.New(entityRepo, edgeRepo, pageRepo, linkRepo, runRepo, itemRepo, artifactRepo)
 
 	return tools.New(tools.Deps{
-		Sites: sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, now),
+		Sites: sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, bus, now),
 		Graph: graph.New(graph.Deps{
 			Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Pages: pageRepo,
 			Profiles: modelProfiles, LLM: book, UnitOfWork: store, Publisher: bus, Clock: now,
@@ -129,7 +129,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding) {
 			Publisher: bus, Clock: now,
 		}),
 		Models: models.New(built, modelRepo, modelProfiles, book,
-			secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), book, now),
+			secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), book, bus, now),
 		Content: content.New(content.Deps{
 			Pages: pageRepo, Entities: entityRepo, Edges: edgeRepo, Specs: templateService,
 			Policies: templateService, Profiles: modelProfiles, LLM: book,
@@ -137,7 +137,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding) {
 		Schedules: schedules.New(schedules.Deps{
 			Schedules: sqlite.NewScheduleRepo(store), Pages: pageRepo, Sites: siteRepo,
 			Runs:      runs.New(stubEngine{}, runRepo, itemRepo, artifactRepo, sqlite.NewRunEventRepo(store), templateService),
-			RunReader: runRepo, Clock: now,
+			RunReader: runRepo, Publisher: bus, Clock: now,
 		}),
 		Actions:   sqlite.NewPendingActionRepo(store),
 		Publisher: bus,

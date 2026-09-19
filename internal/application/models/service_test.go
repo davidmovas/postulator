@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/application/applicationtest"
+	"github.com/davidmovas/postulator/internal/application/events"
 	port "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/models"
 	"github.com/davidmovas/postulator/internal/domain/llm"
@@ -132,6 +134,7 @@ type harness struct {
 	profiles *profiles
 	prober   *prober
 	secrets  *vault
+	events   *applicationtest.Recorder
 }
 
 func newHarness(t *testing.T, book spend) harness {
@@ -141,13 +144,34 @@ func newHarness(t *testing.T, book spend) harness {
 	people := &profiles{global: map[llm.Role]llm.ModelRef{}, resolved: map[llm.Role]llm.ModelRef{}}
 	probe := &prober{}
 	keys := &vault{stored: map[string]string{}}
+	recorder := &applicationtest.Recorder{}
 	return harness{
-		service: models.New(known, known, people, book, keys, probe,
+		service: models.New(known, known, people, book, keys, probe, recorder,
 			clock.NewFake(time.Date(2026, 9, 18, 10, 0, 0, 0, time.UTC))),
 		catalog:  known,
 		profiles: people,
 		prober:   probe,
 		secrets:  keys,
+		events:   recorder,
+	}
+}
+
+func TestSetProviderKeyAnnouncesTheSettingsChange(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t, spend{})
+	if _, err := h.service.SetProviderKey(t.Context(), models.SetProviderKeyRequest{
+		Provider: "openai", APIKey: "sk-secret",
+	}); err != nil {
+		t.Fatalf("SetProviderKey: %v", err)
+	}
+
+	recorded := h.events.Events()
+	if len(recorded) != 1 || recorded[0].Type != events.SettingsChanged {
+		t.Fatalf("recorded %+v, want one %q event", recorded, events.SettingsChanged)
+	}
+	if _, ok := recorded[0].Payload.(events.SettingsChangedPayload); !ok {
+		t.Fatalf("payload = %T, want events.SettingsChangedPayload", recorded[0].Payload)
 	}
 }
 
