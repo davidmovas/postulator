@@ -1,3 +1,4 @@
 * text=auto eol=lf
 frontend/src/generated/events.ts text eol=lf
+frontend/src/generated/vocab.ts text eol=lf
 go.mod text eol=lf

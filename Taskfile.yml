@@ -45,6 +45,11 @@ tasks:
     cmds:
       - go run ./internal/transport/wails/gen
 
+  vocab:
+    summary: Regenerates the TypeScript vocabulary module from the Go const blocks
+    cmds:
+      - go run ./internal/transport/wails/vocabgen
+
   test:
     summary: Runs the Go test suite with the race detector
     cmds:
