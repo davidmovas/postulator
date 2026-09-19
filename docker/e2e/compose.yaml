@@ -61,6 +61,7 @@ services:
       E2E_ADMIN_PASSWORD: ${E2E_ADMIN_PASSWORD:-postulator-admin}
       E2E_SEO: ${E2E_SEO:-none}
       E2E_WOO: ${E2E_WOO:-1}
+      E2E_PLUGIN: ${E2E_PLUGIN:-1}
     entrypoint: ["/bin/sh", "/e2e/bootstrap.sh"]
     volumes:
       - wp:/var/www/html

@@ -68,6 +68,7 @@ tasks:
     env:
       E2E_SEO: '{{.E2E_SEO | default "none"}}'
       E2E_WOO: '{{.E2E_WOO | default "1"}}'
+      E2E_PLUGIN: '{{.E2E_PLUGIN | default "1"}}'
     cmds:
       - docker compose up -d --wait db wordpress
       - docker compose run --rm bootstrap
@@ -98,6 +99,14 @@ tasks:
     cmds:
       - task: e2e:up
       - go test -tags e2e -count=1 -timeout 20m ./internal/e2e/...
+
+  e2e:full:noplugin:
+    summary: Runs the degraded loop against a stack that carries the plugin deactivated
+    cmds:
+      - task: e2e:up
+        vars:
+          E2E_PLUGIN: '0'
+      - go test -tags e2e -count=1 -timeout 20m -run TestTheWholeLoopDegradesWithoutThePlugin ./internal/e2e/...
 
   plugin:lint:
     summary: Runs php -l over every companion plugin source file

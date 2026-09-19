@@ -7,6 +7,7 @@ ADMIN_EMAIL="${E2E_ADMIN_EMAIL:-postulator@example.test}"
 ADMIN_PASSWORD="${E2E_ADMIN_PASSWORD:-postulator-admin}"
 SEO="${E2E_SEO:-none}"
 WOO="${E2E_WOO:-1}"
+PLUGIN="${E2E_PLUGIN:-1}"
 OUT="/e2e/.env.generated"
 
 attempt=0
@@ -29,7 +30,20 @@ if ! wp core is-installed >/dev/null 2>&1; then
 		--skip-email
 fi
 
-wp plugin activate postulator-companion
+case "$PLUGIN" in
+	1)
+		wp plugin activate postulator-companion
+		;;
+	0)
+		if wp plugin is-active postulator-companion >/dev/null 2>&1; then
+			wp plugin deactivate postulator-companion
+		fi
+		;;
+	*)
+		echo "E2E_PLUGIN must be 0 or 1" >&2
+		exit 1
+		;;
+esac
 
 for slug in wordpress-seo seo-by-rank-math; do
 	if wp plugin is-active "$slug" >/dev/null 2>&1; then
@@ -91,6 +105,7 @@ APP_PASSWORD="$(wp user application-password create "$ADMIN_USER" postulator-e2e
 	echo "E2E_WP_APP_PASSWORD=$APP_PASSWORD"
 	echo "E2E_SEO=$SEO"
 	echo "E2E_WOO=$WOO"
+	echo "E2E_PLUGIN=$PLUGIN"
 } > "$OUT"
 
 echo "wordpress is provisioned at $SITE_URL"
