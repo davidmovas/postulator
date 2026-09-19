@@ -33,11 +33,15 @@ func (f sitesFake) List(context.Context, sites.ListRequest) (paging.List[sites.S
 	return answer[paging.List[sites.Site]](f.mode)
 }
 
+func (f sitesFake) TestConnection(context.Context, sites.TestConnectionRequest) (sites.TestConnectionResponse, error) {
+	return answer[sites.TestConnectionResponse](f.mode)
+}
+
 func TestSitesServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
 	assertMethodNames(t, wails.NewSitesService(zap.NewNop(), ready[wails.SitesUseCase](sitesFake{})), []string{
-		"Create", "Delete", "Get", "List", "Update",
+		"Create", "Delete", "Get", "List", "TestConnection", "Update",
 	})
 	assertEveryMethodConverts(t, wails.NewSitesService(zap.NewNop(), ready[wails.SitesUseCase](sitesFake{mode: missing})), missingBody)
 	assertEveryMethodConverts(t, wails.NewSitesService(zap.NewNop(), ready[wails.SitesUseCase](sitesFake{mode: panicking})), panicBody)

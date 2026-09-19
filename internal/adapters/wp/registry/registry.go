@@ -2,6 +2,8 @@ package registry
 
 import (
 	"context"
+	stderrors "errors"
+	"strings"
 	"sync"
 	"time"
 
@@ -72,6 +74,92 @@ func (r *Registry) Client(ctx context.Context, siteID string) (*wp.Client, error
 	r.cached[siteID] = entry{client: client, stamp: record.UpdatedAt, baseURL: record.BaseURL}
 	r.mu.Unlock()
 	return client, nil
+}
+
+const (
+	messageReachable    = "the site answered the WordPress REST API with these credentials"
+	messageNoPassword   = "the site has no stored application password"
+	messageUnauthorized = "the site refused these credentials"
+)
+
+func (r *Registry) TestConnection(ctx context.Context, candidate site.Candidate) (site.Reachability, error) {
+	password, held, err := r.credential(ctx, candidate)
+	if err != nil {
+		return site.Reachability{}, err
+	}
+	if !held {
+		return site.Reachability{Reach: site.ReachUnauthorized, Message: messageNoPassword}, nil
+	}
+
+	client, err := wp.New(wp.Config{
+		BaseURL:       candidate.BaseURL,
+		Username:      candidate.Username,
+		AppPassword:   password,
+		AllowInsecure: candidate.AllowInsecure,
+	}, r.options...)
+	if err != nil {
+		return site.Reachability{}, err
+	}
+
+	result, err := client.Probe(ctx)
+	if err != nil {
+		return classifyProbeFailure(err)
+	}
+	return reachabilityOf(result), nil
+}
+
+func (r *Registry) credential(ctx context.Context, candidate site.Candidate) (password string, held bool, err error) {
+	if candidate.Password != "" {
+		return candidate.Password, true, nil
+	}
+	if candidate.SiteID == "" {
+		return "", false, nil
+	}
+
+	stored, err := r.secrets.Get(ctx, site.SecretRef(candidate.SiteID))
+	if err != nil {
+		if errors.IsCode(err, errors.NotFound) {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+	return stored, stored != "", nil
+}
+
+func reachabilityOf(result wp.ProbeResult) site.Reachability {
+	reached := site.Reachability{
+		Reach:            site.ReachOK,
+		Message:          messageReachable,
+		SiteName:         result.SiteName,
+		HomeURL:          result.HomeURL,
+		SuggestedBaseURL: result.SuggestedBaseURL,
+		HasPlugin:        result.HasPlugin,
+		HasWoo:           result.HasWoo,
+	}
+	if result.Status == wp.ProbeUpgradeRequired {
+		reached.Reach = site.ReachUpgradeRequired
+		reached.Message = strings.Join(result.Warnings, "; ")
+	}
+	return reached
+}
+
+func classifyProbeFailure(err error) (site.Reachability, error) {
+	switch {
+	case errors.IsCode(err, errors.Unauthorized):
+		return site.Reachability{Reach: site.ReachUnauthorized, Message: messageUnauthorized}, nil
+	case errors.IsCode(err, errors.External):
+		return site.Reachability{Reach: site.ReachUnreachable, Message: messageOf(err)}, nil
+	default:
+		return site.Reachability{}, err
+	}
+}
+
+func messageOf(err error) string {
+	var kernel *errors.Error
+	if stderrors.As(err, &kernel) && kernel != nil {
+		return kernel.Message
+	}
+	return err.Error()
 }
 
 func (r *Registry) Probe(ctx context.Context, record site.Site) (site.PluginState, error) {

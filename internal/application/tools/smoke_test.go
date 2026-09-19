@@ -41,6 +41,10 @@ func (stubProbe) Probe(context.Context, site.Site) (site.PluginState, error) {
 	return site.PluginState{Capabilities: []string{}}, nil
 }
 
+func (stubProbe) TestConnection(context.Context, site.Candidate) (site.Reachability, error) {
+	return site.Reachability{Reach: site.ReachOK}, nil
+}
+
 type stubEngine struct{}
 
 func (stubEngine) Enqueue(_ context.Context, record domainrun.Run) (domainrun.Run, error) {
@@ -112,7 +116,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding) {
 	reportsService := reports.New(entityRepo, edgeRepo, pageRepo, linkRepo, runRepo, itemRepo, artifactRepo)
 
 	return tools.New(tools.Deps{
-		Sites: sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, bus, now),
+		Sites: sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, stubProbe{}, bus, now),
 		Graph: graph.New(graph.Deps{
 			Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Pages: pageRepo,
 			Profiles: modelProfiles, LLM: book, UnitOfWork: store, Publisher: bus, Clock: now,

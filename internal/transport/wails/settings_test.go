@@ -99,7 +99,7 @@ func (p *providerKeyFake) DeleteProviderKey(_ context.Context, req models.Delete
 	}
 	p.removed = req.Provider
 	p.written = ""
-	return models.DeleteProviderKeyResponse{Provider: req.Provider}, nil
+	return models.DeleteProviderKeyResponse(req), nil
 }
 
 func settingsHarness(t *testing.T) (deps wails.SettingsDeps, workers *settings.Setting[int], store *storeFake, keys *providerKeyFake, live *settings.Values) {

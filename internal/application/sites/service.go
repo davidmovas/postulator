@@ -28,6 +28,10 @@ type secretStore interface {
 	Delete(ctx context.Context, ref string) error
 }
 
+type connectionProbe interface {
+	TestConnection(ctx context.Context, candidate site.Candidate) (site.Reachability, error)
+}
+
 type unitOfWork interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
 }
@@ -36,12 +40,13 @@ type Service struct {
 	store     siteStore
 	secrets   secretStore
 	uow       unitOfWork
+	probe     connectionProbe
 	publisher application.Publisher
 	clock     clock.Clock
 }
 
-func New(store siteStore, secrets secretStore, uow unitOfWork, publisher application.Publisher, clk clock.Clock) *Service {
-	return &Service{store: store, secrets: secrets, uow: uow, publisher: publisher, clock: clk}
+func New(store siteStore, secrets secretStore, uow unitOfWork, probe connectionProbe, publisher application.Publisher, clk clock.Clock) *Service {
+	return &Service{store: store, secrets: secrets, uow: uow, probe: probe, publisher: publisher, clock: clk}
 }
 
 func (s *Service) now() time.Time {
@@ -192,6 +197,83 @@ func (s *Service) Delete(ctx context.Context, req DeleteRequest) (DeleteResponse
 		return DeleteResponse{}, publishErr
 	}
 	return DeleteResponse{}, nil
+}
+
+func (s *Service) TestConnection(ctx context.Context, req TestConnectionRequest) (TestConnectionResponse, error) {
+	candidate, err := s.candidate(ctx, req)
+	if err != nil {
+		return TestConnectionResponse{}, err
+	}
+
+	reached, err := s.probe.TestConnection(ctx, candidate)
+	if err != nil {
+		return TestConnectionResponse{}, err
+	}
+	return TestConnectionResponse{Reachability: reachabilityView(reached)}, nil
+}
+
+func (s *Service) candidate(ctx context.Context, req TestConnectionRequest) (site.Candidate, error) {
+	siteID := strings.TrimSpace(req.SiteID)
+	baseURL := strings.TrimSpace(req.BaseURL)
+	username := strings.TrimSpace(req.Username)
+
+	if siteID == "" {
+		return unsavedCandidate(baseURL, username, req)
+	}
+
+	record, err := s.store.Get(ctx, siteID)
+	if err != nil {
+		return site.Candidate{}, err
+	}
+
+	candidate := site.Candidate{
+		SiteID:        record.ID,
+		BaseURL:       record.BaseURL,
+		Username:      record.Username,
+		Password:      req.Password,
+		AllowInsecure: record.AllowInsecure,
+	}
+	if req.AllowInsecure != nil {
+		candidate.AllowInsecure = *req.AllowInsecure
+	}
+	if username != "" {
+		candidate.Username = username
+	}
+	if baseURL != "" {
+		normalized, normalizeErr := site.NormalizeBaseURL(baseURL, candidate.AllowInsecure)
+		if normalizeErr != nil {
+			return site.Candidate{}, normalizeErr
+		}
+		candidate.BaseURL = normalized
+	}
+	return candidate, nil
+}
+
+func unsavedCandidate(baseURL, username string, req TestConnectionRequest) (site.Candidate, error) {
+	switch {
+	case baseURL == "":
+		return site.Candidate{}, invalid("a connection test needs a site or a base url", "baseUrl")
+	case username == "":
+		return site.Candidate{}, invalid("a connection test of an unsaved site needs a user name", "username")
+	case req.Password == "":
+		return site.Candidate{}, invalid("a connection test of an unsaved site needs an application password", "password")
+	}
+
+	allowInsecure := req.AllowInsecure != nil && *req.AllowInsecure
+	normalized, err := site.NormalizeBaseURL(baseURL, allowInsecure)
+	if err != nil {
+		return site.Candidate{}, err
+	}
+	return site.Candidate{
+		BaseURL:       normalized,
+		Username:      username,
+		Password:      req.Password,
+		AllowInsecure: allowInsecure,
+	}, nil
+}
+
+func invalid(message, field string) *errors.Error {
+	return errors.New(errors.Invalid, message).WithDetail("field", field)
 }
 
 func (s *Service) Get(ctx context.Context, req GetRequest) (GetResponse, error) {

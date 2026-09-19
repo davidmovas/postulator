@@ -1,6 +1,7 @@
 package sites_test
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -19,12 +20,27 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
+type probeStub struct {
+	seen    site.Candidate
+	reached site.Reachability
+	err     error
+}
+
+func (p *probeStub) TestConnection(_ context.Context, candidate site.Candidate) (site.Reachability, error) {
+	p.seen = candidate
+	if p.err != nil {
+		return site.Reachability{}, p.err
+	}
+	return p.reached, nil
+}
+
 type harness struct {
 	service *sites.Service
 	store   *sqlite.Store
 	secrets *secrets.Store
 	clock   *clock.Fake
 	events  *applicationtest.Recorder
+	probe   *probeStub
 }
 
 func newHarness(t *testing.T) harness {
@@ -34,12 +50,144 @@ func newHarness(t *testing.T) harness {
 	clk := clock.NewFake(time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC))
 	vault := secrets.NewStore(sqlite.NewSecretsRepo(store, clk), sqlitetest.Key())
 	recorder := &applicationtest.Recorder{}
+	reach := &probeStub{reached: site.Reachability{Reach: site.ReachOK, Message: "the site answered", HasPlugin: true}}
 	return harness{
-		service: sites.New(sqlite.NewSiteRepo(store), vault, store, recorder, clk),
+		service: sites.New(sqlite.NewSiteRepo(store), vault, store, reach, recorder, clk),
 		store:   store,
 		secrets: vault,
 		clock:   clk,
 		events:  recorder,
+		probe:   reach,
+	}
+}
+
+func TestTestConnectionProbesCandidateCredentialsBeforeThereIsARow(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	answered, err := h.service.TestConnection(t.Context(), sites.TestConnectionRequest{
+		BaseURL: " https://Shop.example.com/ ", Username: " editor ", Password: "abcd efgh",
+	})
+	if err != nil {
+		t.Fatalf("TestConnection: %v", err)
+	}
+
+	if h.probe.seen.BaseURL != "https://shop.example.com" || h.probe.seen.Username != "editor" {
+		t.Fatalf("the probe received %v", h.probe.seen)
+	}
+	if h.probe.seen.Password != "abcd efgh" || h.probe.seen.SiteID != "" {
+		t.Fatalf("the probe received the wrong candidate: %v", h.probe.seen)
+	}
+	if answered.Reachability.Reach != string(site.ReachOK) || !answered.Reachability.HasPlugin {
+		t.Fatalf("TestConnection = %+v", answered)
+	}
+
+	encoded, marshalErr := json.Marshal(answered)
+	if marshalErr != nil {
+		t.Fatalf("Marshal: %v", marshalErr)
+	}
+	if strings.Contains(string(encoded), "abcd efgh") {
+		t.Fatalf("the response carries the password: %s", encoded)
+	}
+	for _, key := range []string{`"reach":"ok"`, `"message"`, `"hasPlugin":true`, `"suggestedBaseUrl"`} {
+		if !strings.Contains(string(encoded), key) {
+			t.Errorf("view lacks %s: %s", key, encoded)
+		}
+	}
+}
+
+func TestTestConnectionProbesAStoredSiteAndTheEditsOverIt(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	created, err := h.service.Create(t.Context(), sites.CreateRequest{
+		Name: "Shop", BaseURL: "https://shop.example.com", Username: "editor", Password: "abcd efgh",
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	if _, err = h.service.TestConnection(t.Context(), sites.TestConnectionRequest{SiteID: created.Site.ID}); err != nil {
+		t.Fatalf("TestConnection: %v", err)
+	}
+	if h.probe.seen.SiteID != created.Site.ID || h.probe.seen.BaseURL != "https://shop.example.com" ||
+		h.probe.seen.Username != "editor" || h.probe.seen.Password != "" {
+		t.Fatalf("the probe received %v", h.probe.seen)
+	}
+
+	if _, err = h.service.TestConnection(t.Context(), sites.TestConnectionRequest{
+		SiteID: created.Site.ID, BaseURL: "http://staging.example.com", Username: "other",
+		Password: "next pass", AllowInsecure: ptr(true),
+	}); err != nil {
+		t.Fatalf("TestConnection with edits: %v", err)
+	}
+	if h.probe.seen.BaseURL != "http://staging.example.com" || h.probe.seen.Username != "other" ||
+		h.probe.seen.Password != "next pass" || !h.probe.seen.AllowInsecure {
+		t.Fatalf("the probe received %v", h.probe.seen)
+	}
+}
+
+func TestTestConnectionRefusesWhatItCannotProbe(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		request sites.TestConnectionRequest
+		want    errors.Code
+	}{
+		{name: "nothing at all", request: sites.TestConnectionRequest{}, want: errors.Invalid},
+		{
+			name:    "no base url",
+			request: sites.TestConnectionRequest{Username: "editor", Password: "abcd efgh"},
+			want:    errors.Invalid,
+		},
+		{
+			name:    "no user name",
+			request: sites.TestConnectionRequest{BaseURL: "https://shop.example.com", Password: "abcd efgh"},
+			want:    errors.Invalid,
+		},
+		{
+			name:    "no password",
+			request: sites.TestConnectionRequest{BaseURL: "https://shop.example.com", Username: "editor"},
+			want:    errors.Invalid,
+		},
+		{
+			name: "an insecure base url that was not allowed",
+			request: sites.TestConnectionRequest{
+				BaseURL: "http://shop.example.com", Username: "editor", Password: "abcd efgh",
+			},
+			want: errors.Invalid,
+		},
+		{
+			name:    "a site that does not exist",
+			request: sites.TestConnectionRequest{SiteID: "6f3b2a11-0c9d-4e7a-8b25-1f4c6d7e8a90"},
+			want:    errors.NotFound,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := newHarness(t)
+			if _, err := h.service.TestConnection(t.Context(), tc.request); !errors.IsCode(err, tc.want) {
+				t.Fatalf("TestConnection = %v, want %s", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestTestConnectionCarriesTheProbeFailure(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	h.probe.err = errors.New(errors.Locked, "the vault is locked")
+
+	_, err := h.service.TestConnection(t.Context(), sites.TestConnectionRequest{
+		BaseURL: "https://shop.example.com", Username: "editor", Password: "abcd efgh",
+	})
+	if !errors.IsCode(err, errors.Locked) {
+		t.Fatalf("TestConnection = %v, want %s", err, errors.Locked)
 	}
 }
 

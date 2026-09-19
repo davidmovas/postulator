@@ -1,6 +1,7 @@
 package site
 
 import (
+	"fmt"
 	"net/url"
 	"strings"
 	"time"
@@ -8,6 +9,8 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
+
+const redactedPassword = "***"
 
 type Status string
 
@@ -55,6 +58,42 @@ type Site struct {
 
 func SecretRef(siteID string) string {
 	return "site:" + siteID + ":wp_password"
+}
+
+type Reach string
+
+const (
+	ReachOK              Reach = "ok"
+	ReachUpgradeRequired Reach = "upgradeRequired"
+	ReachUnauthorized    Reach = "unauthorized"
+	ReachUnreachable     Reach = "unreachable"
+)
+
+type Candidate struct {
+	SiteID        string
+	BaseURL       string
+	Username      string
+	Password      string
+	AllowInsecure bool
+}
+
+func (c Candidate) String() string {
+	return fmt.Sprintf("site.Candidate{SiteID:%q BaseURL:%q Username:%q Password:%s AllowInsecure:%t}",
+		c.SiteID, c.BaseURL, c.Username, redactedPassword, c.AllowInsecure)
+}
+
+func (c Candidate) GoString() string {
+	return c.String()
+}
+
+type Reachability struct {
+	Reach            Reach
+	Message          string
+	SiteName         string
+	HomeURL          string
+	SuggestedBaseURL string
+	HasPlugin        bool
+	HasWoo           bool
 }
 
 func invalid(message, field string) *errors.Error {

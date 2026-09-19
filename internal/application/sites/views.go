@@ -32,6 +32,28 @@ type Site struct {
 	UpdatedAt     dto.Time `json:"updatedAt"`
 }
 
+type Reachability struct {
+	Reach            string `json:"reach"`
+	Message          string `json:"message"`
+	SiteName         string `json:"siteName"`
+	HomeURL          string `json:"homeUrl"`
+	SuggestedBaseURL string `json:"suggestedBaseUrl"`
+	HasPlugin        bool   `json:"hasPlugin"`
+	HasWoo           bool   `json:"hasWoo"`
+}
+
+func reachabilityView(r site.Reachability) Reachability {
+	return Reachability{
+		Reach:            string(r.Reach),
+		Message:          r.Message,
+		SiteName:         r.SiteName,
+		HomeURL:          r.HomeURL,
+		SuggestedBaseURL: r.SuggestedBaseURL,
+		HasPlugin:        r.HasPlugin,
+		HasWoo:           r.HasWoo,
+	}
+}
+
 func view(s site.Site) Site {
 	capabilities := s.Plugin.Capabilities
 	if capabilities == nil {

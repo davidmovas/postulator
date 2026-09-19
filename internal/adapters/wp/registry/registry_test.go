@@ -176,3 +176,131 @@ func TestProbeCarriesTheClientFailure(t *testing.T) {
 		t.Fatalf("code = %q, want %q (err %v)", errors.CodeOf(err), errors.Locked, err)
 	}
 }
+
+func TestTestConnectionClassifiesWhatTheProbeFound(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name      string
+		opts      []wptest.Option
+		want      site.Reach
+		suggested bool
+		plugin    bool
+	}{
+		{name: "the site answers", want: site.ReachOK, plugin: true},
+		{
+			name:      "the site upgrades to https",
+			opts:      []wptest.Option{wptest.WithRedirect(wptest.RedirectHTTPS)},
+			want:      site.ReachUpgradeRequired,
+			suggested: true,
+		},
+		{
+			name: "the site redirects the rest root to the login page",
+			opts: []wptest.Option{wptest.WithRedirect(wptest.RedirectLogin)},
+			want: site.ReachUnauthorized,
+		},
+		{
+			name: "the credentials are refused",
+			opts: []wptest.Option{wptest.WithCredentials("other", "pass word")},
+			want: site.ReachUnauthorized,
+		},
+		{
+			name: "the host is not wordpress",
+			opts: []wptest.Option{wptest.WithoutNamespaces()},
+			want: site.ReachUnreachable,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := wptest.New(t, tc.opts...)
+			held := registry.New(newSites(server), vault{err: errors.New(errors.NotFound, "no secret")}, wp.WithRateLimit(0))
+
+			reached, err := held.TestConnection(t.Context(), site.Candidate{
+				BaseURL: server.URL(), Username: wptest.DefaultUser,
+				Password: wptest.DefaultPassword, AllowInsecure: true,
+			})
+			if err != nil {
+				t.Fatalf("TestConnection: %v", err)
+			}
+			if reached.Reach != tc.want {
+				t.Fatalf("reach = %q, want %q (message %q)", reached.Reach, tc.want, reached.Message)
+			}
+			if reached.Message == "" {
+				t.Fatal("every outcome must carry a message the form can render")
+			}
+			if tc.suggested && reached.SuggestedBaseURL == "" {
+				t.Fatal("an upgrade must name the base URL the site wants")
+			}
+			if reached.HasPlugin != tc.plugin {
+				t.Fatalf("hasPlugin = %v, want %v", reached.HasPlugin, tc.plugin)
+			}
+		})
+	}
+}
+
+func TestTestConnectionFallsBackToTheStoredPassword(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	store := newSites(server)
+	held := registry.New(store, vault{password: wptest.DefaultPassword}, wp.WithRateLimit(0))
+
+	reached, err := held.TestConnection(t.Context(), site.Candidate{
+		SiteID: siteID, BaseURL: store.record.BaseURL, Username: store.record.Username, AllowInsecure: true,
+	})
+	if err != nil {
+		t.Fatalf("TestConnection: %v", err)
+	}
+	if reached.Reach != site.ReachOK || reached.SiteName == "" {
+		t.Fatalf("reachability = %+v", reached)
+	}
+}
+
+func TestTestConnectionReportsWhatItCannotDo(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	store := newSites(server)
+
+	t.Run("a site with no stored password is unauthorized", func(t *testing.T) {
+		t.Parallel()
+
+		held := registry.New(store, vault{err: errors.New(errors.NotFound, "no secret")}, wp.WithRateLimit(0))
+		reached, err := held.TestConnection(t.Context(), site.Candidate{
+			SiteID: siteID, BaseURL: store.record.BaseURL, Username: store.record.Username, AllowInsecure: true,
+		})
+		if err != nil {
+			t.Fatalf("TestConnection: %v", err)
+		}
+		if reached.Reach != site.ReachUnauthorized || reached.Message == "" {
+			t.Fatalf("reachability = %+v", reached)
+		}
+	})
+
+	t.Run("a locked vault is an error", func(t *testing.T) {
+		t.Parallel()
+
+		held := registry.New(store, vault{err: errors.New(errors.Locked, "locked")}, wp.WithRateLimit(0))
+		_, err := held.TestConnection(t.Context(), site.Candidate{
+			SiteID: siteID, BaseURL: store.record.BaseURL, Username: store.record.Username, AllowInsecure: true,
+		})
+		if !errors.IsCode(err, errors.Locked) {
+			t.Fatalf("code = %q, want %q (err %v)", errors.CodeOf(err), errors.Locked, err)
+		}
+	})
+
+	t.Run("a base url the client refuses is an error", func(t *testing.T) {
+		t.Parallel()
+
+		held := registry.New(store, vault{password: wptest.DefaultPassword}, wp.WithRateLimit(0))
+		_, err := held.TestConnection(t.Context(), site.Candidate{
+			BaseURL: "ftp://shop.example.com", Username: "editor", Password: "abcd efgh",
+		})
+		if !errors.IsCode(err, errors.Invalid) {
+			t.Fatalf("code = %q, want %q (err %v)", errors.CodeOf(err), errors.Invalid, err)
+		}
+	})
+}

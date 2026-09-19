@@ -251,7 +251,7 @@ func (c *Core) compose(ctx context.Context, key []byte) error {
 		Publisher:  relay,
 	}, stepRegistry, runtime.Settings(values), now, logger)
 
-	sitesService := sites.New(siteRepo, secretStore, store, relay, now)
+	sitesService := sites.New(siteRepo, secretStore, store, wordpress, relay, now)
 	graphService := graph.New(graph.Deps{
 		Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Pages: pageRepo,
 		Profiles: modelProfiles, LLM: client, UnitOfWork: store, Publisher: relay, Clock: now,

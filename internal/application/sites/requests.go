@@ -43,6 +43,18 @@ type GetResponse struct {
 	Site Site `json:"site"`
 }
 
+type TestConnectionRequest struct {
+	SiteID        string `json:"siteId,omitempty"`
+	BaseURL       string `json:"baseUrl,omitempty"`
+	Username      string `json:"username,omitempty"`
+	Password      string `json:"password,omitempty"`
+	AllowInsecure *bool  `json:"allowInsecure,omitempty"`
+}
+
+type TestConnectionResponse struct {
+	Reachability Reachability `json:"reachability"`
+}
+
 type ListRequest struct {
 	dto.ListRequest
 	Status string `json:"status,omitempty"`

@@ -2,6 +2,8 @@ package site_test
 
 import (
 	stderrors "errors"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -135,5 +137,48 @@ func TestStatusAndSort(t *testing.T) {
 	}
 	if !site.SortCreatedAt.Valid() || !site.SortName.Valid() || site.Sort("age").Valid() {
 		t.Error("sort validity is wrong")
+	}
+}
+
+func TestCandidateNeverPrintsItsPassword(t *testing.T) {
+	t.Parallel()
+
+	candidate := site.Candidate{
+		SiteID:        "9f0d0d22-6f4f-4c1a-9c07-5b6c1f6bd9a1",
+		BaseURL:       "https://shop.example.com",
+		Username:      "editor",
+		Password:      "abcd EFGH 1234",
+		AllowInsecure: true,
+	}
+
+	cases := []struct {
+		name   string
+		format string
+		value  any
+	}{
+		{name: "the value itself", format: "%v", value: candidate},
+		{name: "the go syntax of the value", format: "%#v", value: candidate},
+		{name: "a string of the value", format: "%s", value: candidate},
+		{name: "inside a slice", format: "%v", value: []site.Candidate{candidate}},
+		{name: "inside a map", format: "%v", value: map[string]site.Candidate{"shop": candidate}},
+		{name: "behind a pointer", format: "%v", value: &candidate},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			formatted := fmt.Sprintf(tc.format, tc.value)
+			if strings.Contains(formatted, "abcd EFGH 1234") {
+				t.Fatalf("%s printed the password: %s", tc.name, formatted)
+			}
+			if !strings.Contains(formatted, "editor") || !strings.Contains(formatted, "shop.example.com") {
+				t.Fatalf("%s dropped the fields that are safe to print: %s", tc.name, formatted)
+			}
+		})
+	}
+
+	if strings.Contains(candidate.String(), "abcd EFGH 1234") {
+		t.Fatalf("String printed the password: %s", candidate.String())
 	}
 }

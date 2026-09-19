@@ -16,6 +16,7 @@ type SitesUseCase interface {
 	Delete(ctx context.Context, req sites.DeleteRequest) (sites.DeleteResponse, error)
 	Get(ctx context.Context, req sites.GetRequest) (sites.GetResponse, error)
 	List(ctx context.Context, req sites.ListRequest) (paging.List[sites.Site], error)
+	TestConnection(ctx context.Context, req sites.TestConnectionRequest) (sites.TestConnectionResponse, error)
 }
 
 type SitesService struct {
@@ -24,6 +25,7 @@ type SitesService struct {
 	remove middleware.Handler[sites.DeleteRequest, sites.DeleteResponse]
 	get    middleware.Handler[sites.GetRequest, sites.GetResponse]
 	list   middleware.Handler[sites.ListRequest, paging.List[sites.Site]]
+	test   middleware.Handler[sites.TestConnectionRequest, sites.TestConnectionResponse]
 }
 
 func NewSitesService(logger *zap.Logger, useCase Source[SitesUseCase]) *SitesService {
@@ -33,6 +35,7 @@ func NewSitesService(logger *zap.Logger, useCase Source[SitesUseCase]) *SitesSer
 		remove: Wrap(logger, "sites.delete", call(useCase, SitesUseCase.Delete)),
 		get:    Wrap(logger, "sites.get", call(useCase, SitesUseCase.Get)),
 		list:   Wrap(logger, "sites.list", call(useCase, SitesUseCase.List)),
+		test:   Wrap(logger, "sites.testConnection", call(useCase, SitesUseCase.TestConnection)),
 	}
 }
 
@@ -54,4 +57,8 @@ func (s *SitesService) Get(c context.Context, req sites.GetRequest) (sites.GetRe
 
 func (s *SitesService) List(c context.Context, req sites.ListRequest) (paging.List[sites.Site], error) {
 	return s.list(c, req)
+}
+
+func (s *SitesService) TestConnection(c context.Context, req sites.TestConnectionRequest) (sites.TestConnectionResponse, error) {
+	return s.test(c, req)
 }
