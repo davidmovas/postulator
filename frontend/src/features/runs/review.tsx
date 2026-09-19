@@ -16,11 +16,13 @@ import {
     HourglassEmptyIcon,
     RestartAltIcon,
     SkeletonRows,
+    SmartToyIcon,
     StatusBadge,
     TabPanel,
     Tabs,
 } from "../../ui/index.js";
 import type { TabDefinition } from "../../ui/index.js";
+import { askAgent } from "../agent/dock-state.js";
 import { countdown, dueMs, remainingMs, retryState, waitingUntil } from "./authority.js";
 import type { ItemView } from "./authority.js";
 import {
@@ -158,6 +160,16 @@ export function ReviewDrawer({
                             {blocked === null ? "" : copy.runs.retryBlockedBody}
                         </span>
                         <div className="flex shrink-0 gap-2">
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                icon={SmartToyIcon}
+                                onClick={() => {
+                                    askAgent(copy.agent.ask.runItem(path, item.runId, item.id));
+                                }}
+                            >
+                                {copy.agent.askAbout}
+                            </Button>
                             {blocked === null ? null : (
                                 <Button
                                     size="sm"

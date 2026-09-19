@@ -852,6 +852,7 @@ export const copy = {
                 paused: "Created paused",
             },
         },
+        askAbout: "Ask the agent about this",
         ask: {
             entity: (name: string, id: string) => `Entity "${name}" (id ${id}). `,
             page: (path: string, id: string) => `Page ${path} (id ${id}). `,

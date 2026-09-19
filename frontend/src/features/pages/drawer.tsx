@@ -20,10 +20,12 @@ import {
     PanelHeader,
     Select,
     SkeletonRows,
+    SmartToyIcon,
     StatusBadge,
     SyncProblemIcon,
     Textarea,
 } from "../../ui/index.js";
+import { askAgent } from "../agent/dock-state.js";
 import { ConflictNotice } from "./conflict-notice.js";
 import type { EntityIndex } from "./entities.js";
 import { statusTone } from "./labels.js";
@@ -360,6 +362,15 @@ export function PageDrawer({ pageId, siteId, index, search, onClose }: PageDrawe
                             }}
                         >
                             {copy.pages.detail.deletePage}
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            icon={SmartToyIcon}
+                            onClick={() => {
+                                askAgent(copy.agent.ask.page(page.path, page.id));
+                            }}
+                        >
+                            {copy.agent.askAbout}
                         </Button>
                         <Button onClick={onClose}>{copy.pages.detail.close}</Button>
                     </>

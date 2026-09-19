@@ -1,7 +1,9 @@
 import { NavLink } from "react-router";
 
 import { copy } from "../copy/index.js";
-import { cx } from "../ui/index.js";
+import { flatten } from "../data/call.js";
+import { usePendingActions } from "../data/hooks/agent.js";
+import { CountBadge, cx } from "../ui/index.js";
 import type { IconComponent } from "../ui/index.js";
 import {
     AccountTreeIcon,
@@ -22,6 +24,7 @@ interface RailEntry {
     to: string;
     label: string;
     Icon: IconComponent;
+    badge?: number;
 }
 
 function siteEntries(siteId: string): RailEntry[] {
@@ -38,25 +41,29 @@ function siteEntries(siteId: string): RailEntry[] {
     ];
 }
 
-const globalEntries: RailEntry[] = [
-    { to: "/sites", label: copy.nav.sites, Icon: PublicIcon },
-    { to: "/agent", label: copy.nav.agent, Icon: SmartToyIcon },
-    { to: "/settings/general", label: copy.nav.settings, Icon: SettingsIcon },
-];
+function globalEntries(awaiting: number): RailEntry[] {
+    return [
+        { to: "/sites", label: copy.nav.sites, Icon: PublicIcon },
+        { to: "/agent", label: awaiting > 0 ? copy.agent.screen.awaiting(awaiting) : copy.nav.agent, Icon: SmartToyIcon, badge: awaiting },
+        { to: "/settings/general", label: copy.nav.settings, Icon: SettingsIcon },
+    ];
+}
 
 export interface RailProps {
     siteId: string | null;
 }
 
 export function Rail({ siteId }: RailProps) {
-    const entries = siteId === null ? globalEntries : [...siteEntries(siteId), ...globalEntries];
+    const pending = usePendingActions({ status: "pending" }, 100);
+    const awaiting = flatten(pending.data?.pages).length;
+    const entries = siteId === null ? globalEntries(awaiting) : [...siteEntries(siteId), ...globalEntries(awaiting)];
 
     return (
         <nav
             aria-label={copy.shell.sections}
             className="flex w-12 shrink-0 flex-col items-center gap-0.5 border-r border-hairline bg-panel py-2"
         >
-            {entries.map(({ to, label, Icon }) => (
+            {entries.map(({ to, label, Icon, badge }) => (
                 <NavLink
                     key={to}
                     to={to}
@@ -80,6 +87,9 @@ export function Rail({ siteId }: RailProps) {
                                 />
                             ) : null}
                             <Icon size={20} />
+                            {badge !== undefined && badge > 0 ? (
+                                <CountBadge tone="warn" count={badge} className="absolute -top-1 -right-1" />
+                            ) : null}
                         </>
                     )}
                 </NavLink>

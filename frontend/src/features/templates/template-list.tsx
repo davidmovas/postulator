@@ -9,6 +9,7 @@ import type { Template } from "../../data/types.js";
 import type { TemplateSort } from "../../data/sorts.js";
 import { copy } from "../../copy/index.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
+import { askAgent } from "../agent/dock-state.js";
 import {
     Button,
     DenseTable,
@@ -172,7 +173,7 @@ export function TemplateList({ siteId, groups, sort, onSortChange }: TemplateLis
                     actions={
                         <Button
                             onClick={() => {
-                                void navigate("/agent");
+                                askAgent(copy.agent.ask.newTemplate);
                             }}
                         >
                             {copy.templates.askAgent}

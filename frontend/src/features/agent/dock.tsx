@@ -5,13 +5,11 @@ import { useNavigate } from "react-router";
 
 import { copy } from "../../copy/index.js";
 import { flatten } from "../../data/call.js";
-import { react } from "../../data/errors.js";
-import { useConversations, useCreateConversation, useSendMessage } from "../../data/hooks/agent.js";
+import { useConversations } from "../../data/hooks/agent.js";
 import type { Conversation } from "../../data/types.js";
 import {
     AddCommentIcon,
     cx,
-    EmptyState,
     ForumIcon,
     IconButton,
     KeyboardArrowDownIcon,
@@ -19,7 +17,7 @@ import {
     RightPanelCloseIcon,
     SmartToyIcon,
 } from "../../ui/index.js";
-import { Composer } from "./conversation/composer.js";
+import { StartConversation } from "./conversation/start.js";
 import { ConversationView } from "./conversation/view.js";
 import { closeDock, rememberConversation, setDockWidth, takePrefill, useDock } from "./dock-state.js";
 import { chooseConversation, dockKey } from "./model/dock.js";
@@ -101,48 +99,6 @@ function Switcher({ current, recent, onPick, onNew, onAll }: SwitcherProps): Rea
                 </DropdownMenu.Content>
             </DropdownMenu.Portal>
         </DropdownMenu.Root>
-    );
-}
-
-interface StartProps {
-    siteId: string | null;
-    prefillSeq: number;
-    onStarted: (conversation: Conversation) => void;
-}
-
-function StartConversation({ siteId, prefillSeq, onStarted }: StartProps): ReactElement {
-    const create = useCreateConversation();
-    const send = useSendMessage();
-    const thrown = create.error ?? send.error;
-    const reaction = thrown === null ? null : react(thrown);
-    const error = reaction === null || reaction.kind === "silent" || reaction.kind === "unlock" ? null : reaction.message;
-
-    return (
-        <div className="flex h-full min-h-0 flex-col">
-            <div className="flex flex-1 items-center justify-center p-4">
-                <EmptyState icon={SmartToyIcon} title={copy.agent.states.start} body={copy.agent.states.startBody} />
-            </div>
-            <Composer
-                answering={false}
-                disabled={create.isPending || send.isPending}
-                placeholder={copy.agent.composer.firstPlaceholder}
-                error={error}
-                prefillSeq={prefillSeq}
-                takePrefill={takePrefill}
-                onSend={(text) => {
-                    create.mutate(
-                        { siteId: siteId ?? undefined, mode: "confirm" },
-                        {
-                            onSuccess: (answered) => {
-                                onStarted(answered.conversation);
-                                send.mutate({ conversationId: answered.conversation.id, text });
-                            },
-                        },
-                    );
-                }}
-                onStop={() => undefined}
-            />
-        </div>
     );
 }
 

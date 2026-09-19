@@ -1,6 +1,7 @@
 import { createHashRouter, Navigate } from "react-router";
 
 import { copy } from "../copy/index.js";
+import { AgentScreen, InboxScreen } from "../features/agent/index.js";
 import { GraphScreen } from "../features/graph/index.js";
 import { LinksScreen } from "../features/links/index.js";
 import { OnboardingScreen } from "../features/onboarding/index.js";
@@ -47,9 +48,9 @@ export const router = createHashRouter([
             {
                 path: "agent",
                 children: [
-                    { index: true, element: panel(copy.nav.agent, "wave 3, agent 6") },
-                    { path: "inbox", element: panel(copy.nav.inbox, "wave 3, agent 6") },
-                    { path: ":conversationId", element: panel("Conversation", "wave 3, agent 6") },
+                    { index: true, element: <AgentScreen /> },
+                    { path: "inbox", element: <InboxScreen /> },
+                    { path: ":conversationId", element: <AgentScreen /> },
                 ],
             },
             {

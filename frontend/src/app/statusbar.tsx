@@ -1,5 +1,8 @@
+import { Link } from "react-router";
+
 import { copy } from "../copy/index.js";
 import { flatten } from "../data/call.js";
+import { usePendingActions } from "../data/hooks/agent.js";
 import { useRuns } from "../data/hooks/runs.js";
 import { useUsage } from "../data/hooks/models.js";
 import { usePluginState } from "../data/hooks/sync.js";
@@ -10,6 +13,7 @@ import {
     ExtensionOffIcon,
     LockIcon,
     LockOpenIcon,
+    PendingActionsIcon,
     PlayCircleIcon,
     cx,
 } from "../ui/index.js";
@@ -23,8 +27,10 @@ export function StatusBar({ siteId }: StatusBarProps) {
     const usage = useUsage();
     const plugin = usePluginState(siteId);
     const gate = useLockGate();
+    const pending = usePendingActions({ status: "pending" }, 100);
 
     const active = flatten(running.data?.pages).length;
+    const awaiting = flatten(pending.data?.pages).length;
     const spent = usage.data?.usd ?? 0;
     const installed = plugin.data?.plugin.installed === true;
 
@@ -42,6 +48,12 @@ export function StatusBar({ siteId }: StatusBarProps) {
                     {installed ? <ExtensionIcon size={13} /> : <ExtensionOffIcon size={13} />}
                     {installed ? copy.shell.pluginInstalled : copy.shell.pluginMissing}
                 </span>
+            )}
+            {awaiting === 0 ? null : (
+                <Link to="/agent/inbox" className="flex items-center gap-1 text-warn hover:text-ink">
+                    <PendingActionsIcon size={13} />
+                    {copy.agent.screen.awaiting(awaiting)}
+                </Link>
             )}
             <span className="ml-auto flex items-center gap-1">
                 {gate.locked ? <LockIcon size={13} /> : <LockOpenIcon size={13} />}

@@ -21,11 +21,13 @@ import {
     Field,
     Input,
     SkeletonRows,
+    SmartToyIcon,
     StatusBadge,
     TabPanel,
     Tabs,
 } from "../../ui/index.js";
 import type { TabDefinition } from "../../ui/index.js";
+import { askAgent } from "../agent/dock-state.js";
 import { fieldErrorOf, formErrorOf } from "./controls.js";
 import { ModelsForm } from "./models-form.js";
 import { OverridesPanel } from "./overrides-panel.js";
@@ -238,6 +240,16 @@ export function TemplateEditorScreen(): ReactElement {
                             onSelect={setLayer}
                         />
                     </div>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        icon={SmartToyIcon}
+                        onClick={() => {
+                            askAgent(copy.agent.ask.template(template.name, template.id));
+                        }}
+                    >
+                        {copy.templates.askAgent}
+                    </Button>
                     <Button size="sm" variant="ghost" disabled={!dirty} onClick={revert}>
                         {copy.templates.editor.revert}
                     </Button>

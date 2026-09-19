@@ -6,7 +6,8 @@ import { Link } from "react-router";
 import { copy } from "../../../copy/index.js";
 import type { PageAudit } from "../../../data/types.js";
 import { relativeTime } from "../../../domain/format.js";
-import { Button, CloseIcon, cx, DeleteIcon, IconButton, SectionLabel, toneClasses } from "../../../ui/index.js";
+import { Button, CloseIcon, cx, DeleteIcon, IconButton, SectionLabel, SmartToyIcon, toneClasses } from "../../../ui/index.js";
+import { askAgent } from "../../agent/dock-state.js";
 import { severityOf } from "../../links/model/audit.js";
 import { entityIcon, formatScore, kindTone } from "../labels.js";
 import type { GraphIndex } from "../model/index.js";
@@ -117,6 +118,15 @@ export function Inspector({ siteId, index, selectedId, onSelect, onReveal, onLen
                         <span>{copy.graph.inspector.rank(rank, index.counts.total)}</span>
                     </p>
                 </div>
+                <IconButton
+                    icon={SmartToyIcon}
+                    label={copy.agent.askAbout}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                        askAgent(copy.agent.ask.entity(entity.name, entity.id));
+                    }}
+                />
                 <IconButton
                     icon={CloseIcon}
                     label={copy.graph.inspector.close}
