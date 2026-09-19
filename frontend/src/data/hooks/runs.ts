@@ -21,7 +21,7 @@ import { catchUpNow, ensureLog } from "../runs/log.js";
 import { useRunEvents } from "../runs/use-run-events.js";
 import type { RunSort } from "../sorts.js";
 import type { Run, RunFilter, RunItem, RunTotals } from "../types.js";
-import { terminalRunStatuses } from "../../domain/vocab.js";
+import { terminalRunStatuses } from "../../generated/vocab.js";
 
 export function useRuns(filter: RunFilter = {}, sort: RunSort | null = null, limit?: number) {
     return useUnlockedInfinite<RunFilter, Run>({

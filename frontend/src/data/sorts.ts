@@ -1,11 +1,15 @@
 import type { Sort } from "../lib/paging.js";
+import {
+    entitySortFields,
+    pageSortFields,
+    runSortFields,
+    siteSortFields,
+    templateSortFields,
+} from "../generated/vocab.js";
 
-export const siteSortFields = ["createdAt", "name"] as const;
-export const pageSortFields = ["createdAt", "path"] as const;
-export const runSortFields = ["createdAt", "status"] as const;
-export const templateSortFields = ["createdAt", "name"] as const;
-export const policySortFields = ["createdAt", "name"] as const;
-export const entitySortFields = ["createdAt", "name"] as const;
+export { entitySortFields, pageSortFields, runSortFields, siteSortFields, templateSortFields };
+
+export const policySortFields = templateSortFields;
 
 export type SortOf<Fields extends readonly string[]> = { field: Fields[number]; desc: boolean };
 
