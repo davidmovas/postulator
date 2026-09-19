@@ -1,3 +1,40 @@
+/*
+design/Postulator.dc.html eyeballed its metrics per block. This is the normalisation.
+Look a design value up here rather than reproducing it.
+
+  surfaces   --page -> canvas | --s0 -> panel | --s1 -> inset | --s2 -> raised | --s3 -> raised-strong
+  borders    --b1 -> hairline | --b2 -> edge
+  text       --t1 -> ink | --t2 -> ink-soft | --t3 -> ink-dim | --t4 -> ink-faint
+  tones      --ac -> accent | --ok -> ok | --warn -> warn | --dang -> danger | --info -> info | --mut -> muted
+             soft was 13/14/15/16%, now 14% for every tone
+             border was 34/42/45/48%, now 40% for every tone
+             on-<tone> replaces the hardcoded #1a1301 and #140404 with the accent's own formula
+
+  text size  design 8.5 9 9.5 10 10.5 -> text-2xs  10px / 1.2
+             design 11 11.5           -> text-xs   11px / 1.4
+             design 12 12.5           -> text-sm   12px / 1.35
+             design 13 13.5 14        -> text-base 13px / 1.5
+             design 15 16 17          -> text-lg   15px / 1.3
+             design 19 21 22          -> text-xl   19px / 1.25
+             design 30                -> text-2xl  30px / 1.1
+
+  radius     design 1 2 3 4 5   -> rounded-sm 4px   chips, badges, checkboxes, bars
+             design 6 7         -> rounded-md 6px   buttons, inputs, selects, rail items
+             design 8 9 10 12   -> rounded-lg 10px  panels, dialogs, drawers, banners
+             design 999         -> rounded-full     switches, dots
+
+  length     every gap, pad, height and width rounds to the nearest multiple of 4,
+             and an exact tie rounds DOWN, because density is the product goal:
+             5->4 6->4 7->8 9->8 10->8 11->12 13->12 14->12 15->16 17->16 18->16
+             19->20 21->20 22->20 26->24 30->28 34->32 38->36
+             so a 30px control is h-7, a 30px dense row is h-7, a 28px header row is h-6
+
+  weight     400 font-normal | 500 font-medium | 600 font-semibold | 700 font-bold, unchanged
+  tracking   -0.03/-0.02/-0.01em -> tracking-tight | .05-.1em -> tracking-label | .18em -> tracking-key
+  motion     80/120ms -> duration-100 | 160ms -> duration-150 | curve -> ease-swift
+  icons      Material Symbols Rounded 300, as SVG components in ./icons, sized 13 14 16 20
+*/
+
 @font-face {
     font-family: "Archivo";
     font-style: normal;
