@@ -1,12 +1,3 @@
-export interface ArtifactRow {
-    kind: string;
-    step: string;
-    size: number;
-    purged: boolean;
-    createdAt: string | null;
-    expiresAt: string | null;
-}
-
 export type Severity = "error" | "warn" | "info";
 
 export const severityError: Severity = "error";
