@@ -106,10 +106,7 @@ export function RunProgress({ run, view, stats, terminal, now }: RunProgressProp
                         trailing={stats.calls === null ? "" : copy.runs.detail.calls(stats.calls)}
                     />
                 ) : (
-                    <div className="flex flex-col gap-0.5">
-                        <span className="font-mono text-sm text-ink">{formatUsd(stats.usd)}</span>
-                        <span className="font-mono text-2xs text-warn">{copy.runs.detail.noCap}</span>
-                    </div>
+                    <span className="font-mono text-sm text-ink">{formatUsd(stats.usd)}</span>
                 )}
             </div>
 

@@ -6,6 +6,7 @@ import { copy } from "../../copy/index.js";
 import { flatten } from "../../data/call.js";
 import { failure } from "../../data/errors.js";
 import { useRuns } from "../../data/hooks/runs.js";
+import { activeRunStatuses } from "../../generated/vocab.js";
 import {
     Banner,
     Button,
@@ -25,7 +26,7 @@ import { RunTable } from "./run-table.js";
 import { StartRunDrawer } from "./start.js";
 
 const pageSize = 100;
-const tickMs = 1000;
+const tickMs = 5000;
 
 export function RunsScreen(): ReactElement {
     const params = useParams();
@@ -39,7 +40,8 @@ export function RunsScreen(): ReactElement {
     const rows = useMemo(() => flatten(listed.data?.pages), [listed.data]);
     const [starting, setStarting] = useState(false);
     const asked = wantsNew(searchParams);
-    const now = useNow(tickMs, true);
+    const active = rows.some((run) => (activeRunStatuses as readonly string[]).includes(run.status));
+    const now = useNow(tickMs, active);
 
     useEffect(() => {
         if (asked) {

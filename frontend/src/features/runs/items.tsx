@@ -26,7 +26,7 @@ import { pathOf } from "./page-index.js";
 import { StepCell } from "./step-cell.js";
 import { VirtualRows } from "../../ui/index.js";
 
-const columns = "minmax(140px,2fr) 108px minmax(160px,2.2fr) 44px minmax(120px,1.6fr) 96px";
+const columns = "minmax(110px,2fr) 104px minmax(110px,2.2fr) 36px minmax(80px,1.6fr) 72px";
 const rowHeight = 28;
 
 export interface ItemStatusTabsProps {

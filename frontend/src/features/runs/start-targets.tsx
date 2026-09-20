@@ -60,14 +60,15 @@ export function StartTargets({ siteId, selected, onToggle }: StartTargetsProps):
                     <p className="p-1 text-xs text-ink-dim">{copy.empty.pages}</p>
                 ) : (
                     pages.map((page) => (
-                        <Checkbox
-                            key={page.id}
-                            checked={selected.includes(page.id)}
-                            label={page.path}
-                            onChange={() => {
-                                onToggle(page.id);
-                            }}
-                        />
+                        <div key={page.id} data-run-target={page.id}>
+                            <Checkbox
+                                checked={selected.includes(page.id)}
+                                label={page.path}
+                                onChange={() => {
+                                    onToggle(page.id);
+                                }}
+                            />
+                        </div>
                     ))
                 )}
                 {listed.hasNextPage ? (

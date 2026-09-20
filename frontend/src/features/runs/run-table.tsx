@@ -14,11 +14,18 @@ import {
     VirtualRows,
 } from "../../ui/index.js";
 import type { RunSort } from "../../data/sorts.js";
-import { pauseReasonShort, pauseReasonTone, statusIcon, statusLabel, statusTone } from "./labels.js";
+import {
+    pauseReasonShort,
+    pauseReasonText,
+    pauseReasonTone,
+    statusIcon,
+    statusLabel,
+    statusTone,
+} from "./labels.js";
 import { spanMs } from "./span.js";
 import { statusPaused } from "./statuses.js";
 
-const columns = "84px 132px minmax(140px,1.8fr) 84px 88px 72px";
+const columns = "64px 152px minmax(120px,1fr) 80px 96px 72px";
 const rowHeight = 28;
 
 interface RunRowProps {
@@ -52,26 +59,42 @@ function RunRow({ run, now, selected, onOpen }: RunRowProps): ReactElement {
         >
             <TableCell mono={true}>{run.kind}</TableCell>
             <TableCell>
-                <span className="flex min-w-0 items-center gap-1">
+                <span
+                    className="flex min-w-0 items-center gap-1"
+                    title={paused ? pauseReasonText(run.pauseReason) : undefined}
+                >
                     <StatusBadge tone={statusTone(run.status)} icon={statusIcon(run.status)}>
                         {statusLabel(run.status)}
                     </StatusBadge>
                     {paused ? (
-                        <StatusBadge tone={pauseReasonTone(run.pauseReason)} dot={false}>
+                        <StatusBadge
+                            tone={pauseReasonTone(run.pauseReason)}
+                            dot={false}
+                            className="min-w-0 truncate"
+                        >
                             {pauseReasonShort(run.pauseReason)}
                         </StatusBadge>
                     ) : null}
                 </span>
             </TableCell>
             <TableCell>
-                <ProgressBar
-                    value={run.stats.done + run.stats.failed}
-                    max={Math.max(run.stats.items, 1)}
-                    tone={run.stats.failed > 0 ? "warn" : "accent"}
-                    label={copy.runs.columns.progress}
-                    leading={copy.runs.detail.items(run.stats.done, run.stats.items)}
-                    trailing={run.stats.failed === 0 ? "" : `${String(run.stats.failed)} ${copy.runs.detail.failed}`}
-                />
+                <span className="flex min-w-0 items-center gap-2">
+                    <span className="shrink-0 font-mono text-xs text-ink-dim">
+                        {copy.runs.detail.items(run.stats.done, run.stats.items)}
+                    </span>
+                    <ProgressBar
+                        className="min-w-0 flex-1"
+                        value={run.stats.done + run.stats.failed}
+                        max={Math.max(run.stats.items, 1)}
+                        tone={run.stats.failed > 0 ? "warn" : "accent"}
+                        label={copy.runs.columns.progress}
+                    />
+                    {run.stats.failed === 0 ? null : (
+                        <span className="shrink-0 font-mono text-2xs text-warn">
+                            {`${String(run.stats.failed)} ${copy.runs.detail.failed}`}
+                        </span>
+                    )}
+                </span>
             </TableCell>
             <TableCell mono={true} align="right" muted={true}>
                 {cap > 0 ? `${usd(run.stats.usd)} / ${usd(cap)}` : usd(run.stats.usd)}

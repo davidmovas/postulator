@@ -40,6 +40,7 @@ export function PageTreeRow({
         <TableRow
             data-page-row={true}
             data-page-id={page.id}
+            data-page-status={page.status}
             interactive={true}
             selected={selected}
             tabIndex={0}

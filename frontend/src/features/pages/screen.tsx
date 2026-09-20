@@ -114,7 +114,7 @@ export function PagesScreen(): ReactElement {
             }
             left={<PageRail siteId={siteId} query={query} index={index} disabled={isTree} onChange={change} />}
             right={
-                selectedId === null ? null : (
+                selectedId === null ? undefined : (
                     <PageSummary
                         key={selectedId}
                         pageId={selectedId}

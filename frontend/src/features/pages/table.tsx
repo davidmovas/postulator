@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 import { copy } from "../../copy/index.js";
 import { flatten } from "../../data/call.js";
@@ -28,7 +28,7 @@ import { statusTone } from "./labels.js";
 import { defaultQuery, filterOf, narrowed, nextSort } from "./params.js";
 import type { PagesQuery } from "./params.js";
 
-const columns = "minmax(120px,2.4fr) minmax(96px,2fr) 76px 92px minmax(96px,1.5fr) 44px 84px";
+const columns = "minmax(96px,2.4fr) minmax(80px,2fr) 60px 84px minmax(80px,1.5fr) 36px 72px";
 const rowHeight = 28;
 const pageSize = 200;
 
@@ -45,6 +45,7 @@ function PageRow({ page, selected, entityName, onSelect, onOpen }: PageRowProps)
         <TableRow
             data-page-row={true}
             data-page-id={page.id}
+            data-page-status={page.status}
             interactive={true}
             selected={selected}
             tabIndex={0}
@@ -126,6 +127,13 @@ export function PageTable({
     const filter = useMemo(() => filterOf(siteId, query), [siteId, query]);
     const listed = usePages(filter, query.sort, pageSize);
     const rows = useMemo(() => flatten(listed.data?.pages), [listed.data]);
+    const firstId = rows.length === 0 ? null : rows[0].id;
+
+    useEffect(() => {
+        if (selectedId === null && firstId !== null) {
+            onSelect(firstId);
+        }
+    }, [selectedId, firstId, onSelect]);
 
     if (listed.isPending) {
         return (
