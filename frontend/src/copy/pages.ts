@@ -27,6 +27,7 @@ export const pages = {
         meta: "Meta",
         links: "Outgoing links",
         moreLinks: (hidden: number) => `and ${hidden} more`,
+        noLinks: "None yet",
         report: "Last report",
     },
     importSheet: "Import",

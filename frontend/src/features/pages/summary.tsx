@@ -187,7 +187,7 @@ export function PageSummary({ pageId, siteId, search, onOpen }: PageSummaryProps
                         </span>
                     </div>
                     {links.length === 0 ? (
-                        <p className="text-xs text-ink-dim">{copy.empty.pageLinks}</p>
+                        <p className="text-xs text-ink-dim">{copy.pages.summary.noLinks}</p>
                     ) : (
                         <ul className="flex flex-col gap-1">
                             {links.slice(0, shownLinks).map((held) => (
