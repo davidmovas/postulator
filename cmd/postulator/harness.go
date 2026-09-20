@@ -23,6 +23,7 @@ import (
 const (
 	devtoolsVariable = "POSTULATOR_DEVTOOLS_PORT"
 	siteVariable     = "POSTULATOR_WP_ADDRESS"
+	torHideVariable  = "POSTULATOR_TOR_HIDE"
 
 	defaultSiteAddress = "127.0.0.1:9223"
 
@@ -124,6 +125,7 @@ func configure(cfg app.Config) (harness, error) {
 	script := &assistantScript{}
 	cfg.Provider = provider
 	cfg.AgentProvider = fake.NewGollem(fake.WithScript(script.answer))
+	cfg.Environment = environment()
 
 	if !fresh {
 		return harness{Config: cfg, Seed: func(ctx context.Context, core *app.Core) error {
@@ -141,6 +143,13 @@ func options(opts application.Options) application.Options {
 			"--remote-debugging-port="+endpoint)
 	}
 	return opts
+}
+
+func environment() func(string) string {
+	if strings.TrimSpace(os.Getenv(torHideVariable)) != "1" {
+		return os.Getenv
+	}
+	return func(string) string { return "" }
 }
 
 func address() string {

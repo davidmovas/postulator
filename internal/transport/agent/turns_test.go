@@ -366,3 +366,39 @@ func (r streamingRunner) Run(ctx context.Context, spec agentapp.RunSpec) (agenta
 	}
 	return result, err
 }
+
+func TestADirectiveFailsATurnWithTheCodeItNames(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		prompt string
+		code   string
+	}{
+		{name: "FAIL names a code", prompt: "FAIL:UNAUTHORIZED", code: string(errors.Unauthorized)},
+		{name: "ERROR names a code", prompt: "ERROR:EXTERNAL", code: string(errors.External)},
+		{name: "FAIL under a sentence", prompt: "show me the error row\nFAIL:RATE_LIMITED", code: string(errors.RateLimited)},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := newHarness(t)
+			conversation := h.conversation(t, domainagent.ModeAutonomous)
+			if _, err := h.service.Send(t.Context(), agentapp.SendRequest{
+				ConversationID: conversation, Text: tc.prompt,
+			}); err != nil {
+				t.Fatalf("Send: %v", err)
+			}
+
+			finished := doneOf(t, h)
+			if finished.Code != tc.code {
+				t.Fatalf("code = %q, want %q", finished.Code, tc.code)
+			}
+			if finished.Error == "" {
+				t.Fatal("the terminal event carries no message")
+			}
+		})
+	}
+}

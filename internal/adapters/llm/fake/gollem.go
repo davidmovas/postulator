@@ -16,6 +16,7 @@ import (
 const (
 	ToolDirective  = "TOOL:"
 	FinalDirective = "FAKE:"
+	FailDirective  = "FAIL:"
 
 	callPrefix     = "fake-call-"
 	toolCallTokens = 8
@@ -339,8 +340,10 @@ func scriptedFailure(inputs []gollem.Input) (errors.Code, bool) {
 		}
 		for line := range strings.SplitSeq(string(text), "\n") {
 			trimmed := strings.TrimSpace(line)
-			if strings.HasPrefix(trimmed, ErrorDirective) {
-				return errors.Code(strings.TrimSpace(strings.TrimPrefix(trimmed, ErrorDirective))), true
+			for _, directive := range []string{ErrorDirective, FailDirective} {
+				if strings.HasPrefix(trimmed, directive) {
+					return errors.Code(strings.TrimSpace(strings.TrimPrefix(trimmed, directive))), true
+				}
 			}
 		}
 	}

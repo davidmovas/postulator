@@ -76,6 +76,14 @@ type Config struct {
 	KeyDir        string
 	Provider      llmport.Client
 	AgentProvider AgentProvider
+	Environment   func(name string) string
+}
+
+func (c Config) environment() func(string) string {
+	if c.Environment != nil {
+		return c.Environment
+	}
+	return os.Getenv
 }
 
 func (c Config) recovery() string {
@@ -332,7 +340,7 @@ func (c *Core) build(ctx context.Context, key []byte) (kit, error) {
 	})
 
 	browserService := browser.New(browser.Deps{
-		Browser: tor.New(os.Getenv),
+		Browser: tor.New(cfg.environment()),
 		TorPath: func() string { return tor.Path(values) },
 	})
 

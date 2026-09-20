@@ -5,6 +5,7 @@ package main
 import (
 	"encoding/json"
 	"net"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -642,5 +643,26 @@ func TestARestartPutsThePublishedPagesBackOnTheFakeSite(t *testing.T) {
 		if link.Kind == "preview" && !link.ExpiresAt.Std().After(time.Now()) {
 			t.Fatalf("the preview link for %s expired at %s, which is already past", page.Path, link.ExpiresAt)
 		}
+	}
+}
+
+func TestTheHarnessCanHideTorBrowser(t *testing.T) {
+	cases := []struct {
+		name   string
+		hide   string
+		wanted string
+	}{
+		{name: "hidden", hide: "1", wanted: ""},
+		{name: "not hidden", hide: "", wanted: os.Getenv("USERPROFILE")},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(torHideVariable, tc.hide)
+
+			if got := environment()("USERPROFILE"); got != tc.wanted {
+				t.Fatalf("the injected environment answered %q, want %q", got, tc.wanted)
+			}
+		})
 	}
 }

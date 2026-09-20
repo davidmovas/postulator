@@ -13,6 +13,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/application/agent"
+	"github.com/davidmovas/postulator/internal/application/browser"
 	"github.com/davidmovas/postulator/internal/application/models"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/templates"
@@ -325,4 +326,39 @@ func TestOpenComposesTheAgentOverTheProviderSeam(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	t.Fatal("the seeded provider never answered the turn")
+}
+
+func TestOpenLooksForTorThroughTheInjectedEnvironment(t *testing.T) {
+	t.Parallel()
+
+	home := t.TempDir()
+	asked := make(map[string]int)
+
+	core, err := app.Open(t.Context(), app.Config{
+		DatabasePath: filepath.Join(home, "postulator.db"),
+		KeyDir:       home,
+		Environment: func(name string) string {
+			asked[name]++
+			return ""
+		},
+	}, zaptest.NewLogger(t))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() {
+		if closeErr := core.Close(); closeErr != nil {
+			t.Errorf("Close: %v", closeErr)
+		}
+	})
+
+	found, err := core.Browser.Locate(t.Context(), browser.LocateRequest{})
+	if err != nil {
+		t.Fatalf("Locate: %v", err)
+	}
+	if found.Installed {
+		t.Fatalf("Locate found %q although the injected environment names no root", found.Path)
+	}
+	if len(asked) == 0 {
+		t.Fatal("the locator never asked the injected environment")
+	}
 }
