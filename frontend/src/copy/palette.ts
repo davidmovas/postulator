@@ -1,6 +1,8 @@
 export const palette = {
     title: "Search",
     placeholder: "Search entities, pages, runs and commands",
+    field: "Search",
+    search: "search",
     goTo: "Go to",
     entities: "Entities",
     pages: "Pages",

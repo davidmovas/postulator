@@ -84,6 +84,7 @@ func launch() error {
 		Height:           820,
 		MinWidth:         960,
 		MinHeight:        600,
+		Frameless:        true,
 		BackgroundColour: application.NewRGB(14, 16, 22),
 		URL:              "/",
 	})
