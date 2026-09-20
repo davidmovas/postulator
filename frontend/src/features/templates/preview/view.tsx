@@ -103,7 +103,6 @@ export function PagePreview({ draft }: PagePreviewProps): ReactElement {
 
     return (
         <div className="flex flex-col gap-3">
-            <p className="text-xs text-ink-dim">{said.title}</p>
             <div className="overflow-hidden rounded-lg border border-hairline bg-canvas">
                 <div className="flex flex-col gap-1 border-b border-hairline bg-panel px-2.5 py-2">
                     <span className="text-2xs font-semibold tracking-label text-ink-faint uppercase">{said.tab}</span>

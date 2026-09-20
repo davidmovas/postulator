@@ -6,9 +6,10 @@ import type { LinkPolicy, LinkRules } from "../../data/types.js";
 import { copy } from "../../copy/index.js";
 import { anchorStrategies, templateScopes } from "../../generated/vocab.js";
 import type { SelectOption } from "../../ui/index.js";
-import { Banner, Button, Drawer, Field, Input, SectionLabel, Select, Switch } from "../../ui/index.js";
+import { Banner, Button, Drawer, Field, Input, Select, Switch } from "../../ui/index.js";
 import { blankDraft } from "./blank.js";
-import { fieldErrorOf, formErrorOf, NumberInput } from "./controls.js";
+import { fieldErrorOf, formErrorOf } from "./controls.js";
+import { PolicyRules } from "./policy-rules.js";
 import { anchorLabel, scopeLabel } from "./labels.js";
 
 const scopeOptions: readonly SelectOption<string>[] = templateScopes.map((value) => ({
@@ -214,116 +215,7 @@ export function PolicyDrawer({ siteId, policy, seed, onClose }: PolicyDrawerProp
                         />
                     )}
                 </Field>
-                <div className="flex flex-col gap-2.5 border-t border-hairline pt-3">
-                    <span className="w-fit cursor-help" title={copy.policies.rulesTooltip}>
-                        <SectionLabel>{copy.policies.rulesTitle}</SectionLabel>
-                    </span>
-                    <div className="grid grid-cols-2 gap-2">
-                        <Field
-                            label={copy.templates.links.upDepth}
-                            error={fieldErrorOf(thrown, "linkRules.upDepth")}
-                        >
-                            {(control) => (
-                                <NumberInput
-                                    id={control.id}
-                                    describedBy={control["aria-describedby"]}
-                                    invalid={control.invalid}
-                                    min={0}
-                                    value={draft.rules.upDepth}
-                                    onValueChange={(upDepth) => {
-                                        editRules({ upDepth });
-                                    }}
-                                />
-                            )}
-                        </Field>
-                        <Field
-                            label={copy.templates.links.siblingMinWeight}
-                            error={fieldErrorOf(thrown, "linkRules.siblingMinWeight")}
-                        >
-                            {(control) => (
-                                <NumberInput
-                                    id={control.id}
-                                    describedBy={control["aria-describedby"]}
-                                    invalid={control.invalid}
-                                    min={0}
-                                    max={1}
-                                    step={0.05}
-                                    value={draft.rules.siblingMinWeight}
-                                    onValueChange={(siblingMinWeight) => {
-                                        editRules({ siblingMinWeight });
-                                    }}
-                                />
-                            )}
-                        </Field>
-                        <Field
-                            label={copy.templates.links.maxLinks}
-                            error={fieldErrorOf(thrown, "linkRules.maxLinks")}
-                        >
-                            {(control) => (
-                                <NumberInput
-                                    id={control.id}
-                                    describedBy={control["aria-describedby"]}
-                                    invalid={control.invalid}
-                                    min={0}
-                                    value={draft.rules.maxLinks}
-                                    onValueChange={(maxLinks) => {
-                                        editRules({ maxLinks });
-                                    }}
-                                />
-                            )}
-                        </Field>
-                        <Field
-                            label={copy.templates.links.maxPerTarget}
-                            error={fieldErrorOf(thrown, "linkRules.maxPerTarget")}
-                        >
-                            {(control) => (
-                                <NumberInput
-                                    id={control.id}
-                                    describedBy={control["aria-describedby"]}
-                                    invalid={control.invalid}
-                                    min={0}
-                                    value={draft.rules.maxPerTarget}
-                                    onValueChange={(maxPerTarget) => {
-                                        editRules({ maxPerTarget });
-                                    }}
-                                />
-                            )}
-                        </Field>
-                        <Field
-                            label={copy.templates.links.parentLinkWithinParagraphs}
-                            error={fieldErrorOf(thrown, "linkRules.parentLinkWithinParagraphs")}
-                        >
-                            {(control) => (
-                                <NumberInput
-                                    id={control.id}
-                                    describedBy={control["aria-describedby"]}
-                                    invalid={control.invalid}
-                                    min={0}
-                                    value={draft.rules.parentLinkWithinParagraphs}
-                                    onValueChange={(parentLinkWithinParagraphs) => {
-                                        editRules({ parentLinkWithinParagraphs });
-                                    }}
-                                />
-                            )}
-                        </Field>
-                    </div>
-                    <Switch
-                        className="w-full"
-                        label={copy.templates.links.downLinks}
-                        checked={draft.rules.downLinks}
-                        onChange={(event) => {
-                            editRules({ downLinks: event.target.checked });
-                        }}
-                    />
-                    <Switch
-                        className="w-full"
-                        label={copy.templates.links.childrenSection}
-                        checked={draft.rules.childrenSection}
-                        onChange={(event) => {
-                            editRules({ childrenSection: event.target.checked });
-                        }}
-                    />
-                </div>
+                <PolicyRules rules={draft.rules} error={thrown} onChange={editRules} />
             </div>
         </Drawer>
     );
