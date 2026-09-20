@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strconv"
 	"sync"
@@ -397,5 +398,40 @@ func TestTheServerRunsOutsideATest(t *testing.T) {
 	}
 	if len(reported.errors) != 0 {
 		t.Fatalf("the fake site reported %v", reported.errors)
+	}
+}
+
+func TestTheServerTakesAnAddress(t *testing.T) {
+	t.Parallel()
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("reserve a port: %v", err)
+	}
+	address := listener.Addr().String()
+	if closeErr := listener.Close(); closeErr != nil {
+		t.Fatalf("release the port: %v", closeErr)
+	}
+
+	server := wptest.New(t, wptest.WithAddress(address))
+	if want := "http://" + address; server.URL() != want {
+		t.Fatalf("URL = %q, want %q", server.URL(), want)
+	}
+
+	request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL()+"/wp-json", nil)
+	if err != nil {
+		t.Fatalf("build the request: %v", err)
+	}
+	request.SetBasicAuth(wptest.DefaultUser, wptest.DefaultPassword)
+
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatalf("call the fake site: %v", err)
+	}
+	if closeErr := response.Body.Close(); closeErr != nil {
+		t.Errorf("close the body: %v", closeErr)
+	}
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", response.StatusCode)
 	}
 }

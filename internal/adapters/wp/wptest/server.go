@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -51,6 +52,7 @@ type Server struct {
 	clock         time.Time
 	user          string
 	password      string
+	address       string
 	seoPlugin     string
 	redirect      Redirect
 	pendingEdit   *edit
@@ -93,6 +95,10 @@ func WithRedirect(mode Redirect) Option {
 	return func(s *Server) { s.redirect = mode }
 }
 
+func WithAddress(address string) Option {
+	return func(s *Server) { s.address = address }
+}
+
 func New(t TB, opts ...Option) *Server {
 	t.Helper()
 
@@ -111,7 +117,20 @@ func New(t TB, opts ...Option) *Server {
 		opt(server)
 	}
 
-	server.http = httptest.NewServer(server.handler())
+	server.http = httptest.NewUnstartedServer(server.handler())
+	if server.address != "" {
+		listener, err := net.Listen("tcp", server.address)
+		if err != nil {
+			t.Errorf("listen on %s: %v", server.address, err)
+			return server
+		}
+		if closeErr := server.http.Listener.Close(); closeErr != nil {
+			t.Errorf("release the default listener: %v", closeErr)
+		}
+		server.http.Listener = listener
+	}
+	server.http.Start()
+
 	t.Cleanup(server.http.Close)
 	return server
 }
