@@ -40,6 +40,7 @@ type AgentDonePayload struct {
 	ConversationID string  `json:"conversationId"`
 	MessageID      string  `json:"messageId"`
 	Text           string  `json:"text"`
+	Code           string  `json:"code"`
 	Error          string  `json:"error"`
 	InputTokens    int     `json:"inputTokens"`
 	OutputTokens   int     `json:"outputTokens"`

@@ -82,7 +82,19 @@ type SendRequest struct {
 }
 
 type SendResponse struct {
-	MessageID string `json:"messageId"`
+	MessageID          string `json:"messageId"`
+	AssistantMessageID string `json:"assistantMessageId"`
+}
+
+type StatusRequest struct {
+	ConversationID string `json:"conversationId"`
+}
+
+type StatusResponse struct {
+	StartedAt dto.Time `json:"startedAt"`
+	MessageID string   `json:"messageId"`
+	LastSeq   int64    `json:"lastSeq"`
+	Running   bool     `json:"running"`
 }
 
 type ConfirmRequest struct {

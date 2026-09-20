@@ -125,8 +125,17 @@ func newHarness(t *testing.T) *harness {
 	return built
 }
 
+type tuning func(*agentapp.Deps)
+
 func build(t *testing.T, store *sqlite.Store, model *fake.Gollem, bus *applicationtest.Recorder,
 	allowed ...string) *harness {
+	t.Helper()
+
+	return buildTuned(t, store, model, bus, nil, allowed...)
+}
+
+func buildTuned(t *testing.T, store *sqlite.Store, model *fake.Gollem, bus *applicationtest.Recorder,
+	tune tuning, allowed ...string) *harness {
 	t.Helper()
 
 	now := clock.NewFake(sqlitetest.Stamp)
@@ -166,7 +175,7 @@ func build(t *testing.T, store *sqlite.Store, model *fake.Gollem, bus *applicati
 
 	titler := &scriptedTitler{text: "Scripted chat name"}
 
-	service := agentapp.New(agentapp.Deps{
+	deps := agentapp.Deps{
 		Conversations: sqlite.NewConversationRepo(store),
 		Messages:      sqlite.NewMessageRepo(store),
 		Actions:       actionRepo,
@@ -185,7 +194,12 @@ func build(t *testing.T, store *sqlite.Store, model *fake.Gollem, bus *applicati
 		Publisher: bus,
 		Clock:     now,
 		Allowed:   allowed,
-	})
+	}
+	if tune != nil {
+		tune(&deps)
+	}
+
+	service := agentapp.New(deps)
 	t.Cleanup(service.Close)
 
 	return &harness{

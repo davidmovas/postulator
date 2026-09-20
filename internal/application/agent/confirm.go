@@ -99,7 +99,7 @@ func (s *Service) execute(ctx context.Context, action domainagent.PendingAction)
 	}); err != nil {
 		return ConfirmResponse{}, err
 	}
-	if err = s.turn(ctx, conversation, resumeText(action.Tool, encoded, failure)); err != nil &&
+	if _, err = s.turn(ctx, conversation, resumeText(action.Tool, encoded, failure)); err != nil &&
 		!errors.IsCode(err, errors.Conflict) {
 		return ConfirmResponse{}, err
 	}

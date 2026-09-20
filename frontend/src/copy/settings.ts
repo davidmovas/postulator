@@ -58,6 +58,10 @@ export const settings = {
             label: "Tool result ceiling",
             help: "A tool result larger than this is cut before the model sees it.",
         },
+        "agent.turnTimeout": {
+            label: "Turn timeout",
+            help: "How long one answer may take before the turn is stopped.",
+        },
         "images.localDir": {
             label: "Image folder",
             help: "Where generated images are written. Empty means the workspace folder.",

@@ -14,6 +14,7 @@ type AgentUseCase interface {
 	CreateConversation(ctx context.Context, req agent.CreateConversationRequest) (agent.CreateConversationResponse, error)
 	SetMode(ctx context.Context, req agent.SetModeRequest) (agent.SetModeResponse, error)
 	Send(ctx context.Context, req agent.SendRequest) (agent.SendResponse, error)
+	Status(ctx context.Context, req agent.StatusRequest) (agent.StatusResponse, error)
 	Confirm(ctx context.Context, req agent.ConfirmRequest) (agent.ConfirmResponse, error)
 	Cancel(ctx context.Context, req agent.CancelRequest) (agent.CancelResponse, error)
 	RenameConversation(ctx context.Context, req agent.RenameConversationRequest) (agent.RenameConversationResponse, error)
@@ -27,6 +28,7 @@ type AgentService struct {
 	createConversation middleware.Handler[agent.CreateConversationRequest, agent.CreateConversationResponse]
 	setMode            middleware.Handler[agent.SetModeRequest, agent.SetModeResponse]
 	send               middleware.Handler[agent.SendRequest, agent.SendResponse]
+	status             middleware.Handler[agent.StatusRequest, agent.StatusResponse]
 	confirm            middleware.Handler[agent.ConfirmRequest, agent.ConfirmResponse]
 	cancel             middleware.Handler[agent.CancelRequest, agent.CancelResponse]
 	renameConversation middleware.Handler[agent.RenameConversationRequest, agent.RenameConversationResponse]
@@ -41,6 +43,7 @@ func NewAgentService(logger *zap.Logger, useCase Source[AgentUseCase]) *AgentSer
 		createConversation: Wrap(logger, "agent.createConversation", call(useCase, AgentUseCase.CreateConversation)),
 		setMode:            Wrap(logger, "agent.setMode", call(useCase, AgentUseCase.SetMode)),
 		send:               Wrap(logger, "agent.send", call(useCase, AgentUseCase.Send)),
+		status:             Wrap(logger, "agent.status", call(useCase, AgentUseCase.Status)),
 		confirm:            Wrap(logger, "agent.confirm", call(useCase, AgentUseCase.Confirm)),
 		cancel:             Wrap(logger, "agent.cancel", call(useCase, AgentUseCase.Cancel)),
 		renameConversation: Wrap(logger, "agent.renameConversation", call(useCase, AgentUseCase.RenameConversation)),
@@ -61,6 +64,10 @@ func (s *AgentService) SetMode(c context.Context, req agent.SetModeRequest) (age
 
 func (s *AgentService) Send(c context.Context, req agent.SendRequest) (agent.SendResponse, error) {
 	return s.send(c, req)
+}
+
+func (s *AgentService) Status(c context.Context, req agent.StatusRequest) (agent.StatusResponse, error) {
+	return s.status(c, req)
 }
 
 func (s *AgentService) Confirm(c context.Context, req agent.ConfirmRequest) (agent.ConfirmResponse, error) {

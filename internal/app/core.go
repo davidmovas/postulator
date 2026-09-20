@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	stdsync "sync"
+	"time"
 
 	"github.com/gollem-dev/gollem"
 	"go.uber.org/zap"
@@ -342,6 +343,7 @@ func (c *Core) compose(ctx context.Context, key []byte) error {
 		}, agentrunner.Config{MaxToolResultBytes: agent.MaxToolResultBytes(values)}),
 		Publisher:     relay,
 		Clock:         now,
+		TurnTimeout:   func() time.Duration { return agent.TurnTimeout(values) },
 		LoopLimit:     agent.LoopLimit(values),
 		HistoryBudget: agent.HistoryBudgetChars(values),
 		MaxToolResult: agent.MaxToolResultBytes(values),

@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
@@ -194,12 +195,14 @@ func TestOneTurnAtATimePerConversation(t *testing.T) {
 	h := newHarness(t)
 	conversation := h.conversation(t, domainagent.ModeAutonomous)
 
-	turns := agentapp.NewTurns()
+	turns := agentapp.NewTurns(nil)
 	release := make(chan struct{})
-	if err := turns.Start(t.Context(), conversation, func(context.Context) { <-release }); err != nil {
+	if err := turns.Start(t.Context(), conversation, "assistant-1", time.Now(),
+		func(context.Context) { <-release }); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
-	if err := turns.Start(t.Context(), conversation, func(context.Context) {}); !errors.IsCode(err, errors.Conflict) {
+	if err := turns.Start(t.Context(), conversation, "assistant-2", time.Now(),
+		func(context.Context) {}); !errors.IsCode(err, errors.Conflict) {
 		t.Fatalf("a second turn = %v, want a conflict", err)
 	}
 	if !turns.Cancel(conversation) {

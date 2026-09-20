@@ -115,7 +115,7 @@ func TestASecondMessageWaitsForTheTurnInFlight(t *testing.T) {
 func TestADroppedEventIsNoted(t *testing.T) {
 	t.Parallel()
 
-	turns := agentapp.NewTurns()
+	turns := agentapp.NewTurns(nil)
 	turns.Note(nil)
 	if len(turns.Dropped()) != 0 {
 		t.Fatal("nothing to note is noted as nothing")

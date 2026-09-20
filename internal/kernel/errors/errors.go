@@ -126,7 +126,7 @@ func CodeOf(err error) Code {
 	return Internal
 }
 
-func Describe(err error) (Code, string) {
+func Describe(err error) (code Code, message string) {
 	if err == nil {
 		return "", ""
 	}

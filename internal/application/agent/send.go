@@ -9,6 +9,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/tools"
 	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
@@ -43,20 +44,37 @@ func (s *Service) Send(ctx context.Context, req SendRequest) (SendResponse, erro
 		}
 	}
 
-	if turnErr := s.turn(ctx, conversation, text); turnErr != nil {
+	assistantID, turnErr := s.turn(ctx, conversation, text)
+	if turnErr != nil {
 		return SendResponse{}, turnErr
 	}
-	return SendResponse{MessageID: asked.ID}, nil
+	return SendResponse{MessageID: asked.ID, AssistantMessageID: assistantID}, nil
 }
 
-func (s *Service) turn(ctx context.Context, conversation domainagent.Conversation, input string) error {
+func (s *Service) Status(_ context.Context, req StatusRequest) (StatusResponse, error) {
+	conversationID := strings.TrimSpace(req.ConversationID)
+	if conversationID == "" {
+		return StatusResponse{}, invalid("a status needs a conversation", "conversationId")
+	}
+
+	held, running := s.deps.Turns.Status(conversationID)
+	if !running {
+		return StatusResponse{}, nil
+	}
+	return StatusResponse{
+		Running: true, MessageID: held.MessageID,
+		StartedAt: dto.NewTime(held.StartedAt), LastSeq: held.LastSeq,
+	}, nil
+}
+
+func (s *Service) turn(ctx context.Context, conversation domainagent.Conversation, input string) (string, error) {
 	ref, err := s.deps.Profiles.Resolve(ctx, siteOf(conversation), domainllm.RoleChat, nil)
 	if err != nil {
-		return err
+		return "", err
 	}
 	built, err := s.siteContext(ctx, conversation)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	spec := RunSpec{
@@ -73,17 +91,29 @@ func (s *Service) turn(ctx context.Context, conversation domainagent.Conversatio
 	}
 	spec.Stream = &stream{service: s, conversationID: conversation.ID, messageID: spec.MessageID}
 
-	return s.deps.Turns.Start(ctx, conversation.ID, func(turnCtx context.Context) {
-		s.answer(turnCtx, conversation.ID, spec)
-	})
+	if startErr := s.deps.Turns.Start(ctx, conversation.ID, spec.MessageID, s.now(),
+		func(turnCtx context.Context) { s.answer(turnCtx, conversation.ID, spec) }); startErr != nil {
+		return "", startErr
+	}
+	return spec.MessageID, nil
 }
 
 func (s *Service) answer(ctx context.Context, conversationID string, spec RunSpec) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			s.deps.Turns.Note(errors.New(errors.Internal, "the agent turn panicked"))
+			s.emit(events.AgentDone, events.AgentDonePayload{
+				ConversationID: conversationID, MessageID: spec.MessageID,
+				Code: string(errors.Internal), Error: "the agent turn failed unexpectedly",
+			})
+		}
+	}()
+
 	result, err := s.deps.Runner.Run(ctx, spec)
 
 	done := events.AgentDonePayload{ConversationID: conversationID, MessageID: spec.MessageID}
 	if err != nil {
-		done.Error = err.Error()
+		done.Code, done.Error = describe(ctx, err)
 		s.emit(events.AgentDone, done)
 		return
 	}
@@ -92,7 +122,7 @@ func (s *Service) answer(ctx context.Context, conversationID string, spec RunSpe
 		if _, appendErr := s.append(ctx, conversationID, domainagent.Message{
 			ID: spec.MessageID, Role: domainagent.RoleAssistant, Text: text,
 		}); appendErr != nil {
-			done.Error = appendErr.Error()
+			done.Code, done.Error = describe(ctx, appendErr)
 			s.emit(events.AgentDone, done)
 			return
 		}
@@ -128,6 +158,14 @@ func (s *Service) emit(eventType events.Type, payload any) {
 	}
 }
 
+func describe(ctx context.Context, err error) (code, message string) {
+	kernelCode, described := errors.Describe(err)
+	if kernelCode == errors.Cancelled && expired(ctx) {
+		described = deadlineMessage
+	}
+	return string(kernelCode), described
+}
+
 func siteOf(conversation domainagent.Conversation) string {
 	if conversation.SiteID == nil {
 		return ""
@@ -142,6 +180,7 @@ type stream struct {
 }
 
 func (s *stream) Delta(_ context.Context, seq int64, text string) error {
+	s.service.deps.Turns.Observe(s.conversationID, seq)
 	return s.service.deps.Publisher.Publish(events.AgentDelta, events.AgentDeltaPayload{
 		ConversationID: s.conversationID, MessageID: s.messageID, Seq: seq, Text: text,
 	})

@@ -79,6 +79,7 @@ type Deps struct {
 	Registry      *tools.Registry
 	Runner        Runner
 	Turns         *Turns
+	TurnTimeout   func() time.Duration
 	Publisher     application.Publisher
 	Clock         clock.Clock
 	Allowed       []string
@@ -93,7 +94,7 @@ type Service struct {
 
 func New(deps Deps) *Service {
 	if deps.Turns == nil {
-		deps.Turns = NewTurns()
+		deps.Turns = NewTurns(deps.TurnTimeout)
 	}
 	if deps.LoopLimit <= 0 {
 		deps.LoopLimit = DefaultLoopLimit
