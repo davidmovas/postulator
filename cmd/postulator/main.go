@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"log"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -10,6 +11,9 @@ import (
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 )
+
+//go:embed appicon.png
+var appIcon []byte
 
 func main() {
 	if err := run(); err != nil {
@@ -46,6 +50,7 @@ func run() error {
 	wails := application.New(application.Options{
 		Name:        "Postulator",
 		Description: "Entity-graph driven WordPress content factory",
+		Icon:        appIcon,
 		Services:    core.Services(logger),
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(frontend.Assets),

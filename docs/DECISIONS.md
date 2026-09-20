@@ -767,3 +767,33 @@ drafts, and WordPress shows a draft only to a logged-in editor.
   host header can refuse to be framed and a parent cannot detect it, so "Open in your browser"
   sits beside the frame. Without the plugin a draft offers WordPress's own `?page_id=` address,
   which asks the client to log in.
+
+## Decisions taken on 2026-09-20 for the application mark
+
+The client opened the built window and found no icon anywhere: not on the executable, not on the
+window, not in the taskbar, not in the installer. Nothing had been forgotten — the resource was
+being built and thrown away.
+
+- **The resource object was written where Go cannot see it.** `build/windows/Taskfile.yml` is the
+  Wails v3 template's, which assumes `main.go` at the repository root, so it generated
+  `../wails_windows_amd64.syso` beside `go.mod`. Go links a `.syso` only from the directory of a
+  package in the build, and the root holds no Go files, so every build produced the object, ignored
+  it and deleted it. `bin/postulator.exe` therefore carried no `VS_VERSIONINFO` and no
+  `RT_GROUP_ICON`, and Wails on Windows reads the window icon out of the executable's own resource
+  id 3 (`webview_window_windows.go`), which is why the window and the taskbar were bare too. The
+  `-out` path now names `cmd/postulator`. **`wails3 update build-assets` regenerates that Taskfile
+  from the template and will put the wrong path back**; the generated file is edited on purpose.
+- **One geometry, four artifacts, no new dependency.** `cmd/appicon` declares the mark once as
+  numbers and renders every shape the build needs: `build/windows/icon.ico` for the executable and
+  the NSIS installer, `build/appicon.png`, `cmd/postulator/appicon.png` for
+  `application.Options.Icon`, and `frontend/public/appmark.svg` for the page icon and the title
+  bar. A second hand-authored copy of the same shape would drift the moment either was touched.
+- **The raster is drawn with distance functions, not a font.** A monogram cut from Archivo would
+  need a glyph rasteriser and would turn to mush at 16px. The stem is a rectangle and the bowl a
+  half annulus, sampled sixteen times per pixel; the SVG states the same two shapes as one path
+  with `fill-rule="evenodd"`, so the vector and the raster cannot disagree.
+- **The icon entries are PNG, and the container is written by hand.** The ICO directory is a
+  six-byte header and sixteen bytes per entry; `wails3 generate syso` accepts PNG payloads, which
+  is verified by the build linking all seven sizes. The test decodes the committed file and
+  compares its pixels with a fresh render rather than comparing bytes, so a change in Go's
+  deflate output is not reported as a stale icon while a changed mark still is.

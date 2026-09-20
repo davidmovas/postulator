@@ -20,9 +20,7 @@ export function TitleBar({ siteId }: TitleBarProps) {
     return (
         <header className="flex h-9 shrink-0 items-center gap-3 border-b border-hairline bg-panel px-3">
             <div className="flex shrink-0 items-center gap-2">
-                <span className="flex h-5 w-5 items-center justify-center rounded-md bg-accent text-2xs font-bold text-on-accent">
-                    P
-                </span>
+                <img src="/appmark.svg" alt="" width={20} height={20} className="h-5 w-5 rounded-md" />
                 <span className="text-lg font-semibold tracking-tight text-ink">{copy.app.name}</span>
             </div>
             <span aria-hidden={true} className="h-4 w-px shrink-0 bg-hairline" />

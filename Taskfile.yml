@@ -35,6 +35,11 @@ tasks:
     cmds:
       - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
 
+  icons:
+    summary: Regenerates the application mark in every shape the build needs
+    cmds:
+      - go run ./cmd/appicon
+
   bindings:
     summary: Regenerates the TypeScript bindings
     cmds:
