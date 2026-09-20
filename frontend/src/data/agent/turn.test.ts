@@ -52,7 +52,7 @@ describe("a turn assembles the streamed text", () => {
     test("done replaces the text with the final answer and records the usage", () => {
         beginTurn(conversationId, "u1");
         delta(1, "partial");
-        applyDone({ conversationId, messageId: "a1", text: "final", error: "", inputTokens: 12, outputTokens: 3, usd: 0.5 });
+        applyDone({ conversationId, messageId: "a1", text: "final", code: "", error: "", inputTokens: 12, outputTokens: 3, usd: 0.5 });
         const turn = getTurn(conversationId);
         expect(turn.status).toBe("done");
         expect(turn.text).toBe("final");
@@ -62,7 +62,7 @@ describe("a turn assembles the streamed text", () => {
 
     test("done with an error is an error turn", () => {
         beginTurn(conversationId, "u1");
-        applyDone({ conversationId, messageId: "a1", text: "", error: "the model could not answer", inputTokens: 0, outputTokens: 0, usd: 0 });
+        applyDone({ conversationId, messageId: "a1", text: "", code: "EXTERNAL", error: "the model could not answer", inputTokens: 0, outputTokens: 0, usd: 0 });
         expect(getTurn(conversationId).status).toBe("error");
         expect(getTurn(conversationId).error).toBe("the model could not answer");
     });
