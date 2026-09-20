@@ -33,6 +33,7 @@ export const settings = {
         wp: { title: "WordPress", blurb: "How this application talks to a site." },
         llm: { title: "Models", blurb: "How model calls are made, and where they are sent." },
         agent: { title: "Agent", blurb: "What the chat agent may do in one turn." },
+        browser: { title: "Browser", blurb: "Where a link from this application opens." },
         images: { title: "Images", blurb: "Where generated images come from and where they are kept." },
         import: { title: "Import", blurb: "What a spreadsheet import will accept." },
         schedules: { title: "Schedules", blurb: "How often a schedule is checked." },
@@ -61,6 +62,10 @@ export const settings = {
         "agent.turnTimeout": {
             label: "Turn timeout",
             help: "How long one answer may take before the turn is stopped.",
+        },
+        "browser.torPath": {
+            label: "Tor Browser",
+            help: "The full path to firefox.exe inside Tor Browser. Left empty, the usual places are searched.",
         },
         "images.localDir": {
             label: "Image folder",

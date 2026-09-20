@@ -201,6 +201,7 @@ export type SettingType = (typeof settingTypes)[number];
 
 export const settingGroups = [
     "agent",
+    "browser",
     "images",
     "import",
     "llm",

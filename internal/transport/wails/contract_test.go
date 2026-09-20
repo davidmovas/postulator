@@ -121,6 +121,7 @@ func TestEveryServiceRefusesWhileTheApplicationIsLocked(t *testing.T) {
 		wails.NewAgentService(logger, refused[wails.AgentUseCase]()),
 		wails.NewSchedulesService(logger, refused[wails.SchedulesUseCase]()),
 		wails.NewToolsService(logger, refused[wails.ToolCatalog]()),
+		wails.NewBrowserService(logger, refused[wails.BrowserUseCase]()),
 		wails.NewSettingsService(logger, wails.SettingsDeps{
 			Access: refused[wails.SettingsAccess](),
 			Backup: refused[wails.BackupControl](),

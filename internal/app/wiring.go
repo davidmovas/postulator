@@ -49,6 +49,7 @@ func (c *Core) Services(logger *log.Logger) []application.Service {
 		Agent:     live(c, func(c *Core) wails.AgentUseCase { return c.Agent }),
 		Schedules: live(c, func(c *Core) wails.SchedulesUseCase { return c.Schedules }),
 		Tools:     live(c, func(c *Core) wails.ToolCatalog { return c.Tools }),
+		Browser:   live(c, func(c *Core) wails.BrowserUseCase { return c.Browser }),
 		Settings: wails.SettingsDeps{
 			Access: live(c, func(c *Core) wails.SettingsAccess {
 				return wails.SettingsAccess{

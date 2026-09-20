@@ -100,6 +100,7 @@ func serviceDeps() wails.Deps {
 		Agent:     ready[wails.AgentUseCase](agentFake{}),
 		Schedules: ready[wails.SchedulesUseCase](schedulesFake{}),
 		Tools:     ready[wails.ToolCatalog](catalogFake{}),
+		Browser:   ready[wails.BrowserUseCase](browserFake{}),
 		Settings: wails.SettingsDeps{
 			Access: ready(wails.SettingsAccess{
 				Declarations: declarationsFake{registry: registry},
@@ -133,6 +134,7 @@ func TestServicesBindsEveryBoundedContext(t *testing.T) {
 		"*wails.AgentService",
 		"*wails.SchedulesService",
 		"*wails.ToolsService",
+		"*wails.BrowserService",
 		"*wails.SettingsService",
 	}
 	if len(services) != len(want) {

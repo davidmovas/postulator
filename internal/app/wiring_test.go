@@ -54,7 +54,7 @@ func TestServicesCarryTheInjectedStamps(t *testing.T) {
 	})
 
 	services := core.Services(logger)
-	if len(services) != 14 {
+	if len(services) != 15 {
 		t.Fatalf("Services returned %d services, want one per bounded context and health", len(services))
 	}
 
@@ -71,9 +71,9 @@ func TestServicesCarryTheInjectedStamps(t *testing.T) {
 		t.Fatalf("Ping = %+v, want the ldflags stamps %q/%q/%q", build, app.Version, app.Commit, app.BuildDate)
 	}
 
-	settingsService, ok := services[13].Instance().(*wails.SettingsService)
+	settingsService, ok := services[14].Instance().(*wails.SettingsService)
 	if !ok {
-		t.Fatalf("Services()[13] is %T, want *wails.SettingsService", services[13].Instance())
+		t.Fatalf("Services()[14] is %T, want *wails.SettingsService", services[14].Instance())
 	}
 
 	described, err := settingsService.Schema(context.Background(), wails.SettingsSchemaRequest{})

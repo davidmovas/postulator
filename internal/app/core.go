@@ -13,6 +13,7 @@ import (
 	"github.com/gollem-dev/gollem"
 	"go.uber.org/zap"
 
+	"github.com/davidmovas/postulator/internal/adapters/browser/tor"
 	"github.com/davidmovas/postulator/internal/adapters/images"
 	"github.com/davidmovas/postulator/internal/adapters/images/localfile"
 	imageopenai "github.com/davidmovas/postulator/internal/adapters/images/openai"
@@ -33,6 +34,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp/plugin"
 	"github.com/davidmovas/postulator/internal/adapters/wp/registry"
 	"github.com/davidmovas/postulator/internal/application/agent"
+	"github.com/davidmovas/postulator/internal/application/browser"
 	"github.com/davidmovas/postulator/internal/application/content"
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/imports"
@@ -143,6 +145,7 @@ type kit struct {
 	WordPress       *registry.Registry
 	Tools           *tools.Registry
 	Agent           *agent.Service
+	Browser         *browser.Service
 	Schedules       *schedules.Service
 	Scheduler       *scheduler.Scheduler
 }
@@ -328,6 +331,11 @@ func (c *Core) build(ctx context.Context, key []byte) (kit, error) {
 		RunReader: runRepo, Publisher: relay, Clock: now,
 	})
 
+	browserService := browser.New(browser.Deps{
+		Browser: tor.New(os.Getenv),
+		TorPath: func() string { return tor.Path(values) },
+	})
+
 	actionRepo := sqlite.NewPendingActionRepo(store)
 	toolRegistry := tools.New(tools.Deps{
 		Sites: sitesService, Graph: graphService, Pages: pagesService, Templates: templateService,
@@ -391,6 +399,7 @@ func (c *Core) build(ctx context.Context, key []byte) (kit, error) {
 		WordPress:       wordpress,
 		Tools:           toolRegistry,
 		Agent:           agentService,
+		Browser:         browserService,
 		Schedules:       schedulesService,
 		Scheduler:       scheduler.New(schedulesService, scheduler.TickInterval(values), logger),
 	}

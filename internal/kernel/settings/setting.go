@@ -44,6 +44,7 @@ type Group string
 
 const (
 	GroupAgent     Group = "agent"
+	GroupBrowser   Group = "browser"
 	GroupImages    Group = "images"
 	GroupImport    Group = "import"
 	GroupLLM       Group = "llm"
@@ -54,7 +55,7 @@ const (
 )
 
 var groups = []Group{
-	GroupAgent, GroupImages, GroupImport, GroupLLM, GroupRuns, GroupSchedules, GroupSync, GroupWP,
+	GroupAgent, GroupBrowser, GroupImages, GroupImport, GroupLLM, GroupRuns, GroupSchedules, GroupSync, GroupWP,
 }
 
 func Groups() []Group {
