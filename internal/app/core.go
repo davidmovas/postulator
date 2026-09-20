@@ -375,9 +375,9 @@ func (c *Core) build(ctx context.Context, key []byte) (kit, error) {
 		Publisher:     relay,
 		Clock:         now,
 		TurnTimeout:   func() time.Duration { return agent.TurnTimeout(values) },
-		LoopLimit:     agent.LoopLimit(values),
-		HistoryBudget: agent.HistoryBudgetChars(values),
-		MaxToolResult: agent.MaxToolResultBytes(values),
+		LoopLimit:     func() int { return agent.LoopLimit(values) },
+		HistoryBudget: func() int { return agent.HistoryBudgetChars(values) },
+		MaxToolResult: func() int { return agent.MaxToolResultBytes(values) },
 	})
 
 	built := kit{

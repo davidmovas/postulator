@@ -86,8 +86,9 @@ func (s *Service) turn(ctx context.Context, conversation domainagent.Conversatio
 		Input:         input,
 		MessageID:     id.New(),
 		Allowed:       s.allowed(),
-		LoopLimit:     s.deps.LoopLimit,
-		HistoryBudget: s.deps.HistoryBudget,
+		LoopLimit:     s.loopLimit(),
+		HistoryBudget: s.historyBudget(),
+		MaxToolResult: s.maxToolResult(),
 	}
 	spec.Stream = &stream{service: s, conversationID: conversation.ID, messageID: spec.MessageID}
 

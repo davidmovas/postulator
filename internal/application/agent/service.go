@@ -83,9 +83,9 @@ type Deps struct {
 	Publisher     application.Publisher
 	Clock         clock.Clock
 	Allowed       []string
-	LoopLimit     int
-	HistoryBudget int
-	MaxToolResult int
+	LoopLimit     func() int
+	HistoryBudget func() int
+	MaxToolResult func() int
 }
 
 type Service struct {
@@ -96,20 +96,33 @@ func New(deps Deps) *Service {
 	if deps.Turns == nil {
 		deps.Turns = NewTurns(deps.TurnTimeout)
 	}
-	if deps.LoopLimit <= 0 {
-		deps.LoopLimit = DefaultLoopLimit
-	}
-	if deps.HistoryBudget <= 0 {
-		deps.HistoryBudget = DefaultHistoryBudgetChars
-	}
-	if deps.MaxToolResult <= 0 {
-		deps.MaxToolResult = DefaultMaxToolResultBytes
-	}
 	return &Service{deps: deps}
 }
 
 func (s *Service) Close() {
 	s.deps.Turns.Close()
+}
+
+func chosen(read func() int, fallback int) int {
+	if read == nil {
+		return fallback
+	}
+	if value := read(); value > 0 {
+		return value
+	}
+	return fallback
+}
+
+func (s *Service) loopLimit() int {
+	return chosen(s.deps.LoopLimit, DefaultLoopLimit)
+}
+
+func (s *Service) historyBudget() int {
+	return chosen(s.deps.HistoryBudget, DefaultHistoryBudgetChars)
+}
+
+func (s *Service) maxToolResult() int {
+	return chosen(s.deps.MaxToolResult, DefaultMaxToolResultBytes)
 }
 
 func (s *Service) now() time.Time {

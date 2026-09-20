@@ -76,7 +76,7 @@ func (s *Service) execute(ctx context.Context, action domainagent.PendingAction)
 	elapsed := time.Since(started).Milliseconds()
 
 	status, encoded, failure := settleCall(outcome, callErr)
-	encoded = capped(encoded, s.deps.MaxToolResult)
+	encoded = capped(encoded, s.maxToolResult())
 	if _, err = s.deps.Actions.Transition(ctx, action.ID, domainagent.ActionApproved, status, encoded,
 		failure, s.now()); err != nil {
 		return ConfirmResponse{}, err

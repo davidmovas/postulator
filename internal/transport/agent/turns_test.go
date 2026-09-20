@@ -2,6 +2,7 @@ package agent_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -401,4 +402,58 @@ func TestADirectiveFailsATurnWithTheCodeItNames(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTheTurnReadsItsLimitsOnEveryTurn(t *testing.T) {
+	t.Parallel()
+
+	var seen []agentapp.RunSpec
+	var mu sync.Mutex
+
+	limit, budget, ceiling := 3, 4000, 2048
+	recorded := recordingRunner{observe: func(spec agentapp.RunSpec) {
+		mu.Lock()
+		defer mu.Unlock()
+		seen = append(seen, spec)
+	}}
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	bus := &applicationtest.Recorder{}
+	h := buildTuned(t, store, fake.NewGollem(), bus, func(deps *agentapp.Deps) {
+		deps.Runner = recorded
+		deps.LoopLimit = func() int { return limit }
+		deps.HistoryBudget = func() int { return budget }
+		deps.MaxToolResult = func() int { return ceiling }
+	})
+	h.siteID = owner.ID
+
+	conversation := h.conversation(t, domainagent.ModeAutonomous)
+	h.send(t, conversation, "first turn")
+
+	limit, budget, ceiling = 9, 9000, 4096
+	bus.Reset()
+	h.send(t, conversation, "second turn")
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if len(seen) != 2 {
+		t.Fatalf("the runner saw %d turns, want 2", len(seen))
+	}
+	if seen[0].LoopLimit != 3 || seen[0].HistoryBudget != 4000 || seen[0].MaxToolResult != 2048 {
+		t.Fatalf("the first turn ran with %+v", seen[0])
+	}
+	if seen[1].LoopLimit != 9 || seen[1].HistoryBudget != 9000 || seen[1].MaxToolResult != 4096 {
+		t.Fatalf("the second turn kept the old limits: %+v", seen[1])
+	}
+}
+
+type recordingRunner struct {
+	observe func(agentapp.RunSpec)
+}
+
+func (r recordingRunner) Run(_ context.Context, spec agentapp.RunSpec) (agentapp.RunResult, error) {
+	r.observe(spec)
+	return agentapp.RunResult{Text: "done"}, nil
 }

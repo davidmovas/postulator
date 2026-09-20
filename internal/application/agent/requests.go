@@ -57,6 +57,7 @@ type RunSpec struct {
 	Stream        Stream
 	LoopLimit     int
 	HistoryBudget int
+	MaxToolResult int
 }
 
 type RunResult struct {

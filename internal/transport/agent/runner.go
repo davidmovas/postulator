@@ -65,6 +65,13 @@ func New(deps Deps, cfg Config) *Runner {
 	return &Runner{deps: deps, cfg: cfg}
 }
 
+func (r *Runner) resultCeiling(spec agentapp.RunSpec) int {
+	if spec.MaxToolResult > 0 {
+		return spec.MaxToolResult
+	}
+	return r.cfg.MaxToolResultBytes
+}
+
 func (r *Runner) Run(ctx context.Context, spec agentapp.RunSpec) (agentapp.RunResult, error) {
 	if strings.TrimSpace(spec.Input) == "" {
 		return agentapp.RunResult{}, errors.New(errors.Invalid, "an agent turn needs something to answer")
@@ -87,7 +94,7 @@ func (r *Runner) Run(ctx context.Context, spec agentapp.RunSpec) (agentapp.RunRe
 		return agentapp.RunResult{}, err
 	}
 
-	guard := newGuard(spec, r.cfg.MaxToolResultBytes)
+	guard := newGuard(spec, r.resultCeiling(spec))
 	usage := &tally{}
 	started := time.Now()
 
