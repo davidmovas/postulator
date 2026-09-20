@@ -2,6 +2,14 @@ export const pages = {
     title: "Pages",
     views: { table: "Table", tree: "Tree" },
     newPage: "New page",
+    openOnSite: "Open in Tor Browser",
+    tabs: {
+        details: "Details",
+        links: "Links",
+        mapping: "Mapping",
+        report: "Report",
+        preview: "Preview",
+    },
     search: "Path starts with",
     sort: "Sort",
     sortOptions: {
@@ -13,7 +21,6 @@ export const pages = {
     tableOnly: "The tree reads the whole site at once, so filtering and sorting belong to the table.",
     summary: {
         open: "Open the editor",
-        openOnSite: "Open in Tor Browser",
         notOnSite: "This page is not on the site yet.",
         entity: "Entity",
         noEntity: "No entity",
@@ -26,13 +33,8 @@ export const pages = {
     sync: "Sync site",
     syncing: "Syncing",
     preview: {
-        panel: "On the site",
         title: (path: string) => `How ${path} looks on the site`,
-        open: "View on the site",
-        openDraft: "Preview the draft",
-        fromReview: "Preview on the site",
-        openInBrowser: "Open in your browser",
-        openAnyway: "Open in your browser anyway",
+        openAnyway: "Open in Tor Browser anyway",
         newLink: "New link",
         close: "Close",
         public: "Public page",
@@ -40,9 +42,6 @@ export const pages = {
         expiresIn: (minutes: number) => (minutes <= 1 ? "link expires in a minute" : `link expires in ${minutes} min`),
         expired: "This link has expired. Ask for a new one.",
         loading: "Loading the page from the site",
-        embedHint: "If the site refuses to be shown inside the app, open it in your browser.",
-        publicBody: "The page is published, so this is its public address.",
-        draftBody: "The draft is shown through the site's theme with a private link that works for an hour and is hidden from search engines.",
         notOnSite: "Not on the site yet",
         notOnSiteBody: "A generate run writes this page to WordPress. Preview it once it is there.",
         archived: "No longer on the site",
@@ -85,7 +84,6 @@ export const pages = {
     drift: {
         badge: "drift",
         title: "Someone edited this page in WordPress",
-        body: "WordPress reports a change made after Postulator last wrote this page. What changed cannot be shown: raw WordPress content never crosses into the app, so there is nothing here to compare against.",
         decision:
             "A publish run started with refuseDrift pauses this page for a human instead of overwriting the edit. Without it the run overwrites the page and records a drift finding on the publish result.",
         lastWritten: "Last synced",

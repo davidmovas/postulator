@@ -176,6 +176,7 @@ export const runs = {
     review: {
         title: "Review",
         close: "Close",
+        openPage: "Open the page",
         item: (path: string) => path,
         attempt: (attempts: number) => (attempts === 1 ? "attempt 1" : `${attempts} attempts`),
         noArtifacts: "Nothing to review yet",

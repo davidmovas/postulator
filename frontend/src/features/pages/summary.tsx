@@ -94,11 +94,11 @@ export function PageSummary({ pageId, siteId, search, onOpen }: PageSummaryProps
                 <div className="flex shrink-0 items-center gap-1">
                     <IconButton
                         icon={OpenInNewIcon}
-                        label={copy.pages.summary.openOnSite}
+                        label={copy.pages.openOnSite}
                         variant="ghost"
                         size="sm"
                         disabled={!reachable}
-                        title={reachable ? copy.pages.summary.openOnSite : copy.pages.summary.notOnSite}
+                        title={reachable ? copy.pages.openOnSite : copy.pages.summary.notOnSite}
                         onClick={() => {
                             void openExternal(url);
                         }}

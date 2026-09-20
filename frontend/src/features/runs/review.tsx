@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router";
 
 import { copy } from "../../copy/index.js";
 import { useArtifacts, useRetryStep } from "../../data/hooks/runs.js";
@@ -14,6 +15,7 @@ import {
     Drawer,
     EmptyState,
     HourglassEmptyIcon,
+    OpenInNewIcon,
     RestartAltIcon,
     SkeletonRows,
     SmartToyIcon,
@@ -23,7 +25,6 @@ import {
 } from "../../ui/index.js";
 import type { TabItem } from "../../ui/index.js";
 import { askAgent } from "../agent/dock-state.js";
-import { PreviewButton } from "../pages/preview/preview-button.js";
 import { countdown, dueMs, remainingMs, retryState, waitingUntil } from "./authority.js";
 import type { ItemView } from "./authority.js";
 import {
@@ -109,6 +110,7 @@ export function ReviewDrawer({
     const retention = useSetting(retentionDaysKey);
     const retryStep = useRetryStep();
     const [active, setActive] = useState<ArtifactKind | null>(null);
+    const navigate = useNavigate();
 
     const kinds = useMemo(
         () => orderedKinds((listed.data?.artifacts ?? []).map((artifact) => artifact.kind)),
@@ -161,7 +163,15 @@ export function ReviewDrawer({
                             {blocked === null ? "" : copy.runs.retryBlockedBody}
                         </span>
                         <div className="flex shrink-0 gap-2">
-                            <PreviewButton pageId={item.targetId} siteId={item.siteId} />
+                            <Button
+                                size="sm"
+                                icon={OpenInNewIcon}
+                                onClick={() => {
+                                    void navigate(`/s/${item.siteId}/pages/${item.targetId}`);
+                                }}
+                            >
+                                {copy.runs.review.openPage}
+                            </Button>
                             <Button
                                 size="sm"
                                 variant="ghost"
