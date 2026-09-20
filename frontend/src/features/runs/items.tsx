@@ -173,7 +173,7 @@ export function RunItemTable({
                     hasMore ? (
                         <div className="flex justify-center border-t border-hairline p-2">
                             <Button size="sm" busy={loadingMore} onClick={onLoadMore}>
-                                {copy.runs.loadMore}
+                                {copy.app.loadMore}
                             </Button>
                         </div>
                     ) : null

@@ -17,7 +17,7 @@ import {
     TabPanel,
     Tabs,
 } from "../../ui/index.js";
-import { askAgent } from "../agent/dock-state.js";
+import { askAgent } from "../agent/index.js";
 import { PageDetails } from "./details.js";
 import type { EntityIndex } from "./entities.js";
 import { statusTone } from "./labels.js";

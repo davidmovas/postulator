@@ -15,7 +15,7 @@ import { pathOf, usePageIndex } from "./page-index.js";
 import { itemSearchOf, readItemStatus } from "./params.js";
 import { recipeSteps } from "./recipe.js";
 import { ReviewDrawer } from "./review.js";
-import { StartRunDialog } from "./start.js";
+import { StartRunDrawer } from "./start.js";
 import { RunSummary } from "./summary.js";
 
 const tickMs = 1000;
@@ -171,7 +171,7 @@ export function RunDetailScreen(): ReactElement {
                 />
             )}
 
-            <StartRunDialog
+            <StartRunDrawer
                 open={rerunning !== null}
                 onOpenChange={(next) => {
                     if (!next) {

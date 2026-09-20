@@ -24,7 +24,7 @@ import {
     Tabs,
 } from "../../ui/index.js";
 import type { TabItem } from "../../ui/index.js";
-import { askAgent } from "../agent/dock-state.js";
+import { askAgent } from "../agent/index.js";
 import { countdown, dueMs, remainingMs, retryState, waitingUntil } from "./authority.js";
 import type { ItemView } from "./authority.js";
 import {

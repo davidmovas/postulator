@@ -36,10 +36,7 @@ export interface RunFiltersProps {
 
 export function RunFilters({ query, onChange }: RunFiltersProps): ReactElement {
     return (
-        <aside
-            aria-label={copy.runs.filters.title}
-            className="flex w-48 shrink-0 flex-col gap-3 overflow-auto border-r border-hairline bg-panel p-3"
-        >
+        <div aria-label={copy.runs.filters.title} className="flex flex-col gap-3 p-3">
             <div className="flex items-center justify-between gap-2">
                 <SectionLabel>{copy.runs.filters.title}</SectionLabel>
                 <Button
@@ -95,6 +92,6 @@ export function RunFilters({ query, onChange }: RunFiltersProps): ReactElement {
                     />
                 ))}
             </div>
-        </aside>
+        </div>
     );
 }
