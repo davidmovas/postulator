@@ -1,4 +1,4 @@
-import type { KeyboardEvent, ReactElement } from "react";
+import type { KeyboardEvent, ReactElement, ReactNode } from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
@@ -8,26 +8,28 @@ const maxComposerHeightPx = 168;
 
 export interface ComposerProps {
     answering: boolean;
+    stopping: boolean;
     disabled: boolean;
     placeholder: string;
     error: string | null;
+    status: ReactNode;
     prefillSeq: number;
     takePrefill: () => string | null;
     onSend: (text: string) => void;
     onStop: () => void;
-    className?: string;
 }
 
 export function Composer({
     answering,
+    stopping,
     disabled,
     placeholder,
     error,
+    status,
     prefillSeq,
     takePrefill,
     onSend,
     onStop,
-    className,
 }: ComposerProps): ReactElement {
     const field = useRef<HTMLTextAreaElement>(null);
     const [draft, setDraft] = useState("");
@@ -70,7 +72,8 @@ export function Composer({
     };
 
     return (
-        <div className={cx("flex shrink-0 flex-col gap-1.5 border-t border-hairline px-3 pt-2 pb-2", className)}>
+        <div className="flex shrink-0 flex-col gap-2 border-t border-hairline px-3 pt-2 pb-2">
+            {status}
             <div className="flex items-end gap-2 rounded-lg border border-hairline bg-inset px-2.5 py-2 focus-within:border-edge">
                 <textarea
                     ref={field}
@@ -86,8 +89,15 @@ export function Composer({
                     className="min-h-6 w-full resize-none bg-transparent text-sm leading-relaxed text-ink outline-none placeholder:text-ink-faint disabled:cursor-not-allowed"
                 />
                 {answering ? (
-                    <Button size="sm" variant="secondary" icon={StopCircleIcon} onClick={onStop}>
-                        {copy.agent.cancelTurn}
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        icon={StopCircleIcon}
+                        busy={stopping}
+                        disabled={stopping}
+                        onClick={onStop}
+                    >
+                        {stopping ? copy.agent.status.stopping : copy.agent.cancelTurn}
                     </Button>
                 ) : (
                     <IconButton
@@ -100,11 +110,9 @@ export function Composer({
                     />
                 )}
             </div>
-            <div className="flex items-center justify-between gap-2 px-0.5">
-                <span className={cx("truncate text-2xs", error === null ? "text-ink-faint" : "text-danger")}>
-                    {error ?? (answering ? copy.agent.composer.answering : copy.agent.composer.hint)}
-                </span>
-            </div>
+            <span className={cx("truncate px-0.5 text-2xs", error === null ? "text-ink-faint" : "text-danger")}>
+                {error ?? copy.agent.composer.hint}
+            </span>
         </div>
     );
 }

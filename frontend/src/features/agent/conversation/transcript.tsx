@@ -1,4 +1,4 @@
-import type { ReactElement, UIEvent } from "react";
+import type { ReactElement, ReactNode, UIEvent } from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
@@ -12,7 +12,7 @@ import { outcomeOf } from "../cards/outcome.js";
 import { familyIcon, toolStatusLabel, toolStatusTone } from "../labels.js";
 import { familyOf, resultSummary, verbOf } from "./model/tools.js";
 import type { Row } from "./model/transcript.js";
-import { CancelledCard, ErrorCard, StalledCard } from "./states.js";
+import { FailedCard, LostCard, StoppedCard } from "./states.js";
 
 const bottomSlackPx = 32;
 
@@ -94,13 +94,14 @@ function ToolRow({ row }: ToolRowProps): ReactElement {
 export interface TranscriptProps {
     rows: readonly Row[];
     settling: { id: string; busy: CardBusy } | null;
-    lastUserText: string | null;
+    canRetry: boolean;
+    header: ReactNode;
     onApprove: (actionId: string) => void;
     onReject: (actionId: string) => void;
     onRetry: () => void;
 }
 
-export function Transcript({ rows, settling, lastUserText, onApprove, onReject, onRetry }: TranscriptProps): ReactElement {
+export function Transcript({ rows, settling, canRetry, header, onApprove, onReject, onRetry }: TranscriptProps): ReactElement {
     const scroller = useRef<HTMLDivElement>(null);
     const [pinned, setPinned] = useState(true);
     const lastRowId = rows[rows.length - 1]?.id ?? "";
@@ -125,11 +126,10 @@ export function Transcript({ rows, settling, lastUserText, onApprove, onReject, 
         setPinned(held.scrollHeight - held.scrollTop - held.clientHeight <= bottomSlackPx);
     };
 
-    const canRetry = lastUserText !== null;
-
     return (
         <div className="relative min-h-0 flex-1">
             <div ref={scroller} onScroll={scrolled} className="flex h-full flex-col gap-3 overflow-y-auto px-3 py-3">
+                {header}
                 {rows.map((row) => {
                     switch (row.kind) {
                         case "user":
@@ -183,6 +183,7 @@ export function Transcript({ rows, settling, lastUserText, onApprove, onReject, 
                                     outcome={row.action === null ? null : outcomeOf(row.action)}
                                     busy={settling !== null && settling.id === row.id ? settling.busy : null}
                                     focus={true}
+                                    keys="confirm"
                                     onApprove={() => {
                                         onApprove(row.id);
                                     }}
@@ -192,12 +193,12 @@ export function Transcript({ rows, settling, lastUserText, onApprove, onReject, 
                                 />
                             );
                         }
-                        case "cancelled":
-                            return <CancelledCard key={row.id} canRetry={canRetry} onRetry={onRetry} />;
-                        case "error":
-                            return <ErrorCard key={row.id} message={row.message} canRetry={canRetry} onRetry={onRetry} />;
+                        case "stopped":
+                            return <StoppedCard key={row.id} detail={row.detail} canRetry={canRetry} onRetry={onRetry} />;
+                        case "failed":
+                            return <FailedCard key={row.id} message={row.message} canRetry={canRetry} onRetry={onRetry} />;
                         default:
-                            return <StalledCard key={row.id} canRetry={canRetry} onRetry={onRetry} />;
+                            return <LostCard key={row.id} canRetry={canRetry} onRetry={onRetry} />;
                     }
                 })}
             </div>

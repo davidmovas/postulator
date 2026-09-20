@@ -1,17 +1,84 @@
 import { useSyncExternalStore } from "react";
 
-import { clampWidth, dockKey, parseChoices, parseWidth } from "./model/dock.js";
+export type DockMode = "narrow" | "wide";
+
+export const narrowDockWidth = 392;
+export const wideDockFraction = 0.5;
+export const minimumDockWidth = 320;
+export const maximumDockWidth = 900;
+export const reservedMainWidth = 360;
+
+export const globalDockKey = "global";
+
+export function dockKey(siteId: string | null): string {
+    return siteId === null || siteId === "" ? globalDockKey : siteId;
+}
+
+export function clampWidth(width: number, windowWidth: number): number {
+    const ceiling = Math.max(minimumDockWidth, Math.min(maximumDockWidth, windowWidth - reservedMainWidth));
+    return Math.min(Math.max(Math.round(width), minimumDockWidth), ceiling);
+}
+
+export function widthOf(mode: DockMode, custom: number | null, windowWidth: number): number {
+    if (custom !== null) {
+        return clampWidth(custom, windowWidth);
+    }
+    return clampWidth(mode === "wide" ? windowWidth * wideDockFraction : narrowDockWidth, windowWidth);
+}
+
+export function parseMode(raw: string | null): DockMode {
+    return raw === "wide" ? "wide" : "narrow";
+}
+
+export function parseCustom(raw: string | null): number | null {
+    const parsed = raw === null ? Number.NaN : Number.parseInt(raw, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+}
+
+export function chooseConversation(
+    remembered: string | undefined,
+    available: readonly { id: string }[],
+): string | null {
+    if (remembered !== undefined && available.some((held) => held.id === remembered)) {
+        return remembered;
+    }
+    return available[0]?.id ?? null;
+}
+
+export function parseChoices(raw: string | null): Record<string, string> {
+    if (raw === null) {
+        return {};
+    }
+    let decoded: unknown;
+    try {
+        decoded = JSON.parse(raw);
+    } catch {
+        return {};
+    }
+    if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) {
+        return {};
+    }
+    const out: Record<string, string> = {};
+    for (const [key, value] of Object.entries(decoded)) {
+        if (typeof value === "string") {
+            out[key] = value;
+        }
+    }
+    return out;
+}
 
 export interface DockState {
     open: boolean;
-    width: number;
+    mode: DockMode;
+    custom: number | null;
     choices: Readonly<Record<string, string>>;
     prefill: string | null;
     focusSeq: number;
 }
 
 const openKey = "postulator.dock.open";
-const widthKey = "postulator.dock.width";
+const modeKey = "postulator.dock.mode";
+const customKey = "postulator.dock.width";
 const choicesKey = "postulator.dock.conversations";
 
 function readStored(key: string): string | null {
@@ -34,7 +101,8 @@ const listeners = new Set<() => void>();
 
 let state: DockState = Object.freeze({
     open: readStored(openKey) === "1",
-    width: parseWidth(readStored(widthKey)),
+    mode: parseMode(readStored(modeKey)),
+    custom: parseCustom(readStored(customKey)),
     choices: Object.freeze(parseChoices(readStored(choicesKey))),
     prefill: null,
     focusSeq: 0,
@@ -86,13 +154,22 @@ export function toggleDock(): void {
     }
 }
 
-export function setDockWidth(width: number): void {
-    const clamped = clampWidth(width);
-    if (clamped === state.width) {
+export function setDockMode(mode: DockMode): void {
+    if (state.mode === mode && state.custom === null) {
         return;
     }
-    writeStored(widthKey, String(clamped));
-    publish({ ...state, width: clamped });
+    writeStored(modeKey, mode);
+    writeStored(customKey, "");
+    publish({ ...state, mode, custom: null });
+}
+
+export function setDockWidth(width: number): void {
+    const rounded = Math.round(width);
+    if (state.custom === rounded) {
+        return;
+    }
+    writeStored(customKey, String(rounded));
+    publish({ ...state, custom: rounded });
 }
 
 export function rememberConversation(siteId: string | null, conversationId: string): void {

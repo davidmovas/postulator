@@ -7,7 +7,7 @@ import { copy } from "../../../copy/index.js";
 import type { PageAudit } from "../../../data/types.js";
 import { relativeTime } from "../../../domain/format.js";
 import { Button, CloseIcon, cx, DeleteIcon, IconButton, SectionLabel, SmartToyIcon, toneClasses } from "../../../ui/index.js";
-import { askAgent } from "../../agent/dock-state.js";
+import { askAgent } from "../../agent/index.js";
 import { severityOf } from "../../links/model/audit.js";
 import { entityIcon, formatScore, kindTone } from "../labels.js";
 import type { GraphIndex } from "../model/index.js";

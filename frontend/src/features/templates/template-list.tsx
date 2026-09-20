@@ -9,7 +9,7 @@ import type { Template } from "../../data/types.js";
 import type { TemplateSort } from "../../data/sorts.js";
 import { copy } from "../../copy/index.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
-import { askAgent } from "../agent/dock-state.js";
+import { askAgent } from "../agent/index.js";
 import {
     Button,
     DenseTable,

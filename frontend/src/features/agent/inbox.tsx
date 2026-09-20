@@ -1,13 +1,13 @@
 import type { KeyboardEvent, ReactElement } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 import { copy } from "../../copy/index.js";
 import { flatten } from "../../data/call.js";
 import { useConfirmAction, useConversations, usePendingActions } from "../../data/hooks/agent.js";
 import { useSites } from "../../data/hooks/sites.js";
 import type { PendingAction } from "../../data/types.js";
-import type { TabItem } from "../../ui/index.js";
+import type { SegmentedOption } from "../../ui/index.js";
 import {
     Banner,
     Button,
@@ -15,16 +15,18 @@ import {
     EmptyState,
     KeyboardIcon,
     PendingActionsIcon,
+    Screen,
+    Segmented,
     SkeletonRows,
-    TabPanel,
-    Tabs,
     TaskAltIcon,
+    Toolbar,
 } from "../../ui/index.js";
 import { ActionCard } from "./cards/action-card.js";
 import type { CardBusy } from "./cards/card.js";
 import { outcomeOf } from "./cards/outcome.js";
 import type { InboxStatus } from "./model/inbox.js";
 import { groupActions, inboxStatuses } from "./model/inbox.js";
+import { agentTabs } from "./tabs.js";
 
 function emptyText(status: InboxStatus): string {
     switch (status) {
@@ -39,7 +41,13 @@ function emptyText(status: InboxStatus): string {
     }
 }
 
+const filters: readonly SegmentedOption<InboxStatus>[] = inboxStatuses.map((held) => ({
+    value: held,
+    label: copy.agent.inbox.tabs[held],
+}));
+
 export function InboxScreen(): ReactElement {
+    const navigate = useNavigate();
     const [status, setStatus] = useState<InboxStatus>("pending");
     const listed = usePendingActions({ status }, 100);
     const pendingOnly = usePendingActions({ status: "pending" }, 100);
@@ -54,20 +62,16 @@ export function InboxScreen(): ReactElement {
     const actions = useMemo(() => flatten(listed.data?.pages), [listed.data]);
     const pendingCount = useMemo(() => flatten(pendingOnly.data?.pages).length, [pendingOnly.data]);
     const rows = useMemo(() => flatten(conversations.data?.pages), [conversations.data]);
-    const siteNames = useMemo(() => new Map(flatten(sites.data?.pages).map((site) => [site.id, site.name])), [sites.data]);
+    const siteNames = useMemo(
+        () => new Map(flatten(sites.data?.pages).map((site) => [site.id, site.name])),
+        [sites.data],
+    );
     const groups = useMemo(() => groupActions(actions, rows), [actions, rows]);
     const ordered = useMemo(() => groups.flatMap((group) => group.actions), [groups]);
 
     useEffect(() => {
         setActive((held) => Math.min(held, Math.max(ordered.length - 1, 0)));
     }, [ordered.length]);
-
-    const tabs: readonly TabItem<InboxStatus>[] = inboxStatuses.map((held) => ({
-        key: held,
-        label: copy.agent.inbox.tabs[held],
-        count: held === "pending" ? pendingCount : undefined,
-        countTone: "warn",
-    }));
 
     const settle = (action: PendingAction, approve: boolean): void => {
         setSettling({ id: action.id, busy: approve ? "approve" : "reject" });
@@ -134,99 +138,117 @@ export function InboxScreen(): ReactElement {
     };
 
     return (
-        <div className="flex h-full min-h-0 flex-col" onKeyDown={keyed}>
-            <header className="flex shrink-0 items-start justify-between gap-3 border-b border-hairline px-4 py-3">
-                <div className="flex min-w-0 flex-col gap-0.5">
-                    <h1 className="text-lg font-semibold tracking-tight text-ink">{copy.agent.inbox.title}</h1>
-                    <p className="text-xs text-ink-dim">{copy.agent.inbox.subtitle}</p>
-                </div>
-                {status === "pending" && pendingCount > 0 ? (
+        <Screen
+            title={copy.agent.title}
+            tabs={agentTabs("inbox", pendingCount, navigate)}
+            actions={
+                status === "pending" && pendingCount > 0 ? (
                     <Button
                         variant="danger"
-                        size="sm"
                         onClick={() => {
                             setRejectingAll(true);
                         }}
                     >
                         {copy.agent.inbox.rejectAll}
                     </Button>
-                ) : null}
-            </header>
-            <div className="flex shrink-0 border-b border-hairline px-1">
-                <Tabs label={copy.agent.inbox.title} items={tabs} value={status} onValueChange={setStatus} />
-            </div>
-            <div className="flex min-h-0 flex-1 flex-col">
-                <TabPanel label={copy.agent.inbox.tabs[status]} active={true}>
-                    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
-                        {status === "pending" && pendingCount > 0 ? (
-                            <Banner
-                                tone="warn"
-                                icon={PendingActionsIcon}
-                                title={copy.agent.inbox.waiting(pendingCount)}
-                                body={copy.agent.inbox.waitingBody}
-                            />
-                        ) : null}
-                        {listed.isPending ? (
-                            <SkeletonRows rows={6} label={copy.app.loading} />
-                        ) : groups.length === 0 ? (
-                            <EmptyState icon={TaskAltIcon} title={emptyText(status)} body={copy.agent.inbox.waitingBody} />
-                        ) : (
-                            groups.map((group) => (
-                                <section key={group.conversationId} className="flex flex-col gap-2">
-                                    <div className="flex items-baseline justify-between gap-2">
-                                        <Link to={`/agent/${group.conversationId}`} className="min-w-0 truncate text-xs font-semibold text-ink hover:text-accent">
-                                            {group.title === null ? copy.agent.inbox.deletedConversation : group.title === "" ? copy.agent.untitled : group.title}
-                                        </Link>
-                                        <span className="shrink-0 text-2xs text-ink-faint">
-                                            {group.siteId === null ? copy.agent.header.everywhere : (siteNames.get(group.siteId) ?? group.siteId)}
-                                        </span>
-                                    </div>
-                                    {group.actions.map((action) => {
-                                        const index = ordered.indexOf(action);
-                                        return (
-                                            <ActionCard
-                                                key={action.id}
-                                                tool={action.tool}
-                                                args={action.args}
-                                                risk={null}
-                                                status={action.status}
-                                                createdAt={action.createdAt}
-                                                outcome={outcomeOf(action)}
-                                                busy={settling !== null && settling.id === action.id ? settling.busy : null}
-                                                focus={index === active}
-                                                className={index === active ? "ring-1 ring-accent-border" : undefined}
-                                                onApprove={() => {
-                                                    settle(action, true);
-                                                }}
-                                                onReject={() => {
-                                                    settle(action, false);
-                                                }}
-                                            />
-                                        );
-                                    })}
-                                </section>
-                            ))
-                        )}
-                        {listed.hasNextPage ? (
-                            <Button
-                                variant="ghost"
-                                className="self-center"
-                                busy={listed.isFetchingNextPage}
-                                onClick={() => {
-                                    void listed.fetchNextPage();
-                                }}
-                            >
-                                {copy.app.loadMore}
-                            </Button>
-                        ) : null}
-                        {ordered.length > 0 ? (
-                            <p className="flex items-center gap-1.5 font-mono text-2xs text-ink-faint">
-                                <KeyboardIcon size={13} />
-                                {copy.agent.inbox.keys}
-                            </p>
-                        ) : null}
-                    </div>
-                </TabPanel>
+                ) : undefined
+            }
+            toolbar={
+                <Toolbar label={copy.agent.inbox.filter}>
+                    <Segmented
+                        label={copy.agent.inbox.filter}
+                        options={filters}
+                        value={status}
+                        onValueChange={setStatus}
+                    />
+                    {ordered.length > 0 ? (
+                        <span className="ml-auto flex items-center gap-1.5 font-mono text-2xs text-ink-faint">
+                            <KeyboardIcon size={13} />
+                            {copy.agent.inbox.keys}
+                        </span>
+                    ) : null}
+                </Toolbar>
+            }
+            variant="full"
+        >
+            <div className="min-h-0 flex-1 overflow-auto" onKeyDown={keyed}>
+                <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
+                    {status === "pending" && pendingCount > 0 ? (
+                        <Banner
+                            tone="warn"
+                            icon={PendingActionsIcon}
+                            title={copy.agent.inbox.waiting(pendingCount)}
+                            body={copy.agent.inbox.waitingBody}
+                        />
+                    ) : null}
+                    {listed.isPending ? (
+                        <SkeletonRows rows={6} label={copy.app.loading} />
+                    ) : groups.length === 0 ? (
+                        <EmptyState icon={TaskAltIcon} title={emptyText(status)} />
+                    ) : (
+                        groups.map((group) => (
+                            <section key={group.conversationId} className="flex flex-col gap-2">
+                                <div className="flex items-baseline justify-between gap-2">
+                                    <Link
+                                        to={`/agent/${group.conversationId}`}
+                                        className="min-w-0 truncate text-xs font-semibold text-ink hover:text-accent"
+                                    >
+                                        {group.title === null
+                                            ? copy.agent.inbox.deletedConversation
+                                            : group.title === ""
+                                              ? copy.agent.untitled
+                                              : group.title}
+                                    </Link>
+                                    <span className="shrink-0 text-2xs text-ink-faint">
+                                        {group.siteId === null
+                                            ? copy.agent.header.everywhere
+                                            : (siteNames.get(group.siteId) ?? group.siteId)}
+                                    </span>
+                                </div>
+                                {group.actions.map((action) => {
+                                    const index = ordered.indexOf(action);
+                                    return (
+                                        <ActionCard
+                                            key={action.id}
+                                            tool={action.tool}
+                                            args={action.args}
+                                            risk={null}
+                                            status={action.status}
+                                            createdAt={action.createdAt}
+                                            outcome={outcomeOf(action)}
+                                            busy={
+                                                settling !== null && settling.id === action.id
+                                                    ? settling.busy
+                                                    : null
+                                            }
+                                            focus={index === active}
+                                            keys="list"
+                                            className={index === active ? "ring-1 ring-accent-border" : undefined}
+                                            onApprove={() => {
+                                                settle(action, true);
+                                            }}
+                                            onReject={() => {
+                                                settle(action, false);
+                                            }}
+                                        />
+                                    );
+                                })}
+                            </section>
+                        ))
+                    )}
+                    {listed.hasNextPage ? (
+                        <Button
+                            variant="ghost"
+                            className="self-center"
+                            busy={listed.isFetchingNextPage}
+                            onClick={() => {
+                                void listed.fetchNextPage();
+                            }}
+                        >
+                            {copy.app.loadMore}
+                        </Button>
+                    ) : null}
+                </div>
             </div>
             <Dialog
                 open={rejectingAll}
@@ -242,6 +264,6 @@ export function InboxScreen(): ReactElement {
                     void rejectAll();
                 }}
             />
-        </div>
+        </Screen>
     );
 }

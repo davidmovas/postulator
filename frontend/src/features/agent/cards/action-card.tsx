@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { useTemplate } from "../../../data/hooks/templates.js";
 import { useTools } from "../../../data/hooks/tools.js";
 import type { Timestamp } from "../../../data/wire.js";
-import type { CardBusy } from "./card.js";
+import type { CardBusy, CardKeys } from "./card.js";
 import { ConfirmationCard } from "./card.js";
 import { Lines, Parts } from "./lines.js";
 import { isArgs, text } from "./model/card.js";
@@ -33,12 +33,26 @@ export interface ActionCardProps {
     outcome: string | null;
     busy: CardBusy;
     focus?: boolean;
+    keys?: CardKeys;
     onApprove?: () => void;
     onReject?: () => void;
     className?: string;
 }
 
-export function ActionCard({ tool, args, risk, status, createdAt, outcome, busy, focus, onApprove, onReject, className }: ActionCardProps): ReactElement {
+export function ActionCard({
+    tool,
+    args,
+    risk,
+    status,
+    createdAt,
+    outcome,
+    busy,
+    focus,
+    keys,
+    onApprove,
+    onReject,
+    className,
+}: ActionCardProps): ReactElement {
     const tools = useTools();
     const current = useTemplate(templateIdOf(tool, args));
     const listed = tools.data?.tools ?? [];
@@ -60,6 +74,7 @@ export function ActionCard({ tool, args, risk, status, createdAt, outcome, busy,
             lines={<Lines lines={view.lines} />}
             busy={busy}
             focus={focus}
+            keys={keys}
             onApprove={onApprove}
             onReject={onReject}
             className={className}

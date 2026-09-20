@@ -30,7 +30,7 @@ import {
     VerifiedIcon,
 } from "../../ui/index.js";
 import type { SegmentedOption, TabItem } from "../../ui/index.js";
-import { askAgent } from "../agent/dock-state.js";
+import { askAgent } from "../agent/index.js";
 import { fieldErrorOf, formErrorOf } from "./controls.js";
 import { ModelsForm } from "./models-form.js";
 import { OverridesPanel } from "./overrides-panel.js";

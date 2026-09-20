@@ -19,24 +19,30 @@ function RetryButton({ canRetry, onRetry }: RetryProps): ReactElement | null {
     );
 }
 
-export function CancelledCard({ canRetry, onRetry }: RetryProps): ReactElement {
+export interface StoppedCardProps extends RetryProps {
+    detail: string;
+}
+
+export function StoppedCard({ detail, canRetry, onRetry }: StoppedCardProps): ReactElement {
     return (
         <div className="flex items-center gap-3 rounded-lg border border-dashed border-edge px-3 py-2.5">
             <StopCircleIcon size={17} className="shrink-0 text-ink-faint" />
             <div className="flex min-w-0 flex-1 flex-col">
-                <span className="text-xs font-semibold text-ink-soft">{copy.agent.states.cancelledTitle}</span>
-                <span className="text-2xs text-ink-faint">{copy.agent.states.cancelledBody}</span>
+                <span className="text-xs font-semibold text-ink-soft">{copy.agent.states.stoppedTitle}</span>
+                <span className="text-2xs text-ink-faint">
+                    {detail === "" ? copy.agent.states.stoppedBody : detail}
+                </span>
             </div>
             <RetryButton canRetry={canRetry} onRetry={onRetry} />
         </div>
     );
 }
 
-export interface ErrorCardProps extends RetryProps {
+export interface FailedCardProps extends RetryProps {
     message: string;
 }
 
-export function ErrorCard({ message, canRetry, onRetry }: ErrorCardProps): ReactElement {
+export function FailedCard({ message, canRetry, onRetry }: FailedCardProps): ReactElement {
     return (
         <Banner
             tone="danger"
@@ -48,13 +54,13 @@ export function ErrorCard({ message, canRetry, onRetry }: ErrorCardProps): React
     );
 }
 
-export function StalledCard({ canRetry, onRetry }: RetryProps): ReactElement {
+export function LostCard({ canRetry, onRetry }: RetryProps): ReactElement {
     return (
         <Banner
             tone="warn"
             icon={HistoryToggleOffIcon}
-            title={copy.agent.states.stalledTitle}
-            body={copy.agent.turnStalled}
+            title={copy.agent.states.lostTitle}
+            body={copy.agent.states.lostBody}
             actions={<RetryButton canRetry={canRetry} onRetry={onRetry} />}
         />
     );

@@ -1,5 +1,5 @@
 import type { Conversation } from "../../../data/types.js";
-import { globalDockKey } from "./dock.js";
+import { globalDockKey } from "../dock/state.js";
 
 export interface SiteGroup {
     key: string;
