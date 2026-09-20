@@ -4,6 +4,10 @@ import { cx } from "./cx.js";
 
 export type ScreenVariant = "plain" | "split" | "full";
 
+function given(slot: ReactNode): boolean {
+    return slot !== undefined && slot !== null && slot !== false;
+}
+
 export interface ScreenProps {
     title: string;
     badge?: ReactNode;
@@ -46,13 +50,13 @@ export function Screen({
                 <div className="min-h-0 flex-1 overflow-auto p-4">{children}</div>
             ) : (
                 <div className="flex min-h-0 flex-1">
-                    {left === undefined ? null : (
+                    {given(left) ? (
                         <aside className="w-53 shrink-0 overflow-auto border-r border-hairline">{left}</aside>
-                    )}
+                    ) : null}
                     <div className="flex min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
-                    {right === undefined ? null : (
+                    {given(right) ? (
                         <aside className="w-80 shrink-0 overflow-auto border-l border-hairline">{right}</aside>
-                    )}
+                    ) : null}
                 </div>
             )}
         </div>
