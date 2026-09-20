@@ -61,6 +61,35 @@ func TestNewAcceptsPlainHTTPOnlyWithConsent(t *testing.T) {
 	}
 }
 
+func TestNewAcceptsPlainHTTPOnALocalAddressWithoutConsent(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		baseURL string
+		want    string
+	}{
+		{name: "localhost", baseURL: "http://localhost:8089", want: "http://localhost:8089/wp-json/wp/v2/pages"},
+		{name: "loopback", baseURL: "http://127.0.0.1:8089/", want: "http://127.0.0.1:8089/wp-json/wp/v2/pages"},
+		{name: "private network", baseURL: "http://192.168.1.10", want: "http://192.168.1.10/wp-json/wp/v2/pages"},
+		{name: "mdns name", baseURL: "http://shop.local", want: "http://shop.local/wp-json/wp/v2/pages"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			client, err := New(Config{BaseURL: tc.baseURL, Username: "u", AppPassword: "p"})
+			if err != nil {
+				t.Fatalf("New: %v", err)
+			}
+			if got := client.resolve(coreNamespace, "/pages", nil); got != tc.want {
+				t.Errorf("resolve = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestNewAppliesTheDefaults(t *testing.T) {
 	t.Parallel()
 

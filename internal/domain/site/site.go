@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/kernel/addr"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -114,9 +115,9 @@ func NormalizeBaseURL(raw string, allowInsecure bool) (string, error) {
 	scheme := strings.ToLower(parsed.Scheme)
 	switch {
 	case scheme == "https":
-	case scheme == "http" && allowInsecure:
+	case scheme == "http" && (allowInsecure || addr.Local(parsed.Host)):
 	case scheme == "http":
-		return "", invalid("site base url must use https unless insecure urls are allowed", "baseUrl")
+		return "", invalid("site base url must use https, or turn on plain http for this site", "baseUrl")
 	default:
 		return "", invalid("site base url must be an absolute http or https url", "baseUrl")
 	}

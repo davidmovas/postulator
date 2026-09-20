@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 
+	"github.com/davidmovas/postulator/internal/kernel/addr"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -124,7 +125,7 @@ func baseURL(cfg Config) (*url.URL, error) {
 	case "https":
 		return parsed, nil
 	case "http":
-		if cfg.AllowInsecure {
+		if cfg.AllowInsecure || addr.Local(parsed.Host) {
 			return parsed, nil
 		}
 		return nil, errors.New(errors.Invalid, "the site base URL must use https unless the site is marked as insecure")

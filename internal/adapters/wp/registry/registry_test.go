@@ -107,6 +107,7 @@ func TestClientReportsWhatItCannotDo(t *testing.T) {
 			name: "the base url is refused",
 			sites: func() *sites {
 				s := newSites(server)
+				s.record.BaseURL = "http://example.com"
 				s.record.AllowInsecure = false
 				return s
 			},

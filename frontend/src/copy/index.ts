@@ -196,6 +196,7 @@ export const copy = {
             passwordKeep: "Leave empty to keep the stored password.",
             allowInsecure: "Allow plain http",
             allowInsecureHint: "Credentials travel unencrypted. Only for a local install.",
+            localAddress: "This address is on your own machine or network, so plain http is accepted.",
         },
         insecureWarning: "This site is reached over plain http, so the application password crosses the network unencrypted.",
         test: "Test connection",

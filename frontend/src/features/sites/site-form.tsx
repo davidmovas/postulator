@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { copy } from "../../copy/index.js";
 import { react } from "../../data/errors.js";
+import { localAddress } from "../../domain/address.js";
 import { useCreateSite, useTestConnection, useUpdateSite } from "../../data/hooks/sites.js";
 import type { Reachability, Site } from "../../data/types.js";
 import { Banner, Button, Dialog, Field, Input, PublicIcon, Switch, TravelExploreIcon } from "../../ui/index.js";
@@ -27,6 +28,8 @@ export function SiteForm({ site, onClose, onSaved }: SiteFormProps): ReactElemen
     const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
     const [formError, setFormError] = useState<string | null>(null);
     const [reachability, setReachability] = useState<Reachability | null>(null);
+
+    const local = localAddress(baseUrl);
 
     const create = useCreateSite();
     const update = useUpdateSite();
@@ -212,19 +215,23 @@ export function SiteForm({ site, onClose, onSaved }: SiteFormProps): ReactElemen
                         />
                     )}
                 </Field>
-                <div className="flex flex-col gap-1">
-                    <Switch
-                        label={copy.sites.field.allowInsecure}
-                        checked={allowInsecure}
-                        tone="danger"
-                        onChange={(event) => {
-                            setAllowInsecure(event.target.checked);
-                            clear("baseUrl");
-                        }}
-                    />
-                    <p className="text-xs text-ink-dim">{copy.sites.field.allowInsecureHint}</p>
-                </div>
-                {allowInsecure ? <Banner tone="warn" title={copy.sites.insecureWarning} /> : null}
+                {local ? (
+                    <p className="text-xs text-ink-dim">{copy.sites.field.localAddress}</p>
+                ) : (
+                    <div className="flex flex-col gap-1">
+                        <Switch
+                            label={copy.sites.field.allowInsecure}
+                            checked={allowInsecure}
+                            tone="danger"
+                            onChange={(event) => {
+                                setAllowInsecure(event.target.checked);
+                                clear("baseUrl");
+                            }}
+                        />
+                        <p className="text-xs text-ink-dim">{copy.sites.field.allowInsecureHint}</p>
+                    </div>
+                )}
+                {allowInsecure && !local ? <Banner tone="warn" title={copy.sites.insecureWarning} /> : null}
                 {formError === null ? null : <Banner tone="danger" title={formError} />}
                 <div className="flex items-center gap-2">
                     <Button
