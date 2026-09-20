@@ -30,7 +30,7 @@ Look a design value up here rather than reproducing it.
              so a 30px control is h-7, a 30px dense row is h-7, a 28px header row is h-6
 
   weight     400 font-normal | 500 font-medium | 600 font-semibold | 700 font-bold, unchanged
-  tracking   -0.03/-0.02/-0.01em -> tracking-tight | .05-.1em -> tracking-label | .18em -> tracking-key
+  tracking   -0.03/-0.02/-0.01em -> tracking-tight | .05-.1em -> tracking-label
   motion     80/120ms -> duration-100 | 160ms -> duration-150 | curve -> ease-swift
   icons      Material Symbols Rounded 300, as SVG components in ./icons, sized 13 14 16 20
 */
@@ -153,7 +153,6 @@ Look a design value up here rather than reproducing it.
     --tracking-*: initial;
     --tracking-tight: -0.02em;
     --tracking-label: 0.08em;
-    --tracking-key: 0.18em;
 
     --radius-*: initial;
     --radius-sm: 4px;
