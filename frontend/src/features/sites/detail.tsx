@@ -8,6 +8,7 @@ import { useTestConnection } from "../../data/hooks/sites.js";
 import { usePolicy, useTemplate } from "../../data/hooks/templates.js";
 import { isBrowsable, openExternal } from "../../data/host.js";
 import type { Reachability, Site } from "../../data/types.js";
+import { localAddress } from "../../domain/address.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
 import {
     Banner,
@@ -138,7 +139,9 @@ export function SiteDetail({ site, onEdit, onDelete }: SiteDetailProps): ReactEl
                     </Row>
                 </dl>
 
-                {site.allowInsecure ? <Banner tone="warn" title={copy.sites.insecureWarning} /> : null}
+                {site.allowInsecure && !localAddress(site.baseUrl) ? (
+                    <Banner tone="warn" title={copy.sites.insecureWarning} />
+                ) : null}
 
                 <PluginPanel site={site} />
 

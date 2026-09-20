@@ -25,7 +25,7 @@ function Entry({ entry }: { entry: NavEntry }): ReactElement {
                     {isActive ? (
                         <span
                             aria-hidden={true}
-                            className="absolute top-3 -left-2 h-5 w-0.5 rounded-full bg-accent"
+                            className="absolute top-3 -left-1 h-5 w-0.5 rounded-full bg-accent"
                         />
                     ) : null}
                     <span className="relative">

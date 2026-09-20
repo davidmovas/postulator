@@ -123,11 +123,23 @@ async function settle(page, wait) {
     await page.waitForTimeout(wait);
 }
 
+function hashOf(route) {
+    return route.startsWith("#") ? route.slice(1) : route;
+}
+
 async function go(page, route, wait) {
-    await page.evaluate((hash) => {
-        window.location.hash = hash.startsWith("#") ? hash.slice(1) : hash;
-    }, route);
-    await settle(page, wait);
+    const wanted = hashOf(route);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+        await page.evaluate((hash) => {
+            window.location.hash = hash;
+        }, wanted);
+        await settle(page, wait);
+        const landed = await page.evaluate(() => window.location.hash.slice(1));
+        if (landed === wanted) {
+            return;
+        }
+    }
+    throw new Error(`the window would not stay on ${wanted}`);
 }
 
 async function resolveSite(page, wait) {
