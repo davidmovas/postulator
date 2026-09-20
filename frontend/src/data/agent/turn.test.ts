@@ -7,14 +7,17 @@ import {
     applyDone,
     applyToolFinished,
     applyToolStarted,
-    beginTurn,
+    attachAssistant,
+    beginStop,
     dropAllTurns,
+    failTurn,
     getTurn,
-    onStall,
-    stallAfterMs,
-    stalledConversationIds,
+    reconcile,
+    settleUnreported,
+    silenceAfterMs,
+    silentConversationIds,
+    startTurn,
     subscribeTurn,
-    sweepStalled,
 } from "./turn.js";
 
 const conversationId = "c1";
@@ -23,13 +26,21 @@ function delta(seq: number, text: string, messageId = "a1") {
     applyDelta({ conversationId, messageId, seq, text });
 }
 
+function done(code: string, error: string, text = "", messageId = "a1") {
+    applyDone({ conversationId, messageId, text, code, error, inputTokens: 0, outputTokens: 0, usd: 0 });
+}
+
+function report(running: boolean, messageId = "", startedAt: string | null = null, lastSeq = 0) {
+    return { running, messageId, startedAt, lastSeq };
+}
+
 afterEach(() => {
     dropAllTurns();
 });
 
 describe("a turn assembles the streamed text", () => {
     test("deltas that arrive out of order are joined in sequence order", () => {
-        beginTurn(conversationId, "u1");
+        startTurn(conversationId);
         delta(2, " world");
         expect(getTurn(conversationId).text).toBe("");
         delta(1, "hello");
@@ -37,110 +48,231 @@ describe("a turn assembles the streamed text", () => {
         expect(getTurn(conversationId).chunks).toBe(2);
         delta(3, "!");
         expect(getTurn(conversationId).text).toBe("hello world!");
+        expect(getTurn(conversationId).lastSeq).toBe(3);
     });
 
-    test("the first delta re-keys the turn from the asked message to the answer", () => {
-        beginTurn(conversationId, "u1");
+    test("a delta is applied by conversation even before Send has answered", () => {
+        startTurn(conversationId);
+        expect(getTurn(conversationId).assistantMessageId).toBeNull();
+        delta(1, "early");
+        expect(getTurn(conversationId).assistantMessageId).toBe("a1");
+        expect(getTurn(conversationId).text).toBe("early");
+    });
+
+    test("a delta carrying another message starts a new turn instead of being dropped", () => {
+        startTurn(conversationId);
         delta(1, "first");
-        expect(getTurn(conversationId).messageId).toBe("a1");
         delta(1, "again", "a2");
-        expect(getTurn(conversationId).messageId).toBe("a2");
-        expect(getTurn(conversationId).text).toBe("again");
-        expect(getTurn(conversationId).chunks).toBe(1);
+        const turn = getTurn(conversationId);
+        expect(turn.assistantMessageId).toBe("a2");
+        expect(turn.text).toBe("again");
+        expect(turn.chunks).toBe(1);
+        expect(turn.status).toBe("working");
     });
 
     test("done replaces the text with the final answer and records the usage", () => {
-        beginTurn(conversationId, "u1");
+        startTurn(conversationId);
         delta(1, "partial");
-        applyDone({ conversationId, messageId: "a1", text: "final", code: "", error: "", inputTokens: 12, outputTokens: 3, usd: 0.5 });
+        applyDone({
+            conversationId,
+            messageId: "a1",
+            text: "final",
+            code: "",
+            error: "",
+            inputTokens: 12,
+            outputTokens: 3,
+            usd: 0.5,
+        });
         const turn = getTurn(conversationId);
         expect(turn.status).toBe("done");
+        expect(turn.end).toBe("answered");
         expect(turn.text).toBe("final");
         expect(turn.usage).toStrictEqual({ inputTokens: 12, outputTokens: 3, usd: 0.5 });
-        expect(turn.error).toBeNull();
-    });
-
-    test("done with an error is an error turn", () => {
-        beginTurn(conversationId, "u1");
-        applyDone({ conversationId, messageId: "a1", text: "", code: "EXTERNAL", error: "the model could not answer", inputTokens: 0, outputTokens: 0, usd: 0 });
-        expect(getTurn(conversationId).status).toBe("error");
-        expect(getTurn(conversationId).error).toBe("the model could not answer");
     });
 });
 
-describe("tool calls and confirmations ride on the turn", () => {
-    test("a tool call runs and then settles with its outcome", () => {
-        beginTurn(conversationId, "u1");
-        applyToolStarted({ conversationId, callId: "k1", tool: "pages_list", args: { limit: 5 } });
-        expect(getTurn(conversationId).tools).toStrictEqual([
-            { callId: "k1", tool: "pages_list", args: { limit: 5 }, status: "running" },
-        ]);
-        applyToolFinished({ conversationId, callId: "k1", tool: "pages_list", result: { items: [] }, status: "ok", error: "", durationMs: 40 });
-        expect(getTurn(conversationId).tools[0]).toStrictEqual({
-            callId: "k1", tool: "pages_list", args: { limit: 5 }, status: "ok", result: { items: [] }, error: undefined, durationMs: 40,
-        });
-    });
-
-    test("a requested confirmation pauses the turn until it is resolved", () => {
-        beginTurn(conversationId, "u1");
-        applyConfirmRequested({ conversationId, confirmationId: "p1", tool: "pages_delete", args: { id: "x" }, risk: "dangerous", summary: "delete" });
-        expect(getTurn(conversationId).status).toBe("awaiting-confirm");
-        expect(getTurn(conversationId).confirm?.confirmationId).toBe("p1");
-        delta(1, "still");
-        expect(getTurn(conversationId).status).toBe("awaiting-confirm");
-        applyConfirmResolved({ conversationId, confirmationId: "p1", tool: "pages_delete", status: "rejected", result: null, error: "" });
-        expect(getTurn(conversationId).status).toBe("streaming");
-        expect(getTurn(conversationId).confirm).toBeNull();
-    });
-});
-
-describe("a turn that stops reporting is stalled", () => {
-    test("the sweep marks a silent turn stalled, keeps what it had, and tells the handlers", () => {
-        const stalled: string[] = [];
-        const stop = onStall((id) => {
-            stalled.push(id);
-        });
-        beginTurn(conversationId, "u1");
-        delta(1, "so far");
-        const now = Date.now();
-        expect(stalledConversationIds(now + stallAfterMs - 1)).toStrictEqual([]);
-        sweepStalled(now + stallAfterMs);
+describe("a turn settles on its terminal event", () => {
+    test("a coded failure is an error turn carrying the code and the message", () => {
+        startTurn(conversationId);
+        done("EXTERNAL", "the model could not answer");
         const turn = getTurn(conversationId);
-        expect(turn.status).toBe("stalled");
-        expect(turn.text).toBe("so far");
-        expect(stalled).toStrictEqual([conversationId]);
-        sweepStalled(now + stallAfterMs * 2);
-        expect(stalled).toStrictEqual([conversationId]);
-        stop();
+        expect(turn.status).toBe("error");
+        expect(turn.end).toBe("failed");
+        expect(turn.code).toBe("EXTERNAL");
+        expect(turn.message).toBe("the model could not answer");
     });
 
-    test("a new turn clears the stall", () => {
-        beginTurn(conversationId, "u1");
-        sweepStalled(Date.now() + stallAfterMs);
-        beginTurn(conversationId, "u2");
-        expect(getTurn(conversationId).status).toBe("streaming");
-        expect(getTurn(conversationId).text).toBe("");
+    test("a cancelled turn is done with a stopped marker and the described reason", () => {
+        startTurn(conversationId);
+        beginStop(conversationId);
+        expect(getTurn(conversationId).status).toBe("stopping");
+        done("CANCELLED", "you stopped the turn");
+        const turn = getTurn(conversationId);
+        expect(turn.status).toBe("done");
+        expect(turn.end).toBe("stopped");
+        expect(turn.message).toBe("you stopped the turn");
     });
 
-    test("a turn awaiting a confirmation is never stalled", () => {
-        beginTurn(conversationId, "u1");
-        applyConfirmRequested({ conversationId, confirmationId: "p1", tool: "pages_delete", args: {}, risk: "dangerous", summary: "delete" });
-        expect(stalledConversationIds(Date.now() + stallAfterMs)).toStrictEqual([]);
+    test("done that lands before Send resolves is not overwritten by the answer", () => {
+        const turnSeq = startTurn(conversationId);
+        done("UNAUTHORIZED", "no key is stored for this provider");
+        attachAssistant(conversationId, "a1", turnSeq);
+        const turn = getTurn(conversationId);
+        expect(turn.status).toBe("error");
+        expect(turn.code).toBe("UNAUTHORIZED");
+    });
+
+    test("a rejected Send fails the turn it started and nothing else", () => {
+        const turnSeq = startTurn(conversationId);
+        failTurn(conversationId, "LOCKED", "Postulator is locked", turnSeq);
+        expect(getTurn(conversationId).status).toBe("error");
+        const later = startTurn(conversationId);
+        failTurn(conversationId, "LOCKED", "Postulator is locked", later - 1);
+        expect(getTurn(conversationId).status).toBe("working");
     });
 });
 
-describe("subscribers and the lock", () => {
-    test("a listener hears every published change and the lock drops every turn", () => {
-        let heard = 0;
-        const stop = subscribeTurn(conversationId, () => {
-            heard += 1;
+describe("a confirmation parks the turn", () => {
+    test("a requested confirmation moves the turn to awaiting-confirm", () => {
+        startTurn(conversationId);
+        applyConfirmRequested({
+            conversationId,
+            confirmationId: "p1",
+            tool: "pages_update",
+            args: {},
+            risk: "write",
+            summary: "update a page",
         });
-        beginTurn(conversationId, "u1");
-        delta(1, "a");
-        expect(heard).toBe(2);
-        dropAllTurns();
+        expect(getTurn(conversationId).status).toBe("awaiting-confirm");
+    });
+
+    test("resolving a confirmation does not resume the turn on its own", () => {
+        startTurn(conversationId);
+        applyConfirmRequested({
+            conversationId,
+            confirmationId: "p1",
+            tool: "pages_update",
+            args: {},
+            risk: "write",
+            summary: "update a page",
+        });
+        applyConfirmResolved({
+            conversationId,
+            confirmationId: "p1",
+            tool: "pages_update",
+            status: "executed",
+            result: null,
+            error: "",
+        });
+        expect(getTurn(conversationId).status).toBe("awaiting-confirm");
+        expect(getTurn(conversationId).confirm).toBeNull();
+        expect(reconcile(conversationId, report(false))).toBe("refetch");
+        settleUnreported(conversationId, true);
         expect(getTurn(conversationId).status).toBe("idle");
-        expect(heard).toBe(3);
+    });
+
+    test("a confirmation resolved while Go is still running resumes the turn", () => {
+        startTurn(conversationId);
+        applyConfirmRequested({
+            conversationId,
+            confirmationId: "p1",
+            tool: "pages_update",
+            args: {},
+            risk: "write",
+            summary: "update a page",
+        });
+        applyConfirmResolved({
+            conversationId,
+            confirmationId: "p1",
+            tool: "pages_update",
+            status: "executed",
+            result: null,
+            error: "",
+        });
+        expect(reconcile(conversationId, report(true, "a1"))).toBe("none");
+        expect(getTurn(conversationId).status).toBe("working");
+    });
+});
+
+describe("reconciling against the turn registry", () => {
+    test("a silent turn that Go is not running asks for a refetch and settles", () => {
+        startTurn(conversationId, Date.now() - silenceAfterMs - 1);
+        expect(silentConversationIds(Date.now())).toStrictEqual([conversationId]);
+        expect(reconcile(conversationId, report(false))).toBe("refetch");
+        settleUnreported(conversationId, false);
+        const turn = getTurn(conversationId);
+        expect(turn.status).toBe("error");
+        expect(turn.end).toBe("lost");
+    });
+
+    test("an answer that arrived while the store waited drops the live turn", () => {
+        startTurn(conversationId);
+        expect(reconcile(conversationId, report(false))).toBe("refetch");
+        settleUnreported(conversationId, true);
+        expect(getTurn(conversationId).status).toBe("idle");
+    });
+
+    test("a terminal event between the status read and the settle wins", () => {
+        startTurn(conversationId);
+        expect(reconcile(conversationId, report(false))).toBe("refetch");
+        done("", "", "the answer");
+        settleUnreported(conversationId, false);
+        expect(getTurn(conversationId).status).toBe("done");
+        expect(getTurn(conversationId).text).toBe("the answer");
+    });
+
+    test("a window that opened mid-turn adopts the running turn", () => {
+        const startedAt = new Date(Date.now() - 5000).toISOString();
+        expect(reconcile(conversationId, report(true, "a9", startedAt, 7))).toBe("adopt");
+        const turn = getTurn(conversationId);
+        expect(turn.status).toBe("working");
+        expect(turn.assistantMessageId).toBe("a9");
+        expect(turn.lastSeq).toBe(7);
+        expect(turn.startedAt).toBe(Date.parse(startedAt));
+    });
+
+    test("a turn restarted by a late delta is still swept by the silence timer", () => {
+        startTurn(conversationId);
+        const stale = Date.now() - silenceAfterMs - 1;
+        applyDelta({ conversationId, messageId: "a2", seq: 1, text: "late" }, stale);
+        expect(silentConversationIds(Date.now())).toStrictEqual([conversationId]);
+        expect(reconcile(conversationId, report(false))).toBe("refetch");
+        settleUnreported(conversationId, false);
+        expect(getTurn(conversationId).end).toBe("lost");
+    });
+});
+
+describe("tool calls and the lock", () => {
+    test("tool events are applied by conversation and finish in place", () => {
+        startTurn(conversationId);
+        applyToolStarted({ conversationId, callId: "t1", tool: "pages_list", args: {} });
+        applyToolFinished({
+            conversationId,
+            callId: "t1",
+            tool: "pages_list",
+            result: { items: [] },
+            status: "ok",
+            error: "",
+            durationMs: 12,
+        });
+        const tools = getTurn(conversationId).tools;
+        expect(tools).toHaveLength(1);
+        expect(tools[0]?.status).toBe("ok");
+        expect(tools[0]?.durationMs).toBe(12);
+    });
+
+    test("the lock resets every turn and keeps its subscribers", () => {
+        let notified = 0;
+        const stop = subscribeTurn(conversationId, () => {
+            notified += 1;
+        });
+        startTurn(conversationId);
+        expect(notified).toBe(1);
+        dropAllTurns();
+        expect(notified).toBe(2);
+        expect(getTurn(conversationId).status).toBe("idle");
+        startTurn(conversationId);
+        expect(notified).toBe(3);
         stop();
     });
 });

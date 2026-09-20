@@ -7,9 +7,15 @@ import type {
     AgentToolStartedPayload,
 } from "../../generated/events.js";
 
-export type TurnStatus = "idle" | "streaming" | "awaiting-confirm" | "done" | "error" | "stalled";
+export type TurnStatus = "idle" | "working" | "awaiting-confirm" | "stopping" | "done" | "error";
+
+export type TurnEnd = "answered" | "stopped" | "failed" | "lost";
 
 export type ToolCallStatus = "running" | "ok" | "error";
+
+export const cancelledCode = "CANCELLED";
+
+export const silenceAfterMs = 30_000;
 
 export interface AgentToolCall {
     callId: string;
@@ -36,15 +42,30 @@ export interface TurnUsage {
 }
 
 export interface Turn {
-    messageId: string | null;
+    status: TurnStatus;
+    end: TurnEnd | null;
+    assistantMessageId: string | null;
+    startedAt: number;
+    lastEventAt: number;
+    lastSeq: number;
     text: string;
     chunks: number;
     tools: readonly AgentToolCall[];
     confirm: AgentConfirmation | null;
-    status: TurnStatus;
-    error: string | null;
+    code: string;
+    message: string;
     usage: TurnUsage | null;
+    turnSeq: number;
 }
+
+export interface TurnReport {
+    running: boolean;
+    messageId: string;
+    startedAt: string | null;
+    lastSeq: number;
+}
+
+export type ReconcileAction = "none" | "refetch" | "adopt";
 
 interface TurnLog {
     conversationId: string;
@@ -52,40 +73,41 @@ interface TurnLog {
     snapshot: Turn;
     buffered: Map<number, string>;
     nextSeq: number;
-    startedAt: number;
+    pendingReconcile: boolean;
     listeners: Set<() => void>;
 }
 
-export const stallAfterMs = 90_000;
+const idleTurn: Turn = Object.freeze({
+    status: "idle" as TurnStatus,
+    end: null,
+    assistantMessageId: null,
+    startedAt: 0,
+    lastEventAt: 0,
+    lastSeq: 0,
+    text: "",
+    chunks: 0,
+    tools: Object.freeze([]) as readonly AgentToolCall[],
+    confirm: null,
+    code: "",
+    message: "",
+    usage: null,
+    turnSeq: 0,
+});
 
 const turns = new Map<string, TurnLog>();
 
-const idleTurn: Turn = Object.freeze({
-    messageId: null,
-    text: "",
-    chunks: 0,
-    tools: [] as readonly AgentToolCall[],
-    confirm: null,
-    status: "idle" as TurnStatus,
-    error: null,
-    usage: null,
-});
+let issued = 0;
 
-type StallHandler = (conversationId: string) => void;
+export function isActive(status: TurnStatus): boolean {
+    return status === "working" || status === "awaiting-confirm" || status === "stopping";
+}
 
-const stallHandlers = new Set<StallHandler>();
+function blank(): Turn {
+    return { ...idleTurn, tools: [] };
+}
 
 function snapshotOf(held: TurnLog): Turn {
-    return Object.freeze({
-        messageId: held.turn.messageId,
-        text: held.turn.text,
-        chunks: held.turn.chunks,
-        tools: held.turn.tools.slice(),
-        confirm: held.turn.confirm,
-        status: held.turn.status,
-        error: held.turn.error,
-        usage: held.turn.usage,
-    });
+    return Object.freeze({ ...held.turn, tools: held.turn.tools.slice() });
 }
 
 function reach(conversationId: string): TurnLog {
@@ -95,20 +117,11 @@ function reach(conversationId: string): TurnLog {
     }
     const created: TurnLog = {
         conversationId,
-        turn: {
-            messageId: null,
-            text: "",
-            chunks: 0,
-            tools: [],
-            confirm: null,
-            status: "idle",
-            error: null,
-            usage: null,
-        },
+        turn: blank(),
         snapshot: idleTurn,
         buffered: new Map<number, string>(),
         nextSeq: 1,
-        startedAt: 0,
+        pendingReconcile: false,
         listeners: new Set<() => void>(),
     };
     turns.set(conversationId, created);
@@ -122,36 +135,87 @@ function publish(held: TurnLog): void {
     });
 }
 
-export function beginTurn(conversationId: string, messageId: string): void {
-    const held = reach(conversationId);
+function restart(held: TurnLog, assistantMessageId: string | null, at: number): void {
+    issued += 1;
     held.turn = {
-        messageId,
-        text: "",
-        chunks: 0,
-        tools: [],
-        confirm: null,
-        status: "streaming",
-        error: null,
-        usage: null,
+        ...blank(),
+        status: "working",
+        assistantMessageId,
+        startedAt: at,
+        lastEventAt: at,
+        turnSeq: issued,
     };
     held.buffered.clear();
     held.nextSeq = 1;
-    held.startedAt = Date.now();
+    held.pendingReconcile = false;
+}
+
+export function startTurn(conversationId: string, at: number = Date.now()): number {
+    const held = reach(conversationId);
+    restart(held, null, at);
+    publish(held);
+    return held.turn.turnSeq;
+}
+
+export function attachAssistant(conversationId: string, assistantMessageId: string, turnSeq: number): void {
+    const held = turns.get(conversationId);
+    if (held === undefined || held.turn.turnSeq !== turnSeq || !isActive(held.turn.status)) {
+        return;
+    }
+    if (held.turn.assistantMessageId === assistantMessageId) {
+        return;
+    }
+    held.turn.assistantMessageId = assistantMessageId;
     publish(held);
 }
 
-export function applyDelta(payload: AgentDeltaPayload): void {
-    const held = reach(payload.conversationId);
-    if (held.turn.messageId !== payload.messageId) {
-        held.turn.messageId = payload.messageId;
-        held.turn.text = "";
-        held.turn.chunks = 0;
-        held.buffered.clear();
-        held.nextSeq = 1;
+export function failTurn(conversationId: string, code: string, message: string, turnSeq: number): void {
+    const held = turns.get(conversationId);
+    if (held === undefined || held.turn.turnSeq !== turnSeq || !isActive(held.turn.status)) {
+        return;
     }
-    held.turn.status = held.turn.status === "awaiting-confirm" ? "awaiting-confirm" : "streaming";
+    settle(held, "error", "failed", code, message);
+}
+
+function settle(held: TurnLog, status: TurnStatus, end: TurnEnd, code: string, message: string): void {
+    held.turn.status = status;
+    held.turn.end = end;
+    held.turn.code = code;
+    held.turn.message = message;
+    held.turn.confirm = null;
+    held.turn.lastEventAt = Date.now();
+    held.buffered.clear();
+    held.pendingReconcile = false;
+    publish(held);
+}
+
+export function beginStop(conversationId: string): void {
+    const held = turns.get(conversationId);
+    if (held === undefined || (held.turn.status !== "working" && held.turn.status !== "awaiting-confirm")) {
+        return;
+    }
+    held.turn.status = "stopping";
+    held.turn.lastEventAt = Date.now();
+    publish(held);
+}
+
+export function applyDelta(payload: AgentDeltaPayload, at: number = Date.now()): void {
+    const held = reach(payload.conversationId);
+    const known = held.turn.assistantMessageId;
+    if (known !== null && known !== payload.messageId) {
+        restart(held, payload.messageId, at);
+    } else if (!isActive(held.turn.status)) {
+        restart(held, payload.messageId, at);
+    } else if (known === null) {
+        held.turn.assistantMessageId = payload.messageId;
+    }
+    if (held.turn.status !== "awaiting-confirm") {
+        held.turn.status = "working";
+    }
+    held.turn.lastEventAt = at;
+    held.turn.lastSeq = Math.max(held.turn.lastSeq, payload.seq);
+    held.pendingReconcile = false;
     held.buffered.set(payload.seq, payload.text);
-    let advanced = false;
     for (;;) {
         const next = held.buffered.get(held.nextSeq);
         if (next === undefined) {
@@ -161,15 +225,25 @@ export function applyDelta(payload: AgentDeltaPayload): void {
         held.turn.chunks += 1;
         held.buffered.delete(held.nextSeq);
         held.nextSeq += 1;
-        advanced = true;
     }
-    if (advanced) {
-        publish(held);
+    publish(held);
+}
+
+function touch(held: TurnLog, at: number): void {
+    held.turn.lastEventAt = at;
+    held.pendingReconcile = false;
+    if (!isActive(held.turn.status)) {
+        held.turn.status = "working";
+        held.turn.end = null;
+        if (held.turn.startedAt === 0) {
+            held.turn.startedAt = at;
+        }
     }
 }
 
-export function applyToolStarted(payload: AgentToolStartedPayload): void {
+export function applyToolStarted(payload: AgentToolStartedPayload, at: number = Date.now()): void {
     const held = reach(payload.conversationId);
+    touch(held, at);
     held.turn.tools = [
         ...held.turn.tools,
         { callId: payload.callId, tool: payload.tool, args: payload.args, status: "running" },
@@ -177,8 +251,9 @@ export function applyToolStarted(payload: AgentToolStartedPayload): void {
     publish(held);
 }
 
-export function applyToolFinished(payload: AgentToolFinishedPayload): void {
+export function applyToolFinished(payload: AgentToolFinishedPayload, at: number = Date.now()): void {
     const held = reach(payload.conversationId);
+    touch(held, at);
     held.turn.tools = held.turn.tools.map((call) =>
         call.callId === payload.callId
             ? {
@@ -193,8 +268,9 @@ export function applyToolFinished(payload: AgentToolFinishedPayload): void {
     publish(held);
 }
 
-export function applyConfirmRequested(payload: AgentConfirmRequestedPayload): void {
+export function applyConfirmRequested(payload: AgentConfirmRequestedPayload, at: number = Date.now()): void {
     const held = reach(payload.conversationId);
+    touch(held, at);
     held.turn.confirm = {
         confirmationId: payload.confirmationId,
         tool: payload.tool,
@@ -206,78 +282,92 @@ export function applyConfirmRequested(payload: AgentConfirmRequestedPayload): vo
     publish(held);
 }
 
-export function applyConfirmResolved(payload: AgentConfirmResolvedPayload): void {
+export function applyConfirmResolved(payload: AgentConfirmResolvedPayload, at: number = Date.now()): void {
     const held = reach(payload.conversationId);
     if (held.turn.confirm?.confirmationId === payload.confirmationId) {
         held.turn.confirm = null;
     }
-    if (held.turn.status === "awaiting-confirm") {
-        held.turn.status = "streaming";
-    }
+    held.turn.lastEventAt = at;
     publish(held);
 }
 
-export function applyDone(payload: AgentDonePayload): void {
+export function applyDone(payload: AgentDonePayload, at: number = Date.now()): void {
     const held = reach(payload.conversationId);
-    held.turn.messageId = payload.messageId;
-    held.turn.text = payload.text;
-    held.turn.confirm = null;
-    held.turn.error = payload.error === "" ? null : payload.error;
-    held.turn.status = payload.error === "" ? "done" : "error";
+    if (payload.messageId !== "") {
+        held.turn.assistantMessageId = payload.messageId;
+    }
+    if (payload.text !== "") {
+        held.turn.text = payload.text;
+    }
     held.turn.usage = {
         inputTokens: payload.inputTokens,
         outputTokens: payload.outputTokens,
         usd: payload.usd,
     };
-    held.buffered.clear();
-    held.startedAt = 0;
-    publish(held);
-}
-
-function markStalled(conversationId: string): void {
-    const held = turns.get(conversationId);
-    if (held === undefined) {
+    held.turn.lastEventAt = at;
+    if (payload.code === "") {
+        settle(held, "done", "answered", "", "");
         return;
     }
-    held.turn = {
-        messageId: held.turn.messageId,
-        text: held.turn.text,
-        chunks: held.turn.chunks,
-        tools: held.turn.tools,
-        confirm: null,
-        status: "stalled",
-        error: null,
-        usage: held.turn.usage,
-    };
-    held.buffered.clear();
-    held.startedAt = 0;
-    publish(held);
+    if (payload.code === cancelledCode) {
+        settle(held, "done", "stopped", payload.code, payload.error);
+        return;
+    }
+    settle(held, "error", "failed", payload.code, payload.error);
 }
 
-export function stalledConversationIds(now: number): string[] {
+function adoptedStart(startedAt: string | null, now: number): number {
+    if (startedAt === null) {
+        return now;
+    }
+    const parsed = Date.parse(startedAt);
+    return Number.isNaN(parsed) ? now : parsed;
+}
+
+export function reconcile(conversationId: string, report: TurnReport, now: number = Date.now()): ReconcileAction {
+    const held = reach(conversationId);
+    if (isActive(held.turn.status) && !report.running) {
+        held.pendingReconcile = true;
+        return "refetch";
+    }
+    if (!isActive(held.turn.status) && report.running) {
+        restart(held, report.messageId === "" ? null : report.messageId, adoptedStart(report.startedAt, now));
+        held.turn.lastSeq = report.lastSeq;
+        publish(held);
+        return "adopt";
+    }
+    if (held.turn.status === "awaiting-confirm" && report.running && held.turn.confirm === null) {
+        held.turn.status = "working";
+        held.turn.lastEventAt = now;
+        publish(held);
+    }
+    return "none";
+}
+
+export function settleUnreported(conversationId: string, answered: boolean): void {
+    const held = turns.get(conversationId);
+    if (held === undefined || !held.pendingReconcile || !isActive(held.turn.status)) {
+        return;
+    }
+    if (answered) {
+        held.turn = blank();
+        held.buffered.clear();
+        held.nextSeq = 1;
+        held.pendingReconcile = false;
+        publish(held);
+        return;
+    }
+    settle(held, "error", "lost", "", "");
+}
+
+export function silentConversationIds(now: number, afterMs: number = silenceAfterMs): string[] {
     const out: string[] = [];
     turns.forEach((held) => {
-        if (held.turn.status === "streaming" && held.startedAt > 0 && now - held.startedAt >= stallAfterMs) {
+        if (isActive(held.turn.status) && held.turn.lastEventAt > 0 && now - held.turn.lastEventAt >= afterMs) {
             out.push(held.conversationId);
         }
     });
     return out;
-}
-
-export function sweepStalled(now: number): void {
-    for (const conversationId of stalledConversationIds(now)) {
-        markStalled(conversationId);
-        stallHandlers.forEach((handler) => {
-            handler(conversationId);
-        });
-    }
-}
-
-export function onStall(handler: StallHandler): () => void {
-    stallHandlers.add(handler);
-    return () => {
-        stallHandlers.delete(handler);
-    };
 }
 
 export function subscribeTurn(conversationId: string, listener: () => void): () => void {
@@ -295,11 +385,10 @@ export function getTurn(conversationId: string): Turn {
 
 export function dropAllTurns(): void {
     turns.forEach((held) => {
-        held.snapshot = idleTurn;
-        held.listeners.forEach((listener) => {
-            listener();
-        });
-        held.listeners.clear();
+        held.turn = blank();
+        held.buffered.clear();
+        held.nextSeq = 1;
+        held.pendingReconcile = false;
+        publish(held);
     });
-    turns.clear();
 }

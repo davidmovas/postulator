@@ -1,8 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo } from "react";
+import type { QueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo } from "react";
 
 import { maxLimit } from "../../lib/paging.js";
-import { beginTurn } from "../agent/turn.js";
+import { reconcileConversation } from "../agent/reconcile.js";
+import { attachAssistant, beginStop, failTurn, startTurn } from "../agent/turn.js";
 import { flatten } from "../call.js";
 import {
     cancelTurn,
@@ -16,6 +18,7 @@ import {
     sendMessage,
     setConversationMode,
 } from "../endpoints/agent.js";
+import { failure, messages as errorMessages } from "../errors.js";
 import { keys } from "../keys.js";
 import { useUnlockedInfinite } from "../query.js";
 import type {
@@ -26,6 +29,20 @@ import type {
     PendingAction,
     PendingActionFilter,
 } from "../types.js";
+
+export const maxAutoPages = 4;
+
+interface TurnContext {
+    turnSeq: number;
+}
+
+function describedFailure(thrown: unknown): { code: string; message: string } {
+    const reported = failure(thrown);
+    return {
+        code: reported.code,
+        message: reported.message === "" ? errorMessages[reported.code] : reported.message,
+    };
+}
 
 export function useConversations(filter: ConversationFilter = {}, limit?: number) {
     return useUnlockedInfinite<ConversationFilter, Conversation>({
@@ -54,24 +71,35 @@ export interface Transcript {
     isPending: boolean;
     complete: boolean;
     error: Error | null;
+    canLoadEarlier: boolean;
+    loadingEarlier: boolean;
+    loadEarlier: () => void;
 }
 
 export function useTranscript(conversationId: string | null): Transcript {
     const listed = useMessages(conversationId, maxLimit);
-    const { hasNextPage, isFetchingNextPage, isFetching, fetchNextPage } = listed;
+    const { hasNextPage, isError, isFetchingNextPage, isFetching, fetchNextPage } = listed;
+    const loaded = listed.data?.pages.length ?? 0;
 
     useEffect(() => {
-        if (hasNextPage && !isFetchingNextPage && !isFetching) {
+        if (hasNextPage && !isError && !isFetchingNextPage && !isFetching && loaded < maxAutoPages) {
             void fetchNextPage();
         }
-    }, [hasNextPage, isFetchingNextPage, isFetching, fetchNextPage]);
+    }, [hasNextPage, isError, isFetchingNextPage, isFetching, fetchNextPage, loaded]);
 
-    const messages = useMemo(() => flatten(listed.data?.pages), [listed.data]);
+    const rows = useMemo(() => flatten(listed.data?.pages), [listed.data]);
+    const loadEarlier = useCallback(() => {
+        void fetchNextPage();
+    }, [fetchNextPage]);
+
     return {
-        messages,
+        messages: rows,
         isPending: listed.isPending,
         complete: listed.data !== undefined && !hasNextPage,
         error: listed.error,
+        canLoadEarlier: hasNextPage && !isFetchingNextPage,
+        loadingEarlier: isFetchingNextPage,
+        loadEarlier,
     };
 }
 
@@ -127,16 +155,56 @@ export function useDeleteConversation() {
     });
 }
 
+function afterTurnStarted(client: QueryClient, conversationId: string): void {
+    void client.invalidateQueries({ queryKey: keys.agent.messagesOf(conversationId) });
+    void client.invalidateQueries({ queryKey: keys.agent.conversationsAll() });
+}
+
 export function useSendMessage() {
     const client = useQueryClient();
     return useMutation({
         mutationFn: (request: Parameters<typeof sendMessage>[0]) => sendMessage(request),
-        onSuccess: (answered, request) => {
-            beginTurn(request.conversationId, answered.messageId);
-            void client.invalidateQueries({
-                queryKey: keys.agent.messagesOf(request.conversationId),
+        onMutate: (request): TurnContext => ({ turnSeq: startTurn(request.conversationId) }),
+        onSuccess: (answered, request, held) => {
+            attachAssistant(request.conversationId, answered.assistantMessageId, held.turnSeq);
+            afterTurnStarted(client, request.conversationId);
+            void reconcileConversation(client, request.conversationId);
+        },
+        onError: (thrown, request, held) => {
+            const described = describedFailure(thrown);
+            failTurn(request.conversationId, described.code, described.message, held?.turnSeq ?? 0);
+        },
+    });
+}
+
+export interface StartRequest {
+    siteId: string | null;
+    mode: string;
+    text: string;
+}
+
+export function useStartConversation() {
+    const client = useQueryClient();
+    return useMutation({
+        mutationFn: async (request: StartRequest): Promise<Conversation> => {
+            const opened = await createConversation({
+                siteId: request.siteId ?? undefined,
+                mode: request.mode,
             });
-            void client.invalidateQueries({ queryKey: keys.agent.conversationsAll() });
+            const conversation = opened.conversation;
+            const turnSeq = startTurn(conversation.id);
+            try {
+                const answered = await sendMessage({ conversationId: conversation.id, text: request.text });
+                attachAssistant(conversation.id, answered.assistantMessageId, turnSeq);
+            } catch (thrown) {
+                const described = describedFailure(thrown);
+                failTurn(conversation.id, described.code, described.message, turnSeq);
+            }
+            return conversation;
+        },
+        onSuccess: (conversation) => {
+            afterTurnStarted(client, conversation.id);
+            void reconcileConversation(client, conversation.id);
         },
     });
 }
@@ -156,10 +224,37 @@ export function useCancelTurn() {
     const client = useQueryClient();
     return useMutation({
         mutationFn: (request: Parameters<typeof cancelTurn>[0]) => cancelTurn(request),
+        onMutate: (request) => {
+            beginStop(request.conversationId);
+        },
+        onSuccess: (answered, request) => {
+            if (!answered.cancelled) {
+                void reconcileConversation(client, request.conversationId);
+            }
+        },
+        onError: (_thrown, request) => {
+            void reconcileConversation(client, request.conversationId);
+        },
         onSettled: (_answered, _thrown, request) => {
-            void client.invalidateQueries({
-                queryKey: keys.agent.messagesOf(request.conversationId),
-            });
+            void client.invalidateQueries({ queryKey: keys.agent.messagesOf(request.conversationId) });
         },
     });
+}
+
+export function useTurnReconciler(conversationId: string | null): void {
+    const client = useQueryClient();
+
+    useEffect(() => {
+        if (conversationId === null || conversationId === "") {
+            return;
+        }
+        void reconcileConversation(client, conversationId);
+        const wake = (): void => {
+            void reconcileConversation(client, conversationId);
+        };
+        window.addEventListener("focus", wake);
+        return () => {
+            window.removeEventListener("focus", wake);
+        };
+    }, [client, conversationId]);
 }

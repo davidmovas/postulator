@@ -325,15 +325,25 @@ export function dropAllLogs(): void {
     logs.forEach((held) => {
         if (held.timer !== null) {
             clearTimeout(held.timer);
+            held.timer = null;
         }
         if (held.frame !== null) {
             cancelAnimationFrame(held.frame);
+            held.frame = null;
         }
+        held.events = [];
+        held.seen = new Set<number>();
+        held.contiguousSeq = 0;
+        held.maxSeq = 0;
+        held.phase = "idle";
+        held.error = null;
+        held.terminal = false;
+        held.settled = false;
+        held.version = 0;
+        held.pending = null;
         held.snapshot = emptyState;
         held.listeners.forEach((listener) => {
             listener();
         });
-        held.listeners.clear();
     });
-    logs.clear();
 }
