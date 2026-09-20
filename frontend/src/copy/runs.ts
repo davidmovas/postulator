@@ -177,6 +177,12 @@ export const runs = {
         title: "Review",
         close: "Close",
         openPage: "Open the page",
+        moveItems: "move between items",
+        position: (at: number, total: number) => `item ${at} of ${total}`,
+        waitingOn: (step: string) => `The artifact appears when ${step} returns.`,
+        driftRefused: "Publish stopped — the page changed in WordPress",
+        driftRefusedBody:
+            "This run refuses drift, so it did not overwrite the edit. What changed cannot be shown: raw WordPress content is not exposed by any binding.",
         item: (path: string) => path,
         attempt: (attempts: number) => (attempts === 1 ? "attempt 1" : `${attempts} attempts`),
         noArtifacts: "Nothing to review yet",

@@ -5,6 +5,7 @@ import type {
     RetryBlockedReason,
     RunKind,
     RunStatus,
+    StepName,
 } from "../../generated/vocab.js";
 
 export const statusPending: RunStatus = "pending";
@@ -28,6 +29,8 @@ export const pauseByUser: PauseReason = "user";
 export const retryInputsExpired: RetryBlockedReason = "inputs_expired";
 
 export const kindGenerate: RunKind = "generate";
+
+export const stepPublish: StepName = "publish";
 
 export const artifactLinkContext: ArtifactKind = "link_context";
 export const artifactDraft: ArtifactKind = "draft";

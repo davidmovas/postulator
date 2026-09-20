@@ -188,6 +188,12 @@ export function RunDetailScreen(): ReactElement {
                     now={now}
                     missing={selected === undefined && !listed.hasNextPage}
                     narrowed={status !== ""}
+                    page={selected === undefined ? undefined : index.byId.get(selected.targetId)}
+                    siblings={items}
+                    onMove={open}
+                    onOpenPage={(pageId) => {
+                        void navigate(`/s/${siteId}/pages/${pageId}`);
+                    }}
                     onClearFilter={() => {
                         setSearchParams(new URLSearchParams(), { replace: true });
                     }}

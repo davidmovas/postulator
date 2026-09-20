@@ -1,20 +1,19 @@
 import type { ReactElement } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router";
 
 import { copy } from "../../copy/index.js";
-import { useArtifacts, useRetryStep } from "../../data/hooks/runs.js";
+import { useArtifacts, useResumeRun, useRetryStep } from "../../data/hooks/runs.js";
 import { useSetting } from "../../data/hooks/settings.js";
-import type { RunItem } from "../../data/types.js";
+import type { Page, RunItem } from "../../data/types.js";
 import { duration } from "../../domain/format.js";
 import type { ArtifactKind } from "../../generated/vocab.js";
+import type { TabItem } from "../../ui/index.js";
 import {
     Banner,
     Button,
     cx,
     Drawer,
-    EmptyState,
-    HourglassEmptyIcon,
+    Kbd,
     OpenInNewIcon,
     RestartAltIcon,
     SkeletonRows,
@@ -23,7 +22,6 @@ import {
     TabPanel,
     Tabs,
 } from "../../ui/index.js";
-import type { TabItem } from "../../ui/index.js";
 import { askAgent } from "../agent/index.js";
 import { countdown, dueMs, remainingMs, retryState, waitingUntil } from "./authority.js";
 import type { ItemView } from "./authority.js";
@@ -38,14 +36,15 @@ import {
 } from "./labels.js";
 import type { RetryNotice, StepEntry } from "./log-view.js";
 import { ArtifactPane } from "./panes/index.js";
+import { driftRefusal } from "./refusal.js";
+import { neighbourOf, positionOf } from "./review-nav.js";
+import { DriftRefused, ReviewEmpty, ReviewMissing } from "./review-states.js";
 import { artifactBodyHtml, retentionDaysKey } from "./statuses.js";
 import { stepText } from "./step-cell.js";
 
-interface TimelineProps {
-    entries: readonly StepEntry[];
-}
+const drawerWidth = 688;
 
-function Timeline({ entries }: TimelineProps): ReactElement | null {
+function Timeline({ entries }: { entries: readonly StepEntry[] }): ReactElement | null {
     if (entries.length === 0) {
         return null;
     }
@@ -77,8 +76,20 @@ function Timeline({ entries }: TimelineProps): ReactElement | null {
     );
 }
 
+function retentionOf(held: unknown): number | null {
+    return typeof held === "number" && Number.isFinite(held) ? held : null;
+}
+
+function typing(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) {
+        return false;
+    }
+    return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
+}
+
 export interface ReviewDrawerProps {
     view: ItemView | null;
+    page: Page | undefined;
     steps: readonly string[];
     timeline: readonly StepEntry[];
     retry: RetryNotice | undefined;
@@ -86,13 +97,17 @@ export interface ReviewDrawerProps {
     now: number;
     missing: boolean;
     narrowed: boolean;
+    siblings: readonly RunItem[];
     onClearFilter: () => void;
+    onMove: (itemId: string) => void;
+    onOpenPage: (pageId: string) => void;
     onClose: () => void;
     onRerun: (pageId: string) => void;
 }
 
 export function ReviewDrawer({
     view,
+    page,
     steps,
     timeline,
     retry,
@@ -100,7 +115,10 @@ export function ReviewDrawer({
     now,
     missing,
     narrowed,
+    siblings,
     onClearFilter,
+    onMove,
+    onOpenPage,
     onClose,
     onRerun,
 }: ReviewDrawerProps): ReactElement {
@@ -109,8 +127,8 @@ export function ReviewDrawer({
     const listed = useArtifacts(itemId === "" ? null : itemId);
     const retention = useSetting(retentionDaysKey);
     const retryStep = useRetryStep();
+    const resume = useResumeRun();
     const [active, setActive] = useState<ArtifactKind | null>(null);
-    const navigate = useNavigate();
 
     const kinds = useMemo(
         () => orderedKinds((listed.data?.artifacts ?? []).map((artifact) => artifact.kind)),
@@ -127,11 +145,34 @@ export function ReviewDrawer({
         }
     }, [active, kinds]);
 
+    useEffect(() => {
+        const onKeyDown = (event: KeyboardEvent): void => {
+            if (event.ctrlKey || event.metaKey || event.altKey || typing(event.target)) {
+                return;
+            }
+            const pressed = event.key.toLowerCase();
+            if (pressed !== "j" && pressed !== "k") {
+                return;
+            }
+            const next = neighbourOf(siblings, itemId, pressed === "j" ? 1 : -1);
+            if (next !== null) {
+                event.preventDefault();
+                onMove(next);
+            }
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => {
+            window.removeEventListener("keydown", onKeyDown);
+        };
+    }, [siblings, itemId, onMove]);
+
     const retentionDays = retentionOf(retention.data?.value);
     const state = item === null ? null : retryState(item);
     const wake = item === null ? null : remainingMs(waitingUntil(item), now);
     const retryLeft = retry === undefined ? null : dueMs(retry.at, retry.afterMs, now);
     const blocked = state !== null && state.kind === "blocked" ? state.reason : null;
+    const refusal = driftRefusal(item, page);
+    const at = positionOf(siblings, itemId);
 
     const tabs: readonly TabItem<ArtifactKind>[] = kinds.map((kind) => ({
         key: kind,
@@ -148,26 +189,34 @@ export function ReviewDrawer({
             }}
             title={path}
             closeLabel={copy.runs.review.close}
-            width={640}
+            width={drawerWidth}
             header={
                 item === null ? undefined : (
-                    <StatusBadge tone={statusTone(item.status)} icon={statusIcon(item.status)}>
-                        {statusLabel(item.status)}
-                    </StatusBadge>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                        {at === 0 ? null : (
+                            <span className="font-mono text-2xs text-ink-faint">
+                                {copy.runs.review.position(at, siblings.length)}
+                            </span>
+                        )}
+                        <StatusBadge tone={statusTone(item.status)} icon={statusIcon(item.status)}>
+                            {statusLabel(item.status)}
+                        </StatusBadge>
+                    </span>
                 )
             }
             footer={
                 item === null ? undefined : (
                     <div className="flex w-full items-center justify-between gap-2">
-                        <span className="truncate text-2xs text-ink-faint">
-                            {blocked === null ? "" : copy.runs.retryBlockedBody}
+                        <span className="flex shrink-0 items-center gap-1.5 text-2xs text-ink-faint">
+                            <Kbd keys={["J", "K"]} />
+                            {copy.runs.review.moveItems}
                         </span>
                         <div className="flex shrink-0 gap-2">
                             <Button
                                 size="sm"
                                 icon={OpenInNewIcon}
                                 onClick={() => {
-                                    void navigate(`/s/${item.siteId}/pages/${item.targetId}`);
+                                    onOpenPage(item.targetId);
                                 }}
                             >
                                 {copy.runs.review.openPage}
@@ -217,16 +266,7 @@ export function ReviewDrawer({
             }
         >
             {item === null ? (
-                <div className="p-4">
-                    <EmptyState
-                        icon={HourglassEmptyIcon}
-                        title={copy.runs.notFound}
-                        body={missing && narrowed ? copy.runs.noItemMatch : copy.empty.runItems}
-                        actions={
-                            narrowed ? <Button onClick={onClearFilter}>{copy.runs.filters.reset}</Button> : undefined
-                        }
-                    />
-                </div>
+                <ReviewMissing narrowed={missing && narrowed} onClearFilter={onClearFilter} />
             ) : (
                 <div className="flex h-full min-h-0 flex-col">
                     <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline px-3 py-2">
@@ -248,7 +288,21 @@ export function ReviewDrawer({
                         )}
                     </div>
 
-                    {item.pauseReason === "" ? null : (
+                    {refusal !== null ? (
+                        <DriftRefused
+                            refusal={refusal}
+                            resuming={resume.isPending}
+                            onOpenPage={() => {
+                                onOpenPage(item.targetId);
+                            }}
+                            onRerun={() => {
+                                onRerun(item.targetId);
+                            }}
+                            onResume={() => {
+                                resume.mutate({ runId: item.runId });
+                            }}
+                        />
+                    ) : item.pauseReason === "" ? null : (
                         <div className="shrink-0 px-3 pt-2">
                             <Banner tone="warn" title={pauseReasonText(item.pauseReason)} />
                         </div>
@@ -275,16 +329,10 @@ export function ReviewDrawer({
                             <SkeletonRows rows={5} label={copy.runs.review.loading} />
                         </div>
                     ) : kinds.length === 0 || active === null ? (
-                        <div className="p-4">
-                            <EmptyState
-                                icon={HourglassEmptyIcon}
-                                title={copy.runs.review.noArtifacts}
-                                body={copy.runs.review.noArtifactsBody}
-                            />
-                        </div>
+                        <ReviewEmpty step={stepText(steps, view?.step ?? item.currentStep)} />
                     ) : (
                         <div className="flex min-h-0 flex-1 flex-col">
-                            <div className="flex shrink-0 overflow-x-auto border-b border-hairline px-1">
+                            <div className="flex h-8 shrink-0 items-center overflow-x-auto border-b border-hairline px-2">
                                 <Tabs
                                     label={copy.runs.review.title}
                                     items={tabs}
@@ -307,8 +355,4 @@ export function ReviewDrawer({
             )}
         </Drawer>
     );
-}
-
-function retentionOf(held: unknown): number | null {
-    return typeof held === "number" && Number.isFinite(held) ? held : null;
 }
