@@ -14,7 +14,7 @@ function Entry({ entry }: { entry: NavEntry }): ReactElement {
             title={label}
             className={({ isActive }) =>
                 cx(
-                    "relative flex h-11 w-15 flex-col items-center justify-center gap-0.5 rounded-md",
+                    "relative flex h-9 w-15 shrink-0 flex-col items-center justify-center rounded-md",
                     "transition-colors duration-100 ease-out",
                     isActive ? "bg-accent-soft text-accent" : "text-ink-dim hover:bg-inset hover:text-ink-soft",
                 )
@@ -25,7 +25,7 @@ function Entry({ entry }: { entry: NavEntry }): ReactElement {
                     {isActive ? (
                         <span
                             aria-hidden={true}
-                            className="absolute top-3 -left-1 h-5 w-0.5 rounded-full bg-accent"
+                            className="absolute top-2 -left-1 h-5 w-0.5 rounded-full bg-accent"
                         />
                     ) : null}
                     <span className="relative">
@@ -52,13 +52,13 @@ export function Rail({ siteId, pending }: RailProps): ReactElement {
     return (
         <nav
             aria-label={copy.shell.sections}
-            className="flex w-17 shrink-0 flex-col items-center gap-1 border-r border-hairline bg-panel py-2"
+            className="flex w-17 shrink-0 flex-col items-center gap-1 overflow-y-auto border-r border-hairline bg-panel py-2"
         >
             {sections.map((section, index) => (
                 <div
                     key={section.key}
                     className={cx(
-                        "flex w-full flex-col items-center gap-1",
+                        "flex w-full shrink-0 flex-col items-center gap-0.5",
                         section.pinned === true && "mt-auto",
                         index > 0 && "border-t border-hairline pt-2",
                     )}

@@ -140,7 +140,7 @@ export function SiteForm({ site, onClose, onSaved }: SiteFormProps): ReactElemen
                 </>
             }
         >
-            <div className="flex flex-col gap-3 p-3">
+            <div className="flex max-w-md flex-col gap-3 p-3">
                 <Field label={copy.sites.field.name} required error={fieldErrors["name"]}>
                     {(control) => (
                         <Input
