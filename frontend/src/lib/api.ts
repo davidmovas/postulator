@@ -1,5 +1,6 @@
 export {
     AgentService as Agent,
+    BrowserService as Browser,
     GraphService as Graph,
     HealthService as Health,
     ImportService as Import,
@@ -15,6 +16,7 @@ export {
     ToolsService as Tools,
 } from "../../bindings/github.com/davidmovas/postulator/internal/transport/wails/index.js";
 
+export type * as BrowserModels from "../../bindings/github.com/davidmovas/postulator/internal/application/browser/models.js";
 export type * as AgentModels from "../../bindings/github.com/davidmovas/postulator/internal/application/agent/models.js";
 export type * as ContentModels from "../../bindings/github.com/davidmovas/postulator/internal/application/content/models.js";
 export type * as GraphModels from "../../bindings/github.com/davidmovas/postulator/internal/application/graph/models.js";

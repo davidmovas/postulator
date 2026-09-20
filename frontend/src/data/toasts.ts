@@ -2,11 +2,17 @@ import { useSyncExternalStore } from "react";
 
 export type ToastTone = "info" | "warning" | "danger";
 
+export interface ToastAction {
+    label: string;
+    to: string;
+}
+
 export interface Toast {
     id: number;
     tone: ToastTone;
     message: string;
     afterMs: number | null;
+    action: ToastAction | null;
 }
 
 const listeners = new Set<() => void>();
@@ -21,10 +27,15 @@ function publish(next: readonly Toast[]): void {
     });
 }
 
-export function pushToast(tone: ToastTone, message: string, afterMs: number | null = null): number {
+export function pushToast(
+    tone: ToastTone,
+    message: string,
+    afterMs: number | null = null,
+    action: ToastAction | null = null,
+): number {
     const id = nextId;
     nextId += 1;
-    publish([...toasts, { id, tone, message, afterMs }]);
+    publish([...toasts, { id, tone, message, afterMs, action }]);
     return id;
 }
 

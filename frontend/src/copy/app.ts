@@ -9,7 +9,10 @@ export const app = {
     save: "Save",
     cancel: "Cancel",
     loadMore: "Load more",
-    openExternal: "Open in your browser",
+    openExternal: "Open in Tor Browser",
+    torMissing: "Tor Browser is not installed, so the link was not opened.",
+    torSetUp: "Set up Tor Browser",
+    more: "More",
 };
 
 export const lock = {

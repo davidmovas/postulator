@@ -1,4 +1,7 @@
-import { Browser, Dialogs } from "@wailsio/runtime";
+import { Dialogs } from "@wailsio/runtime";
+
+import { announceThrown } from "./client.js";
+import { openBrowser } from "./endpoints/browser.js";
 
 export interface HostFilter {
     displayName: string;
@@ -63,6 +66,11 @@ export async function openExternal(url: string): Promise<boolean> {
     if (!isBrowsable(url)) {
         return false;
     }
-    await Browser.OpenURL(url);
-    return true;
+    try {
+        await openBrowser({ url });
+        return true;
+    } catch (thrown) {
+        announceThrown(thrown);
+        return false;
+    }
 }

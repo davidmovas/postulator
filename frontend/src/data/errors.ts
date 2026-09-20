@@ -1,4 +1,4 @@
-import { errorMessages } from "../copy/index.js";
+import { copy, errorMessages } from "../copy/index.js";
 import type { Code, TransportError } from "../lib/errors.js";
 import { parseError } from "../lib/errors.js";
 import { isCancellation } from "./call.js";
@@ -12,6 +12,15 @@ export const codes: readonly Code[] = Object.freeze(Object.keys(messages) as Cod
 const minimumRetryDelayMs = 250;
 const defaultRetryDelayMs = 1000;
 
+export const browserSettingsPath = "/settings/general";
+
+export const torMissingCode = "tor_missing";
+
+export interface ReactionAction {
+    label: string;
+    to: string;
+}
+
 export type Reaction =
     | { kind: "silent" }
     | { kind: "unlock" }
@@ -23,6 +32,7 @@ export type Reaction =
     | { kind: "budget"; message: string }
     | { kind: "review"; message: string }
     | { kind: "external"; message: string }
+    | { kind: "setup"; message: string; action: ReactionAction }
     | { kind: "fatal"; message: string };
 
 export function failure(thrown: unknown): TransportError {
@@ -50,6 +60,13 @@ export function react(thrown: unknown): Reaction {
         case "LOCKED":
             return { kind: "unlock" };
         case "INVALID": {
+            if (detailCodeOf(reported) === torMissingCode) {
+                return {
+                    kind: "setup",
+                    message: copy.app.torMissing,
+                    action: { label: copy.app.torSetUp, to: browserSettingsPath },
+                };
+            }
             const message = reported.message === "" ? messages.INVALID : reported.message;
             const field = fieldOf(reported);
             return field === null ? { kind: "form", message } : { kind: "field", field, message };
@@ -77,12 +94,17 @@ export function react(thrown: unknown): Reaction {
 
 const pluginCodes: ReadonlySet<string> = new Set(["plugin_missing", "plugin_outdated"]);
 
+export function detailCodeOf(reported: TransportError): string | null {
+    const held = reported.details?.["code"];
+    return typeof held === "string" && held !== "" ? held : null;
+}
+
 export function pluginCodeOf(reported: TransportError): string | null {
     if (reported.code !== "INVALID") {
         return null;
     }
-    const held = reported.details?.["code"];
-    return typeof held === "string" && pluginCodes.has(held) ? held : null;
+    const held = detailCodeOf(reported);
+    return held !== null && pluginCodes.has(held) ? held : null;
 }
 
 export function needsPlugin(thrown: unknown): boolean {

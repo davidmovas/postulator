@@ -2,9 +2,9 @@ import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 
 import { isCancellation } from "./call.js";
 import type { Code, Reaction } from "./errors.js";
-import { codes, failure, react, retryAfterOf } from "./errors.js";
+import { codes, failure, messages, react, retryAfterOf } from "./errors.js";
 import { markLocked } from "./lock.js";
-import type { ToastTone } from "./toasts.js";
+import type { ToastAction, ToastTone } from "./toasts.js";
 import { pushToast } from "./toasts.js";
 
 const maxRateLimitedRetries = 5;
@@ -53,7 +53,7 @@ export type QuietMeta = { quiet: readonly Code[] };
 export type Announcement =
     | { kind: "none" }
     | { kind: "locked" }
-    | { kind: "toast"; tone: ToastTone; message: string; afterMs: number | null };
+    | { kind: "toast"; tone: ToastTone; message: string; afterMs: number | null; action: ToastAction | null };
 
 const silence: ReadonlySet<Code> = new Set<Code>();
 
@@ -75,19 +75,23 @@ export function quietOf(meta: Record<string, unknown> | undefined): ReadonlySet<
     return expected;
 }
 
-function toastOf(reaction: Reaction): { tone: ToastTone; message: string; afterMs: number | null } | null {
+function toastOf(
+    reaction: Reaction,
+): { tone: ToastTone; message: string; afterMs: number | null; action: ToastAction | null } | null {
     switch (reaction.kind) {
         case "throttle":
-            return { tone: "warning", message: reaction.message, afterMs: reaction.afterMs };
+            return { tone: "warning", message: reaction.message, afterMs: reaction.afterMs, action: null };
         case "refetch":
-            return { tone: "info", message: reaction.message, afterMs: null };
+            return { tone: "info", message: reaction.message, afterMs: null, action: null };
+        case "setup":
+            return { tone: "warning", message: reaction.message, afterMs: null, action: reaction.action };
         case "credentials":
         case "budget":
         case "review":
         case "external":
-            return { tone: "warning", message: reaction.message, afterMs: null };
+            return { tone: "warning", message: reaction.message, afterMs: null, action: null };
         case "fatal":
-            return { tone: "danger", message: reaction.message, afterMs: null };
+            return { tone: "danger", message: reaction.message, afterMs: null, action: null };
         default:
             return null;
     }
@@ -114,7 +118,18 @@ function announce(client: QueryClient | null, thrown: unknown, meta: Record<stri
         return;
     }
     if (announcement.kind === "toast") {
-        pushToast(announcement.tone, announcement.message, announcement.afterMs);
+        pushToast(announcement.tone, announcement.message, announcement.afterMs, announcement.action);
+    }
+}
+
+export function announceThrown(thrown: unknown): void {
+    const announcement = announcementOf(thrown, silence);
+    if (announcement.kind === "locked") {
+        pushToast("warning", messages.LOCKED, null, null);
+        return;
+    }
+    if (announcement.kind === "toast") {
+        pushToast(announcement.tone, announcement.message, announcement.afterMs, announcement.action);
     }
 }
 

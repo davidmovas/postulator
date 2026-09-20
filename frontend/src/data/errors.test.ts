@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
 
 import type { Code } from "../lib/errors.js";
-import { failure, messages, needsPlugin, pluginCodeOf, react } from "./errors.js";
+import { copy } from "../copy/index.js";
+import { browserSettingsPath, failure, messages, needsPlugin, pluginCodeOf, react } from "./errors.js";
 
 function rejection(code: Code, message = "", extra: Record<string, unknown> = {}): unknown {
     return new Error("rejected", { cause: { code, message, ...extra } });
@@ -22,6 +23,24 @@ describe("the error reaction map", () => {
         expect(react(rejection("INVALID", "the path must start with a slash", { details: { field: "path" } }))).toEqual(
             { kind: "field", field: "path", message: "the path must start with a slash" },
         );
+    });
+
+    test("a missing Tor Browser is a setup reaction that names where to fix it", () => {
+        const thrown = rejection("INVALID", "Tor Browser is not installed", {
+            details: { code: "tor_missing" },
+        });
+        expect(react(thrown)).toEqual({
+            kind: "setup",
+            message: copy.app.torMissing,
+            action: { label: copy.app.torSetUp, to: browserSettingsPath },
+        });
+    });
+
+    test("another INVALID detail code is still a form error", () => {
+        expect(react(rejection("INVALID", "no plugin", { details: { code: "plugin_missing" } }))).toEqual({
+            kind: "form",
+            message: "no plugin",
+        });
     });
 
     test("turns INVALID without a field into a form error", () => {

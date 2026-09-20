@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { Outlet, useLocation } from "react-router";
+import { Link, Outlet, useLocation } from "react-router";
 
 import { copy } from "../copy/index.js";
 import { flatten } from "../data/call.js";
@@ -8,7 +8,7 @@ import { dismissToast, useToasts } from "../data/toasts.js";
 import type { ToastTone } from "../data/toasts.js";
 import { AgentDock, toggleDock, useDock } from "../features/agent/index.js";
 import { CommandPalette, openPalette } from "../features/palette/index.js";
-import { Toast, ToastRegion } from "../ui/index.js";
+import { Button, Toast, ToastRegion } from "../ui/index.js";
 import type { Tone } from "../ui/index.js";
 import { goToEntries } from "./nav.js";
 import { Rail } from "./rail.js";
@@ -40,6 +40,20 @@ function Toasts() {
                     tone={toastTone[toast.tone]}
                     message={toast.message}
                     dismissLabel={copy.app.dismiss}
+                    action={
+                        toast.action === null ? undefined : (
+                            <Link to={toast.action.to}>
+                                <Button
+                                    size="sm"
+                                    onClick={() => {
+                                        dismissToast(toast.id);
+                                    }}
+                                >
+                                    {toast.action.label}
+                                </Button>
+                            </Link>
+                        )
+                    }
                     onDismiss={() => {
                         dismissToast(toast.id);
                     }}

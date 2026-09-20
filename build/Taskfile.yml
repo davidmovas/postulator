@@ -56,6 +56,16 @@ tasks:
               fail=1
             fi
           }
+          banAll() {
+            if git grep -qIE --untracked -e "$2" -- src; then
+              echo "frontend import rule broken: $1"
+              git grep -nIE --untracked -e "$2" -- src
+              fail=1
+            fi
+          }
+          banAll "nothing opens the system browser; a link goes through BrowserService" 'Browser[^a-zA-Z]*\}?[[:space:]]*from "@wailsio/runtime"'
+          banAll "nothing opens the system browser; window.open is not available to this app" 'window\.open'
+          banAll "a link never leaves the window through a target attribute" 'target="_'
           ban "src/features must reach the bindings through src/lib/api.ts, never by name" 'bindings'
           ban "src/features must use data/ hooks, never src/lib/api.ts" 'lib/api'
           ban "src/features must use data/errors.ts, never src/lib/errors.ts" 'lib/errors'

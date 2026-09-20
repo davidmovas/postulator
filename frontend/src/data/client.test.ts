@@ -37,6 +37,7 @@ describe("what the caches announce", () => {
             tone: "info",
             message: messages.NOT_FOUND,
             afterMs: null,
+            action: null,
         });
     });
 
@@ -51,6 +52,7 @@ describe("what the caches announce", () => {
             tone: "info",
             message: messages.CONFLICT,
             afterMs: null,
+            action: null,
         });
     });
 
@@ -60,6 +62,7 @@ describe("what the caches announce", () => {
             tone: "info",
             message: messages.NOT_FOUND,
             afterMs: null,
+            action: null,
         });
     });
 
@@ -92,6 +95,7 @@ describe("what the caches announce", () => {
             tone: "warning",
             message: messages.RATE_LIMITED,
             afterMs: 4000,
+            action: null,
         });
     });
 
@@ -102,6 +106,7 @@ describe("what the caches announce", () => {
                 tone: "warning",
                 message: messages[code],
                 afterMs: null,
+                action: null,
             });
         }
     });
@@ -112,6 +117,7 @@ describe("what the caches announce", () => {
             tone: "danger",
             message: messages.INTERNAL,
             afterMs: null,
+            action: null,
         });
     });
 });
