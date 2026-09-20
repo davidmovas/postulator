@@ -11,10 +11,15 @@ import type { LockState } from "./types.js";
 
 const lockedState: LockState = Object.freeze({ locked: true, protected: true });
 
+export function isLockKey(key: readonly unknown[]): boolean {
+    const lock = keys.settings.lock();
+    return key.length === lock.length && lock.every((part, index) => key[index] === part);
+}
+
 export function markLocked(client: QueryClient): void {
     cancelCoalesced();
-    client.clear();
     client.setQueryData(keys.settings.lock(), lockedState);
+    client.removeQueries({ predicate: (query) => !isLockKey(query.queryKey) });
     dropAllLogs();
     dropAllTurns();
     clearToasts();
