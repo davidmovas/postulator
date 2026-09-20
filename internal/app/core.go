@@ -5,6 +5,7 @@ import (
 	stderrors "errors"
 	"os"
 	"path/filepath"
+	"strings"
 	stdsync "sync"
 
 	"go.uber.org/zap"
@@ -54,6 +55,8 @@ import (
 )
 
 const (
+	HomeVariable = "POSTULATOR_HOME"
+
 	homeDirectory = "Postulator"
 	databaseFile  = "postulator.db"
 )
@@ -70,13 +73,27 @@ func (c Config) recovery() string {
 }
 
 func DefaultConfig() (Config, error) {
-	base, err := os.UserConfigDir()
+	home, err := homePath()
 	if err != nil {
-		return Config{}, errors.Wrap(err, errors.Internal, "locate the user configuration directory")
+		return Config{}, err
+	}
+	return Config{DatabasePath: filepath.Join(home, databaseFile), KeyDir: home}, nil
+}
+
+func homePath() (string, error) {
+	if override := strings.TrimSpace(os.Getenv(HomeVariable)); override != "" {
+		absolute, err := filepath.Abs(override)
+		if err != nil {
+			return "", errors.Wrap(err, errors.Invalid, "resolve "+HomeVariable)
+		}
+		return absolute, nil
 	}
 
-	home := filepath.Join(base, homeDirectory)
-	return Config{DatabasePath: filepath.Join(home, databaseFile), KeyDir: home}, nil
+	base, err := os.UserConfigDir()
+	if err != nil {
+		return "", errors.Wrap(err, errors.Internal, "locate the user configuration directory")
+	}
+	return filepath.Join(base, homeDirectory), nil
 }
 
 type Core struct {

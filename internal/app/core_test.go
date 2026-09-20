@@ -163,7 +163,7 @@ func TestOpenRejectsAnIncompleteConfig(t *testing.T) {
 }
 
 func TestDefaultConfig(t *testing.T) {
-	t.Parallel()
+	t.Setenv(app.HomeVariable, "")
 
 	cfg, err := app.DefaultConfig()
 	if err != nil {
@@ -177,6 +177,53 @@ func TestDefaultConfig(t *testing.T) {
 	}
 	if filepath.Dir(cfg.DatabasePath) != cfg.KeyDir {
 		t.Errorf("the database and the key must share a directory, got %q and %q", cfg.DatabasePath, cfg.KeyDir)
+	}
+}
+
+func TestDefaultConfigFollowsTheHomeVariable(t *testing.T) {
+	home := t.TempDir()
+	nested := filepath.Join(home, "ui-home")
+
+	cases := []struct {
+		name string
+		set  string
+		want string
+	}{
+		{name: "an absolute directory", set: nested, want: nested},
+		{name: "a directory that does not exist yet", set: filepath.Join(nested, "deeper"), want: filepath.Join(nested, "deeper")},
+		{name: "surrounding spaces are trimmed", set: "  " + nested + "  ", want: nested},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(app.HomeVariable, tc.set)
+
+			cfg, err := app.DefaultConfig()
+			if err != nil {
+				t.Fatalf("DefaultConfig: %v", err)
+			}
+			if cfg.KeyDir != tc.want {
+				t.Errorf("KeyDir = %q, want %q", cfg.KeyDir, tc.want)
+			}
+			if want := filepath.Join(tc.want, "postulator.db"); cfg.DatabasePath != want {
+				t.Errorf("DatabasePath = %q, want %q", cfg.DatabasePath, want)
+			}
+		})
+	}
+}
+
+func TestDefaultConfigMakesARelativeHomeAbsolute(t *testing.T) {
+	t.Setenv(app.HomeVariable, "relative-home")
+
+	cfg, err := app.DefaultConfig()
+	if err != nil {
+		t.Fatalf("DefaultConfig: %v", err)
+	}
+	if !filepath.IsAbs(cfg.KeyDir) {
+		t.Errorf("KeyDir = %q, want an absolute path", cfg.KeyDir)
+	}
+	if filepath.Base(cfg.KeyDir) != "relative-home" {
+		t.Errorf("KeyDir = %q, want it to end in relative-home", cfg.KeyDir)
 	}
 }
 
