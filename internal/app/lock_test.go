@@ -15,8 +15,10 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/secrets/masterkey"
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/application/agent"
+	"github.com/davidmovas/postulator/internal/application/events"
 	llmport "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/sites"
+	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -374,5 +376,68 @@ func TestASecondTransitionIsRefused(t *testing.T) {
 	}
 	if core.Locked() {
 		t.Fatal("the core did not unlock once the lock had finished")
+	}
+}
+
+func (r *recordingEmitter) named(name events.Type) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	seen := 0
+	for _, envelope := range r.envelopes {
+		if envelope.Type == name {
+			seen++
+		}
+	}
+	return seen
+}
+
+func TestALockAnnouncesItselfExactlyOnceAndKeepsAnswering(t *testing.T) {
+	t.Parallel()
+
+	home := t.TempDir()
+	core := openCore(t, app.Config{DatabasePath: filepath.Join(home, "postulator.db"), KeyDir: home})
+	t.Cleanup(func() {
+		if closeErr := core.Close(); closeErr != nil {
+			t.Errorf("Close: %v", closeErr)
+		}
+	})
+
+	emitter := &recordingEmitter{}
+	if err := core.Events.Connect(emitter, clock.System{}); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+
+	if err := core.SetMasterPassword(t.Context(), "", "correct horse battery"); err != nil {
+		t.Fatalf("SetMasterPassword: %v", err)
+	}
+	if err := core.Lock(); err != nil {
+		t.Fatalf("Lock: %v", err)
+	}
+
+	if seen := emitter.named(events.AppLocked); seen != 1 {
+		t.Fatalf("app.locked was announced %d times, want once", seen)
+	}
+	if !core.Locked() {
+		t.Fatal("the core did not lock")
+	}
+
+	protected, err := core.Protected()
+	if err != nil || !protected {
+		t.Fatalf("Protected = %v, %v; want a protected core that still answers", protected, err)
+	}
+
+	if err = core.Lock(); err != nil {
+		t.Fatalf("locking twice: %v", err)
+	}
+	if seen := emitter.named(events.AppLocked); seen != 1 {
+		t.Fatalf("app.locked was announced %d times after a second lock, want once", seen)
+	}
+
+	if err = core.Unlock(t.Context(), "correct horse battery"); err != nil {
+		t.Fatalf("Unlock: %v", err)
+	}
+	if seen := emitter.named(events.AppUnlocked); seen != 1 {
+		t.Fatalf("app.unlocked was announced %d times, want once", seen)
 	}
 }

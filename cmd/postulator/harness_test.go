@@ -19,6 +19,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
+	"github.com/davidmovas/postulator/internal/transport/wails"
 )
 
 func freeAddress(t *testing.T) string {
@@ -329,5 +330,50 @@ func TestTheSeededGraphIsATreeAndNotAFlatList(t *testing.T) {
 	}
 	if rooted != 6 {
 		t.Errorf("entities without a parent = %d, want the six hubs", rooted)
+	}
+}
+
+func TestLockingTheSeededHarnessLeavesTheProcessStanding(t *testing.T) {
+	core := seeded(t)
+
+	logger, err := app.Logger()
+	if err != nil {
+		t.Fatalf("Logger: %v", err)
+	}
+	t.Cleanup(func() {
+		if closeErr := logger.Close(); closeErr != nil {
+			t.Errorf("close the logger: %v", closeErr)
+		}
+	})
+	services := core.Services(logger)
+
+	if err = core.SetMasterPassword(t.Context(), "", "correct horse battery"); err != nil {
+		t.Fatalf("SetMasterPassword: %v", err)
+	}
+	if err = core.Lock(); err != nil {
+		t.Fatalf("Lock: %v", err)
+	}
+	if !core.Locked() {
+		t.Fatal("the core did not lock")
+	}
+
+	settings, ok := services[len(services)-1].Instance().(*wails.SettingsService)
+	if !ok {
+		t.Fatalf("the last service is %T, want the settings service", services[len(services)-1].Instance())
+	}
+
+	state, err := settings.LockState(t.Context(), wails.LockStateRequest{})
+	if err != nil {
+		t.Fatalf("LockState: %v", err)
+	}
+	if !state.Locked || !state.Protected {
+		t.Fatalf("LockState = %+v, want a locked and protected core", state)
+	}
+
+	if _, err = settings.Unlock(t.Context(), wails.UnlockRequest{Password: "correct horse battery"}); err != nil {
+		t.Fatalf("Unlock: %v", err)
+	}
+	if core.Locked() {
+		t.Fatal("the core did not come back up")
 	}
 }
