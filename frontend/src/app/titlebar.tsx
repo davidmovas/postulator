@@ -39,10 +39,17 @@ export function TitleBar({ siteId, dockOpen, onToggleDock }: TitleBarProps): Rea
                     toggleMaximise();
                 }
             }}
-            className="flex h-10 shrink-0 items-center gap-3 border-b border-hairline bg-panel pl-3"
+            className="flex h-10 shrink-0 items-center border-b border-hairline bg-panel pl-3"
         >
+            <img
+                src="/appmark.svg"
+                alt=""
+                width={20}
+                height={20}
+                className="mr-2 h-5 w-5 shrink-0 rounded-md"
+            />
             <SitePill siteId={siteId} />
-            <div className="flex min-w-0 flex-1 justify-center">
+            <div className="flex min-w-0 flex-1 justify-center px-3">
                 <button
                     type="button"
                     style={noDrag}

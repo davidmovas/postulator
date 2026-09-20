@@ -70,19 +70,21 @@ export function SitePill({ siteId }: SitePillProps): ReactElement {
                     type="button"
                     style={noDrag}
                     aria-label={copy.shell.siteSwitcher}
-                    className="flex h-8 w-70 max-w-full shrink-0 items-center gap-2 rounded-md border border-hairline bg-inset px-2 text-left transition-colors duration-100 ease-out hover:border-edge"
+                    className="flex h-[30px] max-w-70 shrink-0 items-center gap-2 rounded-md border border-hairline bg-transparent px-2.5 text-left transition-colors duration-100 ease-out hover:bg-inset"
                 >
                     {current === null ? (
                         <PublicIcon size={14} className="shrink-0 text-ink-faint" />
                     ) : (
                         <Dot site={current} />
                     )}
-                    <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate text-sm font-semibold text-ink">
+                    <span className="flex min-w-0 flex-col items-start">
+                        <span className="max-w-full truncate text-sm leading-[14px] font-semibold whitespace-nowrap text-ink">
                             {current === null ? copy.shell.chooseSite : current.name}
                         </span>
                         {current === null ? null : (
-                            <span className="truncate font-mono text-2xs text-ink-faint">{current.baseUrl}</span>
+                            <span className="max-w-full truncate font-mono text-2xs leading-[12px] text-ink-faint">
+                                {current.baseUrl}
+                            </span>
                         )}
                     </span>
                     <UnfoldMoreIcon size={16} className="shrink-0 text-ink-dim" />
