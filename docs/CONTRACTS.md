@@ -37,12 +37,13 @@ the composition root binds the two.
 | `ReportsService` | `SiteOverview LinkAudit LinkAuditPage PageReport RunReport JudgePage` |
 | `ImportService` | `Inspect Preview Apply Export SaveMapping ListMappings DeleteMapping` |
 | `ModelsService` | `ListModels UpsertModel DisableModel GetProfiles SetProfile TestProvider UsageSummary` |
-| `AgentService` | `CreateConversation SetMode RenameConversation DeleteConversation Send Confirm Cancel ListConversations ListMessages ListPendingActions` |
+| `AgentService` | `CreateConversation SetMode RenameConversation DeleteConversation Send Status Confirm Cancel ListConversations ListMessages ListPendingActions` |
 | `SchedulesService` | `Create Update Delete Get List Enable Disable RunNow` |
 | `ToolsService` | `List` |
+| `BrowserService` | `Open Locate` |
 | `SettingsService` | `Schema Get Set SetProviderKey ProviderKeys DeleteProviderKey LockState Lock Unlock SetMasterPassword ExportBackup ImportBackup` |
 
-A hundred and thirteen methods. Where a use case answers with bytes the service writes them
+A hundred and sixteen methods. Where a use case answers with bytes the service writes them
 to the path the request names and returns it, because the webview has no filesystem;
 `SyncService.SavePluginPackage{path}` is the only such method.
 
@@ -166,6 +167,9 @@ application events, `PublishRun(runId, seq, type, payload)` for run events, both
 an unknown name or a mismatched payload. `application.RegisterEvent` is deliberately
 unused.
 
+The generated module also exports `eventTypes`, the same names once more as a readonly
+tuple, so a window can build a handler map the compiler checks for exhaustiveness.
+
 The names and their payloads are the `EventType` union and the `EventPayloads` map in
 [`frontend/src/generated/events.ts`](../frontend/src/generated/events.ts), which is the
 registry rendered. Run events are the `run.* item.* step.*` families plus `llm.usage`;
@@ -176,6 +180,20 @@ agent.confirm.requested agent.confirm.resolved agent.done`, whose payloads all c
 subscribes with `on(type, handler)` from `frontend/src/lib/events.ts`, which narrows
 `payload` to the declared type. Events only travel Go → JS; every frontend-initiated
 action is a bound method call.
+
+## Opening a link
+
+Nothing in this application opens the system browser. `BrowserService.Open{url}` refuses
+anything that is not `http` or `https` with `INVALID`, and otherwise starts Tor Browser
+detached on that address. `Locate{}` answers `{path, source, installed}` where `source` is
+`setting` when the `browser.torPath` setting named it, `detected` when it was found under
+`%USERPROFILE%\Desktop`, `%USERPROFILE%\OneDrive\Desktop`, `%LOCALAPPDATA%`,
+`%PROGRAMFILES%` or `%USERPROFILE%\Downloads` as `<root>\Tor Browser\Browser\firefox.exe`,
+and empty when nothing is installed. A candidate counts only when a `TorBrowser\` directory
+sits beside `firefox.exe`, which is what tells Tor Browser apart from a plain Firefox, and a
+configured path that fails that test is ignored rather than trusted. Nothing installed is
+`INVALID` with `details.code = tor_missing`; a launch that failed is `EXTERNAL`. The address
+never appears in a failure or a log line, because a preview link carries a signed token.
 
 ## Page preview
 
@@ -193,10 +211,19 @@ status`. A site that cannot issue a link answers `INVALID` with `details.code` s
 `autonomous` mode and `SetMode` switches it; `RenameConversation{conversationId, title}`
 retitles it and `DeleteConversation{conversationId}` stops a turn in flight and drops the
 conversation with its messages, pending actions, tool calls and history. An untitled
-conversation takes its first message as its title. `Send{conversationId, text}` returns the
-message id at once and the turn runs behind it: `agent.delta` carries the streamed text,
-`agent.tool.started` and `agent.tool.finished` the tool calls, `agent.done` the end of the
-turn, and `Cancel{conversationId}` stops one in flight. In `confirm` mode a `write` or
+conversation takes its first message as its title. `Send{conversationId, text}` returns
+`{messageId, assistantMessageId}` at once and the turn runs behind it: the assistant id is
+minted before the turn starts and is the id every event of that turn carries, so a window
+that receives the terminal event before `Send` returns can still match the two.
+`agent.delta` carries the streamed text, `agent.tool.started` and `agent.tool.finished` the
+tool calls, `agent.done` the end of the turn, and `Cancel{conversationId}` stops one in
+flight. `Status{conversationId}` answers `{running, messageId, startedAt, lastSeq}` from
+the turn registry, and zeroes all but `running` when nothing is answering, which is how a
+window that opened mid-turn learns there is one. `agent.done` carries a frozen `code`,
+empty on success, and an `error` redacted exactly as a binding error is; `CANCELLED` is
+the stop signal, whether the user stopped the turn or the `agent.turnTimeout` deadline did,
+and the message says which. The turn runs under that deadline for every provider and a
+panic underneath it ends the turn with `INTERNAL` rather than the process. In `confirm` mode a `write` or
 `dangerous` tool does not run: it writes a pending action and emits
 `agent.confirm.requested{conversationId, confirmationId, tool, args, risk, summary}`, which
 `Confirm{actionId, approve}` settles and `agent.confirm.resolved` announces. History is
