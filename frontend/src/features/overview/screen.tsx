@@ -163,7 +163,7 @@ export function OverviewScreen(): ReactElement {
                     />
                 </div>
             ) : (
-                <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4">
+                <div className="@container flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4">
                     {setupNeeded ? (
                         <SetupBanner
                             onDismiss={() => {
@@ -197,7 +197,7 @@ export function OverviewScreen(): ReactElement {
                                 pages={pageTile(answered.pages)}
                                 edges={edgeTile(answered.edges, proposedCount, proposedCapped)}
                             />
-                            <div className="grid grid-cols-[1.25fr_1fr] gap-3">
+                            <div className="grid grid-cols-1 gap-3 @xl:grid-cols-[1.25fr_1fr]">
                                 <DepthPanel bars={histogram(answered.depth ?? [])} />
                                 <TopEntities entries={answered.top ?? []} siteId={siteId} />
                             </div>

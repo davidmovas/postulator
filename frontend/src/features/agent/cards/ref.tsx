@@ -20,13 +20,13 @@ interface ResolvedProps {
 }
 
 function Resolved({ label, pending, id, mono = false }: ResolvedProps): ReactElement {
-    if (pending) {
+    if (pending && id !== "") {
         return <Skeleton width="6ch" height={12} className="inline-block align-middle" />;
     }
     if (label === null) {
         return (
             <span className="font-mono text-ink-faint" title={id}>
-                {id.slice(0, shortIdLength)} · {copy.agent.card.unknownRef}
+                {id === "" ? copy.agent.card.unknownRef : `${id.slice(0, shortIdLength)} · ${copy.agent.card.unknownRef}`}
             </span>
         );
     }

@@ -104,6 +104,8 @@ export interface TranscriptProps {
 export function Transcript({ rows, settling, canRetry, header, onApprove, onReject, onRetry }: TranscriptProps): ReactElement {
     const scroller = useRef<HTMLDivElement>(null);
     const [pinned, setPinned] = useState(true);
+    const pinnedRef = useRef(true);
+    pinnedRef.current = pinned;
     const lastRowId = rows[rows.length - 1]?.id ?? "";
     const lastText = rows[rows.length - 1]?.kind === "streaming" ? (rows[rows.length - 1] as Extract<Row, { kind: "streaming" }>).text.length : 0;
 
@@ -116,10 +118,23 @@ export function Transcript({ rows, settling, canRetry, header, onApprove, onReje
 
     useEffect(() => {
         const held = scroller.current;
-        if (held !== null) {
-            held.scrollTop = held.scrollHeight;
+        if (held === null) {
+            return;
         }
-    }, []);
+        held.scrollTop = held.scrollHeight;
+        const observer = new ResizeObserver(() => {
+            if (pinnedRef.current) {
+                held.scrollTop = held.scrollHeight;
+            }
+        });
+        for (const child of Array.from(held.children)) {
+            observer.observe(child);
+        }
+        observer.observe(held);
+        return () => {
+            observer.disconnect();
+        };
+    }, [rows.length]);
 
     const scrolled = (event: UIEvent<HTMLDivElement>): void => {
         const held = event.currentTarget;
@@ -128,7 +143,7 @@ export function Transcript({ rows, settling, canRetry, header, onApprove, onReje
 
     return (
         <div className="relative min-h-0 flex-1">
-            <div ref={scroller} onScroll={scrolled} className="flex h-full flex-col gap-3 overflow-y-auto px-3 py-3">
+            <div ref={scroller} onScroll={scrolled} className="flex h-full flex-col gap-3 overflow-y-auto px-3 py-3 [&>*]:shrink-0">
                 {header}
                 {rows.map((row) => {
                     switch (row.kind) {

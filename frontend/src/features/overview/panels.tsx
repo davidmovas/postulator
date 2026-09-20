@@ -77,14 +77,14 @@ export interface TilesProps {
 
 export function Tiles({ entities, pages, edges }: TilesProps): ReactElement {
     return (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 @md:grid-cols-3">
             <Tile
                 title={copy.overview.tiles.entities}
                 total={tokens(entities.total)}
                 rows={[
                     { label: copy.overview.tiles.withPublished, value: entities.withPublished, tone: "ok" },
                     {
-                        label: copy.overview.tiles.withCanonical,
+                        label: copy.overview.tiles.withPlanned,
                         value: Math.max(0, entities.withCanonical - entities.withPublished),
                         tone: "accent",
                     },
@@ -105,7 +105,7 @@ export function Tiles({ entities, pages, edges }: TilesProps): ReactElement {
                 total={edges.capped ? copy.overview.tiles.capped(edges.approved) : tokens(edges.approved)}
                 rows={[
                     { label: copy.overview.tiles.realized, value: edges.realized, tone: "ok" },
-                    { label: copy.overview.tiles.approved, value: edges.gap, tone: "accent" },
+                    { label: copy.overview.tiles.notLinked, value: edges.gap, tone: "accent" },
                     { label: copy.overview.tiles.proposed, value: edges.proposed, tone: "info" },
                 ]}
             />
@@ -160,7 +160,7 @@ export function RunPanel({ summary, siteId, onStart }: RunPanelProps): ReactElem
                     trailing={copy.overview.run.items(summary.done, summary.total)}
                 />
             </div>
-            <div className="w-40 shrink-0">
+            <div className="hidden w-40 shrink-0 @md:block">
                 <BudgetGauge
                     label={copy.overview.run.budget}
                     value={summary.usd}

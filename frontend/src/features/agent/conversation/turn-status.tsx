@@ -6,7 +6,6 @@ import type { Turn } from "../../../data/agent/turn.js";
 import { duration } from "../../../domain/format.js";
 import type { Tone } from "../../../ui/index.js";
 import {
-    CheckCircleIcon,
     cx,
     ErrorIcon,
     HistoryToggleOffIcon,
@@ -45,7 +44,7 @@ export function TurnStatus({ turn }: TurnStatusProps): ReactElement | null {
     const running = turn.status === "working" || turn.status === "awaiting-confirm" || turn.status === "stopping";
     const elapsed = useElapsed(turn.startedAt, running);
 
-    if (turn.status === "idle") {
+    if (turn.status === "idle" || (turn.status === "done" && turn.end === "answered")) {
         return null;
     }
 
@@ -67,15 +66,9 @@ export function TurnStatus({ turn }: TurnStatusProps): ReactElement | null {
             label = copy.agent.status.stopping;
             break;
         case "done":
-            if (turn.end === "stopped") {
-                tone = "muted";
-                label = copy.agent.status.stopped;
-                icon = <StopCircleIcon size={13} className="text-ink-faint" />;
-                break;
-            }
-            tone = "ok";
-            label = duration(Math.max(0, turn.lastEventAt - turn.startedAt));
-            icon = <CheckCircleIcon size={13} className={toneClasses.ok.ink} />;
+            tone = "muted";
+            label = copy.agent.status.stopped;
+            icon = <StopCircleIcon size={13} className="text-ink-faint" />;
             break;
         default:
             tone = "danger";

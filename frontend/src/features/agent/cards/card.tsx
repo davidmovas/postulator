@@ -110,7 +110,7 @@ export function ConfirmationCard({
             aria-label={copy.agent.confirmTitle}
             onKeyDown={keyed}
             className={cx(
-                "flex flex-col overflow-hidden rounded-lg border bg-panel outline-none",
+                "flex shrink-0 flex-col overflow-hidden rounded-lg border bg-panel outline-none",
                 pending ? classes.border : "border-hairline",
                 "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
                 className,
