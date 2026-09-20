@@ -6,10 +6,13 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"go.uber.org/zap/zaptest"
 
+	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
 	"github.com/davidmovas/postulator/internal/app"
+	"github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/models"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/templates"
@@ -272,4 +275,54 @@ func TestOpenNamesBothFilesWhenTheDatabaseIsUnreadable(t *testing.T) {
 			t.Errorf("message = %q, want it to name %q", err.Error(), name)
 		}
 	}
+}
+
+func TestOpenComposesTheAgentOverTheProviderSeam(t *testing.T) {
+	t.Parallel()
+
+	home := t.TempDir()
+	core, err := app.Open(t.Context(), app.Config{
+		DatabasePath:  filepath.Join(home, "postulator.db"),
+		KeyDir:        home,
+		Provider:      fake.New(),
+		AgentProvider: fake.NewGollem(fake.WithScript(func(string) fake.Turn { return fake.Turn{Text: "eleven entities carry no canonical page."} })),
+	}, zaptest.NewLogger(t))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() {
+		if closeErr := core.Close(); closeErr != nil {
+			t.Errorf("Close: %v", closeErr)
+		}
+	})
+
+	opened, err := core.Agent.CreateConversation(t.Context(), agent.CreateConversationRequest{Mode: "confirm"})
+	if err != nil {
+		t.Fatalf("CreateConversation: %v", err)
+	}
+
+	sent, err := core.Agent.Send(t.Context(), agent.SendRequest{
+		ConversationID: opened.Conversation.ID, Text: "which entities have no canonical page?",
+	})
+	if err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	if sent.MessageID == "" {
+		t.Fatal("Send returned no message id")
+	}
+
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		listed, listErr := core.Agent.ListMessages(t.Context(), agent.ListMessagesRequest{ConversationID: opened.Conversation.ID})
+		if listErr != nil {
+			t.Fatalf("ListMessages: %v", listErr)
+		}
+		for _, message := range listed.Items {
+			if message.Role == "assistant" && message.Text == "eleven entities carry no canonical page." {
+				return
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("the seeded provider never answered the turn")
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 	stdsync "sync"
 
+	"github.com/gollem-dev/gollem"
 	"go.uber.org/zap"
 
 	"github.com/davidmovas/postulator/internal/adapters/images"
@@ -43,6 +44,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/application/tools"
+	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
@@ -61,10 +63,15 @@ const (
 	databaseFile  = "postulator.db"
 )
 
+type AgentProvider interface {
+	New(ctx context.Context, ref domainllm.ModelRef) (gollem.LLMClient, error)
+}
+
 type Config struct {
-	DatabasePath string
-	KeyDir       string
-	Provider     llmport.Client
+	DatabasePath  string
+	KeyDir        string
+	Provider      llmport.Client
+	AgentProvider AgentProvider
 }
 
 func (c Config) recovery() string {
@@ -204,7 +211,10 @@ func (c *Core) compose(ctx context.Context, key []byte) error {
 
 	templateService := templates.New(templateRepo, policyRepo, pageRepo, siteRepo, store, relay, now)
 	modelProfiles := profiles.New(profileRepo, siteRepo, modelCatalog, now)
-	providers := gollemclient.NewFactory(secretStore, values)
+	var providers AgentProvider = gollemclient.NewFactory(secretStore, values)
+	if cfg.AgentProvider != nil {
+		providers = cfg.AgentProvider
+	}
 	provider := cfg.Provider
 	if provider == nil {
 		provider = gollemclient.New(providers, gollemclient.Timeout(values))
