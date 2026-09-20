@@ -6,6 +6,9 @@ vars:
   BIN_DIR: "bin"
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
   VERSION: '{{.VERSION | default "2.0.0-dev"}}'
+  UI_NAME: "postulator-ui"
+  UI_HOME: '{{.ROOT_DIR}}/.superpowers/ui-home'
+  UI_DEVTOOLS_PORT: '{{.UI_DEVTOOLS_PORT | default 9222}}'
   COMMIT:
     sh: git rev-parse --short HEAD
   BUILD_DATE: '{{now | date "2006-01-02T15:04:05Z"}}'
@@ -54,6 +57,52 @@ tasks:
     summary: Regenerates the TypeScript vocabulary module from the Go const blocks
     cmds:
       - go run ./internal/transport/wails/vocabgen
+
+  ui:build:
+    summary: Builds the harness executable, which composes the window over the fakes and seeds a site
+    deps:
+      - task: common:build:frontend
+        vars:
+          BUILD_FLAGS: '-tags uiharness'
+          DEV: 'false'
+    cmds:
+      - go build -tags uiharness -o "{{.BIN_DIR}}/{{.UI_NAME}}.exe" ./cmd/postulator
+    env:
+      GOOS: windows
+      CGO_ENABLED: '0'
+
+  ui:run:
+    summary: Launches the harness window detached with its own home and the devtools endpoint open
+    deps:
+      - task: ui:build
+    env:
+      POSTULATOR_HOME: '{{.UI_HOME}}'
+      POSTULATOR_DEVTOOLS_PORT: '{{.UI_DEVTOOLS_PORT}}'
+    cmds:
+      - cmd: powershell -NoProfile -Command 'Start-Process -FilePath "{{.ROOT_DIR}}/{{.BIN_DIR}}/{{.UI_NAME}}.exe"'
+        platforms: [windows]
+
+  ui:reset:
+    summary: Stops the harness window and deletes the home it seeded
+    cmds:
+      - cmd: powershell -NoProfile -Command 'Get-Process -Name "{{.UI_NAME}}" -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep -Milliseconds 500; if (Test-Path "{{.UI_HOME}}") { Remove-Item -Recurse -Force "{{.UI_HOME}}" }'
+        platforms: [windows]
+
+  ui:shot:
+    summary: Screenshots one route of the running harness window
+    cmds:
+      - node frontend/scripts/shot.mjs --port {{.UI_DEVTOOLS_PORT}} {{.CLI_ARGS}}
+
+  ui:walk:
+    summary: Screenshots every route in frontend/scripts/routes.json
+    cmds:
+      - node frontend/scripts/shot.mjs --port {{.UI_DEVTOOLS_PORT}} --routes frontend/scripts/routes.json --out-dir frontend/shots
+
+  ui:lint:
+    summary: Lints and tests the harness sources, which the default lint and test runs never see
+    cmds:
+      - golangci-lint run --build-tags uiharness ./cmd/postulator/...
+      - go test -tags uiharness -count=1 -timeout 15m ./cmd/postulator/...
 
   test:
     summary: Runs the Go test suite with the race detector

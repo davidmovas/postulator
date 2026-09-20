@@ -15,14 +15,26 @@ import (
 //go:embed appicon.png
 var appIcon []byte
 
+type harness struct {
+	Config app.Config
+	Seed   func(context.Context, *app.Core) error
+}
+
 func main() {
-	if err := run(); err != nil {
+	if err := launch(); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run() error {
+func launch() error {
+	ctx := context.Background()
+
 	cfg, err := app.DefaultConfig()
+	if err != nil {
+		return err
+	}
+
+	tuned, err := configure(cfg)
 	if err != nil {
 		return err
 	}
@@ -37,7 +49,7 @@ func run() error {
 		}
 	}()
 
-	core, err := app.Open(context.Background(), cfg, logger.Logger)
+	core, err := app.Open(ctx, tuned.Config, logger.Logger)
 	if err != nil {
 		return err
 	}
@@ -47,7 +59,13 @@ func run() error {
 		}
 	}()
 
-	wails := application.New(application.Options{
+	if tuned.Seed != nil {
+		if seedErr := tuned.Seed(ctx, core); seedErr != nil {
+			return seedErr
+		}
+	}
+
+	wails := application.New(options(application.Options{
 		Name:        "Postulator",
 		Description: "Entity-graph driven WordPress content factory",
 		Icon:        appIcon,
@@ -55,7 +73,7 @@ func run() error {
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(frontend.Assets),
 		},
-	})
+	}))
 	if connectErr := core.Events.Connect(wails.Event, clock.System{}); connectErr != nil {
 		return connectErr
 	}

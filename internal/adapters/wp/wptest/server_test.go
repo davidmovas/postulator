@@ -377,7 +377,7 @@ func TestTheServerRunsOutsideATest(t *testing.T) {
 		t.Fatalf("New registered %d cleanups, want 1", len(reported.cleanups))
 	}
 
-	request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL()+"/wp-json", nil)
+	request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL()+"/wp-json", http.NoBody)
 	if err != nil {
 		t.Fatalf("build the request: %v", err)
 	}
@@ -418,7 +418,7 @@ func TestTheServerTakesAnAddress(t *testing.T) {
 		t.Fatalf("URL = %q, want %q", server.URL(), want)
 	}
 
-	request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL()+"/wp-json", nil)
+	request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL()+"/wp-json", http.NoBody)
 	if err != nil {
 		t.Fatalf("build the request: %v", err)
 	}
