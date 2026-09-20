@@ -90,7 +90,17 @@ func hierarchical(itemType string) bool {
 	return itemType == TypePage || itemType == TypeProductCategory
 }
 
+func (s *Server) instant() time.Time {
+	if s.now != nil {
+		return s.now().UTC().Truncate(time.Second)
+	}
+	return s.clock
+}
+
 func (s *Server) tick() time.Time {
+	if s.now != nil {
+		return s.instant()
+	}
 	s.clock = s.clock.Add(time.Second)
 	return s.clock
 }
@@ -98,7 +108,7 @@ func (s *Server) tick() time.Time {
 func (s *Server) Now() time.Time {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.clock
+	return s.instant()
 }
 
 func (s *Server) uniqueSlug(base, itemType string, parent, exclude int64) string {
@@ -147,8 +157,11 @@ func (s *Server) add(item Item) Item {
 		item.Meta = make(map[string]string)
 	}
 
-	s.nextID++
-	item.ID = s.nextID
+	if item.ID <= 0 {
+		s.nextID++
+		item.ID = s.nextID
+	}
+	s.nextID = max(s.nextID, item.ID)
 
 	base := item.Slug
 	if base == "" {
@@ -167,6 +180,18 @@ func (s *Server) add(item Item) Item {
 }
 
 func (s *Server) Seed(items ...Item) []Item {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	stored := make([]Item, 0, len(items))
+	for index := range items {
+		items[index].ID = 0
+		stored = append(stored, s.add(items[index]))
+	}
+	return stored
+}
+
+func (s *Server) Restore(items ...Item) []Item {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

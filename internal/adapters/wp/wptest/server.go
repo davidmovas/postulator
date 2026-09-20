@@ -50,6 +50,7 @@ type Server struct {
 	requests      []Request
 	faults        []fault
 	clock         time.Time
+	now           func() time.Time
 	user          string
 	password      string
 	address       string
@@ -97,6 +98,10 @@ func WithRedirect(mode Redirect) Option {
 
 func WithAddress(address string) Option {
 	return func(s *Server) { s.address = address }
+}
+
+func WithClock(now func() time.Time) Option {
+	return func(s *Server) { s.now = now }
 }
 
 func New(t TB, opts ...Option) *Server {

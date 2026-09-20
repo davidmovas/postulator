@@ -118,7 +118,7 @@ func configure(cfg app.Config) (harness, error) {
 	}
 
 	site := wptest.New(&reporter{}, wptest.WithAddress(address()),
-		wptest.WithCredentials(harnessUser, harnessPassword))
+		wptest.WithClock(time.Now), wptest.WithCredentials(harnessUser, harnessPassword))
 
 	provider := newPacedProvider()
 	script := &assistantScript{}
@@ -126,7 +126,9 @@ func configure(cfg app.Config) (harness, error) {
 	cfg.AgentProvider = fake.NewGollem(fake.WithScript(script.answer))
 
 	if !fresh {
-		return harness{Config: cfg}, nil
+		return harness{Config: cfg, Seed: func(ctx context.Context, core *app.Core) error {
+			return repopulate(ctx, core, site)
+		}}, nil
 	}
 	return harness{Config: cfg, Seed: func(ctx context.Context, core *app.Core) error {
 		return seed(ctx, core, site.URL(), provider, script)

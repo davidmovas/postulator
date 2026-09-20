@@ -435,3 +435,44 @@ func TestTheServerTakesAnAddress(t *testing.T) {
 		t.Fatalf("status = %d, want 200", response.StatusCode)
 	}
 }
+
+func TestTheServerCanFollowAnInjectedClock(t *testing.T) {
+	t.Parallel()
+
+	instant := time.Date(2031, time.March, 4, 9, 30, 0, 0, time.UTC)
+	server := wptest.New(t, wptest.WithClock(func() time.Time { return instant }))
+
+	if got := server.Now(); !got.Equal(instant) {
+		t.Fatalf("Now = %s, want %s", got, instant)
+	}
+
+	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso machines"})
+	if !seeded[0].Modified.Equal(instant) {
+		t.Fatalf("Modified = %s, want the injected instant %s", seeded[0].Modified, instant)
+	}
+}
+
+func TestRestoreKeepsTheIdItIsGiven(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	restored := server.Restore(
+		wptest.Item{ID: 412, Type: wptest.TypePage, Title: "Espresso machines", Slug: "espresso-machines", Status: "publish"},
+		wptest.Item{ID: 77, Type: wptest.TypePage, Title: "Grinders", Slug: "grinders", Status: "draft"},
+	)
+
+	if restored[0].ID != 412 || restored[1].ID != 77 {
+		t.Fatalf("Restore renumbered %d and %d", restored[0].ID, restored[1].ID)
+	}
+	for _, want := range []int64{412, 77} {
+		found, ok := server.Lookup(want)
+		if !ok || found.ID != want {
+			t.Fatalf("the server does not hold %d", want)
+		}
+	}
+
+	fresh := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Portafilter"})
+	if fresh[0].ID <= 412 {
+		t.Fatalf("a later item took id %d, which collides with the restored ones", fresh[0].ID)
+	}
+}

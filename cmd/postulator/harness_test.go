@@ -7,6 +7,7 @@ import (
 	"net"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"go.uber.org/zap/zaptest"
@@ -18,6 +19,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/schedules"
 	"github.com/davidmovas/postulator/internal/application/sites"
+	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/transport/wails"
@@ -267,8 +269,36 @@ func TestASeededHomeIsNotSeededTwice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("configure: %v", err)
 	}
+
+	reopened, err := app.Open(t.Context(), again.Config, zaptest.NewLogger(t))
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	t.Cleanup(func() {
+		if closeErr := reopened.Close(); closeErr != nil {
+			t.Errorf("Close: %v", closeErr)
+		}
+	})
 	if again.Seed != nil {
-		t.Error("a home that already carries a database must not be seeded again")
+		if seedErr := again.Seed(t.Context(), reopened); seedErr != nil {
+			t.Fatalf("the restart hook: %v", seedErr)
+		}
+	}
+
+	listed, err := reopened.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+	if len(listed.Items) != 1 {
+		t.Fatalf("sites after the restart = %d, want the one that was seeded", len(listed.Items))
+	}
+
+	loaded, err := reopened.Graph.LoadGraph(t.Context(), graph.LoadGraphRequest{SiteID: listed.Items[0].ID})
+	if err != nil {
+		t.Fatalf("LoadGraph: %v", err)
+	}
+	if len(loaded.Entities) != 41 {
+		t.Fatalf("entities after the restart = %d, want the forty-one that were seeded", len(loaded.Entities))
 	}
 }
 
@@ -403,9 +433,6 @@ func TestAPendingConfirmationSurvivesARestart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("configure: %v", err)
 	}
-	if again.Seed != nil {
-		t.Fatal("a restart must not reseed")
-	}
 
 	reopened, err := app.Open(t.Context(), again.Config, zaptest.NewLogger(t))
 	if err != nil {
@@ -536,5 +563,84 @@ func TestTheSeededConversationIsNamedLikeAConversation(t *testing.T) {
 	title := listed.Items[0].Title
 	if len(title) < 12 {
 		t.Fatalf("the conversation is called %q, which reads like a scripted stub", title)
+	}
+}
+
+func TestARestartPutsThePublishedPagesBackOnTheFakeSite(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+	siteID := listed.Items[0].ID
+
+	before, err := core.Pages.List(t.Context(), pages.ListRequest{
+		SiteID: siteID, ListRequest: dto.ListRequest{Limit: 100},
+	})
+	if err != nil {
+		t.Fatalf("List pages: %v", err)
+	}
+
+	withWP := 0
+	for _, page := range before.Items {
+		if page.WPID != nil {
+			withWP++
+		}
+	}
+	if withWP == 0 {
+		t.Fatal("the seed published nothing, so a restart has nothing to put back")
+	}
+	if closeErr := core.Close(); closeErr != nil {
+		t.Fatalf("Close: %v", closeErr)
+	}
+
+	cfg, err := app.DefaultConfig()
+	if err != nil {
+		t.Fatalf("DefaultConfig: %v", err)
+	}
+	again, err := configure(cfg)
+	if err != nil {
+		t.Fatalf("configure: %v", err)
+	}
+	if again.Seed == nil {
+		t.Fatal("a restart must still repopulate the fake site")
+	}
+
+	reopened, err := app.Open(t.Context(), again.Config, zaptest.NewLogger(t))
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	t.Cleanup(func() {
+		if closeErr := reopened.Close(); closeErr != nil {
+			t.Errorf("Close: %v", closeErr)
+		}
+	})
+	if seedErr := again.Seed(t.Context(), reopened); seedErr != nil {
+		t.Fatalf("repopulate: %v", seedErr)
+	}
+
+	checked, err := reopened.Sync.CheckPlugin(t.Context(), sync.CheckPluginRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("CheckPlugin: %v", err)
+	}
+	if !checked.Plugin.Installed {
+		t.Fatal("the restored fake site does not answer as a plugin site")
+	}
+
+	for _, page := range before.Items {
+		if page.WPID == nil {
+			continue
+		}
+		link, linkErr := reopened.Pages.PreviewLink(t.Context(), pages.PreviewLinkRequest{PageID: page.ID})
+		if linkErr != nil {
+			t.Fatalf("PreviewLink for %s: %v", page.Path, linkErr)
+		}
+		if link.URL == "" {
+			t.Fatalf("PreviewLink for %s answered no address", page.Path)
+		}
+		if link.Kind == "preview" && !link.ExpiresAt.Std().After(time.Now()) {
+			t.Fatalf("the preview link for %s expired at %s, which is already past", page.Path, link.ExpiresAt)
+		}
 	}
 }

@@ -483,7 +483,7 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 	}
 	s.previewSeq++
 	token := fmt.Sprintf("%032x", s.previewSeq)
-	expires := s.clock.Add(previewLifetime).UTC().Truncate(time.Second)
+	expires := s.instant().Add(previewLifetime).UTC().Truncate(time.Second)
 	stored.PreviewHash = contentHash(token)
 	stored.PreviewExpires = expires
 	link := s.previewURL(stored, token)
