@@ -8,6 +8,7 @@ import { copy } from "../../copy/index.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
 import {
     ChevronRightIcon,
+    EmptyState,
     OpenInNewIcon,
     Panel,
     PanelHeader,
@@ -60,11 +61,12 @@ export function PageReportPanel({ pageId, siteId }: PageReportPanelProps): React
         return (
             <Panel>
                 <PanelHeader title={copy.pages.detail.report} />
-                <div className="flex flex-col gap-1 p-3">
-                    <p className="text-sm text-ink">{problem ?? copy.pages.detail.noReport}</p>
-                    {problem === null ? (
-                        <p className="text-xs text-ink-dim">{copy.pages.detail.noReportBody}</p>
-                    ) : null}
+                <div className="p-3">
+                    <EmptyState
+                        icon={TaskAltIcon}
+                        title={problem ?? copy.pages.detail.noReport}
+                        body={problem === null ? copy.pages.detail.noReportBody : undefined}
+                    />
                 </div>
             </Panel>
         );

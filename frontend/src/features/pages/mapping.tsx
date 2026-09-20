@@ -68,10 +68,7 @@ export function PageMapping({ page, siteId, index, search }: PageMappingProps): 
                 {page.entityId === null ? (
                     <div className="flex items-start gap-2">
                         <LinkOffIcon size={18} className="mt-px shrink-0 text-ink-faint" />
-                        <div className="flex min-w-0 flex-col gap-0.5">
-                            <p className="text-sm font-semibold text-ink">{copy.pages.detail.noEntity}</p>
-                            <p className="text-xs text-ink-dim">{copy.pages.detail.noEntityBody}</p>
-                        </div>
+                        <p className="text-sm font-semibold text-ink">{copy.pages.detail.noEntity}</p>
                     </div>
                 ) : entityQuery.isPending ? (
                     <Skeleton height={18} width="60%" />
@@ -123,15 +120,12 @@ export function PageMapping({ page, siteId, index, search }: PageMappingProps): 
                         </Button>
                     )}
                 </div>
-                {index.entities.length === 0 ? (
-                    <p className="text-2xs text-ink-faint">{copy.pages.filters.noEntities}</p>
-                ) : null}
-
                 <ConflictNotice thrown={map.error} siteId={siteId} search={search} />
 
-                <div className="flex flex-col gap-1 rounded-md border border-hairline bg-inset p-2.5">
-                    <p className="text-xs font-semibold text-ink">{copy.pages.detail.canonicalTitle}</p>
-                    <p className="text-2xs text-ink-dim">{copy.pages.detail.canonicalBody}</p>
+                <div
+                    title={copy.pages.detail.canonicalTitle}
+                    className="flex flex-col gap-1 rounded-md border border-hairline bg-inset p-2.5"
+                >
                     {entity === undefined ? null : isCanonical ? (
                         <p className="text-xs text-ok">{copy.pages.detail.canonicalIsHere}</p>
                     ) : (

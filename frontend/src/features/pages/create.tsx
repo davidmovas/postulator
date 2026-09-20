@@ -125,7 +125,7 @@ export function PlanPageDialog({
                 <Field
                     label={copy.pages.detail.path}
                     required={true}
-                    hint={copy.pages.detail.pathHint}
+                    tooltip={copy.pages.detail.pathHint}
                     error={fieldErrorOf(create.error, "path")}
                 >
                     {(control) => (
@@ -181,7 +181,7 @@ export function PlanPageDialog({
                 </div>
                 <Field
                     label={copy.pages.detail.entity}
-                    hint={copy.pages.create.entityHint}
+                    tooltip={copy.pages.create.entityHint}
                     error={fieldErrorOf(create.error, "entityId")}
                 >
                     {(control) => (

@@ -56,8 +56,6 @@ export const runs = {
         progress: "Items",
         spend: "Spent",
         started: "Started",
-        finished: "Finished",
-        created: "Created",
         lasted: "Took",
         path: "Path",
         step: "Step",
@@ -72,14 +70,12 @@ export const runs = {
         anyStatus: "Any status",
         kind: "Kind",
         anyKind: "Any kind",
-        itemStatus: "Items",
         anyItemStatus: "All items",
     },
     loading: "Loading the run list",
     loadingItems: "Loading the run items",
     noMatch: "No run matches these filters",
     noItemMatch: "No item of this run has that status.",
-    openRun: "Open this run",
     backToRuns: "Runs",
     notFound: "This run is no longer here.",
     detail: {
@@ -94,7 +90,6 @@ export const runs = {
         done: "completed",
         failed: "failed",
         needsHuman: "need a human",
-        running: "running",
         pending: "pending",
         spent: "Spent",
         spentOf: (spent: string, cap: string) => `${spent} of ${cap}`,
@@ -115,8 +110,6 @@ export const runs = {
         live: "live",
         catchingUp: "catching up",
         settled: "log complete",
-        filterItem: "This item only",
-        filterAll: "Whole run",
         names: {
             "run.queued": "Run queued",
             "run.started": "Run started",
@@ -147,7 +140,6 @@ export const runs = {
         waitingUntil: (left: string) => `waiting ${left}`,
         retrying: (attempt: number, left: string) => `retrying, attempt ${attempt} in ${left}`,
         recipe: (first: string, last: string, total: number) => `${total} steps · ${first} → ${last}`,
-        noPercent: "There is no progress inside a step — only which step the item is on.",
     },
     start: {
         open: "Start run",
@@ -183,7 +175,6 @@ export const runs = {
         driftRefused: "Publish stopped — the page changed in WordPress",
         driftRefusedBody:
             "This run refuses drift, so it did not overwrite the edit. What changed cannot be shown: raw WordPress content is not exposed by any binding.",
-        item: (path: string) => path,
         attempt: (attempts: number) => (attempts === 1 ? "attempt 1" : `${attempts} attempts`),
         noArtifacts: "Nothing to review yet",
         noArtifactsBody:
@@ -212,7 +203,6 @@ export const runs = {
         },
         body: {
             preview: "Sandboxed preview",
-            isolated: "Rendered in an isolated frame with no scripts and no access to this window.",
             empty: "The body artifact is empty.",
         },
         links: {
@@ -262,10 +252,8 @@ export const runs = {
             seoApplied: "SEO fields written",
             skipped: "Skipped",
             liveUrl: "Live URL",
-            none: "This item has not published.",
         },
         draft: { sections: "Sections", summary: "Summary" },
-        meta: { characters: (count: number) => `${count} characters` },
         images: { featured: "Featured image", skipped: "Skipped", none: "No image was placed." },
         relink: {
             linked: "linked",
@@ -274,12 +262,10 @@ export const runs = {
             neighbours: "Neighbours",
             none: "No neighbour was touched.",
         },
-        sync: { none: "Nothing was read back for this item." },
         report: {
             score: "Final score",
             errors: "errors",
             warnings: "warnings",
-            none: "This item produced no final report.",
         },
     },
 };

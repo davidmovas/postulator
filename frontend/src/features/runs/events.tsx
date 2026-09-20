@@ -70,7 +70,7 @@ export function RunEventFeed({ events, gap, itemId, paths }: RunEventFeedProps):
     const catching = events.phase === "catching-up";
 
     return (
-        <section className="flex min-h-0 w-80 shrink-0 flex-col border-l border-hairline bg-panel">
+        <section className="flex h-full min-h-0 flex-col bg-panel">
             <PanelHeader title={copy.runs.events.title}>
                 {gap || catching ? (
                     <span className="inline-flex items-center gap-1 text-2xs text-info">
@@ -133,9 +133,8 @@ export function RunEventFeed({ events, gap, itemId, paths }: RunEventFeedProps):
                     })}
                 </ol>
             )}
-            <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-hairline px-2.5 py-1.5 font-mono text-2xs text-ink-faint">
-                <span>{copy.runs.events.seq(events.contiguousSeq)}</span>
-                <span>{copy.runs.step.noPercent}</span>
+            <footer className="flex shrink-0 items-center justify-end border-t border-hairline px-2.5 py-1.5 font-mono text-2xs text-ink-faint">
+                {copy.runs.events.seq(events.contiguousSeq)}
             </footer>
         </section>
     );

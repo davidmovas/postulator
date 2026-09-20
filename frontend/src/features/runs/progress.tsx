@@ -2,10 +2,60 @@ import type { ReactElement } from "react";
 
 import { copy } from "../../copy/index.js";
 import type { Run } from "../../data/types.js";
-import { duration, tokens as formatTokens, usd as formatUsd } from "../../domain/format.js";
-import { BudgetGauge, ProgressBar, SectionLabel } from "../../ui/index.js";
+import { absoluteTime, duration, relativeTime, tokens as formatTokens, usd as formatUsd } from "../../domain/format.js";
+import type { IconComponent } from "../../ui/index.js";
+import {
+    AlarmIcon,
+    BudgetGauge,
+    DashboardCustomizeIcon,
+    EditNoteIcon,
+    ProgressBar,
+    ScheduleIcon,
+    SectionLabel,
+} from "../../ui/index.js";
 import type { RunView, StatsView } from "./authority.js";
+import { recipeSteps } from "./recipe.js";
 import { spanMs } from "./span.js";
+
+interface FactProps {
+    icon: IconComponent;
+    children: string;
+    title?: string;
+}
+
+function Fact({ icon: Icon, children, title }: FactProps): ReactElement {
+    return (
+        <span title={title} className="inline-flex min-w-0 items-center gap-1 text-2xs text-ink-faint">
+            <Icon size={13} className="shrink-0" />
+            <span className="truncate">{children}</span>
+        </span>
+    );
+}
+
+function Facts({ run }: { run: Run }): ReactElement {
+    const steps = recipeSteps(run);
+    return (
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 md:col-span-3">
+            <Fact icon={ScheduleIcon} title={absoluteTime(run.startedAt)}>
+                {`${copy.runs.detail.startedBy(run.createdBy)} · ${relativeTime(run.startedAt)}`}
+            </Fact>
+            <Fact icon={EditNoteIcon}>{copy.runs.detail.publishMode(run.publishMode)}</Fact>
+            <Fact icon={AlarmIcon} title={absoluteTime(run.deadlineAt)}>
+                {`${copy.runs.detail.deadline} ${relativeTime(run.deadlineAt)}`}
+            </Fact>
+            <Fact icon={DashboardCustomizeIcon}>
+                {run.templateId === ""
+                    ? copy.runs.detail.noTemplate
+                    : copy.runs.detail.template(run.templateId, run.templateVersion)}
+            </Fact>
+            {steps.length === 0 ? null : (
+                <Fact icon={DashboardCustomizeIcon}>
+                    {copy.runs.step.recipe(steps[0], steps[steps.length - 1], steps.length)}
+                </Fact>
+            )}
+        </div>
+    );
+}
 
 export interface RunProgressProps {
     run: Run;
@@ -22,7 +72,8 @@ export function RunProgress({ run, view, stats, terminal, now }: RunProgressProp
     const lasted = spanMs(run.startedAt, run.finishedAt, now);
 
     return (
-        <div className="grid shrink-0 grid-cols-1 gap-4 border-b border-hairline px-3 py-3 md:grid-cols-3">
+        <div className="grid shrink-0 grid-cols-1 gap-x-4 gap-y-3 border-b border-hairline px-3 py-3 md:grid-cols-3">
+            <Facts run={run} />
             <div className="flex flex-col gap-1" title={counted}>
                 <SectionLabel>{copy.runs.columns.progress}</SectionLabel>
                 <ProgressBar
