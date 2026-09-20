@@ -1,11 +1,10 @@
 import type { ReactElement } from "react";
 import { useMemo } from "react";
-import { useNavigate } from "react-router";
 
+import { copy } from "../../copy/index.js";
 import { flatten } from "../../data/call.js";
 import { usePages } from "../../data/hooks/pages.js";
 import type { Page } from "../../data/types.js";
-import { copy } from "../../copy/index.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
 import {
     AccountTreeIcon,
@@ -21,14 +20,15 @@ import {
     TableCell,
     TableHead,
     TableRow,
+    UploadFileIcon,
+    VirtualRows,
 } from "../../ui/index.js";
 import type { EntityIndex } from "./entities.js";
 import { statusTone } from "./labels.js";
 import { defaultQuery, filterOf, narrowed, nextSort } from "./params.js";
 import type { PagesQuery } from "./params.js";
-import { VirtualRows } from "../../ui/index.js";
 
-const columns = "minmax(120px,2.4fr) minmax(96px,2fr) 76px 92px minmax(96px,1.5fr) 56px 84px 84px";
+const columns = "minmax(120px,2.4fr) minmax(96px,2fr) 76px 92px minmax(96px,1.5fr) 44px 84px";
 const rowHeight = 28;
 const pageSize = 200;
 
@@ -36,16 +36,22 @@ interface PageRowProps {
     page: Page;
     selected: boolean;
     entityName: string | null;
+    onSelect: (pageId: string) => void;
     onOpen: (pageId: string) => void;
 }
 
-function PageRow({ page, selected, entityName, onOpen }: PageRowProps): ReactElement {
+function PageRow({ page, selected, entityName, onSelect, onOpen }: PageRowProps): ReactElement {
     return (
         <TableRow
+            data-page-row={true}
+            data-page-id={page.id}
             interactive={true}
             selected={selected}
             tabIndex={0}
             onClick={() => {
+                onSelect(page.id);
+            }}
+            onDoubleClick={() => {
                 onOpen(page.id);
             }}
             onKeyDown={(event) => {
@@ -55,7 +61,9 @@ function PageRow({ page, selected, entityName, onOpen }: PageRowProps): ReactEle
                 }
             }}
         >
-            <TableCell mono={true}>{page.path}</TableCell>
+            <TableCell mono={true} title={page.path}>
+                {page.path}
+            </TableCell>
             <TableCell muted={true}>{page.title === "" ? copy.pages.untitled : page.title}</TableCell>
             <TableCell mono={true} muted={true}>
                 {page.wpType}
@@ -84,9 +92,6 @@ function PageRow({ page, selected, entityName, onOpen }: PageRowProps): ReactEle
             <TableCell mono={true} muted={true} title={absoluteTime(page.lastSyncedAt)}>
                 {relativeTime(page.lastSyncedAt)}
             </TableCell>
-            <TableCell mono={true} muted={true} title={absoluteTime(page.createdAt)}>
-                {relativeTime(page.createdAt)}
-            </TableCell>
         </TableRow>
     );
 }
@@ -94,34 +99,33 @@ function PageRow({ page, selected, entityName, onOpen }: PageRowProps): ReactEle
 export interface PageTableProps {
     siteId: string;
     query: PagesQuery;
-    onQueryChange: (next: PagesQuery) => void;
-    selectedId: string | null;
     index: EntityIndex;
-    search: string;
-    onPlan: () => void;
+    selectedId: string | null;
+    onQueryChange: (next: PagesQuery) => void;
+    onSelect: (pageId: string) => void;
+    onOpen: (pageId: string) => void;
+    onCreate: () => void;
+    onImport: () => void;
+    onSync: () => void;
+    syncing: boolean;
 }
 
 export function PageTable({
     siteId,
     query,
-    onQueryChange,
-    selectedId,
     index,
-    search,
-    onPlan,
+    selectedId,
+    onQueryChange,
+    onSelect,
+    onOpen,
+    onCreate,
+    onImport,
+    onSync,
+    syncing,
 }: PageTableProps): ReactElement {
-    const navigate = useNavigate();
     const filter = useMemo(() => filterOf(siteId, query), [siteId, query]);
     const listed = usePages(filter, query.sort, pageSize);
     const rows = useMemo(() => flatten(listed.data?.pages), [listed.data]);
-
-    const open = (pageId: string): void => {
-        void navigate(`/s/${siteId}/pages/${pageId}${search}`);
-    };
-
-    const toggle = (field: "path" | "createdAt"): void => {
-        onQueryChange({ ...query, sort: nextSort(query.sort, field) });
-    };
 
     if (listed.isPending) {
         return (
@@ -138,7 +142,6 @@ export function PageTable({
                     <EmptyState
                         icon={FilterAltIcon}
                         title={copy.pages.noMatch}
-                        body={copy.pages.noMatchBody}
                         actions={
                             <Button
                                 onClick={() => {
@@ -154,10 +157,19 @@ export function PageTable({
                         icon={AccountTreeIcon}
                         title={copy.pages.empty.title}
                         body={copy.empty.pages}
+                        className="w-96"
                         actions={
-                            <Button variant="primary" onClick={onPlan}>
-                                {copy.pages.plan}
-                            </Button>
+                            <>
+                                <Button variant="primary" icon={UploadFileIcon} onClick={onImport}>
+                                    {copy.pages.importSheet}
+                                </Button>
+                                <Button busy={syncing} onClick={onSync}>
+                                    {syncing ? copy.pages.syncing : copy.pages.sync}
+                                </Button>
+                                <Button variant="ghost" onClick={onCreate}>
+                                    {copy.pages.newPage}
+                                </Button>
+                            </>
                         }
                     />
                 )}
@@ -166,13 +178,13 @@ export function PageTable({
     }
 
     return (
-        <DenseTable columns={columns} label={copy.nav.pages} className="min-h-0 flex-1">
+        <DenseTable columns={columns} label={copy.pages.title} className="min-h-0 flex-1">
             <TableHead>
                 <SortableHeader
                     active={query.sort?.field === "path"}
                     direction={query.sort?.desc === true ? "desc" : "asc"}
                     onToggle={() => {
-                        toggle("path");
+                        onQueryChange({ ...query, sort: nextSort(query.sort, "path") });
                     }}
                 >
                     {copy.pages.columns.path}
@@ -183,20 +195,11 @@ export function PageTable({
                 <div>{copy.pages.columns.entity}</div>
                 <div>{copy.pages.columns.drift}</div>
                 <div>{copy.pages.columns.synced}</div>
-                <SortableHeader
-                    active={query.sort?.field === "createdAt"}
-                    direction={query.sort?.desc === true ? "desc" : "asc"}
-                    onToggle={() => {
-                        toggle("createdAt");
-                    }}
-                >
-                    {copy.pages.columns.created}
-                </SortableHeader>
             </TableHead>
             <VirtualRows
                 count={rows.length}
                 rowHeight={rowHeight}
-                scrollKey={`${siteId}:table`}
+                scrollKey={`${siteId}:pages`}
                 row={(position) => {
                     const page = rows[position];
                     if (page === undefined) {
@@ -206,8 +209,11 @@ export function PageTable({
                         <PageRow
                             page={page}
                             selected={page.id === selectedId}
-                            entityName={page.entityId === null ? null : (index.byId.get(page.entityId)?.name ?? null)}
-                            onOpen={open}
+                            entityName={
+                                page.entityId === null ? null : (index.byId.get(page.entityId)?.name ?? null)
+                            }
+                            onSelect={onSelect}
+                            onOpen={onOpen}
                         />
                     );
                 }}
@@ -221,7 +227,7 @@ export function PageTable({
                                     void listed.fetchNextPage();
                                 }}
                             >
-                                {copy.pages.loadMore}
+                                {copy.app.loadMore}
                             </Button>
                         </div>
                     ) : null

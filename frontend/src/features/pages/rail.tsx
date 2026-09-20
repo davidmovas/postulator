@@ -1,14 +1,13 @@
 import type { ReactElement } from "react";
-import { useEffect, useState } from "react";
 
-import { useSiteOverview } from "../../data/hooks/reports.js";
 import { copy } from "../../copy/index.js";
+import { useSiteOverview } from "../../data/hooks/reports.js";
 import { pageStatuses } from "../../generated/vocab.js";
 import type { SelectOption } from "../../ui/index.js";
-import { Button, Checkbox, cx, Input, SectionLabel, Select } from "../../ui/index.js";
+import { Button, Checkbox, cx, SectionLabel, Select } from "../../ui/index.js";
+import type { EntityIndex } from "./entities.js";
 import { defaultQuery, narrowed } from "./params.js";
 import type { PagesQuery } from "./params.js";
-import type { EntityIndex } from "./entities.js";
 
 const anyEntity = "any";
 
@@ -16,18 +15,21 @@ interface CountedRowProps {
     label: string;
     count: number | undefined;
     active: boolean;
+    disabled: boolean;
     onSelect: () => void;
 }
 
-function CountedRow({ label, count, active, onSelect }: CountedRowProps): ReactElement {
+function CountedRow({ label, count, active, disabled, onSelect }: CountedRowProps): ReactElement {
     return (
         <button
             type="button"
             aria-pressed={active}
+            disabled={disabled}
             onClick={onSelect}
             className={cx(
                 "flex h-6 w-full items-center justify-between gap-2 rounded-sm px-1.5 text-xs transition-colors duration-100",
-                active ? "bg-accent-soft text-ink" : "text-ink-dim hover:bg-inset hover:text-ink",
+                "disabled:cursor-not-allowed disabled:opacity-50",
+                active ? "bg-accent-soft text-ink" : "text-ink-dim enabled:hover:bg-inset enabled:hover:text-ink",
             )}
         >
             <span className="truncate">{label}</span>
@@ -36,28 +38,17 @@ function CountedRow({ label, count, active, onSelect }: CountedRowProps): ReactE
     );
 }
 
-export interface PageFiltersProps {
+export interface PageRailProps {
     siteId: string;
     query: PagesQuery;
-    onChange: (next: PagesQuery) => void;
     index: EntityIndex;
+    disabled: boolean;
+    onChange: (next: PagesQuery) => void;
 }
 
-export function PageFilters({ siteId, query, onChange, index }: PageFiltersProps): ReactElement {
+export function PageRail({ siteId, query, index, disabled, onChange }: PageRailProps): ReactElement {
     const overview = useSiteOverview(siteId);
     const totals = overview.data?.pages;
-    const [prefix, setPrefix] = useState(query.pathPrefix);
-
-    useEffect(() => {
-        setPrefix(query.pathPrefix);
-    }, [query.pathPrefix]);
-
-    const applyPrefix = (): void => {
-        const trimmed = prefix.trim();
-        if (trimmed !== query.pathPrefix) {
-            onChange({ ...query, pathPrefix: trimmed });
-        }
-    };
 
     const entityOptions: SelectOption<string>[] = [
         { value: anyEntity, label: copy.pages.filters.anyEntity },
@@ -65,16 +56,17 @@ export function PageFilters({ siteId, query, onChange, index }: PageFiltersProps
     ];
 
     return (
-        <aside
+        <div
             aria-label={copy.pages.filters.title}
-            className="flex w-52 shrink-0 flex-col gap-3 overflow-auto border-r border-hairline bg-panel p-3"
+            title={disabled ? copy.pages.tableOnly : undefined}
+            className="flex flex-col gap-3 p-3"
         >
             <div className="flex items-center justify-between gap-2">
                 <SectionLabel>{copy.pages.filters.title}</SectionLabel>
                 <Button
                     size="sm"
                     variant="ghost"
-                    disabled={!narrowed(query)}
+                    disabled={disabled || !narrowed(query)}
                     onClick={() => {
                         onChange({ ...defaultQuery, view: query.view, sort: query.sort });
                     }}
@@ -84,31 +76,12 @@ export function PageFilters({ siteId, query, onChange, index }: PageFiltersProps
             </div>
 
             <div className="flex flex-col gap-1">
-                <SectionLabel>{copy.pages.filters.pathPrefix}</SectionLabel>
-                <Input
-                    mono={true}
-                    value={prefix}
-                    placeholder="/"
-                    aria-label={copy.pages.filters.pathPrefix}
-                    onChange={(event) => {
-                        setPrefix(event.target.value);
-                    }}
-                    onBlur={applyPrefix}
-                    onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                            applyPrefix();
-                        }
-                    }}
-                />
-                <p className="text-2xs text-ink-faint">{copy.pages.filters.pathPrefixHint}</p>
-            </div>
-
-            <div className="flex flex-col gap-1">
                 <SectionLabel>{copy.pages.filters.status}</SectionLabel>
                 <CountedRow
                     label={copy.pages.filters.anyStatus}
                     count={totals?.total}
                     active={query.status === ""}
+                    disabled={disabled}
                     onSelect={() => {
                         onChange({ ...query, status: "" });
                     }}
@@ -119,6 +92,7 @@ export function PageFilters({ siteId, query, onChange, index }: PageFiltersProps
                         label={status}
                         count={totals?.byStatus?.[status]}
                         active={query.status === status}
+                        disabled={disabled}
                         onSelect={() => {
                             onChange({ ...query, status: query.status === status ? "" : status });
                         }}
@@ -126,26 +100,23 @@ export function PageFilters({ siteId, query, onChange, index }: PageFiltersProps
                 ))}
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1.5">
                 <SectionLabel>{copy.pages.filters.entity}</SectionLabel>
-                <Select
-                    value={query.entityId === "" ? anyEntity : query.entityId}
-                    options={entityOptions}
-                    aria-label={copy.pages.filters.entity}
-                    disabled={index.entities.length === 0}
-                    onValueChange={(next) => {
-                        onChange({ ...query, entityId: next === anyEntity ? "" : next, unmapped: false });
-                    }}
-                />
-                {index.entities.length === 0 ? (
-                    <p className="text-2xs text-ink-faint">{copy.pages.filters.noEntities}</p>
-                ) : null}
-                {index.complete ? null : (
-                    <p className="text-2xs text-warn">{copy.pages.filters.partialEntities}</p>
-                )}
-                <div className="mt-1 flex items-center justify-between gap-2">
+                <div title={index.entities.length === 0 ? copy.pages.filters.noEntities : undefined}>
+                    <Select
+                        value={query.entityId === "" ? anyEntity : query.entityId}
+                        options={entityOptions}
+                        aria-label={copy.pages.filters.entity}
+                        disabled={disabled || index.entities.length === 0}
+                        onValueChange={(next) => {
+                            onChange({ ...query, entityId: next === anyEntity ? "" : next, unmapped: false });
+                        }}
+                    />
+                </div>
+                <div className="flex items-center justify-between gap-2">
                     <Checkbox
                         checked={query.unmapped}
+                        disabled={disabled}
                         label={copy.pages.filters.unmapped}
                         onChange={(event) => {
                             onChange({
@@ -158,6 +129,6 @@ export function PageFilters({ siteId, query, onChange, index }: PageFiltersProps
                     <span className="shrink-0 font-mono text-2xs text-ink-faint">{totals?.unmapped ?? ""}</span>
                 </div>
             </div>
-        </aside>
+        </div>
     );
 }
