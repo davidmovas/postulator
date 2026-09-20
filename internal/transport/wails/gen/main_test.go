@@ -51,6 +51,28 @@ func TestGeneratedFileIsInSync(t *testing.T) {
 	}
 }
 
+func TestRenderCarriesTheEventNameTuple(t *testing.T) {
+	t.Parallel()
+
+	var out bytes.Buffer
+	if err := render(&out, events.NewRegistry().Entries()); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+
+	rendered := out.String()
+	if !strings.Contains(rendered, "export const eventTypes = [\n") {
+		t.Fatal("the module carries no eventTypes tuple")
+	}
+	if !strings.Contains(rendered, "] as const;") {
+		t.Fatal("the eventTypes tuple is not readonly")
+	}
+	for _, entry := range events.NewRegistry().Entries() {
+		if !strings.Contains(rendered, "    \""+string(entry.Type)+"\",\n") {
+			t.Errorf("the eventTypes tuple is missing %q", string(entry.Type))
+		}
+	}
+}
+
 func TestRenderIsDeterministic(t *testing.T) {
 	t.Parallel()
 

@@ -32,6 +32,41 @@ export type EventType =
     | "step.started"
     | "templates.changed";
 
+export const eventTypes = [
+    "agent.confirm.requested",
+    "agent.confirm.resolved",
+    "agent.delta",
+    "agent.done",
+    "agent.titled",
+    "agent.tool.finished",
+    "agent.tool.started",
+    "app.locked",
+    "app.unlocked",
+    "graph.changed",
+    "item.done",
+    "item.failed",
+    "item.needs_human",
+    "item.started",
+    "llm.usage",
+    "pages.changed",
+    "run.budget_exceeded",
+    "run.cancelled",
+    "run.completed",
+    "run.failed",
+    "run.paused",
+    "run.queued",
+    "run.resumed",
+    "run.started",
+    "schedules.changed",
+    "settings.changed",
+    "sites.changed",
+    "step.done",
+    "step.failed",
+    "step.retrying",
+    "step.started",
+    "templates.changed",
+] as const;
+
 export interface AgentConfirmRequestedPayload {
     conversationId: string;
     confirmationId: string;
@@ -61,6 +96,7 @@ export interface AgentDonePayload {
     conversationId: string;
     messageId: string;
     text: string;
+    code: string;
     error: string;
     inputTokens: number;
     outputTokens: number;

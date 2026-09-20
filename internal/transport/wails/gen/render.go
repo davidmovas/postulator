@@ -26,6 +26,12 @@ func render(w io.Writer, entries []events.Entry) error {
 		fmt.Fprintf(&out, "    | %q%s", string(entry.Type), terminator)
 	}
 
+	out.WriteString("export const eventTypes = [\n")
+	for _, entry := range entries {
+		fmt.Fprintf(&out, "    %q,\n", string(entry.Type))
+	}
+	out.WriteString("] as const;\n\n")
+
 	for _, entry := range entries {
 		block, err := renderInterface(entry)
 		if err != nil {
