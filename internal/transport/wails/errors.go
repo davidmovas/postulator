@@ -9,8 +9,6 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
-const internalMessage = "unexpected internal error"
-
 const fallbackBody = `{"code":"INTERNAL","message":"unexpected internal error"}`
 
 type Retry struct {
@@ -25,12 +23,14 @@ type Error struct {
 }
 
 func describe(err error) Error {
+	code, message := errors.Describe(err)
+	described := Error{Code: string(code), Message: message}
+
 	var kernel *errors.Error
 	if !stderrors.As(err, &kernel) || kernel == nil {
-		return Error{Code: string(errors.Internal), Message: internalMessage}
+		return described
 	}
 
-	described := Error{Code: string(kernel.Code), Message: kernel.Message}
 	if kernel.Code != errors.Internal && len(kernel.Details) > 0 {
 		described.Details = maps.Clone(kernel.Details)
 	}

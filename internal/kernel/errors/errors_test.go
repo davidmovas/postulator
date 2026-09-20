@@ -298,3 +298,55 @@ func TestCodesAreFrozen(t *testing.T) {
 		}
 	}
 }
+
+func TestDescribe(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		err     error
+		code    errors.Code
+		message string
+	}{
+		{name: "no failure"},
+		{
+			name: "a kernel error keeps its code and its message",
+			err:  errors.New(errors.NotFound, "no page carries that path"),
+			code: errors.NotFound, message: "no page carries that path",
+		},
+		{
+			name: "a curated internal message is kept, because the transport keeps it too",
+			err:  errors.New(errors.Internal, "handler panicked"),
+			code: errors.Internal, message: "handler panicked",
+		},
+		{
+			name: "a foreign error is internal and says nothing",
+			err:  io.EOF,
+			code: errors.Internal, message: "unexpected internal error",
+		},
+		{
+			name: "a wrapped error is described by its code",
+			err:  errors.Wrap(io.EOF, errors.External, "the site refused the write"),
+			code: errors.External, message: "the site refused the write",
+		},
+		{
+			name: "the cause never reaches the description",
+			err:  errors.New(errors.Unauthorized, "the key was rejected").WithInternal(io.EOF),
+			code: errors.Unauthorized, message: "the key was rejected",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			code, message := errors.Describe(tc.err)
+			if code != tc.code {
+				t.Errorf("code = %q, want %q", code, tc.code)
+			}
+			if message != tc.message {
+				t.Errorf("message = %q, want %q", message, tc.message)
+			}
+		})
+	}
+}

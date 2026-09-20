@@ -11,6 +11,8 @@ import (
 const (
 	maxStackDepth   = 32
 	stackSkipFrames = 3
+
+	internalMessage = "unexpected internal error"
 )
 
 type RetryInfo struct {
@@ -122,6 +124,18 @@ func CodeOf(err error) Code {
 		return kernel.Code
 	}
 	return Internal
+}
+
+func Describe(err error) (Code, string) {
+	if err == nil {
+		return "", ""
+	}
+
+	var kernel *Error
+	if !stderrors.As(err, &kernel) || kernel == nil {
+		return Internal, internalMessage
+	}
+	return kernel.Code, kernel.Message
 }
 
 func IsCode(err error, code Code) bool {
