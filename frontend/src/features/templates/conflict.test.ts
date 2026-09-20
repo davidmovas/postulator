@@ -1,38 +1,65 @@
 import { describe, expect, it } from "vitest";
 
+import { blankDraft } from "./blank.js";
 import type { ConflictKind, Stamp } from "./conflict.js";
-import { conflictOf, stampsAgree } from "./conflict.js";
+import { beneathOf, conflictOf } from "./conflict.js";
 import type { Layer } from "./patch.js";
 
-const opened: Stamp = { version: 3, updatedAt: "2026-09-20T10:00:00Z", overrideUpdatedAt: "2026-09-20T10:00:00Z" };
+const spec = blankDraft();
+const opened: Stamp = { beneath: beneathOf(spec), overrideUpdatedAt: "2026-09-20T10:00:00Z" };
+const moved = beneathOf({ ...spec, maxLinks: 3 });
+
+describe("beneathOf", () => {
+    it("is the same string for the same spec and a different one when the spec moves", () => {
+        expect(beneathOf(spec)).toBe(beneathOf(blankDraft()));
+        expect(beneathOf(spec)).not.toBe(moved);
+    });
+
+    it("answers for a layer that is not loaded yet", () => {
+        expect(beneathOf(null)).toBe("");
+    });
+});
 
 describe("conflictOf", () => {
     const cases: readonly { name: string; layer: Layer; current: Stamp; dirty: boolean; want: ConflictKind }[] = [
-        { name: "a clean editor never conflicts", layer: "site", current: { ...opened, version: 9 }, dirty: false, want: "none" },
+        {
+            name: "a clean editor never conflicts",
+            layer: "site",
+            current: { beneath: moved, overrideUpdatedAt: null },
+            dirty: false,
+            want: "none",
+        },
         { name: "nothing moved, nothing to say", layer: "site", current: opened, dirty: true, want: "none" },
         {
-            name: "a bumped version is the template moving underneath",
+            name: "the spec beneath the layer moved",
             layer: "site",
-            current: { ...opened, version: 4 },
+            current: { ...opened, beneath: moved },
             dirty: true,
             want: "template",
         },
         {
-            name: "a new updatedAt with the same version still counts",
+            name: "the template itself moved while it was being edited",
             layer: "global",
-            current: { ...opened, updatedAt: "2026-09-20T11:00:00Z" },
+            current: { ...opened, beneath: moved },
             dirty: true,
             want: "template",
         },
         {
-            name: "the layer's own override moving is its own kind",
+            name: "a rename does not move the spec, so it is not a conflict",
+            layer: "site",
+            current: { ...opened },
+            dirty: true,
+            want: "none",
+        },
+        {
+            name: "the layer's own override was saved elsewhere",
             layer: "site",
             current: { ...opened, overrideUpdatedAt: "2026-09-20T11:00:00Z" },
             dirty: true,
             want: "override",
         },
         {
-            name: "the page layer watches its own override too",
+            name: "the layer's own override was dropped elsewhere",
             layer: "page",
             current: { ...opened, overrideUpdatedAt: null },
             dirty: true,
@@ -46,9 +73,9 @@ describe("conflictOf", () => {
             want: "none",
         },
         {
-            name: "the template moving wins over the override moving",
+            name: "a moved spec wins over a moved override",
             layer: "site",
-            current: { version: 4, updatedAt: "2026-09-20T11:00:00Z", overrideUpdatedAt: "2026-09-20T11:00:00Z" },
+            current: { beneath: moved, overrideUpdatedAt: "2026-09-20T11:00:00Z" },
             dirty: true,
             want: "template",
         },
@@ -61,15 +88,6 @@ describe("conflictOf", () => {
     }
 
     it("says nothing before the editor has taken a stamp", () => {
-        expect(conflictOf("site", null, opened, true)).toBe("none");
-    });
-});
-
-describe("stampsAgree", () => {
-    it("compares all three fields", () => {
-        expect(stampsAgree(opened, { ...opened })).toBe(true);
-        expect(stampsAgree(opened, { ...opened, version: 4 })).toBe(false);
-        expect(stampsAgree(opened, { ...opened, updatedAt: "2026-09-20T11:00:00Z" })).toBe(false);
-        expect(stampsAgree(opened, { ...opened, overrideUpdatedAt: null })).toBe(false);
+        expect(conflictOf("site", null, { beneath: moved, overrideUpdatedAt: null }, true)).toBe("none");
     });
 });

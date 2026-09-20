@@ -40,6 +40,7 @@ export function TemplateEditorScreen(): ReactElement {
     const [renaming, setRenaming] = useState(false);
     const [confirming, setConfirming] = useState(false);
     const [leaving, setLeaving] = useState<{ act: () => void } | null>(null);
+    const [skeleton, setSkeleton] = useState(true);
 
     const state = useLayerState(templateId, siteId, pageId, layer);
     const { draft, dirty, marks, conflict, edit, clear } = useDraft(
@@ -178,6 +179,10 @@ export function TemplateEditorScreen(): ReactElement {
                     saving={pending}
                     isDefault={isDefault}
                     canSetDefault={site.data !== undefined}
+                    skeleton={skeleton}
+                    onToggleSkeleton={() => {
+                        setSkeleton((held) => !held);
+                    }}
                     onOpenPage={() => {
                         void navigate(`/s/${siteId}/pages/${pageId ?? ""}?tab=preview`);
                     }}
@@ -220,7 +225,7 @@ export function TemplateEditorScreen(): ReactElement {
                     }}
                 />
             }
-            right={<SkeletonPanel draft={draft} />}
+            right={skeleton ? <SkeletonPanel draft={draft} /> : null}
         >
             <div className="min-h-0 flex-1 overflow-auto p-4">
                 <div className="flex flex-col gap-3">

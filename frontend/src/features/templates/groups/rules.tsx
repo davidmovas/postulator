@@ -15,12 +15,17 @@ interface RowProps {
     onChange: (patch: Partial<SpecDraft>) => void;
 }
 
+function controlId(rule: Rule): string {
+    return `rule-${rule.key}`;
+}
+
 function Control({ rule, draft, error, onChange }: Omit<RowProps, "below">): ReactElement {
     const invalid = fieldErrorOf(error, rule.field) !== null;
     switch (rule.kind) {
         case "switch":
             return (
                 <Switch
+                    id={controlId(rule)}
                     checked={rule.read(draft)}
                     aria-label={rule.label}
                     onChange={(event) => {
@@ -32,6 +37,7 @@ function Control({ rule, draft, error, onChange }: Omit<RowProps, "below">): Rea
             return (
                 <div className="w-24">
                     <NumberInput
+                        id={controlId(rule)}
                         value={rule.read(draft)}
                         invalid={invalid}
                         min={rule.min}
@@ -47,6 +53,7 @@ function Control({ rule, draft, error, onChange }: Omit<RowProps, "below">): Rea
             return (
                 <div className="w-48">
                     <Select
+                        id={controlId(rule)}
                         value={rule.read(draft)}
                         options={rule.options}
                         invalid={invalid}
@@ -60,6 +67,7 @@ function Control({ rule, draft, error, onChange }: Omit<RowProps, "below">): Rea
         default:
             return (
                 <Input
+                    id={controlId(rule)}
                     value={rule.read(draft)}
                     invalid={invalid}
                     mono={rule.mono}
@@ -78,18 +86,20 @@ function Row({ rule, draft, below, error, onChange }: RowProps): ReactElement {
     const wide = rule.kind === "text";
     return (
         <div
+            data-rule={rule.key}
             className={cx(
                 "flex flex-col gap-1 border-b border-inset px-3 py-2 last:border-b-0",
                 changed && "shadow-[inset_2px_0_0_var(--color-accent)]",
             )}
         >
             <div className={cx("flex min-w-0 gap-3", wide ? "flex-col" : "items-center")}>
-                <span
+                <label
+                    htmlFor={controlId(rule)}
                     className={cx("min-w-0 truncate text-xs text-ink-soft", !wide && "flex-1")}
                     title={rule.hint}
                 >
                     {rule.label}
-                </span>
+                </label>
                 <Control rule={rule} draft={draft} error={error} onChange={onChange} />
                 {changed ? (
                     <IconButton

@@ -49,19 +49,6 @@ function Card({ section, index, total, error, onChange, onMove, onRemove }: Card
                         }}
                     />
                 </div>
-                <span className="shrink-0 font-mono text-2xs text-ink-faint">
-                    {copy.templates.sections.targetWords}
-                </span>
-                <div className="w-20 shrink-0">
-                    <NumberInput
-                        value={section.targetWords}
-                        min={0}
-                        invalid={fieldErrorOf(error, `${prefix}.targetWords`) !== null}
-                        onValueChange={(targetWords) => {
-                            onChange({ targetWords });
-                        }}
-                    />
-                </div>
                 <IconButton
                     icon={ArrowUpwardIcon}
                     label={copy.templates.sections.moveUp}
@@ -93,7 +80,7 @@ function Card({ section, index, total, error, onChange, onMove, onRemove }: Card
             <div className="flex flex-col gap-2 p-2.5">
                 {headingError === null ? null : <p className="text-2xs text-danger">{headingError}</p>}
                 <Textarea
-                    rows={2}
+                    rows={3}
                     value={section.intent}
                     aria-label={copy.templates.sections.intent}
                     placeholder={copy.templates.sections.intent}
@@ -102,6 +89,21 @@ function Card({ section, index, total, error, onChange, onMove, onRemove }: Card
                         onChange({ intent: event.target.value });
                     }}
                 />
+                <div className="flex items-center gap-2">
+                    <span className="shrink-0 text-2xs text-ink-faint">
+                        {copy.templates.sections.targetWords}
+                    </span>
+                    <div className="w-20 shrink-0">
+                        <NumberInput
+                            value={section.targetWords}
+                            min={0}
+                            invalid={fieldErrorOf(error, `${prefix}.targetWords`) !== null}
+                            onValueChange={(targetWords) => {
+                                onChange({ targetWords });
+                            }}
+                        />
+                    </div>
+                </div>
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                     <span title={copy.templates.sections.requiredHint}>
                         <Switch

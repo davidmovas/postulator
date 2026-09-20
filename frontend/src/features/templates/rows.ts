@@ -3,7 +3,9 @@ import { useMemo } from "react";
 import { flatten } from "../../data/call.js";
 import { useTemplates } from "../../data/hooks/templates.js";
 import type { Template } from "../../data/types.js";
+import type { TemplateSort } from "../../data/sorts.js";
 import type { TemplatesQuery } from "./params.js";
+import { sorts } from "./params.js";
 
 const pageSize = 100;
 
@@ -13,6 +15,18 @@ export function matches(template: Template, search: string): boolean {
         return true;
     }
     return template.name.toLowerCase().includes(needle) || template.pageKind.toLowerCase().includes(needle);
+}
+
+export function ordered(rows: readonly Template[], sort: TemplateSort): readonly Template[] {
+    const out = [...rows];
+    out.sort((a, b) => {
+        const held =
+            sort.field === "name"
+                ? a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+                : (a.createdAt ?? "").localeCompare(b.createdAt ?? "");
+        return sort.desc ? -held : held;
+    });
+    return out;
 }
 
 export function filtered(rows: readonly Template[], query: TemplatesQuery): readonly Template[] {
@@ -48,12 +62,13 @@ export interface TemplateRows {
 }
 
 export function useTemplateRows(siteId: string, query: TemplatesQuery): TemplateRows {
-    const globals = useTemplates({ scope: "global" }, query.sort, pageSize);
-    const locals = useTemplates({ siteId }, query.sort, pageSize);
+    const sort = query.sort ?? sorts.nameAsc;
+    const globals = useTemplates({ scope: "global" }, sort, pageSize);
+    const locals = useTemplates({ siteId }, sort, pageSize);
     const globalRows = useMemo(() => flatten(globals.data?.pages), [globals.data]);
     const localRows = useMemo(() => flatten(locals.data?.pages), [locals.data]);
     const loaded = useMemo(() => [...globalRows, ...localRows], [globalRows, localRows]);
-    const shown = useMemo(() => filtered(loaded, query), [loaded, query]);
+    const shown = useMemo(() => ordered(filtered(loaded, query), sort), [loaded, query, sort]);
     const kinds = useMemo(() => kindsOf(loaded), [loaded]);
 
     return {

@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useTemplate } from "../../data/hooks/templates.js";
 import type { Template, TemplateOverride } from "../../data/types.js";
 import type { ConflictKind, Stamp } from "./conflict.js";
-import { conflictOf } from "./conflict.js";
+import { beneathOf, conflictOf } from "./conflict.js";
 import type { GroupKey } from "./outline.js";
 import { changedGroups } from "./outline.js";
 import type { Layer } from "./patch.js";
@@ -72,8 +72,7 @@ export function useLayerState(
         pageOverride,
         pageOverrides,
         stamp: {
-            version: template?.version ?? 0,
-            updatedAt: template?.updatedAt ?? "",
+            beneath: beneathOf(layer === "page" ? siteResolved : base),
             overrideUpdatedAt: (layer === "page" ? pageOverride?.updatedAt : siteOverride?.updatedAt) ?? null,
         },
     };

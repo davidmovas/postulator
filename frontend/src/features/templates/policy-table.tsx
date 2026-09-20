@@ -16,7 +16,7 @@ import {
 } from "../../ui/index.js";
 import { anchorLabel, forbidsLabel, scopeLabel, scopeTone } from "./labels.js";
 
-const columns = "minmax(140px,1fr) 96px 96px 112px minmax(96px,1.2fr) 80px";
+const columns = "minmax(104px,1fr) 88px 52px 100px minmax(96px,1fr) 56px";
 
 interface RowProps {
     policy: LinkPolicy;
@@ -53,9 +53,9 @@ function Row({ policy, selected, inForce, onSelect }: RowProps): ReactElement {
             </TableCell>
             <TableCell>
                 {inForce ? (
-                    <StatusBadge tone="accent" icon={VerifiedIcon}>
-                        {copy.policies.inForce}
-                    </StatusBadge>
+                    <span className="text-accent" title={copy.policies.inForce}>
+                        <VerifiedIcon size={15} aria-label={copy.policies.inForce} role="img" />
+                    </span>
                 ) : null}
             </TableCell>
             <TableCell muted={true}>{forbidsLabel(policy.forbidExternal, policy.forbidSelf)}</TableCell>

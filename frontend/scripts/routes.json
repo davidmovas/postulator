@@ -30,7 +30,179 @@
   },
   {
     "name": "templates",
-    "route": "#/s/:siteId/templates"
+    "route": "#/s/:siteId/templates",
+    "wait": 1200
+  },
+  {
+    "name": "templates-960",
+    "route": "#/s/:siteId/templates",
+    "width": 960,
+    "height": 600,
+    "wait": 1200
+  },
+  {
+    "name": "templates-policies",
+    "route": "#/s/:siteId/templates/policies",
+    "wait": 1200
+  },
+  {
+    "name": "templates-new",
+    "route": "#/s/:siteId/templates",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-template-new]"
+      },
+      {
+        "wait": 700
+      }
+    ]
+  },
+  {
+    "name": "template-editor-global",
+    "route": "#/s/:siteId/templates",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-template-row]"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "click": "[data-open-editor]"
+      },
+      {
+        "wait": 1200
+      }
+    ]
+  },
+  {
+    "name": "template-editor-rules",
+    "route": "#/s/:siteId/templates",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-template-row]"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "click": "[data-open-editor]"
+      },
+      {
+        "wait": 1200
+      },
+      {
+        "click": "[data-editor-group=rules]"
+      },
+      {
+        "wait": 600
+      }
+    ]
+  },
+  {
+    "name": "template-editor-models",
+    "route": "#/s/:siteId/templates",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-template-row]"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "click": "[data-open-editor]"
+      },
+      {
+        "wait": 1200
+      },
+      {
+        "click": "[data-editor-group=models]"
+      },
+      {
+        "wait": 600
+      }
+    ]
+  },
+  {
+    "name": "template-editor-recipe",
+    "route": "#/s/:siteId/templates",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-template-row]"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "click": "[data-open-editor]"
+      },
+      {
+        "wait": 1200
+      },
+      {
+        "click": "[data-editor-group=recipe]"
+      },
+      {
+        "wait": 600
+      }
+    ]
+  },
+  {
+    "name": "template-editor-site",
+    "route": "#/s/:siteId/templates",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-template-row]"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "click": "[data-open-editor]"
+      },
+      {
+        "wait": 1200
+      },
+      {
+        "click": "[role=radio]:has-text(\"This site\")"
+      },
+      {
+        "wait": 700
+      },
+      {
+        "click": "[data-editor-group=overrides]"
+      },
+      {
+        "wait": 700
+      }
+    ]
+  },
+  {
+    "name": "template-editor-960",
+    "route": "#/s/:siteId/templates",
+    "width": 960,
+    "height": 600,
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-template-row]"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "click": "[data-open-editor]"
+      },
+      {
+        "wait": 1200
+      }
+    ]
   },
   {
     "name": "schedules",

@@ -123,6 +123,8 @@ export const templates = {
             overrides: "Overrides",
         },
         skeleton: "Page skeleton",
+        hideSkeleton: "Hide the page skeleton",
+        showSkeleton: "Show the page skeleton",
         forPage: (path: string) => `for ${path}`,
         leaveTitle: "Leave without saving?",
         leaveBody: "What you changed on this layer has not been written yet.",

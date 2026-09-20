@@ -122,7 +122,10 @@ export function CreateTemplateDrawer({
         >
             <div className="flex max-w-xl flex-col gap-3 p-4">
                 {formError === null ? null : <Banner tone="danger" title={formError} />}
-                <Field label={copy.templates.create.startFrom} hint={copy.templates.create.startBlankHint}>
+                <Field
+                    label={copy.templates.create.startFrom}
+                    hint={start === "blank" ? copy.templates.create.startBlankHint : copy.templates.create.copyFromHint}
+                >
                     {() => (
                         <Segmented
                             label={copy.templates.create.startFrom}
@@ -141,7 +144,7 @@ export function CreateTemplateDrawer({
                     templates.length === 0 ? (
                         <Banner tone="warn" title={copy.templates.create.nothingToCopy} />
                     ) : (
-                        <Field label={copy.templates.create.copyFrom} hint={copy.templates.create.copyFromHint}>
+                        <Field label={copy.templates.create.copyFrom}>
                             {(control) => (
                                 <Select
                                     id={control.id}

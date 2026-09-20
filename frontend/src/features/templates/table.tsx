@@ -18,7 +18,7 @@ import {
 } from "../../ui/index.js";
 import { pageKindLabel, scopeLabel, scopeTone } from "./labels.js";
 
-const columns = "minmax(140px,1fr) 96px 112px 64px 96px 96px";
+const columns = "minmax(104px,1fr) 88px 96px 52px 64px 96px";
 
 interface RowProps {
     template: Template;
@@ -67,9 +67,9 @@ function Row({ template, selected, isDefault, onSelect, onOpen }: RowProps): Rea
             </TableCell>
             <TableCell>
                 {isDefault ? (
-                    <StatusBadge tone="accent" icon={VerifiedIcon}>
-                        {copy.templates.siteDefault}
-                    </StatusBadge>
+                    <span className="text-accent" title={copy.templates.siteDefault}>
+                        <VerifiedIcon size={15} aria-label={copy.templates.siteDefault} role="img" />
+                    </span>
                 ) : null}
             </TableCell>
             <TableCell mono={true} muted={true} align="right" title={absoluteTime(template.updatedAt)}>

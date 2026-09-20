@@ -11,6 +11,8 @@ import {
     MoreHorizIcon,
     OpenInNewIcon,
     RestartAltIcon,
+    RightPanelCloseIcon,
+    RightPanelOpenIcon,
     Segmented,
     SmartToyIcon,
     StatusBadge,
@@ -55,6 +57,8 @@ export interface EditorActionsProps {
     saving: boolean;
     isDefault: boolean;
     canSetDefault: boolean;
+    skeleton: boolean;
+    onToggleSkeleton: () => void;
     onOpenPage: () => void;
     onAskAgent: () => void;
     onSave: () => void;
@@ -72,6 +76,8 @@ export function EditorActions({
     saving,
     isDefault,
     canSetDefault,
+    skeleton,
+    onToggleSkeleton,
     onOpenPage,
     onAskAgent,
     onSave,
@@ -122,6 +128,14 @@ export function EditorActions({
                         icon: EditNoteIcon,
                         disabled: layer !== "global",
                         onSelect: onRename,
+                    },
+                    {
+                        key: "skeleton",
+                        label: skeleton
+                            ? copy.templates.editor.hideSkeleton
+                            : copy.templates.editor.showSkeleton,
+                        icon: skeleton ? RightPanelCloseIcon : RightPanelOpenIcon,
+                        onSelect: onToggleSkeleton,
                     },
                     {
                         key: "default",

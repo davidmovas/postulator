@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Template } from "../../data/types.js";
 import { defaultQuery } from "./params.js";
-import { filtered, kindsOf, namesIn } from "./rows.js";
+import { filtered, kindsOf, namesIn, ordered } from "./rows.js";
 
 function template(name: string, scope: string, pageKind: string): Template {
     return {
@@ -61,6 +61,35 @@ describe("filtered", () => {
 
     it("ignores surrounding space in the search", () => {
         expect(filtered(rows, { ...defaultQuery, search: "   " })).toHaveLength(4);
+    });
+});
+
+describe("ordered", () => {
+    it("sorts the merged global and site rows by name, ignoring case", () => {
+        expect(ordered(rows, { field: "name", desc: false }).map((held) => held.name)).toEqual([
+            "Guide",
+            "Hub",
+            "Kiln care guide",
+            "Product — spec table",
+        ]);
+    });
+
+    it("reverses on demand", () => {
+        expect(ordered(rows, { field: "name", desc: true }).map((held) => held.name)[0]).toBe(
+            "Product — spec table",
+        );
+    });
+
+    it("sorts by when the template was made", () => {
+        const older = { ...template("Older", "site", "guide"), createdAt: "2026-01-01T00:00:00Z" };
+        expect(ordered([...rows, older], { field: "createdAt", desc: false })[0].name).toBe("Older");
+        expect(ordered([...rows, older], { field: "createdAt", desc: true }).at(-1)?.name).toBe("Older");
+    });
+
+    it("leaves the rows it was given alone", () => {
+        const before = rows.map((held) => held.name);
+        ordered(rows, { field: "name", desc: true });
+        expect(rows.map((held) => held.name)).toEqual(before);
     });
 });
 
