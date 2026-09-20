@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"slices"
 	"sync"
-	"testing"
 	"time"
 )
 
@@ -23,6 +22,13 @@ const (
 	maxRequestBytes = 32 << 20
 )
 
+type TB interface {
+	Helper()
+	Cleanup(func())
+	Errorf(format string, args ...any)
+	Logf(format string, args ...any)
+}
+
 type Request struct {
 	Query  url.Values
 	Header http.Header
@@ -32,7 +38,7 @@ type Request struct {
 }
 
 type Server struct {
-	t             testing.TB
+	t             TB
 	http          *httptest.Server
 	items         map[int64]*Item
 	categories    map[int64]*Category
@@ -87,7 +93,7 @@ func WithRedirect(mode Redirect) Option {
 	return func(s *Server) { s.redirect = mode }
 }
 
-func New(t testing.TB, opts ...Option) *Server {
+func New(t TB, opts ...Option) *Server {
 	t.Helper()
 
 	server := &Server{

@@ -3,9 +3,11 @@ package wptest_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -317,5 +319,83 @@ func TestTheFakeClockAdvancesWithEveryStoredItem(t *testing.T) {
 	}
 	if !seeded.Modified.Equal(server.Now()) {
 		t.Errorf("modified = %s, clock = %s", seeded.Modified, server.Now())
+	}
+}
+
+type recorder struct {
+	mu       sync.Mutex
+	cleanups []func()
+	errors   []string
+	logs     []string
+	helpers  int
+}
+
+func (r *recorder) Helper() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.helpers++
+}
+
+func (r *recorder) Cleanup(fn func()) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.cleanups = append(r.cleanups, fn)
+}
+
+func (r *recorder) Errorf(format string, args ...any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.errors = append(r.errors, fmt.Sprintf(format, args...))
+}
+
+func (r *recorder) Logf(format string, args ...any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.logs = append(r.logs, fmt.Sprintf(format, args...))
+}
+
+func (r *recorder) close() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, fn := range r.cleanups {
+		fn()
+	}
+}
+
+func TestTheServerRunsOutsideATest(t *testing.T) {
+	t.Parallel()
+
+	reported := &recorder{}
+	server := wptest.New(reported, wptest.WithCredentials("harness", "open sesame 1234"))
+	t.Cleanup(reported.close)
+
+	if reported.helpers == 0 {
+		t.Error("New must mark itself a helper")
+	}
+	if len(reported.cleanups) != 1 {
+		t.Fatalf("New registered %d cleanups, want 1", len(reported.cleanups))
+	}
+
+	request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL()+"/wp-json", nil)
+	if err != nil {
+		t.Fatalf("build the request: %v", err)
+	}
+	request.SetBasicAuth("harness", "open sesame 1234")
+
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatalf("call the fake site: %v", err)
+	}
+	defer func() {
+		if closeErr := response.Body.Close(); closeErr != nil {
+			t.Errorf("close the body: %v", closeErr)
+		}
+	}()
+
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", response.StatusCode)
+	}
+	if len(reported.errors) != 0 {
+		t.Fatalf("the fake site reported %v", reported.errors)
 	}
 }
