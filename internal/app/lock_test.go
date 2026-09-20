@@ -1,14 +1,21 @@
 package app_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"runtime"
+	"sync"
 	"testing"
+	"time"
 
 	"go.uber.org/zap/zaptest"
 
+	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
 	"github.com/davidmovas/postulator/internal/adapters/secrets/masterkey"
 	"github.com/davidmovas/postulator/internal/app"
+	"github.com/davidmovas/postulator/internal/application/agent"
+	llmport "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -210,5 +217,162 @@ func TestTheBackupRoundTripsThroughTheCore(t *testing.T) {
 	}
 	if core.Locked() || core.Engine == nil {
 		t.Fatal("the core did not come back up after the restore")
+	}
+}
+
+const transitionTimeout = 10 * time.Second
+
+type gatedProvider struct {
+	inner   *fake.Client
+	gate    chan struct{}
+	entered chan struct{}
+	once    sync.Once
+}
+
+func newGatedProvider() *gatedProvider {
+	return &gatedProvider{inner: fake.New(), gate: make(chan struct{}), entered: make(chan struct{})}
+}
+
+func (p *gatedProvider) hold() {
+	p.once.Do(func() { close(p.entered) })
+	<-p.gate
+}
+
+func (p *gatedProvider) release() {
+	close(p.gate)
+}
+
+func (p *gatedProvider) Complete(ctx context.Context, req llmport.Request) (llmport.Response, error) {
+	p.hold()
+	return p.inner.Complete(ctx, req)
+}
+
+func (p *gatedProvider) Stream(ctx context.Context, req llmport.Request) (<-chan llmport.Delta, error) {
+	p.hold()
+	return p.inner.Stream(ctx, req)
+}
+
+func gatedCore(t *testing.T) (*app.Core, *gatedProvider) {
+	t.Helper()
+
+	home := t.TempDir()
+	provider := newGatedProvider()
+	core := openCore(t, app.Config{
+		DatabasePath:  filepath.Join(home, "postulator.db"),
+		KeyDir:        home,
+		Provider:      provider,
+		AgentProvider: fake.NewGollem(),
+	})
+	t.Cleanup(func() {
+		if closeErr := core.Close(); closeErr != nil {
+			t.Errorf("Close: %v", closeErr)
+		}
+	})
+
+	if err := core.SetMasterPassword(t.Context(), "", "correct horse battery"); err != nil {
+		t.Fatalf("SetMasterPassword: %v", err)
+	}
+
+	opened, err := core.Agent.CreateConversation(t.Context(), agent.CreateConversationRequest{Mode: "confirm"})
+	if err != nil {
+		t.Fatalf("CreateConversation: %v", err)
+	}
+	if _, err = core.Agent.Send(t.Context(), agent.SendRequest{
+		ConversationID: opened.Conversation.ID, Text: "name this conversation",
+	}); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+
+	select {
+	case <-provider.entered:
+	case <-time.After(transitionTimeout):
+		t.Fatal("the seeded turn never reached the model")
+	}
+	return core, provider
+}
+
+func within[T any](t *testing.T, what string, call func() T) T {
+	t.Helper()
+
+	answered := make(chan T, 1)
+	go func() { answered <- call() }()
+
+	select {
+	case value := <-answered:
+		return value
+	case <-time.After(transitionTimeout):
+		t.Fatalf("%s never answered while the core was locking", what)
+		var zero T
+		return zero
+	}
+}
+
+func TestALockInFlightStillAnswersTheLockState(t *testing.T) {
+	t.Parallel()
+
+	core, provider := gatedCore(t)
+
+	locking := make(chan error, 1)
+	go func() { locking <- core.Lock() }()
+
+	if !within(t, "Locked", func() bool {
+		for !core.Locked() {
+			runtime.Gosched()
+		}
+		return true
+	}) {
+		t.Fatal("the core never reported itself locked")
+	}
+
+	protected := within(t, "Protected", func() bool {
+		reported, err := core.Protected()
+		return err == nil && reported
+	})
+	if !protected {
+		t.Fatal("Protected answered with a failure while the lock was quiescing")
+	}
+
+	provider.release()
+	if err := <-locking; err != nil {
+		t.Fatalf("Lock: %v", err)
+	}
+	if !core.Locked() {
+		t.Fatal("the core did not lock")
+	}
+}
+
+func TestASecondTransitionIsRefused(t *testing.T) {
+	t.Parallel()
+
+	core, provider := gatedCore(t)
+
+	locking := make(chan error, 1)
+	go func() { locking <- core.Lock() }()
+
+	if !within(t, "Locked", func() bool {
+		for !core.Locked() {
+			runtime.Gosched()
+		}
+		return true
+	}) {
+		t.Fatal("the core never reported itself locked")
+	}
+
+	refused := within(t, "Unlock", func() error {
+		return core.Unlock(context.Background(), "correct horse battery")
+	})
+	if !errors.IsCode(refused, errors.Conflict) {
+		t.Fatalf("a second transition = %v, want a conflict", refused)
+	}
+
+	provider.release()
+	if err := <-locking; err != nil {
+		t.Fatalf("Lock: %v", err)
+	}
+	if err := core.Unlock(t.Context(), "correct horse battery"); err != nil {
+		t.Fatalf("Unlock: %v", err)
+	}
+	if core.Locked() {
+		t.Fatal("the core did not unlock once the lock had finished")
 	}
 }

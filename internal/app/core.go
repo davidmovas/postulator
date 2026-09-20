@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	stdsync "sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gollem-dev/gollem"
@@ -105,11 +106,13 @@ func homePath() (string, error) {
 }
 
 type Core struct {
-	cfg    Config
-	logger *zap.Logger
-	mu     stdsync.RWMutex
-	key    []byte
-	Events *EventRelay
+	cfg      Config
+	logger   *zap.Logger
+	mu       stdsync.RWMutex
+	changing atomic.Bool
+	closed   bool
+	key      []byte
+	Events   *EventRelay
 	kit
 }
 
@@ -177,12 +180,24 @@ func (c *Core) keyConfig() masterkey.Config {
 }
 
 func (c *Core) compose(ctx context.Context, key []byte) error {
+	built, err := c.build(ctx, key)
+	if err != nil {
+		return err
+	}
+	if !c.install(key, built) {
+		quiesce(built)
+		return stderrors.Join(locked(), built.Store.Close())
+	}
+	return nil
+}
+
+func (c *Core) build(ctx context.Context, key []byte) (kit, error) {
 	cfg, logger, relay := c.cfg, c.logger, c.Events
 	recovery := cfg.recovery()
 
 	store, err := sqlite.Open(sqlite.Config{Path: cfg.DatabasePath, Key: key, Recovery: recovery})
 	if err != nil {
-		return err
+		return kit{}, err
 	}
 
 	now := clock.System{}
@@ -190,7 +205,7 @@ func (c *Core) compose(ctx context.Context, key []byte) error {
 	settingsStore := sqlite.NewSettingsRepo(store, now)
 	values, unknown, err := LoadSettings(ctx, settingsStore, declarations)
 	if err != nil {
-		return stderrors.Join(err, store.Close())
+		return kit{}, stderrors.Join(err, store.Close())
 	}
 
 	secretStore := secrets.NewStore(sqlite.NewSecretsRepo(store, now), key)
@@ -207,7 +222,7 @@ func (c *Core) compose(ctx context.Context, key []byte) error {
 
 	modelCatalog, err := catalog.New(modelRepo)
 	if err != nil {
-		return stderrors.Join(err, store.Close())
+		return kit{}, stderrors.Join(err, store.Close())
 	}
 
 	templateService := templates.New(templateRepo, policyRepo, pageRepo, siteRepo, store, relay, now)
@@ -255,7 +270,7 @@ func (c *Core) compose(ctx context.Context, key []byte) error {
 		Clock:      now,
 		BatchSize:  steps.BatchSize(values),
 	}); err != nil {
-		return stderrors.Join(err, store.Close())
+		return kit{}, stderrors.Join(err, store.Close())
 	}
 
 	runRepo := sqlite.NewRunRepo(store)
@@ -349,8 +364,7 @@ func (c *Core) compose(ctx context.Context, key []byte) error {
 		MaxToolResult: agent.MaxToolResultBytes(values),
 	})
 
-	c.key = key
-	c.kit = kit{
+	built := kit{
 		Archive:         export.New(store, now),
 		Store:           store,
 		Secrets:         secretStore,
@@ -382,16 +396,16 @@ func (c *Core) compose(ctx context.Context, key []byte) error {
 	}
 
 	if err = templateService.EnsureSeeded(ctx); err != nil {
-		return stderrors.Join(err, c.abandon(store))
+		return kit{}, stderrors.Join(err, store.Close())
 	}
 	if err = engine.Start(ctx); err != nil {
-		return stderrors.Join(err, c.abandon(store))
+		return kit{}, stderrors.Join(err, store.Close())
 	}
-	if err = c.Scheduler.Start(ctx); err != nil {
+	if err = built.Scheduler.Start(ctx); err != nil {
 		engine.Stop()
-		return stderrors.Join(err, c.abandon(store))
+		return kit{}, stderrors.Join(err, store.Close())
 	}
-	return nil
+	return built, nil
 }
 
 type packer struct{}
@@ -402,6 +416,17 @@ func (packer) Package() ([]byte, error) {
 
 func (c *Core) Close() error {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.shutdown()
+	c.closed = true
+	retired, key := c.kit, c.key
+	c.kit = kit{}
+	c.key = nil
+	c.mu.Unlock()
+
+	if retired.Store == nil {
+		return nil
+	}
+
+	quiesce(retired)
+	clear(key)
+	return retired.Store.Close()
 }

@@ -8,13 +8,16 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/secrets/export"
 	"github.com/davidmovas/postulator/internal/adapters/secrets/masterkey"
-	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 func locked() error {
 	return errors.New(errors.Locked, "the application is locked")
+}
+
+func transitioning() error {
+	return errors.New(errors.Conflict, "the application is already locking or unlocking")
 }
 
 func (c *Core) Locked() bool {
@@ -28,10 +31,12 @@ func (c *Core) Protected() (bool, error) {
 }
 
 func (c *Core) Lock() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	if !c.changing.CompareAndSwap(false, true) {
+		return transitioning()
+	}
+	defer c.changing.Store(false)
 
-	if c.Store == nil {
+	if c.Locked() {
 		return nil
 	}
 
@@ -42,17 +47,27 @@ func (c *Core) Lock() error {
 	if !protected {
 		return errors.New(errors.Invalid, "the application cannot be locked without a master password")
 	}
-	if err := c.shutdown(); err != nil {
-		return err
+
+	retired, key := c.detach()
+	if retired.Store == nil {
+		return nil
+	}
+
+	quiesce(retired)
+	clear(key)
+	if closeErr := retired.Store.Close(); closeErr != nil {
+		return closeErr
 	}
 	return c.Events.Publish(events.AppLocked, events.AppLockedPayload{})
 }
 
 func (c *Core) Unlock(ctx context.Context, password string) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	if !c.changing.CompareAndSwap(false, true) {
+		return transitioning()
+	}
+	defer c.changing.Store(false)
 
-	if c.Store != nil {
+	if !c.Locked() {
 		return nil
 	}
 
@@ -60,15 +75,17 @@ func (c *Core) Unlock(ctx context.Context, password string) error {
 	if err != nil {
 		return err
 	}
-	if err := c.compose(ctx, key); err != nil {
-		return err
+	if composeErr := c.compose(ctx, key); composeErr != nil {
+		return composeErr
 	}
 	return c.Events.Publish(events.AppUnlocked, events.AppUnlockedPayload{})
 }
 
 func (c *Core) SetMasterPassword(ctx context.Context, current, next string) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	if !c.changing.CompareAndSwap(false, true) {
+		return transitioning()
+	}
+	defer c.changing.Store(false)
 
 	key, err := c.currentKey(current)
 	if err != nil {
@@ -84,7 +101,7 @@ func (c *Core) SetMasterPassword(ctx context.Context, current, next string) erro
 		return err
 	}
 
-	if c.Store != nil {
+	if !c.Locked() {
 		return nil
 	}
 	if composeErr := c.compose(ctx, key); composeErr != nil {
@@ -101,20 +118,26 @@ func (c *Core) currentKey(current string) ([]byte, error) {
 	if protected {
 		return masterkey.Unlock(c.keyConfig(), current)
 	}
-	if c.key != nil {
-		return c.key, nil
+
+	c.mu.RLock()
+	held := c.key
+	c.mu.RUnlock()
+
+	if held != nil {
+		return held, nil
 	}
 	return masterkey.Load(c.keyConfig())
 }
 
 func (c *Core) ExportBackup(ctx context.Context, path, password string) (int64, error) {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
+	archive := c.Archive
+	c.mu.RUnlock()
 
-	if c.Store == nil {
+	if archive == nil {
 		return 0, locked()
 	}
-	if err := c.Archive.Write(ctx, path, password); err != nil {
+	if err := archive.Write(ctx, path, password); err != nil {
 		return 0, err
 	}
 
@@ -126,14 +149,20 @@ func (c *Core) ExportBackup(ctx context.Context, path, password string) (int64, 
 }
 
 func (c *Core) ImportBackup(ctx context.Context, path, password string) (err error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	if !c.changing.CompareAndSwap(false, true) {
+		return transitioning()
+	}
+	defer c.changing.Store(false)
 
-	if c.Store == nil {
+	c.mu.RLock()
+	archive := c.Archive
+	c.mu.RUnlock()
+
+	if archive == nil {
 		return locked()
 	}
 
-	restored, err := c.Archive.Read(ctx, path, password)
+	restored, err := archive.Read(ctx, path, password)
 	if err != nil {
 		return err
 	}
@@ -141,42 +170,51 @@ func (c *Core) ImportBackup(ctx context.Context, path, password string) (err err
 		err = stderrors.Join(err, errors.Wrap(os.RemoveAll(restored), errors.Internal, "remove the restored files"))
 	}()
 
-	key, store := c.key, c.Store
-	c.quiesce()
-	if err = store.Restore(ctx, filepath.Join(restored, export.DatabaseName)); err != nil {
-		return stderrors.Join(err, c.abandon(store))
+	retired, key := c.detach()
+	if retired.Store == nil {
+		return locked()
 	}
-	if err := c.abandon(store); err != nil {
-		return err
+
+	quiesce(retired)
+	if err = retired.Store.Restore(ctx, filepath.Join(restored, export.DatabaseName)); err != nil {
+		return stderrors.Join(err, retired.Store.Close())
+	}
+	if closeErr := retired.Store.Close(); closeErr != nil {
+		return closeErr
 	}
 	return c.compose(ctx, key)
 }
 
-func (c *Core) quiesce() {
-	if c.Scheduler != nil {
-		c.Scheduler.Stop()
+func quiesce(retired kit) {
+	if retired.Scheduler != nil {
+		retired.Scheduler.Stop()
 	}
-	if c.Agent != nil {
-		c.Agent.Close()
+	if retired.Agent != nil {
+		retired.Agent.Close()
 	}
-	if c.Engine != nil {
-		c.Engine.Stop()
+	if retired.Engine != nil {
+		retired.Engine.Stop()
 	}
 }
 
-func (c *Core) abandon(store *sqlite.Store) error {
+func (c *Core) detach() (retired kit, key []byte) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	retired, key = c.kit, c.key
 	c.kit = kit{}
-	return store.Close()
+	c.key = nil
+	return retired, key
 }
 
-func (c *Core) shutdown() error {
-	store := c.Store
-	if store == nil {
-		return nil
-	}
+func (c *Core) install(key []byte, built kit) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	c.quiesce()
-	clear(c.key)
-	c.key = nil
-	return c.abandon(store)
+	if c.closed {
+		return false
+	}
+	c.key = key
+	c.kit = built
+	return true
 }
