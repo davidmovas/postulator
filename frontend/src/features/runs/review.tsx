@@ -5,25 +5,10 @@ import { copy } from "../../copy/index.js";
 import { useArtifacts, useResumeRun, useRetryStep } from "../../data/hooks/runs.js";
 import { useSetting } from "../../data/hooks/settings.js";
 import type { Page, RunItem } from "../../data/types.js";
-import { duration } from "../../domain/format.js";
 import type { ArtifactKind } from "../../generated/vocab.js";
 import type { TabItem } from "../../ui/index.js";
-import {
-    Banner,
-    Button,
-    cx,
-    Drawer,
-    Kbd,
-    OpenInNewIcon,
-    RestartAltIcon,
-    SkeletonRows,
-    SmartToyIcon,
-    StatusBadge,
-    TabPanel,
-    Tabs,
-} from "../../ui/index.js";
-import { askAgent } from "../agent/index.js";
-import { countdown, dueMs, remainingMs, retryState, waitingUntil } from "./authority.js";
+import { Banner, Drawer, SkeletonRows, StatusBadge, TabPanel, Tabs } from "../../ui/index.js";
+import { dueMs, remainingMs, retryState, waitingUntil } from "./authority.js";
 import type { ItemView } from "./authority.js";
 import {
     artifactLabel,
@@ -38,43 +23,11 @@ import type { RetryNotice, StepEntry } from "./log-view.js";
 import { ArtifactPane } from "./panes/index.js";
 import { driftRefusal } from "./refusal.js";
 import { neighbourOf, positionOf } from "./review-nav.js";
-import { DriftRefused, ReviewEmpty, ReviewMissing } from "./review-states.js";
+import { DriftRefused, ReviewActions, ReviewEmpty, ReviewMeta, ReviewMissing, Timeline } from "./review-states.js";
 import { artifactBodyHtml, retentionDaysKey } from "./statuses.js";
 import { stepText } from "./step-cell.js";
 
 const drawerWidth = 688;
-
-function Timeline({ entries }: { entries: readonly StepEntry[] }): ReactElement | null {
-    if (entries.length === 0) {
-        return null;
-    }
-    return (
-        <div className="flex flex-wrap items-center gap-1 border-b border-hairline px-3 py-1.5">
-            {entries.map((entry, position) => (
-                <span
-                    key={`${entry.step}:${String(position)}`}
-                    title={entry.message ?? undefined}
-                    className={cx(
-                        "inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 font-mono text-2xs",
-                        entry.code !== null
-                            ? "bg-danger-soft text-danger"
-                            : entry.finishedAt === null
-                              ? "bg-info-soft text-info"
-                              : "bg-inset text-ink-dim",
-                    )}
-                >
-                    {entry.step}
-                    {entry.durationMs === null ? null : (
-                        <span className="text-ink-faint">{duration(entry.durationMs)}</span>
-                    )}
-                    {entry.attempts > 1 ? (
-                        <span className="text-warn">{copy.runs.events.attempt(entry.attempts)}</span>
-                    ) : null}
-                </span>
-            ))}
-        </div>
-    );
-}
 
 function retentionOf(held: unknown): number | null {
     return typeof held === "number" && Number.isFinite(held) ? held : null;
@@ -206,62 +159,20 @@ export function ReviewDrawer({
             }
             footer={
                 item === null ? undefined : (
-                    <div className="flex w-full items-center justify-between gap-2">
-                        <span className="flex shrink-0 items-center gap-1.5 text-2xs text-ink-faint">
-                            <Kbd keys={["J", "K"]} />
-                            {copy.runs.review.moveItems}
-                        </span>
-                        <div className="flex shrink-0 gap-2">
-                            <Button
-                                size="sm"
-                                icon={OpenInNewIcon}
-                                onClick={() => {
-                                    onOpenPage(item.targetId);
-                                }}
-                            >
-                                {copy.runs.review.openPage}
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                icon={SmartToyIcon}
-                                onClick={() => {
-                                    askAgent(copy.agent.ask.runItem(path, item.runId, item.id));
-                                }}
-                            >
-                                {copy.agent.askAbout}
-                            </Button>
-                            {blocked === null ? null : (
-                                <Button
-                                    size="sm"
-                                    onClick={() => {
-                                        onRerun(item.targetId);
-                                    }}
-                                >
-                                    {copy.runs.rerunPage}
-                                </Button>
-                            )}
-                            <Button
-                                size="sm"
-                                variant="primary"
-                                icon={RestartAltIcon}
-                                disabled={state === null || state.kind !== "ready"}
-                                busy={retryStep.isPending}
-                                title={
-                                    state !== null && state.kind === "busy"
-                                        ? copy.runs.retryBusy
-                                        : blocked === null
-                                          ? undefined
-                                          : copy.runs.retryBlockedBody
-                                }
-                                onClick={() => {
-                                    retryStep.mutate({ itemId: item.id });
-                                }}
-                            >
-                                {copy.runs.retryStep}
-                            </Button>
-                        </div>
-                    </div>
+                    <ReviewActions
+                        path={path}
+                        runId={item.runId}
+                        itemId={item.id}
+                        pageId={item.targetId}
+                        blocked={blocked}
+                        state={state}
+                        busy={retryStep.isPending}
+                        onOpenPage={onOpenPage}
+                        onRerun={onRerun}
+                        onRetry={() => {
+                            retryStep.mutate({ itemId: item.id });
+                        }}
+                    />
                 )
             }
         >
@@ -269,24 +180,13 @@ export function ReviewDrawer({
                 <ReviewMissing narrowed={missing && narrowed} onClearFilter={onClearFilter} />
             ) : (
                 <div className="flex h-full min-h-0 flex-col">
-                    <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline px-3 py-2">
-                        <span className="font-mono text-2xs text-ink-faint">
-                            {stepText(steps, view?.step ?? item.currentStep)}
-                        </span>
-                        <span className="font-mono text-2xs text-ink-faint">
-                            {copy.runs.review.attempt(item.attempts)}
-                        </span>
-                        {wake === null ? null : (
-                            <span className="font-mono text-2xs text-info">
-                                {copy.runs.step.waitingUntil(countdown(wake))}
-                            </span>
-                        )}
-                        {retry === undefined || retryLeft === null ? null : (
-                            <span className="font-mono text-2xs text-warn">
-                                {copy.runs.step.retrying(retry.attempt, countdown(retryLeft))}
-                            </span>
-                        )}
-                    </div>
+                    <ReviewMeta
+                        step={stepText(steps, view?.step ?? item.currentStep)}
+                        attempts={item.attempts}
+                        wake={wake}
+                        retry={retry}
+                        retryLeft={retryLeft}
+                    />
 
                     {refusal !== null ? (
                         <DriftRefused

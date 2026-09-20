@@ -64,7 +64,7 @@
   },
   {
     "name": "pages-drawer-details",
-    "route": "#/s/:siteId/pages?prefix=/brewing/channeling/",
+    "route": "#/s/:siteId/pages",
     "wait": 1200,
     "steps": [
       {
@@ -83,7 +83,7 @@
   },
   {
     "name": "pages-drawer-links",
-    "route": "#/s/:siteId/pages?prefix=/brewing/channeling/",
+    "route": "#/s/:siteId/pages",
     "wait": 1200,
     "steps": [
       {
@@ -108,7 +108,7 @@
   },
   {
     "name": "pages-drawer-mapping",
-    "route": "#/s/:siteId/pages?prefix=/brewing/channeling/",
+    "route": "#/s/:siteId/pages",
     "wait": 1200,
     "steps": [
       {
@@ -133,7 +133,7 @@
   },
   {
     "name": "pages-drawer-report",
-    "route": "#/s/:siteId/pages?prefix=/brewing/channeling/",
+    "route": "#/s/:siteId/pages",
     "wait": 1200,
     "steps": [
       {
@@ -158,11 +158,30 @@
   },
   {
     "name": "pages-drawer-preview",
-    "route": "#/s/:siteId/pages?status=published",
+    "route": "#/s/:siteId/pages?status=exists",
     "wait": 1200,
     "steps": [
       {
-        "click": "[data-page-row]"
+        "click": "[data-page-open]"
+      },
+      {
+        "wait": 900
+      },
+      {
+        "click": "[role=tab]:has-text(\"Preview\")"
+      },
+      {
+        "wait": 2000
+      }
+    ]
+  },
+  {
+    "name": "pages-drawer-preview-draft",
+    "route": "#/s/:siteId/pages?status=exists",
+    "wait": 1500,
+    "steps": [
+      {
+        "click": ":nth-match([data-page-row], 3)"
       },
       {
         "wait": 600
@@ -177,7 +196,7 @@
         "click": "[role=tab]:has-text(\"Preview\")"
       },
       {
-        "wait": 1600
+        "wait": 2500
       }
     ]
   },

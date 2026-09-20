@@ -1,9 +1,83 @@
 import type { ReactElement } from "react";
 
 import { copy } from "../../copy/index.js";
-import { absoluteTime, relativeTime } from "../../domain/format.js";
-import { Banner, Button, EmptyState, HourglassEmptyIcon, SyncProblemIcon } from "../../ui/index.js";
+import { absoluteTime, duration, relativeTime } from "../../domain/format.js";
+import {
+    Banner,
+    Button,
+    cx,
+    EmptyState,
+    HourglassEmptyIcon,
+    Kbd,
+    OpenInNewIcon,
+    RestartAltIcon,
+    SmartToyIcon,
+    SyncProblemIcon,
+} from "../../ui/index.js";
+import { askAgent } from "../agent/index.js";
+import type { RetryState } from "./authority.js";
+import { countdown } from "./authority.js";
+import type { RetryNotice, StepEntry } from "./log-view.js";
 import type { DriftRefusal } from "./refusal.js";
+
+export function Timeline({ entries }: { entries: readonly StepEntry[] }): ReactElement | null {
+    if (entries.length === 0) {
+        return null;
+    }
+    return (
+        <div className="flex flex-wrap items-center gap-1 border-b border-hairline px-3 py-1.5">
+            {entries.map((entry, position) => (
+                <span
+                    key={`${entry.step}:${String(position)}`}
+                    title={entry.message ?? undefined}
+                    className={cx(
+                        "inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 font-mono text-2xs",
+                        entry.code !== null
+                            ? "bg-danger-soft text-danger"
+                            : entry.finishedAt === null
+                              ? "bg-info-soft text-info"
+                              : "bg-inset text-ink-dim",
+                    )}
+                >
+                    {entry.step}
+                    {entry.durationMs === null ? null : (
+                        <span className="text-ink-faint">{duration(entry.durationMs)}</span>
+                    )}
+                    {entry.attempts > 1 ? (
+                        <span className="text-warn">{copy.runs.events.attempt(entry.attempts)}</span>
+                    ) : null}
+                </span>
+            ))}
+        </div>
+    );
+}
+
+export interface ReviewMetaProps {
+    step: string;
+    attempts: number;
+    wake: number | null;
+    retry: RetryNotice | undefined;
+    retryLeft: number | null;
+}
+
+export function ReviewMeta({ step, attempts, wake, retry, retryLeft }: ReviewMetaProps): ReactElement {
+    return (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline px-3 py-2">
+            <span className="font-mono text-2xs text-ink-faint">{step}</span>
+            <span className="font-mono text-2xs text-ink-faint">{copy.runs.review.attempt(attempts)}</span>
+            {wake === null ? null : (
+                <span className="font-mono text-2xs text-info">
+                    {copy.runs.step.waitingUntil(countdown(wake))}
+                </span>
+            )}
+            {retry === undefined || retryLeft === null ? null : (
+                <span className="font-mono text-2xs text-warn">
+                    {copy.runs.step.retrying(retry.attempt, countdown(retryLeft))}
+                </span>
+            )}
+        </div>
+    );
+}
 
 export interface ReviewMissingProps {
     narrowed: boolean;
@@ -89,6 +163,89 @@ export function DriftRefused({
                     </>
                 }
             />
+        </div>
+    );
+}
+
+export interface ReviewActionsProps {
+    path: string;
+    runId: string;
+    itemId: string;
+    pageId: string;
+    blocked: string | null;
+    state: RetryState | null;
+    busy: boolean;
+    onOpenPage: (pageId: string) => void;
+    onRerun: (pageId: string) => void;
+    onRetry: () => void;
+}
+
+export function ReviewActions({
+    path,
+    runId,
+    itemId,
+    pageId,
+    blocked,
+    state,
+    busy,
+    onOpenPage,
+    onRerun,
+    onRetry,
+}: ReviewActionsProps): ReactElement {
+    return (
+        <div className="flex w-full items-center justify-between gap-2">
+            <span className="flex shrink-0 items-center gap-1.5 text-2xs text-ink-faint">
+                <Kbd keys={["J", "K"]} />
+                {copy.runs.review.moveItems}
+            </span>
+            <div className="flex shrink-0 gap-2">
+                <Button
+                    size="sm"
+                    icon={OpenInNewIcon}
+                    onClick={() => {
+                        onOpenPage(pageId);
+                    }}
+                >
+                    {copy.runs.review.openPage}
+                </Button>
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={SmartToyIcon}
+                    onClick={() => {
+                        askAgent(copy.agent.ask.runItem(path, runId, itemId));
+                    }}
+                >
+                    {copy.agent.askAbout}
+                </Button>
+                {blocked === null ? null : (
+                    <Button
+                        size="sm"
+                        onClick={() => {
+                            onRerun(pageId);
+                        }}
+                    >
+                        {copy.runs.rerunPage}
+                    </Button>
+                )}
+                <Button
+                    size="sm"
+                    variant="primary"
+                    icon={RestartAltIcon}
+                    disabled={state === null || state.kind !== "ready"}
+                    busy={busy}
+                    title={
+                        state !== null && state.kind === "busy"
+                            ? copy.runs.retryBusy
+                            : blocked === null
+                              ? undefined
+                              : copy.runs.retryBlockedBody
+                    }
+                    onClick={onRetry}
+                >
+                    {copy.runs.retryStep}
+                </Button>
+            </div>
         </div>
     );
 }
