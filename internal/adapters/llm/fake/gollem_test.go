@@ -1,11 +1,14 @@
 package fake_test
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/gollem-dev/gollem"
 
 	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
+	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -165,4 +168,92 @@ func mustText(t *testing.T, text string) gollem.MessageContent {
 		t.Fatalf("NewTextContent: %v", err)
 	}
 	return content
+}
+
+func TestTheScriptedClientAnswersFromAScript(t *testing.T) {
+	t.Parallel()
+
+	script := func(prompt string) fake.Turn {
+		if strings.Contains(prompt, "rename") {
+			return fake.Turn{
+				Tool: "pages_update",
+				Args: json.RawMessage(`{"pageId":"p-1","title":"Best espresso machines under $500"}`),
+				Text: "I retitled the page.",
+			}
+		}
+		return fake.Turn{Text: "Your graph covers eleven espresso topics."}
+	}
+
+	cases := []struct {
+		name      string
+		prompt    string
+		wantCalls int
+		wantText  string
+	}{
+		{name: "prose only", prompt: "how does my graph look?", wantText: "Your graph covers eleven espresso topics."},
+		{name: "one write call", prompt: "please rename that page", wantCalls: 1, wantText: "I retitled the page."},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			opened := session(t, fake.NewGollem(fake.WithScript(script)))
+			answered, err := opened.Generate(t.Context(), []gollem.Input{gollem.Text(tc.prompt)})
+			if err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+			if len(answered.FunctionCalls) != tc.wantCalls {
+				t.Fatalf("calls = %+v, want %d", answered.FunctionCalls, tc.wantCalls)
+			}
+
+			if tc.wantCalls > 0 {
+				if answered.FunctionCalls[0].Name != "pages_update" {
+					t.Fatalf("call = %+v", answered.FunctionCalls[0])
+				}
+				if answered.FunctionCalls[0].Arguments["pageId"] != "p-1" {
+					t.Fatalf("arguments = %v", answered.FunctionCalls[0].Arguments)
+				}
+				answered, err = opened.Generate(t.Context(), []gollem.Input{
+					gollem.FunctionResponse{ID: answered.FunctionCalls[0].ID, Name: "pages_update", Data: map[string]any{"ok": true}},
+				})
+				if err != nil {
+					t.Fatalf("Generate: %v", err)
+				}
+			}
+			if len(answered.Texts) != 1 || answered.Texts[0] != tc.wantText {
+				t.Fatalf("texts = %v, want %q", answered.Texts, tc.wantText)
+			}
+		})
+	}
+}
+
+func TestADirectiveOutranksTheScript(t *testing.T) {
+	t.Parallel()
+
+	client := fake.NewGollem(fake.WithScript(func(string) fake.Turn {
+		return fake.Turn{Text: "the script answered"}
+	}))
+
+	opened := session(t, client)
+	answered, err := opened.Generate(t.Context(), []gollem.Input{gollem.Text("FAKE: the directive answered")})
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	if len(answered.Texts) != 1 || answered.Texts[0] != "the directive answered" {
+		t.Fatalf("texts = %v", answered.Texts)
+	}
+}
+
+func TestTheScriptedClientIsItsOwnFactory(t *testing.T) {
+	t.Parallel()
+
+	client := fake.NewGollem()
+	built, err := client.New(t.Context(), llm.ModelRef{Provider: "openai", Model: "gpt-5-mini"})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if built != gollem.LLMClient(client) {
+		t.Fatalf("New returned %T, want the client itself", built)
+	}
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/gollem-dev/gollem"
 
+	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -22,13 +23,36 @@ const (
 
 var toolPattern = regexp.MustCompile(`TOOL:([A-Za-z0-9_.-]+)(\{.*\})`)
 
+type Turn struct {
+	Text string
+	Tool string
+	Args json.RawMessage
+}
+
+type Script func(prompt string) Turn
+
+type GollemOption func(*Gollem)
+
+func WithScript(script Script) GollemOption {
+	return func(g *Gollem) { g.script = script }
+}
+
 type Gollem struct {
+	script   Script
 	mu       sync.Mutex
 	sessions []*GollemSession
 }
 
-func NewGollem() *Gollem {
-	return &Gollem{}
+func NewGollem(options ...GollemOption) *Gollem {
+	client := &Gollem{}
+	for _, option := range options {
+		option(client)
+	}
+	return client
+}
+
+func (g *Gollem) New(_ context.Context, _ llm.ModelRef) (gollem.LLMClient, error) {
+	return g, nil
 }
 
 func (g *Gollem) NewSession(_ context.Context, options ...gollem.SessionOption) (gollem.Session, error) {
@@ -44,6 +68,7 @@ func (g *Gollem) NewSession(_ context.Context, options ...gollem.SessionOption) 
 		blocks:  cfg.ContentBlockMiddlewares(),
 		streams: cfg.ContentStreamMiddlewares(),
 		system:  cfg.SystemPrompt(),
+		written: g.script,
 	}
 
 	g.mu.Lock()
@@ -73,6 +98,7 @@ type GollemSession struct {
 	blocks  []gollem.ContentBlockMiddleware
 	streams []gollem.ContentStreamMiddleware
 	system  string
+	written Script
 	script  []scripted
 	answer  string
 	primed  bool
@@ -193,6 +219,19 @@ func (s *GollemSession) prime(text string) {
 			s.answer = strings.TrimSpace(strings.TrimPrefix(trimmed, FinalDirective))
 		}
 	}
+	if len(s.script) > 0 || s.answer != "" || s.written == nil {
+		return
+	}
+
+	turn := s.written(text)
+	if turn.Tool != "" {
+		arguments := string(turn.Args)
+		if arguments == "" {
+			arguments = "{}"
+		}
+		s.script = append(s.script, scripted{name: turn.Tool, args: arguments})
+	}
+	s.answer = turn.Text
 }
 
 func (s *GollemSession) emit(call scripted, characters int) *gollem.ContentResponse {
