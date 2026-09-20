@@ -59,12 +59,6 @@ export const shell = {
     unprotected: "No master password",
 };
 
-export const notBuilt = {
-    title: "Not built yet",
-    body: "This screen is scheduled and nothing stands in for it here.",
-    wave: (wave: string) => `It arrives with ${wave}.`,
-};
-
 export const empty = {
     sites: "No sites yet. Add the WordPress site you want Postulator to work on.",
     pages: "No pages in the map. Import a sitemap or let the agent plan the first pages.",

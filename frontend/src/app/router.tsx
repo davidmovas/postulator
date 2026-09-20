@@ -4,7 +4,6 @@ import { copy } from "../copy/index.js";
 import { AgentScreen, InboxScreen } from "../features/agent/index.js";
 import { GraphScreen } from "../features/graph/index.js";
 import { LinksScreen } from "../features/links/index.js";
-import { OnboardingScreen } from "../features/onboarding/index.js";
 import { PagesScreen } from "../features/pages/index.js";
 import { RunDetailScreen, RunsScreen } from "../features/runs/index.js";
 import {
@@ -16,26 +15,31 @@ import {
 } from "../features/settings/index.js";
 import { SitesScreen } from "../features/sites/index.js";
 import { TemplateEditorScreen, TemplatesScreen } from "../features/templates/index.js";
-import { NotBuilt } from "./not-built.js";
+import {
+    MonitoringIcon,
+    ScheduleIcon,
+    SpaceDashboardIcon,
+    UploadFileIcon,
+} from "../ui/index.js";
+import { Landing } from "./landing.js";
+import { Placeholder } from "./placeholder.js";
 import { Shell } from "./shell.js";
-
-function panel(screen: string, wave: string) {
-    return <NotBuilt screen={screen} wave={wave} />;
-}
 
 export const router = createHashRouter([
     {
         path: "/",
         element: <Shell />,
         children: [
-            { index: true, element: <Navigate to="/sites" replace /> },
-            { path: "onboarding", element: <OnboardingScreen /> },
+            { index: true, element: <Landing /> },
             { path: "sites", element: <SitesScreen /> },
             {
                 path: "s/:siteId",
                 children: [
                     { index: true, element: <Navigate to="overview" replace /> },
-                    { path: "overview", element: panel(copy.nav.overview, "wave 3, agent 7") },
+                    {
+                        path: "overview",
+                        element: <Placeholder title={copy.nav.overview} icon={SpaceDashboardIcon} />,
+                    },
                     { path: "graph", element: <GraphScreen /> },
                     { path: "graph/:entityId", element: <GraphScreen /> },
                     { path: "pages", element: <PagesScreen /> },
@@ -47,9 +51,18 @@ export const router = createHashRouter([
                     { path: "runs/:runId/items/:itemId", element: <RunDetailScreen /> },
                     { path: "templates", element: <TemplatesScreen /> },
                     { path: "templates/:templateId", element: <TemplateEditorScreen /> },
-                    { path: "schedules", element: panel(copy.nav.schedules, "wave 3, agent 7") },
-                    { path: "import", element: panel(copy.nav.importExport, "wave 3, agent 8") },
-                    { path: "reports", element: panel(copy.nav.reports, "wave 3, agent 7") },
+                    {
+                        path: "schedules",
+                        element: <Placeholder title={copy.nav.schedules} icon={ScheduleIcon} />,
+                    },
+                    {
+                        path: "import",
+                        element: <Placeholder title={copy.nav.importExport} icon={UploadFileIcon} />,
+                    },
+                    {
+                        path: "reports",
+                        element: <Placeholder title={copy.nav.reports} icon={MonitoringIcon} />,
+                    },
                 ],
             },
             {
@@ -71,7 +84,7 @@ export const router = createHashRouter([
                     { path: "about", element: <AboutScreen /> },
                 ],
             },
-            { path: "*", element: <Navigate to="/sites" replace /> },
+            { path: "*", element: <Navigate to="/" replace /> },
         ],
     },
 ]);

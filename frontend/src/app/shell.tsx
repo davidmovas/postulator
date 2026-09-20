@@ -1,13 +1,18 @@
-import type { KeyboardEvent } from "react";
+import { useEffect, useMemo } from "react";
 import { Outlet, useLocation } from "react-router";
 
 import { copy } from "../copy/index.js";
+import { flatten } from "../data/call.js";
+import { usePendingActions } from "../data/hooks/agent.js";
 import { dismissToast, useToasts } from "../data/toasts.js";
 import type { ToastTone } from "../data/toasts.js";
 import { AgentDock, toggleDock, useDock } from "../features/agent/index.js";
-import { IconButton, RightPanelOpenIcon, Toast, ToastRegion } from "../ui/index.js";
+import { CommandPalette, openPalette } from "../features/palette/index.js";
+import { Toast, ToastRegion } from "../ui/index.js";
 import type { Tone } from "../ui/index.js";
+import { goToEntries } from "./nav.js";
 import { Rail } from "./rail.js";
+import { rememberSite } from "./site-memory.js";
 import { StatusBar } from "./statusbar.js";
 import { TitleBar } from "./titlebar.js";
 
@@ -44,42 +49,58 @@ function Toasts() {
     );
 }
 
-function shortcut(event: KeyboardEvent<HTMLDivElement>): void {
-    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "j") {
-        event.preventDefault();
-        toggleDock();
-    }
-}
-
 export function Shell() {
     const location = useLocation();
     const siteId = siteIdOf(location.pathname);
     const dock = useDock();
+    const pending = usePendingActions({ status: "pending" }, 100);
+    const awaiting = flatten(pending.data?.pages).length;
+    const destinations = useMemo(() => goToEntries(siteId), [siteId]);
+
+    useEffect(() => {
+        if (siteId !== null) {
+            rememberSite(siteId);
+        }
+    }, [siteId]);
+
+    useEffect(() => {
+        const onKeyDown = (event: KeyboardEvent): void => {
+            if (!event.ctrlKey && !event.metaKey) {
+                return;
+            }
+            if (event.altKey) {
+                return;
+            }
+            const pressed = event.key.toLowerCase();
+            if (pressed === "k") {
+                event.preventDefault();
+                openPalette();
+                return;
+            }
+            if (pressed === "j") {
+                event.preventDefault();
+                toggleDock();
+            }
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => {
+            window.removeEventListener("keydown", onKeyDown);
+        };
+    }, []);
 
     return (
-        <div className="flex h-full flex-col bg-canvas" onKeyDown={shortcut}>
-            <TitleBar siteId={siteId} />
+        <div className="flex h-full flex-col bg-canvas">
+            <TitleBar siteId={siteId} dockOpen={dock.open} onToggleDock={toggleDock} />
             <div className="flex min-h-0 flex-1">
-                <Rail siteId={siteId} />
-                <main className="min-w-0 flex-1 overflow-auto">
+                <Rail siteId={siteId} pending={awaiting} />
+                <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
                     <Outlet />
                 </main>
-                {dock.open ? (
-                    <AgentDock siteId={siteId} />
-                ) : (
-                    <div className="flex w-8 shrink-0 justify-center border-l border-hairline bg-panel pt-2">
-                        <IconButton
-                            icon={RightPanelOpenIcon}
-                            label={copy.shell.expandDock}
-                            variant="ghost"
-                            size="sm"
-                            onClick={toggleDock}
-                        />
-                    </div>
-                )}
+                {dock.open ? <AgentDock siteId={siteId} /> : null}
             </div>
             <StatusBar siteId={siteId} />
             <Toasts />
+            <CommandPalette siteId={siteId} destinations={destinations} />
         </div>
     );
 }

@@ -1,5 +1,5 @@
 import { agent } from "./agent.js";
-import { app, empty, lock, nav, notBuilt, shell, toasts } from "./app.js";
+import { app, empty, lock, nav, shell, toasts } from "./app.js";
 import { errorMessages } from "./errors.js";
 import { graph } from "./graph.js";
 import { links } from "./links.js";
@@ -19,7 +19,6 @@ export const copy = {
     nav,
     shell,
     palette,
-    notBuilt,
     empty,
     readiness,
     onboarding,
