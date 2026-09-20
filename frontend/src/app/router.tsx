@@ -15,7 +15,7 @@ import {
     SettingsScreen,
 } from "../features/settings/index.js";
 import { SitesScreen } from "../features/sites/index.js";
-import { TemplateEditorScreen, TemplatesScreen } from "../features/templates/index.js";
+import { PoliciesScreen, TemplateEditorScreen, TemplatesScreen } from "../features/templates/index.js";
 import {
     MonitoringIcon,
     ScheduleIcon,
@@ -47,6 +47,7 @@ export const router = createHashRouter([
                     { path: "runs/:runId", element: <RunDetailScreen /> },
                     { path: "runs/:runId/items/:itemId", element: <RunDetailScreen /> },
                     { path: "templates", element: <TemplatesScreen /> },
+                    { path: "templates/policies", element: <PoliciesScreen /> },
                     { path: "templates/:templateId", element: <TemplateEditorScreen /> },
                     {
                         path: "schedules",

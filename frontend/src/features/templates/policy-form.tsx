@@ -6,7 +6,8 @@ import type { LinkPolicy, LinkRules } from "../../data/types.js";
 import { copy } from "../../copy/index.js";
 import { anchorStrategies, templateScopes } from "../../generated/vocab.js";
 import type { SelectOption } from "../../ui/index.js";
-import { Banner, Button, Drawer, Field, Input, LinkIcon, SectionLabel, Select, Switch } from "../../ui/index.js";
+import { Banner, Button, Drawer, Field, Input, SectionLabel, Select, Switch } from "../../ui/index.js";
+import { blankDraft } from "./blank.js";
 import { fieldErrorOf, formErrorOf, NumberInput } from "./controls.js";
 import { anchorLabel, scopeLabel } from "./labels.js";
 
@@ -29,7 +30,30 @@ interface PolicyDraft {
     rules: LinkRules;
 }
 
-function draftOfPolicy(policy: LinkPolicy): PolicyDraft {
+function blankRules(): LinkRules {
+    const spec = blankDraft();
+    return {
+        upDepth: spec.upDepth,
+        downLinks: spec.downLinks,
+        siblingMinWeight: spec.siblingMinWeight,
+        maxLinks: spec.maxLinks,
+        maxPerTarget: spec.maxPerTarget,
+        parentLinkWithinParagraphs: spec.parentLinkWithinParagraphs,
+        childrenSection: spec.childrenSection,
+    };
+}
+
+function draftOfPolicy(policy: LinkPolicy | null): PolicyDraft {
+    if (policy === null) {
+        return {
+            name: "",
+            scope: templateScopes[0],
+            forbidExternal: false,
+            forbidSelf: false,
+            anchorStrategy: anchorStrategies[0],
+            rules: blankRules(),
+        };
+    }
     return {
         name: policy.name,
         scope: policy.scope,
@@ -43,7 +67,7 @@ function draftOfPolicy(policy: LinkPolicy): PolicyDraft {
 export interface PolicyDrawerProps {
     siteId: string;
     policy: LinkPolicy | null;
-    seed: LinkPolicy;
+    seed: LinkPolicy | null;
     onClose: () => void;
 }
 
@@ -108,9 +132,8 @@ export function PolicyDrawer({ siteId, policy, seed, onClose }: PolicyDrawerProp
                 }
             }}
             title={editing ? copy.policies.create.editTitle : copy.policies.create.title}
-            description={editing ? copy.policies.create.editBody : copy.policies.create.body}
             closeLabel={copy.policies.create.cancel}
-            width={520}
+            width={688}
             footer={
                 <>
                     <Button variant="ghost" onClick={onClose}>
@@ -122,8 +145,8 @@ export function PolicyDrawer({ siteId, policy, seed, onClose }: PolicyDrawerProp
                 </>
             }
         >
-            <div className="flex flex-col gap-3 p-3">
-                {formError === null ? null : <p className="text-xs text-danger">{formError}</p>}
+            <div className="flex max-w-xl flex-col gap-3 p-4">
+                {formError === null ? null : <Banner tone="danger" title={formError} />}
                 <Field label={copy.policies.create.name} required={true} error={fieldErrorOf(thrown, "name")}>
                     {(control) => (
                         <Input
@@ -157,7 +180,6 @@ export function PolicyDrawer({ siteId, policy, seed, onClose }: PolicyDrawerProp
                         )}
                     </Field>
                 )}
-                <Banner tone="info" icon={LinkIcon} title={copy.policies.split} body={copy.policies.splitBody} />
                 <Switch
                     className="w-full"
                     label={copy.policies.forbidExternal}
@@ -193,8 +215,9 @@ export function PolicyDrawer({ siteId, policy, seed, onClose }: PolicyDrawerProp
                     )}
                 </Field>
                 <div className="flex flex-col gap-2.5 border-t border-hairline pt-3">
-                    <SectionLabel>{copy.policies.rulesTitle}</SectionLabel>
-                    <p className="text-xs text-ink-dim">{copy.policies.rulesBody}</p>
+                    <span className="w-fit cursor-help" title={copy.policies.rulesTooltip}>
+                        <SectionLabel>{copy.policies.rulesTitle}</SectionLabel>
+                    </span>
                     <div className="grid grid-cols-2 gap-2">
                         <Field
                             label={copy.templates.links.upDepth}

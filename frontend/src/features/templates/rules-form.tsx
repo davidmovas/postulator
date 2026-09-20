@@ -206,7 +206,7 @@ export function LinksForm({ draft, layers, error, onChange }: RulesFormProps): R
             <PanelHeader title={copy.templates.links.title} />
             <div className="flex flex-col gap-3 p-3">
                 <p className="text-xs text-ink-dim">{copy.templates.links.body}</p>
-                <Banner tone="info" icon={LinkIcon} title={copy.policies.split} body={copy.templates.links.fromTemplate} />
+                <Banner tone="info" icon={LinkIcon} title={copy.templates.links.fromTemplate} />
                 <div className="grid grid-cols-2 gap-3">
                     <LayerField
                         layers={layers}
