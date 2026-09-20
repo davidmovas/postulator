@@ -110,3 +110,10 @@ export function nextSort(current: PageSort | null, field: PageSort["field"]): Pa
     }
     return current.desc ? null : { field, desc: true };
 }
+
+export const actionParam = "action";
+export const actionNew = "new";
+
+export function wantsNew(params: URLSearchParams): boolean {
+    return params.get(actionParam) === actionNew;
+}

@@ -90,3 +90,10 @@ export function readItemStatus(params: URLSearchParams): string {
 export function itemSearchOf(status: string): string {
     return status === "" ? "" : `?item=${status}`;
 }
+
+export const actionParam = "action";
+export const actionNew = "new";
+
+export function wantsNew(params: URLSearchParams): boolean {
+    return params.get(actionParam) === actionNew;
+}

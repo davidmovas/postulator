@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultQuery, filterOf, formatSort, narrowed, nextSort, parseSort, readQuery, searchOf, writeQuery } from "./params.js";
+import {
+    defaultQuery,
+    filterOf,
+    formatSort,
+    narrowed,
+    nextSort,
+    parseSort,
+    readQuery,
+    searchOf,
+    wantsNew,
+    writeQuery,
+} from "./params.js";
 
 describe("parseSort", () => {
     it("accepts the two fields the backend declares", () => {
@@ -100,5 +111,19 @@ describe("formatSort", () => {
     it("renders the segment the query key uses", () => {
         expect(formatSort({ field: "path", desc: true })).toBe("path:desc");
         expect(formatSort(null)).toBe("");
+    });
+});
+
+describe("wantsNew", () => {
+    it("reads the create action the palette sends", () => {
+        expect(wantsNew(new URLSearchParams("action=new"))).toBe(true);
+        expect(wantsNew(new URLSearchParams("action=edit"))).toBe(false);
+        expect(wantsNew(new URLSearchParams())).toBe(false);
+    });
+
+    it("is dropped by writeQuery, so a reload cannot reopen the form", () => {
+        const query = readQuery(new URLSearchParams("action=new&status=planned"));
+        expect(writeQuery(query).has("action")).toBe(false);
+        expect(writeQuery(query).get("status")).toBe("planned");
     });
 });

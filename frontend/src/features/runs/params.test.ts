@@ -12,6 +12,7 @@ import {
     readItemStatus,
     readQuery,
     searchOf,
+    wantsNew,
     writeQuery,
 } from "./params.js";
 
@@ -114,5 +115,19 @@ describe("item status", () => {
     it("writes nothing when nothing is selected", () => {
         expect(itemSearchOf("")).toBe("");
         expect(itemSearchOf("failed")).toBe("?item=failed");
+    });
+});
+
+describe("wantsNew", () => {
+    it("reads the start action the palette sends", () => {
+        expect(wantsNew(new URLSearchParams("action=new"))).toBe(true);
+        expect(wantsNew(new URLSearchParams("action=start"))).toBe(false);
+        expect(wantsNew(new URLSearchParams())).toBe(false);
+    });
+
+    it("is dropped by writeQuery, so a reload cannot reopen the drawer", () => {
+        const query = readQuery(new URLSearchParams("action=new&kind=generate"));
+        expect(writeQuery(query).has("action")).toBe(false);
+        expect(writeQuery(query).get("kind")).toBe("generate");
     });
 });
