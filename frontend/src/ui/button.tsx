@@ -14,6 +14,13 @@ const variantClasses: Readonly<Record<ButtonVariant, string>> = {
     danger: "bg-danger-soft text-danger border border-danger-border enabled:hover:bg-danger enabled:hover:text-on-danger",
 };
 
+const refusedClasses: Readonly<Record<ButtonVariant, string>> = {
+    primary: "disabled:border-transparent disabled:bg-inset disabled:text-ink-faint",
+    secondary: "disabled:border-hairline disabled:bg-transparent disabled:text-ink-faint",
+    ghost: "disabled:border-transparent disabled:bg-transparent disabled:text-ink-faint",
+    danger: "disabled:border-hairline disabled:bg-transparent disabled:text-ink-faint",
+};
+
 const sizeClasses: Readonly<Record<ButtonSize, string>> = {
     md: "h-7 px-3 text-sm",
     sm: "h-6 px-2 text-xs",
@@ -45,11 +52,13 @@ export function Button({
             type={type}
             disabled={blocked}
             aria-busy={busy || undefined}
+            aria-disabled={disabled || undefined}
             className={cx(
                 "inline-flex shrink-0 items-center justify-center gap-1 rounded-md font-semibold whitespace-nowrap transition-colors duration-100 ease-out",
-                "disabled:cursor-not-allowed disabled:opacity-70",
+                "disabled:cursor-default",
                 variantClasses[variant],
                 sizeClasses[size],
+                busy ? "opacity-80" : refusedClasses[variant],
                 className,
             )}
             {...rest}
@@ -85,8 +94,9 @@ export function IconButton({
             title={label}
             className={cx(
                 "inline-flex shrink-0 items-center justify-center rounded-md transition-colors duration-100 ease-out",
-                "disabled:cursor-not-allowed disabled:opacity-70",
+                "disabled:cursor-default",
                 variantClasses[variant],
+                refusedClasses[variant],
                 size === "md" ? "h-7 w-7" : "h-6 w-6",
                 className,
             )}
