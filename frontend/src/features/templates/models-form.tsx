@@ -63,23 +63,24 @@ export function ModelsForm({ draft, layers, error, onChange }: ModelsFormProps):
     return (
         <Panel className="min-w-0">
             <PanelHeader title={copy.templates.models.title}>
-                <Select
-                    className="w-52"
-                    aria-label={copy.templates.models.add}
-                    value=""
-                    placeholder={freeRoles.length === 0 ? copy.templates.models.allPinned : copy.templates.models.add}
-                    disabled={freeRoles.length === 0 || models.length === 0}
-                    options={freeRoles.map((role) => ({ value: role, label: role }))}
-                    onValueChange={(role) => {
-                        const first = models[0];
-                        onChange({
-                            profiles: [
-                                ...draft.profiles,
-                                { role, provider: first?.provider ?? "", model: first?.model ?? "" },
-                            ],
-                        });
-                    }}
-                />
+                <div className="w-52">
+                    <Select
+                        aria-label={copy.templates.models.add}
+                        value={null}
+                        placeholder={freeRoles.length === 0 ? copy.templates.models.allPinned : copy.templates.models.add}
+                        disabled={freeRoles.length === 0 || models.length === 0}
+                        options={freeRoles.map((role) => ({ value: role, label: role }))}
+                        onValueChange={(role) => {
+                            const first = models[0];
+                            onChange({
+                                profiles: [
+                                    ...draft.profiles,
+                                    { role, provider: first?.provider ?? "", model: first?.model ?? "" },
+                                ],
+                            });
+                        }}
+                    />
+                </div>
             </PanelHeader>
             <div className="flex flex-col gap-3 p-3">
                 <p className="text-xs text-ink-dim">{copy.templates.models.body}</p>

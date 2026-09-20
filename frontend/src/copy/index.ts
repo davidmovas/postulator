@@ -56,6 +56,7 @@ export const copy = {
         sections: "Sections",
         siteSwitcher: "Switch site",
         noSiteSelected: "No site selected",
+        selectSite: "Select a site",
         search: "Search",
         agentDock: "Agent",
         collapseDock: "Collapse the agent dock",

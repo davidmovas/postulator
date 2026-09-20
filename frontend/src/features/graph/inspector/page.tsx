@@ -82,7 +82,9 @@ function ChoosePage({ siteId, entity, onPlan }: CanonicalPageProps): ReactElemen
                     <p className="text-xs text-ink-dim">{copy.graph.pageForm.none}</p>
                 ) : (
                     <div className="flex items-center gap-2">
-                        <Select className="min-w-0 flex-1" value={chosen} options={mappedOptions} aria-label={copy.graph.pageForm.mapped} onValueChange={setChoice} />
+                        <div className="min-w-0 flex-1">
+                            <Select value={chosen} options={mappedOptions} aria-label={copy.graph.pageForm.mapped} onValueChange={setChoice} />
+                        </div>
                         <Button
                             size="sm"
                             variant="primary"
@@ -112,7 +114,9 @@ function ChoosePage({ siteId, entity, onPlan }: CanonicalPageProps): ReactElemen
                     <p className="text-xs text-ink-dim">{copy.graph.pageForm.noMatch}</p>
                 ) : (
                     <div className="flex items-center gap-2">
-                        <Select className="min-w-0 flex-1" value={picked} options={candidateOptions} aria-label={copy.graph.pageForm.find} onValueChange={setCandidate} />
+                        <div className="min-w-0 flex-1">
+                            <Select value={picked} options={candidateOptions} aria-label={copy.graph.pageForm.find} onValueChange={setCandidate} />
+                        </div>
                         <Button
                             size="sm"
                             variant="secondary"

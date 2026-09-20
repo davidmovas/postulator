@@ -90,14 +90,15 @@ export function PageMapping({ page, siteId, index, search }: PageMappingProps): 
                 )}
 
                 <div className="flex items-end gap-2">
-                    <Select
-                        className="min-w-0 flex-1"
-                        value={choice}
-                        options={options}
-                        aria-label={copy.pages.detail.entity}
-                        disabled={index.entities.length === 0}
-                        onValueChange={setChoice}
-                    />
+                    <div className="min-w-0 flex-1">
+                        <Select
+                            value={choice}
+                            options={options}
+                            aria-label={copy.pages.detail.entity}
+                            disabled={index.entities.length === 0}
+                            onValueChange={setChoice}
+                        />
+                    </div>
                     {choice === noEntity ? (
                         <Button
                             variant="secondary"

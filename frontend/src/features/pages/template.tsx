@@ -78,13 +78,14 @@ export function TemplatePanel({ page, siteId }: TemplatePanelProps): ReactElemen
                     </div>
                 )}
                 <div className="flex items-end gap-2">
-                    <Select
-                        className="min-w-0 flex-1"
-                        value={choice}
-                        options={options}
-                        aria-label={copy.pages.detail.template}
-                        onValueChange={setChoice}
-                    />
+                    <div className="min-w-0 flex-1">
+                        <Select
+                            value={choice}
+                            options={options}
+                            aria-label={copy.pages.detail.template}
+                            onValueChange={setChoice}
+                        />
+                    </div>
                     <Button
                         variant="primary"
                         disabled={!changed}

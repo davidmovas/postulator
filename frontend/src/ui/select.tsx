@@ -11,14 +11,13 @@ export interface SelectOption<T extends string> {
 }
 
 export interface SelectProps<T extends string> {
-    value: T;
+    value: T | null;
     options: readonly SelectOption<T>[];
     onValueChange: (value: T) => void;
     id?: string;
     placeholder?: string;
     disabled?: boolean;
     invalid?: boolean;
-    className?: string;
     "aria-label"?: string;
     "aria-describedby"?: string;
 }
@@ -31,12 +30,11 @@ export function Select<T extends string>({
     placeholder,
     disabled = false,
     invalid = false,
-    className,
     ...aria
 }: SelectProps<T>): ReactElement {
     return (
         <RadixSelect.Root
-            value={value}
+            value={value ?? ""}
             onValueChange={(next) => {
                 onValueChange(next as T);
             }}
@@ -50,7 +48,6 @@ export function Select<T extends string>({
                     "transition-colors duration-100 ease-out data-[placeholder]:text-ink-faint",
                     "disabled:cursor-not-allowed disabled:opacity-70",
                     invalid ? "border-danger" : "border-hairline hover:border-edge",
-                    className,
                 )}
                 {...aria}
             >

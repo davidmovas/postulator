@@ -93,13 +93,14 @@ export function SitesScreen(): ReactElement {
                     <p className="max-w-2xl text-sm text-ink-soft">{copy.sites.subtitle}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                    <Select
-                        aria-label={copy.sites.columns.status}
-                        className="w-32"
-                        value={status}
-                        options={statusOptions}
-                        onValueChange={setStatus}
-                    />
+                    <div className="w-32">
+                        <Select
+                            aria-label={copy.sites.columns.status}
+                            value={status}
+                            options={statusOptions}
+                            onValueChange={setStatus}
+                        />
+                    </div>
                     <Button
                         variant="primary"
                         icon={AddIcon}
