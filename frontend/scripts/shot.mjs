@@ -8,6 +8,7 @@ const usage = `postulator ui screenshots
 
   node scripts/shot.mjs --port 9222 --route "#/sites" --out shots/sites.png
       [--width 1280] [--height 820] [--wait 800] [--site <id>]
+      [--clip "<x>,<y>,<w>,<h>"]
       [--click "<css>"] [--type "<css>=<text>"] [--key "<Key>"]
 
   node scripts/shot.mjs --port 9222 --routes scripts/routes.json --out-dir shots
@@ -20,8 +21,11 @@ A route containing :siteId is resolved from --site when it is given. Otherwise
 the script opens #/sites and reads the first [data-site-id] row of the table,
 so the seeded site does not have to be known in advance.
 
+--clip writes the named rectangle of the viewport at 1:1 instead of the whole
+window, which is how a strip is judged at pixel scale.
+
 routes.json is an array of
-  { "name", "route", "width", "height", "wait", "site",
+  { "name", "route", "width", "height", "wait", "site", "clip",
     "steps": [ {"click": "<css>"}, {"type": "<css>=<text>"},
                {"key": "Control+K"}, {"wait": 500} ] }
 and each name becomes <out-dir>/<name>.png.`;
@@ -34,6 +38,7 @@ const flags = new Set([
     "--height",
     "--wait",
     "--site",
+    "--clip",
     "--routes",
     "--out-dir",
     "--click",
@@ -78,6 +83,9 @@ function parse(argv) {
             case "--site":
                 options.site = value;
                 break;
+            case "--clip":
+                options.clip = value;
+                break;
             case "--routes":
                 options.routes = value;
                 break;
@@ -121,6 +129,17 @@ async function attach(port) {
 async function settle(page, wait) {
     await page.waitForLoadState("networkidle").catch(() => undefined);
     await page.waitForTimeout(wait);
+}
+
+function clipOf(value) {
+    if (value === undefined) {
+        return undefined;
+    }
+    const parts = value.split(",").map((part) => Number(part.trim()));
+    if (parts.length !== 4 || parts.some((part) => !Number.isFinite(part))) {
+        throw new Error(`--clip takes "<x>,<y>,<w>,<h>", got ${value}`);
+    }
+    return { x: parts[0], y: parts[1], width: parts[2], height: parts[3] };
 }
 
 function hashOf(route) {
@@ -189,7 +208,8 @@ async function shoot(page, shot, resolveSiteId) {
     await apply(page, shot.steps);
     await mkdir(dirname(shot.out), { recursive: true });
     await page.bringToFront();
-    await page.screenshot({ path: shot.out });
+    const clip = clipOf(shot.clip);
+    await page.screenshot(clip === undefined ? { path: shot.out } : { path: shot.out, clip });
     process.stdout.write(`${shot.out}\n`);
 }
 
@@ -206,6 +226,7 @@ async function planned(options) {
                 height: options.height,
                 wait: options.wait,
                 site: options.site,
+                clip: options.clip,
                 steps: options.steps,
             },
         ];
@@ -228,6 +249,7 @@ async function planned(options) {
             height: entry.height ?? options.height,
             wait: entry.wait ?? options.wait,
             site: entry.site ?? options.site,
+            clip: entry.clip ?? options.clip,
             steps: entry.steps ?? [],
         };
     });
