@@ -178,6 +178,8 @@ async function apply(page, steps) {
 }
 
 async function shoot(page, shot, resolveSiteId) {
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
     const route = shot.route.includes(":siteId")
         ? shot.route.replaceAll(":siteId", shot.site ?? (await resolveSiteId(shot.wait)))
         : shot.route;
