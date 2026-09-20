@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 
 import { copy } from "../../copy/index.js";
 import { cx } from "../../ui/index.js";
+import { stepLabel } from "./labels.js";
 import type { ItemView } from "./authority.js";
 import { countdown, dueMs, remainingMs, waitingUntil } from "./authority.js";
 import type { RetryNotice } from "./log-view.js";
@@ -12,7 +13,8 @@ export function stepText(steps: readonly string[], step: string): string {
         return copy.runs.step.noStep;
     }
     const at = stepPosition(steps, step);
-    return at === 0 ? copy.runs.step.unknownRecipe(step) : copy.runs.step.position(at, steps.length, step);
+    const named = stepLabel(step);
+    return at === 0 ? copy.runs.step.unknownRecipe(named) : copy.runs.step.position(at, steps.length, named);
 }
 
 export interface StepPipsProps {

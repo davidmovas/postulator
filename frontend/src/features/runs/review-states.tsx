@@ -17,6 +17,7 @@ import {
 import { askAgent } from "../agent/index.js";
 import type { RetryState } from "./authority.js";
 import { countdown } from "./authority.js";
+import { retryBlockedText, stepLabel } from "./labels.js";
 import type { RetryNotice, StepEntry } from "./log-view.js";
 import type { DriftRefusal } from "./refusal.js";
 
@@ -39,7 +40,7 @@ export function Timeline({ entries }: { entries: readonly StepEntry[] }): ReactE
                               : "bg-inset text-ink-dim",
                     )}
                 >
-                    {entry.step}
+                    {stepLabel(entry.step)}
                     {entry.durationMs === null ? null : (
                         <span className="text-ink-faint">{duration(entry.durationMs)}</span>
                     )}
@@ -232,6 +233,7 @@ export function ReviewActions({
                     size="sm"
                     variant="primary"
                     icon={RestartAltIcon}
+                    className={state !== null && state.kind === "ready" ? undefined : "opacity-40"}
                     disabled={state === null || state.kind !== "ready"}
                     busy={busy}
                     title={
@@ -239,7 +241,7 @@ export function ReviewActions({
                             ? copy.runs.retryBusy
                             : blocked === null
                               ? undefined
-                              : copy.runs.retryBlockedBody
+                              : retryBlockedText(blocked)
                     }
                     onClick={onRetry}
                 >

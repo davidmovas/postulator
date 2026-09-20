@@ -7,7 +7,7 @@ import { absoluteTime, bytes, relativeTime } from "../../../domain/format.js";
 import type { ArtifactKind } from "../../../generated/vocab.js";
 import { Banner, EmptyState, SkeletonRows, TaskAltIcon } from "../../../ui/index.js";
 import { decodeArtifact, linkContextView } from "../artifacts.js";
-import { retentionIcon } from "../labels.js";
+import { retentionIcon, stepLabel } from "../labels.js";
 import {
     artifactBodyHtml,
     artifactDraft,
@@ -108,7 +108,7 @@ export function ArtifactPane({ itemId, kind, pageId, retentionDays }: ArtifactPa
                     }
                 />
                 <p className="font-mono text-2xs text-ink-faint" title={absoluteTime(row.createdAt)}>
-                    {`${row.step} · ${relativeTime(row.createdAt)}`}
+                    {`${stepLabel(row.step)} · ${relativeTime(row.createdAt)}`}
                 </p>
             </div>
         );
@@ -121,7 +121,7 @@ export function ArtifactPane({ itemId, kind, pageId, retentionDays }: ArtifactPa
     return (
         <div className="flex min-h-0 flex-col">
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-inset px-3 py-1 font-mono text-2xs text-ink-faint">
-                <span title={absoluteTime(row.createdAt)}>{`${row.step} · ${relativeTime(row.createdAt)}`}</span>
+                <span title={absoluteTime(row.createdAt)}>{`${stepLabel(row.step)} · ${relativeTime(row.createdAt)}`}</span>
                 <span>{bytes(row.size)}</span>
             </div>
             <Payload itemId={itemId} kind={kind} pageId={pageId} payload={decodeArtifact(row.content)} />

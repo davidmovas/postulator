@@ -1,6 +1,8 @@
 import type { ReactElement } from "react";
 
 import { copy } from "../../copy/index.js";
+import { failure } from "../../data/errors.js";
+import { useTemplate } from "../../data/hooks/templates.js";
 import type { Run } from "../../data/types.js";
 import { absoluteTime, duration, relativeTime, tokens as formatTokens, usd as formatUsd } from "../../domain/format.js";
 import type { IconComponent } from "../../ui/index.js";
@@ -14,6 +16,7 @@ import {
     SectionLabel,
 } from "../../ui/index.js";
 import type { RunView, StatsView } from "./authority.js";
+import { stepLabel } from "./labels.js";
 import { recipeSteps } from "./recipe.js";
 import { spanMs } from "./span.js";
 
@@ -32,8 +35,23 @@ function Fact({ icon: Icon, children, title }: FactProps): ReactElement {
     );
 }
 
+function templateFact(run: Run, named: ReturnType<typeof useTemplate>): string {
+    if (run.templateId === "") {
+        return copy.runs.detail.noTemplate;
+    }
+    const held = named.data?.template;
+    if (held !== undefined) {
+        return copy.runs.detail.template(held.name, run.templateVersion);
+    }
+    if (named.isError && failure(named.error).code === "NOT_FOUND") {
+        return copy.runs.detail.templateGone;
+    }
+    return copy.app.loading;
+}
+
 function Facts({ run }: { run: Run }): ReactElement {
     const steps = recipeSteps(run);
+    const named = useTemplate(run.templateId === "" ? null : run.templateId);
     return (
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 md:col-span-3">
             <Fact icon={ScheduleIcon} title={absoluteTime(run.startedAt)}>
@@ -43,14 +61,16 @@ function Facts({ run }: { run: Run }): ReactElement {
             <Fact icon={AlarmIcon} title={absoluteTime(run.deadlineAt)}>
                 {`${copy.runs.detail.deadline} ${relativeTime(run.deadlineAt)}`}
             </Fact>
-            <Fact icon={DashboardCustomizeIcon}>
-                {run.templateId === ""
-                    ? copy.runs.detail.noTemplate
-                    : copy.runs.detail.template(run.templateId, run.templateVersion)}
+            <Fact icon={DashboardCustomizeIcon} title={run.templateId}>
+                {templateFact(run, named)}
             </Fact>
             {steps.length === 0 ? null : (
                 <Fact icon={DashboardCustomizeIcon}>
-                    {copy.runs.step.recipe(steps[0], steps[steps.length - 1], steps.length)}
+                    {copy.runs.step.recipe(
+                        stepLabel(steps[0]),
+                        stepLabel(steps[steps.length - 1]),
+                        steps.length,
+                    )}
                 </Fact>
             )}
         </div>

@@ -19,7 +19,14 @@ import { useNow } from "./clock.js";
 import { RunControls } from "./controls.js";
 import { RunEventFeed } from "./events.js";
 import { ItemStatusTabs, RunItemTable } from "./items.js";
-import { pauseReasonShort, pauseReasonTone, statusIcon, statusLabel, statusTone } from "./labels.js";
+import {
+    kindLabel,
+    pauseReasonShort,
+    pauseReasonTone,
+    statusIcon,
+    statusLabel,
+    statusTone,
+} from "./labels.js";
 import { retryNotices, stepTimeline } from "./log-view.js";
 import { RunNotices } from "./notices.js";
 import { pathOf, usePageIndex } from "./page-index.js";
@@ -98,7 +105,7 @@ export function RunDetailScreen(): ReactElement {
 
     return (
         <Screen
-            title={copy.runs.detail.header(run.kind)}
+            title={copy.runs.detail.header(kindLabel(run.kind))}
             badge={
                 <span className="flex shrink-0 items-center gap-1.5">
                     <StatusBadge tone={statusTone(run.status)} icon={statusIcon(run.status)}>
@@ -114,7 +121,7 @@ export function RunDetailScreen(): ReactElement {
             variant="split"
             actions={<RunControls run={run} />}
             toolbar={
-                <Toolbar label={copy.runs.detail.header(run.kind)}>
+                <Toolbar label={copy.runs.detail.header(kindLabel(run.kind))}>
                     <Link
                         to={`/s/${siteId}/runs`}
                         className="flex shrink-0 items-center gap-0.5 text-2xs text-ink-faint hover:text-ink"

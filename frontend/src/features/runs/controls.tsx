@@ -6,6 +6,9 @@ import { useCancelRun, usePauseRun, useResumeRun } from "../../data/hooks/runs.j
 import type { Run } from "../../data/types.js";
 import { Button, CancelIcon, Dialog, PauseIcon, PlayArrowIcon } from "../../ui/index.js";
 import { runView } from "./authority.js";
+import { statusRunning } from "./statuses.js";
+
+const dimmed = "opacity-40";
 
 export interface RunControlsProps {
     run: Run;
@@ -18,14 +21,19 @@ export function RunControls({ run }: RunControlsProps): ReactElement {
     const cancel = useCancelRun();
     const [confirming, setConfirming] = useState(false);
 
+    const pausable = run.status === statusRunning;
+    const blocked = (why: string | undefined): string | undefined =>
+        view.terminal ? copy.runs.settled : why;
+
     return (
         <>
             <Button
                 data-run-pause={true}
                 icon={PauseIcon}
-                disabled={!view.active || view.paused}
+                className={pausable ? undefined : dimmed}
+                disabled={!pausable}
                 busy={pause.isPending}
-                title={view.terminal ? copy.runs.settled : view.paused ? copy.runs.alreadyPaused : undefined}
+                title={blocked(view.paused ? copy.runs.alreadyPaused : copy.runs.notRunning)}
                 onClick={() => {
                     pause.mutate({ runId: run.id });
                 }}
@@ -34,9 +42,10 @@ export function RunControls({ run }: RunControlsProps): ReactElement {
             </Button>
             <Button
                 icon={PlayArrowIcon}
+                className={view.paused ? undefined : dimmed}
                 disabled={!view.paused}
                 busy={resume.isPending}
-                title={view.paused ? undefined : copy.runs.notPaused}
+                title={view.paused ? undefined : blocked(copy.runs.notPaused)}
                 onClick={() => {
                     resume.mutate({ runId: run.id });
                 }}
@@ -46,6 +55,7 @@ export function RunControls({ run }: RunControlsProps): ReactElement {
             <Button
                 variant="danger"
                 icon={CancelIcon}
+                className={view.terminal ? dimmed : undefined}
                 disabled={view.terminal}
                 title={view.terminal ? copy.runs.settled : undefined}
                 onClick={() => {

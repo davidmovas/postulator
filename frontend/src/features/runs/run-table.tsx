@@ -15,6 +15,7 @@ import {
 } from "../../ui/index.js";
 import type { RunSort } from "../../data/sorts.js";
 import {
+    kindLabel,
     pauseReasonShort,
     pauseReasonText,
     pauseReasonTone,
@@ -57,7 +58,7 @@ function RunRow({ run, now, selected, onOpen }: RunRowProps): ReactElement {
                 }
             }}
         >
-            <TableCell mono={true}>{run.kind}</TableCell>
+            <TableCell>{kindLabel(run.kind)}</TableCell>
             <TableCell>
                 <span
                     className="flex min-w-0 items-center gap-1"

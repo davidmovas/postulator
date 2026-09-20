@@ -14,7 +14,7 @@ import {
     toneClasses,
 } from "../../ui/index.js";
 import { countdown } from "./authority.js";
-import { eventIcon, eventName, eventTone } from "./labels.js";
+import { eventIcon, eventName, eventTone, stepLabel } from "./labels.js";
 import type { FeedEntry } from "./log-view.js";
 import { feed } from "./log-view.js";
 
@@ -23,7 +23,7 @@ const feedLimit = 200;
 function detailOf(entry: FeedEntry): string {
     const parts: string[] = [];
     if (entry.step !== null) {
-        parts.push(entry.step);
+        parts.push(stepLabel(entry.step));
     }
     if (entry.items !== null) {
         parts.push(copy.runs.detail.targets(entry.items));

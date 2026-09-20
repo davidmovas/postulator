@@ -21,6 +21,7 @@ import {
     SectionLabel,
     Select,
 } from "../../ui/index.js";
+import { kindLabel } from "./labels.js";
 import { StartTargets } from "./start-targets.js";
 import { kindGenerate } from "./statuses.js";
 
@@ -198,7 +199,7 @@ export function StartRunDrawer({
                             <Select
                                 id={control.id}
                                 value={kind}
-                                options={runKinds.map((value) => ({ value, label: value }))}
+                                options={runKinds.map((value) => ({ value, label: kindLabel(value) }))}
                                 onValueChange={(next) => {
                                     setKind(next);
                                     forget();

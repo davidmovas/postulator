@@ -1,7 +1,15 @@
 import { copy } from "../../copy/index.js";
 import type { RunEventType } from "../../data/runs/decode.js";
 import type { ArtifactKind, PauseReason, RetryBlockedReason, RunStatus } from "../../generated/vocab.js";
-import { artifactKinds, isOneOf, pauseReasons, retryBlockedReasons, runStatuses } from "../../generated/vocab.js";
+import {
+    artifactKinds,
+    isOneOf,
+    pauseReasons,
+    retryBlockedReasons,
+    runKinds,
+    runStatuses,
+    stepNames,
+} from "../../generated/vocab.js";
 import type { IconComponent, Tone } from "../../ui/index.js";
 import {
     AutoDeleteIcon,
@@ -63,6 +71,14 @@ export function statusIcon(status: string): IconComponent {
 
 export function statusLabel(status: string): string {
     return isOneOf(runStatuses, status) ? copy.runs.status[status] : status;
+}
+
+export function stepLabel(step: string): string {
+    return isOneOf(stepNames, step) ? copy.runs.steps[step] : step;
+}
+
+export function kindLabel(kind: string): string {
+    return isOneOf(runKinds, kind) ? copy.runs.kinds[kind] : kind;
 }
 
 export function pauseReasonText(reason: string): string {
