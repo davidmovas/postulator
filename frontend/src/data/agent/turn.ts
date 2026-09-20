@@ -6,66 +6,28 @@ import type {
     AgentToolFinishedPayload,
     AgentToolStartedPayload,
 } from "../../generated/events.js";
+import type {
+    AgentToolCall,
+    ReconcileAction,
+    Turn,
+    TurnEnd,
+    TurnReport,
+    TurnStatus,
+} from "./model.js";
+import { cancelledCode, isActive, silenceAfterMs } from "./model.js";
 
-export type TurnStatus = "idle" | "working" | "awaiting-confirm" | "stopping" | "done" | "error";
-
-export type TurnEnd = "answered" | "stopped" | "failed" | "lost";
-
-export type ToolCallStatus = "running" | "ok" | "error";
-
-export const cancelledCode = "CANCELLED";
-
-export const silenceAfterMs = 30_000;
-
-export interface AgentToolCall {
-    callId: string;
-    tool: string;
-    args: unknown;
-    status: ToolCallStatus;
-    result?: unknown;
-    error?: string;
-    durationMs?: number;
-}
-
-export interface AgentConfirmation {
-    confirmationId: string;
-    tool: string;
-    args: unknown;
-    risk: string;
-    summary: string;
-}
-
-export interface TurnUsage {
-    inputTokens: number;
-    outputTokens: number;
-    usd: number;
-}
-
-export interface Turn {
-    status: TurnStatus;
-    end: TurnEnd | null;
-    assistantMessageId: string | null;
-    startedAt: number;
-    lastEventAt: number;
-    lastSeq: number;
-    text: string;
-    chunks: number;
-    tools: readonly AgentToolCall[];
-    confirm: AgentConfirmation | null;
-    code: string;
-    message: string;
-    usage: TurnUsage | null;
-    turnSeq: number;
-}
-
-export interface TurnReport {
-    running: boolean;
-    messageId: string;
-    startedAt: string | null;
-    lastSeq: number;
-}
-
-export type ReconcileAction = "none" | "refetch" | "adopt";
+export type {
+    AgentConfirmation,
+    AgentToolCall,
+    ReconcileAction,
+    ToolCallStatus,
+    Turn,
+    TurnEnd,
+    TurnReport,
+    TurnStatus,
+    TurnUsage,
+} from "./model.js";
+export { cancelledCode, isActive, silenceAfterMs } from "./model.js";
 
 interface TurnLog {
     conversationId: string;
@@ -97,10 +59,6 @@ const idleTurn: Turn = Object.freeze({
 const turns = new Map<string, TurnLog>();
 
 let issued = 0;
-
-export function isActive(status: TurnStatus): boolean {
-    return status === "working" || status === "awaiting-confirm" || status === "stopping";
-}
 
 function blank(): Turn {
     return { ...idleTurn, tools: [] };

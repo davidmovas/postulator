@@ -1,32 +1,26 @@
-import type { KeyboardEvent, ReactElement } from "react";
-import { useEffect, useMemo, useState } from "react";
+import type { ReactElement } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import { copy } from "../../copy/index.js";
 import { flatten } from "../../data/call.js";
-import { react } from "../../data/errors.js";
 import {
     useConversations,
-    useCreateConversation,
     useDeleteConversation,
     usePendingActions,
     useStartConversation,
 } from "../../data/hooks/agent.js";
 import { useSites } from "../../data/hooks/sites.js";
 import type { Conversation } from "../../data/types.js";
-import { absoluteTime, relativeTime } from "../../domain/format.js";
-import type { MenuEntry, SelectOption } from "../../ui/index.js";
+import type { MenuEntry } from "../../ui/index.js";
 import {
     AddCommentIcon,
     Banner,
     BuildIcon,
     Button,
-    CountBadge,
-    cx,
     DeleteIcon,
     Dialog,
     EditIcon,
-    Field,
     IconButton,
     Input,
     Menu,
@@ -34,145 +28,16 @@ import {
     Screen,
     SearchIcon,
     SectionLabel,
-    Select,
     SkeletonRows,
 } from "../../ui/index.js";
+import { ConversationRow } from "./conversation-row.js";
 import { ConversationView } from "./conversation/view.js";
-import { agentTabs } from "./tabs.js";
 import { forgetConversation, globalDockKey, takePrefill, useDock } from "./dock/state.js";
 import { groupBySite, matches } from "./model/conversations.js";
+import { NewConversationDialog } from "./new-conversation.js";
 import { RenameDialog } from "./rename-dialog.js";
+import { agentTabs } from "./tabs.js";
 import { ToolsDrawer } from "./tools-drawer.js";
-
-const noSite = "no-site";
-
-interface RowProps {
-    conversation: Conversation;
-    active: boolean;
-    pending: number;
-    onOpen: () => void;
-    onDelete: () => void;
-}
-
-function ConversationRow({ conversation, active, pending, onOpen, onDelete }: RowProps): ReactElement {
-    const keyed = (event: KeyboardEvent<HTMLDivElement>): void => {
-        if (event.key === "Enter") {
-            event.preventDefault();
-            onOpen();
-        }
-    };
-    return (
-        <div
-            role="button"
-            tabIndex={0}
-            onClick={onOpen}
-            onKeyDown={keyed}
-            className={cx(
-                "group flex items-center gap-2 rounded-md px-2 py-1.5 text-left",
-                active ? "bg-accent-soft" : "hover:bg-inset",
-            )}
-        >
-            <span
-                aria-hidden={true}
-                className={cx(
-                    "h-1.5 w-1.5 shrink-0 rounded-full",
-                    conversation.mode === "autonomous" ? "bg-danger" : "bg-ink-faint",
-                )}
-            />
-            <div className="flex min-w-0 flex-1 flex-col">
-                <span
-                    className={cx(
-                        "truncate text-xs",
-                        conversation.title === ""
-                            ? "text-ink-dim"
-                            : active
-                              ? "font-semibold text-ink"
-                              : "text-ink-soft",
-                    )}
-                >
-                    {conversation.title === "" ? copy.agent.untitled : conversation.title}
-                </span>
-                <span className="font-mono text-2xs text-ink-faint" title={absoluteTime(conversation.createdAt)}>
-                    {relativeTime(conversation.createdAt)}
-                </span>
-            </div>
-            {pending > 0 ? <CountBadge tone="warn" count={pending} /> : null}
-            <IconButton
-                icon={DeleteIcon}
-                label={copy.agent.screen.delete}
-                variant="ghost"
-                size="sm"
-                className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                onClick={(event) => {
-                    event.stopPropagation();
-                    onDelete();
-                }}
-            />
-        </div>
-    );
-}
-
-interface NewDialogProps {
-    open: boolean;
-    sites: readonly SelectOption<string>[];
-    onOpenChange: (open: boolean) => void;
-    onCreated: (conversation: Conversation) => void;
-}
-
-function NewConversationDialog({ open, sites, onOpenChange, onCreated }: NewDialogProps): ReactElement {
-    const create = useCreateConversation();
-    const [siteId, setSiteId] = useState(noSite);
-    const thrown = create.error;
-    const reaction = thrown === null ? null : react(thrown);
-
-    useEffect(() => {
-        if (open) {
-            setSiteId(sites[0]?.value ?? noSite);
-            create.reset();
-        }
-    }, [open, sites]);
-
-    return (
-        <Dialog
-            open={open}
-            onOpenChange={onOpenChange}
-            title={copy.agent.screen.newTitle}
-            description={copy.agent.subtitle}
-            confirmLabel={copy.agent.screen.newStart}
-            cancelLabel={copy.agent.screen.cancel}
-            icon={AddCommentIcon}
-            busy={create.isPending}
-            onConfirm={() => {
-                create.mutate(
-                    { siteId: siteId === noSite ? undefined : siteId, mode: "confirm" },
-                    {
-                        onSuccess: (answered) => {
-                            onOpenChange(false);
-                            onCreated(answered.conversation);
-                        },
-                    },
-                );
-            }}
-        >
-            <Field
-                label={copy.agent.screen.newSite}
-                hint={siteId === noSite ? copy.agent.screen.newEverywhere : undefined}
-            >
-                {(control) => (
-                    <Select
-                        id={control.id}
-                        value={siteId}
-                        options={[...sites, { value: noSite, label: copy.agent.header.everywhere }]}
-                        onValueChange={setSiteId}
-                    />
-                )}
-            </Field>
-            {reaction === null || reaction.kind === "silent" || reaction.kind === "unlock" ? null : (
-                <p className="text-xs text-danger">{reaction.message}</p>
-            )}
-        </Dialog>
-    );
-}
 
 export function AgentScreen(): ReactElement {
     const params = useParams();

@@ -30,7 +30,8 @@ import {
 } from "../../ui/index.js";
 import { ReadinessChecklist } from "./checklist.js";
 import { driftCount, edgeTile, entityTile, histogram, isEmptySite, pageTile, runSummary } from "./model/overview.js";
-import { CoveragePanel, DepthPanel, DriftPanel, RunPanel, Tiles, TopEntities } from "./panels.js";
+import { CoveragePanel, DepthPanel, DriftPanel, RunPanel, TopEntities } from "./panels.js";
+import { Tiles } from "./tiles.js";
 import { useReadiness } from "./readiness.js";
 import { SetupBanner } from "./setup-banner.js";
 
