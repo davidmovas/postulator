@@ -122,23 +122,23 @@ func settingsCopyKeys(t *testing.T) []string {
 		t.Fatal("the copy test must run inside the module")
 	}
 
-	raw, err := os.ReadFile(filepath.Join(filepath.Dir(gomod), "frontend", "src", "copy", "index.ts"))
+	raw, err := os.ReadFile(filepath.Join(filepath.Dir(gomod), "frontend", "src", "copy", "settings.ts"))
 	if err != nil {
 		t.Fatalf("read the copy module: %v", err)
 	}
 
 	text := string(raw)
-	opening := strings.Index(text, "    settings: {")
+	opening := strings.Index(text, "export const settings = {")
 	if opening < 0 {
 		t.Fatal("the copy module carries no settings section")
 	}
 	block := text[opening:]
-	start := strings.Index(block, "        keys: {")
+	start := strings.Index(block, "    keys: {")
 	if start < 0 {
 		t.Fatal("the settings copy carries no keys map")
 	}
 	block = block[start:]
-	end := strings.Index(block, "\n        },")
+	end := strings.Index(block, "\n    },")
 	if end < 0 {
 		t.Fatal("the keys map is not closed")
 	}
@@ -169,7 +169,7 @@ func TestEveryDeclaredSettingCarriesCopy(t *testing.T) {
 
 	for _, key := range declared {
 		if !slices.Contains(written, key) {
-			t.Errorf("setting %s has no label in frontend/src/copy/index.ts", key)
+			t.Errorf("setting %s has no label in frontend/src/copy/settings.ts", key)
 		}
 	}
 	for _, key := range written {
