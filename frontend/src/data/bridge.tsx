@@ -246,6 +246,9 @@ function install(client: QueryClient): (() => void)[] {
                 keys.graph.root(),
             );
         }),
+        on("agent.titled", () => {
+            invalidateAll(client, keys.agent.conversationsAll());
+        }),
     ];
 }
 

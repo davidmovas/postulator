@@ -524,7 +524,7 @@ export const copy = {
         autonomous: "Autonomous mode runs write and dangerous tools without asking.",
         confirmMode: "Confirm mode asks before every write.",
         turnStalled: "The turn stopped reporting. The saved messages are shown instead.",
-        untitled: "Untitled conversation",
+        untitled: "New conversation",
         you: "You",
         assistant: "Assistant",
         composer: {

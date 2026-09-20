@@ -229,3 +229,41 @@ func TestModeAndRoleValidate(t *testing.T) {
 		t.Error("the call statuses are ok, denied and error")
 	}
 }
+
+func TestSuggestedTitle(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		raw  string
+		want string
+		ok   bool
+	}{
+		{name: "a plain answer is kept", raw: "Plan the hub pages", want: "Plan the hub pages", ok: true},
+		{name: "surrounding straight quotes go", raw: "\"Plan the hub pages\"", want: "Plan the hub pages", ok: true},
+		{name: "surrounding curly quotes go", raw: "“Plan the hub pages”", want: "Plan the hub pages", ok: true},
+		{name: "a trailing period goes", raw: "Plan the hub pages.", want: "Plan the hub pages", ok: true},
+		{name: "a label prefix goes", raw: "Title: Plan the hub pages", want: "Plan the hub pages", ok: true},
+		{name: "a lowercase label prefix goes", raw: "title: Plan the hub", want: "Plan the hub", ok: true},
+		{name: "whitespace collapses", raw: "  Plan   the\n hub  ", want: "Plan the hub", ok: true},
+		{name: "quotes and a period together", raw: "\"Plan the hub.\"", want: "Plan the hub", ok: true},
+		{name: "empty is refused", raw: "", ok: false},
+		{name: "blank is refused", raw: "   \n ", ok: false},
+		{name: "punctuation alone is refused", raw: "\".\"", ok: false},
+		{name: "a rambling answer is refused", raw: strings.Repeat("word ", 20), ok: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, ok := agent.SuggestedTitle(tc.raw)
+			if ok != tc.ok {
+				t.Fatalf("SuggestedTitle(%q) usable = %t, want %t", tc.raw, ok, tc.ok)
+			}
+			if ok && got != tc.want {
+				t.Errorf("SuggestedTitle(%q) = %q, want %q", tc.raw, got, tc.want)
+			}
+		})
+	}
+}

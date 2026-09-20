@@ -3,6 +3,7 @@ package agent_test
 import (
 	"context"
 	"encoding/json"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	agentapp "github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/applicationtest"
 	"github.com/davidmovas/postulator/internal/application/events"
+	llmport "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/sites"
@@ -65,9 +67,43 @@ func (fixedCatalog) Lookup(context.Context, domainllm.ModelRef) (domainllm.Model
 	return domainllm.ModelInfo{InputUSDPerM: 1, OutputUSDPerM: 2}, nil
 }
 
+type scriptedTitler struct {
+	mu    sync.Mutex
+	text  string
+	err   error
+	calls int
+}
+
+func (s *scriptedTitler) Complete(_ context.Context, _ llmport.Request) (llmport.Response, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.calls++
+	if s.err != nil {
+		return llmport.Response{}, s.err
+	}
+	return llmport.Response{Text: s.text}, nil
+}
+
+func (s *scriptedTitler) script(text string, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.text = text
+	s.err = err
+}
+
+func (s *scriptedTitler) attempts() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.calls
+}
+
 type harness struct {
 	store    *sqlite.Store
 	model    *fake.Gollem
+	titler   *scriptedTitler
 	service  *agentapp.Service
 	bus      *applicationtest.Recorder
 	registry *tools.Registry
@@ -128,6 +164,8 @@ func build(t *testing.T, store *sqlite.Store, model *fake.Gollem, bus *applicati
 		Logger:   zaptest.NewLogger(t),
 	}, agentrunner.Config{})
 
+	titler := &scriptedTitler{text: "Scripted chat name"}
+
 	service := agentapp.New(agentapp.Deps{
 		Conversations: sqlite.NewConversationRepo(store),
 		Messages:      sqlite.NewMessageRepo(store),
@@ -141,6 +179,7 @@ func build(t *testing.T, store *sqlite.Store, model *fake.Gollem, bus *applicati
 		}),
 		Templates: templateService,
 		Profiles:  chatProfiles{},
+		LLM:       titler,
 		Registry:  registered,
 		Runner:    runner,
 		Publisher: bus,
@@ -150,7 +189,7 @@ func build(t *testing.T, store *sqlite.Store, model *fake.Gollem, bus *applicati
 	t.Cleanup(service.Close)
 
 	return &harness{
-		store: store, model: model, service: service, bus: bus, registry: registered,
+		store: store, model: model, titler: titler, service: service, bus: bus, registry: registered,
 		calls: callRepo, pages: pageRepo,
 	}
 }
@@ -189,6 +228,35 @@ func (h *harness) settled(t *testing.T) {
 		}
 		return false
 	})
+}
+
+func (h *harness) titledConversation(t *testing.T) {
+	t.Helper()
+
+	waitFor(t, "the conversation to be named", func() bool {
+		for _, event := range h.bus.Events() {
+			if event.Type == events.AgentTitled {
+				return true
+			}
+		}
+		return false
+	})
+}
+
+func (h *harness) titleOf(t *testing.T, conversationID string) string {
+	t.Helper()
+
+	listed, err := h.service.ListConversations(t.Context(), agentapp.ListConversationsRequest{SiteID: h.siteID})
+	if err != nil {
+		t.Fatalf("ListConversations: %v", err)
+	}
+	for _, item := range listed.Items {
+		if item.ID == conversationID {
+			return item.Title
+		}
+	}
+	t.Fatalf("conversation %s is not listed", conversationID)
+	return ""
 }
 
 func (h *harness) seen() []events.Type {

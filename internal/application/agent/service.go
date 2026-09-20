@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/application"
+	"github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/application/tools"
@@ -57,6 +58,10 @@ type profileResolver interface {
 	Resolve(ctx context.Context, siteID string, role domainllm.Role, templateProfiles map[domainllm.Role]domainllm.ModelRef) (domainllm.ModelRef, error)
 }
 
+type completer interface {
+	Complete(ctx context.Context, req llm.Request) (llm.Response, error)
+}
+
 type Runner interface {
 	Run(ctx context.Context, spec RunSpec) (RunResult, error)
 }
@@ -70,6 +75,7 @@ type Deps struct {
 	Reports       overviewReader
 	Templates     templateReader
 	Profiles      profileResolver
+	LLM           completer
 	Registry      *tools.Registry
 	Runner        Runner
 	Turns         *Turns

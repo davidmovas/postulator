@@ -302,6 +302,7 @@ func (c *Core) compose(ctx context.Context, key []byte) error {
 		Reports:       reportsService,
 		Templates:     templateService,
 		Profiles:      modelProfiles,
+		LLM:           client,
 		Registry:      toolRegistry,
 		Runner: agentrunner.New(agentrunner.Deps{
 			Factory:  providers,

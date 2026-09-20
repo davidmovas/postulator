@@ -63,6 +63,7 @@ func blocked(t *testing.T) (*agentapp.Service, string, *blockingRunner) {
 		}),
 		Templates: templateService,
 		Profiles:  chatProfiles{},
+		LLM:       &scriptedTitler{text: "a name the blocked turn never reaches"},
 		Registry:  tools.New(tools.Deps{Clock: now}),
 		Runner:    runner,
 		Publisher: failingBus{},

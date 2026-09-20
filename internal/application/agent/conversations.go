@@ -18,7 +18,8 @@ const templatesInPrompt = 20
 func (s *Service) CreateConversation(ctx context.Context, req CreateConversationRequest) (CreateConversationResponse, error) {
 	now := s.now()
 	record := domainagent.Conversation{
-		ID: id.New(), Title: req.Title, Mode: domainagent.Mode(req.Mode), CreatedAt: now, UpdatedAt: now,
+		ID: id.New(), Title: req.Title, Mode: domainagent.Mode(req.Mode),
+		TitleSettled: strings.TrimSpace(req.Title) != "", CreatedAt: now, UpdatedAt: now,
 	}
 	if siteID := strings.TrimSpace(req.SiteID); siteID != "" {
 		if _, err := s.deps.Sites.Get(ctx, siteID); err != nil {
@@ -77,6 +78,7 @@ func (s *Service) RenameConversation(ctx context.Context, req RenameConversation
 	}
 
 	current.Title = title
+	current.TitleSettled = true
 	current.UpdatedAt = s.now()
 	if updateErr := s.deps.Conversations.Update(ctx, current); updateErr != nil {
 		return RenameConversationResponse{}, updateErr

@@ -44,12 +44,13 @@ func (r Role) Valid() bool {
 const MaxTitle = 120
 
 type Conversation struct {
-	ID        string
-	SiteID    *string
-	Title     string
-	Mode      Mode
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID           string
+	SiteID       *string
+	Title        string
+	Mode         Mode
+	TitleSettled bool
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 func invalid(message, field string) *errors.Error {
@@ -73,6 +74,32 @@ func NewConversation(c Conversation) (Conversation, error) {
 		return Conversation{}, invalid("a conversation needs a creation timestamp", "createdAt")
 	}
 	return c, nil
+}
+
+const MaxSuggestedTitle = 60
+
+var titleQuotes = "\"'“”‘’«»„"
+
+var titleLabels = []string{"title:", "chat title:", "conversation title:"}
+
+func SuggestedTitle(raw string) (string, bool) {
+	cleaned := strings.Join(strings.Fields(raw), " ")
+	for _, label := range titleLabels {
+		if len(cleaned) >= len(label) && strings.EqualFold(cleaned[:len(label)], label) {
+			cleaned = strings.TrimSpace(cleaned[len(label):])
+			break
+		}
+	}
+
+	cleaned = strings.Trim(cleaned, titleQuotes)
+	cleaned = strings.TrimRight(cleaned, ".")
+	cleaned = strings.Trim(cleaned, titleQuotes)
+	cleaned = strings.TrimSpace(cleaned)
+
+	if cleaned == "" || len([]rune(cleaned)) > MaxSuggestedTitle {
+		return "", false
+	}
+	return cleaned, true
 }
 
 func Title(raw string) string {

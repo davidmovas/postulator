@@ -103,6 +103,8 @@ func (s *Service) answer(ctx context.Context, conversationID string, spec RunSpe
 	done.OutputTokens = result.Usage.Output
 	done.USD = result.USD
 	s.emit(events.AgentDone, done)
+
+	s.settle(ctx, conversationID, spec.Input, done.Text)
 }
 
 func (s *Service) append(ctx context.Context, conversationID string, message domainagent.Message) (domainagent.Message, error) {

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	agentapp "github.com/davidmovas/postulator/internal/application/agent"
+	"github.com/davidmovas/postulator/internal/application/events"
 	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -79,34 +80,97 @@ func fieldOf(err error) string {
 	return field
 }
 
-func TestTheFirstMessageTitlesAnUntitledConversation(t *testing.T) {
+func TestTheFirstMessageTitlesAnUntitledConversationAtOnce(t *testing.T) {
+	t.Parallel()
+
+	service, conversation, _ := blocked(t)
+
+	if _, err := service.Send(t.Context(), agentapp.SendRequest{
+		ConversationID: conversation, Text: "  Which   pages carry\nno entity? ",
+	}); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+
+	listed, err := service.ListConversations(t.Context(), agentapp.ListConversationsRequest{})
+	if err != nil || len(listed.Items) != 1 {
+		t.Fatalf("ListConversations = %+v, %v", listed, err)
+	}
+	if listed.Items[0].Title != "Which pages carry no entity?" {
+		t.Fatalf("the title while the turn runs is %q", listed.Items[0].Title)
+	}
+}
+
+func TestTheFinishedTurnNamesTheConversation(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
+	h.titler.script("Pages without an entity", nil)
+
 	created, err := h.service.CreateConversation(t.Context(), agentapp.CreateConversationRequest{
 		SiteID: h.siteID, Mode: string(domainagent.ModeAutonomous),
 	})
 	if err != nil || created.Conversation.Title != "" {
 		t.Fatalf("CreateConversation = %+v, %v", created, err)
 	}
-	titled := h.conversation(t, domainagent.ModeAutonomous)
 
-	h.send(t, created.Conversation.ID, "  Which   pages carry\nno entity? ")
-	h.send(t, titled, "  Which   pages carry no entity? ")
+	h.send(t, created.Conversation.ID, "Which pages carry no entity?")
+	h.titledConversation(t)
 
-	listed, err := h.service.ListConversations(t.Context(), agentapp.ListConversationsRequest{SiteID: h.siteID})
-	if err != nil || len(listed.Items) != 2 {
-		t.Fatalf("ListConversations = %+v, %v", listed, err)
+	if got := h.titleOf(t, created.Conversation.ID); got != "Pages without an entity" {
+		t.Fatalf("the conversation is named %q", got)
 	}
-	titles := map[string]string{}
-	for _, item := range listed.Items {
-		titles[item.ID] = item.Title
+
+	payload, ok := h.payload(events.AgentTitled).(events.AgentTitledPayload)
+	if !ok || payload.ConversationID != created.Conversation.ID || payload.Title != "Pages without an entity" {
+		t.Fatalf("agent.titled carried %+v", h.payload(events.AgentTitled))
 	}
-	if titles[created.Conversation.ID] != "Which pages carry no entity?" {
-		t.Fatalf("the untitled conversation is now %q", titles[created.Conversation.ID])
+}
+
+func TestAConversationIsNamedOnceAndNeverAgain(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	h.titler.script("", errors.New(errors.External, "the titler is down"))
+
+	created, err := h.service.CreateConversation(t.Context(), agentapp.CreateConversationRequest{
+		SiteID: h.siteID, Mode: string(domainagent.ModeAutonomous),
+	})
+	if err != nil {
+		t.Fatalf("CreateConversation: %v", err)
 	}
-	if titles[titled] != "plan the hub" {
-		t.Fatalf("the titled conversation became %q", titles[titled])
+
+	h.send(t, created.Conversation.ID, "Which pages carry no entity?")
+	h.titledConversation(t)
+
+	if got := h.titleOf(t, created.Conversation.ID); got != "Which pages carry no entity?" {
+		t.Fatalf("a refused title left %q", got)
+	}
+
+	h.titler.script("A second chance the turn must not take", nil)
+	h.send(t, created.Conversation.ID, "And which of them are drafts?")
+
+	if got := h.titleOf(t, created.Conversation.ID); got != "Which pages carry no entity?" {
+		t.Fatalf("the second turn renamed the conversation to %q", got)
+	}
+	if attempts := h.titler.attempts(); attempts != 1 {
+		t.Fatalf("the titler was asked %d times, want 1", attempts)
+	}
+}
+
+func TestANamedConversationIsNeverRenamedByTheTurn(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	h.titler.script("A name the client did not choose", nil)
+
+	conversation := h.conversation(t, domainagent.ModeAutonomous)
+	h.send(t, conversation, "Which pages carry no entity?")
+
+	if got := h.titleOf(t, conversation); got != "plan the hub" {
+		t.Fatalf("the named conversation became %q", got)
+	}
+	if attempts := h.titler.attempts(); attempts != 0 {
+		t.Fatalf("the titler was asked %d times for a named conversation", attempts)
 	}
 }
 

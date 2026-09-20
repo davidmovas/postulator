@@ -131,7 +131,7 @@ export type AnchorStrategy = (typeof anchorStrategies)[number];
 export const imageSources = ["ai", "wpmedia", "local"] as const;
 export type ImageSource = (typeof imageSources)[number];
 
-export const modelRoles = ["writer", "editor", "linker", "judge", "chat", "image"] as const;
+export const modelRoles = ["writer", "editor", "linker", "judge", "chat", "image", "titler"] as const;
 export type ModelRole = (typeof modelRoles)[number];
 
 export const conversationModes = ["confirm", "autonomous"] as const;

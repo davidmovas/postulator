@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	conversationColumns = `id, site_id, title, mode, created_at, updated_at`
-	insertConversation  = `INSERT INTO conversations (` + conversationColumns + `) VALUES (?, ?, ?, ?, ?, ?)`
-	updateConversation  = `UPDATE conversations SET title = ?, mode = ?, updated_at = ? WHERE id = ?`
+	conversationColumns = `id, site_id, title, mode, title_settled, created_at, updated_at`
+	insertConversation  = `INSERT INTO conversations (` + conversationColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?)`
+	updateConversation  = `UPDATE conversations SET title = ?, mode = ?, title_settled = ?, updated_at = ? WHERE id = ?`
 	selectConversation  = `SELECT ` + conversationColumns + ` FROM conversations WHERE id = ?`
 	deleteConversation  = `DELETE FROM conversations WHERE id = ?`
 )
@@ -33,14 +33,14 @@ func conversationNotFound(id string) *errors.Error {
 
 func (r *ConversationRepo) Insert(ctx context.Context, c agent.Conversation) error {
 	_, err := execWrite(ctx, r.store.writeFrom(ctx), insertConversation, []any{
-		c.ID, nullString(c.SiteID), c.Title, string(c.Mode), formatTime(c.CreatedAt), formatTime(c.UpdatedAt),
+		c.ID, nullString(c.SiteID), c.Title, string(c.Mode), c.TitleSettled, formatTime(c.CreatedAt), formatTime(c.UpdatedAt),
 	}, errors.New(errors.Conflict, "a conversation with this id already exists"), "insert the conversation")
 	return err
 }
 
 func (r *ConversationRepo) Update(ctx context.Context, c agent.Conversation) error {
 	affected, err := execWrite(ctx, r.store.writeFrom(ctx), updateConversation,
-		[]any{c.Title, string(c.Mode), formatTime(c.UpdatedAt), c.ID}, nil, "update the conversation")
+		[]any{c.Title, string(c.Mode), c.TitleSettled, formatTime(c.UpdatedAt), c.ID}, nil, "update the conversation")
 	return requireAffected(affected, err, conversationNotFound(c.ID))
 }
 
@@ -94,7 +94,7 @@ func scanConversation(rows *sql.Rows) (agent.Conversation, error) {
 		mode                 string
 		createdAt, updatedAt string
 	)
-	if err := rows.Scan(&c.ID, &siteID, &c.Title, &mode, &createdAt, &updatedAt); err != nil {
+	if err := rows.Scan(&c.ID, &siteID, &c.Title, &mode, &c.TitleSettled, &createdAt, &updatedAt); err != nil {
 		return agent.Conversation{}, err
 	}
 

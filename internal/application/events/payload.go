@@ -46,6 +46,11 @@ type AgentDonePayload struct {
 	USD            float64 `json:"usd"`
 }
 
+type AgentTitledPayload struct {
+	ConversationID string `json:"conversationId"`
+	Title          string `json:"title"`
+}
+
 type AgentToolFinishedPayload struct {
 	ConversationID string          `json:"conversationId"`
 	CallID         string          `json:"callId"`

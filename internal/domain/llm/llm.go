@@ -9,15 +9,16 @@ const (
 	RoleJudge  Role = "judge"
 	RoleChat   Role = "chat"
 	RoleImage  Role = "image"
+	RoleTitler Role = "titler"
 )
 
 func Roles() []Role {
-	return []Role{RoleWriter, RoleEditor, RoleLinker, RoleJudge, RoleChat, RoleImage}
+	return []Role{RoleWriter, RoleEditor, RoleLinker, RoleJudge, RoleChat, RoleImage, RoleTitler}
 }
 
 func (r Role) Valid() bool {
 	switch r {
-	case RoleWriter, RoleEditor, RoleLinker, RoleJudge, RoleChat, RoleImage:
+	case RoleWriter, RoleEditor, RoleLinker, RoleJudge, RoleChat, RoleImage, RoleTitler:
 		return true
 	default:
 		return false

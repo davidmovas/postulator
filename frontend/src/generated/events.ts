@@ -3,6 +3,7 @@ export type EventType =
     | "agent.confirm.resolved"
     | "agent.delta"
     | "agent.done"
+    | "agent.titled"
     | "agent.tool.finished"
     | "agent.tool.started"
     | "app.locked"
@@ -64,6 +65,11 @@ export interface AgentDonePayload {
     inputTokens: number;
     outputTokens: number;
     usd: number;
+}
+
+export interface AgentTitledPayload {
+    conversationId: string;
+    title: string;
 }
 
 export interface AgentToolFinishedPayload {
@@ -215,6 +221,7 @@ export interface EventPayloads {
     "agent.confirm.resolved": AgentConfirmResolvedPayload;
     "agent.delta": AgentDeltaPayload;
     "agent.done": AgentDonePayload;
+    "agent.titled": AgentTitledPayload;
     "agent.tool.finished": AgentToolFinishedPayload;
     "agent.tool.started": AgentToolStartedPayload;
     "app.locked": AppLockedPayload;
