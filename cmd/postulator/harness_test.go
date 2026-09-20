@@ -296,3 +296,38 @@ func TestTheHarnessOpensTheDevtoolsEndpointOnDemand(t *testing.T) {
 		})
 	}
 }
+
+func TestTheSeededGraphIsATreeAndNotAFlatList(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+
+	loaded, err := core.Graph.LoadGraph(t.Context(), graph.LoadGraphRequest{SiteID: listed.Items[0].ID})
+	if err != nil {
+		t.Fatalf("LoadGraph: %v", err)
+	}
+
+	parents := make(map[string]int, len(loaded.Entities))
+	for _, edge := range loaded.Edges {
+		if edge.Kind == "parent" {
+			parents[edge.FromEntityID]++
+		}
+	}
+
+	rooted := 0
+	for _, entity := range loaded.Entities {
+		switch parents[entity.ID] {
+		case 0:
+			rooted++
+		case 1:
+		default:
+			t.Errorf("%s carries %d parents, want one", entity.Name, parents[entity.ID])
+		}
+	}
+	if rooted != 6 {
+		t.Errorf("entities without a parent = %d, want the six hubs", rooted)
+	}
+}

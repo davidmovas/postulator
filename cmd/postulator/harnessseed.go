@@ -201,7 +201,7 @@ func seedGraph(ctx context.Context, core *app.Core, siteID string) (map[string]s
 			continue
 		}
 		if _, err := core.Graph.AddEdge(ctx, graph.AddEdgeRequest{
-			SiteID: siteID, FromEntityID: byName[entity.Parent], ToEntityID: byName[entity.Name],
+			SiteID: siteID, FromEntityID: byName[entity.Name], ToEntityID: byName[entity.Parent],
 			Kind: "parent", Weight: 1, Source: "user", Status: "approved",
 			Reason: entity.Name + " is one branch of " + entity.Parent + ".",
 		}); err != nil {

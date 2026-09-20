@@ -89,19 +89,24 @@ tasks:
         platforms: [windows]
 
   ui:shot:
-    summary: Screenshots one route of the running harness window
+    summary: Screenshots one route of the running harness window into frontend/shots
+    dir: frontend
     cmds:
-      - node frontend/scripts/shot.mjs --port {{.UI_DEVTOOLS_PORT}} {{.CLI_ARGS}}
+      - node scripts/shot.mjs --port {{.UI_DEVTOOLS_PORT}} {{.CLI_ARGS}}
 
   ui:walk:
-    summary: Screenshots every route in frontend/scripts/routes.json
+    summary: Screenshots every route in frontend/scripts/routes.json into frontend/shots
+    dir: frontend
     cmds:
-      - node frontend/scripts/shot.mjs --port {{.UI_DEVTOOLS_PORT}} --routes frontend/scripts/routes.json --out-dir frontend/shots
+      - node scripts/shot.mjs --port {{.UI_DEVTOOLS_PORT}} --routes scripts/routes.json --out-dir shots
 
   ui:lint:
     summary: Lints and tests the harness sources, which the default lint and test runs never see
+    vars:
+      GOPATH:
+        sh: go env GOPATH
     cmds:
-      - golangci-lint run --build-tags uiharness ./cmd/postulator/...
+      - '"{{.GOPATH}}/bin/golangci-lint.exe" run --build-tags uiharness ./cmd/postulator/...'
       - go test -tags uiharness -count=1 -timeout 15m ./cmd/postulator/...
 
   test:
