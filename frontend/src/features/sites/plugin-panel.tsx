@@ -101,11 +101,6 @@ export function PluginPanel({ site }: PluginPanelProps): ReactElement {
             body={copy.sites.plugin.missingBody}
             actions={
                 <>
-                    <ul className="w-full list-disc pl-4 text-xs text-ink-soft">
-                        {copy.sites.plugin.losses.map((loss) => (
-                            <li key={loss}>{loss}</li>
-                        ))}
-                    </ul>
                     {recheck}
                     {downloadButton}
                 </>

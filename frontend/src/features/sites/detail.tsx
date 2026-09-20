@@ -5,6 +5,7 @@ import { Link } from "react-router";
 import { copy } from "../../copy/index.js";
 import { react } from "../../data/errors.js";
 import { useTestConnection } from "../../data/hooks/sites.js";
+import { usePolicy, useTemplate } from "../../data/hooks/templates.js";
 import { isBrowsable, openExternal } from "../../data/host.js";
 import type { Reachability, Site } from "../../data/types.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
@@ -15,8 +16,7 @@ import {
     EditNoteIcon,
     IconButton,
     OpenInNewIcon,
-    Panel,
-    PanelHeader,
+    SectionLabel,
     SpaceDashboardIcon,
     StatusBadge,
     TravelExploreIcon,
@@ -28,10 +28,32 @@ import { siteStatusTone } from "./status.js";
 function Row({ label, children }: { label: string; children: ReactNode }): ReactElement {
     return (
         <div className="flex items-baseline justify-between gap-3">
-            <dt className="shrink-0 text-2xs font-semibold tracking-label text-ink-faint uppercase">
-                {label}
-            </dt>
+            <dt className="shrink-0 text-2xs font-semibold tracking-label text-ink-faint uppercase">{label}</dt>
             <dd className="min-w-0 truncate text-sm text-ink">{children}</dd>
+        </div>
+    );
+}
+
+function Defaults({ site }: { site: Site }): ReactElement {
+    const template = useTemplate(site.defaults.templateId ?? null);
+    const policy = usePolicy(site.defaults.linkPolicyId ?? null);
+    const roles = Object.keys(site.defaults.modelProfiles ?? {}).length;
+    const said = copy.sites.defaults;
+
+    return (
+        <div className="flex flex-col gap-1.5">
+            <SectionLabel>{said.title}</SectionLabel>
+            <dl className="flex flex-col gap-1.5">
+                <Row label={said.template}>
+                    <Link to={`/s/${site.id}/templates`}>{template.data?.template.name ?? said.none}</Link>
+                </Row>
+                <Row label={said.linkPolicy}>
+                    <Link to={`/s/${site.id}/templates`}>{policy.data?.policy.name ?? said.none}</Link>
+                </Row>
+                <Row label={said.modelRoles}>
+                    <Link to="/settings/models">{roles === 0 ? said.none : said.roles(roles)}</Link>
+                </Row>
+            </dl>
         </div>
     );
 }
@@ -58,19 +80,19 @@ export function SiteDetail({ site, onEdit, onDelete }: SiteDetailProps): ReactEl
                 },
                 onError: (thrown) => {
                     const reaction = react(thrown);
-                    setProblem(
-                        reaction.kind === "field" || reaction.kind === "form" ? reaction.message : null,
-                    );
+                    setProblem(reaction.kind === "field" || reaction.kind === "form" ? reaction.message : null);
                 },
             },
         );
     };
 
     return (
-        <Panel className="w-80 shrink-0">
-            <PanelHeader title={site.name}>
+        <div className="flex h-full min-h-0 flex-col">
+            <header className="flex h-8 shrink-0 items-center justify-between gap-3 border-b border-hairline px-3">
+                <h2 className="truncate text-xs font-semibold text-ink">{site.name}</h2>
                 <div className="flex shrink-0 items-center gap-1">
                     <IconButton
+                        data-site-edit={true}
                         icon={EditNoteIcon}
                         label={copy.sites.edit}
                         variant="ghost"
@@ -85,8 +107,8 @@ export function SiteDetail({ site, onEdit, onDelete }: SiteDetailProps): ReactEl
                         onClick={onDelete}
                     />
                 </div>
-            </PanelHeader>
-            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3">
+            </header>
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-3">
                 <dl className="flex flex-col gap-1.5">
                     <Row label={copy.sites.columns.baseUrl}>
                         {isBrowsable(site.baseUrl) ? (
@@ -120,13 +142,10 @@ export function SiteDetail({ site, onEdit, onDelete }: SiteDetailProps): ReactEl
 
                 <PluginPanel site={site} />
 
+                <Defaults site={site} />
+
                 <div className="flex flex-col gap-2">
-                    <Button
-                        variant="secondary"
-                        icon={TravelExploreIcon}
-                        busy={probe.isPending}
-                        onClick={runTest}
-                    >
+                    <Button variant="secondary" icon={TravelExploreIcon} busy={probe.isPending} onClick={runTest}>
                         {probe.isPending ? copy.sites.testing : copy.sites.test}
                     </Button>
                     {problem === null ? null : <Banner tone="danger" title={problem} />}
@@ -139,6 +158,6 @@ export function SiteDetail({ site, onEdit, onDelete }: SiteDetailProps): ReactEl
                     </Button>
                 </Link>
             </div>
-        </Panel>
+        </div>
     );
 }

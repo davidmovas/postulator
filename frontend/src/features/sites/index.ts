@@ -7,6 +7,8 @@ export type { PluginPanelProps } from "./plugin-panel.js";
 export { ReachabilityReport } from "./reachability.js";
 export type { ReachabilityReportProps } from "./reachability.js";
 export { SitesScreen } from "./screen.js";
+export { SiteTable } from "./table.js";
+export type { SiteTableProps } from "./table.js";
 export { SiteForm } from "./site-form.js";
 export type { SiteFormProps } from "./site-form.js";
 export { siteStatusTone } from "./status.js";

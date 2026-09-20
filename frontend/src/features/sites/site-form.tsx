@@ -3,13 +3,15 @@ import { useState } from "react";
 
 import { copy } from "../../copy/index.js";
 import { react } from "../../data/errors.js";
-import { localAddress } from "../../domain/address.js";
 import { useCreateSite, useTestConnection, useUpdateSite } from "../../data/hooks/sites.js";
 import type { Reachability, Site } from "../../data/types.js";
-import { Banner, Button, Dialog, Field, Input, PublicIcon, Switch, TravelExploreIcon } from "../../ui/index.js";
+import { localAddress } from "../../domain/address.js";
+import { Banner, Button, Drawer, Field, Input, Switch, TravelExploreIcon } from "../../ui/index.js";
 import { ReachabilityReport } from "./reachability.js";
 
 type FieldErrors = Readonly<Record<string, string>>;
+
+const drawerWidth = 688;
 
 export interface SiteFormProps {
     site: Site | null;
@@ -81,6 +83,13 @@ export function SiteForm({ site, onClose, onSaved }: SiteFormProps): ReactElemen
     const save = (): void => {
         setFieldErrors({});
         setFormError(null);
+        const settled = {
+            onSuccess: (answered: { site: Site }) => {
+                onSaved(answered.site);
+                onClose();
+            },
+            onError: absorb,
+        };
         if (site === null) {
             create.mutate(
                 {
@@ -90,13 +99,7 @@ export function SiteForm({ site, onClose, onSaved }: SiteFormProps): ReactElemen
                     password,
                     allowInsecure,
                 },
-                {
-                    onSuccess: (answered) => {
-                        onSaved(answered.site);
-                        onClose();
-                    },
-                    onError: absorb,
-                },
+                settled,
             );
             return;
         }
@@ -109,20 +112,14 @@ export function SiteForm({ site, onClose, onSaved }: SiteFormProps): ReactElemen
                 allowInsecure,
                 ...(password === "" ? {} : { password }),
             },
-            {
-                onSuccess: (answered) => {
-                    onSaved(answered.site);
-                    onClose();
-                },
-                onError: absorb,
-            },
+            settled,
         );
     };
 
     const saving = create.isPending || update.isPending;
 
     return (
-        <Dialog
+        <Drawer
             open={true}
             onOpenChange={(next) => {
                 if (!next) {
@@ -130,14 +127,20 @@ export function SiteForm({ site, onClose, onSaved }: SiteFormProps): ReactElemen
                 }
             }}
             title={editing ? copy.sites.editTitle : copy.sites.addTitle}
-            description={editing ? copy.sites.field.passwordKeep : copy.sites.field.passwordHint}
-            icon={PublicIcon}
-            confirmLabel={copy.app.save}
-            cancelLabel={copy.app.cancel}
-            onConfirm={save}
-            busy={saving}
+            closeLabel={copy.app.cancel}
+            width={drawerWidth}
+            footer={
+                <>
+                    <Button variant="ghost" onClick={onClose}>
+                        {copy.app.cancel}
+                    </Button>
+                    <Button variant="primary" busy={saving} onClick={save}>
+                        {copy.app.save}
+                    </Button>
+                </>
+            }
         >
-            <div className="flex flex-col gap-2.5 pt-1">
+            <div className="flex flex-col gap-3 p-3">
                 <Field label={copy.sites.field.name} required error={fieldErrors["name"]}>
                     {(control) => (
                         <Input
@@ -153,12 +156,7 @@ export function SiteForm({ site, onClose, onSaved }: SiteFormProps): ReactElemen
                         />
                     )}
                 </Field>
-                <Field
-                    label={copy.sites.field.baseUrl}
-                    required
-                    hint={copy.sites.field.baseUrlHint}
-                    error={fieldErrors["baseUrl"]}
-                >
+                <Field label={copy.sites.field.baseUrl} required error={fieldErrors["baseUrl"]}>
                     {(control) => (
                         <Input
                             id={control.id}
@@ -166,6 +164,7 @@ export function SiteForm({ site, onClose, onSaved }: SiteFormProps): ReactElemen
                             invalid={control.invalid}
                             mono={true}
                             inputMode="url"
+                            placeholder={copy.sites.field.baseUrlExample}
                             value={baseUrl}
                             onChange={(event) => {
                                 setBaseUrl(event.target.value);
@@ -174,12 +173,7 @@ export function SiteForm({ site, onClose, onSaved }: SiteFormProps): ReactElemen
                         />
                     )}
                 </Field>
-                <Field
-                    label={copy.sites.field.username}
-                    required={!editing}
-                    hint={copy.sites.field.usernameHint}
-                    error={fieldErrors["username"]}
-                >
+                <Field label={copy.sites.field.username} required={!editing} error={fieldErrors["username"]}>
                     {(control) => (
                         <Input
                             id={control.id}
@@ -196,7 +190,7 @@ export function SiteForm({ site, onClose, onSaved }: SiteFormProps): ReactElemen
                 <Field
                     label={copy.sites.field.password}
                     required={!editing}
-                    hint={editing ? copy.sites.field.passwordKeep : copy.sites.field.passwordHint}
+                    tooltip={copy.sites.field.passwordTooltip}
                     error={fieldErrors["password"]}
                 >
                     {(control) => (
@@ -207,6 +201,7 @@ export function SiteForm({ site, onClose, onSaved }: SiteFormProps): ReactElemen
                             type="password"
                             mono={true}
                             autoComplete="off"
+                            placeholder={editing ? copy.sites.field.passwordKeep : undefined}
                             value={password}
                             onChange={(event) => {
                                 setPassword(event.target.value);
@@ -215,31 +210,21 @@ export function SiteForm({ site, onClose, onSaved }: SiteFormProps): ReactElemen
                         />
                     )}
                 </Field>
-                {local ? (
-                    <p className="text-xs text-ink-dim">{copy.sites.field.localAddress}</p>
-                ) : (
-                    <div className="flex flex-col gap-1">
-                        <Switch
-                            label={copy.sites.field.allowInsecure}
-                            checked={allowInsecure}
-                            tone="danger"
-                            onChange={(event) => {
-                                setAllowInsecure(event.target.checked);
-                                clear("baseUrl");
-                            }}
-                        />
-                        <p className="text-xs text-ink-dim">{copy.sites.field.allowInsecureHint}</p>
-                    </div>
+                {local ? null : (
+                    <Switch
+                        label={copy.sites.field.allowInsecure}
+                        checked={allowInsecure}
+                        tone="danger"
+                        onChange={(event) => {
+                            setAllowInsecure(event.target.checked);
+                            clear("baseUrl");
+                        }}
+                    />
                 )}
                 {allowInsecure && !local ? <Banner tone="warn" title={copy.sites.insecureWarning} /> : null}
                 {formError === null ? null : <Banner tone="danger" title={formError} />}
                 <div className="flex items-center gap-2">
-                    <Button
-                        variant="secondary"
-                        icon={TravelExploreIcon}
-                        busy={probe.isPending}
-                        onClick={runTest}
-                    >
+                    <Button variant="secondary" icon={TravelExploreIcon} busy={probe.isPending} onClick={runTest}>
                         {probe.isPending ? copy.sites.testing : copy.sites.test}
                     </Button>
                 </div>
@@ -255,6 +240,6 @@ export function SiteForm({ site, onClose, onSaved }: SiteFormProps): ReactElemen
                     />
                 )}
             </div>
-        </Dialog>
+        </Drawer>
     );
 }
