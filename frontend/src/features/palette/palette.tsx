@@ -303,6 +303,10 @@ function PaletteDialog({ siteId, destinations }: CommandPaletteProps): ReactElem
                             <Kbd keys={["Esc"]} />
                             {copy.palette.close}
                         </span>
+                        <span className="ml-auto flex items-center gap-1">
+                            <Kbd keys={["F"]} />
+                            {copy.palette.search}
+                        </span>
                     </div>
                 </RadixDialog.Content>
             </RadixDialog.Portal>

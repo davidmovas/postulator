@@ -7,14 +7,17 @@ import { usePendingActions } from "../data/hooks/agent.js";
 import { dismissToast, useToasts } from "../data/toasts.js";
 import type { ToastTone } from "../data/toasts.js";
 import { AgentDock, toggleDock, useDock } from "../features/agent/index.js";
-import { CommandPalette, openPalette } from "../features/palette/index.js";
+import { CommandPalette, openPalette, usePaletteOpen } from "../features/palette/index.js";
 import { Button, Toast, ToastRegion } from "../ui/index.js";
 import type { Tone } from "../ui/index.js";
+import { editableTarget, opensPalette, togglesDock } from "./keys.js";
 import { goToEntries } from "./nav.js";
 import { Rail } from "./rail.js";
 import { rememberSite } from "./site-memory.js";
 import { StatusBar } from "./statusbar.js";
 import { TitleBar } from "./titlebar.js";
+
+const overlaySelector = "[role='dialog'], [role='menu'], [role='listbox'], [data-radix-popper-content-wrapper]";
 
 const toastTone: Readonly<Record<ToastTone, Tone>> = {
     danger: "danger",
@@ -70,6 +73,7 @@ export function Shell() {
     const pending = usePendingActions({ status: "pending" }, 100);
     const awaiting = flatten(pending.data?.pages).length;
     const destinations = useMemo(() => goToEntries(siteId), [siteId]);
+    const paletteOpen = usePaletteOpen();
 
     useEffect(() => {
         if (siteId !== null) {
@@ -79,28 +83,31 @@ export function Shell() {
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent): void => {
-            if (!event.ctrlKey && !event.metaKey) {
-                return;
-            }
-            if (event.altKey) {
-                return;
-            }
-            const pressed = event.key.toLowerCase();
-            if (pressed === "k") {
-                event.preventDefault();
-                openPalette();
-                return;
-            }
-            if (pressed === "j") {
+            const stroke = {
+                key: event.key,
+                ctrl: event.ctrlKey,
+                meta: event.metaKey,
+                alt: event.altKey,
+            };
+            if (togglesDock(stroke)) {
                 event.preventDefault();
                 toggleDock();
+                return;
+            }
+            const where = {
+                editable: editableTarget(document.activeElement),
+                overlayOpen: paletteOpen || document.querySelector(overlaySelector) !== null,
+            };
+            if (opensPalette(stroke, where)) {
+                event.preventDefault();
+                openPalette();
             }
         };
         window.addEventListener("keydown", onKeyDown);
         return () => {
             window.removeEventListener("keydown", onKeyDown);
         };
-    }, []);
+    }, [paletteOpen]);
 
     return (
         <div className="flex h-full flex-col bg-canvas">
