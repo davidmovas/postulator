@@ -19,12 +19,13 @@ export function RunControls({ run }: RunControlsProps): ReactElement {
     const [confirming, setConfirming] = useState(false);
 
     return (
-        <div className="flex shrink-0 items-center gap-2">
+        <>
             <Button
-                size="sm"
+                data-run-pause={true}
                 icon={PauseIcon}
                 disabled={!view.active || view.paused}
                 busy={pause.isPending}
+                title={view.terminal ? copy.runs.settled : view.paused ? copy.runs.alreadyPaused : undefined}
                 onClick={() => {
                     pause.mutate({ runId: run.id });
                 }}
@@ -32,10 +33,10 @@ export function RunControls({ run }: RunControlsProps): ReactElement {
                 {copy.runs.pause}
             </Button>
             <Button
-                size="sm"
                 icon={PlayArrowIcon}
                 disabled={!view.paused}
                 busy={resume.isPending}
+                title={view.paused ? undefined : copy.runs.notPaused}
                 onClick={() => {
                     resume.mutate({ runId: run.id });
                 }}
@@ -43,10 +44,10 @@ export function RunControls({ run }: RunControlsProps): ReactElement {
                 {copy.runs.resume}
             </Button>
             <Button
-                size="sm"
                 variant="danger"
                 icon={CancelIcon}
                 disabled={view.terminal}
+                title={view.terminal ? copy.runs.settled : undefined}
                 onClick={() => {
                     setConfirming(true);
                 }}
@@ -74,6 +75,6 @@ export function RunControls({ run }: RunControlsProps): ReactElement {
                     );
                 }}
             />
-        </div>
+        </>
     );
 }

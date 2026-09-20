@@ -30,6 +30,9 @@ export const runs = {
     budgetPausedBody:
         "A run carries the cap it was started with and there is no binding that raises it. Resuming lets the run continue until its next model call and then it pauses again. To finish the work, cancel this run and start a new one over the same pages with a higher cap.",
     pause: "Pause",
+    settled: "This run has already finished.",
+    alreadyPaused: "This run is already paused.",
+    notPaused: "This run is not paused.",
     resume: "Resume",
     cancel: "Cancel run",
     cancelTitle: "Cancel this run",
@@ -99,6 +102,7 @@ export const runs = {
             "A run with no dollar cap never stops itself on spend. Cancel it if the bill matters, and give the next run a cap.",
         hardStop: "A run pauses itself at the cap; it never overruns it.",
         tokens: "Tokens",
+        tokensOf: (spent: string, cap: string) => `${spent} of ${cap}`,
         tokensBody: "Tokens are reported, not capped — the run stops on dollars.",
         calls: (count: number) => (count === 1 ? "1 model call" : `${count} model calls`),
         liveStats: "Counted from the run log while the run is live.",

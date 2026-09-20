@@ -121,6 +121,9 @@ export function RunItemTable({
                     const failure = item.error === "" ? view.stepFailure?.code : item.error;
                     return (
                         <TableRow
+                            data-item-row={true}
+                            data-item-id={item.id}
+                            data-item-status={item.status}
                             interactive={true}
                             selected={item.id === selectedId}
                             tabIndex={0}
