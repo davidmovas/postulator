@@ -138,11 +138,20 @@ func configure(cfg app.Config) (harness, error) {
 }
 
 func options(opts application.Options) application.Options {
-	if endpoint := strings.TrimSpace(os.Getenv(devtoolsVariable)); endpoint != "" {
+	endpoint := strings.TrimSpace(os.Getenv(devtoolsVariable))
+	if endpoint != "" {
 		opts.Windows.AdditionalBrowserArgs = append(opts.Windows.AdditionalBrowserArgs,
 			"--remote-debugging-port="+endpoint)
 	}
+	opts.SingleInstance = onlyInstance(harnessInstanceID(endpoint))
 	return opts
+}
+
+func harnessInstanceID(endpoint string) string {
+	if endpoint == "" {
+		endpoint = "default"
+	}
+	return ProductionInstanceID + ".uiharness." + endpoint
 }
 
 func environment() func(string) string {

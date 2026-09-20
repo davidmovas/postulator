@@ -13,5 +13,6 @@ func configure(cfg app.Config) (harness, error) {
 }
 
 func options(opts application.Options) application.Options {
+	opts.SingleInstance = onlyInstance(ProductionInstanceID)
 	return opts
 }

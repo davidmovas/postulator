@@ -666,3 +666,33 @@ func TestTheHarnessCanHideTorBrowser(t *testing.T) {
 		})
 	}
 }
+
+func TestTheHarnessRunsBesideTheRealApplication(t *testing.T) {
+	cases := []struct {
+		name  string
+		port  string
+		want  string
+		other string
+	}{
+		{name: "a devtools port", port: "9222", want: ProductionInstanceID + ".uiharness.9222"},
+		{name: "another worker's port", port: "9444", want: ProductionInstanceID + ".uiharness.9444"},
+		{name: "no port", port: "", want: ProductionInstanceID + ".uiharness.default"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(devtoolsVariable, tc.port)
+
+			only := options(application.Options{Name: "Postulator"}).SingleInstance
+			if only == nil {
+				t.Fatal("the harness build declares no single instance")
+			}
+			if only.UniqueID != tc.want {
+				t.Fatalf("UniqueID = %q, want %q", only.UniqueID, tc.want)
+			}
+			if only.UniqueID == ProductionInstanceID {
+				t.Fatal("the harness took the production id, so it would refuse to start beside the real application")
+			}
+		})
+	}
+}
