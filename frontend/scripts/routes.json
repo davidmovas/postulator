@@ -1,0 +1,45 @@
+[
+  { "name": "sites", "route": "#/sites" },
+  { "name": "overview", "route": "#/s/:siteId/overview" },
+  { "name": "graph", "route": "#/s/:siteId/graph", "wait": 1400 },
+  { "name": "pages", "route": "#/s/:siteId/pages", "wait": 1200 },
+  { "name": "links", "route": "#/s/:siteId/links", "wait": 1200 },
+  { "name": "runs", "route": "#/s/:siteId/runs", "wait": 1200 },
+  { "name": "templates", "route": "#/s/:siteId/templates" },
+  { "name": "schedules", "route": "#/s/:siteId/schedules" },
+  { "name": "import", "route": "#/s/:siteId/import" },
+  { "name": "reports", "route": "#/s/:siteId/reports" },
+  { "name": "agent", "route": "#/agent", "wait": 1200 },
+  { "name": "agent-inbox", "route": "#/agent/inbox" },
+  { "name": "settings-general", "route": "#/settings/general" },
+  { "name": "settings-models", "route": "#/settings/models" },
+  { "name": "settings-security", "route": "#/settings/security" },
+  { "name": "settings-about", "route": "#/settings/about" },
+  {
+    "name": "palette",
+    "route": "#/s/:siteId/pages",
+    "wait": 1200,
+    "steps": [{ "key": "Control+K" }, { "wait": 300 }, { "type": "[data-palette-query]=a" }, { "wait": 700 }]
+  },
+  {
+    "name": "site-drawer",
+    "route": "#/sites",
+    "steps": [{ "click": "[data-site-edit]" }, { "wait": 500 }]
+  },
+  { "name": "rail-nosite", "route": "#/sites" },
+  { "name": "rail-site", "route": "#/s/:siteId/overview" },
+  { "name": "sites-960", "route": "#/sites", "width": 960, "height": 600 },
+  { "name": "overview-960", "route": "#/s/:siteId/overview", "width": 960, "height": 600 },
+  { "name": "pages-960", "route": "#/s/:siteId/pages", "width": 960, "height": 600, "wait": 1200 },
+  { "name": "runs-960", "route": "#/s/:siteId/runs", "width": 960, "height": 600, "wait": 1200 },
+  { "name": "agent-960", "route": "#/agent", "width": 960, "height": 600, "wait": 1200 },
+  { "name": "rail-site-960", "route": "#/s/:siteId/graph", "width": 960, "height": 600, "wait": 1400 },
+  {
+    "name": "palette-960",
+    "route": "#/s/:siteId/pages",
+    "width": 960,
+    "height": 600,
+    "wait": 1200,
+    "steps": [{ "key": "Control+K" }, { "wait": 300 }, { "type": "[data-palette-query]=a" }, { "wait": 700 }]
+  }
+]

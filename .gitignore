@@ -20,3 +20,4 @@ coverage.html
 *.db-shm
 
 docker/e2e/.env.generated
+frontend/shots/
