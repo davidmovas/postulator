@@ -37,7 +37,7 @@ import {
     statusTone,
 } from "./labels.js";
 import type { RetryNotice, StepEntry } from "./log-view.js";
-import { ArtifactPane } from "./panes.js";
+import { ArtifactPane } from "./panes/index.js";
 import { artifactBodyHtml, retentionDaysKey } from "./statuses.js";
 import { stepText } from "./step-cell.js";
 

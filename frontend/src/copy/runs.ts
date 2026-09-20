@@ -1,5 +1,6 @@
 export const runs = {
     title: "Runs",
+    openOnSite: "Open in Tor Browser",
     reconnecting: "Reconnecting to the run log",
     reconnectingBody:
         "Live events are never buffered, so a reload loses the stream while the run carries on. The log below is being refilled from the run itself.",
