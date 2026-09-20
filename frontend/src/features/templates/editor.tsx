@@ -29,7 +29,7 @@ import {
     Tabs,
     VerifiedIcon,
 } from "../../ui/index.js";
-import type { TabDefinition } from "../../ui/index.js";
+import type { TabItem } from "../../ui/index.js";
 import { askAgent } from "../agent/dock-state.js";
 import { fieldErrorOf, formErrorOf } from "./controls.js";
 import { ModelsForm } from "./models-form.js";
@@ -49,18 +49,18 @@ type EditorTab = "sections" | "content" | "links" | "meta" | "models" | "recipe"
 
 type AsideTab = "preview" | "overrides";
 
-const tabs: readonly TabDefinition<EditorTab>[] = [
-    { value: "sections", label: copy.templates.editor.tabs.sections },
-    { value: "content", label: copy.templates.editor.tabs.content },
-    { value: "links", label: copy.templates.editor.tabs.links },
-    { value: "meta", label: copy.templates.editor.tabs.meta },
-    { value: "models", label: copy.templates.editor.tabs.models },
-    { value: "recipe", label: copy.templates.editor.tabs.recipe },
+const tabs: readonly TabItem<EditorTab>[] = [
+    { key: "sections", label: copy.templates.editor.tabs.sections },
+    { key: "content", label: copy.templates.editor.tabs.content },
+    { key: "links", label: copy.templates.editor.tabs.links },
+    { key: "meta", label: copy.templates.editor.tabs.meta },
+    { key: "models", label: copy.templates.editor.tabs.models },
+    { key: "recipe", label: copy.templates.editor.tabs.recipe },
 ];
 
-const asideTabs: readonly TabDefinition<AsideTab>[] = [
-    { value: "preview", label: copy.templates.editor.aside.preview },
-    { value: "overrides", label: copy.templates.editor.aside.overrides },
+const asideTabs: readonly TabItem<AsideTab>[] = [
+    { key: "preview", label: copy.templates.editor.aside.preview },
+    { key: "overrides", label: copy.templates.editor.aside.overrides },
 ];
 
 const layerHints: Readonly<Record<Layer, string>> = {
@@ -371,42 +371,63 @@ export function TemplateEditorScreen(): ReactElement {
                             </div>
                         ) : null}
                     </div>
-                    <Tabs
-                        className="min-h-0 flex-1"
-                        label={copy.templates.title}
-                        value={tab}
-                        onValueChange={setTab}
-                        tabs={tabs}
-                    >
-                        <TabPanel value="sections" className="p-3">
-                            <SectionsForm draft={draft} layers={layers} error={thrown} onChange={edit} />
+                    <div className="flex shrink-0 border-b border-hairline px-1">
+                        <Tabs label={copy.templates.title} items={tabs} value={tab} onValueChange={setTab} />
+                    </div>
+                    <div className="flex min-h-0 flex-1 flex-col">
+                        <TabPanel label={copy.templates.editor.tabs.sections} active={tab === "sections"}>
+                            <div className="p-3">
+                                <SectionsForm draft={draft} layers={layers} error={thrown} onChange={edit} />
+                            </div>
                         </TabPanel>
-                        <TabPanel value="content" className="p-3">
-                            <ContentForm draft={draft} layers={layers} error={thrown} onChange={edit} />
+                        <TabPanel label={copy.templates.editor.tabs.content} active={tab === "content"}>
+                            <div className="p-3">
+                                <ContentForm draft={draft} layers={layers} error={thrown} onChange={edit} />
+                            </div>
                         </TabPanel>
-                        <TabPanel value="links" className="p-3">
-                            <LinksForm draft={draft} layers={layers} error={thrown} onChange={edit} />
+                        <TabPanel label={copy.templates.editor.tabs.links} active={tab === "links"}>
+                            <div className="p-3">
+                                <LinksForm draft={draft} layers={layers} error={thrown} onChange={edit} />
+                            </div>
                         </TabPanel>
-                        <TabPanel value="meta" className="p-3">
-                            <MetaForm draft={draft} layers={layers} error={thrown} onChange={edit} />
+                        <TabPanel label={copy.templates.editor.tabs.meta} active={tab === "meta"}>
+                            <div className="p-3">
+                                <MetaForm draft={draft} layers={layers} error={thrown} onChange={edit} />
+                            </div>
                         </TabPanel>
-                        <TabPanel value="models" className="p-3">
-                            <ModelsForm draft={draft} layers={layers} error={thrown} onChange={edit} />
+                        <TabPanel label={copy.templates.editor.tabs.models} active={tab === "models"}>
+                            <div className="p-3">
+                                <ModelsForm draft={draft} layers={layers} error={thrown} onChange={edit} />
+                            </div>
                         </TabPanel>
-                        <TabPanel value="recipe" className="p-3">
-                            <RecipeForm draft={draft} layers={layers} error={thrown} onChange={edit} />
+                        <TabPanel label={copy.templates.editor.tabs.recipe} active={tab === "recipe"}>
+                            <div className="p-3">
+                                <RecipeForm draft={draft} layers={layers} error={thrown} onChange={edit} />
+                            </div>
                         </TabPanel>
-                    </Tabs>
+                    </div>
                 </div>
                 <aside className="flex w-80 shrink-0 flex-col border-l border-hairline">
-                    <Tabs className="min-h-0 flex-1" label={copy.templates.editor.aside.preview} value={asideTab} onValueChange={setAsideTab} tabs={asideTabs}>
-                        <TabPanel value="preview" className="p-3">
-                            <PagePreview draft={draft} />
+                    <div className="flex shrink-0 border-b border-hairline px-1">
+                        <Tabs
+                            label={copy.templates.editor.aside.preview}
+                            items={asideTabs}
+                            value={asideTab}
+                            onValueChange={setAsideTab}
+                        />
+                    </div>
+                    <div className="flex min-h-0 flex-1 flex-col">
+                        <TabPanel label={copy.templates.editor.aside.preview} active={asideTab === "preview"}>
+                            <div className="p-3">
+                                <PagePreview draft={draft} />
+                            </div>
                         </TabPanel>
-                        <TabPanel value="overrides" className="p-3">
-                            <OverridesPanel base={base} siteOverride={siteOverride} pageOverrides={pageOverrides} />
+                        <TabPanel label={copy.templates.editor.aside.overrides} active={asideTab === "overrides"}>
+                            <div className="p-3">
+                                <OverridesPanel base={base} siteOverride={siteOverride} pageOverrides={pageOverrides} />
+                            </div>
                         </TabPanel>
-                    </Tabs>
+                    </div>
                 </aside>
             </div>
             <Dialog

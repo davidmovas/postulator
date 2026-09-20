@@ -61,12 +61,13 @@ export interface FieldProps {
     label: string;
     children: (control: ControlBinding) => ReactNode;
     hint?: string;
+    tooltip?: string;
     error?: string | null;
     required?: boolean;
     className?: string;
 }
 
-export function Field({ label, children, hint, error, required = false, className }: FieldProps): ReactElement {
+export function Field({ label, children, hint, tooltip, error, required = false, className }: FieldProps): ReactElement {
     const base = useId();
     const controlId = `${base}-control`;
     const noteId = `${base}-note`;
@@ -75,7 +76,7 @@ export function Field({ label, children, hint, error, required = false, classNam
 
     return (
         <div className={cx("flex flex-col gap-1", className)}>
-            <label htmlFor={controlId} className="text-xs font-medium text-ink-soft">
+            <label htmlFor={controlId} title={tooltip} className="w-fit text-xs font-medium text-ink-soft">
                 {label}
                 {required ? <span className="ml-0.5 text-danger">*</span> : null}
             </label>

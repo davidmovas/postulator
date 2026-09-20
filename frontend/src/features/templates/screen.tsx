@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
 import { copy } from "../../copy/index.js";
-import type { TabDefinition } from "../../ui/index.js";
+import type { TabItem } from "../../ui/index.js";
 import { AddIcon, Button, EmptyState, PublicIcon, TabPanel, Tabs } from "../../ui/index.js";
 import { CreateTemplateDialog } from "./create-template.js";
 import type { TemplatesQuery, TemplatesTab } from "./params.js";
@@ -11,9 +11,9 @@ import { readQuery, writeQuery } from "./params.js";
 import { PolicyList } from "./policy-list.js";
 import { TemplateList, useTemplateGroups } from "./template-list.js";
 
-const tabs: readonly TabDefinition<TemplatesTab>[] = [
-    { value: "templates", label: copy.templates.tabs.templates },
-    { value: "policies", label: copy.templates.tabs.policies },
+const tabs: readonly TabItem<TemplatesTab>[] = [
+    { key: "templates", label: copy.templates.tabs.templates },
+    { key: "policies", label: copy.templates.tabs.policies },
 ];
 
 export function TemplatesScreen(): ReactElement {
@@ -57,16 +57,18 @@ export function TemplatesScreen(): ReactElement {
                     </Button>
                 ) : null}
             </header>
-            <Tabs
-                className="min-h-0 flex-1"
-                label={copy.templates.title}
-                value={query.tab}
-                onValueChange={(tab) => {
-                    change({ ...query, tab, sort: null });
-                }}
-                tabs={tabs}
-            >
-                <TabPanel value="templates">
+            <div className="flex shrink-0 border-b border-hairline px-1">
+                <Tabs
+                    label={copy.templates.title}
+                    items={tabs}
+                    value={query.tab}
+                    onValueChange={(tab) => {
+                        change({ ...query, tab, sort: null });
+                    }}
+                />
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col">
+                <TabPanel label={copy.templates.tabs.templates} active={query.tab === "templates"}>
                     <TemplateList
                         siteId={siteId}
                         groups={groups}
@@ -84,7 +86,7 @@ export function TemplatesScreen(): ReactElement {
                         </p>
                     )}
                 </TabPanel>
-                <TabPanel value="policies">
+                <TabPanel label={copy.templates.tabs.policies} active={query.tab === "policies"}>
                     <PolicyList
                         siteId={siteId}
                         sort={query.sort}
@@ -93,7 +95,7 @@ export function TemplatesScreen(): ReactElement {
                         }}
                     />
                 </TabPanel>
-            </Tabs>
+            </div>
             <CreateTemplateDialog
                 open={creating}
                 onOpenChange={setCreating}

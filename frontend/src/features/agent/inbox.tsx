@@ -7,7 +7,7 @@ import { flatten } from "../../data/call.js";
 import { useConfirmAction, useConversations, usePendingActions } from "../../data/hooks/agent.js";
 import { useSites } from "../../data/hooks/sites.js";
 import type { PendingAction } from "../../data/types.js";
-import type { TabDefinition } from "../../ui/index.js";
+import type { TabItem } from "../../ui/index.js";
 import {
     Banner,
     Button,
@@ -62,8 +62,8 @@ export function InboxScreen(): ReactElement {
         setActive((held) => Math.min(held, Math.max(ordered.length - 1, 0)));
     }, [ordered.length]);
 
-    const tabs: readonly TabDefinition<InboxStatus>[] = inboxStatuses.map((held) => ({
-        value: held,
+    const tabs: readonly TabItem<InboxStatus>[] = inboxStatuses.map((held) => ({
+        key: held,
         label: copy.agent.inbox.tabs[held],
         count: held === "pending" ? pendingCount : undefined,
         countTone: "warn",
@@ -152,9 +152,12 @@ export function InboxScreen(): ReactElement {
                     </Button>
                 ) : null}
             </header>
-            <Tabs value={status} onValueChange={setStatus} tabs={tabs} label={copy.agent.inbox.title} className="min-h-0 flex-1">
-                <TabPanel value={status} className="p-4">
-                    <div className="mx-auto flex max-w-3xl flex-col gap-4">
+            <div className="flex shrink-0 border-b border-hairline px-1">
+                <Tabs label={copy.agent.inbox.title} items={tabs} value={status} onValueChange={setStatus} />
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col">
+                <TabPanel label={copy.agent.inbox.tabs[status]} active={true}>
+                    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
                         {status === "pending" && pendingCount > 0 ? (
                             <Banner
                                 tone="warn"
@@ -224,7 +227,7 @@ export function InboxScreen(): ReactElement {
                         ) : null}
                     </div>
                 </TabPanel>
-            </Tabs>
+            </div>
             <Dialog
                 open={rejectingAll}
                 onOpenChange={setRejectingAll}

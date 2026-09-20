@@ -21,7 +21,7 @@ import {
     TabPanel,
     Tabs,
 } from "../../ui/index.js";
-import type { TabDefinition } from "../../ui/index.js";
+import type { TabItem } from "../../ui/index.js";
 import { askAgent } from "../agent/dock-state.js";
 import { PreviewButton } from "../pages/preview/preview-button.js";
 import { countdown, dueMs, remainingMs, retryState, waitingUntil } from "./authority.js";
@@ -131,8 +131,8 @@ export function ReviewDrawer({
     const retryLeft = retry === undefined ? null : dueMs(retry.at, retry.afterMs, now);
     const blocked = state !== null && state.kind === "blocked" ? state.reason : null;
 
-    const tabs: readonly TabDefinition<ArtifactKind>[] = kinds.map((kind) => ({
-        value: kind,
+    const tabs: readonly TabItem<ArtifactKind>[] = kinds.map((kind) => ({
+        key: kind,
         label: artifactLabel(kind),
     }));
 
@@ -273,14 +273,16 @@ export function ReviewDrawer({
                             />
                         </div>
                     ) : (
-                        <Tabs
-                            value={active}
-                            onValueChange={setActive}
-                            tabs={tabs}
-                            label={copy.runs.review.title}
-                            className="min-h-0 flex-1"
-                        >
-                            <TabPanel value={active}>
+                        <div className="flex min-h-0 flex-1 flex-col">
+                            <div className="flex shrink-0 overflow-x-auto border-b border-hairline px-1">
+                                <Tabs
+                                    label={copy.runs.review.title}
+                                    items={tabs}
+                                    value={active}
+                                    onValueChange={setActive}
+                                />
+                            </div>
+                            <TabPanel label={artifactLabel(active)} active={true}>
                                 <ArtifactPane
                                     key={`${item.id}:${active}`}
                                     itemId={item.id}
@@ -289,7 +291,7 @@ export function ReviewDrawer({
                                     retentionDays={retentionDays}
                                 />
                             </TabPanel>
-                        </Tabs>
+                        </div>
                     )}
                 </div>
             )}
