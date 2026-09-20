@@ -4,6 +4,7 @@ import { copy } from "../copy/index.js";
 import { AgentScreen, InboxScreen } from "../features/agent/index.js";
 import { GraphScreen } from "../features/graph/index.js";
 import { LinksScreen } from "../features/links/index.js";
+import { OverviewScreen } from "../features/overview/index.js";
 import { PagesScreen } from "../features/pages/index.js";
 import { RunDetailScreen, RunsScreen } from "../features/runs/index.js";
 import {
@@ -18,7 +19,6 @@ import { TemplateEditorScreen, TemplatesScreen } from "../features/templates/ind
 import {
     MonitoringIcon,
     ScheduleIcon,
-    SpaceDashboardIcon,
     UploadFileIcon,
 } from "../ui/index.js";
 import { Landing } from "./landing.js";
@@ -36,10 +36,7 @@ export const router = createHashRouter([
                 path: "s/:siteId",
                 children: [
                     { index: true, element: <Navigate to="overview" replace /> },
-                    {
-                        path: "overview",
-                        element: <Placeholder title={copy.nav.overview} icon={SpaceDashboardIcon} />,
-                    },
+                    { path: "overview", element: <OverviewScreen /> },
                     { path: "graph", element: <GraphScreen /> },
                     { path: "graph/:entityId", element: <GraphScreen /> },
                     { path: "pages", element: <PagesScreen /> },

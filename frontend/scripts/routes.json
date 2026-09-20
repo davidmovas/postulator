@@ -1,6 +1,6 @@
 [
   { "name": "sites", "route": "#/sites" },
-  { "name": "overview", "route": "#/s/:siteId/overview" },
+  { "name": "overview", "route": "#/s/:siteId/overview", "wait": 1500 },
   { "name": "graph", "route": "#/s/:siteId/graph", "wait": 1400 },
   { "name": "pages", "route": "#/s/:siteId/pages", "wait": 1200 },
   { "name": "links", "route": "#/s/:siteId/links", "wait": 1200 },
@@ -26,10 +26,31 @@
     "route": "#/sites",
     "steps": [{ "click": "[data-site-edit]" }, { "wait": 500 }]
   },
+  {
+    "name": "dock-narrow",
+    "route": "#/s/:siteId/overview",
+    "wait": 1500,
+    "steps": [{ "click": "[aria-label=\"Expand the agent dock\"]" }, { "wait": 1200 }]
+  },
+  {
+    "name": "dock-wide",
+    "route": "#/s/:siteId/overview",
+    "wait": 1500,
+    "steps": [{ "click": "[aria-label=\"Expand the agent dock\"]" }, { "wait": 800 }, { "click": "[aria-label=\"Dock width\"] [role=radio]:last-of-type" }, { "wait": 1200 }]
+  },
+  {
+    "name": "dock-narrow-960",
+    "route": "#/s/:siteId/overview",
+    "width": 960,
+    "height": 600,
+    "wait": 1500,
+    "steps": [{ "click": "[aria-label=\"Expand the agent dock\"]" }, { "wait": 1200 }]
+  },
+  { "name": "agent-inbox-960", "route": "#/agent/inbox", "width": 960, "height": 600, "wait": 1200 },
   { "name": "rail-nosite", "route": "#/sites" },
   { "name": "rail-site", "route": "#/s/:siteId/overview" },
   { "name": "sites-960", "route": "#/sites", "width": 960, "height": 600 },
-  { "name": "overview-960", "route": "#/s/:siteId/overview", "width": 960, "height": 600 },
+  { "name": "overview-960", "route": "#/s/:siteId/overview", "width": 960, "height": 600, "wait": 1500 },
   { "name": "pages-960", "route": "#/s/:siteId/pages", "width": 960, "height": 600, "wait": 1200 },
   { "name": "runs-960", "route": "#/s/:siteId/runs", "width": 960, "height": 600, "wait": 1200 },
   { "name": "agent-960", "route": "#/agent", "width": 960, "height": 600, "wait": 1200 },

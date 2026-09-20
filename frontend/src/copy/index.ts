@@ -3,7 +3,7 @@ import { app, empty, lock, nav, shell, toasts } from "./app.js";
 import { errorMessages } from "./errors.js";
 import { graph } from "./graph.js";
 import { links } from "./links.js";
-import { onboarding, readiness } from "./onboarding.js";
+import { overview, readiness } from "./overview.js";
 import { pages } from "./pages.js";
 import { palette } from "./palette.js";
 import { policies, templates } from "./templates.js";
@@ -21,7 +21,7 @@ export const copy = {
     palette,
     empty,
     readiness,
-    onboarding,
+    overview,
     sites,
     settings,
     runs,

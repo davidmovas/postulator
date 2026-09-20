@@ -1,0 +1,309 @@
+import type { ReactElement } from "react";
+import { Link } from "react-router";
+
+import { copy } from "../../copy/index.js";
+import type { EntityScore } from "../../data/types.js";
+import { tokens, usd } from "../../domain/format.js";
+import type { Tone } from "../../ui/index.js";
+import {
+    ArrowRightAltIcon,
+    BudgetGauge,
+    Button,
+    ChevronRightIcon,
+    cx,
+    EmptyState,
+    HubIcon,
+    MonitoringIcon,
+    Panel,
+    ProgressBar,
+    SectionLabel,
+    StatusBadge,
+    SyncProblemIcon,
+    toneClasses,
+} from "../../ui/index.js";
+import type { DepthBar, EdgeTile, EntityTile, PageTile, RunSummary } from "./model/overview.js";
+
+export interface TileRow {
+    label: string;
+    value: number;
+    tone: Tone;
+}
+
+interface TileProps {
+    title: string;
+    total: string;
+    rows: readonly TileRow[];
+}
+
+function Tile({ title, total, rows }: TileProps): ReactElement {
+    const sum = rows.reduce((carried, row) => carried + row.value, 0);
+    return (
+        <Panel className="flex flex-col gap-2.5 p-3">
+            <div className="flex items-baseline justify-between gap-2">
+                <SectionLabel>{title}</SectionLabel>
+                <span className="text-lg font-semibold tracking-tight text-ink">{total}</span>
+            </div>
+            <div className="flex h-1 gap-px overflow-hidden rounded-sm">
+                {rows.map((row) => (
+                    <span
+                        key={row.label}
+                        aria-hidden={true}
+                        className={cx("h-full", toneClasses[row.tone].solid)}
+                        style={{ width: `${sum === 0 ? 0 : (row.value / sum) * 100}%` }}
+                    />
+                ))}
+            </div>
+            <dl className="flex flex-col gap-1">
+                {rows.map((row) => (
+                    <div key={row.label} className="flex items-center gap-2">
+                        <span
+                            aria-hidden={true}
+                            className={cx("h-1.5 w-1.5 shrink-0 rounded-xs", toneClasses[row.tone].solid)}
+                        />
+                        <dt className="min-w-0 flex-1 truncate text-xs text-ink-soft">{row.label}</dt>
+                        <dd className="shrink-0 font-mono text-xs text-ink">{tokens(row.value)}</dd>
+                    </div>
+                ))}
+            </dl>
+        </Panel>
+    );
+}
+
+export interface TilesProps {
+    entities: EntityTile;
+    pages: PageTile;
+    edges: EdgeTile;
+}
+
+export function Tiles({ entities, pages, edges }: TilesProps): ReactElement {
+    return (
+        <div className="grid grid-cols-3 gap-3">
+            <Tile
+                title={copy.overview.tiles.entities}
+                total={tokens(entities.total)}
+                rows={[
+                    { label: copy.overview.tiles.withPublished, value: entities.withPublished, tone: "ok" },
+                    {
+                        label: copy.overview.tiles.withCanonical,
+                        value: Math.max(0, entities.withCanonical - entities.withPublished),
+                        tone: "accent",
+                    },
+                    { label: copy.overview.tiles.withoutPage, value: entities.withoutPage, tone: "warn" },
+                ]}
+            />
+            <Tile
+                title={copy.overview.tiles.pages}
+                total={tokens(pages.total)}
+                rows={[
+                    { label: copy.overview.tiles.mapped, value: pages.mapped, tone: "ok" },
+                    { label: copy.overview.tiles.unmapped, value: pages.unmapped, tone: "warn" },
+                    { label: copy.overview.tiles.orphans, value: pages.orphans, tone: "danger" },
+                ]}
+            />
+            <Tile
+                title={copy.overview.tiles.edges}
+                total={edges.capped ? copy.overview.tiles.capped(edges.approved) : tokens(edges.approved)}
+                rows={[
+                    { label: copy.overview.tiles.realized, value: edges.realized, tone: "ok" },
+                    { label: copy.overview.tiles.approved, value: edges.gap, tone: "accent" },
+                    { label: copy.overview.tiles.proposed, value: edges.proposed, tone: "info" },
+                ]}
+            />
+        </div>
+    );
+}
+
+export interface RunPanelProps {
+    summary: RunSummary | null;
+    siteId: string;
+    onStart: () => void;
+}
+
+export function RunPanel({ summary, siteId, onStart }: RunPanelProps): ReactElement {
+    if (summary === null) {
+        return (
+            <Panel className="p-3">
+                <EmptyState
+                    icon={MonitoringIcon}
+                    title={copy.overview.run.none}
+                    actions={
+                        <Button variant="primary" onClick={onStart}>
+                            {copy.overview.startRun}
+                        </Button>
+                    }
+                />
+            </Panel>
+        );
+    }
+    const run = summary.run;
+    return (
+        <Link
+            to={`/s/${siteId}/runs/${run.id}`}
+            title={copy.overview.run.open}
+            className="flex items-center gap-3 rounded-lg border border-hairline bg-panel px-3 py-2.5 hover:border-edge"
+        >
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <div className="flex items-center gap-2">
+                    <span className="truncate text-xs font-semibold text-ink">{run.kind}</span>
+                    <StatusBadge tone={summary.active ? "info" : "muted"}>
+                        {summary.active ? copy.overview.run.active : run.status}
+                    </StatusBadge>
+                    <span className="truncate font-mono text-2xs text-ink-dim">
+                        {copy.overview.run.startedBy(run.createdBy)} · {copy.overview.run.publish(run.publishMode)}
+                    </span>
+                </div>
+                <ProgressBar
+                    label={copy.overview.run.title}
+                    value={summary.done + summary.failed}
+                    max={Math.max(summary.total, 1)}
+                    tone={summary.failed > 0 ? "warn" : summary.active ? "accent" : "ok"}
+                    trailing={copy.overview.run.items(summary.done, summary.total)}
+                />
+            </div>
+            <div className="w-40 shrink-0">
+                <BudgetGauge
+                    label={copy.overview.run.budget}
+                    value={summary.usd}
+                    max={summary.maxUsd}
+                    trailing={`${usd(summary.usd)} / ${usd(summary.maxUsd)}`}
+                />
+            </div>
+            <ChevronRightIcon size={16} className="shrink-0 text-ink-faint" />
+        </Link>
+    );
+}
+
+export interface DepthPanelProps {
+    bars: readonly DepthBar[];
+}
+
+export function DepthPanel({ bars }: DepthPanelProps): ReactElement {
+    return (
+        <Panel className="flex min-h-40 flex-col gap-3 p-3">
+            <div className="flex items-baseline justify-between gap-2">
+                <SectionLabel>{copy.overview.depth.title}</SectionLabel>
+                <span className="font-mono text-2xs text-ink-faint">{copy.overview.depth.unit}</span>
+            </div>
+            {bars.length === 0 ? (
+                <p className="text-xs text-ink-dim">{copy.empty.depth}</p>
+            ) : (
+                <div className="flex min-h-0 flex-1 items-end gap-2">
+                    {bars.map((bar) => (
+                        <div key={bar.depth} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
+                            <span className="font-mono text-2xs text-ink-dim">{tokens(bar.pages)}</span>
+                            <span
+                                aria-hidden={true}
+                                className="w-full rounded-t-sm bg-accent"
+                                style={{ height: `${Math.max(2, bar.fraction * 100)}%` }}
+                            />
+                            <span className="font-mono text-2xs text-ink-faint">
+                                {copy.overview.depth.bucket(bar.depth)}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </Panel>
+    );
+}
+
+export interface TopEntitiesProps {
+    entries: readonly EntityScore[];
+    siteId: string;
+}
+
+export function TopEntities({ entries, siteId }: TopEntitiesProps): ReactElement {
+    return (
+        <Panel className="flex flex-col gap-2 p-3">
+            <div className="flex items-baseline justify-between gap-2">
+                <SectionLabel>{copy.overview.top.title}</SectionLabel>
+                <span className="font-mono text-2xs text-ink-faint">{copy.overview.top.unit}</span>
+            </div>
+            {entries.length === 0 ? (
+                <p className="text-xs text-ink-dim">{copy.empty.topEntities}</p>
+            ) : (
+                <ul className="flex flex-col gap-1">
+                    {entries.map((entry) => (
+                        <li key={entry.entityId} className="flex items-center gap-2">
+                            <HubIcon size={13} className="shrink-0 text-ink-faint" />
+                            <Link
+                                to={`/s/${siteId}/graph/${entry.entityId}`}
+                                className="min-w-0 flex-1 truncate text-xs text-ink-soft hover:text-accent"
+                            >
+                                {entry.name}
+                            </Link>
+                            <span
+                                aria-hidden={true}
+                                className="h-1 w-16 shrink-0 overflow-hidden rounded-sm bg-inset"
+                            >
+                                <span
+                                    className="block h-full bg-accent"
+                                    style={{ width: `${Math.min(100, entry.score * 100)}%` }}
+                                />
+                            </span>
+                            <span className="w-10 shrink-0 text-right font-mono text-2xs text-ink-dim">
+                                {entry.score.toFixed(3)}
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </Panel>
+    );
+}
+
+export interface DriftPanelProps {
+    count: number;
+    siteId: string;
+}
+
+export function DriftPanel({ count, siteId }: DriftPanelProps): ReactElement | null {
+    if (count === 0) {
+        return null;
+    }
+    return (
+        <Panel className="flex items-start gap-2 p-3">
+            <SyncProblemIcon size={16} className="mt-px shrink-0 text-warn" />
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className="text-xs font-semibold text-warn">{copy.overview.drift.title(count)}</span>
+                <span className="text-2xs text-ink-dim">{copy.overview.drift.body}</span>
+                <Link
+                    to={`/s/${siteId}/pages`}
+                    className="inline-flex items-center gap-0.5 text-2xs font-semibold text-accent"
+                >
+                    {copy.overview.drift.action}
+                    <ArrowRightAltIcon size={13} />
+                </Link>
+            </div>
+        </Panel>
+    );
+}
+
+export interface CoveragePanelProps {
+    edges: EdgeTile;
+    onRelink: () => void;
+}
+
+export function CoveragePanel({ edges, onRelink }: CoveragePanelProps): ReactElement {
+    return (
+        <Panel className="flex flex-col gap-2 p-3">
+            <SectionLabel>{copy.overview.coverage.title}</SectionLabel>
+            <ProgressBar
+                label={copy.overview.coverage.title}
+                value={edges.realized}
+                max={Math.max(edges.approved, 1)}
+                tone={edges.gap === 0 ? "ok" : "accent"}
+                leading={`${tokens(edges.realized)} / ${tokens(edges.approved)}`}
+                trailing={`${Math.round(edges.coverage * 100)}%`}
+            />
+            <span className="text-2xs text-ink-dim">
+                {edges.gap === 0 ? copy.overview.coverage.closed : copy.overview.coverage.gap(edges.gap)}
+            </span>
+            {edges.gap === 0 ? null : (
+                <Button size="sm" onClick={onRelink}>
+                    {copy.overview.coverage.action}
+                </Button>
+            )}
+        </Panel>
+    );
+}
