@@ -3,6 +3,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net"
 	"path/filepath"
 	"testing"
@@ -375,5 +376,93 @@ func TestLockingTheSeededHarnessLeavesTheProcessStanding(t *testing.T) {
 	}
 	if core.Locked() {
 		t.Fatal("the core did not come back up")
+	}
+}
+
+func TestAPendingConfirmationSurvivesARestart(t *testing.T) {
+	core := seeded(t)
+
+	before, err := core.Agent.ListPendingActions(t.Context(), agent.ListPendingActionsRequest{
+		Status: "pending", ListRequest: dto.ListRequest{Limit: 10},
+	})
+	if err != nil {
+		t.Fatalf("ListPendingActions: %v", err)
+	}
+	if len(before.Items) != 1 {
+		t.Fatalf("pending actions before the restart = %d, want 1", len(before.Items))
+	}
+	if closeErr := core.Close(); closeErr != nil {
+		t.Fatalf("Close: %v", closeErr)
+	}
+
+	cfg, err := app.DefaultConfig()
+	if err != nil {
+		t.Fatalf("DefaultConfig: %v", err)
+	}
+	again, err := configure(cfg)
+	if err != nil {
+		t.Fatalf("configure: %v", err)
+	}
+	if again.Seed != nil {
+		t.Fatal("a restart must not reseed")
+	}
+
+	reopened, err := app.Open(t.Context(), again.Config, zaptest.NewLogger(t))
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	t.Cleanup(func() {
+		if closeErr := reopened.Close(); closeErr != nil {
+			t.Errorf("Close: %v", closeErr)
+		}
+	})
+
+	after, err := reopened.Agent.ListPendingActions(t.Context(), agent.ListPendingActionsRequest{
+		Status: "pending", ListRequest: dto.ListRequest{Limit: 10},
+	})
+	if err != nil {
+		t.Fatalf("ListPendingActions: %v", err)
+	}
+	if len(after.Items) != 1 {
+		t.Fatalf("pending actions after the restart = %d, want the one that was waiting", len(after.Items))
+	}
+	if after.Items[0].ID != before.Items[0].ID {
+		t.Fatalf("the pending action is %s, want %s", after.Items[0].ID, before.Items[0].ID)
+	}
+}
+
+func TestTheSeededConfirmationNamesARealPage(t *testing.T) {
+	core := seeded(t)
+
+	pending, err := core.Agent.ListPendingActions(t.Context(), agent.ListPendingActionsRequest{
+		Status: "pending", ListRequest: dto.ListRequest{Limit: 10},
+	})
+	if err != nil {
+		t.Fatalf("ListPendingActions: %v", err)
+	}
+	if len(pending.Items) != 1 {
+		t.Fatalf("pending actions = %d, want 1", len(pending.Items))
+	}
+
+	var args struct {
+		ID        string `json:"id"`
+		MetaTitle string `json:"metaTitle"`
+	}
+	if unmarshalErr := json.Unmarshal(pending.Items[0].Args, &args); unmarshalErr != nil {
+		t.Fatalf("read the pending arguments %s: %v", pending.Items[0].Args, unmarshalErr)
+	}
+	if args.ID == "" {
+		t.Fatalf("the pending action carries no page id: %s", pending.Items[0].Args)
+	}
+	if args.MetaTitle == "" {
+		t.Fatalf("the pending action carries no new title: %s", pending.Items[0].Args)
+	}
+
+	page, err := core.Pages.Get(t.Context(), pages.GetRequest{ID: args.ID})
+	if err != nil {
+		t.Fatalf("the pending action names a page that does not exist: %v", err)
+	}
+	if page.Page.Path != "/espresso-machines/under-500/" {
+		t.Fatalf("the pending action names %s, want the under-500 page", page.Page.Path)
 	}
 }
