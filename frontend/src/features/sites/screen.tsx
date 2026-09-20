@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router";
 
 import { copy } from "../../copy/index.js";
 import { flatten } from "../../data/call.js";
@@ -44,6 +45,8 @@ function matching(rows: readonly Site[], search: string): readonly Site[] {
 }
 
 export function SitesScreen(): ReactElement {
+    const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [status, setStatus] = useState<string>(anyStatus);
     const [search, setSearch] = useState("");
     const [sort, setSort] = useState<SiteSort | null>(null);
@@ -67,6 +70,16 @@ export function SitesScreen(): ReactElement {
             return held !== null && listed.includes(held) ? held : listed[0];
         });
     }, [ids]);
+
+    const asked = searchParams.get("action");
+
+    useEffect(() => {
+        if (asked !== "new") {
+            return;
+        }
+        setForm({ mode: "create" });
+        setSearchParams({}, { replace: true });
+    }, [asked, setSearchParams]);
 
     const selected = shown.find((row) => row.id === selectedId) ?? null;
     const nothingAtAll = !sites.isPending && rows.length === 0 && status === anyStatus && search === "";
@@ -180,6 +193,9 @@ export function SitesScreen(): ReactElement {
                         sort={sort}
                         onSortChange={setSort}
                         onSelect={setSelectedId}
+                        onEnter={(id) => {
+                            void navigate(`/s/${id}/overview`);
+                        }}
                     />
                 )}
                 {sites.hasNextPage ? (

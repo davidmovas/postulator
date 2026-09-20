@@ -1,4 +1,5 @@
 import type { ReactElement } from "react";
+import { Link } from "react-router";
 
 import { copy } from "../../copy/index.js";
 import { isBrowsable, openExternal } from "../../data/host.js";
@@ -36,6 +37,7 @@ export interface SiteTableProps {
     sort: SiteSort | null;
     onSortChange: (sort: SiteSort) => void;
     onSelect: (id: string) => void;
+    onEnter: (id: string) => void;
 }
 
 export function SiteTable({
@@ -45,6 +47,7 @@ export function SiteTable({
     sort,
     onSortChange,
     onSelect,
+    onEnter,
 }: SiteTableProps): ReactElement {
     return (
         <DenseTable columns={columns} label={copy.sites.title}>
@@ -86,13 +89,29 @@ export function SiteTable({
                             onSelect(row.id);
                         }}
                         onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
+                            if (event.key === "Enter") {
+                                event.preventDefault();
+                                onEnter(row.id);
+                                return;
+                            }
+                            if (event.key === " ") {
                                 event.preventDefault();
                                 onSelect(row.id);
                             }
                         }}
                     >
-                        <TableCell>{row.name}</TableCell>
+                        <TableCell>
+                            <Link
+                                to={`/s/${row.id}/overview`}
+                                title={copy.sites.open}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                }}
+                                className="truncate text-ink hover:text-accent hover:underline"
+                            >
+                                {row.name}
+                            </Link>
+                        </TableCell>
                         <TableCell mono={true} muted={true} title={row.baseUrl}>
                             <span className="flex min-w-0 items-center gap-1">
                                 <span className="truncate">{row.baseUrl}</span>
