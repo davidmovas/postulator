@@ -34,6 +34,7 @@ type profileStore interface {
 type spendReader interface {
 	SumByRun(ctx context.Context, runID string) (llm.Spend, error)
 	SumByConversation(ctx context.Context, conversationID string) (llm.Spend, error)
+	SumAll(ctx context.Context) (llm.Spend, error)
 }
 
 type prober interface {
@@ -277,18 +278,21 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequest) (Te
 func (s *Service) UsageSummary(ctx context.Context, req UsageSummaryRequest) (UsageSummaryResponse, error) {
 	runID := strings.TrimSpace(req.RunID)
 	conversationID := strings.TrimSpace(req.ConversationID)
-	if (runID == "") == (conversationID == "") {
-		return UsageSummaryResponse{}, errors.New(errors.Invalid, "name exactly one of the run and the conversation")
+	if runID != "" && conversationID != "" {
+		return UsageSummaryResponse{}, errors.New(errors.Invalid, "name the run or the conversation, not both")
 	}
 
 	var (
 		spend llm.Spend
 		err   error
 	)
-	if runID != "" {
+	switch {
+	case runID != "":
 		spend, err = s.spend.SumByRun(ctx, runID)
-	} else {
+	case conversationID != "":
 		spend, err = s.spend.SumByConversation(ctx, conversationID)
+	default:
+		spend, err = s.spend.SumAll(ctx)
 	}
 	if err != nil {
 		return UsageSummaryResponse{}, err

@@ -7,6 +7,13 @@ import { LinksScreen } from "../features/links/index.js";
 import { OnboardingScreen } from "../features/onboarding/index.js";
 import { PagesScreen } from "../features/pages/index.js";
 import { RunDetailScreen, RunsScreen } from "../features/runs/index.js";
+import {
+    AboutScreen,
+    GeneralSettingsScreen,
+    ModelSettingsScreen,
+    SecurityScreen,
+    SettingsScreen,
+} from "../features/settings/index.js";
 import { SitesScreen } from "../features/sites/index.js";
 import { TemplateEditorScreen, TemplatesScreen } from "../features/templates/index.js";
 import { NotBuilt } from "./not-built.js";
@@ -55,12 +62,13 @@ export const router = createHashRouter([
             },
             {
                 path: "settings",
+                element: <SettingsScreen />,
                 children: [
                     { index: true, element: <Navigate to="general" replace /> },
-                    { path: "general", element: panel("General settings", "wave 3, agent 8") },
-                    { path: "models", element: panel("Models and profiles", "wave 3, agent 8") },
-                    { path: "security", element: panel("Security and backup", "wave 3, agent 8") },
-                    { path: "about", element: panel("About", "wave 3, agent 8") },
+                    { path: "general", element: <GeneralSettingsScreen /> },
+                    { path: "models", element: <ModelSettingsScreen /> },
+                    { path: "security", element: <SecurityScreen /> },
+                    { path: "about", element: <AboutScreen /> },
                 ],
             },
             { path: "*", element: <Navigate to="/sites" replace /> },

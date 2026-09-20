@@ -5,7 +5,7 @@ import type {
     UseQueryOptions,
     UseQueryResult,
 } from "@tanstack/react-query";
-import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useQueries, useQuery } from "@tanstack/react-query";
 
 import type { Cursor, List, Sort } from "../lib/paging.js";
 import type { Paged } from "./call.js";
@@ -25,6 +25,20 @@ export function useUnlockedQuery<TQueryFnData, TData = TQueryFnData>(
     const { quiet, ...rest } = options;
     const enabled = (options.enabled ?? true) && gate.ready && !gate.locked;
     return useQuery({ ...rest, enabled, meta: quiet === undefined ? undefined : quietMeta(quiet) });
+}
+
+export function useUnlockedQueries<TQueryFnData>(
+    options: readonly UnlockedQueryOptions<TQueryFnData, TQueryFnData>[],
+): UseQueryResult<TQueryFnData, Error>[] {
+    const gate = useLockGate();
+    const ready = gate.ready && !gate.locked;
+    return useQueries({
+        queries: options.map(({ quiet, ...rest }) => ({
+            ...rest,
+            enabled: (rest.enabled ?? true) && ready,
+            meta: quiet === undefined ? undefined : quietMeta(quiet),
+        })),
+    });
 }
 
 export function nextPageParam<T>(last: List<T>): Cursor | undefined {

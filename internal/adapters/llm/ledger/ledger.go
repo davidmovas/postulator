@@ -17,6 +17,7 @@ type callStore interface {
 	Insert(ctx context.Context, call llm.Call) error
 	SumByRun(ctx context.Context, runID string) (llm.Spend, error)
 	SumByConversation(ctx context.Context, conversationID string) (llm.Spend, error)
+	SumAll(ctx context.Context) (llm.Spend, error)
 	List(ctx context.Context, q llm.CallQuery, page paging.Request) (paging.List[llm.Call], error)
 }
 
@@ -142,6 +143,10 @@ func (l *Ledger) SumByRun(ctx context.Context, runID string) (llm.Spend, error) 
 
 func (l *Ledger) SumByConversation(ctx context.Context, conversationID string) (llm.Spend, error) {
 	return l.store.SumByConversation(ctx, conversationID)
+}
+
+func (l *Ledger) SumAll(ctx context.Context) (llm.Spend, error) {
+	return l.store.SumAll(ctx)
 }
 
 func (l *Ledger) List(ctx context.Context, q llm.CallQuery, page paging.Request) (paging.List[llm.Call], error) {

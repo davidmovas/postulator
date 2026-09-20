@@ -94,6 +94,7 @@ func (p *profiles) Resolve(_ context.Context, siteID string, role llm.Role, _ ma
 type spend struct {
 	run          llm.Spend
 	conversation llm.Spend
+	everything   llm.Spend
 	err          error
 }
 
@@ -103,6 +104,10 @@ func (s spend) SumByRun(context.Context, string) (llm.Spend, error) {
 
 func (s spend) SumByConversation(context.Context, string) (llm.Spend, error) {
 	return s.conversation, s.err
+}
+
+func (s spend) SumAll(context.Context) (llm.Spend, error) {
+	return s.everything, s.err
 }
 
 type prober struct {
@@ -451,6 +456,7 @@ func TestUsageSummary(t *testing.T) {
 	book := spend{
 		run:          llm.Spend{Usage: llm.Usage{Input: 100, Output: 50, Total: 150}, USD: 1.5, Calls: 3},
 		conversation: llm.Spend{Usage: llm.Usage{Input: 10, Output: 5, Total: 15}, USD: 0.1, Calls: 1},
+		everything:   llm.Spend{Usage: llm.Usage{Input: 900, Output: 400, Total: 1300}, USD: 9.9, Calls: 27},
 	}
 
 	cases := []struct {
@@ -461,7 +467,7 @@ func TestUsageSummary(t *testing.T) {
 	}{
 		{name: "by run", req: models.UsageSummaryRequest{RunID: "run-1"}, wantCalls: 3},
 		{name: "by conversation", req: models.UsageSummaryRequest{ConversationID: "chat-1"}, wantCalls: 1},
-		{name: "neither", req: models.UsageSummaryRequest{}, wantErr: true},
+		{name: "neither names everything spent", req: models.UsageSummaryRequest{}, wantCalls: 27},
 		{name: "both", req: models.UsageSummaryRequest{RunID: "run-1", ConversationID: "chat-1"}, wantErr: true},
 	}
 

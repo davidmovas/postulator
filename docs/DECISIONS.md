@@ -797,3 +797,87 @@ being built and thrown away.
   is verified by the build linking all seven sizes. The test decodes the committed file and
   compares its pixels with a fresh render rather than comparing bytes, so a change in Go's
   deflate output is not reported as a stale icon while a changed mark still is.
+
+## Decisions taken on 2026-09-20 for the shell, the site scheme and chat names
+
+Three defects found by opening the built window, each one not what it looked like.
+
+- **A design system primitive does not size itself.** `ui/select.tsx` hardcoded `w-full` on its
+  trigger and `ui/cx.ts` joins class strings without resolving Tailwind conflicts, so the `w-56`
+  the title bar passed landed in the same class attribute and lost to the later `w-full` rule: the
+  site switcher ate the whole header. `SelectProps` no longer carries `className` at all, which
+  makes the mistake unexpressible, and the seven call sites that sized a select wrap it instead.
+  `tailwind-merge` was considered and refused: `theme.css` renames the type scale, so `text-2xs`
+  would be read as a colour and silently dropped against `text-ink` unless the merge config
+  mirrored the theme, which is a second source of truth for a one-line problem.
+- **The header carries context, not a second name.** The window has a system frame that already
+  says Postulator, so the bar holds the site switcher at a fixed width and the current site's base
+  URL beside it, which answers "am I on the docker site or the live one" at a glance. The
+  `no-site` sentinel option is gone: a placeholder is what Radix has for an empty selection, and a
+  fake row mixed into the site list was data pretending to be a choice.
+- **An address on your own machine is not the risk the https rule exists for.** `AllowInsecure`
+  already unlocked plain http per site, but the refusal said "must use https" while the switch
+  that allows it sat further down the form, so the docker stack on `http://localhost:8089` read as
+  a hard block. `kernel/addr.Local` answers what a local host is — loopback, private, link-local,
+  `localhost` and the `.local`, `.localhost` and `.test` suffixes — and both places that decide a
+  scheme read it, because the domain and the WordPress client must agree or one accepts a site the
+  other refuses. The per-site consent stays for a public host over http; the form hides the switch
+  where it cannot matter.
+- **A chat names itself once, from the exchange, and never again.** Every conversation the UI
+  starts was untitled, and the first message then became the title verbatim. The deterministic
+  title still lands the moment the message is sent, so no list is ever empty, and when the first
+  turn finishes the cheapest model in the catalog replaces it with three to six words. `Send` is
+  not made slower by this and `agent.done` is not made to wait: the call happens after the event,
+  and `agent.titled` tells the window to reread the list.
+- **`title_settled` is the whole state the rule needs.** It is written whichever way the attempt
+  goes, a rename sets it, and a conversation created with a title has it from birth, so a failed
+  call cannot make turn five rename a chat about turn one. Migration 0020 sets it on every row
+  that already carries a title, because retitling the client's existing chats behind their back
+  would be the same bug in reverse.
+- **The titler is a role, not a literal.** `llm.RoleTitler` resolves through the same profiles
+  every other role does and defaults to `openai/gpt-5.6-luna`: the cheapest model of the provider
+  every other default names, twenty times cheaper than the chat default. Pointing it at a gemini
+  model would have left a client holding one OpenAI key with no names at all.
+
+## Decisions taken on 2026-09-20 for the settings screen
+
+Four routes were `NotBuilt` panels, eight of the twelve `SettingsService` methods and four of the
+`ModelsService` ones were unreachable, and `HealthService.Ping` had no caller at all. The data
+layer was already written: every hook existed and none was imported by a component.
+
+- **The general tab is rendered from the schema, never from a list in TypeScript.** `Schema()`
+  already answers every declared key sorted, with its type, default and bounds, so the screen walks
+  it and picks a control from `Descriptor.Type`. A setting declared in Go appears here without a
+  frontend edit, which is the whole reason the registry exists.
+- **The prose lives in the copy module and a Go test proves the two sets match.** `Descriptor`
+  carries no label and no explanation, and putting English into `internal/kernel` would make the
+  settings registry a localisation surface. `copy.settings.keys` holds a label and a one-line
+  explanation per key; `TestEveryDeclaredSettingCarriesCopy` in `internal/app`, the one package
+  that composes every registration, reads `frontend/src/copy/index.ts` and fails in both
+  directions — a declared key with no label, and a label naming a key nobody declares. A key that
+  slips through anyway still renders a working control, under a warning naming it, because a dead
+  control would be worse than an ugly one.
+- **A row is written per field, not behind a Save button.** These are twenty-eight independent
+  scalars behind a service that takes one key per call. A Save button would fan out twenty-eight
+  calls and then have to explain "nine saved, one refused", which is a worse failure than one row
+  turning red. The value is checked against the declared bounds before the call is made, so an
+  out-of-range number never leaves the window.
+- **"Changed" is a semantic comparison, not a textual one.** `60s` and `1m` are the same duration,
+  and a screen that called one of them changed would be lying about the client's own settings.
+  `sameValue` compares durations by length and everything else by identity.
+- **`isDefault` from the backend is deliberately ignored.** It reports storage — whether a row
+  exists — and a stored value equal to the default has exactly the effect of no row at all. There
+  is no delete endpoint, so resetting writes the default back; reporting the row rather than the
+  effect would tell the client about the database instead of about their software.
+- **The tabs are routes, not component state.** `ui/tabs.tsx` is a controlled Radix machine whose
+  state would have to be derived from the URL anyway, and `features/onboarding/readiness.ts`
+  deep-links to `/settings/models`. A layout route with four `NavLink`s dressed as tab triggers
+  gives the back button, `aria-current` and the deep link for nothing, and it is the idiom
+  `app/rail.tsx` already uses.
+- **`UsageSummary` with neither id now answers everything spent.** It refused that combination,
+  and `app/statusbar.tsx` called it exactly that way, so the "Spent" figure in the status bar has
+  been a hardcoded `$0.00` since it landed: the refusal is an `INVALID` without a field, which
+  `react` maps to a form error that nothing renders. Deleting the figure would have been honest
+  but poorer; `LLMCallRepo.SumAll` is one query with no key, so the guard now refuses only naming
+  both, and the status bar and the settings screen show the real total. Naming both is still
+  refused, because summing a run and a conversation together means nothing.

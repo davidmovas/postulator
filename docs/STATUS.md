@@ -65,8 +65,12 @@ page drawer, the template editor and the run review. The template editor starts 
 copy, edits a page's own changes through `?page=`, types the two step settings, sets the site
 default and draws the page a template asks for. A page drawer and the run review open the page on
 the site: a published page by its address, a draft through the plugin's link in a frame with
-desktop, tablet and phone widths. Not built yet: the overview, reports, schedules, import and
-settings; every one of them is a `NotBuilt` panel in `router.tsx`.
+desktop, tablet and phone widths. Settings landed on 2026-09-20: `/settings` is a layout route
+with four tabs, General renders the twenty-eight declared settings from `SettingsService.Schema`
+grouped and checked against their own bounds, Models holds the provider keys, the seven role
+profiles, the catalog and the lifetime spend, Security holds the lock, the master password and the
+backup, and About answers from `HealthService.Ping`. Not built yet: the overview, reports,
+schedules and import; every one of them is a `NotBuilt` panel in `router.tsx`.
 
 ## How to run
 
@@ -164,6 +168,8 @@ Module coverage is 87.6% of 14439 statements; `domain` + `application` sit at 86
   `SettingsService.Set` writes a declared value at the transport, which is the one layer that does
   not publish, so a second window on the settings screen does not learn that `runs.workers`
   changed. Closing that needs an application settings use case, which the service does not have.
+  The screen covers the case it can: its own write updates the cache the read came from, a return
+  to the window rereads every value, and "Reread" invalidates the whole settings key.
 - `SitesService.TestConnection` builds a throwaway `wp.Client` for the candidate rather than the
   one `registry.Client` caches, because a candidate has no row to key the cache on; a test
   therefore neither warms nor invalidates the cached client.
@@ -206,13 +212,15 @@ Module coverage is 87.6% of 14439 statements; `domain` + `application` sit at 86
 
 ## Next steps
 
-1. Build the remaining screens: the overview, reports, schedules, import and settings.
+1. Build the remaining screens: the overview, reports, schedules and import.
 2. Walk the agent dock, the inbox, the cards, the template editor and the page preview in the
    built window, which no automation here can see.
 3. Tag `v2.0.0` when the UI lands; `release.yml` publishes the executable, the NSIS installer and
    the companion plugin archive, now 1.1.0, from that tag.
 4. Close the gaps above that the UI reaches: the ledger screen and `settings.changed` for a
-   declared value, which needs an application settings use case.
+   declared value, which needs an application settings use case. The settings screen rereads on
+   window focus and on demand instead, which covers the second window but not a write from the
+   agent while the screen is open.
 
 ## Final review
 

@@ -4,7 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -101,6 +106,75 @@ func TestEverySettingBelongsToADeclaredGroup(t *testing.T) {
 		}
 		if descriptor.Group != string(group) {
 			t.Fatalf("descriptor %s reports the group %q", descriptor.Key, descriptor.Group)
+		}
+	}
+}
+
+func settingsCopyKeys(t *testing.T) []string {
+	t.Helper()
+
+	out, err := exec.Command("go", "env", "GOMOD").Output()
+	if err != nil {
+		t.Fatalf("go env GOMOD: %v", err)
+	}
+	gomod := strings.TrimSpace(string(out))
+	if gomod == "" || gomod == os.DevNull {
+		t.Fatal("the copy test must run inside the module")
+	}
+
+	raw, err := os.ReadFile(filepath.Join(filepath.Dir(gomod), "frontend", "src", "copy", "index.ts"))
+	if err != nil {
+		t.Fatalf("read the copy module: %v", err)
+	}
+
+	text := string(raw)
+	opening := strings.Index(text, "    settings: {")
+	if opening < 0 {
+		t.Fatal("the copy module carries no settings section")
+	}
+	block := text[opening:]
+	start := strings.Index(block, "        keys: {")
+	if start < 0 {
+		t.Fatal("the settings copy carries no keys map")
+	}
+	block = block[start:]
+	end := strings.Index(block, "\n        },")
+	if end < 0 {
+		t.Fatal("the keys map is not closed")
+	}
+
+	found := regexp.MustCompile(`"([a-zA-Z]+(?:\.[a-zA-Z]+)+)": \{`).FindAllStringSubmatch(block[:end], -1)
+	keys := make([]string, 0, len(found))
+	for _, match := range found {
+		keys = append(keys, match[1])
+	}
+	return keys
+}
+
+func TestEveryDeclaredSettingCarriesCopy(t *testing.T) {
+	t.Parallel()
+
+	schema, err := settings.Default().Schema()
+	if err != nil {
+		t.Fatalf("Schema: %v", err)
+	}
+
+	written := settingsCopyKeys(t)
+	declared := make([]string, 0, len(schema))
+	for _, descriptor := range schema {
+		declared = append(declared, descriptor.Key)
+	}
+	slices.Sort(declared)
+	slices.Sort(written)
+
+	for _, key := range declared {
+		if !slices.Contains(written, key) {
+			t.Errorf("setting %s has no label in frontend/src/copy/index.ts", key)
+		}
+	}
+	for _, key := range written {
+		if !slices.Contains(declared, key) {
+			t.Errorf("copy names %s, which no package declares as a setting", key)
 		}
 	}
 }

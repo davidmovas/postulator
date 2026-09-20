@@ -20,6 +20,8 @@ const (
 		FROM llm_calls WHERE run_id = ?`
 	sumByConversation = `SELECT coalesce(sum(input_tokens), 0), coalesce(sum(output_tokens), 0), coalesce(sum(usd), 0), count(*)
 		FROM llm_calls WHERE conversation_id = ?`
+	sumAll = `SELECT coalesce(sum(input_tokens), 0), coalesce(sum(output_tokens), 0), coalesce(sum(usd), 0), count(*)
+		FROM llm_calls`
 )
 
 type LLMCallRepo struct {
@@ -50,9 +52,16 @@ func (r *LLMCallRepo) SumByConversation(ctx context.Context, conversationID stri
 	return r.sum(ctx, sumByConversation, conversationID, "total the llm spend of the conversation")
 }
 
+func (r *LLMCallRepo) SumAll(ctx context.Context) (llm.Spend, error) {
+	return total(r.store.execFrom(ctx).QueryRowContext(ctx, sumAll), "total the llm spend")
+}
+
 func (r *LLMCallRepo) sum(ctx context.Context, query, key, message string) (llm.Spend, error) {
+	return total(r.store.execFrom(ctx).QueryRowContext(ctx, query, key), message)
+}
+
+func total(row *sql.Row, message string) (llm.Spend, error) {
 	var spend llm.Spend
-	row := r.store.execFrom(ctx).QueryRowContext(ctx, query, key)
 	if err := row.Scan(&spend.Usage.Input, &spend.Usage.Output, &spend.USD, &spend.Calls); err != nil {
 		return llm.Spend{}, dbx.Convert(err, message)
 	}

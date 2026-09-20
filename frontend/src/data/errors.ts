@@ -91,3 +91,38 @@ export function needsPlugin(thrown: unknown): boolean {
     }
     return pluginCodeOf(parseError(thrown)) !== null;
 }
+
+export function fieldErrorOf(thrown: unknown, field: string): string | null {
+    if (thrown === null || thrown === undefined) {
+        return null;
+    }
+    const reaction = react(thrown);
+    return reaction.kind === "field" && reaction.field === field ? reaction.message : null;
+}
+
+export function formErrorOf(thrown: unknown): string | null {
+    if (thrown === null || thrown === undefined) {
+        return null;
+    }
+    const reaction = react(thrown);
+    switch (reaction.kind) {
+        case "silent":
+        case "unlock":
+        case "field":
+            return null;
+        default:
+            return reaction.message;
+    }
+}
+
+export function keyErrorOf(thrown: unknown, key: string): string | null {
+    if (thrown === null || thrown === undefined) {
+        return null;
+    }
+    const reported = failure(thrown);
+    if (reported.code !== "INVALID") {
+        return null;
+    }
+    const held = reported.details?.["key"];
+    return held === key ? (reported.message === "" ? messages.INVALID : reported.message) : null;
+}

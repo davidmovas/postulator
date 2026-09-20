@@ -66,6 +66,14 @@ func TestLLMCallRepo(t *testing.T) {
 		t.Errorf("conversation spend = %+v, want one call of 10/5", conversation)
 	}
 
+	everything, err := repo.SumAll(ctx)
+	if err != nil {
+		t.Fatalf("SumAll: %v", err)
+	}
+	if everything.Calls != 6 || everything.Usage.Total != 765 {
+		t.Errorf("total spend = %+v, want six calls of 765 tokens", everything)
+	}
+
 	empty, err := repo.SumByRun(ctx, "run-missing")
 	if err != nil {
 		t.Fatalf("SumByRun missing: %v", err)

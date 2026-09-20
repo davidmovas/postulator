@@ -15,7 +15,7 @@ import {
 } from "../endpoints/settings.js";
 import { keys } from "../keys.js";
 import { markLocked, markUnlocked, useLockState } from "../lock.js";
-import { useUnlockedQuery } from "../query.js";
+import { useUnlockedQueries, useUnlockedQuery } from "../query.js";
 
 export { useLockState };
 
@@ -32,6 +32,15 @@ export function useSetting(key: string | null) {
         queryFn: ({ signal }) => getSetting({ key: key ?? "" }, signal),
         enabled: key !== null && key !== "",
     });
+}
+
+export function useSettingValues(settingKeys: readonly string[]) {
+    return useUnlockedQueries(
+        settingKeys.map((key) => ({
+            queryKey: keys.settings.value(key),
+            queryFn: ({ signal }: { signal: AbortSignal }) => getSetting({ key }, signal),
+        })),
+    );
 }
 
 export function useProviderKeys() {
