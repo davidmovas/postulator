@@ -53,6 +53,7 @@ func observe(stream agentapp.Stream, usage *tally, note func(error)) gollem.Cont
 					select {
 					case out <- chunk:
 					case <-ctx.Done():
+						drain(chunks)
 						return
 					}
 				}
@@ -80,5 +81,10 @@ func observeChunk(ctx context.Context, stream agentapp.Stream, usage *tally, chu
 			note(err)
 			return
 		}
+	}
+}
+
+func drain(chunks <-chan *gollem.ContentResponse) {
+	for range chunks {
 	}
 }
