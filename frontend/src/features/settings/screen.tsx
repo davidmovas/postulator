@@ -1,19 +1,15 @@
 import type { ReactElement } from "react";
-import { NavLink, Outlet } from "react-router";
+import { Outlet } from "react-router";
 
 import { copy } from "../../copy/index.js";
-import { cx } from "../../ui/index.js";
+import { Tabs } from "../../ui/index.js";
+import type { TabItem } from "../../ui/index.js";
 
-interface Tab {
-    to: string;
-    label: string;
-}
-
-const tabs: readonly Tab[] = [
-    { to: "/settings/general", label: copy.settings.tabs.general },
-    { to: "/settings/models", label: copy.settings.tabs.models },
-    { to: "/settings/security", label: copy.settings.tabs.security },
-    { to: "/settings/about", label: copy.settings.tabs.about },
+const tabs: readonly TabItem[] = [
+    { key: "general", label: copy.settings.tabs.general, to: "/settings/general" },
+    { key: "models", label: copy.settings.tabs.models, to: "/settings/models" },
+    { key: "security", label: copy.settings.tabs.security, to: "/settings/security" },
+    { key: "about", label: copy.settings.tabs.about, to: "/settings/about" },
 ];
 
 export function SettingsScreen(): ReactElement {
@@ -23,24 +19,9 @@ export function SettingsScreen(): ReactElement {
                 <h1 className="text-xl font-semibold tracking-tight text-ink">{copy.settings.title}</h1>
                 <p className="max-w-2xl text-sm text-ink-soft">{copy.settings.subtitle}</p>
             </header>
-            <nav aria-label={copy.nav.settings} className="flex shrink-0 gap-0.5 border-b border-hairline px-3">
-                {tabs.map(({ to, label }) => (
-                    <NavLink
-                        key={to}
-                        to={to}
-                        className={({ isActive }) =>
-                            cx(
-                                "inline-flex h-7 items-center px-2.5 text-sm font-medium transition-colors duration-100 ease-out",
-                                isActive
-                                    ? "font-semibold text-ink shadow-[inset_0_-2px_0_var(--color-accent)]"
-                                    : "text-ink-dim hover:text-ink",
-                            )
-                        }
-                    >
-                        {label}
-                    </NavLink>
-                ))}
-            </nav>
+            <div className="flex shrink-0 border-b border-hairline px-3">
+                <Tabs label={copy.nav.settings} items={tabs} />
+            </div>
             <div className="min-h-0 flex-1 overflow-auto p-4">
                 <Outlet />
             </div>

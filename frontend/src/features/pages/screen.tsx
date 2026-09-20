@@ -8,12 +8,12 @@ import {
     AccountTreeIcon,
     AddIcon,
     Button,
-    cx,
     EmptyState,
     PublicIcon,
+    Segmented,
     TableRowsIcon,
 } from "../../ui/index.js";
-import type { IconComponent } from "../../ui/index.js";
+import type { SegmentedOption } from "../../ui/index.js";
 import { PlanPageDialog } from "./create.js";
 import { PageDrawer } from "./drawer.js";
 import { useEntityIndex } from "./entities.js";
@@ -23,33 +23,10 @@ import type { PagesQuery, PagesView } from "./params.js";
 import { PageTable } from "./table.js";
 import { PageTree } from "./tree.js";
 
-interface ViewButtonProps {
-    view: PagesView;
-    current: PagesView;
-    label: string;
-    icon: IconComponent;
-    onSelect: (view: PagesView) => void;
-}
-
-function ViewButton({ view, current, label, icon: Icon, onSelect }: ViewButtonProps): ReactElement {
-    const active = view === current;
-    return (
-        <button
-            type="button"
-            aria-pressed={active}
-            onClick={() => {
-                onSelect(view);
-            }}
-            className={cx(
-                "inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors duration-100",
-                active ? "bg-raised text-ink" : "text-ink-dim hover:bg-inset hover:text-ink",
-            )}
-        >
-            <Icon size={14} className="shrink-0" />
-            {label}
-        </button>
-    );
-}
+const views: readonly SegmentedOption<PagesView>[] = [
+    { value: "table", label: copy.pages.views.table, icon: TableRowsIcon },
+    { value: "tree", label: copy.pages.views.tree, icon: AccountTreeIcon },
+];
 
 export function PagesScreen(): ReactElement {
     const params = useParams();
@@ -89,26 +66,14 @@ export function PagesScreen(): ReactElement {
             <div className="flex min-w-0 flex-1 flex-col">
                 <header className="flex h-8 shrink-0 items-center justify-between gap-3 border-b border-hairline px-3">
                     <div className="flex min-w-0 items-center gap-2">
-                        <div className="flex shrink-0 items-center gap-0.5 rounded-md bg-inset p-0.5">
-                            <ViewButton
-                                view="table"
-                                current={query.view}
-                                label={copy.pages.views.table}
-                                icon={TableRowsIcon}
-                                onSelect={(view) => {
-                                    change({ ...query, view });
-                                }}
-                            />
-                            <ViewButton
-                                view="tree"
-                                current={query.view}
-                                label={copy.pages.views.tree}
-                                icon={AccountTreeIcon}
-                                onSelect={(view) => {
-                                    change({ ...query, view });
-                                }}
-                            />
-                        </div>
+                        <Segmented
+                            label={copy.nav.pages}
+                            value={query.view}
+                            options={views}
+                            onValueChange={(view) => {
+                                change({ ...query, view });
+                            }}
+                        />
                         {query.view === "tree" ? (
                             <span className="truncate text-2xs text-ink-faint">{copy.pages.tree.noFilters}</span>
                         ) : null}

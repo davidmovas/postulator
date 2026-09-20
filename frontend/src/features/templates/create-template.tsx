@@ -7,7 +7,7 @@ import type { Template } from "../../data/types.js";
 import { copy } from "../../copy/index.js";
 import { templateScopes } from "../../generated/vocab.js";
 import type { SelectOption } from "../../ui/index.js";
-import { AddIcon, cx, Dialog, Field, Input, Select } from "../../ui/index.js";
+import { AddIcon, Dialog, Field, Input, Segmented, Select } from "../../ui/index.js";
 import { blankDraft } from "./blank.js";
 import { fieldErrorOf, formErrorOf } from "./controls.js";
 import { scopeLabel } from "./labels.js";
@@ -19,36 +19,6 @@ const scopeOptions: readonly SelectOption<string>[] = templateScopes.map((value)
     value,
     label: scopeLabel(value),
 }));
-
-interface StartButtonProps {
-    value: Start;
-    current: Start;
-    label: string;
-    disabled?: boolean;
-    onSelect: (value: Start) => void;
-}
-
-function StartButton({ value, current, label, disabled = false, onSelect }: StartButtonProps): ReactElement {
-    const active = value === current;
-    return (
-        <button
-            type="button"
-            role="radio"
-            aria-checked={active}
-            disabled={disabled}
-            onClick={() => {
-                onSelect(value);
-            }}
-            className={cx(
-                "inline-flex h-6 flex-1 items-center justify-center rounded-md px-2 text-xs font-medium transition-colors duration-100",
-                active ? "bg-raised text-ink" : "text-ink-dim hover:bg-inset hover:text-ink",
-                disabled && "cursor-not-allowed opacity-50",
-            )}
-        >
-            {label}
-        </button>
-    );
-}
 
 export interface CreateTemplateDialogProps {
     open: boolean;
@@ -123,16 +93,19 @@ export function CreateTemplateDialog({
             <div className="mt-1 flex flex-col gap-2.5">
                 <Field label={copy.templates.create.startFrom} hint={start === "blank" ? copy.templates.create.startBlankHint : copy.templates.create.copyFromHint}>
                     {() => (
-                        <div role="radiogroup" className="flex items-center gap-0.5 rounded-md bg-inset p-0.5">
-                            <StartButton value="blank" current={start} label={copy.templates.create.startBlank} onSelect={setStart} />
-                            <StartButton
-                                value="copy"
-                                current={start}
-                                label={copy.templates.create.startCopy}
-                                disabled={templates.length === 0}
-                                onSelect={setStart}
-                            />
-                        </div>
+                        <Segmented
+                            label={copy.templates.create.startFrom}
+                            value={start}
+                            options={[
+                                { value: "blank", label: copy.templates.create.startBlank },
+                                {
+                                    value: "copy",
+                                    label: copy.templates.create.startCopy,
+                                    disabled: templates.length === 0,
+                                },
+                            ]}
+                            onValueChange={setStart}
+                        />
                     )}
                 </Field>
                 {start === "copy" ? (

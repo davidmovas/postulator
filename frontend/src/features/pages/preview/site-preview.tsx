@@ -6,7 +6,6 @@ import { failure, needsPlugin, pluginCodeOf, react } from "../../../data/errors.
 import { usePreviewLink } from "../../../data/hooks/pages.js";
 import { openExternal } from "../../../data/host.js";
 import type { Page } from "../../../data/types.js";
-import type { IconComponent } from "../../../ui/index.js";
 import {
     Banner,
     Button,
@@ -17,23 +16,23 @@ import {
     MobileIcon,
     OpenInBrowserIcon,
     RefreshIcon,
+    Segmented,
     SkeletonRows,
     StatusBadge,
     TabletIcon,
 } from "../../../ui/index.js";
+import type { SegmentedOption } from "../../../ui/index.js";
 import type { Viewport } from "./model.js";
 import { expiresInMinutes, frameScale, viewports } from "./model.js";
 
 const drawerWidth = 1120;
 const tickMs = 30_000;
 
-const viewportIcons: Readonly<Record<Viewport, IconComponent>> = {
-    desktop: DesktopWindowsIcon,
-    tablet: TabletIcon,
-    phone: MobileIcon,
-};
-
-const viewportOrder: readonly Viewport[] = ["desktop", "tablet", "phone"];
+const viewportOptions: readonly SegmentedOption<Viewport>[] = [
+    { value: "desktop", label: copy.pages.preview.viewports.desktop, icon: DesktopWindowsIcon },
+    { value: "tablet", label: copy.pages.preview.viewports.tablet, icon: TabletIcon },
+    { value: "phone", label: copy.pages.preview.viewports.phone, icon: MobileIcon },
+];
 
 function useNow(): number {
     const [now, setNow] = useState(() => Date.now());
@@ -138,30 +137,13 @@ export function SitePreviewDrawer({ page, editorUrl, onClose }: SitePreviewDrawe
                     {minutes === null ? null : <span className="font-mono font-normal"> · {said.expiresIn(minutes)}</span>}
                 </StatusBadge>
             )}
-            <div role="radiogroup" aria-label={said.viewport} className="flex items-center gap-0.5 rounded-md bg-inset p-0.5">
-                {viewportOrder.map((held) => {
-                    const Icon = viewportIcons[held];
-                    return (
-                        <button
-                            key={held}
-                            type="button"
-                            role="radio"
-                            aria-checked={viewport === held}
-                            title={said.viewports[held]}
-                            onClick={() => {
-                                setViewport(held);
-                            }}
-                            className={cx(
-                                "inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs",
-                                viewport === held ? "bg-raised text-ink" : "text-ink-dim hover:text-ink",
-                            )}
-                        >
-                            <Icon size={14} />
-                            <span className="hidden xl:inline">{said.viewports[held]}</span>
-                        </button>
-                    );
-                })}
-            </div>
+            <Segmented
+                label={said.viewport}
+                value={viewport}
+                options={viewportOptions}
+                onValueChange={setViewport}
+                iconOnly={true}
+            />
             {answer?.kind === "preview" ? (
                 <Button
                     size="sm"

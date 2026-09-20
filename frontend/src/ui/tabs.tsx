@@ -22,8 +22,9 @@ export interface TabsProps<T extends string = string> {
     onValueChange?: (key: T) => void;
 }
 
+const stripBase = "flex h-full min-h-7 shrink-0 items-stretch gap-0.5";
 const triggerBase =
-    "inline-flex h-7 shrink-0 items-center gap-1.5 px-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-100 ease-out";
+    "inline-flex shrink-0 items-center gap-1.5 px-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-100 ease-out";
 const triggerActive = "font-semibold text-ink shadow-[inset_0_-2px_0_var(--color-accent)]";
 const triggerIdle = "text-ink-dim hover:text-ink";
 const triggerBlocked = "cursor-not-allowed text-ink-faint opacity-50";
@@ -51,7 +52,7 @@ export function Tabs<T extends string = string>({ label, items, value, onValueCh
 
     if (items.some((item) => item.to !== undefined)) {
         return (
-            <nav aria-label={label} className="flex shrink-0 items-center gap-0.5">
+            <nav aria-label={label} className={stripBase}>
                 {items.map((item) => (
                     <NavLink
                         key={item.key}
@@ -87,7 +88,7 @@ export function Tabs<T extends string = string>({ label, items, value, onValueCh
     };
 
     return (
-        <div role="tablist" aria-label={label} className="flex shrink-0 items-center gap-0.5">
+        <div role="tablist" aria-label={label} className={stripBase}>
             {items.map((item, index) => (
                 <button
                     key={item.key}

@@ -8,15 +8,16 @@ import { absoluteTime, relativeTime } from "../../domain/format.js";
 import { itemStatuses } from "../../generated/vocab.js";
 import {
     Button,
-    cx,
     DenseTable,
     EmptyState,
     PendingActionsIcon,
+    Segmented,
     StatusBadge,
     TableCell,
     TableHead,
     TableRow,
 } from "../../ui/index.js";
+import type { SegmentedOption } from "../../ui/index.js";
 import { itemViews } from "./authority.js";
 import { statusIcon, statusLabel, statusTone } from "./labels.js";
 import type { RetryNotice } from "./log-view.js";
@@ -33,39 +34,20 @@ export interface ItemStatusTabsProps {
     onChange: (next: string) => void;
 }
 
+const itemStatusOptions: readonly SegmentedOption<string>[] = [
+    { value: "", label: copy.runs.filters.anyItemStatus },
+    ...itemStatuses.map((status) => ({ value: status, label: statusLabel(status) })),
+];
+
 export function ItemStatusTabs({ value, onChange }: ItemStatusTabsProps): ReactElement {
     return (
-        <div className="flex shrink-0 flex-wrap items-center gap-0.5">
-            <button
-                type="button"
-                aria-pressed={value === ""}
-                onClick={() => {
-                    onChange("");
-                }}
-                className={cx(
-                    "h-5 rounded-sm px-1.5 text-2xs font-medium transition-colors duration-100",
-                    value === "" ? "bg-raised text-ink" : "text-ink-dim hover:bg-inset hover:text-ink",
-                )}
-            >
-                {copy.runs.filters.anyItemStatus}
-            </button>
-            {itemStatuses.map((status) => (
-                <button
-                    key={status}
-                    type="button"
-                    aria-pressed={value === status}
-                    onClick={() => {
-                        onChange(value === status ? "" : status);
-                    }}
-                    className={cx(
-                        "h-5 rounded-sm px-1.5 text-2xs font-medium transition-colors duration-100",
-                        value === status ? "bg-raised text-ink" : "text-ink-dim hover:bg-inset hover:text-ink",
-                    )}
-                >
-                    {statusLabel(status)}
-                </button>
-            ))}
-        </div>
+        <Segmented
+            label={copy.runs.filters.anyItemStatus}
+            value={value}
+            options={itemStatusOptions}
+            onValueChange={onChange}
+            size="sm"
+        />
     );
 }
 

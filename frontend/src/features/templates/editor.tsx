@@ -17,11 +17,11 @@ import {
     Banner,
     Button,
     ChevronRightIcon,
-    cx,
     DeleteIcon,
     Dialog,
     Field,
     Input,
+    Segmented,
     SkeletonRows,
     SmartToyIcon,
     StatusBadge,
@@ -29,7 +29,7 @@ import {
     Tabs,
     VerifiedIcon,
 } from "../../ui/index.js";
-import type { TabItem } from "../../ui/index.js";
+import type { SegmentedOption, TabItem } from "../../ui/index.js";
 import { askAgent } from "../agent/dock-state.js";
 import { fieldErrorOf, formErrorOf } from "./controls.js";
 import { ModelsForm } from "./models-form.js";
@@ -69,30 +69,15 @@ const layerHints: Readonly<Record<Layer, string>> = {
     page: copy.templates.layer.pageHint,
 };
 
-interface LayerButtonProps {
-    layer: Layer;
-    current: Layer;
-    label: string;
-    onSelect: (layer: Layer) => void;
-}
-
-function LayerButton({ layer, current, label, onSelect }: LayerButtonProps): ReactElement {
-    const active = layer === current;
-    return (
-        <button
-            type="button"
-            aria-pressed={active}
-            onClick={() => {
-                onSelect(layer);
-            }}
-            className={cx(
-                "inline-flex h-6 items-center rounded-md px-2 text-xs font-medium transition-colors duration-100",
-                active ? "bg-raised text-ink" : "text-ink-dim hover:bg-inset hover:text-ink",
-            )}
-        >
-            {label}
-        </button>
-    );
+function layerOptions(pageId: string | null): readonly SegmentedOption<Layer>[] {
+    const listed: SegmentedOption<Layer>[] = [
+        { value: "global", label: copy.templates.layer.global },
+        { value: "site", label: copy.templates.layer.site },
+    ];
+    if (pageId !== null) {
+        listed.push({ value: "page", label: copy.templates.layer.page });
+    }
+    return listed;
 }
 
 export function TemplateEditorScreen(): ReactElement {
@@ -296,13 +281,12 @@ export function TemplateEditorScreen(): ReactElement {
                     {dirty ? (
                         <span className="text-2xs text-warn">{copy.templates.editor.unsaved}</span>
                     ) : null}
-                    <div className="flex items-center gap-0.5 rounded-md bg-inset p-0.5">
-                        <LayerButton layer="global" current={layer} label={copy.templates.layer.global} onSelect={setLayer} />
-                        <LayerButton layer="site" current={layer} label={copy.templates.layer.site} onSelect={setLayer} />
-                        {pageId === null ? null : (
-                            <LayerButton layer="page" current={layer} label={copy.templates.layer.page} onSelect={setLayer} />
-                        )}
-                    </div>
+                    <Segmented
+                        label={copy.templates.layer.label}
+                        value={layer}
+                        options={layerOptions(pageId)}
+                        onValueChange={setLayer}
+                    />
                     <Button
                         size="sm"
                         variant="ghost"

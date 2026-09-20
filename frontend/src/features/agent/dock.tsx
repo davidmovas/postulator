@@ -1,4 +1,3 @@
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import type { PointerEvent, ReactElement } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
@@ -9,14 +8,18 @@ import { useConversations } from "../../data/hooks/agent.js";
 import type { Conversation } from "../../data/types.js";
 import {
     AddCommentIcon,
+    BoltIcon,
+    ChatIcon,
     cx,
     ForumIcon,
     IconButton,
     KeyboardArrowDownIcon,
+    Menu,
     OpenInFullIcon,
     RightPanelCloseIcon,
     SmartToyIcon,
 } from "../../ui/index.js";
+import type { MenuEntry } from "../../ui/index.js";
 import { StartConversation } from "./conversation/start.js";
 import { ConversationView } from "./conversation/view.js";
 import { closeDock, rememberConversation, setDockWidth, takePrefill, useDock } from "./dock-state.js";
@@ -34,9 +37,39 @@ interface SwitcherProps {
 
 function Switcher({ current, recent, onPick, onNew, onAll }: SwitcherProps): ReactElement {
     const label = current === null ? copy.agent.header.newConversation : current.title === "" ? copy.agent.untitled : current.title;
+    const items: MenuEntry[] = [
+        {
+            key: "new",
+            label: copy.agent.header.newConversation,
+            icon: AddCommentIcon,
+            onSelect: onNew,
+        },
+    ];
+    if (recent.length > 0) {
+        items.push({ kind: "separator", key: "recent-separator" });
+        items.push({ kind: "label", key: "recent-label", label: copy.agent.header.recent });
+        for (const held of recent) {
+            items.push({
+                key: held.id,
+                label: held.title === "" ? copy.agent.untitled : held.title,
+                icon: held.mode === "autonomous" ? BoltIcon : ChatIcon,
+                active: held.id === current?.id,
+                onSelect: () => {
+                    onPick(held.id);
+                },
+            });
+        }
+    }
+    items.push({ kind: "separator", key: "all-separator" });
+    items.push({ key: "all", label: copy.agent.header.more, icon: ForumIcon, onSelect: onAll });
+
     return (
-        <DropdownMenu.Root>
-            <DropdownMenu.Trigger asChild={true}>
+        <Menu
+            label={copy.agent.header.switchConversation}
+            align="start"
+            width={288}
+            items={items}
+            trigger={
                 <button
                     type="button"
                     title={copy.agent.header.switchConversation}
@@ -47,58 +80,8 @@ function Switcher({ current, recent, onPick, onNew, onAll }: SwitcherProps): Rea
                     </span>
                     <KeyboardArrowDownIcon size={14} className="shrink-0 text-ink-faint" />
                 </button>
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Portal>
-                <DropdownMenu.Content
-                    align="start"
-                    sideOffset={4}
-                    aria-label={copy.agent.header.switchConversation}
-                    className="z-30 w-72 rounded-md border border-edge bg-raised p-1 data-[state=open]:animate-fade-in"
-                >
-                    <DropdownMenu.Item
-                        className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1 text-xs text-ink outline-none data-[highlighted]:bg-inset"
-                        onSelect={onNew}
-                    >
-                        <AddCommentIcon size={14} className="text-accent" />
-                        {copy.agent.header.newConversation}
-                    </DropdownMenu.Item>
-                    {recent.length === 0 ? null : (
-                        <>
-                            <DropdownMenu.Separator className="my-1 h-px bg-hairline" />
-                            <DropdownMenu.Label className="px-2 py-1 text-2xs font-semibold tracking-label text-ink-faint uppercase">
-                                {copy.agent.header.recent}
-                            </DropdownMenu.Label>
-                            {recent.map((held) => (
-                                <DropdownMenu.Item
-                                    key={held.id}
-                                    className={cx(
-                                        "flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1 text-xs outline-none data-[highlighted]:bg-inset",
-                                        held.id === current?.id ? "text-accent" : "text-ink-soft data-[highlighted]:text-ink",
-                                    )}
-                                    onSelect={() => {
-                                        onPick(held.id);
-                                    }}
-                                >
-                                    <span
-                                        aria-hidden={true}
-                                        className={cx("h-1.5 w-1.5 shrink-0 rounded-full", held.mode === "autonomous" ? "bg-danger" : "bg-ink-faint")}
-                                    />
-                                    <span className="truncate">{held.title === "" ? copy.agent.untitled : held.title}</span>
-                                </DropdownMenu.Item>
-                            ))}
-                        </>
-                    )}
-                    <DropdownMenu.Separator className="my-1 h-px bg-hairline" />
-                    <DropdownMenu.Item
-                        className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1 text-xs text-ink-soft outline-none data-[highlighted]:bg-inset data-[highlighted]:text-ink"
-                        onSelect={onAll}
-                    >
-                        <ForumIcon size={14} />
-                        {copy.agent.header.more}
-                    </DropdownMenu.Item>
-                </DropdownMenu.Content>
-            </DropdownMenu.Portal>
-        </DropdownMenu.Root>
+            }
+        />
     );
 }
 
