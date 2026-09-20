@@ -466,3 +466,75 @@ func TestTheSeededConfirmationNamesARealPage(t *testing.T) {
 		t.Fatalf("the pending action names %s, want the under-500 page", page.Page.Path)
 	}
 }
+
+func TestTheCompletedRunSucceedsOnEveryItem(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Runs.List(t.Context(), runs.ListRequest{
+		Status: string(run.StatusCompleted), ListRequest: dto.ListRequest{Limit: 10},
+	})
+	if err != nil {
+		t.Fatalf("List runs: %v", err)
+	}
+	if len(listed.Items) != 1 {
+		t.Fatalf("completed runs = %d, want 1", len(listed.Items))
+	}
+
+	items, err := core.Runs.ListItems(t.Context(), runs.ListItemsRequest{
+		RunID: listed.Items[0].ID, ListRequest: dto.ListRequest{Limit: 20},
+	})
+	if err != nil {
+		t.Fatalf("ListItems: %v", err)
+	}
+	if len(items.Items) != len(completedRun) {
+		t.Fatalf("items = %d, want %d", len(items.Items), len(completedRun))
+	}
+	for _, item := range items.Items {
+		if item.Status != string(run.StatusCompleted) {
+			t.Errorf("the item for %s is %q: %s", item.TargetID, item.Status, item.Error)
+		}
+	}
+}
+
+func TestTheSeededGraphCarriesScores(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+
+	loaded, err := core.Graph.LoadGraph(t.Context(), graph.LoadGraphRequest{SiteID: listed.Items[0].ID})
+	if err != nil {
+		t.Fatalf("LoadGraph: %v", err)
+	}
+
+	scored := 0
+	for _, entity := range loaded.Entities {
+		if entity.Score > 0 {
+			scored++
+		}
+	}
+	if scored == 0 {
+		t.Fatal("no entity carries a score; the seed never recomputed them")
+	}
+}
+
+func TestTheSeededConversationIsNamedLikeAConversation(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Agent.ListConversations(t.Context(), agent.ListConversationsRequest{
+		ListRequest: dto.ListRequest{Limit: 10},
+	})
+	if err != nil {
+		t.Fatalf("ListConversations: %v", err)
+	}
+	if len(listed.Items) != 1 {
+		t.Fatalf("conversations = %d, want 1", len(listed.Items))
+	}
+
+	title := listed.Items[0].Title
+	if len(title) < 12 {
+		t.Fatalf("the conversation is called %q, which reads like a scripted stub", title)
+	}
+}

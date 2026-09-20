@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"log"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
@@ -26,6 +27,8 @@ import (
 )
 
 const (
+	anchorMarker = "PHRASE TO INCLUDE\n"
+
 	siteName  = "Crema Bench"
 	pollEvery = 100 * time.Millisecond
 	pollFor   = 3 * time.Minute
@@ -73,10 +76,26 @@ func harnessReplies() []fake.Reply {
 			fake.Reply{Step: steps.NameGenerateMeta, Match: path, Text: metaOf(subject)},
 		)
 	}
+	out = append(out, repairReplies()...)
 	return append(out,
 		fake.Reply{Step: steps.NameJudge, Text: `{"score":0.88,"issues":[],"suggestions":["Add a photograph of the puck after extraction."]}`},
-		fake.Reply{Step: steps.NameRepairLinks, Text: `{"sentence":"It sits beside the rest of our espresso brewing technique guides."}`},
+		fake.Reply{Step: "title", Text: "Which topics still need a canonical page"},
 	)
+}
+
+func repairReplies() []fake.Reply {
+	declared := seedEntities()
+	out := make([]fake.Reply, 0, len(declared))
+
+	for index := range declared {
+		anchor := declared[index].Anchor
+		out = append(out, fake.Reply{
+			Step:  steps.NameRepairLinks,
+			Match: anchorMarker + anchor + "\n",
+			Text:  `{"sentence":"We cover ` + anchor + ` in its own guide, and it is worth reading before you change anything here."}`,
+		})
+	}
+	return out
 }
 
 func subjectOf(path string) string {
@@ -113,7 +132,18 @@ func metaOf(subject string) string {
 }
 
 type assistantScript struct {
-	page string
+	page atomic.Pointer[string]
+}
+
+func (a *assistantScript) naming(id string) {
+	a.page.Store(&id)
+}
+
+func (a *assistantScript) pageID() string {
+	if held := a.page.Load(); held != nil {
+		return *held
+	}
+	return ""
 }
 
 func (a *assistantScript) answer(prompt string) fake.Turn {
@@ -123,7 +153,7 @@ func (a *assistantScript) answer(prompt string) fake.Turn {
 	case strings.Contains(lowered, "retitle") || strings.Contains(lowered, "rename"):
 		return fake.Turn{
 			Tool: "pages_update",
-			Args: json.RawMessage(`{"id":"` + a.page + `","metaTitle":"Espresso machines under $500: nine we would buy"}`),
+			Args: json.RawMessage(`{"id":"` + a.pageID() + `","metaTitle":"Espresso machines under $500: nine we would buy"}`),
 			Text: "I have queued the retitle. The page keeps its path and its canonical, only the meta title " +
 				"changes, so the entry in the search results leads with the price the reader searched for.",
 		}
@@ -157,7 +187,7 @@ func seed(ctx context.Context, core *app.Core, baseURL string, provider *pacedPr
 	if err != nil {
 		return err
 	}
-	script.page = pagesByPath["/espresso-machines/under-500/"]
+	script.naming(pagesByPath["/espresso-machines/under-500/"])
 
 	guide, policy, err := seedTemplates(ctx, core, siteID)
 	if err != nil {
@@ -166,6 +196,9 @@ func seed(ctx context.Context, core *app.Core, baseURL string, provider *pacedPr
 	if _, err = core.Sites.Update(ctx, sites.UpdateRequest{
 		ID: siteID, Defaults: &sites.Defaults{TemplateID: &guide, LinkPolicyID: &policy},
 	}); err != nil {
+		return err
+	}
+	if _, err = core.Graph.RecomputeScores(ctx, graph.RecomputeScoresRequest{SiteID: siteID}); err != nil {
 		return err
 	}
 	if runErr := seedRuns(ctx, core, siteID, guide, pagesByPath, provider); runErr != nil {
