@@ -154,6 +154,7 @@ async function resolveSite(page, wait) {
 async function apply(page, steps) {
     for (const step of steps) {
         if (step.click !== undefined) {
+            await page.bringToFront();
             await page.click(step.click);
             continue;
         }
@@ -187,6 +188,7 @@ async function shoot(page, shot, resolveSiteId) {
     await go(page, route, shot.wait);
     await apply(page, shot.steps);
     await mkdir(dirname(shot.out), { recursive: true });
+    await page.bringToFront();
     await page.screenshot({ path: shot.out });
     process.stdout.write(`${shot.out}\n`);
 }
