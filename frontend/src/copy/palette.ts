@@ -19,8 +19,11 @@ export const palette = {
         page: "page",
         run: "run",
         action: "action",
+        setting: "setting",
     },
-    run: (id: string, kind: string) => `Run ${id} · ${kind}`,
+    run: (kind: string, items: number, when: string) =>
+        `${kind} · ${items === 1 ? "1 page" : `${items} pages`} · ${when}`,
+    settings: "Settings",
     newRun: "New run",
     newEntity: "New entity",
     syncSite: "Sync site",

@@ -120,6 +120,10 @@ export function unitOf(key: string): UnitId | null {
     return byKey.get(key)?.placement.unit ?? null;
 }
 
+export function tabOf(key: string): SettingsTabKey {
+    return sectionFor(key).tab;
+}
+
 export function humanLabel(key: string): string {
     const leaf = key.slice(key.lastIndexOf(".") + 1);
     const words = leaf.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase();

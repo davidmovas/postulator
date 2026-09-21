@@ -4,10 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { copy } from "../../copy/index.js";
+
+const described = copy.settings.keys as Readonly<Record<string, { label: string; help: string }>>;
 import { flatten } from "../../data/call.js";
 import { useEntities } from "../../data/hooks/graph.js";
 import { usePages } from "../../data/hooks/pages.js";
 import { useRuns } from "../../data/hooks/runs.js";
+import { useSettingsSchema } from "../../data/hooks/settings.js";
 import { useSyncSite } from "../../data/hooks/sync.js";
 import { pushToast } from "../../data/toasts.js";
 import {
@@ -20,11 +23,14 @@ import {
     SearchIcon,
     SmartToyIcon,
     SyncIcon,
+    TuneIcon,
     cx,
 } from "../../ui/index.js";
 import type { IconComponent } from "../../ui/index.js";
 import { askAgent } from "../agent/index.js";
+import { humanLabel, tabOf } from "../settings/model/layout.js";
 import { rankBy } from "./rank.js";
+import { pagePrefix, runRowLabel } from "./rows.js";
 import { closePalette, usePaletteOpen } from "./state.js";
 
 const debounceMs = 180;
@@ -90,8 +96,13 @@ function PaletteDialog({ siteId, destinations }: CommandPaletteProps): ReactElem
         { field: "name", desc: false },
         perSection,
     );
-    const pages = usePages({ siteId: siteId ?? "", pathPrefix: settled }, { field: "path", desc: false }, perSection);
+    const pages = usePages(
+        { siteId: siteId ?? "", pathPrefix: pagePrefix(settled) },
+        { field: "path", desc: false },
+        perSection,
+    );
     const runs = useRuns(siteId === null ? {} : { siteId }, null, perSection);
+    const schema = useSettingsSchema();
 
     const go = (to: string): (() => void) => {
         return () => {
@@ -180,10 +191,26 @@ function PaletteDialog({ siteId, destinations }: CommandPaletteProps): ReactElem
             perSection,
         ).map((held) => ({
             key: `run:${held.id}`,
-            label: said.run(held.id.slice(0, 8), held.kind),
+            label: runRowLabel(held),
             kind: said.kinds.run,
             Icon: PlayCircleIcon,
             run: go(`/s/${held.siteId}/runs/${held.id}`),
+        }));
+
+        const settingRows: Row[] = rankBy(
+            settled,
+            (schema.data?.settings ?? []).map((descriptor) => ({
+                key: descriptor.key,
+                label: described[descriptor.key]?.label ?? humanLabel(descriptor.key),
+            })),
+            (entry) => entry.label,
+            perSection,
+        ).map((entry) => ({
+            key: `setting:${entry.key}`,
+            label: entry.label,
+            kind: said.kinds.setting,
+            Icon: TuneIcon,
+            run: go(`/settings/${tabOf(entry.key)}`),
         }));
 
         return [
@@ -192,8 +219,9 @@ function PaletteDialog({ siteId, destinations }: CommandPaletteProps): ReactElem
             { key: "entities", label: said.entities, rows: entityRows },
             { key: "pages", label: said.pages, rows: pageRows },
             { key: "runs", label: said.runs, rows: runRows },
+            { key: "settings", label: said.settings, rows: settingRows },
         ].filter((section) => section.rows.length > 0);
-    }, [settled, siteId, destinations, entities.data, pages.data, runs.data, navigate, sync]);
+    }, [settled, siteId, destinations, entities.data, pages.data, runs.data, schema.data, navigate, sync]);
 
     const rows = useMemo(() => sections.flatMap((section) => section.rows), [sections]);
     const at = rows.length === 0 ? -1 : Math.min(active, rows.length - 1);
