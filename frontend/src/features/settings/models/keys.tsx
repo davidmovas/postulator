@@ -3,7 +3,7 @@ import { useState } from "react";
 
 import { copy } from "../../../copy/index.js";
 import { failure, fieldErrorOf, formErrorOf, providerMessageOf } from "../../../data/errors.js";
-import { useModelCatalog, useTestProvider } from "../../../data/hooks/models.js";
+import { useTestProvider } from "../../../data/hooks/models.js";
 import { useDeleteProviderKey, useProviderKeys, useSetProviderKey } from "../../../data/hooks/settings.js";
 import {
     Button,
@@ -31,7 +31,6 @@ interface Tested {
 
 export function ProviderCards(): ReactElement {
     const providers = useProviderKeys();
-    const catalog = useModelCatalog();
     const store = useSetProviderKey();
     const revoke = useDeleteProviderKey();
     const probe = useTestProvider();
@@ -44,11 +43,7 @@ export function ProviderCards(): ReactElement {
     const [failed, setFailed] = useState<string | null>(null);
 
     const rows = providers.data?.providers ?? [];
-    const models = catalog.data?.models ?? [];
     const reported = failed === null || probe.error === null ? null : failure(probe.error);
-
-    const modelFor = (provider: string): string | null =>
-        models.find((model) => model.provider === provider)?.model ?? null;
 
     if (providers.isPending) {
         return <Skeleton height={104} />;
@@ -58,7 +53,6 @@ export function ProviderCards(): ReactElement {
         <div className="@container">
             <div className="grid grid-cols-1 gap-3 @lg:grid-cols-2 @4xl:grid-cols-4">
                 {rows.map((row) => {
-                    const model = modelFor(row.provider);
                     return (
                         <Panel key={row.provider}>
                             <div className="flex flex-col gap-3 p-3">
@@ -89,18 +83,13 @@ export function ProviderCards(): ReactElement {
                                         size="sm"
                                         variant="ghost"
                                         busy={probe.isPending}
-                                        disabled={!row.configured || model === null}
-                                        title={
-                                            !row.configured ? said.noKey : model === null ? said.noModel : undefined
-                                        }
+                                        disabled={!row.configured}
+                                        title={row.configured ? undefined : said.noKey}
                                         onClick={() => {
-                                            if (model === null) {
-                                                return;
-                                            }
                                             setTested(null);
                                             setFailed(null);
                                             probe.mutate(
-                                                { provider: row.provider, model },
+                                                { provider: row.provider, model: "" },
                                                 {
                                                     onSuccess: (answered) => {
                                                         setTested({

@@ -207,7 +207,6 @@ export const settings = {
             revokeBody: (provider: string) =>
                 `Every role pointing at a ${provider} model will start failing until a key is set again.`,
             tested: (ms: number, tokens: number) => `Answered in ${ms} ms, ${tokens} tokens`,
-            noModel: "The catalog carries no model for this provider, so there is nothing to test with.",
             noKey: "Set a key before testing it.",
         },
         profiles: {
