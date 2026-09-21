@@ -88,6 +88,10 @@ func catalog() []vocabulary {
 		},
 		{export: "imageSources", tsType: "ImageSource", pkg: "internal/domain/template", typeName: "ImageSource"},
 		{export: "modelRoles", tsType: "ModelRole", pkg: "internal/domain/llm", typeName: "Role"},
+		{
+			export: "reasoningEfforts", tsType: "ReasoningEffort", pkg: "internal/domain/llm",
+			typeName: "ReasoningEffort",
+		},
 		{export: "conversationModes", tsType: "ConversationMode", pkg: "internal/domain/agent", typeName: "Mode"},
 		{export: "messageRoles", tsType: "MessageRole", pkg: "internal/domain/agent", typeName: "Role"},
 		{

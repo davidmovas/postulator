@@ -18,6 +18,7 @@ type UpsertModelRequest struct {
 	SupportsStructured bool    `json:"supportsStructured"`
 	SupportsImages     bool    `json:"supportsImages"`
 	Reasoning          bool    `json:"reasoning"`
+	ReasoningEffort    string  `json:"reasoningEffort,omitempty" enum:"none,low,medium,high,xhigh"`
 }
 
 type UpsertModelResponse struct {

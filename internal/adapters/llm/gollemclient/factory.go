@@ -32,6 +32,10 @@ type secretReader interface {
 	Get(ctx context.Context, ref string) (string, error)
 }
 
+type modelReader interface {
+	Lookup(ctx context.Context, ref llm.ModelRef) (llm.ModelInfo, error)
+}
+
 type cached struct {
 	client      gollem.LLMClient
 	fingerprint string
@@ -39,13 +43,14 @@ type cached struct {
 
 type Factory struct {
 	secrets secretReader
+	models  modelReader
 	values  *settings.Values
 	clients map[string]cached
 	mu      sync.Mutex
 }
 
-func NewFactory(secrets secretReader, values *settings.Values) *Factory {
-	return &Factory{secrets: secrets, values: values, clients: make(map[string]cached)}
+func NewFactory(secrets secretReader, models modelReader, values *settings.Values) *Factory {
+	return &Factory{secrets: secrets, models: models, values: values, clients: make(map[string]cached)}
 }
 
 func (f *Factory) New(ctx context.Context, ref llm.ModelRef) (gollem.LLMClient, error) {
@@ -120,7 +125,11 @@ func (f *Factory) compatible(ctx context.Context, ref llm.ModelRef, base string)
 		return nil, err
 	}
 
-	options := []openai.Option{openai.WithModel(ref.Model)}
+	options := []openai.Option{
+		openai.WithModel(ref.Model),
+		openai.WithReasoningEffort(string(f.effort(ctx, ref))),
+		openai.WithVerbosity(""),
+	}
 	if base != "" {
 		options = append(options, openai.WithBaseURL(base))
 	}
@@ -132,6 +141,18 @@ func wrap[T gollem.LLMClient](client T, err error) (gollem.LLMClient, error) {
 		return nil, errors.Wrap(err, errors.External, "build the provider client")
 	}
 	return client, nil
+}
+
+func (f *Factory) effort(ctx context.Context, ref llm.ModelRef) llm.ReasoningEffort {
+	if f.models == nil {
+		return ""
+	}
+
+	info, err := f.models.Lookup(ctx, ref)
+	if err != nil || !info.ReasoningEffort.Valid() {
+		return ""
+	}
+	return info.ReasoningEffort
 }
 
 func (f *Factory) key(ctx context.Context, provider string) (string, error) {

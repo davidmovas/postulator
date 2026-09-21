@@ -238,7 +238,7 @@ func (c *Core) build(ctx context.Context, key []byte) (kit, error) {
 
 	templateService := templates.New(templateRepo, policyRepo, pageRepo, siteRepo, store, relay, now)
 	modelProfiles := profiles.New(profileRepo, siteRepo, modelCatalog, now)
-	var providers AgentProvider = gollemclient.NewFactory(secretStore, values)
+	var providers AgentProvider = gollemclient.NewFactory(secretStore, modelCatalog, values)
 	if cfg.AgentProvider != nil {
 		providers = cfg.AgentProvider
 	}

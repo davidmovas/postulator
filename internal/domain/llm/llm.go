@@ -42,17 +42,37 @@ func SecretRef(provider string) string {
 	return "llm:" + provider + ":api_key"
 }
 
+type ReasoningEffort string
+
+const (
+	EffortNone   ReasoningEffort = "none"
+	EffortLow    ReasoningEffort = "low"
+	EffortMedium ReasoningEffort = "medium"
+	EffortHigh   ReasoningEffort = "high"
+	EffortXHigh  ReasoningEffort = "xhigh"
+)
+
+func (e ReasoningEffort) Valid() bool {
+	switch e {
+	case EffortNone, EffortLow, EffortMedium, EffortHigh, EffortXHigh:
+		return true
+	default:
+		return false
+	}
+}
+
 type ModelInfo struct {
-	Ref                ModelRef `json:"ref"`
-	ContextTokens      int      `json:"contextTokens"`
-	MaxOutputTokens    int      `json:"maxOutputTokens"`
-	InputUSDPerM       float64  `json:"inputUsdPerM"`
-	OutputUSDPerM      float64  `json:"outputUsdPerM"`
-	RPM                int      `json:"rpm"`
-	TPM                int      `json:"tpm"`
-	SupportsStructured bool     `json:"supportsStructured"`
-	SupportsImages     bool     `json:"supportsImages"`
-	Reasoning          bool     `json:"reasoning"`
+	Ref                ModelRef        `json:"ref"`
+	ReasoningEffort    ReasoningEffort `json:"reasoningEffort,omitempty"`
+	ContextTokens      int             `json:"contextTokens"`
+	MaxOutputTokens    int             `json:"maxOutputTokens"`
+	InputUSDPerM       float64         `json:"inputUsdPerM"`
+	OutputUSDPerM      float64         `json:"outputUsdPerM"`
+	RPM                int             `json:"rpm"`
+	TPM                int             `json:"tpm"`
+	SupportsStructured bool            `json:"supportsStructured"`
+	SupportsImages     bool            `json:"supportsImages"`
+	Reasoning          bool            `json:"reasoning"`
 }
 
 type Usage struct {

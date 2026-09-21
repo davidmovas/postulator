@@ -74,7 +74,7 @@ func newClient(t *testing.T, provider, setting string, handler http.HandlerFunc)
 	t.Cleanup(server.Close)
 
 	values := newValues(t, map[string]string{setting: server.URL})
-	factory := gollemclient.NewFactory(vault{gollemclient.SecretRef(provider): "test-key"}, values)
+	factory := gollemclient.NewFactory(vault{gollemclient.SecretRef(provider): "test-key"}, nil, values)
 	return gollemclient.New(factory, 10*time.Second), captured
 }
 
@@ -325,7 +325,7 @@ func TestStructuredOverTheProvider(t *testing.T) {
 func TestClientRejectsAnInvalidRequest(t *testing.T) {
 	t.Parallel()
 
-	client := gollemclient.New(gollemclient.NewFactory(vault{}, newValues(t, nil)), time.Second)
+	client := gollemclient.New(gollemclient.NewFactory(vault{}, nil, newValues(t, nil)), time.Second)
 	req := port.Request{Ref: llm.ModelRef{}, Messages: nil}
 
 	if _, err := client.Complete(t.Context(), req); !errors.IsCode(err, errors.Invalid) {
@@ -418,7 +418,7 @@ func TestFactoryRefusals(t *testing.T) {
 			if secrets == nil {
 				secrets = vault{}
 			}
-			factory := gollemclient.NewFactory(secrets, newValues(t, tc.values))
+			factory := gollemclient.NewFactory(secrets, nil, newValues(t, tc.values))
 			if _, err := factory.New(t.Context(), tc.ref); !errors.IsCode(err, tc.want) {
 				t.Fatalf("New error = %v (%s), want %s", err, errors.CodeOf(err), tc.want)
 			}
@@ -431,6 +431,7 @@ func TestFactoryCachesByModel(t *testing.T) {
 
 	factory := gollemclient.NewFactory(
 		vault{gollemclient.SecretRef(gollemclient.ProviderOpenAI): "key"},
+		nil,
 		newValues(t, nil),
 	)
 
@@ -500,7 +501,7 @@ func TestCompleteHonoursTheTimeout(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	values := newValues(t, map[string]string{"llm.openai.baseUrl": server.URL})
-	factory := gollemclient.NewFactory(vault{gollemclient.SecretRef(gollemclient.ProviderOpenAI): "key"}, values)
+	factory := gollemclient.NewFactory(vault{gollemclient.SecretRef(gollemclient.ProviderOpenAI): "key"}, nil, values)
 	client := gollemclient.New(factory, 20*time.Millisecond)
 
 	_, err := client.Complete(t.Context(), port.Request{Ref: openaiRef(), Messages: []port.Message{{Role: port.RoleUser, Text: "write"}}})
@@ -572,7 +573,7 @@ func TestClientWithoutATimeout(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	values := newValues(t, map[string]string{"llm.openai.baseUrl": server.URL})
-	factory := gollemclient.NewFactory(vault{gollemclient.SecretRef(gollemclient.ProviderOpenAI): "key"}, values)
+	factory := gollemclient.NewFactory(vault{gollemclient.SecretRef(gollemclient.ProviderOpenAI): "key"}, nil, values)
 	client := gollemclient.New(factory, 0)
 
 	resp, err := client.Complete(t.Context(), port.Request{Ref: openaiRef(), Messages: []port.Message{{Role: port.RoleUser, Text: "write"}}})
@@ -617,7 +618,7 @@ func TestGeminiOpenAIDefaultsToGoogleAI(t *testing.T) {
 	}
 
 	values := settings.Default().NewValues()
-	factory := gollemclient.NewFactory(vault{}, values)
+	factory := gollemclient.NewFactory(vault{}, nil, values)
 	if _, err := factory.New(t.Context(), llm.ModelRef{
 		Provider: gollemclient.ProviderGeminiOpenAI, Model: "gemini-3.5-flash",
 	}); !errors.IsCode(err, errors.Unauthorized) {

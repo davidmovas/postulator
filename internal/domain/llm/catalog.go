@@ -35,6 +35,9 @@ func (i ModelInfo) Validate() error {
 	if i.TPM <= 0 {
 		return invalid("the token rate limit must be positive", "tpm")
 	}
+	if i.ReasoningEffort != "" && !i.ReasoningEffort.Valid() {
+		return invalid("the reasoning effort must be none, low, medium, high or xhigh", "reasoningEffort")
+	}
 	return nil
 }
 

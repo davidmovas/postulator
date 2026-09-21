@@ -134,6 +134,9 @@ export type ImageSource = (typeof imageSources)[number];
 export const modelRoles = ["writer", "editor", "linker", "judge", "chat", "image", "titler"] as const;
 export type ModelRole = (typeof modelRoles)[number];
 
+export const reasoningEfforts = ["none", "low", "medium", "high", "xhigh"] as const;
+export type ReasoningEffort = (typeof reasoningEfforts)[number];
+
 export const conversationModes = ["confirm", "autonomous"] as const;
 export type ConversationMode = (typeof conversationModes)[number];
 

@@ -179,6 +179,7 @@ func (s *Service) UpsertModel(ctx context.Context, req UpsertModelRequest) (Upse
 		SupportsStructured: req.SupportsStructured,
 		SupportsImages:     req.SupportsImages,
 		Reasoning:          req.Reasoning,
+		ReasoningEffort:    llm.ReasoningEffort(strings.TrimSpace(req.ReasoningEffort)),
 	}
 	if err := info.Validate(); err != nil {
 		return UpsertModelResponse{}, err

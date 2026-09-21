@@ -99,6 +99,12 @@ func (p *provider) seen() (headers, paths []string) {
 func provided(t *testing.T) (*app.Core, *provider) {
 	t.Helper()
 
+	return providedFor(t, "openai", "llm.openai.baseUrl")
+}
+
+func providedFor(t *testing.T, named, baseKey string) (*app.Core, *provider) {
+	t.Helper()
+
 	fake := &provider{}
 	server := httptest.NewServer(fake.serve())
 	t.Cleanup(server.Close)
@@ -112,22 +118,22 @@ func provided(t *testing.T) (*app.Core, *provider) {
 	})
 
 	if _, err := core.Models.SetProviderKey(t.Context(), models.SetProviderKeyRequest{
-		Provider: "openai", APIKey: storedKey,
+		Provider: named, APIKey: storedKey,
 	}); err != nil {
 		t.Fatalf("SetProviderKey: %v", err)
 	}
-	pointAt(t, core, server.URL+"/v1")
+	pointAt(t, core, baseKey, server.URL+"/v1")
 	return core, fake
 }
 
-func pointAt(t *testing.T, core *app.Core, base string) {
+func pointAt(t *testing.T, core *app.Core, key, base string) {
 	t.Helper()
 
 	encoded, err := json.Marshal(base)
 	if err != nil {
 		t.Fatalf("encode the base url: %v", err)
 	}
-	if err = core.SettingsStore.Set(t.Context(), "llm.openai.baseUrl", encoded); err != nil {
+	if err = core.SettingsStore.Set(t.Context(), key, encoded); err != nil {
 		t.Fatalf("store the base url: %v", err)
 	}
 
@@ -359,4 +365,125 @@ func TestEveryRoleHasADefaultOnAFreshInstall(t *testing.T) {
 				profile.Role, profile.Effective.Provider, profile.Effective.Model, expected)
 		}
 	}
+}
+
+func TestTheRequestCarriesOnlyTheReasoningEffortTheCatalogNames(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		model string
+		want  string
+	}{
+		{name: "the cheap model asks for little", model: "gpt-5.6-luna", want: "low"},
+		{name: "the mid tier asks for more", model: "gpt-5.6-terra", want: "medium"},
+		{name: "the flagship asks for more", model: "gpt-5.6-sol", want: "medium"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			core, fake := provided(t)
+			if _, err := core.Models.TestProvider(t.Context(), models.TestProviderRequest{
+				Provider: "openai", Model: tc.model,
+			}); err != nil {
+				t.Fatalf("TestProvider: %v", err)
+			}
+
+			asked := decodeRequest(t, fake.lastRequest())
+			effort, carried := asked["reasoning_effort"]
+			if !carried {
+				t.Fatalf("the request carries no reasoning_effort, want %q: %s", tc.want, fake.lastRequest())
+			}
+			if effort != tc.want {
+				t.Fatalf("reasoning_effort = %v, want %q", effort, tc.want)
+			}
+			if effort == "minimal" {
+				t.Fatal("the request carries gollem's minimal, which today's models refuse")
+			}
+			if _, verbose := asked["verbosity"]; verbose {
+				t.Fatalf("the request carries a verbosity nobody asked for: %s", fake.lastRequest())
+			}
+		})
+	}
+}
+
+func TestAModelWithNoEffortSendsNoReasoningEffort(t *testing.T) {
+	t.Parallel()
+
+	core, fake := provided(t)
+	if _, err := core.Models.UpsertModel(t.Context(), models.UpsertModelRequest{
+		Provider: "openai", Model: "gpt-plain", ContextTokens: 200000, MaxOutputTokens: 64000,
+		InputUSDPerM: 1, OutputUSDPerM: 2, RPM: 60, TPM: 120000,
+	}); err != nil {
+		t.Fatalf("UpsertModel: %v", err)
+	}
+
+	if _, err := core.Models.TestProvider(t.Context(), models.TestProviderRequest{
+		Provider: "openai", Model: "gpt-plain",
+	}); err != nil {
+		t.Fatalf("TestProvider: %v", err)
+	}
+
+	asked := decodeRequest(t, fake.lastRequest())
+	if effort, carried := asked["reasoning_effort"]; carried {
+		t.Fatalf("the request carries reasoning_effort %v, want none at all: %s", effort, fake.lastRequest())
+	}
+	if _, verbose := asked["verbosity"]; verbose {
+		t.Fatalf("the request carries a verbosity nobody asked for: %s", fake.lastRequest())
+	}
+}
+
+func TestTheGeminiCompatibleEndpointSendsNoReasoningEffort(t *testing.T) {
+	t.Parallel()
+
+	core, fake := providedFor(t, "gemini-openai", "llm.geminiOpenai.baseUrl")
+	if _, err := core.Models.TestProvider(t.Context(), models.TestProviderRequest{
+		Provider: "gemini-openai", Model: "gemini-2.5-flash-lite",
+	}); err != nil {
+		t.Fatalf("TestProvider: %v", err)
+	}
+
+	asked := decodeRequest(t, fake.lastRequest())
+	if effort, carried := asked["reasoning_effort"]; carried {
+		t.Fatalf("the gemini endpoint was sent reasoning_effort %v: %s", effort, fake.lastRequest())
+	}
+	if _, verbose := asked["verbosity"]; verbose {
+		t.Fatalf("the gemini endpoint was sent a verbosity: %s", fake.lastRequest())
+	}
+}
+
+func TestAnInvalidReasoningEffortIsRefused(t *testing.T) {
+	t.Parallel()
+
+	home := t.TempDir()
+	core := openCore(t, app.Config{DatabasePath: filepath.Join(home, "postulator.db"), KeyDir: home})
+	t.Cleanup(func() {
+		if closeErr := core.Close(); closeErr != nil {
+			t.Errorf("Close: %v", closeErr)
+		}
+	})
+
+	_, err := core.Models.UpsertModel(t.Context(), models.UpsertModelRequest{
+		Provider: "openai", Model: "gpt-odd", ContextTokens: 200000, MaxOutputTokens: 64000,
+		InputUSDPerM: 1, OutputUSDPerM: 2, RPM: 60, TPM: 120000, ReasoningEffort: "minimal",
+	})
+	if !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("UpsertModel with minimal = %v, want INVALID", err)
+	}
+}
+
+func decodeRequest(t *testing.T, body string) map[string]any {
+	t.Helper()
+
+	if body == "" {
+		t.Fatal("the provider was never called")
+	}
+
+	var asked map[string]any
+	if err := json.Unmarshal([]byte(body), &asked); err != nil {
+		t.Fatalf("read the request %s: %v", body, err)
+	}
+	return asked
 }

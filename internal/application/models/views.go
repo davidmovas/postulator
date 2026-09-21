@@ -19,6 +19,7 @@ type Model struct {
 	SupportsStructured bool    `json:"supportsStructured"`
 	SupportsImages     bool    `json:"supportsImages"`
 	Reasoning          bool    `json:"reasoning"`
+	ReasoningEffort    string  `json:"reasoningEffort"`
 }
 
 type Profile struct {
@@ -51,6 +52,7 @@ func modelView(info llm.ModelInfo) Model {
 		SupportsStructured: info.SupportsStructured,
 		SupportsImages:     info.SupportsImages,
 		Reasoning:          info.Reasoning,
+		ReasoningEffort:    string(info.ReasoningEffort),
 	}
 }
 
