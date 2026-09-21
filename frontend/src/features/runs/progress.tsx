@@ -16,7 +16,7 @@ import {
     SectionLabel,
 } from "../../ui/index.js";
 import type { RunView, StatsView } from "./authority.js";
-import { publishModeLabel, stepLabel } from "./labels.js";
+import { publishingLabel, stepLabel } from "./labels.js";
 import { recipeSteps } from "./recipe.js";
 import { spanMs } from "./span.js";
 
@@ -57,7 +57,7 @@ function Facts({ run }: { run: Run }): ReactElement {
             <Fact icon={ScheduleIcon} title={absoluteTime(run.startedAt)}>
                 {`${copy.runs.detail.startedBy(run.createdBy)} · ${relativeTime(run.startedAt)}`}
             </Fact>
-            <Fact icon={EditNoteIcon}>{copy.runs.detail.publishMode(publishModeLabel(run.publishMode))}</Fact>
+            <Fact icon={EditNoteIcon}>{publishingLabel(run.publishMode)}</Fact>
             <Fact icon={AlarmIcon} title={absoluteTime(run.deadlineAt)}>
                 {`${copy.runs.detail.deadline} ${relativeTime(run.deadlineAt)}`}
             </Fact>

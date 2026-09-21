@@ -78,9 +78,14 @@ export function stepLabel(step: string): string {
 }
 
 const publishWords: Readonly<Record<PublishMode, string>> = copy.runs.detail.publishModes;
+const publishingWords: Readonly<Record<PublishMode, string>> = copy.runs.detail.publishing;
 
 export function publishModeLabel(mode: string): string {
     return isOneOf(publishModes, mode) ? publishWords[mode] : mode;
+}
+
+export function publishingLabel(mode: string): string {
+    return isOneOf(publishModes, mode) ? publishingWords[mode] : mode;
 }
 
 export function kindLabel(kind: string): string {
