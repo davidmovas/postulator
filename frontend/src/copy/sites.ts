@@ -65,7 +65,18 @@ export const sites = {
         download: "Save the plugin zip",
         saved: (path: string) => `Companion plugin written to ${path}`,
         capabilities: "Capabilities",
+        capabilityNames: {
+            bulk: "bulk writes",
+            seo_meta: "SEO meta",
+            content_hash: "change detection",
+            raw: "raw content",
+            preview: "draft previews",
+        } as Readonly<Record<string, string>>,
         seo: "SEO plugin",
+        seoNames: {
+            yoast: "Yoast SEO",
+            rankmath: "Rank Math",
+        } as Readonly<Record<string, string>>,
         noSeo: "none detected",
         noCapabilities: "none reported",
     },

@@ -14,6 +14,7 @@ import {
     Skeleton,
     SyncIcon,
 } from "../../ui/index.js";
+import { capabilityLabel, seoPluginLabel } from "./plugin.js";
 
 const packageFilename = "postulator-companion.zip";
 
@@ -80,8 +81,9 @@ export function PluginPanel({ site }: PluginPanelProps): ReactElement {
 
     if (plugin.installed) {
         const listed = plugin.capabilities ?? [];
-        const capabilities = listed.length === 0 ? copy.sites.plugin.noCapabilities : listed.join(", ");
-        const seo = plugin.seoPlugin === "" ? copy.sites.plugin.noSeo : plugin.seoPlugin;
+        const capabilities =
+            listed.length === 0 ? copy.sites.plugin.noCapabilities : listed.map(capabilityLabel).join(", ");
+        const seo = plugin.seoPlugin === "" ? copy.sites.plugin.noSeo : seoPluginLabel(plugin.seoPlugin);
         return (
             <Banner
                 tone="ok"
