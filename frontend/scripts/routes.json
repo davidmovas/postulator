@@ -34,7 +34,7 @@
     "wait": 1200,
     "steps": [
       {
-        "click": "[data-run-status=running]"
+        "click": "[data-run-kind=generate][data-run-status=running]"
       },
       {
         "wait": 1800
@@ -460,7 +460,7 @@
     "wait": 1200,
     "steps": [
       {
-        "click": "[data-run-status=completed]"
+        "click": "[data-run-kind=generate][data-run-status=completed]"
       },
       {
         "wait": 1800
@@ -473,7 +473,7 @@
     "wait": 1200,
     "steps": [
       {
-        "click": "[data-run-status=completed]"
+        "click": "[data-run-kind=generate][data-run-status=completed]"
       },
       {
         "wait": 1800
@@ -498,7 +498,7 @@
     "wait": 1200,
     "steps": [
       {
-        "click": "[data-run-status=completed]"
+        "click": "[data-run-kind=generate][data-run-status=completed]"
       },
       {
         "wait": 1800

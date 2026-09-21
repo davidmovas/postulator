@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 
+import { copy } from "../../copy/index.js";
 import { flatten } from "../../data/call.js";
 import { usePages } from "../../data/hooks/pages.js";
 import type { Page } from "../../data/types.js";
@@ -36,5 +37,9 @@ export function usePageIndex(siteId: string): PageIndex {
 }
 
 export function pathOf(index: PageIndex, pageId: string): string {
-    return index.byId.get(pageId)?.path ?? pageId;
+    const held = index.byId.get(pageId)?.path;
+    if (held !== undefined) {
+        return held;
+    }
+    return index.loading ? copy.app.loading : copy.runs.wholeSite;
 }

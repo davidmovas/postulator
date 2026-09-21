@@ -55,6 +55,7 @@ export const runs = {
         "A run carries the cap it was started with and there is no binding that raises it. Resuming lets the run continue until its next model call and then it pauses again. To finish the work, cancel this run and start a new one over the same pages with a higher cap.",
     pause: "Pause",
     settled: "This run has already finished.",
+    wholeSite: "The whole site",
     alreadyPaused: "This run is already paused.",
     notPaused: "This run is not paused.",
     notRunning: "Only a running run can be paused.",
@@ -100,6 +101,7 @@ export const runs = {
     loadingItems: "Loading the run items",
     noMatch: "No run matches these filters",
     noItemMatch: "No item of this run has that status.",
+    missingItem: "This item is not in the run.",
     backToRuns: "Runs",
     notFound: "This run is no longer here.",
     detail: {
@@ -164,7 +166,8 @@ export const runs = {
         noStep: "no step recorded yet",
         waitingUntil: (left: string) => `waiting ${left}`,
         retrying: (attempt: number, left: string) => `retrying, attempt ${attempt} in ${left}`,
-        recipe: (first: string, last: string, total: number) => `${total} steps · ${first} → ${last}`,
+        recipe: (first: string, last: string, total: number) =>
+            `${total === 1 ? "1 step" : `${total} steps`} · ${first} → ${last}`,
     },
     start: {
         open: "Start run",

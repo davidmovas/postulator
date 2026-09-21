@@ -45,6 +45,7 @@ function RunRow({ run, now, selected, onOpen }: RunRowProps): ReactElement {
             data-run-row={true}
             data-run-id={run.id}
             data-run-status={run.status}
+            data-run-kind={run.kind}
             interactive={true}
             selected={selected}
             tabIndex={0}

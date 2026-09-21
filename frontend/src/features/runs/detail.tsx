@@ -190,7 +190,7 @@ export function RunDetailScreen(): ReactElement {
                     steps={steps}
                     timeline={timeline}
                     retry={retries.get(itemId)}
-                    path={selected === undefined ? itemId : pathOf(index, selected.targetId)}
+                    path={selected === undefined ? copy.runs.missingItem : pathOf(index, selected.targetId)}
                     now={now}
                     missing={selected === undefined && !listed.hasNextPage}
                     narrowed={status !== ""}
