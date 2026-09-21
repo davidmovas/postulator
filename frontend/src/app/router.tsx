@@ -8,6 +8,7 @@ import { LinksScreen } from "../features/links/index.js";
 import { OverviewScreen } from "../features/overview/index.js";
 import { PagesScreen } from "../features/pages/index.js";
 import { RunDetailScreen, RunsScreen } from "../features/runs/index.js";
+import { SchedulesScreen } from "../features/schedules/index.js";
 import {
     AboutScreen,
     AgentSettingsScreen,
@@ -19,7 +20,7 @@ import {
 } from "../features/settings/index.js";
 import { SitesScreen } from "../features/sites/index.js";
 import { PoliciesScreen, TemplateEditorScreen, TemplatesScreen } from "../features/templates/index.js";
-import { MonitoringIcon, ScheduleIcon } from "../ui/index.js";
+import { MonitoringIcon } from "../ui/index.js";
 import { Landing } from "./landing.js";
 import { Placeholder } from "./placeholder.js";
 import { Shell } from "./shell.js";
@@ -48,10 +49,7 @@ export const router = createHashRouter([
                     { path: "templates", element: <TemplatesScreen /> },
                     { path: "templates/policies", element: <PoliciesScreen /> },
                     { path: "templates/:templateId", element: <TemplateEditorScreen /> },
-                    {
-                        path: "schedules",
-                        element: <Placeholder title={copy.nav.schedules} icon={ScheduleIcon} />,
-                    },
+                    { path: "schedules", element: <SchedulesScreen /> },
                     { path: "import", element: <ImportScreen /> },
                     {
                         path: "reports",

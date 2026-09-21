@@ -206,7 +206,8 @@
   },
   {
     "name": "schedules",
-    "route": "#/s/:siteId/schedules"
+    "route": "#/s/:siteId/schedules",
+    "wait": 1000
   },
   {
     "name": "import-file",
@@ -676,6 +677,18 @@
   {
     "name": "import-960",
     "route": "#/s/:siteId/import",
+    "width": 960,
+    "height": 600,
+    "wait": 900
+  },
+  {
+    "name": "schedules-new",
+    "route": "#/s/:siteId/schedules?action=new",
+    "wait": 900
+  },
+  {
+    "name": "schedules-960",
+    "route": "#/s/:siteId/schedules",
     "width": 960,
     "height": 600,
     "wait": 900
