@@ -61,21 +61,25 @@ export function RunPanel({ summary, siteId, onStart }: RunPanelProps): ReactElem
                         {copy.overview.run.startedBy(run.createdBy)} · {copy.overview.run.publish(run.publishMode)}
                     </span>
                 </div>
-                <ProgressBar
-                    label={copy.overview.run.title}
-                    value={summary.done + summary.failed}
-                    max={Math.max(summary.total, 1)}
-                    tone={summary.failed > 0 ? "warn" : summary.active ? "accent" : "ok"}
-                    trailing={copy.overview.run.items(summary.done, summary.total)}
-                />
-            </div>
-            <div className="hidden w-40 shrink-0 @md:block">
-                <BudgetGauge
-                    label={copy.overview.run.budget}
-                    value={summary.usd}
-                    max={summary.maxUsd}
-                    trailing={`${usd(summary.usd)} / ${usd(summary.maxUsd)}`}
-                />
+                <div className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                        <ProgressBar
+                            label={copy.overview.run.title}
+                            value={summary.done + summary.failed}
+                            max={Math.max(summary.total, 1)}
+                            tone={summary.failed > 0 ? "warn" : summary.active ? "accent" : "ok"}
+                            trailing={copy.overview.run.items(summary.done, summary.total)}
+                        />
+                    </div>
+                    <div className="hidden w-40 shrink-0 @md:block">
+                        <BudgetGauge
+                            label={copy.overview.run.budget}
+                            value={summary.usd}
+                            max={summary.maxUsd}
+                            trailing={`${usd(summary.usd)} / ${usd(summary.maxUsd)}`}
+                        />
+                    </div>
+                </div>
             </div>
             <ChevronRightIcon size={16} className="shrink-0 text-ink-faint" />
         </Link>
