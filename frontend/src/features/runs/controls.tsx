@@ -8,8 +8,6 @@ import { Button, CancelIcon, Dialog, PauseIcon, PlayArrowIcon } from "../../ui/i
 import { runView } from "./authority.js";
 import { statusRunning } from "./statuses.js";
 
-const dimmed = "opacity-40";
-
 export interface RunControlsProps {
     run: Run;
 }
@@ -30,7 +28,6 @@ export function RunControls({ run }: RunControlsProps): ReactElement {
             <Button
                 data-run-pause={true}
                 icon={PauseIcon}
-                className={pausable ? undefined : dimmed}
                 disabled={!pausable}
                 busy={pause.isPending}
                 title={blocked(view.paused ? copy.runs.alreadyPaused : copy.runs.notRunning)}
@@ -42,7 +39,6 @@ export function RunControls({ run }: RunControlsProps): ReactElement {
             </Button>
             <Button
                 icon={PlayArrowIcon}
-                className={view.paused ? undefined : dimmed}
                 disabled={!view.paused}
                 busy={resume.isPending}
                 title={view.paused ? undefined : blocked(copy.runs.notPaused)}
@@ -55,7 +51,6 @@ export function RunControls({ run }: RunControlsProps): ReactElement {
             <Button
                 variant="danger"
                 icon={CancelIcon}
-                className={view.terminal ? dimmed : undefined}
                 disabled={view.terminal}
                 title={view.terminal ? copy.runs.settled : undefined}
                 onClick={() => {

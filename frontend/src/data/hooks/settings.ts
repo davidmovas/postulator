@@ -16,6 +16,7 @@ import {
 import { keys } from "../keys.js";
 import { markLocked, markUnlocked, useLockState } from "../lock.js";
 import { useUnlockedQueries, useUnlockedQuery } from "../query.js";
+import type { SettingValue } from "../types.js";
 
 export { useLockState };
 
@@ -55,11 +56,10 @@ export function useSetSetting() {
     return useMutation({
         mutationFn: (request: Parameters<typeof setSetting>[0]) => setSetting(request),
         onSuccess: (answered) => {
-            client.setQueryData(keys.settings.value(answered.key), {
-                key: answered.key,
-                value: answered.value,
-                isDefault: false,
-            });
+            client.setQueryData(keys.settings.value(answered.key), (held: SettingValue | undefined) =>
+                held === undefined ? held : { ...held, value: answered.value },
+            );
+            void client.invalidateQueries({ queryKey: keys.settings.value(answered.key) });
         },
     });
 }

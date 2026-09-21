@@ -209,7 +209,7 @@ export function PageSummary({ pageId, siteId, search, onOpen }: PageSummaryProps
 
                 <div className="flex flex-col gap-1.5">
                     <SectionLabel>{copy.pages.summary.report}</SectionLabel>
-                    {report.data === undefined ? (
+                    {report.data === undefined || report.data.finishedAt === null || report.data.finishedAt === "" ? (
                         <p className="text-xs text-ink-dim">{copy.pages.detail.noReport}</p>
                     ) : (
                         <Link

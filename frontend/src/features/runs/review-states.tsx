@@ -233,7 +233,6 @@ export function ReviewActions({
                     size="sm"
                     variant="primary"
                     icon={RestartAltIcon}
-                    className={state !== null && state.kind === "ready" ? undefined : "opacity-40"}
                     disabled={state === null || state.kind !== "ready"}
                     busy={busy}
                     title={

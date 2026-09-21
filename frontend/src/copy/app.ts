@@ -97,7 +97,6 @@ export const empty = {
     models: "No models in the catalog. Add one or restore the seeded catalog.",
     profiles: "No role profiles set. Every role falls back to the global model.",
     providerKeys: "No provider key is stored yet.",
-    settings: "No settings in this group.",
     readiness: "Everything on the checklist is done. Start a generate run.",
     usage: "Nothing has been spent yet.",
     depth: "No pages are deep enough to chart.",

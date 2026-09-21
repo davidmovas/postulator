@@ -10,6 +10,7 @@ export interface TabItem<T extends string = string> {
     key: T;
     label: string;
     to?: string;
+    within?: boolean;
     count?: number;
     countTone?: Tone;
     disabled?: boolean;
@@ -57,6 +58,7 @@ export function Tabs<T extends string = string>({ label, items, value, onValueCh
                     <NavLink
                         key={item.key}
                         to={item.to ?? ""}
+                        end={item.within !== true}
                         className={({ isActive }) =>
                             cx(triggerBase, isActive ? triggerActive : triggerIdle)
                         }

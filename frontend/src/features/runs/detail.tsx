@@ -138,10 +138,9 @@ export function RunDetailScreen(): ReactElement {
                             );
                         }}
                     />
-                    <span className="ml-auto shrink-0 font-mono text-2xs text-ink-faint">
+                    <span className="ml-auto shrink-0 font-mono text-2xs text-ink-faint" title={run.id}>
                         {copy.runs.detail.targets(run.targets?.length ?? 0)}
                     </span>
-                    <span className="shrink-0 truncate font-mono text-2xs text-ink-faint select-all">{run.id}</span>
                 </Toolbar>
             }
             right={
