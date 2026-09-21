@@ -2,14 +2,14 @@ import type { ReactElement, ReactNode, UIEvent } from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
-import { absoluteTime, tokens, usd } from "../../../domain/format.js";
-import type { TurnUsage } from "../../../data/agent/turn.js";
+import { absoluteTime } from "../../../domain/format.js";
 import type { Timestamp } from "../../../data/wire.js";
 import { ArrowDownwardIcon, Button, cx, SmartToyIcon, Spinner, toneClasses } from "../../../ui/index.js";
 import { ActionCard } from "../cards/action-card.js";
 import type { CardBusy } from "../cards/card.js";
 import { outcomeOf } from "../cards/outcome.js";
 import { familyIcon, toolStatusLabel, toolStatusTone } from "../labels.js";
+import { Markdown } from "./markdown.js";
 import { familyOf, resultSummary, toolLabel } from "./model/tools.js";
 import type { Row } from "./model/transcript.js";
 import { FailedCard, LostCard, StoppedCard } from "./states.js";
@@ -31,18 +31,6 @@ function AssistantKicker({ at }: KickerProps): ReactElement {
                 </span>
             )}
         </div>
-    );
-}
-
-interface UsageLineProps {
-    usage: TurnUsage;
-}
-
-function UsageLine({ usage }: UsageLineProps): ReactElement {
-    return (
-        <span className="font-mono text-2xs text-ink-faint">
-            {copy.agent.transcript.usage(tokens(usage.inputTokens), tokens(usage.outputTokens), usd(usage.usd))}
-        </span>
     );
 }
 
@@ -162,18 +150,22 @@ export function Transcript({ rows, settling, canRetry, header, onApprove, onReje
                             return (
                                 <div key={row.id} className="flex flex-col gap-1.5">
                                     <AssistantKicker at={row.at} />
-                                    <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink-soft">{row.text}</p>
-                                    {row.usage === null ? null : <UsageLine usage={row.usage} />}
+                                    <Markdown text={row.text} />
                                 </div>
                             );
                         case "streaming":
                             return (
                                 <div key={row.id} className="flex flex-col gap-1.5">
                                     <AssistantKicker at={null} />
-                                    <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink-soft">
-                                        {row.text}
-                                        <span aria-hidden={true} className="ml-0.5 inline-block h-3.5 w-0.5 animate-caret bg-accent align-middle" />
-                                    </p>
+                                    <Markdown
+                                        text={row.text}
+                                        trailing={
+                                            <span
+                                                aria-hidden={true}
+                                                className="inline-block h-3.5 w-0.5 animate-caret bg-accent align-middle"
+                                            />
+                                        }
+                                    />
                                 </div>
                             );
                         case "working":

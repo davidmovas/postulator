@@ -1,9 +1,7 @@
 import type { ReactElement } from "react";
-import { useEffect, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
 import type { Turn } from "../../../data/agent/turn.js";
-import { duration } from "../../../domain/format.js";
 import type { Tone } from "../../../ui/index.js";
 import {
     cx,
@@ -15,36 +13,12 @@ import {
     toneClasses,
 } from "../../../ui/index.js";
 
-const tickMs = 1000;
-
-function useElapsed(startedAt: number, running: boolean): number {
-    const [now, setNow] = useState(() => Date.now());
-
-    useEffect(() => {
-        if (!running) {
-            return;
-        }
-        setNow(Date.now());
-        const timer = setInterval(() => {
-            setNow(Date.now());
-        }, tickMs);
-        return () => {
-            clearInterval(timer);
-        };
-    }, [running, startedAt]);
-
-    return startedAt === 0 ? 0 : Math.max(0, Math.round((now - startedAt) / tickMs) * tickMs);
-}
-
 export interface TurnStatusProps {
     turn: Turn;
 }
 
 export function TurnStatus({ turn }: TurnStatusProps): ReactElement | null {
-    const running = turn.status === "working" || turn.status === "awaiting-confirm" || turn.status === "stopping";
-    const elapsed = useElapsed(turn.startedAt, running);
-
-    if (turn.status === "idle" || (turn.status === "done" && turn.end === "answered")) {
+    if (turn.status === "idle" || turn.status === "working" || (turn.status === "done" && turn.end === "answered")) {
         return null;
     }
 
@@ -53,9 +27,6 @@ export function TurnStatus({ turn }: TurnStatusProps): ReactElement | null {
     let icon: ReactElement = <Spinner size={11} className="text-info" />;
 
     switch (turn.status) {
-        case "working":
-            label = elapsed === 0 ? copy.agent.status.working : copy.agent.status.workingFor(duration(elapsed));
-            break;
         case "awaiting-confirm":
             tone = "warn";
             label = copy.agent.status.awaiting;

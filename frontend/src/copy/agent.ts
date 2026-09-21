@@ -64,7 +64,6 @@ export const agent = {
     transcript: {
         jumpToLatest: "Jump to the latest",
         loadEarlier: "Load earlier messages",
-        usage: (input: string, output: string, usd: string) => `${input} in · ${output} out · ${usd}`,
         tool: {
             running: "running",
             ok: "done",
