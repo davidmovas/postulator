@@ -961,6 +961,24 @@ for the first time. The plan is `docs/superpowers/plans/2026-09-20-phase-13-fron
 - **Escape closes an overlay; it never decides.** The confirmation card bound Escape to reject
   with no undo, and the screenshot walk destroyed a seeded proposal by pressing it. The card keeps
   Ctrl+Enter to approve; rejecting is a click or the inbox's `r`.
+- **A provider error says what the provider said.** A working OpenAI key was reported as
+  rejected: the Settings test probed the first catalog row, the costliest flagship, the key had no
+  access to that model, and every 401 and 403 wore the same sentence. A 403 now reads "the key has
+  no access to this model", the provider's own message travels in `details.providerMessage` with
+  any key fragment masked to its last four characters, the test probes the provider's cheapest
+  model, and the client cache is keyed on the key's fingerprint, so a rotated key is used at once.
+- **The catalog is verified, not remembered, and every role has a reasoned default.** The
+  shipped models were checked against the providers' current model and pricing pages; the
+  flagship nobody should pay for by accident was removed. Defaults follow the step: the writer
+  gets the best model whose page still costs cents, editor, judge and chat the mid-tier, linker
+  and titler the cheapest, images the current image model.
+- **A dropped file lands where the client is looking.** Wails delivers dropped paths to Go, which
+  relays them as `files.dropped`; on Import the sheet becomes step one's file, anywhere else it
+  opens the dock with a readable sentence asking the agent to inspect it, never to apply it.
+- **A hidden input is positioned inside its label.** `sr-only` is `position: absolute`; without a
+  containing block the switch's real input escaped every `overflow: hidden` and stretched the
+  document past the window, so the whole application scrolled on the densest screen of switches.
+  The labels are positioned and `html`, `body` and `#root` refuse to scroll.
 - **Honest gaps stay visible.** Schedules say "UTC" because the backend evaluates cron in UTC;
   `Import.Apply` shows a busy state without a percentage because it is synchronous; the pages rail
   has no drift facet because `Pages.List` has none; a `Sites.List` search filters the loaded rows

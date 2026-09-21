@@ -48,7 +48,12 @@ package` (the 16 MB installer) are green. The docker suites (`task e2e:test`, `t
 `llm.usage` was registered as a run event while the ledger published it without a run sequence,
 so every model call with usage failed as soon as a window was attached, since phase 1; no gate saw
 it because the Go suite fakes the publisher and the harness seeds before the window exists. It is
-fixed, and a release check now starts a run after the window is up.
+fixed, and a release check now starts a run after the window is up. The user's first walk on
+2026-09-21 found a working OpenAI key reported as rejected (the test probed the costliest catalog
+row and every 403 was called a bad key), the whole window scrolling on the template editor (a
+`sr-only` input escaping its label), and asked for drag-and-drop, a centred Settings column, a
+roles table in two columns and an export format select; all landed the same day, with the catalog
+re-verified against the providers' pages and a reasoned default model per role.
 
 **Phase 13, the product frontend, landed on 2026-09-20 and 21** (plan:
 `docs/superpowers/plans/2026-09-20-phase-13-frontend.md`). Every screen sits on one screen
@@ -56,7 +61,8 @@ contract (`ui/screen.tsx` with `Toolbar`, `Tabs`, `Segmented`, `Menu`, `Kbd`), t
 frameless with its own title bar (site pill, search on `F`, dock toggle, window controls), the rail
 is icon-over-label in three sections, and the four missing screens exist: Overview
 (`/s/:siteId/overview`, readiness, run summary, tiles, depth, edge coverage), Import (a four-step
-wizard over `Import.Inspect/Preview/Apply` plus export), Schedules (interval or cron, shown in UTC,
+wizard over `Import.Inspect/Preview/Apply`, a dropped sheet lands in step one, export as `.xlsx`
+or `.csv`), Schedules (interval or cron, shown in UTC,
 targets rather than a kind because a schedule has none), Reports (site, runs, pages). Sites,
 Pages, Runs, Templates, Graph and Linking were re-framed onto the contract; the graph's legend
 became a hover card over the node. Settings is six tabs by intent (Models, Runs, Agent, Browser,
