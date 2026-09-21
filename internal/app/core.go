@@ -244,7 +244,7 @@ func (c *Core) build(ctx context.Context, key []byte) (kit, error) {
 	}
 	provider := cfg.Provider
 	if provider == nil {
-		provider = gollemclient.New(providers, gollemclient.Timeout(values))
+		provider = gollemclient.New(providers, modelCatalog, gollemclient.Timeout(values))
 	}
 	book := ledger.New(
 		recordreplay.New(provider, recordreplay.Mode(values), recordreplay.DefaultDir),

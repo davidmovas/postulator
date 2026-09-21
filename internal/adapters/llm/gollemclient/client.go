@@ -18,13 +18,18 @@ type ProviderFactory interface {
 	New(ctx context.Context, ref llm.ModelRef) (gollem.LLMClient, error)
 }
 
+type ModelReader interface {
+	Lookup(ctx context.Context, ref llm.ModelRef) (llm.ModelInfo, error)
+}
+
 type Client struct {
 	factory ProviderFactory
+	models  ModelReader
 	timeout time.Duration
 }
 
-func New(factory ProviderFactory, timeout time.Duration) *Client {
-	return &Client{factory: factory, timeout: timeout}
+func New(factory ProviderFactory, models ModelReader, timeout time.Duration) *Client {
+	return &Client{factory: factory, models: models, timeout: timeout}
 }
 
 func (c *Client) Complete(ctx context.Context, req port.Request) (port.Response, error) {
@@ -40,7 +45,8 @@ func (c *Client) Complete(ctx context.Context, req port.Request) (port.Response,
 		return port.Response{}, err
 	}
 
-	resp, err := session.Generate(call, lastInput(req), generateOptions(req)...)
+	ceiling := c.ceiling(call, req)
+	resp, err := session.Generate(call, lastInput(req), generateOptions(req, ceiling)...)
 	if err != nil {
 		if stderrors.Is(err, gollem.ErrProhibitedContent) {
 			return port.Response{FinishReason: port.FinishContentFilter}, nil
@@ -52,7 +58,7 @@ func (c *Client) Complete(ctx context.Context, req port.Request) (port.Response,
 	return port.Response{
 		Text:         strings.Join(resp.Texts, ""),
 		Usage:        usage,
-		FinishReason: finishReason(req, usage),
+		FinishReason: finishReason(ceiling, usage),
 	}, nil
 }
 
@@ -69,7 +75,7 @@ func (c *Client) Stream(ctx context.Context, req port.Request) (<-chan port.Delt
 		return nil, err
 	}
 
-	chunks, err := session.Stream(call, lastInput(req), generateOptions(req)...)
+	chunks, err := session.Stream(call, lastInput(req), generateOptions(req, c.ceiling(call, req))...)
 	if err != nil {
 		cancel()
 		return nil, classify(ctx, err)
@@ -101,6 +107,18 @@ func (c *Client) Stream(ctx context.Context, req port.Request) (<-chan port.Delt
 		send(call, out, port.Delta{Done: true, Usage: &final})
 	}()
 	return out, nil
+}
+
+func (c *Client) ceiling(ctx context.Context, req port.Request) int {
+	if req.MaxTokens <= 0 || c.models == nil {
+		return req.MaxTokens
+	}
+
+	info, err := c.models.Lookup(ctx, req.Ref)
+	if err != nil {
+		return req.MaxTokens
+	}
+	return budget(req.MaxTokens, info)
 }
 
 func (c *Client) withTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
@@ -158,10 +176,10 @@ func lastInput(req port.Request) []gollem.Input {
 	return []gollem.Input{gollem.Text(req.Messages[len(req.Messages)-1].Text)}
 }
 
-func generateOptions(req port.Request) []gollem.GenerateOption {
+func generateOptions(req port.Request, ceiling int) []gollem.GenerateOption {
 	options := make([]gollem.GenerateOption, 0, 2)
-	if req.MaxTokens > 0 {
-		options = append(options, gollem.WithMaxTokens(req.MaxTokens))
+	if ceiling > 0 {
+		options = append(options, gollem.WithMaxTokens(ceiling))
 	}
 	if req.Temperature != nil {
 		options = append(options, gollem.WithTemperature(*req.Temperature))
@@ -173,8 +191,8 @@ func usageOf(input, output int) llm.Usage {
 	return llm.Usage{Input: input, Output: output, Total: input + output}
 }
 
-func finishReason(req port.Request, usage llm.Usage) port.FinishReason {
-	if req.MaxTokens > 0 && usage.Output >= req.MaxTokens {
+func finishReason(ceiling int, usage llm.Usage) port.FinishReason {
+	if ceiling > 0 && usage.Output >= ceiling {
 		return port.FinishLength
 	}
 	return port.FinishStop

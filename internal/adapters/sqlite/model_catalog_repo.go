@@ -9,8 +9,8 @@ import (
 
 const (
 	modelColumns = `provider, model, context_tokens, max_output_tokens, input_usd_per_m, output_usd_per_m, rpm, tpm,
-		supports_structured, supports_images, reasoning, enabled, created_at, updated_at`
-	upsertModel = `INSERT INTO model_catalog (` + modelColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		supports_structured, supports_images, reasoning, reasoning_effort, enabled, created_at, updated_at`
+	upsertModel = `INSERT INTO model_catalog (` + modelColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (provider, model) DO UPDATE SET
 			context_tokens = excluded.context_tokens,
 			max_output_tokens = excluded.max_output_tokens,
@@ -21,6 +21,7 @@ const (
 			supports_structured = excluded.supports_structured,
 			supports_images = excluded.supports_images,
 			reasoning = excluded.reasoning,
+			reasoning_effort = excluded.reasoning_effort,
 			enabled = excluded.enabled,
 			updated_at = excluded.updated_at`
 	selectModels = `SELECT ` + modelColumns + ` FROM model_catalog ORDER BY provider, model`
@@ -39,6 +40,7 @@ func (r *ModelCatalogRepo) Upsert(ctx context.Context, override llm.ModelOverrid
 	_, err := execWrite(ctx, r.store.writeFrom(ctx), upsertModel, []any{
 		info.Ref.Provider, info.Ref.Model, info.ContextTokens, info.MaxOutputTokens, info.InputUSDPerM, info.OutputUSDPerM,
 		info.RPM, info.TPM, boolInt(info.SupportsStructured), boolInt(info.SupportsImages), boolInt(info.Reasoning),
+		string(info.ReasoningEffort),
 		boolInt(override.Enabled), formatTime(override.CreatedAt), formatTime(override.UpdatedAt),
 	}, nil, "store the model override")
 	return err
@@ -52,13 +54,13 @@ func scanModelOverride(rows *sql.Rows) (llm.ModelOverride, error) {
 	var (
 		override                                  llm.ModelOverride
 		structured, images, reasoning, enabled    int64
-		createdAt, updatedAt                      string
+		createdAt, updatedAt, effort              string
 		contextTokens, maxOutput, requests, count int
 	)
 	if err := rows.Scan(
 		&override.Info.Ref.Provider, &override.Info.Ref.Model, &contextTokens, &maxOutput,
 		&override.Info.InputUSDPerM, &override.Info.OutputUSDPerM, &requests, &count,
-		&structured, &images, &reasoning, &enabled, &createdAt, &updatedAt,
+		&structured, &images, &reasoning, &effort, &enabled, &createdAt, &updatedAt,
 	); err != nil {
 		return llm.ModelOverride{}, err
 	}
@@ -70,6 +72,7 @@ func scanModelOverride(rows *sql.Rows) (llm.ModelOverride, error) {
 	override.Info.SupportsStructured = structured == 1
 	override.Info.SupportsImages = images == 1
 	override.Info.Reasoning = reasoning == 1
+	override.Info.ReasoningEffort = llm.ReasoningEffort(effort)
 	override.Enabled = enabled == 1
 
 	var err error

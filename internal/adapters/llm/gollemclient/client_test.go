@@ -59,7 +59,23 @@ func claudeRef() llm.ModelRef {
 	return llm.ModelRef{Provider: gollemclient.ProviderAnthropic, Model: claudeModel}
 }
 
+type catalog map[string]llm.ModelInfo
+
+func (c catalog) Lookup(_ context.Context, ref llm.ModelRef) (llm.ModelInfo, error) {
+	info, ok := c[ref.String()]
+	if !ok {
+		return llm.ModelInfo{}, errors.New(errors.NotFound, "the catalog has no such model")
+	}
+	return info, nil
+}
+
 func newClient(t *testing.T, provider, setting string, handler http.HandlerFunc) (*gollemclient.Client, *bodies) {
+	t.Helper()
+
+	return newClientOver(t, provider, setting, nil, handler)
+}
+
+func newClientOver(t *testing.T, provider, setting string, models gollemclient.ModelReader, handler http.HandlerFunc) (*gollemclient.Client, *bodies) {
 	t.Helper()
 
 	captured := &bodies{}
@@ -75,7 +91,7 @@ func newClient(t *testing.T, provider, setting string, handler http.HandlerFunc)
 
 	values := newValues(t, map[string]string{setting: server.URL})
 	factory := gollemclient.NewFactory(vault{gollemclient.SecretRef(provider): "test-key"}, nil, values)
-	return gollemclient.New(factory, 10*time.Second), captured
+	return gollemclient.New(factory, models, 10*time.Second), captured
 }
 
 type bodies struct {
@@ -325,7 +341,7 @@ func TestStructuredOverTheProvider(t *testing.T) {
 func TestClientRejectsAnInvalidRequest(t *testing.T) {
 	t.Parallel()
 
-	client := gollemclient.New(gollemclient.NewFactory(vault{}, nil, newValues(t, nil)), time.Second)
+	client := gollemclient.New(gollemclient.NewFactory(vault{}, nil, newValues(t, nil)), nil, time.Second)
 	req := port.Request{Ref: llm.ModelRef{}, Messages: nil}
 
 	if _, err := client.Complete(t.Context(), req); !errors.IsCode(err, errors.Invalid) {
@@ -502,7 +518,7 @@ func TestCompleteHonoursTheTimeout(t *testing.T) {
 
 	values := newValues(t, map[string]string{"llm.openai.baseUrl": server.URL})
 	factory := gollemclient.NewFactory(vault{gollemclient.SecretRef(gollemclient.ProviderOpenAI): "key"}, nil, values)
-	client := gollemclient.New(factory, 20*time.Millisecond)
+	client := gollemclient.New(factory, nil, 20*time.Millisecond)
 
 	_, err := client.Complete(t.Context(), port.Request{Ref: openaiRef(), Messages: []port.Message{{Role: port.RoleUser, Text: "write"}}})
 	if !errors.IsCode(err, errors.External) {
@@ -574,7 +590,7 @@ func TestClientWithoutATimeout(t *testing.T) {
 
 	values := newValues(t, map[string]string{"llm.openai.baseUrl": server.URL})
 	factory := gollemclient.NewFactory(vault{gollemclient.SecretRef(gollemclient.ProviderOpenAI): "key"}, nil, values)
-	client := gollemclient.New(factory, 0)
+	client := gollemclient.New(factory, nil, 0)
 
 	resp, err := client.Complete(t.Context(), port.Request{Ref: openaiRef(), Messages: []port.Message{{Role: port.RoleUser, Text: "write"}}})
 	if err != nil {
@@ -623,5 +639,76 @@ func TestGeminiOpenAIDefaultsToGoogleAI(t *testing.T) {
 		Provider: gollemclient.ProviderGeminiOpenAI, Model: "gemini-3.5-flash",
 	}); !errors.IsCode(err, errors.Unauthorized) {
 		t.Fatalf("New without a key = %v, want %s", err, errors.Unauthorized)
+	}
+}
+
+func TestCompleteCarriesAnOutputBudgetAReasoningModelCanAnswerWithin(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		info  llm.ModelInfo
+		asked int
+		want  string
+	}{
+		{
+			name:  "a reasoning model is given room to think and to answer",
+			info:  llm.ModelInfo{Ref: openaiRef(), Reasoning: true, ReasoningEffort: llm.EffortLow, MaxOutputTokens: 128000},
+			asked: 16,
+			want:  `"max_completion_tokens":2064`,
+		},
+		{
+			name:  "a model that does not reason is asked for exactly what the caller wanted",
+			info:  llm.ModelInfo{Ref: openaiRef(), MaxOutputTokens: 128000},
+			asked: 16,
+			want:  `"max_completion_tokens":16`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			client, captured := newClientOver(t, gollemclient.ProviderOpenAI, "llm.openai.baseUrl",
+				catalog{openaiRef().String(): tc.info},
+				func(w http.ResponseWriter, _ *http.Request) {
+					writeJSON(t, w, openaiCompletion)
+				})
+
+			resp, err := client.Complete(t.Context(), port.Request{
+				Ref:       openaiRef(),
+				Messages:  []port.Message{{Role: port.RoleUser, Text: "ping"}},
+				MaxTokens: tc.asked,
+			})
+			if err != nil {
+				t.Fatalf("Complete: %v", err)
+			}
+			if resp.FinishReason != port.FinishStop {
+				t.Errorf("finish reason = %s, want %s", resp.FinishReason, port.FinishStop)
+			}
+			if sent := captured.last(); !strings.Contains(sent, tc.want) {
+				t.Errorf("the request body does not carry %s: %s", tc.want, sent)
+			}
+		})
+	}
+}
+
+func TestCompleteFallsBackToTheAskedCeilingWhenTheCatalogHasNoRow(t *testing.T) {
+	t.Parallel()
+
+	client, captured := newClientOver(t, gollemclient.ProviderOpenAI, "llm.openai.baseUrl", catalog{},
+		func(w http.ResponseWriter, _ *http.Request) {
+			writeJSON(t, w, openaiCompletion)
+		})
+
+	if _, err := client.Complete(t.Context(), port.Request{
+		Ref:       openaiRef(),
+		Messages:  []port.Message{{Role: port.RoleUser, Text: "ping"}},
+		MaxTokens: 128,
+	}); err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+	if sent := captured.last(); !strings.Contains(sent, `"max_completion_tokens":128`) {
+		t.Errorf("the request body does not carry the asked ceiling: %s", sent)
 	}
 }

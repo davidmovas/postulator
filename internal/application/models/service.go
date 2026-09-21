@@ -14,7 +14,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
-const probeTokens = 1
+const probeTokens = 16
 
 type catalogReader interface {
 	List(ctx context.Context) ([]llm.ModelInfo, error)

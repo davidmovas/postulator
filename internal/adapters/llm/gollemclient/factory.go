@@ -32,10 +32,6 @@ type secretReader interface {
 	Get(ctx context.Context, ref string) (string, error)
 }
 
-type modelReader interface {
-	Lookup(ctx context.Context, ref llm.ModelRef) (llm.ModelInfo, error)
-}
-
 type cached struct {
 	client      gollem.LLMClient
 	fingerprint string
@@ -43,13 +39,13 @@ type cached struct {
 
 type Factory struct {
 	secrets secretReader
-	models  modelReader
+	models  ModelReader
 	values  *settings.Values
 	clients map[string]cached
 	mu      sync.Mutex
 }
 
-func NewFactory(secrets secretReader, models modelReader, values *settings.Values) *Factory {
+func NewFactory(secrets secretReader, models ModelReader, values *settings.Values) *Factory {
 	return &Factory{secrets: secrets, models: models, values: values, clients: make(map[string]cached)}
 }
 

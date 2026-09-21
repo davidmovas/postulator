@@ -168,3 +168,31 @@ func TestLookupRejectsAnUnknownModel(t *testing.T) {
 		t.Fatalf("Lookup error = %v, want %s", err, errors.NotFound)
 	}
 }
+
+func TestTheReasoningEffortSurvivesAnOverride(t *testing.T) {
+	t.Parallel()
+
+	_, repo := newCatalog(t)
+	ref := llm.ModelRef{Provider: "openai", Model: "gpt-5.6-luna"}
+	stored := override(ref, true, 1)
+	stored.Info.Reasoning = true
+	stored.Info.ReasoningEffort = llm.EffortHigh
+
+	if err := repo.Upsert(t.Context(), stored); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+
+	listed, err := repo.List(t.Context())
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(listed) != 1 {
+		t.Fatalf("listed %d overrides, want 1", len(listed))
+	}
+	if listed[0].Info.ReasoningEffort != llm.EffortHigh {
+		t.Errorf("reasoning effort = %q, want %q", listed[0].Info.ReasoningEffort, llm.EffortHigh)
+	}
+	if !listed[0].Info.Reasoning {
+		t.Error("the override forgot that the model reasons")
+	}
+}

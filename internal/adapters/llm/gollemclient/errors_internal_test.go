@@ -128,3 +128,52 @@ func TestRetryAfterWithoutAResponse(t *testing.T) {
 		t.Fatalf("retryAfter(future) = %s, want a positive delay", got)
 	}
 }
+
+func TestClassifyNamesAnExhaustedOutputBudget(t *testing.T) {
+	t.Parallel()
+
+	param := "max_completion_tokens"
+	const told = "Could not finish the message because max_tokens or model output limit was reached. " +
+		"Please try again with higher max_tokens."
+
+	cases := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{
+			name: "the provider names the parameter",
+			err:  &openai.APIError{HTTPStatusCode: http.StatusBadRequest, Param: &param, Message: "no help"},
+			want: exhaustedOutput,
+		},
+		{
+			name: "the provider only says it in prose",
+			err:  &openai.APIError{HTTPStatusCode: http.StatusBadRequest, Message: told},
+			want: exhaustedOutput,
+		},
+		{
+			name: "another bad request keeps the general sentence",
+			err:  &openai.APIError{HTTPStatusCode: http.StatusBadRequest, Message: "unknown parameter: frequency_penalty"},
+			want: rejectedRequest,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := classify(context.Background(), tc.err)
+			if !errors.IsCode(got, errors.Invalid) {
+				t.Fatalf("classify = %v (%s), want %s", got, errors.CodeOf(got), errors.Invalid)
+			}
+
+			var kernel *errors.Error
+			if !stderrors.As(got, &kernel) {
+				t.Fatalf("classify returned %T, want a kernel error", got)
+			}
+			if kernel.Message != tc.want {
+				t.Errorf("message = %q, want %q", kernel.Message, tc.want)
+			}
+		})
+	}
+}

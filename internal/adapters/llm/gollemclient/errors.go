@@ -38,6 +38,26 @@ func classify(ctx context.Context, err error) error {
 	return fromStatus(status, after, err)
 }
 
+const (
+	rejectedRequest = "the model provider rejected the request"
+	exhaustedOutput = "the model used its whole output budget before it answered"
+)
+
+var outputLimitParams = map[string]bool{"max_tokens": true, "max_completion_tokens": true}
+
+func outputLimited(err error) bool {
+	var apiErr *openai.APIError
+	if stderrors.As(err, &apiErr) && apiErr.Param != nil && outputLimitParams[*apiErr.Param] {
+		return true
+	}
+
+	told := strings.ToLower(messageOf(err))
+	if !strings.Contains(told, "max_tokens") {
+		return false
+	}
+	return strings.Contains(told, "limit") || strings.Contains(told, "reached")
+}
+
 func fromStatus(status int, after time.Duration, err error) error {
 	base := func(code errors.Code, message string) *errors.Error {
 		built := errors.New(code, message).WithDetail("status", status).WithInternal(err)
@@ -58,8 +78,10 @@ func fromStatus(status int, after time.Duration, err error) error {
 		return base(errors.RateLimited, "the model provider is rate limiting this key").WithRetry(after)
 	case status >= http.StatusInternalServerError:
 		return base(errors.External, "the model provider returned a server error").WithRetry(after)
+	case status >= http.StatusBadRequest && outputLimited(err):
+		return base(errors.Invalid, exhaustedOutput)
 	case status >= http.StatusBadRequest:
-		return base(errors.Invalid, "the model provider rejected the request")
+		return base(errors.Invalid, rejectedRequest)
 	default:
 		return base(errors.External, "the model provider returned an unexpected status")
 	}

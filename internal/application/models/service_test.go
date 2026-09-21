@@ -436,8 +436,8 @@ func TestTestProvider(t *testing.T) {
 	if resp.Model.Model != "gpt-5.6-luna" || resp.Usage.Total != 2 {
 		t.Errorf("response = %+v, want the probe usage", resp)
 	}
-	if h.prober.seen.MaxTokens != 1 || h.prober.seen.Meta.Step != "test_provider" {
-		t.Errorf("probe request = %+v, want a one token call", h.prober.seen)
+	if h.prober.seen.MaxTokens <= 1 || h.prober.seen.Meta.Step != "test_provider" {
+		t.Errorf("probe request = %+v, want room for an answer a reasoning model can reach", h.prober.seen)
 	}
 
 	if _, err = h.service.TestProvider(t.Context(), models.TestProviderRequest{Provider: "openai", Model: "ghost"}); !errors.IsCode(err, errors.NotFound) {
