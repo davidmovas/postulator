@@ -2,6 +2,8 @@ package main
 
 import (
 	"log"
+	"os"
+	"strings"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
@@ -9,7 +11,22 @@ import (
 	"github.com/davidmovas/postulator/internal/application/events"
 )
 
-const ProductionInstanceID = "com.davidmovas.postulator"
+const (
+	ProductionInstanceID = "com.davidmovas.postulator"
+
+	devtoolsVariable = "POSTULATOR_DEVTOOLS_PORT"
+)
+
+func withDevtools(opts application.Options) (tuned application.Options, endpoint string) {
+	endpoint = strings.TrimSpace(os.Getenv(devtoolsVariable))
+	if endpoint == "" {
+		return opts, ""
+	}
+
+	opts.Windows.AdditionalBrowserArgs = append(opts.Windows.AdditionalBrowserArgs,
+		"--remote-debugging-port="+endpoint)
+	return opts, endpoint
+}
 
 type raisable interface {
 	Restore()

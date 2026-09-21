@@ -132,3 +132,30 @@ func TestADropIsRelayedAsPaths(t *testing.T) {
 		})
 	}
 }
+
+func TestTheBuildOpensTheDevtoolsEndpointWhenAsked(t *testing.T) {
+	cases := []struct {
+		name string
+		port string
+		want []string
+	}{
+		{name: "unset changes nothing", port: ""},
+		{name: "a port is passed to the webview", port: "9333", want: []string{"--remote-debugging-port=9333"}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(devtoolsVariable, tc.port)
+
+			got := options(application.Options{Name: "Postulator"}).Windows.AdditionalBrowserArgs
+			if len(got) != len(tc.want) {
+				t.Fatalf("AdditionalBrowserArgs = %v, want %v", got, tc.want)
+			}
+			for index, arg := range tc.want {
+				if got[index] != arg {
+					t.Fatalf("AdditionalBrowserArgs = %v, want %v", got, tc.want)
+				}
+			}
+		})
+	}
+}

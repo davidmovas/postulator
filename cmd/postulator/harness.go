@@ -21,9 +21,8 @@ import (
 )
 
 const (
-	devtoolsVariable = "POSTULATOR_DEVTOOLS_PORT"
-	siteVariable     = "POSTULATOR_WP_ADDRESS"
-	torHideVariable  = "POSTULATOR_TOR_HIDE"
+	siteVariable    = "POSTULATOR_WP_ADDRESS"
+	torHideVariable = "POSTULATOR_TOR_HIDE"
 
 	defaultSiteAddress = "127.0.0.1:9223"
 
@@ -138,13 +137,9 @@ func configure(cfg app.Config) (harness, error) {
 }
 
 func options(opts application.Options) application.Options {
-	endpoint := strings.TrimSpace(os.Getenv(devtoolsVariable))
-	if endpoint != "" {
-		opts.Windows.AdditionalBrowserArgs = append(opts.Windows.AdditionalBrowserArgs,
-			"--remote-debugging-port="+endpoint)
-	}
-	opts.SingleInstance = onlyInstance(harnessInstanceID(endpoint))
-	return opts
+	tuned, endpoint := withDevtools(opts)
+	tuned.SingleInstance = onlyInstance(harnessInstanceID(endpoint))
+	return tuned
 }
 
 func harnessInstanceID(endpoint string) string {
