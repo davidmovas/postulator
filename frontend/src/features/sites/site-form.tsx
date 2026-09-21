@@ -11,7 +11,7 @@ import { ReachabilityReport } from "./reachability.js";
 
 type FieldErrors = Readonly<Record<string, string>>;
 
-const drawerWidth = 688;
+const drawerWidth = 480;
 
 export interface SiteFormProps {
     site: Site | null;

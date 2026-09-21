@@ -127,7 +127,7 @@ export const pages = {
         templateEdit: "Edit",
         entity: "Entity",
         entityMissing: "The entity this page points at could not be read.",
-        entityMeta: (kind: string, score: number) => `${kind} · score ${score.toFixed(2)}`,
+        entityMeta: (kind: string, score: string) => `${kind} · score ${score}`,
         noEntity: "Not mapped to an entity",
         noEntityOption: "No entity",
         map: "Map",

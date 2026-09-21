@@ -19,6 +19,7 @@ import {
 } from "../../ui/index.js";
 import { ConflictNotice } from "./conflict-notice.js";
 import type { EntityIndex } from "./entities.js";
+import { formatScore, kindLabel } from "../graph/labels.js";
 import { entityIcon } from "./labels.js";
 
 const noEntity = "none";
@@ -80,7 +81,7 @@ export function PageMapping({ page, siteId, index, search }: PageMappingProps): 
                         <div className="flex min-w-0 flex-col">
                             <span className="truncate text-sm font-semibold text-ink">{entity.name}</span>
                             <span className="font-mono text-2xs text-ink-faint">
-                                {copy.pages.detail.entityMeta(entity.kind, entity.score)}
+                                {copy.pages.detail.entityMeta(kindLabel(entity.kind), formatScore(entity.score))}
                             </span>
                         </div>
                     </div>
