@@ -7,6 +7,7 @@ import { links } from "./links.js";
 import { overview, readiness } from "./overview.js";
 import { pages } from "./pages.js";
 import { palette } from "./palette.js";
+import { reports } from "./reports.js";
 import { policies, templates } from "./templates.js";
 import { runs } from "./runs.js";
 import { schedules } from "./schedules.js";
@@ -27,6 +28,7 @@ export const copy = {
     sites,
     settings,
     runs,
+    reports,
     schedules,
     agent,
     pages,

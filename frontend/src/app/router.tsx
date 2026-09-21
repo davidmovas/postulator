@@ -1,12 +1,12 @@
 import { createHashRouter, Navigate } from "react-router";
 
-import { copy } from "../copy/index.js";
 import { AgentScreen, InboxScreen } from "../features/agent/index.js";
 import { GraphScreen } from "../features/graph/index.js";
 import { ImportScreen } from "../features/imports/index.js";
 import { LinksScreen } from "../features/links/index.js";
 import { OverviewScreen } from "../features/overview/index.js";
 import { PagesScreen } from "../features/pages/index.js";
+import { ReportsScreen } from "../features/reports/index.js";
 import { RunDetailScreen, RunsScreen } from "../features/runs/index.js";
 import { SchedulesScreen } from "../features/schedules/index.js";
 import {
@@ -20,9 +20,7 @@ import {
 } from "../features/settings/index.js";
 import { SitesScreen } from "../features/sites/index.js";
 import { PoliciesScreen, TemplateEditorScreen, TemplatesScreen } from "../features/templates/index.js";
-import { MonitoringIcon } from "../ui/index.js";
 import { Landing } from "./landing.js";
-import { Placeholder } from "./placeholder.js";
 import { Shell } from "./shell.js";
 
 export const router = createHashRouter([
@@ -51,10 +49,7 @@ export const router = createHashRouter([
                     { path: "templates/:templateId", element: <TemplateEditorScreen /> },
                     { path: "schedules", element: <SchedulesScreen /> },
                     { path: "import", element: <ImportScreen /> },
-                    {
-                        path: "reports",
-                        element: <Placeholder title={copy.nav.reports} icon={MonitoringIcon} />,
-                    },
+                    { path: "reports", element: <ReportsScreen /> },
                 ],
             },
             {

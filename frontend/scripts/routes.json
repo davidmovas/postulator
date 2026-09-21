@@ -215,8 +215,9 @@
     "wait": 1000
   },
   {
-    "name": "reports",
-    "route": "#/s/:siteId/reports"
+    "name": "reports-site",
+    "route": "#/s/:siteId/reports",
+    "wait": 1500
   },
   {
     "name": "pages-tree",
@@ -692,5 +693,38 @@
     "width": 960,
     "height": 600,
     "wait": 900
+  },
+  {
+    "name": "reports-runs",
+    "route": "#/s/:siteId/reports?tab=runs",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-run-id]"
+      },
+      {
+        "wait": 900
+      }
+    ]
+  },
+  {
+    "name": "reports-pages",
+    "route": "#/s/:siteId/reports?tab=pages",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-page-id]"
+      },
+      {
+        "wait": 900
+      }
+    ]
+  },
+  {
+    "name": "reports-960",
+    "route": "#/s/:siteId/reports",
+    "width": 960,
+    "height": 600,
+    "wait": 1200
   }
 ]
