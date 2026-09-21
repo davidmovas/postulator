@@ -6,11 +6,11 @@ import { copy } from "../../copy/index.js";
 import { react } from "../../data/errors.js";
 import { useGraph } from "../../data/hooks/graph.js";
 import { useLinkAudit } from "../../data/hooks/reports.js";
-import { Banner, EmptyState, PublicIcon, SkeletonRows } from "../../ui/index.js";
+import { Banner, Button, CountBadge, PlayCircleIcon, Screen, SkeletonRows } from "../../ui/index.js";
 import { buildGraphIndex } from "../graph/model/index.js";
-import { StartRunDialog } from "../runs/start.js";
+import { StartRunDrawer } from "../runs/start.js";
 import { LinkFilters } from "./filters.js";
-import { AuditMeters } from "./meters.js";
+import { AuditStrip } from "./meters.js";
 import { rows as auditRows, showCounts } from "./model/audit.js";
 import { defaultQuery, narrowed, readQuery, searchOf, writeQuery } from "./model/params.js";
 import type { LinksQuery } from "./model/params.js";
@@ -45,6 +45,8 @@ export function LinksScreen(): ReactElement {
     }, [pages]);
     const relinkTargets = useMemo(() => rows.filter((row) => row.missing > 0 && row.skipReason === "").map((row) => row.pageId), [rows]);
     const selected = pageId === null ? undefined : pages.find((row) => row.pageId === pageId);
+    const relinkCount = Math.min(relinkTargets.length, relinkCap);
+    const relinkCapped = relinkTargets.length > relinkCap;
 
     const change = (next: LinksQuery): void => {
         setSearchParams(writeQuery(next), { replace: true });
@@ -54,62 +56,29 @@ export function LinksScreen(): ReactElement {
         void navigate(id === null ? `/s/${siteId}/links${search}` : `/s/${siteId}/links/${id}${search}`, { replace: true });
     };
 
-    if (siteId === "") {
-        return (
-            <div className="flex h-full items-start justify-center p-6">
-                <EmptyState icon={PublicIcon} title={copy.shell.noSiteSelected} body={copy.empty.sites} />
-            </div>
-        );
-    }
-
     const failure = audit.error === null ? null : react(audit.error);
 
     return (
-        <div className="flex h-full min-h-0 flex-col">
-            <header className="flex h-8 shrink-0 items-center justify-between gap-3 border-b border-hairline px-3">
-                <h1 className="text-sm font-semibold text-ink">{copy.links.title}</h1>
-                <p className="hidden truncate text-2xs text-ink-faint lg:block">{copy.links.subtitle}</p>
-            </header>
-            {audit.data === undefined ? null : (
-                <AuditMeters
-                    totals={audit.data.totals}
-                    policy={audit.data.policy}
-                    relinkCount={Math.min(relinkTargets.length, relinkCap)}
-                    relinkCapped={relinkTargets.length > relinkCap}
-                    relinkCap={relinkCap}
-                    onRelink={() => {
+        <Screen
+            title={copy.links.title}
+            badge={audit.data === undefined ? undefined : <CountBadge tone="muted" count={audit.data.totals.audited} />}
+            actions={
+                <Button
+                    variant="primary"
+                    icon={PlayCircleIcon}
+                    disabled={relinkCount === 0}
+                    title={relinkCount === 0 ? copy.links.relink.noneTitle : relinkCapped ? copy.links.relink.capped(relinkCap) : copy.links.relink.title}
+                    onClick={() => {
                         setRelinking(relinkTargets.slice(0, relinkCap));
                     }}
-                />
-            )}
-            <div className="flex min-h-0 flex-1">
-                <LinkFilters query={query} counts={counts} statusCounts={statusCounts} index={index} onChange={change} />
-                <div className="flex min-w-0 flex-1 flex-col">
-                    {audit.isPending ? (
-                        <div className="p-3">
-                            <SkeletonRows rows={10} label={copy.links.loading} />
-                        </div>
-                    ) : failure !== null && failure.kind !== "silent" && failure.kind !== "unlock" ? (
-                        <div className="p-3">
-                            <Banner tone="danger" title={failure.message} />
-                        </div>
-                    ) : (
-                        <AuditTable
-                            siteId={siteId}
-                            rows={rows}
-                            selectedId={pageId}
-                            narrowed={narrowed(query)}
-                            onOpen={open}
-                            onReset={() => {
-                                change({ ...defaultQuery, sort: query.sort });
-                            }}
-                            onOpenGraph={() => {
-                                void navigate(`/s/${siteId}/graph`);
-                            }}
-                        />
-                    )}
-                </div>
-                {selected === undefined ? null : (
+                >
+                    {relinkCount === 0 ? copy.links.relink.none : copy.links.relink.start(relinkCount)}
+                </Button>
+            }
+            variant="split"
+            left={<LinkFilters query={query} counts={counts} statusCounts={statusCounts} index={index} onChange={change} />}
+            right={
+                selected === undefined ? undefined : (
                     <AuditPanel
                         key={selected.pageId}
                         siteId={siteId}
@@ -121,9 +90,42 @@ export function LinksScreen(): ReactElement {
                             setRelinking([id]);
                         }}
                     />
-                )}
-            </div>
-            <StartRunDialog
+                )
+            }
+        >
+            {audit.data === undefined ? null : <AuditStrip totals={audit.data.totals} policy={audit.data.policy} />}
+            {audit.isPending ? (
+                <div className="p-4">
+                    <SkeletonRows rows={10} label={copy.links.loading} />
+                </div>
+            ) : failure !== null && failure.kind !== "silent" && failure.kind !== "unlock" ? (
+                <div className="p-4">
+                    <Banner
+                        tone="danger"
+                        title={failure.message}
+                        actions={
+                            <Button size="sm" variant="secondary" onClick={() => void audit.refetch()}>
+                                {copy.app.retry}
+                            </Button>
+                        }
+                    />
+                </div>
+            ) : (
+                <AuditTable
+                    siteId={siteId}
+                    rows={rows}
+                    selectedId={pageId}
+                    narrowed={narrowed(query)}
+                    onOpen={open}
+                    onReset={() => {
+                        change({ ...defaultQuery, sort: query.sort });
+                    }}
+                    onOpenGraph={() => {
+                        void navigate(`/s/${siteId}/graph`);
+                    }}
+                />
+            )}
+            <StartRunDrawer
                 open={relinking !== null}
                 onOpenChange={(next) => {
                     if (!next) {
@@ -138,6 +140,6 @@ export function LinksScreen(): ReactElement {
                     void navigate(`/s/${siteId}/runs/${runId}`);
                 }}
             />
-        </div>
+        </Screen>
     );
 }

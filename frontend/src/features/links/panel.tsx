@@ -136,7 +136,7 @@ export function AuditPanel({ siteId, row, onClose, onRelink }: AuditPanelProps):
     const skipped = row.skipReason !== "";
 
     return (
-        <aside aria-label={copy.links.panel.title} className="flex w-96 shrink-0 flex-col overflow-auto border-l border-hairline bg-panel">
+        <section aria-label={copy.links.panel.title} className="flex h-full min-h-0 flex-col bg-panel">
             <header className="flex items-start gap-2 border-b border-hairline p-3">
                 <div className="min-w-0 flex-1">
                     <Link to={`/s/${siteId}/pages/${row.pageId}`} className="block truncate font-mono text-sm text-ink hover:text-accent" title={row.path}>
@@ -254,6 +254,6 @@ export function AuditPanel({ siteId, row, onClose, onRelink }: AuditPanelProps):
                     </Button>
                 </footer>
             </div>
-        </aside>
+        </section>
     );
 }

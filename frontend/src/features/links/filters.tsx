@@ -2,14 +2,19 @@ import type { ReactElement } from "react";
 
 import { copy } from "../../copy/index.js";
 import { pageStatuses } from "../../generated/vocab.js";
-import { Button, cx, SectionLabel, Select } from "../../ui/index.js";
-import type { SelectOption } from "../../ui/index.js";
+import { Button, cx, SectionLabel, Segmented, Select } from "../../ui/index.js";
+import type { SegmentedOption, SelectOption } from "../../ui/index.js";
 import type { GraphIndex } from "../graph/model/index.js";
 import { showLabel } from "./labels.js";
-import type { LinksQuery, Show } from "./model/params.js";
+import type { LinksQuery, LinksSort, Show } from "./model/params.js";
 import { defaultQuery, narrowed, shows } from "./model/params.js";
 
 const anyEntity = "any";
+
+const sortOptions: readonly SegmentedOption<LinksSort>[] = [
+    { value: "severity", label: copy.links.filters.severity },
+    { value: "path", label: copy.links.filters.path },
+];
 
 interface CountedRowProps {
     label: string;
@@ -50,7 +55,7 @@ export function LinkFilters({ query, counts, statusCounts, index, onChange }: Li
     ];
 
     return (
-        <aside aria-label={copy.links.filters.title} className="flex w-52 shrink-0 flex-col gap-3 overflow-auto border-r border-hairline bg-panel p-3">
+        <div aria-label={copy.links.filters.title} className="flex flex-col gap-3 p-3">
             <div className="flex items-center justify-between gap-2">
                 <SectionLabel>{copy.links.filters.title}</SectionLabel>
                 <Button
@@ -118,25 +123,15 @@ export function LinkFilters({ query, counts, statusCounts, index, onChange }: Li
 
             <div className="flex flex-col gap-1">
                 <SectionLabel>{copy.links.filters.sort}</SectionLabel>
-                <div className="flex items-center gap-0.5 rounded-md bg-inset p-0.5">
-                    {(["severity", "path"] as const).map((sort) => (
-                        <button
-                            key={sort}
-                            type="button"
-                            aria-pressed={query.sort === sort}
-                            className={cx(
-                                "h-6 flex-1 rounded-md text-xs transition-colors duration-100",
-                                query.sort === sort ? "bg-raised text-ink" : "text-ink-dim hover:text-ink",
-                            )}
-                            onClick={() => {
-                                onChange({ ...query, sort });
-                            }}
-                        >
-                            {copy.links.filters[sort]}
-                        </button>
-                    ))}
-                </div>
+                <Segmented
+                    label={copy.links.filters.sort}
+                    value={query.sort}
+                    options={sortOptions}
+                    onValueChange={(sort) => {
+                        onChange({ ...query, sort });
+                    }}
+                />
             </div>
-        </aside>
+        </div>
     );
 }
