@@ -21,7 +21,7 @@ import {
     SectionLabel,
     Select,
 } from "../../ui/index.js";
-import { kindLabel } from "./labels.js";
+import { kindLabel, publishModeLabel } from "./labels.js";
 import { StartTargets } from "./start-targets.js";
 import { kindGenerate } from "./statuses.js";
 
@@ -186,7 +186,7 @@ export function StartRunDrawer({
                             <Select
                                 id={control.id}
                                 value={publishMode}
-                                options={publishModes.map((mode) => ({ value: mode, label: mode }))}
+                                options={publishModes.map((mode) => ({ value: mode, label: publishModeLabel(mode) }))}
                                 onValueChange={(next) => {
                                     setPublishMode(next);
                                     forget();

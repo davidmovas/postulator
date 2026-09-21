@@ -102,10 +102,6 @@ export const reports = {
         issues: "Issues",
         suggestions: "Suggestions",
         notPublished: "Not published",
-        publishStatuses: {
-            draft: "Draft",
-            publish: "Published",
-        },
         liveUrl: "Live address",
         neighbours: "Neighbour pages",
         linked: "linked",

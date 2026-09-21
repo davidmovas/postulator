@@ -1,8 +1,9 @@
 import { copy } from "../../copy/index.js";
-import { isOneOf, pageStatuses, publishModes } from "../../generated/vocab.js";
+import { isOneOf, pageStatuses } from "../../generated/vocab.js";
 import type { Tone } from "../../ui/index.js";
 import { noPage } from "./model/site.js";
 import type { CoverageReason } from "./model/site.js";
+import { publishModeLabel } from "../runs/labels.js";
 
 export function reasonLabel(reason: CoverageReason): string {
     if (reason === noPage) {
@@ -24,7 +25,7 @@ export function reasonTone(reason: CoverageReason): Tone {
 }
 
 export function publishStatusLabel(status: string): string {
-    return isOneOf(publishModes, status) ? copy.reports.pages.publishStatuses[status] : status;
+    return publishModeLabel(status);
 }
 
 export function shareOf(fraction: number): string {

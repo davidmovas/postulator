@@ -108,6 +108,10 @@ export const runs = {
         header: (kind: string) => `${kind} run`,
         startedBy: (actor: string) => `started by ${actor}`,
         publishMode: (mode: string) => `publish mode: ${mode}`,
+        publishModes: {
+            draft: "draft",
+            publish: "published live",
+        },
         deadline: "Deadline",
         template: (name: string, version: number) => `${name} v${version}`,
         templateGone: "Template removed",

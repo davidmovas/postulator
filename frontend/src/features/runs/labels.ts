@@ -1,10 +1,11 @@
 import { copy } from "../../copy/index.js";
 import type { RunEventType } from "../../data/runs/decode.js";
-import type { ArtifactKind, PauseReason, RetryBlockedReason, RunStatus } from "../../generated/vocab.js";
+import type { ArtifactKind, PauseReason, PublishMode, RetryBlockedReason, RunStatus } from "../../generated/vocab.js";
 import {
     artifactKinds,
     isOneOf,
     pauseReasons,
+    publishModes,
     retryBlockedReasons,
     runKinds,
     runStatuses,
@@ -74,6 +75,12 @@ export function statusLabel(status: string): string {
 
 export function stepLabel(step: string): string {
     return isOneOf(stepNames, step) ? copy.runs.steps[step] : step;
+}
+
+const publishWords: Readonly<Record<PublishMode, string>> = copy.runs.detail.publishModes;
+
+export function publishModeLabel(mode: string): string {
+    return isOneOf(publishModes, mode) ? publishWords[mode] : mode;
 }
 
 export function kindLabel(kind: string): string {
