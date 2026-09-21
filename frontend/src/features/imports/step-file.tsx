@@ -1,10 +1,12 @@
-import type { ReactElement } from "react";
+import type { DragEvent, ReactElement } from "react";
+import { useState } from "react";
 
 import { copy } from "../../copy/index.js";
 import { relativeTime } from "../../domain/format.js";
 import {
     Button,
     CloseIcon,
+    cx,
     DescriptionIcon,
     IconButton,
     SectionLabel,
@@ -37,10 +39,33 @@ export function StepFile({
     onForget,
     onNext,
 }: StepFileProps): ReactElement {
+    const [over, setOver] = useState(false);
+    const leave = (event: DragEvent<HTMLDivElement>): void => {
+        event.preventDefault();
+        setOver(false);
+    };
+
     return (
         <div className="flex flex-col gap-4 p-4">
-            <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-hairline bg-panel px-4 py-8">
-                <UploadFileIcon size={20} className="text-ink-faint" />
+            <div
+                data-drop-target={true}
+                onDragEnter={(event) => {
+                    event.preventDefault();
+                    setOver(true);
+                }}
+                onDragOver={(event) => {
+                    event.preventDefault();
+                    setOver(true);
+                }}
+                onDragLeave={leave}
+                onDrop={leave}
+                className={cx(
+                    "flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-8 transition-colors duration-100",
+                    over ? "border-accent bg-accent-soft" : "border-hairline bg-panel",
+                )}
+            >
+                <UploadFileIcon size={20} className={over ? "text-accent" : "text-ink-faint"} />
+                {over ? <p className="text-sm font-semibold text-accent">{copy.imports.dropped.hint}</p> : null}
                 {path === "" ? (
                     <>
                         <p className="text-sm font-semibold text-ink">{copy.imports.file.title}</p>

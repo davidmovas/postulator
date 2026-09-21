@@ -15,6 +15,7 @@ import {
     applyToolStarted,
     silentConversationIds,
 } from "./agent/turn.js";
+import { publishDrop } from "./drops.js";
 import { coalesce, invalidate, invalidateAll, invalidateBySite } from "./invalidate.js";
 import { keys } from "./keys.js";
 import { markLocked, markUnlocked } from "./lock.js";
@@ -234,6 +235,9 @@ function handlersFor(client: QueryClient): Handlers {
                 keys.pages.root(),
                 keys.graph.root(),
             );
+        },
+        "files.dropped": (envelope) => {
+            publishDrop(envelope.payload.paths);
         },
         "agent.titled": () => {
             invalidateAll(client, keys.agent.conversationsAll());

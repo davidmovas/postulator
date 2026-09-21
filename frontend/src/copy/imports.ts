@@ -1,4 +1,9 @@
 export const imports = {
+    dropped: {
+        ask: (path: string) => `Import the sheet at ${path} into this site. `,
+        rejected: "Only a .csv or .xlsx sheet can be dropped here.",
+        hint: "Drop a .csv or .xlsx sheet",
+    },
     title: "Import",
     tabs: {
         label: "Import or export",

@@ -1,12 +1,13 @@
 import { useEffect, useMemo } from "react";
-import { Link, Outlet, useLocation } from "react-router";
+import { Link, Outlet, useLocation, useNavigate } from "react-router";
 
 import { copy } from "../copy/index.js";
 import { flatten } from "../data/call.js";
+import { sheetIn, siteImportedOn, subscribeDrop } from "../data/drops.js";
 import { usePendingActions } from "../data/hooks/agent.js";
-import { dismissToast, useToasts } from "../data/toasts.js";
+import { dismissToast, pushToast, useToasts } from "../data/toasts.js";
 import type { ToastTone } from "../data/toasts.js";
-import { AgentDock, toggleDock, useDock } from "../features/agent/index.js";
+import { AgentDock, askAgent, toggleDock, useDock } from "../features/agent/index.js";
 import { CommandPalette, openPalette, usePaletteOpen } from "../features/palette/index.js";
 import { Button, Toast, ToastRegion } from "../ui/index.js";
 import type { Tone } from "../ui/index.js";
@@ -68,6 +69,7 @@ function Toasts() {
 
 export function Shell() {
     const location = useLocation();
+    const navigate = useNavigate();
     const siteId = siteIdOf(location.pathname);
     const dock = useDock();
     const pending = usePendingActions({ status: "pending" }, 100);
@@ -80,6 +82,22 @@ export function Shell() {
             rememberSite(siteId);
         }
     }, [siteId]);
+
+    useEffect(() => {
+        return subscribeDrop((paths) => {
+            const sheet = sheetIn(paths);
+            if (sheet === null) {
+                pushToast("warning", copy.imports.dropped.rejected);
+                return;
+            }
+            const importing = siteImportedOn(location.pathname);
+            if (importing !== null) {
+                void navigate(`/s/${importing}/import?path=${encodeURIComponent(sheet)}`, { replace: true });
+                return;
+            }
+            askAgent(copy.imports.dropped.ask(sheet));
+        });
+    }, [location.pathname, navigate]);
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent): void => {
