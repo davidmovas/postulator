@@ -118,6 +118,7 @@ func (s *Service) ProposeFromPages(ctx context.Context, req ProposeFromPagesRequ
 			System:    system,
 			Messages:  []llm.Message{{Role: llm.RoleUser, Text: user}},
 			MaxTokens: proposalTokens,
+			Meta:      llm.CallMeta{Step: NameProposeFromPages},
 		})
 		if callErr != nil {
 			return ProposeFromPagesResponse{}, callErr
@@ -189,6 +190,7 @@ func (s *Service) ProposeRelated(ctx context.Context, req ProposeRelatedRequest)
 		System:    system,
 		Messages:  []llm.Message{{Role: llm.RoleUser, Text: user}},
 		MaxTokens: proposalTokens,
+		Meta:      llm.CallMeta{Step: NameProposeRelated},
 	})
 	if err != nil {
 		return ProposeRelatedResponse{}, err

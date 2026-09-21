@@ -325,3 +325,56 @@ func TestProposeRelatedNeedsTwoEntities(t *testing.T) {
 		t.Fatal("a site with one entity has nothing to relate, so the model must not be called")
 	}
 }
+
+func TestProposalsNameTheStepTheySpendOn(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		reply string
+		want  string
+		run   func(t *testing.T, f proposeFixture) error
+	}{
+		{
+			name:  "from the pages",
+			reply: proposal,
+			want:  appgraph.NameProposeFromPages,
+			run: func(t *testing.T, f proposeFixture) error {
+				t.Helper()
+				f.page(t, "/coffee/", "Coffee")
+				_, err := f.service.ProposeFromPages(t.Context(), appgraph.ProposeFromPagesRequest{SiteID: f.siteID})
+				return err
+			},
+		},
+		{
+			name:  "between the entities",
+			reply: `{"edges":[]}`,
+			want:  appgraph.NameProposeRelated,
+			run: func(t *testing.T, f proposeFixture) error {
+				t.Helper()
+				sqlitetest.Entity(t, f.store, f.siteID, "Coffee")
+				sqlitetest.Entity(t, f.store, f.siteID, "Espresso")
+				_, err := f.service.ProposeRelated(t.Context(), appgraph.ProposeRelatedRequest{SiteID: f.siteID})
+				return err
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			model := &scriptedModel{replies: []string{tc.reply}}
+			f := newProposeFixture(t, model, fixedProfiles{})
+			if err := tc.run(t, f); err != nil {
+				t.Fatalf("propose: %v", err)
+			}
+			if len(model.calls) == 0 {
+				t.Fatal("the model was never called")
+			}
+			if step := model.calls[0].Meta.Step; step != tc.want {
+				t.Errorf("step = %q, want %q; the ledger and the harness both key on it", step, tc.want)
+			}
+		})
+	}
+}

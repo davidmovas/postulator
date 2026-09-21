@@ -79,10 +79,22 @@ func harnessReplies() []fake.Reply {
 		)
 	}
 	out = append(out, repairReplies()...)
+	out = append(out, proposeReplies()...)
 	return append(out,
 		fake.Reply{Step: steps.NameJudge, Text: `{"score":0.88,"issues":[],"suggestions":["Add a photograph of the puck after extraction."]}`},
 		fake.Reply{Step: "title", Text: "Which topics still need a canonical page"},
 	)
+}
+
+func proposeReplies() []fake.Reply {
+	fromPages := `{"entities":[{"path":"/blog/","name":"The bench journal","kind":"hub","intent":"read what we learned on the bench this month","primaryKeyword":"espresso blog","secondaryKeywords":["coffee journal"],"anchors":["the bench journal"],"parentPath":"","relatedPaths":[]},{"path":"/blog/espresso-for-beginners/","name":"Espresso for beginners","kind":"topic","intent":"survive the first two weeks with a new machine","primaryKeyword":"espresso for beginners","secondaryKeywords":["first espresso machine"],"anchors":["espresso for beginners"],"parentPath":"/blog/","relatedPaths":["/blog/why-your-shot-tastes-sour/"]},{"path":"/blog/why-your-shot-tastes-sour/","name":"Sour shots","kind":"topic","intent":"work out why a shot tastes sour and fix it","primaryKeyword":"sour espresso","secondaryKeywords":["under-extracted shot"],"anchors":["sour shots"],"parentPath":"/blog/","relatedPaths":[]},{"path":"/blog/water-hardness-and-espresso/","name":"Water for espresso","kind":"topic","intent":"choose water that will not ruin the machine","primaryKeyword":"espresso water hardness","secondaryKeywords":["brew water"],"anchors":["water for espresso"],"parentPath":"/blog/","relatedPaths":[]},{"path":"/reviews/","name":"Machine reviews","kind":"hub","intent":"compare the machines we have lived with","primaryKeyword":"espresso machine reviews","secondaryKeywords":["machine review"],"anchors":["machine reviews"],"parentPath":"","relatedPaths":[]},{"path":"/reviews/gaggia-classic-pro/","name":"Gaggia Classic Pro","kind":"product","intent":"decide whether the Classic Pro is the machine to buy","primaryKeyword":"gaggia classic pro","secondaryKeywords":["classic pro review"],"anchors":["the Gaggia Classic Pro"],"parentPath":"/reviews/","relatedPaths":["/reviews/rancilio-silvia/"]},{"path":"/reviews/rancilio-silvia/","name":"Rancilio Silvia","kind":"product","intent":"decide whether the Silvia is the machine to buy","primaryKeyword":"rancilio silvia","secondaryKeywords":["silvia review"],"anchors":["the Rancilio Silvia"],"parentPath":"/reviews/","relatedPaths":["/reviews/gaggia-classic-pro/"]},{"path":"/reviews/lelit-anna/","name":"Lelit Anna","kind":"product","intent":"decide whether the Anna is the machine to buy","primaryKeyword":"lelit anna","secondaryKeywords":["anna review"],"anchors":["the Lelit Anna"],"parentPath":"/reviews/","relatedPaths":[]},{"path":"/glossary/","name":"Espresso glossary","kind":"topic","intent":"look up a word heard in a coffee shop","primaryKeyword":"espresso glossary","secondaryKeywords":["coffee terms"],"anchors":["the glossary"],"parentPath":"","relatedPaths":[]},{"path":"/faq/","name":"Common questions","kind":"topic","intent":"find the answer we give every week","primaryKeyword":"espresso questions","secondaryKeywords":["coffee faq"],"anchors":["the questions we are asked"],"parentPath":"","relatedPaths":[]}]}`
+
+	related := `{"edges":[{"from":"Tampers","to":"Tamping","weight":0.86,"reason":"a tamper is the tool the tamping step is about"},{"from":"Distribution tools","to":"WDT distribution","weight":0.81,"reason":"the tool exists to do the distribution"},{"from":"Espresso scales","to":"Dialing in espresso","weight":0.77,"reason":"dialing in is measured, and the scale is what measures it"},{"from":"Knock boxes","to":"Puck preparation","weight":0.58,"reason":"the puck routine begins by knocking the last one out"},{"from":"Coffee freshness","to":"Espresso blends","weight":0.69,"reason":"a blend is chosen and then raced against its rest date"},{"from":"Espresso roast profiles","to":"Single origin espresso","weight":0.64,"reason":"a single origin is usually roasted on its own profile"}]}`
+
+	return []fake.Reply{
+		{Step: graph.NameProposeFromPages, Text: fromPages},
+		{Step: graph.NameProposeRelated, Text: related},
+	}
 }
 
 func repairReplies() []fake.Reply {
