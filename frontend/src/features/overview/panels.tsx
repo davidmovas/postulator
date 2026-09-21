@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import { Link } from "react-router";
 
 import { copy } from "../../copy/index.js";
+import { formatScore } from "../graph/labels.js";
 import { kindLabel as runKindLabel, statusLabel as runStatusLabel } from "../runs/labels.js";
 import type { EntityScore } from "../../data/types.js";
 import { tokens, usd } from "../../domain/format.js";
@@ -150,7 +151,7 @@ export function TopEntities({ entries, siteId }: TopEntitiesProps): ReactElement
                                 />
                             </span>
                             <span className="w-10 shrink-0 text-right font-mono text-2xs text-ink-dim">
-                                {entry.score.toFixed(3)}
+                                {formatScore(entry.score)}
                             </span>
                         </li>
                     ))}
