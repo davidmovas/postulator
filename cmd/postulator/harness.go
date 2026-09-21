@@ -129,7 +129,7 @@ func configure(cfg app.Config) (harness, error) {
 
 	if !fresh {
 		return harness{Config: cfg, Seed: func(ctx context.Context, core *app.Core) error {
-			return repopulate(ctx, core, site)
+			return restoreWhenReady(ctx, core, site)
 		}}, nil
 	}
 	return harness{Config: cfg, Seed: func(ctx context.Context, core *app.Core) error {

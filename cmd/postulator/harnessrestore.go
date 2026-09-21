@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"sort"
 	"strings"
 	"time"
@@ -17,9 +18,48 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
 
-const restorePageLimit = 100
+const (
+	restorePageLimit = 100
+
+	unlockPoll = 500 * time.Millisecond
+	unlockWait = time.Hour
+)
+
+func restoreWhenReady(ctx context.Context, core *app.Core, site *wptest.Server) error {
+	if !core.Locked() {
+		return repopulate(ctx, core, site)
+	}
+
+	log.Print("the harness holds the fake site back until the core is unlocked")
+	go awaitUnlock(context.WithoutCancel(ctx), core, site)
+	return nil
+}
+
+func awaitUnlock(ctx context.Context, core *app.Core, site *wptest.Server) {
+	deadline := time.Now().Add(unlockWait)
+	for time.Now().Before(deadline) {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(unlockPoll):
+		}
+
+		if core.Locked() {
+			continue
+		}
+		if err := repopulate(ctx, core, site); err != nil {
+			log.Printf("the harness could not restore the fake site: %v", err)
+		}
+		return
+	}
+	log.Print("the harness gave up waiting for the core to be unlocked; the fake site stays empty")
+}
 
 func repopulate(ctx context.Context, core *app.Core, site *wptest.Server) error {
+	if core.Locked() {
+		return nil
+	}
+
 	listed, err := core.Sites.List(ctx, sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
 	if err != nil {
 		return err

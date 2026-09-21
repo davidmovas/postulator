@@ -696,3 +696,112 @@ func TestTheHarnessRunsBesideTheRealApplication(t *testing.T) {
 		})
 	}
 }
+
+func reopen(t *testing.T) (*app.Core, harness) {
+	t.Helper()
+
+	cfg, err := app.DefaultConfig()
+	if err != nil {
+		t.Fatalf("DefaultConfig: %v", err)
+	}
+	again, err := configure(cfg)
+	if err != nil {
+		t.Fatalf("configure: %v", err)
+	}
+
+	reopened, err := app.Open(t.Context(), again.Config, zaptest.NewLogger(t))
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	t.Cleanup(func() {
+		if closeErr := reopened.Close(); closeErr != nil {
+			t.Errorf("Close: %v", closeErr)
+		}
+	})
+	return reopened, again
+}
+
+func publishedPage(t *testing.T, core *app.Core) pages.Page {
+	t.Helper()
+
+	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+
+	stored, err := core.Pages.List(t.Context(), pages.ListRequest{
+		SiteID: listed.Items[0].ID, ListRequest: dto.ListRequest{Limit: 100},
+	})
+	if err != nil {
+		t.Fatalf("List pages: %v", err)
+	}
+	for index := range stored.Items {
+		if stored.Items[index].WPID != nil {
+			return stored.Items[index]
+		}
+	}
+	t.Fatal("the seed published nothing")
+	return pages.Page{}
+}
+
+func TestARestartOfALockedHomeRestoresOnceItIsUnlocked(t *testing.T) {
+	core := seeded(t)
+	target := publishedPage(t, core)
+
+	if err := core.SetMasterPassword(t.Context(), "", "correct horse battery"); err != nil {
+		t.Fatalf("SetMasterPassword: %v", err)
+	}
+	if closeErr := core.Close(); closeErr != nil {
+		t.Fatalf("Close: %v", closeErr)
+	}
+
+	reopened, again := reopen(t)
+	if !reopened.Locked() {
+		t.Fatal("a home with a master password must reopen locked")
+	}
+	if again.Seed == nil {
+		t.Fatal("a restart still needs its hook")
+	}
+	if seedErr := again.Seed(t.Context(), reopened); seedErr != nil {
+		t.Fatalf("the restart hook refused a locked core: %v", seedErr)
+	}
+
+	if err := reopened.Unlock(t.Context(), "correct horse battery"); err != nil {
+		t.Fatalf("Unlock: %v", err)
+	}
+
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		link, err := reopened.Pages.PreviewLink(t.Context(), pages.PreviewLinkRequest{PageID: target.ID})
+		if err == nil && link.URL != "" {
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	t.Fatal("the fake site was never restored after the unlock")
+}
+
+func TestARestartOfAnOpenHomeRestoresAtOnce(t *testing.T) {
+	core := seeded(t)
+	target := publishedPage(t, core)
+
+	if closeErr := core.Close(); closeErr != nil {
+		t.Fatalf("Close: %v", closeErr)
+	}
+
+	reopened, again := reopen(t)
+	if reopened.Locked() {
+		t.Fatal("a home without a master password must reopen composed")
+	}
+	if seedErr := again.Seed(t.Context(), reopened); seedErr != nil {
+		t.Fatalf("the restart hook: %v", seedErr)
+	}
+
+	link, err := reopened.Pages.PreviewLink(t.Context(), pages.PreviewLinkRequest{PageID: target.ID})
+	if err != nil {
+		t.Fatalf("PreviewLink after the restart: %v", err)
+	}
+	if link.URL == "" {
+		t.Fatal("PreviewLink answered no address")
+	}
+}
