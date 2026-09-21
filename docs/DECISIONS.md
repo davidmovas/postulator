@@ -881,3 +881,87 @@ layer was already written: every hook existed and none was imported by a compone
   but poorer; `LLMCallRepo.SumAll` is one query with no key, so the guard now refuses only naming
   both, and the status bar and the settings screen show the real total. Naming both is still
   refused, because summing a run and a conversation together means nothing.
+
+## Decisions taken on 2026-09-20 and 21 for the product frontend
+
+Four sessions had written thirty-nine thousand lines of frontend in a day, and the result was five
+competing ways to navigate, three page-header conventions, six hand-rolled segmented controls, a
+legend explaining the graph, eighty paragraphs explaining the rest, four screens that were stubs
+naming the wave that owed them, and an agent chat that said "Working" forever. Four explore agents
+read it, eight workers rebuilt it under one orchestrator, and every screen was looked at rendered
+for the first time. The plan is `docs/superpowers/plans/2026-09-20-phase-13-frontend.md`.
+
+- **The foundation stayed and the layer above it was rebuilt.** `frontend/src/data`, `ui/theme.css`,
+  the copy discipline, the canvas engine, the graph models and the pure modules under every
+  feature were good and are untouched in substance; the shell, every screen's framing, the agent
+  surfaces and the settings screen were rewritten. Rewriting the data layer would have thrown away
+  the one part that was right.
+- **One screen contract binds every screen.** A `Screen` primitive owns the 40px header (title, at
+  most one badge, optional tabs or a view toggle in the centre, at most three actions), the body
+  variants `plain`, `split` and `full`, and the 212px rail and 320px panel; `Toolbar`, `Tabs`,
+  `Segmented`, `Menu` and `Kbd` are the one implementation of each. A primitive never sizes itself
+  and never takes a layout `className`. Explanatory prose exists in exactly three places: an empty
+  state, inline validation and a one-sentence tooltip. Legends are banned; a visual encoding is
+  either self-evident or explained on the element, which is why the graph's legend became a hover
+  card over the node. The contract is what makes eight workers' screens one product.
+- **The rail carries a label under every icon.** The design mock had a 54px icon-only rail with
+  tooltips; twelve icons a client must learn is a legend by another name. The rail is 68px, icon
+  over a 10px word, in three sections: the site's screens, production, and Agent, Sites and
+  Settings pinned at the bottom.
+- **A mock is a reference, never a spec.** The five later Claude Design screens were built with the
+  user's rule that nothing is transferred blindly: a worker owns the copy, the ergonomics and the
+  layout, and draws nothing the backend cannot back. That is how Templates lost a per-section link
+  count that `template.Section` does not have, Schedules lost a kind column because a schedule has
+  no kind, Reports lost a cannibalisation tile with no site-level source, and Settings lost its
+  whole layout.
+- **Settings are laid out by intent; the schema drives validation, never the layout.** The mock
+  and the previous decision rendered twenty-eight rows from the schema, grouped by Go package, each
+  printing its backend key. That is a developer panel and the user called it terrible. Six tabs
+  (Models, Runs, Agent, Browser, Security, About) hold the eight settings a client touches under
+  human labels with the unit in the control; everything else sits in one collapsed Advanced card
+  per tab. A test places every declared key exactly once, so a new Go setting still appears by
+  itself, in the Advanced card of the tab its group maps to, and a new group fails the compile.
+- **The agent turn is settled by Go's answer, never by a string in an error.** The frontend marked
+  a turn "working" only after `Send` returned, while Go had already started the goroutine, so a
+  fast terminal event was overwritten and nothing ever arrived again; Stop ignored `cancelled:false`
+  and never touched the store. `AgentService.Status` now reports the turn registry, `Send` returns
+  the assistant message id, `agent.done` carries a frozen `code`, and the store reconciles with
+  Go after a send, on mount, on focus and after thirty seconds of silence. `CANCELLED` is the stop
+  signal; the described message is the detail.
+- **A live lock reaches the gate because the lock query is never removed.** `markLocked` cleared
+  the whole query cache and then wrote the locked state, which removed the very query the gate
+  observed; the observer kept its stale result and every read answered `LOCKED` behind a screen
+  that did not change. The locked state is written first and every other query is removed after.
+- **A link opens in Tor Browser or nowhere.** The client works in Tor Browser for its privacy, so
+  the runtime's `Browser.OpenURL`, `window.open` and `target=` are banned by the import check and
+  every external open goes through `BrowserService.Open`, which launches `firefox.exe` from a Tor
+  Browser folder detached. Detection tries the usual install roots and accepts a `firefox.exe` only
+  with a `TorBrowser` sibling; `browser.torPath` overrides it; a missing browser is `INVALID` with
+  `details.code = "tor_missing"` and the toast leads to the Browser tab. The in-app themed preview
+  stays, with "Open in Tor Browser" beside it.
+- **The window is frameless and the header is the title bar.** No product mark: the header reads
+  site pill, search, dock toggle, our own minimise, maximise and close. `F` opens search when no
+  editable element has focus; the map's fit key moved to `0` for that reason. The app refuses to
+  run twice through Wails' single-instance option.
+- **A build-tagged harness is how the UI is seen.** `-tags uiharness` composes the real window over
+  a fake model, an in-process fake WordPress that keeps wall time and survives a restart, and a
+  seeded espresso site, with a DevTools port so `frontend/scripts/shot.mjs` can photograph any
+  route. Every worker verified its screens there and the orchestrator reviewed from the PNGs. Two
+  harness windows need two binary names, because WebView2 keys its user data on the executable.
+- **A canvas host and a data-layer state machine are exempt from the 300-line rule.** `map.tsx`,
+  `data/agent/turn.ts` and `domain/cron.ts` are each one cohesive unit whose parts need each
+  other's internals; the rule is for feature files, which are composed from parts.
+- **`llm.usage` is not a run-log event.** The registry declared it run-scoped while the ledger
+  published it through the plain publisher, so the bridge refused it and the refusal came back in
+  place of the model answer: every model call with usage failed as soon as a window was attached,
+  and no gate saw it because the Go suite fakes the publisher and the harness seeds before the
+  window exists. It is never appended to the run event store, so `ListEvents` could never replay
+  it; it is registered without `Run`, the frontend invalidates the usage query instead of feeding
+  it into the run log, and a release check starts a run after the window is up.
+- **Escape closes an overlay; it never decides.** The confirmation card bound Escape to reject
+  with no undo, and the screenshot walk destroyed a seeded proposal by pressing it. The card keeps
+  Ctrl+Enter to approve; rejecting is a click or the inbox's `r`.
+- **Honest gaps stay visible.** Schedules say "UTC" because the backend evaluates cron in UTC;
+  `Import.Apply` shows a busy state without a percentage because it is synchronous; the pages rail
+  has no drift facet because `Pages.List` has none; a `Sites.List` search filters the loaded rows
+  because the wire has no name filter. Each is in the plan's backlog rather than faked in the UI.

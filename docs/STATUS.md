@@ -38,39 +38,37 @@ the item. `frontend/src/generated/vocab.ts` is the second generated TypeScript m
 renders every string union, the five sort field lists and six derived groupings from the Go const
 blocks in declaration order, and a byte-comparing test fails when it is stale.
 
-The last gate run on 2026-09-19: `task events`, `task vocab`, `task bindings`, `gofmt -l .`,
-`task check:go:comments`, `go vet`, `golangci-lint` (v2.13.2, 0 issues, the build-tagged sources
-included), `go test -count=1 -race -covermode=atomic ./...`, `go run ./cmd/covergate`,
-`npm run typecheck`, `vitest`, `task build`, `task plugin:lint`, `task e2e:test`, `task e2e:full`
-and `task e2e:full:noplugin` are green. `task package` was last run on 2026-09-18, when
-`bin/postulator.exe` opened its window and answered `health.ping`.
+The last gate run on 2026-09-21: `task events`, `task vocab`, `task bindings` (15 services, 116
+methods), `gofmt -l .`, `task check:go:comments`, `go vet`, `golangci-lint` (0 issues, plain and
+`--build-tags uiharness`), `go test -count=1 -race -covermode=atomic ./...`, `go run
+./cmd/covergate` (84.98% domain+application, 86.57% total), `npm run typecheck`, `vitest` (919
+tests in 90 files), the frontend import bans, `task build`, `task ui:walk` (64 routes) and `task
+package` (the 16 MB installer) are green. The docker suites (`task e2e:test`, `task e2e:full`,
+`task e2e:full:noplugin`) were last green on 2026-09-19 and are run by hand before a tag.
+`llm.usage` was registered as a run event while the ledger published it without a run sequence,
+so every model call with usage failed as soon as a window was attached, since phase 1; no gate saw
+it because the Go suite fakes the publisher and the harness seeds before the window exists. It is
+fixed, and a release check now starts a run after the window is up.
 
-The frontend is a React application being built on that surface. Its toolchain, typed data layer,
-event bridge, run-event replay, app shell, router and lock gate landed in `0a9a97e`, with vitest
-over the data layer wired into CI; the design system, the sites, pages, runs and templates screens
-followed. The graph screen (`/s/:siteId/graph`) draws the topical map on an own Canvas 2D engine
-(`frontend/src/canvas`): a folding left-to-right tree over the parent edges, related arcs, badges
-for the problems a node carries, three levels of detail by zoom, lenses, search, an outline view, an
-inspector that edits an entity, its anchors and its canonical page, connect and drag-to-reparent
-with the cycle refusal shown, a proposal queue with keyboard and bulk decisions, the model actions
-with a real cancel, a pulse on what changed, and a link-proof overlay. The Linking screen
-(`/s/:siteId/links`) reads `LinkAudit` and `LinkAuditPage`: meters, a filter rail, the pages worst
-first, a panel naming every link a page owes and carries, and a relink run over the selection.
-The agent (`frontend/src/features/agent`) is a dock on every screen bound to the site in the route,
-toggled with Ctrl+J and resized by its edge, plus `/agent` for every conversation grouped by site
-and `/agent/inbox` for the actions waiting on approval. The transcript streams text and tool calls,
-and a write stops at a confirmation card that describes the action in sentences, one describer per
-tool family, `dangerous` visibly apart. "Ask the agent about this" sits on the graph inspector, the
-page drawer, the template editor and the run review. The template editor starts blank or from a
-copy, edits a page's own changes through `?page=`, types the two step settings, sets the site
-default and draws the page a template asks for. A page drawer and the run review open the page on
-the site: a published page by its address, a draft through the plugin's link in a frame with
-desktop, tablet and phone widths. Settings landed on 2026-09-20: `/settings` is a layout route
-with four tabs, General renders the twenty-eight declared settings from `SettingsService.Schema`
-grouped and checked against their own bounds, Models holds the provider keys, the seven role
-profiles, the catalog and the lifetime spend, Security holds the lock, the master password and the
-backup, and About answers from `HealthService.Ping`. Not built yet: the overview, reports,
-schedules and import; every one of them is a `NotBuilt` panel in `router.tsx`.
+**Phase 13, the product frontend, landed on 2026-09-20 and 21** (plan:
+`docs/superpowers/plans/2026-09-20-phase-13-frontend.md`). Every screen sits on one screen
+contract (`ui/screen.tsx` with `Toolbar`, `Tabs`, `Segmented`, `Menu`, `Kbd`), the window is
+frameless with its own title bar (site pill, search on `F`, dock toggle, window controls), the rail
+is icon-over-label in three sections, and the four missing screens exist: Overview
+(`/s/:siteId/overview`, readiness, run summary, tiles, depth, edge coverage), Import (a four-step
+wizard over `Import.Inspect/Preview/Apply` plus export), Schedules (interval or cron, shown in UTC,
+targets rather than a kind because a schedule has none), Reports (site, runs, pages). Sites,
+Pages, Runs, Templates, Graph and Linking were re-framed onto the contract; the graph's legend
+became a hover card over the node. Settings is six tabs by intent (Models, Runs, Agent, Browser,
+Security, About) with human labels, units in the control and one collapsed Advanced card per tab;
+a test places every declared key exactly once. Every external link opens in Tor Browser only,
+through `BrowserService.Open` over `internal/adapters/browser/tor` (auto-detected or
+`browser.torPath`; `tor_missing` leads to the Browser tab). The agent turn is settled by
+`AgentService.Status` and `agent.done.code`, never by an error string, so a fast failure shows an
+error row at once and Stop stops; a live lock shows the gate in place. The app refuses to run
+twice. The UI harness (`task ui:run`) composes the real window over `adapters/llm/fake`, an
+in-process `wptest` WordPress and a seeded espresso site with a DevTools port, and
+`frontend/scripts/shot.mjs` photographs any route; every screen was reviewed from those PNGs.
 
 ## How to run
 
@@ -79,6 +77,9 @@ task vocab                 frontend/src/generated/vocab.ts from the Go const blo
 task events                frontend/src/generated/events.ts from the Go event registry
 task build                 bin/postulator.exe, builds the frontend and the bindings first
 task package               the NSIS installer in bin/
+task ui:run                the harness window over the fakes, seeded, DevTools on 9222
+task ui:walk               a PNG per route in frontend/shots/ (task ui:shot for one route)
+task ui:reset              stops the harness and deletes its home
 task plugin:zip            bin/postulator-companion.zip
 go test -count=1 -race -covermode=atomic -coverprofile=coverage.out ./...
 go run ./cmd/covergate     enforces the coverage gates on that profile
@@ -130,15 +131,15 @@ Module coverage is 87.6% of 14439 statements; `domain` + `application` sit at 86
   site with thousands of unmapped pages holds the window's call for minutes. The dialog says how
   many calls it will make, counts the seconds, and its stop aborts the call so earlier batches stay;
   turning it into a run with progress events is the proper fix.
-- The map, the agent dock and screens, the confirmation cards, the template skeleton and the
-  preview frame cannot be seen from this machine's automation, so their rendering has been checked
-  by tests over the pure modules, the typecheck and by reading the code, not by looking at a window.
+- The UI harness sees every screen, but not the window chrome: dragging, snapping and the resize
+  edges of the frameless window, and the close button's hover, are checked by hand.
 - A preview link rotates on every issue, so two windows previewing one draft invalidate each
   other's frame; each holds its link fifty minutes and "New link" recovers it. A security plugin
-  or host header that refuses framing blanks the frame without telling the parent; "Open in your
-  browser" sits beside it.
-- A turn's streamed text is not persisted, so a window opened mid-turn sees the answer only when
-  `agent.done` lands; a turn silent for ninety seconds is shown as stalled with the saved rows.
+  or host header that refuses framing blanks the frame without telling the parent; "Open in Tor
+  Browser" sits beside it.
+- A turn's streamed text is not persisted, so a window opened mid-turn adopts the running turn
+  from `AgentService.Status` and sees the answer when `agent.done` lands; thirty seconds of silence
+  reconciles with Go rather than guessing.
 - Nothing purges an artifact for an item that never published, so every failed or unpublished item
   stays retryable. The dead end `retryable` reports is narrow by construction: a published item
   past its retention window whose current step consumes `body_html`, `draft` or `images`. No
@@ -212,15 +213,15 @@ Module coverage is 87.6% of 14439 statements; `domain` + `application` sit at 86
 
 ## Next steps
 
-1. Build the remaining screens: the overview, reports, schedules and import.
-2. Walk the agent dock, the inbox, the cards, the template editor and the page preview in the
-   built window, which no automation here can see.
-3. Tag `v2.0.0` when the UI lands; `release.yml` publishes the executable, the NSIS installer and
-   the companion plugin archive, now 1.1.0, from that tag.
-4. Close the gaps above that the UI reaches: the ledger screen and `settings.changed` for a
-   declared value, which needs an application settings use case. The settings screen rereads on
-   window focus and on demand instead, which covers the second window but not a write from the
-   agent while the screen is open.
+1. A human walk of what automation cannot see: dragging and snapping the frameless window, the
+   close button's hover, a real provider key and a real WordPress, Tor on a machine with a
+   different install path.
+2. Tag `v2.0.0`; `release.yml` publishes the executable, the NSIS installer and the companion
+   plugin archive, now 1.1.0, from that tag.
+3. The backlog the frontend made visible, in `docs/superpowers/plans/2026-09-20-phase-13-frontend.md`'s
+   workspace notes and the decisions: a schedule kind and a per-schedule run list, cron in the
+   machine's zone, `Import.Apply` and `ProposeFromPages` as runs with progress, drag-and-drop into
+   Import through a Go event, the ledger screen, `settings.changed` for a declared value.
 
 ## Final review
 
