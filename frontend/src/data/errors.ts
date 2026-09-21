@@ -94,6 +94,11 @@ export function react(thrown: unknown): Reaction {
 
 const pluginCodes: ReadonlySet<string> = new Set(["plugin_missing", "plugin_outdated"]);
 
+export function providerMessageOf(reported: TransportError): string | null {
+    const held = reported.details?.["providerMessage"];
+    return typeof held === "string" && held !== "" ? held : null;
+}
+
 export function detailCodeOf(reported: TransportError): string | null {
     const held = reported.details?.["code"];
     return typeof held === "string" && held !== "" ? held : null;

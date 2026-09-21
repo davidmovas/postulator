@@ -2,7 +2,7 @@ import type { ReactElement } from "react";
 import { useState } from "react";
 
 import { copy } from "../../../copy/index.js";
-import { failure, fieldErrorOf, formErrorOf } from "../../../data/errors.js";
+import { failure, fieldErrorOf, formErrorOf, providerMessageOf } from "../../../data/errors.js";
 import { useModelCatalog, useTestProvider } from "../../../data/hooks/models.js";
 import { useDeleteProviderKey, useProviderKeys, useSetProviderKey } from "../../../data/hooks/settings.js";
 import {
@@ -138,6 +138,11 @@ export function ProviderCards(): ReactElement {
                                             {reported.code}
                                         </StatusBadge>
                                         <p className="text-xs text-danger">{reported.message}</p>
+                                        {providerMessageOf(reported) === null ? null : (
+                                            <p className="font-mono text-2xs break-words text-ink-dim">
+                                                {providerMessageOf(reported)}
+                                            </p>
+                                        )}
                                     </div>
                                 ) : null}
                             </div>

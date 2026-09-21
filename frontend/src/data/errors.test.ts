@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import type { Code } from "../lib/errors.js";
 import { copy } from "../copy/index.js";
-import { browserSettingsPath, failure, messages, needsPlugin, pluginCodeOf, react } from "./errors.js";
+import { browserSettingsPath, failure, messages, needsPlugin, pluginCodeOf, providerMessageOf, react } from "./errors.js";
 
 function rejection(code: Code, message = "", extra: Record<string, unknown> = {}): unknown {
     return new Error("rejected", { cause: { code, message, ...extra } });
@@ -114,5 +114,16 @@ describe("a site that cannot issue a preview", () => {
         expect(react(rejection("INVALID", "the plugin is not installed", { details: { code: "plugin_missing" } })).kind).toBe(
             "form",
         );
+    });
+});
+
+describe("providerMessageOf", () => {
+    test("reads what the provider itself said, and nothing else", () => {
+        const told = rejection("UNAUTHORIZED", "the key was refused", {
+            details: { providerMessage: "Incorrect API key provided: sk-***." },
+        });
+        expect(providerMessageOf(failure(told))).toBe("Incorrect API key provided: sk-***.");
+        expect(providerMessageOf(failure(rejection("UNAUTHORIZED", "the key was refused")))).toBeNull();
+        expect(providerMessageOf(failure(rejection("UNAUTHORIZED", "x", { details: { providerMessage: "" } })))).toBeNull();
     });
 });
