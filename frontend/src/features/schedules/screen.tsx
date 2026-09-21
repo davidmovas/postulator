@@ -165,17 +165,27 @@ export function SchedulesScreen(): ReactElement {
                 <div className="p-4">
                     <EmptyState
                         icon={ScheduleIcon}
-                        title={copy.empty.schedules}
+                        title={query.show === "all" ? copy.empty.schedules : copy.schedules.noneMatch}
                         actions={
-                            <Button
-                                variant="primary"
-                                icon={AddIcon}
-                                onClick={() => {
-                                    change({ ...query, id: "" }, true);
-                                }}
-                            >
-                                {copy.schedules.create}
-                            </Button>
+                            query.show === "all" ? (
+                                <Button
+                                    variant="primary"
+                                    icon={AddIcon}
+                                    onClick={() => {
+                                        change({ ...query, id: "" }, true);
+                                    }}
+                                >
+                                    {copy.schedules.create}
+                                </Button>
+                            ) : (
+                                <Button
+                                    onClick={() => {
+                                        change({ ...query, show: "all" }, true);
+                                    }}
+                                >
+                                    {copy.schedules.showAll}
+                                </Button>
+                            )
                         }
                     />
                 </div>

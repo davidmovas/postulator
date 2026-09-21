@@ -2,6 +2,8 @@ export const schedules = {
     title: "Schedules",
     loading: "Loading the schedules",
     create: "New schedule",
+    noneMatch: "No schedule matches that filter.",
+    showAll: "Show every schedule",
     filter: {
         label: "Which schedules",
         all: "All",
