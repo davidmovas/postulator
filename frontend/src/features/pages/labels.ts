@@ -1,3 +1,4 @@
+import { copy } from "../../copy/index.js";
 import type { EntityKind, ItemStatus, LinkOrigin, PageStatus } from "../../generated/vocab.js";
 import { entityKinds, isOneOf, itemStatuses, linkOrigins, pageStatuses } from "../../generated/vocab.js";
 import type { IconComponent, Tone } from "../../ui/index.js";
@@ -20,6 +21,10 @@ const statusTones: Readonly<Record<PageStatus, Tone>> = {
 
 export function statusTone(status: string): Tone {
     return isOneOf(pageStatuses, status) ? statusTones[status] : "muted";
+}
+
+export function pageStatusLabel(status: string): string {
+    return isOneOf(pageStatuses, status) ? copy.pages.statuses[status] : status;
 }
 
 const originTones: Readonly<Record<LinkOrigin, Tone>> = {

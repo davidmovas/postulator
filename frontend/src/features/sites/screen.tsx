@@ -22,6 +22,7 @@ import {
 import type { SegmentedOption } from "../../ui/index.js";
 import { SiteDeleteDialog } from "./delete-dialog.js";
 import { SiteDetail } from "./detail.js";
+import { siteStatusLabel } from "./status.js";
 import { SiteForm } from "./site-form.js";
 import { SiteTable } from "./table.js";
 
@@ -29,7 +30,7 @@ const anyStatus = "any";
 
 const statusOptions: readonly SegmentedOption<string>[] = [
     { value: anyStatus, label: copy.sites.anyStatus },
-    ...siteStatuses.map((held) => ({ value: held, label: held })),
+    ...siteStatuses.map((held) => ({ value: held, label: siteStatusLabel(held) })),
 ];
 
 type FormState = { mode: "create" } | { mode: "edit"; site: Site } | null;

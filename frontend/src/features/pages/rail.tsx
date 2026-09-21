@@ -6,6 +6,7 @@ import { pageStatuses } from "../../generated/vocab.js";
 import type { SelectOption } from "../../ui/index.js";
 import { Button, Checkbox, cx, SectionLabel, Select } from "../../ui/index.js";
 import type { EntityIndex } from "./entities.js";
+import { pageStatusLabel } from "./labels.js";
 import { defaultQuery, narrowed } from "./params.js";
 import type { PagesQuery } from "./params.js";
 
@@ -89,7 +90,7 @@ export function PageRail({ siteId, query, index, disabled, onChange }: PageRailP
                 {pageStatuses.map((status) => (
                     <CountedRow
                         key={status}
-                        label={status}
+                        label={pageStatusLabel(status)}
                         count={totals?.byStatus?.[status]}
                         active={query.status === status}
                         disabled={disabled}

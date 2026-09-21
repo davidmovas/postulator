@@ -16,7 +16,8 @@ import {
     cx,
     toneClasses,
 } from "../../ui/index.js";
-import { actionLabel, actionTone, edgeKindLabel, entityKindLabel } from "./labels.js";
+import { kindLabel as entityKindLabel } from "../graph/labels.js";
+import { actionLabel, actionTone, edgeKindLabel } from "./labels.js";
 
 type Sheet = "pages" | "entities" | "edges";
 

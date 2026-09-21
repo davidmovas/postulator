@@ -146,13 +146,6 @@ export const imports = {
         update: "updated",
         skip: "skipped",
     },
-    entityKinds: {
-        hub: "Hub",
-        product: "Product",
-        topic: "Topic",
-        category: "Category",
-        custom: "Custom",
-    },
     edgeKinds: {
         parent: "Parent",
         related: "Related",

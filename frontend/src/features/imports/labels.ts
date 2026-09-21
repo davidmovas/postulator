@@ -3,7 +3,6 @@ import {
     blockingImportFindingCodes,
     cannibalizationReasons,
     edgeKinds,
-    entityKinds,
     importActions,
     importFields,
     importFindingCodes,
@@ -26,10 +25,6 @@ export function actionLabel(action: string): string {
 
 export function reasonLabel(reason: string): string {
     return isOneOf(cannibalizationReasons, reason) ? copy.imports.reasons[reason] : reason;
-}
-
-export function entityKindLabel(kind: string): string {
-    return isOneOf(entityKinds, kind) ? copy.imports.entityKinds[kind] : kind;
 }
 
 export function edgeKindLabel(kind: string): string {

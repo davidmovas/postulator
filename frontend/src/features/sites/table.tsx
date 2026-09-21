@@ -19,7 +19,7 @@ import {
     TableHead,
     TableRow,
 } from "../../ui/index.js";
-import { siteStatusTone } from "./status.js";
+import { siteStatusLabel, siteStatusTone } from "./status.js";
 
 const columns = "minmax(8rem,1.4fr) minmax(10rem,2fr) 5.5rem 7rem 6rem";
 
@@ -130,7 +130,7 @@ export function SiteTable({
                             </span>
                         </TableCell>
                         <TableCell>
-                            <StatusBadge tone={siteStatusTone(row.status)}>{row.status}</StatusBadge>
+                            <StatusBadge tone={siteStatusTone(row.status)}>{siteStatusLabel(row.status)}</StatusBadge>
                         </TableCell>
                         <TableCell>
                             {row.plugin.installed ? (

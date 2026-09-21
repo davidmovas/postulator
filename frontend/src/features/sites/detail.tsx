@@ -24,7 +24,7 @@ import {
 } from "../../ui/index.js";
 import { PluginPanel } from "./plugin-panel.js";
 import { ReachabilityReport } from "./reachability.js";
-import { siteStatusTone } from "./status.js";
+import { siteStatusLabel, siteStatusTone } from "./status.js";
 
 function Row({ label, children }: { label: string; children: ReactNode }): ReactElement {
     return (
@@ -132,7 +132,7 @@ export function SiteDetail({ site, onEdit, onDelete }: SiteDetailProps): ReactEl
                         <span className="font-mono text-xs">{site.username}</span>
                     </Row>
                     <Row label={copy.sites.columns.status}>
-                        <StatusBadge tone={siteStatusTone(site.status)}>{site.status}</StatusBadge>
+                        <StatusBadge tone={siteStatusTone(site.status)}>{siteStatusLabel(site.status)}</StatusBadge>
                     </Row>
                     <Row label={copy.sites.columns.created}>
                         <span title={absoluteTime(site.createdAt)}>{relativeTime(site.createdAt)}</span>

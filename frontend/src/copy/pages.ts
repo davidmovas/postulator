@@ -1,4 +1,10 @@
 export const pages = {
+    statuses: {
+        planned: "Planned",
+        exists: "Exists",
+        published: "Published",
+        archived: "Archived",
+    },
     title: "Pages",
     views: { table: "Table", tree: "Tree" },
     newPage: "New page",

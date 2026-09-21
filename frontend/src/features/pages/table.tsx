@@ -24,7 +24,7 @@ import {
     VirtualRows,
 } from "../../ui/index.js";
 import type { EntityIndex } from "./entities.js";
-import { statusTone } from "./labels.js";
+import { pageStatusLabel, statusTone } from "./labels.js";
 import { defaultQuery, filterOf, narrowed, nextSort } from "./params.js";
 import type { PagesQuery } from "./params.js";
 
@@ -70,7 +70,7 @@ function PageRow({ page, selected, entityName, onSelect, onOpen }: PageRowProps)
                 {page.wpType}
             </TableCell>
             <TableCell>
-                <StatusBadge tone={statusTone(page.status)}>{page.status}</StatusBadge>
+                <StatusBadge tone={statusTone(page.status)}>{pageStatusLabel(page.status)}</StatusBadge>
             </TableCell>
             <TableCell muted={page.entityId === null}>
                 {page.entityId === null ? (

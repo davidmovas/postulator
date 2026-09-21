@@ -24,7 +24,7 @@ import {
     TaskAltIcon,
     VerifiedIcon,
 } from "../../ui/index.js";
-import { entityIcon, statusTone } from "./labels.js";
+import { entityIcon, pageStatusLabel, statusTone } from "./labels.js";
 
 const shownLinks = 6;
 
@@ -122,7 +122,7 @@ export function PageSummary({ pageId, siteId, search, onOpen }: PageSummaryProps
                         {page.title === "" ? copy.pages.untitled : page.title}
                     </p>
                     <div className="flex flex-wrap items-center gap-1.5">
-                        <StatusBadge tone={statusTone(page.status)}>{page.status}</StatusBadge>
+                        <StatusBadge tone={statusTone(page.status)}>{pageStatusLabel(page.status)}</StatusBadge>
                         <StatusBadge tone="muted" dot={false}>
                             {page.wpType}
                         </StatusBadge>

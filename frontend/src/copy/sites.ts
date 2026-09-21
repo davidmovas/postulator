@@ -1,4 +1,9 @@
 export const sites = {
+    statuses: {
+        active: "Active",
+        paused: "Paused",
+        error: "Not reachable",
+    },
     title: "Sites",
     add: "Add site",
     addTitle: "Add a site",

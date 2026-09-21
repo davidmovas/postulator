@@ -12,7 +12,7 @@ import {
     TableCell,
     TableRow,
 } from "../../ui/index.js";
-import { statusTone } from "./labels.js";
+import { pageStatusLabel, statusTone } from "./labels.js";
 import type { TreeRow } from "./tree-model.js";
 
 export const treeColumns = "minmax(200px,3fr) 92px minmax(96px,1.5fr) 44px 84px";
@@ -93,7 +93,7 @@ export function PageTreeRow({
                 </span>
             </TableCell>
             <TableCell>
-                <StatusBadge tone={statusTone(page.status)}>{page.status}</StatusBadge>
+                <StatusBadge tone={statusTone(page.status)}>{pageStatusLabel(page.status)}</StatusBadge>
             </TableCell>
             <TableCell muted={page.entityId === null}>
                 {page.entityId === null ? (

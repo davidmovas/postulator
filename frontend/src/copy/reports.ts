@@ -97,12 +97,6 @@ export const reports = {
         score: (score: number) => `${Math.round(score * 100)}%`,
         complianceScore: (score: number) => `compliance ${Math.round(score * 100)}%`,
         structureScore: (score: number) => `structure ${Math.round(score * 100)}%`,
-        statuses: {
-            planned: "Planned",
-            exists: "Exists",
-            published: "Published",
-            archived: "Archived",
-        },
         findings: (count: number) => (count === 1 ? "1 finding" : `${count} findings`),
         noFindings: "Nothing to fix",
         issues: "Issues",

@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import { Link } from "react-router";
 
 import { copy } from "../../copy/index.js";
+import { kindLabel as runKindLabel, statusLabel as runStatusLabel } from "../runs/labels.js";
 import type { EntityScore } from "../../data/types.js";
 import { tokens, usd } from "../../domain/format.js";
 import {
@@ -51,9 +52,9 @@ export function RunPanel({ summary, siteId, onStart }: RunPanelProps): ReactElem
         >
             <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <div className="flex items-center gap-2">
-                    <span className="truncate text-xs font-semibold text-ink">{run.kind}</span>
+                    <span className="truncate text-xs font-semibold text-ink">{runKindLabel(run.kind)}</span>
                     <StatusBadge tone={summary.active ? "info" : "muted"}>
-                        {summary.active ? copy.overview.run.active : run.status}
+                        {summary.active ? copy.overview.run.active : runStatusLabel(run.status)}
                     </StatusBadge>
                     <span className="truncate font-mono text-2xs text-ink-dim">
                         {copy.overview.run.startedBy(run.createdBy)} · {copy.overview.run.publish(run.publishMode)}

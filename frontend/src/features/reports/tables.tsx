@@ -20,7 +20,8 @@ import {
     TaskAltIcon,
 } from "../../ui/index.js";
 import { liveUrl } from "../pages/summary.js";
-import { entityKindLabel, reasonLabel, reasonTone } from "./labels.js";
+import { kindLabel as entityKindLabel } from "../graph/labels.js";
+import { reasonLabel, reasonTone } from "./labels.js";
 import type { CoverageRow } from "./model/site.js";
 
 const coverageGrid = "minmax(0,1.6fr) 7rem minmax(0,1.4fr) 9rem 6rem";

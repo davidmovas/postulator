@@ -20,7 +20,7 @@ import {
     StatusBadge,
     toneClasses,
 } from "../../ui/index.js";
-import { statusTone } from "../pages/labels.js";
+import { pageStatusLabel, statusTone } from "../pages/labels.js";
 import { classLabel, classTone, relationIcon } from "./labels.js";
 import { groups } from "./model/detail.js";
 
@@ -143,7 +143,7 @@ export function AuditPanel({ siteId, row, onClose, onRelink }: AuditPanelProps):
                         {row.path}
                     </Link>
                     <p className="flex flex-wrap items-center gap-2 text-2xs text-ink-dim">
-                        <StatusBadge tone={statusTone(row.status)}>{row.status}</StatusBadge>
+                        <StatusBadge tone={statusTone(row.status)}>{pageStatusLabel(row.status)}</StatusBadge>
                         {row.entityName === "" ? null : (
                             <Link to={`/s/${siteId}/graph/${row.entityId}`} className="truncate">
                                 {row.entityName}

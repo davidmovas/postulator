@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 
 import { copy } from "../../copy/index.js";
 import { pageStatuses } from "../../generated/vocab.js";
+import { pageStatusLabel } from "../pages/labels.js";
 import { Button, cx, SectionLabel, Segmented, Select } from "../../ui/index.js";
 import type { SegmentedOption, SelectOption } from "../../ui/index.js";
 import type { GraphIndex } from "../graph/model/index.js";
@@ -98,7 +99,7 @@ export function LinkFilters({ query, counts, statusCounts, index, onChange }: Li
                 {pageStatuses.map((status) => (
                     <CountedRow
                         key={status}
-                        label={status}
+                        label={pageStatusLabel(status)}
                         count={statusCounts.get(status)}
                         active={query.status === status}
                         onSelect={() => {

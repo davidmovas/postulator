@@ -20,7 +20,7 @@ import {
 import { askAgent } from "../agent/index.js";
 import { PageDetails } from "./details.js";
 import type { EntityIndex } from "./entities.js";
-import { statusTone } from "./labels.js";
+import { pageStatusLabel, statusTone } from "./labels.js";
 import { PageLinks } from "./links.js";
 import { PageMapping } from "./mapping.js";
 import { PreviewTab } from "./preview/tab.js";
@@ -68,7 +68,7 @@ export function PageDrawer({ pageId, siteId, index, search, onClose }: PageDrawe
             header={
                 page === undefined ? null : (
                     <div className="flex shrink-0 items-center gap-1.5">
-                        <StatusBadge tone={statusTone(page.status)}>{page.status}</StatusBadge>
+                        <StatusBadge tone={statusTone(page.status)}>{pageStatusLabel(page.status)}</StatusBadge>
                         {page.drift ? (
                             <StatusBadge tone="warn" icon={SyncProblemIcon}>
                                 {copy.pages.drift.badge}
