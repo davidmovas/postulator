@@ -49,21 +49,28 @@ export function productionEntries(siteId: string): readonly NavEntry[] {
     ];
 }
 
-export function globalEntries(pending: number): readonly NavEntry[] {
+export function workspaceEntries(pending: number): readonly NavEntry[] {
     return [
-        { key: "agent", label: copy.nav.agent, to: "/agent", Icon: SmartToyIcon, badge: pending },
         { key: "sites", label: copy.nav.sites, to: "/sites", Icon: PublicIcon },
-        { key: "settings", label: copy.nav.settings, to: settingsHome, Icon: SettingsIcon },
+        { key: "agent", label: copy.nav.agent, to: "/agent", Icon: SmartToyIcon, badge: pending },
     ];
 }
 
+export function settingsEntry(): NavEntry {
+    return { key: "settings", label: copy.nav.settings, to: settingsHome, Icon: SettingsIcon };
+}
+
+export function globalEntries(pending: number): readonly NavEntry[] {
+    return [...workspaceEntries(pending), settingsEntry()];
+}
+
 export function railSections(siteId: string | null, pending: number): readonly NavSection[] {
-    const sections: NavSection[] = [];
+    const sections: NavSection[] = [{ key: "workspace", entries: workspaceEntries(pending) }];
     if (siteId !== null) {
         sections.push({ key: "site", entries: siteEntries(siteId) });
         sections.push({ key: "production", entries: productionEntries(siteId) });
     }
-    sections.push({ key: "global", entries: globalEntries(pending), pinned: true });
+    sections.push({ key: "settings", entries: [settingsEntry()], pinned: true });
     return sections;
 }
 

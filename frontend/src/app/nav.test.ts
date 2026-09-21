@@ -3,23 +3,26 @@ import { describe, expect, it } from "vitest";
 import { goToEntries, railSections } from "./nav.js";
 
 describe("railSections", () => {
-    it("shows the global section alone when no site is in the route", () => {
+    it("opens with the workspace pair and closes with the settings, whatever the route", () => {
         const sections = railSections(null, 0);
-        expect(sections.map((section) => section.key)).toEqual(["global"]);
-        expect(sections[0].pinned).toBe(true);
+        expect(sections.map((section) => section.key)).toEqual(["workspace", "settings"]);
+        expect(sections[0].entries.map((entry) => entry.key)).toEqual(["sites", "agent"]);
+        expect(sections[0].pinned).toBeUndefined();
+        expect(sections[1].entries.map((entry) => entry.key)).toEqual(["settings"]);
+        expect(sections[1].pinned).toBe(true);
     });
 
-    it("adds the site and production sections when a site is in the route", () => {
+    it("puts everything a site owns between the pair and the settings", () => {
         const sections = railSections("s1", 0);
-        expect(sections.map((section) => section.key)).toEqual(["site", "production", "global"]);
-        expect(sections[0].entries.map((entry) => entry.key)).toEqual([
+        expect(sections.map((section) => section.key)).toEqual(["workspace", "site", "production", "settings"]);
+        expect(sections[1].entries.map((entry) => entry.key)).toEqual([
             "overview",
             "graph",
             "pages",
             "links",
             "runs",
         ]);
-        expect(sections[1].entries.map((entry) => entry.to)).toEqual([
+        expect(sections[2].entries.map((entry) => entry.to)).toEqual([
             "/s/s1/templates",
             "/s/s1/schedules",
             "/s/s1/import",
@@ -28,14 +31,14 @@ describe("railSections", () => {
     });
 
     it("carries the pending count on the agent entry alone", () => {
-        const global = railSections("s1", 4).find((section) => section.key === "global");
-        expect(global?.entries.map((entry) => entry.badge)).toEqual([4, undefined, undefined]);
+        const workspace = railSections("s1", 4).find((section) => section.key === "workspace");
+        expect(workspace?.entries.map((entry) => entry.badge)).toEqual([undefined, 4]);
     });
 });
 
 describe("goToEntries", () => {
     it("is the global entries alone without a site", () => {
-        expect(goToEntries(null).map((entry) => entry.key)).toEqual(["agent", "sites", "settings"]);
+        expect(goToEntries(null).map((entry) => entry.key)).toEqual(["sites", "agent", "settings"]);
     });
 
     it("is every screen of the site followed by the global ones", () => {
@@ -49,8 +52,8 @@ describe("goToEntries", () => {
             "schedules",
             "import",
             "reports",
-            "agent",
             "sites",
+            "agent",
             "settings",
         ]);
     });
