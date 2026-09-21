@@ -67,8 +67,10 @@ func repopulate(ctx context.Context, core *app.Core, site *wptest.Server) error 
 	if len(listed.Items) == 0 {
 		return nil
 	}
-	siteID := listed.Items[0].ID
+	return placeOnSite(ctx, core, site, listed.Items[0].ID)
+}
 
+func placeOnSite(ctx context.Context, core *app.Core, site *wptest.Server, siteID string) error {
 	mapped, err := allPages(ctx, core, siteID)
 	if err != nil {
 		return err
@@ -79,29 +81,40 @@ func repopulate(ctx context.Context, core *app.Core, site *wptest.Server) error 
 	}
 
 	sort.SliceStable(mapped, func(a, b int) bool {
-		return strings.Count(mapped[a].Path, "/") < strings.Count(mapped[b].Path, "/")
+		return depthOf(mapped[a].Path) < depthOf(mapped[b].Path)
 	})
 
-	wpByPage := make(map[string]int64, len(mapped))
+	wpByPath := make(map[string]int64, len(mapped))
 	for index := range mapped {
 		page := &mapped[index]
-		if page.Status == statusArchived {
+		if page.Status == statusArchived || page.Status == statusPlanned {
 			continue
 		}
 
 		item := wptest.Item{
 			Type: page.WPType, Title: page.Title, H1: page.H1, Slug: slugOf(page.Path),
 			Content: bodies[page.ID], Status: wpStatus(page.Status), Modified: time.Now().UTC(),
+			Parent: wpByPath[parentOf(page.Path)],
 		}
 		if page.WPID != nil {
 			item.ID = *page.WPID
 		}
-		if page.ParentPageID != nil {
-			item.Parent = wpByPage[*page.ParentPageID]
-		}
-		wpByPage[page.ID] = site.Restore(item)[0].ID
+		wpByPath[page.Path] = site.Restore(item)[0].ID
 	}
 	return nil
+}
+
+func depthOf(path string) int {
+	return strings.Count(strings.Trim(path, "/"), "/")
+}
+
+func parentOf(path string) string {
+	trimmed := strings.Trim(path, "/")
+	cut := strings.LastIndex(trimmed, "/")
+	if cut < 0 {
+		return ""
+	}
+	return "/" + trimmed[:cut] + "/"
 }
 
 func allPages(ctx context.Context, core *app.Core, siteID string) ([]pages.Page, error) {

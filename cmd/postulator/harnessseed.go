@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
+	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/graph"
@@ -18,6 +19,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/schedules"
 	"github.com/davidmovas/postulator/internal/application/sites"
+	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -169,14 +171,14 @@ func (a *assistantScript) answer(prompt string) fake.Turn {
 	}
 }
 
-func seed(ctx context.Context, core *app.Core, baseURL string, provider *pacedProvider, script *assistantScript) error {
-	site, err := core.Sites.Create(ctx, sites.CreateRequest{
-		Name: siteName, BaseURL: baseURL, Username: harnessUser, Password: harnessPassword, AllowInsecure: true,
+func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pacedProvider, script *assistantScript) error {
+	created, err := core.Sites.Create(ctx, sites.CreateRequest{
+		Name: siteName, BaseURL: site.URL(), Username: harnessUser, Password: harnessPassword, AllowInsecure: true,
 	})
 	if err != nil {
 		return err
 	}
-	siteID := site.Site.ID
+	siteID := created.Site.ID
 
 	entities, err := seedGraph(ctx, core, siteID)
 	if err != nil {
@@ -201,6 +203,9 @@ func seed(ctx context.Context, core *app.Core, baseURL string, provider *pacedPr
 	if _, err = core.Graph.RecomputeScores(ctx, graph.RecomputeScoresRequest{SiteID: siteID}); err != nil {
 		return err
 	}
+	if adoptErr := adoptTheSite(ctx, core, site, siteID); adoptErr != nil {
+		return adoptErr
+	}
 	if runErr := seedRuns(ctx, core, siteID, guide, pagesByPath, provider); runErr != nil {
 		return runErr
 	}
@@ -208,6 +213,18 @@ func seed(ctx context.Context, core *app.Core, baseURL string, provider *pacedPr
 		return scheduleErr
 	}
 	return seedConversation(ctx, core, siteID)
+}
+
+func adoptTheSite(ctx context.Context, core *app.Core, site *wptest.Server, siteID string) error {
+	if err := placeOnSite(ctx, core, site, siteID); err != nil {
+		return err
+	}
+
+	started, err := core.Sync.SyncSite(ctx, sync.SyncSiteRequest{SiteID: siteID})
+	if err != nil {
+		return err
+	}
+	return waitForRun(ctx, core, started.RunID, run.StatusCompleted)
 }
 
 func seedGraph(ctx context.Context, core *app.Core, siteID string) (map[string]string, error) {

@@ -133,7 +133,7 @@ func configure(cfg app.Config) (harness, error) {
 		}}, nil
 	}
 	return harness{Config: cfg, Seed: func(ctx context.Context, core *app.Core) error {
-		return seed(ctx, core, site.URL(), provider, script)
+		return seed(ctx, core, site, provider, script)
 	}}, nil
 }
 

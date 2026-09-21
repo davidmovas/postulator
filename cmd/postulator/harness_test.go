@@ -174,7 +174,7 @@ func TestTheHarnessSeedsRunsInEveryStatusARealPathReaches(t *testing.T) {
 
 	completed := ""
 	for _, item := range listed.Items {
-		if item.Status == string(run.StatusCompleted) {
+		if item.Status == string(run.StatusCompleted) && item.Kind == string(run.KindGenerate) {
 			completed = item.ID
 		}
 	}
@@ -499,13 +499,14 @@ func TestTheCompletedRunSucceedsOnEveryItem(t *testing.T) {
 	core := seeded(t)
 
 	listed, err := core.Runs.List(t.Context(), runs.ListRequest{
-		Status: string(run.StatusCompleted), ListRequest: dto.ListRequest{Limit: 10},
+		Status: string(run.StatusCompleted), Kind: string(run.KindGenerate),
+		ListRequest: dto.ListRequest{Limit: 10},
 	})
 	if err != nil {
 		t.Fatalf("List runs: %v", err)
 	}
 	if len(listed.Items) != 1 {
-		t.Fatalf("completed runs = %d, want 1", len(listed.Items))
+		t.Fatalf("completed generate runs = %d, want 1", len(listed.Items))
 	}
 
 	items, err := core.Runs.ListItems(t.Context(), runs.ListItemsRequest{
@@ -803,5 +804,96 @@ func TestARestartOfAnOpenHomeRestoresAtOnce(t *testing.T) {
 	}
 	if link.URL == "" {
 		t.Fatal("PreviewLink answered no address")
+	}
+}
+
+func TestASyncKeepsThePagesTheSiteStillHolds(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+	siteID := listed.Items[0].ID
+
+	before := pagesByPath(t, core, siteID)
+	target, held := before["/accessories/knock-boxes/"]
+	if !held {
+		t.Fatal("the seed never mapped /accessories/knock-boxes/")
+	}
+	t.Logf("before the sync: status %q, wpId %v", target.Status, target.WPID)
+
+	stopActiveRuns(t, core)
+
+	started, err := core.Sync.SyncSite(t.Context(), sync.SyncSiteRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("SyncSite: %v", err)
+	}
+	if err = waitForRun(t.Context(), core, started.RunID, run.StatusCompleted); err != nil {
+		t.Fatalf("the sync run: %v", err)
+	}
+
+	after := pagesByPath(t, core, siteID)
+	settled, still := after["/accessories/knock-boxes/"]
+	if !still {
+		for path := range after {
+			if _, known := before[path]; !known {
+				t.Logf("new path after the sync: %s (wpId %v, status %s)", path, after[path].WPID, after[path].Status)
+			}
+		}
+		for path := range before {
+			if _, known := after[path]; !known {
+				t.Logf("gone after the sync: %s (wpId %v, status %s)", path, before[path].WPID, before[path].Status)
+			}
+		}
+		t.Fatalf("the sync dropped /accessories/knock-boxes/; the map went from %d to %d pages",
+			len(before), len(after))
+	}
+	t.Logf("after the sync: status %q, wpId %v", settled.Status, settled.WPID)
+
+	if settled.Status == statusArchived {
+		t.Errorf("the sync archived /accessories/knock-boxes/ although the fake site still holds it")
+	}
+	if len(after) != len(before) {
+		t.Errorf("the map went from %d to %d pages", len(before), len(after))
+	}
+}
+
+func stopActiveRuns(t *testing.T, core *app.Core) {
+	t.Helper()
+
+	listed, err := core.Runs.List(t.Context(), runs.ListRequest{ListRequest: dto.ListRequest{Limit: 20}})
+	if err != nil {
+		t.Fatalf("List runs: %v", err)
+	}
+	for index := range listed.Items {
+		if !run.Status(listed.Items[index].Status).Active() {
+			continue
+		}
+		if _, cancelErr := core.Runs.Cancel(t.Context(), runs.CancelRequest{RunID: listed.Items[index].ID}); cancelErr != nil {
+			t.Fatalf("Cancel %s: %v", listed.Items[index].ID, cancelErr)
+		}
+	}
+}
+
+func pagesByPath(t *testing.T, core *app.Core, siteID string) map[string]pages.Page {
+	t.Helper()
+
+	out := make(map[string]pages.Page, 64)
+	cursor := ""
+	for {
+		page, err := core.Pages.List(t.Context(), pages.ListRequest{
+			SiteID: siteID, ListRequest: dto.ListRequest{Limit: 100, Cursor: cursor},
+		})
+		if err != nil {
+			t.Fatalf("List pages: %v", err)
+		}
+		for index := range page.Items {
+			out[page.Items[index].Path] = page.Items[index]
+		}
+		if page.Next == "" {
+			return out
+		}
+		cursor = string(page.Next)
 	}
 }
