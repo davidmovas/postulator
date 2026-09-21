@@ -20,7 +20,7 @@ export function Checkbox({
     return (
         <label
             className={cx(
-                "inline-flex items-center gap-2 text-sm select-none",
+                "relative inline-flex items-center gap-2 text-sm select-none",
                 disabled ? "cursor-not-allowed text-ink-faint" : "cursor-pointer text-ink",
                 className,
             )}

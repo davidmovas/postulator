@@ -220,6 +220,7 @@ Look a design value up here rather than reproducing it.
     body,
     #root {
         height: 100%;
+        overflow: hidden;
     }
 
     body {

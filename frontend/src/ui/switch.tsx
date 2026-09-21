@@ -18,7 +18,7 @@ export function Switch({
     return (
         <label
             className={cx(
-                "inline-flex items-center justify-between gap-3 text-sm select-none",
+                "relative inline-flex items-center justify-between gap-3 text-sm select-none",
                 disabled ? "cursor-not-allowed text-ink-faint" : "cursor-pointer text-ink",
                 className,
             )}
