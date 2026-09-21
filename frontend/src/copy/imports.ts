@@ -1,7 +1,7 @@
 export const imports = {
     dropped: {
-        ask: (path: string) => `Import the sheet at ${path} into this site. `,
-        rejected: "Only a .csv or .xlsx sheet can be dropped here.",
+        ask: (path: string) => `Inspect the sheet at ${path} and tell me what it would import into this site. `,
+        rejected: "Only a .csv or .xlsx sheet can be imported.",
         hint: "Drop a .csv or .xlsx sheet",
     },
     title: "Import",
