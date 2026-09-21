@@ -983,3 +983,31 @@ for the first time. The plan is `docs/superpowers/plans/2026-09-20-phase-13-fron
   `Import.Apply` shows a busy state without a percentage because it is synchronous; the pages rail
   has no drift facet because `Pages.List` has none; a `Sites.List` search filters the loaded rows
   because the wire has no name filter. Each is in the plan's backlog rather than faked in the UI.
+
+- **A reasoning model is given room to think, and the caller keeps budgeting the answer.** A
+  working OpenAI key read `INVALID` because the Settings probe asked for one output token and the
+  cheapest catalog row reasons: the budget went on thinking, nothing visible was emitted and the
+  provider answered 400, which every status at or above 400 wore as "rejected the request". The two
+  numbers are now separate. A caller states the answer it wants; `gollemclient` reads the catalog
+  row and adds an allowance per declared reasoning effort, clamped by the row's max output.
+  `finishReason` compares against that same ceiling, or every reasoning call would claim a length
+  stop it never hit, and a 400 about the output limit says so. `reasoning_effort` is persisted
+  since migration 0021, because an override row replaces the embedded one wholesale and saving any
+  catalog row silently stripped it.
+- **A model call names its step.** The two proposals did not, although their names were declared
+  beside them. The ledger writes `Meta.Step`, so their spend was unattributable, and the scripted
+  fake keys its replies on the same field, so the harness could never answer them: the button had
+  never been seen working, and the schema refusal that produced was read as a provider fault.
+- **A control is sized by a prop, never by a className.** `cx` joins strings and Tailwind resolves
+  by CSS source order, so a caller's `w-14` or `h-6` loses to `Input`'s own `w-full` and
+  `h-7`. Six such overrides were dead in five files. `Input` carries the size scale `Button`
+  already had, width is the parent's job through a wrapper, and `ui/overrides.test.ts` reads the
+  sources and names the next dead override by file and line.
+- **A stored score of zero means unscored.** `Graph.Score` is PageRank normalised to a maximum of
+  one, so a computed score is strictly positive and zero can only mean the recompute never ran. It
+  reads as a dash, and "Highest scores" says so and offers the recompute instead of listing zeroes.
+  Nothing recomputes on its own; the number is honest about being absent rather than invented.
+- **A canvas label is measured twice.** `TextCache` never expired, and the first measure happens
+  on a detached canvas before the self-hosted Archivo has loaded, so a node was sized for the
+  fallback face and the text later painted into it overflowed. The cache is cleared once
+  `document.fonts` settles and the layout is recomputed.

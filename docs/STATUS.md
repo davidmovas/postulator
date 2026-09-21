@@ -55,6 +55,16 @@ row and every 403 was called a bad key), the whole window scrolling on the templ
 roles table in two columns and an export format select; all landed the same day, with the catalog
 re-verified against the providers' pages and a reasoned default model per role.
 
+A second walk on 2026-09-21 found six things and three roots. The provider test called a working
+OpenAI key rejected, because it asked a reasoning model for one output token; output budgets now
+carry a reasoning allowance from the catalog row and `reasoning_effort` survives a catalog edit
+(migration 0021). `cx` cannot beat a component's own base class, so every `w-` and `h-` a
+caller passed to `Input` was dead; `Input` has a size scale and a test refuses the next one.
+A stored score of zero means unscored and reads as a dash. The Graph screen's pill, node badges,
+outline grid, review queue and propose dialog were rebuilt around those. `ProposeFromPages` and
+`ProposeRelated` now name their step, which both attributes their spend and lets the harness
+answer them for the first time.
+
 **Phase 13, the product frontend, landed on 2026-09-20 and 21** (plan:
 `docs/superpowers/plans/2026-09-20-phase-13-frontend.md`). Every screen sits on one screen
 contract (`ui/screen.tsx` with `Toolbar`, `Tabs`, `Segmented`, `Menu`, `Kbd`), the window is
