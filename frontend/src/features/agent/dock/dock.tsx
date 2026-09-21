@@ -20,6 +20,7 @@ import {
     OpenInFullIcon,
     RightPanelCloseIcon,
     Segmented,
+    SkeletonRows,
     SmartToyIcon,
 } from "../../../ui/index.js";
 import { ConversationView } from "../conversation/view.js";
@@ -238,6 +239,11 @@ export function AgentDock({ siteId }: AgentDockProps): ReactElement {
                 />
             </header>
             <div className="min-h-0 flex-1">
+                {listed.isPending ? (
+                    <div className="p-3">
+                        <SkeletonRows rows={6} label={copy.agent.states.loading} />
+                    </div>
+                ) : (
                 <ConversationView
                     conversation={current}
                     siteId={siteId}
@@ -263,6 +269,7 @@ export function AgentDock({ siteId }: AgentDockProps): ReactElement {
                         }
                     }}
                 />
+                )}
             </div>
             <RenameDialog
                 conversation={renaming}
