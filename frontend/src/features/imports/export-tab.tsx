@@ -7,16 +7,25 @@ import { react } from "../../data/errors.js";
 import { useExportSite } from "../../data/hooks/imports.js";
 import { useSite } from "../../data/hooks/sites.js";
 import { pickSaveFile } from "../../data/host.js";
-import { Banner, Button, CheckCircleIcon, CloudUploadIcon, Field, Input } from "../../ui/index.js";
+import { Banner, Button, CheckCircleIcon, CloudUploadIcon, Field, Input, Select } from "../../ui/index.js";
+import type { SelectOption } from "../../ui/index.js";
+import type { ExportFormat } from "../../generated/vocab.js";
+import { exportFormats } from "../../generated/vocab.js";
+import { exportFormatLabel } from "./labels.js";
 import { fileName } from "./recent.js";
 
-function suggested(name: string): string {
+function suggested(name: string, format: ExportFormat): string {
     const slug = name
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "");
-    return `${slug === "" ? "postulator" : slug}-export.xlsx`;
+    return `${slug === "" ? "postulator" : slug}-export.${format}`;
 }
+
+const formatOptions: readonly SelectOption<ExportFormat>[] = exportFormats.map((value) => ({
+    value,
+    label: exportFormatLabel(value),
+}));
 
 export interface ExportTabProps {
     siteId: string;
@@ -26,14 +35,15 @@ export function ExportTab({ siteId }: ExportTabProps): ReactElement {
     const site = useSite(siteId === "" ? null : siteId);
     const exporting = useExportSite();
     const [path, setPath] = useState("");
+    const [format, setFormat] = useState<ExportFormat>(exportFormats[0]);
     const written = exporting.data ?? null;
     const failure = exporting.error === null ? null : react(exporting.error);
 
     const choose = (): void => {
         void pickSaveFile({
             title: copy.imports.export.dialogTitle,
-            filename: suggested(site.data?.site.name ?? ""),
-            filters: [{ displayName: copy.imports.file.workbooks, pattern: "*.xlsx" }],
+            filename: suggested(site.data?.site.name ?? "", format),
+            filters: [{ displayName: exportFormatLabel(format), pattern: `*.${format}` }],
         }).then((picked) => {
             if (picked !== null) {
                 setPath(picked);
@@ -58,7 +68,7 @@ export function ExportTab({ siteId }: ExportTabProps): ReactElement {
                                 data-export-path={true}
                                 mono={true}
                                 value={path}
-                                placeholder={suggested(site.data?.site.name ?? "")}
+                                placeholder={suggested(site.data?.site.name ?? "", format)}
                                 title={path}
                                 onChange={(event) => {
                                     setPath(event.target.value);
@@ -68,6 +78,22 @@ export function ExportTab({ siteId }: ExportTabProps): ReactElement {
                             <Button variant="secondary" onClick={choose}>
                                 {copy.imports.export.choose}
                             </Button>
+                        </div>
+                    )}
+                </Field>
+                <Field label={copy.imports.export.format}>
+                    {(control) => (
+                        <div className="w-64">
+                            <Select
+                                id={control.id}
+                                data-export-format={true}
+                                value={format}
+                                options={formatOptions}
+                                onValueChange={(picked) => {
+                                    setFormat(picked);
+                                    exporting.reset();
+                                }}
+                            />
                         </div>
                     )}
                 </Field>
@@ -82,7 +108,7 @@ export function ExportTab({ siteId }: ExportTabProps): ReactElement {
                         disabled={path === ""}
                         title={path === "" ? copy.imports.export.noDestination : undefined}
                         onClick={() => {
-                            exporting.mutate({ siteId, path });
+                            exporting.mutate({ siteId, path, format });
                         }}
                     >
                         {copy.imports.export.start}

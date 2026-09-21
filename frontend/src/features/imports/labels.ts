@@ -3,6 +3,7 @@ import {
     blockingImportFindingCodes,
     cannibalizationReasons,
     edgeKinds,
+    exportFormats,
     importActions,
     importFields,
     importFindingCodes,
@@ -29,6 +30,10 @@ export function reasonLabel(reason: string): string {
 
 export function edgeKindLabel(kind: string): string {
     return isOneOf(edgeKinds, kind) ? copy.imports.edgeKinds[kind] : kind;
+}
+
+export function exportFormatLabel(format: string): string {
+    return isOneOf(exportFormats, format) ? copy.imports.export.formats[format] : format;
 }
 
 export function blocking(code: string): boolean {

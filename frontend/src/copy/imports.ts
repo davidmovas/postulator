@@ -108,6 +108,11 @@ export const imports = {
         title: "Write this site to a sheet",
         body: "Every page and every entity goes into one workbook, ready to edit and import back.",
         destination: "Destination file",
+        format: "Format",
+        formats: {
+            xlsx: "Excel workbook (.xlsx)",
+            csv: "Comma separated (.csv)",
+        },
         choose: "Choose…",
         dialogTitle: "Where to write the sheet",
         start: "Export",
