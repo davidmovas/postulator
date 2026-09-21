@@ -43,6 +43,25 @@ export function verbOf(tool: string): string {
     return parts.slice(1).join(" ");
 }
 
+const plural: ReadonlySet<string> = new Set<string>(["list", "search"]);
+
+function capitalised(phrase: string): string {
+    return phrase === "" ? phrase : phrase[0].toUpperCase() + phrase.slice(1);
+}
+
+export function toolLabel(tool: string): string {
+    const verb = verbOf(tool);
+    const family = familyOf(tool);
+    if (family === "other" || verb.includes(" ")) {
+        return capitalised(verb);
+    }
+    const held = nouns[family];
+    if (held === undefined) {
+        return capitalised(verb);
+    }
+    return `${capitalised(verb)} ${plural.has(verb) ? held[1] : held[0]}`;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }

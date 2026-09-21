@@ -2,7 +2,7 @@ import type { KeyboardEvent, ReactElement, ReactNode } from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
-import { Button, cx, IconButton, SendIcon, StopCircleIcon } from "../../../ui/index.js";
+import { Button, IconButton, SendIcon, StopCircleIcon } from "../../../ui/index.js";
 
 const maxComposerHeightPx = 168;
 
@@ -110,9 +110,7 @@ export function Composer({
                     />
                 )}
             </div>
-            <span className={cx("truncate px-0.5 text-2xs", error === null ? "text-ink-faint" : "text-danger")}>
-                {error ?? copy.agent.composer.hint}
-            </span>
+            {error === null ? null : <span className="truncate px-0.5 text-2xs text-danger">{error}</span>}
         </div>
     );
 }

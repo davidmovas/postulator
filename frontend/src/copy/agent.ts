@@ -12,7 +12,6 @@ export const agent = {
     composer: {
         placeholder: "Ask the agent to change something…",
         firstPlaceholder: "Ask something. Your first message starts a conversation on this site.",
-        hint: "Enter sends · Shift+Enter breaks the line",
         noModel: "No chat model is set. Point the chat role at a model in the settings first.",
     },
     status: {
@@ -94,7 +93,6 @@ export const agent = {
         riskDangerous: "Dangerous",
         dangerousWarn: "This cannot be undone from Postulator.",
         approveKeys: ["Ctrl", "Enter"] as readonly string[],
-        rejectKeys: ["Esc"] as readonly string[],
         listApproveKeys: ["A"] as readonly string[],
         listRejectKeys: ["R"] as readonly string[],
         approving: "Approving",
@@ -103,9 +101,9 @@ export const agent = {
         executedWith: (summary: string) => `Approved and done: ${summary}`,
         approved: "Approved, running",
         rejected: "Rejected",
+        settled: "Resolved",
         failed: (reason: string) => `Failed: ${reason}`,
         requested: (when: string) => `Asked ${when}`,
-        tool: (name: string) => `Tool ${name}`,
         unknownRef: "no longer here",
     },
     inbox: {

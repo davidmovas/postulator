@@ -10,7 +10,7 @@ import { ActionCard } from "../cards/action-card.js";
 import type { CardBusy } from "../cards/card.js";
 import { outcomeOf } from "../cards/outcome.js";
 import { familyIcon, toolStatusLabel, toolStatusTone } from "../labels.js";
-import { familyOf, resultSummary, verbOf } from "./model/tools.js";
+import { familyOf, resultSummary, toolLabel } from "./model/tools.js";
 import type { Row } from "./model/transcript.js";
 import { FailedCard, LostCard, StoppedCard } from "./states.js";
 
@@ -72,7 +72,7 @@ function ToolRow({ row }: ToolRowProps): ReactElement {
                 ) : (
                     <Icon size={14} className={cx("shrink-0", toneClasses[tone].ink)} />
                 )}
-                <span className="min-w-0 flex-1 truncate font-mono text-xs text-ink-soft">{verbOf(row.tool)}</span>
+                <span className="min-w-0 flex-1 truncate text-xs text-ink-soft">{toolLabel(row.tool)}</span>
                 <span className={cx("shrink-0 text-2xs font-semibold tracking-label uppercase", toneClasses[tone].ink)}>
                     {toolStatusLabel(row.status)}
                 </span>

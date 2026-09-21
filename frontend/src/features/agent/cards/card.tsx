@@ -14,12 +14,14 @@ import {
     toneClasses,
     WarningIcon,
 } from "../../../ui/index.js";
-import { familyOf } from "../conversation/model/tools.js";
+import { familyOf, toolLabel } from "../conversation/model/tools.js";
 import { familyIcon, familyLabel, riskLabel, riskTone } from "../labels.js";
+import type { CardKeys } from "./model/keys.js";
+import { cardChoice } from "./model/keys.js";
 
 export type CardBusy = "approve" | "reject" | null;
 
-export type CardKeys = "confirm" | "list" | "none";
+export type { CardKeys } from "./model/keys.js";
 
 export interface ConfirmationCardProps {
     tool: string;
@@ -41,18 +43,18 @@ function KeyHints({ keys }: { keys: CardKeys }): ReactElement | null {
     if (keys === "none") {
         return null;
     }
-    const approve = keys === "confirm" ? copy.agent.card.approveKeys : copy.agent.card.listApproveKeys;
-    const reject = keys === "confirm" ? copy.agent.card.rejectKeys : copy.agent.card.listRejectKeys;
     return (
         <span className="flex shrink-0 items-center gap-2 text-2xs text-ink-faint">
             <span className="flex items-center gap-1">
-                <Kbd keys={approve} />
+                <Kbd keys={keys === "confirm" ? copy.agent.card.approveKeys : copy.agent.card.listApproveKeys} />
                 {copy.agent.approve.toLowerCase()}
             </span>
-            <span className="flex items-center gap-1">
-                <Kbd keys={reject} />
-                {copy.agent.reject.toLowerCase()}
-            </span>
+            {keys === "list" ? (
+                <span className="flex items-center gap-1">
+                    <Kbd keys={copy.agent.card.listRejectKeys} />
+                    {copy.agent.reject.toLowerCase()}
+                </span>
+            ) : null}
         </span>
     );
 }
@@ -91,14 +93,10 @@ export function ConfirmationCard({
         if (!pending || busy !== null) {
             return;
         }
-        if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && onApprove !== undefined) {
+        if (cardChoice(keys, event) === "approve" && onApprove !== undefined) {
             event.preventDefault();
             event.stopPropagation();
             onApprove();
-        } else if (event.key === "Escape" && onReject !== undefined) {
-            event.preventDefault();
-            event.stopPropagation();
-            onReject();
         }
     };
 
@@ -132,7 +130,11 @@ export function ConfirmationCard({
                         pending ? classes.ink : "text-ink-dim",
                     )}
                 >
-                    {dangerous ? copy.agent.card.kickerDangerous : copy.agent.card.kickerWrite}
+                    {pending
+                        ? dangerous
+                            ? copy.agent.card.kickerDangerous
+                            : copy.agent.card.kickerWrite
+                        : (outcome ?? copy.agent.card.settled)}
                 </span>
                 <span className="shrink-0 font-mono text-2xs text-ink-faint" title={absoluteTime(createdAt)}>
                     {copy.agent.card.requested(relativeTime(createdAt))}
@@ -177,9 +179,8 @@ export function ConfirmationCard({
                         <KeyHints keys={keys} />
                     </div>
                 ) : (
-                    <div className="flex items-center justify-between gap-2 font-mono text-2xs text-ink-faint">
-                        <span>{outcome}</span>
-                        <span className="truncate">{copy.agent.card.tool(tool)}</span>
+                    <div className="flex items-center justify-end gap-2 text-2xs text-ink-faint">
+                        <span className="truncate">{toolLabel(tool)}</span>
                     </div>
                 )}
             </div>

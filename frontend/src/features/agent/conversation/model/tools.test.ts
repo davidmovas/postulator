@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { familyOf, resultSummary, verbOf } from "./tools.js";
+import { familyOf, resultSummary, toolLabel, verbOf } from "./tools.js";
 
 describe("familyOf and verbOf", () => {
     it("reads the family off the prefix and the verb off the rest", () => {
@@ -52,5 +52,23 @@ describe("resultSummary", () => {
         const summary = resultSummary("reports_site_overview", { entities: { total: 3 }, pages: { total: 9, byStatus: {} } });
         expect(summary).not.toMatch(/[{}"]/);
         expect(summary).toBe("2 fields");
+    });
+});
+
+describe("toolLabel", () => {
+    it("names the act in words, never the wire name", () => {
+        expect(toolLabel("pages_update")).toBe("Update page");
+        expect(toolLabel("pages_list")).toBe("List pages");
+        expect(toolLabel("graph_create_entity")).toBe("Create entity");
+        expect(toolLabel("sites_get")).toBe("Get site");
+        expect(toolLabel("schedules_search")).toBe("Search schedules");
+    });
+
+    it("spells out a tool of no known family and carries no underscore", () => {
+        expect(toolLabel("mystery_move")).toBe("Mystery move");
+        expect(toolLabel("mystery")).toBe("Mystery");
+        for (const name of ["pages_update", "graph_create_entity", "mystery_move"]) {
+            expect(toolLabel(name)).not.toContain("_");
+        }
     });
 });
