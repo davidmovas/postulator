@@ -77,9 +77,9 @@ export function duration(milliseconds: number): string {
     if (seconds < 60) {
         return `${seconds.toFixed(1)} s`;
     }
-    const minutes = Math.floor(seconds / 60);
-    const rest = Math.round(seconds - minutes * 60);
-    return `${minutes}m ${rest}s`;
+    const whole = Math.round(seconds);
+    const minutes = Math.floor(whole / 60);
+    return `${minutes}m ${whole - minutes * 60}s`;
 }
 
 const byteUnits = ["B", "KB", "MB", "GB", "TB"] as const;
