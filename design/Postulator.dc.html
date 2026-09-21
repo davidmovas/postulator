@@ -86,6 +86,12 @@ a:hover{color:var(--ac-h)}
       <a href="#screen-review" style="display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:6px;border:1px solid var(--b1);background:var(--s0);color:var(--t2);font:500 12px Archivo">4 · Review drawer</a>
       <a href="#screen-agent" style="display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:6px;border:1px solid var(--b1);background:var(--s0);color:var(--t2);font:500 12px Archivo">5 · Agent dock</a>
       <a href="#screen-pages" style="display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:6px;border:1px solid var(--b1);background:var(--s0);color:var(--t2);font:500 12px Archivo">6 · Pages table</a>
+      <a href="#screen-templates" style="display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:6px;border:1px solid var(--b1);background:var(--s0);color:var(--t2);font:500 12px Archivo">7 · Templates</a>
+      <a href="#screen-template-editor" style="display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:6px;border:1px solid var(--b1);background:var(--s0);color:var(--t2);font:500 12px Archivo">8 · Template editor</a>
+      <a href="#screen-schedules" style="display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:6px;border:1px solid var(--b1);background:var(--s0);color:var(--t2);font:500 12px Archivo">9 · Schedules</a>
+      <a href="#screen-import" style="display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:6px;border:1px solid var(--b1);background:var(--s0);color:var(--t2);font:500 12px Archivo">10 · Import</a>
+      <a href="#screen-settings" style="display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:6px;border:1px solid var(--b1);background:var(--s0);color:var(--t2);font:500 12px Archivo">11 · Settings</a>
+      <a href="#screen-reports" style="display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:6px;border:1px solid var(--b1);background:var(--s0);color:var(--t2);font:500 12px Archivo">12 · Reports</a>
     </div>
   </div>
 
@@ -1936,6 +1942,1482 @@ a:hover{color:var(--ac-h)}
     </div>
   </div>
 
+  <div id="screen-templates" style="width:1280px;display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:baseline;gap:10px"><div style="font:600 15px Archivo">7 · Templates</div><div style="font:400 12px Archivo;color:var(--t4)">What shape should a page of this kind have?</div></div>
+      <div style="display:flex;gap:3px;background:var(--s0);border:1px solid var(--b1);border-radius:7px;padding:3px">
+        <sc-for list="{{ tplStates }}" as="s" hint-placeholder-count="5">
+          <button onClick="{{ s.on }}" style="height:23px;padding:0 10px;border-radius:5px;white-space:nowrap;font:500 11.5px Archivo;background:{{ s.bg }};color:{{ s.fg }}">{{ s.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+    <div style="width:1280px;height:820px;border:1px solid var(--b2);border-radius:10px;overflow:hidden;background:var(--page);display:flex;flex-direction:column">
+
+      <div style="height:40px;border-bottom:1px solid var(--b1);background:var(--s0);display:flex;align-items:center;justify-content:space-between;padding-left:12px;flex-shrink:0;position:relative">
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="display:flex;align-items:center;gap:8px"><div style="width:17px;height:17px;border-radius:5px;background:var(--ac);display:flex;align-items:center;justify-content:center;color:var(--on-ac);font:700 10px Archivo">P</div><div style="font:600 12.5px Archivo">Postulator</div></div>
+          <div style="width:1px;height:18px;background:var(--b1)"></div>
+          <div style="display:flex;align-items:center;gap:8px;height:28px;padding:0 8px 0 9px;border-radius:6px;background:var(--s1);border:1px solid var(--b1);cursor:pointer" style-hover="background:var(--s2)">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--ok)"></span>
+            <div style="display:flex;flex-direction:column;gap:1px"><div style="font:600 11.5px/1 Archivo">Clay &amp; Kiln</div><div style="font:400 9.5px/1 var(--mono);color:var(--t4)">https://clayandkiln.com</div></div>
+            <span style="font-family:'Material Symbols Rounded';font-size:16px;color:var(--t3)">unfold_more</span>
+          </div>
+        </div>
+        <div style="position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;height:26px;padding:0 9px;border-radius:6px;background:var(--s1);border:1px solid var(--b1);width:330px;cursor:pointer" style-hover="border-color:var(--b2)">
+          <span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--t4)">search</span>
+          <div style="font:400 12px Archivo;color:var(--t4);flex:1">Search entities, pages, runs…</div>
+          <kbd style="font:500 9.5px var(--mono);background:var(--s3);border:1px solid var(--b2);border-radius:4px;padding:1px 5px;color:var(--t3)">Ctrl K</kbd>
+        </div>
+        <div style="display:flex">
+          <div style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--t3)" style-hover="background:var(--s1)"><span style="font-family:'Material Symbols Rounded';font-size:17px">remove</span></div>
+          <div style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--t3)" style-hover="background:var(--s1)"><span style="font-family:'Material Symbols Rounded';font-size:15px">crop_square</span></div>
+          <div style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--t3)" style-hover="background:var(--dang);color:#fff"><span style="font-family:'Material Symbols Rounded';font-size:17px">close</span></div>
+        </div>
+      </div>
+
+      <div style="flex:1;display:flex;min-height:0;position:relative">
+        <div style="width:68px;border-right:1px solid var(--b1);background:var(--s0);display:flex;flex-direction:column;justify-content:space-between;flex-shrink:0;padding:6px 0">
+          <div style="display:flex;flex-direction:column">
+            <sc-for list="{{ railTplTop }}" as="g" hint-placeholder-count="2">
+              <div style="display:flex;flex-direction:column;gap:2px;padding:0 6px 7px;margin-bottom:7px;border-bottom:1px solid var(--b1)">
+                <sc-for list="{{ g.items }}" as="r" hint-placeholder-count="5">
+                  <a href="#screen-{{ r.a }}" style="position:relative;height:44px;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:{{ r.fg }};background:{{ r.bg }}" style-hover="background:var(--s2);color:var(--t1)">
+                    <span style="font-family:'Material Symbols Rounded';font-size:18px">{{ r.i }}</span>
+                    <span style="font:500 10px Archivo">{{ r.l }}</span>
+                    <span style="position:absolute;left:-6px;top:11px;width:2px;height:22px;border-radius:1px;background:{{ r.bar }}"></span>
+                  </a>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px;padding:7px 6px 0;border-top:1px solid var(--b1)">
+            <sc-for list="{{ railTplBot }}" as="r" hint-placeholder-count="3">
+              <a href="#screen-{{ r.a }}" style="position:relative;height:44px;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:{{ r.fg }};background:{{ r.bg }}" style-hover="background:var(--s2);color:var(--t1)">
+                <span style="font-family:'Material Symbols Rounded';font-size:18px">{{ r.i }}</span>
+                <span style="font:500 10px Archivo">{{ r.l }}</span>
+              </a>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+          <div style="height:40px;border-bottom:1px solid var(--b1);display:flex;align-items:center;padding:0 16px;flex-shrink:0;gap:16px">
+            <div style="display:flex;align-items:center;gap:8px;width:250px">
+              <div style="font:600 14px Archivo">{{ tplTitle }}</div>
+              <div style="display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:5px;background:var(--s2);color:var(--t2);font:600 10.5px var(--mono)">{{ tplCount }}</div>
+            </div>
+            <div style="flex:1;display:flex;justify-content:center;gap:2px;align-self:stretch">
+              <sc-for list="{{ tplTabs }}" as="t" hint-placeholder-count="2">
+                <button onClick="{{ t.on }}" style="padding:0 12px;font:600 12px Archivo;color:{{ t.fg }};border-bottom:2px solid {{ t.bd }};margin-bottom:-1px">{{ t.label }}</button>
+              </sc-for>
+            </div>
+            <div style="display:flex;gap:7px;width:250px;justify-content:flex-end">
+              <button style="height:28px;padding:0 11px;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 12px Archivo" style-hover="background:var(--s3)">New policy</button>
+              <button onClick="{{ tplTabs.0.on }}" style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px;border-radius:6px;background:var(--ac);color:var(--on-ac);font:600 12px Archivo" style-hover="background:var(--ac-h)"><span style="font-family:'Material Symbols Rounded';font-size:15px">add</span>New template</button>
+            </div>
+          </div>
+
+          <div style="flex:1;display:flex;min-height:0">
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;padding:16px;gap:12px">
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                <div style="display:flex;align-items:center;gap:7px;height:28px;padding:0 9px;border-radius:6px;background:var(--s1);border:1px solid var(--b1);width:216px">
+                  <span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--t4)">search</span>
+                  <div style="font:400 12px Archivo;color:var(--t4)">Search templates…</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:7px;height:28px;padding:0 9px;border-radius:6px;background:var(--s1);border:1px solid var(--b1)"><div style="font:500 12px Archivo;color:var(--t2)">Scope: all</div><span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--t4)">expand_more</span></div>
+                <div style="display:flex;align-items:center;gap:7px;height:28px;padding:0 9px;border-radius:6px;background:var(--s1);border:1px solid var(--b1)"><div style="font:500 12px Archivo;color:var(--t2)">Page kind: all</div><span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--t4)">expand_more</span></div>
+              </div>
+
+              <sc-if value="{{ tplTable }}" hint-placeholder-val="{{ true }}">
+                <div style="flex:1;min-height:0;border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden;display:flex;flex-direction:column">
+                  <div style="display:grid;grid-template-columns:1fr 84px 104px 56px 92px 88px;gap:12px;align-items:center;height:30px;padding:0 12px;border-bottom:1px solid var(--b1);background:var(--s1);font:600 10.5px Archivo;letter-spacing:.07em;text-transform:uppercase;color:var(--t4)">
+                    <div>Name</div><div>Scope</div><div>Page kind</div><div>Version</div><div>Default</div><div style="text-align:right">Updated</div>
+                  </div>
+                  <sc-for list="{{ tplRows }}" as="r" hint-placeholder-count="8">
+                    <div style="display:grid;grid-template-columns:1fr 84px 104px 56px 92px 88px;gap:12px;align-items:center;height:30px;padding:0 12px;border-bottom:1px solid var(--s1);background:{{ r.bg }};box-shadow:{{ r.mark }};cursor:pointer" style-hover="background:var(--s1)">
+                      <div style="font:500 12px Archivo;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.name }}</div>
+                      <div><span style="display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:5px;font:600 10.5px Archivo;background:{{ r.scopeBg }};color:{{ r.scopeFg }}">{{ r.scope }}</span></div>
+                      <div style="font:400 11.5px var(--mono);color:var(--t3)">{{ r.kind }}</div>
+                      <div style="font:500 11.5px var(--mono);color:var(--t2)">{{ r.ver }}</div>
+                      <div style="font:500 11px Archivo;color:var(--ac)">{{ r.def }}</div>
+                      <div style="font:400 11.5px var(--mono);color:var(--t4);text-align:right">{{ r.upd }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ tplPolicies }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:1;min-height:0;border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden;display:flex;flex-direction:column">
+                  <div style="display:grid;grid-template-columns:1fr 208px 108px 168px;gap:12px;align-items:center;height:30px;padding:0 12px;border-bottom:1px solid var(--b1);background:var(--s1);font:600 10.5px Archivo;letter-spacing:.07em;text-transform:uppercase;color:var(--t4)">
+                    <div>Name</div><div>Target kinds</div><div>Min / max links</div><div>Anchor rule</div>
+                  </div>
+                  <sc-for list="{{ tplPolicyRows }}" as="p" hint-placeholder-count="4">
+                    <div style="display:grid;grid-template-columns:1fr 208px 108px 168px;gap:12px;align-items:center;height:30px;padding:0 12px;border-bottom:1px solid var(--s1);background:{{ p.bg }};box-shadow:{{ p.mark }};cursor:pointer" style-hover="background:var(--s1)">
+                      <div style="font:500 12px Archivo;color:var(--t1)">{{ p.name }}</div>
+                      <div style="font:400 11.5px var(--mono);color:var(--t3)">{{ p.kinds }}</div>
+                      <div style="font:500 11.5px var(--mono);color:var(--t2)">{{ p.links }}</div>
+                      <div style="font:400 11.5px Archivo;color:var(--t3)">{{ p.anchor }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ tplLoading }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:1;min-height:0;border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden;display:flex;flex-direction:column">
+                  <div style="display:grid;grid-template-columns:1fr 84px 104px 56px 92px 88px;gap:12px;align-items:center;height:30px;padding:0 12px;border-bottom:1px solid var(--b1);background:var(--s1);font:600 10.5px Archivo;letter-spacing:.07em;text-transform:uppercase;color:var(--t4)">
+                    <div>Name</div><div>Scope</div><div>Page kind</div><div>Version</div><div>Default</div><div style="text-align:right">Updated</div>
+                  </div>
+                  <sc-for list="{{ tplSkeleton }}" as="k" hint-placeholder-count="8">
+                    <div style="display:grid;grid-template-columns:1fr 84px 104px 56px 92px 88px;gap:12px;align-items:center;height:30px;padding:0 12px;border-bottom:1px solid var(--s1)">
+                      <div style="height:9px;border-radius:4px;width:{{ k.w }};background:linear-gradient(90deg,var(--s1),var(--s2),var(--s1));background-size:380px 100%;animation:shimmer 1.2s linear infinite"></div>
+                      <div style="height:9px;border-radius:4px;width:70%;background:var(--s1)"></div>
+                      <div style="height:9px;border-radius:4px;width:60%;background:var(--s1)"></div>
+                      <div style="height:9px;border-radius:4px;width:50%;background:var(--s1)"></div>
+                      <div style="height:9px;border-radius:4px;width:40%;background:var(--s1)"></div>
+                      <div style="height:9px;border-radius:4px;width:70%;background:var(--s1);justify-self:end"></div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ tplEmpty }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:1;min-height:0;border:1px solid var(--b1);border-radius:9px;background:var(--s0);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px">
+                  <span style="font-family:'Material Symbols Rounded';font-size:30px;color:var(--t4)">dashboard_customize</span>
+                  <div style="font:600 15px Archivo">No templates yet</div>
+                  <div style="font:400 12.5px Archivo;color:var(--t3)">A template decides the sections, rules and models a page is written with.</div>
+                  <div style="display:flex;gap:8px;margin-top:2px">
+                    <button style="height:28px;padding:0 12px;border-radius:6px;background:var(--ac);color:var(--on-ac);font:600 12px Archivo" style-hover="background:var(--ac-h)">New template</button>
+                    <button style="height:28px;padding:0 12px;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 12px Archivo" style-hover="background:var(--s3)">Copy the global set</button>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+
+            <sc-if value="{{ tplPanel }}" hint-placeholder-val="{{ true }}">
+              <div style="width:320px;border-left:1px solid var(--b1);background:var(--s0);display:flex;flex-direction:column;min-height:0">
+                <div style="height:40px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;padding:0 12px;flex-shrink:0">
+                  <div style="display:flex;flex-direction:column;gap:1px;min-width:0">
+                    <div style="font:600 12.5px/1.2 Archivo;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ tplPanelName }}</div>
+                    <div style="font:400 10px/1.2 var(--mono);color:var(--t4)">{{ tplPanelMeta }}</div>
+                  </div>
+                  <span style="font-family:'Material Symbols Rounded';font-size:17px;color:var(--t4)">more_horiz</span>
+                </div>
+                <div style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:16px;min-height:0">
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Sections</div>
+                    <sc-for list="{{ tplSections }}" as="s" hint-placeholder-count="5">
+                      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;height:24px">
+                        <div style="font:400 12px Archivo;color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ s.name }}</div>
+                        <div style="font:400 11px var(--mono);color:var(--t4);flex-shrink:0">{{ s.range }}</div>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Models</div>
+                    <sc-for list="{{ tplModels }}" as="m" hint-placeholder-count="6">
+                      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;height:22px">
+                        <div style="font:400 12px Archivo;color:var(--t3)">{{ m.role }}</div>
+                        <div style="font:400 11px var(--mono);color:var(--t2)">{{ m.model }}</div>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Recipe</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:5px">
+                      <sc-for list="{{ tplRecipe }}" as="r" hint-placeholder-count="12">
+                        <span style="display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:5px;border:1px solid var(--b1);background:var(--s1);font:400 10.5px var(--mono);color:var(--t3)">{{ r.name }}</span>
+                      </sc-for>
+                    </div>
+                  </div>
+                </div>
+                <div style="border-top:1px solid var(--b1);padding:12px;display:flex;flex-direction:column;gap:7px;flex-shrink:0">
+                  <button style="height:28px;border-radius:6px;background:var(--ac);color:var(--on-ac);font:600 12px Archivo" style-hover="background:var(--ac-h)">Open editor</button>
+                  <div style="display:flex;gap:7px">
+                    <button style="flex:1;height:28px;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 12px Archivo" style-hover="background:var(--s3)">Duplicate</button>
+                    <button style="flex:1;height:28px;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 12px Archivo" style-hover="background:var(--s3)">Set as site default</button>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+
+        <sc-if value="{{ tplDrawer }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;background:color-mix(in oklab, #000 46%, transparent);display:flex;justify-content:flex-end">
+            <div style="width:688px;background:var(--page);border-left:1px solid var(--b2);display:flex;flex-direction:column;animation:slideIn 160ms cubic-bezier(.2,.8,.2,1)">
+              <div style="height:40px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;padding:0 16px;flex-shrink:0">
+                <div style="font:600 13px Archivo">New template</div>
+                <button onClick="{{ tplTabs.0.on }}" style="width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--t3)" style-hover="background:var(--s1)"><span style="font-family:'Material Symbols Rounded';font-size:17px">close</span></button>
+              </div>
+              <div style="flex:1;padding:16px;display:flex;flex-direction:column;gap:12px;min-height:0">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                  <div style="border:1px solid var(--ac-b);background:var(--ac-s);border-radius:9px;padding:12px;display:flex;flex-direction:column;gap:8px;cursor:pointer">
+                    <span style="font-family:'Material Symbols Rounded';font-size:20px;color:var(--ac)">note_add</span>
+                    <div style="font:600 12.5px Archivo">Start blank</div>
+                    <div style="font:400 11.5px/1.45 Archivo;color:var(--t3)">Five empty sections, global rules, no overrides.</div>
+                  </div>
+                  <div style="border:1px solid var(--b1);background:var(--s0);border-radius:9px;padding:12px;display:flex;flex-direction:column;gap:8px;cursor:pointer" style-hover="border-color:var(--b2)">
+                    <span style="font-family:'Material Symbols Rounded';font-size:20px;color:var(--t3)">content_copy</span>
+                    <div style="font:600 12.5px Archivo">Copy an existing template</div>
+                    <div style="font:400 11.5px/1.45 Archivo;color:var(--t3)">Start from the sections, rules and recipe of a template you already use.</div>
+                  </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Copy from</div>
+                  <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden">
+                    <sc-for list="{{ tplRows }}" as="r" hint-placeholder-count="8">
+                      <div style="display:grid;grid-template-columns:1fr 84px 104px 56px;gap:12px;align-items:center;height:30px;padding:0 12px;border-bottom:1px solid var(--s1);cursor:pointer" style-hover="background:var(--s1)">
+                        <div style="font:500 12px Archivo;color:var(--t2)">{{ r.name }}</div>
+                        <div><span style="display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:5px;font:600 10.5px Archivo;background:{{ r.scopeBg }};color:{{ r.scopeFg }}">{{ r.scope }}</span></div>
+                        <div style="font:400 11.5px var(--mono);color:var(--t3)">{{ r.kind }}</div>
+                        <div style="font:500 11.5px var(--mono);color:var(--t4)">{{ r.ver }}</div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+              <div style="border-top:1px solid var(--b1);padding:12px 16px;display:flex;justify-content:flex-end;gap:8px;flex-shrink:0">
+                <button onClick="{{ tplTabs.0.on }}" style="height:28px;padding:0 12px;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 12px Archivo" style-hover="background:var(--s3)">Cancel</button>
+                <a href="#screen-template-editor" style="display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:6px;background:var(--ac);color:var(--on-ac);font:600 12px Archivo" style-hover="background:var(--ac-h)">Create</a>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="height:26px;border-top:1px solid var(--b1);background:var(--s0);display:flex;align-items:center;justify-content:space-between;padding:0 12px;font:400 11px var(--mono);flex-shrink:0">
+        <div style="display:flex;align-items:center;gap:16px">
+          <a href="#screen-run" style="display:flex;align-items:center;gap:6px;color:var(--t2)"><span style="width:6px;height:6px;border-radius:50%;background:var(--info);animation:pulse 1.6s ease-in-out infinite"></span>Run #241 · generate · 142/512</a>
+          <span style="color:var(--t4)">today $18.40</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px">
+          <span style="display:flex;align-items:center;gap:6px;color:var(--t4)"><span style="font-family:'Material Symbols Rounded';font-size:13px;color:var(--ok)">extension</span>Plugin v1.4.2</span>
+          <span style="display:flex;align-items:center;gap:6px;color:var(--t4)"><span style="font-family:'Material Symbols Rounded';font-size:13px;color:var(--ok)">lock_open</span>Unlocked · auto-lock 20 min</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-template-editor" style="width:1280px;display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:baseline;gap:10px"><div style="font:600 15px Archivo">8 · Template editor</div><div style="font:400 12px Archivo;color:var(--t4)">Three layers over one template; only the differences belong to a layer.</div></div>
+      <div style="display:flex;gap:3px;background:var(--s0);border:1px solid var(--b1);border-radius:7px;padding:3px">
+        <sc-for list="{{ tedStates }}" as="s" hint-placeholder-count="5">
+          <button onClick="{{ s.on }}" style="height:23px;padding:0 10px;border-radius:5px;white-space:nowrap;font:500 11.5px Archivo;background:{{ s.bg }};color:{{ s.fg }}">{{ s.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+    <div style="width:1280px;height:820px;border:1px solid var(--b2);border-radius:10px;overflow:hidden;background:var(--page);display:flex;flex-direction:column">
+
+      <div style="height:40px;border-bottom:1px solid var(--b1);background:var(--s0);display:flex;align-items:center;justify-content:space-between;padding-left:12px;flex-shrink:0;position:relative">
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="display:flex;align-items:center;gap:8px"><div style="width:17px;height:17px;border-radius:5px;background:var(--ac);display:flex;align-items:center;justify-content:center;color:var(--on-ac);font:700 10px Archivo">P</div><div style="font:600 12.5px Archivo">Postulator</div></div>
+          <div style="width:1px;height:18px;background:var(--b1)"></div>
+          <div style="display:flex;align-items:center;gap:8px;height:28px;padding:0 8px 0 9px;border-radius:6px;background:var(--s1);border:1px solid var(--b1);cursor:pointer" style-hover="background:var(--s2)">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--ok)"></span>
+            <div style="display:flex;flex-direction:column;gap:1px"><div style="font:600 11.5px/1 Archivo">Clay &amp; Kiln</div><div style="font:400 9.5px/1 var(--mono);color:var(--t4)">https://clayandkiln.com</div></div>
+            <span style="font-family:'Material Symbols Rounded';font-size:16px;color:var(--t3)">unfold_more</span>
+          </div>
+        </div>
+        <div style="position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;height:26px;padding:0 9px;border-radius:6px;background:var(--s1);border:1px solid var(--b1);width:330px;cursor:pointer" style-hover="border-color:var(--b2)">
+          <span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--t4)">search</span>
+          <div style="font:400 12px Archivo;color:var(--t4);flex:1">Search entities, pages, runs…</div>
+          <kbd style="font:500 9.5px var(--mono);background:var(--s3);border:1px solid var(--b2);border-radius:4px;padding:1px 5px;color:var(--t3)">Ctrl K</kbd>
+        </div>
+        <div style="display:flex">
+          <div style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--t3)" style-hover="background:var(--s1)"><span style="font-family:'Material Symbols Rounded';font-size:17px">remove</span></div>
+          <div style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--t3)" style-hover="background:var(--s1)"><span style="font-family:'Material Symbols Rounded';font-size:15px">crop_square</span></div>
+          <div style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--t3)" style-hover="background:var(--dang);color:#fff"><span style="font-family:'Material Symbols Rounded';font-size:17px">close</span></div>
+        </div>
+      </div>
+
+      <div style="flex:1;display:flex;min-height:0">
+        <div style="width:68px;border-right:1px solid var(--b1);background:var(--s0);display:flex;flex-direction:column;justify-content:space-between;flex-shrink:0;padding:6px 0">
+          <div style="display:flex;flex-direction:column">
+            <sc-for list="{{ railTedTop }}" as="g" hint-placeholder-count="2">
+              <div style="display:flex;flex-direction:column;gap:2px;padding:0 6px 7px;margin-bottom:7px;border-bottom:1px solid var(--b1)">
+                <sc-for list="{{ g.items }}" as="r" hint-placeholder-count="5">
+                  <a href="#screen-{{ r.a }}" style="position:relative;height:44px;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:{{ r.fg }};background:{{ r.bg }}" style-hover="background:var(--s2);color:var(--t1)">
+                    <span style="font-family:'Material Symbols Rounded';font-size:18px">{{ r.i }}</span>
+                    <span style="font:500 10px Archivo">{{ r.l }}</span>
+                    <span style="position:absolute;left:-6px;top:11px;width:2px;height:22px;border-radius:1px;background:{{ r.bar }}"></span>
+                  </a>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px;padding:7px 6px 0;border-top:1px solid var(--b1)">
+            <sc-for list="{{ railTedBot }}" as="r" hint-placeholder-count="3">
+              <a href="#screen-{{ r.a }}" style="position:relative;height:44px;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:{{ r.fg }};background:{{ r.bg }}" style-hover="background:var(--s2);color:var(--t1)">
+                <span style="font-family:'Material Symbols Rounded';font-size:18px">{{ r.i }}</span>
+                <span style="font:500 10px Archivo">{{ r.l }}</span>
+              </a>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+          <div style="height:40px;border-bottom:1px solid var(--b1);display:flex;align-items:center;padding:0 16px;flex-shrink:0;gap:14px">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">
+              <a href="#screen-templates" style="font:400 11.5px var(--mono);color:var(--t4)">Templates /</a>
+              <div style="display:flex;align-items:center;gap:6px;height:26px;padding:0 7px;border-radius:6px;border:1px dashed var(--b1);max-width:250px" style-hover="border-color:var(--ac-b);border-style:solid">
+                <div style="font:600 13px Archivo;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ tedName }}</div>
+                <span style="width:1px;height:13px;background:var(--ac);animation:caret 1s steps(1) infinite"></span>
+              </div>
+              <span style="display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:5px;background:var(--s2);color:var(--t2);font:600 10.5px var(--mono)">{{ tedVersion }}</span>
+              <span style="display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:5px;background:var(--info-s);color:var(--info);font:600 10.5px Archivo">{{ tedFrom }}</span>
+              <sc-if value="{{ tedUnsaved }}" hint-placeholder-val="{{ false }}">
+                <span style="display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:5px;background:var(--warn-s);color:var(--warn);font:600 10.5px Archivo">Unsaved</span>
+              </sc-if>
+            </div>
+            <div style="display:flex;gap:3px;background:var(--s1);border:1px solid var(--b1);border-radius:7px;padding:2px">
+              <sc-for list="{{ tedLayers }}" as="l" hint-placeholder-count="3">
+                <button onClick="{{ l.on }}" style="height:22px;padding:0 10px;border-radius:5px;font:600 11.5px Archivo;background:{{ l.bg }};color:{{ l.fg }}">{{ l.label }}</button>
+              </sc-for>
+            </div>
+            <div style="display:flex;gap:7px;flex:1;justify-content:flex-end">
+              <button style="height:28px;padding:0 11px;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 12px Archivo" style-hover="background:var(--s3)">Preview page</button>
+              <a href="#screen-agent" style="display:inline-flex;align-items:center;height:28px;padding:0 11px;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 12px Archivo" style-hover="background:var(--s3)">Ask the agent</a>
+              <button style="height:28px;padding:0 13px;border-radius:6px;background:{{ tedSaveBg }};color:{{ tedSaveFg }};font:600 12px Archivo">Save</button>
+            </div>
+          </div>
+
+          <sc-if value="{{ tedConflict }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;align-items:center;gap:12px;height:36px;padding:0 16px;background:var(--warn-s);border-bottom:1px solid color-mix(in oklab, var(--warn) 40%, transparent);flex-shrink:0">
+              <span style="font-family:'Material Symbols Rounded';font-size:16px;color:var(--warn)">warning</span>
+              <div style="font:500 12px Archivo;color:var(--warn);flex:1">Changed since you opened it — the site layer was saved by a schedule 4 minutes ago.</div>
+              <button style="height:24px;padding:0 10px;border-radius:5px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 11.5px Archivo" style-hover="background:var(--s3)">Reload</button>
+              <button style="height:24px;padding:0 10px;border-radius:5px;background:transparent;border:1px solid color-mix(in oklab, var(--dang) 45%, transparent);color:var(--dang);font:600 11.5px Archivo" style-hover="background:var(--dang-s)">Overwrite</button>
+            </div>
+          </sc-if>
+
+          <div style="flex:1;display:flex;min-height:0">
+            <div style="width:212px;border-right:1px solid var(--b1);background:var(--s0);padding:12px 8px;display:flex;flex-direction:column;gap:2px;flex-shrink:0">
+              <div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4);padding:0 8px 8px">Form groups</div>
+              <sc-for list="{{ tedOutline }}" as="o" hint-placeholder-count="6">
+                <div style="display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:6px;background:{{ o.bg }};color:{{ o.fg }};font:500 12.5px Archivo;cursor:pointer" style-hover="background:var(--s1)">
+                  <span style="flex:1">{{ o.name }}</span>
+                  <span style="width:5px;height:5px;border-radius:50%;background:{{ o.dot }}"></span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;padding:16px;gap:12px;overflow-y:auto">
+              <div style="font:600 13px Archivo;flex-shrink:0">{{ tedGroup }}</div>
+
+              <sc-if value="{{ tedSections }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <sc-for list="{{ tedSecRows }}" as="s" hint-placeholder-count="5">
+                    <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);padding:12px;display:flex;gap:10px;align-items:flex-start">
+                      <span style="font-family:'Material Symbols Rounded';font-size:17px;color:var(--t4);cursor:grab;margin-top:5px">drag_indicator</span>
+                      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px">
+                        <div style="display:flex;align-items:center;gap:8px">
+                          <div style="height:28px;flex:1;border:1px solid var(--b1);border-radius:6px;background:var(--s1);display:flex;align-items:center;padding:0 9px;font:500 12.5px Archivo">{{ s.name }}</div>
+                          <div style="display:flex;align-items:center;gap:5px"><div style="font:400 11px var(--mono);color:var(--t4)">words</div><div style="height:28px;width:54px;border:1px solid var(--b1);border-radius:6px;background:var(--s1);display:flex;align-items:center;justify-content:center;font:500 11.5px var(--mono)">{{ s.min }}</div><div style="font:400 11px var(--mono);color:var(--t4)">–</div><div style="height:28px;width:54px;border:1px solid var(--b1);border-radius:6px;background:var(--s1);display:flex;align-items:center;justify-content:center;font:500 11.5px var(--mono)">{{ s.max }}</div></div>
+                          <div style="display:flex;align-items:center;gap:5px"><div style="font:400 11px var(--mono);color:var(--t4)">links</div><div style="height:28px;width:44px;border:1px solid var(--b1);border-radius:6px;background:var(--s1);display:flex;align-items:center;justify-content:center;font:500 11.5px var(--mono)">{{ s.links }}</div></div>
+                          <button style="width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--t4)" style-hover="background:var(--dang-s);color:var(--dang)"><span style="font-family:'Material Symbols Rounded';font-size:16px">delete</span></button>
+                        </div>
+                        <div style="height:28px;border:1px solid var(--b1);border-radius:6px;background:var(--s1);display:flex;align-items:center;padding:0 9px;font:400 12px Archivo;color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ s.intent }}</div>
+                      </div>
+                    </div>
+                  </sc-for>
+                  <button style="height:28px;align-self:flex-start;padding:0 11px;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 12px Archivo;display:inline-flex;align-items:center;gap:6px" style-hover="background:var(--s3)"><span style="font-family:'Material Symbols Rounded';font-size:15px">add</span>Add section</button>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ tedRules }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;gap:16px">
+                  <sc-for list="{{ tedRuleBlocks }}" as="b" hint-placeholder-count="4">
+                    <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden">
+                      <div style="height:30px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid var(--b1);background:var(--s1);font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">{{ b.g }}</div>
+                      <sc-for list="{{ b.rows }}" as="r" hint-placeholder-count="4">
+                        <div style="display:flex;align-items:center;gap:12px;height:34px;padding:0 12px;border-bottom:1px solid var(--s1);box-shadow:inset 2px 0 0 {{ r.changed }}">
+                          <div style="flex:1;font:400 12.5px Archivo;color:var(--t2)">{{ r.label }}</div>
+                          <sc-if value="{{ r.isSwitch }}" hint-placeholder-val="{{ true }}">
+                            <div style="width:30px;height:17px;border-radius:9px;background:{{ r.track }};padding:2px;flex-shrink:0"><div style="width:13px;height:13px;border-radius:50%;background:#fff;transform:{{ r.knob }};transition:transform 80ms ease-out"></div></div>
+                          </sc-if>
+                          <sc-if value="{{ r.isNum }}" hint-placeholder-val="{{ false }}">
+                            <div style="height:26px;width:76px;border:1px solid var(--b1);border-radius:6px;background:var(--s1);display:flex;align-items:center;justify-content:flex-end;padding:0 8px;font:500 11.5px var(--mono)">{{ r.value }}</div>
+                          </sc-if>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ tedModels }}" hint-placeholder-val="{{ false }}">
+                <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden">
+                  <div style="display:grid;grid-template-columns:120px 1fr 1fr;gap:12px;align-items:center;height:30px;padding:0 12px;border-bottom:1px solid var(--b1);background:var(--s1);font:600 10.5px Archivo;letter-spacing:.07em;text-transform:uppercase;color:var(--t4)"><div>Role</div><div>Provider</div><div>Model</div></div>
+                  <sc-for list="{{ tedModelRows }}" as="m" hint-placeholder-count="7">
+                    <div style="display:grid;grid-template-columns:120px 1fr 1fr;gap:12px;align-items:center;height:38px;padding:0 12px;border-bottom:1px solid var(--s1)">
+                      <div style="font:500 12.5px Archivo;color:var(--t1)">{{ m.role }}</div>
+                      <div style="height:26px;border:1px solid var(--b1);border-radius:6px;background:var(--s1);display:flex;align-items:center;justify-content:space-between;padding:0 9px;font:400 11.5px var(--mono);color:var(--t2)">{{ m.provider }}<span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--t4)">expand_more</span></div>
+                      <div style="height:26px;border:1px solid var(--b1);border-radius:6px;background:var(--s1);display:flex;align-items:center;justify-content:space-between;padding:0 9px;font:400 11.5px var(--mono);color:var(--t2)">{{ m.model }}<span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--t4)">expand_more</span></div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ tedRecipe }}" hint-placeholder-val="{{ false }}">
+                <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden">
+                  <sc-for list="{{ tedRecipeRows }}" as="r" hint-placeholder-count="12">
+                    <div style="display:flex;align-items:center;gap:12px;height:34px;padding:0 12px;border-bottom:1px solid var(--s1)">
+                      <div style="width:18px;font:400 11px var(--mono);color:var(--t4)">{{ r.n }}</div>
+                      <span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--t4);cursor:grab">drag_indicator</span>
+                      <div style="flex:1;font:400 12px var(--mono);color:{{ r.fg }}">{{ r.name }}</div>
+                      <sc-if value="{{ r.settingKind }}" hint-placeholder-val="{{ false }}">
+                        <div style="display:flex;align-items:center;gap:7px"><div style="font:400 11px Archivo;color:var(--t4)">{{ r.setting }}</div><div style="height:24px;min-width:44px;border:1px solid var(--b1);border-radius:6px;background:var(--s1);display:flex;align-items:center;justify-content:center;padding:0 8px;font:500 11px var(--mono);color:var(--t2)">{{ r.settingVal }}</div></div>
+                      </sc-if>
+                      <div style="width:30px;height:17px;border-radius:9px;background:{{ r.track }};padding:2px;flex-shrink:0"><div style="width:13px;height:13px;border-radius:50%;background:#fff;transform:{{ r.knob }};transition:transform 80ms ease-out"></div></div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ tedOverridesOn }}" hint-placeholder-val="{{ false }}">
+                <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden">
+                  <div style="display:grid;grid-template-columns:1fr 200px 200px 74px;gap:12px;align-items:center;height:30px;padding:0 12px;border-bottom:1px solid var(--b1);background:var(--s1);font:600 10.5px Archivo;letter-spacing:.07em;text-transform:uppercase;color:var(--t4)"><div>Field</div><div>Global layer</div><div>This site</div><div></div></div>
+                  <sc-for list="{{ tedOverrideRows }}" as="o" hint-placeholder-count="3">
+                    <div style="display:grid;grid-template-columns:1fr 200px 200px 74px;gap:12px;align-items:center;height:38px;padding:0 12px;border-bottom:1px solid var(--s1);box-shadow:inset 2px 0 0 var(--ac)">
+                      <div style="font:400 12px var(--mono);color:var(--t2)">{{ o.field }}</div>
+                      <div style="font:400 11.5px var(--mono);color:var(--t4);text-decoration:line-through">{{ o.below }}</div>
+                      <div style="font:500 11.5px var(--mono);color:var(--ac)">{{ o.here }}</div>
+                      <button style="height:24px;border-radius:5px;background:var(--s2);border:1px solid var(--b1);color:var(--t2);font:600 11px Archivo" style-hover="background:var(--s3)">Revert</button>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+
+            <div style="width:320px;border-left:1px solid var(--b1);background:var(--s0);display:flex;flex-direction:column;min-height:0">
+              <div style="height:30px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;padding:0 12px;flex-shrink:0">
+                <div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Page skeleton</div>
+                <div style="font:400 10px var(--mono);color:var(--t4)">1 500 – 2 200 words</div>
+              </div>
+              <div style="flex:1;overflow-y:auto;padding:12px;min-height:0">
+                <div style="border:1px solid var(--b1);border-radius:8px;background:var(--page);padding:14px;display:flex;flex-direction:column;gap:12px">
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <div style="height:13px;border-radius:4px;background:var(--s3);width:82%"></div>
+                    <div style="height:7px;border-radius:3px;background:var(--s2);width:56%"></div>
+                  </div>
+                  <div style="height:56px;border-radius:6px;border:1px dashed var(--b2);display:flex;align-items:center;justify-content:center;color:var(--t4)"><span style="font-family:'Material Symbols Rounded';font-size:18px">image</span></div>
+                  <sc-for list="{{ tedPreview }}" as="s" hint-placeholder-count="5">
+                    <div style="display:flex;flex-direction:column;gap:5px">
+                      <div style="height:9px;border-radius:3px;background:var(--s3);width:62%"></div>
+                      <div style="height:{{ s.h }}px;border-radius:5px;background:var(--s1);border:1px solid var(--s2)"></div>
+                    </div>
+                  </sc-for>
+                  <div style="height:42px;border-radius:6px;border:1px dashed var(--b2);display:flex;align-items:center;justify-content:center;color:var(--t4)"><span style="font-family:'Material Symbols Rounded';font-size:18px">image</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="height:26px;border-top:1px solid var(--b1);background:var(--s0);display:flex;align-items:center;justify-content:space-between;padding:0 12px;font:400 11px var(--mono);flex-shrink:0">
+        <div style="display:flex;align-items:center;gap:16px">
+          <a href="#screen-run" style="display:flex;align-items:center;gap:6px;color:var(--t2)"><span style="width:6px;height:6px;border-radius:50%;background:var(--info);animation:pulse 1.6s ease-in-out infinite"></span>Run #241 · generate · 142/512</a>
+          <span style="color:var(--t4)">today $18.40</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px">
+          <span style="display:flex;align-items:center;gap:6px;color:var(--t4)"><span style="font-family:'Material Symbols Rounded';font-size:13px;color:var(--ok)">extension</span>Plugin v1.4.2</span>
+          <span style="display:flex;align-items:center;gap:6px;color:var(--t4)"><span style="font-family:'Material Symbols Rounded';font-size:13px;color:var(--ok)">lock_open</span>Unlocked · auto-lock 20 min</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-schedules" style="width:1280px;display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:baseline;gap:10px"><div style="font:600 15px Archivo">9 · Schedules</div><div style="font:400 12px Archivo;color:var(--t4)">Unattended work: what runs, how often, and under which budget.</div></div>
+      <div style="display:flex;gap:3px;background:var(--s0);border:1px solid var(--b1);border-radius:7px;padding:3px">
+        <sc-for list="{{ schStates }}" as="s" hint-placeholder-count="4">
+          <button onClick="{{ s.on }}" style="height:23px;padding:0 10px;border-radius:5px;white-space:nowrap;font:500 11.5px Archivo;background:{{ s.bg }};color:{{ s.fg }}">{{ s.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+    <div style="width:1280px;height:820px;border:1px solid var(--b2);border-radius:10px;overflow:hidden;background:var(--page);display:flex;flex-direction:column">
+
+      <div style="height:40px;border-bottom:1px solid var(--b1);background:var(--s0);display:flex;align-items:center;justify-content:space-between;padding-left:12px;flex-shrink:0;position:relative">
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="display:flex;align-items:center;gap:8px"><div style="width:17px;height:17px;border-radius:5px;background:var(--ac);display:flex;align-items:center;justify-content:center;color:var(--on-ac);font:700 10px Archivo">P</div><div style="font:600 12.5px Archivo">Postulator</div></div>
+          <div style="width:1px;height:18px;background:var(--b1)"></div>
+          <div style="display:flex;align-items:center;gap:8px;height:28px;padding:0 8px 0 9px;border-radius:6px;background:var(--s1);border:1px solid var(--b1);cursor:pointer" style-hover="background:var(--s2)">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--ok)"></span>
+            <div style="display:flex;flex-direction:column;gap:1px"><div style="font:600 11.5px/1 Archivo">Clay &amp; Kiln</div><div style="font:400 9.5px/1 var(--mono);color:var(--t4)">https://clayandkiln.com</div></div>
+            <span style="font-family:'Material Symbols Rounded';font-size:16px;color:var(--t3)">unfold_more</span>
+          </div>
+        </div>
+        <div style="position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;height:26px;padding:0 9px;border-radius:6px;background:var(--s1);border:1px solid var(--b1);width:330px;cursor:pointer" style-hover="border-color:var(--b2)">
+          <span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--t4)">search</span>
+          <div style="font:400 12px Archivo;color:var(--t4);flex:1">Search entities, pages, runs…</div>
+          <kbd style="font:500 9.5px var(--mono);background:var(--s3);border:1px solid var(--b2);border-radius:4px;padding:1px 5px;color:var(--t3)">Ctrl K</kbd>
+        </div>
+        <div style="display:flex">
+          <div style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--t3)" style-hover="background:var(--s1)"><span style="font-family:'Material Symbols Rounded';font-size:17px">remove</span></div>
+          <div style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--t3)" style-hover="background:var(--s1)"><span style="font-family:'Material Symbols Rounded';font-size:15px">crop_square</span></div>
+          <div style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--t3)" style-hover="background:var(--dang);color:#fff"><span style="font-family:'Material Symbols Rounded';font-size:17px">close</span></div>
+        </div>
+      </div>
+
+      <div style="flex:1;display:flex;min-height:0">
+        <div style="width:68px;border-right:1px solid var(--b1);background:var(--s0);display:flex;flex-direction:column;justify-content:space-between;flex-shrink:0;padding:6px 0">
+          <div style="display:flex;flex-direction:column">
+            <sc-for list="{{ railSchTop }}" as="g" hint-placeholder-count="2">
+              <div style="display:flex;flex-direction:column;gap:2px;padding:0 6px 7px;margin-bottom:7px;border-bottom:1px solid var(--b1)">
+                <sc-for list="{{ g.items }}" as="r" hint-placeholder-count="5">
+                  <a href="#screen-{{ r.a }}" style="position:relative;height:44px;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:{{ r.fg }};background:{{ r.bg }}" style-hover="background:var(--s2);color:var(--t1)">
+                    <span style="font-family:'Material Symbols Rounded';font-size:18px">{{ r.i }}</span>
+                    <span style="font:500 10px Archivo">{{ r.l }}</span>
+                    <span style="position:absolute;left:-6px;top:11px;width:2px;height:22px;border-radius:1px;background:{{ r.bar }}"></span>
+                  </a>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px;padding:7px 6px 0;border-top:1px solid var(--b1)">
+            <sc-for list="{{ railSchBot }}" as="r" hint-placeholder-count="3">
+              <a href="#screen-{{ r.a }}" style="position:relative;height:44px;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:{{ r.fg }};background:{{ r.bg }}" style-hover="background:var(--s2);color:var(--t1)">
+                <span style="font-family:'Material Symbols Rounded';font-size:18px">{{ r.i }}</span>
+                <span style="font:500 10px Archivo">{{ r.l }}</span>
+              </a>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+          <div style="height:40px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;padding:0 16px;flex-shrink:0">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="font:600 14px Archivo">Schedules</div>
+              <div style="display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:5px;background:var(--s2);color:var(--t2);font:600 10.5px var(--mono)">{{ schCount }}</div>
+            </div>
+            <button style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px;border-radius:6px;background:var(--ac);color:var(--on-ac);font:600 12px Archivo" style-hover="background:var(--ac-h)"><span style="font-family:'Material Symbols Rounded';font-size:15px">add</span>New schedule</button>
+          </div>
+
+          <div style="flex:1;display:flex;min-height:0">
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;padding:16px;gap:12px">
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                <div style="display:flex;align-items:center;gap:7px;height:28px;padding:0 9px;border-radius:6px;background:var(--s1);border:1px solid var(--b1)"><div style="font:500 12px Archivo;color:var(--t2)">Kind: all</div><span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--t4)">expand_more</span></div>
+                <div style="display:flex;gap:2px;background:var(--s1);border:1px solid var(--b1);border-radius:6px;padding:2px">
+                  <div style="height:22px;padding:0 10px;border-radius:5px;background:var(--s2);color:var(--t1);font:600 11.5px Archivo;display:flex;align-items:center">All</div>
+                  <div style="height:22px;padding:0 10px;border-radius:5px;color:var(--t3);font:600 11.5px Archivo;display:flex;align-items:center;cursor:pointer">On</div>
+                  <div style="height:22px;padding:0 10px;border-radius:5px;color:var(--t3);font:600 11.5px Archivo;display:flex;align-items:center;cursor:pointer">Off</div>
+                </div>
+              </div>
+
+              <sc-if value="{{ schTable }}" hint-placeholder-val="{{ true }}">
+                <div style="flex:1;min-height:0;border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden;display:flex;flex-direction:column">
+                  <div style="display:grid;grid-template-columns:1fr 92px 200px 118px 132px 52px;gap:12px;align-items:center;height:30px;padding:0 12px;border-bottom:1px solid var(--b1);background:var(--s1);font:600 10.5px Archivo;letter-spacing:.07em;text-transform:uppercase;color:var(--t4)">
+                    <div>Name</div><div>Kind</div><div>Cadence</div><div>Next run</div><div>Last run</div><div style="text-align:right">On</div>
+                  </div>
+                  <sc-for list="{{ schRows }}" as="r" hint-placeholder-count="6">
+                    <div style="display:grid;grid-template-columns:1fr 92px 200px 118px 132px 52px;gap:12px;align-items:center;height:30px;padding:0 12px;border-bottom:1px solid var(--s1);background:{{ r.bg }};box-shadow:{{ r.mark }};cursor:pointer" style-hover="background:var(--s1)">
+                      <div style="font:500 12px Archivo;color:{{ r.nameFg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.name }}</div>
+                      <div><span style="display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:5px;font:600 10.5px Archivo;background:{{ r.kindBg }};color:{{ r.kindFg }}">{{ r.kind }}</span></div>
+                      <div style="font:400 11.5px Archivo;color:var(--t3)">{{ r.cadence }}</div>
+                      <div style="font:400 11.5px var(--mono);color:{{ r.nextFg }}">{{ r.next }}</div>
+                      <div><span style="display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:5px;font:600 10.5px Archivo;background:{{ r.lastBg }};color:{{ r.lastFg }}">{{ r.last }}</span></div>
+                      <div style="justify-self:end"><div style="width:30px;height:17px;border-radius:9px;background:{{ r.track }};padding:2px"><div style="width:13px;height:13px;border-radius:50%;background:#fff;transform:{{ r.knob }};transition:transform 80ms ease-out"></div></div></div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ schEmpty }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:1;min-height:0;border:1px solid var(--b1);border-radius:9px;background:var(--s0);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px">
+                  <span style="font-family:'Material Symbols Rounded';font-size:30px;color:var(--t4)">schedule</span>
+                  <div style="font:600 15px Archivo">No schedules</div>
+                  <div style="font:400 12.5px Archivo;color:var(--t3)">A schedule starts a run on its own, on an interval or a cron expression.</div>
+                  <button style="height:28px;padding:0 12px;border-radius:6px;background:var(--ac);color:var(--on-ac);font:600 12px Archivo;margin-top:2px" style-hover="background:var(--ac-h)">New schedule</button>
+                </div>
+              </sc-if>
+            </div>
+
+            <sc-if value="{{ schPanel }}" hint-placeholder-val="{{ true }}">
+              <div style="width:320px;border-left:1px solid var(--b1);background:var(--s0);display:flex;flex-direction:column;min-height:0">
+                <div style="height:40px;border-bottom:1px solid var(--b1);display:flex;align-items:center;padding:0 12px;flex-shrink:0">
+                  <div style="font:600 12.5px Archivo">{{ schPanelTitle }}</div>
+                </div>
+                <div style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:16px;min-height:0">
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Name</div>
+                    <div style="height:28px;border:1px solid var(--b1);border-radius:6px;background:var(--s1);display:flex;align-items:center;padding:0 9px;font:500 12.5px Archivo;color:var(--t1)">{{ schName }}<span style="font:400 12.5px Archivo;color:var(--t4)">{{ schNamePlaceholder }}</span></div>
+                  </div>
+
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Cadence</div>
+                    <div style="display:flex;gap:2px;background:var(--s1);border:1px solid var(--b1);border-radius:6px;padding:2px">
+                      <div style="flex:1;height:22px;border-radius:5px;background:{{ schIntervalBg }};color:{{ schIntervalFg }};font:600 11.5px Archivo;display:flex;align-items:center;justify-content:center;cursor:pointer">Interval</div>
+                      <div style="flex:1;height:22px;border-radius:5px;background:{{ schCronBg }};color:{{ schCronFg }};font:600 11.5px Archivo;display:flex;align-items:center;justify-content:center;cursor:pointer">Cron</div>
+                    </div>
+                    <sc-if value="{{ schCron }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;flex-direction:column;gap:5px">
+                        <div style="height:28px;border:1px solid {{ schCronBorder }};border-radius:6px;background:var(--s1);display:flex;align-items:center;padding:0 9px;font:400 12px var(--mono);color:var(--t1)">{{ schCronValue }}</div>
+                        <div style="display:flex;align-items:center;gap:6px;font:400 11px Archivo;color:var(--dang)"><span style="font-family:'Material Symbols Rounded';font-size:14px">error</span>{{ schCronError }}</div>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ schHasRuns }}" hint-placeholder-val="{{ true }}">
+                      <div style="display:flex;align-items:center;gap:8px">
+                        <div style="height:28px;width:64px;border:1px solid var(--b1);border-radius:6px;background:var(--s1);display:flex;align-items:center;justify-content:flex-end;padding:0 9px;font:500 12px var(--mono)">30</div>
+                        <div style="flex:1;height:28px;border:1px solid var(--b1);border-radius:6px;background:var(--s1);display:flex;align-items:center;justify-content:space-between;padding:0 9px;font:400 12px Archivo;color:var(--t2)">minutes<span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--t4)">expand_more</span></div>
+                      </div>
+                      <div style="font:400 11px Archivo;color:var(--t4)">Runs every 30 minutes · next in 12 min</div>
+                    </sc-if>
+                  </div>
+
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Kind &amp; parameters</div>
+                    <div style="height:28px;border:1px solid var(--b1);border-radius:6px;background:var(--s1);display:flex;align-items:center;justify-content:space-between;padding:0 9px;font:400 12px Archivo;color:var(--t2)">sync<span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--t4)">expand_more</span></div>
+                    <div style="height:28px;border:1px solid var(--b1);border-radius:6px;background:var(--s1);display:flex;align-items:center;justify-content:space-between;padding:0 9px;font:400 12px Archivo;color:var(--t2)">Guide — long form<span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--t4)">expand_more</span></div>
+                    <div style="display:flex;gap:2px;background:var(--s1);border:1px solid var(--b1);border-radius:6px;padding:2px">
+                      <div style="flex:1;height:22px;border-radius:5px;background:var(--s2);color:var(--t1);font:600 11.5px Archivo;display:flex;align-items:center;justify-content:center">draft</div>
+                      <div style="flex:1;height:22px;border-radius:5px;color:var(--t3);font:600 11.5px Archivo;display:flex;align-items:center;justify-content:center;cursor:pointer">publish</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <div style="flex:1;font:400 12px Archivo;color:var(--t2)">Budget cap</div>
+                      <div style="height:28px;width:92px;border:1px solid var(--b1);border-radius:6px;background:var(--s1);display:flex;align-items:center;justify-content:space-between;padding:0 9px;font:500 12px var(--mono)"><span style="color:var(--t4)">$</span>25.00</div>
+                    </div>
+                  </div>
+
+                  <sc-if value="{{ schHasRuns }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex;flex-direction:column;gap:6px">
+                      <div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Last runs</div>
+                      <sc-for list="{{ schRuns }}" as="r" hint-placeholder-count="5">
+                        <a href="#screen-run" style="display:flex;align-items:center;gap:8px;height:26px;color:inherit">
+                          <div style="font:500 11.5px var(--mono);color:var(--t2);width:34px">{{ r.id }}</div>
+                          <span style="display:inline-flex;align-items:center;height:17px;padding:0 6px;border-radius:5px;font:600 10px Archivo;background:{{ r.bg }};color:{{ r.fg }}">{{ r.status }}</span>
+                          <div style="flex:1;font:400 10.5px var(--mono);color:var(--t4);text-align:right">{{ r.when }}</div>
+                        </a>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+                <div style="border-top:1px solid var(--b1);padding:12px;display:flex;flex-direction:column;gap:7px;flex-shrink:0">
+                  <button style="height:28px;border-radius:6px;background:var(--ac);color:var(--on-ac);font:600 12px Archivo" style-hover="background:var(--ac-h)">Run now</button>
+                  <div style="display:flex;gap:7px">
+                    <button style="flex:1;height:28px;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 12px Archivo" style-hover="background:var(--s3)">Disable</button>
+                    <button style="flex:1;height:28px;border-radius:6px;background:transparent;border:1px solid color-mix(in oklab, var(--dang) 45%, transparent);color:var(--dang);font:600 12px Archivo" style-hover="background:var(--dang-s)">Delete</button>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+
+      <div style="height:26px;border-top:1px solid var(--b1);background:var(--s0);display:flex;align-items:center;justify-content:space-between;padding:0 12px;font:400 11px var(--mono);flex-shrink:0">
+        <div style="display:flex;align-items:center;gap:16px">
+          <a href="#screen-run" style="display:flex;align-items:center;gap:6px;color:var(--t2)"><span style="width:6px;height:6px;border-radius:50%;background:var(--info);animation:pulse 1.6s ease-in-out infinite"></span>Run #241 · generate · 142/512</a>
+          <span style="color:var(--t4)">today $18.40</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px">
+          <span style="display:flex;align-items:center;gap:6px;color:var(--t4)"><span style="font-family:'Material Symbols Rounded';font-size:13px;color:var(--ok)">extension</span>Plugin v1.4.2</span>
+          <span style="display:flex;align-items:center;gap:6px;color:var(--t4)"><span style="font-family:'Material Symbols Rounded';font-size:13px;color:var(--ok)">lock_open</span>Unlocked · auto-lock 20 min</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-import" style="width:1280px;display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:baseline;gap:10px"><div style="font:600 15px Archivo">10 · Import</div><div style="font:400 12px Archivo;color:var(--t4)">A spreadsheet becomes entities and pages, in four visible steps.</div></div>
+      <div style="display:flex;gap:3px;background:var(--s0);border:1px solid var(--b1);border-radius:7px;padding:3px">
+        <sc-for list="{{ impStates }}" as="s" hint-placeholder-count="5">
+          <button onClick="{{ s.on }}" style="height:23px;padding:0 10px;border-radius:5px;white-space:nowrap;font:500 11.5px Archivo;background:{{ s.bg }};color:{{ s.fg }}">{{ s.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+    <div style="width:1280px;height:820px;border:1px solid var(--b2);border-radius:10px;overflow:hidden;background:var(--page);display:flex;flex-direction:column">
+
+      <div style="height:40px;border-bottom:1px solid var(--b1);background:var(--s0);display:flex;align-items:center;justify-content:space-between;padding-left:12px;flex-shrink:0;position:relative">
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="display:flex;align-items:center;gap:8px"><div style="width:17px;height:17px;border-radius:5px;background:var(--ac);display:flex;align-items:center;justify-content:center;color:var(--on-ac);font:700 10px Archivo">P</div><div style="font:600 12.5px Archivo">Postulator</div></div>
+          <div style="width:1px;height:18px;background:var(--b1)"></div>
+          <div style="display:flex;align-items:center;gap:8px;height:28px;padding:0 8px 0 9px;border-radius:6px;background:var(--s1);border:1px solid var(--b1);cursor:pointer" style-hover="background:var(--s2)">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--ok)"></span>
+            <div style="display:flex;flex-direction:column;gap:1px"><div style="font:600 11.5px/1 Archivo">Clay &amp; Kiln</div><div style="font:400 9.5px/1 var(--mono);color:var(--t4)">https://clayandkiln.com</div></div>
+            <span style="font-family:'Material Symbols Rounded';font-size:16px;color:var(--t3)">unfold_more</span>
+          </div>
+        </div>
+        <div style="position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;height:26px;padding:0 9px;border-radius:6px;background:var(--s1);border:1px solid var(--b1);width:330px;cursor:pointer" style-hover="border-color:var(--b2)">
+          <span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--t4)">search</span>
+          <div style="font:400 12px Archivo;color:var(--t4);flex:1">Search entities, pages, runs…</div>
+          <kbd style="font:500 9.5px var(--mono);background:var(--s3);border:1px solid var(--b2);border-radius:4px;padding:1px 5px;color:var(--t3)">Ctrl K</kbd>
+        </div>
+        <div style="display:flex">
+          <div style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--t3)" style-hover="background:var(--s1)"><span style="font-family:'Material Symbols Rounded';font-size:17px">remove</span></div>
+          <div style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--t3)" style-hover="background:var(--s1)"><span style="font-family:'Material Symbols Rounded';font-size:15px">crop_square</span></div>
+          <div style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--t3)" style-hover="background:var(--dang);color:#fff"><span style="font-family:'Material Symbols Rounded';font-size:17px">close</span></div>
+        </div>
+      </div>
+
+      <div style="flex:1;display:flex;min-height:0">
+        <div style="width:68px;border-right:1px solid var(--b1);background:var(--s0);display:flex;flex-direction:column;justify-content:space-between;flex-shrink:0;padding:6px 0">
+          <div style="display:flex;flex-direction:column">
+            <sc-for list="{{ railImpTop }}" as="g" hint-placeholder-count="2">
+              <div style="display:flex;flex-direction:column;gap:2px;padding:0 6px 7px;margin-bottom:7px;border-bottom:1px solid var(--b1)">
+                <sc-for list="{{ g.items }}" as="r" hint-placeholder-count="5">
+                  <a href="#screen-{{ r.a }}" style="position:relative;height:44px;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:{{ r.fg }};background:{{ r.bg }}" style-hover="background:var(--s2);color:var(--t1)">
+                    <span style="font-family:'Material Symbols Rounded';font-size:18px">{{ r.i }}</span>
+                    <span style="font:500 10px Archivo">{{ r.l }}</span>
+                    <span style="position:absolute;left:-6px;top:11px;width:2px;height:22px;border-radius:1px;background:{{ r.bar }}"></span>
+                  </a>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px;padding:7px 6px 0;border-top:1px solid var(--b1)">
+            <sc-for list="{{ railImpBot }}" as="r" hint-placeholder-count="3">
+              <a href="#screen-{{ r.a }}" style="position:relative;height:44px;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:{{ r.fg }};background:{{ r.bg }}" style-hover="background:var(--s2);color:var(--t1)">
+                <span style="font-family:'Material Symbols Rounded';font-size:18px">{{ r.i }}</span>
+                <span style="font:500 10px Archivo">{{ r.l }}</span>
+              </a>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+          <div style="height:40px;border-bottom:1px solid var(--b1);display:flex;align-items:center;padding:0 16px;flex-shrink:0;gap:16px">
+            <div style="width:200px;font:600 14px Archivo">Import</div>
+            <div style="flex:1;display:flex;justify-content:center;gap:2px;align-self:stretch">
+              <sc-for list="{{ impTabs }}" as="t" hint-placeholder-count="2">
+                <button onClick="{{ t.on }}" style="padding:0 12px;font:600 12px Archivo;color:{{ t.fg }};border-bottom:2px solid {{ t.bd }};margin-bottom:-1px">{{ t.label }}</button>
+              </sc-for>
+            </div>
+            <div style="width:200px"></div>
+          </div>
+
+          <sc-if value="{{ impWizard }}" hint-placeholder-val="{{ true }}">
+            <div style="height:52px;border-bottom:1px solid var(--b1);display:flex;align-items:center;padding:0 16px;gap:0;flex-shrink:0">
+              <sc-for list="{{ impSteps }}" as="s" hint-placeholder-count="4">
+                <div style="display:flex;align-items:center;gap:10px;flex:1">
+                  <div style="width:22px;height:22px;border-radius:50%;border:1px solid {{ s.bd }};background:{{ s.bg }};color:{{ s.fg }};display:flex;align-items:center;justify-content:center;font:600 11px var(--mono);flex-shrink:0">{{ s.n }}</div>
+                  <div style="font:600 12.5px Archivo;color:{{ s.textFg }};flex-shrink:0">{{ s.label }}</div>
+                  <div style="flex:1;height:1px;background:{{ s.line }};margin-right:12px"></div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <div style="flex:1;display:flex;min-height:0">
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;padding:16px;gap:12px;min-height:0">
+
+              <sc-if value="{{ impStep1 }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;gap:16px;flex:1;min-height:0">
+                  <div style="height:168px;border:1px dashed var(--b2);border-radius:9px;background:var(--s0);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;flex-shrink:0">
+                    <span style="font-family:'Material Symbols Rounded';font-size:28px;color:var(--t4)">upload_file</span>
+                    <div style="font:600 13px Archivo">Drop a CSV or XLSX here</div>
+                    <div style="font:400 11.5px Archivo;color:var(--t3)">One row per page. Up to 20 000 rows.</div>
+                    <button style="height:28px;padding:0 12px;border-radius:6px;background:var(--ac);color:var(--on-ac);font:600 12px Archivo;margin-top:2px" style-hover="background:var(--ac-h)">Choose file…</button>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:8px;min-height:0">
+                    <div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Recent files</div>
+                    <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden">
+                      <sc-for list="{{ impRecent }}" as="f" hint-placeholder-count="5">
+                        <div style="display:grid;grid-template-columns:1fr 110px 96px;gap:12px;align-items:center;height:30px;padding:0 12px;border-bottom:1px solid var(--s1);cursor:pointer" style-hover="background:var(--s1)">
+                          <div style="font:400 12px var(--mono);color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ f.name }}</div>
+                          <div style="font:400 11.5px var(--mono);color:var(--t4)">{{ f.rows }}</div>
+                          <div style="font:400 11.5px var(--mono);color:var(--t4);text-align:right">{{ f.when }}</div>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ impStep2 }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;gap:12px;flex:1;min-height:0">
+                  <div style="flex:1;min-height:0;border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden;display:flex;flex-direction:column">
+                    <div style="display:grid;grid-template-columns:150px 1fr 78px 176px;gap:12px;align-items:center;height:30px;padding:0 12px;border-bottom:1px solid var(--b1);background:var(--s1);font:600 10.5px Archivo;letter-spacing:.07em;text-transform:uppercase;color:var(--t4)">
+                      <div>Column</div><div>Sample values</div><div>Type</div><div>Target field</div>
+                    </div>
+                    <sc-for list="{{ impCols }}" as="c" hint-placeholder-count="8">
+                      <div style="display:grid;grid-template-columns:150px 1fr 78px 176px;gap:12px;align-items:center;min-height:44px;padding:6px 12px;border-bottom:1px solid var(--s1)">
+                        <div style="display:flex;align-items:center;gap:6px;min-width:0">
+                          <span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--warn)">{{ c.warn }}</span>
+                          <div style="font:500 12px Archivo;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.header }}</div>
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:1px;min-width:0">
+                          <div style="font:400 10.5px var(--mono);color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.s1 }}</div>
+                          <div style="font:400 10.5px var(--mono);color:var(--t4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.s2 }}</div>
+                          <div style="font:400 10.5px var(--mono);color:var(--t4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.s3 }}</div>
+                        </div>
+                        <div style="font:400 11px var(--mono);color:var(--t4)">{{ c.type }}</div>
+                        <div style="height:28px;border:1px solid {{ c.bd }};border-radius:6px;background:var(--s1);display:flex;align-items:center;justify-content:space-between;padding:0 9px;font:400 11.5px var(--mono);color:{{ c.fg }};cursor:pointer">{{ c.target }}<span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--t4)">expand_more</span></div>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                    <div style="display:flex;align-items:center;gap:6px;font:400 11.5px Archivo;color:var(--warn);flex:1"><span style="font-family:'Material Symbols Rounded';font-size:15px">warning</span>Two columns are not mapped. They will be ignored.</div>
+                    <button style="height:28px;padding:0 11px;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 12px Archivo" style-hover="background:var(--s3)">Save mapping as…</button>
+                    <button style="height:28px;padding:0 11px;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 12px Archivo" style-hover="background:var(--s3)">Back</button>
+                    <button style="height:28px;padding:0 14px;border-radius:6px;background:var(--ac);color:var(--on-ac);font:600 12px Archivo" style-hover="background:var(--ac-h)">Next</button>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ impStep3 }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;gap:12px;flex:1;min-height:0">
+                  <div style="display:flex;align-items:center;gap:7px;flex-shrink:0">
+                    <span style="display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:6px;font:600 11.5px Archivo;background:var(--ok-s);color:var(--ok)">12 new</span>
+                    <span style="display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:6px;font:600 11.5px Archivo;background:var(--info-s);color:var(--info)">4 updated</span>
+                    <span style="display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:6px;font:600 11.5px Archivo;background:var(--mut-s);color:var(--t3)">2 skipped</span>
+                  </div>
+                  <div style="flex:1;min-height:0;border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden;display:flex;flex-direction:column">
+                    <div style="display:grid;grid-template-columns:1fr 168px 96px 88px;gap:12px;align-items:center;height:30px;padding:0 12px;border-bottom:1px solid var(--b1);background:var(--s1);font:600 10.5px Archivo;letter-spacing:.07em;text-transform:uppercase;color:var(--t4)">
+                      <div>Page path</div><div>Entity</div><div>Kind</div><div style="text-align:right">Action</div>
+                    </div>
+                    <sc-for list="{{ impPreview }}" as="p" hint-placeholder-count="8">
+                      <div style="display:grid;grid-template-columns:1fr 168px 96px 88px;gap:12px;align-items:center;height:30px;padding:0 12px;border-bottom:1px solid var(--s1)">
+                        <div style="font:400 11.5px var(--mono);color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.path }}</div>
+                        <div style="font:400 12px Archivo;color:var(--t3)">{{ p.entity }}</div>
+                        <div style="font:400 11.5px var(--mono);color:var(--t4)">{{ p.kind }}</div>
+                        <div style="justify-self:end"><span style="display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:5px;font:600 10.5px Archivo;background:{{ p.bg }};color:{{ p.fg }}">{{ p.action }}</span></div>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;justify-content:flex-end;gap:8px;flex-shrink:0">
+                    <button style="height:28px;padding:0 11px;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 12px Archivo" style-hover="background:var(--s3)">Back</button>
+                    <button style="height:28px;padding:0 14px;border-radius:6px;background:var(--ac);color:var(--on-ac);font:600 12px Archivo" style-hover="background:var(--ac-h)">Apply</button>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ impStep4 }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;gap:16px;flex:1;min-height:0">
+                  <div style="display:flex;flex-direction:column;gap:7px">
+                    <div style="display:flex;align-items:center;justify-content:space-between"><div style="font:500 12px Archivo;color:var(--t2)">Applied 18 rows</div><div style="font:400 11.5px var(--mono);color:var(--ok)">done · 4.2 s</div></div>
+                    <div style="height:5px;border-radius:3px;background:var(--s2);overflow:hidden"><div style="width:100%;height:100%;background:var(--ok)"></div></div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+                    <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);padding:12px;display:flex;flex-direction:column;gap:6px"><div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Created</div><div style="font:600 24px Archivo;color:var(--ok);letter-spacing:-0.02em">12</div><div style="font:400 11px Archivo;color:var(--t4)">8 entities · 12 pages</div></div>
+                    <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);padding:12px;display:flex;flex-direction:column;gap:6px"><div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Updated</div><div style="font:600 24px Archivo;color:var(--info);letter-spacing:-0.02em">4</div><div style="font:400 11px Archivo;color:var(--t4)">paths and parents</div></div>
+                    <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);padding:12px;display:flex;flex-direction:column;gap:6px"><div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Skipped</div><div style="font:600 24px Archivo;color:var(--t3);letter-spacing:-0.02em">2</div><div style="font:400 11px Archivo;color:var(--t4)">blocking findings</div></div>
+                  </div>
+                  <div style="display:flex;gap:8px">
+                    <a href="#screen-graph" style="display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:6px;background:var(--ac);color:var(--on-ac);font:600 12px Archivo" style-hover="background:var(--ac-h)">Open graph</a>
+                    <a href="#screen-pages" style="display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 12px Archivo" style-hover="background:var(--s3)">Open pages</a>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ impExport }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;gap:16px;max-width:560px">
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">What to export</div>
+                    <div style="display:flex;gap:2px;background:var(--s1);border:1px solid var(--b1);border-radius:6px;padding:2px;width:300px">
+                      <div style="flex:1;height:24px;border-radius:5px;color:var(--t3);font:600 11.5px Archivo;display:flex;align-items:center;justify-content:center;cursor:pointer">Pages</div>
+                      <div style="flex:1;height:24px;border-radius:5px;color:var(--t3);font:600 11.5px Archivo;display:flex;align-items:center;justify-content:center;cursor:pointer">Entities</div>
+                      <div style="flex:1;height:24px;border-radius:5px;background:var(--s2);color:var(--t1);font:600 11.5px Archivo;display:flex;align-items:center;justify-content:center">Both</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Destination file</div>
+                    <div style="display:flex;gap:8px">
+                      <div style="flex:1;height:28px;border:1px solid var(--b1);border-radius:6px;background:var(--s1);display:flex;align-items:center;padding:0 9px;font:400 11.5px var(--mono);color:var(--t2)">C:\Users\dm\Documents\clayandkiln-export.csv</div>
+                      <button style="height:28px;padding:0 11px;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 12px Archivo" style-hover="background:var(--s3)">Choose…</button>
+                    </div>
+                  </div>
+                  <button style="height:28px;width:100px;border-radius:6px;background:var(--ac);color:var(--on-ac);font:600 12px Archivo" style-hover="background:var(--ac-h)">Export</button>
+                </div>
+              </sc-if>
+            </div>
+
+            <sc-if value="{{ impPanel }}" hint-placeholder-val="{{ true }}">
+              <div style="width:320px;border-left:1px solid var(--b1);background:var(--s0);display:flex;flex-direction:column;min-height:0">
+                <sc-if value="{{ impStep1 }}" hint-placeholder-val="{{ true }}">
+                  <div style="height:30px;border-bottom:1px solid var(--b1);display:flex;align-items:center;padding:0 12px;font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4);flex-shrink:0">Saved mappings</div>
+                  <div style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;min-height:0">
+                    <sc-for list="{{ impSaved }}" as="m" hint-placeholder-count="3">
+                      <div style="border:1px solid var(--b1);border-radius:8px;background:var(--s1);padding:12px;display:flex;flex-direction:column;gap:7px">
+                        <div style="font:600 12px Archivo">{{ m.name }}</div>
+                        <div style="font:400 10.5px/1.5 var(--mono);color:var(--t4)">{{ m.cols }}</div>
+                        <div style="display:flex;align-items:center;justify-content:space-between"><div style="font:400 10.5px var(--mono);color:var(--t4)">used {{ m.used }}</div><button style="height:24px;padding:0 10px;border-radius:5px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 11px Archivo" style-hover="background:var(--s3)">Use</button></div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ impStep3 }}" hint-placeholder-val="{{ false }}">
+                  <div style="height:30px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;padding:0 12px;flex-shrink:0">
+                    <div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Warnings</div>
+                    <div style="font:500 10.5px var(--mono);color:var(--warn)">6</div>
+                  </div>
+                  <div style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;min-height:0">
+                    <sc-for list="{{ impWarnings }}" as="w" hint-placeholder-count="6">
+                      <div style="display:flex;gap:9px">
+                        <div style="font:500 11px var(--mono);color:var(--t4);width:30px;flex-shrink:0;padding-top:1px">r{{ w.row }}</div>
+                        <div style="display:flex;flex-direction:column;gap:3px;min-width:0">
+                          <div style="font:500 11px var(--mono);color:var(--warn)">{{ w.code }}</div>
+                          <div style="font:400 11.5px/1.45 Archivo;color:var(--t3)">{{ w.why }}</div>
+                        </div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+
+      <div style="height:26px;border-top:1px solid var(--b1);background:var(--s0);display:flex;align-items:center;justify-content:space-between;padding:0 12px;font:400 11px var(--mono);flex-shrink:0">
+        <div style="display:flex;align-items:center;gap:16px">
+          <a href="#screen-run" style="display:flex;align-items:center;gap:6px;color:var(--t2)"><span style="width:6px;height:6px;border-radius:50%;background:var(--info);animation:pulse 1.6s ease-in-out infinite"></span>Run #241 · generate · 142/512</a>
+          <span style="color:var(--t4)">today $18.40</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px">
+          <span style="display:flex;align-items:center;gap:6px;color:var(--t4)"><span style="font-family:'Material Symbols Rounded';font-size:13px;color:var(--ok)">extension</span>Plugin v1.4.2</span>
+          <span style="display:flex;align-items:center;gap:6px;color:var(--t4)"><span style="font-family:'Material Symbols Rounded';font-size:13px;color:var(--ok)">lock_open</span>Unlocked · auto-lock 20 min</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-settings" style="width:1280px;display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:baseline;gap:10px"><div style="font:600 15px Archivo">11 · Settings</div><div style="font:400 12px Archivo;color:var(--t4)">Backend keys, shown as they exist. Values save on blur.</div></div>
+      <div style="display:flex;gap:3px;background:var(--s0);border:1px solid var(--b1);border-radius:7px;padding:3px">
+        <sc-for list="{{ setStates }}" as="s" hint-placeholder-count="6">
+          <button onClick="{{ s.on }}" style="height:23px;padding:0 10px;border-radius:5px;white-space:nowrap;font:500 11.5px Archivo;background:{{ s.bg }};color:{{ s.fg }}">{{ s.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+    <div style="width:1280px;height:820px;border:1px solid var(--b2);border-radius:10px;overflow:hidden;background:var(--page);display:flex;flex-direction:column">
+
+      <div style="height:40px;border-bottom:1px solid var(--b1);background:var(--s0);display:flex;align-items:center;justify-content:space-between;padding-left:12px;flex-shrink:0;position:relative">
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="display:flex;align-items:center;gap:8px"><div style="width:17px;height:17px;border-radius:5px;background:var(--ac);display:flex;align-items:center;justify-content:center;color:var(--on-ac);font:700 10px Archivo">P</div><div style="font:600 12.5px Archivo">Postulator</div></div>
+          <div style="width:1px;height:18px;background:var(--b1)"></div>
+          <div style="display:flex;align-items:center;gap:8px;height:28px;padding:0 8px 0 9px;border-radius:6px;background:var(--s1);border:1px solid var(--b1);cursor:pointer" style-hover="background:var(--s2)">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--ok)"></span>
+            <div style="display:flex;flex-direction:column;gap:1px"><div style="font:600 11.5px/1 Archivo">Clay &amp; Kiln</div><div style="font:400 9.5px/1 var(--mono);color:var(--t4)">https://clayandkiln.com</div></div>
+            <span style="font-family:'Material Symbols Rounded';font-size:16px;color:var(--t3)">unfold_more</span>
+          </div>
+        </div>
+        <div style="position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;height:26px;padding:0 9px;border-radius:6px;background:var(--s1);border:1px solid var(--b1);width:330px;cursor:pointer" style-hover="border-color:var(--b2)">
+          <span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--t4)">search</span>
+          <div style="font:400 12px Archivo;color:var(--t4);flex:1">Search entities, pages, runs…</div>
+          <kbd style="font:500 9.5px var(--mono);background:var(--s3);border:1px solid var(--b2);border-radius:4px;padding:1px 5px;color:var(--t3)">Ctrl K</kbd>
+        </div>
+        <div style="display:flex">
+          <div style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--t3)" style-hover="background:var(--s1)"><span style="font-family:'Material Symbols Rounded';font-size:17px">remove</span></div>
+          <div style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--t3)" style-hover="background:var(--s1)"><span style="font-family:'Material Symbols Rounded';font-size:15px">crop_square</span></div>
+          <div style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--t3)" style-hover="background:var(--dang);color:#fff"><span style="font-family:'Material Symbols Rounded';font-size:17px">close</span></div>
+        </div>
+      </div>
+
+      <div style="flex:1;display:flex;min-height:0">
+        <div style="width:68px;border-right:1px solid var(--b1);background:var(--s0);display:flex;flex-direction:column;justify-content:space-between;flex-shrink:0;padding:6px 0">
+          <div style="display:flex;flex-direction:column">
+            <sc-for list="{{ railSetTop }}" as="g" hint-placeholder-count="2">
+              <div style="display:flex;flex-direction:column;gap:2px;padding:0 6px 7px;margin-bottom:7px;border-bottom:1px solid var(--b1)">
+                <sc-for list="{{ g.items }}" as="r" hint-placeholder-count="5">
+                  <a href="#screen-{{ r.a }}" style="position:relative;height:44px;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:{{ r.fg }};background:{{ r.bg }}" style-hover="background:var(--s2);color:var(--t1)">
+                    <span style="font-family:'Material Symbols Rounded';font-size:18px">{{ r.i }}</span>
+                    <span style="font:500 10px Archivo">{{ r.l }}</span>
+                    <span style="position:absolute;left:-6px;top:11px;width:2px;height:22px;border-radius:1px;background:{{ r.bar }}"></span>
+                  </a>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px;padding:7px 6px 0;border-top:1px solid var(--b1)">
+            <sc-for list="{{ railSetBot }}" as="r" hint-placeholder-count="3">
+              <a href="#screen-{{ r.a }}" style="position:relative;height:44px;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:{{ r.fg }};background:{{ r.bg }}" style-hover="background:var(--s2);color:var(--t1)">
+                <span style="font-family:'Material Symbols Rounded';font-size:18px">{{ r.i }}</span>
+                <span style="font:500 10px Archivo">{{ r.l }}</span>
+              </a>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+          <div style="height:40px;border-bottom:1px solid var(--b1);display:flex;align-items:center;padding:0 16px;flex-shrink:0;gap:16px">
+            <div style="width:170px;font:600 14px Archivo">Settings</div>
+            <div style="flex:1;display:flex;justify-content:center;gap:2px;align-self:stretch">
+              <sc-for list="{{ setTabs }}" as="t" hint-placeholder-count="5">
+                <button onClick="{{ t.on }}" style="padding:0 12px;font:600 12px Archivo;color:{{ t.fg }};border-bottom:2px solid {{ t.bd }};margin-bottom:-1px">{{ t.label }}</button>
+              </sc-for>
+            </div>
+            <div style="width:170px"></div>
+          </div>
+
+          <sc-if value="{{ setGeneral }}" hint-placeholder-val="{{ true }}">
+            <div style="height:48px;border-bottom:1px solid var(--b1);display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0">
+              <div style="display:flex;align-items:center;gap:7px;height:28px;padding:0 9px;border-radius:6px;background:var(--s1);border:1px solid var(--b1);width:260px">
+                <span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--t4)">search</span>
+                <div style="font:400 12px Archivo;color:var(--t4)">Search settings…</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="width:30px;height:17px;border-radius:9px;background:var(--s3);padding:2px"><div style="width:13px;height:13px;border-radius:50%;background:#fff"></div></div>
+                <div style="font:400 12px Archivo;color:var(--t2)">Changed only</div>
+              </div>
+            </div>
+            <div style="flex:1;overflow-y:auto;padding:16px;min-height:0">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+                <sc-for list="{{ setGroups }}" as="g" hint-placeholder-count="8">
+                  <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden">
+                    <div style="height:30px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid var(--b1);background:var(--s1);font:600 10.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--t3)">{{ g.g }}</div>
+                    <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="4">
+                      <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--s1)">
+                        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                          <div style="font:400 12.5px Archivo;color:var(--t1)">{{ r.label }}</div>
+                          <div style="font:400 10px var(--mono);color:var(--t4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.key }}</div>
+                          <div style="font:400 10.5px Archivo;color:var(--dang)">{{ r.error }}</div>
+                        </div>
+                        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0">
+                          <sc-if value="{{ r.isSwitch }}" hint-placeholder-val="{{ false }}">
+                            <div style="width:30px;height:17px;border-radius:9px;background:{{ r.track }};padding:2px"><div style="width:13px;height:13px;border-radius:50%;background:#fff;transform:{{ r.knob }}"></div></div>
+                          </sc-if>
+                          <sc-if value="{{ r.isNum }}" hint-placeholder-val="{{ true }}">
+                            <div style="height:26px;width:104px;border:1px solid {{ r.bd }};border-radius:6px;background:var(--s1);display:flex;align-items:center;justify-content:flex-end;padding:0 8px;font:500 11.5px var(--mono);color:var(--t1)">{{ r.value }}</div>
+                          </sc-if>
+                          <sc-if value="{{ r.isText }}" hint-placeholder-val="{{ false }}">
+                            <div style="height:26px;width:160px;border:1px solid {{ r.bd }};border-radius:6px;background:var(--s1);display:flex;align-items:center;justify-content:flex-end;padding:0 8px;font:400 11px var(--mono);color:var(--t2);overflow:hidden;white-space:nowrap">{{ r.value }}</div>
+                          </sc-if>
+                          <div style="font:400 10px var(--mono);color:var(--t4)">{{ r.bounds }}</div>
+                        </div>
+                        <div style="width:54px;display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
+                          <div style="font:500 9.5px Archivo;letter-spacing:.06em;text-transform:uppercase;color:var(--t4)">{{ r.def }}</div>
+                          <button style="font:600 10.5px Archivo;color:{{ r.resetFg }}" style-hover="color:var(--ac)">Reset</button>
+                        </div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ setModels }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px;min-height:0">
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;flex-shrink:0">
+                <sc-for list="{{ setProviders }}" as="p" hint-placeholder-count="4">
+                  <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);padding:12px;display:flex;flex-direction:column;gap:10px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                      <div style="font:600 12.5px Archivo;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.name }}</div>
+                      <span style="display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:5px;font:600 10.5px Archivo;background:{{ p.chipBg }};color:{{ p.chipFg }};flex-shrink:0">{{ p.status }}</span>
+                    </div>
+                    <div style="font:400 10.5px var(--mono);color:var(--t4)">{{ p.key }}</div>
+                    <div style="display:flex;gap:6px">
+                      <button style="height:26px;flex:1;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 11px Archivo" style-hover="background:var(--s3)">Set key…</button>
+                      <button style="height:26px;padding:0 9px;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 11px Archivo" style-hover="background:var(--s3)">Test</button>
+                      <button style="height:26px;padding:0 9px;border-radius:6px;background:transparent;border:1px solid color-mix(in oklab, var(--dang) 40%, transparent);color:var(--dang);font:600 11px Archivo" style-hover="background:var(--dang-s)">Revoke</button>
+                    </div>
+                    <div style="font:400 10.5px var(--mono);color:{{ p.resFg }}">{{ p.result }}</div>
+                  </div>
+                </sc-for>
+              </div>
+
+              <div style="display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:start;flex-shrink:0">
+                <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden">
+                  <div style="height:30px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid var(--b1);background:var(--s1);font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Role profiles</div>
+                  <sc-for list="{{ setRoles }}" as="r" hint-placeholder-count="7">
+                    <div style="display:grid;grid-template-columns:120px 1fr 1fr;gap:12px;align-items:center;height:38px;padding:0 12px;border-bottom:1px solid var(--s1)">
+                      <div style="font:500 12.5px Archivo">{{ r.role }}</div>
+                      <div style="height:26px;border:1px solid var(--b1);border-radius:6px;background:var(--s1);display:flex;align-items:center;justify-content:space-between;padding:0 9px;font:400 11.5px var(--mono);color:var(--t2)">{{ r.provider }}<span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--t4)">expand_more</span></div>
+                      <div style="height:26px;border:1px solid var(--b1);border-radius:6px;background:var(--s1);display:flex;align-items:center;justify-content:space-between;padding:0 9px;font:400 11.5px var(--mono);color:var(--t2)">{{ r.model }}<span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--t4)">expand_more</span></div>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);padding:12px;display:flex;flex-direction:column;gap:8px">
+                  <div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Lifetime spend</div>
+                  <div style="font:600 26px Archivo;letter-spacing:-0.02em">$1 284.60</div>
+                  <div style="font:400 11.5px var(--mono);color:var(--t4)">48 211 calls · since 14 Jun</div>
+                </div>
+              </div>
+
+              <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden;flex-shrink:0">
+                <div style="height:30px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-bottom:1px solid var(--b1);background:var(--s1)">
+                  <div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Model catalog</div>
+                  <div style="font:400 10px var(--mono);color:var(--t4)">USD per million tokens</div>
+                </div>
+                <div style="display:grid;grid-template-columns:130px 1fr 92px 92px 1fr 52px;gap:12px;align-items:center;height:30px;padding:0 12px;border-bottom:1px solid var(--b1);font:600 10.5px Archivo;letter-spacing:.07em;text-transform:uppercase;color:var(--t4)">
+                  <div>Provider</div><div>Model</div><div style="text-align:right">Input</div><div style="text-align:right">Output</div><div>Limits</div><div style="text-align:right">On</div>
+                </div>
+                <sc-for list="{{ setCatalog }}" as="c" hint-placeholder-count="6">
+                  <div style="display:grid;grid-template-columns:130px 1fr 92px 92px 1fr 52px;gap:12px;align-items:center;height:30px;padding:0 12px;border-bottom:1px solid var(--s1);cursor:pointer" style-hover="background:var(--s1)">
+                    <div style="font:400 11.5px var(--mono);color:var(--t3)">{{ c.provider }}</div>
+                    <div style="font:500 12px Archivo;color:var(--t1)">{{ c.model }}</div>
+                    <div style="font:500 11.5px var(--mono);color:var(--t2);text-align:right">{{ c.inp }}</div>
+                    <div style="font:500 11.5px var(--mono);color:var(--t2);text-align:right">{{ c.out }}</div>
+                    <div style="font:400 11px var(--mono);color:var(--t4)">{{ c.limits }}</div>
+                    <div style="justify-self:end"><div style="width:30px;height:17px;border-radius:9px;background:{{ c.track }};padding:2px"><div style="width:13px;height:13px;border-radius:50%;background:#fff;transform:{{ c.knob }}"></div></div></div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ setBrowser }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;padding:16px;min-height:0">
+              <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);padding:12px;display:flex;flex-direction:column;gap:12px;max-width:640px">
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <div style="font:600 12.5px Archivo">Tor Browser</div>
+                  <span style="display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:5px;font:600 10.5px Archivo;background:{{ setTorChipBg }};color:{{ setTorChipFg }}">{{ setTorChip }}</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:5px">
+                  <div style="height:28px;border:1px solid {{ setTorBorder }};border-radius:6px;background:var(--s1);display:flex;align-items:center;padding:0 9px;font:400 11.5px var(--mono);color:var(--t2);overflow:hidden;white-space:nowrap">{{ setTorPath }}</div>
+                  <div style="display:flex;align-items:center;gap:6px;font:400 11px Archivo;color:var(--dang)">{{ setTorError }}</div>
+                </div>
+                <div style="display:flex;gap:8px">
+                  <button style="height:28px;padding:0 12px;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 12px Archivo" style-hover="background:var(--s3)">Choose…</button>
+                  <button style="height:28px;padding:0 12px;border-radius:6px;background:var(--ac);color:var(--on-ac);font:600 12px Archivo" style-hover="background:var(--ac-h)">Test in browser</button>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ setSecurity }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px;min-height:0;max-width:760px">
+              <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:9px;background:var(--warn-s);border:1px solid color-mix(in oklab, var(--warn) 40%, transparent)">
+                <span style="font-family:'Material Symbols Rounded';font-size:17px;color:var(--warn)">warning</span>
+                <div style="font:500 12px Archivo;color:var(--warn);flex:1">A run is active. Importing a backup will stop it.</div>
+                <a href="#screen-run" style="font:600 11.5px Archivo">Open run #241</a>
+              </div>
+              <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);padding:12px;display:flex;align-items:center;gap:12px">
+                <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                  <div style="font:600 12.5px Archivo">Master password</div>
+                  <div style="font:400 11.5px Archivo;color:var(--t3)">Set · unlocks provider keys and the vault at startup</div>
+                </div>
+                <button style="height:28px;padding:0 12px;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 12px Archivo" style-hover="background:var(--s3)">Change…</button>
+                <button style="height:28px;padding:0 12px;border-radius:6px;background:transparent;border:1px solid color-mix(in oklab, var(--dang) 45%, transparent);color:var(--dang);font:600 12px Archivo" style-hover="background:var(--dang-s)">Remove…</button>
+                <a href="#screen-lock" style="display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:6px;background:var(--ac);color:var(--on-ac);font:600 12px Archivo" style-hover="background:var(--ac-h)">Lock now</a>
+              </div>
+              <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden">
+                <div style="height:30px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid var(--b1);background:var(--s1);font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Backup</div>
+                <div style="padding:12px;display:flex;flex-direction:column;gap:12px">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <div style="width:64px;font:500 12px Archivo;color:var(--t2)">Export</div>
+                    <div style="flex:1;height:28px;border:1px solid var(--b1);border-radius:6px;background:var(--s1);display:flex;align-items:center;padding:0 9px;font:400 11px var(--mono);color:var(--t2);overflow:hidden;white-space:nowrap">C:\Users\dm\Documents\postulator-2026-09-20.bak</div>
+                    <button style="height:28px;padding:0 10px;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 11.5px Archivo" style-hover="background:var(--s3)">Choose…</button>
+                    <div style="width:132px;height:28px;border:1px solid var(--b1);border-radius:6px;background:var(--s1);display:flex;align-items:center;padding:0 9px;font:400 12px var(--mono);color:var(--t3)">••••••••</div>
+                    <button style="height:28px;padding:0 12px;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 12px Archivo" style-hover="background:var(--s3)">Export…</button>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <div style="width:64px;font:500 12px Archivo;color:var(--t2)">Import</div>
+                    <div style="flex:1;height:28px;border:1px solid var(--b1);border-radius:6px;background:var(--s1);display:flex;align-items:center;padding:0 9px;font:400 11px var(--mono);color:var(--t4);overflow:hidden;white-space:nowrap">Choose a .bak file</div>
+                    <button style="height:28px;padding:0 10px;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 11.5px Archivo" style-hover="background:var(--s3)">Choose…</button>
+                    <div style="width:132px;height:28px;border:1px solid var(--b1);border-radius:6px;background:var(--s1);display:flex;align-items:center;padding:0 9px;font:400 12px var(--mono);color:var(--t4)">password</div>
+                    <button style="height:28px;padding:0 12px;border-radius:6px;background:transparent;border:1px solid color-mix(in oklab, var(--dang) 45%, transparent);color:var(--dang);font:600 12px Archivo" style-hover="background:var(--dang-s)">Import…</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ setAbout }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;padding:16px;display:flex;flex-direction:column;gap:16px;min-height:0;max-width:520px">
+              <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);padding:12px;display:flex;flex-direction:column;gap:9px">
+                <div style="display:flex;align-items:center;justify-content:space-between"><div style="font:400 12px Archivo;color:var(--t3)">Version</div><div style="font:500 12px var(--mono);color:var(--t1)">1.4.2</div></div>
+                <div style="display:flex;align-items:center;justify-content:space-between"><div style="font:400 12px Archivo;color:var(--t3)">Commit</div><div style="font:500 12px var(--mono);color:var(--t1)">a41f9c2</div></div>
+                <div style="display:flex;align-items:center;justify-content:space-between"><div style="font:400 12px Archivo;color:var(--t3)">Build date</div><div style="font:500 12px var(--mono);color:var(--t1)">18 Sep 2026</div></div>
+              </div>
+              <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden">
+                <div style="height:30px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid var(--b1);background:var(--s1);font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Registered</div>
+                <sc-for list="{{ setCounts }}" as="c" hint-placeholder-count="4">
+                  <div style="display:flex;align-items:center;justify-content:space-between;height:30px;padding:0 12px;border-bottom:1px solid var(--s1)">
+                    <div style="font:400 12px Archivo;color:var(--t2)">{{ c.name }}</div>
+                    <div style="font:500 12px var(--mono);color:var(--t1)">{{ c.n }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+
+      <div style="height:26px;border-top:1px solid var(--b1);background:var(--s0);display:flex;align-items:center;justify-content:space-between;padding:0 12px;font:400 11px var(--mono);flex-shrink:0">
+        <div style="display:flex;align-items:center;gap:16px">
+          <a href="#screen-run" style="display:flex;align-items:center;gap:6px;color:var(--t2)"><span style="width:6px;height:6px;border-radius:50%;background:var(--info);animation:pulse 1.6s ease-in-out infinite"></span>Run #241 · generate · 142/512</a>
+          <span style="color:var(--t4)">today $18.40</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px">
+          <span style="display:flex;align-items:center;gap:6px;color:var(--t4)"><span style="font-family:'Material Symbols Rounded';font-size:13px;color:var(--ok)">extension</span>Plugin v1.4.2</span>
+          <span style="display:flex;align-items:center;gap:6px;color:var(--t4)"><span style="font-family:'Material Symbols Rounded';font-size:13px;color:var(--ok)">lock_open</span>Unlocked · auto-lock 20 min</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-reports" style="width:1280px;display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:baseline;gap:10px"><div style="font:600 15px Archivo">12 · Reports</div><div style="font:400 12px Archivo;color:var(--t4)">What the last runs left behind, at site, run and page scale.</div></div>
+      <div style="display:flex;gap:3px;background:var(--s0);border:1px solid var(--b1);border-radius:7px;padding:3px">
+        <sc-for list="{{ repStates }}" as="s" hint-placeholder-count="5">
+          <button onClick="{{ s.on }}" style="height:23px;padding:0 10px;border-radius:5px;white-space:nowrap;font:500 11.5px Archivo;background:{{ s.bg }};color:{{ s.fg }}">{{ s.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+    <div style="width:1280px;height:820px;border:1px solid var(--b2);border-radius:10px;overflow:hidden;background:var(--page);display:flex;flex-direction:column">
+
+      <div style="height:40px;border-bottom:1px solid var(--b1);background:var(--s0);display:flex;align-items:center;justify-content:space-between;padding-left:12px;flex-shrink:0;position:relative">
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="display:flex;align-items:center;gap:8px"><div style="width:17px;height:17px;border-radius:5px;background:var(--ac);display:flex;align-items:center;justify-content:center;color:var(--on-ac);font:700 10px Archivo">P</div><div style="font:600 12.5px Archivo">Postulator</div></div>
+          <div style="width:1px;height:18px;background:var(--b1)"></div>
+          <div style="display:flex;align-items:center;gap:8px;height:28px;padding:0 8px 0 9px;border-radius:6px;background:var(--s1);border:1px solid var(--b1);cursor:pointer" style-hover="background:var(--s2)">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--ok)"></span>
+            <div style="display:flex;flex-direction:column;gap:1px"><div style="font:600 11.5px/1 Archivo">Clay &amp; Kiln</div><div style="font:400 9.5px/1 var(--mono);color:var(--t4)">https://clayandkiln.com</div></div>
+            <span style="font-family:'Material Symbols Rounded';font-size:16px;color:var(--t3)">unfold_more</span>
+          </div>
+        </div>
+        <div style="position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;height:26px;padding:0 9px;border-radius:6px;background:var(--s1);border:1px solid var(--b1);width:330px;cursor:pointer" style-hover="border-color:var(--b2)">
+          <span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--t4)">search</span>
+          <div style="font:400 12px Archivo;color:var(--t4);flex:1">Search entities, pages, runs…</div>
+          <kbd style="font:500 9.5px var(--mono);background:var(--s3);border:1px solid var(--b2);border-radius:4px;padding:1px 5px;color:var(--t3)">Ctrl K</kbd>
+        </div>
+        <div style="display:flex">
+          <div style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--t3)" style-hover="background:var(--s1)"><span style="font-family:'Material Symbols Rounded';font-size:17px">remove</span></div>
+          <div style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--t3)" style-hover="background:var(--s1)"><span style="font-family:'Material Symbols Rounded';font-size:15px">crop_square</span></div>
+          <div style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--t3)" style-hover="background:var(--dang);color:#fff"><span style="font-family:'Material Symbols Rounded';font-size:17px">close</span></div>
+        </div>
+      </div>
+
+      <div style="flex:1;display:flex;min-height:0">
+        <div style="width:68px;border-right:1px solid var(--b1);background:var(--s0);display:flex;flex-direction:column;justify-content:space-between;flex-shrink:0;padding:6px 0">
+          <div style="display:flex;flex-direction:column">
+            <sc-for list="{{ railRepTop }}" as="g" hint-placeholder-count="2">
+              <div style="display:flex;flex-direction:column;gap:2px;padding:0 6px 7px;margin-bottom:7px;border-bottom:1px solid var(--b1)">
+                <sc-for list="{{ g.items }}" as="r" hint-placeholder-count="5">
+                  <a href="#screen-{{ r.a }}" style="position:relative;height:44px;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:{{ r.fg }};background:{{ r.bg }}" style-hover="background:var(--s2);color:var(--t1)">
+                    <span style="font-family:'Material Symbols Rounded';font-size:18px">{{ r.i }}</span>
+                    <span style="font:500 10px Archivo">{{ r.l }}</span>
+                    <span style="position:absolute;left:-6px;top:11px;width:2px;height:22px;border-radius:1px;background:{{ r.bar }}"></span>
+                  </a>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px;padding:7px 6px 0;border-top:1px solid var(--b1)">
+            <sc-for list="{{ railRepBot }}" as="r" hint-placeholder-count="3">
+              <a href="#screen-{{ r.a }}" style="position:relative;height:44px;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:{{ r.fg }};background:{{ r.bg }}" style-hover="background:var(--s2);color:var(--t1)">
+                <span style="font-family:'Material Symbols Rounded';font-size:18px">{{ r.i }}</span>
+                <span style="font:500 10px Archivo">{{ r.l }}</span>
+              </a>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+          <div style="height:40px;border-bottom:1px solid var(--b1);display:flex;align-items:center;padding:0 16px;flex-shrink:0;gap:16px">
+            <div style="width:170px;font:600 14px Archivo">Reports</div>
+            <div style="flex:1;display:flex;justify-content:center;gap:2px;align-self:stretch">
+              <sc-for list="{{ repTabs }}" as="t" hint-placeholder-count="3">
+                <button onClick="{{ t.on }}" style="padding:0 12px;font:600 12px Archivo;color:{{ t.fg }};border-bottom:2px solid {{ t.bd }};margin-bottom:-1px">{{ t.label }}</button>
+              </sc-for>
+            </div>
+            <div style="width:170px"></div>
+          </div>
+
+          <div style="flex:1;display:flex;min-height:0">
+            <sc-if value="{{ repSite }}" hint-placeholder-val="{{ true }}">
+              <div style="flex:1;min-width:0;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px">
+                <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:16px;flex-shrink:0">
+                  <sc-for list="{{ repTiles }}" as="t" hint-placeholder-count="6">
+                    <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);padding:12px;display:flex;flex-direction:column;gap:6px">
+                      <div style="font:600 10.5px Archivo;letter-spacing:.07em;text-transform:uppercase;color:var(--t4)">{{ t.name }}</div>
+                      <div style="font:600 22px Archivo;letter-spacing:-0.02em;color:{{ t.fg }}">{{ t.value }}</div>
+                      <div style="font:400 10.5px var(--mono);color:var(--t4)">{{ t.note }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+
+                <sc-if value="{{ repSiteEmpty }}" hint-placeholder-val="{{ false }}">
+                  <div style="flex:1;border:1px solid var(--b1);border-radius:9px;background:var(--s0);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:56px 0">
+                    <span style="font-family:'Material Symbols Rounded';font-size:30px;color:var(--t4)">assessment</span>
+                    <div style="font:600 15px Archivo">No runs yet</div>
+                    <div style="font:400 12.5px Archivo;color:var(--t3)">Coverage, drift and link compliance are measured from finished runs.</div>
+                    <a href="#screen-overview" style="display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:6px;background:var(--ac);color:var(--on-ac);font:600 12px Archivo;margin-top:2px" style-hover="background:var(--ac-h)">Start run</a>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ repSiteData }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:grid;grid-template-columns:1fr 320px;gap:16px;flex-shrink:0">
+                    <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);padding:12px;display:flex;flex-direction:column;gap:12px">
+                      <div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Depth histogram</div>
+                      <div style="height:116px;display:flex;align-items:flex-end;gap:12px">
+                        <sc-for list="{{ repDepth }}" as="d" hint-placeholder-count="6">
+                          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end">
+                            <div style="font:500 11px var(--mono);color:var(--t2)">{{ d.n }}</div>
+                            <div style="width:100%;border-radius:4px 4px 2px 2px;background:{{ d.fill }};height:{{ d.h }}%"></div>
+                            <div style="font:400 10px var(--mono);color:var(--t4)">{{ d.label }}</div>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </div>
+                    <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);padding:12px;display:flex;flex-direction:column;gap:10px">
+                      <div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Link audit</div>
+                      <div style="display:flex;align-items:baseline;gap:8px"><div style="font:600 22px Archivo;letter-spacing:-0.02em;color:var(--warn)">78%</div><div style="font:400 11px Archivo;color:var(--t4)">pages compliant</div></div>
+                      <div style="display:flex;flex-direction:column;gap:5px">
+                        <div style="display:flex;align-items:center;justify-content:space-between"><div style="font:400 11.5px Archivo;color:var(--t3)">Missing links</div><div style="font:500 11.5px var(--mono);color:var(--dang)">214</div></div>
+                        <div style="display:flex;align-items:center;justify-content:space-between"><div style="font:400 11.5px Archivo;color:var(--t3)">Wrong anchors</div><div style="font:500 11.5px var(--mono);color:var(--warn)">46</div></div>
+                      </div>
+                      <a href="#screen-pages" style="display:inline-flex;align-items:center;justify-content:center;height:28px;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 12px Archivo;margin-top:2px" style-hover="background:var(--s3)">Open Linking</a>
+                    </div>
+                  </div>
+
+                  <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden;flex-shrink:0">
+                    <div style="height:30px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-bottom:1px solid var(--b1);background:var(--s1)">
+                      <div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Coverage</div>
+                      <div style="font:400 10px var(--mono);color:var(--t4)">worst first</div>
+                    </div>
+                    <sc-for list="{{ repCoverage }}" as="c" hint-placeholder-count="6">
+                      <a href="#screen-graph" style="display:grid;grid-template-columns:1fr 104px 180px 92px;gap:12px;align-items:center;height:30px;padding:0 12px;border-bottom:1px solid var(--s1);color:inherit" style-hover="background:var(--s1)">
+                        <div style="font:500 12px Archivo;color:var(--t1)">{{ c.name }}</div>
+                        <div style="font:400 11.5px var(--mono);color:var(--t4)">{{ c.kind }}</div>
+                        <div><span style="display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:5px;font:600 10.5px Archivo;background:{{ c.bg }};color:{{ c.fg }}">{{ c.reason }}</span></div>
+                        <div style="font:400 11.5px var(--mono);color:var(--t3);text-align:right">{{ c.links }}</div>
+                      </a>
+                    </sc-for>
+                  </div>
+
+                  <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden;flex-shrink:0">
+                    <div style="height:30px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid var(--b1);background:var(--s1);font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Drift</div>
+                    <div style="display:grid;grid-template-columns:1fr 140px 140px 232px;gap:12px;align-items:center;height:30px;padding:0 12px;border-bottom:1px solid var(--b1);font:600 10.5px Archivo;letter-spacing:.07em;text-transform:uppercase;color:var(--t4)">
+                      <div>Page path</div><div>Last published</div><div>Changed on site</div><div></div>
+                    </div>
+                    <sc-for list="{{ repDrift }}" as="d" hint-placeholder-count="4">
+                      <div style="display:grid;grid-template-columns:1fr 140px 140px 232px;gap:12px;align-items:center;height:34px;padding:0 12px;border-bottom:1px solid var(--s1)">
+                        <div style="font:400 11.5px var(--mono);color:var(--t2)">{{ d.path }}</div>
+                        <div style="font:400 11px var(--mono);color:var(--t4)">{{ d.pub }}</div>
+                        <div style="font:400 11px var(--mono);color:var(--warn)">{{ d.changed }}</div>
+                        <div style="display:flex;gap:7px;justify-content:flex-end">
+                          <button style="height:24px;padding:0 10px;border-radius:5px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 11px Archivo" style-hover="background:var(--s3)">Open in Tor Browser</button>
+                          <button style="height:24px;padding:0 10px;border-radius:5px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 11px Archivo" style-hover="background:var(--s3)">Re-sync</button>
+                        </div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ repRuns }}" hint-placeholder-val="{{ false }}">
+              <div style="flex:1;min-width:0;padding:16px;display:flex;flex-direction:column;min-height:0">
+                <div style="flex:1;min-height:0;border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden;display:flex;flex-direction:column">
+                  <div style="display:grid;grid-template-columns:70px 104px 168px 82px 128px 86px;gap:12px;align-items:center;height:30px;padding:0 12px;border-bottom:1px solid var(--b1);background:var(--s1);font:600 10.5px Archivo;letter-spacing:.07em;text-transform:uppercase;color:var(--t4)">
+                    <div>Run</div><div>Kind</div><div>When</div><div style="text-align:right">Items</div><div style="text-align:right">Succeeded / failed</div><div style="text-align:right">Cost</div>
+                  </div>
+                  <sc-for list="{{ repRunRows }}" as="r" hint-placeholder-count="6">
+                    <div style="display:grid;grid-template-columns:70px 104px 168px 82px 128px 86px;gap:12px;align-items:center;height:30px;padding:0 12px;border-bottom:1px solid var(--s1);background:{{ r.bg }};box-shadow:{{ r.mark }};cursor:pointer" style-hover="background:var(--s1)">
+                      <div style="font:500 11.5px var(--mono);color:var(--t1)">{{ r.id }}</div>
+                      <div style="font:400 12px Archivo;color:var(--t2)">{{ r.kind }}</div>
+                      <div style="font:400 11.5px var(--mono);color:var(--t4)">{{ r.when }}</div>
+                      <div style="font:400 11.5px var(--mono);color:var(--t3);text-align:right">{{ r.items }}</div>
+                      <div style="font:500 11.5px var(--mono);color:{{ r.fg }};text-align:right">{{ r.sf }}</div>
+                      <div style="font:500 11.5px var(--mono);color:var(--t2);text-align:right">{{ r.cost }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="width:320px;border-left:1px solid var(--b1);background:var(--s0);display:flex;flex-direction:column;min-height:0">
+                <div style="height:40px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;padding:0 12px;flex-shrink:0">
+                  <div style="font:600 12.5px Archivo">Run #241 report</div>
+                  <div style="font:400 10.5px var(--mono);color:var(--t4)">generate</div>
+                </div>
+                <div style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:6px;min-height:0">
+                  <sc-for list="{{ repOutcomes }}" as="o" hint-placeholder-count="7">
+                    <div style="display:flex;flex-direction:column;gap:4px;padding:8px 0;border-bottom:1px solid var(--s1)">
+                      <div style="font:400 11px var(--mono);color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ o.path }}</div>
+                      <div style="display:flex;align-items:center;gap:8px">
+                        <span style="display:inline-flex;align-items:center;height:17px;padding:0 6px;border-radius:5px;font:600 10px Archivo;background:{{ o.bg }};color:{{ o.fg }}">{{ o.status }}</span>
+                        <div style="font:400 10.5px var(--mono);color:var(--t4)">{{ o.findings }}</div>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="border-top:1px solid var(--b1);padding:12px;flex-shrink:0">
+                  <a href="#screen-run" style="display:flex;align-items:center;justify-content:center;height:28px;border-radius:6px;background:var(--ac);color:var(--on-ac);font:600 12px Archivo" style-hover="background:var(--ac-h)">Open run</a>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ repRunsEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="flex:1;padding:16px;display:flex;min-height:0">
+                <div style="flex:1;border:1px solid var(--b1);border-radius:9px;background:var(--s0);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px">
+                  <span style="font-family:'Material Symbols Rounded';font-size:30px;color:var(--t4)">history</span>
+                  <div style="font:600 15px Archivo">No finished runs</div>
+                  <div style="font:400 12.5px Archivo;color:var(--t3)">A report is written when a run reaches its last step.</div>
+                  <a href="#screen-overview" style="display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:6px;background:var(--ac);color:var(--on-ac);font:600 12px Archivo;margin-top:2px" style-hover="background:var(--ac-h)">Start run</a>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ repPage }}" hint-placeholder-val="{{ false }}">
+              <div style="flex:1;min-width:0;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px">
+                <div style="display:flex;align-items:center;gap:7px;height:28px;padding:0 9px;border-radius:6px;background:var(--s1);border:1px solid var(--b1);max-width:520px;flex-shrink:0">
+                  <span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--t4)">search</span>
+                  <div style="font:400 12px var(--mono);color:var(--t1);flex:1">/guides/season-a-mug/</div>
+                  <span style="font-family:'Material Symbols Rounded';font-size:15px;color:var(--t4)">close</span>
+                </div>
+
+                <div style="border:1px solid color-mix(in oklab, var(--dang) 40%, transparent);border-radius:9px;background:var(--s0);overflow:hidden">
+                  <div style="height:30px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-bottom:1px solid var(--b1);background:var(--dang-s)">
+                    <div style="font:600 11.5px Archivo;color:var(--dang)">Validation — failed</div>
+                    <div style="font:400 10.5px var(--mono);color:var(--dang)">5 findings</div>
+                  </div>
+                  <sc-for list="{{ repFindings }}" as="f" hint-placeholder-count="5">
+                    <div style="display:flex;align-items:center;gap:10px;height:32px;padding:0 12px;border-bottom:1px solid var(--s1)">
+                      <span style="display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:5px;font:600 10.5px Archivo;background:{{ f.bg }};color:{{ f.fg }};width:62px;justify-content:center">{{ f.sev }}</span>
+                      <div style="font:400 12px Archivo;color:var(--t2)">{{ f.text }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+                  <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden">
+                    <div style="height:30px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-bottom:1px solid var(--b1);background:var(--s1)">
+                      <div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Judge</div>
+                      <div style="font:600 12px var(--mono);color:var(--warn)">6.4 / 10</div>
+                    </div>
+                    <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
+                      <sc-for list="{{ repJudge }}" as="j" hint-placeholder-count="3">
+                        <div style="font:400 12px/1.5 Archivo;color:var(--t2)">{{ j.t }}</div>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:16px">
+                    <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden">
+                      <div style="height:30px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-bottom:1px solid var(--b1);background:var(--s1)">
+                        <div style="font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Publish</div>
+                        <span style="display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:5px;font:600 10.5px Archivo;background:var(--mut-s);color:var(--t3)">not published</span>
+                      </div>
+                      <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
+                        <div style="font:400 11.5px var(--mono);color:var(--t2)">https://clayandkiln.com/guides/season-a-mug/</div>
+                        <div style="font:400 11.5px Archivo;color:var(--t3)">Held as a draft — validation failed before the publish step.</div>
+                        <button style="height:28px;align-self:flex-start;padding:0 12px;border-radius:6px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);font:600 12px Archivo" style-hover="background:var(--s3)">Open in Tor Browser</button>
+                      </div>
+                    </div>
+                    <div style="border:1px solid var(--b1);border-radius:9px;background:var(--s0);overflow:hidden">
+                      <div style="height:30px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid var(--b1);background:var(--s1);font:600 10.5px Archivo;letter-spacing:.09em;text-transform:uppercase;color:var(--t4)">Relink</div>
+                      <div style="padding:12px;display:flex;flex-direction:column;gap:7px">
+                        <div style="font:400 11.5px Archivo;color:var(--t3)">Not run — relinking waits for a successful publish.</div>
+                        <div style="font:400 11px var(--mono);color:var(--t4)">3 neighbour pages queued</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+
+      <div style="height:26px;border-top:1px solid var(--b1);background:var(--s0);display:flex;align-items:center;justify-content:space-between;padding:0 12px;font:400 11px var(--mono);flex-shrink:0">
+        <div style="display:flex;align-items:center;gap:16px">
+          <a href="#screen-run" style="display:flex;align-items:center;gap:6px;color:var(--t2)"><span style="width:6px;height:6px;border-radius:50%;background:var(--info);animation:pulse 1.6s ease-in-out infinite"></span>Run #241 · generate · 142/512</a>
+          <span style="color:var(--t4)">today $18.40</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px">
+          <span style="display:flex;align-items:center;gap:6px;color:var(--t4)"><span style="font-family:'Material Symbols Rounded';font-size:13px;color:var(--ok)">extension</span>Plugin v1.4.2</span>
+          <span style="display:flex;align-items:center;gap:6px;color:var(--t4)"><span style="font-family:'Material Symbols Rounded';font-size:13px;color:var(--ok)">lock_open</span>Unlocked · auto-lock 20 min</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 </x-dc>
@@ -1951,7 +3433,19 @@ const RAIL = [
   {key:'reports', anchor:'components', icon:'insights', label:'Reports'}
 ];
 class Component extends DCLogic {
-  state = { lock:'idle', ov:'default', gr:'default', run:'live', rev:'body', revState:'ok', ag:'write', pg:'table' };
+  state = { lock:'idle', ov:'default', gr:'default', run:'live', rev:'body', revState:'ok', ag:'write', pg:'table', tpl:'populated', ted:'global', sch:'populated', imp:'step1', set:'general', rep:'site' };
+  rail2(active){
+    const G = [
+      [['overview','space_dashboard','Overview','overview'],['graph','hub','Graph','graph'],['pages','description','Pages','pages'],['linking','link','Linking','pages'],['runs','play_circle','Runs','run']],
+      [['templates','dashboard_customize','Templates','templates'],['schedules','schedule','Schedules','schedules'],['import','upload_file','Import','import'],['reports','assessment','Reports','reports']],
+      [['agent','forum','Agent','agent'],['sites','language','Sites','overview'],['settings','settings','Settings','settings']]
+    ];
+    const m = g => g.map(r => ({a:r[3], i:r[1], l:r[2],
+      fg: r[0] === active ? 'var(--ac)' : 'var(--t3)',
+      bg: r[0] === active ? 'var(--ac-s)' : 'transparent',
+      bar: r[0] === active ? 'var(--ac)' : 'transparent'}));
+    return {top:[{items:m(G[0])},{items:m(G[1])}], bot:m(G[2])};
+  }
   rail(active){
     return RAIL.map(r => Object.assign({}, r, {
       fg: r.key === active ? 'var(--ac)' : 'var(--t3)',
@@ -2497,10 +3991,367 @@ class Component extends DCLogic {
     const a = this.props.accent;
     if (a) document.documentElement.style.setProperty('--ac', a);
   }
+  memo(name, key, build){
+    this._memo = this._memo || {};
+    const hit = this._memo[name];
+    if (hit && hit.key === key) return hit.val;
+    const val = build();
+    this._memo[name] = {key, val};
+    return val;
+  }
+  tplVals(){ return this.memo('tpl', this.state.tpl, () => this.buildTpl()); }
+  buildTpl(){
+    const st = this.state.tpl;
+    const mk = r => ({name:r[0], scope:r[1], kind:r[2], ver:r[3], def:r[4] ? 'site default' : '', upd:r[5],
+      scopeFg: r[1] === 'global' ? 'var(--info)' : 'var(--ac)',
+      scopeBg: r[1] === 'global' ? 'var(--info-s)' : 'var(--ac-s)',
+      bg: r[6] ? 'var(--ac-s)' : 'transparent', mark: r[6] ? 'inset 2px 0 0 var(--ac)' : 'none'});
+    const rows = [
+      ['Guide','global','guide','v3',true,'12 Sep',false],
+      ['Hub','global','hub','v2',true,'12 Sep',false],
+      ['Category','global','category','v2',false,'11 Sep',false],
+      ['Product','global','product','v4',true,'09 Sep',false],
+      ['Comparison','global','comparison','v1',false,'02 Sep',false],
+      ['Guide — long form','site','guide','v7',false,'2 h ago',true],
+      ['Product — spec table','site','product','v2',false,'yesterday',false],
+      ['Kiln care guide','site','guide','v1',false,'18 Aug',false]
+    ].map(mk);
+    const pol = [
+      ['Standard internal','hub · category · product','4 / 12','prefer user anchors',false],
+      ['Hub fan-out','hub','6 / 18','rotate anchors',true],
+      ['Product tight','product','2 / 6','prefer user anchors',false],
+      ['Guide cross-link','guide · topic','3 / 12','rotate anchors',false]
+    ].map(p => ({name:p[0], kinds:p[1], links:p[2], anchor:p[3],
+      bg: p[4] ? 'var(--ac-s)' : 'transparent', mark: p[4] ? 'inset 2px 0 0 var(--ac)' : 'none'}));
+    const wr = t => Math.round(t * 0.85) + '–' + Math.round(t * 1.15);
+    const sections = [['Introduction',200],['Step-by-Step Instructions',900],['Tips and Common Mistakes',300],['Tools and Materials',150],['Frequently Asked Questions',250]]
+      .map(s => ({name:s[0], range:wr(s[1]) + ' words'}));
+    const models = [['writer','openai','gpt-5.1'],['editor','anthropic','claude-sonnet-4.5'],['linker','openai','gpt-5.1-mini'],['judge','anthropic','claude-opus-4.1'],['image','openai','gpt-image-2'],['titler','gemini','gemini-2.5-flash']]
+      .map(m => ({role:m[0], provider:m[1], model:m[2]}));
+    const recipe = ['resolve_context','generate_body','generate_meta','insert_links','repair_links','generate_images','validate','judge','publish','relink_neighbors','sync_back','report'].map(s => ({name:s}));
+    const policies = st === 'policies';
+    return {
+      tplStates: this.seg('tpl',[{v:'populated',label:'Populated'},{v:'policies',label:'Link policies'},{v:'drawer',label:'New template'},{v:'empty',label:'Empty'},{v:'loading',label:'Loading'}]),
+      railTplTop: this.rail2('templates').top, railTplBot: this.rail2('templates').bot,
+      tplTabs: [
+        {label:'Templates', fg: policies ? 'var(--t3)' : 'var(--t1)', bd: policies ? 'transparent' : 'var(--ac)', on: () => this.setState({tpl:'populated'})},
+        {label:'Link policies', fg: policies ? 'var(--t1)' : 'var(--t3)', bd: policies ? 'var(--ac)' : 'transparent', on: () => this.setState({tpl:'policies'})}
+      ],
+      tplTitle: policies ? 'Link policies' : 'Templates',
+      tplCount: policies ? '4' : '8',
+      tplTable: st === 'populated' || st === 'drawer',
+      tplPolicies: policies,
+      tplEmpty: st === 'empty',
+      tplLoading: st === 'loading',
+      tplPanel: st === 'populated' || st === 'drawer' || policies,
+      tplDrawer: st === 'drawer',
+      tplRows: rows, tplPolicyRows: pol,
+      tplSkeleton: [0,1,2,3,4,5,6,7].map(i => ({w: 40 + ((i * 13) % 45) + '%'})),
+      tplSections: sections, tplModels: models, tplRecipe: recipe,
+      tplPanelName: policies ? 'Hub fan-out' : 'Guide — long form',
+      tplPanelMeta: policies ? 'site · hub' : 'site · guide · v7'
+    };
+  }
+  tedVals(){ return this.memo('ted', this.state.ted, () => this.buildTed()); }
+  buildTed(){
+    const st = this.state.ted;
+    const layer = st === 'site' ? 'site' : (st === 'page' ? 'page' : 'global');
+    const group = {global:'Sections', site:'Overrides', page:'Recipe', unsaved:'Rules', conflict:'Sections'}[st];
+    const dots = {global:[], site:['Rules','Models','Recipe'], page:['Recipe'], unsaved:['Rules'], conflict:[]}[st];
+    const outline = ['Sections','Rules','Models','Recipe','Overrides','Policies'].map(g => ({
+      name:g,
+      bg: g === group ? 'var(--s2)' : 'transparent',
+      fg: g === group ? 'var(--t1)' : 'var(--t3)',
+      dot: dots.indexOf(g) >= 0 ? 'var(--ac)' : 'transparent'
+    }));
+    const layers = [{v:'global',l:'Global'},{v:'site',l:'This site'},{v:'page',l:'This page'}].map(o => ({
+      label:o.l,
+      bg: layer === o.v ? 'var(--s2)' : 'transparent',
+      fg: layer === o.v ? 'var(--t1)' : 'var(--t3)',
+      on: () => this.setState({ted:o.v})
+    }));
+    const wr = t => Math.round(t * 0.85) + ' – ' + Math.round(t * 1.15);
+    const secs = [['Introduction','Say what the reader will achieve and what they need before starting',200,1],['Step-by-Step Instructions','Numbered steps in execution order, expected result after each',900,3],['Tips and Common Mistakes','Three beginner mistakes and two expert tips',300,2],['Tools and Materials','What is needed, linking to product or category pages',150,4],['Frequently Asked Questions','Answer the follow-up questions a reader has after the steps',250,2]]
+      .map((s,i) => ({n:i + 1, name:s[0], intent:s[1], min:Math.round(s[2] * 0.85), max:Math.round(s[2] * 1.15), links:s[3], h: Math.max(14, Math.round(s[2] / 16))}));
+    const rules = [
+      {g:'Keywords', rows:[['Primary keyword in title','switch','on'],['Primary keyword in H1','switch','on'],['Primary keyword in first paragraph','switch','on'],['Max keyword density','num','0.02']]},
+      {g:'Length', rows:[['Minimum words','num','1500'],['Maximum words','num', st === 'unsaved' ? '2600' : '2200']]},
+      {g:'Links', rows:[['Up depth','num','2'],['Link down to children','switch','on'],['Sibling minimum weight','num','0.50'],['Max links per page','num','12'],['Max links per target','num','1'],['Parent link within first N paragraphs','num','2'],['Children section','switch','off']]},
+      {g:'Meta & images', rows:[['Description max characters','num','155'],['Featured image','switch','on'],['Inline images','num','2'],['Forbid unsupported claims','switch','on'],['Max headings','num','9']]}
+    ].map(b => ({g:b.g, rows:b.rows.map(r => ({label:r[0], isSwitch:r[1] === 'switch', isNum:r[1] === 'num', value:r[2],
+      knob: r[2] === 'on' ? 'translateX(13px)' : 'none',
+      track: r[2] === 'on' ? 'var(--ac)' : 'var(--s3)',
+      changed: (st === 'unsaved' && r[0] === 'Maximum words') ? 'var(--ac)' : 'transparent'}))}));
+    const models = [['writer','openai','gpt-5.1'],['editor','anthropic','claude-sonnet-4.5'],['linker','openai','gpt-5.1-mini'],['judge','anthropic','claude-opus-4.1'],['chat','anthropic','claude-sonnet-4.5'],['image','openai','gpt-image-2'],['titler','gemini','gemini-2.5-flash']]
+      .map(m => ({role:m[0], provider:m[1], model:m[2]}));
+    const recipe = [['resolve_context',1],['generate_body',1],['insert_links',1],['repair_links',1],['validate',1],['generate_meta',1],['generate_images',1],['judge',1],['publish',1],['relink_neighbors', st === 'page' ? 0 : 1],['sync_back',1],['report',1]]
+      .map((s,i) => ({n:i + 1, name:s[0], on:!!s[1],
+        knob: s[1] ? 'translateX(13px)' : 'none',
+        track: s[1] ? 'var(--ac)' : 'var(--s3)',
+        fg: s[1] ? 'var(--t1)' : 'var(--t4)',
+        setting: s[0] === 'validate' ? 'allow errors' : (s[0] === 'repair_links' ? 'iterations' : ''),
+        settingKind: s[0] === 'validate' ? 'switch' : (s[0] === 'repair_links' ? 'num' : ''),
+        settingVal: s[0] === 'repair_links' ? '3' : ''}));
+    const overrides = [
+      ['length.max','2200','2600','Rules'],
+      ['modelProfiles.writer','openai / gpt-5.1','anthropic / claude-opus-4.1','Models'],
+      ['recipe.judge.enabled','true','false','Recipe']
+    ].map(o => ({field:o[0], below:o[1], here:o[2], group:o[3]}));
+    return {
+      tedStates: this.seg('ted',[{v:'global',label:'Global layer'},{v:'site',label:'Site + overrides'},{v:'page',label:'Page layer'},{v:'unsaved',label:'Unsaved'},{v:'conflict',label:'Save conflict'}]),
+      railTedTop: this.rail2('templates').top, railTedBot: this.rail2('templates').bot,
+      tedLayers: layers, tedOutline: outline, tedGroup: group,
+      tedPageLayer: st === 'page',
+      tedName: st === 'page' ? 'Guide — /guides/how-to-season-a-mug/' : 'Guide — long form',
+      tedVersion: layer === 'global' ? 'v3' : (layer === 'site' ? 'v7' : 'v7 · page'),
+      tedFrom: layer === 'global' ? 'source of truth' : 'from Global v3',
+      tedUnsaved: st === 'unsaved',
+      tedSaveBg: st === 'unsaved' ? 'var(--ac)' : 'var(--s2)',
+      tedSaveFg: st === 'unsaved' ? 'var(--on-ac)' : 'var(--t4)',
+      tedConflict: st === 'conflict',
+      tedSections: group === 'Sections', tedRules: group === 'Rules',
+      tedModels: group === 'Models', tedRecipe: group === 'Recipe',
+      tedOverridesOn: group === 'Overrides',
+      tedSecRows: secs, tedRuleBlocks: rules, tedModelRows: models, tedRecipeRows: recipe, tedOverrideRows: overrides,
+      tedPreview: secs
+    };
+  }
+  schVals(){ return this.memo('sch', this.state.sch, () => this.buildSch()); }
+  buildSch(){
+    const st = this.state.sch;
+    const KIND = {generate:'--ac', relink:'--info', audit:'--warn', sync:'--ok'};
+    const rows = [
+      ['Nightly guides','generate','Every day at 03:00','in 7 h','completed','--ok',true,false],
+      ['Relink mugs cluster','relink','Every 6 hours','in 2 h 14 min','completed','--ok',true,false],
+      ['Weekly link audit','audit','Every Monday at 06:00','in 3 d','failed','--dang',true,false],
+      ['Sync from site','sync','Every 30 minutes','in 12 min','completed','--ok',true,true],
+      ['Product refresh','generate','Every day at 04:30','in 8 h','paused · budget','--warn',true,false],
+      ['Comparison sweep','audit','Every Sunday at 05:00','—','cancelled','--mut',false,false]
+    ].map(r => ({name:r[0], kind:r[1], cadence:r[2], next:r[3], last:r[4],
+      kindFg:'var(' + KIND[r[1]] + ')', kindBg:'color-mix(in oklab, var(' + KIND[r[1]] + ') 14%, transparent)',
+      lastFg:'var(' + r[5] + ')', lastBg:'color-mix(in oklab, var(' + r[5] + ') 14%, transparent)',
+      nextFg: r[6] ? 'var(--t2)' : 'var(--t4)',
+      nameFg: r[6] ? 'var(--t1)' : 'var(--t4)',
+      knob: r[6] ? 'translateX(13px)' : 'none',
+      track: r[6] ? 'var(--ac)' : 'var(--s3)',
+      bg: r[7] ? 'var(--ac-s)' : 'transparent', mark: r[7] ? 'inset 2px 0 0 var(--ac)' : 'none'}));
+    const editing = st === 'editing';
+    const last5 = [['#241','completed','--ok','today 03:00','128 items'],['#236','completed','--ok','yesterday 03:00','131 items'],['#230','failed','--dang','18 Sep 03:00','12 items'],['#224','completed','--ok','17 Sep 03:00','126 items'],['#219','cancelled','--mut','16 Sep 03:00','40 items']]
+      .map(r => ({id:r[0], status:r[1], when:r[3], items:r[4], fg:'var(' + r[2] + ')', bg:'color-mix(in oklab, var(' + r[2] + ') 14%, transparent)'}));
+    return {
+      schStates: this.seg('sch',[{v:'populated',label:'Populated'},{v:'editing',label:'Editing · cron error'},{v:'new',label:'New schedule'},{v:'empty',label:'Empty'}]),
+      railSchTop: this.rail2('schedules').top, railSchBot: this.rail2('schedules').bot,
+      schRows: st === 'empty' ? [] : rows,
+      schTable: st !== 'empty',
+      schEmpty: st === 'empty',
+      schPanel: st !== 'empty',
+      schNew: st === 'new',
+      schPanelTitle: st === 'new' ? 'New schedule' : 'Sync from site',
+      schName: st === 'new' ? '' : 'Sync from site',
+      schNamePlaceholder: st === 'new' ? 'Name this schedule' : '',
+      schCron: editing,
+      schCronValue: editing ? '*/15 * * ? *' : '0 3 * * *',
+      schCronBorder: editing ? 'var(--dang)' : 'var(--b2)',
+      schCronError: editing ? 'Not a valid cron expression' : '',
+      schCronPreview: editing ? '' : 'Every day at 03:00',
+      schIntervalBg: editing ? 'transparent' : 'var(--s2)',
+      schIntervalFg: editing ? 'var(--t3)' : 'var(--t1)',
+      schCronBg: editing ? 'var(--s2)' : 'transparent',
+      schCronFg: editing ? 'var(--t1)' : 'var(--t3)',
+      schRuns: st === 'new' ? [] : last5,
+      schHasRuns: st !== 'new',
+      schCount: st === 'empty' ? '0' : '6'
+    };
+  }
+  impVals(){ return this.memo('imp', this.state.imp, () => this.buildImp()); }
+  buildImp(){
+    const st = this.state.imp;
+    const idx = {step1:1, step2:2, step3:3, step4:4, export:0}[st];
+    const steps = [['File',1],['Columns',2],['Preview',3],['Apply',4]].map(s => ({
+      n:s[1], label:s[0],
+      fg: s[1] === idx ? 'var(--on-ac)' : (s[1] < idx ? 'var(--ok)' : 'var(--t4)'),
+      bg: s[1] === idx ? 'var(--ac)' : (s[1] < idx ? 'var(--ok-s)' : 'var(--s1)'),
+      bd: s[1] === idx ? 'var(--ac)' : (s[1] < idx ? 'var(--ok)' : 'var(--b1)'),
+      textFg: s[1] === idx ? 'var(--t1)' : 'var(--t3)',
+      line: s[1] < idx ? 'var(--ok)' : 'var(--b1)'
+    }));
+    const recent = [['sitemap-export-sep.csv','2 h ago','4 812 rows'],['clayandkiln-pages.xlsx','yesterday','512 rows'],['mugs-cluster.csv','18 Sep','86 rows'],['teapots-plan.csv','12 Sep','44 rows'],['sitemap-import-example.csv','02 Sep','12 rows']]
+      .map(r => ({name:r[0], when:r[1], rows:r[2]}));
+    const saved = [['Sitemap export (Screaming Frog)','path, title, h1, entity, parent_entity','2 h ago'],['Product feed','path, title, entity, entity_kind, wp_type','11 Sep'],['Guide plan','path, title, primary_keyword, page_kind','28 Aug']]
+      .map(m => ({name:m[0], cols:m[1], used:m[2]}));
+    const cols = [
+      ['Address','https://clayandkiln.com/collections/ceramic-mugs/','https://clayandkiln.com/guides/season-a-mug/','https://clayandkiln.com/products/mug-350/','path','page path'],
+      ['Title 1','Ceramic Mugs — Clay &amp; Kiln','How to Season a Mug','Stoneware Mug 350ml','title','title'],
+      ['H1-1','Ceramic Mugs','How to Season a Mug','Stoneware Mug 350 ml','h1','h1'],
+      ['Entity','Ceramic Mugs','Season a Mug','Mug 350ml','entity','entity name'],
+      ['Entity type','hub','topic','product','entity_kind','kind'],
+      ['Parent','Pottery','Ceramic Mugs','Ceramic Mugs','parent_entity','parent'],
+      ['Status Code','200','200','404','','unmapped'],
+      ['Indexability','Indexable','Indexable','Non-Indexable','','unmapped']
+    ].map(c => ({header:c[0], s1:c[1], s2:c[2], s3:c[3], type:c[4] ? 'text' : 'number',
+      target: c[5], mapped: !!c[4],
+      fg: c[4] ? 'var(--t2)' : 'var(--warn)',
+      bd: c[4] ? 'var(--b1)' : 'color-mix(in oklab, var(--warn) 50%, transparent)',
+      warn: c[4] ? '' : 'warning'}));
+    const prev = [
+      ['/collections/ceramic-mugs/','Ceramic Mugs','hub','create','--ok'],
+      ['/guides/season-a-mug/','Season a Mug','topic','create','--ok'],
+      ['/products/mug-350/','Mug 350ml','product','update','--info'],
+      ['/products/mug-500/','Mug 500ml','product','update','--info'],
+      ['/collections/teapots/','Teapots','hub','create','--ok'],
+      ['/guides/glaze-basics/','Glazing Basics','topic','create','--ok'],
+      ['/products/travel-mug/','Travel Mug','product','skip','--mut'],
+      ['/collections/','—','—','skip','--mut']
+    ].map(p => ({path:p[0], entity:p[1], kind:p[2], action:p[3],
+      fg:'var(' + p[4] + ')', bg:'color-mix(in oklab, var(' + p[4] + ') 14%, transparent)'}));
+    const warns = [[14,'intermediate_path','/collections/ has no entity of its own'],[27,'duplicate_path','/products/mug-350/ appears twice'],[41,'unknown_parent','parent “Ceramics” is not in the file or the graph'],[58,'cannibalization','shares its primary keyword with /collections/mugs/'],[63,'unknown_page_kind','“landing” is not a known page kind'],[77,'self_edge','the row lists itself as its own parent']]
+      .map(w => ({row:w[0], code:w[1], why:w[2]}));
+    return {
+      impStates: this.seg('imp',[{v:'step1',label:'1 · File'},{v:'step2',label:'2 · Columns'},{v:'step3',label:'3 · Preview'},{v:'step4',label:'4 · Apply'},{v:'export',label:'Export'}]),
+      railImpTop: this.rail2('import').top, railImpBot: this.rail2('import').bot,
+      impTabs: [
+        {label:'Import', fg: st === 'export' ? 'var(--t3)' : 'var(--t1)', bd: st === 'export' ? 'transparent' : 'var(--ac)', on: () => this.setState({imp:'step1'})},
+        {label:'Export', fg: st === 'export' ? 'var(--t1)' : 'var(--t3)', bd: st === 'export' ? 'var(--ac)' : 'transparent', on: () => this.setState({imp:'export'})}
+      ],
+      impWizard: st !== 'export', impSteps: steps,
+      impStep1: st === 'step1', impStep2: st === 'step2', impStep3: st === 'step3', impStep4: st === 'step4',
+      impExport: st === 'export',
+      impPanel: st === 'step1' || st === 'step3',
+      impRecent: recent, impSaved: saved, impCols: cols, impPreview: prev, impWarnings: warns
+    };
+  }
+  setVals(){ return this.memo('set', this.state.set, () => this.buildSet()); }
+  buildSet(){
+    const st = this.state.set;
+    const tab = {general:'General', models:'Models', browserFound:'Browser', browserMissing:'Browser', security:'Security', about:'About'}[st];
+    const tabs = [['General','general'],['Models','models'],['Browser','browserFound'],['Security','security'],['About','about']].map(t => ({
+      label:t[0],
+      fg: tab === t[0] ? 'var(--t1)' : 'var(--t3)',
+      bd: tab === t[0] ? 'var(--ac)' : 'transparent',
+      on: () => this.setState({set:t[1]})
+    }));
+    const row = (key, label, type, value, bounds, changed, error) => ({key, label, type, value, bounds: bounds || '',
+      isSwitch: type === 'bool', isNum: type === 'int', isText: type === 'string' || type === 'duration' || type === 'enum',
+      knob: value === 'on' ? 'translateX(13px)' : 'none',
+      track: value === 'on' ? 'var(--ac)' : 'var(--s3)',
+      def: changed ? '' : 'default',
+      error: error || '',
+      bd: error ? 'var(--dang)' : 'var(--b1)',
+      resetFg: changed ? 'var(--t3)' : 'var(--t4)'});
+    const groups = [
+      {g:'agent', rows:[
+        row('agent.loopLimit','Tool loop limit','int','99','1 – 64',true,'Must be between 1 and 64'),
+        row('agent.historyBudgetChars','History budget','int','120000','2 000 – 400 000',false),
+        row('agent.maxToolResultBytes','Max tool result','int','32768','1 024 – 262 144',false),
+        row('agent.mode','Default mode','enum','confirm','confirm · autonomous',false)]},
+      {g:'runs', rows:[
+        row('runs.workers','Workers','int','4','1 – 16',true),
+        row('runs.perSite','Concurrent runs per site','int','1','1 – 8',false),
+        row('runs.sweepInterval','Sweep interval','duration','5s','1s – 5m',false),
+        row('runs.stepTimeout','Step timeout','duration','5m','10s – 1h',false),
+        row('runs.leaseDuration','Lease duration','duration','10m','30s – 2h',false),
+        row('runs.deadline','Run deadline','duration','6h','5m – 7d',false),
+        row('runs.artifactRetentionDays','Artifact retention','int','30','1 – 365',false),
+        row('runs.eventRetentionDays','Event retention','int','90','1 – 365',false)]},
+      {g:'llm', rows:[
+        row('llm.timeout','Request timeout','duration','2m','5s – 30m',false),
+        row('llm.retries','Retries','int','3','0 – 3',false),
+        row('llm.openai.baseUrl','OpenAI base URL','string','—','',false),
+        row('llm.anthropic.baseUrl','Anthropic base URL','string','—','',false),
+        row('llm.gemini.projectId','Gemini project','string','clay-kiln-457','',true),
+        row('llm.gemini.location','Gemini location','string','europe-west4','',true),
+        row('llm.recordReplayMode','Record / replay','enum','off','off · record · replay',false)]},
+      {g:'wp', rows:[
+        row('wp.timeout','Request timeout','duration','30s','1s – 5m',false),
+        row('wp.retries','Retries','int','3','0 – 10',false),
+        row('wp.rateLimitPerSecond','Rate limit','int','5','1 – 100',false),
+        row('wp.proxyUrl','Proxy URL','string','socks5://127.0.0.1:9050','',true)]},
+      {g:'images', rows:[
+        row('images.openaiModel','Image model','string','gpt-image-2','',false),
+        row('images.localDir','Local image folder','string','C:\\pictures','',true)]},
+      {g:'import', rows:[row('import.maxRows','Max rows per file','int','20000','100 – 200 000',false)]},
+      {g:'sync', rows:[row('sync.batchSize','Batch size','int','100','10 – 500',false)]},
+      {g:'schedules', rows:[
+        row('schedules.maxTargets','Max pages per schedule','int','500','1 – 500',false),
+        row('schedules.catchUpMissed','Catch up missed runs','bool','off','',false)]}
+    ];
+    const providers = [['OpenAI','openai','set','142 ms','--ok'],['Anthropic','anthropic','set','208 ms','--ok'],['Gemini','gemini','not set','never tested','--mut'],['Gemini (OpenAI API)','geminiOpenai','set','401 invalid_api_key','--dang']]
+      .map(p => ({name:p[0], key:p[1], status:p[2], result:p[3],
+        chipFg: p[2] === 'set' ? 'var(--ok)' : 'var(--t4)',
+        chipBg: p[2] === 'set' ? 'var(--ok-s)' : 'var(--mut-s)',
+        resFg:'var(' + p[4] + ')'}));
+    const roles = [['writer','openai','gpt-5.1'],['editor','anthropic','claude-sonnet-4.5'],['linker','openai','gpt-5.1-mini'],['judge','anthropic','claude-opus-4.1'],['chat','anthropic','claude-sonnet-4.5'],['image','openai','gpt-image-2'],['titler','gemini','gemini-2.5-flash']]
+      .map(r => ({role:r[0], provider:r[1], model:r[2]}));
+    const catalog = [['openai','gpt-5.1','1.25','10.00','400k / 128k · 500 rpm',true],['openai','gpt-5.1-mini','0.25','2.00','400k / 128k · 2 000 rpm',true],['anthropic','claude-opus-4.1','15.00','75.00','200k / 32k · 50 rpm',true],['anthropic','claude-sonnet-4.5','3.00','15.00','200k / 64k · 250 rpm',true],['gemini','gemini-2.5-flash','0.30','2.50','1M / 65k · 1 000 rpm',false],['openai','gpt-image-2','5.00','40.00','—',true]]
+      .map(c => ({provider:c[0], model:c[1], inp:'$' + c[2], out:'$' + c[3], limits:c[4],
+        knob: c[5] ? 'translateX(13px)' : 'none', track: c[5] ? 'var(--ac)' : 'var(--s3)'}));
+    const counts = [['settings','34'],['models','6'],['tools','22'],['provider keys','3']].map(c => ({name:c[0], n:c[1]}));
+    return {
+      setStates: this.seg('set',[{v:'general',label:'General · error'},{v:'models',label:'Models'},{v:'browserFound',label:'Browser found'},{v:'browserMissing',label:'Browser missing'},{v:'security',label:'Security'},{v:'about',label:'About'}]),
+      railSetTop: this.rail2('settings').top, railSetBot: this.rail2('settings').bot,
+      setTabs: tabs, setTab: tab,
+      setGeneral: st === 'general', setModels: st === 'models',
+      setBrowser: st === 'browserFound' || st === 'browserMissing',
+      setBrowserFound: st === 'browserFound',
+      setBrowserMissing: st === 'browserMissing',
+      setSecurity: st === 'security', setAbout: st === 'about',
+      setGroups: groups, setProviders: providers, setRoles: roles, setCatalog: catalog, setCounts: counts,
+      setTorPath: st === 'browserFound' ? 'C:\\Users\\dm\\Desktop\\Tor Browser\\Browser\\firefox.exe' : 'C:\\Program Files\\Mozilla Firefox\\firefox.exe',
+      setTorChip: st === 'browserFound' ? 'detected' : 'chosen',
+      setTorChipFg: st === 'browserFound' ? 'var(--ok)' : 'var(--warn)',
+      setTorChipBg: st === 'browserFound' ? 'var(--ok-s)' : 'var(--warn-s)',
+      setTorError: st === 'browserMissing' ? 'This is Firefox, not Tor Browser' : '',
+      setTorBorder: st === 'browserMissing' ? 'var(--dang)' : 'var(--b1)'
+    };
+  }
+  repVals(){ return this.memo('rep', this.state.rep, () => this.buildRep()); }
+  buildRep(){
+    const st = this.state.rep;
+    const tab = {site:'Site', siteEmpty:'Site', runs:'Runs', runsEmpty:'Runs', page:'Pages'}[st];
+    const tabs = [['Site','site'],['Runs','runs'],['Pages','page']].map(t => ({
+      label:t[0],
+      fg: tab === t[0] ? 'var(--t1)' : 'var(--t3)',
+      bd: tab === t[0] ? 'var(--ac)' : 'transparent',
+      on: () => this.setState({rep:t[1]})
+    }));
+    const blank = st === 'siteEmpty';
+    const tiles = [['Pages mapped','86%','440 of 512','--ok'],['Entities with a page','71%','134 of 188','--warn'],['Orphan pages','38','no inbound link','--dang'],['Cannibalised entities','7','same primary keyword','--warn'],['Drifted pages','12','changed on site','--warn'],['Average depth','2.8','segments in path','--t2']]
+      .map(t => ({name:t[0], value: blank ? '—' : t[1], note: blank ? '' : t[2], fg: blank ? 'var(--t4)' : 'var(' + t[3] + ')'}));
+    const depth = [['1',18],['2',146],['3',214],['4',96],['5',31],['6',7]].map(d => ({
+      label:'depth ' + d[0], n: d[1], h: Math.round(d[1] / 214 * 100),
+      fill: d[1] > 150 ? 'var(--ac)' : 'var(--s3)'}));
+    const coverage = [['Kiln Care','topic','no canonical page','0 links','--dang'],['Travel Mug','product','no canonical page','0 links','--dang'],['Glaze Recipes','topic','page planned','1 link','--warn'],['Clay Types','category','page planned','2 links','--warn'],['Studio Safety','topic','published','2 links','--warn'],['Mug 500ml','product','published','3 links','--warn']]
+      .map(c => ({name:c[0], kind:c[1], reason:c[2], links:c[3], fg:'var(' + c[4] + ')', bg:'color-mix(in oklab, var(' + c[4] + ') 14%, transparent)'}));
+    const drift = [['/collections/ceramic-mugs/','12 Sep 03:14','18 Sep 11:02'],['/products/mug-350/','09 Sep 04:02','17 Sep 08:40'],['/guides/season-a-mug/','02 Sep 03:31','16 Sep 19:12'],['/collections/teapots/','28 Aug 03:22','15 Sep 07:55']]
+      .map(d => ({path:d[0], pub:d[1], changed:d[2]}));
+    const runs = [['#241','generate','today 03:00','512','498 / 14','$21.40','--ok'],['#238','relink','today 00:00','188','188 / 0','$2.10','--ok'],['#236','generate','yesterday 03:00','512','504 / 8','$20.80','--ok'],['#233','audit','16 Sep 06:00','512','512 / 0','$0.00','--ok'],['#230','sync','16 Sep 00:30','512','470 / 42','$0.00','--dang'],['#228','generate','15 Sep 03:00','128','96 / 32','$6.20','--dang']]
+      .map((r,i) => ({id:r[0], kind:r[1], when:r[2], items:r[3], sf:r[4], cost:r[5],
+        fg:'var(' + r[6] + ')',
+        bg: i === 0 ? 'var(--ac-s)' : 'transparent', mark: i === 0 ? 'inset 2px 0 0 var(--ac)' : 'none'}));
+    const outcomes = [['/collections/ceramic-mugs/','completed','0','--ok'],['/products/mug-350/','completed','2','--ok'],['/guides/season-a-mug/','failed','5','--dang'],['/collections/teapots/','completed','1','--ok'],['/products/mug-500/','completed','0','--ok'],['/guides/glaze-basics/','cancelled','0','--mut'],['/products/travel-mug/','failed','3','--dang']]
+      .map(o => ({path:o[0], status:o[1], findings:o[2] + ' findings', fg:'var(' + o[3] + ')', bg:'color-mix(in oklab, var(' + o[3] + ') 14%, transparent)'}));
+    const findings = [['error','Primary keyword missing from H1','--dang'],['error','Only 3 of 12 required internal links were inserted','--dang'],['warning','Section “Tools and Materials” is 84 words below its range','--warn'],['warning','Meta description is 172 characters, max is 155','--warn'],['info','Two anchors reuse the same text','--info']]
+      .map(f => ({sev:f[0], text:f[1], fg:'var(' + f[2] + ')', bg:'color-mix(in oklab, var(' + f[2] + ') 14%, transparent)'}));
+    const judge = ['Structure follows the template, but the introduction promises a materials list the body never gives.','Steps 4 and 5 repeat the same instruction with different wording.','Tone matches the site; no unsupported claims found.'].map(t => ({t}));
+    return {
+      repStates: this.seg('rep',[{v:'site',label:'Site'},{v:'siteEmpty',label:'Site · no runs'},{v:'runs',label:'Runs'},{v:'runsEmpty',label:'Runs · empty'},{v:'page',label:'Page · failed'}]),
+      railRepTop: this.rail2('reports').top, railRepBot: this.rail2('reports').bot,
+      repTabs: tabs,
+      repSite: st === 'site' || st === 'siteEmpty',
+      repSiteData: st === 'site',
+      repSiteEmpty: blank,
+      repRuns: st === 'runs', repRunsEmpty: st === 'runsEmpty',
+      repPage: st === 'page',
+      repTiles: tiles, repDepth: depth, repCoverage: coverage, repDrift: drift,
+      repRunRows: runs, repOutcomes: outcomes, repFindings: findings, repJudge: judge
+    };
+  }
   renderVals(){
     const ov = this.state.ov;
     const tile = (title,total,bar,rows) => ({title,total,bar,rows});
     return {
+      ...this.tplVals(), ...this.tedVals(), ...this.schVals(),
+      ...this.impVals(), ...this.setVals(), ...this.repVals(),
       railOv: this.rail('overview'),
       lockStates: this.seg('lock',[{v:'idle',label:'Password'},{v:'busy',label:'Unlocking'},{v:'error',label:'Wrong password'}]),
       lockIdle: this.state.lock === 'idle',
