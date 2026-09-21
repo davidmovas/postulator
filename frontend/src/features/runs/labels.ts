@@ -33,7 +33,6 @@ import {
     RestartAltIcon,
     ScheduleIcon,
     ShieldIcon,
-    SmartToyIcon,
     SyncAltIcon,
     TaskAltIcon,
     VisibilityIcon,
@@ -125,7 +124,6 @@ const eventIcons: Readonly<Record<RunEventType, IconComponent>> = {
     "step.done": CheckCircleIcon,
     "step.failed": ErrorIcon,
     "step.retrying": RestartAltIcon,
-    "llm.usage": SmartToyIcon,
 };
 
 const eventTones: Readonly<Record<RunEventType, Tone>> = {
@@ -145,7 +143,6 @@ const eventTones: Readonly<Record<RunEventType, Tone>> = {
     "step.done": "muted",
     "step.failed": "danger",
     "step.retrying": "warn",
-    "llm.usage": "muted",
 };
 
 export function eventIcon(type: RunEventType): IconComponent {

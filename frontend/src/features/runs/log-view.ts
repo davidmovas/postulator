@@ -111,9 +111,7 @@ export interface FeedEntry {
     durationMs: number | null;
     attempt: number | null;
     afterMs: number | null;
-    tokens: number | null;
     usd: number | null;
-    model: string | null;
     items: number | null;
 }
 
@@ -130,9 +128,7 @@ function blank(record: RunEventRecord): FeedEntry {
         durationMs: null,
         attempt: null,
         afterMs: null,
-        tokens: null,
         usd: null,
-        model: null,
         items: null,
     };
 }
@@ -244,16 +240,6 @@ export function describe(record: RunEventRecord): FeedEntry {
             }
             return entry;
         }
-        case "llm.usage": {
-            const payload = payloadOf(record, "llm.usage");
-            if (payload !== null) {
-                entry.itemId = payload.itemId === "" ? null : payload.itemId;
-                entry.tokens = payload.promptTokens + payload.completionTokens;
-                entry.usd = payload.usd;
-                entry.model = payload.model;
-            }
-            return entry;
-        }
         default:
             return entry;
     }
@@ -269,18 +255,4 @@ export function feed(events: Events, limit: number, itemId: string | null = null
         out.push(entry);
     }
     return out;
-}
-
-export function spentUsd(events: Events, itemId: string): number {
-    let total = 0;
-    for (const record of events) {
-        if (record.type !== "llm.usage") {
-            continue;
-        }
-        const payload = payloadOf(record, "llm.usage");
-        if (payload !== null && payload.itemId === itemId) {
-            total += payload.usd;
-        }
-    }
-    return total;
 }

@@ -165,15 +165,6 @@ export function liveStats(events: Events): LiveStats {
             case "item.needs_human":
                 totals.needsHuman += 1;
                 break;
-            case "llm.usage": {
-                const payload = payloadOf(record, "llm.usage");
-                if (payload !== null) {
-                    totals.tokens += payload.promptTokens + payload.completionTokens;
-                    totals.usd += payload.usd;
-                    totals.calls += 1;
-                }
-                break;
-            }
             default:
                 break;
         }

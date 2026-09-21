@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { RunEventRecord, RunEventType } from "../../data/runs/decode.js";
-import { describe as describeEvent, feed, retryNotices, spentUsd, stepTimeline } from "./log-view.js";
+import { describe as describeEvent, feed, retryNotices, stepTimeline } from "./log-view.js";
 
 let seq = 0;
 
@@ -124,46 +124,10 @@ describe("feed", () => {
         expect(entry.step).toBe("judge");
     });
 
-    it("reads spend off a usage event and leaves a run-level call unattributed", () => {
-        reset();
-        const entry = describeEvent(
-            event("llm.usage", {
-                runId: "r",
-                itemId: "",
-                provider: "anthropic",
-                model: "claude",
-                promptTokens: 100,
-                completionTokens: 50,
-                usd: 0.02,
-            }),
-        );
-        expect(entry.itemId).toBeNull();
-        expect(entry.tokens).toBe(150);
-        expect(entry.usd).toBe(0.02);
-        expect(entry.model).toBe("claude");
-    });
-
     it("leaves every field null for a payload it cannot read", () => {
         reset();
         const entry = describeEvent(event("step.done", null));
         expect(entry.step).toBeNull();
         expect(entry.durationMs).toBeNull();
-    });
-});
-
-describe("spentUsd", () => {
-    it("adds only the usage of the item asked for", () => {
-        reset();
-        const usage = (itemId: string, usd: number) =>
-            event("llm.usage", {
-                runId: "r",
-                itemId,
-                provider: "p",
-                model: "m",
-                promptTokens: 1,
-                completionTokens: 1,
-                usd,
-            });
-        expect(spentUsd([usage("a", 0.5), usage("b", 1), usage("a", 0.25)], "a")).toBe(0.75);
     });
 });

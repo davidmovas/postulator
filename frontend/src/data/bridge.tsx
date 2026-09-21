@@ -143,11 +143,11 @@ function handlersFor(client: QueryClient): Handlers {
         "step.retrying": stepOnly,
         "llm.usage": (envelope) => {
             const runId = runIdOf(envelope);
-            ingestLive(runId, record(envelope));
             coalesce(
                 `usage:${runId}`,
                 () => {
                     invalidate(client, keys.models.usage({ runId }));
+                    invalidate(client, keys.models.usageAll());
                 },
                 usageCoalesceMs,
             );

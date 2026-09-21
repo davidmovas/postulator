@@ -17,7 +17,6 @@ export const runEventTypes = [
     "step.done",
     "step.failed",
     "step.retrying",
-    "llm.usage",
 ] as const;
 
 export type RunEventType = (typeof runEventTypes)[number];

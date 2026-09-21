@@ -21,6 +21,7 @@ import { itemProgress, liveStats } from "../runs/derive.js";
 import type { RunEventsState } from "../runs/log.js";
 import { catchUpNow, ensureLog } from "../runs/log.js";
 import { useRunEvents } from "../runs/use-run-events.js";
+import { useUsage } from "./models.js";
 import type { RunSort } from "../sorts.js";
 import type { Run, RunFilter, RunItem, RunTotals } from "../types.js";
 import { terminalRunStatuses } from "../../generated/vocab.js";
@@ -86,9 +87,16 @@ export function useRunProgress(runId: string): RunProgress {
     const rows = useRunItems(runId);
     const events = useRunEvents(runId);
 
+    const spent = useUsage({ runId });
+
     const run = row.data?.run;
     const terminal = run !== undefined && (terminalRunStatuses as readonly string[]).includes(run.status);
-    const live = liveStats(events.events);
+    const counted = liveStats(events.events);
+    const summary = spent.data;
+    const live: LiveStats =
+        summary === undefined
+            ? counted
+            : { ...counted, tokens: summary.usage.total, usd: summary.usd, calls: summary.calls };
 
     return {
         run,

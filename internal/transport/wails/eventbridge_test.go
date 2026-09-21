@@ -118,6 +118,43 @@ func TestPublishRunCarriesTheRunSequence(t *testing.T) {
 	}
 }
 
+func TestPublishCarriesAModelCallWhateverItBelongsTo(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		payload events.LLMUsagePayload
+	}{
+		{
+			name: "inside a run",
+			payload: events.LLMUsagePayload{
+				RunID: "6f3b2a11-0c9d-4e7a-8b25-1f4c6d7e8a90", ItemID: "i1",
+				Provider: "openai", Model: "gpt-5.6-luna", PromptTokens: 7, CompletionTokens: 50, USD: 0.001,
+			},
+		},
+		{
+			name: "outside a run",
+			payload: events.LLMUsagePayload{
+				Provider: "openai", Model: "gpt-5.6-sol", PromptTokens: 3, CompletionTokens: 9, USD: 0.0002,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			bridge, emitter := newBridge()
+			if err := bridge.Publish(events.LLMUsage, tc.payload); err != nil {
+				t.Fatalf("Publish: %v", err)
+			}
+			if len(emitter.events()) != 1 {
+				t.Fatalf("emitted %d events, want 1", len(emitter.events()))
+			}
+		})
+	}
+}
+
 func TestPublishRejectsMisuse(t *testing.T) {
 	t.Parallel()
 

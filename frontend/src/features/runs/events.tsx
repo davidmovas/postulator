@@ -3,7 +3,7 @@ import { useMemo } from "react";
 
 import { copy } from "../../copy/index.js";
 import type { RunEventsState } from "../../data/runs/log.js";
-import { absoluteTime, duration, relativeTime, tokens as formatTokens, usd as formatUsd } from "../../domain/format.js";
+import { absoluteTime, duration, relativeTime, usd as formatUsd } from "../../domain/format.js";
 import {
     CloudSyncIcon,
     cx,
@@ -39,12 +39,6 @@ function detailOf(entry: FeedEntry): string {
     }
     if (entry.durationMs !== null) {
         parts.push(duration(entry.durationMs));
-    }
-    if (entry.model !== null && entry.model !== "") {
-        parts.push(entry.model);
-    }
-    if (entry.tokens !== null) {
-        parts.push(formatTokens(entry.tokens));
     }
     if (entry.usd !== null) {
         parts.push(formatUsd(entry.usd));

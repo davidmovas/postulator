@@ -5,6 +5,7 @@ const { fetchEvents } = vi.hoisted(() => ({ fetchEvents: vi.fn() }));
 vi.mock("../endpoints/runs.js", () => ({ listRunEvents: fetchEvents }));
 
 import type { RawRunEvent } from "./decode.js";
+import { runEventTypes } from "./decode.js";
 import {
     catchUpLimit,
     catchUpNow,
@@ -49,6 +50,23 @@ describe("the run event log", () => {
         const state = getSnapshot("unknown");
         expect(state.events.map((held) => held.seq)).toEqual([1, 3]);
         expect(state.contiguousSeq).toBe(3);
+    });
+
+    test("keeps a model call out of the log, because ListEvents never replays one", async () => {
+        ingestReplay("usage", [
+            row(1),
+            {
+                seq: 2,
+                type: "llm.usage",
+                at: "2026-09-19T10:00:01Z",
+                payload: { runId: "r", itemId: "i", provider: "openai", model: "m", promptTokens: 7, completionTokens: 9, usd: 0.01 },
+            },
+        ]);
+        await tick();
+
+        const state = getSnapshot("usage");
+        expect(state.events.map((held) => held.type)).toEqual(["step.done"]);
+        expect(runEventTypes).not.toContain("llm.usage");
     });
 
     test("heals a real gap by asking from contiguousSeq, never maxSeq", async () => {

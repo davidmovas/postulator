@@ -49,7 +49,7 @@ func NewRegistry() Registry {
 		{Type: StepDone, Payload: StepDonePayload{}, Run: true},
 		{Type: StepFailed, Payload: StepFailedPayload{}, Run: true},
 		{Type: StepRetrying, Payload: StepRetryingPayload{}, Run: true},
-		{Type: LLMUsage, Payload: LLMUsagePayload{}, Run: true},
+		{Type: LLMUsage, Payload: LLMUsagePayload{}},
 	}
 
 	slices.SortFunc(entries, func(a, b Entry) int {
