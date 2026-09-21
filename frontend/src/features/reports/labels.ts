@@ -1,5 +1,5 @@
 import { copy } from "../../copy/index.js";
-import { entityKinds, isOneOf, pageStatuses } from "../../generated/vocab.js";
+import { entityKinds, isOneOf, pageStatuses, publishModes } from "../../generated/vocab.js";
 import type { Tone } from "../../ui/index.js";
 import { noPage } from "./model/site.js";
 import type { CoverageReason } from "./model/site.js";
@@ -21,6 +21,14 @@ const reasonTones: Readonly<Record<string, Tone>> = {
 
 export function reasonTone(reason: CoverageReason): Tone {
     return reasonTones[reason] ?? "muted";
+}
+
+export function pageStatusLabel(status: string): string {
+    return isOneOf(pageStatuses, status) ? copy.reports.pages.statuses[status] : status;
+}
+
+export function publishStatusLabel(status: string): string {
+    return isOneOf(publishModes, status) ? copy.reports.pages.publishStatuses[status] : status;
 }
 
 export function entityKindLabel(kind: string): string {

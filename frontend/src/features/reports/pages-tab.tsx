@@ -21,6 +21,7 @@ import {
 } from "../../ui/index.js";
 import { statusTone } from "../pages/labels.js";
 import { statusLabel } from "../runs/labels.js";
+import { pageStatusLabel } from "./labels.js";
 import { PageReportCards } from "./page-cards.js";
 import { pathFilter } from "./params.js";
 
@@ -88,7 +89,7 @@ export function PagesTab({ siteId, prefix, pageId, onPrefix, onSelect }: PagesTa
                                         {page.path}
                                     </span>
                                     <StatusBadge tone={statusTone(page.status)} dot={false}>
-                                        {page.status}
+                                        {pageStatusLabel(page.status)}
                                     </StatusBadge>
                                 </button>
                             </li>

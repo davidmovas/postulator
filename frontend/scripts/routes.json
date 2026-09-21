@@ -46,6 +46,62 @@
     "wait": 1200
   },
   {
+    "name": "schedules",
+    "route": "#/s/:siteId/schedules",
+    "wait": 1200
+  },
+  {
+    "name": "schedules-new",
+    "route": "#/s/:siteId/schedules?action=new",
+    "wait": 1000
+  },
+  {
+    "name": "schedules-off",
+    "route": "#/s/:siteId/schedules?show=off",
+    "wait": 1000
+  },
+  {
+    "name": "import-file",
+    "route": "#/s/:siteId/import",
+    "wait": 1000
+  },
+  {
+    "name": "import-export",
+    "route": "#/s/:siteId/import?tab=export",
+    "wait": 900
+  },
+  {
+    "name": "reports-site",
+    "route": "#/s/:siteId/reports",
+    "wait": 1800
+  },
+  {
+    "name": "reports-runs",
+    "route": "#/s/:siteId/reports?tab=runs",
+    "wait": 1500,
+    "steps": [
+      {
+        "click": "[data-run-id]"
+      },
+      {
+        "wait": 900
+      }
+    ]
+  },
+  {
+    "name": "reports-pages",
+    "route": "#/s/:siteId/reports?tab=pages",
+    "wait": 1500,
+    "steps": [
+      {
+        "click": "[data-page-id]"
+      },
+      {
+        "wait": 900
+      }
+    ]
+  },
+  {
     "name": "templates-new",
     "route": "#/s/:siteId/templates",
     "wait": 1200,
@@ -203,21 +259,6 @@
         "wait": 1200
       }
     ]
-  },
-  {
-    "name": "schedules",
-    "route": "#/s/:siteId/schedules",
-    "wait": 1000
-  },
-  {
-    "name": "import-file",
-    "route": "#/s/:siteId/import",
-    "wait": 1000
-  },
-  {
-    "name": "reports-site",
-    "route": "#/s/:siteId/reports",
-    "wait": 1500
   },
   {
     "name": "pages-tree",
@@ -671,60 +712,24 @@
     ]
   },
   {
-    "name": "import-export",
-    "route": "#/s/:siteId/import?tab=export",
-    "wait": 900
+    "name": "schedules-960",
+    "route": "#/s/:siteId/schedules",
+    "width": 960,
+    "height": 600,
+    "wait": 1200
   },
   {
     "name": "import-960",
     "route": "#/s/:siteId/import",
     "width": 960,
     "height": 600,
-    "wait": 900
-  },
-  {
-    "name": "schedules-new",
-    "route": "#/s/:siteId/schedules?action=new",
-    "wait": 900
-  },
-  {
-    "name": "schedules-960",
-    "route": "#/s/:siteId/schedules",
-    "width": 960,
-    "height": 600,
-    "wait": 900
-  },
-  {
-    "name": "reports-runs",
-    "route": "#/s/:siteId/reports?tab=runs",
-    "wait": 1200,
-    "steps": [
-      {
-        "click": "[data-run-id]"
-      },
-      {
-        "wait": 900
-      }
-    ]
-  },
-  {
-    "name": "reports-pages",
-    "route": "#/s/:siteId/reports?tab=pages",
-    "wait": 1200,
-    "steps": [
-      {
-        "click": "[data-page-id]"
-      },
-      {
-        "wait": 900
-      }
-    ]
+    "wait": 1000
   },
   {
     "name": "reports-960",
     "route": "#/s/:siteId/reports",
     "width": 960,
     "height": 600,
-    "wait": 1200
+    "wait": 1800
   }
 ]

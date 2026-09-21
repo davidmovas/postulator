@@ -28,6 +28,7 @@ import { enabledOf, readQuery, wantsNew, writeQuery } from "./params.js";
 import { SchedulesTable } from "./table.js";
 
 const runsPage = 100;
+const templatePage = 100;
 
 export function SchedulesScreen(): ReactElement {
     const params = useParams();
@@ -39,13 +40,17 @@ export function SchedulesScreen(): ReactElement {
 
     const listed = useSchedules({ siteId, enabled: enabledOf(query.show) });
     const graph = useGraph(siteId === "" ? null : siteId);
-    const templates = useTemplates({ siteId });
+    const siteTemplates = useTemplates({ siteId }, { field: "name", desc: false }, templatePage);
+    const globalTemplates = useTemplates({ scope: "global" }, { field: "name", desc: false }, templatePage);
     const runs = useRuns({ siteId }, null, runsPage);
     const enable = useEnableSchedule();
     const disable = useDisableSchedule();
 
     const rows = useMemo(() => flatten(listed.data?.pages), [listed.data]);
-    const templateRows = useMemo(() => flatten(templates.data?.pages), [templates.data]);
+    const templateRows = useMemo(
+        () => [...flatten(globalTemplates.data?.pages), ...flatten(siteTemplates.data?.pages)],
+        [globalTemplates.data, siteTemplates.data],
+    );
     const entities = useMemo(() => graph.data?.entities ?? [], [graph.data]);
     const entityNames = useMemo(() => {
         const held = new Map<string, string>();
@@ -62,8 +67,8 @@ export function SchedulesScreen(): ReactElement {
         return held;
     }, [runs.data]);
 
-    const selected = rows.find((row) => row.id === query.id) ?? null;
     const failure = listed.error === null ? null : react(listed.error);
+    const selected = rows.find((row) => row.id === query.id) ?? (query.id === "" ? (rows[0] ?? null) : null);
 
     const change = (next: SchedulesQuery, createNew = false): void => {
         const written = writeQuery(next);
@@ -181,7 +186,7 @@ export function SchedulesScreen(): ReactElement {
                         rows={rows}
                         entityNames={entityNames}
                         lastRuns={lastRuns}
-                        selectedId={creating ? "" : query.id}
+                        selectedId={creating ? "" : (selected?.id ?? "")}
                         onSelect={(id) => {
                             change({ ...query, id });
                         }}

@@ -95,7 +95,8 @@ export function RunReportPanel({ siteId, runId }: RunPanelProps): ReactElement {
                             <dd className="font-mono text-ink">{usd(held.stats.usd)}</dd>
                         </div>
                         <div className="flex gap-1.5">
-                            <dt>{tokens(held.stats.tokens)}</dt>
+                            <dt>{copy.reports.runs.tokens}</dt>
+                            <dd className="font-mono text-ink">{tokens(held.stats.tokens)}</dd>
                         </div>
                     </dl>
                     <Link
@@ -108,7 +109,7 @@ export function RunReportPanel({ siteId, runId }: RunPanelProps): ReactElement {
                 </div>
             </Panel>
             <Panel>
-                <PanelHeader title={copy.reports.runs.path} />
+                <PanelHeader title={copy.reports.runs.perPage} />
                 <ul className="flex flex-col">
                     {rows.map((row) => (
                         <li key={row.itemId} className="flex flex-col gap-1 border-b border-hairline p-3 last:border-b-0">

@@ -162,6 +162,7 @@ export function StepPreview({ report, onBack, onApply }: StepPreviewProps): Reac
                     </Button>
                     <Button
                         variant="primary"
+                        data-import-apply={true}
                         disabled={errors.length > 0}
                         title={errors.length > 0 ? copy.imports.preview.blocked : undefined}
                         onClick={onApply}

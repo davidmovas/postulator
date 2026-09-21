@@ -7,6 +7,8 @@ import { shareOf, shareTone } from "./labels.js";
 import type { AuditCard, DepthBar } from "./model/site.js";
 import { toneClasses } from "../../ui/index.js";
 
+const barTrack = 112;
+
 export interface HistogramProps {
     bars: readonly DepthBar[];
 }
@@ -20,11 +22,11 @@ export function Histogram({ bars }: HistogramProps): ReactElement {
                     <EmptyState icon={MonitoringIcon} title={copy.empty.depth} />
                 </div>
             ) : (
-                <ul className="flex h-40 items-end gap-2 p-3">
+                <ul className="flex items-end gap-2 p-3">
                     {bars.map((bar) => (
                         <li
                             key={bar.level}
-                            className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1"
+                            className="flex min-w-0 flex-1 flex-col items-center gap-1"
                             title={copy.reports.depth.pages(bar.pages)}
                         >
                             <span className="font-mono text-2xs text-ink-soft">{bar.pages}</span>
@@ -33,7 +35,7 @@ export function Histogram({ bars }: HistogramProps): ReactElement {
                                     "w-full rounded-sm",
                                     bar.fraction === 1 ? "bg-accent" : "bg-raised-strong",
                                 )}
-                                style={{ height: `${Math.max(bar.fraction * 100, 3)}%` }}
+                                style={{ height: `${Math.round(Math.max(bar.fraction, 0.03) * barTrack)}px` }}
                             />
                             <span className="truncate text-2xs text-ink-faint">{copy.reports.depth.level(bar.level)}</span>
                         </li>

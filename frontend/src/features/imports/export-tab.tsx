@@ -15,7 +15,7 @@ function suggested(name: string): string {
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "");
-    return `${slug === "" ? "postulator" : slug}-export.csv`;
+    return `${slug === "" ? "postulator" : slug}-export.xlsx`;
 }
 
 export interface ExportTabProps {
@@ -33,7 +33,7 @@ export function ExportTab({ siteId }: ExportTabProps): ReactElement {
         void pickSaveFile({
             title: copy.imports.export.dialogTitle,
             filename: suggested(site.data?.site.name ?? ""),
-            filters: [{ displayName: copy.imports.file.spreadsheets, pattern: "*.csv" }],
+            filters: [{ displayName: copy.imports.file.workbooks, pattern: "*.xlsx" }],
         }).then((picked) => {
             if (picked !== null) {
                 setPath(picked);
@@ -55,11 +55,15 @@ export function ExportTab({ siteId }: ExportTabProps): ReactElement {
                         <div className="flex items-center gap-2">
                             <Input
                                 id={control.id}
+                                data-export-path={true}
                                 mono={true}
-                                readOnly={true}
                                 value={path}
                                 placeholder={suggested(site.data?.site.name ?? "")}
                                 title={path}
+                                onChange={(event) => {
+                                    setPath(event.target.value);
+                                    exporting.reset();
+                                }}
                             />
                             <Button variant="secondary" onClick={choose}>
                                 {copy.imports.export.choose}
@@ -73,6 +77,7 @@ export function ExportTab({ siteId }: ExportTabProps): ReactElement {
                 <div className="flex items-center gap-2">
                     <Button
                         variant="primary"
+                        data-export-start={true}
                         busy={exporting.isPending}
                         disabled={path === ""}
                         title={path === "" ? copy.imports.export.noDestination : undefined}

@@ -43,6 +43,7 @@ export function CoverageTable({ siteId, rows }: CoverageTableProps): ReactElemen
                     <EmptyState icon={TaskAltIcon} title={copy.empty.entities} />
                 </div>
             ) : (
+                <div className="max-h-96 overflow-auto">
                 <DenseTable columns={coverageGrid} label={copy.reports.coverage.title}>
                     <TableHead>
                         <span>{copy.reports.coverage.entity}</span>
@@ -74,6 +75,7 @@ export function CoverageTable({ siteId, rows }: CoverageTableProps): ReactElemen
                         </TableRow>
                     ))}
                 </DenseTable>
+                </div>
             )}
         </Panel>
     );

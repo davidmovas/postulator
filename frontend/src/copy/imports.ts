@@ -21,6 +21,7 @@ export const imports = {
         change: "Choose another file",
         dialogTitle: "Choose a sheet to import",
         spreadsheets: "Spreadsheets",
+        workbooks: "Excel workbooks",
         reading: "Reading the sheet",
         rows: (count: number) => (count === 1 ? "1 row" : `${count} rows`),
         columns: (count: number) => (count === 1 ? "1 column" : `${count} columns`),
@@ -100,7 +101,7 @@ export const imports = {
     },
     export: {
         title: "Write this site to a sheet",
-        body: "Every page and every entity goes into one CSV, ready to edit and import back.",
+        body: "Every page and every entity goes into one workbook, ready to edit and import back.",
         destination: "Destination file",
         choose: "Choose…",
         dialogTitle: "Where to write the sheet",

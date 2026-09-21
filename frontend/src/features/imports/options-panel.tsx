@@ -69,6 +69,7 @@ export function OptionsPanel({ siteId, mapping, options, onOptions, onSaved }: O
                         {(control) => (
                             <Input
                                 id={control.id}
+                                data-mapping-name={true}
                                 value={name}
                                 invalid={control.invalid}
                                 placeholder={copy.imports.mappings.namePlaceholder}
@@ -83,6 +84,7 @@ export function OptionsPanel({ siteId, mapping, options, onOptions, onSaved }: O
                     )}
                     <Button
                         variant="secondary"
+                        data-mapping-save={true}
                         busy={save.isPending}
                         disabled={name.trim() === "" || !usable(mapping.columns)}
                         onClick={() => {

@@ -30,9 +30,11 @@ function Group({ title, count, tone, findings }: GroupProps): ReactElement | nul
                         className="flex flex-col gap-0.5 border-b border-hairline px-3 py-2 last:border-b-0"
                     >
                         <div className="flex items-baseline gap-2">
-                            <span className="shrink-0 font-mono text-2xs text-ink-faint">
-                                {copy.imports.preview.row(finding.row)}
-                            </span>
+                            {finding.row > 0 ? (
+                                <span className="shrink-0 font-mono text-2xs text-ink-faint">
+                                    {copy.imports.preview.row(finding.row)}
+                                </span>
+                            ) : null}
                             <span className="min-w-0 flex-1 text-xs text-ink">{findingLabel(finding.code)}</span>
                         </div>
                         {finding.message === "" ? null : (

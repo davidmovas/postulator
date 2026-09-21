@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { copy } from "../../copy/index.js";
 import { fieldErrorOf, formErrorOf } from "../../data/errors.js";
@@ -12,31 +12,12 @@ import {
     useUpdateSchedule,
 } from "../../data/hooks/schedules.js";
 import type { Entity, Schedule, Template } from "../../data/types.js";
-import {
-    Banner,
-    Button,
-    CloseIcon,
-    Dialog,
-    Field,
-    IconButton,
-    Input,
-    PanelHeader,
-    PlayArrowIcon,
-    Segmented,
-    SectionLabel,
-    Select,
-    StatusBadge,
-} from "../../ui/index.js";
-import { stepLabel } from "../runs/labels.js";
-import { CadenceFields } from "./cadence.js";
+import { Banner, Button, CloseIcon, Dialog, Field, IconButton, Input, PlayArrowIcon } from "../../ui/index.js";
+import { ScheduleFields } from "./fields.js";
 import { createOf, draftOf, dirty, ready, updateOf } from "./form.js";
 import type { ScheduleDraft } from "./form.js";
-import { actorLabel, publishLabel } from "./labels.js";
+import { actorLabel } from "./labels.js";
 import { LastRunCard } from "./last-run.js";
-
-const anyStatus = "any";
-const anyEntity = "any";
-const siteTemplate = "site";
 
 export interface SchedulePanelProps {
     siteId: string;
@@ -73,26 +54,9 @@ export function SchedulePanel({
     }, [schedule]);
 
     const thrown = schedule === null ? create.error : update.error;
-    const cronError = fieldErrorOf(thrown, "cron") ?? fieldErrorOf(thrown, "interval");
     const formError = formErrorOf(thrown);
     const changed = dirty(draft, schedule);
     const saving = create.isPending || update.isPending;
-
-    const templateOptions = useMemo(
-        () => [
-            { value: siteTemplate, label: copy.schedules.panel.anyTemplate },
-            ...templates.map((template) => ({ value: template.id, label: template.name })),
-        ],
-        [templates],
-    );
-
-    const entityOptions = useMemo(
-        () => [
-            { value: anyEntity, label: copy.schedules.panel.anyEntity },
-            ...entities.map((entity) => ({ value: entity.id, label: entity.name })),
-        ],
-        [entities],
-    );
 
     const save = (): void => {
         if (schedule === null) {
@@ -108,7 +72,10 @@ export function SchedulePanel({
 
     return (
         <div className="flex flex-col gap-3 p-3">
-            <PanelHeader title={schedule?.name ?? copy.schedules.panel.create}>
+            <header className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-hairline">
+                <h2 className="min-w-0 truncate text-sm font-semibold text-ink">
+                    {schedule?.name ?? copy.schedules.panel.create}
+                </h2>
                 <IconButton
                     icon={CloseIcon}
                     label={copy.schedules.panel.close}
@@ -116,11 +83,12 @@ export function SchedulePanel({
                     variant="ghost"
                     onClick={onClose}
                 />
-            </PanelHeader>
+            </header>
             <Field label={copy.schedules.panel.name} error={fieldErrorOf(thrown, "name")} required={true}>
                 {(control) => (
                     <Input
                         id={control.id}
+                        data-schedule-name={true}
                         value={draft.name}
                         invalid={control.invalid}
                         placeholder={copy.schedules.panel.namePlaceholder}
@@ -130,132 +98,14 @@ export function SchedulePanel({
                     />
                 )}
             </Field>
-            <CadenceFields draft={draft} cronError={cronError} onChange={setDraft} />
-
-            <SectionLabel>{copy.schedules.panel.work}</SectionLabel>
-            <Field label={copy.schedules.panel.template}>
-                {(control) => (
-                    <Select
-                        id={control.id}
-                        value={draft.templateId === "" ? siteTemplate : draft.templateId}
-                        options={templateOptions}
-                        onValueChange={(next) => {
-                            setDraft({ ...draft, templateId: next === siteTemplate ? "" : next });
-                        }}
-                    />
-                )}
-            </Field>
-            <Field label={copy.schedules.panel.publish}>
-                {() => (
-                    <Segmented
-                        label={copy.schedules.panel.publish}
-                        value={draft.publishMode}
-                        options={[
-                            { value: "draft", label: publishLabel("draft") },
-                            { value: "publish", label: publishLabel("publish") },
-                        ]}
-                        onValueChange={(next) => {
-                            setDraft({ ...draft, publishMode: next });
-                        }}
-                    />
-                )}
-            </Field>
-            {schedule === null || schedule.steps === null || schedule.steps.length === 0 ? (
-                <p className="text-2xs text-ink-faint">{copy.schedules.panel.templateRecipe}</p>
-            ) : (
-                <div className="flex flex-wrap gap-1">
-                    {schedule.steps.map((step) => (
-                        <StatusBadge key={step} tone="muted" dot={false}>
-                            {stepLabel(step)}
-                        </StatusBadge>
-                    ))}
-                </div>
-            )}
-
-            <SectionLabel>{copy.schedules.panel.targets}</SectionLabel>
-            <Field label={copy.schedules.panel.status} error={fieldErrorOf(thrown, "status")}>
-                {(control) => (
-                    <Select
-                        id={control.id}
-                        value={draft.status === "" ? anyStatus : draft.status}
-                        options={[
-                            { value: anyStatus, label: copy.schedules.panel.anyStatus },
-                            { value: "planned", label: copy.schedules.statuses.planned },
-                            { value: "exists", label: copy.schedules.statuses.exists },
-                            { value: "published", label: copy.schedules.statuses.published },
-                            { value: "archived", label: copy.schedules.statuses.archived },
-                        ]}
-                        onValueChange={(next) => {
-                            setDraft({ ...draft, status: next === anyStatus ? "" : next });
-                        }}
-                    />
-                )}
-            </Field>
-            <Field label={copy.schedules.panel.entity}>
-                {(control) => (
-                    <Select
-                        id={control.id}
-                        value={draft.entityId === "" ? anyEntity : draft.entityId}
-                        options={entityOptions}
-                        disabled={entities.length === 0}
-                        onValueChange={(next) => {
-                            setDraft({ ...draft, entityId: next === anyEntity ? "" : next });
-                        }}
-                    />
-                )}
-            </Field>
-            <Field label={copy.schedules.panel.limit} error={fieldErrorOf(thrown, "limit")}>
-                {(control) => (
-                    <Input
-                        id={control.id}
-                        type="number"
-                        min={1}
-                        max={500}
-                        mono={true}
-                        invalid={control.invalid}
-                        value={String(draft.limit)}
-                        onChange={(event) => {
-                            setDraft({ ...draft, limit: Number(event.target.value) });
-                        }}
-                    />
-                )}
-            </Field>
-
-            <SectionLabel>{copy.schedules.panel.budget}</SectionLabel>
-            <div className="flex gap-2">
-                <Field label={copy.schedules.panel.maxUsd} error={fieldErrorOf(thrown, "budget")} className="flex-1">
-                    {(control) => (
-                        <Input
-                            id={control.id}
-                            type="number"
-                            min={0}
-                            step={0.5}
-                            mono={true}
-                            invalid={control.invalid}
-                            value={String(draft.maxUsd)}
-                            placeholder={copy.schedules.panel.noCap}
-                            onChange={(event) => {
-                                setDraft({ ...draft, maxUsd: Number(event.target.value) });
-                            }}
-                        />
-                    )}
-                </Field>
-                <Field label={copy.schedules.panel.maxTokens} className="flex-1">
-                    {(control) => (
-                        <Input
-                            id={control.id}
-                            type="number"
-                            min={0}
-                            mono={true}
-                            value={String(draft.maxTokens)}
-                            placeholder={copy.schedules.panel.noCap}
-                            onChange={(event) => {
-                                setDraft({ ...draft, maxTokens: Number(event.target.value) });
-                            }}
-                        />
-                    )}
-                </Field>
-            </div>
+            <ScheduleFields
+                draft={draft}
+                schedule={schedule}
+                templates={templates}
+                entities={entities}
+                thrown={thrown}
+                onChange={setDraft}
+            />
 
             {formError === null ? null : <Banner tone="danger" title={formError} />}
             {runNow.data?.skipped === undefined || runNow.data.skipped === "" ? null : (
@@ -263,13 +113,20 @@ export function SchedulePanel({
             )}
 
             <div className="flex flex-wrap gap-2">
-                <Button variant="primary" busy={saving} disabled={!ready(draft) || !changed} onClick={save}>
+                <Button
+                    variant="primary"
+                    data-schedule-save={true}
+                    busy={saving}
+                    disabled={!ready(draft) || !changed}
+                    onClick={save}
+                >
                     {copy.schedules.panel.save}
                 </Button>
                 {schedule === null ? null : (
                     <>
                         <Button
                             variant="secondary"
+                            data-schedule-run={true}
                             icon={PlayArrowIcon}
                             busy={runNow.isPending}
                             onClick={() => {
@@ -302,6 +159,7 @@ export function SchedulePanel({
                         </Button>
                         <Button
                             variant="danger"
+                            data-schedule-delete={true}
                             onClick={() => {
                                 setDoomed(true);
                             }}

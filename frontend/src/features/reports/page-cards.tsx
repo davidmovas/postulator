@@ -6,6 +6,7 @@ import { isBrowsable, openExternal } from "../../data/host.js";
 import { Button, OpenInNewIcon, Panel, PanelHeader, StatusBadge, cx } from "../../ui/index.js";
 import type { Finding } from "../runs/artifacts.js";
 import { judgeView, publishView, relinkView, validationView, weigh } from "../runs/artifacts.js";
+import { publishStatusLabel } from "./labels.js";
 
 interface FindingListProps {
     findings: readonly Finding[];
@@ -89,7 +90,7 @@ export function PageReportCards({ report }: PageReportCardsProps): ReactElement 
                 <Card
                     title={copy.reports.pages.judge}
                     badge={
-                        <StatusBadge tone={judge.score >= 7 ? "ok" : judge.score >= 5 ? "warn" : "danger"} dot={false}>
+                        <StatusBadge tone={judge.score >= 0.7 ? "ok" : judge.score >= 0.5 ? "warn" : "danger"} dot={false}>
                             {copy.reports.pages.score(judge.score)}
                         </StatusBadge>
                     }
@@ -134,7 +135,7 @@ export function PageReportCards({ report }: PageReportCardsProps): ReactElement 
                     title={copy.reports.pages.publish}
                     badge={
                         <StatusBadge tone={publish.status === "" ? "muted" : "ok"} dot={false}>
-                            {publish.status === "" ? copy.reports.pages.notPublished : publish.status}
+                            {publish.status === "" ? copy.reports.pages.notPublished : publishStatusLabel(publish.status)}
                         </StatusBadge>
                     }
                 >
@@ -160,18 +161,20 @@ export function PageReportCards({ report }: PageReportCardsProps): ReactElement 
                             </span>
                         </p>
                         <FindingList findings={publish.findings} />
-                        <Button
-                            size="sm"
-                            variant="secondary"
-                            icon={OpenInNewIcon}
-                            disabled={!isBrowsable(publish.url)}
-                            title={copy.app.openExternal}
-                            onClick={() => {
-                                void openExternal(publish.url);
-                            }}
-                        >
-                            {copy.app.openExternal}
-                        </Button>
+                        <div className="flex">
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                icon={OpenInNewIcon}
+                                disabled={!isBrowsable(publish.url)}
+                                title={copy.app.openExternal}
+                                onClick={() => {
+                                    void openExternal(publish.url);
+                                }}
+                            >
+                                {copy.app.openExternal}
+                            </Button>
+                        </div>
                     </>
                 </Card>
             )}

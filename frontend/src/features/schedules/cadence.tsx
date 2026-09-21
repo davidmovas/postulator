@@ -36,6 +36,7 @@ export function CadenceFields({ draft, cronError, onChange }: CadenceFieldsProps
                     {(control) => (
                         <Input
                             id={control.id}
+                            data-schedule-cron={true}
                             mono={true}
                             invalid={control.invalid}
                             value={draft.cron}

@@ -44,7 +44,7 @@ export const schedules = {
         anyStatus: "Any status",
         entity: "Under an entity",
         anyEntity: "Any entity",
-        limit: "At most, pages per run",
+        limit: "Most pages per run",
         budget: "Budget",
         maxUsd: "Spend cap",
         maxTokens: "Token cap",
