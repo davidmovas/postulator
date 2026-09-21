@@ -101,7 +101,7 @@ export function SiteTab({ siteId }: SiteTabProps): ReactElement {
     }
 
     return (
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-auto p-4">
             <SiteTileRow tiles={tiles(held.entities, held.pages, held.depth)} drifted={drifted.length} />
             <div className="flex flex-wrap gap-4">
                 <Histogram bars={bars(held.depth)} />

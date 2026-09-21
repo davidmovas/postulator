@@ -29,6 +29,19 @@
     "wait": 1200
   },
   {
+    "name": "run-running",
+    "route": "#/s/:siteId/runs",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-run-status=running]"
+      },
+      {
+        "wait": 1800
+      }
+    ]
+  },
+  {
     "name": "templates",
     "route": "#/s/:siteId/templates",
     "wait": 1200
@@ -442,19 +455,6 @@
     ]
   },
   {
-    "name": "run-running",
-    "route": "#/s/:siteId/runs",
-    "wait": 1200,
-    "steps": [
-      {
-        "click": "[data-run-status=running]"
-      },
-      {
-        "wait": 1800
-      }
-    ]
-  },
-  {
     "name": "run-finished",
     "route": "#/s/:siteId/runs",
     "wait": 1200,
@@ -606,12 +606,6 @@
     "wait": 1500,
     "steps": [
       {
-        "click": "[aria-label=\"Expand the agent dock\"]"
-      },
-      {
-        "wait": 800
-      },
-      {
         "click": "[aria-label=\"Dock width\"] [role=radio]:last-of-type"
       },
       {
@@ -627,7 +621,7 @@
     "wait": 1500,
     "steps": [
       {
-        "click": "[aria-label=\"Expand the agent dock\"]"
+        "click": "[aria-label=\"Dock width\"] [role=radio]:first-of-type"
       },
       {
         "wait": 1200
@@ -639,7 +633,15 @@
     "route": "#/agent/inbox",
     "width": 960,
     "height": 600,
-    "wait": 1200
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[aria-label=\"Collapse the agent dock\"]"
+      },
+      {
+        "wait": 800
+      }
+    ]
   },
   {
     "name": "rail-nosite",
