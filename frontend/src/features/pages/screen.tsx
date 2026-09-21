@@ -18,8 +18,8 @@ import type { SegmentedOption } from "../../ui/index.js";
 import { PlanPageDialog } from "./create.js";
 import { PageDrawer } from "./drawer.js";
 import { useEntityIndex } from "./entities.js";
-import { readQuery, searchOf, wantsNew, writeQuery } from "./params.js";
-import type { PagesQuery, PagesView } from "./params.js";
+import { readQuery, readTab, searchOf, wantsNew, withTab, writeQuery } from "./params.js";
+import type { PageTab, PagesQuery, PagesView } from "./params.js";
 import { PageRail } from "./rail.js";
 import { PageSummary } from "./summary.js";
 import { PageTable } from "./table.js";
@@ -165,6 +165,10 @@ export function PagesScreen(): ReactElement {
                     siteId={siteId}
                     index={index}
                     search={search}
+                    tab={readTab(searchParams)}
+                    onTabChange={(tab: PageTab) => {
+                        setSearchParams(withTab(searchParams, tab), { replace: true });
+                    }}
                     onClose={() => {
                         void navigate(`/s/${siteId}/pages${search}`);
                     }}

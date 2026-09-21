@@ -115,8 +115,8 @@ export const templates = {
         changeKindBody: "Both belong to the template itself, so a change here reaches every site.",
         changeKindConfirm: "Apply",
         identityLocked: "The name and the page kind belong to the template. Switch to the template layer to change them.",
-        openPage: "Open the page",
-        openPageRefused: "Open this editor from a page to see that page.",
+        openPage: "Preview page",
+        openPageRefused: "Open this editor from a page to preview that page.",
         groups: {
             title: "Form groups",
             rules: "Rules",

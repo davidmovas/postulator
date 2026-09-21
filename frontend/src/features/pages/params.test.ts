@@ -8,8 +8,10 @@ import {
     nextSort,
     parseSort,
     readQuery,
+    readTab,
     searchOf,
     wantsNew,
+    withTab,
     writeQuery,
 } from "./params.js";
 
@@ -125,5 +127,22 @@ describe("wantsNew", () => {
         const query = readQuery(new URLSearchParams("action=new&status=planned"));
         expect(writeQuery(query).has("action")).toBe(false);
         expect(writeQuery(query).get("status")).toBe("planned");
+    });
+});
+
+describe("the drawer tab in the address", () => {
+    it("reads a tab another screen asked for", () => {
+        expect(readTab(new URLSearchParams("tab=preview"))).toBe("preview");
+        expect(readTab(new URLSearchParams("tab=mapping"))).toBe("mapping");
+    });
+
+    it("falls back to the details tab for anything it does not know", () => {
+        expect(readTab(new URLSearchParams(""))).toBe("details");
+        expect(readTab(new URLSearchParams("tab=telepathy"))).toBe("details");
+    });
+
+    it("writes every tab but the default one, so a plain link stays plain", () => {
+        expect(withTab(new URLSearchParams("view=tree"), "preview").toString()).toBe("view=tree&tab=preview");
+        expect(withTab(new URLSearchParams("view=tree"), "details").toString()).toBe("view=tree");
     });
 });

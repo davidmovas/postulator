@@ -111,6 +111,28 @@ export function nextSort(current: PageSort | null, field: PageSort["field"]): Pa
     return current.desc ? null : { field, desc: true };
 }
 
+export const pageTabs = ["details", "links", "mapping", "report", "preview"] as const;
+
+export type PageTab = (typeof pageTabs)[number];
+
+export const defaultTab: PageTab = "details";
+
+export const tabParam = "tab";
+
+export function readTab(params: URLSearchParams): PageTab {
+    const asked = params.get(tabParam) ?? "";
+    return (pageTabs as readonly string[]).includes(asked) ? (asked as PageTab) : defaultTab;
+}
+
+export function withTab(params: URLSearchParams, tab: PageTab): URLSearchParams {
+    const next = new URLSearchParams(params);
+    next.delete(tabParam);
+    if (tab !== defaultTab) {
+        next.set(tabParam, tab);
+    }
+    return next;
+}
+
 export const actionParam = "action";
 export const actionNew = "new";
 

@@ -18,6 +18,7 @@ import {
     Tabs,
 } from "../../ui/index.js";
 import { askAgent } from "../agent/index.js";
+import type { PageTab } from "./params.js";
 import { PageDetails } from "./details.js";
 import type { EntityIndex } from "./entities.js";
 import { pageStatusLabel, statusTone } from "./labels.js";
@@ -28,8 +29,6 @@ import { PageReportPanel } from "./report.js";
 import { TemplatePanel } from "./template.js";
 
 const drawerWidth = 688;
-
-type PageTab = "details" | "links" | "mapping" | "report" | "preview";
 
 const tabs: readonly TabItem<PageTab>[] = [
     { key: "details", label: copy.pages.tabs.details },
@@ -44,13 +43,22 @@ export interface PageDrawerProps {
     siteId: string;
     index: EntityIndex;
     search: string;
+    tab: PageTab;
+    onTabChange: (tab: PageTab) => void;
     onClose: () => void;
 }
 
-export function PageDrawer({ pageId, siteId, index, search, onClose }: PageDrawerProps): ReactElement {
+export function PageDrawer({
+    pageId,
+    siteId,
+    index,
+    search,
+    tab: active,
+    onTabChange: setActive,
+    onClose,
+}: PageDrawerProps): ReactElement {
     const detail = usePage(pageId);
     const remove = useDeletePage();
-    const [active, setActive] = useState<PageTab>("details");
     const [confirming, setConfirming] = useState(false);
     const page = detail.data?.page;
 
