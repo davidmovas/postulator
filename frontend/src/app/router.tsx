@@ -3,6 +3,7 @@ import { createHashRouter, Navigate } from "react-router";
 import { copy } from "../copy/index.js";
 import { AgentScreen, InboxScreen } from "../features/agent/index.js";
 import { GraphScreen } from "../features/graph/index.js";
+import { ImportScreen } from "../features/imports/index.js";
 import { LinksScreen } from "../features/links/index.js";
 import { OverviewScreen } from "../features/overview/index.js";
 import { PagesScreen } from "../features/pages/index.js";
@@ -18,11 +19,7 @@ import {
 } from "../features/settings/index.js";
 import { SitesScreen } from "../features/sites/index.js";
 import { PoliciesScreen, TemplateEditorScreen, TemplatesScreen } from "../features/templates/index.js";
-import {
-    MonitoringIcon,
-    ScheduleIcon,
-    UploadFileIcon,
-} from "../ui/index.js";
+import { MonitoringIcon, ScheduleIcon } from "../ui/index.js";
 import { Landing } from "./landing.js";
 import { Placeholder } from "./placeholder.js";
 import { Shell } from "./shell.js";
@@ -55,10 +52,7 @@ export const router = createHashRouter([
                         path: "schedules",
                         element: <Placeholder title={copy.nav.schedules} icon={ScheduleIcon} />,
                     },
-                    {
-                        path: "import",
-                        element: <Placeholder title={copy.nav.importExport} icon={UploadFileIcon} />,
-                    },
+                    { path: "import", element: <ImportScreen /> },
                     {
                         path: "reports",
                         element: <Placeholder title={copy.nav.reports} icon={MonitoringIcon} />,

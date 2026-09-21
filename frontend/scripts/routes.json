@@ -209,8 +209,9 @@
     "route": "#/s/:siteId/schedules"
   },
   {
-    "name": "import",
-    "route": "#/s/:siteId/import"
+    "name": "import-file",
+    "route": "#/s/:siteId/import",
+    "wait": 1000
   },
   {
     "name": "reports",
@@ -666,5 +667,17 @@
         "wait": 700
       }
     ]
+  },
+  {
+    "name": "import-export",
+    "route": "#/s/:siteId/import?tab=export",
+    "wait": 900
+  },
+  {
+    "name": "import-960",
+    "route": "#/s/:siteId/import",
+    "width": 960,
+    "height": 600,
+    "wait": 900
   }
 ]
