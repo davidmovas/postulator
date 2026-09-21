@@ -207,8 +207,9 @@ func TestWriteRefusesWhatItCannotSave(t *testing.T) {
 		path string
 	}{
 		{name: "no path", path: ""},
-		{name: "unknown extension", path: filepath.Join(t.TempDir(), "export.csv")},
+		{name: "unknown extension", path: filepath.Join(t.TempDir(), "export.json")},
 		{name: "missing directory", path: filepath.Join(t.TempDir(), "absent", "export.xlsx")},
+		{name: "missing directory for a csv", path: filepath.Join(t.TempDir(), "absent", "export.csv")},
 	}
 
 	for _, tc := range cases {
@@ -305,5 +306,64 @@ func TestReadStopsAtTheRowCap(t *testing.T) {
 				t.Fatalf("Read at the cap = %+v, %v", table, err)
 			}
 		})
+	}
+}
+
+func TestWriteChoosesTheWriterFromTheExtension(t *testing.T) {
+	t.Parallel()
+
+	table := importmap.Table{
+		Headers: []string{"path", "title", "entity"},
+		Rows: [][]string{
+			{"/espresso-machines/", "Espresso machines", "Espresso machines"},
+			{"/grinders/hand/", `Hand grinders, "the good ones"`, "Hand grinders"},
+		},
+	}
+
+	cases := []struct {
+		name string
+		file string
+	}{
+		{name: "a workbook", file: "map.xlsx"},
+		{name: "separated values", file: "map.csv"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			path := filepath.Join(t.TempDir(), tc.file)
+			if err := importer.Write(path, table); err != nil {
+				t.Fatalf("Write: %v", err)
+			}
+
+			read, err := importer.Read(t.Context(), path, 100)
+			if err != nil {
+				t.Fatalf("Read back: %v", err)
+			}
+			if len(read.Headers) != len(table.Headers) {
+				t.Fatalf("headers = %v, want %v", read.Headers, table.Headers)
+			}
+			if len(read.Rows) != len(table.Rows) {
+				t.Fatalf("rows = %d, want %d", len(read.Rows), len(table.Rows))
+			}
+			for row := range table.Rows {
+				for cell := range table.Rows[row] {
+					if read.Rows[row][cell] != table.Rows[row][cell] {
+						t.Fatalf("row %d cell %d = %q, want %q",
+							row, cell, read.Rows[row][cell], table.Rows[row][cell])
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestWriteRefusesAFileItCannotWrite(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "map.json")
+	if err := importer.Write(path, importmap.Table{Headers: []string{"path"}}); !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("Write to a .json = %v, want INVALID", err)
 	}
 }

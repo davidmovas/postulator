@@ -299,3 +299,75 @@ func TestThePageKindPicksTheSiteTemplateOverTheGlobalOne(t *testing.T) {
 		t.Fatalf("the exported page kind = %q, want %q", got, seed.PageKind)
 	}
 }
+
+func TestExportWritesTheFormatItIsAsked(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		file   string
+		format string
+		want   string
+	}{
+		{name: "a workbook by default", file: "export.xlsx", want: "xlsx"},
+		{name: "a workbook asked for", file: "export.xlsx", format: "xlsx", want: "xlsx"},
+		{name: "separated values", file: "export.csv", format: "csv", want: "csv"},
+		{name: "the case does not matter", file: "export.csv", format: "CSV", want: "csv"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := newHarness(t)
+			h.apply(t, h.file(t, "rich.csv", richSheet), richMapping(h))
+
+			path := filepath.Join(h.dir, tc.file)
+			got, err := h.service.Export(t.Context(), imports.ExportRequest{
+				SiteID: h.siteID, Path: path, Format: tc.format,
+			})
+			if err != nil {
+				t.Fatalf("Export: %v", err)
+			}
+			if got.Format != tc.want {
+				t.Fatalf("Format = %q, want %q", got.Format, tc.want)
+			}
+
+			detected, err := h.service.Inspect(t.Context(), imports.InspectRequest{SiteID: h.siteID, Path: path})
+			if err != nil {
+				t.Fatalf("Inspect what was written: %v", err)
+			}
+			if len(detected.Detected.Columns) != len(importmap.Fields()) {
+				t.Fatalf("the export is not fully auto-detected: %+v", detected.Detected.Columns)
+			}
+		})
+	}
+}
+
+func TestExportRefusesAFormatItDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		file   string
+		format string
+	}{
+		{name: "an unknown format", file: "export.xlsx", format: "json"},
+		{name: "a csv asked for a workbook name", file: "export.xlsx", format: "csv"},
+		{name: "a workbook asked for a csv name", file: "export.csv", format: "xlsx"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := newHarness(t)
+			_, err := h.service.Export(t.Context(), imports.ExportRequest{
+				SiteID: h.siteID, Path: filepath.Join(h.dir, tc.file), Format: tc.format,
+			})
+			if !errors.IsCode(err, errors.Invalid) {
+				t.Fatalf("Export = %v, want INVALID", err)
+			}
+		})
+	}
+}

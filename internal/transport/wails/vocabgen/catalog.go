@@ -116,6 +116,7 @@ func catalog() []vocabulary {
 			},
 		},
 		{export: "importActions", tsType: "ImportAction", pkg: "internal/application/imports", typeName: "Action"},
+		{export: "exportFormats", tsType: "ExportFormat", pkg: "internal/domain/importmap", typeName: "Format"},
 		{export: "settingTypes", tsType: "SettingType", pkg: "internal/kernel/settings", typeName: "Type"},
 		{export: "settingGroups", tsType: "SettingGroup", pkg: "internal/kernel/settings", typeName: "Group"},
 		{export: "entitySortFields", tsType: "EntitySortField", pkg: "internal/domain/graph", typeName: "EntitySort"},

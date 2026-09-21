@@ -48,15 +48,18 @@ func readWorkbook(path string, add func([]string) error) (err error) {
 	return nil
 }
 
-func Write(path string, table importmap.Table) (err error) {
+func Write(path string, table importmap.Table) error {
 	extension, err := Extension(path)
 	if err != nil {
 		return err
 	}
-	if extension != extensionXLSX {
-		return errors.New(errors.Invalid, "an export is written as a .xlsx").WithDetail("field", "path")
+	if extension == extensionCSV {
+		return writeSeparated(path, table)
 	}
+	return writeWorkbook(path, table)
+}
 
+func writeWorkbook(path string, table importmap.Table) (err error) {
 	file := excelize.NewFile()
 	defer func() {
 		if closeErr := file.Close(); closeErr != nil && err == nil {

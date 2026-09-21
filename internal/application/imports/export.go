@@ -2,16 +2,23 @@ package imports
 
 import (
 	"context"
+	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 func (s *Service) Export(ctx context.Context, req ExportRequest) (ExportResponse, error) {
 	if err := s.requireSite(ctx, req.SiteID); err != nil {
+		return ExportResponse{}, err
+	}
+
+	format, err := exportFormat(req)
+	if err != nil {
 		return ExportResponse{}, err
 	}
 
@@ -61,7 +68,26 @@ func (s *Service) Export(ctx context.Context, req ExportRequest) (ExportResponse
 	if err := s.deps.Tables.Write(req.Path, table); err != nil {
 		return ExportResponse{}, err
 	}
-	return ExportResponse{Path: req.Path, Pages: len(pages), Entities: len(state.entities)}, nil
+	return ExportResponse{
+		Path: req.Path, Format: string(format), Pages: len(pages), Entities: len(state.entities),
+	}, nil
+}
+
+func exportFormat(req ExportRequest) (importmap.Format, error) {
+	format := importmap.Format(strings.TrimSpace(strings.ToLower(req.Format)))
+	if format == "" {
+		format = importmap.FormatXLSX
+	}
+	if !format.Valid() {
+		return "", errors.New(errors.Invalid, "an export is written as a xlsx or a csv").
+			WithDetail("field", "format").WithDetail("format", req.Format)
+	}
+
+	if extension := strings.ToLower(filepath.Ext(strings.TrimSpace(req.Path))); extension != format.Extension() {
+		return "", errors.New(errors.Invalid, "the file name must end in "+format.Extension()).
+			WithDetail("field", "path").WithDetail("format", string(format))
+	}
+	return format, nil
 }
 
 func (s *Service) pageKinds(ctx context.Context, pages []pagemap.Page) (map[string]string, error) {

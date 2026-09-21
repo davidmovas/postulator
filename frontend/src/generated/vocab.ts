@@ -196,6 +196,9 @@ export const blockingImportFindingCodes: readonly ImportFindingCode[] = [
 export const importActions = ["create", "update", "skip"] as const;
 export type ImportAction = (typeof importActions)[number];
 
+export const exportFormats = ["xlsx", "csv"] as const;
+export type ExportFormat = (typeof exportFormats)[number];
+
 export const settingTypes = ["bool", "int", "string", "enum", "duration"] as const;
 export type SettingType = (typeof settingTypes)[number];
 

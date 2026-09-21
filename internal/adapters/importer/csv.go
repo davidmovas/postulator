@@ -8,12 +8,15 @@ import (
 	"os"
 	"strings"
 
+	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 const sniffWindow = 64 * 1024
 
-var delimiters = []rune{',', ';', '\t'}
+const defaultDelimiter = ','
+
+var delimiters = []rune{defaultDelimiter, ';', '\t'}
 
 func sniff(head []byte) rune {
 	for line := range strings.SplitSeq(strings.ReplaceAll(string(head), "\r\n", "\n"), "\n") {
@@ -42,6 +45,30 @@ func countOutsideQuotes(line string, delimiter rune) int {
 		}
 	}
 	return count
+}
+
+func writeSeparated(path string, table importmap.Table) (err error) {
+	file, err := os.Create(path)
+	if err != nil {
+		return errors.Wrap(err, errors.Invalid, "create the separated values file")
+	}
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil && err == nil {
+			err = errors.Wrap(closeErr, errors.Internal, "close the separated values file")
+		}
+	}()
+
+	writer := csv.NewWriter(file)
+	writer.Comma = defaultDelimiter
+
+	for _, row := range append([][]string{table.Headers}, table.Rows...) {
+		if writeErr := writer.Write(row); writeErr != nil {
+			return errors.Wrap(writeErr, errors.Internal, "write a separated values row")
+		}
+	}
+
+	writer.Flush()
+	return errors.Wrap(writer.Error(), errors.Internal, "flush the separated values file")
 }
 
 func readSeparated(path string, add func([]string) error) (err error) {

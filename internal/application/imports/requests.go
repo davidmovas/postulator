@@ -42,10 +42,12 @@ type ApplyResponse struct {
 type ExportRequest struct {
 	SiteID string `json:"siteId"`
 	Path   string `json:"path"`
+	Format string `json:"format,omitempty" enum:"xlsx,csv"`
 }
 
 type ExportResponse struct {
 	Path     string `json:"path"`
+	Format   string `json:"format"`
 	Pages    int    `json:"pages"`
 	Entities int    `json:"entities"`
 }
