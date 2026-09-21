@@ -27,15 +27,25 @@ func classify(ctx context.Context, err error) error {
 	if stderrors.Is(err, context.DeadlineExceeded) {
 		return errors.New(errors.External, "the model did not answer before the timeout").WithInternal(err).WithRetry(0)
 	}
+	if provider, ok := Provider(err); ok {
+		return provider
+	}
+	return errors.New(errors.External, "the model provider could not be reached").WithInternal(err).WithRetry(0)
+}
+
+func Provider(err error) (error, bool) {
+	if err == nil {
+		return nil, false
+	}
 	if stderrors.Is(err, gollem.ErrTokenSizeExceeded) {
-		return errors.New(errors.Invalid, "the prompt does not fit the model context window").WithInternal(err)
+		return errors.New(errors.Invalid, "the prompt does not fit the model context window").WithInternal(err), true
 	}
 
 	status, after, ok := statusOf(err)
 	if !ok {
-		return errors.New(errors.External, "the model provider could not be reached").WithInternal(err).WithRetry(0)
+		return nil, false
 	}
-	return fromStatus(status, after, err)
+	return fromStatus(status, after, err), true
 }
 
 const (

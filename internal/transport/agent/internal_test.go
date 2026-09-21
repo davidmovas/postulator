@@ -3,10 +3,13 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	stderrors "errors"
+	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/gollem-dev/gollem"
+	"github.com/sashabaranov/go-openai"
 
 	applicationllm "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -201,5 +204,62 @@ func TestEncodeAnswersAnObjectForNothing(t *testing.T) {
 	}
 	if got := string(encode(map[string]any{"a": make(chan int)})); got != "{}" {
 		t.Fatalf("encode of something unencodable = %s", got)
+	}
+}
+
+func TestConvertSaysWhatTheProviderSaid(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		err     error
+		want    errors.Code
+		message string
+	}{
+		{
+			name:    "a key without access to the model",
+			err:     &openai.APIError{HTTPStatusCode: http.StatusForbidden, Message: "the project cannot reach this model"},
+			want:    errors.Unauthorized,
+			message: "the project cannot reach this model",
+		},
+		{
+			name:    "a model the provider does not have",
+			err:     &openai.APIError{HTTPStatusCode: http.StatusNotFound, Message: "unknown model"},
+			want:    errors.NotFound,
+			message: "unknown model",
+		},
+		{
+			name:    "a rejected request",
+			err:     &openai.APIError{HTTPStatusCode: http.StatusBadRequest, Message: "tools[7].function.parameters is invalid"},
+			want:    errors.Invalid,
+			message: "tools[7].function.parameters is invalid",
+		},
+		{
+			name: "a rate limited key",
+			err:  &openai.APIError{HTTPStatusCode: http.StatusTooManyRequests, Message: "slow down"},
+			want: errors.RateLimited,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := convert(tc.err)
+			if !errors.IsCode(got, tc.want) {
+				t.Fatalf("convert = %v (%s), want %s", got, errors.CodeOf(got), tc.want)
+			}
+			if tc.message == "" {
+				return
+			}
+
+			var kernel *errors.Error
+			if !stderrors.As(got, &kernel) {
+				t.Fatalf("convert returned %T, want a kernel error", got)
+			}
+			if kernel.Details["providerMessage"] != tc.message {
+				t.Errorf("providerMessage = %v, want %q", kernel.Details["providerMessage"], tc.message)
+			}
+		})
 	}
 }

@@ -22,6 +22,8 @@ const (
 	ProviderGemini    = "gemini"
 
 	ProviderGeminiOpenAI = "gemini-openai"
+
+	toolsSuffix = "|tools"
 )
 
 func SecretRef(provider string) string {
@@ -50,23 +52,35 @@ func NewFactory(secrets secretReader, models ModelReader, values *settings.Value
 }
 
 func (f *Factory) New(ctx context.Context, ref llm.ModelRef) (gollem.LLMClient, error) {
+	return f.client(ctx, ref, false)
+}
+
+func (f *Factory) NewForTools(ctx context.Context, ref llm.ModelRef) (gollem.LLMClient, error) {
+	return f.client(ctx, ref, true)
+}
+
+func (f *Factory) client(ctx context.Context, ref llm.ModelRef, carriesTools bool) (gollem.LLMClient, error) {
 	if !ref.Valid() {
 		return nil, errors.New(errors.Invalid, "a model reference must name a provider and a model")
 	}
 	mark := f.fingerprint(ctx, ref.Provider)
+	key := ref.String()
+	if carriesTools {
+		key += toolsSuffix
+	}
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	if held, ok := f.clients[ref.String()]; ok && held.fingerprint == mark {
+	if held, ok := f.clients[key]; ok && held.fingerprint == mark {
 		return held.client, nil
 	}
 
-	client, err := f.build(ctx, ref)
+	client, err := f.build(ctx, ref, carriesTools)
 	if err != nil {
 		return nil, err
 	}
-	f.clients[ref.String()] = cached{client: client, fingerprint: mark}
+	f.clients[key] = cached{client: client, fingerprint: mark}
 	return client, nil
 }
 
@@ -83,16 +97,16 @@ func (f *Factory) fingerprint(ctx context.Context, provider string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func (f *Factory) build(ctx context.Context, ref llm.ModelRef) (gollem.LLMClient, error) {
+func (f *Factory) build(ctx context.Context, ref llm.ModelRef, carriesTools bool) (gollem.LLMClient, error) {
 	switch ref.Provider {
 	case ProviderOpenAI:
-		return f.compatible(ctx, ref, openaiBaseURL.Get(f.values))
+		return f.compatible(ctx, ref, openaiBaseURL.Get(f.values), carriesTools)
 	case ProviderGeminiOpenAI:
 		base := geminiOpenAIBase.Get(f.values)
 		if base == "" {
 			base = DefaultGeminiOpenAIBaseURL
 		}
-		return f.compatible(ctx, ref, base)
+		return f.compatible(ctx, ref, base, carriesTools)
 	case ProviderAnthropic:
 		key, err := f.key(ctx, ref.Provider)
 		if err != nil {
@@ -115,7 +129,7 @@ func (f *Factory) build(ctx context.Context, ref llm.ModelRef) (gollem.LLMClient
 	}
 }
 
-func (f *Factory) compatible(ctx context.Context, ref llm.ModelRef, base string) (gollem.LLMClient, error) {
+func (f *Factory) compatible(ctx context.Context, ref llm.ModelRef, base string, carriesTools bool) (gollem.LLMClient, error) {
 	key, err := f.key(ctx, ref.Provider)
 	if err != nil {
 		return nil, err
@@ -123,7 +137,7 @@ func (f *Factory) compatible(ctx context.Context, ref llm.ModelRef, base string)
 
 	options := []openai.Option{
 		openai.WithModel(ref.Model),
-		openai.WithReasoningEffort(string(f.effort(ctx, ref))),
+		openai.WithReasoningEffort(string(f.effort(ctx, ref, carriesTools))),
 		openai.WithVerbosity(""),
 	}
 	if base != "" {
@@ -139,13 +153,19 @@ func wrap[T gollem.LLMClient](client T, err error) (gollem.LLMClient, error) {
 	return client, nil
 }
 
-func (f *Factory) effort(ctx context.Context, ref llm.ModelRef) llm.ReasoningEffort {
+func (f *Factory) effort(ctx context.Context, ref llm.ModelRef, carriesTools bool) llm.ReasoningEffort {
 	if f.models == nil {
 		return ""
 	}
 
 	info, err := f.models.Lookup(ctx, ref)
-	if err != nil || !info.ReasoningEffort.Valid() {
+	if err != nil {
+		return ""
+	}
+	if carriesTools && info.Reasoning {
+		return llm.EffortNone
+	}
+	if !info.ReasoningEffort.Valid() {
 		return ""
 	}
 	return info.ReasoningEffort

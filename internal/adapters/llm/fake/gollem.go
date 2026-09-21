@@ -56,6 +56,10 @@ func (g *Gollem) New(_ context.Context, _ llm.ModelRef) (gollem.LLMClient, error
 	return g, nil
 }
 
+func (g *Gollem) NewForTools(_ context.Context, _ llm.ModelRef) (gollem.LLMClient, error) {
+	return g, nil
+}
+
 func (g *Gollem) NewSession(_ context.Context, options ...gollem.SessionOption) (gollem.Session, error) {
 	cfg := gollem.NewSessionConfig(options...)
 

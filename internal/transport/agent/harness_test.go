@@ -39,7 +39,7 @@ type staticFactory struct {
 	err    error
 }
 
-func (f staticFactory) New(context.Context, domainllm.ModelRef) (gollem.LLMClient, error) {
+func (f staticFactory) NewForTools(context.Context, domainllm.ModelRef) (gollem.LLMClient, error) {
 	return f.client, f.err
 }
 

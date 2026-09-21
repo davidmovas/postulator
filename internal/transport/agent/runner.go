@@ -11,6 +11,7 @@ import (
 	"github.com/gollem-dev/gollem"
 	"go.uber.org/zap"
 
+	"github.com/davidmovas/postulator/internal/adapters/llm/gollemclient"
 	agentapp "github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/tools"
@@ -28,7 +29,7 @@ var prompts = llm.MustPrompts(promptFS, "prompts/*.tmpl")
 const promptName = "system"
 
 type providerFactory interface {
-	New(ctx context.Context, ref domainllm.ModelRef) (gollem.LLMClient, error)
+	NewForTools(ctx context.Context, ref domainllm.ModelRef) (gollem.LLMClient, error)
 }
 
 type callStore interface {
@@ -84,7 +85,7 @@ func (r *Runner) Run(ctx context.Context, spec agentapp.RunSpec) (agentapp.RunRe
 		return agentapp.RunResult{}, errors.New(errors.Invalid, "an agent turn needs a model")
 	}
 
-	client, err := r.deps.Factory.New(ctx, spec.Ref)
+	client, err := r.deps.Factory.NewForTools(ctx, spec.Ref)
 	if err != nil {
 		return agentapp.RunResult{}, err
 	}
@@ -101,6 +102,11 @@ func (r *Runner) Run(ctx context.Context, spec agentapp.RunSpec) (agentapp.RunRe
 	result, err := r.execute(ctx, client, spec, system+"\n\n"+user, guard, usage)
 	r.record(ctx, spec, usage, time.Since(started), err)
 	if err != nil {
+		r.deps.Logger.Error("an agent turn failed",
+			zap.String("conversationId", spec.Binding.ConversationID),
+			zap.String("model", spec.Ref.String()),
+			zap.String("code", errors.CodeOf(err).String()),
+			zap.Error(err))
 		return agentapp.RunResult{}, err
 	}
 
@@ -148,11 +154,7 @@ func (r *Runner) execute(ctx context.Context, client gollem.LLMClient, spec agen
 		return agentapp.RunResult{}, convert(err)
 	}
 
-	text := ""
-	if answered != nil {
-		text = answered.String()
-	}
-	return agentapp.RunResult{Text: text}, guard.failure()
+	return agentapp.RunResult{Text: joined(answered)}, guard.failure()
 }
 
 func (r *Runner) record(ctx context.Context, spec agentapp.RunSpec, usage *tally, latency time.Duration, failure error) {
@@ -196,6 +198,13 @@ func (r *Runner) cost(ctx context.Context, ref domainllm.ModelRef, usage domainl
 	return domainllm.Cost(usage, info)
 }
 
+func joined(answered *gollem.ExecuteResponse) string {
+	if answered == nil {
+		return ""
+	}
+	return strings.Join(answered.Texts, "")
+}
+
 func convert(err error) error {
 	switch {
 	case err == nil:
@@ -207,6 +216,9 @@ func convert(err error) error {
 	case stderrors.Is(err, gollem.ErrLoopLimitExceeded):
 		return errors.Wrap(err, errors.BudgetExceeded, "the agent used up its tool call budget for this turn")
 	default:
+		if provider, ok := gollemclient.Provider(err); ok {
+			return provider
+		}
 		return errors.Wrap(err, errors.External, "the model could not answer")
 	}
 }

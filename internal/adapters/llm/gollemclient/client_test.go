@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gollem-dev/gollem"
+
 	"github.com/davidmovas/postulator/internal/adapters/llm/gollemclient"
 	port "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/domain/llm"
@@ -710,5 +712,92 @@ func TestCompleteFallsBackToTheAskedCeilingWhenTheCatalogHasNoRow(t *testing.T) 
 	}
 	if sent := captured.last(); !strings.Contains(sent, `"max_completion_tokens":128`) {
 		t.Errorf("the request body does not carry the asked ceiling: %s", sent)
+	}
+}
+
+func TestAClientBuiltForToolsAsksForNoReasoning(t *testing.T) {
+	t.Parallel()
+
+	reasoning := llm.ModelInfo{Ref: openaiRef(), Reasoning: true, ReasoningEffort: llm.EffortMedium, MaxOutputTokens: 128000}
+	plain := llm.ModelInfo{Ref: openaiRef(), MaxOutputTokens: 4096}
+
+	cases := []struct {
+		name     string
+		info     llm.ModelInfo
+		tools    bool
+		want     string
+		unwanted string
+	}{
+		{
+			name: "a reasoning model answering on its own keeps its declared effort",
+			info: reasoning,
+			want: `"reasoning_effort":"medium"`,
+		},
+		{
+			name:     "a reasoning model carrying tools asks for none",
+			info:     reasoning,
+			tools:    true,
+			want:     `"reasoning_effort":"none"`,
+			unwanted: `"reasoning_effort":"medium"`,
+		},
+		{
+			name:     "a model that does not reason is never sent an effort",
+			info:     plain,
+			tools:    true,
+			unwanted: `"reasoning_effort"`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			captured := &bodies{}
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					t.Errorf("read the request body: %v", err)
+				}
+				captured.add(string(body))
+				writeJSON(t, w, openaiCompletion)
+			}))
+			t.Cleanup(server.Close)
+
+			values := newValues(t, map[string]string{"llm.openai.baseUrl": server.URL})
+			factory := gollemclient.NewFactory(
+				vault{gollemclient.SecretRef(gollemclient.ProviderOpenAI): "key"},
+				catalog{openaiRef().String(): tc.info},
+				values,
+			)
+
+			var (
+				provider gollem.LLMClient
+				err      error
+			)
+			if tc.tools {
+				provider, err = factory.NewForTools(t.Context(), openaiRef())
+			} else {
+				provider, err = factory.New(t.Context(), openaiRef())
+			}
+			if err != nil {
+				t.Fatalf("build the client: %v", err)
+			}
+
+			session, err := provider.NewSession(t.Context())
+			if err != nil {
+				t.Fatalf("NewSession: %v", err)
+			}
+			if _, err = session.Generate(t.Context(), []gollem.Input{gollem.Text("ping")}); err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+
+			sent := captured.last()
+			if tc.want != "" && !strings.Contains(sent, tc.want) {
+				t.Errorf("the request body does not carry %s: %s", tc.want, sent)
+			}
+			if tc.unwanted != "" && strings.Contains(sent, tc.unwanted) {
+				t.Errorf("the request body still carries %s: %s", tc.unwanted, sent)
+			}
+		})
 	}
 }

@@ -69,6 +69,7 @@ const (
 
 type AgentProvider interface {
 	New(ctx context.Context, ref domainllm.ModelRef) (gollem.LLMClient, error)
+	NewForTools(ctx context.Context, ref domainllm.ModelRef) (gollem.LLMClient, error)
 }
 
 type Config struct {
