@@ -1,5 +1,6 @@
 export const graph = {
     title: "Graph",
+    kinds: { hub: "Hub", product: "Product", topic: "Topic", category: "Category", custom: "Custom" },
     views: { label: "View", map: "Map", outline: "Outline" },
     label: "Entity graph",
     loading: "Loading the graph",

@@ -40,7 +40,7 @@ export function lensHint(lens: Lens): string {
 }
 
 export function kindLabel(kind: string): string {
-    return kind;
+    return isOneOf(entityKinds, kind) ? copy.graph.kinds[kind] : kind;
 }
 
 export function formatScore(score: number): string {
