@@ -1,5 +1,5 @@
 export { StatusBadge, CountBadge } from "./badge.js";
-export type { CountBadgeProps, StatusBadgeProps } from "./badge.js";
+export type { CountBadgeProps, CountBadgeVariant, StatusBadgeProps } from "./badge.js";
 export { Banner } from "./banner.js";
 export type { BannerProps } from "./banner.js";
 export { Button, IconButton } from "./button.js";
@@ -18,7 +18,7 @@ export type { DrawerProps } from "./drawer.js";
 export { EmptyState } from "./empty.js";
 export type { EmptyStateProps } from "./empty.js";
 export { Field, Input, Textarea } from "./field.js";
-export type { ControlBinding, FieldProps, InputProps, TextareaProps } from "./field.js";
+export type { ControlBinding, ControlSize, FieldProps, InputProps, TextareaProps } from "./field.js";
 export { BudgetGauge } from "./gauge.js";
 export type { BudgetGaugeProps } from "./gauge.js";
 export { Kbd } from "./kbd.js";

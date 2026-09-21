@@ -130,19 +130,20 @@ export function ConnectDrawer({ siteId, index, fromId, toId, onClose }: ConnectD
                     {choice === "related" ? (
                         <Field label={copy.graph.connect.weight} hint={copy.graph.connect.weightHint}>
                             {(control) => (
-                                <Input
-                                    {...control}
-                                    type="number"
-                                    min={0}
-                                    max={1}
-                                    step={0.05}
-                                    mono={true}
-                                    className="w-24"
-                                    value={weight}
-                                    onChange={(event) => {
-                                        setWeight(event.target.value);
-                                    }}
-                                />
+                                <div className="w-24">
+                                    <Input
+                                        {...control}
+                                        type="number"
+                                        min={0}
+                                        max={1}
+                                        step={0.05}
+                                        mono={true}
+                                        value={weight}
+                                        onChange={(event) => {
+                                            setWeight(event.target.value);
+                                        }}
+                                    />
+                                </div>
                             )}
                         </Field>
                     ) : null}

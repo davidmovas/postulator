@@ -51,18 +51,19 @@ export function CadenceFields({ draft, cronError, onChange }: CadenceFieldsProps
                 <Field label={copy.schedules.panel.every} error={cronError}>
                     {(control) => (
                         <div className="flex items-center gap-2">
-                            <Input
-                                id={control.id}
-                                type="number"
-                                min={1}
-                                mono={true}
-                                invalid={control.invalid}
-                                value={String(draft.intervalValue)}
-                                className="w-20"
-                                onChange={(event) => {
-                                    onChange({ ...draft, intervalValue: Number(event.target.value) });
-                                }}
-                            />
+                            <div className="w-20 shrink-0">
+                                <Input
+                                    id={control.id}
+                                    type="number"
+                                    min={1}
+                                    mono={true}
+                                    invalid={control.invalid}
+                                    value={String(draft.intervalValue)}
+                                    onChange={(event) => {
+                                        onChange({ ...draft, intervalValue: Number(event.target.value) });
+                                    }}
+                                />
+                            </div>
                             <Select<IntervalUnit>
                                 aria-label={copy.schedules.panel.cadence}
                                 value={draft.intervalUnit}

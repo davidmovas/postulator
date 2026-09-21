@@ -7,6 +7,13 @@ import { ErrorIcon } from "./icons/index.js";
 const controlBase =
     "w-full rounded-md bg-inset text-ink placeholder:text-ink-faint transition-colors duration-100 ease-out disabled:cursor-not-allowed disabled:opacity-70";
 
+export type ControlSize = "md" | "sm";
+
+const controlSizes: Readonly<Record<ControlSize, string>> = {
+    md: "h-7 px-2.5 text-sm",
+    sm: "h-6 px-2 text-xs",
+};
+
 export interface ControlBinding {
     id: string;
     "aria-describedby": string | undefined;
@@ -16,16 +23,18 @@ export interface ControlBinding {
 export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "size"> {
     invalid?: boolean;
     mono?: boolean;
+    size?: ControlSize;
 }
 
-export function Input({ invalid = false, mono = false, className, type = "text", ...rest }: InputProps): ReactElement {
+export function Input({ invalid = false, mono = false, size = "md", className, type = "text", ...rest }: InputProps): ReactElement {
     return (
         <input
             type={type}
             aria-invalid={invalid || undefined}
             className={cx(
                 controlBase,
-                "h-7 border px-2.5 text-sm",
+                "border",
+                controlSizes[size],
                 mono && "font-mono",
                 invalid ? "border-danger" : "border-hairline focus:border-edge",
                 className,
