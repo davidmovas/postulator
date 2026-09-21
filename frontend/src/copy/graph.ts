@@ -34,7 +34,7 @@ export const graph = {
     controls: {
         zoomIn: "Zoom in",
         zoomOut: "Zoom out",
-        fit: "Fit the whole map",
+        fit: "Fit the whole map (0)",
         expandAll: "Expand every subtree",
         collapseToRoots: "Collapse to the roots",
         showRelated: "Show every related link",
@@ -81,14 +81,6 @@ export const graph = {
         multiParent: (count: number) => (count === 1 ? "1 entity with two parents" : `${count} entities with several parents`),
         clean: "Every entity has a page, a parent and no edge waiting.",
         top: "Highest scores",
-        keys: "Keys",
-        keyRows: [
-            ["Arrows", "move through the map"],
-            ["Space", "fold or unfold a subtree"],
-            ["Ctrl F", "find an entity"],
-            ["F", "fit the map"],
-            ["Esc", "clear the selection"],
-        ],
     },
     inspector: {
         title: "Entity",

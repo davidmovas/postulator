@@ -714,7 +714,7 @@ export function GraphMap({
                 return;
             }
             onSelect(null);
-        } else if (event.key === "f" || event.key === "F") {
+        } else if (event.key === "0") {
             fitAll();
         } else if (event.key === "n" || event.key === "N") {
             onCreateChild(selected);

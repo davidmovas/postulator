@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { copy } from "../../../copy/index.js";
 import { entityKinds } from "../../../generated/vocab.js";
 import { SectionLabel, toneClasses } from "../../../ui/index.js";
-import { entityIcon, formatScore, kindTone, lensLabel, lensTone } from "../labels.js";
+import { entityIcon, formatScore, kindLabel, kindTone, lensLabel, lensTone } from "../labels.js";
 import type { GraphIndex } from "../model/index.js";
 import type { Lens } from "../model/lens.js";
 
@@ -63,7 +63,7 @@ export function Summary({ index, onLens, onSelect }: SummaryProps): ReactElement
                             <li key={kind} className="flex items-center justify-between text-xs">
                                 <span className="flex items-center gap-2 text-ink-soft">
                                     <Icon size={14} className={toneClasses[kindTone(kind)].ink} />
-                                    {kind}
+                                    {kindLabel(kind)}
                                 </span>
                                 <span className="font-mono text-2xs text-ink-dim">{count}</span>
                             </li>
@@ -125,20 +125,6 @@ export function Summary({ index, onLens, onSelect }: SummaryProps): ReactElement
                     </ol>
                 </section>
             ) : null}
-
-            <section className="flex flex-col gap-1">
-                <SectionLabel>{copy.graph.summary.keys}</SectionLabel>
-                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-2xs">
-                    {copy.graph.summary.keyRows.map(([key, meaning]) => (
-                        <div key={key} className="contents">
-                            <dt>
-                                <kbd className="rounded-sm border border-edge bg-raised px-1 font-mono text-2xs text-ink-soft">{key}</kbd>
-                            </dt>
-                            <dd className="text-ink-dim">{meaning}</dd>
-                        </div>
-                    ))}
-                </dl>
-            </section>
         </div>
     );
 }
