@@ -7,12 +7,16 @@ import { useUpdatePage } from "../../data/hooks/pages.js";
 import type { Page } from "../../data/types.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
 import { pageStatuses, pageWpTypes } from "../../generated/vocab.js";
+import { pageStatusLabel } from "./labels.js";
 import type { SelectOption } from "../../ui/index.js";
 import { Banner, Button, Field, Input, Select, SyncProblemIcon, Textarea } from "../../ui/index.js";
 import { ConflictNotice } from "./conflict-notice.js";
 
 const wpTypeOptions: readonly SelectOption<string>[] = pageWpTypes.map((value) => ({ value, label: value }));
-const statusOptions: readonly SelectOption<string>[] = pageStatuses.map((value) => ({ value, label: value }));
+const statusOptions: readonly SelectOption<string>[] = pageStatuses.map((value) => ({
+    value,
+    label: pageStatusLabel(value),
+}));
 
 interface Draft {
     path: string;

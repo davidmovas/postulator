@@ -7,9 +7,13 @@ import { useUpdateEntity } from "../../../data/hooks/graph.js";
 import type { Entity } from "../../../data/types.js";
 import { entityKinds } from "../../../generated/vocab.js";
 import { Button, ChipInput, Field, Input, Select, Textarea } from "../../../ui/index.js";
+import { kindLabel } from "../labels.js";
 import type { SelectOption } from "../../../ui/index.js";
 
-const kindOptions: readonly SelectOption<string>[] = entityKinds.map((value) => ({ value, label: value }));
+const kindOptions: readonly SelectOption<string>[] = entityKinds.map((value) => ({
+    value,
+    label: kindLabel(value),
+}));
 
 interface Draft {
     name: string;

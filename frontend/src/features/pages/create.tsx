@@ -6,6 +6,7 @@ import { react } from "../../data/errors.js";
 import { useCreatePage } from "../../data/hooks/pages.js";
 import { copy } from "../../copy/index.js";
 import { pageStatuses, pageWpTypes } from "../../generated/vocab.js";
+import { pageStatusLabel } from "./labels.js";
 import type { SelectOption } from "../../ui/index.js";
 import { AddIcon, Dialog, Field, Input, Select } from "../../ui/index.js";
 import { ConflictNotice } from "./conflict-notice.js";
@@ -14,7 +15,10 @@ import type { EntityIndex } from "./entities.js";
 const noEntity = "none";
 
 const wpTypeOptions: readonly SelectOption<string>[] = pageWpTypes.map((value) => ({ value, label: value }));
-const statusOptions: readonly SelectOption<string>[] = pageStatuses.map((value) => ({ value, label: value }));
+const statusOptions: readonly SelectOption<string>[] = pageStatuses.map((value) => ({
+    value,
+    label: pageStatusLabel(value),
+}));
 
 function fieldErrorOf(thrown: unknown, field: string): string | null {
     if (thrown === null || thrown === undefined) {
