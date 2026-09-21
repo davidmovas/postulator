@@ -483,12 +483,20 @@
     "route": "#/agent/inbox"
   },
   {
-    "name": "settings-general",
-    "route": "#/settings/general"
-  },
-  {
     "name": "settings-models",
     "route": "#/settings/models"
+  },
+  {
+    "name": "settings-runs",
+    "route": "#/settings/runs"
+  },
+  {
+    "name": "settings-agent",
+    "route": "#/settings/agent"
+  },
+  {
+    "name": "settings-browser",
+    "route": "#/settings/browser"
   },
   {
     "name": "settings-security",
@@ -497,6 +505,12 @@
   {
     "name": "settings-about",
     "route": "#/settings/about"
+  },
+  {
+    "name": "settings-models-960",
+    "route": "#/settings/models",
+    "width": 960,
+    "height": 600
   },
   {
     "name": "palette",
