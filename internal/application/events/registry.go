@@ -33,6 +33,7 @@ func NewRegistry() Registry {
 		{Type: AgentTitled, Payload: AgentTitledPayload{}},
 		{Type: AppLocked, Payload: AppLockedPayload{}},
 		{Type: AppUnlocked, Payload: AppUnlockedPayload{}},
+		{Type: FilesDropped, Payload: FilesDroppedPayload{}},
 		{Type: RunQueued, Payload: RunQueuedPayload{}, Run: true},
 		{Type: RunStarted, Payload: RunStartedPayload{}, Run: true},
 		{Type: RunPaused, Payload: RunPausedPayload{}, Run: true},

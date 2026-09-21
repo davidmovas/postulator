@@ -94,6 +94,7 @@ type everyKindPayload struct {
 	Duration int64           `json:"duration"`
 	Amount   float64         `json:"amount"`
 	Enabled  bool            `json:"enabled"`
+	Paths    []string        `json:"paths"`
 	Args     json.RawMessage `json:"args"`
 }
 
@@ -111,6 +112,7 @@ func TestRenderMapsEverySupportedKind(t *testing.T) {
     duration: number;
     amount: number;
     enabled: boolean;
+    paths: string[];
     args: unknown;
 }`
 	if !strings.Contains(out.String(), want) {

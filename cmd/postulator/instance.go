@@ -1,7 +1,12 @@
 package main
 
 import (
+	"log"
+
 	"github.com/wailsapp/wails/v3/pkg/application"
+
+	"github.com/davidmovas/postulator/internal/app"
+	"github.com/davidmovas/postulator/internal/application/events"
 )
 
 const ProductionInstanceID = "com.davidmovas.postulator"
@@ -42,4 +47,21 @@ func firstWindow() raisable {
 		return found
 	}
 	return nil
+}
+
+type publisher interface {
+	Publish(eventType events.Type, payload any) error
+}
+
+func relayDrop(core *app.Core, dropped *application.WindowEvent) {
+	publishDrop(core.Events, dropped.Context().DroppedFiles())
+}
+
+func publishDrop(relay publisher, paths []string) {
+	if len(paths) == 0 {
+		return
+	}
+	if err := relay.Publish(events.FilesDropped, events.FilesDroppedPayload{Paths: paths}); err != nil {
+		log.Print(err)
+	}
 }

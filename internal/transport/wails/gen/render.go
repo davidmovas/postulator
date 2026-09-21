@@ -109,6 +109,12 @@ func tsType(field reflect.Type) (string, error) {
 	}
 
 	switch field.Kind() {
+	case reflect.Slice:
+		element, err := tsType(field.Elem())
+		if err != nil {
+			return "", err
+		}
+		return element + "[]", nil
 	case reflect.String:
 		return "string", nil
 	case reflect.Int, reflect.Int64, reflect.Float64:

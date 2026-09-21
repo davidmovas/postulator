@@ -82,6 +82,10 @@ type AgentConfirmResolvedPayload struct {
 
 type AppLockedPayload struct{}
 
+type FilesDroppedPayload struct {
+	Paths []string `json:"paths"`
+}
+
 type AppUnlockedPayload struct{}
 
 type RunQueuedPayload struct {

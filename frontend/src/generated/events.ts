@@ -8,6 +8,7 @@ export type EventType =
     | "agent.tool.started"
     | "app.locked"
     | "app.unlocked"
+    | "files.dropped"
     | "graph.changed"
     | "item.done"
     | "item.failed"
@@ -42,6 +43,7 @@ export const eventTypes = [
     "agent.tool.started",
     "app.locked",
     "app.unlocked",
+    "files.dropped",
     "graph.changed",
     "item.done",
     "item.failed",
@@ -128,6 +130,10 @@ export interface AgentToolStartedPayload {
 export interface AppLockedPayload {}
 
 export interface AppUnlockedPayload {}
+
+export interface FilesDroppedPayload {
+    paths: string[];
+}
 
 export interface GraphChangedPayload {
     siteId: string;
@@ -262,6 +268,7 @@ export interface EventPayloads {
     "agent.tool.started": AgentToolStartedPayload;
     "app.locked": AppLockedPayload;
     "app.unlocked": AppUnlockedPayload;
+    "files.dropped": FilesDroppedPayload;
     "graph.changed": GraphChangedPayload;
     "item.done": ItemDonePayload;
     "item.failed": ItemFailedPayload;

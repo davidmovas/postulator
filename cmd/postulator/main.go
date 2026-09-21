@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	wailsevents "github.com/wailsapp/wails/v3/pkg/events"
 
 	"github.com/davidmovas/postulator/frontend"
 	"github.com/davidmovas/postulator/internal/app"
@@ -78,15 +79,19 @@ func launch() error {
 		return connectErr
 	}
 
-	wails.Window.NewWithOptions(application.WebviewWindowOptions{
+	window := wails.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            "Postulator",
 		Width:            1280,
 		Height:           820,
 		MinWidth:         960,
 		MinHeight:        600,
 		Frameless:        true,
+		EnableFileDrop:   true,
 		BackgroundColour: application.NewRGB(14, 16, 22),
 		URL:              "/",
+	})
+	window.OnWindowEvent(wailsevents.Common.WindowFilesDropped, func(dropped *application.WindowEvent) {
+		relayDrop(core, dropped)
 	})
 
 	return wails.Run()

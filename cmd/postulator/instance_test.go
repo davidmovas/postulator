@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+
+	"github.com/davidmovas/postulator/internal/application/events"
 )
 
 type stubWindow struct {
@@ -74,5 +76,59 @@ func TestTheProductionBuildTakesTheStableId(t *testing.T) {
 	}
 	if only.UniqueID == "" {
 		t.Fatal("the single instance has no id, so a second launch would not be noticed")
+	}
+}
+
+type recordingRelay struct {
+	seen []events.Type
+	sent []events.FilesDroppedPayload
+}
+
+func (r *recordingRelay) Publish(eventType events.Type, payload any) error {
+	r.seen = append(r.seen, eventType)
+	if dropped, ok := payload.(events.FilesDroppedPayload); ok {
+		r.sent = append(r.sent, dropped)
+	}
+	return nil
+}
+
+func TestADropIsRelayedAsPaths(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		paths []string
+		want  int
+	}{
+		{name: "nothing dropped", paths: nil},
+		{name: "one file", paths: []string{`C:\Users\admin\Downloads\map.xlsx`}, want: 1},
+		{name: "several files", paths: []string{`C:\a.csv`, `C:\b.csv`}, want: 1},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			relay := &recordingRelay{}
+			publishDrop(relay, tc.paths)
+
+			if len(relay.seen) != tc.want {
+				t.Fatalf("published %v, want %d event(s)", relay.seen, tc.want)
+			}
+			if tc.want == 0 {
+				return
+			}
+			if relay.seen[0] != events.FilesDropped {
+				t.Fatalf("published %q, want %q", relay.seen[0], events.FilesDropped)
+			}
+			if len(relay.sent[0].Paths) != len(tc.paths) {
+				t.Fatalf("relayed %v, want %v", relay.sent[0].Paths, tc.paths)
+			}
+			for index, path := range tc.paths {
+				if relay.sent[0].Paths[index] != path {
+					t.Fatalf("relayed %v, want %v", relay.sent[0].Paths, tc.paths)
+				}
+			}
+		})
 	}
 }

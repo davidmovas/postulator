@@ -18,6 +18,7 @@ const (
 	AgentTitled           Type = "agent.titled"
 	AppLocked             Type = "app.locked"
 	AppUnlocked           Type = "app.unlocked"
+	FilesDropped          Type = "files.dropped"
 
 	RunQueued         Type = "run.queued"
 	RunStarted        Type = "run.started"
