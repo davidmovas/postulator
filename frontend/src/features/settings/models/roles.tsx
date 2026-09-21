@@ -42,7 +42,7 @@ export function RoleTable(): ReactElement {
                     <EmptyState icon={KeyOffIcon} title={said.title} body={copy.empty.models} />
                 </div>
             ) : (
-                <DenseTable columns="10rem minmax(12rem,1fr) 9rem" label={said.title}>
+                <DenseTable columns="12rem minmax(12rem,1fr) 7rem" label={said.title}>
                     <TableHead>
                         <TableCell>{said.role}</TableCell>
                         <TableCell>{said.choice}</TableCell>
@@ -67,11 +67,11 @@ export function RoleTable(): ReactElement {
                                 />
                             </TableCell>
                             <TableCell>
-                                {row.source === "global" ? null : (
-                                    <StatusBadge tone="muted" dot={false}>
-                                        {row.source === "seeded" ? said.sourceSeeded : said.sourceNone}
+                                {row.source === "global" ? (
+                                    <StatusBadge tone="accent" dot={false}>
+                                        {said.sourceGlobal}
                                     </StatusBadge>
-                                )}
+                                ) : null}
                             </TableCell>
                         </TableRow>
                     ))}

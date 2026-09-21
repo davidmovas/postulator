@@ -133,7 +133,7 @@ export function ProviderCards(): ReactElement {
                                     <p className="text-xs text-ok">{said.tested(tested.latencyMs, tested.tokens)}</p>
                                 ) : null}
                                 {failed === row.provider && reported !== null ? (
-                                    <div className="flex flex-col gap-1">
+                                    <div className="flex flex-col items-start gap-1">
                                         <StatusBadge tone="danger" dot={false}>
                                             {reported.code}
                                         </StatusBadge>

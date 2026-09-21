@@ -66,6 +66,34 @@ export function kindOf(descriptor: SettingDescriptor): SettingKind {
     }
 }
 
+const nanosecondsPerSecond = 1000000000;
+const secondsPerMinute = 60;
+const secondsPerHour = 3600;
+
+function trimDuration(text: string): string {
+    const held = parseDuration(text);
+    if (held === null || held <= 0 || held % nanosecondsPerSecond !== 0) {
+        return text;
+    }
+    let rest = held / nanosecondsPerSecond;
+    const hours = Math.floor(rest / secondsPerHour);
+    rest -= hours * secondsPerHour;
+    const minutes = Math.floor(rest / secondsPerMinute);
+    rest -= minutes * secondsPerMinute;
+
+    const parts: string[] = [];
+    if (hours > 0) {
+        parts.push(`${hours}h`);
+    }
+    if (minutes > 0) {
+        parts.push(`${minutes}m`);
+    }
+    if (rest > 0) {
+        parts.push(`${rest}s`);
+    }
+    return parts.join("");
+}
+
 export function renderValue(kind: SettingKind, raw: unknown): string {
     if (kind === "bool") {
         return raw === true ? "true" : "false";
@@ -74,7 +102,10 @@ export function renderValue(kind: SettingKind, raw: unknown): string {
         const held = boundNumber(raw);
         return held === null ? "" : String(held);
     }
-    return typeof raw === "string" ? raw : "";
+    if (typeof raw !== "string") {
+        return "";
+    }
+    return kind === "duration" ? trimDuration(raw) : raw;
 }
 
 export function parseValue(kind: SettingKind, text: string): unknown {

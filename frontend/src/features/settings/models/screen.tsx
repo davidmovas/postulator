@@ -18,7 +18,10 @@ export function ModelSettingsScreen(): ReactElement {
         <div className="@container flex flex-col gap-4">
             <ProviderCards />
             <div className="grid grid-cols-1 items-start gap-4 @3xl:grid-cols-[minmax(0,1fr)_16rem]">
-                <RoleTable />
+                <div className="flex min-w-0 flex-col gap-4">
+                    <RoleTable />
+                    <AdvancedCard sections={settings.advanced} />
+                </div>
                 <div className="flex flex-col gap-4">
                     <SpendTile />
                     <Button
@@ -31,9 +34,6 @@ export function ModelSettingsScreen(): ReactElement {
                         {copy.settings.models.catalog.open}
                     </Button>
                 </div>
-            </div>
-            <div className="max-w-2xl">
-                <AdvancedCard sections={settings.advanced} />
             </div>
             {catalogOpen ? (
                 <CatalogDrawer

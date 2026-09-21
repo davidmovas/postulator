@@ -102,3 +102,22 @@ describe("checkSetting", () => {
         expect(checkSetting(descriptor({ key: "wp.proxyUrl", type: "string" }), "")).toBeNull();
     });
 });
+
+describe("renderValue trims a duration to the units it carries", () => {
+    it.each([
+        ["6h0m0s", "6h"],
+        ["10m0s", "10m"],
+        ["1h30m0s", "1h30m"],
+        ["1h0m30s", "1h30s"],
+        ["2m30s", "2m30s"],
+        ["30s", "30s"],
+        ["0s", "0s"],
+    ])("shows %s as %s", (stored, shown) => {
+        expect(renderValue("duration", stored)).toBe(shown);
+    });
+
+    it("leaves a value it cannot read alone", () => {
+        expect(renderValue("duration", "500ms")).toBe("500ms");
+        expect(renderValue("duration", "banana")).toBe("banana");
+    });
+});

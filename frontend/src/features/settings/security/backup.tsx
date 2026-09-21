@@ -38,16 +38,18 @@ function ExportPanel(): ReactElement {
                 </div>
                 <Field label={said.password} hint={said.passwordHint} required={true}>
                     {(binding) => (
-                        <Input
-                            id={binding.id}
-                            aria-describedby={binding["aria-describedby"]}
-                            type="password"
-                            autoComplete="off"
-                            value={password}
-                            onChange={(event) => {
-                                setPassword(event.target.value);
-                            }}
-                        />
+                        <div className="w-64">
+                            <Input
+                                id={binding.id}
+                                aria-describedby={binding["aria-describedby"]}
+                                type="password"
+                                autoComplete="off"
+                                value={password}
+                                onChange={(event) => {
+                                    setPassword(event.target.value);
+                                }}
+                            />
+                        </div>
                     )}
                 </Field>
                 {formErrorOf(write.error) === null ? null : (
@@ -119,15 +121,17 @@ function ImportPanel(): ReactElement {
                 </div>
                 <Field label={said.password} required={true}>
                     {(binding) => (
-                        <Input
-                            id={binding.id}
-                            type="password"
-                            autoComplete="off"
-                            value={password}
-                            onChange={(event) => {
-                                setPassword(event.target.value);
-                            }}
-                        />
+                        <div className="w-64">
+                            <Input
+                                id={binding.id}
+                                type="password"
+                                autoComplete="off"
+                                value={password}
+                                onChange={(event) => {
+                                    setPassword(event.target.value);
+                                }}
+                            />
+                        </div>
                     )}
                 </Field>
                 {formErrorOf(read.error) === null ? null : (

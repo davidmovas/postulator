@@ -83,40 +83,43 @@ export function MasterPasswordPanel(): ReactElement {
         <Panel>
             <PanelHeader title={said.password.title}>
                 <StatusBadge tone={held ? "ok" : "warn"} icon={ShieldIcon}>
-                    {held ? said.lock.protected : said.lock.unprotected}
+                    {held ? said.lock.stateSet : said.lock.stateUnset}
                 </StatusBadge>
             </PanelHeader>
-            <div className="flex flex-wrap items-center gap-2 p-3">
-                <Button
-                    variant={held ? "secondary" : "primary"}
-                    onClick={() => {
-                        setChanging(true);
-                    }}
-                >
-                    {held ? said.password.change : said.password.set}
-                </Button>
-                {held ? (
+            <div className="flex flex-col gap-2 p-3">
+                <p className="text-xs text-ink-dim">{held ? said.lock.protected : said.lock.unprotected}</p>
+                <div className="flex flex-wrap items-center gap-2">
                     <Button
-                        variant="ghost"
+                        variant={held ? "secondary" : "primary"}
                         onClick={() => {
-                            setRemoving(true);
+                            setChanging(true);
                         }}
                     >
-                        {said.password.remove}
+                        {held ? said.password.change : said.password.set}
                     </Button>
-                ) : null}
-                <div className="ml-auto">
-                    <Button
-                        variant="secondary"
-                        icon={LockIcon}
-                        disabled={!held}
-                        title={held ? undefined : said.lock.cannotLock}
-                        onClick={() => {
-                            setLocking(true);
-                        }}
-                    >
-                        {said.lock.confirm}
-                    </Button>
+                    {held ? (
+                        <Button
+                            variant="ghost"
+                            onClick={() => {
+                                setRemoving(true);
+                            }}
+                        >
+                            {said.password.remove}
+                        </Button>
+                    ) : null}
+                    <div className="ml-auto">
+                        <Button
+                            variant="secondary"
+                            icon={LockIcon}
+                            disabled={!held}
+                            title={held ? undefined : said.lock.cannotLock}
+                            onClick={() => {
+                                setLocking(true);
+                            }}
+                        >
+                            {said.lock.confirm}
+                        </Button>
+                    </div>
                 </div>
             </div>
 

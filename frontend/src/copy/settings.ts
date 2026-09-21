@@ -215,7 +215,7 @@ export const settings = {
             role: "Job",
             choice: "Model",
             effective: "In use",
-            sourceSeeded: "Shipped default",
+            sourceGlobal: "Chosen here",
             sourceNone: "Nothing set",
             labels: {
                 writer: "Writes the body",
@@ -230,7 +230,7 @@ export const settings = {
         catalog: {
             open: "Manage models",
             title: "Model catalog",
-            subtitle: (count: number) => `${count} models, each one a role can be pointed at.`,
+            subtitle: (count: number) => `${count} models a role can be pointed at.`,
             close: "Done",
             model: "Model",
             context: "Context",
@@ -239,7 +239,6 @@ export const settings = {
             outputPrice: "Out $/M",
             rpm: "RPM",
             tpm: "TPM",
-            flags: "Carries",
             structured: "JSON",
             images: "Images",
             reasoning: "Reasoning",
@@ -290,6 +289,8 @@ export const settings = {
     security: {
         lock: {
             title: "Lock",
+            stateSet: "Set",
+            stateUnset: "Not set",
             protected: "A master password protects this workspace.",
             unprotected: "No master password is set, so this workspace opens with your Windows account alone.",
             cannotLock: "Set a master password first; without one nothing could unlock this workspace again.",

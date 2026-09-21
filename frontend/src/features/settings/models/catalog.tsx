@@ -8,12 +8,12 @@ import { usd } from "../../../domain/format.js";
 import {
     AddIcon,
     Button,
+    CheckIcon,
     DenseTable,
     Dialog,
     Drawer,
     EmptyState,
     KeyOffIcon,
-    StatusBadge,
     TableCell,
     TableHead,
     TableRow,
@@ -90,14 +90,12 @@ export function CatalogDrawer({ onClose }: CatalogDrawerProps): ReactElement {
                     />
                 </div>
             ) : (
-                <DenseTable columns="minmax(10rem,1fr) 5rem 5rem 4rem 4rem 8rem 7rem" label={said.title}>
+                <DenseTable columns="minmax(10rem,1fr) 4.5rem 4.5rem 4rem 7rem" label={said.title}>
                     <TableHead>
                         <TableCell>{said.model}</TableCell>
                         <TableCell align="right">{said.inputPrice}</TableCell>
                         <TableCell align="right">{said.outputPrice}</TableCell>
-                        <TableCell align="right">{said.context}</TableCell>
-                        <TableCell align="right">{said.rpm}</TableCell>
-                        <TableCell>{said.flags}</TableCell>
+                        <TableCell align="right">{said.images}</TableCell>
                         <TableCell align="right">{copy.app.actions}</TableCell>
                     </TableHead>
                     {models.map((model) => (
@@ -109,30 +107,8 @@ export function CatalogDrawer({ onClose }: CatalogDrawerProps): ReactElement {
                             <TableCell align="right" mono={true}>
                                 {usd(model.outputUsdPerM)}
                             </TableCell>
-                            <TableCell align="right" mono={true}>
-                                {String(model.contextTokens)}
-                            </TableCell>
-                            <TableCell align="right" mono={true}>
-                                {String(model.rpm)}
-                            </TableCell>
-                            <TableCell>
-                                <div className="flex flex-wrap gap-1">
-                                    {model.supportsStructured ? (
-                                        <StatusBadge tone="muted" dot={false}>
-                                            {said.structured}
-                                        </StatusBadge>
-                                    ) : null}
-                                    {model.supportsImages ? (
-                                        <StatusBadge tone="muted" dot={false}>
-                                            {said.images}
-                                        </StatusBadge>
-                                    ) : null}
-                                    {model.reasoning ? (
-                                        <StatusBadge tone="muted" dot={false}>
-                                            {said.reasoning}
-                                        </StatusBadge>
-                                    ) : null}
-                                </div>
+                            <TableCell align="right">
+                                {model.supportsImages ? <CheckIcon size={14} /> : null}
                             </TableCell>
                             <TableCell align="right">
                                 <div className="flex justify-end gap-1">
