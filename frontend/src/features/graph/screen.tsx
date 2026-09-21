@@ -7,40 +7,55 @@ import { react } from "../../data/errors.js";
 import { useGraph, useRecomputeScores } from "../../data/hooks/graph.js";
 import { useLinkAudit } from "../../data/hooks/reports.js";
 import { pushToast } from "../../data/toasts.js";
-import { AddLinkIcon, Banner, Button, EmptyState, HubIcon, PublicIcon, SkeletonRows, UploadFileIcon } from "../../ui/index.js";
+import {
+    AddLinkIcon,
+    Banner,
+    Button,
+    CountBadge,
+    EmptyState,
+    HubIcon,
+    Screen,
+    Segmented,
+    SkeletonRows,
+    TableRowsIcon,
+    UploadFileIcon,
+} from "../../ui/index.js";
+import type { SegmentedOption } from "../../ui/index.js";
 import { tintByEntity } from "../links/model/audit.js";
-import { PlanPageDialog } from "../pages/create.js";
 import type { EntityIndex } from "../pages/entities.js";
-import { ConnectDrawer } from "./actions/connect.js";
+import { GraphActions } from "./actions.js";
 import { EntityContextMenu } from "./actions/context-menu.js";
 import type { MenuTarget } from "./actions/context-menu.js";
-import { CreateEntityDrawer } from "./actions/create-entity.js";
-import { DeleteEntityDialog } from "./actions/delete-entity.js";
-import { MoveEntityDialog } from "./actions/move-entity.js";
 import type { MoveRequest } from "./actions/move-entity.js";
-import { ProposeFromPagesDialog, ProposeRelatedDialog } from "./actions/propose.js";
 import { Controls } from "./canvas/controls.js";
-import { Legend } from "./canvas/legend.js";
 import { GraphMap, pulseMs } from "./canvas/map.js";
 import type { MapHandle, Pulse } from "./canvas/map.js";
-import { diffIndex } from "./model/diff.js";
 import { Inspector } from "./inspector/panel.js";
-import { LensBar } from "./lens-bar.js";
+import { diffIndex } from "./model/diff.js";
 import { collapseToDepth, defaultFold, expandAll, liftMore, reveal, toggle, visibleRows } from "./model/fold.js";
 import type { FoldState } from "./model/fold.js";
 import { buildGraphIndex } from "./model/index.js";
-import { isolate, lensCounts, matchedSet } from "./model/lens.js";
+import { isolate, matchedSet } from "./model/lens.js";
 import type { Lens } from "./model/lens.js";
 import { readQuery, searchOf, writeQuery } from "./model/params.js";
-import type { GraphQuery } from "./model/params.js";
+import type { GraphQuery, GraphView } from "./model/params.js";
 import { pruneRows } from "./model/prune.js";
+import { NodeCard } from "./node-card.js";
+import type { Hovered } from "./node-card.js";
 import { OutlineView } from "./outline/view.js";
+import { GraphOverlays } from "./overlays.js";
+import type { Creating, Proposing } from "./overlays.js";
 import { ProposalQueue } from "./queue/sheet.js";
 import { useGraphSession } from "./state.js";
-import { Toolbar } from "./toolbar.js";
+import { GraphToolbar } from "./toolbar.js";
 
-interface Creating {
-    parentId: string | null;
+const viewOptions: readonly SegmentedOption<GraphView>[] = [
+    { value: "map", label: copy.graph.views.map, icon: HubIcon },
+    { value: "outline", label: copy.graph.views.outline, icon: TableRowsIcon },
+];
+
+interface Card extends Hovered {
+    width: number;
 }
 
 export function GraphScreen(): ReactElement {
@@ -62,10 +77,12 @@ export function GraphScreen(): ReactElement {
     const [planning, setPlanning] = useState<string | null>(null);
     const [menu, setMenu] = useState<MenuTarget | null>(null);
     const [hoverEdge, setHoverEdge] = useState<string | null>(null);
-    const [proposing, setProposing] = useState<"pages" | "related" | null>(null);
+    const [proposing, setProposing] = useState<Proposing>(null);
     const [pulse, setPulse] = useState<Pulse | null>(null);
     const [moving, setMoving] = useState<MoveRequest | null>(null);
+    const [card, setCard] = useState<Card | null>(null);
     const map = useRef<MapHandle | null>(null);
+    const host = useRef<HTMLDivElement>(null);
     const recompute = useRecomputeScores();
     const audit = useLinkAudit(query.proof && siteId !== "" ? siteId : null);
     const auditPages = useMemo(() => (query.proof ? (audit.data?.pages ?? null) : null), [query.proof, audit.data]);
@@ -96,6 +113,16 @@ export function GraphScreen(): ReactElement {
             patchSession({ fold: defaultFold(index) });
         }
     }, [session.fold, graph.data, index, patchSession]);
+
+    const asked = searchParams.get("action");
+
+    useEffect(() => {
+        if (asked !== "new") {
+            return;
+        }
+        setCreating({ parentId: null });
+        setSearchParams(writeQuery(query), { replace: true });
+    }, [asked, query, setSearchParams]);
 
     const setFold = useCallback(
         (next: FoldState): void => {
@@ -141,7 +168,6 @@ export function GraphScreen(): ReactElement {
     const kept = useMemo(() => (query.isolate && matched !== null ? isolate(index, matched) : null), [index, matched, query.isolate]);
     const visible = useMemo(() => visibleRows(index, fold, session.order), [index, fold, session.order]);
     const rows = useMemo(() => pruneRows(visible, kept), [visible, kept]);
-    const counts = useMemo(() => lensCounts(index), [index]);
 
     useEffect(() => {
         if (entityId === null || !index.byId.has(entityId)) {
@@ -197,236 +223,209 @@ export function GraphScreen(): ReactElement {
         patchSession({ queue: true });
     };
 
-    if (siteId === "") {
-        return (
-            <div className="flex h-full items-start justify-center p-6">
-                <EmptyState icon={PublicIcon} title={copy.shell.noSiteSelected} body={copy.empty.sites} />
-            </div>
-        );
-    }
-
     const failure = graph.error === null ? null : react(graph.error);
     const empty = graph.data !== undefined && index.counts.total === 0;
     const connecting = connectFrom === null ? undefined : index.byId.get(connectFrom);
+    const ready = !empty && !graph.isPending;
+
+    const content = graph.isPending ? (
+        <div className="p-4">
+            <SkeletonRows rows={8} label={copy.graph.loading} />
+        </div>
+    ) : failure !== null && failure.kind !== "silent" && failure.kind !== "unlock" ? (
+        <div className="p-4">
+            <Banner
+                tone="danger"
+                title={failure.message}
+                actions={
+                    <Button size="sm" variant="secondary" onClick={() => void graph.refetch()}>
+                        {copy.app.retry}
+                    </Button>
+                }
+            />
+        </div>
+    ) : empty ? (
+        <div className="flex h-full items-center justify-center">
+            <EmptyState
+                icon={HubIcon}
+                title={copy.graph.empty.title}
+                body={copy.graph.empty.body}
+                actions={
+                    <>
+                        <Button
+                            variant="primary"
+                            onClick={() => {
+                                setProposing("pages");
+                            }}
+                        >
+                            {copy.graph.empty.propose}
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            icon={UploadFileIcon}
+                            onClick={() => {
+                                void navigate(`/s/${siteId}/import`);
+                            }}
+                        >
+                            {copy.graph.empty.import}
+                        </Button>
+                    </>
+                }
+            />
+        </div>
+    ) : query.view === "outline" ? (
+        <OutlineView
+            siteId={siteId}
+            index={index}
+            rows={rows}
+            selectedId={entityId}
+            matched={matched}
+            onSelect={select}
+            onPick={pick}
+            onToggle={toggleNode}
+            onLiftMore={(parentId, count) => {
+                setFold(liftMore(fold, parentId, count));
+            }}
+        />
+    ) : (
+        <>
+            <GraphMap
+                siteId={siteId}
+                index={index}
+                rows={rows}
+                fold={fold}
+                selectedId={entityId}
+                matched={matched}
+                showRelated={session.showRelated}
+                highlightEdgeId={hoverEdge}
+                pulse={pulse}
+                tint={tint}
+                revealVersion={revealVersion}
+                onSelect={select}
+                onPick={pick}
+                onToggle={toggleNode}
+                onLiftMore={(parentId, count) => {
+                    setFold(liftMore(fold, parentId, count));
+                }}
+                onContextMenu={(id, at) => {
+                    setCard(null);
+                    if (id === null) {
+                        setMenu(null);
+                        return;
+                    }
+                    const row = rows.find((held) => held.id === id);
+                    setMenu({
+                        id,
+                        at,
+                        expanded: row?.kind === "entity" && row.expanded,
+                        hasChildren: row?.kind === "entity" && row.childCount > 0,
+                    });
+                }}
+                onHover={(id, at) => {
+                    setCard(id === null ? null : { id, at, width: host.current?.clientWidth ?? 0 });
+                }}
+                onCreateChild={(parentId) => {
+                    setCreating({ parentId });
+                }}
+                onConnect={startConnect}
+                onDelete={setDeleting}
+                onReparent={(childId, parentId) => {
+                    setMoving({ childId, parentId });
+                }}
+                ref={(handle) => {
+                    map.current = handle;
+                }}
+                minimap={session.minimap}
+            />
+            <Controls
+                siteId={siteId}
+                showRelated={session.showRelated}
+                onZoom={(factor) => map.current?.zoomBy(factor)}
+                onFit={() => map.current?.fit()}
+                onExpandAll={() => {
+                    setFold(expandAll(index));
+                }}
+                onCollapse={() => {
+                    setFold(collapseToDepth(index, 1));
+                }}
+                onToggleRelated={() => {
+                    patchSession({ showRelated: !session.showRelated });
+                }}
+            />
+            {card === null || menu !== null ? null : <NodeCard index={index} hovered={card} hostWidth={card.width} />}
+            <EntityContextMenu
+                target={menu}
+                onClose={() => {
+                    setMenu(null);
+                }}
+                onAddChild={(id) => {
+                    setCreating({ parentId: id });
+                }}
+                onConnect={startConnect}
+                onToggle={toggleNode}
+                onCenter={revealEntity}
+                onDelete={setDeleting}
+            />
+        </>
+    );
 
     return (
-        <div
-            className="flex h-full min-h-0 flex-col"
-            onKeyDown={(event) => {
-                if ((event.ctrlKey || event.metaKey) && (event.key === "f" || event.key === "F")) {
-                    event.preventDefault();
-                    setFocusSearch((held) => held + 1);
-                }
-            }}
-        >
-            <Toolbar
-                index={index}
-                view={query.view}
-                selectedId={entityId}
-                connectFrom={connectFrom}
-                onView={(view) => {
-                    change({ ...query, view });
-                }}
-                onPick={revealEntity}
-                onCreate={() => {
-                    setCreating({ parentId: entityId });
-                }}
-                onConnect={() => {
-                    if (entityId !== null) {
-                        startConnect(entityId);
-                    }
-                }}
-                onStopConnect={stopConnect}
-                reviewing={session.queue}
-                recomputing={recompute.isPending}
-                onReview={() => {
-                    patchSession({ queue: !session.queue });
-                }}
-                onProposeFromPages={() => {
-                    setProposing("pages");
-                }}
-                onProposeRelated={() => {
-                    setProposing("related");
-                }}
-                onRecompute={recomputeScores}
-                focusSearch={focusSearch}
-            />
-            <LensBar query={query} counts={counts} proofBusy={query.proof && audit.isPending} onChange={change} />
-            {connecting === undefined ? null : (
-                <div className="border-b border-hairline px-3 py-2">
-                    <Banner
-                        tone="info"
-                        icon={AddLinkIcon}
-                        title={copy.graph.connect.picking(connecting.name)}
-                        actions={
-                            <Button size="sm" variant="ghost" onClick={stopConnect}>
-                                {copy.graph.connect.stop}
-                            </Button>
+        <Screen
+            title={copy.graph.title}
+            badge={graph.data === undefined ? undefined : <CountBadge tone="muted" count={index.counts.total} />}
+            tabs={
+                <Segmented
+                    label={copy.graph.views.label}
+                    value={query.view}
+                    options={viewOptions}
+                    onValueChange={(view) => {
+                        change({ ...query, view });
+                    }}
+                />
+            }
+            actions={
+                <GraphActions
+                    index={index}
+                    selectedId={entityId}
+                    connecting={connectFrom !== null}
+                    reviewing={session.queue}
+                    recomputing={recompute.isPending}
+                    onCreate={() => {
+                        setCreating({ parentId: entityId });
+                    }}
+                    onConnect={() => {
+                        if (entityId !== null) {
+                            startConnect(entityId);
                         }
+                    }}
+                    onStopConnect={stopConnect}
+                    onReview={() => {
+                        patchSession({ queue: !session.queue });
+                    }}
+                    onProposeFromPages={() => {
+                        setProposing("pages");
+                    }}
+                    onProposeRelated={() => {
+                        setProposing("related");
+                    }}
+                    onRecompute={recomputeScores}
+                />
+            }
+            toolbar={
+                ready ? (
+                    <GraphToolbar
+                        index={index}
+                        query={query}
+                        proofBusy={query.proof && audit.isPending}
+                        focusSearch={focusSearch}
+                        onChange={change}
+                        onPick={revealEntity}
                     />
-                </div>
-            )}
-            <div className="flex min-h-0 flex-1">
-                <div className="relative flex min-w-0 flex-1 flex-col">
-                    {graph.isPending ? (
-                        <div className="p-3">
-                            <SkeletonRows rows={8} label={copy.graph.loading} />
-                        </div>
-                    ) : failure !== null && failure.kind !== "silent" && failure.kind !== "unlock" ? (
-                        <div className="p-3">
-                            <Banner tone="danger" title={failure.message} />
-                        </div>
-                    ) : empty ? (
-                        <div className="flex h-full items-start justify-center p-6">
-                            <EmptyState
-                                icon={HubIcon}
-                                title={copy.graph.empty.title}
-                                body={copy.graph.empty.body}
-                                actions={
-                                    <>
-                                        <Button
-                                            variant="primary"
-                                            size="sm"
-                                            onClick={() => {
-                                                setProposing("pages");
-                                            }}
-                                        >
-                                            {copy.graph.empty.propose}
-                                        </Button>
-                                        <Button
-                                            variant="secondary"
-                                            size="sm"
-                                            onClick={() => {
-                                                setCreating({ parentId: null });
-                                            }}
-                                        >
-                                            {copy.graph.empty.add}
-                                        </Button>
-                                        <Button
-                                            variant="secondary"
-                                            size="sm"
-                                            icon={UploadFileIcon}
-                                            onClick={() => {
-                                                void navigate(`/s/${siteId}/import`);
-                                            }}
-                                        >
-                                            {copy.graph.empty.import}
-                                        </Button>
-                                    </>
-                                }
-                            />
-                        </div>
-                    ) : query.view === "outline" ? (
-                        <OutlineView
-                            siteId={siteId}
-                            index={index}
-                            rows={rows}
-                            selectedId={entityId}
-                            matched={matched}
-                            onSelect={select}
-                            onPick={pick}
-                            onToggle={toggleNode}
-                            onLiftMore={(parentId, count) => {
-                                setFold(liftMore(fold, parentId, count));
-                            }}
-                        />
-                    ) : (
-                        <>
-                            <GraphMap
-                                siteId={siteId}
-                                index={index}
-                                rows={rows}
-                                fold={fold}
-                                selectedId={entityId}
-                                matched={matched}
-                                showRelated={session.showRelated}
-                                highlightEdgeId={hoverEdge}
-                                pulse={pulse}
-                                tint={tint}
-                                revealVersion={revealVersion}
-                                onSelect={select}
-                                onPick={pick}
-                                onToggle={toggleNode}
-                                onLiftMore={(parentId, count) => {
-                                    setFold(liftMore(fold, parentId, count));
-                                }}
-                                onContextMenu={(id, at) => {
-                                    if (id === null) {
-                                        setMenu(null);
-                                        return;
-                                    }
-                                    const row = rows.find((held) => held.id === id);
-                                    setMenu({
-                                        id,
-                                        at,
-                                        expanded: row?.kind === "entity" && row.expanded,
-                                        hasChildren: row?.kind === "entity" && row.childCount > 0,
-                                    });
-                                }}
-                                onCreateChild={(parentId) => {
-                                    setCreating({ parentId });
-                                }}
-                                onConnect={startConnect}
-                                onDelete={setDeleting}
-                                onReparent={(childId, parentId) => {
-                                    setMoving({ childId, parentId });
-                                }}
-                                ref={(handle) => {
-                                    map.current = handle;
-                                }}
-                                minimap={session.minimap}
-                            />
-                            <Controls
-                                siteId={siteId}
-                                showRelated={session.showRelated}
-                                onZoom={(factor) => map.current?.zoomBy(factor)}
-                                onFit={() => map.current?.fit()}
-                                onExpandAll={() => {
-                                    setFold(expandAll(index));
-                                }}
-                                onCollapse={() => {
-                                    setFold(collapseToDepth(index, 1));
-                                }}
-                                onToggleRelated={() => {
-                                    patchSession({ showRelated: !session.showRelated });
-                                }}
-                            />
-                            <Legend
-                                open={session.legend}
-                                proof={tint !== null}
-                                onToggle={() => {
-                                    patchSession({ legend: !session.legend });
-                                }}
-                            />
-                            <EntityContextMenu
-                                target={menu}
-                                onClose={() => {
-                                    setMenu(null);
-                                }}
-                                onAddChild={(id) => {
-                                    setCreating({ parentId: id });
-                                }}
-                                onConnect={startConnect}
-                                onToggle={toggleNode}
-                                onCenter={revealEntity}
-                                onDelete={setDeleting}
-                            />
-                        </>
-                    )}
-                    {empty || graph.isPending ? null : (
-                        <ProposalQueue
-                            index={index}
-                            open={session.queue}
-                            onClose={() => {
-                                patchSession({ queue: false });
-                                setHoverEdge(null);
-                            }}
-                            onHover={setHoverEdge}
-                            onReveal={revealEntity}
-                        />
-                    )}
-                </div>
-                {empty || graph.isPending ? null : (
+                ) : undefined
+            }
+            variant="full"
+            right={
+                ready ? (
                     <Inspector
                         siteId={siteId}
                         index={index}
@@ -439,81 +438,69 @@ export function GraphScreen(): ReactElement {
                         onPlanPage={setPlanning}
                         audit={auditPages}
                     />
+                ) : undefined
+            }
+        >
+            <div
+                className="flex h-full min-h-0 flex-col"
+                onKeyDown={(event) => {
+                    if ((event.ctrlKey || event.metaKey) && (event.key === "f" || event.key === "F")) {
+                        event.preventDefault();
+                        setFocusSearch((held) => held + 1);
+                    }
+                }}
+            >
+                {connecting === undefined ? null : (
+                    <div className="border-b border-hairline px-4 py-2">
+                        <Banner
+                            tone="info"
+                            icon={AddLinkIcon}
+                            title={copy.graph.connect.picking(connecting.name)}
+                            actions={
+                                <Button size="sm" variant="ghost" onClick={stopConnect}>
+                                    {copy.graph.connect.stop}
+                                </Button>
+                            }
+                        />
+                    </div>
                 )}
+                <div ref={host} className="relative flex min-h-0 flex-1 flex-col">
+                    {content}
+                    {ready ? (
+                        <ProposalQueue
+                            index={index}
+                            open={session.queue}
+                            onClose={() => {
+                                patchSession({ queue: false });
+                                setHoverEdge(null);
+                            }}
+                            onHover={setHoverEdge}
+                            onReveal={revealEntity}
+                        />
+                    ) : null}
+                </div>
             </div>
-            <CreateEntityDrawer
-                open={creating !== null}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        setCreating(null);
-                    }
-                }}
+            <GraphOverlays
                 siteId={siteId}
                 index={index}
-                parentId={creating?.parentId ?? null}
-                onCreated={select}
-            />
-            <ConnectDrawer
-                siteId={siteId}
-                index={index}
-                fromId={connectFrom}
-                toId={connectTo}
-                onClose={stopConnect}
-            />
-            <DeleteEntityDialog
-                index={index}
-                entityId={deleting}
-                onClose={() => {
-                    setDeleting(null);
-                }}
-                onDeleted={() => {
-                    if (deleting === entityId) {
-                        select(null);
-                    }
-                }}
-            />
-            <MoveEntityDialog
-                siteId={siteId}
-                index={index}
-                move={moving}
-                onClose={() => {
-                    setMoving(null);
-                }}
-            />
-            <ProposeFromPagesDialog
-                open={proposing === "pages"}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        setProposing(null);
-                    }
-                }}
-                siteId={siteId}
-                onReview={openQueue}
-            />
-            <ProposeRelatedDialog
-                open={proposing === "related"}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        setProposing(null);
-                    }
-                }}
-                siteId={siteId}
-                index={index}
+                entityIndex={entityIndex}
                 selectedId={entityId}
-                onReview={openQueue}
+                creating={creating}
+                connectFrom={connectFrom}
+                connectTo={connectTo}
+                deleting={deleting}
+                moving={moving}
+                proposing={proposing}
+                planning={planning}
+                onCreatingChange={setCreating}
+                onStopConnect={stopConnect}
+                onDeletingChange={setDeleting}
+                onMovingChange={setMoving}
+                onProposingChange={setProposing}
+                onPlanningChange={setPlanning}
+                onSelect={select}
+                onReviewQueue={openQueue}
             />
-            <PlanPageDialog
-                open={planning !== null}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        setPlanning(null);
-                    }
-                }}
-                siteId={siteId}
-                index={entityIndex}
-                search=""
-                initialEntityId={planning ?? undefined}
-            />
-        </div>
+        </Screen>
     );
 }

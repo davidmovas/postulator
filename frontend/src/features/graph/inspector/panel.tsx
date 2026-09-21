@@ -9,7 +9,7 @@ import { relativeTime } from "../../../domain/format.js";
 import { Button, CloseIcon, cx, DeleteIcon, IconButton, SectionLabel, SmartToyIcon, toneClasses } from "../../../ui/index.js";
 import { askAgent } from "../../agent/index.js";
 import { severityOf } from "../../links/model/audit.js";
-import { entityIcon, formatScore, kindTone } from "../labels.js";
+import { entityIcon, formatScore, kindLabel, kindTone } from "../labels.js";
 import type { GraphIndex } from "../model/index.js";
 import type { Lens } from "../model/lens.js";
 import { AnchorsEditor } from "./anchors.js";
@@ -50,7 +50,7 @@ function AuditRows({ siteId, entityId, audit }: AuditRowsProps): ReactElement {
             {rows === null ? (
                 <p className="text-2xs text-ink-faint">{copy.graph.inspector.linksOff}</p>
             ) : rows.length === 0 ? (
-                <p className="text-2xs text-ink-faint">{copy.graph.legend.proofMuted}</p>
+                <p className="text-2xs text-ink-faint">{copy.graph.inspector.linksNone}</p>
             ) : (
                 <ul className="flex flex-col gap-1">
                     {rows.map((row) => {
@@ -98,22 +98,22 @@ export function Inspector({ siteId, index, selectedId, onSelect, onReveal, onLen
 
     if (entity === undefined) {
         return (
-            <aside aria-label={copy.graph.summary.title} className="flex w-80 shrink-0 flex-col overflow-auto border-l border-hairline bg-panel">
+            <section aria-label={copy.graph.summary.title} className="flex h-full min-h-0 flex-col bg-panel">
                 <Summary index={index} onLens={onLens} onSelect={onSelect} />
-            </aside>
+            </section>
         );
     }
 
     const Icon = entityIcon(entity.kind);
 
     return (
-        <aside aria-label={copy.graph.inspector.title} className="flex w-80 shrink-0 flex-col overflow-auto border-l border-hairline bg-panel">
+        <section aria-label={copy.graph.inspector.title} className="flex h-full min-h-0 flex-col bg-panel">
             <header className="flex items-start gap-2 border-b border-hairline p-3">
                 <Icon size={20} className={`mt-0.5 shrink-0 ${toneClasses[kindTone(entity.kind)].ink}`} />
                 <div className="min-w-0 flex-1">
                     <h2 className="truncate text-base font-semibold text-ink">{entity.name}</h2>
                     <p className="flex items-center gap-2 text-2xs text-ink-dim">
-                        <span>{entity.kind}</span>
+                        <span>{kindLabel(entity.kind)}</span>
                         <span className="font-mono">{formatScore(entity.score)}</span>
                         <span>{copy.graph.inspector.rank(rank, index.counts.total)}</span>
                     </p>
@@ -192,6 +192,6 @@ export function Inspector({ siteId, index, selectedId, onSelect, onReveal, onLen
                     </Button>
                 </footer>
             </div>
-        </aside>
+        </section>
     );
 }

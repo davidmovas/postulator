@@ -80,6 +80,7 @@ export interface GraphMapProps {
     onToggle: (id: string) => void;
     onLiftMore: (parentId: string, count: number) => void;
     onContextMenu?: (id: string | null, screen: Point) => void;
+    onHover?: (id: string | null, screen: Point) => void;
     onCreateChild: (id: string | null) => void;
     onConnect: (id: string) => void;
     onDelete: (id: string) => void;
@@ -125,6 +126,7 @@ export function GraphMap({
     onToggle,
     onLiftMore,
     onContextMenu,
+    onHover,
     onCreateChild,
     onConnect,
     onDelete,
@@ -599,6 +601,7 @@ export function GraphMap({
         if (next !== hover.current) {
             hover.current = next;
             host.current?.redraw();
+            onHover?.(latest.current.rowById.get(next ?? "")?.kind === "entity" ? next : null, pointer);
         }
     };
 
@@ -745,6 +748,7 @@ export function GraphMap({
                     if (hover.current !== null) {
                         hover.current = null;
                         host.current?.redraw();
+                        onHover?.(null, { x: 0, y: 0 });
                     }
                 }}
                 onDoubleClick={onDoubleClick}
