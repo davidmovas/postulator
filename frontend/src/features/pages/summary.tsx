@@ -163,7 +163,7 @@ export function PageSummary({ pageId, siteId, search, onOpen }: PageSummaryProps
                     <SectionLabel>{copy.pages.summary.meta}</SectionLabel>
                     <dl className="flex flex-col gap-1.5">
                         <Row label={copy.pages.detail.metaTitle}>
-                            {page.metaTitle === "" ? copy.pages.untitled : page.metaTitle}
+                            {page.metaTitle === "" ? copy.pages.noMetaTitle : page.metaTitle}
                         </Row>
                         <Row label={copy.pages.detail.metaDescription}>
                             <span title={page.metaDescription}>

@@ -202,8 +202,9 @@ function PaletteDialog({ siteId, destinations }: CommandPaletteProps): ReactElem
             (schema.data?.settings ?? []).map((descriptor) => ({
                 key: descriptor.key,
                 label: described[descriptor.key]?.label ?? humanLabel(descriptor.key),
+                matched: `${described[descriptor.key]?.label ?? humanLabel(descriptor.key)} ${descriptor.key.split(".").join(" ")}`,
             })),
-            (entry) => entry.label,
+            (entry) => entry.matched,
             perSection,
         ).map((entry) => ({
             key: `setting:${entry.key}`,

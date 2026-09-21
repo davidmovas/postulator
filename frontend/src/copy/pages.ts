@@ -85,6 +85,7 @@ export const pages = {
     loading: "Loading the page map",
     noMatch: "No page matches these filters",
     untitled: "Untitled",
+    noMetaTitle: "Not set",
     mapped: "mapped",
     unmapped: "no entity",
     empty: { title: "The page map is empty" },
