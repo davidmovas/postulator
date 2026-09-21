@@ -5,7 +5,7 @@ import { MasterPasswordPanel } from "./password.js";
 
 export function SecurityScreen(): ReactElement {
     return (
-        <div className="flex max-w-2xl flex-col gap-4">
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
             <MasterPasswordPanel />
             <BackupPanels />
         </div>

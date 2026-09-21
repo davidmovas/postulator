@@ -28,7 +28,7 @@ export function AboutScreen(): ReactElement {
     const build = useBuildInfo();
 
     return (
-        <div className="flex max-w-lg flex-col gap-4">
+        <div className="mx-auto flex w-full max-w-lg flex-col gap-4">
             <Panel>
                 <PanelHeader title={copy.settings.about.title}>
                     <Button

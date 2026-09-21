@@ -6,16 +6,12 @@ import { useModelCatalog, useRoleProfiles, useSetProfile } from "../../../data/h
 import { modelRoles } from "../../../generated/vocab.js";
 import {
     Banner,
-    DenseTable,
     EmptyState,
     KeyOffIcon,
     Panel,
     PanelHeader,
     Select,
     StatusBadge,
-    TableCell,
-    TableHead,
-    TableRow,
 } from "../../../ui/index.js";
 import { profileRows, refOf, refText } from "../model/profiles.js";
 
@@ -42,16 +38,22 @@ export function RoleTable(): ReactElement {
                     <EmptyState icon={KeyOffIcon} title={said.title} body={copy.empty.models} />
                 </div>
             ) : (
-                <DenseTable columns="12rem minmax(12rem,1fr) 7rem" label={said.title}>
-                    <TableHead>
-                        <TableCell>{said.role}</TableCell>
-                        <TableCell>{said.choice}</TableCell>
-                        <TableCell>{""}</TableCell>
-                    </TableHead>
+                <div role="list" aria-label={said.title}>
                     {rows.map((row) => (
-                        <TableRow key={row.role}>
-                            <TableCell>{roleLabels[row.role] ?? row.role}</TableCell>
-                            <TableCell>
+                        <div
+                            key={row.role}
+                            role="listitem"
+                            className="flex h-9 items-center gap-3 border-b border-hairline px-3 last:border-b-0"
+                        >
+                            <span className="min-w-0 flex-1 truncate text-sm text-ink-soft">
+                                {roleLabels[row.role] ?? row.role}
+                            </span>
+                            {row.source === "global" ? (
+                                <StatusBadge tone="accent" dot={false}>
+                                    {said.sourceGlobal}
+                                </StatusBadge>
+                            ) : null}
+                            <div className="w-64 shrink-0">
                                 <Select
                                     aria-label={`${roleLabels[row.role] ?? row.role} ${said.choice}`}
                                     value={row.chosen === null ? null : refText(row.chosen)}
@@ -65,17 +67,10 @@ export function RoleTable(): ReactElement {
                                         choose.mutate({ role: row.role, provider: ref.provider, model: ref.model });
                                     }}
                                 />
-                            </TableCell>
-                            <TableCell>
-                                {row.source === "global" ? (
-                                    <StatusBadge tone="accent" dot={false}>
-                                        {said.sourceGlobal}
-                                    </StatusBadge>
-                                ) : null}
-                            </TableCell>
-                        </TableRow>
+                            </div>
+                        </div>
                     ))}
-                </DenseTable>
+                </div>
             )}
             {formErrorOf(choose.error) === null ? null : (
                 <div className="px-3 pb-3">

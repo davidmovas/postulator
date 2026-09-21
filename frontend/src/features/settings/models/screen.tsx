@@ -15,7 +15,7 @@ export function ModelSettingsScreen(): ReactElement {
     const [catalogOpen, setCatalogOpen] = useState(false);
 
     return (
-        <div className="@container flex flex-col gap-4">
+        <div className="@container mx-auto flex w-full max-w-5xl flex-col gap-4">
             <ProviderCards />
             <div className="grid grid-cols-1 items-start gap-4 @3xl:grid-cols-[minmax(0,1fr)_16rem]">
                 <div className="flex min-w-0 flex-col gap-4">
