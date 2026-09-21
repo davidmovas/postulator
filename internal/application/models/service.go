@@ -253,6 +253,13 @@ func (s *Service) GetProfiles(ctx context.Context, req GetProfilesRequest) (GetP
 
 func (s *Service) TestProvider(ctx context.Context, req TestProviderRequest) (TestProviderResponse, error) {
 	ref := llm.ModelRef{Provider: strings.TrimSpace(req.Provider), Model: strings.TrimSpace(req.Model)}
+	if ref.Model == "" {
+		chosen, err := s.cheapest(ctx, ref.Provider)
+		if err != nil {
+			return TestProviderResponse{}, err
+		}
+		ref.Model = chosen
+	}
 	if _, err := s.catalog.Lookup(ctx, ref); err != nil {
 		return TestProviderResponse{}, err
 	}
@@ -273,6 +280,33 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequest) (Te
 		Usage:     usageView(resp.Usage),
 		LatencyMs: time.Since(started).Milliseconds(),
 	}, nil
+}
+
+func (s *Service) cheapest(ctx context.Context, provider string) (string, error) {
+	if provider == "" {
+		return "", errors.New(errors.Invalid, "a provider test needs a provider").WithDetail("field", "provider")
+	}
+
+	known, err := s.catalog.List(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	chosen, price := "", 0.0
+	for index := range known {
+		info := known[index]
+		if info.Ref.Provider != provider {
+			continue
+		}
+		if cost := info.InputUSDPerM + info.OutputUSDPerM; chosen == "" || cost < price {
+			chosen, price = info.Ref.Model, cost
+		}
+	}
+	if chosen == "" {
+		return "", errors.New(errors.NotFound, "the catalog carries no model for this provider").
+			WithDetail("provider", provider)
+	}
+	return chosen, nil
 }
 
 func (s *Service) UsageSummary(ctx context.Context, req UsageSummaryRequest) (UsageSummaryResponse, error) {

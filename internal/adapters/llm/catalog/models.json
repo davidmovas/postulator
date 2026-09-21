@@ -2,11 +2,11 @@
   "defaults": {
     "writer": {
       "provider": "openai",
-      "model": "gpt-5.6-terra"
+      "model": "gpt-5.6-sol"
     },
     "editor": {
       "provider": "openai",
-      "model": "gpt-5.6-luna"
+      "model": "gpt-5.6-terra"
     },
     "linker": {
       "provider": "openai",
@@ -18,7 +18,11 @@
     },
     "chat": {
       "provider": "openai",
-      "model": "gpt-5.6-sol"
+      "model": "gpt-5.6-terra"
+    },
+    "image": {
+      "provider": "openai",
+      "model": "gpt-image-2"
     },
     "titler": {
       "provider": "openai",
@@ -26,21 +30,6 @@
     }
   },
   "models": [
-    {
-      "ref": {
-        "provider": "openai",
-        "model": "gpt-6-astra"
-      },
-      "contextTokens": 1050000,
-      "maxOutputTokens": 128000,
-      "inputUsdPerM": 10.0,
-      "outputUsdPerM": 50.0,
-      "rpm": 60,
-      "tpm": 120000,
-      "supportsStructured": true,
-      "supportsImages": true,
-      "reasoning": true
-    },
     {
       "ref": {
         "provider": "openai",
@@ -85,6 +74,21 @@
       "supportsStructured": true,
       "supportsImages": true,
       "reasoning": true
+    },
+    {
+      "ref": {
+        "provider": "openai",
+        "model": "gpt-image-2"
+      },
+      "contextTokens": 1050000,
+      "maxOutputTokens": 128000,
+      "inputUsdPerM": 8.0,
+      "outputUsdPerM": 30.0,
+      "rpm": 60,
+      "tpm": 120000,
+      "supportsStructured": false,
+      "supportsImages": true,
+      "reasoning": false
     },
     {
       "ref": {

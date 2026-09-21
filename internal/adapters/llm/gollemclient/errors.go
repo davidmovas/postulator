@@ -2,8 +2,10 @@ package gollemclient
 
 import (
 	"context"
+	"encoding/json"
 	stderrors "errors"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -38,12 +40,18 @@ func classify(ctx context.Context, err error) error {
 
 func fromStatus(status int, after time.Duration, err error) error {
 	base := func(code errors.Code, message string) *errors.Error {
-		return errors.New(code, message).WithDetail("status", status).WithInternal(err)
+		built := errors.New(code, message).WithDetail("status", status).WithInternal(err)
+		if told := maskKeys(messageOf(err)); told != "" {
+			built = built.WithDetail("providerMessage", told)
+		}
+		return built
 	}
 
 	switch {
-	case status == http.StatusUnauthorized, status == http.StatusForbidden:
+	case status == http.StatusUnauthorized:
 		return base(errors.Unauthorized, "the model provider rejected the api key")
+	case status == http.StatusForbidden:
+		return base(errors.Unauthorized, "the key has no access to this model")
 	case status == http.StatusNotFound:
 		return base(errors.NotFound, "the model provider has no such model")
 	case status == http.StatusTooManyRequests:
@@ -55,6 +63,50 @@ func fromStatus(status int, after time.Duration, err error) error {
 	default:
 		return base(errors.External, "the model provider returned an unexpected status")
 	}
+}
+
+const ellipsis = "…"
+
+var keyPattern = regexp.MustCompile(`sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{10,}`)
+
+func maskKeys(text string) string {
+	return keyPattern.ReplaceAllStringFunc(text, func(token string) string {
+		prefix := "sk-"
+		if strings.HasPrefix(token, "AIza") {
+			prefix = "AIza"
+		}
+		return prefix + ellipsis + token[len(token)-4:]
+	})
+}
+
+func messageOf(err error) string {
+	var apiErr *openai.APIError
+	if stderrors.As(err, &apiErr) {
+		return strings.TrimSpace(apiErr.Message)
+	}
+
+	var requestErr *openai.RequestError
+	if stderrors.As(err, &requestErr) {
+		return strings.TrimSpace(envelopeMessage(requestErr.Body))
+	}
+
+	var anthropicErr *anthropic.Error
+	if stderrors.As(err, &anthropicErr) {
+		return strings.TrimSpace(envelopeMessage([]byte(anthropicErr.RawJSON())))
+	}
+	return ""
+}
+
+func envelopeMessage(body []byte) string {
+	var envelope struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return ""
+	}
+	return envelope.Error.Message
 }
 
 func statusOf(err error) (status int, after time.Duration, ok bool) {

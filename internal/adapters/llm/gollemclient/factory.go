@@ -2,6 +2,8 @@ package gollemclient
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"sync"
 
 	"github.com/gollem-dev/gollem"
@@ -30,35 +32,54 @@ type secretReader interface {
 	Get(ctx context.Context, ref string) (string, error)
 }
 
+type cached struct {
+	client      gollem.LLMClient
+	fingerprint string
+}
+
 type Factory struct {
 	secrets secretReader
 	values  *settings.Values
-	clients map[string]gollem.LLMClient
+	clients map[string]cached
 	mu      sync.Mutex
 }
 
 func NewFactory(secrets secretReader, values *settings.Values) *Factory {
-	return &Factory{secrets: secrets, values: values, clients: make(map[string]gollem.LLMClient)}
+	return &Factory{secrets: secrets, values: values, clients: make(map[string]cached)}
 }
 
 func (f *Factory) New(ctx context.Context, ref llm.ModelRef) (gollem.LLMClient, error) {
 	if !ref.Valid() {
 		return nil, errors.New(errors.Invalid, "a model reference must name a provider and a model")
 	}
+	mark := f.fingerprint(ctx, ref.Provider)
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	if client, ok := f.clients[ref.String()]; ok {
-		return client, nil
+	if held, ok := f.clients[ref.String()]; ok && held.fingerprint == mark {
+		return held.client, nil
 	}
 
 	client, err := f.build(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
-	f.clients[ref.String()] = client
+	f.clients[ref.String()] = cached{client: client, fingerprint: mark}
 	return client, nil
+}
+
+func (f *Factory) fingerprint(ctx context.Context, provider string) string {
+	if provider == ProviderGemini {
+		return ""
+	}
+
+	key, err := f.secrets.Get(ctx, SecretRef(provider))
+	if err != nil || key == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(key))
+	return hex.EncodeToString(sum[:])
 }
 
 func (f *Factory) build(ctx context.Context, ref llm.ModelRef) (gollem.LLMClient, error) {

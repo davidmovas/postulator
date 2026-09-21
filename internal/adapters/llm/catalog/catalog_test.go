@@ -81,7 +81,7 @@ func TestDefaults(t *testing.T) {
 		{name: "linker", role: llm.RoleLinker},
 		{name: "judge", role: llm.RoleJudge},
 		{name: "chat", role: llm.RoleChat},
-		{name: "image has no text default", role: llm.RoleImage, wantErr: true},
+		{name: "image", role: llm.RoleImage},
 		{name: "an unknown role has none", role: "painter", wantErr: true},
 	}
 

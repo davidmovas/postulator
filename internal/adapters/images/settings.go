@@ -2,7 +2,7 @@ package images
 
 import "github.com/davidmovas/postulator/internal/kernel/settings"
 
-const DefaultOpenAIModel = "gpt-image-1"
+const DefaultOpenAIModel = "gpt-image-2"
 
 var (
 	localDirSetting    = settings.String("images.localDir", "")
