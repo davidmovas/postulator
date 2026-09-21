@@ -13,6 +13,9 @@ const usage = `postulator ui screenshots
 
   node scripts/shot.mjs --port 9222 --routes scripts/routes.json --out-dir shots
 
+A walk closes the agent dock and reloads once before its first shot, so the
+set does not depend on what the last session left open.
+
 The window is the one "task ui:run" started; it is reached over the DevTools
 protocol and never launched here. --click, --type and --key are applied in the
 order they are written on the command line, after the route has settled.
@@ -197,6 +200,20 @@ async function apply(page, steps) {
     }
 }
 
+async function rest(page) {
+    await page.evaluate(() => {
+        for (const key of ["postulator.dock.open", "postulator.dock.width"]) {
+            try {
+                window.localStorage.removeItem(key);
+            } catch {
+                return;
+            }
+        }
+    });
+    await page.reload({ waitUntil: "networkidle" });
+    await page.waitForTimeout(1200);
+}
+
 async function shoot(page, shot, resolveSiteId) {
     await page.keyboard.press("Escape");
     await page.waitForTimeout(200);
@@ -269,6 +286,9 @@ async function main() {
         return seeded;
     };
     try {
+        if (options.routes !== undefined) {
+            await rest(page);
+        }
         for (const shot of shots) {
             await shoot(page, shot, resolver);
         }
