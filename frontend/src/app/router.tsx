@@ -9,8 +9,10 @@ import { PagesScreen } from "../features/pages/index.js";
 import { RunDetailScreen, RunsScreen } from "../features/runs/index.js";
 import {
     AboutScreen,
-    GeneralSettingsScreen,
+    AgentSettingsScreen,
+    BrowserSettingsScreen,
     ModelSettingsScreen,
+    RunSettingsScreen,
     SecurityScreen,
     SettingsScreen,
 } from "../features/settings/index.js";
@@ -75,11 +77,14 @@ export const router = createHashRouter([
                 path: "settings",
                 element: <SettingsScreen />,
                 children: [
-                    { index: true, element: <Navigate to="general" replace /> },
-                    { path: "general", element: <GeneralSettingsScreen /> },
+                    { index: true, element: <Navigate to="models" replace /> },
                     { path: "models", element: <ModelSettingsScreen /> },
+                    { path: "runs", element: <RunSettingsScreen /> },
+                    { path: "agent", element: <AgentSettingsScreen /> },
+                    { path: "browser", element: <BrowserSettingsScreen /> },
                     { path: "security", element: <SecurityScreen /> },
                     { path: "about", element: <AboutScreen /> },
+                    { path: "*", element: <Navigate to="models" replace /> },
                 ],
             },
             { path: "*", element: <Navigate to="/" replace /> },

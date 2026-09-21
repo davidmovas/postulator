@@ -40,6 +40,9 @@ export const keys = {
     tools: {
         list: () => [scope, "tools", "list"] as const,
     },
+    browser: {
+        locate: () => [scope, "browser", "locate"] as const,
+    },
     sites: {
         root: () => [scope, "sites"] as const,
         lists: () => [scope, "sites", "list"] as const,

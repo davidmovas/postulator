@@ -12,7 +12,7 @@ export const codes: readonly Code[] = Object.freeze(Object.keys(messages) as Cod
 const minimumRetryDelayMs = 250;
 const defaultRetryDelayMs = 1000;
 
-export const browserSettingsPath = "/settings/general";
+export const browserSettingsPath = "/settings/browser";
 
 export const torMissingCode = "tor_missing";
 

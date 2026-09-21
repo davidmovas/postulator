@@ -1,4 +1,5 @@
 import { copy } from "../copy/index.js";
+import { settingsHome } from "../features/settings/index.js";
 import type { IconComponent } from "../ui/icons/index.js";
 import {
     AccountTreeIcon,
@@ -52,7 +53,7 @@ export function globalEntries(pending: number): readonly NavEntry[] {
     return [
         { key: "agent", label: copy.nav.agent, to: "/agent", Icon: SmartToyIcon, badge: pending },
         { key: "sites", label: copy.nav.sites, to: "/sites", Icon: PublicIcon },
-        { key: "settings", label: copy.nav.settings, to: "/settings/general", Icon: SettingsIcon },
+        { key: "settings", label: copy.nav.settings, to: settingsHome, Icon: SettingsIcon },
     ];
 }
 
