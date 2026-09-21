@@ -258,6 +258,16 @@ export const settings = {
                 outputUsdPerM: "Output $ per million",
                 rpm: "Requests per minute",
                 tpm: "Tokens per minute",
+                effort: "Reasoning effort",
+            },
+            effortHint: "How long the model may think before it answers. Its output budget is raised to match.",
+            effortDefault: "The provider decides",
+            effortLabels: {
+                none: "None",
+                low: "Low",
+                medium: "Medium",
+                high: "High",
+                xhigh: "Highest",
             },
         },
         spend: {

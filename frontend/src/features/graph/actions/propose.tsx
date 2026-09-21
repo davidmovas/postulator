@@ -5,7 +5,7 @@ import { copy } from "../../../copy/index.js";
 import { react } from "../../../data/errors.js";
 import { useProposeFromPages, useProposeRelated } from "../../../data/hooks/graph.js";
 import { useSiteOverview } from "../../../data/hooks/reports.js";
-import { Dialog, Spinner, Stars2Icon } from "../../../ui/index.js";
+import { Dialog, Stars2Icon } from "../../../ui/index.js";
 import type { GraphIndex } from "../model/index.js";
 
 const pagesPerCall = 40;
@@ -39,8 +39,7 @@ interface RunningProps {
 
 function Running({ seconds }: RunningProps): ReactElement {
     return (
-        <p className="flex items-center gap-2 text-xs text-ink-soft">
-            <Spinner size={12} />
+        <p aria-live="polite" className="flex items-center gap-1.5 text-xs text-ink-soft">
             {copy.graph.ai.running}
             <span className="font-mono text-2xs text-ink-faint">{copy.graph.ai.elapsed(seconds)}</span>
         </p>
@@ -99,10 +98,14 @@ export function ProposeFromPagesDialog({ open, onOpenChange, siteId, onReview }:
         );
     };
 
+    const stop = (): void => {
+        controller.current?.abort();
+        setStopped(true);
+    };
+
     const close = (next: boolean): void => {
         if (!next && propose.isPending) {
-            controller.current?.abort();
-            setStopped(true);
+            stop();
         }
         onOpenChange(next);
     };
@@ -114,11 +117,13 @@ export function ProposeFromPagesDialog({ open, onOpenChange, siteId, onReview }:
             open={open}
             onOpenChange={close}
             title={copy.graph.ai.fromPagesTitle}
-            description={copy.graph.ai.fromPagesBody(unmapped, calls)}
+            description={overview.isPending ? copy.graph.ai.counting : copy.graph.ai.fromPagesBody(unmapped, calls)}
             icon={Stars2Icon}
             confirmLabel={outcome === null ? copy.graph.ai.start : copy.graph.ai.review}
             cancelLabel={propose.isPending ? copy.graph.ai.stop : outcome === null ? copy.graph.ai.cancel : copy.graph.ai.close}
             busy={propose.isPending}
+            status={propose.isPending ? <Running seconds={seconds} /> : undefined}
+            onCancel={propose.isPending ? stop : undefined}
             onConfirm={() => {
                 if (outcome !== null) {
                     onOpenChange(false);
@@ -128,7 +133,6 @@ export function ProposeFromPagesDialog({ open, onOpenChange, siteId, onReview }:
                 }
             }}
         >
-            {propose.isPending ? <Running seconds={seconds} /> : null}
             {outcome === null ? null : (
                 <p className="text-xs text-ink-soft">
                     {outcome.line} <span className="font-mono text-2xs text-ink-faint">· {copy.graph.ai.tokens(outcome.tokens)}</span>
@@ -186,10 +190,14 @@ export function ProposeRelatedDialog({ open, onOpenChange, siteId, index, select
         );
     };
 
+    const stop = (): void => {
+        controller.current?.abort();
+        setStopped(true);
+    };
+
     const close = (next: boolean): void => {
         if (!next && propose.isPending) {
-            controller.current?.abort();
-            setStopped(true);
+            stop();
         }
         onOpenChange(next);
     };
@@ -206,6 +214,8 @@ export function ProposeRelatedDialog({ open, onOpenChange, siteId, index, select
             confirmLabel={outcome === null ? copy.graph.ai.start : copy.graph.ai.review}
             cancelLabel={propose.isPending ? copy.graph.ai.stop : outcome === null ? copy.graph.ai.cancel : copy.graph.ai.close}
             busy={propose.isPending}
+            status={propose.isPending ? <Running seconds={seconds} /> : undefined}
+            onCancel={propose.isPending ? stop : undefined}
             onConfirm={() => {
                 if (outcome !== null) {
                     onOpenChange(false);
@@ -228,7 +238,6 @@ export function ProposeRelatedDialog({ open, onOpenChange, siteId, index, select
                     </label>
                 </fieldset>
             ) : null}
-            {propose.isPending ? <Running seconds={seconds} /> : null}
             {outcome === null ? null : (
                 <p className="text-xs text-ink-soft">
                     {outcome.line} <span className="font-mono text-2xs text-ink-faint">· {copy.graph.ai.tokens(outcome.tokens)}</span>

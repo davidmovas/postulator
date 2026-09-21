@@ -44,5 +44,9 @@ export function kindLabel(kind: string): string {
 }
 
 export function formatScore(score: number): string {
-    return score.toFixed(2);
+    return score === 0 ? copy.graph.score.none : score.toFixed(2);
+}
+
+export function scored(entities: readonly { score: number }[]): boolean {
+    return entities.some((entity) => entity.score > 0);
 }

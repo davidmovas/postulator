@@ -62,24 +62,26 @@ export function AnchorsEditor({ entity }: AnchorsEditorProps): ReactElement {
                             <StatusBadge tone={anchor.source === "user" ? "ok" : "info"} dot={false}>
                                 {anchor.source}
                             </StatusBadge>
-                            <Input
-                                type="number"
-                                min={0}
-                                max={1}
-                                step={0.1}
-                                mono={true}
-                                aria-label={copy.graph.anchorsForm.weight}
-                                className="w-14"
-                                value={anchor.weight}
-                                onChange={(event) => {
-                                    const parsed = Number.parseFloat(event.target.value);
-                                    setDraft(
-                                        anchors.map((held, index) =>
-                                            index === position ? { ...held, weight: Number.isFinite(parsed) ? Math.min(Math.max(parsed, 0), 1) : held.weight } : held,
-                                        ),
-                                    );
-                                }}
-                            />
+                            <div className="w-16 shrink-0">
+                                <Input
+                                    type="number"
+                                    size="sm"
+                                    min={0}
+                                    max={1}
+                                    step={0.1}
+                                    mono={true}
+                                    aria-label={copy.graph.anchorsForm.weight}
+                                    value={anchor.weight}
+                                    onChange={(event) => {
+                                        const parsed = Number.parseFloat(event.target.value);
+                                        setDraft(
+                                            anchors.map((held, index) =>
+                                                index === position ? { ...held, weight: Number.isFinite(parsed) ? Math.min(Math.max(parsed, 0), 1) : held.weight } : held,
+                                            ),
+                                        );
+                                    }}
+                                />
+                            </div>
                             <IconButton
                                 icon={CloseIcon}
                                 label={copy.graph.anchorsForm.remove}
@@ -94,37 +96,40 @@ export function AnchorsEditor({ entity }: AnchorsEditorProps): ReactElement {
                 </ul>
             )}
             <form
-                className="flex items-center gap-2"
+                className="flex items-end gap-2"
                 onSubmit={(event) => {
                     event.preventDefault();
                     add();
                 }}
             >
-                <Input
-                    mono={true}
-                    aria-label={copy.graph.anchorsForm.text}
-                    placeholder={copy.graph.anchorsForm.text}
-                    className="min-w-0 flex-1"
-                    value={text}
-                    invalid={duplicate}
-                    onChange={(event) => {
-                        setText(event.target.value);
-                        setDuplicate(false);
-                    }}
-                />
-                <Input
-                    type="number"
-                    min={0}
-                    max={1}
-                    step={0.1}
-                    mono={true}
-                    aria-label={copy.graph.anchorsForm.weight}
-                    className="w-14"
-                    value={weight}
-                    onChange={(event) => {
-                        setWeight(event.target.value);
-                    }}
-                />
+                <label className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className="text-2xs text-ink-faint">{copy.graph.anchorsForm.text}</span>
+                    <Input
+                        size="sm"
+                        mono={true}
+                        value={text}
+                        invalid={duplicate}
+                        onChange={(event) => {
+                            setText(event.target.value);
+                            setDuplicate(false);
+                        }}
+                    />
+                </label>
+                <label className="flex w-16 shrink-0 flex-col gap-1">
+                    <span className="text-2xs text-ink-faint">{copy.graph.anchorsForm.weight}</span>
+                    <Input
+                        type="number"
+                        size="sm"
+                        min={0}
+                        max={1}
+                        step={0.1}
+                        mono={true}
+                        value={weight}
+                        onChange={(event) => {
+                            setWeight(event.target.value);
+                        }}
+                    />
+                </label>
                 <Button type="submit" size="sm" variant="secondary" disabled={text.trim() === ""}>
                     {copy.graph.anchorsForm.add}
                 </Button>

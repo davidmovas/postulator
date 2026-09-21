@@ -41,7 +41,7 @@ export function Segmented<T extends string>({
         <div
             role="radiogroup"
             aria-label={label}
-            className="inline-flex shrink-0 items-center gap-0.5 rounded-md bg-inset p-0.5"
+            className="inline-flex shrink-0 self-center items-center gap-0.5 rounded-md bg-inset p-0.5"
         >
             {options.map((option) => {
                 const Icon = option.icon;

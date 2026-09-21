@@ -17,6 +17,8 @@ export interface DialogProps {
     destructive?: boolean;
     icon?: IconComponent;
     busy?: boolean;
+    status?: ReactNode;
+    onCancel?: () => void;
     children?: ReactNode;
 }
 
@@ -31,6 +33,8 @@ export function Dialog({
     destructive = false,
     icon: Icon,
     busy = false,
+    status,
+    onCancel,
     children,
 }: DialogProps): ReactElement {
     return (
@@ -56,10 +60,17 @@ export function Dialog({
                         </RadixDialog.Description>
                         {children}
                     </div>
-                    <div className="flex justify-end gap-2 border-t border-hairline bg-panel px-4 py-2.5">
-                        <RadixDialog.Close asChild>
-                            <Button variant="ghost">{cancelLabel}</Button>
-                        </RadixDialog.Close>
+                    <div className="flex items-center justify-end gap-2 border-t border-hairline bg-panel px-4 py-2.5">
+                        {status === undefined ? null : <div className="mr-auto min-w-0">{status}</div>}
+                        {onCancel === undefined ? (
+                            <RadixDialog.Close asChild>
+                                <Button variant="ghost">{cancelLabel}</Button>
+                            </RadixDialog.Close>
+                        ) : (
+                            <Button variant="ghost" onClick={onCancel}>
+                                {cancelLabel}
+                            </Button>
+                        )}
                         <Button variant={destructive ? "danger" : "primary"} busy={busy} onClick={onConfirm}>
                             {confirmLabel}
                         </Button>

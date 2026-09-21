@@ -10,6 +10,10 @@ export class TextCache {
 
     constructor(private readonly measurer: TextMeasurer) {}
 
+    clear(): void {
+        this.widths.clear();
+    }
+
     width(font: string, text: string): number {
         const key = `${font}\u0000${text}`;
         const held = this.widths.get(key);

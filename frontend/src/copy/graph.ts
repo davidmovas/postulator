@@ -236,6 +236,7 @@ export const graph = {
         onlySelection: (name: string) => `Only pairs with ${name}`,
         start: "Start",
         cancel: "Cancel",
+        counting: "Counting the pages that have no entity…",
         running: "Working",
         elapsed: (seconds: number) => `${seconds}s`,
         stop: "Stop and keep what landed",
@@ -261,8 +262,11 @@ export const graph = {
         related: "related",
         noReason: "No reason recorded",
         threshold: "Threshold",
-        approveAbove: (count: number) => `Approve ${count} at or above`,
-        rejectBelow: (count: number) => `Reject ${count} below`,
+        resize: "Drag to make the review taller",
+        approveFrom: "Confidence ≥",
+        rejectUnder: "Confidence <",
+        approveAbove: (count: number) => `Approve ${count}`,
+        rejectBelow: (count: number) => `Reject ${count}`,
         bulkApproveTitle: (count: number, threshold: number) =>
             `Approve ${count} ${count === 1 ? "edge" : "edges"} at or above ${threshold.toFixed(2)}?`,
         bulkRejectTitle: (count: number, threshold: number) =>
@@ -273,6 +277,12 @@ export const graph = {
         cancel: "Cancel",
         bulkDone: (count: number, decision: "approve" | "reject") => `${count} ${decision === "approve" ? "approved" : "rejected"}`,
         bulkStopped: (done: number, total: number, message: string) => `Stopped after ${done} of ${total}: ${message}`,
+    },
+    score: {
+        none: "—",
+        notComputed: "No entity has been scored yet.",
+        notComputedHint: "The ranking is worked out from the approved edges, on demand.",
+        compute: "Compute the scores",
     },
     outline: {
         columns: { name: "Entity", kind: "Kind", score: "Score", page: "Page", attention: "Attention" },

@@ -32,6 +32,7 @@ const rootGap = 1;
 const padding = 8;
 const iconSize = 14;
 const badgeSize = 12;
+const badgeGap = 6;
 const labelMax = 220;
 const fitPadding = 40;
 const dragThreshold = 3;
@@ -151,6 +152,25 @@ export function GraphMap({
         }
     }, []);
 
+    const [measureVersion, setMeasureVersion] = useState(0);
+
+    useEffect(() => {
+        if (texts === null || typeof document.fonts === "undefined") {
+            return undefined;
+        }
+        let live = true;
+        void document.fonts.ready.then(() => {
+            if (!live) {
+                return;
+            }
+            texts.clear();
+            setMeasureVersion((held) => held + 1);
+        });
+        return () => {
+            live = false;
+        };
+    }, [texts]);
+
     const measures = useMemo(() => {
         const out = new Map<string, Measure>();
         if (texts === null || fonts === null) {
@@ -169,11 +189,18 @@ export function GraphMap({
                 (flags?.noPage ? badgeSize + 4 : 0) + (flags?.multiParent ? badgeSize + 4 : 0) + ((flags?.proposed ?? 0) > 0 ? 22 : 0);
             const chip = row.childCount > 0 ? String(row.expanded ? "" : row.hiddenChildren) : "";
             const chipWidth = row.childCount > 0 ? 14 + (chip === "" ? 0 : texts.width(fonts.chip, chip) + 4) : 0;
-            const width = padding + iconSize + 6 + texts.width(fonts.label, text) + badges + (chipWidth > 0 ? 6 + chipWidth : 0) + padding;
+            const width =
+                padding +
+                iconSize +
+                6 +
+                texts.width(fonts.label, text) +
+                (badges > 0 ? badgeGap + badges : 0) +
+                (chipWidth > 0 ? badgeGap + chipWidth : 0) +
+                padding;
             out.set(row.id, { text, chip, chipWidth, badges, width });
         }
         return out;
-    }, [rows, index, texts, fonts]);
+    }, [rows, index, texts, fonts, measureVersion]);
 
     const layout: Layout = useMemo(
         () => layoutTree(treeOf(rows, (row) => measures.get(row.id)?.width ?? 40), layoutOptions),

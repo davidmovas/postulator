@@ -6,14 +6,12 @@ import { useApproveEdge, useRejectEdge } from "../../../data/hooks/graph.js";
 import type { Edge } from "../../../data/types.js";
 import {
     ArrowRightAltIcon,
-    Button,
     CheckIcon,
     CloseIcon,
     cx,
     DenseTable,
     EmptyState,
     IconButton,
-    Input,
     PolylineIcon,
     Sheet,
     SyncAltIcon,
@@ -27,10 +25,11 @@ import { entityIcon, kindTone } from "../labels.js";
 import type { GraphIndex } from "../model/index.js";
 import { BulkDialog } from "./bulk.js";
 import type { BulkRequest } from "./bulk.js";
+import { Threshold } from "./thresholds.js";
 
 const columns = "minmax(140px, 1.4fr) 76px minmax(140px, 1.4fr) 112px minmax(160px, 2fr) 64px";
 const rowHeight = 28;
-const sheetHeight = 264;
+const minSheetHeight = 160;
 
 function confidenceTone(weight: number): "ok" | "warn" | "danger" {
     if (weight >= 0.7) {
@@ -66,12 +65,14 @@ function Name({ id, index, onReveal }: NameProps): ReactElement {
 export interface ProposalQueueProps {
     index: GraphIndex;
     open: boolean;
+    height: number;
     onClose: () => void;
+    onHeightChange: (height: number) => void;
     onHover: (edgeId: string | null) => void;
     onReveal: (entityId: string) => void;
 }
 
-export function ProposalQueue({ index, open, onClose, onHover, onReveal }: ProposalQueueProps): ReactElement | null {
+export function ProposalQueue({ index, open, height, onClose, onHeightChange, onHover, onReveal }: ProposalQueueProps): ReactElement | null {
     const approve = useApproveEdge();
     const reject = useRejectEdge();
     const edges = index.proposedEdges;
@@ -209,62 +210,35 @@ export function ProposalQueue({ index, open, onClose, onHover, onReveal }: Propo
                 title={copy.graph.queue.title(edges.length)}
                 closeLabel={copy.graph.queue.close}
                 onClose={onClose}
-                height={sheetHeight}
+                height={height}
+                minHeight={minSheetHeight}
+                resizeLabel={copy.graph.queue.resize}
+                onHeightChange={onHeightChange}
                 onKeyDown={onKeyDown}
                 header={
                     <>
-                        <span className="hidden font-mono text-2xs text-ink-faint lg:inline">{copy.graph.queue.keys}</span>
+                        <span className="hidden font-mono text-2xs text-ink-faint xl:inline">{copy.graph.queue.keys}</span>
                         <span className="flex-1" />
-                        <span className="flex items-center gap-1 text-2xs text-ink-dim">
-                            <Input
-                                type="number"
-                                min={0}
-                                max={1}
-                                step={0.05}
-                                mono={true}
-                                aria-label={copy.graph.queue.threshold}
-                                className="h-6 w-16"
-                                value={approveAt}
-                                onChange={(event) => {
-                                    setApproveAt(event.target.value);
-                                }}
-                            />
-                            <Button
-                                size="sm"
-                                variant="secondary"
-                                disabled={aboveCount === 0}
-                                onClick={() => {
-                                    setBulk({ decision: "approve", threshold: approveThreshold, edges: edges.filter((edge) => edge.weight >= approveThreshold) });
-                                }}
-                            >
-                                {copy.graph.queue.approveAbove(aboveCount)}
-                            </Button>
-                        </span>
-                        <span className="flex items-center gap-1 text-2xs text-ink-dim">
-                            <Input
-                                type="number"
-                                min={0}
-                                max={1}
-                                step={0.05}
-                                mono={true}
-                                aria-label={copy.graph.queue.threshold}
-                                className="h-6 w-16"
-                                value={rejectBelow}
-                                onChange={(event) => {
-                                    setRejectBelow(event.target.value);
-                                }}
-                            />
-                            <Button
-                                size="sm"
-                                variant="secondary"
-                                disabled={belowCount === 0}
-                                onClick={() => {
-                                    setBulk({ decision: "reject", threshold: rejectThreshold, edges: edges.filter((edge) => edge.weight < rejectThreshold) });
-                                }}
-                            >
-                                {copy.graph.queue.rejectBelow(belowCount)}
-                            </Button>
-                        </span>
+                        <Threshold
+                            label={copy.graph.queue.approveFrom}
+                            action={copy.graph.queue.approveAbove(aboveCount)}
+                            value={approveAt}
+                            matched={aboveCount}
+                            onChange={setApproveAt}
+                            onApply={() => {
+                                setBulk({ decision: "approve", threshold: approveThreshold, edges: edges.filter((edge) => edge.weight >= approveThreshold) });
+                            }}
+                        />
+                        <Threshold
+                            label={copy.graph.queue.rejectUnder}
+                            action={copy.graph.queue.rejectBelow(belowCount)}
+                            value={rejectBelow}
+                            matched={belowCount}
+                            onChange={setRejectBelow}
+                            onApply={() => {
+                                setBulk({ decision: "reject", threshold: rejectThreshold, edges: edges.filter((edge) => edge.weight < rejectThreshold) });
+                            }}
+                        />
                     </>
                 }
             >

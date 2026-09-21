@@ -29,6 +29,17 @@ describe("TextCache", () => {
         expect(measurer.font).toBe("12px mono");
     });
 
+    it("measures again after a clear, which is how a late web font is picked up", () => {
+        const measurer = new FakeMeasurer();
+        const cache = new TextCache(measurer);
+        cache.width("12px sans", "hello");
+        expect(measurer.calls).toBe(1);
+
+        cache.clear();
+        cache.width("12px sans", "hello");
+        expect(measurer.calls).toBe(2);
+    });
+
     it("returns a label that fits unchanged", () => {
         const cache = new TextCache(new FakeMeasurer());
         expect(cache.ellipsise("12px sans", "short", 100)).toBe("short");

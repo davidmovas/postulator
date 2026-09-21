@@ -4,6 +4,7 @@ import { copy } from "../../../copy/index.js";
 import {
     Button,
     CallSplitIcon,
+    CheckIcon,
     ChevronRightIcon,
     CountBadge,
     cx,
@@ -23,7 +24,7 @@ import type { GraphIndex } from "../model/index.js";
 import { move } from "../model/navigation.js";
 import type { NavKey } from "../model/navigation.js";
 
-const columns = "minmax(180px, 2fr) 84px 56px 72px minmax(120px, 1fr)";
+const columns = "minmax(200px, 3fr) 88px 64px 104px minmax(104px, 1fr)";
 const rowHeight = 28;
 const indentStep = 14;
 
@@ -141,11 +142,14 @@ export function OutlineView({ siteId, index, rows, selectedId, matched, onSelect
                             {copy.graph.outline.noPage}
                         </StatusBadge>
                     ) : (
-                        <span className="text-2xs text-ink-faint">{copy.graph.outline.page}</span>
+                        <span className="flex items-center gap-1 text-2xs text-ink-dim">
+                            <CheckIcon size={12} className="shrink-0 text-ok" />
+                            {copy.graph.outline.page}
+                        </span>
                     )}
                 </TableCell>
                 <TableCell>
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center justify-end gap-1">
                         {(flags?.proposed ?? 0) > 0 ? <CountBadge tone="info" count={flags?.proposed ?? 0} /> : null}
                         {flags?.orphan ? (
                             <StatusBadge tone="warn" dot={false}>
@@ -167,7 +171,7 @@ export function OutlineView({ siteId, index, rows, selectedId, matched, onSelect
                     <TableCell>{copy.graph.outline.columns.kind}</TableCell>
                     <TableCell align="right">{copy.graph.outline.columns.score}</TableCell>
                     <TableCell>{copy.graph.outline.columns.page}</TableCell>
-                    <TableCell>{copy.graph.outline.columns.attention}</TableCell>
+                    <TableCell align="right">{copy.graph.outline.columns.attention}</TableCell>
                 </TableHead>
                 <VirtualRows count={rows.length} rowHeight={rowHeight} row={row} scrollKey={`${siteId}:graph-outline`} />
             </DenseTable>

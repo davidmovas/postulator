@@ -53,7 +53,12 @@ export function GraphActions({
             {proposed > 0 || reviewing ? (
                 <Button variant={reviewing ? "primary" : "secondary"} icon={PolylineIcon} aria-pressed={reviewing} onClick={onReview}>
                     {copy.graph.queue.open}
-                    <CountBadge tone={reviewing ? "accent" : "info"} count={proposed} className="ml-1" />
+                    <CountBadge
+                        tone="info"
+                        variant={reviewing ? "contrast" : "soft"}
+                        count={proposed}
+                        className="ml-1"
+                    />
                 </Button>
             ) : null}
             {connecting ? (

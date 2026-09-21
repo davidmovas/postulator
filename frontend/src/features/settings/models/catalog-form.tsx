@@ -5,9 +5,18 @@ import { copy } from "../../../copy/index.js";
 import { formErrorOf } from "../../../data/errors.js";
 import { useUpsertModel } from "../../../data/hooks/models.js";
 import type { CatalogModel } from "../../../data/types.js";
-import { Banner, Button, Field, Input, Switch } from "../../../ui/index.js";
+import { reasoningEfforts } from "../../../generated/vocab.js";
+import { Banner, Button, Field, Input, Select, Switch } from "../../../ui/index.js";
+import type { SelectOption } from "../../../ui/index.js";
 
 const said = copy.settings.models.catalog;
+
+const providerDefault = "default";
+
+const effortOptions: readonly SelectOption<string>[] = [
+    { value: providerDefault, label: said.effortDefault },
+    ...reasoningEfforts.map((effort) => ({ value: effort, label: said.effortLabels[effort] })),
+];
 
 type Numeric = "contextTokens" | "maxOutputTokens" | "inputUsdPerM" | "outputUsdPerM" | "rpm" | "tpm";
 
@@ -32,6 +41,7 @@ interface Draft {
     supportsStructured: boolean;
     supportsImages: boolean;
     reasoning: boolean;
+    reasoningEffort: string;
 }
 
 function draftOf(model: CatalogModel | null): Draft {
@@ -47,6 +57,7 @@ function draftOf(model: CatalogModel | null): Draft {
         supportsStructured: model?.supportsStructured ?? false,
         supportsImages: model?.supportsImages ?? false,
         reasoning: model?.reasoning ?? false,
+        reasoningEffort: model?.reasoningEffort ?? "",
     };
 }
 
@@ -158,6 +169,23 @@ export function ModelForm({ editing, onDone }: ModelFormProps): ReactElement {
                         }}
                     />
                 </div>
+                {draft.reasoning ? (
+                    <div className="mt-3 max-w-64">
+                        <Field label={said.field.effort} hint={said.effortHint}>
+                            {(binding) => (
+                                <Select
+                                    id={binding.id}
+                                    aria-describedby={binding["aria-describedby"]}
+                                    value={draft.reasoningEffort === "" ? providerDefault : draft.reasoningEffort}
+                                    options={effortOptions}
+                                    onValueChange={(next) => {
+                                        set("reasoningEffort", next === providerDefault ? "" : next);
+                                    }}
+                                />
+                            )}
+                        </Field>
+                    </div>
+                ) : null}
                 {formErrorOf(save.error) === null ? null : (
                     <div className="pt-3">
                         <Banner tone="danger" title={formErrorOf(save.error) ?? ""} />
@@ -189,6 +217,7 @@ export function ModelForm({ editing, onDone }: ModelFormProps): ReactElement {
                                 supportsStructured: draft.supportsStructured,
                                 supportsImages: draft.supportsImages,
                                 reasoning: draft.reasoning,
+                                reasoningEffort: draft.reasoning ? draft.reasoningEffort : "",
                             },
                             { onSuccess: onDone },
                         );

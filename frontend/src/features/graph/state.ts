@@ -9,6 +9,7 @@ export interface GraphSession {
     showRelated: boolean;
     minimap: boolean;
     queue: boolean;
+    queueHeight: number;
 }
 
 const emptySession: GraphSession = Object.freeze({
@@ -17,6 +18,7 @@ const emptySession: GraphSession = Object.freeze({
     showRelated: false,
     minimap: true,
     queue: false,
+    queueHeight: 264,
 });
 
 const sessions = new Map<string, GraphSession>();

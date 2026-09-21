@@ -436,6 +436,8 @@ export function GraphScreen(): ReactElement {
                         onConnect={startConnect}
                         onDelete={setDeleting}
                         onPlanPage={setPlanning}
+                        onRecompute={recomputeScores}
+                        recomputing={recompute.isPending}
                         audit={auditPages}
                     />
                 ) : undefined
@@ -470,6 +472,10 @@ export function GraphScreen(): ReactElement {
                         <ProposalQueue
                             index={index}
                             open={session.queue}
+                            height={session.queueHeight}
+                            onHeightChange={(next) => {
+                                patchSession({ queueHeight: next });
+                            }}
                             onClose={() => {
                                 patchSession({ queue: false });
                                 setHoverEdge(null);

@@ -35,20 +35,22 @@ export function StatusBadge({ tone, children, icon: Icon, dot = true, className 
     );
 }
 
+export type CountBadgeVariant = "soft" | "contrast";
+
 export interface CountBadgeProps {
     tone: Tone;
     count: number;
+    variant?: CountBadgeVariant;
     className?: string;
 }
 
-export function CountBadge({ tone, count, className }: CountBadgeProps): ReactElement {
+export function CountBadge({ tone, count, variant = "soft", className }: CountBadgeProps): ReactElement {
     const classes = toneClasses[tone];
     return (
         <span
             className={cx(
                 "inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full px-1 font-mono text-2xs font-medium",
-                classes.soft,
-                classes.ink,
+                variant === "contrast" ? "bg-canvas/35 text-current" : cx(classes.soft, classes.ink),
                 className,
             )}
         >

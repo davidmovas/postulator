@@ -28,6 +28,8 @@ export interface InspectorProps {
     onConnect: (id: string) => void;
     onDelete: (id: string) => void;
     onPlanPage: (id: string) => void;
+    onRecompute: () => void;
+    recomputing: boolean;
     audit: readonly PageAudit[] | null;
 }
 
@@ -81,7 +83,20 @@ function AuditRows({ siteId, entityId, audit }: AuditRowsProps): ReactElement {
     );
 }
 
-export function Inspector({ siteId, index, selectedId, onSelect, onReveal, onLens, onConnect, onDelete, onPlanPage, audit }: InspectorProps): ReactElement {
+export function Inspector({
+    siteId,
+    index,
+    selectedId,
+    onSelect,
+    onReveal,
+    onLens,
+    onConnect,
+    onDelete,
+    onPlanPage,
+    onRecompute,
+    recomputing,
+    audit,
+}: InspectorProps): ReactElement {
     const entity = selectedId === null ? undefined : index.byId.get(selectedId);
     const rank = useMemo(() => {
         if (entity === undefined) {
@@ -99,7 +114,13 @@ export function Inspector({ siteId, index, selectedId, onSelect, onReveal, onLen
     if (entity === undefined) {
         return (
             <section aria-label={copy.graph.summary.title} className="flex h-full min-h-0 flex-col bg-panel">
-                <Summary index={index} onLens={onLens} onSelect={onSelect} />
+                <Summary
+                    index={index}
+                    recomputing={recomputing}
+                    onLens={onLens}
+                    onSelect={onSelect}
+                    onRecompute={onRecompute}
+                />
             </section>
         );
     }
