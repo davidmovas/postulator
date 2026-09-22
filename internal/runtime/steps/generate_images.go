@@ -270,12 +270,11 @@ func place(doc *content.Document, spec template.Images, uploaded []images.Image,
 	if spec.Featured && len(remaining) > 0 {
 		featured := remaining[0]
 		remaining = remaining[1:]
-		switch {
-		case featured.WPID == 0:
+		if featured.WPID == 0 {
 			result.skip(page, CodeImageNotPlaced,
 				"the featured image of "+page.Path+" carries no media id, so the site has nothing to set",
 				featured.URL)
-		default:
+		} else {
 			result.FeaturedID = featured.WPID
 			result.Images = append(result.Images, PlacedImage{
 				Role: RoleFeatured, URL: featured.URL, Alt: featured.Alt, WPID: featured.WPID,

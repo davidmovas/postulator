@@ -141,7 +141,10 @@ func TestReportNamesEveryArtifactRetentionTookAway(t *testing.T) {
 		if finding.Severity != content.SeverityWarn {
 			t.Errorf("finding = %+v, want a warning", finding)
 		}
-		kind, _ := finding.Details["kind"].(string)
+		kind, ok := finding.Details["kind"].(string)
+		if !ok {
+			t.Fatalf("the finding %+v does not name the artifact it is about", finding)
+		}
 		named = append(named, kind)
 	}
 	slices.Sort(named)
