@@ -132,3 +132,104 @@ func TestInternalPath(t *testing.T) {
 		})
 	}
 }
+
+func TestNewSite(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		baseURL string
+		want    pagemap.Site
+	}{
+		{name: "root install", baseURL: "https://shop.example.com", want: pagemap.Site{Scheme: "https", Host: "shop.example.com", Base: "/"}},
+		{name: "trailing slash", baseURL: "https://shop.example.com/", want: pagemap.Site{Scheme: "https", Host: "shop.example.com", Base: "/"}},
+		{name: "subdirectory install", baseURL: "https://h.example.com/blog", want: pagemap.Site{Scheme: "https", Host: "h.example.com", Base: "/blog/"}},
+		{name: "subdirectory with a slash", baseURL: "https://h.example.com/Blog/", want: pagemap.Site{Scheme: "https", Host: "h.example.com", Base: "/blog/"}},
+		{name: "plain http on a port", baseURL: "http://localhost:8089", want: pagemap.Site{Scheme: "http", Host: "localhost:8089", Base: "/"}},
+		{name: "nothing at all", baseURL: "", want: pagemap.Site{Base: "/"}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := pagemap.NewSite(tc.baseURL); got != tc.want {
+				t.Errorf("NewSite(%q) = %+v, want %+v", tc.baseURL, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSiteURLDoesNotDoubleTheBasePath(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		baseURL string
+		path    string
+		want    string
+	}{
+		{name: "root install", baseURL: "https://shop.example.com", path: "/shop/", want: "https://shop.example.com/shop/"},
+		{name: "root home", baseURL: "https://shop.example.com", path: "/", want: "https://shop.example.com/"},
+		{name: "subdirectory path already carries the base", baseURL: "https://h.example.com/blog", path: "/blog/shop/", want: "https://h.example.com/blog/shop/"},
+		{name: "subdirectory home", baseURL: "https://h.example.com/blog", path: "/blog/", want: "https://h.example.com/blog/"},
+		{name: "subdirectory path without the base", baseURL: "https://h.example.com/blog", path: "/shop/", want: "https://h.example.com/blog/shop/"},
+		{name: "a sibling prefix is not the base", baseURL: "https://h.example.com/blog", path: "/blogging/", want: "https://h.example.com/blog/blogging/"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := pagemap.NewSite(tc.baseURL).URL(tc.path); got != tc.want {
+				t.Errorf("URL(%q) = %q, want %q", tc.path, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSiteResolve(t *testing.T) {
+	t.Parallel()
+
+	root := pagemap.NewSite("https://shop.example.com")
+	nested := pagemap.NewSite("https://h.example.com/blog")
+
+	cases := []struct {
+		name string
+		site pagemap.Site
+		href string
+		path string
+		kind pagemap.LinkKind
+	}{
+		{name: "a bare path is completed", site: root, href: "/shop", path: "/shop/", kind: pagemap.LinkPath},
+		{name: "casing is folded", site: root, href: "/Shop/", path: "/shop/", kind: pagemap.LinkPath},
+		{name: "a query is dropped", site: root, href: "/shop/?utm=x", path: "/shop/", kind: pagemap.LinkPath},
+		{name: "a fragment is dropped", site: root, href: "/shop/#top", path: "/shop/", kind: pagemap.LinkPath},
+		{name: "the own host over https", site: root, href: "https://shop.example.com/shop/", path: "/shop/", kind: pagemap.LinkPath},
+		{name: "the own host over http", site: root, href: "http://shop.example.com/shop/", path: "/shop/", kind: pagemap.LinkPath},
+		{name: "www is another host", site: root, href: "https://www.shop.example.com/shop/", kind: pagemap.LinkExternal},
+		{name: "an escaped slash stays escaped", site: root, href: "/a%2Fb/", path: "/a%2fb/", kind: pagemap.LinkPath},
+		{name: "a percent escaped accent", site: root, href: "/caf%C3%A9/", path: "/caf%c3%a9/", kind: pagemap.LinkPath},
+		{name: "a raw accent escapes the same way", site: root, href: "/café/", path: "/caf%c3%a9/", kind: pagemap.LinkPath},
+		{name: "a relative href joins the base", site: root, href: "shop/", path: "/shop/", kind: pagemap.LinkPath},
+		{name: "a fragment names this document", site: root, href: "#faq", kind: pagemap.LinkSameDocument},
+		{name: "a query names this document", site: root, href: "?utm=x", kind: pagemap.LinkSameDocument},
+		{name: "an empty href names this document", site: root, href: "", kind: pagemap.LinkSameDocument},
+		{name: "a mail link is external", site: root, href: "mailto:hello@shop.example.com", kind: pagemap.LinkExternal},
+		{name: "an unrelated host is external", site: root, href: "https://other.example.org/shop/", kind: pagemap.LinkExternal},
+		{name: "a dot segment resolves to nothing", site: root, href: "/a/../b/", kind: pagemap.LinkUnresolved},
+		{name: "the subdirectory path as written", site: nested, href: "/blog/shop/", path: "/blog/shop/", kind: pagemap.LinkPath},
+		{name: "the subdirectory path absolute", site: nested, href: "https://h.example.com/blog/shop/", path: "/blog/shop/", kind: pagemap.LinkPath},
+		{name: "a relative href joins the subdirectory base", site: nested, href: "shop/", path: "/blog/shop/", kind: pagemap.LinkPath},
+		{name: "the server root of a subdirectory install", site: nested, href: "https://h.example.com", path: "/", kind: pagemap.LinkPath},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			path, kind := tc.site.Resolve(tc.href)
+			if path != tc.path || kind != tc.kind {
+				t.Errorf("Resolve(%q) = %q, %s; want %q, %s", tc.href, path, kind, tc.path, tc.kind)
+			}
+		})
+	}
+}

@@ -44,30 +44,111 @@ func NormalizePath(raw string) (string, error) {
 	return builder.String(), nil
 }
 
-func InternalPath(href, siteHost string) (path string, internal bool) {
-	parsed, err := url.Parse(strings.TrimSpace(href))
+type LinkKind string
+
+const (
+	LinkPath         LinkKind = "path"
+	LinkSameDocument LinkKind = "same_document"
+	LinkExternal     LinkKind = "external"
+	LinkUnresolved   LinkKind = "unresolved"
+)
+
+type Site struct {
+	Scheme string `json:"scheme"`
+	Host   string `json:"host"`
+	Base   string `json:"base"`
+}
+
+func NewSite(baseURL string) Site {
+	parsed, err := url.Parse(strings.TrimSpace(baseURL))
 	if err != nil {
-		return "", false
+		return Site{Base: "/"}
+	}
+	base, err := NormalizePath(parsed.EscapedPath())
+	if err != nil {
+		base = "/"
+	}
+	return Site{Scheme: strings.ToLower(parsed.Scheme), Host: strings.ToLower(parsed.Host), Base: base}
+}
+
+func (s Site) BasePath() string {
+	if s.Base == "" {
+		return "/"
+	}
+	return s.Base
+}
+
+func (s Site) Origin() string {
+	if s.Host == "" {
+		return ""
+	}
+	scheme := s.Scheme
+	if scheme == "" {
+		scheme = "https"
+	}
+	return scheme + "://" + s.Host
+}
+
+func (s Site) URL(path string) string {
+	base := s.BasePath()
+	switch {
+	case path == "":
+		return s.Origin() + base
+	case !strings.HasPrefix(path, "/"):
+		return s.Origin() + base + path
+	case base != "/" && !strings.HasPrefix(path, base):
+		return s.Origin() + base + strings.TrimPrefix(path, "/")
+	default:
+		return s.Origin() + path
+	}
+}
+
+func (s Site) Resolve(href string) (path string, kind LinkKind) {
+	trimmed := strings.TrimSpace(href)
+	if trimmed == "" || trimmed[0] == '#' || trimmed[0] == '?' {
+		return "", LinkSameDocument
+	}
+
+	parsed, err := url.Parse(trimmed)
+	if err != nil {
+		return "", LinkUnresolved
 	}
 	if parsed.Scheme != "" && parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return "", false
+		return "", LinkExternal
 	}
-	if parsed.Host != "" && !strings.EqualFold(parsed.Host, siteHost) {
-		return "", false
+	if parsed.Host != "" && !strings.EqualFold(parsed.Host, s.Host) {
+		return "", LinkExternal
 	}
 
 	escaped := parsed.EscapedPath()
-	if escaped == "" {
-		if parsed.Host == "" {
-			return "", true
-		}
-		return "/", true
+	switch {
+	case escaped == "" && parsed.Host == "":
+		return "", LinkSameDocument
+	case escaped == "":
+		return "/", LinkPath
+	case escaped[0] != '/' && parsed.Host != "":
+		return "", LinkExternal
+	case escaped[0] != '/':
+		escaped = s.BasePath() + escaped
 	}
+
 	normalized, err := NormalizePath(escaped)
 	if err != nil {
+		return "", LinkUnresolved
+	}
+	return normalized, LinkPath
+}
+
+func InternalPath(href, siteHost string) (path string, internal bool) {
+	resolved, kind := Site{Host: siteHost}.Resolve(href)
+	switch kind {
+	case LinkPath:
+		return resolved, true
+	case LinkSameDocument:
+		return "", true
+	default:
 		return "", false
 	}
-	return normalized, true
 }
 
 func ParentPath(path string) string {
