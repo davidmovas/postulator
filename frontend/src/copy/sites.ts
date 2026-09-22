@@ -54,7 +54,7 @@ export const sites = {
     woo: "WooCommerce detected",
     deleteTitle: "Delete this site",
     deleteBody: (name: string) =>
-        `${name} goes, and with it its page map, entities and edges, runs and their artifacts, site templates and link policies, schedules, saved import mappings and agent conversations. Nothing on WordPress is touched.`,
+        `${name} goes, and with it twelve tables: its pages and their links, its entities, their anchors and their edges, its runs with their items, artifacts, step records and event log, its own templates, template overrides and link policies, its schedules, its saved import mappings and its agent conversations with their messages. None of it can be brought back, and the stored application password goes with it. Nothing on WordPress is touched: the pages stay on the site.`,
     deleteConfirm: "Delete the site",
     plugin: {
         title: "Companion plugin",

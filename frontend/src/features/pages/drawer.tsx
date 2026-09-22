@@ -7,6 +7,7 @@ import { useDeletePage, usePage } from "../../data/hooks/pages.js";
 import type { TabItem } from "../../ui/index.js";
 import {
     Button,
+    Checkbox,
     DeleteIcon,
     Dialog,
     Drawer,
@@ -60,7 +61,9 @@ export function PageDrawer({
     const detail = usePage(pageId);
     const remove = useDeletePage();
     const [confirming, setConfirming] = useState(false);
+    const [onSite, setOnSite] = useState(false);
     const page = detail.data?.page;
+    const live = page?.wpId !== null && page?.wpId !== undefined && page.wpId !== 0;
 
     return (
         <Drawer
@@ -158,7 +161,12 @@ export function PageDrawer({
                     </TabPanel>
                     <Dialog
                         open={confirming}
-                        onOpenChange={setConfirming}
+                        onOpenChange={(next) => {
+                            setConfirming(next);
+                            if (!next) {
+                                setOnSite(false);
+                            }
+                        }}
                         title={copy.pages.detail.deleteTitle}
                         description={copy.pages.detail.deleteBody}
                         confirmLabel={copy.pages.detail.deleteConfirm}
@@ -168,16 +176,34 @@ export function PageDrawer({
                         busy={remove.isPending}
                         onConfirm={() => {
                             remove.mutate(
-                                { id: page.id },
+                                { id: page.id, onSite: onSite && live },
                                 {
                                     onSuccess: () => {
                                         setConfirming(false);
+                                        setOnSite(false);
                                         onClose();
                                     },
                                 },
                             );
                         }}
-                    />
+                    >
+                        <div className="flex flex-col gap-1.5 rounded-md border border-hairline bg-panel px-3 py-2.5">
+                            <Checkbox
+                                data-page-delete-on-site={true}
+                                label={copy.pages.detail.deleteOnSite}
+                                checked={onSite && live}
+                                disabled={!live}
+                                onChange={(event) => {
+                                    setOnSite(event.currentTarget.checked);
+                                }}
+                            />
+                            <p className="text-2xs text-ink-faint">
+                                {live
+                                    ? copy.pages.detail.deleteOnSiteHint
+                                    : copy.pages.detail.deleteOnSiteUnavailable}
+                            </p>
+                        </div>
+                    </Dialog>
                 </div>
             )}
         </Drawer>

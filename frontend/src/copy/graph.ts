@@ -250,9 +250,10 @@ export const graph = {
     },
     remove: {
         title: (name: string) => `Delete ${name}?`,
-        alone: "The entity goes. No edge touches it, and its page stays in the map, unmapped.",
+        alone:
+            "The entity goes, with its anchors. No edge touches it. Every page mapped to it stays in the map and on the site; it loses its mapping, so nothing plans its links any more.",
         withEdges: (edges: number) =>
-            `The entity goes, and so ${edges === 1 ? "does the 1 edge" : `do the ${edges} edges`} that touch it. Its page stays in the map, unmapped.`,
+            `The entity goes, with its anchors, and so ${edges === 1 ? "does the 1 edge" : `do the ${edges} edges`} that touch it. Every page mapped to it stays in the map and on the site; it loses its mapping, so nothing plans its links any more.`,
         confirm: "Delete the entity",
         cancel: "Keep it",
         deleted: (name: string) => `${name} deleted`,

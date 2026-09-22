@@ -165,7 +165,12 @@ export const pages = {
         liveUrl: "Live URL",
         deletePage: "Delete",
         deleteTitle: "Delete this page?",
-        deleteBody: "The row leaves the page map. Nothing on the WordPress site is touched.",
+        deleteBody:
+            "The row leaves the page map, with its links and its mapping. On its own this touches nothing on the WordPress site.",
+        deleteOnSite: "Also move it to the WordPress trash",
+        deleteOnSiteHint:
+            "WordPress keeps a trashed page until it is emptied, so it can be restored there. The row here cannot: it is gone for good.",
+        deleteOnSiteUnavailable: "This page is not on the site, so there is nothing to trash.",
         deleteConfirm: "Delete",
         cancel: "Cancel",
     },
