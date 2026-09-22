@@ -10,7 +10,19 @@ const (
 	DefaultLoopLimit          = 12
 	DefaultHistoryBudgetChars = 48000
 	DefaultMaxToolResultBytes = 16384
+
+	MinHistoryToolResultBytes = 512
+	MaxHistoryToolResultBytes = 65536
+
+	historyToolResultShare = 4
 )
+
+func HistoryToolResultBytes(maxToolResult int) int {
+	if maxToolResult <= 0 {
+		maxToolResult = DefaultMaxToolResultBytes
+	}
+	return min(max(maxToolResult/historyToolResultShare, MinHistoryToolResultBytes), MaxHistoryToolResultBytes)
+}
 
 var (
 	loopLimitSetting     = settings.Int("agent.loopLimit", DefaultLoopLimit, settings.IntRange(1, 64))

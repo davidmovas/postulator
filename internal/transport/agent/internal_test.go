@@ -8,11 +8,14 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gollem-dev/gollem"
 	"github.com/sashabaranov/go-openai"
 
+	agentapp "github.com/davidmovas/postulator/internal/application/agent"
 	applicationllm "github.com/davidmovas/postulator/internal/application/llm"
+	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -72,6 +75,165 @@ func TestTrimKeepsTheNewestWholeTurns(t *testing.T) {
 	empty := &gollem.History{Version: gollem.HistoryVersion}
 	if kept := trim(empty, 10); len(kept.Messages) != 0 {
 		t.Error("trimming an empty history answers it unchanged")
+	}
+}
+
+const fenceBytes = 64
+
+type heldHistory struct {
+	body    []byte
+	version int
+}
+
+func (h *heldHistory) Load(context.Context, string) (body []byte, version int, err error) {
+	if h.body == nil {
+		return nil, 0, errors.New(errors.NotFound, "nothing stored yet")
+	}
+	return h.body, h.version, nil
+}
+
+func (h *heldHistory) Save(_ context.Context, _ string, body []byte, version int, _ time.Time) error {
+	h.body = body
+	h.version = version
+	return nil
+}
+
+func fatResponse(t *testing.T, name string, rows int) gollem.Message {
+	t.Helper()
+
+	items := make([]any, 0, rows)
+	for i := range rows {
+		items = append(items, map[string]any{
+			"id":    fmt.Sprintf("page-%03d", i),
+			"path":  fmt.Sprintf("/coffee/espresso/%03d/", i),
+			"title": strings.Repeat("Espresso ", 8),
+		})
+	}
+
+	content, err := gollem.NewToolResponseContent("call-1", name,
+		agentapp.Fence(map[string]any{"items": items, "hasMore": true, "nextCursor": "c-42"}), false)
+	if err != nil {
+		t.Fatalf("NewToolResponseContent: %v", err)
+	}
+	return gollem.Message{Role: gollem.RoleUser, Contents: []gollem.MessageContent{content}}
+}
+
+func TestAStoredToolResultReplaysShortenedAndStillDecodes(t *testing.T) {
+	t.Parallel()
+
+	fat := fatResponse(t, "pages_list", 128)
+	if measured := len(fat.Contents[0].Data); measured < agentapp.DefaultMaxToolResultBytes {
+		t.Fatalf("the fixture is %d bytes, want at least the in-turn ceiling", measured)
+	}
+
+	store := &heldHistory{}
+	held := bounded{
+		store: store, clock: clock.NewFake(time.Date(2026, 9, 22, 9, 0, 0, 0, time.UTC)),
+		budget: agentapp.DefaultHistoryBudgetChars,
+		cap:    agentapp.HistoryToolResultBytes(agentapp.DefaultMaxToolResultBytes),
+	}
+
+	written := &gollem.History{
+		LLType:  gollem.LLMTypeOpenAI,
+		Version: gollem.HistoryVersion,
+		Messages: []gollem.Message{
+			message(t, gollem.RoleUser, "list the espresso pages"),
+			fat,
+			message(t, gollem.RoleAssistant, "a hundred and twenty pages"),
+		},
+	}
+	if err := held.Save(t.Context(), "c1", written); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	replayed, err := held.Load(t.Context(), "c1")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(replayed.Messages) != 3 {
+		t.Fatalf("the replayed history holds %d messages", len(replayed.Messages))
+	}
+	if replayed.Messages[0].Contents[0].Type != gollem.MessageContentTypeText {
+		t.Fatal("a text message must be replayed untouched")
+	}
+
+	shortened := replayed.Messages[1].Contents[0]
+	if len(shortened.Data) >= len(fat.Contents[0].Data) {
+		t.Fatalf("the stored result is %d bytes of the original %d", len(shortened.Data), len(fat.Contents[0].Data))
+	}
+	if len(shortened.Data) > agentapp.HistoryToolResultBytes(agentapp.DefaultMaxToolResultBytes)+fenceBytes {
+		t.Fatalf("the stored result is %d bytes, over the history ceiling", len(shortened.Data))
+	}
+
+	answered, err := shortened.GetToolResponseContent()
+	if err != nil {
+		t.Fatalf("the shortened result no longer decodes: %v", err)
+	}
+	if answered.ToolCallID != "call-1" || answered.Name != "pages_list" {
+		t.Fatalf("the shortened result lost its call: %+v", answered)
+	}
+	if answered.Response[agentapp.UntrustedMarker] != true {
+		t.Fatalf("the shortened result lost its fence: %+v", answered.Response)
+	}
+
+	inner, ok := answered.Response[agentapp.UntrustedData].(map[string]any)
+	if !ok || inner[agentapp.TruncatedKey] != true {
+		t.Fatalf("the shortened result does not say it was shortened: %+v", answered.Response)
+	}
+	document, ok := inner[agentapp.ResultKey].(map[string]any)
+	if !ok || document["nextCursor"] != "c-42" || document["hasMore"] != true {
+		t.Fatalf("the shortened result lost the fields that say how to ask for the rest: %+v", inner)
+	}
+	kept, ok := document["items"].([]any)
+	if !ok || len(kept) == 0 || len(kept) >= 128 {
+		t.Fatalf("the shortened result kept %d of 128 rows", len(kept))
+	}
+}
+
+func TestAResultThatFitsIsStoredUntouched(t *testing.T) {
+	t.Parallel()
+
+	small := toolResponse(t, "pages_tree")
+	history := &gollem.History{
+		LLType:   gollem.LLMTypeOpenAI,
+		Version:  gollem.HistoryVersion,
+		Messages: []gollem.Message{message(t, gollem.RoleUser, "hello"), small},
+	}
+
+	kept := shorten(history, agentapp.HistoryToolResultBytes(agentapp.DefaultMaxToolResultBytes))
+	if string(kept.Messages[1].Contents[0].Data) != string(small.Contents[0].Data) {
+		t.Fatalf("a result inside the ceiling was rewritten: %s", kept.Messages[1].Contents[0].Data)
+	}
+	if shorten(nil, 100) != nil {
+		t.Error("shortening nothing answers nothing")
+	}
+	if shorten(history, 0) != history {
+		t.Error("no ceiling shortens nothing")
+	}
+}
+
+func TestTheHistoryCeilingIsAQuarterOfWhatTheModelMayRead(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		input int
+		want  int
+	}{
+		{name: "the shipped default", input: agentapp.DefaultMaxToolResultBytes, want: 4096},
+		{name: "the smallest a client may ask for", input: 1024, want: 512},
+		{name: "the largest a client may ask for", input: 262144, want: 65536},
+		{name: "an unset ceiling takes the default", input: 0, want: 4096},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := agentapp.HistoryToolResultBytes(tc.input); got != tc.want {
+				t.Fatalf("HistoryToolResultBytes(%d) = %d, want %d", tc.input, got, tc.want)
+			}
+		})
 	}
 }
 

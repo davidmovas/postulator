@@ -80,6 +80,10 @@ func (r *Runner) resultCeiling(spec agentapp.RunSpec) int {
 	return r.cfg.MaxToolResultBytes
 }
 
+func (r *Runner) historyCeiling(spec agentapp.RunSpec) int {
+	return agentapp.HistoryToolResultBytes(r.resultCeiling(spec))
+}
+
 func (r *Runner) Run(ctx context.Context, spec agentapp.RunSpec) (agentapp.RunResult, error) {
 	if strings.TrimSpace(spec.Input) == "" {
 		return agentapp.RunResult{}, errors.New(errors.Invalid, "an agent turn needs something to answer")
@@ -157,7 +161,10 @@ func (r *Runner) execute(ctx context.Context, client gollem.LLMClient, spec agen
 	}
 	if r.deps.History != nil && spec.Binding.ConversationID != "" {
 		options = append(options, gollem.WithHistoryRepository(
-			bounded{store: r.deps.History, clock: r.deps.Clock, budget: spec.HistoryBudget},
+			bounded{
+				store: r.deps.History, clock: r.deps.Clock,
+				budget: spec.HistoryBudget, cap: r.historyCeiling(spec),
+			},
 			spec.Binding.ConversationID,
 		))
 	}

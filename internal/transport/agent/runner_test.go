@@ -3,6 +3,7 @@ package agent_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 	"slices"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/gollem-dev/gollem"
 
+	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	agentapp "github.com/davidmovas/postulator/internal/application/agent"
@@ -22,6 +24,8 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 	agentrunner "github.com/davidmovas/postulator/internal/transport/agent"
 )
+
+const historyFenceSlack = 64
 
 func TestATurnStreamsItsAnswerAndRecordsTheSpend(t *testing.T) {
 	t.Parallel()
@@ -346,6 +350,64 @@ func TestTheConversationHistoryIsReplayedOnTheNextTurn(t *testing.T) {
 	messages, ok := history["messages"].([]any)
 	if !ok || len(messages) == 0 {
 		t.Fatalf("the stored history is %s", body)
+	}
+}
+
+func TestTheStoredHistoryReplaysAShorterToolResultThanTheTurnSaw(t *testing.T) {
+	t.Parallel()
+
+	const ceiling = 4096
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	for i := range 40 {
+		sqlitetest.Page(t, store, owner.ID, fmt.Sprintf("/coffee/espresso/single-origin-blend-%02d/", i))
+	}
+
+	h := buildTuned(t, store, fake.NewGollem(), &applicationtest.Recorder{}, func(deps *agentapp.Deps) {
+		deps.MaxToolResult = func() int { return ceiling }
+	})
+	h.siteID = owner.ID
+
+	conversation := h.conversation(t, domainagent.ModeAutonomous)
+	h.send(t, conversation, "TOOL:pages_list{}\nFAKE: forty pages")
+
+	outcome, ok := h.payload(events.AgentToolFinished).(events.AgentToolFinishedPayload)
+	if !ok || outcome.Tool != "pages_list" || len(outcome.Result) == 0 {
+		t.Fatalf("the finished payload is %+v", h.payload(events.AgentToolFinished))
+	}
+
+	body, _, err := sqlite.NewConversationHistoryRepo(store).Load(t.Context(), conversation)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	var history gollem.History
+	if unmarshalErr := json.Unmarshal(body, &history); unmarshalErr != nil {
+		t.Fatalf("decode the stored history: %v", unmarshalErr)
+	}
+
+	replayed := 0
+	for _, message := range history.Messages {
+		for _, content := range message.Contents {
+			if content.Type != gollem.MessageContentTypeToolResponse {
+				continue
+			}
+			replayed++
+			if len(content.Data) > agentapp.HistoryToolResultBytes(ceiling)+historyFenceSlack {
+				t.Fatalf("the stored result is %d bytes, over the history ceiling", len(content.Data))
+			}
+			if len(content.Data) >= len(outcome.Result) {
+				t.Fatalf("the stored result is %d bytes of the %d the turn saw",
+					len(content.Data), len(outcome.Result))
+			}
+			if _, decodeErr := content.GetToolResponseContent(); decodeErr != nil {
+				t.Fatalf("the stored result no longer decodes: %v", decodeErr)
+			}
+		}
+	}
+	if replayed != 1 {
+		t.Fatalf("the stored history holds %d tool results, want 1", replayed)
 	}
 }
 
