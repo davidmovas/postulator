@@ -129,6 +129,8 @@ export function Transcript({ rows, settling, canRetry, header, onApprove, onReje
         setPinned(held.scrollHeight - held.scrollTop - held.clientHeight <= bottomSlackPx);
     };
 
+    const awaiting = rows.filter((row) => row.kind === "confirm").at(-1)?.id ?? null;
+
     return (
         <div className="relative min-h-0 flex-1">
             <div ref={scroller} onScroll={scrolled} className="flex h-full flex-col gap-3 overflow-y-auto px-3 py-3 [&>*]:shrink-0">
@@ -189,7 +191,7 @@ export function Transcript({ rows, settling, canRetry, header, onApprove, onReje
                                     createdAt={row.action?.createdAt ?? null}
                                     outcome={row.action === null ? null : outcomeOf(row.action)}
                                     busy={settling !== null && settling.id === row.id ? settling.busy : null}
-                                    focus={true}
+                                    focus={row.id === awaiting}
                                     keys="confirm"
                                     onApprove={() => {
                                         onApprove(row.id);

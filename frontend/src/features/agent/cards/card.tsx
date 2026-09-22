@@ -21,6 +21,16 @@ import { cardChoice } from "./model/keys.js";
 
 export type CardBusy = "approve" | "reject" | null;
 
+const editable = new Set(["input", "textarea", "select"]);
+
+function typing(): boolean {
+    const held = document.activeElement;
+    if (held === null) {
+        return false;
+    }
+    return editable.has(held.tagName.toLowerCase()) || (held instanceof HTMLElement && held.isContentEditable);
+}
+
 export type { CardKeys } from "./model/keys.js";
 
 export interface ConfirmationCardProps {
@@ -49,12 +59,10 @@ function KeyHints({ keys }: { keys: CardKeys }): ReactElement | null {
                 <Kbd keys={keys === "confirm" ? copy.agent.card.approveKeys : copy.agent.card.listApproveKeys} />
                 {copy.agent.approve.toLowerCase()}
             </span>
-            {keys === "list" ? (
-                <span className="flex items-center gap-1">
-                    <Kbd keys={copy.agent.card.listRejectKeys} />
-                    {copy.agent.reject.toLowerCase()}
-                </span>
-            ) : null}
+            <span className="flex items-center gap-1">
+                <Kbd keys={keys === "confirm" ? copy.agent.card.rejectKeys : copy.agent.card.listRejectKeys} />
+                {copy.agent.reject.toLowerCase()}
+            </span>
         </span>
     );
 }
@@ -84,7 +92,7 @@ export function ConfirmationCard({
     const RiskIcon = dangerous ? GavelIcon : ShieldIcon;
 
     useEffect(() => {
-        if (focus && pending) {
+        if (focus && pending && !typing()) {
             root.current?.focus();
         }
     }, [focus, pending]);
@@ -93,10 +101,12 @@ export function ConfirmationCard({
         if (!pending || busy !== null) {
             return;
         }
-        if (cardChoice(keys, event) === "approve" && onApprove !== undefined) {
+        const chosen = cardChoice(keys, event);
+        const settle = chosen === "approve" ? onApprove : chosen === "reject" ? onReject : undefined;
+        if (settle !== undefined) {
             event.preventDefault();
             event.stopPropagation();
-            onApprove();
+            settle();
         }
     };
 

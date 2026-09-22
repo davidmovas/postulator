@@ -6,11 +6,12 @@ export interface CardStroke {
     key: string;
     ctrlKey: boolean;
     metaKey: boolean;
+    shiftKey: boolean;
 }
 
 export function cardChoice(keys: CardKeys, stroke: CardStroke): CardChoice {
-    if (keys !== "confirm") {
+    if (keys !== "confirm" || stroke.key !== "Enter" || !(stroke.ctrlKey || stroke.metaKey)) {
         return null;
     }
-    return stroke.key === "Enter" && (stroke.ctrlKey || stroke.metaKey) ? "approve" : null;
+    return stroke.shiftKey ? "reject" : "approve";
 }

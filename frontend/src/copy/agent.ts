@@ -64,6 +64,9 @@ export const agent = {
     transcript: {
         jumpToLatest: "Jump to the latest",
         loadEarlier: "Load earlier messages",
+        copyCode: "Copy",
+        codeCopied: "Copied",
+        plainCode: "code",
         tool: {
             running: "running",
             ok: "done",
@@ -92,6 +95,7 @@ export const agent = {
         riskDangerous: "Dangerous",
         dangerousWarn: "This cannot be undone from Postulator.",
         approveKeys: ["Ctrl", "Enter"] as readonly string[],
+        rejectKeys: ["Ctrl", "Shift", "Enter"] as readonly string[],
         listApproveKeys: ["A"] as readonly string[],
         listRejectKeys: ["R"] as readonly string[],
         approving: "Approving",

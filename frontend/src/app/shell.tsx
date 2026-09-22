@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
 
 import { copy } from "../copy/index.js";
@@ -7,7 +7,7 @@ import { sheetIn, siteImportedOn, subscribeDrop } from "../data/drops.js";
 import { usePendingActions } from "../data/hooks/agent.js";
 import { dismissToast, pushToast, useToasts } from "../data/toasts.js";
 import type { ToastTone } from "../data/toasts.js";
-import { AgentDock, askAgent, toggleDock, useDock } from "../features/agent/index.js";
+import { AgentDock, askAgent, openDock, toggleDock, useDock } from "../features/agent/index.js";
 import { CommandPalette, openPalette, usePaletteOpen } from "../features/palette/index.js";
 import { Button, Toast, ToastRegion } from "../ui/index.js";
 import type { Tone } from "../ui/index.js";
@@ -82,6 +82,14 @@ export function Shell() {
             rememberSite(siteId);
         }
     }, [siteId]);
+
+    const waited = useRef(0);
+    useEffect(() => {
+        if (awaiting > waited.current) {
+            openDock();
+        }
+        waited.current = awaiting;
+    }, [awaiting]);
 
     useEffect(() => {
         return subscribeDrop((paths) => {
