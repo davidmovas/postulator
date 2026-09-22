@@ -344,9 +344,9 @@ func TestStartRejectsBadRequests(t *testing.T) {
 			want:    errors.NotFound,
 		},
 		{
-			name:    "no recipe anywhere",
+			name:    "a template recipe that names a step of another kind",
 			request: runs.StartRequest{SiteID: "s", PageIDs: []string{"p"}},
-			prepare: func(f *fixture) { f.specs.spec = template.TemplateSpec{} },
+			prepare: func(f *fixture) { f.specs.spec = template.TemplateSpec{Recipe: run.SyncRecipe()} },
 			want:    errors.Invalid,
 		},
 		{

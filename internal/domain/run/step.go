@@ -21,7 +21,10 @@ const (
 	StepSyncSite        StepName = "sync_site"
 )
 
-const RevertStep = "revert"
+const (
+	RevertStep     = "revert"
+	RelinkPageStep = "relink_page"
+)
 
 var stepNames = []StepName{
 	StepResolveContext, StepGenerateBody, StepGenerateMeta, StepInsertLinks, StepRepairLinks,
@@ -29,6 +32,24 @@ var stepNames = []StepName{
 	StepReport, StepSyncSite,
 }
 
+var perKindSteps = []string{
+	string(StepRepairHierarchy), string(StepSyncSite), RelinkPageStep, RevertStep,
+}
+
 func StepNames() []StepName {
 	return slices.Clone(stepNames)
+}
+
+func PerKindStep(name string) bool {
+	return slices.Contains(perKindSteps, name)
+}
+
+func TemplateStepNames() []StepName {
+	out := make([]StepName, 0, len(stepNames))
+	for _, name := range stepNames {
+		if !PerKindStep(string(name)) {
+			out = append(out, name)
+		}
+	}
+	return out
 }

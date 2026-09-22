@@ -392,6 +392,125 @@ func TestASecondRunUpdatesTheSameDraft(t *testing.T) {
 	}
 }
 
+func (p *pipeline) runKind(t *testing.T, kind run.Kind) run.Item {
+	t.Helper()
+
+	recipe, owns := kind.Recipe()
+	if !owns {
+		t.Fatalf("%s owns no recipe", kind)
+	}
+
+	queued, err := p.engine.Enqueue(t.Context(), run.Run{
+		ID: id.New(), SiteID: p.siteID, Kind: kind, Targets: []string{p.pageID},
+		Recipe: recipe, TemplateID: "guide", TemplateVersion: 1, PublishMode: run.PublishDraft,
+	})
+	if err != nil {
+		t.Fatalf("Enqueue a %s run: %v", kind, err)
+	}
+
+	deadline := time.Now().Add(pollTimeout)
+	for time.Now().Before(deadline) {
+		items, listErr := p.items.ByRun(t.Context(), queued.ID)
+		if listErr == nil && len(items) == 1 && items[0].Status.Terminal() {
+			if items[0].Status != run.StatusCompleted {
+				t.Fatalf("the %s item reached %q: %s", kind, items[0].Status, items[0].Error)
+			}
+			return items[0]
+		}
+		time.Sleep(pollInterval)
+	}
+	t.Fatalf("timed out waiting for the %s run to finish", kind)
+	return run.Item{}
+}
+
+func TestEveryKindRecipeIsRunnableByTheRealRegistry(t *testing.T) {
+	t.Parallel()
+
+	registry := run.NewRegistry()
+	if err := steps.Register(registry, steps.Deps{}); err != nil {
+		t.Fatalf("register the steps: %v", err)
+	}
+
+	for _, kind := range []run.Kind{run.KindRelink, run.KindRepair, run.KindSync, run.KindRevert} {
+		recipe, owns := kind.Recipe()
+		if !owns {
+			t.Fatalf("%s owns no recipe", kind)
+		}
+		if err := run.ValidateRecipe(registry, recipe); err != nil {
+			t.Errorf("the %s recipe does not hold together: %v", kind, err)
+		}
+	}
+	if err := run.ValidateRecipe(registry, run.GenerateRecipe()); err != nil {
+		t.Errorf("the generate recipe does not hold together: %v", err)
+	}
+}
+
+func TestARelinkRunPlacesTheLinksWithoutWritingThePageAgain(t *testing.T) {
+	t.Parallel()
+
+	p := newPipeline(t)
+	p.start(t)
+
+	generated := p.generate(t)
+	var published steps.PublishResult
+	p.artifactOf(t, generated.ID, run.ArtifactPublishResult, &published)
+
+	before, ok := p.server.Lookup(published.WPID)
+	if !ok {
+		t.Fatal("the generate run left nothing on the site")
+	}
+
+	item := p.runKind(t, run.KindRelink)
+
+	var relinked steps.RelinkPageResult
+	p.artifactOf(t, item.ID, run.ArtifactRelinkResult, &relinked)
+	if len(relinked.Placed) == 0 {
+		t.Fatalf("the relink judged no target: %+v", relinked)
+	}
+	for i := range relinked.Placed {
+		if relinked.Placed[i].Outcome != steps.OutcomeUnchanged {
+			t.Fatalf("a page the generate run linked was linked again: %+v", relinked.Placed[i])
+		}
+	}
+
+	var again steps.PublishResult
+	p.artifactOf(t, item.ID, run.ArtifactPublishResult, &again)
+	if again.Created || again.WPID != published.WPID {
+		t.Fatalf("the relink result = %+v, want an update of %d", again, published.WPID)
+	}
+
+	after, _ := p.server.Lookup(published.WPID)
+	if after.Content != before.Content {
+		t.Fatalf("the relink rewrote the body:\n%q\n%q", before.Content, after.Content)
+	}
+
+	var synced steps.SyncResult
+	p.artifactOf(t, item.ID, run.ArtifactSyncResult, &synced)
+	if synced.WPID != published.WPID {
+		t.Fatalf("the relink did not read the page back: %+v", synced)
+	}
+}
+
+func TestARelinkRunAndARepairRunCostNothing(t *testing.T) {
+	t.Parallel()
+
+	p := newPipeline(t)
+	engine := p.start(t)
+
+	for _, kind := range []run.Kind{run.KindRelink, run.KindRepair, run.KindSync} {
+		recipe, _ := kind.Recipe()
+		estimate, err := engine.EstimateRun(t.Context(), run.Run{
+			SiteID: p.siteID, Kind: kind, Targets: []string{p.pageID}, Recipe: recipe,
+		}, template.TemplateSpec{})
+		if err != nil {
+			t.Fatalf("EstimateRun for %s: %v", kind, err)
+		}
+		if estimate.Tokens != 0 || estimate.USD != 0 || len(estimate.Findings) != 0 {
+			t.Errorf("a %s run is priced at %+v, want nothing: it calls no model", kind, estimate)
+		}
+	}
+}
+
 func TestTheRecipeDegradesWithoutThePlugin(t *testing.T) {
 	t.Parallel()
 

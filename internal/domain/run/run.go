@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"slices"
 	"strings"
 	"time"
 
@@ -43,12 +44,53 @@ func (k Kind) PageScoped() bool {
 	}
 }
 
+func (k Kind) Recipe() ([]template.StepSpec, bool) {
+	switch k {
+	case KindRelink:
+		return RelinkRecipe(), true
+	case KindRepair:
+		return RepairRecipe(), true
+	case KindSync:
+		return SyncRecipe(), true
+	case KindRevert:
+		return RevertRecipe(), true
+	case KindGenerate, KindAudit, KindImport, KindCustom:
+		return nil, false
+	default:
+		return nil, false
+	}
+}
+
+func steps(names ...string) []template.StepSpec {
+	out := make([]template.StepSpec, 0, len(names))
+	for _, name := range names {
+		out = append(out, template.StepSpec{Name: name, Enabled: true})
+	}
+	return out
+}
+
+func GenerateRecipe() []template.StepSpec {
+	return steps(
+		string(StepResolveContext), string(StepGenerateBody), string(StepGenerateMeta),
+		string(StepInsertLinks), string(StepRepairLinks), string(StepValidate), string(StepJudge),
+		string(StepPublish), string(StepRelinkNeighbors), string(StepSyncBack), string(StepReport),
+	)
+}
+
+func RelinkRecipe() []template.StepSpec {
+	return steps(string(StepResolveContext), RelinkPageStep, string(StepSyncBack), string(StepReport))
+}
+
+func RepairRecipe() []template.StepSpec {
+	return steps(string(StepRepairHierarchy), string(StepSyncBack), string(StepReport))
+}
+
 func RevertRecipe() []template.StepSpec {
-	return []template.StepSpec{{Name: RevertStep, Enabled: true}}
+	return steps(RevertStep)
 }
 
 func SyncRecipe() []template.StepSpec {
-	return []template.StepSpec{{Name: string(StepSyncSite), Enabled: true}}
+	return steps(string(StepSyncSite))
 }
 
 type PublishMode string
@@ -264,12 +306,7 @@ func ArtifactKinds() []ArtifactKind {
 }
 
 func (k ArtifactKind) Valid() bool {
-	for _, known := range ArtifactKinds() {
-		if k == known {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(ArtifactKinds(), k)
 }
 
 type Artifact struct {

@@ -29,6 +29,10 @@ const (
 	ReasonNeighborUnmapped   = "the neighbor is not mapped to an entity, so it has no rules of its own"
 	ReasonNeighborNoTemplate = "the neighbor has no template, so nothing says what it may link to"
 
+	ReasonPageOffTheSite = "is not on the site, so there is nothing to relink; publish it first"
+	ReasonPageGone       = "the page is no longer on the site"
+	ReasonPageUnreadable = "the stored content of the page could not be read as HTML"
+
 	ReasonNeighborOwesNothing = "the rules of the neighbor do not ask it to link to this page"
 
 	ReasonNeighborOwesTheCanonicalPage = "the rules of the neighbor ask it to link to the canonical page " +
@@ -136,6 +140,7 @@ func all(deps Deps) []run.StepDef {
 		RepairHierarchy(deps),
 		Publish(deps),
 		RelinkNeighbors(deps),
+		RelinkPage(deps),
 		SyncBack(deps),
 		Report(deps),
 		SyncSite(deps),
