@@ -17,13 +17,20 @@ import (
 const (
 	NameJudge = "judge"
 
-	judgeTokens = 1024
+	JudgeTokens = 1024
 )
 
-type JudgeReport struct {
+type judgeAnswer struct {
 	Score       float64  `json:"score" description:"The overall quality of the page between 0 and 1"`
 	Issues      []string `json:"issues" description:"What is wrong with the page, worst first, one sentence each"`
 	Suggestions []string `json:"suggestions" description:"What would raise the score, one sentence each"`
+}
+
+type JudgeReport struct {
+	Score       *float64                `json:"score,omitempty"`
+	Issues      []string                `json:"issues"`
+	Suggestions []string                `json:"suggestions"`
+	Findings    []contentdomain.Finding `json:"findings,omitempty"`
 }
 
 func (s *Service) Assess(ctx context.Context, req AssessRequest) (AssessResponse, error) {
@@ -40,17 +47,17 @@ func (s *Service) Assess(ctx context.Context, req AssessRequest) (AssessResponse
 		return AssessResponse{}, err
 	}
 
-	report, usage, err := llm.Structured[JudgeReport](ctx, s.deps.LLM, llm.Request{
+	answer, usage, err := llm.Structured[judgeAnswer](ctx, s.deps.LLM, llm.Request{
 		Ref:       ref,
 		System:    system,
 		Messages:  []llm.Message{{Role: llm.RoleUser, Text: user}},
-		MaxTokens: judgeTokens,
+		MaxTokens: JudgeTokens,
 		Meta:      req.Call,
 	})
 	if err != nil {
 		return AssessResponse{Tokens: usage.Total}, err
 	}
-	return AssessResponse{Report: settle(report), Tokens: usage.Total}, nil
+	return AssessResponse{Report: settle(answer), Tokens: usage.Total}, nil
 }
 
 func (s *Service) Judge(ctx context.Context, req JudgeRequest) (JudgeResponse, error) {
@@ -122,7 +129,7 @@ func (s *Service) context(ctx context.Context, page pagemap.Page,
 		return graph.Entity{}, nil, err
 	}
 	policy := template.LinkPolicy{
-		Rules:          spec.LinkRules,
+		Rules:          templates.EffectiveRules(effective.Policy.Rules, spec.LinkRules),
 		ForbidExternal: effective.Policy.ForbidExternal,
 		ForbidSelf:     effective.Policy.ForbidSelf,
 		AnchorStrategy: template.AnchorStrategy(effective.Policy.AnchorStrategy),
@@ -144,15 +151,19 @@ func (s *Service) context(ctx context.Context, page pagemap.Page,
 		return graph.Entity{}, nil, err
 	}
 
-	lc := contentdomain.BuildLinkContext(built, pagemap.NewIndex(pages), entity.ID, policy)
-	return entity, lc.Targets, nil
+	planned := contentdomain.PlanLinks(built, pagemap.NewIndex(pages), contentdomain.Subject{
+		PageID: page.ID, PagePath: page.Path, EntityID: entity.ID,
+	}, policy)
+	return entity, planned.Context.Targets, nil
 }
 
-func settle(report JudgeReport) JudgeReport {
-	report.Score = min(max(report.Score, 0), 1)
-	report.Issues = trimmed(report.Issues)
-	report.Suggestions = trimmed(report.Suggestions)
-	return report
+func settle(answer judgeAnswer) JudgeReport {
+	scored := min(max(answer.Score, 0), 1)
+	return JudgeReport{
+		Score:       &scored,
+		Issues:      trimmed(answer.Issues),
+		Suggestions: trimmed(answer.Suggestions),
+	}
 }
 
 func trimmed(lines []string) []string {

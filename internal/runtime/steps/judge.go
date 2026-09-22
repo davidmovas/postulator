@@ -13,7 +13,7 @@ import (
 const (
 	NameJudge = appcontent.NameJudge
 
-	judgeOutputTokens = 1024
+	CodeJudgeUnavailable = "judge_unavailable"
 )
 
 type JudgeReport = appcontent.JudgeReport
@@ -25,18 +25,14 @@ func Judge(deps Deps) run.StepDef {
 		Requires: []run.ArtifactKind{run.ArtifactBodyHTML},
 		Produces: []run.ArtifactKind{run.ArtifactJudgeReport},
 		Retry:    run.RetryPolicy{Max: 1},
-		Price:    run.Price{OutputTokens: judgeOutputTokens},
+		Price:    run.Price{OutputTokens: appcontent.JudgeTokens},
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			report, tokens, err := judgement(ctx, deps, sc)
 			if err != nil {
 				if ctx.Err() != nil {
 					return run.Result{}, err
 				}
-				report = JudgeReport{
-					Score:       0,
-					Issues:      []string{"the judge could not be reached: " + err.Error()},
-					Suggestions: []string{},
-				}
+				report = unreachable(sc, err)
 			}
 
 			blob, encodeErr := encode(report, "judge report")
@@ -46,10 +42,32 @@ func Judge(deps Deps) run.StepDef {
 			return run.Result{
 				Artifacts: []run.Artifact{{Kind: run.ArtifactJudgeReport, Blob: blob}},
 				Tokens:    tokens,
-				Message:   "the judge scored " + strconv.FormatFloat(report.Score, 'f', 2, 64),
+				Message:   verdict(report, sc.Page.Path),
 			}, nil
 		},
 	}
+}
+
+func unreachable(sc *run.StepContext, err error) JudgeReport {
+	return JudgeReport{
+		Issues:      []string{},
+		Suggestions: []string{},
+		Findings: []content.Finding{{
+			Severity: content.SeverityWarn,
+			Code:     CodeJudgeUnavailable,
+			Message:  "the judge could not be reached, so " + sc.Page.Path + " carries no quality score: " + err.Error(),
+			Details: map[string]any{
+				"pageId": sc.Page.ID, "path": sc.Page.Path, "reason": err.Error(),
+			},
+		}},
+	}
+}
+
+func verdict(report JudgeReport, path string) string {
+	if report.Score == nil {
+		return "the judge could not be reached, so " + path + " is not scored"
+	}
+	return "the judge scored " + strconv.FormatFloat(*report.Score, 'f', 2, 64)
 }
 
 func judgement(ctx context.Context, deps Deps, sc *run.StepContext) (report JudgeReport, tokens int, err error) {
@@ -71,8 +89,13 @@ func judgement(ctx context.Context, deps Deps, sc *run.StepContext) (report Judg
 		targets = lc.Targets
 	}
 
+	body, err := doc.Render()
+	if err != nil {
+		return JudgeReport{}, 0, err
+	}
+
 	assessed, err := deps.Content.Assess(ctx, appcontent.AssessRequest{
-		SiteID: sc.Run.SiteID, Page: sc.Page, Entity: entity, Spec: sc.Spec, Body: doc.HTML(),
+		SiteID: sc.Run.SiteID, Page: sc.Page, Entity: entity, Spec: sc.Spec, Body: body,
 		Snippet:    appcontent.Snippet{Title: snippet.Title, Description: snippet.Description},
 		HasSnippet: hasSnippet, Targets: targets, Call: callMeta(sc, NameJudge),
 	})

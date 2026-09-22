@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
@@ -46,7 +47,7 @@ func TestJudgeScoresThePage(t *testing.T) {
 	deps := judgeDeps(llmStub{reply: `{"score":0.8,"issues":["The body is thin."," "],"suggestions":["Add a worked example."]}`})
 
 	report := runJudge(t, deps)
-	if report.Score != 0.8 {
+	if report.Score == nil || *report.Score != 0.8 {
 		t.Errorf("score = %v, want 0.8", report.Score)
 	}
 	if len(report.Issues) != 1 || report.Issues[0] != "The body is thin." {
@@ -74,24 +75,71 @@ func TestJudgeClampsTheScore(t *testing.T) {
 			t.Parallel()
 
 			deps := judgeDeps(llmStub{reply: tc.reply})
-			if got := runJudge(t, deps).Score; got != tc.want {
+			got := runJudge(t, deps).Score
+			if got == nil || *got != tc.want {
 				t.Fatalf("score = %v, want %v", got, tc.want)
 			}
 		})
 	}
 }
 
-func TestJudgeNeverFailsTheItem(t *testing.T) {
+func TestJudgeNeverFailsTheItemAndNeverScoresItEither(t *testing.T) {
 	t.Parallel()
 
-	deps := judgeDeps(llmStub{err: errors.New(errors.External, "the judge is unreachable")})
-
-	report := runJudge(t, deps)
-	if report.Score != 0 {
-		t.Errorf("score = %v, want 0 when the judge could not be reached", report.Score)
+	cases := []struct {
+		name string
+		err  error
+	}{
+		{name: "the provider is down", err: errors.New(errors.External, "the judge is unreachable")},
+		{name: "the provider refuses the key", err: errors.New(errors.Unauthorized, "the api key is rejected")},
 	}
-	if len(report.Issues) != 1 || !strings.Contains(report.Issues[0], "could not be reached") {
-		t.Fatalf("issues = %v", report.Issues)
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			report := runJudge(t, judgeDeps(llmStub{err: tc.err}))
+			if report.Score != nil {
+				t.Errorf("score = %v, want none: an unreachable judge scores nothing", *report.Score)
+			}
+			if len(report.Issues) != 0 {
+				t.Errorf("issues = %v, want none: the model said nothing about the page", report.Issues)
+			}
+			if len(report.Findings) != 1 {
+				t.Fatalf("findings = %+v, want the one that says the judge was not reached", report.Findings)
+			}
+			finding := report.Findings[0]
+			if finding.Code != steps.CodeJudgeUnavailable || finding.Severity != content.SeverityWarn {
+				t.Errorf("finding = %+v", finding)
+			}
+			if !strings.Contains(finding.Message, tc.err.Error()) {
+				t.Errorf("message = %q, want the provider's own words", finding.Message)
+			}
+			if finding.Details["pageId"] != "page-child" {
+				t.Errorf("details = %+v, want the page named", finding.Details)
+			}
+		})
+	}
+}
+
+func TestJudgeReportsAnUnscoredPageInTheFinalReport(t *testing.T) {
+	t.Parallel()
+
+	result, err := steps.Judge(judgeDeps(llmStub{err: errors.New(errors.External, "the judge is unreachable")})).
+		Run(t.Context(), judgeContext(t))
+	if err != nil {
+		t.Fatalf("Judge: %v", err)
+	}
+
+	final := runReport(t, map[run.ArtifactKind][]byte{
+		run.ArtifactValidationReport: []byte(storedValidation),
+		run.ArtifactJudgeReport:      result.Artifacts[0].Blob,
+	})
+	if final.Score == nil || *final.Score != 0.7 {
+		t.Fatalf("score = %v, want the validation score untouched by a judge that never ran", final.Score)
+	}
+	if final.Warnings != 2 {
+		t.Errorf("warnings = %d, want the structure warning and the judge that could not be reached", final.Warnings)
 	}
 }
 

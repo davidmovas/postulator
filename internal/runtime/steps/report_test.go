@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
@@ -59,7 +60,7 @@ func TestReportAggregatesEveryArtifact(t *testing.T) {
 		report.Relink == nil || report.Sync == nil || report.Images == nil {
 		t.Fatalf("report = %+v", report)
 	}
-	if report.Score != 0.5 {
+	if report.Score == nil || *report.Score != 0.5 {
 		t.Errorf("score = %v, want the lower of the validation and the judge", report.Score)
 	}
 	if len(report.Findings) != 3 {
@@ -96,11 +97,59 @@ func TestReportSurvivesAnEmptyItem(t *testing.T) {
 	t.Parallel()
 
 	report := runReport(t, nil)
-	if report.Score != 1 || len(report.Findings) != 0 {
-		t.Fatalf("report = %+v", report)
+	if report.Score != nil {
+		t.Fatalf("score = %v, want none: nothing scored this page", *report.Score)
+	}
+	if len(report.Findings) != 0 {
+		t.Fatalf("findings = %+v", report.Findings)
 	}
 	if report.Validation != nil || report.Judge != nil || report.Publish != nil {
 		t.Fatalf("report = %+v", report)
+	}
+}
+
+func TestReportNamesEveryArtifactRetentionTookAway(t *testing.T) {
+	t.Parallel()
+
+	purged := map[run.ArtifactKind]run.Artifact{
+		run.ArtifactValidationReport: {Kind: run.ArtifactValidationReport, Purged: true},
+		run.ArtifactJudgeReport:      {Kind: run.ArtifactJudgeReport, Purged: true},
+		run.ArtifactPublishResult:    {Kind: run.ArtifactPublishResult, Blob: []byte(storedPublish)},
+	}
+
+	sc := unitContext(t, nil)
+	sc.Artifacts = purged
+
+	result, err := steps.Report(unitDeps()).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("Report: %v", err)
+	}
+
+	var report steps.FinalReport
+	if err = json.Unmarshal(result.Artifacts[0].Blob, &report); err != nil {
+		t.Fatalf("decode the final report: %v", err)
+	}
+	if report.Score != nil {
+		t.Fatalf("score = %v, want none: the validation report it would come from is gone", *report.Score)
+	}
+
+	named := make([]string, 0, len(report.Findings))
+	for _, finding := range report.Findings {
+		if finding.Code != steps.CodeArtifactPurged {
+			continue
+		}
+		if finding.Severity != content.SeverityWarn {
+			t.Errorf("finding = %+v, want a warning", finding)
+		}
+		kind, _ := finding.Details["kind"].(string)
+		named = append(named, kind)
+	}
+	slices.Sort(named)
+	if !slices.Equal(named, []string{"judge_report", "validation_report"}) {
+		t.Fatalf("the report names %v as gone, want both sections retention took", named)
+	}
+	if report.Warnings != 2 {
+		t.Errorf("warnings = %d, want one per section that is gone", report.Warnings)
 	}
 }
 

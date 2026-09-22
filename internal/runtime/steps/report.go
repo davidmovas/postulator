@@ -8,7 +8,11 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
 
-const NameReport = string(run.StepReport)
+const (
+	NameReport = string(run.StepReport)
+
+	CodeArtifactPurged = "artifact_purged"
+)
 
 type FinalReport struct {
 	Validation *ValidationReport `json:"validation,omitempty"`
@@ -17,10 +21,10 @@ type FinalReport struct {
 	Relink     *RelinkResult     `json:"relink,omitempty"`
 	Sync       *SyncResult       `json:"sync,omitempty"`
 	Images     *ImagesResult     `json:"images,omitempty"`
+	Score      *float64          `json:"score,omitempty"`
 	PageID     string            `json:"pageId"`
 	Path       string            `json:"path"`
 	Findings   []content.Finding `json:"findings"`
-	Score      float64           `json:"score"`
 	Errors     int               `json:"errors"`
 	Warnings   int               `json:"warnings"`
 }
@@ -35,8 +39,7 @@ func Report(deps Deps) run.StepDef {
 			report := FinalReport{
 				PageID:   sc.Page.ID,
 				Path:     sc.Page.Path,
-				Findings: make([]content.Finding, 0),
-				Score:    1,
+				Findings: purgedFindings(sc),
 			}
 
 			validation, found, err := decodeArtifact[ValidationReport](sc, run.ArtifactValidationReport)
@@ -45,7 +48,7 @@ func Report(deps Deps) run.StepDef {
 			}
 			if found {
 				report.Validation = &validation
-				report.Score = validation.Score
+				report.Score = &validation.Score
 				report.Findings = append(report.Findings, validation.Compliance.Items...)
 				report.Findings = append(report.Findings, validation.Structure.Items...)
 			}
@@ -56,7 +59,8 @@ func Report(deps Deps) run.StepDef {
 			}
 			if found {
 				report.Judge = &judged
-				report.Score = min(report.Score, judged.Score)
+				report.Score = lower(report.Score, judged.Score)
+				report.Findings = append(report.Findings, judged.Findings...)
 			}
 
 			published, found, err := decodeArtifact[PublishResult](sc, run.ArtifactPublishResult)
@@ -92,6 +96,15 @@ func Report(deps Deps) run.StepDef {
 			}
 			if found {
 				report.Images = &pictures
+				report.Findings = append(report.Findings, pictures.Findings...)
+			}
+
+			snippet, found, err := decodeArtifact[Meta](sc, run.ArtifactMeta)
+			if err != nil {
+				return run.Result{}, err
+			}
+			if found {
+				report.Findings = append(report.Findings, snippet.Findings...)
 			}
 
 			report.Errors, report.Warnings = weigh(report.Findings)
@@ -102,11 +115,54 @@ func Report(deps Deps) run.StepDef {
 			}
 			return run.Result{
 				Artifacts: []run.Artifact{{Kind: run.ArtifactFinalReport, Blob: blob}},
-				Message: sc.Page.Path + " scored " + strconv.FormatFloat(report.Score, 'f', 2, 64) +
-					" with " + strconv.Itoa(report.Errors) + " errors",
+				Message:   scoreline(report),
 			}, nil
 		},
 	}
+}
+
+var reportSections = []run.ArtifactKind{
+	run.ArtifactValidationReport, run.ArtifactJudgeReport, run.ArtifactPublishResult,
+	run.ArtifactRelinkResult, run.ArtifactSyncResult, run.ArtifactImages,
+}
+
+func purgedFindings(sc *run.StepContext) []content.Finding {
+	out := make([]content.Finding, 0)
+	for _, kind := range reportSections {
+		artifact, held := sc.Artifacts[kind]
+		if !held || !artifact.Purged {
+			continue
+		}
+		out = append(out, content.Finding{
+			Severity: content.SeverityWarn,
+			Code:     CodeArtifactPurged,
+			Message: "the " + string(kind) + " of " + sc.Page.Path +
+				" was dropped by retention before the report was assembled, so this report does not carry it",
+			Details: map[string]any{"pageId": sc.Page.ID, "path": sc.Page.Path, "kind": string(kind)},
+		})
+	}
+	return out
+}
+
+func lower(running, candidate *float64) *float64 {
+	switch {
+	case candidate == nil:
+		return running
+	case running == nil:
+		return candidate
+	case *candidate < *running:
+		return candidate
+	default:
+		return running
+	}
+}
+
+func scoreline(report FinalReport) string {
+	scored := "is not scored"
+	if report.Score != nil {
+		scored = "scored " + strconv.FormatFloat(*report.Score, 'f', 2, 64)
+	}
+	return report.Path + " " + scored + " with " + strconv.Itoa(report.Errors) + " errors"
 }
 
 func weigh(findings []content.Finding) (errorCount, warnCount int) {

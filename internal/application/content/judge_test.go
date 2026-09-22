@@ -55,25 +55,31 @@ func (e edgeStub) ListBySite(context.Context, string) ([]graph.Edge, error) {
 }
 
 type specStub struct {
-	err error
+	rules *template.LinkRules
+	err   error
 }
 
 func (s specStub) ResolveForPage(context.Context, templates.ResolveForPageRequest) (templates.ResolveForPageResponse, error) {
 	if s.err != nil {
 		return templates.ResolveForPageResponse{}, s.err
 	}
+	rules := template.LinkRules{UpDepth: 1, DownLinks: true, MaxLinks: 10, MaxPerTarget: 1}
+	if s.rules != nil {
+		rules = *s.rules
+	}
 	return templates.ResolveForPageResponse{
 		TemplateID: "t1", SiteID: "site", Version: 1,
 		Spec: template.TemplateSpec{
 			Tone:      "plain",
 			Length:    template.Length{Min: 200, Max: 900},
-			LinkRules: template.LinkRules{UpDepth: 1, DownLinks: true, MaxLinks: 10, MaxPerTarget: 1},
+			LinkRules: rules,
 		},
 	}, nil
 }
 
 type policyStub struct {
-	err error
+	rules template.LinkRules
+	err   error
 }
 
 func (p policyStub) GetEffectivePolicy(context.Context, templates.GetEffectivePolicyRequest) (templates.GetEffectivePolicyResponse, error) {
@@ -81,7 +87,9 @@ func (p policyStub) GetEffectivePolicy(context.Context, templates.GetEffectivePo
 		return templates.GetEffectivePolicyResponse{}, p.err
 	}
 	return templates.GetEffectivePolicyResponse{
-		Policy: templates.LinkPolicy{ForbidExternal: true, ForbidSelf: true, AnchorStrategy: "prefer_user"},
+		Policy: templates.LinkPolicy{
+			Rules: p.rules, ForbidExternal: true, ForbidSelf: true, AnchorStrategy: "prefer_user",
+		},
 	}, nil
 }
 
@@ -197,7 +205,7 @@ func TestJudgeAuditsTheLivePage(t *testing.T) {
 	if out.PageID != "page-child" || out.Path != "/coffee/espresso/" || out.Tokens != 30 {
 		t.Fatalf("response = %+v", out)
 	}
-	if out.Report.Score != 1 {
+	if out.Report.Score == nil || *out.Report.Score != 1 {
 		t.Fatalf("score = %v, want the clamp at one", out.Report.Score)
 	}
 	if len(out.Report.Issues) != 1 || out.Report.Suggestions == nil {
@@ -212,6 +220,55 @@ func TestJudgeAuditsTheLivePage(t *testing.T) {
 	}
 	if !strings.Contains(model.last.System, "RUBRIC") {
 		t.Error("the system prompt does not carry the rubric")
+	}
+}
+
+func TestJudgePlansTheLinksOfThePageItAudits(t *testing.T) {
+	t.Parallel()
+
+	second := pagemap.Page{
+		ID: "page-second", SiteID: "site", Path: "/shop/espresso/", WPType: pagemap.WPPage,
+		Status: pagemap.StatusPublished, EntityID: pointer("child"), WPID: wpID(13),
+	}
+
+	cases := []struct {
+		mutate func(*appcontent.Deps)
+		name   string
+		pageID string
+		want   string
+	}{
+		{
+			name:   "a second page of one entity owes its canonical page a link",
+			pageID: "page-second",
+			mutate: func(d *appcontent.Deps) { d.Pages = pageStub{items: append(pages(), second)} },
+			want:   "- /coffee/espresso/ (up",
+		},
+		{
+			name:   "a template with no link rules of its own takes the site policy's",
+			pageID: "page-child",
+			mutate: func(d *appcontent.Deps) {
+				d.Specs = specStub{rules: &template.LinkRules{}}
+				d.Policies = policyStub{rules: template.LinkRules{UpDepth: 1, MaxPerTarget: 1}}
+			},
+			want: "- /coffee/ (up",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			model := &llmStub{reply: `{"score":1}`}
+			service := newService(model, tc.mutate)
+			if _, err := service.Judge(t.Context(), appcontent.JudgeRequest{PageID: tc.pageID}); err != nil {
+				t.Fatalf("Judge: %v", err)
+			}
+
+			prompt := model.last.Messages[len(model.last.Messages)-1].Text
+			if !strings.Contains(prompt, tc.want) {
+				t.Fatalf("the judge was told the required links are:\n%s\nwant one reading %q", prompt, tc.want)
+			}
+		})
 	}
 }
 
