@@ -3,13 +3,63 @@ package runtime_test
 import (
 	"context"
 	stderrors "errors"
+	"slices"
 	"testing"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
+
+func TestEnqueueDispatchesAParentBeforeItsChild(t *testing.T) {
+	t.Parallel()
+
+	harness := newHarness(t, 0)
+	given := []string{
+		"/components/batteries/e-bike-range/",
+		"/components/",
+		"/electric-bikes/",
+		"/components/batteries/",
+	}
+
+	pathOf := make(map[string]string, len(given))
+	for _, path := range given {
+		page := sqlitetest.Page(t, harness.store, harness.siteID, path)
+		pathOf[page.ID] = path
+		harness.pages = append(harness.pages, page.ID)
+	}
+
+	step := producing("only", run.ArtifactFinalReport, nil,
+		func(context.Context, *run.StepContext) (run.Result, error) {
+			return run.Result{Next: run.TransitionComplete}, nil
+		})
+	engine := harness.idle(t, mustRegister(t, step))
+
+	if _, err := engine.Enqueue(t.Context(), harness.newRun(recipeOf("only"))); err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+
+	items, err := harness.items.Runnable(t.Context(), time.Now().UTC().Add(time.Minute), 10)
+	if err != nil {
+		t.Fatalf("Runnable: %v", err)
+	}
+
+	got := make([]string, 0, len(items))
+	for i := range items {
+		got = append(got, pathOf[items[i].TargetID])
+	}
+	want := []string{
+		"/components/",
+		"/electric-bikes/",
+		"/components/batteries/",
+		"/components/batteries/e-bike-range/",
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("the run is dispatched as %v, want %v: a parent reaches WordPress before its child", got, want)
+	}
+}
 
 func TestRetryStepRefusesAnItemWhoseInputsExpired(t *testing.T) {
 	t.Parallel()

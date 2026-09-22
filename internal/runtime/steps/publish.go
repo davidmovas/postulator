@@ -20,6 +20,10 @@ const (
 	CodeSEOMetaSkipped   = "seo_meta_skipped"
 	CodePublishOverDrift = "publish_over_drift"
 
+	ParentWaitLimit = 6
+
+	checkpointParentWaits = "parentWaits"
+
 	publishTimeout = 2 * time.Minute
 	lookupPerPage  = 100
 )
@@ -62,10 +66,15 @@ func Publish(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			parent, err := parentWPID(ctx, deps, sc.Page)
+			placement, err := parentOf(ctx, deps, sc.Page)
 			if err != nil {
 				return run.Result{}, err
 			}
+			if placement.pending {
+				return holdForParent(sc, placement)
+			}
+			parent := placement.wpID
+
 			featured, _, err := decodeArtifact[ImagesResult](sc, run.ArtifactImages)
 			if err != nil {
 				return run.Result{}, err
@@ -163,22 +172,54 @@ func clientFor(ctx context.Context, deps Deps, siteID string) (*wp.Client, error
 	return deps.WordPress.Client(ctx, siteID)
 }
 
-func parentWPID(ctx context.Context, deps Deps, page pagemap.Page) (int64, error) {
+type placement struct {
+	path    string
+	wpID    int64
+	pending bool
+}
+
+func parentOf(ctx context.Context, deps Deps, page pagemap.Page) (placement, error) {
 	if page.ParentPageID == nil {
-		return 0, nil
+		return placement{}, nil
 	}
 
 	parent, err := deps.Pages.Get(ctx, *page.ParentPageID)
 	if err != nil {
 		if errors.IsCode(err, errors.NotFound) {
-			return 0, nil
+			return placement{}, errors.New(errors.Invalid,
+				"the page names a parent the page map does not hold").
+				WithDetail("pageId", page.ID).
+				WithDetail("path", page.Path).
+				WithDetail("parentPageId", *page.ParentPageID)
 		}
-		return 0, err
+		return placement{}, err
 	}
 	if parent.WPID == nil {
-		return 0, nil
+		return placement{path: parent.Path, pending: true}, nil
 	}
-	return *parent.WPID, nil
+	return placement{path: parent.Path, wpID: *parent.WPID}, nil
+}
+
+func holdForParent(sc *run.StepContext, parent placement) (run.Result, error) {
+	waits, _, err := run.Get[int](sc.Check, checkpointParentWaits)
+	if err != nil {
+		return run.Result{}, err
+	}
+
+	held := "the parent " + parent.path + " of " + sc.Page.Path + " is not on the site yet"
+	if waits >= ParentWaitLimit {
+		return run.Result{
+			Next:    run.TransitionPause,
+			Reason:  run.PauseNeedsHuman,
+			Message: held + ", so " + sc.Page.Path + " would be published at the top level",
+		}, nil
+	}
+
+	check := run.NewCheckpoint()
+	if setErr := run.Set(check, checkpointParentWaits, waits+1); setErr != nil {
+		return run.Result{}, setErr
+	}
+	return run.Result{Next: run.TransitionWait, Checkpoint: check, Message: held}, nil
 }
 
 func locate(ctx context.Context, client *wp.Client, itemType wp.ItemType, page pagemap.Page, parent int64) (wp.Item, bool, error) {
@@ -201,12 +242,30 @@ func locate(ctx context.Context, client *wp.Client, itemType wp.ItemType, page p
 	if err != nil {
 		return wp.Item{}, false, err
 	}
-	for i := range listed.Items {
-		if listed.Items[i].Parent == parent {
-			return listed.Items[i], true, nil
+	return bySlug(listed.Items, page, parent)
+}
+
+func bySlug(items []wp.Item, page pagemap.Page, parent int64) (wp.Item, bool, error) {
+	elsewhere := make([]wp.Item, 0, len(items))
+	for i := range items {
+		if items[i].Parent == parent {
+			return items[i], true, nil
 		}
+		elsewhere = append(elsewhere, items[i])
 	}
-	return wp.Item{}, false, nil
+
+	switch len(elsewhere) {
+	case 0:
+		return wp.Item{}, false, nil
+	case 1:
+		return elsewhere[0], true, nil
+	default:
+		return wp.Item{}, false, errors.New(errors.Conflict,
+			"the site carries several pages under that slug and none of them under the wanted parent").
+			WithDetail("slug", page.Slug).
+			WithDetail("path", page.Path).
+			WithDetail("parent", parent)
+	}
 }
 
 type writeRequest struct {

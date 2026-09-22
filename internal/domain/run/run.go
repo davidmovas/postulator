@@ -152,6 +152,7 @@ type Item struct {
 	Status      Status
 	CurrentStep string
 	Attempts    int
+	Seq         int
 	AdvanceSeq  int64
 	Checkpoint  Checkpoint
 	LeaseUntil  *time.Time

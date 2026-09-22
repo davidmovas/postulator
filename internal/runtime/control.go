@@ -2,6 +2,8 @@ package runtime
 
 import (
 	"context"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/application/events"
@@ -30,6 +32,7 @@ func (e *Engine) Enqueue(ctx context.Context, record run.Run) (run.Run, error) {
 		record.DeadlineAt = record.CreatedAt.Add(e.cfg.RunDeadline)
 	}
 	record.Stats.Items = len(record.Targets)
+	record.Targets = e.ancestorsFirst(ctx, record.Targets)
 
 	validated, err := run.NewRun(record)
 	if err != nil {
@@ -40,10 +43,10 @@ func (e *Engine) Enqueue(ctx context.Context, record run.Run) (run.Run, error) {
 		if insertErr := e.deps.Runs.Insert(c, validated); insertErr != nil {
 			return insertErr
 		}
-		for _, targetID := range validated.Targets {
+		for seq, targetID := range validated.Targets {
 			item, itemErr := run.NewItem(run.Item{
 				ID: id.New(), RunID: validated.ID, SiteID: validated.SiteID, TargetID: targetID,
-				CurrentStep: first, CreatedAt: now, UpdatedAt: now,
+				CurrentStep: first, Seq: seq, CreatedAt: now, UpdatedAt: now,
 			})
 			if itemErr != nil {
 				return itemErr
@@ -63,6 +66,40 @@ func (e *Engine) Enqueue(ctx context.Context, record run.Run) (run.Run, error) {
 
 	e.nudge()
 	return validated, nil
+}
+
+func (e *Engine) ancestorsFirst(ctx context.Context, targets []string) []string {
+	if len(targets) < 2 || e.deps.Pages == nil {
+		return targets
+	}
+
+	paths := make(map[string]string, len(targets))
+	for _, targetID := range targets {
+		page, err := e.deps.Pages.Get(ctx, targetID)
+		if err != nil {
+			continue
+		}
+		paths[targetID] = page.Path
+	}
+
+	ordered := slices.Clone(targets)
+	slices.SortStableFunc(ordered, func(a, b string) int {
+		left, leftKnown := paths[a]
+		right, rightKnown := paths[b]
+		switch {
+		case !leftKnown && !rightKnown:
+			return 0
+		case !leftKnown:
+			return 1
+		case !rightKnown:
+			return -1
+		}
+		if depth := strings.Count(left, "/") - strings.Count(right, "/"); depth != 0 {
+			return depth
+		}
+		return strings.Compare(left, right)
+	})
+	return ordered
 }
 
 func (e *Engine) Pause(ctx context.Context, runID string, reason run.PauseReason) error {

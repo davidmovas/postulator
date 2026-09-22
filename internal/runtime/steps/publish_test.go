@@ -3,6 +3,7 @@ package steps_test
 import (
 	"encoding/json"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
@@ -208,6 +209,105 @@ func TestPublishReparentsUnderTheParentPage(t *testing.T) {
 	stored, ok := server.Lookup(published.WPID)
 	if !ok || stored.Parent != wpID {
 		t.Fatalf("the draft is %+v, want it under %d", stored, wpID)
+	}
+}
+
+func TestPublishWaitsWhileTheParentIsNotOnTheSite(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	sc := publishContext(t)
+	sc.Page.ParentPageID = pointer("page-parent")
+
+	result, err := steps.Publish(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+	if result.Next != run.TransitionWait {
+		t.Fatalf("Publish under an unpublished parent = %q, want a wait", result.Next)
+	}
+	if len(result.Artifacts) != 0 {
+		t.Fatalf("a waiting publish produced %+v", result.Artifacts)
+	}
+	if len(server.Items()) != 0 {
+		t.Fatalf("the site holds %d items, want none while the parent is missing", len(server.Items()))
+	}
+}
+
+func TestPublishStopsOnceTheParentHasNotArrived(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	sc := publishContext(t)
+	sc.Page.ParentPageID = pointer("page-parent")
+
+	var result run.Result
+	for attempt := 0; attempt <= steps.ParentWaitLimit; attempt++ {
+		var err error
+		result, err = steps.Publish(deps).Run(t.Context(), sc)
+		if err != nil {
+			t.Fatalf("Publish: %v", err)
+		}
+		sc.Check = sc.Check.MergedWith(result.Checkpoint)
+		if result.Next != run.TransitionWait {
+			break
+		}
+	}
+
+	if result.Next != run.TransitionPause || result.Reason != run.PauseNeedsHuman {
+		t.Fatalf("Publish after %d waits = %q / %q, want a pause for a human",
+			steps.ParentWaitLimit, result.Next, result.Reason)
+	}
+	if !strings.Contains(result.Message, "/coffee/") {
+		t.Errorf("the pause message %q does not name the parent path", result.Message)
+	}
+	if len(server.Items()) != 0 {
+		t.Fatalf("the site holds %d items, want none", len(server.Items()))
+	}
+}
+
+func TestPublishRefusesADanglingParent(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	sc := publishContext(t)
+	sc.Page.ParentPageID = pointer("page-ghost")
+
+	if _, err := steps.Publish(deps).Run(t.Context(), sc); !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("Publish under a parent that is not in the map = %v, want an invalid error", err)
+	}
+	if len(server.Items()) != 0 {
+		t.Fatalf("the site holds %d items, want none", len(server.Items()))
+	}
+}
+
+func TestPublishMovesAFlatPageRatherThanDuplicatingIt(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	parent := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Coffee", Slug: "coffee"})
+	wpID := parent[0].ID
+	flat := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Slug: "espresso", Status: "draft"})
+
+	deps.Pages = pageList{items: []pagemap.Page{{
+		ID: "page-parent", SiteID: "site", Path: "/coffee/", Slug: "coffee", WPType: pagemap.WPPage,
+		Status: pagemap.StatusPublished, WPID: &wpID,
+	}}}
+
+	sc := publishContext(t)
+	sc.Page.ParentPageID = pointer("page-parent")
+
+	published := runPublish(t, deps, sc)
+	if published.Created || published.WPID != flat[0].ID {
+		t.Fatalf("publish = %+v, want the flat page %d moved rather than a second one made",
+			published, flat[0].ID)
+	}
+	if len(server.Items()) != 2 {
+		t.Fatalf("the site holds %d items, want the parent and the one page", len(server.Items()))
+	}
+	stored, ok := server.Lookup(published.WPID)
+	if !ok || stored.Parent != wpID {
+		t.Fatalf("the moved page is %+v, want it under %d", stored, wpID)
 	}
 }
 

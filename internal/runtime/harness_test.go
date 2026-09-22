@@ -169,7 +169,18 @@ func newHarness(t *testing.T, targets int) *harness {
 func (h *harness) engine(t *testing.T, registry *run.Registry) *runtime.Engine {
 	t.Helper()
 
-	engine := runtime.New(runtime.Deps{
+	engine := h.idle(t, registry)
+	if err := engine.Start(t.Context()); err != nil {
+		t.Fatalf("start the engine: %v", err)
+	}
+	t.Cleanup(engine.Stop)
+	return engine
+}
+
+func (h *harness) idle(t *testing.T, registry *run.Registry) *runtime.Engine {
+	t.Helper()
+
+	return runtime.New(runtime.Deps{
 		Runs:       h.runs,
 		Items:      h.items,
 		Artifacts:  h.blobs,
@@ -190,12 +201,6 @@ func (h *harness) engine(t *testing.T, registry *run.Registry) *runtime.Engine {
 		LeaseDuration: 200 * time.Millisecond,
 		RunDeadline:   h.deadline,
 	}, clock.System{}, h.logger)
-
-	if err := engine.Start(t.Context()); err != nil {
-		t.Fatalf("start the engine: %v", err)
-	}
-	t.Cleanup(engine.Stop)
-	return engine
 }
 
 func (h *harness) newRun(recipe []template.StepSpec) run.Run {
