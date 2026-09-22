@@ -9,6 +9,9 @@ export function outcomeOf(action: PendingAction): string | null {
         case "approved":
             return copy.agent.card.approved;
         case "executed": {
+            if ((action.error ?? "") !== "") {
+                return copy.agent.card.undelivered;
+            }
             const summary = resultSummary(action.tool, action.result ?? null);
             return summary === "done" ? copy.agent.card.executed : copy.agent.card.executedWith(summary);
         }

@@ -14,7 +14,7 @@ import type {
     TurnReport,
     TurnStatus,
 } from "./model.js";
-import { cancelledCode, isActive, silenceAfterMs } from "./model.js";
+import { cancelledCode, isActive, silenceAfterMs, toolCallStatus } from "./model.js";
 
 export type {
     AgentConfirmation,
@@ -27,7 +27,7 @@ export type {
     TurnStatus,
     TurnUsage,
 } from "./model.js";
-export { cancelledCode, isActive, silenceAfterMs } from "./model.js";
+export { budgetCode, cancelledCode, isActive, silenceAfterMs, toolCallStatus } from "./model.js";
 
 interface TurnLog {
     conversationId: string;
@@ -216,7 +216,7 @@ export function applyToolFinished(payload: AgentToolFinishedPayload, at: number 
         call.callId === payload.callId
             ? {
                   ...call,
-                  status: payload.status === "ok" ? "ok" : "error",
+                  status: toolCallStatus(payload.status),
                   result: payload.result,
                   error: payload.error === "" ? undefined : payload.error,
                   durationMs: payload.durationMs,

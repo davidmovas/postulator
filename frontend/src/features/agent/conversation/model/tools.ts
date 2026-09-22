@@ -1,3 +1,5 @@
+import { copy } from "../../../../copy/index.js";
+
 export const families = [
     "sites",
     "graph",
@@ -66,6 +68,45 @@ function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+const refusalMark = "is not open to this conversation";
+
+export function refusedText(text: string): boolean {
+    return text.includes(refusalMark);
+}
+
+export interface Truncation {
+    totalBytes: number;
+    dropped: readonly { path: string; count: number }[];
+    shortened: number;
+    whole: boolean;
+}
+
+export function truncationOf(result: unknown): Truncation | null {
+    if (!isRecord(result) || result["truncated"] !== true) {
+        return null;
+    }
+    const counts = result["droppedItems"];
+    const dropped: { path: string; count: number }[] = [];
+    if (isRecord(counts)) {
+        for (const [path, count] of Object.entries(counts)) {
+            if (typeof count === "number" && count > 0) {
+                dropped.push({ path, count });
+            }
+        }
+        dropped.sort((first, second) => second.count - first.count);
+    }
+    return {
+        totalBytes: typeof result["totalBytes"] === "number" ? result["totalBytes"] : 0,
+        dropped,
+        shortened: typeof result["shortenedText"] === "number" ? result["shortenedText"] : 0,
+        whole: result["result"] !== undefined,
+    };
+}
+
+export function kilobytes(bytes: number): number {
+    return Math.max(1, Math.round(bytes / 1000));
+}
+
 function nounFor(tool: string, count: number): string {
     const held = nouns[familyOf(tool)];
     const [one, many] = held ?? ["item", "items"];
@@ -111,9 +152,9 @@ export function resultSummary(tool: string, result: unknown): string {
     if (result["status"] === "confirmationRequired") {
         return "asked for approval";
     }
-    if (result["truncated"] === true) {
-        const bytes = typeof result["totalBytes"] === "number" ? result["totalBytes"] : 0;
-        return `a long answer, ${Math.max(1, Math.round(bytes / 1000))} KB`;
+    const cut = truncationOf(result);
+    if (cut !== null) {
+        return copy.agent.transcript.tool.cutSummary(kilobytes(cut.totalBytes));
     }
     if (Array.isArray(result["items"])) {
         return listSummary(tool, result["items"], result["hasMore"] === true);

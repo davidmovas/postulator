@@ -10,6 +10,7 @@ import type { CardBusy } from "../cards/card.js";
 import { outcomeOf } from "../cards/outcome.js";
 import { familyIcon, toolStatusLabel, toolStatusTone } from "../labels.js";
 import { Markdown } from "./markdown.js";
+import { detailLines } from "./model/rows.js";
 import { familyOf, resultSummary, toolLabel } from "./model/tools.js";
 import type { Row } from "./model/transcript.js";
 import { FailedCard, LostCard, StoppedCard } from "./states.js";
@@ -44,6 +45,7 @@ function ToolRow({ row }: ToolRowProps): ReactElement {
     const Icon = familyIcon(family);
     const tone = toolStatusTone(row.status);
     const summary = row.status === "running" ? null : row.error ?? resultSummary(row.tool, row.result);
+    const details = detailLines(row);
 
     return (
         <div className="flex flex-col rounded-md border border-hairline bg-inset">
@@ -76,8 +78,13 @@ function ToolRow({ row }: ToolRowProps): ReactElement {
                 </span>
             </button>
             {open && summary !== null ? (
-                <div className={cx("border-t border-hairline px-2 py-1.5 text-xs", row.error === null ? "text-ink-dim" : "text-danger")}>
-                    {summary}
+                <div className="flex flex-col gap-1 border-t border-hairline px-2 py-1.5">
+                    <span className={cx("text-xs", toneClasses[tone].ink)}>{summary}</span>
+                    {details.map((line) => (
+                        <span key={line} className="text-2xs text-ink-faint">
+                            {line}
+                        </span>
+                    ))}
                 </div>
             ) : null}
         </div>
@@ -210,7 +217,15 @@ export function Transcript({ rows, settling, canRetry, header, onApprove, onReje
                         case "stopped":
                             return <StoppedCard key={row.id} detail={row.detail} canRetry={canRetry} onRetry={onRetry} />;
                         case "failed":
-                            return <FailedCard key={row.id} message={row.message} canRetry={canRetry} onRetry={onRetry} />;
+                            return (
+                                <FailedCard
+                                    key={row.id}
+                                    code={row.code}
+                                    message={row.message}
+                                    canRetry={canRetry}
+                                    onRetry={onRetry}
+                                />
+                            );
                         default:
                             return <LostCard key={row.id} canRetry={canRetry} onRetry={onRetry} />;
                     }

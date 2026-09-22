@@ -2,7 +2,9 @@ export type TurnStatus = "idle" | "working" | "awaiting-confirm" | "stopping" | 
 
 export type TurnEnd = "answered" | "stopped" | "failed" | "lost";
 
-export type ToolCallStatus = "running" | "ok" | "error";
+export type ToolCallStatus = "running" | "ok" | "denied" | "error";
+
+export const budgetCode = "BUDGET_EXCEEDED";
 
 export const cancelledCode = "CANCELLED";
 
@@ -60,4 +62,15 @@ export type ReconcileAction = "none" | "refetch" | "adopt";
 
 export function isActive(status: TurnStatus): boolean {
     return status === "working" || status === "awaiting-confirm" || status === "stopping";
+}
+
+export function toolCallStatus(reported: string): ToolCallStatus {
+    switch (reported) {
+        case "ok":
+            return "ok";
+        case "denied":
+            return "denied";
+        default:
+            return "error";
+    }
 }

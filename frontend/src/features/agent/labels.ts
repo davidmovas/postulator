@@ -48,6 +48,10 @@ export function toolStatusTone(status: ToolRowStatus): Tone {
             return "info";
         case "ok":
             return "ok";
+        case "cut":
+            return "warn";
+        case "denied":
+            return "warn";
         default:
             return "danger";
     }
@@ -59,6 +63,10 @@ export function toolStatusLabel(status: ToolRowStatus): string {
             return copy.agent.transcript.tool.running;
         case "ok":
             return copy.agent.transcript.tool.ok;
+        case "cut":
+            return copy.agent.transcript.tool.cut;
+        case "denied":
+            return copy.agent.transcript.tool.denied;
         default:
             return copy.agent.transcript.tool.error;
     }

@@ -261,6 +261,33 @@ describe("tool calls and the lock", () => {
         expect(tools[0]?.durationMs).toBe(12);
     });
 
+    test("a refusal keeps its own status rather than reading as a failure", () => {
+        startTurn(conversationId);
+        applyToolStarted({ conversationId, callId: "t1", tool: "pages_delete", args: {} });
+        applyToolFinished({
+            conversationId,
+            callId: "t1",
+            tool: "pages_delete",
+            result: null,
+            status: "denied",
+            error: "the tool pages_delete is not open to this conversation",
+            durationMs: 3,
+        });
+        expect(getTurn(conversationId).tools[0]?.status).toBe("denied");
+
+        applyToolStarted({ conversationId, callId: "t2", tool: "pages_get", args: {} });
+        applyToolFinished({
+            conversationId,
+            callId: "t2",
+            tool: "pages_get",
+            result: null,
+            status: "error",
+            error: "no such page",
+            durationMs: 3,
+        });
+        expect(getTurn(conversationId).tools[1]?.status).toBe("error");
+    });
+
     test("the lock resets every turn and keeps its subscribers", () => {
         let notified = 0;
         const stop = subscribeTurn(conversationId, () => {

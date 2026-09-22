@@ -1,9 +1,10 @@
-import type { AgentConfirmation, Turn, TurnUsage } from "../../../../data/agent/turn.js";
+import type { AgentConfirmation, ToolCallStatus, Turn, TurnUsage } from "../../../../data/agent/turn.js";
 import { isActive } from "../../../../data/agent/turn.js";
 import type { Message, PendingAction } from "../../../../data/types.js";
 import type { Timestamp } from "../../../../data/wire.js";
+import { refusedText, truncationOf } from "./tools.js";
 
-export type ToolRowStatus = "running" | "ok" | "error";
+export type ToolRowStatus = "running" | "ok" | "cut" | "denied" | "error";
 
 export type Row =
     | { kind: "user"; id: string; text: string; at: Timestamp }
@@ -26,6 +27,13 @@ export type Row =
     | { kind: "failed"; id: string; code: string; message: string }
     | { kind: "lost"; id: string };
 
+function settledStatus(reported: ToolCallStatus, result: unknown): ToolRowStatus {
+    if (reported === "ok" && truncationOf(result) !== null) {
+        return "cut";
+    }
+    return reported;
+}
+
 function savedRow(message: Message, turn: Turn): Row | null {
     switch (message.role) {
         case "user":
@@ -45,7 +53,7 @@ function savedRow(message: Message, turn: Turn): Row | null {
                 id: message.id,
                 callId: message.callId ?? "",
                 tool: message.tool ?? "",
-                status: message.text === "" ? "ok" : "error",
+                status: settledStatus(message.text === "" ? "ok" : refusedText(message.text) ? "denied" : "error", message.payload ?? null),
                 durationMs: null,
                 result: message.payload ?? null,
                 error: message.text === "" ? null : message.text,
@@ -87,7 +95,7 @@ function liveRows(turn: Turn, saved: readonly Message[]): Row[] {
                 id: `live:${call.callId}`,
                 callId: call.callId,
                 tool: call.tool,
-                status: call.status,
+                status: call.status === "running" ? "running" : settledStatus(call.status, call.result ?? null),
                 durationMs: call.durationMs ?? null,
                 result: call.result ?? null,
                 error: call.error ?? null,

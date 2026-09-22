@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { familyOf, resultSummary, toolLabel, verbOf } from "./tools.js";
+import { familyOf, refusedText, resultSummary, toolLabel, truncationOf, verbOf } from "./tools.js";
 
 describe("familyOf and verbOf", () => {
     it("reads the family off the prefix and the verb off the rest", () => {
@@ -41,7 +41,7 @@ describe("resultSummary", () => {
 
     it("says what a truncated or empty answer is", () => {
         expect(resultSummary("pages_tree", { truncated: true, totalBytes: 40_000, preview: "…" })).toBe(
-            "a long answer, 40 KB",
+            "40 KB, shortened to fit",
         );
         expect(resultSummary("pages_delete", {})).toBe("done");
         expect(resultSummary("pages_delete", null)).toBe("done");
@@ -70,5 +70,45 @@ describe("toolLabel", () => {
         for (const name of ["pages_update", "graph_create_entity", "mystery_move"]) {
             expect(toolLabel(name)).not.toContain("_");
         }
+    });
+});
+
+describe("truncationOf", () => {
+    it("reads what a shortened answer says it dropped, widest list first", () => {
+        const cut = truncationOf({
+            truncated: true,
+            totalBytes: 41_000,
+            droppedItems: { "tree.children": 4, items: 37 },
+            shortenedText: 2,
+            result: { items: [{ id: "p1" }], nextCursor: "c1" },
+        });
+        expect(cut).not.toBeNull();
+        expect(cut?.totalBytes).toBe(41_000);
+        expect(cut?.shortened).toBe(2);
+        expect(cut?.whole).toBe(true);
+        expect(cut?.dropped).toStrictEqual([
+            { path: "items", count: 37 },
+            { path: "tree.children", count: 4 },
+        ]);
+    });
+
+    it("marks a fallback preview as no longer whole", () => {
+        const cut = truncationOf({ truncated: true, totalBytes: 41_000, preview: "{\"items\":[" });
+        expect(cut?.whole).toBe(false);
+        expect(cut?.dropped).toStrictEqual([]);
+    });
+
+    it("answers nothing for an answer that was never cut", () => {
+        expect(truncationOf({ items: [] })).toBeNull();
+        expect(truncationOf(null)).toBeNull();
+        expect(truncationOf("done")).toBeNull();
+    });
+});
+
+describe("refusedText", () => {
+    it("knows the sentence the guard writes when a tool is closed to a conversation", () => {
+        expect(refusedText("the tool pages_delete is not open to this conversation")).toBe(true);
+        expect(refusedText("no record carries that id")).toBe(false);
+        expect(refusedText("")).toBe(false);
     });
 });

@@ -68,6 +68,28 @@ describe("rows over the saved transcript", () => {
         expect(rows(saved, idle, [])[0]).toMatchObject({ kind: "tool", status: "error", error: "no such page" });
     });
 
+    it("tells a saved refusal apart from a saved failure", () => {
+        const saved = [
+            message(1, "tool", "the tool pages_delete is not open to this conversation", {
+                tool: "pages_delete",
+                callId: "k1",
+                payload: null,
+            }),
+        ];
+        expect(rows(saved, idle, [])[0]).toMatchObject({ kind: "tool", status: "denied" });
+    });
+
+    it("marks a saved answer that had to be shortened", () => {
+        const saved = [
+            message(1, "tool", "", {
+                tool: "pages_list",
+                callId: "k1",
+                payload: { truncated: true, totalBytes: 41_000, droppedItems: { items: 37 }, result: { items: [] } },
+            }),
+        ];
+        expect(rows(saved, idle, [])[0]).toMatchObject({ kind: "tool", status: "cut" });
+    });
+
     it("lists every pending action as a card even when no turn is live", () => {
         const saved = [message(1, "user", "delete it")];
         const listed = rows(saved, idle, [action("a1"), action("a2", "executed")]);
@@ -139,6 +161,33 @@ describe("rows over a live turn", () => {
         const listed = rows(saved, turn, []);
         expect(listed.map((row) => row.kind)).toStrictEqual(["user", "tool", "tool", "working"]);
         expect(listed[2]).toMatchObject({ callId: "k2", live: true, status: "running" });
+    });
+
+    it("carries a live refusal and a live shortening as their own row states", () => {
+        const turn: Turn = {
+            ...idle,
+            assistantMessageId: "a1",
+            status: "working",
+            tools: [
+                {
+                    callId: "k1",
+                    tool: "pages_delete",
+                    args: {},
+                    status: "denied",
+                    error: "the tool pages_delete is not open to this conversation",
+                },
+                {
+                    callId: "k2",
+                    tool: "pages_list",
+                    args: {},
+                    status: "ok",
+                    result: { truncated: true, totalBytes: 41_000, droppedItems: { items: 37 }, result: { items: [] } },
+                },
+            ],
+        };
+        const listed = rows([message(1, "user", "hi")], turn, []);
+        expect(listed[1]).toMatchObject({ kind: "tool", callId: "k1", status: "denied" });
+        expect(listed[2]).toMatchObject({ kind: "tool", callId: "k2", status: "cut" });
     });
 
     it("hides the live answer once the saved assistant row carries the same id", () => {

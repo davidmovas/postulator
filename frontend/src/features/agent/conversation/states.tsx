@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 
 import { copy } from "../../../copy/index.js";
 import { Banner, Button, ErrorIcon, HistoryToggleOffIcon, RestartAltIcon, StopCircleIcon } from "../../../ui/index.js";
+import { failure } from "./model/rows.js";
 
 export interface RetryProps {
     canRetry: boolean;
@@ -39,16 +40,18 @@ export function StoppedCard({ detail, canRetry, onRetry }: StoppedCardProps): Re
 }
 
 export interface FailedCardProps extends RetryProps {
+    code: string;
     message: string;
 }
 
-export function FailedCard({ message, canRetry, onRetry }: FailedCardProps): ReactElement {
+export function FailedCard({ code, message, canRetry, onRetry }: FailedCardProps): ReactElement {
+    const told = failure(code, message);
     return (
         <Banner
-            tone="danger"
-            icon={ErrorIcon}
-            title={copy.agent.states.errorTitle}
-            body={message}
+            tone={told.spent ? "warn" : "danger"}
+            icon={told.spent ? HistoryToggleOffIcon : ErrorIcon}
+            title={told.title}
+            body={told.body}
             actions={<RetryButton canRetry={canRetry} onRetry={onRetry} />}
         />
     );
