@@ -163,6 +163,18 @@ func TestEnvelopeMarshalsTheAgreedShape(t *testing.T) {
 			want:  `{"type":"graph.changed","seq":4,"at":"2026-09-17T10:30:00Z","payload":{"siteId":"s1"}}`,
 		},
 		{
+			name: "a budget the run outgrew names the money and the tokens",
+			input: events.Envelope{
+				Type: events.RunBudgetExceeded, Seq: 7, RunID: &runID, At: at,
+				Payload: events.RunBudgetExceededPayload{
+					RunID: runID, SpentUSD: 1.5, BudgetUSD: 1, SpentTokens: 40000, BudgetTokens: 30000,
+				},
+			},
+			want: `{"type":"run.budget_exceeded","seq":7,"runId":"6f3b2a11-0c9d-4e7a-8b25-1f4c6d7e8a90",` +
+				`"at":"2026-09-17T10:30:00Z","payload":{"runId":"6f3b2a11-0c9d-4e7a-8b25-1f4c6d7e8a90",` +
+				`"spentUsd":1.5,"budgetUsd":1,"spentTokens":40000,"budgetTokens":30000}}`,
+		},
+		{
 			name:  "run event carries the run id",
 			input: events.Envelope{Type: events.RunStarted, Seq: 1, RunID: &runID, At: at, Payload: events.RunStartedPayload{RunID: runID}},
 			want:  `{"type":"run.started","seq":1,"runId":"6f3b2a11-0c9d-4e7a-8b25-1f4c6d7e8a90","at":"2026-09-17T10:30:00Z","payload":{"runId":"6f3b2a11-0c9d-4e7a-8b25-1f4c6d7e8a90"}}`,

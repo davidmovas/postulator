@@ -206,6 +206,8 @@ export interface RunBudgetExceededPayload {
     runId: string;
     spentUsd: number;
     budgetUsd: number;
+    spentTokens: number;
+    budgetTokens: number;
 }
 
 export interface RunCancelledPayload {

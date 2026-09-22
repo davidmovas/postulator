@@ -146,9 +146,11 @@ type RunFailedPayload struct {
 }
 
 type RunBudgetExceededPayload struct {
-	RunID     string  `json:"runId"`
-	SpentUSD  float64 `json:"spentUsd"`
-	BudgetUSD float64 `json:"budgetUsd"`
+	RunID        string  `json:"runId"`
+	SpentUSD     float64 `json:"spentUsd"`
+	BudgetUSD    float64 `json:"budgetUsd"`
+	SpentTokens  int     `json:"spentTokens"`
+	BudgetTokens int     `json:"budgetTokens"`
 }
 
 type ItemStartedPayload struct {
