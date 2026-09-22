@@ -23,6 +23,7 @@ import (
 const (
 	siteVariable    = "POSTULATOR_WP_ADDRESS"
 	torHideVariable = "POSTULATOR_TOR_HIDE"
+	keyVariable     = "POSTULATOR_OPENAI_KEY"
 
 	defaultSiteAddress = "127.0.0.1:9223"
 
@@ -122,8 +123,11 @@ func configure(cfg app.Config) (harness, error) {
 
 	provider := newPacedProvider()
 	script := &assistantScript{}
-	cfg.Provider = provider
-	cfg.AgentProvider = fake.NewGollem(fake.WithScript(script.answer))
+	key := strings.TrimSpace(os.Getenv(keyVariable))
+	if key == "" {
+		cfg.Provider = provider
+		cfg.AgentProvider = fake.NewGollem(fake.WithScript(script.answer))
+	}
 	cfg.Environment = environment()
 
 	if !fresh {
@@ -132,7 +136,7 @@ func configure(cfg app.Config) (harness, error) {
 		}}, nil
 	}
 	return harness{Config: cfg, Seed: func(ctx context.Context, core *app.Core) error {
-		return seed(ctx, core, site, provider, script)
+		return seed(ctx, core, site, provider, script, key)
 	}}, nil
 }
 

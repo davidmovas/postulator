@@ -1011,3 +1011,76 @@ for the first time. The plan is `docs/superpowers/plans/2026-09-20-phase-13-fron
   on a detached canvas before the self-hosted Archivo has loaded, so a node was sized for the
   fallback face and the text later painted into it overflowed. The cache is cleared once
   `document.fonts` settles and the layout is recomputed.
+
+## Decisions taken on 2026-09-22 for the agent, its tools and what a turn costs
+
+The client's own walk: the agent could not complete a single tool call, six approvals failed
+after the click, the answer arrived as raw markdown, and the application reported $0.98 against
+$0.39 on the provider's page.
+
+- **A round of a turn is counted once, and every round is counted.** The turn summed the token
+  counts of every streamed chunk. gollem's OpenAI session sends the full per-call totals twice on
+  any round that produced tool calls, once beside the function calls and once as a trailing usage
+  chunk, and gollem's own loop takes the latest non-zero value rather than summing for exactly
+  that reason. The scripted fake now repeats its usage the way the real client does, because the
+  fault was invisible while the fake reported once.
+- **A cached input token is charged at the cached rate.** gollem reports it as
+  `CacheReadInputToken` and nothing read the field, while a system prompt and eighty-seven tool
+  schemas are resent on every round and are a cache hit after the first. Measured on a real key:
+  136,307 input tokens of which about 86% were cache reads, $0.085 against the $0.297 the full
+  rate would have charged. `CachedInputUSDPerM` of zero means undeclared and falls back to the
+  fresh rate, so an override row written before migration 0022 cannot silently make a cache read
+  free.
+- **The strategy concludes without texts.** gollem appends the final texts to the session history
+  itself, joined with newlines, on top of the copy the provider session already appended, so every
+  later turn resent the answer twice and one copy had newlines inside its words. `readTheStream`
+  returns an empty `ExecuteResponse` and the answer is read from the stream the window saw, which
+  makes the saved message and the streamed one the same text by construction.
+- **A tool field that names a domain choice carries its values.** Sixty of the tools hand `NewTool`
+  a DTO written for the Wails window, and those carry no `enum` and no `description`, so every
+  domain choice reached the model as a bare string and every refusal was the model guessing. Three
+  tests in `internal/transport/wails/vocabgen` hold the line against the same Go const blocks
+  `vocab.ts` is rendered from: a choice list equals a vocabulary or is listed as a deliberate
+  narrowing, a field named like a choice offers one, and every field of a write says what it is
+  for. The first of them caught `runs_start` offering four run kinds of six.
+- **The template specification is typed.** It was an opaque JSON string because `TemplateSpec`
+  carries two Go maps and the reflection refuses a map. The tools take the domain structs directly
+  and replace only the maps: model profiles as a list of role, provider and model, and step params
+  as the two keys a step reads. An override is a typed patch, so a misspelled key is refused at the
+  call rather than inside `Resolve` later.
+- **Arguments are read before a confirmation is written.** Decoding and domain validation used to
+  happen for the first time inside `Confirm`, after the approval, so the client approved what could
+  not run. `Tool.Check` decodes with `DisallowUnknownFields` and runs the domain validator where
+  there is one. Unknown fields are refused everywhere, not only at the proposal: they used to be
+  dropped in silence.
+- **A result that arrives mid-turn is queued, never dropped.** `Confirm` swallowed the `Conflict`
+  from `Turns.Start`, so approving two actions in a row lost the second every time. `Turns` holds
+  the results against the running turn and delivers them as one turn when it ends.
+- **A tree is one decision.** `graph_create_entities` takes the whole list, each entity naming its
+  parent by name, resolves those names against the batch and the site, and writes the entities and
+  their parent edges in one unit of work or none of them. Twenty entities used to be twenty cards.
+- **The runner is as patient as the port.** It took a raw gollem client, so it went round the retry
+  and limiter that stand on `llm.Client` and one 429 ended the turn. A content stream middleware
+  holds the declared requests per minute and tries a refused call again with backoff, honouring
+  `Retry-After`. A model whose rate is unknown is not held back at all, because treating unknown as
+  one call per minute is worse than not limiting.
+- **The prompt stops working against the model.** It forbade retrying a failed call, which left no
+  way to self-correct, and asked for English however the client wrote. It now says to read the
+  refusal and call again, to answer in the language of the question, to reach for the tool that
+  takes a list, and never to claim something awaits the client when no tool was called. The tool
+  names it repeated are dropped, since the tools are sent natively.
+- **Spans nest.** The markdown reader is rewritten: escapes, underscore emphasis that never fires
+  inside a word, strikethrough, images as their alt text, bare and angled addresses, code carrying
+  a backtick, real nested lists inside the item they belong to, ordered lists as `ol` starting where
+  they say, multi-line quotes holding blocks, table alignment and escaped pipes, and hard breaks.
+  An unfinished marker still stays the text it is, because a streamed answer is read while it is
+  still arriving. A code block names its language and copies itself; a link opens in Tor Browser
+  through `BrowserService`, which is the only way this application opens anything.
+- **The dock opens itself for a confirmation.** It is closed by default and the card lives inside
+  it, so a confirmation raised while it was closed existed only as a badge. Only the newest card
+  takes focus and none of them takes it from the composer mid-sentence; refusing is
+  Ctrl+Shift+Enter, symmetric with approving.
+- **The UI harness can talk to a real provider.** `POSTULATOR_OPENAI_KEY` leaves `Config.Provider`
+  and `Config.AgentProvider` unset, seals the key into the harness home and skips the seeded runs,
+  schedule and conversation, which would otherwise be real spend. That is how the numbers above
+  were measured, against a seeded site and a home of its own rather than the client's.

@@ -65,6 +65,18 @@ outline grid, review queue and propose dialog were rebuilt around those. `Propos
 `ProposeRelated` now name their step, which both attributes their spend and lets the harness
 answer them for the first time.
 
+**The agent was rebuilt on 2026-09-22** after the client's walk found it unable to complete a
+single tool call. Four faults and their roots are in `DECISIONS.md`: the spend was double counted
+on every tool round and charged cached input at the full rate, so $0.085 of real work read as
+$0.30; sixty tools handed the model a DTO written for the window, with no enum and no description,
+so every domain choice was a guess; arguments were only decoded after the client approved them,
+and a result that arrived while the conversation was answering was dropped; the markdown reader
+covered the common shapes and broke on the rest. `graph_create_entities` makes a tree one decision,
+the runner retries a rate limit instead of dying on it, the prompt lets the model correct itself
+and answer in the language it was asked in, and `POSTULATOR_OPENAI_KEY` points the UI harness at a
+real provider. Verified on a live OpenAI key against the seeded site: an entity tree and a template
+each landed on the first call, from one card each.
+
 **Phase 13, the product frontend, landed on 2026-09-20 and 21** (plan:
 `docs/superpowers/plans/2026-09-20-phase-13-frontend.md`). Every screen sits on one screen
 contract (`ui/screen.tsx` with `Toolbar`, `Tabs`, `Segmented`, `Menu`, `Kbd`), the window is

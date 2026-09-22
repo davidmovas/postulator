@@ -15,6 +15,7 @@ import (
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/graph"
+	"github.com/davidmovas/postulator/internal/application/models"
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/schedules"
@@ -183,7 +184,8 @@ func (a *assistantScript) answer(prompt string) fake.Turn {
 	}
 }
 
-func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pacedProvider, script *assistantScript) error {
+func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pacedProvider,
+	script *assistantScript, key string) error {
 	created, err := core.Sites.Create(ctx, sites.CreateRequest{
 		Name: siteName, BaseURL: site.URL(), Username: harnessUser, Password: harnessPassword, AllowInsecure: true,
 	})
@@ -217,6 +219,10 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 	}
 	if adoptErr := adoptTheSite(ctx, core, site, siteID); adoptErr != nil {
 		return adoptErr
+	}
+	if key != "" {
+		_, keyErr := core.Models.SetProviderKey(ctx, models.SetProviderKeyRequest{Provider: "openai", APIKey: key})
+		return keyErr
 	}
 	if runErr := seedRuns(ctx, core, siteID, guide, pagesByPath, provider); runErr != nil {
 		return runErr
