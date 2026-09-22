@@ -278,6 +278,8 @@ export const settings = {
             title: "Spent on models",
             calls: (count: number) => (count === 1 ? "1 call" : `${count} calls`),
             tokens: (total: string) => `${total} tokens`,
+            cached: (percent: number) => `${percent}% cached`,
+            cachedHint: "How much of what was sent to the models the providers served from their own cache, at a lower rate.",
         },
     },
     browser: {
