@@ -18,6 +18,7 @@ const idle: Turn = {
     code: "",
     message: "",
     usage: null,
+    waiting: null,
     turnSeq: 0,
 };
 
@@ -69,6 +70,38 @@ describe("rows over the saved transcript", () => {
     });
 
     it("tells a saved refusal apart from a saved failure", () => {
+        const saved = [
+            message(1, "tool", "the tool pages_delete is not open to this conversation", {
+                tool: "pages_delete",
+                callId: "k1",
+                payload: null,
+                toolStatus: "denied",
+            }),
+        ];
+        expect(rows(saved, idle, [])[0]).toMatchObject({ kind: "tool", status: "denied" });
+    });
+
+    it("takes the saved status from the ledger, whatever the refusal sentence reads like", () => {
+        const cases: readonly { name: string; toolStatus: string; text: string; want: string }[] = [
+            { name: "a refusal worded another way", toolStatus: "denied", text: "нельзя", want: "denied" },
+            { name: "a failure that mentions the refusal sentence", toolStatus: "error", text: "the tool pages_delete is not open to this conversation, it said", want: "error" },
+            { name: "a call that worked and said nothing", toolStatus: "ok", text: "", want: "ok" },
+        ];
+
+        for (const tc of cases) {
+            const saved = [
+                message(1, "tool", tc.text, {
+                    tool: "pages_delete",
+                    callId: "k1",
+                    payload: null,
+                    toolStatus: tc.toolStatus,
+                }),
+            ];
+            expect(rows(saved, idle, [])[0], tc.name).toMatchObject({ kind: "tool", status: tc.want });
+        }
+    });
+
+    it("falls back to the sentence for a row saved before the ledger was read back", () => {
         const saved = [
             message(1, "tool", "the tool pages_delete is not open to this conversation", {
                 tool: "pages_delete",

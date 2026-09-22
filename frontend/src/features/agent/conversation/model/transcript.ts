@@ -1,5 +1,5 @@
 import type { AgentConfirmation, ToolCallStatus, Turn, TurnUsage } from "../../../../data/agent/turn.js";
-import { isActive } from "../../../../data/agent/turn.js";
+import { isActive, toolCallStatus } from "../../../../data/agent/turn.js";
 import type { Message, PendingAction } from "../../../../data/types.js";
 import type { Timestamp } from "../../../../data/wire.js";
 import { refusedText, truncationOf } from "./tools.js";
@@ -34,6 +34,17 @@ function settledStatus(reported: ToolCallStatus, result: unknown): ToolRowStatus
     return reported;
 }
 
+export function savedStatus(message: Message): ToolCallStatus {
+    const recorded = message.toolStatus ?? "";
+    if (recorded !== "") {
+        return toolCallStatus(recorded);
+    }
+    if (message.text === "") {
+        return "ok";
+    }
+    return refusedText(message.text) ? "denied" : "error";
+}
+
 function savedRow(message: Message, turn: Turn): Row | null {
     switch (message.role) {
         case "user":
@@ -53,7 +64,7 @@ function savedRow(message: Message, turn: Turn): Row | null {
                 id: message.id,
                 callId: message.callId ?? "",
                 tool: message.tool ?? "",
-                status: settledStatus(message.text === "" ? "ok" : refusedText(message.text) ? "denied" : "error", message.payload ?? null),
+                status: settledStatus(savedStatus(message), message.payload ?? null),
                 durationMs: null,
                 result: message.payload ?? null,
                 error: message.text === "" ? null : message.text,

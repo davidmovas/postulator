@@ -25,6 +25,7 @@ type Message struct {
 	Text           string          `json:"text"`
 	Tool           string          `json:"tool,omitempty"`
 	CallID         string          `json:"callId,omitempty"`
+	ToolStatus     string          `json:"toolStatus,omitempty"`
 	Payload        json.RawMessage `json:"payload,omitempty"`
 	CreatedAt      dto.Time        `json:"createdAt"`
 }
@@ -49,10 +50,11 @@ func conversationView(c domainagent.Conversation) Conversation {
 	}
 }
 
-func messageView(m domainagent.Message) Message {
+func messageView(m domainagent.Message, status string) Message {
 	return Message{
 		ID: m.ID, ConversationID: m.ConversationID, Seq: m.Seq, Role: string(m.Role), Text: m.Text,
-		Tool: m.Tool, CallID: m.CallID, Payload: m.Payload, CreatedAt: dto.NewTime(m.CreatedAt),
+		Tool: m.Tool, CallID: m.CallID, ToolStatus: status, Payload: m.Payload,
+		CreatedAt: dto.NewTime(m.CreatedAt),
 	}
 }
 

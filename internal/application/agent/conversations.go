@@ -120,7 +120,39 @@ func (s *Service) ListMessages(ctx context.Context, req ListMessagesRequest) (pa
 	if err != nil {
 		return paging.List[Message]{}, err
 	}
-	return application.MapList(found, messageView), nil
+
+	settled, err := s.toolStatuses(ctx, conversationID, found.Items)
+	if err != nil {
+		return paging.List[Message]{}, err
+	}
+	return application.MapList(found, func(m domainagent.Message) Message {
+		return messageView(m, settled[m.CallID])
+	}), nil
+}
+
+func (s *Service) toolStatuses(ctx context.Context, conversationID string,
+	listed []domainagent.Message) (map[string]string, error) {
+	answered := false
+	for i := range listed {
+		if listed[i].Role == domainagent.RoleTool && listed[i].CallID != "" {
+			answered = true
+			break
+		}
+	}
+	if !answered || s.deps.Calls == nil {
+		return nil, nil
+	}
+
+	recorded, err := s.deps.Calls.ByConversation(ctx, conversationID)
+	if err != nil {
+		return nil, err
+	}
+
+	settled := make(map[string]string, len(recorded))
+	for i := range recorded {
+		settled[recorded[i].CallID] = string(recorded[i].Status)
+	}
+	return settled, nil
 }
 
 func (s *Service) ListPendingActions(ctx context.Context, req ListPendingActionsRequest) (paging.List[PendingAction], error) {

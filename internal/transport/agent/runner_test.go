@@ -439,6 +439,56 @@ func TestTheStoredHistoryHoldsTheAnswerOnce(t *testing.T) {
 	}
 }
 
+func TestASavedToolRowCarriesTheStatusTheLedgerRecorded(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	created, err := h.service.CreateConversation(t.Context(), agentapp.CreateConversationRequest{
+		Mode: string(domainagent.ModeAutonomous),
+	})
+	if err != nil {
+		t.Fatalf("CreateConversation: %v", err)
+	}
+	conversation := created.Conversation.ID
+
+	h.send(t, conversation, "TOOL:pages_tree{}\nFAKE: no site here")
+
+	live, ok := h.payload(events.AgentToolFinished).(events.AgentToolFinishedPayload)
+	if !ok || live.Status != string(domainagent.CallDenied) {
+		t.Fatalf("the live row is %+v", h.payload(events.AgentToolFinished))
+	}
+
+	saved := h.messages(t, conversation)
+	rows := 0
+	for _, message := range saved {
+		if message.Role != "tool" {
+			continue
+		}
+		rows++
+		if message.ToolStatus != string(domainagent.CallDenied) {
+			t.Fatalf("the saved row reads %q, want the %q the ledger holds",
+				message.ToolStatus, domainagent.CallDenied)
+		}
+	}
+	if rows != 1 {
+		t.Fatalf("the transcript holds %d tool rows", rows)
+	}
+}
+
+func TestASavedToolRowThatSucceededReadsAsDone(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	conversation := h.conversation(t, domainagent.ModeAutonomous)
+	h.send(t, conversation, "TOOL:pages_tree{}\nFAKE: the tree is empty")
+
+	for _, message := range h.messages(t, conversation) {
+		if message.Role == "tool" && message.ToolStatus != string(domainagent.CallOK) {
+			t.Fatalf("the saved row reads %q, want ok", message.ToolStatus)
+		}
+	}
+}
+
 func TestSendRefusesWhatItCannotAnswer(t *testing.T) {
 	t.Parallel()
 

@@ -40,6 +40,7 @@ type actionStore interface {
 
 type callStore interface {
 	Insert(ctx context.Context, c domainagent.ToolCall) error
+	ByConversation(ctx context.Context, conversationID string) ([]domainagent.ToolCall, error)
 }
 
 type siteReader interface {
