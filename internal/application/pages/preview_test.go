@@ -15,18 +15,26 @@ import (
 
 type issued struct {
 	siteID string
+	wpType string
 	wpID   int64
 }
 
 type recordingIssuer struct {
-	answer pages.IssuedPreview
-	err    error
-	calls  []issued
+	answer   pages.IssuedPreview
+	err      error
+	trashErr error
+	calls    []issued
+	trashed  []issued
 }
 
 func (r *recordingIssuer) IssuePreview(_ context.Context, siteID string, wpID int64) (pages.IssuedPreview, error) {
 	r.calls = append(r.calls, issued{siteID: siteID, wpID: wpID})
 	return r.answer, r.err
+}
+
+func (r *recordingIssuer) TrashItem(_ context.Context, siteID string, wpID int64, wpType string) error {
+	r.trashed = append(r.trashed, issued{siteID: siteID, wpID: wpID, wpType: wpType})
+	return r.trashErr
 }
 
 func (h harness) placed(t *testing.T, path string, status pagemap.Status, wpID int64) pages.Page {

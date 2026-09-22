@@ -38,7 +38,8 @@ type UpdateResponse struct {
 }
 
 type DeleteRequest struct {
-	ID string `json:"id" description:"The id of the page to remove from the map, exactly as a read tool returned it"`
+	ID     string `json:"id" description:"The id of the page to remove from the map, exactly as a read tool returned it"`
+	OnSite bool   `json:"onSite,omitempty" description:"Also move the page to the WordPress trash, where a human can still restore it"`
 }
 
 type DeleteResponse struct{}

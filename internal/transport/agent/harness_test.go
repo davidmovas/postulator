@@ -61,6 +61,10 @@ func (stubPreview) IssuePreview(context.Context, string, int64) (pages.IssuedPre
 		WithDetail("code", "plugin_missing")
 }
 
+func (stubPreview) TrashItem(context.Context, string, int64, string) error {
+	return errors.New(errors.Invalid, "no site in this test removes a page")
+}
+
 type fixedCatalog struct{}
 
 func (fixedCatalog) Lookup(context.Context, domainllm.ModelRef) (domainllm.ModelInfo, error) {

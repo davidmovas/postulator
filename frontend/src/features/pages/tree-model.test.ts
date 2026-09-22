@@ -21,6 +21,8 @@ function page(id: string, path: string): Page {
         entityId: null,
         templateId: null,
         contentHash: "",
+        observed: { link: "", slug: "", status: "", title: "", h1: "" },
+        mismatches: [],
         wpModifiedAt: null,
         lastSyncedAt: null,
         drift: false,

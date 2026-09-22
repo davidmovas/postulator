@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 
+	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/application/pages"
 )
 
@@ -21,4 +22,12 @@ func (p previewIssuer) IssuePreview(ctx context.Context, siteID string, wpID int
 		return pages.IssuedPreview{}, err
 	}
 	return pages.IssuedPreview{URL: link.URL, ExpiresAt: link.ExpiresAt}, nil
+}
+
+func (p previewIssuer) TrashItem(ctx context.Context, siteID string, wpID int64, wpType string) error {
+	client, err := p.clients.Client(ctx, siteID)
+	if err != nil {
+		return err
+	}
+	return client.DeleteItem(ctx, wp.ItemType(wpType), wpID, false)
 }

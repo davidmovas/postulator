@@ -188,17 +188,26 @@ func (s *Service) Update(ctx context.Context, req UpdateRequest) (UpdateResponse
 }
 
 func (s *Service) Delete(ctx context.Context, req DeleteRequest) (DeleteResponse, error) {
-	var siteID string
-	err := s.uow.Do(ctx, func(c context.Context) error {
-		current, getErr := s.pages.Get(c, req.ID)
-		if getErr != nil {
-			return getErr
-		}
-		siteID = current.SiteID
-		return s.pages.Delete(c, req.ID)
-	})
+	current, err := s.pages.Get(ctx, req.ID)
 	if err != nil {
 		return DeleteResponse{}, err
+	}
+	if req.OnSite {
+		if current.WPID == nil {
+			return DeleteResponse{}, errors.New(errors.Invalid,
+				"the page is not on the site, so there is nothing to remove there").
+				WithDetail("field", "wpId").WithDetail("pageId", current.ID)
+		}
+		if trashErr := s.preview.TrashItem(ctx, current.SiteID, *current.WPID, string(current.WPType)); trashErr != nil {
+			return DeleteResponse{}, trashErr
+		}
+	}
+
+	siteID := current.SiteID
+	if dropErr := s.uow.Do(ctx, func(c context.Context) error {
+		return s.pages.Delete(c, req.ID)
+	}); dropErr != nil {
+		return DeleteResponse{}, dropErr
 	}
 	if publishErr := s.changed(siteID); publishErr != nil {
 		return DeleteResponse{}, publishErr

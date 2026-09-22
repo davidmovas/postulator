@@ -13,6 +13,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -385,5 +386,67 @@ func TestDelete(t *testing.T) {
 	}
 	if _, err = h.service.Get(t.Context(), pages.GetRequest{ID: page.ID}); !errors.IsCode(err, errors.NotFound) {
 		t.Errorf("Get missing code = %q, want NOT_FOUND", errors.CodeOf(err))
+	}
+}
+
+func TestDeleteRemovesThePageFromTheSiteWhenAsked(t *testing.T) {
+	t.Parallel()
+
+	issuer := &recordingIssuer{}
+	h := newPreviewHarness(t, issuer)
+	published := h.placed(t, "/coffee/", pagemap.StatusPublished, 42)
+	h.recorder.Reset()
+
+	if _, err := h.service.Delete(t.Context(), pages.DeleteRequest{ID: published.ID, OnSite: true}); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if len(issuer.trashed) != 1 || issuer.trashed[0].wpID != 42 || issuer.trashed[0].wpType != "page" {
+		t.Fatalf("the site was asked %+v, want the page trashed", issuer.trashed)
+	}
+	if _, err := h.service.Get(t.Context(), pages.GetRequest{ID: published.ID}); !errors.IsCode(err, errors.NotFound) {
+		t.Fatalf("the page survived the delete: %v", err)
+	}
+}
+
+func TestDeleteLeavesTheSiteAloneByDefault(t *testing.T) {
+	t.Parallel()
+
+	issuer := &recordingIssuer{}
+	h := newPreviewHarness(t, issuer)
+	published := h.placed(t, "/coffee/", pagemap.StatusPublished, 42)
+
+	if _, err := h.service.Delete(t.Context(), pages.DeleteRequest{ID: published.ID}); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if len(issuer.trashed) != 0 {
+		t.Fatalf("the site was asked %+v, want it left alone", issuer.trashed)
+	}
+}
+
+func TestDeleteKeepsThePageWhenTheSiteRefuses(t *testing.T) {
+	t.Parallel()
+
+	issuer := &recordingIssuer{trashErr: errors.New(errors.External, "the site is down")}
+	h := newPreviewHarness(t, issuer)
+	published := h.placed(t, "/coffee/", pagemap.StatusPublished, 42)
+
+	if _, err := h.service.Delete(t.Context(), pages.DeleteRequest{ID: published.ID, OnSite: true}); !errors.IsCode(err, errors.External) {
+		t.Fatalf("Delete = %v, want the site's refusal", err)
+	}
+	if _, err := h.service.Get(t.Context(), pages.GetRequest{ID: published.ID}); err != nil {
+		t.Fatalf("the page was dropped although the site refused: %v", err)
+	}
+}
+
+func TestDeleteOnSiteNeedsAPageThatIsOnTheSite(t *testing.T) {
+	t.Parallel()
+
+	issuer := &recordingIssuer{}
+	h := newPreviewHarness(t, issuer)
+	planned := h.placed(t, "/planned/", pagemap.StatusPlanned, 0)
+
+	_, err := h.service.Delete(t.Context(), pages.DeleteRequest{ID: planned.ID, OnSite: true})
+	if !errors.IsCode(err, errors.Invalid) || fieldOf(err) != "wpId" {
+		t.Fatalf("Delete = %v, want an invalid error naming wpId", err)
 	}
 }

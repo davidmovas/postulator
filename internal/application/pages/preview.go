@@ -24,6 +24,7 @@ type IssuedPreview struct {
 
 type previewIssuer interface {
 	IssuePreview(ctx context.Context, siteID string, wpID int64) (IssuedPreview, error)
+	TrashItem(ctx context.Context, siteID string, wpID int64, wpType string) error
 }
 
 func (s *Service) PreviewLink(ctx context.Context, req PreviewLinkRequest) (PreviewLinkResponse, error) {
