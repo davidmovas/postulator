@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -87,6 +88,56 @@ func TestSyncBackReadsThroughThePlugin(t *testing.T) {
 	}
 	if links[0].Origin != pagemap.OriginObserved || links[0].AnchorText != "coffee" {
 		t.Fatalf("link = %+v", links[0])
+	}
+}
+
+func TestSyncBackRecordsWhatTheSiteHolds(t *testing.T) {
+	t.Parallel()
+
+	deps, _, _, wpID := syncBackDeps(t)
+	stored := &pagemap.Page{}
+	pages, ok := deps.Pages.(pageList)
+	if !ok {
+		t.Fatal("the sync back fixture no longer carries a page list")
+	}
+	pages.recorded = stored
+	deps.Pages = pages
+
+	synced := runSyncBack(t, deps, syncBackContext(t, wpID))
+
+	if stored.Observed.H1 != "Espresso" || stored.Observed.Title != "Espresso" {
+		t.Fatalf("the stored mirror = %+v, want the heading and the title the site holds", stored.Observed)
+	}
+	if stored.Observed.Status != "draft" || stored.Observed.Slug != "espresso" {
+		t.Fatalf("the stored mirror = %+v", stored.Observed)
+	}
+	if len(synced.Mismatches) != 0 {
+		t.Errorf("mismatches = %+v, want none: nothing was planned to disagree with", synced.Mismatches)
+	}
+}
+
+func TestSyncBackReportsAHeadingThatIsNotTheOneAskedFor(t *testing.T) {
+	t.Parallel()
+
+	deps, _, _, wpID := syncBackDeps(t)
+	sc := syncBackContext(t, wpID)
+	sc.Page.H1 = "How Far Can an E-Bike Go?"
+	sc.Page.Status = pagemap.StatusExists
+
+	synced := runSyncBack(t, deps, sc)
+
+	if len(synced.Mismatches) != 1 || synced.Mismatches[0].Field != pagemap.FieldH1 {
+		t.Fatalf("mismatches = %+v, want the heading reported", synced.Mismatches)
+	}
+	if synced.Mismatches[0].Planned != "How Far Can an E-Bike Go?" || synced.Mismatches[0].Actual != "Espresso" {
+		t.Errorf("the mismatch = %+v", synced.Mismatches[0])
+	}
+	if len(synced.Findings) != 1 || synced.Findings[0].Code != steps.CodePlanNotKept {
+		t.Fatalf("findings = %+v, want one %q warning", synced.Findings, steps.CodePlanNotKept)
+	}
+	if synced.Findings[0].Severity != content.SeverityWarn ||
+		synced.Findings[0].Details["class"] != steps.ClassNeedsHuman {
+		t.Errorf("the finding = %+v", synced.Findings[0])
 	}
 }
 

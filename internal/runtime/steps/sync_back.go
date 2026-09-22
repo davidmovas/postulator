@@ -15,17 +15,21 @@ import (
 const (
 	NameSyncBack = string(run.StepSyncBack)
 
+	CodePlanNotKept = "plan_not_kept"
+
 	syncBackTimeout = 2 * time.Minute
 )
 
 type SyncResult struct {
-	ModifiedAt  time.Time `json:"modifiedAt"`
-	URL         string    `json:"url"`
-	Status      string    `json:"status"`
-	ContentHash string    `json:"contentHash"`
-	Source      string    `json:"source"`
-	WPID        int64     `json:"wpId"`
-	Links       int       `json:"links"`
+	ModifiedAt  time.Time          `json:"modifiedAt"`
+	URL         string             `json:"url"`
+	Status      string             `json:"status"`
+	ContentHash string             `json:"contentHash"`
+	Source      string             `json:"source"`
+	Findings    []content.Finding  `json:"findings"`
+	Mismatches  []pagemap.Mismatch `json:"mismatches"`
+	WPID        int64              `json:"wpId"`
+	Links       int                `json:"links"`
 }
 
 func SyncBack(deps Deps) run.StepDef {
@@ -84,6 +88,10 @@ func SyncBack(deps Deps) run.StepDef {
 			next := sc.Page
 			next.WPID = &item.ID
 			next.ContentHash = wp.ContentHash(body)
+			next.Observed = pagemap.Observed{
+				Link: permalinkOf(item), Slug: item.Slug, Status: item.Status,
+				Title: item.Title, H1: headingOne(doc),
+			}
 			next.Drift = false
 			next.LastSyncedAt = &now
 			next.UpdatedAt = now
@@ -96,9 +104,11 @@ func SyncBack(deps Deps) run.StepDef {
 				return run.Result{}, persistErr
 			}
 
+			mismatches := next.Mismatches()
 			result := SyncResult{
 				WPID: item.ID, URL: item.Link, Status: item.Status, ContentHash: next.ContentHash,
 				Source: source, Links: len(links), ModifiedAt: item.Modified.UTC(),
+				Mismatches: mismatches, Findings: planFindings(next, mismatches),
 			}
 			blob, err := encode(result, "sync result")
 			if err != nil {
@@ -110,6 +120,23 @@ func SyncBack(deps Deps) run.StepDef {
 			}, nil
 		},
 	}
+}
+
+func planFindings(page pagemap.Page, mismatches []pagemap.Mismatch) []content.Finding {
+	out := make([]content.Finding, 0, len(mismatches))
+	for i := range mismatches {
+		out = append(out, content.Finding{
+			Severity: content.SeverityWarn,
+			Code:     CodePlanNotKept,
+			Message: "the " + mismatches[i].Field + " of " + page.Path + " was planned as " +
+				mismatches[i].Planned + " and the site holds " + mismatches[i].Actual,
+			Details: map[string]any{
+				"class": ClassNeedsHuman, "pageId": page.ID, "path": page.Path,
+				"field": mismatches[i].Field, "planned": mismatches[i].Planned, "actual": mismatches[i].Actual,
+			},
+		})
+	}
+	return out
 }
 
 func readBack(ctx context.Context, client *wp.Client, wpID int64, fallback string) (body, source string, err error) {

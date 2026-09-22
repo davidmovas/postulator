@@ -65,6 +65,7 @@ func Report(deps Deps) run.StepDef {
 			}
 			if found {
 				report.Publish = &published
+				report.Findings = append(report.Findings, published.Findings...)
 			}
 
 			relinked, found, err := decodeArtifact[RelinkResult](sc, run.ArtifactRelinkResult)
@@ -82,6 +83,7 @@ func Report(deps Deps) run.StepDef {
 			}
 			if found {
 				report.Sync = &synced
+				report.Findings = append(report.Findings, synced.Findings...)
 			}
 
 			pictures, found, err := decodeArtifact[ImagesResult](sc, run.ArtifactImages)

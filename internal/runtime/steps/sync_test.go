@@ -326,6 +326,68 @@ func TestSyncSiteFlagsDriftOnlyOverOurOwnHashAndArchivesWhatIsGone(t *testing.T)
 	}
 }
 
+func TestSyncSiteKeepsThePlanAndRecordsWhatTheSiteHolds(t *testing.T) {
+	t.Parallel()
+
+	h := newSyncHarness(t, 0)
+	flat := h.server.Seed(wptest.Item{
+		Type: wptest.TypePage, Title: "How Far Can an E-Bike Go?", Slug: "e-bike-range",
+		Content: `<h1>How Far Can an E-Bike Go?</h1><p>How far.</p>`,
+	})
+	wpID := flat[0].ID
+
+	planned := pagemap.Page{
+		ID: id.New(), SiteID: h.siteID, Path: "/components/batteries/e-bike-range/", Slug: "e-bike-range",
+		WPType: pagemap.WPPage, WPID: &wpID, Title: "How Far Can an E-Bike Go?",
+		Status: pagemap.StatusPublished, ContentHash: wp.ContentHash(`<h1>How Far Can an E-Bike Go?</h1><p>How far.</p>`),
+		CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+	}
+	if err := h.pages.Insert(t.Context(), planned); err != nil {
+		t.Fatalf("insert the planned page: %v", err)
+	}
+
+	h.all(t)
+
+	stored, err := h.pages.Get(t.Context(), planned.ID)
+	if err != nil {
+		t.Fatalf("read the planned page: %v", err)
+	}
+	if stored.Path != planned.Path {
+		t.Fatalf("the stored path = %q, want the plan %q: WordPress owns no field of the plan",
+			stored.Path, planned.Path)
+	}
+	if stored.Title != planned.Title {
+		t.Errorf("the stored title = %q, want the plan %q", stored.Title, planned.Title)
+	}
+	if stored.Observed.Link == "" || stored.Observed.Slug != "e-bike-range" {
+		t.Fatalf("the stored mirror = %+v, want the address the site holds", stored.Observed)
+	}
+
+	found := stored.Mismatches()
+	if len(found) != 1 || found[0].Field != pagemap.FieldPath {
+		t.Fatalf("mismatches = %+v, want the flattened path reported", found)
+	}
+	if found[0].Planned != planned.Path || found[0].Actual != "/e-bike-range/" {
+		t.Errorf("the mismatch = %+v", found[0])
+	}
+}
+
+func TestSyncSiteAdoptsAPageItHasNeverSeen(t *testing.T) {
+	t.Parallel()
+
+	h := newSyncHarness(t, 0)
+	seedSite(t, h)
+	h.all(t)
+
+	discovered := h.byPath(t, "/coffee/espresso/")
+	if discovered.Title != "Espresso" || discovered.Observed.Slug != "espresso" {
+		t.Fatalf("a page the map never held = %+v, want the site's own values adopted", discovered)
+	}
+	if found := discovered.Mismatches(); len(found) != 0 {
+		t.Fatalf("mismatches = %+v, want none: nothing was planned for this page", found)
+	}
+}
+
 func TestSyncSiteRestartsWhenTheCursorSourceChanges(t *testing.T) {
 	t.Parallel()
 

@@ -2,6 +2,7 @@ package steps_test
 
 import (
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/run"
@@ -66,6 +67,28 @@ func TestReportAggregatesEveryArtifact(t *testing.T) {
 	}
 	if report.Errors != 1 || report.Warnings != 2 {
 		t.Errorf("errors = %d, warnings = %d", report.Errors, report.Warnings)
+	}
+}
+
+func TestReportCarriesWhatThePublishAndTheReadBackFound(t *testing.T) {
+	t.Parallel()
+
+	report := runReport(t, map[run.ArtifactKind][]byte{
+		run.ArtifactPublishResult: []byte(`{"wpId":7,"url":"/espresso/","status":"draft",` +
+			`"findings":[{"severity":"warn","code":"seo_meta_skipped","message":"no plugin"}]}`),
+		run.ArtifactSyncResult: []byte(`{"wpId":7,"status":"draft","links":2,"source":"plugin",` +
+			`"findings":[{"severity":"warn","code":"plan_not_kept","message":"the h1 differs"}]}`),
+	})
+
+	codes := make([]string, 0, len(report.Findings))
+	for _, finding := range report.Findings {
+		codes = append(codes, finding.Code)
+	}
+	if !slices.Contains(codes, steps.CodeSEOMetaSkipped) || !slices.Contains(codes, steps.CodePlanNotKept) {
+		t.Fatalf("the report carries %v, want what the publish and the read back found", codes)
+	}
+	if report.Warnings != 2 {
+		t.Errorf("warnings = %d, want both counted", report.Warnings)
 	}
 }
 

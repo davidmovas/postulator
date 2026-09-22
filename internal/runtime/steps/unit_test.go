@@ -41,8 +41,9 @@ func (e edgeList) ListBySite(context.Context, string) ([]graph.Edge, error) {
 }
 
 type pageList struct {
-	items []pagemap.Page
-	err   error
+	recorded *pagemap.Page
+	items    []pagemap.Page
+	err      error
 }
 
 func (p pageList) ListBySite(context.Context, string) ([]pagemap.Page, error) {
@@ -61,7 +62,10 @@ func (p pageList) Get(_ context.Context, id string) (pagemap.Page, error) {
 	return pagemap.Page{}, errors.New(errors.NotFound, "no such page")
 }
 
-func (p pageList) Update(context.Context, pagemap.Page) error {
+func (p pageList) Update(_ context.Context, page pagemap.Page) error {
+	if p.recorded != nil {
+		*p.recorded = page
+	}
 	return p.err
 }
 

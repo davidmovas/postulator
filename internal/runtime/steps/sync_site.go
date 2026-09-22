@@ -487,16 +487,21 @@ func merge(current pagemap.Page, known bool, item pulledItem, siteID string,
 
 	drifted = known && next.ContentHash != "" && next.ContentHash != item.ContentHash
 
-	next.Path = item.Path
-	next.Slug = pagemap.Slug(item.Path)
+	if !authored(next) {
+		next.Path = item.Path
+		next.Slug = pagemap.Slug(item.Path)
+		next.Title = item.Title
+		next.H1 = item.H1
+		next.MetaTitle = item.Meta.Title
+		next.MetaDescription = item.Meta.Description
+		next.Canonical = item.Meta.Canonical
+		next.Status = statusFor(item.Status)
+	}
 	next.WPType = wpTypeOrPage(item.Type)
 	next.WPID = &item.WPID
-	next.Title = item.Title
-	next.H1 = item.H1
-	next.MetaTitle = item.Meta.Title
-	next.MetaDescription = item.Meta.Description
-	next.Canonical = item.Meta.Canonical
-	next.Status = statusFor(item.Status)
+	next.Observed = pagemap.Observed{
+		Link: item.Path, Slug: item.Slug, Status: item.Status, Title: item.Title, H1: item.H1,
+	}
 	next.Drift = drifted
 	next.LastSyncedAt = &now
 	next.UpdatedAt = now
@@ -505,6 +510,10 @@ func merge(current pagemap.Page, known bool, item pulledItem, siteID string,
 		next.WPModifiedAt = &modified
 	}
 	return next, drifted
+}
+
+func authored(page pagemap.Page) bool {
+	return page.ContentHash != ""
 }
 
 func wpTypeOrPage(itemType pagemap.WPType) pagemap.WPType {
