@@ -37,6 +37,7 @@ func registered() []string {
 		"graph_approve_edge",
 		"graph_reject_edge",
 		"graph_delete_edge",
+		"graph_move_entity",
 		"graph_load",
 		"graph_recompute_scores",
 		"graph_propose_from_pages",
@@ -223,6 +224,36 @@ func TestAPreviewLinkIsApprovedBeforeItIsIssued(t *testing.T) {
 		return
 	}
 	t.Fatal("pages_preview_link is not registered")
+}
+
+func TestMovingAnEntityIsOneWriteTheModelCanMake(t *testing.T) {
+	t.Parallel()
+
+	registry := newRegistry(&actionRecorder{}, &busRecorder{})
+	def, known := registry.Lookup("graph_move_entity")
+	if !known {
+		t.Fatal("graph_move_entity is not registered")
+	}
+	if def.Risk != tools.RiskWrite {
+		t.Fatalf("risk = %s, want write: it rewrites the tree", def.Risk)
+	}
+
+	for _, field := range []string{"entityId", "newParentId", "keepBoth"} {
+		if def.Schema.Properties[field] == nil {
+			t.Errorf("the schema offers no %s: %+v", field, def.Schema)
+		}
+	}
+	if def.Schema.Properties["siteId"] != nil {
+		t.Error("the tool takes its site from the conversation")
+	}
+
+	want := []string{"entityId", "newParentId"}
+	got := slices.Clone(def.Schema.Required)
+	slices.Sort(got)
+	slices.Sort(want)
+	if !slices.Equal(got, want) {
+		t.Fatalf("required = %v, want %v: the use case refuses neither of those absent", got, want)
+	}
 }
 
 func TestEveryToolCarriesADefinitionAndASchema(t *testing.T) {

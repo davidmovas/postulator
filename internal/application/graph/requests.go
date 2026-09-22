@@ -113,6 +113,17 @@ type RejectEdgeResponse struct {
 	Edge Edge `json:"edge"`
 }
 
+type MoveEntityRequest struct {
+	EntityID    string `json:"entityId" description:"The id of the entity to move, exactly as a read tool returned it"`
+	NewParentID string `json:"newParentId" description:"The id of the entity it should sit under from now on"`
+	KeepBoth    bool   `json:"keepBoth,omitempty" description:"Keep the parent it sits under today as well, which leaves the entity with two parents; leave it out to replace it"`
+}
+
+type MoveEntityResponse struct {
+	Edge           Edge     `json:"edge"`
+	RemovedEdgeIDs []string `json:"removedEdgeIds"`
+}
+
 type DeleteEdgeRequest struct {
 	ID string `json:"id" description:"The id of the edge to remove, exactly as a read tool returned it"`
 }

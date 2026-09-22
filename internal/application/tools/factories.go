@@ -19,6 +19,7 @@ func factories() []factory {
 		graphApproveEdge,
 		graphRejectEdge,
 		graphDeleteEdge,
+		graphMoveEntity,
 		graphLoad,
 		graphRecomputeScores,
 		graphProposeFromPages,

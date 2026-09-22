@@ -1,13 +1,16 @@
 package graph
 
 import (
+	"context"
+
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
+	kctx "github.com/davidmovas/postulator/internal/kernel/ctx"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
 
 type Anchor struct {
 	Text   string  `json:"text" description:"The link text another page points here with"`
-	Source string  `json:"source" enum:"user,ai" description:"Who wrote the anchor; an anchor you propose is ai"`
+	Source string  `json:"source,omitempty" enum:"user,ai" description:"Who wrote the anchor; leave it out and an anchor you propose is recorded as ai"`
 	Weight float64 `json:"weight,omitempty" minimum:"0" maximum:"1" description:"How strongly to prefer this anchor over the others, between 0 and 1; leave it out for no preference"`
 }
 
@@ -75,10 +78,30 @@ func entityView(e graphdomain.Entity) Entity {
 	}
 }
 
-func anchorsOf(anchors []Anchor) []graphdomain.Anchor {
+func anchorsOf(ctx context.Context, anchors []Anchor) []graphdomain.Anchor {
+	fallback := anchorSourceOfActor(ctx)
+
 	out := make([]graphdomain.Anchor, 0, len(anchors))
 	for _, anchor := range anchors {
-		out = append(out, graphdomain.Anchor{Text: anchor.Text, Source: graphdomain.AnchorSource(anchor.Source), Weight: anchor.Weight})
+		source := graphdomain.AnchorSource(anchor.Source)
+		if anchor.Source == "" {
+			source = fallback
+		}
+		out = append(out, graphdomain.Anchor{Text: anchor.Text, Source: source, Weight: anchor.Weight})
 	}
 	return out
+}
+
+func anchorSourceOfActor(ctx context.Context) graphdomain.AnchorSource {
+	if actor, ok := kctx.ActorFrom(ctx); ok && actor == kctx.ActorAgent {
+		return graphdomain.AnchorAI
+	}
+	return graphdomain.AnchorUser
+}
+
+func sourceOfActor(ctx context.Context) graphdomain.Source {
+	if actor, ok := kctx.ActorFrom(ctx); ok && actor == kctx.ActorAgent {
+		return graphdomain.SourceAI
+	}
+	return graphdomain.SourceUser
 }

@@ -46,7 +46,7 @@ func (s *Service) CreateEntities(ctx context.Context, req CreateEntitiesRequest)
 			Intent:            req.Entities[i].Intent,
 			PrimaryKeyword:    req.Entities[i].PrimaryKeyword,
 			SecondaryKeywords: req.Entities[i].SecondaryKeywords,
-			Anchors:           anchorsOf(req.Entities[i].Anchors),
+			Anchors:           anchorsOf(ctx, req.Entities[i].Anchors),
 			Source:            source,
 			CreatedAt:         now,
 			UpdatedAt:         now,

@@ -57,6 +57,10 @@ func (f graphFake) DeleteEdge(context.Context, graph.DeleteEdgeRequest) (graph.D
 	return answer[graph.DeleteEdgeResponse](f.mode)
 }
 
+func (f graphFake) MoveEntity(context.Context, graph.MoveEntityRequest) (graph.MoveEntityResponse, error) {
+	return answer[graph.MoveEntityResponse](f.mode)
+}
+
 func (f graphFake) ListEdges(context.Context, graph.ListEdgesRequest) (paging.List[graph.Edge], error) {
 	return answer[paging.List[graph.Edge]](f.mode)
 }
@@ -78,7 +82,7 @@ func TestGraphServiceConvertsEveryFailure(t *testing.T) {
 
 	assertMethodNames(t, wails.NewGraphService(zap.NewNop(), ready[wails.GraphUseCase](graphFake{})), []string{
 		"AddEdge", "ApproveEdge", "CreateEntity", "DeleteEdge", "DeleteEntity", "GetEntity",
-		"ListEdges", "ListEntities", "LoadGraph", "ProposeFromPages", "ProposeRelated",
+		"ListEdges", "ListEntities", "LoadGraph", "MoveEntity", "ProposeFromPages", "ProposeRelated",
 		"RecomputeScores", "RejectEdge", "SetAnchors", "UpdateEntity",
 	})
 	assertEveryMethodConverts(t, wails.NewGraphService(zap.NewNop(), ready[wails.GraphUseCase](graphFake{mode: missing})), missingBody)

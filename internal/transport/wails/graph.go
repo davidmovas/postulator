@@ -22,6 +22,7 @@ type GraphUseCase interface {
 	ApproveEdge(ctx context.Context, req graph.ApproveEdgeRequest) (graph.ApproveEdgeResponse, error)
 	RejectEdge(ctx context.Context, req graph.RejectEdgeRequest) (graph.RejectEdgeResponse, error)
 	DeleteEdge(ctx context.Context, req graph.DeleteEdgeRequest) (graph.DeleteEdgeResponse, error)
+	MoveEntity(ctx context.Context, req graph.MoveEntityRequest) (graph.MoveEntityResponse, error)
 	ListEdges(ctx context.Context, req graph.ListEdgesRequest) (paging.List[graph.Edge], error)
 	RecomputeScores(ctx context.Context, req graph.RecomputeScoresRequest) (graph.RecomputeScoresResponse, error)
 	ProposeFromPages(ctx context.Context, req graph.ProposeFromPagesRequest) (graph.ProposeFromPagesResponse, error)
@@ -40,6 +41,7 @@ type GraphService struct {
 	approveEdge      middleware.Handler[graph.ApproveEdgeRequest, graph.ApproveEdgeResponse]
 	rejectEdge       middleware.Handler[graph.RejectEdgeRequest, graph.RejectEdgeResponse]
 	deleteEdge       middleware.Handler[graph.DeleteEdgeRequest, graph.DeleteEdgeResponse]
+	moveEntity       middleware.Handler[graph.MoveEntityRequest, graph.MoveEntityResponse]
 	listEdges        middleware.Handler[graph.ListEdgesRequest, paging.List[graph.Edge]]
 	recomputeScores  middleware.Handler[graph.RecomputeScoresRequest, graph.RecomputeScoresResponse]
 	proposeFromPages middleware.Handler[graph.ProposeFromPagesRequest, graph.ProposeFromPagesResponse]
@@ -59,6 +61,7 @@ func NewGraphService(logger *zap.Logger, useCase Source[GraphUseCase]) *GraphSer
 		approveEdge:      Wrap(logger, "graph.approveEdge", call(useCase, GraphUseCase.ApproveEdge)),
 		rejectEdge:       Wrap(logger, "graph.rejectEdge", call(useCase, GraphUseCase.RejectEdge)),
 		deleteEdge:       Wrap(logger, "graph.deleteEdge", call(useCase, GraphUseCase.DeleteEdge)),
+		moveEntity:       Wrap(logger, "graph.moveEntity", call(useCase, GraphUseCase.MoveEntity)),
 		listEdges:        Wrap(logger, "graph.listEdges", call(useCase, GraphUseCase.ListEdges)),
 		recomputeScores:  Wrap(logger, "graph.recomputeScores", call(useCase, GraphUseCase.RecomputeScores)),
 		proposeFromPages: Wrap(logger, "graph.proposeFromPages", call(useCase, GraphUseCase.ProposeFromPages)),
@@ -108,6 +111,10 @@ func (s *GraphService) RejectEdge(c context.Context, req graph.RejectEdgeRequest
 
 func (s *GraphService) DeleteEdge(c context.Context, req graph.DeleteEdgeRequest) (graph.DeleteEdgeResponse, error) {
 	return s.deleteEdge(c, req)
+}
+
+func (s *GraphService) MoveEntity(c context.Context, req graph.MoveEntityRequest) (graph.MoveEntityResponse, error) {
+	return s.moveEntity(c, req)
 }
 
 func (s *GraphService) ListEdges(c context.Context, req graph.ListEdgesRequest) (paging.List[graph.Edge], error) {

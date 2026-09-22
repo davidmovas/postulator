@@ -43,7 +43,7 @@ func (s *Service) CreateEntity(ctx context.Context, req CreateEntityRequest) (Cr
 		Intent:            req.Intent,
 		PrimaryKeyword:    req.PrimaryKeyword,
 		SecondaryKeywords: req.SecondaryKeywords,
-		Anchors:           anchorsOf(req.Anchors),
+		Anchors:           anchorsOf(ctx, req.Anchors),
 		Source:            source,
 		CreatedAt:         now,
 		UpdatedAt:         now,
@@ -87,7 +87,7 @@ func (s *Service) UpdateEntity(ctx context.Context, req UpdateEntityRequest) (Up
 
 func (s *Service) SetAnchors(ctx context.Context, req SetAnchorsRequest) (SetAnchorsResponse, error) {
 	updated, err := s.rewriteEntity(ctx, req.EntityID, func(next *graphdomain.Entity) {
-		next.Anchors = anchorsOf(req.Anchors)
+		next.Anchors = anchorsOf(ctx, req.Anchors)
 	})
 	if err != nil {
 		return SetAnchorsResponse{}, err
