@@ -24,7 +24,18 @@ func publishContext(t *testing.T) *run.StepContext {
 		run.ArtifactDraft:    []byte(goodDraft),
 		run.ArtifactMeta:     []byte(`{"title":"espresso | Shop","description":"Pull a shot.","canonical":"https://shop.example.com/coffee/espresso/"}`),
 	})
+	sc.Page.Path = "/espresso/"
 	sc.Page.Slug = pagemap.Slug(sc.Page.Path)
+	return sc
+}
+
+func nestedContext(t *testing.T) *run.StepContext {
+	t.Helper()
+
+	sc := publishContext(t)
+	sc.Page.Path = "/coffee/espresso/"
+	sc.Page.Slug = pagemap.Slug(sc.Page.Path)
+	sc.Page.ParentPageID = pointer("page-parent")
 	return sc
 }
 
@@ -202,8 +213,7 @@ func TestPublishReparentsUnderTheParentPage(t *testing.T) {
 		},
 	}}
 
-	sc := publishContext(t)
-	sc.Page.ParentPageID = pointer("page-parent")
+	sc := nestedContext(t)
 
 	published := runPublish(t, deps, sc)
 	stored, ok := server.Lookup(published.WPID)
@@ -216,8 +226,7 @@ func TestPublishWaitsWhileTheParentIsNotOnTheSite(t *testing.T) {
 	t.Parallel()
 
 	deps, server := imageDeps(t)
-	sc := publishContext(t)
-	sc.Page.ParentPageID = pointer("page-parent")
+	sc := nestedContext(t)
 
 	result, err := steps.Publish(deps).Run(t.Context(), sc)
 	if err != nil {
@@ -238,8 +247,7 @@ func TestPublishStopsOnceTheParentHasNotArrived(t *testing.T) {
 	t.Parallel()
 
 	deps, server := imageDeps(t)
-	sc := publishContext(t)
-	sc.Page.ParentPageID = pointer("page-parent")
+	sc := nestedContext(t)
 
 	var result run.Result
 	for attempt := 0; attempt <= steps.ParentWaitLimit; attempt++ {
@@ -266,11 +274,56 @@ func TestPublishStopsOnceTheParentHasNotArrived(t *testing.T) {
 	}
 }
 
-func TestPublishRefusesADanglingParent(t *testing.T) {
+func TestPublishKeepsASectionOutOfTheHomePage(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	home := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Home", Slug: "home"})
+	homeID := home[0].ID
+
+	deps.Pages = pageList{items: []pagemap.Page{{
+		ID: "page-home", SiteID: "site", Path: "/", Slug: "", WPType: pagemap.WPPage,
+		Status: pagemap.StatusPublished, WPID: &homeID,
+	}}}
+
+	sc := publishContext(t)
+	sc.Page.Path = "/coffee/"
+	sc.Page.Slug = pagemap.Slug(sc.Page.Path)
+	sc.Page.ParentPageID = pointer("page-home")
+
+	published := runPublish(t, deps, sc)
+	stored, ok := server.Lookup(published.WPID)
+	if !ok || stored.Parent != 0 {
+		t.Fatalf("the section is %+v, want it at the top level: the front page is not an ancestor", stored)
+	}
+}
+
+func TestPublishRefusesAnIncompleteAncestorChain(t *testing.T) {
 	t.Parallel()
 
 	deps, server := imageDeps(t)
 	sc := publishContext(t)
+	sc.Page.Path = "/components/batteries/e-bike-range/"
+	sc.Page.Slug = pagemap.Slug(sc.Page.Path)
+	sc.Page.ParentPageID = nil
+
+	_, err := steps.Publish(deps).Run(t.Context(), sc)
+	if !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("Publish of a page whose parent path has no page = %v, want an invalid error", err)
+	}
+	if !strings.Contains(err.Error(), "/components/batteries/") {
+		t.Errorf("the refusal %q does not name the missing parent path", err.Error())
+	}
+	if len(server.Items()) != 0 {
+		t.Fatalf("the site holds %d items, want none", len(server.Items()))
+	}
+}
+
+func TestPublishRefusesADanglingParent(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	sc := nestedContext(t)
 	sc.Page.ParentPageID = pointer("page-ghost")
 
 	if _, err := steps.Publish(deps).Run(t.Context(), sc); !errors.IsCode(err, errors.Invalid) {
@@ -294,8 +347,7 @@ func TestPublishMovesAFlatPageRatherThanDuplicatingIt(t *testing.T) {
 		Status: pagemap.StatusPublished, WPID: &wpID,
 	}}}
 
-	sc := publishContext(t)
-	sc.Page.ParentPageID = pointer("page-parent")
+	sc := nestedContext(t)
 
 	published := runPublish(t, deps, sc)
 	if published.Created || published.WPID != flat[0].ID {

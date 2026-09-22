@@ -179,8 +179,17 @@ type placement struct {
 }
 
 func parentOf(ctx context.Context, deps Deps, page pagemap.Page) (placement, error) {
-	if page.ParentPageID == nil {
+	wanted := pagemap.ParentPath(page.Path)
+	if wanted == "" || wanted == "/" {
 		return placement{}, nil
+	}
+
+	if page.ParentPageID == nil {
+		return placement{}, errors.New(errors.Invalid,
+			"the page map holds no page at "+wanted+", so "+page.Path+" has no parent to sit under").
+			WithDetail("pageId", page.ID).
+			WithDetail("path", page.Path).
+			WithDetail("parentPath", wanted)
 	}
 
 	parent, err := deps.Pages.Get(ctx, *page.ParentPageID)
@@ -193,6 +202,14 @@ func parentOf(ctx context.Context, deps Deps, page pagemap.Page) (placement, err
 				WithDetail("parentPageId", *page.ParentPageID)
 		}
 		return placement{}, err
+	}
+	if parent.Path != wanted {
+		return placement{}, errors.New(errors.Invalid,
+			"the page is linked to "+parent.Path+" while its path asks for "+wanted).
+			WithDetail("pageId", page.ID).
+			WithDetail("path", page.Path).
+			WithDetail("parentPath", wanted).
+			WithDetail("linkedPath", parent.Path)
 	}
 	if parent.WPID == nil {
 		return placement{path: parent.Path, pending: true}, nil
