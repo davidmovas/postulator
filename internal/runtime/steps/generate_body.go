@@ -15,10 +15,26 @@ import (
 const NameGenerateBody = string(run.StepGenerateBody)
 
 type bodyPrompt struct {
-	Page    pagemap.Page
-	Entity  graph.Entity
-	Spec    template.TemplateSpec
-	Phrases []string
+	Page     pagemap.Page
+	Entity   graph.Entity
+	Spec     template.TemplateSpec
+	Phrases  []string
+	Children []string
+}
+
+func childAnchors(lc content.LinkContext, wanted bool) []string {
+	if !wanted {
+		return nil
+	}
+
+	out := make([]string, 0, len(lc.Targets))
+	for i := range lc.Targets {
+		if lc.Targets[i].Relation != content.RelationDown || len(lc.Targets[i].Anchors) == 0 {
+			continue
+		}
+		out = append(out, lc.Targets[i].Anchors[0])
+	}
+	return out
 }
 
 func GenerateBody(deps Deps) run.StepDef {
@@ -45,6 +61,7 @@ func GenerateBody(deps Deps) run.StepDef {
 
 			system, user, err := render(NameGenerateBody, bodyPrompt{
 				Page: sc.Page, Entity: entity, Spec: sc.Spec, Phrases: lc.Phrases(),
+				Children: childAnchors(lc, sc.Spec.LinkRules.ChildrenSection),
 			})
 			if err != nil {
 				return run.Result{}, err

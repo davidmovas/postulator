@@ -440,6 +440,59 @@ func TestGenerateBodyAssemblesAndCountsTokens(t *testing.T) {
 	}
 }
 
+func TestGenerateBodyNamesTheChildrenWhenTheRulesAskFor(t *testing.T) {
+	t.Parallel()
+
+	down, err := json.Marshal(content.LinkContext{
+		PageID: "page-child", PageURL: "/coffee/espresso/", EntityID: "child",
+		Targets: []content.LinkTarget{
+			{
+				EntityID: "grind", PageID: "page-grind", URL: "/coffee/espresso/grind/",
+				Anchors: []string{"grinding for espresso"}, Relation: content.RelationDown, Weight: 1, Depth: 1,
+			},
+			{
+				EntityID: "parent", PageID: "page-parent", URL: "/coffee/",
+				Anchors: []string{"coffee"}, Relation: content.RelationUp, Required: true, Weight: 1, Depth: 1,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("encode the link context: %v", err)
+	}
+
+	cases := []struct {
+		name    string
+		section bool
+		want    bool
+	}{
+		{name: "the rules ask for a children section", section: true, want: true},
+		{name: "the rules do not", section: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps := unitDeps()
+			recorder := &promptRecorder{reply: goodDraft}
+			deps.LLM = recorder
+			sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: down})
+			sc.Spec.LinkRules.ChildrenSection = tc.section
+
+			if _, runErr := steps.GenerateBody(deps).Run(t.Context(), sc); runErr != nil {
+				t.Fatalf("GenerateBody: %v", runErr)
+			}
+			if strings.Contains(recorder.last, "CHILDREN") != tc.want {
+				t.Fatalf("the prompt asks for a children section = %t, want %t:\n%s",
+					!tc.want, tc.want, recorder.last)
+			}
+			if tc.want && !strings.Contains(recorder.last, "grinding for espresso") {
+				t.Fatalf("the prompt does not name the child:\n%s", recorder.last)
+			}
+		})
+	}
+}
+
 func TestInsertLinksAndValidateReadTheirArtifacts(t *testing.T) {
 	t.Parallel()
 
