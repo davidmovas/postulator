@@ -10,6 +10,7 @@ func factories() []factory {
 		graphListEntities,
 		graphGetEntity,
 		graphCreateEntity,
+		graphCreateEntities,
 		graphUpdateEntity,
 		graphDeleteEntity,
 		graphSetAnchors,

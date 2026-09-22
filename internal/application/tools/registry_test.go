@@ -28,6 +28,7 @@ func registered() []string {
 		"graph_list_entities",
 		"graph_get_entity",
 		"graph_create_entity",
+		"graph_create_entities",
 		"graph_update_entity",
 		"graph_delete_entity",
 		"graph_set_anchors",
@@ -353,6 +354,54 @@ func TestSummaryCarriesTheArguments(t *testing.T) {
 	}
 }
 
+func TestAnUnusableCallNeverBecomesAConfirmation(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		tool string
+		args string
+	}{
+		{
+			name: "a field the tool does not take",
+			tool: "graph_create_entity",
+			args: `{"name":"Creatine","kind":"topic","shade":"blue"}`,
+		},
+		{
+			name: "a field of the wrong shape",
+			tool: "templates_create",
+			args: `{"name":"Guide","pageKind":"guide","spec":{"tone":{"voice":"warm"}}}`,
+		},
+		{
+			name: "a specification the domain refuses",
+			tool: "templates_create",
+			args: `{"name":"Guide","pageKind":"guide","spec":{"sections":[],"tone":"plain"}}`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			actions := &actionRecorder{}
+			bus := &busRecorder{}
+			registry := newRegistry(actions, bus)
+			binding := tools.Binding{ConversationID: "conversation-1", SiteID: "site-1", Mode: agent.ModeConfirm}
+
+			_, err := registry.Call(t.Context(), binding, tc.tool, json.RawMessage(tc.args))
+			if !errors.IsCode(err, errors.Invalid) {
+				t.Fatalf("the call answered %v, want an invalid argument", err)
+			}
+			if len(actions.actions) != 0 {
+				t.Fatalf("the client was asked to approve %+v", actions.actions)
+			}
+			if len(bus.payloads) != 0 {
+				t.Fatalf("a confirmation was announced: %+v", bus.payloads)
+			}
+		})
+	}
+}
+
 func TestASecretNeverReachesTheSummaryOrTheEvent(t *testing.T) {
 	t.Parallel()
 
@@ -361,7 +410,7 @@ func TestASecretNeverReachesTheSummaryOrTheEvent(t *testing.T) {
 	registry := newRegistry(actions, bus)
 	binding := tools.Binding{ConversationID: "conversation-1", Mode: agent.ModeConfirm}
 
-	args := json.RawMessage(`{"provider":"openai","apiKey":"sk-live-secret","nested":[{"password":"hunter2"}]}`)
+	args := json.RawMessage(`{"provider":"openai","apiKey":"sk-live-secret"}`)
 	for _, tool := range registry.Build(binding) {
 		if tool.Def.Name != "models_set_provider_key" {
 			continue
@@ -385,8 +434,9 @@ func TestASecretNeverReachesTheSummaryOrTheEvent(t *testing.T) {
 	if !ok || strings.Contains(string(payload.Args), "sk-live-secret") {
 		t.Fatalf("the event carries the key: %s", payload.Args)
 	}
-	if strings.Contains(string(payload.Args), "hunter2") {
-		t.Fatalf("a nested secret survived the redaction: %s", payload.Args)
+	nested := tools.Redact(json.RawMessage(`{"rows":[{"password":"hunter2"}]}`))
+	if strings.Contains(string(nested), "hunter2") {
+		t.Fatalf("a nested secret survived the redaction: %s", nested)
 	}
 
 	if got := string(tools.Redact(json.RawMessage("not json"))); got != "not json" {

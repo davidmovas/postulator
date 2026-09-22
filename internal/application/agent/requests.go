@@ -24,7 +24,6 @@ type SiteContext struct {
 	SiteName  string
 	Mode      string
 	Templates []string
-	Tools     []string
 	Entities  int
 	Pages     int
 	Published int

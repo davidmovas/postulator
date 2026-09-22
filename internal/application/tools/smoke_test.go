@@ -192,7 +192,7 @@ func TestEveryWriteToolProposesInsteadOfWriting(t *testing.T) {
 			continue
 		}
 
-		out, err := tool.Run(t.Context(), binding, json.RawMessage(`{}`))
+		out, err := tool.Run(t.Context(), binding, argumentsFor(tool.Def.Name))
 		if err != nil {
 			t.Fatalf("%s proposed with %v", tool.Def.Name, err)
 		}
@@ -228,10 +228,22 @@ func TestEveryWriteToolRunsAgainstTheRealUseCases(t *testing.T) {
 	}
 }
 
+const minimalSpec = `{"sections":[{"heading":"Overview","intent":"what it is","targetWords":200,"required":true,` +
+	`"keywordRules":{"include":[],"primaryInHeading":false}}],"tone":"plain","length":{"min":300,"max":900},` +
+	`"keywordRules":{"primaryInTitle":true,"primaryInH1":true,"primaryInFirstParagraph":true,"maxDensity":0.02},` +
+	`"linkRules":{"upDepth":1,"downLinks":true,"siblingMinWeight":0.5,"maxLinks":8,"maxPerTarget":2,` +
+	`"parentLinkWithinParagraphs":2,"childrenSection":false},` +
+	`"metaRules":{"titlePattern":"{primaryKeyword}","descriptionMax":155},` +
+	`"images":{"featured":false,"inline":0,"source":"ai"}}`
+
 func argumentsFor(name string) json.RawMessage {
 	switch name {
 	case "imports_inspect", "imports_preview":
 		return json.RawMessage(`{"path":"C:/nowhere/absent.csv","mapping":{"columns":[]}}`)
+	case "templates_create":
+		return json.RawMessage(`{"name":"Guide","pageKind":"guide","spec":` + minimalSpec + `}`)
+	case "templates_update":
+		return json.RawMessage(`{"id":"t1","spec":` + minimalSpec + `}`)
 	default:
 		return json.RawMessage(`{}`)
 	}

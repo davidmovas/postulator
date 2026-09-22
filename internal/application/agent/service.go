@@ -96,7 +96,21 @@ func New(deps Deps) *Service {
 	if deps.Turns == nil {
 		deps.Turns = NewTurns(deps.TurnTimeout)
 	}
-	return &Service{deps: deps}
+	service := &Service{deps: deps}
+	deps.Turns.Resuming(service.resumeQueued)
+	return service
+}
+
+func (s *Service) resumeQueued(conversationID, text string) {
+	ctx := context.WithoutCancel(context.Background())
+	conversation, err := s.deps.Conversations.Get(ctx, conversationID)
+	if err != nil {
+		s.deps.Turns.Note(err)
+		return
+	}
+	if _, err = s.turn(ctx, conversation, text); err != nil {
+		s.deps.Turns.Note(err)
+	}
 }
 
 func (s *Service) Close() {

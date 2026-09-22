@@ -42,6 +42,8 @@ type catalogReader interface {
 
 type Config struct {
 	MaxToolResultBytes int
+	Retries            int
+	Backoff            time.Duration
 }
 
 type Deps struct {
@@ -55,15 +57,16 @@ type Deps struct {
 }
 
 type Runner struct {
-	deps Deps
-	cfg  Config
+	deps    Deps
+	cfg     Config
+	waiting *patience
 }
 
 func New(deps Deps, cfg Config) *Runner {
 	if cfg.MaxToolResultBytes <= 0 {
 		cfg.MaxToolResultBytes = agentapp.DefaultMaxToolResultBytes
 	}
-	return &Runner{deps: deps, cfg: cfg}
+	return &Runner{deps: deps, cfg: cfg, waiting: newPatience(deps.Catalog, cfg.Retries, cfg.Backoff)}
 }
 
 func (r *Runner) resultCeiling(spec agentapp.RunSpec) int {
@@ -138,6 +141,7 @@ func (r *Runner) execute(ctx context.Context, client gollem.LLMClient, spec agen
 		gollem.WithSystemPrompt(system),
 		gollem.WithResponseMode(gollem.ResponseModeStreaming),
 		gollem.WithStrategy(readTheStream{}),
+		gollem.WithContentStreamMiddleware(r.waiting.middleware(spec.Ref)),
 		gollem.WithContentStreamMiddleware(observe(spec.Stream, usage, spoken, guard.note)),
 		gollem.WithTools(adapted...),
 	}

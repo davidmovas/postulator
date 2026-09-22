@@ -46,6 +46,16 @@ export const describeGraph: Describer = (tool, args) => {
             }
             return view(said.create(text(args, "name") ?? ""), lines);
         }
+        case "graph_create_entities": {
+            const entities = records(args, "entities");
+            const lines: Line[] = [line("note", said.createManyBody)];
+            for (const entity of entities) {
+                const name = text(entity, "name") ?? "";
+                const parent = text(entity, "parentName");
+                lines.push(line(parent === null ? "target" : "link", parent === null ? said.root(name) : said.child(name, parent)));
+            }
+            return view(said.createMany(entities.length), lines);
+        }
         case "graph_update_entity":
             return view([`${said.update} `, ref("entity", text(args, "id") ?? "")], entityFields(args, true));
         case "graph_delete_entity":

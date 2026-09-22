@@ -4,6 +4,7 @@ import (
 	"context"
 	stderrors "errors"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -35,13 +36,32 @@ type Turns struct {
 	mu      sync.Mutex
 	wg      sync.WaitGroup
 	running map[string]*turn
+	waiting map[string][]string
+	resume  func(conversationID, text string)
 	dropped []error
 	timeout func() time.Duration
 	closed  bool
 }
 
 func NewTurns(timeout func() time.Duration) *Turns {
-	return &Turns{running: make(map[string]*turn), timeout: timeout}
+	return &Turns{running: make(map[string]*turn), waiting: make(map[string][]string), timeout: timeout}
+}
+
+func (t *Turns) Resuming(resume func(conversationID, text string)) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.resume = resume
+}
+
+func (t *Turns) Queue(conversationID, text string) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.closed || t.running[conversationID] == nil {
+		return false
+	}
+	t.waiting[conversationID] = append(t.waiting[conversationID], text)
+	return true
 }
 
 func (t *Turns) deadline() time.Duration {
@@ -87,8 +107,16 @@ func (t *Turns) finish(conversationID string, cancel context.CancelFunc) {
 	cancel()
 
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	delete(t.running, conversationID)
+	queued := t.waiting[conversationID]
+	delete(t.waiting, conversationID)
+	resume, closed := t.resume, t.closed
+	t.mu.Unlock()
+
+	if len(queued) == 0 || resume == nil || closed {
+		return
+	}
+	resume(conversationID, strings.Join(queued, "\n\n"))
 }
 
 func (t *Turns) Cancel(conversationID string) bool {

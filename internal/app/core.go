@@ -372,7 +372,11 @@ func (c *Core) build(ctx context.Context, key []byte) (kit, error) {
 			Catalog:  modelCatalog,
 			Clock:    now,
 			Logger:   logger,
-		}, agentrunner.Config{MaxToolResultBytes: agent.MaxToolResultBytes(values)}),
+		}, agentrunner.Config{
+			MaxToolResultBytes: agent.MaxToolResultBytes(values),
+			Retries:            retry.Retries(values),
+			Backoff:            retry.DefaultBackoff,
+		}),
 		Publisher:     relay,
 		Clock:         now,
 		TurnTimeout:   func() time.Duration { return agent.TurnTimeout(values) },

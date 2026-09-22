@@ -151,7 +151,6 @@ func (s *Service) Cancel(_ context.Context, req CancelRequest) (CancelResponse, 
 func (s *Service) siteContext(ctx context.Context, conversation domainagent.Conversation) (SiteContext, error) {
 	built := SiteContext{
 		Mode:      string(conversation.Mode),
-		Tools:     s.deps.Registry.Names(),
 		Templates: []string{},
 	}
 

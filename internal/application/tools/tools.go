@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"maps"
@@ -49,6 +50,7 @@ type Binding struct {
 
 type Tool struct {
 	Authorize func(ctx context.Context, b Binding) error
+	Check     func(args json.RawMessage) error
 	Run       func(ctx context.Context, b Binding, args json.RawMessage) (any, error)
 	Def       Def
 }
@@ -70,22 +72,57 @@ func NewTool[In, Out any](def Def, fn func(ctx context.Context, b Binding, in In
 	schema, schemaErr := llm.SchemaFor[In]()
 	def.Schema = schema
 
+	read := func(args json.RawMessage) (In, error) {
+		var in In
+		if schemaErr != nil {
+			return in, errors.Wrap(schemaErr, errors.Internal, "tool "+def.Name+" has no usable argument schema")
+		}
+		if len(args) == 0 {
+			return in, nil
+		}
+
+		decoder := json.NewDecoder(bytes.NewReader(args))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&in); err != nil {
+			return in, errors.New(errors.Invalid, "the arguments of tool "+def.Name+" are not what it takes").
+				WithDetail("tool", def.Name).WithInternal(err)
+		}
+		return in, nil
+	}
+
 	return Tool{
 		Def: def,
+		Check: func(args json.RawMessage) error {
+			_, err := read(args)
+			return err
+		},
 		Run: func(ctx context.Context, b Binding, args json.RawMessage) (any, error) {
-			if schemaErr != nil {
-				return nil, errors.Wrap(schemaErr, errors.Internal, "tool "+def.Name+" has no usable argument schema")
-			}
-
-			var in In
-			if len(args) > 0 {
-				if err := json.Unmarshal(args, &in); err != nil {
-					return nil, errors.Wrap(err, errors.Invalid, "the arguments of tool "+def.Name+" are not readable")
-				}
+			in, err := read(args)
+			if err != nil {
+				return nil, err
 			}
 			return fn(ctx, b, in)
 		},
 	}
+}
+
+func checking[In any](tool Tool, validate func(in In) error) Tool {
+	decode := tool.Check
+	tool.Check = func(args json.RawMessage) error {
+		if err := decode(args); err != nil {
+			return err
+		}
+
+		var in In
+		if len(args) == 0 {
+			return validate(in)
+		}
+		if err := json.Unmarshal(args, &in); err != nil {
+			return errors.Wrap(err, errors.Invalid, "the arguments of tool "+tool.Def.Name+" are not what it takes")
+		}
+		return validate(in)
+	}
+	return tool
 }
 
 func newSiteTool[In, Out any](def Def, fn func(ctx context.Context, b Binding, in In) (Out, error)) Tool {

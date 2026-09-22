@@ -99,11 +99,22 @@ func (s *Service) execute(ctx context.Context, action domainagent.PendingAction)
 	}); err != nil {
 		return ConfirmResponse{}, err
 	}
-	if _, err = s.turn(ctx, conversation, resumeText(action.Tool, encoded, failure)); err != nil &&
-		!errors.IsCode(err, errors.Conflict) {
-		return ConfirmResponse{}, err
-	}
+	s.deps.Turns.Note(s.resume(ctx, conversation, resumeText(action.Tool, encoded, failure)))
 	return ConfirmResponse{Action: actionView(settled)}, nil
+}
+
+func (s *Service) resume(ctx context.Context, conversation domainagent.Conversation, text string) error {
+	for range 2 {
+		if s.deps.Turns.Queue(conversation.ID, text) {
+			return nil
+		}
+		_, err := s.turn(ctx, conversation, text)
+		if err == nil || !errors.IsCode(err, errors.Conflict) {
+			return err
+		}
+	}
+	return errors.New(errors.Conflict, "the conversation could not be told that the tool ran").
+		WithDetail("conversationId", conversation.ID)
 }
 
 func (s *Service) allowed() []string {

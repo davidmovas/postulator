@@ -29,6 +29,13 @@ export const confirmableArgs: Readonly<Record<string, Record<string, unknown>>> 
         secondaryKeywords: ["insulated mug", "mug with lid"],
         anchors: [{ text: "travel mugs", source: "user", weight: 1 }],
     },
+    graph_create_entities: {
+        entities: [
+            { name: "Supplements", kind: "hub", primaryKeyword: "supplements" },
+            { name: "Vitamins", kind: "category", primaryKeyword: "vitamins", parentName: "Supplements" },
+            { name: "Vitamin D", kind: "topic", primaryKeyword: "vitamin d", parentName: "Vitamins" },
+        ],
+    },
     graph_update_entity: { id: "e1", name: "Ceramic Mugs", primaryKeyword: "ceramic mug" },
     graph_delete_entity: { id: "e1" },
     graph_set_anchors: { entityId: "e1", anchors: [{ text: "ceramic mugs", source: "user", weight: 1 }, { text: "stoneware mugs", source: "model", weight: 0.6 }] },

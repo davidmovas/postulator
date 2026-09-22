@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/content"
@@ -77,7 +78,7 @@ func (r *Registry) Build(b Binding) []Tool {
 	for _, name := range r.order {
 		tool := r.byName[name](r.deps)
 		if b.Mode == agent.ModeConfirm && tool.Def.Risk.NeedsConfirmation() {
-			tool.Run = r.proposal(tool.Def)
+			tool.Run = r.proposal(tool.Def, tool.Check)
 		}
 		built = append(built, tool)
 	}
@@ -92,7 +93,7 @@ func (r *Registry) Call(ctx context.Context, b Binding, name string, args json.R
 
 	tool := build(r.deps)
 	if b.Mode == agent.ModeConfirm && !b.Approved && tool.Def.Risk.NeedsConfirmation() {
-		tool.Run = r.proposal(tool.Def)
+		tool.Run = r.proposal(tool.Def, tool.Check)
 	}
 	if tool.Authorize != nil {
 		if err := tool.Authorize(ctx, b); err != nil {
@@ -110,11 +111,17 @@ func (r *Registry) Lookup(name string) (Def, bool) {
 	return build(r.deps).Def, true
 }
 
-func (r *Registry) proposal(def Def) func(context.Context, Binding, json.RawMessage) (any, error) {
+func (r *Registry) proposal(def Def, check func(json.RawMessage) error) func(
+	context.Context, Binding, json.RawMessage) (any, error) {
 	return func(ctx context.Context, b Binding, args json.RawMessage) (any, error) {
 		if b.ConversationID == "" {
 			return nil, errors.New(errors.Invalid, "a confirmation needs the conversation that asked for it").
 				WithDetail("tool", def.Name)
+		}
+		if check != nil {
+			if err := check(args); err != nil {
+				return nil, err
+			}
 		}
 
 		now := r.now()
@@ -128,10 +135,11 @@ func (r *Registry) proposal(def Def) func(context.Context, Binding, json.RawMess
 		if insertErr := r.deps.Actions.Insert(ctx, action); insertErr != nil {
 			return nil, insertErr
 		}
-		if publishErr := r.deps.Publisher.Publish(events.AgentConfirmRequested, events.AgentConfirmRequestedPayload{
-			ConversationID: b.ConversationID, ConfirmationID: action.ID, Tool: def.Name,
-			Args: Redact(action.Args), Risk: string(def.Risk), Summary: action.Summary,
-		}); publishErr != nil {
+		if publishErr := r.deps.Publisher.Publish(events.AgentConfirmRequested,
+			events.AgentConfirmRequestedPayload{
+				ConversationID: b.ConversationID, ConfirmationID: action.ID, Tool: def.Name,
+				Args: Redact(action.Args), Risk: string(def.Risk), Summary: action.Summary,
+			}); publishErr != nil {
 			return nil, publishErr
 		}
 		return Confirmation{Status: agent.ConfirmationRequired, ActionID: action.ID, Summary: action.Summary}, nil
@@ -152,8 +160,17 @@ func Summary(def Def, args json.RawMessage) string {
 	if compact == "" || compact == "{}" || compact == "null" {
 		return summary
 	}
-	if len(compact) > maxSummaryArgs {
-		compact = compact[:maxSummaryArgs] + "…"
+	return summary + " with " + shortened(compact, maxSummaryArgs)
+}
+
+func shortened(text string, limit int) string {
+	if len(text) <= limit {
+		return text
 	}
-	return summary + " with " + compact
+
+	cut := limit
+	for cut > 0 && !utf8.RuneStart(text[cut]) {
+		cut--
+	}
+	return text[:cut] + "…"
 }

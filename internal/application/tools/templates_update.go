@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/template"
 )
 
 const templatesUpdateName = "templates_update"
@@ -16,7 +17,7 @@ type templatesUpdateArgs struct {
 }
 
 func templatesUpdate(deps Deps) Tool {
-	return NewTool(Def{
+	return checking(NewTool(Def{
 		Name:        templatesUpdateName,
 		Description: "Change the name, page kind or specification of a template.",
 		Risk:        RiskWrite,
@@ -27,5 +28,10 @@ func templatesUpdate(deps Deps) Tool {
 			request.Spec = &spec
 		}
 		return deps.Templates.UpdateTemplate(ctx, request)
+	}), func(in templatesUpdateArgs) error {
+		if in.Spec == nil {
+			return nil
+		}
+		return template.Validate(in.Spec.spec())
 	})
 }

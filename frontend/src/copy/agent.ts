@@ -197,6 +197,10 @@ export const agent = {
         },
         graph: {
             create: (name: string) => `Create entity "${name}"`,
+            createMany: (count: number) => `Create ${count} entities in one write`,
+            createManyBody: "The whole list is written together, or none of it is.",
+            root: (name: string) => `"${name}" · a root of the tree`,
+            child: (name: string, parent: string) => `"${name}" · under "${parent}"`,
             update: "Update entity",
             delete: "Delete entity",
             deleteBody: "Its pages keep their content and lose their entity. Its edges go.",

@@ -258,9 +258,16 @@ wraps the copy the model reads.
 
 In `confirm` mode a `write` or `dangerous` tool does not execute: it writes a
 `PendingAction` row and returns `{status:"confirmationRequired", actionId, summary}`, so a
-confirmation survives a restart. Wails services call the use cases directly and typed;
+confirmation survives a restart. The arguments are decoded into the tool's own request type
+first, with `DisallowUnknownFields`, and a tool that declares a `Check` runs its domain
+validator too, so a call the domain would refuse is answered with the refusal rather than
+put in front of the user. A result that arrives while the conversation is already answering
+is queued and delivered as one turn when that turn ends, rather than dropped. Wails services call the use cases directly and typed;
 they never go through the registry. A tool that works inside one site declares `Authorize` and takes its site from the
 binding, so `siteId` leaves the schema the model sees and no conversation reaches another
-site through it. `NewTool` derives that schema from the request type with the reflection
+site through it. Every field that names a domain choice carries its values as an `enum` tag
+and every field of a write says what it is for; three tests in
+`internal/transport/wails/vocabgen` hold that against the Go const blocks `vocab.ts` is
+rendered from. `NewTool` derives that schema from the request type with the reflection
 rules of `application/llm.Structured`, which do not cover a Go map; the few requests that
 carry one take a tool-local argument type instead.

@@ -17,6 +17,27 @@ type CreateEntityResponse struct {
 	Entity Entity `json:"entity"`
 }
 
+type EntityInput struct {
+	Name              string   `json:"name" description:"What the entity is about, two to four words in title case"`
+	Kind              string   `json:"kind" enum:"hub,product,topic,category,custom" description:"Where the entity sits in the graph: a hub is a subject root, a category groups topics, a topic is one subject, a product is a thing sold, custom is anything else"`
+	Intent            string   `json:"intent,omitempty" description:"What a reader wants from the page, one short sentence"`
+	PrimaryKeyword    string   `json:"primaryKeyword,omitempty" description:"The phrase a reader searches to reach the page"`
+	SecondaryKeywords []string `json:"secondaryKeywords,omitempty" description:"Further phrases the page can rank for, at most four"`
+	Anchors           []Anchor `json:"anchors,omitempty" description:"The link texts another page may point here with"`
+	ParentName        string   `json:"parentName,omitempty" description:"The name of the entity one level up, spelled exactly as it is written in this list or as it already exists on the site; leave it out for a root of the tree"`
+}
+
+type CreateEntitiesRequest struct {
+	SiteID   string        `json:"siteId"`
+	Entities []EntityInput `json:"entities" description:"The whole tree in one list, a parent before the children that name it; the batch is written or refused as one"`
+	Source   string        `json:"source,omitempty" enum:"import,user,ai" description:"Who asked for the entities; leave it out and a batch you propose is recorded as ai"`
+}
+
+type CreateEntitiesResponse struct {
+	Entities []Entity `json:"entities"`
+	Edges    []Edge   `json:"edges"`
+}
+
 type UpdateEntityRequest struct {
 	ID                string    `json:"id" description:"The id of the entity, exactly as a read tool returned it"`
 	Name              *string   `json:"name,omitempty" description:"The new name, left out to keep the current one"`

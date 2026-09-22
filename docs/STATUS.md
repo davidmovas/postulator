@@ -29,7 +29,7 @@ page proposer derives one from the page paths, and `AddEdge` accepts one.
 message titles an untitled one. `PagesService.PreviewLink` answers where a page can be seen as the
 site's theme renders it: a published page's public address, or an hour-long link the companion
 plugin 1.1.0 signs for a draft; `pages_preview_link` hands it to the agent as a `write` tool,
-eighty-six tools in all.
+eighty-seven tools in all since `graph_create_entities` landed on 2026-09-22.
 
 `RunsService.ListItems` carries `retryable` and `retryBlockedReason` since 2026-09-19, computed
 from the current step's `Requires` against the item's purged artifacts; `inputs_expired` is the
