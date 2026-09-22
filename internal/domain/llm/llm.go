@@ -67,6 +67,7 @@ type ModelInfo struct {
 	ContextTokens      int             `json:"contextTokens"`
 	MaxOutputTokens    int             `json:"maxOutputTokens"`
 	InputUSDPerM       float64         `json:"inputUsdPerM"`
+	CachedInputUSDPerM float64         `json:"cachedInputUsdPerM,omitempty"`
 	OutputUSDPerM      float64         `json:"outputUsdPerM"`
 	RPM                int             `json:"rpm"`
 	TPM                int             `json:"tpm"`
@@ -76,19 +77,32 @@ type ModelInfo struct {
 }
 
 type Usage struct {
-	Input  int `json:"input"`
-	Output int `json:"output"`
-	Total  int `json:"total"`
+	Input       int `json:"input"`
+	CachedInput int `json:"cachedInput"`
+	Output      int `json:"output"`
+	Total       int `json:"total"`
 }
 
 func (u Usage) Add(other Usage) Usage {
-	return Usage{Input: u.Input + other.Input, Output: u.Output + other.Output, Total: u.Total + other.Total}
+	return Usage{
+		Input:       u.Input + other.Input,
+		CachedInput: u.CachedInput + other.CachedInput,
+		Output:      u.Output + other.Output,
+		Total:       u.Total + other.Total,
+	}
 }
 
 const tokensPerMillion = 1_000_000
 
 func Cost(usage Usage, info ModelInfo) float64 {
-	input := float64(usage.Input) / tokensPerMillion * info.InputUSDPerM
+	cachedRate := info.CachedInputUSDPerM
+	if cachedRate <= 0 {
+		cachedRate = info.InputUSDPerM
+	}
+	cached := min(max(usage.CachedInput, 0), usage.Input)
+
+	fresh := float64(usage.Input-cached) / tokensPerMillion * info.InputUSDPerM
+	reused := float64(cached) / tokensPerMillion * cachedRate
 	output := float64(usage.Output) / tokensPerMillion * info.OutputUSDPerM
-	return input + output
+	return fresh + reused + output
 }

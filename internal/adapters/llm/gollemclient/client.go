@@ -54,7 +54,7 @@ func (c *Client) Complete(ctx context.Context, req port.Request) (port.Response,
 		return port.Response{}, classify(ctx, err)
 	}
 
-	usage := usageOf(resp.InputToken, resp.OutputToken)
+	usage := usageOf(resp.InputToken, resp.CacheReadInputToken, resp.OutputToken)
 	return port.Response{
 		Text:         strings.Join(resp.Texts, ""),
 		Usage:        usage,
@@ -93,7 +93,7 @@ func (c *Client) Stream(ctx context.Context, req port.Request) (<-chan port.Delt
 				return
 			}
 			if chunk.InputToken > 0 || chunk.OutputToken > 0 {
-				usage = usageOf(chunk.InputToken, chunk.OutputToken)
+				usage = usageOf(chunk.InputToken, chunk.CacheReadInputToken, chunk.OutputToken)
 			}
 			text := strings.Join(chunk.Texts, "")
 			if text == "" {
@@ -187,8 +187,8 @@ func generateOptions(req port.Request, ceiling int) []gollem.GenerateOption {
 	return options
 }
 
-func usageOf(input, output int) llm.Usage {
-	return llm.Usage{Input: input, Output: output, Total: input + output}
+func usageOf(input, cached, output int) llm.Usage {
+	return llm.Usage{Input: input, CachedInput: cached, Output: output, Total: input + output}
 }
 
 func finishReason(ceiling int, usage llm.Usage) port.FinishReason {

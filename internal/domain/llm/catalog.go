@@ -29,6 +29,12 @@ func (i ModelInfo) Validate() error {
 	if i.InputUSDPerM < 0 || i.OutputUSDPerM < 0 {
 		return invalid("a price must not be negative", "inputUsdPerM")
 	}
+	if i.CachedInputUSDPerM < 0 {
+		return invalid("a price must not be negative", "cachedInputUsdPerM")
+	}
+	if i.CachedInputUSDPerM > i.InputUSDPerM {
+		return invalid("a cached input token must not cost more than a fresh one", "cachedInputUsdPerM")
+	}
 	if i.RPM <= 0 {
 		return invalid("the request rate limit must be positive", "rpm")
 	}

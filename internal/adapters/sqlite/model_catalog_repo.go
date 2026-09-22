@@ -8,13 +8,16 @@ import (
 )
 
 const (
-	modelColumns = `provider, model, context_tokens, max_output_tokens, input_usd_per_m, output_usd_per_m, rpm, tpm,
+	modelColumns = `provider, model, context_tokens, max_output_tokens, input_usd_per_m, cached_input_usd_per_m,
+		output_usd_per_m, rpm, tpm,
 		supports_structured, supports_images, reasoning, reasoning_effort, enabled, created_at, updated_at`
-	upsertModel = `INSERT INTO model_catalog (` + modelColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	upsertModel = `INSERT INTO model_catalog (` + modelColumns + `)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (provider, model) DO UPDATE SET
 			context_tokens = excluded.context_tokens,
 			max_output_tokens = excluded.max_output_tokens,
 			input_usd_per_m = excluded.input_usd_per_m,
+			cached_input_usd_per_m = excluded.cached_input_usd_per_m,
 			output_usd_per_m = excluded.output_usd_per_m,
 			rpm = excluded.rpm,
 			tpm = excluded.tpm,
@@ -38,7 +41,8 @@ func NewModelCatalogRepo(store *Store) *ModelCatalogRepo {
 func (r *ModelCatalogRepo) Upsert(ctx context.Context, override llm.ModelOverride) error {
 	info := override.Info
 	_, err := execWrite(ctx, r.store.writeFrom(ctx), upsertModel, []any{
-		info.Ref.Provider, info.Ref.Model, info.ContextTokens, info.MaxOutputTokens, info.InputUSDPerM, info.OutputUSDPerM,
+		info.Ref.Provider, info.Ref.Model, info.ContextTokens, info.MaxOutputTokens, info.InputUSDPerM,
+		info.CachedInputUSDPerM, info.OutputUSDPerM,
 		info.RPM, info.TPM, boolInt(info.SupportsStructured), boolInt(info.SupportsImages), boolInt(info.Reasoning),
 		string(info.ReasoningEffort),
 		boolInt(override.Enabled), formatTime(override.CreatedAt), formatTime(override.UpdatedAt),
@@ -59,7 +63,8 @@ func scanModelOverride(rows *sql.Rows) (llm.ModelOverride, error) {
 	)
 	if err := rows.Scan(
 		&override.Info.Ref.Provider, &override.Info.Ref.Model, &contextTokens, &maxOutput,
-		&override.Info.InputUSDPerM, &override.Info.OutputUSDPerM, &requests, &count,
+		&override.Info.InputUSDPerM, &override.Info.CachedInputUSDPerM, &override.Info.OutputUSDPerM,
+		&requests, &count,
 		&structured, &images, &reasoning, &effort, &enabled, &createdAt, &updatedAt,
 	); err != nil {
 		return llm.ModelOverride{}, err

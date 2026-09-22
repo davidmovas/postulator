@@ -67,6 +67,25 @@ func TestEmbeddedCatalogIsUsable(t *testing.T) {
 	}
 }
 
+func TestEveryEmbeddedModelPricesACacheRead(t *testing.T) {
+	t.Parallel()
+
+	built, _ := newCatalog(t)
+	models, err := built.List(t.Context())
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+
+	for _, info := range models {
+		if info.CachedInputUSDPerM <= 0 {
+			t.Errorf("%s prices no cache read, so a reused prompt is charged as a fresh one", info.Ref)
+		}
+		if info.CachedInputUSDPerM > info.InputUSDPerM {
+			t.Errorf("%s prices a cache read above a fresh token", info.Ref)
+		}
+	}
+}
+
 func TestDefaults(t *testing.T) {
 	t.Parallel()
 

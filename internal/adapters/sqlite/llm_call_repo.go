@@ -13,15 +13,14 @@ import (
 )
 
 const (
-	callColumns = `id, run_id, item_id, step, conversation_id, provider, model, input_tokens, output_tokens, usd,
-		latency_ms, status, error_code, created_at`
-	insertCall = `INSERT INTO llm_calls (` + callColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	sumByRun   = `SELECT coalesce(sum(input_tokens), 0), coalesce(sum(output_tokens), 0), coalesce(sum(usd), 0), count(*)
-		FROM llm_calls WHERE run_id = ?`
-	sumByConversation = `SELECT coalesce(sum(input_tokens), 0), coalesce(sum(output_tokens), 0), coalesce(sum(usd), 0), count(*)
-		FROM llm_calls WHERE conversation_id = ?`
-	sumAll = `SELECT coalesce(sum(input_tokens), 0), coalesce(sum(output_tokens), 0), coalesce(sum(usd), 0), count(*)
-		FROM llm_calls`
+	callColumns = `id, run_id, item_id, step, conversation_id, provider, model, input_tokens, cached_input_tokens,
+		output_tokens, usd, latency_ms, status, error_code, created_at`
+	insertCall = `INSERT INTO llm_calls (` + callColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	sumColumns = `coalesce(sum(input_tokens), 0), coalesce(sum(cached_input_tokens), 0),
+		coalesce(sum(output_tokens), 0), coalesce(sum(usd), 0), count(*)`
+	sumByRun          = `SELECT ` + sumColumns + ` FROM llm_calls WHERE run_id = ?`
+	sumByConversation = `SELECT ` + sumColumns + ` FROM llm_calls WHERE conversation_id = ?`
+	sumAll            = `SELECT ` + sumColumns + ` FROM llm_calls`
 )
 
 type LLMCallRepo struct {
@@ -38,8 +37,8 @@ func (r *LLMCallRepo) Insert(ctx context.Context, call llm.Call) error {
 	}
 	_, err := execWrite(ctx, r.store.writeFrom(ctx), insertCall, []any{
 		call.ID, call.RunID, call.ItemID, call.Step, call.ConversationID, call.Ref.Provider, call.Ref.Model,
-		call.Usage.Input, call.Usage.Output, call.USD, call.Latency.Milliseconds(), string(call.Status),
-		call.ErrorCode, formatTime(call.CreatedAt),
+		call.Usage.Input, call.Usage.CachedInput, call.Usage.Output, call.USD, call.Latency.Milliseconds(),
+		string(call.Status), call.ErrorCode, formatTime(call.CreatedAt),
 	}, nil, "record the llm call")
 	return err
 }
@@ -62,7 +61,8 @@ func (r *LLMCallRepo) sum(ctx context.Context, query, key, message string) (llm.
 
 func total(row *sql.Row, message string) (llm.Spend, error) {
 	var spend llm.Spend
-	if err := row.Scan(&spend.Usage.Input, &spend.Usage.Output, &spend.USD, &spend.Calls); err != nil {
+	if err := row.Scan(&spend.Usage.Input, &spend.Usage.CachedInput, &spend.Usage.Output,
+		&spend.USD, &spend.Calls); err != nil {
 		return llm.Spend{}, dbx.Convert(err, message)
 	}
 	spend.Usage.Total = spend.Usage.Input + spend.Usage.Output
@@ -114,7 +114,8 @@ func scanCall(rows *sql.Rows) (llm.Call, error) {
 	)
 	if err := rows.Scan(
 		&call.ID, &call.RunID, &call.ItemID, &call.Step, &call.ConversationID, &call.Ref.Provider, &call.Ref.Model,
-		&call.Usage.Input, &call.Usage.Output, &call.USD, &latency, &status, &call.ErrorCode, &createdAt,
+		&call.Usage.Input, &call.Usage.CachedInput, &call.Usage.Output, &call.USD, &latency, &status,
+		&call.ErrorCode, &createdAt,
 	); err != nil {
 		return llm.Call{}, err
 	}

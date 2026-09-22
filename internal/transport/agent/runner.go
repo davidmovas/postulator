@@ -97,9 +97,10 @@ func (r *Runner) Run(ctx context.Context, spec agentapp.RunSpec) (agentapp.RunRe
 
 	guard := newGuard(spec, r.resultCeiling(spec))
 	usage := &tally{}
+	spoken := &answer{}
 	started := time.Now()
 
-	result, err := r.execute(ctx, client, spec, system+"\n\n"+user, guard, usage)
+	result, err := r.execute(ctx, client, spec, system+"\n\n"+user, guard, usage, spoken)
 	r.record(ctx, spec, usage, time.Since(started), err)
 	if err != nil {
 		r.deps.Logger.Error("an agent turn failed",
@@ -117,7 +118,7 @@ func (r *Runner) Run(ctx context.Context, spec agentapp.RunSpec) (agentapp.RunRe
 }
 
 func (r *Runner) execute(ctx context.Context, client gollem.LLMClient, spec agentapp.RunSpec, system string,
-	guard *guard, usage *tally) (result agentapp.RunResult, err error) {
+	guard *guard, usage *tally, spoken *answer) (result agentapp.RunResult, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			r.deps.Logger.Error("an agent turn panicked", zap.String("conversationId", spec.Binding.ConversationID))
@@ -136,7 +137,8 @@ func (r *Runner) execute(ctx context.Context, client gollem.LLMClient, spec agen
 		gollem.WithLoopLimit(spec.LoopLimit),
 		gollem.WithSystemPrompt(system),
 		gollem.WithResponseMode(gollem.ResponseModeStreaming),
-		gollem.WithContentStreamMiddleware(observe(spec.Stream, usage, guard.note)),
+		gollem.WithStrategy(readTheStream{}),
+		gollem.WithContentStreamMiddleware(observe(spec.Stream, usage, spoken, guard.note)),
 		gollem.WithTools(adapted...),
 	}
 	for _, middleware := range guard.middlewares() {
@@ -149,12 +151,11 @@ func (r *Runner) execute(ctx context.Context, client gollem.LLMClient, spec agen
 		))
 	}
 
-	answered, err := gollem.New(client, options...).Execute(ctx, gollem.Text(spec.Input))
-	if err != nil {
+	if _, err = gollem.New(client, options...).Execute(ctx, gollem.Text(spec.Input)); err != nil {
 		return agentapp.RunResult{}, convert(err)
 	}
 
-	return agentapp.RunResult{Text: joined(answered)}, guard.failure()
+	return agentapp.RunResult{Text: spoken.String()}, guard.failure()
 }
 
 func (r *Runner) record(ctx context.Context, spec agentapp.RunSpec, usage *tally, latency time.Duration, failure error) {
@@ -198,11 +199,25 @@ func (r *Runner) cost(ctx context.Context, ref domainllm.ModelRef, usage domainl
 	return domainllm.Cost(usage, info)
 }
 
-func joined(answered *gollem.ExecuteResponse) string {
-	if answered == nil {
-		return ""
+type readTheStream struct{}
+
+func (readTheStream) Init(context.Context, []gollem.Input) error {
+	return nil
+}
+
+func (readTheStream) Handle(_ context.Context, state *gollem.StrategyState) (
+	[]gollem.Input, *gollem.ExecuteResponse, error) {
+	if state.Iteration == 0 {
+		return state.InitInput, nil, nil
 	}
-	return strings.Join(answered.Texts, "")
+	if state.LastResponse != nil && len(state.LastResponse.FunctionCalls) == 0 {
+		return nil, &gollem.ExecuteResponse{}, nil
+	}
+	return state.NextInput, nil, nil
+}
+
+func (readTheStream) Tools(context.Context) ([]gollem.Tool, error) {
+	return []gollem.Tool{}, nil
 }
 
 func convert(err error) error {

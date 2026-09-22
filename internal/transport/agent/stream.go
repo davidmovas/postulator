@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"strings"
 	"sync"
 
 	"github.com/gollem-dev/gollem"
@@ -10,18 +11,38 @@ import (
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 )
 
+type spend struct {
+	input  int
+	cached int
+	output int
+}
+
+func (s *spend) reading(chunk *gollem.ContentResponse) {
+	if chunk.InputToken > 0 {
+		s.input = chunk.InputToken
+	}
+	if chunk.CacheReadInputToken > 0 {
+		s.cached = chunk.CacheReadInputToken
+	}
+	if chunk.OutputToken > 0 {
+		s.output = chunk.OutputToken
+	}
+}
+
 type tally struct {
 	mu     sync.Mutex
 	input  int
+	cached int
 	output int
 	seq    int64
 }
 
-func (t *tally) add(input, output int) {
+func (t *tally) add(round spend) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.input += input
-	t.output += output
+	t.input += round.input
+	t.cached += round.cached
+	t.output += round.output
 }
 
 func (t *tally) next() int64 {
@@ -34,10 +55,71 @@ func (t *tally) next() int64 {
 func (t *tally) total() domainllm.Usage {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	return domainllm.Usage{Input: t.input, Output: t.output, Total: t.input + t.output}
+	return domainllm.Usage{
+		Input:       t.input,
+		CachedInput: t.cached,
+		Output:      t.output,
+		Total:       t.input + t.output,
+	}
 }
 
-func observe(stream agentapp.Stream, usage *tally, note func(error)) gollem.ContentStreamMiddleware {
+type answer struct {
+	mu     sync.Mutex
+	rounds []string
+}
+
+func (a *answer) spoke(text string) {
+	if strings.TrimSpace(text) == "" {
+		return
+	}
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.rounds = append(a.rounds, text)
+}
+
+func (a *answer) String() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return strings.Join(a.rounds, "\n\n")
+}
+
+type watch struct {
+	stream agentapp.Stream
+	usage  *tally
+	spoken *answer
+	note   func(error)
+	round  spend
+	said   strings.Builder
+}
+
+func (w *watch) chunk(ctx context.Context, chunk *gollem.ContentResponse) {
+	if chunk == nil {
+		return
+	}
+
+	w.round.reading(chunk)
+	for _, text := range chunk.Texts {
+		if text == "" {
+			continue
+		}
+		w.said.WriteString(text)
+		if w.stream == nil {
+			continue
+		}
+		if err := w.stream.Delta(ctx, w.usage.next(), text); err != nil {
+			w.note(err)
+			return
+		}
+	}
+}
+
+func (w *watch) settle() {
+	w.usage.add(w.round)
+	w.spoken.spoke(w.said.String())
+}
+
+func observe(stream agentapp.Stream, usage *tally, spoken *answer, note func(error)) gollem.ContentStreamMiddleware {
 	return func(next gollem.ContentStreamHandler) gollem.ContentStreamHandler {
 		return func(ctx context.Context, req *gollem.ContentRequest) (<-chan *gollem.ContentResponse, error) {
 			chunks, err := next(ctx, req)
@@ -47,9 +129,14 @@ func observe(stream agentapp.Stream, usage *tally, note func(error)) gollem.Cont
 
 			out := make(chan *gollem.ContentResponse)
 			go func() {
-				defer close(out)
+				round := &watch{stream: stream, usage: usage, spoken: spoken, note: note}
+				defer func() {
+					round.settle()
+					close(out)
+				}()
+
 				for chunk := range chunks {
-					observeChunk(ctx, stream, usage, chunk, note)
+					round.chunk(ctx, chunk)
 					select {
 					case out <- chunk:
 					case <-ctx.Done():
@@ -59,27 +146,6 @@ func observe(stream agentapp.Stream, usage *tally, note func(error)) gollem.Cont
 				}
 			}()
 			return out, nil
-		}
-	}
-}
-
-func observeChunk(ctx context.Context, stream agentapp.Stream, usage *tally, chunk *gollem.ContentResponse,
-	note func(error)) {
-	if chunk == nil {
-		return
-	}
-
-	usage.add(chunk.InputToken, chunk.OutputToken)
-	if stream == nil {
-		return
-	}
-	for _, text := range chunk.Texts {
-		if text == "" {
-			continue
-		}
-		if err := stream.Delta(ctx, usage.next(), text); err != nil {
-			note(err)
-			return
 		}
 	}
 }

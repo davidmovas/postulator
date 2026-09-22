@@ -10,13 +10,14 @@ import (
 
 func validInfo() llm.ModelInfo {
 	return llm.ModelInfo{
-		Ref:             llm.ModelRef{Provider: "openai", Model: "gpt-5.6-terra"},
-		ContextTokens:   1050000,
-		MaxOutputTokens: 128000,
-		InputUSDPerM:    2,
-		OutputUSDPerM:   12,
-		RPM:             60,
-		TPM:             120000,
+		Ref:                llm.ModelRef{Provider: "openai", Model: "gpt-5.6-terra"},
+		ContextTokens:      1050000,
+		MaxOutputTokens:    128000,
+		InputUSDPerM:       2,
+		CachedInputUSDPerM: 0.2,
+		OutputUSDPerM:      12,
+		RPM:                60,
+		TPM:                120000,
 	}
 }
 
@@ -35,6 +36,9 @@ func TestModelInfoValidate(t *testing.T) {
 		{name: "the output fits the context", mutate: func(i *llm.ModelInfo) { i.MaxOutputTokens = i.ContextTokens + 1 }, wantErr: true},
 		{name: "a price is not negative", mutate: func(i *llm.ModelInfo) { i.InputUSDPerM = -1 }, wantErr: true},
 		{name: "the output price is not negative", mutate: func(i *llm.ModelInfo) { i.OutputUSDPerM = -1 }, wantErr: true},
+		{name: "the cached price is not negative", mutate: func(i *llm.ModelInfo) { i.CachedInputUSDPerM = -1 }, wantErr: true},
+		{name: "the cached price does not exceed the input price", mutate: func(i *llm.ModelInfo) { i.CachedInputUSDPerM = i.InputUSDPerM + 1 }, wantErr: true},
+		{name: "the cached price may be left undeclared", mutate: func(i *llm.ModelInfo) { i.CachedInputUSDPerM = 0 }},
 		{name: "the request rate is positive", mutate: func(i *llm.ModelInfo) { i.RPM = 0 }, wantErr: true},
 		{name: "the token rate is positive", mutate: func(i *llm.ModelInfo) { i.TPM = 0 }, wantErr: true},
 	}

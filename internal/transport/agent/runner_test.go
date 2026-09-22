@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gollem-dev/gollem"
+
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	agentapp "github.com/davidmovas/postulator/internal/application/agent"
@@ -253,6 +255,34 @@ func TestTheConversationHistoryIsReplayedOnTheNextTurn(t *testing.T) {
 	messages, ok := history["messages"].([]any)
 	if !ok || len(messages) == 0 {
 		t.Fatalf("the stored history is %s", body)
+	}
+}
+
+func TestTheStoredHistoryHoldsTheAnswerOnce(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	conversation := h.conversation(t, domainagent.ModeAutonomous)
+	h.send(t, conversation, "FAKE: Отличная идея.")
+
+	body, _, err := sqlite.NewConversationHistoryRepo(h.store).Load(t.Context(), conversation)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	var history gollem.History
+	if unmarshalErr := json.Unmarshal(body, &history); unmarshalErr != nil {
+		t.Fatalf("decode the stored history: %v", unmarshalErr)
+	}
+
+	spoken := 0
+	for _, message := range history.Messages {
+		if message.Role == gollem.RoleAssistant {
+			spoken++
+		}
+	}
+	if spoken != 1 {
+		t.Fatalf("the stored history holds %d assistant messages, want 1: %s", spoken, body)
 	}
 }
 

@@ -2,6 +2,7 @@ package llm_test
 
 import (
 	"encoding/json"
+	"math"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/llm"
@@ -70,23 +71,47 @@ func TestModelRefJSONIsCamelCase(t *testing.T) {
 func TestCost(t *testing.T) {
 	t.Parallel()
 
-	info := llm.ModelInfo{Ref: llm.ModelRef{Provider: "openai", Model: "gpt"}, InputUSDPerM: 3, OutputUSDPerM: 15}
+	priced := llm.ModelInfo{
+		Ref: llm.ModelRef{Provider: "openai", Model: "gpt"}, InputUSDPerM: 3, OutputUSDPerM: 15,
+		CachedInputUSDPerM: 0.3,
+	}
+	unpriced := llm.ModelInfo{Ref: llm.ModelRef{Provider: "openai", Model: "gpt"}, InputUSDPerM: 3, OutputUSDPerM: 15}
 
 	cases := []struct {
 		name  string
+		info  llm.ModelInfo
 		usage llm.Usage
 		want  float64
 	}{
-		{name: "nothing used", usage: llm.Usage{}, want: 0},
-		{name: "one million input tokens", usage: llm.Usage{Input: 1_000_000}, want: 3},
-		{name: "half a million output tokens", usage: llm.Usage{Output: 500_000}, want: 7.5},
-		{name: "both", usage: llm.Usage{Input: 1_000_000, Output: 500_000, Total: 1_500_000}, want: 10.5},
+		{name: "nothing used", info: priced, usage: llm.Usage{}, want: 0},
+		{name: "one million input tokens", info: priced, usage: llm.Usage{Input: 1_000_000}, want: 3},
+		{name: "half a million output tokens", info: priced, usage: llm.Usage{Output: 500_000}, want: 7.5},
+		{
+			name: "both", info: priced,
+			usage: llm.Usage{Input: 1_000_000, Output: 500_000, Total: 1_500_000}, want: 10.5,
+		},
+		{
+			name: "a cached input token costs the cached rate", info: priced,
+			usage: llm.Usage{Input: 1_000_000, CachedInput: 1_000_000, Total: 1_000_000}, want: 0.3,
+		},
+		{
+			name: "a partly cached prompt is charged at both rates", info: priced,
+			usage: llm.Usage{Input: 1_000_000, CachedInput: 900_000, Total: 1_000_000}, want: 0.57,
+		},
+		{
+			name: "a model with no cached price charges the full rate", info: unpriced,
+			usage: llm.Usage{Input: 1_000_000, CachedInput: 1_000_000, Total: 1_000_000}, want: 3,
+		},
+		{
+			name: "more cached tokens than input tokens cannot go negative", info: priced,
+			usage: llm.Usage{Input: 1_000_000, CachedInput: 4_000_000, Total: 1_000_000}, want: 0.3,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			if got := llm.Cost(tc.usage, info); got != tc.want {
+			if got := llm.Cost(tc.usage, tc.info); math.Abs(got-tc.want) > 1e-9 {
 				t.Errorf("Cost() = %v, want %v", got, tc.want)
 			}
 		})
@@ -96,8 +121,9 @@ func TestCost(t *testing.T) {
 func TestUsageAdd(t *testing.T) {
 	t.Parallel()
 
-	sum := llm.Usage{Input: 10, Output: 5, Total: 15}.Add(llm.Usage{Input: 1, Output: 2, Total: 3})
-	if sum != (llm.Usage{Input: 11, Output: 7, Total: 18}) {
+	sum := llm.Usage{Input: 10, Output: 5, CachedInput: 4, Total: 15}.
+		Add(llm.Usage{Input: 1, Output: 2, CachedInput: 1, Total: 3})
+	if sum != (llm.Usage{Input: 11, Output: 7, CachedInput: 5, Total: 18}) {
 		t.Fatalf("Add = %+v", sum)
 	}
 }

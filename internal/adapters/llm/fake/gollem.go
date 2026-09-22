@@ -142,11 +142,12 @@ func (s *GollemSession) Stream(ctx context.Context, input []gollem.Input, _ ...g
 		defer close(out)
 		for chunk := range chunks {
 			out <- &gollem.Response{
-				Texts:         chunk.Texts,
-				FunctionCalls: chunk.FunctionCalls,
-				InputToken:    chunk.InputToken,
-				OutputToken:   chunk.OutputToken,
-				Error:         chunk.Error,
+				Texts:               chunk.Texts,
+				FunctionCalls:       chunk.FunctionCalls,
+				InputToken:          chunk.InputToken,
+				CacheReadInputToken: chunk.CacheReadInputToken,
+				OutputToken:         chunk.OutputToken,
+				Error:               chunk.Error,
 			}
 		}
 	}()
@@ -159,14 +160,22 @@ func (s *GollemSession) stream(ctx context.Context, req *gollem.ContentRequest) 
 		return nil, err
 	}
 
-	out := make(chan *gollem.ContentResponse, len(resp.Texts)+1)
+	out := make(chan *gollem.ContentResponse, len(resp.Texts)+2)
 	for _, text := range resp.Texts {
 		out <- &gollem.ContentResponse{Texts: []string{text}}
 	}
+	if len(resp.FunctionCalls) > 0 {
+		out <- &gollem.ContentResponse{
+			FunctionCalls:       resp.FunctionCalls,
+			InputToken:          resp.InputToken,
+			CacheReadInputToken: resp.CacheReadInputToken,
+			OutputToken:         resp.OutputToken,
+		}
+	}
 	out <- &gollem.ContentResponse{
-		FunctionCalls: resp.FunctionCalls,
-		InputToken:    resp.InputToken,
-		OutputToken:   resp.OutputToken,
+		InputToken:          resp.InputToken,
+		CacheReadInputToken: resp.CacheReadInputToken,
+		OutputToken:         resp.OutputToken,
 	}
 	close(out)
 	return out, nil
