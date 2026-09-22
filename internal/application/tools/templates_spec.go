@@ -23,7 +23,7 @@ type stepArgs struct {
 
 type sectionKeywordRulesArgs struct {
 	Include          []string `json:"include,omitempty" description:"Phrases this section must use at least once; leave it out for none"`
-	PrimaryInHeading bool     `json:"primaryInHeading,omitempty" description:"The primary keyword must appear in this section's heading; leave it out and it need not"`
+	PrimaryInHeading bool     `json:"primaryInHeading,omitempty" description:"The primary keyword must appear in this section's heading"`
 }
 
 func (a sectionKeywordRulesArgs) rules() template.SectionKeywordRules {
@@ -34,7 +34,7 @@ type sectionArgs struct {
 	Heading      string                   `json:"heading" description:"The heading the section opens with, which may carry {primaryKeyword}"`
 	Intent       string                   `json:"intent,omitempty" description:"What the section has to cover, one short sentence to the writer"`
 	TargetWords  int                      `json:"targetWords,omitempty" minimum:"0" description:"About how many words the section should run to; leave it out to let the writer decide"`
-	Required     bool                     `json:"required,omitempty" description:"The page is not valid without this section; leave it out to make it optional"`
+	Required     bool                     `json:"required,omitempty" description:"The page is not valid without this section"`
 	KeywordRules *sectionKeywordRulesArgs `json:"keywordRules,omitempty" description:"What this section has to say about the keywords; leave it out to ask nothing of it"`
 }
 
@@ -70,9 +70,9 @@ func (a lengthArgs) length() template.Length {
 }
 
 type keywordRulesArgs struct {
-	PrimaryInTitle          bool    `json:"primaryInTitle,omitempty" description:"The primary keyword must appear in the title; leave it out and it need not"`
-	PrimaryInH1             bool    `json:"primaryInH1,omitempty" description:"The primary keyword must appear in the first heading; leave it out and it need not"`
-	PrimaryInFirstParagraph bool    `json:"primaryInFirstParagraph,omitempty" description:"The primary keyword must appear in the opening paragraph; leave it out and it need not"`
+	PrimaryInTitle          bool    `json:"primaryInTitle,omitempty" description:"The primary keyword must appear in the title"`
+	PrimaryInH1             bool    `json:"primaryInH1,omitempty" description:"The primary keyword must appear in the first heading"`
+	PrimaryInFirstParagraph bool    `json:"primaryInFirstParagraph,omitempty" description:"The primary keyword must appear in the opening paragraph"`
 	MaxDensity              float64 `json:"maxDensity,omitempty" minimum:"0" maximum:"1" description:"The largest share of the words the primary keyword may take, between 0 and 1; leave it out for no ceiling"`
 }
 
@@ -87,12 +87,12 @@ func (a keywordRulesArgs) rules() template.KeywordRules {
 
 type linkRulesArgs struct {
 	UpDepth                    int     `json:"upDepth,omitempty" minimum:"0" description:"How many levels up the tree a page links to, 1 for its parent alone; leave it out for none"`
-	DownLinks                  bool    `json:"downLinks,omitempty" description:"Link down to the children of the entity; leave it out and none are placed"`
+	DownLinks                  bool    `json:"downLinks,omitempty" description:"Link down to the children of the entity"`
 	SiblingMinWeight           float64 `json:"siblingMinWeight,omitempty" minimum:"0" maximum:"1" description:"The weight a related edge needs before a sibling link is placed, between 0 and 1; leave it out to place every sibling link"`
 	MaxLinks                   int     `json:"maxLinks,omitempty" minimum:"0" description:"The most internal links one page may carry; leave it out for no ceiling"`
 	MaxPerTarget               int     `json:"maxPerTarget,omitempty" minimum:"0" description:"The most links one page may point at a single target; leave it out for no ceiling"`
 	ParentLinkWithinParagraphs int     `json:"parentLinkWithinParagraphs,omitempty" minimum:"0" description:"The parent link must appear within this many paragraphs of the start; leave it out to let it sit anywhere"`
-	ChildrenSection            bool    `json:"childrenSection,omitempty" description:"Close the page with a section listing its children; leave it out for no such section"`
+	ChildrenSection            bool    `json:"childrenSection,omitempty" description:"Close the page with a section listing its children"`
 }
 
 func (a linkRulesArgs) rules() template.LinkRules {
@@ -117,7 +117,7 @@ func (a metaRulesArgs) rules() template.MetaRules {
 }
 
 type imagesArgs struct {
-	Featured bool                 `json:"featured,omitempty" description:"The page carries a featured image; leave it out for a page without one"`
+	Featured bool                 `json:"featured,omitempty" description:"The page carries a featured image"`
 	Inline   int                  `json:"inline,omitempty" minimum:"0" description:"How many images to place inside the body; leave it out for a page without images"`
 	Source   template.ImageSource `json:"source,omitempty" enum:"ai,wpmedia,local" description:"Where the images come from: drawn by a model, picked from the WordPress library, or read from a folder; required as soon as any image is asked for"`
 }
