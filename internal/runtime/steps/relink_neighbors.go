@@ -2,7 +2,6 @@ package steps
 
 import (
 	"context"
-	"net/url"
 	"strconv"
 	"time"
 
@@ -314,11 +313,6 @@ func adopt(ctx context.Context, deps Deps, page pagemap.Page, index pagemap.Inde
 	return persist(ctx, deps, next, observedOn(page, index, site, doc.Links(), now))
 }
 
-func observedLinks(page pagemap.Page, index pagemap.Index, host string, found []content.Link,
-	at time.Time) []pagemap.PageLink {
-	return observedOn(page, index, pagemap.Site{Host: host}, found, at)
-}
-
 func observedOn(page pagemap.Page, index pagemap.Index, site pagemap.Site, found []content.Link,
 	at time.Time) []pagemap.PageLink {
 	out := make([]pagemap.PageLink, 0, len(found))
@@ -348,12 +342,4 @@ func observedLink(link pagemap.PageLink) (pagemap.PageLink, bool) {
 		return pagemap.PageLink{}, false
 	}
 	return built, true
-}
-
-func hostOf(baseURL string) string {
-	parsed, err := url.Parse(baseURL)
-	if err != nil {
-		return ""
-	}
-	return parsed.Host
 }

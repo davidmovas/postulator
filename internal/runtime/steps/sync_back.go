@@ -83,7 +83,7 @@ func SyncBack(deps Deps) run.StepDef {
 
 			now := deps.now()
 			index := pagemap.NewIndex(pages)
-			links := observedLinks(sc.Page, index, hostOf(owner.BaseURL), doc.Links(), now)
+			links := observedOn(sc.Page, index, pagemap.NewSite(owner.BaseURL), doc.Links(), now)
 
 			next := sc.Page
 			next.WPID = &item.ID

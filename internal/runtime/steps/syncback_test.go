@@ -9,6 +9,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
+	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
@@ -88,6 +89,51 @@ func TestSyncBackReadsThroughThePlugin(t *testing.T) {
 	}
 	if links[0].Origin != pagemap.OriginObserved || links[0].AnchorText != "coffee" {
 		t.Fatalf("link = %+v", links[0])
+	}
+}
+
+func TestSyncBackResolvesALinkAgainstTheFolderTheSiteLivesIn(t *testing.T) {
+	t.Parallel()
+
+	const relative = `<h1>Espresso</h1><p>Part of our <a href="coffee/">coffee</a> range.</p>`
+
+	deps, server := imageDepsWith(t)
+	seeded := server.Seed(wptest.Item{
+		Type: wptest.TypePage, Title: "Espresso", Slug: "espresso", Content: relative, Status: "draft",
+	})
+	wpID := seeded[0].ID
+
+	recorder := &linkRecorder{}
+	deps.Links = recorder
+	deps.Sites = siteStub{record: site.Site{
+		ID: "site", Name: "Shop", BaseURL: "https://shop.example.com/blog", Username: "editor",
+		Status: site.StatusActive,
+	}}
+	deps.Pages = pageList{items: []pagemap.Page{
+		{
+			ID: "page-parent", SiteID: "site", Path: "/blog/coffee/", Slug: "coffee", WPType: pagemap.WPPage,
+			Status: pagemap.StatusPublished, EntityID: pointer("parent"),
+		},
+		{
+			ID: "page-child", SiteID: "site", Path: "/blog/coffee/espresso/", Slug: "espresso",
+			WPType: pagemap.WPPage, Status: pagemap.StatusExists, EntityID: pointer("child"), WPID: &wpID,
+		},
+	}}
+
+	sc := syncBackContext(t, wpID)
+	sc.Page.Path = "/blog/coffee/espresso/"
+
+	synced := runSyncBack(t, deps, sc)
+	if synced.Links != 1 {
+		t.Fatalf("synced = %+v, want the relative link kept", synced)
+	}
+
+	links := recorder.byPage["page-child"]
+	if len(links) != 1 || links[0].ToURL != "/blog/coffee/" {
+		t.Fatalf("the recorded links are %+v, want one resolved under the site's own folder", links)
+	}
+	if links[0].ToPageID == nil || *links[0].ToPageID != "page-parent" {
+		t.Fatalf("the recorded link points at %v, want the page that carries that path", links[0].ToPageID)
 	}
 }
 
