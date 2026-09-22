@@ -8,8 +8,10 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
+	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
@@ -48,7 +50,12 @@ func relinkDeps(t *testing.T, body string, opts ...wptest.Option) (steps.Deps, *
 
 	recorder := &linkRecorder{}
 	deps.Links = recorder
-	deps.Pages = pageList{items: []pagemap.Page{
+	deps.Pages = pageList{items: relinkPages(wpID)}
+	return deps, server, recorder, wpID
+}
+
+func relinkPages(wpID int64) []pagemap.Page {
+	return []pagemap.Page{
 		{
 			ID: "page-parent", SiteID: "site", Path: "/coffee/", Slug: "coffee", WPType: pagemap.WPPage,
 			Status: pagemap.StatusPublished, EntityID: pointer("parent"), WPID: &wpID,
@@ -57,8 +64,7 @@ func relinkDeps(t *testing.T, body string, opts ...wptest.Option) (steps.Deps, *
 			ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", Slug: "espresso",
 			WPType: pagemap.WPPage, Status: pagemap.StatusExists, EntityID: pointer("child"),
 		},
-	}}
-	return deps, server, recorder, wpID
+	}
 }
 
 func relinkContext(t *testing.T, deps steps.Deps) *run.StepContext {
@@ -175,6 +181,131 @@ func TestRelinkSkipsWithoutThePlugin(t *testing.T) {
 	}
 	if stored.Content != parentBody {
 		t.Errorf("the neighbor content is %q, want the stored content untouched", stored.Content)
+	}
+}
+
+func TestRelinkAsksWhatTheNeighborsOwnRulesAllow(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		rules   template.LinkRules
+		outcome string
+		detail  string
+	}{
+		{
+			name:    "a neighbor that links down owes the backlink",
+			rules:   template.LinkRules{UpDepth: 2, DownLinks: true, MaxPerTarget: 1},
+			outcome: steps.OutcomeLinked,
+		},
+		{
+			name:    "a neighbor whose template does not link down owes nothing",
+			rules:   template.LinkRules{UpDepth: 2, MaxPerTarget: 1},
+			outcome: steps.OutcomeSkipped,
+			detail:  steps.ReasonNeighborOwesNothing,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps, server, _, wpID := relinkDeps(t, parentBody)
+			deps.Policies = policyStub{specs: map[string]template.LinkRules{"page-parent": tc.rules}}
+
+			relinked := runRelink(t, deps)
+			if len(relinked.Neighbors) != 1 || relinked.Neighbors[0].Outcome != tc.outcome {
+				t.Fatalf("relinked = %+v, want one %s", relinked, tc.outcome)
+			}
+			if relinked.Neighbors[0].Detail != tc.detail {
+				t.Errorf("detail = %q, want %q", relinked.Neighbors[0].Detail, tc.detail)
+			}
+
+			stored, _ := server.Lookup(wpID)
+			written := stored.Content != parentBody
+			if written != (tc.outcome == steps.OutcomeLinked) {
+				t.Errorf("the neighbor holds %q", stored.Content)
+			}
+			if tc.outcome != steps.OutcomeSkipped {
+				return
+			}
+			if len(relinked.Findings) != 1 || relinked.Findings[0].Code != steps.CodeRelinkSkipped ||
+				relinked.Findings[0].Details["reason"] != tc.detail {
+				t.Fatalf("findings = %+v", relinked.Findings)
+			}
+		})
+	}
+}
+
+func TestRelinkSpendsTheNeighborsOwnBudget(t *testing.T) {
+	t.Parallel()
+
+	body := `<h1>Coffee</h1><p>We roast every espresso blend beside our ` +
+		`<a href="/coffee/filter/">filter</a> range.</p>`
+
+	cases := []struct {
+		name     string
+		maxLinks int
+		outcome  string
+	}{
+		{name: "a spent budget leaves the neighbor alone", maxLinks: 1, outcome: steps.OutcomeUnchanged},
+		{name: "a budget with room left takes the backlink", maxLinks: 2, outcome: steps.OutcomeLinked},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps, server, _, wpID := relinkDeps(t, body)
+			deps.Entities = entityList{items: append(unitEntities(), graph.Entity{
+				ID: "filter", SiteID: "site", Name: "Filter", PrimaryKeyword: "filter",
+				Anchors: []graph.Anchor{{Text: "filter", Source: graph.AnchorUser, Weight: 1}},
+				Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-filter"),
+			})}
+			deps.Edges = edgeList{items: append(unitEdges(), graph.Edge{
+				ID: "e2", SiteID: "site", FromEntityID: "parent", ToEntityID: "filter",
+				Kind: graph.EdgeRelated, Weight: 1, Source: graph.SourceUser, Status: graph.StatusApproved,
+			})}
+			deps.Pages = pageList{items: append(relinkPages(wpID), pagemap.Page{
+				ID: "page-filter", SiteID: "site", Path: "/coffee/filter/", Slug: "filter",
+				WPType: pagemap.WPPage, Status: pagemap.StatusPublished, EntityID: pointer("filter"),
+			})}
+			deps.Policies = policyStub{specs: map[string]template.LinkRules{
+				"page-parent": {UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: tc.maxLinks, MaxPerTarget: 1},
+			}}
+
+			relinked := runRelink(t, deps)
+			if len(relinked.Neighbors) != 1 || relinked.Neighbors[0].Outcome != tc.outcome {
+				t.Fatalf("relinked = %+v, want one %s", relinked, tc.outcome)
+			}
+			stored, _ := server.Lookup(wpID)
+			if strings.Contains(stored.Content, `href="/coffee/espresso/"`) != (tc.outcome == steps.OutcomeLinked) {
+				t.Errorf("the neighbor holds %q", stored.Content)
+			}
+		})
+	}
+}
+
+func TestRelinkRecordsNoLinkWithoutATarget(t *testing.T) {
+	t.Parallel()
+
+	body := `<h1>Coffee</h1><p>We roast every espresso blend. Read the <a href="#faq">questions</a>, ` +
+		`the <a href="?print=1">printable page</a> and <a href="https://example.org/">a roaster</a>.</p>`
+	deps, _, recorder, _ := relinkDeps(t, body)
+
+	relinked := runRelink(t, deps)
+	if relinked.Linked != 1 {
+		t.Fatalf("relinked = %+v", relinked)
+	}
+
+	links := recorder.byPage["page-parent"]
+	if len(links) != 1 || links[0].ToURL != "/coffee/espresso/" {
+		t.Fatalf("the recorded links are %+v, want the graph link alone", links)
+	}
+	for i := range links {
+		if strings.TrimSpace(links[i].ToURL) == "" {
+			t.Fatalf("a link with no target was recorded: %+v", links[i])
+		}
 	}
 }
 

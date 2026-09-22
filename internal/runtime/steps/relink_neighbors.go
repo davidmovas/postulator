@@ -4,10 +4,10 @@ import (
 	"context"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -77,28 +77,32 @@ func RelinkNeighbors(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			pages, err := deps.Pages.ListBySite(ctx, sc.Run.SiteID)
+			neighborhood, err := aroundThePage(ctx, deps, sc)
 			if err != nil {
 				return run.Result{}, err
 			}
 
-			index := pagemap.NewIndex(pages)
 			result := RelinkResult{
 				Neighbors: make([]NeighborResult, 0, len(lc.Targets)),
 				Findings:  make([]content.Finding, 0),
 			}
 
 			for i := range lc.Targets {
-				neighbor, ok := index.ByID(lc.Targets[i].PageID)
-				if !ok || neighbor.WPID == nil || neighbor.ID == sc.Page.ID {
+				neighbor, ok := neighborhood.index.ByID(lc.Targets[i].PageID)
+				switch {
+				case !ok, neighbor.WPID == nil, neighbor.ID == sc.Page.ID:
+					continue
+				case lc.Targets[i].EntityID == entity.ID:
 					continue
 				}
 
-				outcome, relinkErr := relinkOne(ctx, deps, client, neighborWork{
-					neighbor: neighbor, host: hostOf(owner.BaseURL), index: index,
-					target: backLink(sc.Page, entity, lc.Targets[i]),
-					policy: policy,
-				})
+				work := neighborhood
+				work.neighbor = neighbor
+				work.site = pagemap.NewSite(owner.BaseURL)
+				work.page = sc.Page
+				work.base = policy
+
+				outcome, relinkErr := relinkOne(ctx, deps, client, work)
 				if relinkErr != nil {
 					return run.Result{}, relinkErr
 				}
@@ -130,10 +134,31 @@ func RelinkNeighbors(deps Deps) run.StepDef {
 
 type neighborWork struct {
 	neighbor pagemap.Page
-	host     string
+	page     pagemap.Page
+	site     pagemap.Site
 	index    pagemap.Index
-	target   content.LinkTarget
-	policy   template.LinkPolicy
+	graph    graph.Graph
+	base     template.LinkPolicy
+}
+
+func aroundThePage(ctx context.Context, deps Deps, sc *run.StepContext) (neighborWork, error) {
+	pages, err := deps.Pages.ListBySite(ctx, sc.Run.SiteID)
+	if err != nil {
+		return neighborWork{}, err
+	}
+	entities, err := deps.Entities.ListBySite(ctx, sc.Run.SiteID)
+	if err != nil {
+		return neighborWork{}, err
+	}
+	edges, err := deps.Edges.ListBySite(ctx, sc.Run.SiteID)
+	if err != nil {
+		return neighborWork{}, err
+	}
+	built, err := graph.New(entities, edges)
+	if err != nil {
+		return neighborWork{}, err
+	}
+	return neighborWork{index: pagemap.NewIndex(pages), graph: built}, nil
 }
 
 func skippedFinding(outcome NeighborResult) content.Finding {
@@ -158,45 +183,51 @@ func conflictFinding(outcome NeighborResult) content.Finding {
 	}
 }
 
-func backLink(page pagemap.Page, entity graph.Entity, forward content.LinkTarget) content.LinkTarget {
-	return content.LinkTarget{
-		EntityID: entity.ID,
-		PageID:   page.ID,
-		URL:      page.Path,
-		Anchors:  anchorsOf(entity),
-		Relation: mirror(forward.Relation),
-		Weight:   1,
+func neighborPlan(ctx context.Context, deps Deps, in neighborWork) (content.LinkContext, template.LinkPolicy, error) {
+	resolved, err := deps.Policies.ResolveForPage(ctx, templates.ResolveForPageRequest{PageID: in.neighbor.ID})
+	if err != nil {
+		return content.LinkContext{}, template.LinkPolicy{}, err
 	}
+
+	policy := in.base
+	policy.Rules = templates.EffectiveRules(in.base.Rules, resolved.Spec.LinkRules)
+
+	plan := content.PlanLinks(in.graph, in.index, content.Subject{
+		Site: in.site, PageID: in.neighbor.ID, PagePath: in.neighbor.Path, EntityID: *in.neighbor.EntityID,
+	}, policy)
+	return plan.Context, policy, nil
 }
 
-func mirror(relation content.Relation) content.Relation {
-	switch relation {
-	case content.RelationUp:
-		return content.RelationDown
-	case content.RelationDown:
-		return content.RelationUp
-	default:
-		return content.RelationSibling
+func owedReason(lc content.LinkContext, page pagemap.Page) string {
+	if page.EntityID == nil {
+		return ReasonNeighborOwesNothing
 	}
-}
-
-func anchorsOf(entity graph.Entity) []string {
-	out := make([]string, 0, len(entity.Anchors)+1)
-	for _, anchor := range entity.Anchors {
-		if text := strings.TrimSpace(anchor.Text); text != "" {
-			out = append(out, text)
+	for i := range lc.Targets {
+		if lc.Targets[i].EntityID == *page.EntityID {
+			return ReasonNeighborOwesTheCanonicalPage
 		}
 	}
-	if len(out) == 0 {
-		if name := strings.TrimSpace(entity.Name); name != "" {
-			out = append(out, name)
-		}
-	}
-	return out
+	return ReasonNeighborOwesNothing
 }
 
 func relinkOne(ctx context.Context, deps Deps, client *wp.Client, in neighborWork) (NeighborResult, error) {
 	outcome := NeighborResult{PageID: in.neighbor.ID, Path: in.neighbor.Path, WPID: *in.neighbor.WPID}
+
+	if in.neighbor.EntityID == nil {
+		return skip(outcome, ReasonNeighborUnmapped), nil
+	}
+	lc, policy, err := neighborPlan(ctx, deps, in)
+	if errors.IsCode(err, errors.NotFound) {
+		return skip(outcome, ReasonNeighborNoTemplate), nil
+	}
+	if err != nil {
+		return NeighborResult{}, err
+	}
+
+	target, owed := lc.ByPageID(in.page.ID)
+	if !owed {
+		return skip(outcome, owedReason(lc, in.page)), nil
+	}
 
 	raw, err := client.GetRaw(ctx, *in.neighbor.WPID)
 	if err != nil {
@@ -215,15 +246,7 @@ func relinkOne(ctx context.Context, deps Deps, client *wp.Client, in neighborWor
 		return skip(outcome, ReasonNeighborUnreadable), nil
 	}
 
-	lc := content.LinkContext{
-		PageID: in.neighbor.ID, PageURL: in.neighbor.Path,
-		Targets: []content.LinkTarget{in.target},
-	}
-	if in.neighbor.EntityID != nil {
-		lc.EntityID = *in.neighbor.EntityID
-	}
-
-	placement := content.InsertLinks(doc, lc, in.policy)
+	placement := content.InsertTarget(doc, lc, policy, target)
 	anchor, inserted := insertedAnchor(placement)
 	if !inserted {
 		outcome.Outcome = OutcomeUnchanged
@@ -244,7 +267,7 @@ func relinkOne(ctx context.Context, deps Deps, client *wp.Client, in neighborWor
 
 	outcome.Outcome = OutcomeLinked
 	outcome.Anchor = anchor
-	if adoptErr := adopt(ctx, deps, in.neighbor, in.index, in.host, doc, hash); adoptErr != nil {
+	if adoptErr := adopt(ctx, deps, in.neighbor, in.index, in.site, doc, hash); adoptErr != nil {
 		return NeighborResult{}, adoptErr
 	}
 	return outcome, nil
@@ -272,7 +295,7 @@ func firstDetail(placement content.InsertResult) string {
 	return string(placement.Decisions[0].Outcome) + ": " + placement.Decisions[0].Detail
 }
 
-func adopt(ctx context.Context, deps Deps, page pagemap.Page, index pagemap.Index, host string,
+func adopt(ctx context.Context, deps Deps, page pagemap.Page, index pagemap.Index, site pagemap.Site,
 	doc *content.Document, hash string) error {
 	now := deps.now()
 	next := page
@@ -281,14 +304,20 @@ func adopt(ctx context.Context, deps Deps, page pagemap.Page, index pagemap.Inde
 	next.LastSyncedAt = &now
 	next.UpdatedAt = now
 
-	return persist(ctx, deps, next, observedLinks(page, index, host, doc.Links(), now))
+	return persist(ctx, deps, next, observedOn(page, index, site, doc.Links(), now))
 }
 
-func observedLinks(page pagemap.Page, index pagemap.Index, host string, found []content.Link, at time.Time) []pagemap.PageLink {
+func observedLinks(page pagemap.Page, index pagemap.Index, host string, found []content.Link,
+	at time.Time) []pagemap.PageLink {
+	return observedOn(page, index, pagemap.Site{Host: host}, found, at)
+}
+
+func observedOn(page pagemap.Page, index pagemap.Index, site pagemap.Site, found []content.Link,
+	at time.Time) []pagemap.PageLink {
 	out := make([]pagemap.PageLink, 0, len(found))
 	for i := range found {
-		path, internal := pagemap.InternalPath(found[i].Href, host)
-		if !internal {
+		path, kind := site.Resolve(found[i].Href)
+		if kind != pagemap.LinkPath || path == "" {
 			continue
 		}
 

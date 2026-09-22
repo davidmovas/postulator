@@ -114,7 +114,10 @@ func (s siteStub) Get(context.Context, string) (site.Site, error) {
 }
 
 type policyStub struct {
-	err error
+	rules      template.LinkRules
+	specs      map[string]template.LinkRules
+	err        error
+	resolveErr error
 }
 
 func (p policyStub) GetEffectivePolicy(context.Context, templates.GetEffectivePolicyRequest) (templates.GetEffectivePolicyResponse, error) {
@@ -122,7 +125,23 @@ func (p policyStub) GetEffectivePolicy(context.Context, templates.GetEffectivePo
 		return templates.GetEffectivePolicyResponse{}, p.err
 	}
 	return templates.GetEffectivePolicyResponse{
-		Policy: templates.LinkPolicy{ForbidExternal: true, ForbidSelf: true, AnchorStrategy: "prefer_user"},
+		Policy: templates.LinkPolicy{
+			Rules: p.rules, ForbidExternal: true, ForbidSelf: true, AnchorStrategy: "prefer_user",
+		},
+	}, nil
+}
+
+func (p policyStub) ResolveForPage(_ context.Context, req templates.ResolveForPageRequest) (templates.ResolveForPageResponse, error) {
+	if p.resolveErr != nil {
+		return templates.ResolveForPageResponse{}, p.resolveErr
+	}
+	rules, ok := p.specs[req.PageID]
+	if !ok {
+		rules = template.LinkRules{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxPerTarget: 1}
+	}
+	return templates.ResolveForPageResponse{
+		TemplateID: "template", SiteID: "site", Version: 1,
+		Spec: template.TemplateSpec{LinkRules: rules},
 	}, nil
 }
 
@@ -160,24 +179,32 @@ func judgeDeps(client port.Client) steps.Deps {
 	return deps
 }
 
-func unitDeps() steps.Deps {
-	parent := graph.Entity{
-		ID: "parent", SiteID: "site", Name: "Coffee", PrimaryKeyword: "coffee",
-		Anchors: []graph.Anchor{{Text: "coffee", Source: graph.AnchorUser, Weight: 1}},
-		Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-parent"),
+func unitEntities() []graph.Entity {
+	return []graph.Entity{
+		{
+			ID: "parent", SiteID: "site", Name: "Coffee", PrimaryKeyword: "coffee",
+			Anchors: []graph.Anchor{{Text: "coffee", Source: graph.AnchorUser, Weight: 1}},
+			Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-parent"),
+		},
+		{
+			ID: "child", SiteID: "site", Name: "Espresso", PrimaryKeyword: "espresso",
+			Anchors: []graph.Anchor{{Text: "espresso", Source: graph.AnchorUser, Weight: 1}},
+			Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-child"),
+		},
 	}
-	child := graph.Entity{
-		ID: "child", SiteID: "site", Name: "Espresso", PrimaryKeyword: "espresso",
-		Anchors: []graph.Anchor{{Text: "espresso", Source: graph.AnchorUser, Weight: 1}},
-		Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-child"),
-	}
+}
 
+func unitEdges() []graph.Edge {
+	return []graph.Edge{{
+		ID: "e1", SiteID: "site", FromEntityID: "child", ToEntityID: "parent",
+		Kind: graph.EdgeParent, Weight: 1, Source: graph.SourceUser, Status: graph.StatusApproved,
+	}}
+}
+
+func unitDeps() steps.Deps {
 	return steps.Deps{
-		Entities: entityList{items: []graph.Entity{parent, child}},
-		Edges: edgeList{items: []graph.Edge{{
-			ID: "e1", SiteID: "site", FromEntityID: "child", ToEntityID: "parent",
-			Kind: graph.EdgeParent, Weight: 1, Source: graph.SourceUser, Status: graph.StatusApproved,
-		}}},
+		Entities: entityList{items: unitEntities()},
+		Edges:    edgeList{items: unitEdges()},
 		Pages: pageList{items: []pagemap.Page{
 			{ID: "page-parent", SiteID: "site", Path: "/coffee/", WPType: pagemap.WPPage, Status: pagemap.StatusPublished},
 			{ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", WPType: pagemap.WPPage, Status: pagemap.StatusPlanned},

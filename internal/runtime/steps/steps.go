@@ -26,6 +26,13 @@ const (
 	ReasonNoSEOWriter        = "the companion plugin on this site cannot write SEO meta"
 	ReasonNeighborGone       = "the neighbor is no longer on the site"
 	ReasonNeighborUnreadable = "the stored content of the neighbor could not be read as HTML"
+	ReasonNeighborUnmapped   = "the neighbor is not mapped to an entity, so it has no rules of its own"
+	ReasonNeighborNoTemplate = "the neighbor has no template, so nothing says what it may link to"
+
+	ReasonNeighborOwesNothing = "the rules of the neighbor do not ask it to link to this page"
+
+	ReasonNeighborOwesTheCanonicalPage = "the rules of the neighbor ask it to link to the canonical page " +
+		"of this entity, not to this page"
 )
 
 const (
@@ -73,8 +80,9 @@ type unitOfWork interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
 }
 
-type policyReader interface {
+type templateReader interface {
 	GetEffectivePolicy(ctx context.Context, req templates.GetEffectivePolicyRequest) (templates.GetEffectivePolicyResponse, error)
+	ResolveForPage(ctx context.Context, req templates.ResolveForPageRequest) (templates.ResolveForPageResponse, error)
 }
 
 type profileResolver interface {
@@ -93,7 +101,7 @@ type Deps struct {
 	Sites         siteReader
 	SiteWriter    siteWriter
 	WordPress     siteClients
-	Policies      policyReader
+	Policies      templateReader
 	Profiles      profileResolver
 	Content       judgeService
 	LLM           llm.Client
@@ -140,7 +148,7 @@ func effectivePolicy(ctx context.Context, deps Deps, sc *run.StepContext) (templ
 	}
 
 	return template.LinkPolicy{
-		Rules:          sc.Spec.LinkRules,
+		Rules:          templates.EffectiveRules(resp.Policy.Rules, sc.Spec.LinkRules),
 		ForbidExternal: resp.Policy.ForbidExternal,
 		ForbidSelf:     resp.Policy.ForbidSelf,
 		AnchorStrategy: template.AnchorStrategy(resp.Policy.AnchorStrategy),
