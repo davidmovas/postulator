@@ -29,7 +29,7 @@ func (f fixture) idFor(tool, field string) (string, bool) {
 		return f.site, true
 	case "entityId", "fromEntityId", "parentEntityId":
 		return f.entity, true
-	case "toEntityId":
+	case "toEntityId", "newParentId":
 		return f.other, true
 	case "pageId":
 		return f.page, true
