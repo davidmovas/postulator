@@ -2,7 +2,8 @@ import type { KeyboardEvent, ReactElement, ReactNode } from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
-import { Button, IconButton, SendIcon, StopCircleIcon } from "../../../ui/index.js";
+import { pickOpenFile } from "../../../data/host.js";
+import { Button, IconButton, SendIcon, StopCircleIcon, UploadFileIcon } from "../../../ui/index.js";
 
 const maxComposerHeightPx = 168;
 
@@ -64,6 +65,19 @@ export function Composer({
         setDraft("");
     };
 
+    const attach = (): void => {
+        void pickOpenFile({
+            title: copy.imports.file.dialogTitle,
+            filters: [{ displayName: copy.imports.file.spreadsheets, pattern: "*.csv;*.xlsx" }],
+        }).then((picked) => {
+            if (picked === null) {
+                return;
+            }
+            setDraft((current) => `${copy.imports.dropped.ask(picked)}${current}`);
+            field.current?.focus();
+        });
+    };
+
     const keyed = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
         if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault();
@@ -87,6 +101,14 @@ export function Composer({
                     }}
                     onKeyDown={keyed}
                     className="min-h-6 w-full resize-none bg-transparent text-sm leading-relaxed text-ink outline-none placeholder:text-ink-faint disabled:cursor-not-allowed"
+                />
+                <IconButton
+                    icon={UploadFileIcon}
+                    label={copy.agent.attach}
+                    variant="ghost"
+                    size="sm"
+                    disabled={disabled || answering}
+                    onClick={attach}
                 />
                 {answering ? (
                     <Button

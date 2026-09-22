@@ -1,6 +1,7 @@
 export const agent = {
     title: "Agent",
     subtitle: "The agent can do everything this app can. Every write stops and asks, in plain words.",
+    attach: "Attach a spreadsheet",
     send: "Send",
     cancelTurn: "Stop",
     thinking: "Working",
