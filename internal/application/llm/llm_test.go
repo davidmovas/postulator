@@ -119,8 +119,8 @@ func TestSchemaFor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SchemaFor: %v", err)
 	}
-	if schema.Type != llm.SchemaObject || schema.Title != "draft" {
-		t.Fatalf("schema = %+v, want an object titled draft", schema)
+	if schema.Type != llm.SchemaObject {
+		t.Fatalf("schema = %+v, want an object", schema)
 	}
 
 	kinds := map[string]llm.SchemaType{
@@ -179,6 +179,48 @@ func TestSchemaFor(t *testing.T) {
 	if score.Maximum == nil || *score.Maximum != 1 {
 		t.Errorf("score maximum = %v, want 1", score.Maximum)
 	}
+}
+
+func TestNoGoTypeNameReachesTheModel(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		make func() (*llm.Schema, error)
+	}{
+		{name: "the object itself", make: llm.SchemaFor[draft]},
+		{name: "a nested object", make: llm.SchemaFor[section]},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			schema, err := tc.make()
+			if err != nil {
+				t.Fatalf("SchemaFor: %v", err)
+			}
+			for _, titled := range titles(schema) {
+				t.Errorf("the schema carries the title %q, which names a Go type the model has no use for", titled)
+			}
+		})
+	}
+}
+
+func titles(schema *llm.Schema) []string {
+	if schema == nil {
+		return nil
+	}
+
+	out := make([]string, 0)
+	if schema.Title != "" {
+		out = append(out, schema.Title)
+	}
+	out = append(out, titles(schema.Items)...)
+	for _, property := range schema.Properties {
+		out = append(out, titles(property)...)
+	}
+	return out
 }
 
 func TestSchemaForRefusesUnsupportedTypes(t *testing.T) {

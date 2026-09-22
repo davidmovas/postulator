@@ -79,7 +79,7 @@ func structSchema(t reflect.Type, path []reflect.Type) (*Schema, error) {
 	}
 	path = append(path, t)
 
-	schema := &Schema{Type: SchemaObject, Title: t.Name(), Properties: map[string]*Schema{}, Required: []string{}}
+	schema := &Schema{Type: SchemaObject, Properties: map[string]*Schema{}, Required: []string{}}
 	for i := range t.NumField() {
 		field := t.Field(i)
 		if !field.IsExported() {
