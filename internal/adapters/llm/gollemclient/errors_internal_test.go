@@ -129,6 +129,91 @@ func TestRetryAfterWithoutAResponse(t *testing.T) {
 	}
 }
 
+func TestAnOpenAIRateLimitIsWaitedOutAsLongAsItAsks(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		err  error
+		want time.Duration
+	}{
+		{
+			name: "the seconds the provider named",
+			err: &openai.APIError{HTTPStatusCode: http.StatusTooManyRequests, Message: "Rate limit reached for " +
+				"gpt-5.6-terra in organization org-1 on tokens per min. Limit: 30000, Used: 29998. " +
+				"Please try again in 1.982s. Visit the account page to raise it."},
+			want: 1982 * time.Millisecond,
+		},
+		{
+			name: "milliseconds",
+			err: &openai.APIError{HTTPStatusCode: http.StatusTooManyRequests,
+				Message: "Rate limit reached. Please try again in 20ms."},
+			want: 20 * time.Millisecond,
+		},
+		{
+			name: "a compound duration is read whole",
+			err: &openai.APIError{HTTPStatusCode: http.StatusTooManyRequests,
+				Message: "Rate limit reached. Please try again in 1m30s."},
+			want: 90 * time.Second,
+		},
+		{
+			name: "a wait longer than a turn should hold for is left to the backoff",
+			err: &openai.APIError{HTTPStatusCode: http.StatusTooManyRequests,
+				Message: "Rate limit reached. Please try again in 6m0s."},
+		},
+		{
+			name: "a body the sdk hands back unparsed",
+			err: &openai.RequestError{HTTPStatusCode: http.StatusTooManyRequests,
+				Body: []byte(`{"error":{"message":"Rate limit reached. Please try again in 3s."}}`)},
+			want: 3 * time.Second,
+		},
+		{
+			name: "a refusal that names no delay",
+			err: &openai.APIError{HTTPStatusCode: http.StatusTooManyRequests,
+				Message: "Rate limit reached for requests"},
+		},
+		{
+			name: "a delay longer than a turn would wait is left to the backoff",
+			err: &openai.APIError{HTTPStatusCode: http.StatusTooManyRequests,
+				Message: "Rate limit reached. Please try again in 9h."},
+		},
+		{
+			name: "a server error naming a delay is waited out too",
+			err: &openai.APIError{HTTPStatusCode: http.StatusServiceUnavailable,
+				Message: "The engine is overloaded. Please try again in 12s."},
+			want: 12 * time.Second,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := classify(context.Background(), tc.err)
+
+			var kernel *errors.Error
+			if !stderrors.As(got, &kernel) || kernel.Retry == nil {
+				t.Fatalf("classify = %v, want a retryable kernel error", got)
+			}
+			if kernel.Retry.After != tc.want {
+				t.Fatalf("retry after = %s, want %s", kernel.Retry.After, tc.want)
+			}
+		})
+	}
+}
+
+func TestAnAnthropicHeaderBeatsTheSentence(t *testing.T) {
+	t.Parallel()
+
+	held := anthropicError(http.StatusTooManyRequests, "7")
+	got := classify(context.Background(), held)
+
+	var kernel *errors.Error
+	if !stderrors.As(got, &kernel) || kernel.Retry == nil || kernel.Retry.After != 7*time.Second {
+		t.Fatalf("classify = %v, want the seven seconds the header named", got)
+	}
+}
+
 func TestClassifyNamesAnExhaustedOutputBudget(t *testing.T) {
 	t.Parallel()
 

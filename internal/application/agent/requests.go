@@ -33,8 +33,15 @@ type SiteContext struct {
 type Stream interface {
 	Delta(ctx context.Context, seq int64, text string) error
 	Spent(ctx context.Context, round RoundUsage) error
+	Waiting(ctx context.Context, held Wait) error
 	ToolStarted(ctx context.Context, callID, tool string, args json.RawMessage) error
 	ToolFinished(ctx context.Context, outcome ToolOutcome) error
+}
+
+type Wait struct {
+	Reason  string
+	Attempt int
+	AfterMS int64
 }
 
 type RoundUsage struct {

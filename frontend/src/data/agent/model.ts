@@ -44,6 +44,13 @@ export const noUsage: TurnUsage = Object.freeze({
     usd: 0,
 });
 
+export interface TurnWait {
+    reason: string;
+    attempt: number;
+    afterMs: number;
+    since: number;
+}
+
 export interface Turn {
     status: TurnStatus;
     end: TurnEnd | null;
@@ -58,7 +65,12 @@ export interface Turn {
     code: string;
     message: string;
     usage: TurnUsage | null;
+    waiting: TurnWait | null;
     turnSeq: number;
+}
+
+export function waitingUntil(turn: Turn): number {
+    return turn.waiting === null ? 0 : turn.waiting.since + turn.waiting.afterMs;
 }
 
 export interface TurnReport {

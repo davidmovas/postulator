@@ -15,6 +15,7 @@ const (
 	AgentConfirmRequested Type = "agent.confirm.requested"
 	AgentConfirmResolved  Type = "agent.confirm.resolved"
 	AgentUsage            Type = "agent.usage"
+	AgentWaiting          Type = "agent.waiting"
 	AgentDone             Type = "agent.done"
 	AgentTitled           Type = "agent.titled"
 	AppLocked             Type = "app.locked"

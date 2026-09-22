@@ -48,6 +48,14 @@ type AgentUsagePayload struct {
 	USD               float64 `json:"usd"`
 }
 
+type AgentWaitingPayload struct {
+	ConversationID string `json:"conversationId"`
+	MessageID      string `json:"messageId"`
+	Reason         string `json:"reason"`
+	Attempt        int    `json:"attempt"`
+	AfterMs        int64  `json:"afterMs"`
+}
+
 type AgentDonePayload struct {
 	ConversationID    string  `json:"conversationId"`
 	MessageID         string  `json:"messageId"`

@@ -1,7 +1,8 @@
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 import { copy } from "../../../copy/index.js";
 import type { Turn } from "../../../data/agent/turn.js";
+import { isActive } from "../../../data/agent/turn.js";
 import type { Tone } from "../../../ui/index.js";
 import {
     cx,
@@ -17,7 +18,19 @@ export interface TurnStatusProps {
     turn: Turn;
 }
 
+function waitingSeconds(afterMs: number): number {
+    return Math.max(1, Math.round(afterMs / 1000));
+}
+
 export function TurnStatus({ turn }: TurnStatusProps): ReactElement | null {
+    const held = turn.waiting;
+    if (held !== null && isActive(turn.status)) {
+        return (
+            <Pill tone="warn" icon={<Spinner size={11} className={toneClasses.warn.ink} />}>
+                {copy.agent.status.waiting(waitingSeconds(held.afterMs))}
+            </Pill>
+        );
+    }
     if (turn.status === "idle" || turn.status === "working" || (turn.status === "done" && turn.end === "answered")) {
         return null;
     }
@@ -53,6 +66,20 @@ export function TurnStatus({ turn }: TurnStatusProps): ReactElement | null {
     }
 
     return (
+        <Pill tone={tone} icon={icon}>
+            {label}
+        </Pill>
+    );
+}
+
+interface PillProps {
+    tone: Tone;
+    icon: ReactElement;
+    children: ReactNode;
+}
+
+function Pill({ tone, icon, children }: PillProps): ReactElement {
+    return (
         <div className="flex h-5 items-center gap-2">
             <span
                 className={cx(
@@ -63,7 +90,7 @@ export function TurnStatus({ turn }: TurnStatusProps): ReactElement | null {
                 )}
             >
                 {icon}
-                {label}
+                {children}
             </span>
         </div>
     );

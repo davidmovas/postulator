@@ -24,6 +24,8 @@ export const agent = {
         failed: "The turn failed",
         lost: "The answer was lost",
         retry: "Ask again",
+        waiting: (seconds: number) =>
+            seconds === 1 ? "The provider is busy · trying again in 1s" : `The provider is busy · trying again in ${seconds}s`,
     },
     dock: {
         label: "Dock width",

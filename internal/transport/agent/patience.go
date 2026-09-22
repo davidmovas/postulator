@@ -20,6 +20,8 @@ const (
 	maxBackoff       = 30 * time.Second
 )
 
+type waiting func(ctx context.Context, cause error, attempt int, delay time.Duration)
+
 type patience struct {
 	mu       sync.Mutex
 	catalog  catalogReader
@@ -41,13 +43,17 @@ func newPatience(catalog catalogReader, retries int, backoff time.Duration) *pat
 	return &patience{catalog: catalog, limiters: make(map[string]*rate.Limiter), retries: retries, backoff: backoff}
 }
 
-func (p *patience) middleware(ref domainllm.ModelRef) gollem.ContentStreamMiddleware {
+func (p *patience) middleware(ref domainllm.ModelRef, told waiting) gollem.ContentStreamMiddleware {
 	return func(next gollem.ContentStreamHandler) gollem.ContentStreamHandler {
 		return func(ctx context.Context, req *gollem.ContentRequest) (<-chan *gollem.ContentResponse, error) {
 			var last error
 			for attempt := 0; attempt <= p.retries; attempt++ {
 				if attempt > 0 {
-					if err := p.pause(ctx, last, attempt); err != nil {
+					delay := delayFor(last, p.backoffFor(attempt-1))
+					if told != nil {
+						told(ctx, last, attempt, delay)
+					}
+					if err := p.pause(ctx, delay); err != nil {
 						return nil, err
 					}
 				}
@@ -107,8 +113,8 @@ func (p *patience) limiterFor(ref domainllm.ModelRef, rpm int) *rate.Limiter {
 	return created
 }
 
-func (p *patience) pause(ctx context.Context, last error, attempt int) error {
-	timer := time.NewTimer(delayFor(last, p.backoffFor(attempt-1)))
+func (p *patience) pause(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
 	defer timer.Stop()
 
 	select {

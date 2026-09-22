@@ -45,6 +45,10 @@ func (r *recordingStream) Spent(_ context.Context, round agentapp.RoundUsage) er
 	return r.err
 }
 
+func (r *recordingStream) Waiting(context.Context, agentapp.Wait) error {
+	return r.err
+}
+
 func (r *recordingStream) ToolStarted(context.Context, string, string, json.RawMessage) error {
 	return r.err
 }

@@ -7,6 +7,7 @@ export type EventType =
     | "agent.tool.finished"
     | "agent.tool.started"
     | "agent.usage"
+    | "agent.waiting"
     | "app.locked"
     | "app.unlocked"
     | "files.dropped"
@@ -43,6 +44,7 @@ export const eventTypes = [
     "agent.tool.finished",
     "agent.tool.started",
     "agent.usage",
+    "agent.waiting",
     "app.locked",
     "app.unlocked",
     "files.dropped",
@@ -141,6 +143,14 @@ export interface AgentUsagePayload {
     cachedInputTokens: number;
     outputTokens: number;
     usd: number;
+}
+
+export interface AgentWaitingPayload {
+    conversationId: string;
+    messageId: string;
+    reason: string;
+    attempt: number;
+    afterMs: number;
 }
 
 export interface AppLockedPayload {}
@@ -283,6 +293,7 @@ export interface EventPayloads {
     "agent.tool.finished": AgentToolFinishedPayload;
     "agent.tool.started": AgentToolStartedPayload;
     "agent.usage": AgentUsagePayload;
+    "agent.waiting": AgentWaitingPayload;
     "app.locked": AppLockedPayload;
     "app.unlocked": AppUnlockedPayload;
     "files.dropped": FilesDroppedPayload;

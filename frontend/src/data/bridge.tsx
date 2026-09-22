@@ -14,6 +14,7 @@ import {
     applyToolFinished,
     applyToolStarted,
     applyUsage,
+    applyWaiting,
     silentConversationIds,
 } from "./agent/turn.js";
 import { publishDrop } from "./drops.js";
@@ -224,6 +225,9 @@ function handlersFor(client: QueryClient): Handlers {
                 keys.agent.messagesOf(envelope.payload.conversationId),
             );
             void reconcileConversation(client, envelope.payload.conversationId);
+        },
+        "agent.waiting": (envelope) => {
+            applyWaiting(envelope.payload);
         },
         "agent.usage": (envelope) => {
             const conversationId = envelope.payload.conversationId;

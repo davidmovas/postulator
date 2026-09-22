@@ -8,6 +8,7 @@ import {
     applyToolFinished,
     applyToolStarted,
     applyUsage,
+    applyWaiting,
     attachAssistant,
     beginStop,
     dropAllTurns,
@@ -262,6 +263,47 @@ describe("a confirmation parks the turn", () => {
         });
         expect(reconcile(conversationId, report(true, "a1"))).toBe("none");
         expect(getTurn(conversationId).status).toBe("working");
+    });
+});
+
+describe("a round held back by the provider", () => {
+    function waiting(afterMs: number, at: number, attempt = 1, messageId = "a1") {
+        applyWaiting({ conversationId, messageId, reason: "RATE_LIMITED", attempt, afterMs }, at);
+    }
+
+    test("the wait is carried on the turn and says how long it is", () => {
+        startTurn(conversationId);
+        attachAssistant(conversationId, "a1", getTurn(conversationId).turnSeq);
+        waiting(20_000, Date.now(), 2);
+        const turn = getTurn(conversationId);
+        expect(turn.status).toBe("working");
+        expect(turn.waiting).toMatchObject({ reason: "RATE_LIMITED", attempt: 2, afterMs: 20_000 });
+    });
+
+    test("the silence rule leaves a turn alone until the wait it announced is over", () => {
+        const began = Date.now() - silenceAfterMs - 1;
+        startTurn(conversationId, began);
+        attachAssistant(conversationId, "a1", getTurn(conversationId).turnSeq);
+        waiting(60_000, began);
+        expect(silentConversationIds(began + silenceAfterMs + 1)).toStrictEqual([]);
+        expect(silentConversationIds(began + 60_001)).toStrictEqual([conversationId]);
+    });
+
+    test("the next chunk clears the wait", () => {
+        startTurn(conversationId);
+        attachAssistant(conversationId, "a1", getTurn(conversationId).turnSeq);
+        waiting(20_000, Date.now());
+        applyToolStarted({ conversationId, callId: "c-1", tool: "pages_tree", args: {} });
+        expect(getTurn(conversationId).waiting).toBeNull();
+    });
+
+    test("a settled turn is never revived by a late wait", () => {
+        startTurn(conversationId);
+        done("", "", "the answer");
+        waiting(20_000, Date.now());
+        const turn = getTurn(conversationId);
+        expect(turn.status).toBe("done");
+        expect(turn.waiting).toBeNull();
     });
 });
 

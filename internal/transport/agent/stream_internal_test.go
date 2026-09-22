@@ -26,6 +26,10 @@ func (q *quietStream) Spent(_ context.Context, round agentapp.RoundUsage) error 
 	return nil
 }
 
+func (q *quietStream) Waiting(context.Context, agentapp.Wait) error {
+	return nil
+}
+
 func (q *quietStream) ToolStarted(context.Context, string, string, json.RawMessage) error {
 	return nil
 }

@@ -64,8 +64,8 @@ func TestATurnSurvivesAProviderThatRefusesOnce(t *testing.T) {
 			t.Parallel()
 
 			calls := 0
-			waiting := newPatience(countingCatalog{rpm: 600}, tc.retries, time.Millisecond)
-			handler := waiting.middleware(domainllm.ModelRef{Provider: "openai", Model: "chat"})(
+			held := newPatience(countingCatalog{rpm: 600}, tc.retries, time.Millisecond)
+			handler := held.middleware(domainllm.ModelRef{Provider: "openai", Model: "chat"}, nil)(
 				func(context.Context, *gollem.ContentRequest) (<-chan *gollem.ContentResponse, error) {
 					calls++
 					if calls <= tc.failures {
@@ -90,15 +90,57 @@ func TestATurnSurvivesAProviderThatRefusesOnce(t *testing.T) {
 func TestAModelWithNoDeclaredRateIsNotHeldBack(t *testing.T) {
 	t.Parallel()
 
-	waiting := newPatience(countingCatalog{rpm: 0}, 0, time.Millisecond)
+	held := newPatience(countingCatalog{rpm: 0}, 0, time.Millisecond)
 	ref := domainllm.ModelRef{Provider: "openai", Model: "chat"}
 
 	deadline, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
 
 	for range 5 {
-		if err := waiting.wait(deadline, ref); err != nil {
+		if err := held.wait(deadline, ref); err != nil {
 			t.Fatalf("a model with no declared rate was held back: %v", err)
+		}
+	}
+}
+
+func TestARateLimitedRoundSaysHowLongItIsWaiting(t *testing.T) {
+	t.Parallel()
+
+	type notice struct {
+		reason  errors.Code
+		attempt int
+		delay   time.Duration
+	}
+
+	told := make([]notice, 0, 2)
+	calls := 0
+	held := newPatience(countingCatalog{rpm: 600}, 3, time.Millisecond)
+	handler := held.middleware(domainllm.ModelRef{Provider: "openai", Model: "chat"},
+		func(_ context.Context, cause error, attempt int, delay time.Duration) {
+			told = append(told, notice{reason: errors.CodeOf(cause), attempt: attempt, delay: delay})
+		})(
+		func(context.Context, *gollem.ContentRequest) (<-chan *gollem.ContentResponse, error) {
+			calls++
+			if calls <= 2 {
+				return nil, refused(errors.RateLimited, 4*time.Millisecond)
+			}
+			out := make(chan *gollem.ContentResponse)
+			close(out)
+			return out, nil
+		})
+
+	if _, err := handler(t.Context(), &gollem.ContentRequest{}); err != nil {
+		t.Fatalf("the call answered %v", err)
+	}
+	if len(told) != 2 {
+		t.Fatalf("the stream was told about %d waits, want one per retry: %+v", len(told), told)
+	}
+	for index, said := range told {
+		if said.attempt != index+1 || said.reason != errors.RateLimited {
+			t.Fatalf("wait %d reads %+v", index+1, said)
+		}
+		if said.delay != 4*time.Millisecond {
+			t.Fatalf("wait %d held for %s, want the delay the provider named", index+1, said.delay)
 		}
 	}
 }

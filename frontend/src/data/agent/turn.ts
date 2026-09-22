@@ -6,6 +6,7 @@ import type {
     AgentToolFinishedPayload,
     AgentToolStartedPayload,
     AgentUsagePayload,
+    AgentWaitingPayload,
 } from "../../generated/events.js";
 import type {
     AgentToolCall,
@@ -16,7 +17,7 @@ import type {
     TurnStatus,
     TurnUsage,
 } from "./model.js";
-import { cancelledCode, isActive, noUsage, silenceAfterMs, toolCallStatus } from "./model.js";
+import { cancelledCode, isActive, noUsage, silenceAfterMs, toolCallStatus, waitingUntil } from "./model.js";
 
 export type {
     AgentConfirmation,
@@ -28,6 +29,7 @@ export type {
     TurnReport,
     TurnStatus,
     TurnUsage,
+    TurnWait,
 } from "./model.js";
 export { budgetCode, cancelledCode, isActive, silenceAfterMs, toolCallStatus } from "./model.js";
 
@@ -55,6 +57,7 @@ const idleTurn: Turn = Object.freeze({
     code: "",
     message: "",
     usage: null,
+    waiting: null,
     turnSeq: 0,
 });
 
@@ -143,6 +146,7 @@ function settle(held: TurnLog, status: TurnStatus, end: TurnEnd, code: string, m
     held.turn.code = code;
     held.turn.message = message;
     held.turn.confirm = null;
+    held.turn.waiting = null;
     held.turn.lastEventAt = Date.now();
     held.buffered.clear();
     held.pendingReconcile = false;
@@ -174,6 +178,7 @@ export function applyDelta(payload: AgentDeltaPayload, at: number = Date.now()):
     }
     held.turn.lastEventAt = at;
     held.turn.lastSeq = Math.max(held.turn.lastSeq, payload.seq);
+    held.turn.waiting = null;
     held.pendingReconcile = false;
     held.buffered.set(payload.seq, payload.text);
     for (;;) {
@@ -189,8 +194,29 @@ export function applyDelta(payload: AgentDeltaPayload, at: number = Date.now()):
     publish(held);
 }
 
+export function applyWaiting(payload: AgentWaitingPayload, at: number = Date.now()): void {
+    const held = reach(payload.conversationId);
+    const known = held.turn.assistantMessageId;
+    if (known !== null && known !== payload.messageId) {
+        return;
+    }
+    if (!isActive(held.turn.status)) {
+        return;
+    }
+    held.turn.lastEventAt = at;
+    held.pendingReconcile = false;
+    held.turn.waiting = {
+        reason: payload.reason,
+        attempt: payload.attempt,
+        afterMs: payload.afterMs,
+        since: at,
+    };
+    publish(held);
+}
+
 function touch(held: TurnLog, at: number): void {
     held.turn.lastEventAt = at;
+    held.turn.waiting = null;
     held.pendingReconcile = false;
     if (!isActive(held.turn.status)) {
         held.turn.status = "working";
@@ -346,7 +372,13 @@ export function settleUnreported(conversationId: string, answered: boolean): voi
 export function silentConversationIds(now: number, afterMs: number = silenceAfterMs): string[] {
     const out: string[] = [];
     turns.forEach((held) => {
-        if (isActive(held.turn.status) && held.turn.lastEventAt > 0 && now - held.turn.lastEventAt >= afterMs) {
+        if (!isActive(held.turn.status) || held.turn.lastEventAt === 0) {
+            return;
+        }
+        if (now < waitingUntil(held.turn)) {
+            return;
+        }
+        if (now - held.turn.lastEventAt >= afterMs) {
             out.push(held.conversationId);
         }
     });

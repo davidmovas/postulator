@@ -144,19 +144,40 @@ func envelopeMessage(body []byte) string {
 func statusOf(err error) (status int, after time.Duration, ok bool) {
 	var apiErr *openai.APIError
 	if stderrors.As(err, &apiErr) {
-		return apiErr.HTTPStatusCode, 0, true
+		return apiErr.HTTPStatusCode, statedDelay(messageOf(err)), true
 	}
 
 	var requestErr *openai.RequestError
 	if stderrors.As(err, &requestErr) {
-		return requestErr.HTTPStatusCode, 0, true
+		return requestErr.HTTPStatusCode, statedDelay(messageOf(err)), true
 	}
 
 	var anthropicErr *anthropic.Error
 	if stderrors.As(err, &anthropicErr) {
-		return anthropicErr.StatusCode, retryAfter(anthropicErr.Response), true
+		held := retryAfter(anthropicErr.Response)
+		if held == 0 {
+			held = statedDelay(messageOf(err))
+		}
+		return anthropicErr.StatusCode, held, true
 	}
 	return 0, 0, false
+}
+
+const maxStatedDelay = 2 * time.Minute
+
+var statedDelayPattern = regexp.MustCompile(`(?i)try again in ((?:\d+(?:\.\d+)?(?:ms|s|m|h))+)`)
+
+func statedDelay(text string) time.Duration {
+	match := statedDelayPattern.FindStringSubmatch(text)
+	if match == nil {
+		return 0
+	}
+
+	delay, err := time.ParseDuration(strings.ToLower(match[1]))
+	if err != nil || delay <= 0 || delay > maxStatedDelay {
+		return 0
+	}
+	return delay
 }
 
 func retryAfter(resp *http.Response) time.Duration {

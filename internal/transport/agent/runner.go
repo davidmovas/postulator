@@ -145,13 +145,21 @@ func (r *Runner) execute(ctx context.Context, client gollem.LLMClient, spec agen
 
 	billing := context.WithoutCancel(ctx)
 	record := func(done round) { r.bill(billing, spec, usage, done, guard.note) }
+	told := func(waitCtx context.Context, cause error, attempt int, delay time.Duration) {
+		if spec.Stream == nil {
+			return
+		}
+		guard.note(spec.Stream.Waiting(waitCtx, agentapp.Wait{
+			Reason: errors.CodeOf(convert(cause)).String(), Attempt: attempt, AfterMS: delay.Milliseconds(),
+		}))
+	}
 
 	options := []gollem.Option{
 		gollem.WithLoopLimit(spec.LoopLimit),
 		gollem.WithSystemPrompt(system),
 		gollem.WithResponseMode(gollem.ResponseModeStreaming),
 		gollem.WithStrategy(readTheStream{}),
-		gollem.WithContentStreamMiddleware(r.waiting.middleware(spec.Ref)),
+		gollem.WithContentStreamMiddleware(r.waiting.middleware(spec.Ref, told)),
 		gollem.WithContentStreamMiddleware(observe(spec.Stream, usage, spoken, guard.note, record)),
 		gollem.WithContentStreamMiddleware(guard.unknown(r.deps.Registry.Names())),
 		gollem.WithTools(adapted...),

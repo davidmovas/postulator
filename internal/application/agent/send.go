@@ -197,6 +197,13 @@ func (s *stream) Spent(_ context.Context, round RoundUsage) error {
 	})
 }
 
+func (s *stream) Waiting(_ context.Context, held Wait) error {
+	return s.service.deps.Publisher.Publish(events.AgentWaiting, events.AgentWaitingPayload{
+		ConversationID: s.conversationID, MessageID: s.messageID,
+		Reason: held.Reason, Attempt: held.Attempt, AfterMs: held.AfterMS,
+	})
+}
+
 func (s *stream) ToolStarted(_ context.Context, callID, tool string, args json.RawMessage) error {
 	return s.service.deps.Publisher.Publish(events.AgentToolStarted, events.AgentToolStartedPayload{
 		ConversationID: s.conversationID, CallID: callID, Tool: tool, Args: args,
