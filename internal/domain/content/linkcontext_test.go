@@ -162,11 +162,11 @@ func TestBuildLinkContextOnAMultiParentDAG(t *testing.T) {
 	if phrases := lc.Phrases(); len(phrases) != 6 || phrases[0] != "drinks" {
 		t.Fatalf("Phrases = %v", phrases)
 	}
-	if _, ok := lc.ByURL("/drinks/"); !ok {
-		t.Error("ByURL must find a target")
+	if lc.Resolve("/drinks/").Class != content.ClassGraph {
+		t.Error("Resolve must find a target")
 	}
-	if _, ok := lc.ByURL("/nope/"); ok {
-		t.Error("ByURL must refuse an unknown url")
+	if lc.Resolve("/nope/").Class != content.ClassUnknownInternal {
+		t.Error("Resolve must refuse an unknown path")
 	}
 }
 

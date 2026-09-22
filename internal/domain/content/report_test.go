@@ -15,6 +15,15 @@ func codesOf(report content.Report) []string {
 	return out
 }
 
+func detailsOf(report content.Report, code string) map[string]any {
+	for _, item := range report.Items {
+		if item.Code == code {
+			return item.Details
+		}
+	}
+	return nil
+}
+
 func hasCode(report content.Report, code string) bool {
 	for _, item := range report.Items {
 		if item.Code == code {
@@ -122,9 +131,6 @@ func TestCompliancePolicySwitchesAndCaps(t *testing.T) {
 	if hasCode(report, content.CodeSelfLink) || hasCode(report, content.CodeExternalLink) {
 		t.Fatalf("a permissive policy allows both: %v", codesOf(report))
 	}
-	if !hasCode(report, content.CodeTooManyLinks) {
-		t.Fatalf("the link cap must be reported: %v", codesOf(report))
-	}
 	if report.HasErrors() {
 		t.Fatalf("a permissive policy reports no error: %v", codesOf(report))
 	}
@@ -132,6 +138,71 @@ func TestCompliancePolicySwitchesAndCaps(t *testing.T) {
 	strict := content.Compliance(doc, lc, policy(template.LinkRules{}), "self")
 	if !strict.HasErrors() {
 		t.Fatalf("a strict policy reports errors: %v", codesOf(strict))
+	}
+}
+
+func TestTheLinkCapCountsGraphLinksOnBothSides(t *testing.T) {
+	t.Parallel()
+
+	lc := contextOf(
+		target("/a/", []string{"alpha"}, content.RelationDown, false),
+		target("/b/", []string{"bravo"}, content.RelationDown, false),
+		target("/c/", []string{"charlie"}, content.RelationDown, false),
+	)
+	rules := template.LinkRules{MaxLinks: 2}
+
+	cases := []struct {
+		name    string
+		body    string
+		graph   int
+		capped  bool
+		outcome content.Outcome
+	}{
+		{
+			name: "off-graph links do not spend the budget",
+			body: `<p>An <a href="/a/">alpha</a>, <a href="/legal/">the terms</a>, ` +
+				`<a href="https://example.com/">elsewhere</a> and <a href="#top">the top</a>. ` +
+				`A charlie waits.</p>`,
+			graph: 1, outcome: content.OutcomeInserted,
+		},
+		{
+			name:  "a spent budget stops the next target",
+			body:  `<p>An <a href="/a/">alpha</a> and a <a href="/b/">bravo</a>. A charlie waits.</p>`,
+			graph: 2, outcome: content.OutcomeCapReached,
+		},
+		{
+			name: "a body over the cap is reported",
+			body: `<p>An <a href="/a/">alpha</a>, a <a href="/b/">bravo</a> and a ` +
+				`<a href="/c/">charlie</a>.</p>`,
+			graph: 3, capped: true, outcome: content.OutcomeAlreadyLinked,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := content.CountGraphLinks(mustParse(t, tc.body), lc); got != tc.graph {
+				t.Fatalf("CountGraphLinks = %d, want %d", got, tc.graph)
+			}
+
+			report := content.Compliance(mustParse(t, tc.body), lc, policy(rules), "self")
+			if hasCode(report, content.CodeTooManyLinks) != tc.capped {
+				t.Fatalf("the cap finding = %v, want capped=%t", codesOf(report), tc.capped)
+			}
+			if tc.capped {
+				details := detailsOf(report, content.CodeTooManyLinks)
+				if details["links"] != tc.graph || details["counted"] != content.CountedGraphLinks {
+					t.Fatalf("the cap names %+v, want %d %s", details, tc.graph, content.CountedGraphLinks)
+				}
+			}
+
+			result := content.InsertLinks(mustParse(t, tc.body), lc, policy(rules))
+			last := result.Decisions[len(result.Decisions)-1]
+			if last.Target.URL != "/c/" || last.Outcome != tc.outcome {
+				t.Fatalf("the last decision = %+v, want /c/ %s", last, tc.outcome)
+			}
+		})
 	}
 }
 

@@ -208,7 +208,7 @@ func auditPage(state *siteLinks, page pagemap.Page, templateID string, rules tem
 		})
 	}
 	for i := range links {
-		class := lc.ClassifyLink(links[i], state.host)
+		class := lc.ClassifyLink(links[i])
 		if !class.OffGraph() {
 			continue
 		}

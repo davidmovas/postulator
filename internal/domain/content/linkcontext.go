@@ -46,6 +46,7 @@ type LinkContext struct {
 	PageID   string       `json:"pageId"`
 	PageURL  string       `json:"pageUrl"`
 	EntityID string       `json:"entityId"`
+	Site     pagemap.Site `json:"site"`
 	Targets  []LinkTarget `json:"targets"`
 }
 
@@ -62,15 +63,6 @@ func (c LinkContext) Phrases() []string {
 		}
 	}
 	return out
-}
-
-func (c LinkContext) ByURL(url string) (LinkTarget, bool) {
-	for _, target := range c.Targets {
-		if target.URL == url {
-			return target, true
-		}
-	}
-	return LinkTarget{}, false
 }
 
 func (c LinkContext) ByPageID(pageID string) (LinkTarget, bool) {

@@ -2,7 +2,6 @@ package content
 
 import (
 	"slices"
-	"strings"
 	"unicode"
 
 	"golang.org/x/net/html"
@@ -47,18 +46,26 @@ var forbiddenZones = []string{
 }
 
 func InsertLinks(doc *Document, lc LinkContext, policy template.LinkPolicy) InsertResult {
+	return insert(doc, lc, policy, lc.Targets)
+}
+
+func InsertTarget(doc *Document, lc LinkContext, policy template.LinkPolicy, only LinkTarget) InsertResult {
+	return insert(doc, lc, policy, []LinkTarget{only})
+}
+
+func insert(doc *Document, lc LinkContext, policy template.LinkPolicy, wanted []LinkTarget) InsertResult {
 	result := InsertResult{
-		Placed:    make([]Placement, 0, len(lc.Targets)),
+		Placed:    make([]Placement, 0, len(wanted)),
 		Missing:   make([]LinkTarget, 0),
-		Decisions: make([]Decision, 0, len(lc.Targets)),
+		Decisions: make([]Decision, 0, len(wanted)),
 	}
 
 	maxLinks := policy.Rules.MaxLinks
 	perTarget := max(policy.Rules.MaxPerTarget, 1)
-	placed := countGraphLinks(doc, lc)
+	placed := CountGraphLinks(doc, lc)
 
-	for _, target := range lc.Targets {
-		existing := existingFor(doc, target)
+	for _, target := range wanted {
+		existing := existingFor(doc, lc, target)
 		if len(existing) > 0 {
 			for _, node := range existing {
 				result.Placed = append(result.Placed, Placement{
@@ -232,26 +239,26 @@ func paragraphOf(doc *Document, node *html.Node) int {
 	return paragraphIndexOf(doc.Paragraphs(), node)
 }
 
-func existingFor(doc *Document, target LinkTarget) []*html.Node {
+func existingFor(doc *Document, lc LinkContext, target LinkTarget) []*html.Node {
 	out := make([]*html.Node, 0, 1)
+	wanted, ok := canonicalPath(target.URL)
+	if !ok {
+		return out
+	}
 	for _, link := range doc.Links() {
-		if sameHref(link.Href, target.URL) {
+		if lc.Resolve(link.Href).Path == wanted {
 			out = append(out, link.Node)
 		}
 	}
 	return out
 }
 
-func countGraphLinks(doc *Document, lc LinkContext) int {
+func CountGraphLinks(doc *Document, lc LinkContext) int {
 	total := 0
 	for _, link := range doc.Links() {
-		if _, ok := lc.ByURL(strings.TrimSpace(link.Href)); ok {
+		if lc.Resolve(link.Href).Class == ClassGraph {
 			total++
 		}
 	}
 	return total
-}
-
-func sameHref(href, url string) bool {
-	return strings.TrimSpace(href) == url
 }

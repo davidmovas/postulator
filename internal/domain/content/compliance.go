@@ -1,9 +1,9 @@
 package content
 
 import (
+	"strconv"
 	"strings"
 
-	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/template"
 )
 
@@ -44,6 +44,8 @@ const (
 	CodeAnchorNotAllowed = "anchor_not_allowed"
 	CodeTooManyLinks     = "too_many_links"
 
+	CountedGraphLinks = "graph_links"
+
 	errorPenalty = 0.25
 	warnPenalty  = 0.05
 )
@@ -52,7 +54,7 @@ func Compliance(doc *Document, lc LinkContext, policy template.LinkPolicy, pageI
 	report := Report{Items: make([]Finding, 0)}
 
 	for _, target := range lc.Targets {
-		if len(existingFor(doc, target)) > 0 {
+		if len(existingFor(doc, lc, target)) > 0 {
 			continue
 		}
 		severity := SeverityWarn
@@ -66,17 +68,22 @@ func Compliance(doc *Document, lc LinkContext, policy template.LinkPolicy, pageI
 		})
 	}
 
-	links := doc.Links()
-	for _, link := range links {
+	graphLinks := 0
+	for _, link := range doc.Links() {
 		href := strings.TrimSpace(link.Href)
-		switch classify(href, lc) {
+		resolution := lc.Resolve(href)
+		if resolution.SameDocument {
+			continue
+		}
+
+		switch resolution.Class {
 		case ClassGraph:
-			target, _ := lc.ByURL(href)
-			if !AnchorAllowed(target, link.Anchor) {
+			graphLinks++
+			if !AnchorAllowed(resolution.Target, link.Anchor) {
 				report.Items = append(report.Items, Finding{
 					Severity: SeverityWarn, Code: CodeAnchorNotAllowed,
-					Message: "the anchor " + link.Anchor + " is not one of the anchors of " + href,
-					Details: map[string]any{"href": href, "anchor": link.Anchor},
+					Message: "the anchor " + link.Anchor + " is not one of the anchors of " + resolution.Target.URL,
+					Details: map[string]any{"href": href, "path": resolution.Path, "anchor": link.Anchor},
 				})
 			}
 		case ClassSelf:
@@ -84,7 +91,7 @@ func Compliance(doc *Document, lc LinkContext, policy template.LinkPolicy, pageI
 				report.Items = append(report.Items, Finding{
 					Severity: SeverityError, Code: CodeSelfLink,
 					Message: "the page links to itself",
-					Details: map[string]any{"href": href},
+					Details: map[string]any{"href": href, "path": resolution.Path},
 				})
 			}
 		case ClassExternal:
@@ -99,37 +106,24 @@ func Compliance(doc *Document, lc LinkContext, policy template.LinkPolicy, pageI
 			report.Items = append(report.Items, Finding{
 				Severity: SeverityWarn, Code: CodeUnknownInternal,
 				Message: "the page links to " + href + ", which the entity graph does not sanction",
-				Details: map[string]any{"href": href},
+				Details: map[string]any{"href": href, "path": resolution.Path},
 			})
 		}
 	}
 
-	if policy.Rules.MaxLinks > 0 && len(links) > policy.Rules.MaxLinks {
+	if policy.Rules.MaxLinks > 0 && graphLinks > policy.Rules.MaxLinks {
 		report.Items = append(report.Items, Finding{
 			Severity: SeverityWarn, Code: CodeTooManyLinks,
-			Message: "the page carries more links than the policy allows",
-			Details: map[string]any{"links": len(links), "maxLinks": policy.Rules.MaxLinks},
+			Message: "the page carries " + strconv.Itoa(graphLinks) + " graph links, more than the " +
+				strconv.Itoa(policy.Rules.MaxLinks) + " its rules allow",
+			Details: map[string]any{
+				"links": graphLinks, "counted": CountedGraphLinks, "maxLinks": policy.Rules.MaxLinks,
+			},
 		})
 	}
 
 	report.Score = scoreOf(report.Items)
 	return report
-}
-
-func classify(href string, lc LinkContext) LinkClass {
-	switch {
-	case href == "":
-		return ClassUnknownInternal
-	case lc.PageURL != "" && href == lc.PageURL:
-		return ClassSelf
-	}
-	if _, ok := lc.ByURL(href); ok {
-		return ClassGraph
-	}
-	if _, internal := pagemap.InternalPath(href, ""); !internal {
-		return ClassExternal
-	}
-	return ClassUnknownInternal
 }
 
 func ScoreOf(items []Finding) float64 {

@@ -19,7 +19,36 @@ func (c LinkClass) OffGraph() bool {
 	return c != ClassGraph
 }
 
-func (c LinkContext) ClassifyLink(link pagemap.PageLink, host string) LinkClass {
+type Resolution struct {
+	Path         string
+	Target       LinkTarget
+	Class        LinkClass
+	SameDocument bool
+}
+
+func (c LinkContext) Resolve(href string) Resolution {
+	path, kind := c.Site.Resolve(href)
+	switch kind {
+	case pagemap.LinkExternal:
+		return Resolution{Class: ClassExternal}
+	case pagemap.LinkSameDocument:
+		return Resolution{Class: ClassSelf, SameDocument: true}
+	case pagemap.LinkUnresolved:
+		return Resolution{Class: ClassUnknownInternal}
+	}
+
+	if own, ok := canonicalPath(c.PageURL); ok && own == path {
+		return Resolution{Path: path, Class: ClassSelf}
+	}
+	for _, target := range c.Targets {
+		if wanted, ok := canonicalPath(target.URL); ok && wanted == path {
+			return Resolution{Path: path, Target: target, Class: ClassGraph}
+		}
+	}
+	return Resolution{Path: path, Class: ClassUnknownInternal}
+}
+
+func (c LinkContext) ClassifyLink(link pagemap.PageLink) LinkClass {
 	if link.ToPageID != nil {
 		if *link.ToPageID == c.PageID {
 			return ClassSelf
@@ -29,18 +58,15 @@ func (c LinkContext) ClassifyLink(link pagemap.PageLink, host string) LinkClass 
 		}
 		return ClassUnknownInternal
 	}
+	return c.Resolve(link.ToURL).Class
+}
 
-	path, internal := pagemap.InternalPath(link.ToURL, host)
-	switch {
-	case !internal:
-		return ClassExternal
-	case path != "" && path == c.PageURL:
-		return ClassSelf
+func canonicalPath(raw string) (string, bool) {
+	path, kind := pagemap.Site{}.Resolve(raw)
+	if kind != pagemap.LinkPath {
+		return "", false
 	}
-	if _, ok := c.ByURL(path); ok {
-		return ClassGraph
-	}
-	return ClassUnknownInternal
+	return path, true
 }
 
 func AnchorAllowed(target LinkTarget, anchor string) bool {
