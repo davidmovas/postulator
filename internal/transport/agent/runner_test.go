@@ -356,7 +356,10 @@ func TestTheConversationHistoryIsReplayedOnTheNextTurn(t *testing.T) {
 func TestTheStoredHistoryReplaysAShorterToolResultThanTheTurnSaw(t *testing.T) {
 	t.Parallel()
 
-	const ceiling = 4096
+	const (
+		ceiling      = 4096
+		replayedCeil = 1024
+	)
 
 	store := sqlitetest.Open(t)
 	owner := sqlitetest.Site(t, store, "shop")
@@ -366,6 +369,7 @@ func TestTheStoredHistoryReplaysAShorterToolResultThanTheTurnSaw(t *testing.T) {
 
 	h := buildTuned(t, store, fake.NewGollem(), &applicationtest.Recorder{}, func(deps *agentapp.Deps) {
 		deps.MaxToolResult = func() int { return ceiling }
+		deps.HistoryToolResult = func() int { return replayedCeil }
 	})
 	h.siteID = owner.ID
 
@@ -394,7 +398,7 @@ func TestTheStoredHistoryReplaysAShorterToolResultThanTheTurnSaw(t *testing.T) {
 				continue
 			}
 			replayed++
-			if len(content.Data) > agentapp.HistoryToolResultBytes(ceiling)+historyFenceSlack {
+			if len(content.Data) > replayedCeil+historyFenceSlack {
 				t.Fatalf("the stored result is %d bytes, over the history ceiling", len(content.Data))
 			}
 			if len(content.Data) >= len(outcome.Result) {

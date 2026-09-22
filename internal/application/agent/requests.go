@@ -65,16 +65,17 @@ type ToolOutcome struct {
 }
 
 type RunSpec struct {
-	Binding       tools.Binding
-	Ref           domainllm.ModelRef
-	Context       SiteContext
-	Input         string
-	MessageID     string
-	Allowed       []string
-	Stream        Stream
-	LoopLimit     int
-	HistoryBudget int
-	MaxToolResult int
+	Binding           tools.Binding
+	Ref               domainllm.ModelRef
+	Context           SiteContext
+	Input             string
+	MessageID         string
+	Allowed           []string
+	Stream            Stream
+	LoopLimit         int
+	HistoryBudget     int
+	MaxToolResult     int
+	HistoryToolResult int
 }
 
 type RunResult struct {

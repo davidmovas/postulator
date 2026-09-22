@@ -7,28 +7,21 @@ import (
 )
 
 const (
-	DefaultLoopLimit          = 12
-	DefaultHistoryBudgetChars = 48000
-	DefaultMaxToolResultBytes = 16384
-
-	MinHistoryToolResultBytes = 512
-	MaxHistoryToolResultBytes = 65536
-
-	historyToolResultShare = 4
+	DefaultLoopLimit              = 12
+	DefaultHistoryBudgetChars     = 48000
+	DefaultMaxToolResultBytes     = 16384
+	DefaultHistoryToolResultBytes = 4096
+	MinHistoryToolResultBytes     = 512
+	MaxHistoryToolResultBytes     = 65536
 )
-
-func HistoryToolResultBytes(maxToolResult int) int {
-	if maxToolResult <= 0 {
-		maxToolResult = DefaultMaxToolResultBytes
-	}
-	return min(max(maxToolResult/historyToolResultShare, MinHistoryToolResultBytes), MaxHistoryToolResultBytes)
-}
 
 var (
 	loopLimitSetting     = settings.Int("agent.loopLimit", DefaultLoopLimit, settings.IntRange(1, 64))
 	historyBudgetSetting = settings.Int("agent.historyBudgetChars", DefaultHistoryBudgetChars, settings.IntRange(2000, 400000))
 	toolResultSetting    = settings.Int("agent.maxToolResultBytes", DefaultMaxToolResultBytes, settings.IntRange(1024, 262144))
-	turnTimeoutSetting   = settings.Duration("agent.turnTimeout", DefaultTurnTimeout, settings.DurationRange(time.Minute, 2*time.Hour))
+	historyResultSetting = settings.Int("agent.historyToolResultBytes", DefaultHistoryToolResultBytes,
+		settings.IntRange(MinHistoryToolResultBytes, MaxHistoryToolResultBytes))
+	turnTimeoutSetting = settings.Duration("agent.turnTimeout", DefaultTurnTimeout, settings.DurationRange(time.Minute, 2*time.Hour))
 )
 
 func TurnTimeout(values *settings.Values) time.Duration {
@@ -45,4 +38,8 @@ func HistoryBudgetChars(values *settings.Values) int {
 
 func MaxToolResultBytes(values *settings.Values) int {
 	return toolResultSetting.Get(values)
+}
+
+func HistoryToolResultBytes(values *settings.Values) int {
+	return historyResultSetting.Get(values)
 }

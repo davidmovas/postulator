@@ -93,6 +93,7 @@ export const placements: readonly Placement[] = [
     { key: "agent.loopLimit", section: "agentLimits", unit: "steps" },
     { key: "agent.historyBudgetChars", section: "agentDepth", unit: "characters" },
     { key: "agent.maxToolResultBytes", section: "agentDepth", unit: "bytes" },
+    { key: "agent.historyToolResultBytes", section: "agentDepth", unit: "bytes" },
     { key: "browser.torPath", section: "tor" },
 ];
 

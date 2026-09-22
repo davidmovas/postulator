@@ -81,14 +81,15 @@ func (s *Service) turn(ctx context.Context, conversation domainagent.Conversatio
 		Binding: tools.Binding{
 			SiteID: siteOf(conversation), ConversationID: conversation.ID, Mode: conversation.Mode,
 		},
-		Ref:           ref,
-		Context:       built,
-		Input:         input,
-		MessageID:     id.New(),
-		Allowed:       s.allowed(),
-		LoopLimit:     s.loopLimit(),
-		HistoryBudget: s.historyBudget(),
-		MaxToolResult: s.maxToolResult(),
+		Ref:               ref,
+		Context:           built,
+		Input:             input,
+		MessageID:         id.New(),
+		Allowed:           s.allowed(),
+		LoopLimit:         s.loopLimit(),
+		HistoryBudget:     s.historyBudget(),
+		MaxToolResult:     s.maxToolResult(),
+		HistoryToolResult: s.historyToolResult(),
 	}
 	spec.Stream = &stream{service: s, conversationID: conversation.ID, messageID: spec.MessageID}
 

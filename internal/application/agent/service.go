@@ -68,25 +68,26 @@ type Runner interface {
 }
 
 type Deps struct {
-	Conversations conversationStore
-	Messages      messageStore
-	Actions       actionStore
-	Calls         callStore
-	Sites         siteReader
-	Reports       overviewReader
-	Templates     templateReader
-	Profiles      profileResolver
-	LLM           completer
-	Registry      *tools.Registry
-	Runner        Runner
-	Turns         *Turns
-	TurnTimeout   func() time.Duration
-	Publisher     application.Publisher
-	Clock         clock.Clock
-	Allowed       []string
-	LoopLimit     func() int
-	HistoryBudget func() int
-	MaxToolResult func() int
+	Conversations     conversationStore
+	Messages          messageStore
+	Actions           actionStore
+	Calls             callStore
+	Sites             siteReader
+	Reports           overviewReader
+	Templates         templateReader
+	Profiles          profileResolver
+	LLM               completer
+	Registry          *tools.Registry
+	Runner            Runner
+	Turns             *Turns
+	TurnTimeout       func() time.Duration
+	Publisher         application.Publisher
+	Clock             clock.Clock
+	Allowed           []string
+	LoopLimit         func() int
+	HistoryBudget     func() int
+	MaxToolResult     func() int
+	HistoryToolResult func() int
 }
 
 type Service struct {
@@ -138,6 +139,10 @@ func (s *Service) historyBudget() int {
 
 func (s *Service) maxToolResult() int {
 	return chosen(s.deps.MaxToolResult, DefaultMaxToolResultBytes)
+}
+
+func (s *Service) historyToolResult() int {
+	return chosen(s.deps.HistoryToolResult, DefaultHistoryToolResultBytes)
 }
 
 func (s *Service) now() time.Time {

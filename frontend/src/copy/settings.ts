@@ -67,6 +67,10 @@ export const settings = {
             label: "Conversation kept in mind",
             help: "How much of a conversation goes back to the model with your next question.",
         },
+        "agent.historyToolResultBytes": {
+            label: "Tool answer kept for the next question",
+            help: "How much of a tool's answer is kept in the conversation. The agent reads more than this at the time; only this much goes back to the model afterwards.",
+        },
         "agent.loopLimit": {
             label: "Tool steps per answer",
             help: "How many things the agent may do before it has to answer you.",

@@ -130,7 +130,7 @@ func TestAStoredToolResultReplaysShortenedAndStillDecodes(t *testing.T) {
 	held := bounded{
 		store: store, clock: clock.NewFake(time.Date(2026, 9, 22, 9, 0, 0, 0, time.UTC)),
 		budget: agentapp.DefaultHistoryBudgetChars,
-		cap:    agentapp.HistoryToolResultBytes(agentapp.DefaultMaxToolResultBytes),
+		cap:    agentapp.DefaultHistoryToolResultBytes,
 	}
 
 	written := &gollem.History{
@@ -161,7 +161,7 @@ func TestAStoredToolResultReplaysShortenedAndStillDecodes(t *testing.T) {
 	if len(shortened.Data) >= len(fat.Contents[0].Data) {
 		t.Fatalf("the stored result is %d bytes of the original %d", len(shortened.Data), len(fat.Contents[0].Data))
 	}
-	if len(shortened.Data) > agentapp.HistoryToolResultBytes(agentapp.DefaultMaxToolResultBytes)+fenceBytes {
+	if len(shortened.Data) > agentapp.DefaultHistoryToolResultBytes+fenceBytes {
 		t.Fatalf("the stored result is %d bytes, over the history ceiling", len(shortened.Data))
 	}
 
@@ -200,7 +200,7 @@ func TestAResultThatFitsIsStoredUntouched(t *testing.T) {
 		Messages: []gollem.Message{message(t, gollem.RoleUser, "hello"), small},
 	}
 
-	kept := shorten(history, agentapp.HistoryToolResultBytes(agentapp.DefaultMaxToolResultBytes))
+	kept := shorten(history, agentapp.DefaultHistoryToolResultBytes)
 	if string(kept.Messages[1].Contents[0].Data) != string(small.Contents[0].Data) {
 		t.Fatalf("a result inside the ceiling was rewritten: %s", kept.Messages[1].Contents[0].Data)
 	}
@@ -212,26 +212,38 @@ func TestAResultThatFitsIsStoredUntouched(t *testing.T) {
 	}
 }
 
-func TestTheHistoryCeilingIsAQuarterOfWhatTheModelMayRead(t *testing.T) {
+func TestTheHistoryCeilingIsTheSettingTheTurnCarries(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name  string
-		input int
-		want  int
+		name string
+		spec agentapp.RunSpec
+		want int
 	}{
-		{name: "the shipped default", input: agentapp.DefaultMaxToolResultBytes, want: 4096},
-		{name: "the smallest a client may ask for", input: 1024, want: 512},
-		{name: "the largest a client may ask for", input: 262144, want: 65536},
-		{name: "an unset ceiling takes the default", input: 0, want: 4096},
+		{
+			name: "the turn carries what the setting says",
+			spec: agentapp.RunSpec{HistoryToolResult: 8192, MaxToolResult: 16384},
+			want: 8192,
+		},
+		{
+			name: "a turn carrying none takes the shipped default",
+			spec: agentapp.RunSpec{MaxToolResult: 262144},
+			want: agentapp.DefaultHistoryToolResultBytes,
+		},
+		{
+			name: "what the model may read in the turn no longer decides it",
+			spec: agentapp.RunSpec{HistoryToolResult: 512, MaxToolResult: 262144},
+			want: 512,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := agentapp.HistoryToolResultBytes(tc.input); got != tc.want {
-				t.Fatalf("HistoryToolResultBytes(%d) = %d, want %d", tc.input, got, tc.want)
+			runner := New(Deps{}, Config{})
+			if got := runner.historyCeiling(tc.spec); got != tc.want {
+				t.Fatalf("historyCeiling = %d, want %d", got, tc.want)
 			}
 		})
 	}

@@ -387,12 +387,13 @@ func (c *Core) build(ctx context.Context, key []byte) (kit, error) {
 			Retries:            retry.Retries(values),
 			Backoff:            retry.DefaultBackoff,
 		}),
-		Publisher:     relay,
-		Clock:         now,
-		TurnTimeout:   func() time.Duration { return agent.TurnTimeout(values) },
-		LoopLimit:     func() int { return agent.LoopLimit(values) },
-		HistoryBudget: func() int { return agent.HistoryBudgetChars(values) },
-		MaxToolResult: func() int { return agent.MaxToolResultBytes(values) },
+		Publisher:         relay,
+		Clock:             now,
+		TurnTimeout:       func() time.Duration { return agent.TurnTimeout(values) },
+		LoopLimit:         func() int { return agent.LoopLimit(values) },
+		HistoryBudget:     func() int { return agent.HistoryBudgetChars(values) },
+		MaxToolResult:     func() int { return agent.MaxToolResultBytes(values) },
+		HistoryToolResult: func() int { return agent.HistoryToolResultBytes(values) },
 	})
 
 	built := kit{

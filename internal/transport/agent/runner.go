@@ -81,7 +81,10 @@ func (r *Runner) resultCeiling(spec agentapp.RunSpec) int {
 }
 
 func (r *Runner) historyCeiling(spec agentapp.RunSpec) int {
-	return agentapp.HistoryToolResultBytes(r.resultCeiling(spec))
+	if spec.HistoryToolResult > 0 {
+		return spec.HistoryToolResult
+	}
+	return agentapp.DefaultHistoryToolResultBytes
 }
 
 func (r *Runner) Run(ctx context.Context, spec agentapp.RunSpec) (agentapp.RunResult, error) {
