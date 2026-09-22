@@ -20,12 +20,13 @@ const (
 	KindAudit    Kind = "audit"
 	KindSync     Kind = "sync"
 	KindImport   Kind = "import"
+	KindRepair   Kind = "repair"
 	KindCustom   Kind = "custom"
 )
 
 func (k Kind) Valid() bool {
 	switch k {
-	case KindGenerate, KindRelink, KindAudit, KindSync, KindImport, KindCustom:
+	case KindGenerate, KindRelink, KindAudit, KindSync, KindImport, KindRepair, KindCustom:
 		return true
 	default:
 		return false
@@ -34,7 +35,7 @@ func (k Kind) Valid() bool {
 
 func (k Kind) PageScoped() bool {
 	switch k {
-	case KindGenerate, KindRelink, KindAudit, KindCustom:
+	case KindGenerate, KindRelink, KindAudit, KindRepair, KindCustom:
 		return true
 	default:
 		return false

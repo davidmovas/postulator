@@ -15,7 +15,7 @@ type modelProfileArgs struct {
 }
 
 type stepArgs struct {
-	Name        string `json:"name" enum:"resolve_context,generate_body,generate_meta,insert_links,repair_links,generate_images,validate,judge,publish,relink_neighbors,sync_back,report,sync_site" description:"Which step of the run this is"`
+	Name        string `json:"name" enum:"resolve_context,generate_body,generate_meta,insert_links,repair_links,generate_images,validate,judge,repair_hierarchy,publish,relink_neighbors,sync_back,report,sync_site" description:"Which step of the run this is"`
 	Enabled     bool   `json:"enabled" description:"Run this step; a disabled step stays in the recipe and is skipped"`
 	AllowErrors *bool  `json:"allowErrors,omitempty" description:"Only the validate step reads this: let the item go on although validation found faults"`
 	Iterations  *int   `json:"iterations,omitempty" minimum:"1" description:"Only the repair_links step reads this: how many passes it may make"`

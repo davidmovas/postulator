@@ -79,3 +79,10 @@ func (r PauseReason) Valid() bool {
 		return false
 	}
 }
+
+func PauseReasons() []string {
+	return []string{
+		string(PauseBudgetExceeded), string(PauseAwaitingConfirmation),
+		string(PauseNeedsHuman), string(PauseUser),
+	}
+}

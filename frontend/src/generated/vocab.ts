@@ -52,7 +52,7 @@ export type LinkBlockedReason = (typeof linkBlockedReasons)[number];
 export const linkAuditSkipReasons = ["unmapped", "no_template"] as const;
 export type LinkAuditSkipReason = (typeof linkAuditSkipReasons)[number];
 
-export const runKinds = ["generate", "relink", "audit", "sync", "import", "custom"] as const;
+export const runKinds = ["generate", "relink", "audit", "sync", "import", "repair", "custom"] as const;
 export type RunKind = (typeof runKinds)[number];
 
 export const runStatuses = [
@@ -108,6 +108,7 @@ export const stepNames = [
     "generate_images",
     "validate",
     "judge",
+    "repair_hierarchy",
     "publish",
     "relink_neighbors",
     "sync_back",

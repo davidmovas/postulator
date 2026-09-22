@@ -115,6 +115,7 @@ func all(deps Deps) []run.StepDef {
 		GenerateImages(deps),
 		Validate(deps),
 		Judge(deps),
+		RepairHierarchy(deps),
 		Publish(deps),
 		RelinkNeighbors(deps),
 		SyncBack(deps),

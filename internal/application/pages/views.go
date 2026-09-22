@@ -7,28 +7,44 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
 
+type Observed struct {
+	Link   string `json:"link"`
+	Slug   string `json:"slug"`
+	Status string `json:"status"`
+	Title  string `json:"title"`
+	H1     string `json:"h1"`
+}
+
+type Mismatch struct {
+	Field   string `json:"field"`
+	Planned string `json:"planned"`
+	Actual  string `json:"actual"`
+}
+
 type Page struct {
-	ID              string   `json:"id"`
-	SiteID          string   `json:"siteId"`
-	Path            string   `json:"path"`
-	Slug            string   `json:"slug"`
-	ParentPageID    *string  `json:"parentPageId"`
-	WPType          string   `json:"wpType"`
-	WPID            *int64   `json:"wpId"`
-	Title           string   `json:"title"`
-	H1              string   `json:"h1"`
-	MetaTitle       string   `json:"metaTitle"`
-	MetaDescription string   `json:"metaDescription"`
-	Canonical       string   `json:"canonical"`
-	Status          string   `json:"status"`
-	EntityID        *string  `json:"entityId"`
-	TemplateID      *string  `json:"templateId"`
-	ContentHash     string   `json:"contentHash"`
-	WPModifiedAt    dto.Time `json:"wpModifiedAt"`
-	LastSyncedAt    dto.Time `json:"lastSyncedAt"`
-	Drift           bool     `json:"drift"`
-	CreatedAt       dto.Time `json:"createdAt"`
-	UpdatedAt       dto.Time `json:"updatedAt"`
+	ID              string     `json:"id"`
+	SiteID          string     `json:"siteId"`
+	Path            string     `json:"path"`
+	Slug            string     `json:"slug"`
+	ParentPageID    *string    `json:"parentPageId"`
+	WPType          string     `json:"wpType"`
+	WPID            *int64     `json:"wpId"`
+	Title           string     `json:"title"`
+	H1              string     `json:"h1"`
+	MetaTitle       string     `json:"metaTitle"`
+	MetaDescription string     `json:"metaDescription"`
+	Canonical       string     `json:"canonical"`
+	Status          string     `json:"status"`
+	EntityID        *string    `json:"entityId"`
+	TemplateID      *string    `json:"templateId"`
+	ContentHash     string     `json:"contentHash"`
+	Observed        Observed   `json:"observed"`
+	Mismatches      []Mismatch `json:"mismatches"`
+	WPModifiedAt    dto.Time   `json:"wpModifiedAt"`
+	LastSyncedAt    dto.Time   `json:"lastSyncedAt"`
+	Drift           bool       `json:"drift"`
+	CreatedAt       dto.Time   `json:"createdAt"`
+	UpdatedAt       dto.Time   `json:"updatedAt"`
 }
 
 type PageLink struct {
@@ -79,12 +95,26 @@ func view(p pagemap.Page) Page {
 		EntityID:        p.EntityID,
 		TemplateID:      p.TemplateID,
 		ContentHash:     p.ContentHash,
-		WPModifiedAt:    optionalTime(p.WPModifiedAt),
-		LastSyncedAt:    optionalTime(p.LastSyncedAt),
-		Drift:           p.Drift,
-		CreatedAt:       dto.NewTime(p.CreatedAt),
-		UpdatedAt:       dto.NewTime(p.UpdatedAt),
+		Observed: Observed{
+			Link: p.Observed.Link, Slug: p.Observed.Slug, Status: p.Observed.Status,
+			Title: p.Observed.Title, H1: p.Observed.H1,
+		},
+		Mismatches:   mismatchViews(p),
+		WPModifiedAt: optionalTime(p.WPModifiedAt),
+		LastSyncedAt: optionalTime(p.LastSyncedAt),
+		Drift:        p.Drift,
+		CreatedAt:    dto.NewTime(p.CreatedAt),
+		UpdatedAt:    dto.NewTime(p.UpdatedAt),
 	}
+}
+
+func mismatchViews(p pagemap.Page) []Mismatch {
+	found := p.Mismatches()
+	out := make([]Mismatch, 0, len(found))
+	for i := range found {
+		out = append(out, Mismatch{Field: found[i].Field, Planned: found[i].Planned, Actual: found[i].Actual})
+	}
+	return out
 }
 
 func linkView(l pagemap.PageLink) PageLink {

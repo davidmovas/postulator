@@ -3,6 +3,8 @@ package runs_test
 import (
 	"context"
 	"encoding/json"
+	stderrors "errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -692,8 +694,20 @@ func TestControlRejectsBadRequests(t *testing.T) {
 	if _, err := fixture.service.Pause(t.Context(), runs.PauseRequest{}); !errors.IsCode(err, errors.Invalid) {
 		t.Fatalf("Pause without a run = %v", err)
 	}
-	if _, err := fixture.service.Pause(t.Context(), runs.PauseRequest{RunID: "r", Reason: "bored"}); !errors.IsCode(err, errors.Invalid) {
-		t.Fatalf("Pause with an unknown reason = %v", err)
+	unknown := func() error {
+		_, err := fixture.service.Pause(t.Context(), runs.PauseRequest{RunID: "r", Reason: "bored"})
+		return err
+	}()
+	if !errors.IsCode(unknown, errors.Invalid) {
+		t.Fatalf("Pause with an unknown reason = %v", unknown)
+	}
+	var refusal *errors.Error
+	if !stderrors.As(unknown, &refusal) {
+		t.Fatalf("Pause refusal %v is not a kernel error", unknown)
+	}
+	allowed, ok := refusal.Details["allowed"].([]string)
+	if !ok || !slices.Contains(allowed, string(run.PauseUser)) {
+		t.Fatalf("the refusal carries %v, want the reasons it would accept", refusal.Details)
 	}
 	if _, err := fixture.service.Resume(t.Context(), runs.ResumeRequest{}); !errors.IsCode(err, errors.Invalid) {
 		t.Fatalf("Resume without a run = %v", err)

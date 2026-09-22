@@ -18,7 +18,9 @@ func (s *Service) Pause(ctx context.Context, req PauseRequest) (PauseResponse, e
 		reason = run.PauseUser
 	}
 	if !reason.Valid() {
-		return PauseResponse{}, invalid("pause reason is not recognized", "reason")
+		allowed := run.PauseReasons()
+		return PauseResponse{}, invalid("pause reason is not recognized; it is one of "+
+			strings.Join(allowed, ", "), "reason").WithDetail("allowed", allowed)
 	}
 
 	if err := s.engine.Pause(ctx, runID, reason); err != nil {

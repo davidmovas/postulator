@@ -14,6 +14,7 @@ export const runs = {
         generate_images: "Make images",
         validate: "Validate",
         judge: "Judge",
+        repair_hierarchy: "Move under the parent",
         publish: "Publish",
         relink_neighbors: "Relink neighbours",
         sync_back: "Read back",
@@ -26,6 +27,7 @@ export const runs = {
         audit: "Audit",
         sync: "Sync",
         import: "Import",
+        repair: "Repair",
         custom: "Custom",
     },
     status: {
