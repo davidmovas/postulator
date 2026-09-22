@@ -48,6 +48,56 @@ func TestDocumentReadsItsShape(t *testing.T) {
 	}
 }
 
+func TestRenderSaysSoRatherThanAnsweringAnEmptyBody(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		mutate   func(*content.Document)
+		name     string
+		fragment string
+		want     string
+	}{
+		{
+			name:     "a readable body",
+			fragment: "<h1>Espresso</h1><p>One shot.</p>",
+			want:     "<h1>Espresso</h1><p>One shot.</p>",
+		},
+		{
+			name:     "a body that cannot be rendered",
+			fragment: "<p>One shot.</p>",
+			mutate:   func(d *content.Document) { d.Paragraphs()[0].Type = html.ErrorNode },
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc := mustParse(t, tc.fragment)
+			if tc.mutate != nil {
+				tc.mutate(doc)
+			}
+
+			rendered, err := doc.Render()
+			if tc.mutate == nil {
+				if err != nil {
+					t.Fatalf("Render: %v", err)
+				}
+				if rendered != tc.want {
+					t.Fatalf("Render = %q, want %q", rendered, tc.want)
+				}
+				return
+			}
+			if !errors.IsCode(err, errors.Internal) {
+				t.Fatalf("Render = %q, %v; want an internal error rather than a silent empty body", rendered, err)
+			}
+			if doc.HTML() != "" {
+				t.Fatalf("HTML = %q, want the empty string the unchecked sibling has always answered", doc.HTML())
+			}
+		})
+	}
+}
+
 func TestTextNodesSkipWhatTheCallerRefuses(t *testing.T) {
 	t.Parallel()
 

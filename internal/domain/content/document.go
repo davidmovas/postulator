@@ -102,14 +102,22 @@ func (d *Document) Links() []Link {
 	return out
 }
 
-func (d *Document) HTML() string {
+func (d *Document) Render() (string, error) {
 	var builder strings.Builder
 	for child := d.root.FirstChild; child != nil; child = child.NextSibling {
 		if err := html.Render(&builder, child); err != nil {
-			return ""
+			return "", errors.Wrap(err, errors.Internal, "render the body back to html")
 		}
 	}
-	return builder.String()
+	return builder.String(), nil
+}
+
+func (d *Document) HTML() string {
+	rendered, err := d.Render()
+	if err != nil {
+		return ""
+	}
+	return rendered
 }
 
 func (d *Document) Text() string {
