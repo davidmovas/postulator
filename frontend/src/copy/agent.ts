@@ -158,7 +158,10 @@ export const agent = {
         noMatch: "No conversation matches.",
         groupEverywhere: "Everywhere",
         deleteTitle: "Delete this conversation?",
-        deleteBody: "Its messages, its pending actions and its history go with it. A turn in flight is stopped.",
+        deleteBody:
+            "Everything in it goes: the messages, the tool calls it made, the actions still waiting for you " +
+            "and the history the agent reads back. A turn in flight is stopped. What it already wrote to the " +
+            "graph, the pages or the site stays.",
         deleteConfirm: "Delete it",
         cancel: "Cancel",
         delete: "Delete",
