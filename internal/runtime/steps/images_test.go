@@ -10,6 +10,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/images"
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -106,14 +107,17 @@ func runImages(t *testing.T, deps steps.Deps, sc *run.StepContext) (steps.Images
 	return manifest, result
 }
 
-func TestGenerateImagesSkipsWhenTheTemplateAsksForNone(t *testing.T) {
+func TestGenerateImagesHonoursItsProducesWhenTheTemplateAsksForNone(t *testing.T) {
 	t.Parallel()
 
 	deps, server := imageDeps(t)
-	_, result := runImages(t, deps, imageContext(t, template.Images{Source: template.ImagesAI}))
+	manifest, result := runImages(t, deps, imageContext(t, template.Images{Source: template.ImagesAI}))
 
-	if len(result.Artifacts) != 0 {
-		t.Fatalf("the step produced %+v", result.Artifacts)
+	if len(result.Artifacts) != 1 || result.Artifacts[0].Kind != run.ArtifactImages {
+		t.Fatalf("the step produced %+v, want the empty manifest its Produces promises", result.Artifacts)
+	}
+	if len(manifest.Images) != 0 || len(manifest.Skipped) != 0 || len(manifest.Findings) != 0 {
+		t.Fatalf("manifest = %+v, want an empty one", manifest)
 	}
 	if len(server.Uploads()) != 0 {
 		t.Fatalf("the step uploaded %+v", server.Uploads())
@@ -249,6 +253,64 @@ func TestGenerateImagesRecordsWhatItCouldNotDo(t *testing.T) {
 			}
 			if manifest.FeaturedID != 0 {
 				t.Fatalf("manifest = %+v, want no featured image", manifest)
+			}
+			if len(manifest.Findings) != 1 {
+				t.Fatalf("findings = %+v, want the reason to reach the report", manifest.Findings)
+			}
+			finding := manifest.Findings[0]
+			if finding.Code != tc.want || finding.Severity != content.SeverityWarn {
+				t.Errorf("finding = %+v", finding)
+			}
+			if !strings.Contains(finding.Message, "/coffee/espresso/") {
+				t.Errorf("message = %q, want the page named", finding.Message)
+			}
+			if finding.Details["pageId"] != "page-child" {
+				t.Errorf("details = %+v, want the page named", finding.Details)
+			}
+		})
+	}
+}
+
+func TestGenerateImagesReportsAnImageItCouldNotPlace(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		picked images.Image
+		spec   template.Images
+	}{
+		{
+			name:   "an inline image the site gave no address",
+			picked: images.Image{WPID: 42, Alt: "a cup"},
+			spec:   template.Images{Inline: 1, Source: template.ImagesWPMedia},
+		},
+		{
+			name:   "a featured image with no media id behind it",
+			picked: images.Image{URL: "https://shop.example.com/a.png", Alt: "a cup"},
+			spec:   template.Images{Featured: true, Source: template.ImagesWPMedia},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps, _ := imageDeps(t)
+			deps.ImageSources = map[template.ImageSource]steps.ImageSource{
+				template.ImagesWPMedia: library{items: []images.Image{tc.picked}},
+			}
+
+			manifest, result := runImages(t, deps, imageContext(t, tc.spec))
+			if len(manifest.Images) != 0 || manifest.FeaturedID != 0 {
+				t.Fatalf("manifest = %+v, want nothing reported as placed", manifest)
+			}
+			for i := range result.Artifacts {
+				if result.Artifacts[i].Kind == run.ArtifactBodyHTML {
+					t.Fatal("the step rewrote the body although it placed nothing")
+				}
+			}
+			if len(manifest.Findings) != 1 || manifest.Findings[0].Code != steps.CodeImageNotPlaced {
+				t.Fatalf("findings = %+v, want the drop named", manifest.Findings)
 			}
 		})
 	}

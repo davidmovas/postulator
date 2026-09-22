@@ -11,6 +11,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -22,9 +23,10 @@ const (
 	RoleFeatured = "featured"
 	RoleInline   = "inline"
 
-	CodeNoImageSource = "no_image_source"
-	CodeImagesFailed  = "images_failed"
-	CodeUploadFailed  = "image_upload_failed"
+	CodeNoImageSource  = "no_image_source"
+	CodeImagesFailed   = "images_failed"
+	CodeUploadFailed   = "image_upload_failed"
+	CodeImageNotPlaced = "image_not_placed"
 
 	imageStepTimeout = 5 * time.Minute
 )
@@ -45,9 +47,20 @@ type PlacedImage struct {
 }
 
 type ImagesResult struct {
-	Images     []PlacedImage `json:"images"`
-	Skipped    []string      `json:"skipped"`
-	FeaturedID int64         `json:"featuredId"`
+	Images     []PlacedImage     `json:"images"`
+	Skipped    []string          `json:"skipped"`
+	Findings   []content.Finding `json:"findings"`
+	FeaturedID int64             `json:"featuredId"`
+}
+
+func (r *ImagesResult) skip(page pagemap.Page, code, message, reason string) {
+	r.Skipped = append(r.Skipped, code+": "+reason)
+	r.Findings = append(r.Findings, content.Finding{
+		Severity: content.SeverityWarn,
+		Code:     code,
+		Message:  message,
+		Details:  map[string]any{"pageId": page.ID, "path": page.Path, "reason": reason},
+	})
 }
 
 func GenerateImages(deps Deps) run.StepDef {
@@ -59,9 +72,15 @@ func GenerateImages(deps Deps) run.StepDef {
 		Timeout:  imageStepTimeout,
 		Price:    run.Price{Unpriced: true},
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
+			result := ImagesResult{
+				Images:   make([]PlacedImage, 0),
+				Skipped:  make([]string, 0),
+				Findings: make([]content.Finding, 0),
+			}
+
 			wanted := wantedImages(sc.Spec.Images)
 			if wanted == 0 {
-				return run.Result{Message: "the template asks for no image"}, nil
+				return manifest(result, nil, "the template asks for no image")
 			}
 
 			doc, err := bodyOf(sc)
@@ -73,12 +92,11 @@ func GenerateImages(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			acquired, skipped, err := acquire(ctx, deps, sc, entity, wanted)
+			acquired, err := acquire(ctx, deps, sc, entity, wanted, &result)
 			if err != nil {
 				return run.Result{}, err
 			}
 
-			result := ImagesResult{Images: make([]PlacedImage, 0, len(acquired)), Skipped: skipped}
 			uploaded := make([]images.Image, 0, len(acquired))
 			for i := range acquired {
 				stored, uploadErr := store(ctx, deps, sc, acquired[i])
@@ -86,29 +104,41 @@ func GenerateImages(deps Deps) run.StepDef {
 					if ctx.Err() != nil {
 						return run.Result{}, uploadErr
 					}
-					result.Skipped = append(result.Skipped, CodeUploadFailed+": "+uploadErr.Error())
+					result.skip(sc.Page, CodeUploadFailed,
+						"an image for "+sc.Page.Path+" reached no media library, so it was not placed: "+
+							uploadErr.Error(), uploadErr.Error())
 					continue
 				}
 				uploaded = append(uploaded, stored)
 			}
 
-			artifacts := make([]run.Artifact, 0, 2)
-			if place(doc, sc.Spec.Images, uploaded, &result) {
-				artifacts = append(artifacts, run.Artifact{Kind: run.ArtifactBodyHTML, Blob: []byte(doc.HTML())})
+			var body []byte
+			if place(doc, sc.Spec.Images, uploaded, &result, sc.Page) {
+				rendered, renderErr := doc.Render()
+				if renderErr != nil {
+					return run.Result{}, renderErr
+				}
+				body = []byte(rendered)
 			}
 
-			blob, err := encode(result, "image manifest")
-			if err != nil {
-				return run.Result{}, err
-			}
-			artifacts = append(artifacts, run.Artifact{Kind: run.ArtifactImages, Blob: blob})
-
-			return run.Result{
-				Artifacts: artifacts,
-				Message:   "placed " + strconv.Itoa(len(result.Images)) + " images on " + sc.Page.Path,
-			}, nil
+			return manifest(result, body,
+				"placed "+strconv.Itoa(len(result.Images))+" images on "+sc.Page.Path)
 		},
 	}
+}
+
+func manifest(result ImagesResult, body []byte, message string) (run.Result, error) {
+	artifacts := make([]run.Artifact, 0, 2)
+	if body != nil {
+		artifacts = append(artifacts, run.Artifact{Kind: run.ArtifactBodyHTML, Blob: body})
+	}
+
+	blob, err := encode(result, "image manifest")
+	if err != nil {
+		return run.Result{}, err
+	}
+	artifacts = append(artifacts, run.Artifact{Kind: run.ArtifactImages, Blob: blob})
+	return run.Result{Artifacts: artifacts, Message: message}, nil
 }
 
 func wantedImages(spec template.Images) int {
@@ -119,14 +149,18 @@ func wantedImages(spec template.Images) int {
 	return count
 }
 
-func acquire(ctx context.Context, deps Deps, sc *run.StepContext, entity graph.Entity, wanted int) ([]images.Image, []string, error) {
+func acquire(ctx context.Context, deps Deps, sc *run.StepContext, entity graph.Entity, wanted int,
+	result *ImagesResult) ([]images.Image, error) {
 	if sc.Spec.Images.Source == template.ImagesAI {
-		return generated(ctx, deps, sc, entity, wanted)
+		return generated(ctx, deps, sc, entity, wanted, result)
 	}
 
 	source, ok := deps.ImageSources[sc.Spec.Images.Source]
 	if !ok || source == nil {
-		return nil, []string{CodeNoImageSource + ": " + string(sc.Spec.Images.Source)}, nil
+		result.skip(sc.Page, CodeNoImageSource,
+			"no image library named "+string(sc.Spec.Images.Source)+" is configured, so "+sc.Page.Path+
+				" was written without the images its template asks for", string(sc.Spec.Images.Source))
+		return nil, nil
 	}
 
 	picked, err := source.Pick(ctx, images.Query{
@@ -134,21 +168,26 @@ func acquire(ctx context.Context, deps Deps, sc *run.StepContext, entity graph.E
 	})
 	if err != nil {
 		if ctx.Err() != nil {
-			return nil, nil, err
+			return nil, err
 		}
-		return nil, []string{CodeImagesFailed + ": " + err.Error()}, nil
+		result.skip(sc.Page, CodeImagesFailed,
+			"the image library answered nothing for "+sc.Page.Path+": "+err.Error(), err.Error())
+		return nil, nil
 	}
-	return picked, nil, nil
+	return picked, nil
 }
 
-func generated(ctx context.Context, deps Deps, sc *run.StepContext, entity graph.Entity, wanted int) ([]images.Image, []string, error) {
+func generated(ctx context.Context, deps Deps, sc *run.StepContext, entity graph.Entity, wanted int,
+	result *ImagesResult) ([]images.Image, error) {
 	if deps.ImageProvider == nil {
-		return nil, []string{CodeNoImageSource + ": " + string(template.ImagesAI)}, nil
+		result.skip(sc.Page, CodeNoImageSource,
+			"no model is configured to draw images, so "+sc.Page.Path+
+				" was written without the images its template asks for", string(template.ImagesAI))
+		return nil, nil
 	}
 
 	subject := subjectOf(sc, entity)
 	out := make([]images.Image, 0, wanted)
-	skipped := make([]string, 0)
 	for index := range wanted {
 		drawn, err := deps.ImageProvider.Generate(ctx, images.Prompt{
 			SiteID:  sc.Run.SiteID,
@@ -158,14 +197,16 @@ func generated(ctx context.Context, deps Deps, sc *run.StepContext, entity graph
 		})
 		if err != nil {
 			if ctx.Err() != nil {
-				return nil, nil, err
+				return nil, err
 			}
-			skipped = append(skipped, CodeImagesFailed+": "+err.Error())
+			result.skip(sc.Page, CodeImagesFailed,
+				"the image model stopped after "+strconv.Itoa(len(out))+" of "+strconv.Itoa(wanted)+
+					" images for "+sc.Page.Path+": "+err.Error(), err.Error())
 			break
 		}
 		out = append(out, drawn)
 	}
-	return out, skipped, nil
+	return out, nil
 }
 
 func subjectOf(sc *run.StepContext, entity graph.Entity) string {
@@ -223,24 +264,37 @@ func store(ctx context.Context, deps Deps, sc *run.StepContext, image images.Ima
 	return image, nil
 }
 
-func place(doc *content.Document, spec template.Images, uploaded []images.Image, result *ImagesResult) bool {
+func place(doc *content.Document, spec template.Images, uploaded []images.Image, result *ImagesResult,
+	page pagemap.Page) bool {
 	remaining := uploaded
 	if spec.Featured && len(remaining) > 0 {
 		featured := remaining[0]
 		remaining = remaining[1:]
-		result.FeaturedID = featured.WPID
-		result.Images = append(result.Images, PlacedImage{
-			Role: RoleFeatured, URL: featured.URL, Alt: featured.Alt, WPID: featured.WPID,
-		})
+		switch {
+		case featured.WPID == 0:
+			result.skip(page, CodeImageNotPlaced,
+				"the featured image of "+page.Path+" carries no media id, so the site has nothing to set",
+				featured.URL)
+		default:
+			result.FeaturedID = featured.WPID
+			result.Images = append(result.Images, PlacedImage{
+				Role: RoleFeatured, URL: featured.URL, Alt: featured.Alt, WPID: featured.WPID,
+			})
+		}
 	}
 
 	changed := false
 	for index := range min(spec.Inline, len(remaining)) {
 		inline := remaining[index]
 		if inline.URL == "" {
+			result.skip(page, CodeImageNotPlaced,
+				"an image for "+page.Path+" carries no address, so it was left out of the body",
+				strconv.FormatInt(inline.WPID, 10))
 			continue
 		}
 		if err := doc.InsertAfterSection(index, figureOf(inline)); err != nil {
+			result.skip(page, CodeImageNotPlaced,
+				"an image for "+page.Path+" found no place in the body: "+err.Error(), err.Error())
 			continue
 		}
 		changed = true
