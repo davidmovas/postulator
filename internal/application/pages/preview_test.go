@@ -131,6 +131,58 @@ func TestPreviewLinkOfAPublishedPageIsItsAddress(t *testing.T) {
 	h.wantEvents(t)
 }
 
+func (h harness) rebase(t *testing.T, baseURL string) {
+	t.Helper()
+
+	repo := sqlite.NewSiteRepo(h.store)
+	owner, err := repo.Get(t.Context(), h.siteID)
+	if err != nil {
+		t.Fatalf("read the site: %v", err)
+	}
+	owner.BaseURL = baseURL
+	if err = repo.Update(t.Context(), owner); err != nil {
+		t.Fatalf("rebase the site on %s: %v", baseURL, err)
+	}
+}
+
+func TestPreviewLinkJoinsTheOriginWithoutDoublingTheBasePath(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		baseURL string
+		path    string
+		want    string
+	}{
+		{
+			name: "a root install", baseURL: "https://shop.example.com", path: "/coffee/",
+			want: "https://shop.example.com/coffee/",
+		},
+		{
+			name: "a subdirectory install", baseURL: "https://shop.example.com/blog", path: "/blog/coffee/",
+			want: "https://shop.example.com/blog/coffee/",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := newPreviewHarness(t, &recordingIssuer{})
+			h.rebase(t, tc.baseURL)
+			published := h.placed(t, tc.path, pagemap.StatusPublished, 42)
+
+			answered, err := h.service.PreviewLink(t.Context(), pages.PreviewLinkRequest{PageID: published.ID})
+			if err != nil {
+				t.Fatalf("PreviewLink: %v", err)
+			}
+			if answered.URL != tc.want {
+				t.Errorf("URL = %q, want %q", answered.URL, tc.want)
+			}
+		})
+	}
+}
+
 func TestPreviewLinkOfADraftIsIssuedByTheSite(t *testing.T) {
 	t.Parallel()
 

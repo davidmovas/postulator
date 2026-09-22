@@ -51,7 +51,9 @@ func (s *Service) PreviewLink(ctx context.Context, req PreviewLinkRequest) (Prev
 		return PreviewLinkResponse{}, err
 	}
 	if page.Status == pagemap.StatusPublished {
-		return PreviewLinkResponse{URL: owner.BaseURL + page.Path, Kind: string(PreviewPublic)}, nil
+		return PreviewLinkResponse{
+			URL: pagemap.NewSite(owner.BaseURL).URL(page.Path), Kind: string(PreviewPublic),
+		}, nil
 	}
 
 	issued, err := s.preview.IssuePreview(ctx, page.SiteID, *page.WPID)

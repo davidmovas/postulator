@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/run"
+	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
@@ -99,6 +100,50 @@ func TestGenerateMetaSettlesWhatTheModelReturns(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			tc.check(t, runMeta(t, tc.reply))
+		})
+	}
+}
+
+func TestGenerateMetaCanonicalJoinsTheOriginOnce(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		baseURL string
+		path    string
+		want    string
+	}{
+		{
+			name: "a root install", baseURL: "https://shop.example.com", path: "/coffee/espresso/",
+			want: "https://shop.example.com/coffee/espresso/",
+		},
+		{
+			name: "a subdirectory install", baseURL: "https://shop.example.com/blog", path: "/blog/coffee/espresso/",
+			want: "https://shop.example.com/blog/coffee/espresso/",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			sc, deps := metaContext(t, `{"title":"espresso | Shop","canonical":""}`)
+			deps.Sites = siteStub{record: site.Site{
+				ID: "site", Name: "Shop", BaseURL: tc.baseURL, Username: "editor", Status: site.StatusActive,
+			}}
+			sc.Page.Path = tc.path
+
+			result, err := steps.GenerateMeta(deps).Run(t.Context(), sc)
+			if err != nil {
+				t.Fatalf("GenerateMeta: %v", err)
+			}
+			var meta steps.Meta
+			if err = json.Unmarshal(result.Artifacts[0].Blob, &meta); err != nil {
+				t.Fatalf("decode the meta artifact: %v", err)
+			}
+			if meta.Canonical != tc.want {
+				t.Errorf("canonical = %q, want %q", meta.Canonical, tc.want)
+			}
 		})
 	}
 }

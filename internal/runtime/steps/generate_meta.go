@@ -65,7 +65,7 @@ func GenerateMeta(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			canonical := owner.BaseURL + sc.Page.Path
+			canonical := pagemap.NewSite(owner.BaseURL).URL(sc.Page.Path)
 			system, user, err := render(NameGenerateMeta, metaPrompt{
 				Page: sc.Page, Entity: entity, Spec: sc.Spec, Draft: draft,
 				SiteName:  owner.Name,
