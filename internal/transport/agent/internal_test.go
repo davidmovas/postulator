@@ -123,9 +123,23 @@ func TestParametersFollowTheSchema(t *testing.T) {
 			"tags":  {Type: applicationllm.SchemaArray, Items: &applicationllm.Schema{Type: applicationllm.SchemaString}},
 			"loose": {Type: applicationllm.SchemaArray},
 			"nested": {
-				Type:       applicationllm.SchemaObject,
-				Required:   []string{"id"},
-				Properties: map[string]*applicationllm.Schema{"id": {Type: applicationllm.SchemaString}},
+				Type:     applicationllm.SchemaObject,
+				Required: []string{"id"},
+				Properties: map[string]*applicationllm.Schema{
+					"id":   {Type: applicationllm.SchemaString},
+					"hint": {Type: applicationllm.SchemaString},
+				},
+			},
+			"rows": {
+				Type: applicationllm.SchemaArray,
+				Items: &applicationllm.Schema{
+					Type:     applicationllm.SchemaObject,
+					Required: []string{"text"},
+					Properties: map[string]*applicationllm.Schema{
+						"text":   {Type: applicationllm.SchemaString},
+						"weight": {Type: applicationllm.SchemaNumber},
+					},
+				},
 			},
 		},
 	}
@@ -139,6 +153,15 @@ func TestParametersFollowTheSchema(t *testing.T) {
 	}
 	if parameters["nested"].Properties["id"] == nil || !parameters["nested"].Properties["id"].Required {
 		t.Fatalf("the nested parameter is %+v", parameters["nested"])
+	}
+	if parameters["nested"].Properties["hint"].Required {
+		t.Fatalf("a nested field its own schema leaves out was still required: %+v", parameters["nested"])
+	}
+	if parameters["rows"].Items == nil || !parameters["rows"].Items.Properties["text"].Required {
+		t.Fatalf("the item parameter is %+v", parameters["rows"].Items)
+	}
+	if parameters["rows"].Items.Properties["weight"].Required {
+		t.Fatalf("an optional field of a list item was still required: %+v", parameters["rows"].Items)
 	}
 	if len(parametersOf(nil)) != 0 {
 		t.Error("a tool with no schema takes no parameters")
