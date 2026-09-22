@@ -10,12 +10,12 @@ import (
 const graphListEdgesName = "graph_list_edges"
 
 func graphListEdges(deps Deps) Tool {
-	return newSiteTool(Def{
+	return sortedBy(newSiteTool(Def{
 		Name:        graphListEdgesName,
 		Description: "List the parent and related edges of the site.",
 		Risk:        RiskRead,
 	}, func(ctx context.Context, b Binding, in graph.ListEdgesRequest) (paging.List[graph.Edge], error) {
 		in.SiteID = b.SiteID
 		return deps.Graph.ListEdges(ctx, in)
-	})
+	}), sortByCreatedAt)
 }

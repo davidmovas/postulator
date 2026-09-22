@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"slices"
 
 	"github.com/davidmovas/postulator/internal/application/llm"
@@ -58,7 +59,12 @@ type Confirmation struct {
 	Summary  string `json:"summary"`
 }
 
-const siteField = "siteId"
+const (
+	siteField       = "siteId"
+	sortField       = "sort"
+	fieldField      = "field"
+	sortByCreatedAt = "createdAt"
+)
 
 func NewTool[In, Out any](def Def, fn func(ctx context.Context, b Binding, in In) (Out, error)) Tool {
 	schema, schemaErr := llm.SchemaFor[In]()
@@ -94,6 +100,33 @@ func requireSite(_ context.Context, b Binding) error {
 		return errors.New(errors.Unauthorized, "this tool works inside one site and the conversation names none")
 	}
 	return nil
+}
+
+func sortedBy(tool Tool, fields ...string) Tool {
+	schema := tool.Def.Schema
+	if schema == nil || schema.Properties == nil {
+		return tool
+	}
+	ordering, ok := schema.Properties[sortField]
+	if !ok || ordering.Properties == nil {
+		return tool
+	}
+	key, ok := ordering.Properties[fieldField]
+	if !ok {
+		return tool
+	}
+
+	chosen := *key
+	chosen.Enum = fields
+	nested := *ordering
+	nested.Properties = maps.Clone(ordering.Properties)
+	nested.Properties[fieldField] = &chosen
+
+	widened := *schema
+	widened.Properties = maps.Clone(schema.Properties)
+	widened.Properties[sortField] = &nested
+	tool.Def.Schema = &widened
+	return tool
 }
 
 func withoutSite(schema *llm.Schema) *llm.Schema {

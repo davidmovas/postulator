@@ -26,7 +26,7 @@ type AssessResponse struct {
 }
 
 type JudgeRequest struct {
-	PageID string `json:"pageId"`
+	PageID string `json:"pageId" description:"The id of the page to grade against its template, exactly as a read tool returned it"`
 }
 
 type JudgeResponse struct {

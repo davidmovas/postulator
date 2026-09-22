@@ -26,7 +26,7 @@ type EstimateResponse struct {
 }
 
 type GetRequest struct {
-	RunID string `json:"runId"`
+	RunID string `json:"runId" description:"The id of the run, exactly as runs_start or runs_list returned it"`
 }
 
 type GetResponse struct {
@@ -36,20 +36,20 @@ type GetResponse struct {
 type ListRequest struct {
 	dto.ListRequest
 	SiteID string `json:"siteId,omitempty"`
-	Status string `json:"status,omitempty"`
-	Kind   string `json:"kind,omitempty"`
+	Status string `json:"status,omitempty" enum:"pending,running,waiting,paused,completed,failed,cancelled" description:"Keep only runs in this state"`
+	Kind   string `json:"kind,omitempty" enum:"generate,relink,audit,sync,import,custom" description:"Keep only runs of this kind"`
 }
 
 type ListItemsRequest struct {
 	dto.ListRequest
-	RunID  string `json:"runId"`
-	Status string `json:"status,omitempty"`
+	RunID  string `json:"runId" description:"The id of the run, exactly as runs_start or runs_list returned it"`
+	Status string `json:"status,omitempty" enum:"pending,running,waiting,paused,completed,failed,cancelled" description:"Keep only items in this state"`
 }
 
 type ListEventsRequest struct {
-	RunID    string `json:"runId"`
-	SinceSeq int64  `json:"sinceSeq"`
-	Limit    int    `json:"limit"`
+	RunID    string `json:"runId" description:"The id of the run, exactly as runs_start or runs_list returned it"`
+	SinceSeq int64  `json:"sinceSeq,omitempty" minimum:"0" description:"Return only events after this sequence number; leave it out to start at the beginning"`
+	Limit    int    `json:"limit,omitempty" minimum:"0" description:"How many events to return; leave it out for the default"`
 }
 
 type ListEventsResponse struct {
@@ -57,8 +57,8 @@ type ListEventsResponse struct {
 }
 
 type GetArtifactRequest struct {
-	ItemID string `json:"itemId"`
-	Kind   string `json:"kind"`
+	ItemID string `json:"itemId" description:"The id of the run item, exactly as runs_list_items returned it"`
+	Kind   string `json:"kind" enum:"link_context,draft,body_html,meta,images,validation_report,judge_report,publish_result,relink_result,sync_result,final_report" description:"Which artifact of the item to read"`
 }
 
 type GetArtifactResponse struct {
@@ -66,7 +66,7 @@ type GetArtifactResponse struct {
 }
 
 type ListArtifactsRequest struct {
-	ItemID string `json:"itemId"`
+	ItemID string `json:"itemId" description:"The id of the run item, exactly as runs_list_items returned it"`
 }
 
 type ListArtifactsResponse struct {
@@ -74,26 +74,26 @@ type ListArtifactsResponse struct {
 }
 
 type PauseRequest struct {
-	RunID  string `json:"runId"`
-	Reason string `json:"reason,omitempty"`
+	RunID  string `json:"runId" description:"The id of the run to hold, exactly as runs_start or runs_list returned it"`
+	Reason string `json:"reason,omitempty" description:"Why the run is being held, one short sentence"`
 }
 
 type PauseResponse struct{}
 
 type ResumeRequest struct {
-	RunID string `json:"runId"`
+	RunID string `json:"runId" description:"The id of the held run, exactly as runs_list returned it"`
 }
 
 type ResumeResponse struct{}
 
 type CancelRequest struct {
-	RunID string `json:"runId"`
+	RunID string `json:"runId" description:"The id of the run to stop, exactly as runs_start or runs_list returned it"`
 }
 
 type CancelResponse struct{}
 
 type RetryStepRequest struct {
-	ItemID string `json:"itemId"`
+	ItemID string `json:"itemId" description:"The id of the failed run item to try again, exactly as runs_list_items returned it"`
 }
 
 type RetryStepResponse struct{}

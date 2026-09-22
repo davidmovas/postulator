@@ -41,8 +41,8 @@ type ApplyResponse struct {
 
 type ExportRequest struct {
 	SiteID string `json:"siteId"`
-	Path   string `json:"path"`
-	Format string `json:"format,omitempty" enum:"xlsx,csv"`
+	Path   string `json:"path" description:"The absolute path on this machine to write the file to"`
+	Format string `json:"format,omitempty" enum:"xlsx,csv" description:"Which format to write; leave it out to take it from the file extension"`
 }
 
 type ExportResponse struct {
@@ -69,7 +69,7 @@ type ListMappingsResponse struct {
 }
 
 type DeleteMappingRequest struct {
-	ID string `json:"id"`
+	ID string `json:"id" description:"The id of the saved mapping to remove, exactly as imports_list_mappings returned it"`
 }
 
 type DeleteMappingResponse struct{}

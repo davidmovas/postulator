@@ -58,6 +58,11 @@ export function text(args: Args, key: string): string | null {
     return typeof held === "string" && held !== "" ? held : null;
 }
 
+export function object(args: Args, key: string): Args | null {
+    const held = args[key];
+    return isArgs(held) ? held : null;
+}
+
 export function flag(args: Args, key: string): boolean | null {
     const held = args[key];
     return typeof held === "boolean" ? held : null;

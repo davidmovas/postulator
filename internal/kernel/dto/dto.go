@@ -61,14 +61,14 @@ func (t *Time) UnmarshalJSON(raw []byte) error {
 }
 
 type Sort struct {
-	Field string `json:"field"`
-	Desc  bool   `json:"desc"`
+	Field string `json:"field" description:"The field to order by; a cursor is issued for one order and refuses another"`
+	Desc  bool   `json:"desc" description:"Order from the largest value down rather than up"`
 }
 
 type ListRequest struct {
-	Cursor string `json:"cursor,omitempty"`
-	Limit  int    `json:"limit"`
-	Sort   *Sort  `json:"sort,omitempty"`
+	Cursor string `json:"cursor,omitempty" description:"The nextCursor a previous page returned; leave it out for the first page"`
+	Limit  int    `json:"limit,omitempty" description:"How many rows to return; leave it out for the default"`
+	Sort   *Sort  `json:"sort,omitempty" description:"How to order the rows; leave it out for the default order"`
 }
 
 func (r ListRequest) Normalize() ListRequest {

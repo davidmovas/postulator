@@ -43,10 +43,10 @@ func (c FindingCode) Blocking() bool {
 }
 
 type Options struct {
-	PathPrefixStrip  string `json:"pathPrefixStrip,omitempty"`
-	KeywordSeparator string `json:"keywordSeparator,omitempty"`
-	AnchorSeparator  string `json:"anchorSeparator,omitempty"`
-	ListSeparator    string `json:"listSeparator,omitempty"`
+	PathPrefixStrip  string `json:"pathPrefixStrip,omitempty" description:"Remove this prefix from every path in the sheet, such as a domain the export wrote in"`
+	KeywordSeparator string `json:"keywordSeparator,omitempty" description:"What separates several keywords inside one cell, a comma by default"`
+	AnchorSeparator  string `json:"anchorSeparator,omitempty" description:"What separates several anchors inside one cell, a comma by default"`
+	ListSeparator    string `json:"listSeparator,omitempty" description:"What separates any other list inside one cell, a comma by default"`
 }
 
 type Mapping struct {

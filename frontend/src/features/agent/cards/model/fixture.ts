@@ -9,15 +9,13 @@ const spec = {
     linkRules: { upDepth: 1, downLinks: true, siblingMinWeight: 0.5, maxLinks: 8, maxPerTarget: 2, parentLinkWithinParagraphs: 2, childrenSection: true },
     metaRules: { titlePattern: "{primaryKeyword} | {siteName}", descriptionMax: 155 },
     images: { featured: true, inline: 1, source: "wpmedia" },
-    modelProfiles: { writer: { provider: "openai", model: "gpt-5" } },
+    modelProfiles: [{ role: "writer", provider: "openai", model: "gpt-5" }],
     recipe: [
         { name: "resolve_context", enabled: true },
         { name: "generate_body", enabled: true },
         { name: "publish", enabled: false },
     ],
 };
-
-export const specJson = JSON.stringify(spec);
 
 export const confirmableArgs: Readonly<Record<string, Record<string, unknown>>> = {
     sites_create: { name: "Clay and Kiln", baseUrl: "https://clayandkiln.com", username: "editor", password: "***", allowInsecure: false },
@@ -48,10 +46,10 @@ export const confirmableArgs: Readonly<Record<string, Record<string, unknown>>> 
     pages_unmap: { pageId: "p1" },
     pages_set_canonical: { entityId: "e2", pageId: "p1" },
     pages_replace_links: { pageId: "p1", links: [{ toPageId: "p2", toUrl: "/mugs/", anchorText: "ceramic mugs" }, { toUrl: "https://example.com", anchorText: "the source" }] },
-    templates_create: { scope: "site", siteId: "s1", name: "Product page", pageKind: "product", spec: specJson },
-    templates_update: { id: "t1", name: "Product page v2", spec: specJson },
+    templates_create: { scope: "site", siteId: "s1", name: "Product page", pageKind: "product", spec },
+    templates_update: { id: "t1", name: "Product page v2", spec },
     templates_delete: { id: "t1" },
-    templates_set_override: { templateId: "t1", scope: "page", targetId: "p1", patch: JSON.stringify({ tone: "playful", length: { min: 300, max: 500 } }) },
+    templates_set_override: { templateId: "t1", scope: "page", targetId: "p1", patch: { tone: "playful", length: { min: 300, max: 500 } } },
     templates_delete_override: { id: "o1" },
     policies_create: { scope: "site", siteId: "s1", name: "Strict", rules: { upDepth: 2, downLinks: true, siblingMinWeight: 0.7, maxLinks: 6, maxPerTarget: 1, parentLinkWithinParagraphs: 1, childrenSection: false }, forbidExternal: true, forbidSelf: true, anchorStrategy: "rotate" },
     policies_update: { id: "l1", name: "Looser", forbidExternal: false },

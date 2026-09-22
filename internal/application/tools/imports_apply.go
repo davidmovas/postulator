@@ -9,9 +9,9 @@ import (
 const importsApplyName = "imports_apply"
 
 type importsApplyArgs struct {
-	Path          string      `json:"path" description:"the absolute path of the .xlsx or .csv file on this machine"`
-	Mapping       mappingArgs `json:"mapping"`
-	SaveMappingAs string      `json:"saveMappingAs,omitempty"`
+	Path          string      `json:"path" description:"The absolute path of the .xlsx or .csv file on this machine"`
+	Mapping       mappingArgs `json:"mapping" description:"Which spreadsheet column fills which page field"`
+	SaveMappingAs string      `json:"saveMappingAs,omitempty" description:"Keep the mapping under this name so the next import can reuse it; leave it out to use it once"`
 }
 
 func importsApply(deps Deps) Tool {

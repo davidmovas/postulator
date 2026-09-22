@@ -77,6 +77,7 @@ func TestEveryToolSatisfiesTheFunctionCallingContract(t *testing.T) {
 				def.Name, len(def.Description), maxToolDescriptionLength)
 		}
 		if def.Schema == nil {
+			t.Errorf("%s has no argument schema, so it fails at call time with an error the model cannot act on", def.Name)
 			continue
 		}
 		if def.Schema.Type != llm.SchemaObject {

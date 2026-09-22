@@ -94,8 +94,9 @@ type section struct {
 type draft struct {
 	Title    string    `json:"title" description:"the page title"`
 	Tone     string    `json:"tone" enum:"formal,casual"`
+	Tags     []string  `json:"tags,omitempty" enum:"seo,news"`
 	Sections []section `json:"sections"`
-	Score    float64   `json:"score"`
+	Score    float64   `json:"score" minimum:"0" maximum:"1"`
 	Words    int       `json:"words"`
 	Draft    bool      `json:"draft"`
 	Note     *string   `json:"note,omitempty"`
@@ -125,6 +126,7 @@ func TestSchemaFor(t *testing.T) {
 	kinds := map[string]llm.SchemaType{
 		"title":    llm.SchemaString,
 		"tone":     llm.SchemaString,
+		"tags":     llm.SchemaArray,
 		"sections": llm.SchemaArray,
 		"score":    llm.SchemaNumber,
 		"words":    llm.SchemaInteger,
@@ -160,6 +162,22 @@ func TestSchemaFor(t *testing.T) {
 	}
 	if got := items.Properties["heading"].Description; got != "the section heading" {
 		t.Errorf("heading description = %q, want the tag value", got)
+	}
+
+	tags := schema.Properties["tags"]
+	if len(tags.Enum) != 0 {
+		t.Errorf("tags enum = %v, want the choice on the items rather than the list", tags.Enum)
+	}
+	if tags.Items == nil || strings.Join(tags.Items.Enum, ",") != "seo,news" {
+		t.Errorf("tag items = %+v, want the enum seo,news", tags.Items)
+	}
+
+	score := schema.Properties["score"]
+	if score.Minimum == nil || *score.Minimum != 0 {
+		t.Errorf("score minimum = %v, want 0", score.Minimum)
+	}
+	if score.Maximum == nil || *score.Maximum != 1 {
+		t.Errorf("score maximum = %v, want 1", score.Maximum)
 	}
 }
 

@@ -9,15 +9,15 @@ import (
 const sitesUpdateName = "sites_update"
 
 type sitesUpdateArgs struct {
-	ID                  string  `json:"id"`
-	Name                *string `json:"name,omitempty"`
-	BaseURL             *string `json:"baseUrl,omitempty"`
-	Username            *string `json:"username,omitempty"`
-	Password            *string `json:"password,omitempty" description:"the WordPress application password; it is stored encrypted and never read back"`
-	AllowInsecure       *bool   `json:"allowInsecure,omitempty"`
-	Status              *string `json:"status,omitempty" enum:"active,paused,error"`
-	DefaultTemplateID   *string `json:"defaultTemplateId,omitempty"`
-	DefaultLinkPolicyID *string `json:"defaultLinkPolicyId,omitempty"`
+	ID                  string  `json:"id" description:"The id of the site, exactly as sites_list returned it"`
+	Name                *string `json:"name,omitempty" description:"The new name, left out to keep the current one"`
+	BaseURL             *string `json:"baseUrl,omitempty" description:"The new address of the WordPress site, left out to keep the current one"`
+	Username            *string `json:"username,omitempty" description:"The new administrator login, left out to keep the current one"`
+	Password            *string `json:"password,omitempty" description:"The WordPress application password; it is stored encrypted and never read back"`
+	AllowInsecure       *bool   `json:"allowInsecure,omitempty" description:"Accept a certificate the machine does not trust, which only a local site should need"`
+	Status              *string `json:"status,omitempty" enum:"active,paused,error" description:"The new status, left out to keep the current one"`
+	DefaultTemplateID   *string `json:"defaultTemplateId,omitempty" description:"The template a page of this site falls back to, exactly as templates_list returned its id"`
+	DefaultLinkPolicyID *string `json:"defaultLinkPolicyId,omitempty" description:"The link policy this site falls back to, exactly as policies_list returned its id"`
 }
 
 func sitesUpdate(deps Deps) Tool {

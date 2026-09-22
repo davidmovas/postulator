@@ -3,13 +3,17 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	stderrors "errors"
+	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/gollem-dev/gollem"
 
 	applicationllm "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/tools"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/kernel/log"
 )
 
 const resultKey = "result"
@@ -30,7 +34,7 @@ func (t *gollemTool) Spec() gollem.ToolSpec {
 func (t *gollemTool) Run(ctx context.Context, args map[string]any) (map[string]any, error) {
 	if t.tool.Authorize != nil {
 		if err := t.tool.Authorize(ctx, t.binding); err != nil {
-			return nil, err
+			return nil, explain(err)
 		}
 	}
 
@@ -41,9 +45,32 @@ func (t *gollemTool) Run(ctx context.Context, args map[string]any) (map[string]a
 
 	out, err := t.tool.Run(ctx, t.binding, encoded)
 	if err != nil {
-		return nil, err
+		return nil, explain(err)
 	}
 	return objectOf(out)
+}
+
+func explain(err error) error {
+	var known *errors.Error
+	if !stderrors.As(err, &known) || len(known.Details) == 0 {
+		return err
+	}
+
+	keys := make([]string, 0, len(known.Details))
+	for key := range known.Details {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+
+	named := make([]string, 0, len(keys))
+	for _, key := range keys {
+		value := known.Details[key]
+		if log.IsSensitiveKey(key) {
+			value = log.Mask
+		}
+		named = append(named, key+": "+fmt.Sprint(value))
+	}
+	return errors.New(known.Code, err.Error()+" ("+strings.Join(named, ", ")+")")
 }
 
 func objectOf(value any) (map[string]any, error) {
@@ -88,6 +115,8 @@ func parameterOf(schema *applicationllm.Schema) *gollem.Parameter {
 		Title:       schema.Title,
 		Description: schema.Description,
 		Enum:        schema.Enum,
+		Minimum:     schema.Minimum,
+		Maximum:     schema.Maximum,
 	}
 	if schema.Items != nil {
 		parameter.Items = parameterOf(schema.Items)

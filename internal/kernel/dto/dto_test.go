@@ -158,14 +158,22 @@ func TestListRequestJSON(t *testing.T) {
 	}
 }
 
-func TestListRequestOmitsAbsentSort(t *testing.T) {
+func TestListRequestOmitsWhatTheCallerLeftOut(t *testing.T) {
 	t.Parallel()
 
-	encoded, err := json.Marshal(dto.ListRequest{})
+	empty, err := json.Marshal(dto.ListRequest{})
 	if err != nil {
 		t.Fatalf("Marshal() error: %v", err)
 	}
-	if string(encoded) != `{"limit":0}` {
-		t.Fatalf("Marshal() = %s", encoded)
+	if string(empty) != `{}` {
+		t.Fatalf("Marshal() = %s, want an empty object so a caller need not invent a page size", empty)
+	}
+
+	asked, err := json.Marshal(dto.ListRequest{Limit: 25})
+	if err != nil {
+		t.Fatalf("Marshal() error: %v", err)
+	}
+	if string(asked) != `{"limit":25}` {
+		t.Fatalf("Marshal() = %s", asked)
 	}
 }

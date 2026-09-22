@@ -4,13 +4,13 @@ import "github.com/davidmovas/postulator/internal/kernel/dto"
 
 type CreateEntityRequest struct {
 	SiteID            string   `json:"siteId"`
-	Name              string   `json:"name"`
-	Kind              string   `json:"kind"`
-	Intent            string   `json:"intent"`
-	PrimaryKeyword    string   `json:"primaryKeyword"`
-	SecondaryKeywords []string `json:"secondaryKeywords"`
-	Anchors           []Anchor `json:"anchors"`
-	Source            string   `json:"source,omitempty"`
+	Name              string   `json:"name" description:"What the entity is about, two to four words in title case"`
+	Kind              string   `json:"kind" enum:"hub,product,topic,category,custom" description:"Where the entity sits in the graph: a hub is a subject root, a category groups topics, a topic is one subject, a product is a thing sold, custom is anything else"`
+	Intent            string   `json:"intent,omitempty" description:"What a reader wants from the page, one short sentence"`
+	PrimaryKeyword    string   `json:"primaryKeyword,omitempty" description:"The phrase a reader searches to reach the page"`
+	SecondaryKeywords []string `json:"secondaryKeywords,omitempty" description:"Further phrases the page can rank for, at most four"`
+	Anchors           []Anchor `json:"anchors,omitempty" description:"The link texts another page may point here with; leave it out and the anchors can be set later"`
+	Source            string   `json:"source,omitempty" enum:"import,user,ai" description:"Who asked for the entity; leave it out and it is recorded as user"`
 }
 
 type CreateEntityResponse struct {
@@ -18,12 +18,12 @@ type CreateEntityResponse struct {
 }
 
 type UpdateEntityRequest struct {
-	ID                string    `json:"id"`
-	Name              *string   `json:"name,omitempty"`
-	Kind              *string   `json:"kind,omitempty"`
-	Intent            *string   `json:"intent,omitempty"`
-	PrimaryKeyword    *string   `json:"primaryKeyword,omitempty"`
-	SecondaryKeywords *[]string `json:"secondaryKeywords,omitempty"`
+	ID                string    `json:"id" description:"The id of the entity, exactly as a read tool returned it"`
+	Name              *string   `json:"name,omitempty" description:"The new name, left out to keep the current one"`
+	Kind              *string   `json:"kind,omitempty" enum:"hub,product,topic,category,custom" description:"The new kind, left out to keep the current one"`
+	Intent            *string   `json:"intent,omitempty" description:"The new reader intent, left out to keep the current one"`
+	PrimaryKeyword    *string   `json:"primaryKeyword,omitempty" description:"The new primary keyword, left out to keep the current one"`
+	SecondaryKeywords *[]string `json:"secondaryKeywords,omitempty" description:"The whole new list of secondary keywords, left out to keep the current one"`
 }
 
 type UpdateEntityResponse struct {
@@ -31,13 +31,13 @@ type UpdateEntityResponse struct {
 }
 
 type DeleteEntityRequest struct {
-	ID string `json:"id"`
+	ID string `json:"id" description:"The id of the entity to remove, exactly as a read tool returned it"`
 }
 
 type DeleteEntityResponse struct{}
 
 type GetEntityRequest struct {
-	ID string `json:"id"`
+	ID string `json:"id" description:"The id of the entity, exactly as a read tool returned it"`
 }
 
 type GetEntityResponse struct {
@@ -47,14 +47,14 @@ type GetEntityResponse struct {
 type ListEntitiesRequest struct {
 	dto.ListRequest
 	SiteID           string `json:"siteId"`
-	Kind             string `json:"kind,omitempty"`
-	HasCanonicalPage *bool  `json:"hasCanonicalPage,omitempty"`
-	NamePrefix       string `json:"namePrefix,omitempty"`
+	Kind             string `json:"kind,omitempty" enum:"hub,product,topic,category,custom" description:"Keep only entities of this kind"`
+	HasCanonicalPage *bool  `json:"hasCanonicalPage,omitempty" description:"Keep only entities that do, or do not, own a page"`
+	NamePrefix       string `json:"namePrefix,omitempty" description:"Keep only entities whose name starts with this text"`
 }
 
 type SetAnchorsRequest struct {
-	EntityID string   `json:"entityId"`
-	Anchors  []Anchor `json:"anchors"`
+	EntityID string   `json:"entityId" description:"The id of the entity, exactly as a read tool returned it"`
+	Anchors  []Anchor `json:"anchors" description:"The whole new list of anchors, which replaces the current one"`
 }
 
 type SetAnchorsResponse struct {
@@ -63,12 +63,12 @@ type SetAnchorsResponse struct {
 
 type AddEdgeRequest struct {
 	SiteID       string  `json:"siteId"`
-	FromEntityID string  `json:"fromEntityId"`
-	ToEntityID   string  `json:"toEntityId"`
-	Kind         string  `json:"kind"`
-	Weight       float64 `json:"weight"`
-	Source       string  `json:"source,omitempty"`
-	Status       string  `json:"status,omitempty"`
+	FromEntityID string  `json:"fromEntityId" description:"The id of the entity the edge starts at; for a parent edge this is the child"`
+	ToEntityID   string  `json:"toEntityId" description:"The id of the entity the edge points at; for a parent edge this is the parent"`
+	Kind         string  `json:"kind" enum:"parent,related" description:"A parent edge builds the tree and must not make a cycle; a related edge is an undirected sibling link"`
+	Weight       float64 `json:"weight" minimum:"0" maximum:"1" description:"How close the two are, between 0 and 1; a parent edge takes 1"`
+	Source       string  `json:"source,omitempty" enum:"import,user,ai" description:"Who asked for the edge; leave it out and it is recorded as user"`
+	Status       string  `json:"status,omitempty" enum:"approved,proposed,rejected" description:"Leave it out to add the edge approved; propose it instead to leave the decision to the user"`
 	Reason       string  `json:"reason,omitempty" description:"Why the two belong together, one short sentence"`
 }
 
@@ -77,7 +77,7 @@ type AddEdgeResponse struct {
 }
 
 type ApproveEdgeRequest struct {
-	ID string `json:"id"`
+	ID string `json:"id" description:"The id of the proposed edge, exactly as a read tool returned it"`
 }
 
 type ApproveEdgeResponse struct {
@@ -85,7 +85,7 @@ type ApproveEdgeResponse struct {
 }
 
 type RejectEdgeRequest struct {
-	ID string `json:"id"`
+	ID string `json:"id" description:"The id of the proposed edge, exactly as a read tool returned it"`
 }
 
 type RejectEdgeResponse struct {
@@ -93,7 +93,7 @@ type RejectEdgeResponse struct {
 }
 
 type DeleteEdgeRequest struct {
-	ID string `json:"id"`
+	ID string `json:"id" description:"The id of the edge to remove, exactly as a read tool returned it"`
 }
 
 type DeleteEdgeResponse struct{}
@@ -101,9 +101,9 @@ type DeleteEdgeResponse struct{}
 type ListEdgesRequest struct {
 	dto.ListRequest
 	SiteID   string `json:"siteId"`
-	Kind     string `json:"kind,omitempty"`
-	Status   string `json:"status,omitempty"`
-	EntityID string `json:"entityId,omitempty"`
+	Kind     string `json:"kind,omitempty" enum:"parent,related" description:"Keep only edges of this kind"`
+	Status   string `json:"status,omitempty" enum:"approved,proposed,rejected" description:"Keep only edges in this state"`
+	EntityID string `json:"entityId,omitempty" description:"Keep only edges that touch this entity, at either end"`
 }
 
 type LoadGraphRequest struct {

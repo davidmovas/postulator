@@ -9,11 +9,11 @@ import (
 const templatesCreateName = "templates_create"
 
 type templatesCreateArgs struct {
-	Scope    string  `json:"scope,omitempty" enum:"global,site"`
-	SiteID   *string `json:"siteId,omitempty"`
-	Name     string  `json:"name"`
-	PageKind string  `json:"pageKind" enum:"hub,category,guide,comparison,product"`
-	Spec     string  `json:"spec" description:"the whole template specification as a JSON object: sections, tone, length, keywordRules, linkRules, metaRules, images, modelProfiles and recipe"`
+	Scope    string           `json:"scope,omitempty" enum:"global,site" description:"Whether the template belongs to every site or to one; leave it out for global"`
+	SiteID   *string          `json:"siteId,omitempty" description:"The site the template belongs to, required when the scope is site"`
+	Name     string           `json:"name" description:"What to call the template, two to four words"`
+	PageKind string           `json:"pageKind" enum:"hub,category,guide,comparison,product" description:"The kind of page this template writes"`
+	Spec     templateSpecArgs `json:"spec" description:"The whole specification: the sections, the tone, the length, and the keyword, link, meta and image rules"`
 }
 
 func templatesCreate(deps Deps) Tool {
@@ -22,12 +22,8 @@ func templatesCreate(deps Deps) Tool {
 		Description: "Create a content template from a full specification.",
 		Risk:        RiskWrite,
 	}, func(ctx context.Context, _ Binding, in templatesCreateArgs) (templates.CreateTemplateResponse, error) {
-		spec, err := decodeSpec(in.Spec)
-		if err != nil {
-			return templates.CreateTemplateResponse{}, err
-		}
 		return deps.Templates.CreateTemplate(ctx, templates.CreateTemplateRequest{
-			Scope: in.Scope, SiteID: in.SiteID, Name: in.Name, PageKind: in.PageKind, Spec: spec,
+			Scope: in.Scope, SiteID: in.SiteID, Name: in.Name, PageKind: in.PageKind, Spec: in.Spec.spec(),
 		})
 	})
 }

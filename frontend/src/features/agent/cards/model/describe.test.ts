@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ToolSchema } from "../../../../data/types.js";
+import type { TemplateSpec, ToolSchema } from "../../../../data/types.js";
 import { stepLabel } from "../../../templates/labels.js";
 import type { Part } from "./card.js";
 import { describeAction } from "./describe.js";
@@ -72,9 +72,10 @@ describe("the template cards", () => {
     });
 
     it("describes an update as what changes against the current template", () => {
-        const current = JSON.parse(confirmableArgs["templates_create"]?.["spec"] as string);
-        const changed = { ...current, tone: "brisk", length: { min: 400, max: 800 } };
-        const view = describeAction("templates_update", { id: "t1", spec: JSON.stringify(changed) }, null, { currentTemplate: current });
+        const sent = confirmableArgs["templates_create"]?.["spec"] as Record<string, unknown>;
+        const stored = { ...sent, modelProfiles: { writer: { provider: "openai", model: "gpt-5" } } } as unknown as TemplateSpec;
+        const changed = { ...sent, tone: "brisk", length: { min: 400, max: 800 } };
+        const view = describeAction("templates_update", { id: "t1", spec: changed }, null, { currentTemplate: stored });
         const joined = view.lines.map((line) => texts(line.parts).join("")).join("\n");
         expect(joined).toContain("brisk");
         expect(joined).toContain("400");

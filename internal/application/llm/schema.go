@@ -3,6 +3,7 @@ package llm
 import (
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,6 +24,8 @@ const (
 type Schema struct {
 	Items       *Schema            `json:"items,omitempty"`
 	Properties  map[string]*Schema `json:"properties,omitempty"`
+	Minimum     *float64           `json:"minimum,omitempty"`
+	Maximum     *float64           `json:"maximum,omitempty"`
 	Type        SchemaType         `json:"type"`
 	Title       string             `json:"title,omitempty"`
 	Description string             `json:"description,omitempty"`
@@ -106,11 +109,8 @@ func structSchema(t reflect.Type, path []reflect.Type) (*Schema, error) {
 		if err != nil {
 			return nil, err
 		}
-		if description := field.Tag.Get("description"); description != "" {
-			property.Description = description
-		}
-		if values := field.Tag.Get("enum"); values != "" {
-			property.Enum = strings.Split(values, ",")
+		if describeErr := describe(property, field); describeErr != nil {
+			return nil, describeErr
 		}
 
 		schema.Properties[name] = property
@@ -120,6 +120,60 @@ func structSchema(t reflect.Type, path []reflect.Type) (*Schema, error) {
 	}
 	slices.Sort(schema.Required)
 	return schema, nil
+}
+
+func describe(property *Schema, field reflect.StructField) error {
+	if description := field.Tag.Get("description"); description != "" {
+		property.Description = description
+	}
+	if values := field.Tag.Get("enum"); values != "" {
+		choices := strings.Split(values, ",")
+		if property.Type == SchemaArray && property.Items != nil {
+			property.Items.Enum = choices
+		} else {
+			property.Enum = choices
+		}
+	}
+
+	bound, err := bounds(field)
+	if err != nil {
+		return err
+	}
+	property.Minimum, property.Maximum = bound.least, bound.most
+	return nil
+}
+
+type bound struct {
+	least *float64
+	most  *float64
+}
+
+func bounds(field reflect.StructField) (bound, error) {
+	var (
+		read bound
+		err  error
+	)
+	if read.least, err = number(field, "minimum"); err != nil {
+		return bound{}, err
+	}
+	if read.most, err = number(field, "maximum"); err != nil {
+		return bound{}, err
+	}
+	return read, nil
+}
+
+func number(field reflect.StructField, name string) (*float64, error) {
+	raw := field.Tag.Get(name)
+	if raw == "" {
+		return nil, nil
+	}
+
+	parsed, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return nil, errors.New(errors.Invalid, "a schema bound must be a number").
+			WithDetail("field", field.Name).WithDetail("tag", name)
+	}
+	return &parsed, nil
 }
 
 func fieldName(field reflect.StructField) (name string, optional, skip bool) {
