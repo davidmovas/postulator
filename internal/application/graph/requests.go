@@ -75,7 +75,7 @@ type ListEntitiesRequest struct {
 
 type SetAnchorsRequest struct {
 	EntityID string   `json:"entityId" description:"The id of the entity, exactly as a read tool returned it"`
-	Anchors  []Anchor `json:"anchors" description:"The whole new list of anchors, which replaces the current one"`
+	Anchors  []Anchor `json:"anchors,omitempty" description:"The whole new list of anchors, which replaces the current one; leave it out to clear every anchor the entity has"`
 }
 
 type SetAnchorsResponse struct {
@@ -87,7 +87,7 @@ type AddEdgeRequest struct {
 	FromEntityID string  `json:"fromEntityId" description:"The id of the entity the edge starts at; for a parent edge this is the child"`
 	ToEntityID   string  `json:"toEntityId" description:"The id of the entity the edge points at; for a parent edge this is the parent"`
 	Kind         string  `json:"kind" enum:"parent,related" description:"A parent edge builds the tree and must not make a cycle; a related edge is an undirected sibling link"`
-	Weight       float64 `json:"weight" minimum:"0" maximum:"1" description:"How close the two are, between 0 and 1; a parent edge takes 1"`
+	Weight       float64 `json:"weight,omitempty" minimum:"0" maximum:"1" description:"How close the two are, between 0 and 1; a parent edge takes 1 and leaving it out records no closeness at all"`
 	Source       string  `json:"source,omitempty" enum:"import,user,ai" description:"Who asked for the edge; leave it out and it is recorded as user"`
 	Status       string  `json:"status,omitempty" enum:"approved,proposed,rejected" description:"Leave it out to add the edge approved; propose it instead to leave the decision to the user"`
 	Reason       string  `json:"reason,omitempty" description:"Why the two belong together, one short sentence"`

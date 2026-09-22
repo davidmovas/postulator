@@ -8,10 +8,10 @@ type columnArgs struct {
 }
 
 type mappingArgs struct {
-	ID      string          `json:"id,omitempty" description:"The id of a saved mapping to reuse, left out for a mapping given here"`
-	Name    string          `json:"name,omitempty" description:"What to call the mapping when it is saved"`
-	Columns []columnArgs    `json:"columns" description:"Which spreadsheet column fills which page field"`
-	Options imports.Options `json:"options" description:"How to read the cells: what to strip from a path and what separates a list"`
+	ID      string           `json:"id,omitempty" description:"The id of a saved mapping to reuse, left out for a mapping given here"`
+	Name    string           `json:"name,omitempty" description:"What to call the mapping when it is saved"`
+	Columns []columnArgs     `json:"columns,omitempty" description:"Which spreadsheet column fills which page field; leave it out and the columns detected by imports_inspect are used"`
+	Options *imports.Options `json:"options,omitempty" description:"How to read the cells: what to strip from a path and what separates a list; leave it out for the defaults"`
 }
 
 func (m mappingArgs) mapping(siteID string) imports.Mapping {
@@ -19,5 +19,10 @@ func (m mappingArgs) mapping(siteID string) imports.Mapping {
 	for _, column := range m.Columns {
 		columns[column.Field] = column.Column
 	}
-	return imports.Mapping{ID: m.ID, SiteID: siteID, Name: m.Name, Columns: columns, Options: m.Options}
+
+	built := imports.Mapping{ID: m.ID, SiteID: siteID, Name: m.Name, Columns: columns}
+	if m.Options != nil {
+		built.Options = *m.Options
+	}
+	return built
 }

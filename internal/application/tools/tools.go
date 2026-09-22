@@ -166,6 +166,31 @@ func sortedBy(tool Tool, fields ...string) Tool {
 	return tool
 }
 
+func orderedOnly(tool Tool) Tool {
+	schema := tool.Def.Schema
+	if schema == nil || schema.Properties == nil {
+		return tool
+	}
+	ordering, ok := schema.Properties[sortField]
+	if !ok || ordering.Properties == nil {
+		return tool
+	}
+
+	direction := *ordering
+	direction.Description = "Whether to read the rows the other way round; this listing takes no other order"
+	direction.Properties = maps.Clone(ordering.Properties)
+	delete(direction.Properties, fieldField)
+	direction.Required = slices.DeleteFunc(slices.Clone(ordering.Required), func(name string) bool {
+		return name == fieldField
+	})
+
+	widened := *schema
+	widened.Properties = maps.Clone(schema.Properties)
+	widened.Properties[sortField] = &direction
+	tool.Def.Schema = &widened
+	return tool
+}
+
 func withoutSite(schema *llm.Schema) *llm.Schema {
 	if schema == nil || schema.Type != llm.SchemaObject {
 		return schema

@@ -62,7 +62,7 @@ func (t *Time) UnmarshalJSON(raw []byte) error {
 
 type Sort struct {
 	Field string `json:"field" description:"The field to order by; a cursor is issued for one order and refuses another"`
-	Desc  bool   `json:"desc" description:"Order from the largest value down rather than up"`
+	Desc  bool   `json:"desc,omitempty" description:"Order from the largest value down rather than up; leave it out to order upwards"`
 }
 
 type ListRequest struct {

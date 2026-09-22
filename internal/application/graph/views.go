@@ -8,7 +8,7 @@ import (
 type Anchor struct {
 	Text   string  `json:"text" description:"The link text another page points here with"`
 	Source string  `json:"source" enum:"user,ai" description:"Who wrote the anchor; an anchor you propose is ai"`
-	Weight float64 `json:"weight" minimum:"0" maximum:"1" description:"How strongly to prefer this anchor over the others, between 0 and 1"`
+	Weight float64 `json:"weight,omitempty" minimum:"0" maximum:"1" description:"How strongly to prefer this anchor over the others, between 0 and 1; leave it out for no preference"`
 }
 
 type Entity struct {

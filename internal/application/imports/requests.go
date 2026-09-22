@@ -2,9 +2,9 @@ package imports
 
 type InspectRequest struct {
 	SiteID   string   `json:"siteId"`
-	Path     string   `json:"path"`
-	Sheets   []string `json:"sheets,omitempty"`
-	NoHeader bool     `json:"noHeader,omitempty"`
+	Path     string   `json:"path" description:"The absolute path of the .xlsx or .csv file on this machine"`
+	Sheets   []string `json:"sheets,omitempty" description:"Which sheets of the workbook to read; leave it out to read every one"`
+	NoHeader bool     `json:"noHeader,omitempty" description:"The sheet carries no header row, so every column is addressed by its spreadsheet letter; leave it out for a sheet whose first row names the columns"`
 }
 
 type InspectResponse struct {

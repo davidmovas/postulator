@@ -9,8 +9,8 @@ import (
 const importsPreviewName = "imports_preview"
 
 type importsPreviewArgs struct {
-	Path    string      `json:"path" description:"the absolute path of the .xlsx or .csv file on this machine"`
-	Mapping mappingArgs `json:"mapping"`
+	Path    string      `json:"path" description:"The absolute path of the .xlsx or .csv file on this machine"`
+	Mapping mappingArgs `json:"mapping,omitempty" description:"Which spreadsheet column fills which page field; leave it out and the columns detected by imports_inspect are used"`
 }
 
 func importsPreview(deps Deps) Tool {

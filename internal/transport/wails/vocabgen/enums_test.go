@@ -15,8 +15,6 @@ var narrowed = map[string]bool{
 	"templates_update.parameters.pageKind":   true,
 	"templates_list.parameters.pageKind":     true,
 	"graph_list_edges.parameters.sort.field": true,
-	"runs_list_items.parameters.sort.field":  true,
-	"schedules_list.parameters.sort.field":   true,
 	"imports_export.parameters.format":       true,
 }
 
@@ -62,11 +60,6 @@ func settled(values []string) string {
 func schemas(t *testing.T) map[string]*llm.Schema {
 	t.Helper()
 	return selected(t, func(tools.Risk) bool { return true })
-}
-
-func written(t *testing.T) map[string]*llm.Schema {
-	t.Helper()
-	return selected(t, tools.Risk.NeedsConfirmation)
 }
 
 func selected(t *testing.T, keep func(tools.Risk) bool) map[string]*llm.Schema {
@@ -135,14 +128,11 @@ func TestEveryToolFieldThatNamesAChoiceOffersOne(t *testing.T) {
 	}
 }
 
-func TestEveryFieldOfAWriteSaysWhatItIsFor(t *testing.T) {
+func TestEveryFieldOfEveryToolSaysWhatItIsFor(t *testing.T) {
 	t.Parallel()
 
-	for name, schema := range written(t) {
+	for name, schema := range schemas(t) {
 		eachProperty(schema, name+".parameters", func(path, _ string, property *llm.Schema) {
-			if property.Type == llm.SchemaObject || property.Type == llm.SchemaArray {
-				return
-			}
 			if property.Description == "" {
 				t.Errorf("%s reaches the model with no description", path)
 			}

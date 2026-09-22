@@ -82,14 +82,26 @@ func (stubPacker) Package() ([]byte, error) {
 	return []byte("PK"), nil
 }
 
-func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding) {
+type fixture struct {
+	site     string
+	entity   string
+	other    string
+	page     string
+	template string
+}
+
+func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seeded fixture) {
 	t.Helper()
 
 	store := sqlitetest.Open(t)
 	owner := sqlitetest.Site(t, store, "shop")
-	sqlitetest.Entity(t, store, owner.ID, "Coffee")
-	sqlitetest.Page(t, store, owner.ID, "/coffee/")
-	sqlitetest.Template(t, store, "Guide")
+	entity := sqlitetest.Entity(t, store, owner.ID, "Coffee")
+	other := sqlitetest.Entity(t, store, owner.ID, "Espresso")
+	page := sqlitetest.Page(t, store, owner.ID, "/coffee/")
+	guide := sqlitetest.Template(t, store, "Guide")
+	seeded = fixture{
+		site: owner.ID, entity: entity.ID, other: other.ID, page: page.ID, template: guide.ID,
+	}
 
 	conversation, err := domainagent.NewConversation(domainagent.Conversation{
 		ID: id.New(), SiteID: &owner.ID, Title: "smoke", CreatedAt: stamp, UpdatedAt: stamp,
@@ -161,13 +173,13 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding) {
 		Actions:   sqlite.NewPendingActionRepo(store),
 		Publisher: bus,
 		Clock:     now,
-	}), tools.Binding{SiteID: owner.ID, ConversationID: conversation.ID}
+	}), tools.Binding{SiteID: owner.ID, ConversationID: conversation.ID}, seeded
 }
 
 func TestEveryReadToolRunsAgainstTheRealUseCases(t *testing.T) {
 	t.Parallel()
 
-	registry, binding := wired(t)
+	registry, binding, _ := wired(t)
 	binding.Mode = domainagent.ModeAutonomous
 
 	for _, tool := range registry.Build(binding) {
@@ -187,7 +199,7 @@ func TestEveryReadToolRunsAgainstTheRealUseCases(t *testing.T) {
 func TestEveryWriteToolProposesInsteadOfWriting(t *testing.T) {
 	t.Parallel()
 
-	registry, binding := wired(t)
+	registry, binding, _ := wired(t)
 	binding.Mode = domainagent.ModeConfirm
 
 	proposals := 0
@@ -215,7 +227,7 @@ func TestEveryWriteToolProposesInsteadOfWriting(t *testing.T) {
 func TestEveryWriteToolRunsAgainstTheRealUseCases(t *testing.T) {
 	t.Parallel()
 
-	registry, binding := wired(t)
+	registry, binding, _ := wired(t)
 	binding.Mode = domainagent.ModeAutonomous
 
 	for _, tool := range registry.Build(binding) {

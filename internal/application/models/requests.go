@@ -11,14 +11,14 @@ type UpsertModelRequest struct {
 	Model              string  `json:"model" description:"The model name the provider answers to"`
 	ContextTokens      int     `json:"contextTokens" minimum:"1" description:"How many tokens the model reads in one call"`
 	MaxOutputTokens    int     `json:"maxOutputTokens" minimum:"1" description:"How many tokens the model may answer with, which must fit the context"`
-	InputUSDPerM       float64 `json:"inputUsdPerM" minimum:"0" description:"Dollars per million input tokens"`
+	InputUSDPerM       float64 `json:"inputUsdPerM,omitempty" minimum:"0" description:"Dollars per million input tokens; leave it out for a model that costs nothing to read"`
 	CachedInputUSDPerM float64 `json:"cachedInputUsdPerM,omitempty" minimum:"0" description:"Dollars per million input tokens served from the provider's prompt cache; leave it out and a cache read is charged at the full rate"`
-	OutputUSDPerM      float64 `json:"outputUsdPerM" minimum:"0" description:"Dollars per million output tokens"`
+	OutputUSDPerM      float64 `json:"outputUsdPerM,omitempty" minimum:"0" description:"Dollars per million output tokens; leave it out for a model that costs nothing to answer"`
 	RPM                int     `json:"rpm" minimum:"1" description:"The requests per minute the account may make"`
 	TPM                int     `json:"tpm" minimum:"1" description:"The tokens per minute the account may use"`
-	SupportsStructured bool    `json:"supportsStructured" description:"The model can answer against a JSON schema"`
-	SupportsImages     bool    `json:"supportsImages" description:"The model can read images"`
-	Reasoning          bool    `json:"reasoning" description:"The model thinks before it answers and bills those tokens as output"`
+	SupportsStructured bool    `json:"supportsStructured,omitempty" description:"The model can answer against a JSON schema; leave it out for a model that cannot"`
+	SupportsImages     bool    `json:"supportsImages,omitempty" description:"The model can read images; leave it out for a model that cannot"`
+	Reasoning          bool    `json:"reasoning,omitempty" description:"The model thinks before it answers and bills those tokens as output; leave it out for a model that does not"`
 	ReasoningEffort    string  `json:"reasoningEffort,omitempty" enum:"none,low,medium,high,xhigh" description:"How long the model may think; leave it out to send no effort at all"`
 }
 
@@ -86,8 +86,8 @@ type TestProviderResponse struct {
 }
 
 type UsageSummaryRequest struct {
-	RunID          string `json:"runId,omitempty"`
-	ConversationID string `json:"conversationId,omitempty"`
+	RunID          string `json:"runId,omitempty" description:"Count only what this run spent; leave it out for everything"`
+	ConversationID string `json:"conversationId,omitempty" description:"Count only what this conversation spent; leave it out for everything"`
 }
 
 type UsageSummaryResponse struct {

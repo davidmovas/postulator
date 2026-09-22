@@ -10,7 +10,7 @@ const importsApplyName = "imports_apply"
 
 type importsApplyArgs struct {
 	Path          string      `json:"path" description:"The absolute path of the .xlsx or .csv file on this machine"`
-	Mapping       mappingArgs `json:"mapping" description:"Which spreadsheet column fills which page field"`
+	Mapping       mappingArgs `json:"mapping,omitempty" description:"Which spreadsheet column fills which page field; leave it out and the columns detected by imports_inspect are used"`
 	SaveMappingAs string      `json:"saveMappingAs,omitempty" description:"Keep the mapping under this name so the next import can reuse it; leave it out to use it once"`
 }
 

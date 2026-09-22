@@ -51,7 +51,7 @@ type SiteOverviewResponse struct {
 }
 
 type PageReportRequest struct {
-	PageID string `json:"pageId"`
+	PageID string `json:"pageId" description:"The id of the page, exactly as a read tool returned it"`
 }
 
 type PageReportResponse struct {
@@ -68,7 +68,7 @@ type PageReportResponse struct {
 }
 
 type RunReportRequest struct {
-	RunID string `json:"runId"`
+	RunID string `json:"runId" description:"The id of the run, exactly as runs_list or runs_start returned it"`
 }
 
 type ItemReport struct {
@@ -154,7 +154,7 @@ type LinkAuditResponse struct {
 }
 
 type LinkAuditPageRequest struct {
-	PageID string `json:"pageId"`
+	PageID string `json:"pageId" description:"The id of the mapped page to audit, exactly as a read tool returned it"`
 }
 
 type RequiredLink struct {

@@ -9,11 +9,12 @@ import (
 const modelsGetProfilesName = "models_get_profiles"
 
 func modelsGetProfiles(deps Deps) Tool {
-	return NewTool(Def{
+	return newSiteTool(Def{
 		Name:        modelsGetProfilesName,
-		Description: "Read the model bound to each role.",
+		Description: "Read the model bound to each role on this site.",
 		Risk:        RiskRead,
-	}, func(ctx context.Context, _ Binding, in models.GetProfilesRequest) (models.GetProfilesResponse, error) {
+	}, func(ctx context.Context, b Binding, in models.GetProfilesRequest) (models.GetProfilesResponse, error) {
+		in.SiteID = b.SiteID
 		return deps.Models.GetProfiles(ctx, in)
 	})
 }

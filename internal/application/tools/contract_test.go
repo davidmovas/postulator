@@ -51,7 +51,7 @@ func walk(t *testing.T, name, path string, schema *llm.Schema, depth int) {
 func TestEveryToolSatisfiesTheFunctionCallingContract(t *testing.T) {
 	t.Parallel()
 
-	registry, binding := wired(t)
+	registry, binding, _ := wired(t)
 	built := registry.Build(binding)
 
 	if len(built) > maxToolsPerRequest {

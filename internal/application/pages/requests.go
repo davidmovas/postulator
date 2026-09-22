@@ -6,7 +6,7 @@ type CreateRequest struct {
 	SiteID          string  `json:"siteId"`
 	Path            string  `json:"path" description:"Where the page lives on the site, a leading and trailing slash, for example /supplements/creatine/"`
 	WPType          string  `json:"wpType,omitempty" enum:"page,post,product,product_cat" description:"What WordPress calls the record; leave it out for a page"`
-	Title           string  `json:"title" description:"The title the page carries in WordPress"`
+	Title           string  `json:"title,omitempty" description:"The title the page carries in WordPress; leave it out to plan the page without one"`
 	H1              string  `json:"h1,omitempty" description:"The heading the page opens with, left out to follow the title"`
 	MetaTitle       string  `json:"metaTitle,omitempty" description:"The SEO title, left out to follow the template"`
 	MetaDescription string  `json:"metaDescription,omitempty" description:"The SEO description, left out to follow the template"`
@@ -105,7 +105,7 @@ type LinkInput struct {
 
 type ReplaceLinksRequest struct {
 	PageID string      `json:"pageId" description:"The id of the page whose links are replaced, exactly as a read tool returned it"`
-	Links  []LinkInput `json:"links" description:"The whole new list of links, which replaces the current one"`
+	Links  []LinkInput `json:"links,omitempty" description:"The whole new list of links, which replaces the current one; leave it out to clear every link the page carries"`
 }
 
 type ReplaceLinksResponse struct {
