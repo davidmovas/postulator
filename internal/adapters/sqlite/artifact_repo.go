@@ -16,6 +16,7 @@ const (
 	selectArtifact      = `SELECT ` + artifactColumns + ` FROM artifacts WHERE id = ?`
 	selectItemArtifacts = `SELECT ` + artifactColumns + ` FROM artifacts WHERE item_id = ? ORDER BY created_at, id`
 	selectPurgedKinds   = `SELECT item_id, kind FROM artifacts WHERE purged = 1 AND item_id IN `
+	selectHeldKinds     = `SELECT item_id, kind FROM artifacts WHERE purged = 0 AND item_id IN `
 )
 
 var purgeArtifacts = `UPDATE artifacts SET blob = x'', size = 0, purged = 1
@@ -86,6 +87,30 @@ func (r *ArtifactRepo) PurgedByItems(ctx context.Context, itemIDs []string) (map
 		purged[row.itemID] = append(purged[row.itemID], row.kind)
 	}
 	return purged, nil
+}
+
+func (r *ArtifactRepo) KindsByItems(ctx context.Context, itemIDs []string) (map[string][]run.ArtifactKind, error) {
+	held := make(map[string][]run.ArtifactKind, len(itemIDs))
+	if len(itemIDs) == 0 {
+		return held, nil
+	}
+
+	args := make([]any, 0, len(itemIDs))
+	for _, itemID := range itemIDs {
+		args = append(args, itemID)
+	}
+
+	query := selectHeldKinds + "(" + placeholders(len(itemIDs)) + ") ORDER BY item_id, created_at, id"
+	rows, err := selectAll(ctx, r.store.execFrom(ctx), query, args, scanPurgedKind,
+		"list the artifacts the run items still hold")
+	if err != nil {
+		return nil, err
+	}
+
+	for _, row := range rows {
+		held[row.itemID] = append(held[row.itemID], row.kind)
+	}
+	return held, nil
 }
 
 type purgedKind struct {

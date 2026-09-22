@@ -21,12 +21,13 @@ const (
 	KindSync     Kind = "sync"
 	KindImport   Kind = "import"
 	KindRepair   Kind = "repair"
+	KindRevert   Kind = "revert"
 	KindCustom   Kind = "custom"
 )
 
 func (k Kind) Valid() bool {
 	switch k {
-	case KindGenerate, KindRelink, KindAudit, KindSync, KindImport, KindRepair, KindCustom:
+	case KindGenerate, KindRelink, KindAudit, KindSync, KindImport, KindRepair, KindRevert, KindCustom:
 		return true
 	default:
 		return false
@@ -40,6 +41,10 @@ func (k Kind) PageScoped() bool {
 	default:
 		return false
 	}
+}
+
+func RevertRecipe() []template.StepSpec {
+	return []template.StepSpec{{Name: RevertStep, Enabled: true}}
 }
 
 func SyncRecipe() []template.StepSpec {
@@ -247,13 +252,14 @@ const (
 	ArtifactRelinkResult     ArtifactKind = "relink_result"
 	ArtifactSyncResult       ArtifactKind = "sync_result"
 	ArtifactFinalReport      ArtifactKind = "final_report"
+	ArtifactRevertResult     ArtifactKind = "revert_result"
 )
 
 func ArtifactKinds() []ArtifactKind {
 	return []ArtifactKind{
 		ArtifactLinkContext, ArtifactDraft, ArtifactBodyHTML, ArtifactMeta, ArtifactImages,
 		ArtifactValidationReport, ArtifactJudgeReport, ArtifactPublishResult, ArtifactRelinkResult,
-		ArtifactSyncResult, ArtifactFinalReport,
+		ArtifactSyncResult, ArtifactFinalReport, ArtifactRevertResult,
 	}
 }
 

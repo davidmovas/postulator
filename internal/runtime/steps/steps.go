@@ -93,11 +93,21 @@ type judgeService interface {
 	Assess(ctx context.Context, req appcontent.AssessRequest) (appcontent.AssessResponse, error)
 }
 
+type itemReader interface {
+	ByRun(ctx context.Context, runID string) ([]run.Item, error)
+}
+
+type artifactReader interface {
+	ByItem(ctx context.Context, itemID string) ([]run.Artifact, error)
+}
+
 type Deps struct {
 	Entities      entityReader
 	Edges         edgeReader
 	Pages         pageStore
 	Links         linkStore
+	Items         itemReader
+	Artifacts     artifactReader
 	Sites         siteReader
 	SiteWriter    siteWriter
 	WordPress     siteClients
@@ -129,6 +139,7 @@ func all(deps Deps) []run.StepDef {
 		SyncBack(deps),
 		Report(deps),
 		SyncSite(deps),
+		Revert(deps),
 	}
 }
 
@@ -233,6 +244,20 @@ func draftOf(sc *run.StepContext) (content.ContentDraft, error) {
 		return content.ContentDraft{}, errors.Wrap(unmarshalErr, errors.Internal, "the stored draft is not readable")
 	}
 	return decoded, nil
+}
+
+func blobOf[T any](stored []run.Artifact, kind run.ArtifactKind) (value T, found bool, err error) {
+	for i := range stored {
+		if stored[i].Kind != kind || stored[i].Purged || len(stored[i].Blob) == 0 {
+			continue
+		}
+		if unmarshalErr := json.Unmarshal(stored[i].Blob, &value); unmarshalErr != nil {
+			return value, false, errors.Wrap(unmarshalErr, errors.Internal,
+				"the stored "+string(kind)+" is not readable")
+		}
+		return value, true, nil
+	}
+	return value, false, nil
 }
 
 func decodeArtifact[T any](sc *run.StepContext, kind run.ArtifactKind) (value T, found bool, err error) {

@@ -52,7 +52,16 @@ export type LinkBlockedReason = (typeof linkBlockedReasons)[number];
 export const linkAuditSkipReasons = ["unmapped", "no_template"] as const;
 export type LinkAuditSkipReason = (typeof linkAuditSkipReasons)[number];
 
-export const runKinds = ["generate", "relink", "audit", "sync", "import", "repair", "custom"] as const;
+export const runKinds = [
+    "generate",
+    "relink",
+    "audit",
+    "sync",
+    "import",
+    "repair",
+    "revert",
+    "custom",
+] as const;
 export type RunKind = (typeof runKinds)[number];
 
 export const runStatuses = [
@@ -94,6 +103,7 @@ export const artifactKinds = [
     "relink_result",
     "sync_result",
     "final_report",
+    "revert_result",
 ] as const;
 export type ArtifactKind = (typeof artifactKinds)[number];
 

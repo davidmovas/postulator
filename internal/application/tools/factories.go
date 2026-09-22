@@ -58,6 +58,7 @@ func factories() []factory {
 		runsResume,
 		runsCancel,
 		runsRetryStep,
+		runsRevert,
 		syncSite,
 		syncCheckPlugin,
 		reportsSiteOverview,

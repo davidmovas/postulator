@@ -61,12 +61,16 @@ func (f runsFake) RetryStep(context.Context, runs.RetryStepRequest) (runs.RetryS
 	return answer[runs.RetryStepResponse](f.mode)
 }
 
+func (f runsFake) Revert(context.Context, runs.RevertRequest) (runs.RevertResponse, error) {
+	return answer[runs.RevertResponse](f.mode)
+}
+
 func TestRunsServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
 	assertMethodNames(t, wails.NewRunsService(zap.NewNop(), ready[wails.RunsUseCase](runsFake{})), []string{
 		"Cancel", "Estimate", "Get", "GetArtifact", "List", "ListArtifacts", "ListEvents",
-		"ListItems", "Pause", "Resume", "RetryStep", "Start",
+		"ListItems", "Pause", "Resume", "RetryStep", "RevertRun", "Start",
 	})
 	assertEveryMethodConverts(t, wails.NewRunsService(zap.NewNop(), ready[wails.RunsUseCase](runsFake{mode: missing})), missingBody)
 	assertEveryMethodConverts(t, wails.NewRunsService(zap.NewNop(), ready[wails.RunsUseCase](runsFake{mode: panicking})), panicBody)

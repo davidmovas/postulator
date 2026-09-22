@@ -9,6 +9,7 @@ import {
     itemViews,
     remainingMs,
     retryState,
+    revertState,
     runView,
     statsView,
     waitingUntil,
@@ -77,6 +78,27 @@ function aRun(overrides: Partial<Run> = {}): Run {
         ...overrides,
     };
 }
+
+describe("revertState", () => {
+    it.each([
+        ["completed", { kind: "ready" }],
+        ["failed", { kind: "ready" }],
+        ["cancelled", { kind: "ready" }],
+        ["running", { kind: "blocked", reason: "in_flight" }],
+        ["paused", { kind: "blocked", reason: "in_flight" }],
+        ["pending", { kind: "blocked", reason: "in_flight" }],
+        ["waiting", { kind: "blocked", reason: "in_flight" }],
+    ])("a %s run", (status, want) => {
+        expect(revertState(aRun({ status }))).toStrictEqual(want);
+    });
+
+    it("refuses a revert of a revert", () => {
+        expect(revertState(aRun({ kind: "revert", status: "completed" }))).toStrictEqual({
+            kind: "blocked",
+            reason: "already_a_revert",
+        });
+    });
+});
 
 describe("itemView", () => {
     it("takes the current step from the log while the run is live", () => {

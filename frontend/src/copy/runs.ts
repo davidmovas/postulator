@@ -28,6 +28,7 @@ export const runs = {
         sync: "Sync",
         import: "Import",
         repair: "Repair",
+        revert: "Revert",
         custom: "Custom",
     },
     status: {
@@ -65,9 +66,18 @@ export const runs = {
     cancel: "Cancel run",
     cancelTitle: "Cancel this run",
     cancelBody:
-        "Every pending, running and waiting item stops. Pages already published stay published; nothing on WordPress is undone.",
+        "Every pending, running and waiting item stops. Pages already published stay published; use Revert afterwards to take them back off the site.",
     cancelConfirm: "Cancel the run",
     keepRunning: "Keep it running",
+    revert: "Revert",
+    revertRunning: "A run that is still going cannot be reverted. Cancel it first.",
+    revertOfARevert: "A revert cannot itself be reverted.",
+    revertTitle: "Put back what this run wrote",
+    revertBody:
+        "Every page this run created goes to the WordPress trash and its row here goes back to planned. Every page it updated gets the body it replaced, and every neighbour it relinked gets the content it replaced. A page a human has edited since is left alone and held for you. Images it uploaded stay in the media library, and the SEO meta it wrote stays as it is.",
+    revertConfirm: "Revert the run",
+    revertKeep: "Leave it as it is",
+    revertStep: "Put it back",
     retryStep: "Retry this step",
     retryBusy: "The item has not stopped, so there is nothing to retry.",
     retryBlocked: {
@@ -237,6 +247,7 @@ export const runs = {
             relink_result: "Neighbours",
             sync_result: "Sync",
             final_report: "Report",
+            revert_result: "Revert",
         },
         body: {
             preview: "Sandboxed preview",

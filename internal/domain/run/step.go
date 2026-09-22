@@ -21,6 +21,8 @@ const (
 	StepSyncSite        StepName = "sync_site"
 )
 
+const RevertStep = "revert"
+
 var stepNames = []StepName{
 	StepResolveContext, StepGenerateBody, StepGenerateMeta, StepInsertLinks, StepRepairLinks,
 	StepGenerateImages, StepValidate, StepJudge, StepRepairHierarchy, StepPublish, StepRelinkNeighbors, StepSyncBack,

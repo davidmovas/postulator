@@ -1,7 +1,14 @@
 import type { ItemProgress, LiveStats, StepFailure } from "../../data/runs/derive.js";
 import type { Run, RunItem, RunTotals } from "../../data/types.js";
 import { activeRunStatuses, terminalRunStatuses } from "../../generated/vocab.js";
-import { itemPending, itemRunning, pauseBudgetExceeded, statusPaused, statusWaiting } from "./statuses.js";
+import {
+    itemPending,
+    itemRunning,
+    kindRevert,
+    pauseBudgetExceeded,
+    statusPaused,
+    statusWaiting,
+} from "./statuses.js";
 
 export interface ItemView {
     item: RunItem;
@@ -87,6 +94,20 @@ export function runView(run: Run): RunView {
         cap,
         capped: Number.isFinite(cap) && cap > 0,
     };
+}
+
+export type RevertBlock = "in_flight" | "already_a_revert";
+
+export type RevertState = { kind: "ready" } | { kind: "blocked"; reason: RevertBlock };
+
+export function revertState(run: Run): RevertState {
+    if (run.kind === kindRevert) {
+        return { kind: "blocked", reason: "already_a_revert" };
+    }
+    if (!(terminalRunStatuses as readonly string[]).includes(run.status)) {
+        return { kind: "blocked", reason: "in_flight" };
+    }
+    return { kind: "ready" };
 }
 
 export type RetryState =

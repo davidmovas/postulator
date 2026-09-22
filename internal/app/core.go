@@ -267,12 +267,20 @@ func (c *Core) build(ctx context.Context, key []byte) (kit, error) {
 		Policies: templateService, Profiles: modelProfiles, Raw: rawContent{clients: wordpress}, LLM: client,
 	})
 
+	runRepo := sqlite.NewRunRepo(store)
+	itemRepo := sqlite.NewRunItemRepo(store)
+	artifactRepo := sqlite.NewArtifactRepo(store)
+	execRepo := sqlite.NewStepExecRepo(store)
+	eventRepo := sqlite.NewRunEventRepo(store)
+
 	stepRegistry := run.NewRegistry()
 	if err = steps.Register(stepRegistry, steps.Deps{
 		Entities:      entityRepo,
 		Edges:         edgeRepo,
 		Pages:         pageRepo,
 		Links:         linkRepo,
+		Items:         itemRepo,
+		Artifacts:     artifactRepo,
 		Sites:         siteRepo,
 		SiteWriter:    siteRepo,
 		WordPress:     wordpress,
@@ -292,12 +300,6 @@ func (c *Core) build(ctx context.Context, key []byte) (kit, error) {
 	}); err != nil {
 		return kit{}, stderrors.Join(err, store.Close())
 	}
-
-	runRepo := sqlite.NewRunRepo(store)
-	itemRepo := sqlite.NewRunItemRepo(store)
-	artifactRepo := sqlite.NewArtifactRepo(store)
-	execRepo := sqlite.NewStepExecRepo(store)
-	eventRepo := sqlite.NewRunEventRepo(store)
 
 	engine := runtime.New(runtime.Deps{
 		Runs:       runRepo,

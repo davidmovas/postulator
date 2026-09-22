@@ -32,7 +32,7 @@ func (e *Engine) Enqueue(ctx context.Context, record run.Run) (run.Run, error) {
 		record.DeadlineAt = record.CreatedAt.Add(e.cfg.RunDeadline)
 	}
 	record.Stats.Items = len(record.Targets)
-	record.Targets = e.ancestorsFirst(ctx, record.Targets)
+	record.Targets = e.inWorkingOrder(ctx, record.Kind, record.Targets)
 
 	validated, err := run.NewRun(record)
 	if err != nil {
@@ -66,6 +66,16 @@ func (e *Engine) Enqueue(ctx context.Context, record run.Run) (run.Run, error) {
 
 	e.nudge()
 	return validated, nil
+}
+
+func (e *Engine) inWorkingOrder(ctx context.Context, kind run.Kind, targets []string) []string {
+	ordered := e.ancestorsFirst(ctx, targets)
+	if kind != run.KindRevert {
+		return ordered
+	}
+	reversed := slices.Clone(ordered)
+	slices.Reverse(reversed)
+	return reversed
 }
 
 func (e *Engine) ancestorsFirst(ctx context.Context, targets []string) []string {

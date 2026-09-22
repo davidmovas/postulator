@@ -43,7 +43,7 @@ func TestOpenWiresTheUseCasesAndSeedsTheStarterTemplates(t *testing.T) {
 		if core.Sync == nil || core.Reports == nil || core.WordPress == nil {
 			t.Fatal("the core must carry the wordpress sync and the read models")
 		}
-		if names := core.Steps.Names(); len(names) != 14 || names[0] != "resolve_context" {
+		if names := core.Steps.Names(); len(names) != 15 || names[0] != "resolve_context" {
 			t.Fatalf("round %d: the step registry holds %v", round, names)
 		}
 		if _, err := core.Runs.List(t.Context(), runs.ListRequest{}); err != nil {

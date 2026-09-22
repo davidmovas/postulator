@@ -22,16 +22,19 @@ type engine interface {
 
 type runStore interface {
 	Get(ctx context.Context, id string) (run.Run, error)
+	ByParent(ctx context.Context, parentRunID string) ([]run.Run, error)
 	List(ctx context.Context, q run.Query, page paging.Request) (paging.List[run.Run], error)
 }
 
 type itemStore interface {
 	Get(ctx context.Context, id string) (run.Item, error)
+	ByRun(ctx context.Context, runID string) ([]run.Item, error)
 	List(ctx context.Context, q run.ItemQuery, page paging.Request) (paging.List[run.Item], error)
 }
 
 type artifactStore interface {
 	ByItem(ctx context.Context, itemID string) ([]run.Artifact, error)
+	KindsByItems(ctx context.Context, itemIDs []string) (map[string][]run.ArtifactKind, error)
 	PurgedByItems(ctx context.Context, itemIDs []string) (map[string][]run.ArtifactKind, error)
 }
 

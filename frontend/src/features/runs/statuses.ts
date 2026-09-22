@@ -29,6 +29,7 @@ export const pauseByUser: PauseReason = "user";
 export const retryInputsExpired: RetryBlockedReason = "inputs_expired";
 
 export const kindGenerate: RunKind = "generate";
+export const kindRevert: RunKind = "revert";
 
 export const stepPublish: StepName = "publish";
 
@@ -43,5 +44,6 @@ export const artifactPublishResult: ArtifactKind = "publish_result";
 export const artifactRelinkResult: ArtifactKind = "relink_result";
 export const artifactSyncResult: ArtifactKind = "sync_result";
 export const artifactFinalReport: ArtifactKind = "final_report";
+export const artifactRevertResult: ArtifactKind = "revert_result";
 
 export const retentionDaysKey = "runs.artifactRetentionDays";

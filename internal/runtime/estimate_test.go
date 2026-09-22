@@ -121,6 +121,29 @@ func TestEstimateNamesTheStepItCannotPrice(t *testing.T) {
 	}
 }
 
+func TestARevertRunIsPricedAtNothing(t *testing.T) {
+	t.Parallel()
+
+	harness := newHarness(t, 2)
+	reverting := run.StepDef{
+		Name:     run.RevertStep,
+		Produces: []run.ArtifactKind{run.ArtifactRevertResult},
+		Run:      func(context.Context, *run.StepContext) (run.Result, error) { return run.Result{}, nil },
+	}
+	engine := harness.engine(t, mustRegister(t, reverting))
+
+	record := harness.newRun(run.RevertRecipe())
+	record.Kind = run.KindRevert
+
+	estimate, err := engine.EstimateRun(t.Context(), record, harness.specs.spec)
+	if err != nil {
+		t.Fatalf("EstimateRun: %v", err)
+	}
+	if estimate.Tokens != 0 || estimate.USD != 0 || len(estimate.Findings) != 0 {
+		t.Fatalf("a revert is priced at %+v, want nothing", estimate)
+	}
+}
+
 func TestATokenBudgetPausesTheRun(t *testing.T) {
 	t.Parallel()
 

@@ -198,10 +198,11 @@ func TestTheShippedStepsRegisterInRecipeOrder(t *testing.T) {
 	}
 
 	names := registry.Names()
-	want := make([]string, 0, len(run.StepNames()))
+	want := make([]string, 0, len(run.StepNames())+1)
 	for _, declared := range run.StepNames() {
 		want = append(want, string(declared))
 	}
+	want = append(want, run.RevertStep)
 	if len(names) != len(want) {
 		t.Fatalf("the registry holds %v", names)
 	}

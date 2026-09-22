@@ -12,6 +12,7 @@ import {
     pauseRun,
     resumeRun,
     retryStep,
+    revertRun,
     startRun,
 } from "../endpoints/runs.js";
 import { keys } from "../keys.js";
@@ -152,6 +153,18 @@ export function useResumeRun() {
 
 export function useCancelRun() {
     return useRunControl((request: Parameters<typeof cancelRun>[0]) => cancelRun(request));
+}
+
+export function useRevertRun() {
+    const client = useQueryClient();
+    return useMutation({
+        mutationFn: (request: Parameters<typeof revertRun>[0]) => revertRun(request),
+        onSuccess: (answered) => {
+            ensureLog(answered.runId);
+            void catchUpNow(answered.runId);
+            void client.invalidateQueries({ queryKey: keys.runs.lists() });
+        },
+    });
 }
 
 export function useRetryStep() {

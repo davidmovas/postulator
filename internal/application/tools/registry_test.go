@@ -76,6 +76,7 @@ func registered() []string {
 		"runs_resume",
 		"runs_cancel",
 		"runs_retry_step",
+		"runs_revert",
 		"sync_site",
 		"sync_check_plugin",
 		"reports_site_overview",
@@ -155,6 +156,53 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 			t.Errorf("%s is registered twice", name)
 		}
 		seen[name] = struct{}{}
+	}
+}
+
+const (
+	schemaCeilingBytes = 77775
+	charactersPerToken = 4
+)
+
+type sentTool struct {
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
+	Parameters  *llm.Schema `json:"parameters"`
+}
+
+func schemaBytes(t *testing.T, tool tools.Tool) int {
+	t.Helper()
+
+	encoded, err := json.Marshal(sentTool{
+		Name: tool.Def.Name, Description: tool.Def.Description, Parameters: tool.Def.Schema,
+	})
+	if err != nil {
+		t.Fatalf("encode the schema of %s: %v", tool.Def.Name, err)
+	}
+	return len(encoded)
+}
+
+func TestTheToolSchemasFitTheirCeiling(t *testing.T) {
+	t.Parallel()
+
+	registry := newRegistry(&actionRecorder{}, &busRecorder{})
+	built := registry.Build(tools.Binding{SiteID: "site-1", Mode: agent.ModeAutonomous})
+
+	total, widest, name := 0, 0, ""
+	for _, tool := range built {
+		measured := schemaBytes(t, tool)
+		total += measured
+		if measured > widest {
+			widest, name = measured, tool.Def.Name
+		}
+	}
+
+	t.Logf("%d tools, %d bytes of schema, about %d tokens; the widest is %s at %d bytes",
+		len(built), total, total/charactersPerToken, name, widest)
+
+	if total > schemaCeilingBytes {
+		t.Fatalf("the tool schemas grew to %d bytes, over the %d this build allows; "+
+			"every round of every turn resends all of it", total, schemaCeilingBytes)
 	}
 }
 

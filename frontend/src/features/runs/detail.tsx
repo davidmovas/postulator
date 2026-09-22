@@ -119,7 +119,14 @@ export function RunDetailScreen(): ReactElement {
                 </span>
             }
             variant="split"
-            actions={<RunControls run={run} />}
+            actions={
+                <RunControls
+                    run={run}
+                    onReverted={(revertRunId) => {
+                        void navigate(`/s/${siteId}/runs/${revertRunId}`);
+                    }}
+                />
+            }
             toolbar={
                 <Toolbar label={copy.runs.detail.header(kindLabel(run.kind))}>
                     <Link

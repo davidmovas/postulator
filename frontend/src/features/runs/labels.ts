@@ -22,6 +22,7 @@ import {
     DescriptionIcon,
     ErrorIcon,
     GavelIcon,
+    HistoryIcon,
     HistoryToggleOffIcon,
     HourglassEmptyIcon,
     LinkIcon,
@@ -40,6 +41,8 @@ import {
     WarningIcon,
 } from "../../ui/index.js";
 import type { LinkClass } from "./artifacts.js";
+
+const revertStepName = "revert";
 
 const statusTones: Readonly<Record<RunStatus, Tone>> = {
     pending: "muted",
@@ -74,6 +77,9 @@ export function statusLabel(status: string): string {
 }
 
 export function stepLabel(step: string): string {
+    if (step === revertStepName) {
+        return copy.runs.revertStep;
+    }
     return isOneOf(stepNames, step) ? copy.runs.steps[step] : step;
 }
 
@@ -181,6 +187,7 @@ const artifactIcons: Readonly<Record<ArtifactKind, IconComponent>> = {
     relink_result: SyncAltIcon,
     sync_result: SyncAltIcon,
     final_report: MonitoringIcon,
+    revert_result: HistoryIcon,
 };
 
 export function artifactLabel(kind: string): string {
