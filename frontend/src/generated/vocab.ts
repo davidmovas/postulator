@@ -64,6 +64,8 @@ export const runKinds = [
 ] as const;
 export type RunKind = (typeof runKinds)[number];
 
+export const runKindsWithTheirOwnRecipe: readonly RunKind[] = ["relink", "sync", "repair", "revert"];
+
 export const runStatuses = [
     "pending",
     "running",

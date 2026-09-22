@@ -54,7 +54,18 @@ func catalog() []vocabulary {
 			export: "linkAuditSkipReasons", tsType: "LinkAuditSkipReason", pkg: "internal/application/reports",
 			typeName: "SkipReason",
 		},
-		{export: "runKinds", tsType: "RunKind", pkg: "internal/domain/run", typeName: "Kind"},
+		{
+			export: "runKinds", tsType: "RunKind", pkg: "internal/domain/run", typeName: "Kind",
+			derived: []derivation{
+				{
+					export: "runKindsWithTheirOwnRecipe",
+					keep: func(value string) bool {
+						_, owns := run.Kind(value).Recipe()
+						return owns
+					},
+				},
+			},
+		},
 		{
 			export: "runStatuses", tsType: "RunStatus", pkg: "internal/domain/run", typeName: "Status",
 			derived: []derivation{

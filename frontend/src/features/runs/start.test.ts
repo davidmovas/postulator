@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { runKinds } from "../../generated/vocab.js";
-import { kindDoes, tokenCapOf } from "./start.js";
+import { runKinds, runKindsWithTheirOwnRecipe } from "../../generated/vocab.js";
+import { kindDoes, takesATemplate, tokenCapOf } from "./start.js";
 
 describe("what the drawer says a kind does", () => {
     it("has one sentence for every kind a run can be", () => {
@@ -41,3 +41,22 @@ describe("the token cap the drawer sends", () => {
         });
     }
 });
+
+describe("the template select the drawer offers", () => {
+    it("is offered for a kind that takes a template's recipe", () => {
+        for (const kind of runKinds) {
+            if ((runKindsWithTheirOwnRecipe as readonly string[]).includes(kind)) {
+                continue;
+            }
+            expect(takesATemplate(kind), kind).toBe(true);
+        }
+    });
+
+    it("is hidden for every kind that names its own steps", () => {
+        expect(runKindsWithTheirOwnRecipe.length).toBeGreaterThan(0);
+        for (const kind of runKindsWithTheirOwnRecipe) {
+            expect(takesATemplate(kind), kind).toBe(false);
+        }
+    });
+});
+

@@ -8,7 +8,7 @@ import { useEstimateRun, useStartRun } from "../../data/hooks/runs.js";
 import { useTemplates } from "../../data/hooks/templates.js";
 import type { Estimate } from "../../data/types.js";
 import { tokens as formatTokens, usd as formatUsd } from "../../domain/format.js";
-import { publishModes, runKinds } from "../../generated/vocab.js";
+import { publishModes, runKinds, runKindsWithTheirOwnRecipe } from "../../generated/vocab.js";
 import type { SelectOption } from "../../ui/index.js";
 import {
     Banner,
@@ -46,6 +46,11 @@ export function kindDoes(kind: string): string {
     const said: Record<string, string> = copy.runs.start.kindDoes;
     return said[kind] ?? "";
 }
+
+export function takesATemplate(kind: string): boolean {
+    return !(runKindsWithTheirOwnRecipe as readonly string[]).includes(kind);
+}
+
 
 export interface StartRunDrawerProps {
     open: boolean;
@@ -223,19 +228,21 @@ export function StartRunDrawer({
                     </Field>
                 </div>
 
-                <Field label={copy.runs.start.template} tooltip={copy.runs.start.templateHint}>
-                    {(control) => (
-                        <Select
-                            id={control.id}
-                            value={templateId === templateAuto ? templateAutoValue : templateId}
-                            options={templateOptions}
-                            onValueChange={(next) => {
-                                setTemplateId(next === templateAutoValue ? templateAuto : next);
-                                forget();
-                            }}
-                        />
-                    )}
-                </Field>
+                {takesATemplate(kind) ? (
+                    <Field label={copy.runs.start.template} tooltip={copy.runs.start.templateHint}>
+                        {(control) => (
+                            <Select
+                                id={control.id}
+                                value={templateId === templateAuto ? templateAutoValue : templateId}
+                                options={templateOptions}
+                                onValueChange={(next) => {
+                                    setTemplateId(next === templateAutoValue ? templateAuto : next);
+                                    forget();
+                                }}
+                            />
+                        )}
+                    </Field>
+                ) : null}
 
                 <div className="grid grid-cols-2 gap-2">
                     <Field

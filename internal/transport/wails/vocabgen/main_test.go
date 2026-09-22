@@ -117,7 +117,8 @@ func TestTheDerivedGroupingsReadTheirGoPredicates(t *testing.T) {
 		"blockingImportFindingCodes": {
 			"bad_path", "unknown_parent", "unknown_related", "self_edge", "cycle",
 		},
-		"offGraphLinkClasses": {"self", "external", "unknown_internal"},
+		"offGraphLinkClasses":        {"self", "external", "unknown_internal"},
+		"runKindsWithTheirOwnRecipe": {"relink", "sync", "repair", "revert"},
 	}
 
 	seen := make(map[string][]string)
