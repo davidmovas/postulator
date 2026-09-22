@@ -308,7 +308,7 @@ func (c *Core) build(ctx context.Context, key []byte) (kit, error) {
 
 	sitesService := sites.New(siteRepo, secretStore, store, wordpress, relay, now)
 	graphService := graph.New(graph.Deps{
-		Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Pages: pageRepo,
+		Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Pages: pageRepo, Work: itemRepo,
 		Profiles: modelProfiles, LLM: client, UnitOfWork: store, Publisher: relay, Clock: now,
 	})
 	pagesService := pages.New(pageRepo, linkRepo, entityRepo, siteRepo, store, relay, now, previewIssuer{clients: wordpress})

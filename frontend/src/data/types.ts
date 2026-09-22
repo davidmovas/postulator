@@ -41,6 +41,7 @@ export type PageFilter = ListFilter<PagesModels.ListRequest>;
 export type Entity = Wire<GraphModels.Entity>;
 export type Edge = Wire<GraphModels.Edge>;
 export type Anchor = Wire<GraphModels.Anchor>;
+export type EntityPage = Wire<GraphModels.EntityPage>;
 export type EntityFilter = ListFilter<GraphModels.ListEntitiesRequest>;
 export type EdgeFilter = ListFilter<GraphModels.ListEdgesRequest>;
 

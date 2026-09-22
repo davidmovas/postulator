@@ -43,3 +43,24 @@ describe("isolate", () => {
         expect(ids(isolate(index, new Set()))).toStrictEqual([]);
     });
 });
+
+describe("matchedSet over page states", () => {
+    const stated = buildGraphIndex(potteryEntities, potteryEdges, [
+        { entityId: "pottery", pageId: "p1", path: "/pottery/", status: "published", work: "", mismatch: false },
+        { entityId: "mugs", pageId: "p2", path: "/pottery/mugs/", status: "published", work: "", mismatch: true },
+        { entityId: "care", pageId: "p3", path: "/care/", status: "planned", work: "", mismatch: false },
+    ]);
+
+    it("keeps only the nodes in the chosen states", () => {
+        expect([...matchedSet(stated, "all", null, ["mismatch"])]).toStrictEqual(["mugs"]);
+        expect([...matchedSet(stated, "all", null, ["published", "planned"])].sort()).toStrictEqual(["care", "pottery"]);
+    });
+
+    it("ignores the state filter when none is chosen", () => {
+        expect(matchedSet(stated, "all", null, []).size).toBe(potteryEntities.length);
+    });
+
+    it("asks for both the kind and the state", () => {
+        expect([...matchedSet(stated, "all", new Set(["hub"]), ["published"])]).toStrictEqual(["pottery"]);
+    });
+});

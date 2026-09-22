@@ -89,7 +89,7 @@ export function GraphScreen(): ReactElement {
     const auditPages = useMemo(() => (query.proof ? (audit.data?.pages ?? null) : null), [query.proof, audit.data]);
     const tint = useMemo(() => (auditPages === null ? null : tintByEntity(auditPages)), [auditPages]);
 
-    const index = useMemo(() => buildGraphIndex(graph.data?.entities ?? [], graph.data?.edges ?? []), [graph.data]);
+    const index = useMemo(() => buildGraphIndex(graph.data?.entities ?? [], graph.data?.edges ?? [], graph.data?.pages ?? []), [graph.data]);
     const previous = useRef(index);
 
     useEffect(() => {
@@ -165,7 +165,7 @@ export function GraphScreen(): ReactElement {
 
     const kinds = useMemo(() => new Set(query.kinds), [query.kinds]);
     const lensActive = query.lens !== "all" || kinds.size > 0;
-    const matched = useMemo(() => (lensActive ? matchedSet(index, query.lens, kinds) : null), [index, query.lens, kinds, lensActive]);
+    const matched = useMemo(() => (lensActive ? matchedSet(index, query.lens, kinds, query.states) : null), [index, query.lens, kinds, lensActive]);
     const kept = useMemo(() => (query.isolate && matched !== null ? isolate(index, matched) : null), [index, matched, query.isolate]);
     const visible = useMemo(() => visibleRows(index, fold, session.order), [index, fold, session.order]);
     const rows = useMemo(() => pruneRows(visible, kept), [visible, kept]);

@@ -69,7 +69,59 @@ func (s *Service) LoadGraph(ctx context.Context, req LoadGraphRequest) (LoadGrap
 	if err != nil {
 		return LoadGraphResponse{}, err
 	}
-	return LoadGraphResponse{Entities: entityViews(g.Entities()), Edges: edgeViews(g.Edges())}, nil
+	states, err := s.pageStates(ctx, req.SiteID)
+	if err != nil {
+		return LoadGraphResponse{}, err
+	}
+	return LoadGraphResponse{
+		Entities: entityViews(g.Entities()), Edges: edgeViews(g.Edges()), Pages: states,
+	}, nil
+}
+
+func (s *Service) pageStates(ctx context.Context, siteID string) ([]EntityPage, error) {
+	pages, err := s.pages.ListBySite(ctx, siteID)
+	if err != nil {
+		return nil, err
+	}
+	working, err := s.inFlight(ctx, siteID)
+	if err != nil {
+		return nil, err
+	}
+
+	states := make([]EntityPage, 0, len(pages))
+	for i := range pages {
+		if pages[i].EntityID == nil {
+			continue
+		}
+		states = append(states, EntityPage{
+			EntityID: *pages[i].EntityID,
+			PageID:   pages[i].ID,
+			Path:     pages[i].Path,
+			Status:   string(pages[i].Status),
+			Work:     working[pages[i].ID],
+			Mismatch: len(pages[i].Mismatches()) > 0,
+		})
+	}
+	return states, nil
+}
+
+func (s *Service) inFlight(ctx context.Context, siteID string) (map[string]string, error) {
+	if s.work == nil {
+		return map[string]string{}, nil
+	}
+	items, err := s.work.ActiveBySite(ctx, siteID)
+	if err != nil {
+		return nil, err
+	}
+
+	working := make(map[string]string, len(items))
+	for i := range items {
+		if _, seen := working[items[i].TargetID]; seen {
+			continue
+		}
+		working[items[i].TargetID] = string(items[i].Status)
+	}
+	return working, nil
 }
 
 func (s *Service) checkAcyclic(ctx context.Context, candidate graphdomain.Edge) error {

@@ -1,4 +1,16 @@
-import type { Edge, Entity } from "../../../data/types.js";
+import type { Edge, Entity, EntityPage } from "../../../data/types.js";
+
+export type NodeState = "mismatch" | "working" | "published" | "exists" | "planned" | "archived" | "noPage";
+
+export const nodeStates: readonly NodeState[] = [
+    "mismatch",
+    "working",
+    "published",
+    "exists",
+    "planned",
+    "archived",
+    "noPage",
+];
 
 export interface RelatedLink {
     edgeId: string;
@@ -21,6 +33,7 @@ export interface GraphCounts {
     proposedEdges: number;
     ai: number;
     multiParent: number;
+    states: Readonly<Record<NodeState, number>>;
 }
 
 export interface GraphIndex {
@@ -39,7 +52,30 @@ export interface GraphIndex {
     subtreeCount: ReadonlyMap<string, number>;
     depth: ReadonlyMap<string, number>;
     problems: ReadonlyMap<string, EntityProblems>;
+    pageState: ReadonlyMap<string, EntityPage>;
     counts: GraphCounts;
+}
+
+export function nodeStateOf(index: GraphIndex, id: string): NodeState {
+    const page = index.pageState.get(id);
+    if (page === undefined) {
+        return "noPage";
+    }
+    if (page.mismatch) {
+        return "mismatch";
+    }
+    if (page.work !== "") {
+        return "working";
+    }
+    switch (page.status) {
+        case "published":
+        case "exists":
+        case "planned":
+        case "archived":
+            return page.status;
+        default:
+            return "noPage";
+    }
 }
 
 export function compareNames(left: string, right: string): number {
@@ -114,7 +150,19 @@ function breakCycles(placement: Map<string, string>, proposed: Set<string>): voi
     }
 }
 
-export function buildGraphIndex(entities: readonly Entity[], edges: readonly Edge[]): GraphIndex {
+export function buildGraphIndex(
+    entities: readonly Entity[],
+    edges: readonly Edge[],
+    pages: readonly EntityPage[] = [],
+): GraphIndex {
+    const pageState = new Map<string, EntityPage>();
+    for (const state of pages) {
+        const held = pageState.get(state.entityId);
+        if (held === undefined || rank(state) > rank(held)) {
+            pageState.set(state.entityId, state);
+        }
+    }
+
     const byId = new Map<string, Entity>();
     for (const held of entities) {
         byId.set(held.id, held);
@@ -219,7 +267,13 @@ export function buildGraphIndex(entities: readonly Entity[], edges: readonly Edg
     }
 
     const problems = new Map<string, EntityProblems>();
-    const counts: GraphCounts = { total: byId.size, noPage: 0, orphan: 0, proposedEdges: proposedEdges.length, ai: 0, multiParent: 0 };
+    const states: Record<NodeState, number> = {
+        mismatch: 0, working: 0, published: 0, exists: 0, planned: 0, archived: 0, noPage: 0,
+    };
+    const counts: GraphCounts = {
+        total: byId.size, noPage: 0, orphan: 0, proposedEdges: proposedEdges.length, ai: 0, multiParent: 0,
+        states,
+    };
     for (const held of byId.values()) {
         const approved = approvedParents.get(held.id) ?? [];
         const flags: EntityProblems = {
@@ -235,7 +289,7 @@ export function buildGraphIndex(entities: readonly Entity[], edges: readonly Edg
         counts.ai += held.source === "ai" ? 1 : 0;
     }
 
-    return {
+    const built: GraphIndex = {
         entities,
         edges,
         byId,
@@ -251,6 +305,21 @@ export function buildGraphIndex(entities: readonly Entity[], edges: readonly Edg
         subtreeCount,
         depth,
         problems,
+        pageState,
         counts,
     };
+    for (const id of byId.keys()) {
+        states[nodeStateOf(built, id)] += 1;
+    }
+    return built;
+}
+
+function rank(state: EntityPage): number {
+    if (state.mismatch) {
+        return 3;
+    }
+    if (state.work !== "") {
+        return 2;
+    }
+    return state.status === "published" ? 1 : 0;
 }

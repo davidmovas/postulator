@@ -17,7 +17,8 @@ import type { Severity } from "../../links/model/audit.js";
 import { entityIcon, kindTone } from "../labels.js";
 import type { FoldState, VisibleRow } from "../model/fold.js";
 import { childLimit, treeOf } from "../model/fold.js";
-import type { GraphIndex } from "../model/index.js";
+import { nodeStateOf } from "../model/index.js";
+import type { GraphIndex, NodeState } from "../model/index.js";
 import { detailOf, labelled } from "../model/lod.js";
 import { move } from "../model/navigation.js";
 import type { NavKey } from "../model/navigation.js";
@@ -295,6 +296,24 @@ export function GraphMap({
         }
         const proofFill: Readonly<Record<Severity, string>> = { ok: colors.okSoft, warn: colors.warnSoft, danger: colors.dangerSoft, muted: colors.mutedSoft };
         const proofStroke: Readonly<Record<Severity, string>> = { ok: colors.ok, warn: colors.warn, danger: colors.danger, muted: colors.hairline };
+        const stateFill: Readonly<Record<NodeState, string>> = {
+            mismatch: colors.dangerSoft,
+            working: colors.accentSoft,
+            published: colors.okSoft,
+            exists: colors.warnSoft,
+            planned: colors.infoSoft,
+            archived: colors.mutedSoft,
+            noPage: colors.inset,
+        };
+        const stateStroke: Readonly<Record<NodeState, string>> = {
+            mismatch: colors.danger,
+            working: colors.accent,
+            published: colors.ok,
+            exists: colors.warn,
+            planned: colors.info,
+            archived: colors.muted,
+            noPage: colors.hairline,
+        };
         const detail = detailOf(current.k);
         const seen = visibleWorld(current, area);
         const reach = { x: seen.x - 640, y: seen.y - rowHeight * 2, width: seen.width + 1280, height: seen.height + rowHeight * 4 };
@@ -443,14 +462,15 @@ export function GraphMap({
             const showLabel = labelled(detail, node.depth, row.childCount, isSelected);
 
             const grade: Severity | null = proof === null ? null : (proof.get(node.id) ?? "muted");
+            const state = nodeStateOf(graph, node.id);
             roundRect(context, node.x, node.y, node.width, node.height, 6);
             if (!showLabel) {
-                context.fillStyle = grade === null ? tone : proofStroke[grade];
+                context.fillStyle = grade !== null ? proofStroke[grade] : state === "noPage" ? tone : stateStroke[state];
                 context.globalAlpha = dim ? 0.15 : 0.4;
                 context.fill();
                 context.globalAlpha = 1;
             } else {
-                context.fillStyle = grade !== null ? proofFill[grade] : isSelected ? colors.accentSoft : isHovered ? colors.raised : colors.inset;
+                context.fillStyle = grade !== null ? proofFill[grade] : isSelected ? colors.accentSoft : isHovered ? colors.raised : stateFill[state];
                 context.fill();
             }
             if (glow > 0 && pulsing !== null && pulsing.ids.has(node.id)) {
@@ -475,6 +495,8 @@ export function GraphMap({
             } else if (graph.placementProposed.has(node.id)) {
                 context.strokeStyle = colors.info;
                 context.setLineDash([4, 3]);
+            } else if (state !== "noPage" && !isSelected && !isNeighbour) {
+                context.strokeStyle = stateStroke[state];
             } else {
                 context.strokeStyle = isSelected ? colors.accent : isNeighbour ? colors.info : colors.hairline;
             }

@@ -25,6 +25,9 @@ const (
 	selectItemsByRun    = `SELECT ` + itemColumns + ` FROM run_items WHERE run_id = ? ORDER BY created_at, id`
 	selectItemsByTarget = `SELECT ` + itemColumns + ` FROM run_items WHERE target_id = ?
 		ORDER BY created_at DESC, id DESC LIMIT ?`
+	selectActiveItems = `SELECT ` + itemColumns + ` FROM run_items
+		WHERE site_id = ? AND status IN ('pending', 'running', 'waiting', 'paused')
+		ORDER BY updated_at DESC, id`
 	selectDueItems = `SELECT ` + itemColumns + ` FROM run_items
 		WHERE status = 'waiting' AND wake_at IS NOT NULL AND wake_at <= ? ORDER BY wake_at, id LIMIT ?`
 	selectStalledItems = `SELECT ` + itemColumns + ` FROM run_items
@@ -127,6 +130,11 @@ func (r *RunItemRepo) Stalled(ctx context.Context, now time.Time, limit int) ([]
 func (r *RunItemRepo) Runnable(ctx context.Context, now time.Time, limit int) ([]run.Item, error) {
 	return selectAll(ctx, r.store.execFrom(ctx), selectRunnableItems, []any{formatTime(now), limit}, scanItem,
 		"list the runnable run items")
+}
+
+func (r *RunItemRepo) ActiveBySite(ctx context.Context, siteID string) ([]run.Item, error) {
+	return selectAll(ctx, r.store.execFrom(ctx), selectActiveItems, []any{siteID}, scanItem,
+		"list the run items still in flight")
 }
 
 func (r *RunItemRepo) Requeue(ctx context.Context, id string, expectSeq int64, from run.Status, now time.Time) (bool, error) {

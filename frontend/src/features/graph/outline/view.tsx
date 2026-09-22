@@ -4,7 +4,6 @@ import { copy } from "../../../copy/index.js";
 import {
     Button,
     CallSplitIcon,
-    CheckIcon,
     ChevronRightIcon,
     CountBadge,
     cx,
@@ -17,9 +16,10 @@ import {
     toneClasses,
     VirtualRows,
 } from "../../../ui/index.js";
-import { entityIcon, formatScore, kindTone } from "../labels.js";
+import { entityIcon, formatScore, kindTone, stateLabel, stateTone } from "../labels.js";
 import type { VisibleRow } from "../model/fold.js";
 import { childLimit } from "../model/fold.js";
+import { nodeStateOf } from "../model/index.js";
 import type { GraphIndex } from "../model/index.js";
 import { move } from "../model/navigation.js";
 import type { NavKey } from "../model/navigation.js";
@@ -95,6 +95,7 @@ export function OutlineView({ siteId, index, rows, selectedId, matched, onSelect
         }
         const entity = index.byId.get(held.id);
         const flags = index.problems.get(held.id);
+        const state = nodeStateOf(index, held.id);
         const Icon = entityIcon(entity?.kind ?? "");
         const dim = matched !== null && !matched.has(held.id);
         return (
@@ -137,15 +138,14 @@ export function OutlineView({ siteId, index, rows, selectedId, matched, onSelect
                     {entity === undefined ? "" : formatScore(entity.score)}
                 </TableCell>
                 <TableCell>
-                    {flags?.noPage ? (
+                    {state === "noPage" ? (
                         <StatusBadge tone="danger" icon={LinkOffIcon} dot={false}>
                             {copy.graph.outline.noPage}
                         </StatusBadge>
                     ) : (
-                        <span className="flex items-center gap-1 text-2xs text-ink-dim">
-                            <CheckIcon size={12} className="shrink-0 text-ok" />
-                            {copy.graph.outline.page}
-                        </span>
+                        <StatusBadge tone={stateTone(state)} dot={true}>
+                            {stateLabel(state)}
+                        </StatusBadge>
                     )}
                 </TableCell>
                 <TableCell>

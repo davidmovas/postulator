@@ -132,8 +132,9 @@ type LoadGraphRequest struct {
 }
 
 type LoadGraphResponse struct {
-	Entities []Entity `json:"entities"`
-	Edges    []Edge   `json:"edges"`
+	Entities []Entity     `json:"entities"`
+	Edges    []Edge       `json:"edges"`
+	Pages    []EntityPage `json:"pages"`
 }
 
 type RecomputeScoresRequest struct {

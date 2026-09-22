@@ -3,6 +3,7 @@ import type { EntityKind } from "../../generated/vocab.js";
 import { entityKinds, isOneOf } from "../../generated/vocab.js";
 import type { Tone } from "../../ui/index.js";
 import { entityIcon } from "../pages/labels.js";
+import type { NodeState } from "./model/index.js";
 import type { Lens } from "./model/lens.js";
 
 export { entityIcon };
@@ -49,4 +50,22 @@ export function formatScore(score: number): string {
 
 export function scored(entities: readonly { score: number }[]): boolean {
     return entities.some((entity) => entity.score > 0);
+}
+
+const stateTones: Readonly<Record<NodeState, Tone>> = {
+    mismatch: "danger",
+    working: "accent",
+    published: "ok",
+    exists: "warn",
+    planned: "info",
+    archived: "muted",
+    noPage: "muted",
+};
+
+export function stateTone(state: NodeState): Tone {
+    return stateTones[state];
+}
+
+export function stateLabel(state: NodeState): string {
+    return copy.graph.legend.state[state];
 }

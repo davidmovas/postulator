@@ -92,6 +92,15 @@ export function Legend({ open, proof, onToggle }: LegendProps): ReactElement {
                             );
                         })}
                     </Group>
+                    <Group title={said.states}>
+                        <Row swatch={<Pill className="border-danger bg-danger-soft" />} label={said.state.mismatch} />
+                        <Row swatch={<Pill className="border-accent bg-accent-soft" />} label={said.state.working} />
+                        <Row swatch={<Pill className="border-ok bg-ok-soft" />} label={said.state.published} />
+                        <Row swatch={<Pill className="border-warn bg-warn-soft" />} label={said.state.exists} />
+                        <Row swatch={<Pill className="border-info bg-info-soft" />} label={said.state.planned} />
+                        <Row swatch={<Pill className="border-muted bg-muted-soft" />} label={said.state.archived} />
+                        <Row swatch={<Pill className="border-hairline" />} label={said.state.noPage} />
+                    </Group>
                     <Group title={said.nodes}>
                         <Row swatch={<Pill className="border-hairline" />} label={said.plain} />
                         <Row swatch={<Pill className="border-dashed border-danger" />} label={said.noPage} />

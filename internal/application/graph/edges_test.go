@@ -7,10 +7,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/adapters/sqlite"
+	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/graph"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
 func (h harness) edge(t *testing.T, from, to, kind, status string) graph.Edge {
@@ -233,5 +237,59 @@ func TestLoadGraphAndRecomputeScores(t *testing.T) {
 	}
 	if _, err = h.service.RecomputeScores(t.Context(), graph.RecomputeScoresRequest{}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("missing site code = %q, want INVALID", errors.CodeOf(err))
+	}
+}
+
+func TestLoadGraphCarriesTheStateOfEveryMappedPage(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	hub := h.entity(t, "Components", "hub")
+	topic := h.entity(t, "Range", "topic")
+	h.entity(t, "Unmapped", "topic")
+
+	repo := sqlite.NewPageRepo(h.store)
+	wpID := int64(42)
+	pages := []pagemap.Page{
+		{
+			ID: id.New(), SiteID: h.siteID, Path: "/components/", Slug: "components", WPType: pagemap.WPPage,
+			Status: pagemap.StatusPublished, EntityID: &hub.ID, WPID: &wpID,
+			Observed:  pagemap.Observed{Link: "https://shop.example.com/components/", Slug: "components", Status: "publish"},
+			CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+		},
+		{
+			ID: id.New(), SiteID: h.siteID, Path: "/components/batteries/range/", Slug: "range", WPType: pagemap.WPPage,
+			Status: pagemap.StatusPublished, EntityID: &topic.ID,
+			Observed:  pagemap.Observed{Link: "https://shop.example.com/range/", Slug: "range", Status: "publish"},
+			CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+		},
+	}
+	for _, page := range pages {
+		if err := repo.Insert(t.Context(), page); err != nil {
+			t.Fatalf("insert %s: %v", page.Path, err)
+		}
+	}
+
+	loaded, err := h.service.LoadGraph(t.Context(), graph.LoadGraphRequest{SiteID: h.siteID})
+	if err != nil {
+		t.Fatalf("LoadGraph: %v", err)
+	}
+	if len(loaded.Pages) != 2 {
+		t.Fatalf("the graph carries %d page states, want one per mapped page", len(loaded.Pages))
+	}
+
+	byEntity := make(map[string]graph.EntityPage, len(loaded.Pages))
+	for _, state := range loaded.Pages {
+		byEntity[state.EntityID] = state
+	}
+	if state := byEntity[hub.ID]; state.Status != "published" || state.Mismatch {
+		t.Errorf("the hub page state = %+v, want a published page the site agrees with", state)
+	}
+	flat := byEntity[topic.ID]
+	if !flat.Mismatch || flat.Path != "/components/batteries/range/" {
+		t.Fatalf("the flattened page state = %+v, want the disagreement reported", flat)
+	}
+	if flat.Work != "" {
+		t.Errorf("the page state = %+v, want no work in flight", flat)
 	}
 }

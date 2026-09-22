@@ -10,6 +10,7 @@ import (
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -45,6 +46,10 @@ type pageStore interface {
 	Update(ctx context.Context, p pagemap.Page) error
 }
 
+type workReader interface {
+	ActiveBySite(ctx context.Context, siteID string) ([]run.Item, error)
+}
+
 type profileResolver interface {
 	Resolve(ctx context.Context, siteID string, role domainllm.Role, templateProfiles map[domainllm.Role]domainllm.ModelRef) (domainllm.ModelRef, error)
 }
@@ -58,6 +63,7 @@ type Deps struct {
 	Edges      edgeStore
 	Sites      siteReader
 	Pages      pageStore
+	Work       workReader
 	Profiles   profileResolver
 	LLM        llm.Client
 	UnitOfWork unitOfWork
@@ -70,6 +76,7 @@ type Service struct {
 	edges     edgeStore
 	sites     siteReader
 	pages     pageStore
+	work      workReader
 	profiles  profileResolver
 	llm       llm.Client
 	uow       unitOfWork
@@ -79,7 +86,7 @@ type Service struct {
 
 func New(deps Deps) *Service {
 	return &Service{
-		entities: deps.Entities, edges: deps.Edges, sites: deps.Sites, pages: deps.Pages,
+		entities: deps.Entities, edges: deps.Edges, sites: deps.Sites, pages: deps.Pages, work: deps.Work,
 		profiles: deps.Profiles, llm: deps.LLM, uow: deps.UnitOfWork, publisher: deps.Publisher,
 		clock: deps.Clock,
 	}

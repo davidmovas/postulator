@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { edge, entity, potteryEdges, potteryEntities } from "./fixture.js";
-import { buildGraphIndex } from "./index.js";
+import { buildGraphIndex, nodeStateOf } from "./index.js";
 
 const index = buildGraphIndex(potteryEntities, potteryEdges);
 
@@ -43,7 +43,10 @@ describe("buildGraphIndex", () => {
     });
 
     it("totals the problems for the site", () => {
-        expect(index.counts).toStrictEqual({ total: 10, noPage: 2, orphan: 2, proposedEdges: 3, ai: 2, multiParent: 1 });
+        expect(index.counts).toStrictEqual({
+            total: 10, noPage: 2, orphan: 2, proposedEdges: 3, ai: 2, multiParent: 1,
+            states: { mismatch: 0, working: 0, published: 0, exists: 0, planned: 0, archived: 0, noPage: 10 },
+        });
     });
 
     it("lists related links from both ends, strongest first", () => {
@@ -80,5 +83,38 @@ describe("buildGraphIndex", () => {
         const empty = buildGraphIndex([], []);
         expect(empty.roots).toStrictEqual([]);
         expect(empty.counts.total).toBe(0);
+    });
+});
+
+describe("node state", () => {
+    const states = buildGraphIndex(potteryEntities, potteryEdges, [
+        { entityId: "pottery", pageId: "page-pottery", path: "/pottery/", status: "published", work: "", mismatch: false },
+        { entityId: "mugs", pageId: "page-mugs", path: "/pottery/mugs/", status: "published", work: "", mismatch: true },
+        { entityId: "stone", pageId: "page-stone", path: "/pottery/stone/", status: "exists", work: "running", mismatch: false },
+        { entityId: "care", pageId: "page-care", path: "/care/", status: "planned", work: "", mismatch: false },
+    ]);
+
+    it("reads the state of a node from its page", () => {
+        expect(nodeStateOf(states, "pottery")).toBe("published");
+        expect(nodeStateOf(states, "care")).toBe("planned");
+    });
+
+    it("puts a disagreement with the site above everything else", () => {
+        expect(nodeStateOf(states, "mugs")).toBe("mismatch");
+    });
+
+    it("shows work in flight above the stored status", () => {
+        expect(nodeStateOf(states, "stone")).toBe("working");
+    });
+
+    it("has no page where the graph has no page", () => {
+        expect(nodeStateOf(states, "travel")).toBe("noPage");
+        expect(nodeStateOf(index, "pottery")).toBe("noPage");
+    });
+
+    it("counts the nodes of each state", () => {
+        expect(states.counts.states).toStrictEqual({
+            mismatch: 1, working: 1, published: 1, exists: 0, planned: 1, archived: 0, noPage: 6,
+        });
     });
 });
