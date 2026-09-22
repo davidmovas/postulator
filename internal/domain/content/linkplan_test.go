@@ -85,7 +85,7 @@ func TestPlanLinksReportsWhatItCannotLink(t *testing.T) {
 			t.Parallel()
 
 			fixture := tc.fixture(t)
-			plan := content.PlanLinks(fixture.g, fixture.index, tc.entityID, policy(tc.rules))
+			plan := content.PlanLinks(fixture.g, fixture.index, content.Subject{EntityID: tc.entityID}, policy(tc.rules))
 			if !reflect.DeepEqual(plan.Blocked, tc.want) {
 				t.Fatalf("blocked = %+v, want %+v", plan.Blocked, tc.want)
 			}
@@ -100,6 +100,79 @@ func TestPlanLinksReportsWhatItCannotLink(t *testing.T) {
 	}
 }
 
+func secondaryPageDAG(t *testing.T) dag {
+	t.Helper()
+
+	fixture := multiParentDAG(t)
+	pages := append(fixture.index.Pages(), page("page-review", "/reviews/gaggia/", "coffee"))
+	return dag{g: fixture.g, index: pagemap.NewIndex(pages)}
+}
+
+func TestPlanLinksBindsSelfToThePageBeingWritten(t *testing.T) {
+	t.Parallel()
+
+	fixture := secondaryPageDAG(t)
+	rules := template.LinkRules{UpDepth: 1, SiblingMinWeight: 0.95}
+
+	cases := []struct {
+		name      string
+		subject   content.Subject
+		canonical content.LinkClass
+		itself    content.LinkClass
+		extra     bool
+	}{
+		{
+			name: "the canonical page of the entity",
+			subject: content.Subject{
+				Site: pagemap.NewSite("https://shop.example.com"), PageID: "page-coffee",
+				PagePath: "/drinks/hot/coffee/", EntityID: "coffee",
+			},
+			canonical: content.ClassSelf, itself: content.ClassSelf,
+		},
+		{
+			name: "a second page mapped to the same entity",
+			subject: content.Subject{
+				Site: pagemap.NewSite("https://shop.example.com"), PageID: "page-review",
+				PagePath: "/reviews/gaggia/", EntityID: "coffee",
+			},
+			canonical: content.ClassGraph, itself: content.ClassSelf, extra: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			lc := content.PlanLinks(fixture.g, fixture.index, tc.subject, policy(rules)).Context
+			if lc.PageID != tc.subject.PageID || lc.PageURL != tc.subject.PagePath {
+				t.Fatalf("the context binds %s %s, want %s %s",
+					lc.PageID, lc.PageURL, tc.subject.PageID, tc.subject.PagePath)
+			}
+			if got := lc.Resolve("/drinks/hot/coffee/").Class; got != tc.canonical {
+				t.Errorf("the canonical page reads as %s, want %s", got, tc.canonical)
+			}
+			if got := lc.Resolve(tc.subject.PagePath).Class; got != tc.itself {
+				t.Errorf("the page itself reads as %s, want %s", got, tc.itself)
+			}
+
+			held := false
+			for _, target := range lc.Targets {
+				if target.PageID != "page-coffee" {
+					continue
+				}
+				held = true
+				if target.EntityID != "coffee" || target.Required || target.Relation != content.RelationUp ||
+					target.Depth != 0 {
+					t.Errorf("the canonical target = %+v, want an optional up link at depth zero", target)
+				}
+			}
+			if held != tc.extra {
+				t.Errorf("the canonical page is a target = %t, want %t (%v)", held, tc.extra, urls(lc.Targets))
+			}
+		})
+	}
+}
+
 func TestBuildLinkContextIsThePlanContext(t *testing.T) {
 	t.Parallel()
 
@@ -109,7 +182,7 @@ func TestBuildLinkContextIsThePlanContext(t *testing.T) {
 		{UpDepth: 1, SiblingMinWeight: 0.8},
 	} {
 		built := content.BuildLinkContext(fixture.g, fixture.index, "coffee", policy(rules))
-		planned := content.PlanLinks(fixture.g, fixture.index, "coffee", policy(rules)).Context
+		planned := content.PlanLinks(fixture.g, fixture.index, content.Subject{EntityID: "coffee"}, policy(rules)).Context
 		if !reflect.DeepEqual(built, planned) {
 			t.Fatalf("BuildLinkContext = %+v, PlanLinks.Context = %+v", built, planned)
 		}

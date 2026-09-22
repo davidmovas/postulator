@@ -248,6 +248,7 @@ func (f *factory) engine(t *testing.T) *runtime.Engine {
 		Entities: sqlite.NewEntityRepo(f.store),
 		Edges:    sqlite.NewEdgeRepo(f.store),
 		Pages:    sqlite.NewPageRepo(f.store),
+		Sites:    sqlite.NewSiteRepo(f.store),
 		Policies: specs,
 		Profiles: stubProfiles{},
 		LLM:      f.llm,

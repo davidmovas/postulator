@@ -74,34 +74,53 @@ func (c LinkContext) ByPageID(pageID string) (LinkTarget, bool) {
 	return LinkTarget{}, false
 }
 
-func BuildLinkContext(g graph.Graph, index pagemap.Index, entityID string, policy template.LinkPolicy) LinkContext {
-	return PlanLinks(g, index, entityID, policy).Context
+type Subject struct {
+	Site     pagemap.Site
+	PageID   string
+	PagePath string
+	EntityID string
 }
 
-func PlanLinks(g graph.Graph, index pagemap.Index, entityID string, policy template.LinkPolicy) LinkPlan {
+func BuildLinkContext(g graph.Graph, index pagemap.Index, entityID string, policy template.LinkPolicy) LinkContext {
+	return PlanLinks(g, index, Subject{EntityID: entityID}, policy).Context
+}
+
+func PlanLinks(g graph.Graph, index pagemap.Index, subject Subject, policy template.LinkPolicy) LinkPlan {
 	plan := LinkPlan{
-		Context: LinkContext{EntityID: entityID, Targets: make([]LinkTarget, 0)},
+		Context: LinkContext{
+			PageID: subject.PageID, PageURL: subject.PagePath, EntityID: subject.EntityID,
+			Site: subject.Site, Targets: make([]LinkTarget, 0),
+		},
 		Blocked: make([]BlockedTarget, 0),
 	}
 
-	self, known := g.Entity(entityID)
+	self, known := g.Entity(subject.EntityID)
 	if !known {
 		return plan
 	}
-	if page, ok := canonical(index, self); ok {
-		plan.Context.PageID = page.ID
-		plan.Context.PageURL = page.Path
-	}
 
 	walk := planner{
-		g: g, index: index, seen: map[string]struct{}{entityID: {}},
+		g: g, index: index, seen: map[string]struct{}{subject.EntityID: {}},
 		targets: make([]LinkTarget, 0), blocked: make([]BlockedTarget, 0),
 	}
-	walk.up(entityID, policy.Rules.UpDepth)
-	if policy.Rules.DownLinks {
-		walk.down(entityID)
+
+	page, mapped := canonical(index, self)
+	switch {
+	case subject.PageID == "" && mapped:
+		plan.Context.PageID = page.ID
+		plan.Context.PageURL = page.Path
+	case subject.PageID != "" && mapped && page.ID != subject.PageID:
+		walk.targets = append(walk.targets, LinkTarget{
+			EntityID: self.ID, PageID: page.ID, URL: page.Path, Anchors: anchorsOf(self),
+			Relation: RelationUp, Weight: 1,
+		})
 	}
-	walk.siblings(entityID, policy.Rules.SiblingMinWeight)
+
+	walk.up(subject.EntityID, policy.Rules.UpDepth)
+	if policy.Rules.DownLinks {
+		walk.down(subject.EntityID)
+	}
+	walk.siblings(subject.EntityID, policy.Rules.SiblingMinWeight)
 
 	plan.Context.Targets = walk.targets
 	plan.Blocked = walk.blocked

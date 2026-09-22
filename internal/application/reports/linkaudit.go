@@ -3,7 +3,6 @@ package reports
 import (
 	"cmp"
 	"context"
-	"net/url"
 	"slices"
 	"strings"
 
@@ -16,7 +15,7 @@ import (
 )
 
 type siteLinks struct {
-	host     string
+	site     pagemap.Site
 	policy   template.LinkPolicy
 	view     LinkPolicySummary
 	g        graph.Graph
@@ -125,8 +124,9 @@ func (s *Service) loadLinks(ctx context.Context, siteID string) (siteLinks, erro
 	_, incoming := linkSets(links)
 
 	return siteLinks{
-		host: hostOf(owner.BaseURL),
+		site: pagemap.NewSite(owner.BaseURL),
 		policy: template.LinkPolicy{
+			Rules:          effective.Policy.Rules,
 			ForbidExternal: effective.Policy.ForbidExternal,
 			ForbidSelf:     effective.Policy.ForbidSelf,
 			AnchorStrategy: template.AnchorStrategy(effective.Policy.AnchorStrategy),
@@ -179,10 +179,10 @@ func auditPage(state *siteLinks, page pagemap.Page, templateID string, rules tem
 	detail.rules = rules
 	policy := state.policy
 	policy.Rules = rules
-	plan := content.PlanLinks(state.g, state.index, *page.EntityID, policy)
+	plan := content.PlanLinks(state.g, state.index, content.Subject{
+		Site: state.site, PageID: page.ID, PagePath: page.Path, EntityID: *page.EntityID,
+	}, policy)
 	lc := plan.Context
-	lc.PageID = page.ID
-	lc.PageURL = page.Path
 	links := state.outgoing[page.ID]
 
 	for _, target := range lc.Targets {
@@ -192,7 +192,7 @@ func auditPage(state *siteLinks, page pagemap.Page, templateID string, rules tem
 			TargetPageID: target.PageID, TargetPath: target.URL,
 			AnchorsAllowed: slices.Clone(target.Anchors), Weight: target.Weight, Depth: target.Depth,
 		}
-		if link, ok := firstLinkTo(links, target, state.host); ok {
+		if link, ok := firstLinkTo(lc, links, target); ok {
 			row.Satisfied = true
 			row.Anchor = link.AnchorText
 			row.AnchorAllowed = content.AnchorAllowed(target, link.AnchorText)
@@ -242,7 +242,7 @@ func auditPage(state *siteLinks, page pagemap.Page, templateID string, rules tem
 	return detail
 }
 
-func firstLinkTo(links []pagemap.PageLink, target content.LinkTarget, host string) (pagemap.PageLink, bool) {
+func firstLinkTo(lc content.LinkContext, links []pagemap.PageLink, target content.LinkTarget) (pagemap.PageLink, bool) {
 	for i := range links {
 		if links[i].ToPageID != nil {
 			if *links[i].ToPageID == target.PageID {
@@ -250,7 +250,8 @@ func firstLinkTo(links []pagemap.PageLink, target content.LinkTarget, host strin
 			}
 			continue
 		}
-		if path, internal := pagemap.InternalPath(links[i].ToURL, host); internal && path == target.URL {
+		resolution := lc.Resolve(links[i].ToURL)
+		if resolution.Class == content.ClassGraph && resolution.Target.PageID == target.PageID {
 			return links[i], true
 		}
 	}
@@ -288,12 +289,4 @@ func linksByPage(links []pagemap.PageLink) map[string][]pagemap.PageLink {
 		})
 	}
 	return out
-}
-
-func hostOf(baseURL string) string {
-	parsed, err := url.Parse(baseURL)
-	if err != nil {
-		return ""
-	}
-	return strings.ToLower(parsed.Host)
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/reports"
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -244,27 +245,105 @@ func TestLinkAuditRefusesWhatItCannotRead(t *testing.T) {
 	}
 }
 
-func TestLinkAuditRebindsSelfToTheAuditedPage(t *testing.T) {
+func (f *fixture) plan(t *testing.T, page pagemap.Page, entityID string, rules template.LinkRules) content.LinkContext {
+	t.Helper()
+
+	entities, err := sqlite.NewEntityRepo(f.store).ListBySite(t.Context(), f.siteID)
+	if err != nil {
+		t.Fatalf("list the entities: %v", err)
+	}
+	edges, err := sqlite.NewEdgeRepo(f.store).ListBySite(t.Context(), f.siteID)
+	if err != nil {
+		t.Fatalf("list the edges: %v", err)
+	}
+	pages, err := sqlite.NewPageRepo(f.store).ListBySite(t.Context(), f.siteID)
+	if err != nil {
+		t.Fatalf("list the pages: %v", err)
+	}
+	owner, err := sqlite.NewSiteRepo(f.store).Get(t.Context(), f.siteID)
+	if err != nil {
+		t.Fatalf("read the site: %v", err)
+	}
+	built, err := graph.New(entities, edges)
+	if err != nil {
+		t.Fatalf("graph.New: %v", err)
+	}
+
+	return content.PlanLinks(built, pagemap.NewIndex(pages), content.Subject{
+		Site: pagemap.NewSite(owner.BaseURL), PageID: page.ID, PagePath: page.Path, EntityID: entityID,
+	}, template.LinkPolicy{Rules: rules, ForbidExternal: true, ForbidSelf: true}).Context
+}
+
+func TestASecondPageOfAnEntityIsAuditedAndValidatedAlike(t *testing.T) {
 	t.Parallel()
 
 	f := newFixture(t)
 	pageRepo := sqlite.NewPageRepo(f.store)
-	second := f.page(t, pageRepo, "/coffee/espresso-2/", pagemap.StatusPublished)
-	f.map_(t, pageRepo, second, f.entities["Espresso"].ID)
 	canonical := f.pages["/coffee/espresso/"]
-	f.replaceLinks(t, second,
-		f.storedLink(second, &second.ID, "/coffee/espresso-2/", "me", 0),
-		f.storedLink(second, &canonical.ID, "/coffee/espresso/", "the other", 1),
-	)
 
-	detail, err := f.service.LinkAuditPage(t.Context(), reports.LinkAuditPageRequest{PageID: second.ID})
-	if err != nil {
-		t.Fatalf("LinkAuditPage: %v", err)
+	seconds := []pagemap.Page{
+		f.page(t, pageRepo, "/coffee/espresso-2/", pagemap.StatusPublished),
+		f.page(t, pageRepo, "/reviews/gaggia/", pagemap.StatusPublished),
+		f.page(t, pageRepo, "/reviews/rancilio/", pagemap.StatusPublished),
 	}
-	if detail.Page.OffGraph != 2 || len(detail.Extra) != 2 {
-		t.Fatalf("detail = %+v", detail)
+	for i := range seconds {
+		f.map_(t, pageRepo, seconds[i], f.entities["Espresso"].ID)
+		f.replaceLinks(t, seconds[i],
+			f.storedLink(seconds[i], &seconds[i].ID, seconds[i].Path, "me", 0),
+			f.storedLink(seconds[i], &canonical.ID, "/coffee/espresso/", "Espresso", 1),
+			f.storedLink(seconds[i], nil, "https://shop.example.com/coffee/espresso/", "Espresso", 2),
+		)
 	}
-	if detail.Extra[0].Kind != "self" || detail.Extra[1].Kind != "unknown_internal" {
-		t.Fatalf("extra = %+v", detail.Extra)
+
+	for _, second := range seconds {
+		t.Run(second.Path, func(t *testing.T) {
+			detail, err := f.service.LinkAuditPage(t.Context(), reports.LinkAuditPageRequest{PageID: second.ID})
+			if err != nil {
+				t.Fatalf("LinkAuditPage: %v", err)
+			}
+
+			row, found := requiredFor(detail.Required, canonical.ID)
+			if !found || row.Required || row.Relation != "up" || !row.Satisfied {
+				t.Fatalf("the canonical page is %+v, want an optional up target already satisfied", row)
+			}
+			if detail.Page.OffGraph != 1 || len(detail.Extra) != 1 || detail.Extra[0].Kind != "self" {
+				t.Fatalf("off-graph = %+v, want the link to the page itself alone", detail.Extra)
+			}
+
+			lc := f.plan(t, second, f.entities["Espresso"].ID, detail.Rules)
+			body := `<p>Read the <a href="/coffee/espresso/">Espresso</a> page, the ` +
+				`<a href="https://shop.example.com/coffee/espresso/">Espresso</a> page again and ` +
+				`<a href="` + second.Path + `">this one</a>.</p>`
+			doc, err := content.Parse(body)
+			if err != nil {
+				t.Fatalf("parse the body: %v", err)
+			}
+
+			report := content.Compliance(doc, lc, template.LinkPolicy{
+				Rules: detail.Rules, ForbidExternal: true, ForbidSelf: true,
+			}, second.ID)
+			selfLinks, offGraph := 0, 0
+			for _, item := range report.Items {
+				switch item.Code {
+				case content.CodeSelfLink:
+					selfLinks++
+				case content.CodeExternalLink, content.CodeUnknownInternal:
+					offGraph++
+				}
+			}
+			if selfLinks != 1 || offGraph != 0 {
+				t.Fatalf("Compliance found %d self links and %d off-graph links, want 1 and 0 (%+v)",
+					selfLinks, offGraph, report.Items)
+			}
+		})
 	}
+}
+
+func requiredFor(rows []reports.RequiredLink, pageID string) (reports.RequiredLink, bool) {
+	for i := range rows {
+		if rows[i].TargetPageID == pageID {
+			return rows[i], true
+		}
+	}
+	return reports.RequiredLink{}, false
 }

@@ -40,13 +40,22 @@ func ResolveContext(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
+			owner, err := deps.Sites.Get(ctx, sc.Run.SiteID)
+			if err != nil {
+				return run.Result{}, err
+			}
 
 			g, err := graph.New(entities, edges)
 			if err != nil {
 				return run.Result{}, err
 			}
 
-			lc := content.BuildLinkContext(g, pagemap.NewIndex(pages), entity.ID, policy)
+			lc := content.PlanLinks(g, pagemap.NewIndex(pages), content.Subject{
+				Site:     pagemap.NewSite(owner.BaseURL),
+				PageID:   sc.Page.ID,
+				PagePath: sc.Page.Path,
+				EntityID: entity.ID,
+			}, policy).Context
 			blob, err := encode(lc, "link context")
 			if err != nil {
 				return run.Result{}, err
