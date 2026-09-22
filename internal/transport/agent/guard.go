@@ -6,7 +6,6 @@ import (
 	"slices"
 	"sync"
 	"time"
-	"unicode/utf8"
 
 	"github.com/gollem-dev/gollem"
 
@@ -14,17 +13,6 @@ import (
 	"github.com/davidmovas/postulator/internal/application/tools"
 	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
-)
-
-const (
-	untrustedMarker = agentapp.UntrustedMarker
-	untrustedData   = agentapp.UntrustedData
-
-	truncatedKey  = agentapp.TruncatedKey
-	previewKey    = agentapp.PreviewKey
-	totalBytesKey = agentapp.TotalBytesKey
-
-	minPreviewBytes = agentapp.MinPreviewBytes
 )
 
 type guard struct {
@@ -77,7 +65,7 @@ func (g *guard) fence() gollem.ToolMiddleware {
 			}
 
 			fenced := *resp
-			fenced.Result = map[string]any{untrustedMarker: true, untrustedData: resp.Result}
+			fenced.Result = agentapp.Fence(resp.Result)
 			return &fenced, err
 		}
 	}
@@ -131,8 +119,8 @@ func (g *guard) capResult() gollem.ToolMiddleware {
 				return resp, err
 			}
 
-			capped, cut := truncate(resp.Result, g.cap)
-			if !cut {
+			capped, shortened := agentapp.Cap(resp.Result, g.cap)
+			if !shortened {
 				return resp, err
 			}
 
@@ -146,10 +134,8 @@ func (g *guard) capResult() gollem.ToolMiddleware {
 func (g *guard) permission() gollem.ToolMiddleware {
 	return func(next gollem.ToolHandler) gollem.ToolHandler {
 		return func(ctx context.Context, req *gollem.ToolExecRequest) (*gollem.ToolExecResponse, error) {
-			if len(g.allowed) > 0 && !slices.Contains(g.allowed, req.Tool.Name) {
-				return &gollem.ToolExecResponse{
-					Error: errors.New(errors.Unauthorized, "the tool "+req.Tool.Name+" is not open to this conversation"),
-				}, nil
+			if err := agentapp.Permit(g.allowed, req.Tool.Name); err != nil {
+				return &gollem.ToolExecResponse{Error: err}, nil
 			}
 			return next(ctx, req)
 		}
@@ -166,30 +152,4 @@ func encode(value map[string]any) json.RawMessage {
 		return json.RawMessage("{}")
 	}
 	return encoded
-}
-
-func truncate(result map[string]any, limit int) (map[string]any, bool) {
-	encoded, err := json.Marshal(result)
-	if err != nil || len(encoded) <= limit {
-		return result, false
-	}
-
-	preview := max(limit/2, minPreviewBytes)
-	return map[string]any{
-		truncatedKey:  true,
-		totalBytesKey: len(encoded),
-		previewKey:    cutAtRune(string(encoded), preview),
-	}, true
-}
-
-func cutAtRune(text string, limit int) string {
-	if len(text) <= limit {
-		return text
-	}
-
-	cut := limit
-	for cut > 0 && !utf8.RuneStart(text[cut]) {
-		cut--
-	}
-	return text[:cut]
 }

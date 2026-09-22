@@ -89,32 +89,6 @@ func TestTrimDropsAHistoryThatStartsWithNoTurn(t *testing.T) {
 	}
 }
 
-func TestTruncateCutsOnlyWhatIsTooBig(t *testing.T) {
-	t.Parallel()
-
-	small := map[string]any{"ok": true}
-	if _, cut := truncate(small, 1000); cut {
-		t.Error("a small result must pass through")
-	}
-
-	big := map[string]any{"text": strings.Repeat("x", 4000)}
-	capped, cut := truncate(big, 512)
-	if !cut || capped[truncatedKey] != true || capped[totalBytesKey] == nil {
-		t.Fatalf("the capped result is %v", capped)
-	}
-
-	preview, ok := capped[previewKey].(string)
-	if !ok || preview == "" || len(preview) > 4000 {
-		t.Fatalf("the preview is %q", preview)
-	}
-	if got := cutAtRune("héllo", 2); got != "h" {
-		t.Fatalf("cutAtRune split a rune: %q", got)
-	}
-	if got := cutAtRune("short", 50); got != "short" {
-		t.Fatalf("cutAtRune = %q", got)
-	}
-}
-
 func TestObjectOfWrapsWhatIsNotAnObject(t *testing.T) {
 	t.Parallel()
 

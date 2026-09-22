@@ -151,6 +151,39 @@ func TestAnOversizedToolResultIsCappedBeforeItReachesTheModel(t *testing.T) {
 	}
 }
 
+func TestACappedListingStillDecodesAndSaysWhatWasDropped(t *testing.T) {
+	t.Parallel()
+
+	b := newBareRunner(t, 760)
+	stream := &recordingStream{}
+
+	if _, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_list{}\nFAKE: done", nil, stream)); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	settled := stream.settled()
+	if len(settled) != 1 {
+		t.Fatalf("the outcomes are %+v", settled)
+	}
+
+	var decoded struct {
+		Truncated bool           `json:"truncated"`
+		Dropped   map[string]int `json:"droppedItems"`
+		Result    struct {
+			Items []map[string]any `json:"items"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(settled[0].Result, &decoded); err != nil {
+		t.Fatalf("the capped result no longer decodes: %v (%s)", err, settled[0].Result)
+	}
+	if !decoded.Truncated {
+		t.Fatalf("the result was not cut: %s", settled[0].Result)
+	}
+	if len(decoded.Result.Items) == 0 || decoded.Dropped["items"] == 0 {
+		t.Fatalf("the capped listing is %s", settled[0].Result)
+	}
+}
+
 func TestTheFenceWrapsTheModelCopyAndTheLedgerKeepsTheRaw(t *testing.T) {
 	t.Parallel()
 

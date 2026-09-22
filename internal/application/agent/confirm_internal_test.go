@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -91,7 +92,35 @@ func TestCappedShortensOnlyWhatIsTooBig(t *testing.T) {
 	if err := json.Unmarshal(shortened, &decoded); err != nil {
 		t.Fatalf("the capped result is not readable: %v", err)
 	}
-	if decoded[TruncatedKey] != true || decoded[PreviewKey] == nil || decoded[TotalBytesKey] == nil {
+	if decoded[TruncatedKey] != true || decoded[TotalBytesKey] == nil || decoded[ResultKey] == nil {
+		t.Fatalf("the capped result is %v", decoded)
+	}
+}
+
+func TestCappedCutsAMultibyteAnswerAtARune(t *testing.T) {
+	t.Parallel()
+
+	shortened := capped(json.RawMessage(`{"body":"`+strings.Repeat("Ω", 2048)+`"}`), 512)
+
+	var decoded map[string]any
+	if err := json.Unmarshal(shortened, &decoded); err != nil {
+		t.Fatalf("the capped result is not readable: %v", err)
+	}
+	if !utf8.Valid(shortened) {
+		t.Fatalf("the capped result carries a broken rune: %s", shortened)
+	}
+}
+
+func TestCappedFallsBackToAPreviewForAnAnswerThatIsNoObject(t *testing.T) {
+	t.Parallel()
+
+	shortened := capped(json.RawMessage(`"`+strings.Repeat("a", 2048)+`"`), 512)
+
+	var decoded map[string]any
+	if err := json.Unmarshal(shortened, &decoded); err != nil {
+		t.Fatalf("the capped result is not readable: %v", err)
+	}
+	if decoded[TruncatedKey] != true || decoded[PreviewKey] == nil {
 		t.Fatalf("the capped result is %v", decoded)
 	}
 }

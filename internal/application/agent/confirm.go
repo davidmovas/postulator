@@ -126,9 +126,8 @@ func (s *Service) allowed() []string {
 
 func (s *Service) replay(ctx context.Context, conversation domainagent.Conversation,
 	action domainagent.PendingAction) (any, error) {
-	if len(s.deps.Allowed) > 0 && !slices.Contains(s.deps.Allowed, action.Tool) {
-		return nil, errors.New(errors.Unauthorized, "the tool "+action.Tool+" is not open to this conversation").
-			WithDetail("tool", action.Tool)
+	if err := Permit(s.deps.Allowed, action.Tool); err != nil {
+		return nil, err
 	}
 
 	return s.deps.Registry.Call(ctx, tools.Binding{
@@ -166,10 +165,21 @@ func capped(encoded json.RawMessage, limit int) json.RawMessage {
 		return encoded
 	}
 
-	preview := min(max(limit/2, MinPreviewBytes), len(encoded))
-	shortened, err := json.Marshal(map[string]any{
-		TruncatedKey: true, TotalBytesKey: len(encoded), PreviewKey: string(encoded[:preview]),
-	})
+	var document map[string]any
+	if json.Unmarshal(encoded, &document) != nil {
+		held, err := json.Marshal(preview(string(encoded), len(encoded), limit))
+		if err != nil {
+			return encoded
+		}
+		return held
+	}
+
+	capped, cut := Cap(document, limit)
+	if !cut {
+		return encoded
+	}
+
+	shortened, err := json.Marshal(capped)
 	if err != nil {
 		return encoded
 	}
@@ -201,7 +211,7 @@ func resumeText(tool string, result json.RawMessage, failure string) string {
 	if failure != "" {
 		return "The confirmed tool " + tool + " failed: " + failure
 	}
-	fenced, err := json.Marshal(map[string]any{UntrustedMarker: true, UntrustedData: result})
+	fenced, err := json.Marshal(Fence(result))
 	if err != nil {
 		return "The confirmed tool " + tool + " ran and answered something that cannot be read back."
 	}
