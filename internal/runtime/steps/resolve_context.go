@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 const NameResolveContext = string(run.StepResolveContext)
@@ -50,20 +51,29 @@ func ResolveContext(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			lc := content.PlanLinks(g, pagemap.NewIndex(pages), content.Subject{
+			if _, held := g.Entity(entity.ID); !held {
+				return run.Result{}, errors.New(errors.Invalid,
+					"the graph does not hold the entity "+sc.Page.Path+" is mapped to, so nothing says what it must link to").
+					WithDetail("pageId", sc.Page.ID).
+					WithDetail("path", sc.Page.Path).
+					WithDetail("entityId", entity.ID)
+			}
+
+			plan := content.PlanLinks(g, pagemap.NewIndex(pages), content.Subject{
 				Site:     pagemap.NewSite(owner.BaseURL),
 				PageID:   sc.Page.ID,
 				PagePath: sc.Page.Path,
 				EntityID: entity.ID,
-			}, policy).Context
-			blob, err := encode(lc, "link context")
+			}, policy)
+			blob, err := encode(plan.Context, "link context")
 			if err != nil {
 				return run.Result{}, err
 			}
 
 			return run.Result{
 				Artifacts: []run.Artifact{{Kind: run.ArtifactLinkContext, Blob: blob}},
-				Message:   "resolved " + plural(len(lc.Targets)) + " for " + sc.Page.Path,
+				Message: "resolved " + plural(len(plan.Context.Targets)) + " for " + sc.Page.Path +
+					withheld(plan.Blocked),
 			}, nil
 		},
 	}
@@ -74,4 +84,18 @@ func plural(count int) string {
 		return "one link target"
 	}
 	return strconv.Itoa(count) + " link targets"
+}
+
+func withheld(blocked []content.BlockedTarget) string {
+	required := 0
+	for i := range blocked {
+		if blocked[i].Required {
+			required++
+		}
+	}
+	if len(blocked) == 0 {
+		return ""
+	}
+	return ", holding back " + strconv.Itoa(len(blocked)) + " the graph asks for (" +
+		strconv.Itoa(required) + " of them required) because no page carries them yet"
 }
