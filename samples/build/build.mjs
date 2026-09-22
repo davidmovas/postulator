@@ -4,6 +4,20 @@ import { fileURLToPath } from "node:url";
 import ExcelJS from "exceljs";
 import { planHeaders, planRows, messyHeaders, messyRows } from "./plan.mjs";
 import { crawlHeaders, crawlRows, feedHeaders, feedRows } from "./site.mjs";
+import {
+  bikesRows,
+  brokenHeaders,
+  brokenRows,
+  componentsRows,
+  crawlHeaders as messyCrawlHeaders,
+  crawlRows as messyCrawlRows,
+  guidesRows,
+  indentHeaders,
+  indentRows,
+  notesHeaders,
+  notesRows,
+  plainHeaders,
+} from "./messy.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const out = resolve(here, "..");
@@ -29,6 +43,32 @@ async function workbook(name, headers, rows, file) {
   return rows.length;
 }
 
+async function sheets(parts, file) {
+  const book = new ExcelJS.Workbook();
+  book.creator = "Postulator samples";
+  book.created = new Date(Date.UTC(2026, 8, 22));
+  book.modified = book.created;
+
+  let total = 0;
+  for (const part of parts) {
+    const sheet = book.addWorksheet(part.name);
+    if (part.headers.length > 0) {
+      sheet.addRow(part.headers);
+      sheet.getRow(1).font = { bold: true };
+    }
+    for (const row of part.rows) {
+      sheet.addRow(row);
+    }
+    sheet.columns.forEach((column) => {
+      column.width = 28;
+    });
+    total += part.rows.length;
+  }
+
+  await book.xlsx.writeFile(join(out, file));
+  return total;
+}
+
 function field(value) {
   const text = String(value ?? "");
   if (text.includes(",") || text.includes('"') || text.includes("\n")) {
@@ -50,6 +90,21 @@ async function main() {
     ["site-export.xlsx", await workbook("internal_html", crawlHeaders, crawlRows, "site-export.xlsx")],
     ["product-feed.csv", await separated(feedHeaders, feedRows, "product-feed.csv")],
     ["messy-plan.xlsx", await workbook("Topical plan", messyHeaders, messyRows, "messy-plan.xlsx")],
+    [
+      "messy-sheets.xlsx",
+      await sheets(
+        [
+          { name: "Site map", headers: indentHeaders, rows: indentRows },
+          { name: "Bikes", headers: plainHeaders, rows: bikesRows },
+          { name: "Components", headers: plainHeaders, rows: componentsRows },
+          { name: "Guides", headers: plainHeaders, rows: guidesRows },
+          { name: "shop crawl (old)", headers: messyCrawlHeaders, rows: messyCrawlRows },
+          { name: "Broken", headers: brokenHeaders, rows: brokenRows },
+          { name: "Notes", headers: notesHeaders, rows: notesRows },
+        ],
+        "messy-sheets.xlsx",
+      ),
+    ],
   ];
   for (const [name, count] of written) {
     process.stdout.write(name + " " + count + " rows\n");
