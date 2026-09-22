@@ -19,7 +19,6 @@ export function parentBeingReplaced(index: GraphIndex, childId: string): string 
 }
 
 export interface MoveEntityDialogProps {
-    siteId: string;
     index: GraphIndex;
     move: MoveRequest | null;
     onClose: () => void;

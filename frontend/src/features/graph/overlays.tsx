@@ -87,7 +87,6 @@ export function GraphOverlays({
                 }}
             />
             <MoveEntityDialog
-                siteId={siteId}
                 index={index}
                 move={moving}
                 onClose={() => {
