@@ -9,6 +9,7 @@ export const app = {
     save: "Save",
     cancel: "Cancel",
     loadMore: "Load more",
+    loadingMore: "Loading more",
     openExternal: "Open in Tor Browser",
     torMissing: "Tor Browser is not installed, so the link was not opened.",
     torSetUp: "Set up Tor Browser",

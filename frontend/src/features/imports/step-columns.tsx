@@ -18,7 +18,7 @@ import type { ColumnMap } from "./columns.js";
 import { takenFrom, targetOf, unmappedHeaders, usable } from "./columns.js";
 import { fieldChoices, noField } from "./labels.js";
 
-const grid = "minmax(0,1.1fr) minmax(0,2fr) 13rem";
+const grid = "minmax(0,1.1fr) minmax(0,2fr) 10rem";
 
 export interface StepColumnsProps {
     headers: readonly string[];
@@ -57,6 +57,7 @@ export function StepColumns({
 }: StepColumnsProps): ReactElement {
     const ignored = unmappedHeaders(headers, columns);
     const ready = usable(columns, indentColumns);
+    const unmatched = !usable(detected) && !usable(columns);
 
     if (headers.length === 0) {
         return (
@@ -97,6 +98,8 @@ export function StepColumns({
                                 <TableCell>
                                     <Select
                                         aria-label={copy.imports.columns.target}
+                                        size="sm"
+                                        quiet={target === null}
                                         value={target ?? noField}
                                         options={fieldChoices}
                                         onValueChange={(next) => {
@@ -116,6 +119,13 @@ export function StepColumns({
                             {copy.imports.columns.unmapped(ignored.length)}
                         </span>
                     )
+                ) : unmatched ? (
+                    <Banner
+                        tone="warn"
+                        title={copy.imports.columns.noHeaderHelp}
+                        body={copy.imports.columns.noHeaderHelpBody}
+                        className="min-w-0 flex-1"
+                    />
                 ) : (
                     <Banner tone="warn" title={copy.imports.columns.needsTarget} className="min-w-0 flex-1" />
                 )}

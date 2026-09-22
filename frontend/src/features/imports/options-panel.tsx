@@ -57,9 +57,14 @@ export function OptionsPanel({
         } else {
             held.add(sheet);
         }
-        onOptions({ ...options, sheets: sheets.map((each) => each.name).filter((each) => held.has(each)) });
+        onOptions({
+            ...options,
+            sheets: sheets.map((each) => each.name).filter((each) => held.has(each)),
+            indentColumns: [],
+        });
     };
 
+    const reading = chosenSheets.length > 0 ? chosenSheets : sheets.slice(0, 1).map((each) => each.name);
     const indent = options.indentColumns ?? [];
     const toggleIndent = (column: string): void => {
         const held = new Set(indent);
@@ -78,6 +83,7 @@ export function OptionsPanel({
                     <PanelHeader title={copy.imports.columns.sheets} />
                     <div className="flex flex-col gap-1 p-3">
                         <p className="text-2xs text-ink-faint">{copy.imports.columns.sheetsHint}</p>
+                        <p className="text-2xs text-ink-dim">{copy.imports.columns.reading(reading)}</p>
                         <ul className="flex flex-col">
                             {sheets.map((sheet) => (
                                 <li key={sheet.name} className="flex h-7 items-center gap-2">

@@ -9,6 +9,7 @@ import { absoluteTime, relativeTime } from "../../domain/format.js";
 import {
     AccountTreeIcon,
     Button,
+    Spinner,
     DenseTable,
     EmptyState,
     FilterAltIcon,
@@ -225,18 +226,16 @@ export function PageTable({
                         />
                     );
                 }}
+                onReachEnd={() => {
+                    if (listed.hasNextPage && !listed.isFetchingNextPage) {
+                        void listed.fetchNextPage();
+                    }
+                }}
                 footer={
-                    listed.hasNextPage ? (
-                        <div className="flex justify-center border-t border-hairline p-2">
-                            <Button
-                                size="sm"
-                                busy={listed.isFetchingNextPage}
-                                onClick={() => {
-                                    void listed.fetchNextPage();
-                                }}
-                            >
-                                {copy.app.loadMore}
-                            </Button>
+                    listed.isFetchingNextPage ? (
+                        <div className="flex h-7 items-center justify-center gap-2 text-2xs text-ink-faint">
+                            <Spinner size={12} />
+                            {copy.app.loadingMore}
                         </div>
                     ) : null
                 }

@@ -61,6 +61,11 @@ export const imports = {
         sheets: "Sheets",
         sheetsHint: "Sheets that do not carry the same columns have to be imported one at a time.",
         sheetRows: (rows: number) => (rows === 1 ? "1 row" : `${rows} rows`),
+        reading: (names: readonly string[]) =>
+            names.length === 0 ? "Reading nothing yet." : `Reading ${names.join(", ")}.`,
+        noHeaderHelp: "Nothing matched automatically.",
+        noHeaderHelpBody:
+            "If this sheet carries no header row, turn on “The sheet has no header row”: the columns become A, B, C and every line is read as data. Then tick the columns whose position carries the hierarchy.",
         noHeader: "The sheet has no header row",
         noHeaderHint: "Every column is addressed by its spreadsheet letter and every row is read as data.",
         indent: "Hierarchy by indentation",

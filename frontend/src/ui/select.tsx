@@ -2,7 +2,15 @@ import * as RadixSelect from "@radix-ui/react-select";
 import type { ReactElement } from "react";
 
 import { cx } from "./cx.js";
+import type { ControlSize } from "./field.js";
 import { CheckIcon, KeyboardArrowDownIcon, KeyboardArrowUpIcon } from "./icons/index.js";
+
+const triggerSizes: Readonly<Record<ControlSize, string>> = {
+    md: "h-7 px-2.5 text-sm",
+    sm: "h-6 px-2 text-xs",
+};
+
+const chevronSizes: Readonly<Record<ControlSize, number>> = { md: 18, sm: 14 };
 
 export interface SelectOption<T extends string> {
     value: T;
@@ -18,6 +26,8 @@ export interface SelectProps<T extends string> {
     placeholder?: string;
     disabled?: boolean;
     invalid?: boolean;
+    size?: ControlSize;
+    quiet?: boolean;
     "aria-label"?: string;
     "aria-describedby"?: string;
 }
@@ -30,6 +40,8 @@ export function Select<T extends string>({
     placeholder,
     disabled = false,
     invalid = false,
+    size = "md",
+    quiet = false,
     ...aria
 }: SelectProps<T>): ReactElement {
     return (
@@ -44,16 +56,20 @@ export function Select<T extends string>({
                 id={id}
                 aria-invalid={invalid || undefined}
                 className={cx(
-                    "inline-flex h-7 w-full items-center justify-between gap-2 rounded-md border bg-inset px-2.5 text-sm text-ink",
+                    "inline-flex w-full items-center justify-between gap-2 rounded-md border text-ink",
+                    triggerSizes[size],
                     "transition-colors duration-100 ease-out data-[placeholder]:text-ink-faint",
                     "disabled:cursor-not-allowed disabled:opacity-70",
-                    invalid ? "border-danger" : "border-hairline hover:border-edge",
+                    quiet
+                        ? "border-transparent bg-transparent text-ink-dim hover:bg-inset hover:text-ink data-[state=open]:border-edge data-[state=open]:bg-inset"
+                        : "bg-inset",
+                    invalid ? "border-danger" : quiet ? "" : "border-hairline hover:border-edge",
                 )}
                 {...aria}
             >
                 <RadixSelect.Value placeholder={placeholder} />
                 <RadixSelect.Icon asChild>
-                    <KeyboardArrowDownIcon size={18} className="shrink-0 text-ink-dim" />
+                    <KeyboardArrowDownIcon size={chevronSizes[size]} className="shrink-0 text-ink-faint" />
                 </RadixSelect.Icon>
             </RadixSelect.Trigger>
             <RadixSelect.Portal>
