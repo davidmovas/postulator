@@ -24,7 +24,7 @@ import type { GraphIndex } from "../model/index.js";
 import { move } from "../model/navigation.js";
 import type { NavKey } from "../model/navigation.js";
 
-const columns = "minmax(200px, 3fr) 88px 64px 104px minmax(104px, 1fr)";
+const columns = "minmax(200px, 3fr) 88px 64px 128px minmax(104px, 1fr)";
 const rowHeight = 28;
 const indentStep = 14;
 

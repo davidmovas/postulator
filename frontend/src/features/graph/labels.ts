@@ -67,5 +67,9 @@ export function stateTone(state: NodeState): Tone {
 }
 
 export function stateLabel(state: NodeState): string {
+    return copy.graph.legend.stateShort[state];
+}
+
+export function stateHint(state: NodeState): string {
     return copy.graph.legend.state[state];
 }

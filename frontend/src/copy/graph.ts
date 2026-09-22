@@ -22,6 +22,15 @@ export const graph = {
         isolate: "Isolate",
         isolateHint: "Hide everything the lens does not match and keep the path to each match.",
         states: "Page state",
+        stateShort: {
+            mismatch: "Diverged",
+            working: "In a run",
+            published: "Live",
+            exists: "Draft",
+            planned: "Planned",
+            archived: "Gone",
+            noPage: "No page",
+        },
         state: {
             mismatch: "The site does not hold what was planned",
             working: "A run is working on it now",
@@ -77,6 +86,15 @@ export const graph = {
         proposedBadge: "Edges waiting on a decision",
         order: "Children are ordered by score, strongest first.",
         states: "Page state",
+        stateShort: {
+            mismatch: "Diverged",
+            working: "In a run",
+            published: "Live",
+            exists: "Draft",
+            planned: "Planned",
+            archived: "Gone",
+            noPage: "No page",
+        },
         state: {
             mismatch: "The site does not hold what was planned",
             working: "A run is working on it now",
