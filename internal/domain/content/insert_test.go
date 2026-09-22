@@ -143,6 +143,28 @@ func TestInsertLinksGolden(t *testing.T) {
 			want:    `<p>We love <a href="/coffee/">espresso</a>.</p>`,
 			placed:  1, outcomes: []content.Outcome{content.OutcomeInserted},
 		},
+		{
+			name:    "an anchor inside a longer word is not an anchor",
+			body:    "<p>Add it to your cart and restart.</p>",
+			context: contextOf(target("/art/", []string{"art"}, content.RelationDown, false)),
+			want:    "<p>Add it to your cart and restart.</p>",
+			placed:  0, missing: 1,
+			outcomes: []content.Outcome{content.OutcomeAnchorNotFound},
+		},
+		{
+			name:    "a word standing on its own is still an anchor",
+			body:    "<p>The art of the cart.</p>",
+			context: contextOf(target("/art/", []string{"art"}, content.RelationDown, false)),
+			want:    `<p>The <a href="/art/">art</a> of the cart.</p>`,
+			placed:  1, outcomes: []content.Outcome{content.OutcomeInserted},
+		},
+		{
+			name:    "a hyphen is a boundary",
+			body:    "<p>A single-origin lot.</p>",
+			context: contextOf(target("/origin/", []string{"origin"}, content.RelationDown, false)),
+			want:    `<p>A single-<a href="/origin/">origin</a> lot.</p>`,
+			placed:  1, outcomes: []content.Outcome{content.OutcomeInserted},
+		},
 	}
 
 	for _, tc := range cases {
@@ -171,6 +193,46 @@ func TestInsertLinksGolden(t *testing.T) {
 				if result.Decisions[i].Detail == "" {
 					t.Errorf("decision %d carries no detail", i)
 				}
+			}
+		})
+	}
+}
+
+func TestInsertLinksFollowsTheAnchorStrategy(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		strategy template.AnchorStrategy
+		want     string
+	}{
+		{
+			name: "prefer_user keeps the order the user wrote", strategy: template.AnchorPreferUser,
+			want: `<p><a href="/beans/">Beans</a> and coffee <a href="/beans/">beans</a>.</p>`,
+		},
+		{
+			name: "rotate takes the next anchor for the next placement", strategy: template.AnchorRotate,
+			want: `<p><a href="/beans/">Beans</a> and <a href="/beans/">coffee</a> beans.</p>`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc := mustParse(t, "<p>Beans and coffee beans.</p>")
+			result := content.InsertLinks(doc,
+				contextOf(target("/beans/", []string{"beans", "coffee"}, content.RelationDown, false)),
+				template.LinkPolicy{
+					Rules:          template.LinkRules{MaxPerTarget: 2},
+					ForbidExternal: true, ForbidSelf: true, AnchorStrategy: tc.strategy,
+				})
+
+			if doc.HTML() != tc.want {
+				t.Fatalf("HTML =\n%s\nwant\n%s", doc.HTML(), tc.want)
+			}
+			if len(result.Placed) != 2 {
+				t.Fatalf("Placed = %+v, want two", result.Placed)
 			}
 		})
 	}

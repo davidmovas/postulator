@@ -93,7 +93,7 @@ func insert(doc *Document, lc LinkContext, policy template.LinkPolicy, wanted []
 			if maxLinks > 0 && placed >= maxLinks {
 				break
 			}
-			placement, outcome, detail := insertOne(doc, target, policy)
+			placement, outcome, detail := insertOne(doc, target, policy, inserted)
 			if outcome != OutcomeInserted {
 				if inserted == 0 {
 					result.Decisions = append(result.Decisions, Decision{
@@ -118,11 +118,23 @@ func insert(doc *Document, lc LinkContext, policy template.LinkPolicy, wanted []
 	return result
 }
 
-func insertOne(doc *Document, target LinkTarget, policy template.LinkPolicy) (Placement, Outcome, string) {
+func anchorOrder(target LinkTarget, strategy template.AnchorStrategy, placed int) []string {
+	shift := 0
+	if strategy == template.AnchorRotate && len(target.Anchors) > 1 {
+		shift = placed % len(target.Anchors)
+	}
+	if shift == 0 {
+		return target.Anchors
+	}
+	return append(slices.Clone(target.Anchors[shift:]), target.Anchors[:shift]...)
+}
+
+func insertOne(doc *Document, target LinkTarget, policy template.LinkPolicy, placed int) (Placement, Outcome, string) {
 	limit := policy.Rules.ParentLinkWithinParagraphs
 	restricted := target.Relation == RelationUp && limit > 0
 
 	paragraphs := doc.Paragraphs()
+	anchors := anchorOrder(target, policy.AnchorStrategy, placed)
 	sawZone := false
 
 	for node := range doc.TextNodes(nil) {
@@ -136,7 +148,7 @@ func insertOne(doc *Document, target LinkTarget, policy template.LinkPolicy) (Pl
 			continue
 		}
 
-		for _, anchor := range target.Anchors {
+		for _, anchor := range anchors {
 			start, end, matched := findFold(node.Data, anchor)
 			if !matched {
 				continue
@@ -200,12 +212,23 @@ func findFold(haystack, needle string) (start, end int, found bool) {
 	offsets = append(offsets, position)
 
 	for i := 0; i+len(target) <= len(source); i++ {
-		if !foldEqual(source[i:i+len(target)], target) {
+		if !foldEqual(source[i:i+len(target)], target) || !bounded(source, i, i+len(target)) {
 			continue
 		}
 		return offsets[i], offsets[i+len(target)], true
 	}
 	return 0, 0, false
+}
+
+func bounded(source []rune, start, end int) bool {
+	if start > 0 && wordRune(source[start-1]) && wordRune(source[start]) {
+		return false
+	}
+	return end >= len(source) || !wordRune(source[end]) || !wordRune(source[end-1])
+}
+
+func wordRune(r rune) bool {
+	return unicode.IsLetter(r) || unicode.IsDigit(r)
 }
 
 func foldEqual(a, b []rune) bool {
