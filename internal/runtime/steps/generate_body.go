@@ -86,11 +86,15 @@ func GenerateBody(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
+			body, err := doc.Render()
+			if err != nil {
+				return run.Result{}, err
+			}
 
 			return run.Result{
 				Artifacts: []run.Artifact{
 					{Kind: run.ArtifactDraft, Blob: encoded},
-					{Kind: run.ArtifactBodyHTML, Blob: []byte(doc.HTML())},
+					{Kind: run.ArtifactBodyHTML, Blob: []byte(body)},
 				},
 				Tokens:  usage.Total,
 				Message: "wrote the body of " + sc.Page.Path,

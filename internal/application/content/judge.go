@@ -97,9 +97,13 @@ func (s *Service) Judge(ctx context.Context, req JudgeRequest) (JudgeResponse, e
 	if err != nil {
 		return JudgeResponse{}, err
 	}
+	body, err := doc.Render()
+	if err != nil {
+		return JudgeResponse{}, err
+	}
 
 	assessed, err := s.Assess(ctx, AssessRequest{
-		SiteID: page.SiteID, Page: page, Entity: entity, Spec: resolved.Spec, Body: doc.HTML(),
+		SiteID: page.SiteID, Page: page, Entity: entity, Spec: resolved.Spec, Body: body,
 		Snippet:    Snippet{Title: page.MetaTitle, Description: page.MetaDescription},
 		HasSnippet: page.MetaTitle != "" || page.MetaDescription != "",
 		Targets:    targets,
