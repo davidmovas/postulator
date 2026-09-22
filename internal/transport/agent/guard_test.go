@@ -27,6 +27,7 @@ type recordingStream struct {
 	mu       sync.Mutex
 	deltas   []string
 	outcomes []agentapp.ToolOutcome
+	rounds   []agentapp.RoundUsage
 	err      error
 }
 
@@ -34,6 +35,13 @@ func (r *recordingStream) Delta(_ context.Context, _ int64, text string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.deltas = append(r.deltas, text)
+	return r.err
+}
+
+func (r *recordingStream) Spent(_ context.Context, round agentapp.RoundUsage) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.rounds = append(r.rounds, round)
 	return r.err
 }
 

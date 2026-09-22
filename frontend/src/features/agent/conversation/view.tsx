@@ -140,7 +140,16 @@ function LivePane({ conversation, prefillSeq, takePrefill, onOpenTools }: LivePa
             <ConversationMeta
                 conversation={conversation}
                 siteName={site.data?.site.name ?? null}
-                spend={usage.data === undefined ? null : { usd: usage.data.usd, calls: usage.data.calls }}
+                spend={
+                    usage.data === undefined
+                        ? null
+                        : {
+                              usd: usage.data.usd,
+                              calls: usage.data.calls,
+                              input: usage.data.usage.input,
+                              cachedInput: usage.data.usage.cachedInput,
+                          }
+                }
                 model={chat === null ? null : `${chat.provider}/${chat.model}`}
                 toolCount={tools.data?.tools?.length ?? null}
                 onModeChange={(mode) => {

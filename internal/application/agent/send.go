@@ -131,7 +131,9 @@ func (s *Service) answer(ctx context.Context, conversationID string, spec RunSpe
 	}
 
 	done.InputTokens = result.Usage.Input
+	done.CachedInputTokens = result.Usage.CachedInput
 	done.OutputTokens = result.Usage.Output
+	done.Calls = result.Calls
 	done.USD = result.USD
 	s.emit(events.AgentDone, done)
 
@@ -184,6 +186,14 @@ func (s *stream) Delta(_ context.Context, seq int64, text string) error {
 	s.service.deps.Turns.Observe(s.conversationID, seq)
 	return s.service.deps.Publisher.Publish(events.AgentDelta, events.AgentDeltaPayload{
 		ConversationID: s.conversationID, MessageID: s.messageID, Seq: seq, Text: text,
+	})
+}
+
+func (s *stream) Spent(_ context.Context, round RoundUsage) error {
+	return s.service.deps.Publisher.Publish(events.AgentUsage, events.AgentUsagePayload{
+		ConversationID: s.conversationID, MessageID: s.messageID, Provider: round.Provider,
+		Model: round.Model, Round: round.Round, InputTokens: round.Input,
+		CachedInputTokens: round.CachedInput, OutputTokens: round.Output, USD: round.USD,
 	})
 }
 

@@ -6,6 +6,7 @@ export type EventType =
     | "agent.titled"
     | "agent.tool.finished"
     | "agent.tool.started"
+    | "agent.usage"
     | "app.locked"
     | "app.unlocked"
     | "files.dropped"
@@ -41,6 +42,7 @@ export const eventTypes = [
     "agent.titled",
     "agent.tool.finished",
     "agent.tool.started",
+    "agent.usage",
     "app.locked",
     "app.unlocked",
     "files.dropped",
@@ -101,7 +103,9 @@ export interface AgentDonePayload {
     code: string;
     error: string;
     inputTokens: number;
+    cachedInputTokens: number;
     outputTokens: number;
+    calls: number;
     usd: number;
 }
 
@@ -125,6 +129,18 @@ export interface AgentToolStartedPayload {
     callId: string;
     tool: string;
     args: unknown;
+}
+
+export interface AgentUsagePayload {
+    conversationId: string;
+    messageId: string;
+    provider: string;
+    model: string;
+    round: number;
+    inputTokens: number;
+    cachedInputTokens: number;
+    outputTokens: number;
+    usd: number;
 }
 
 export interface AppLockedPayload {}
@@ -266,6 +282,7 @@ export interface EventPayloads {
     "agent.titled": AgentTitledPayload;
     "agent.tool.finished": AgentToolFinishedPayload;
     "agent.tool.started": AgentToolStartedPayload;
+    "agent.usage": AgentUsagePayload;
     "app.locked": AppLockedPayload;
     "app.unlocked": AppUnlockedPayload;
     "files.dropped": FilesDroppedPayload;

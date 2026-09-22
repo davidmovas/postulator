@@ -7,6 +7,7 @@ import {
     applyDone,
     applyToolFinished,
     applyToolStarted,
+    applyUsage,
     attachAssistant,
     beginStop,
     dropAllTurns,
@@ -27,7 +28,32 @@ function delta(seq: number, text: string, messageId = "a1") {
 }
 
 function done(code: string, error: string, text = "", messageId = "a1") {
-    applyDone({ conversationId, messageId, text, code, error, inputTokens: 0, outputTokens: 0, usd: 0 });
+    applyDone({
+        conversationId,
+        messageId,
+        text,
+        code,
+        error,
+        inputTokens: 0,
+        cachedInputTokens: 0,
+        outputTokens: 0,
+        calls: 0,
+        usd: 0,
+    });
+}
+
+function round(index: number, input: number, cached: number, output: number, usd: number, messageId = "a1") {
+    applyUsage({
+        conversationId,
+        messageId,
+        provider: "openai",
+        model: "gpt-5.6-terra",
+        round: index,
+        inputTokens: input,
+        cachedInputTokens: cached,
+        outputTokens: output,
+        usd,
+    });
 }
 
 function report(running: boolean, messageId = "", startedAt: string | null = null, lastSeq = 0) {
@@ -80,14 +106,59 @@ describe("a turn assembles the streamed text", () => {
             code: "",
             error: "",
             inputTokens: 12,
+            cachedInputTokens: 8,
             outputTokens: 3,
+            calls: 2,
             usd: 0.5,
         });
         const turn = getTurn(conversationId);
         expect(turn.status).toBe("done");
         expect(turn.end).toBe("answered");
         expect(turn.text).toBe("final");
-        expect(turn.usage).toStrictEqual({ inputTokens: 12, outputTokens: 3, usd: 0.5 });
+        expect(turn.usage).toStrictEqual({
+            inputTokens: 12,
+            cachedInputTokens: 8,
+            outputTokens: 3,
+            calls: 2,
+            usd: 0.5,
+        });
+    });
+});
+
+describe("a round says what it spent while the turn is still running", () => {
+    test("the rounds add up and the count is the round index", () => {
+        startTurn(conversationId);
+        round(1, 1200, 0, 40, 0.01);
+        round(2, 1800, 1152, 30, 0.012);
+        const turn = getTurn(conversationId);
+        expect(turn.usage).toStrictEqual({
+            inputTokens: 3000,
+            cachedInputTokens: 1152,
+            outputTokens: 70,
+            calls: 2,
+            usd: 0.022,
+        });
+        expect(turn.status).toBe("working");
+    });
+
+    test("a round belonging to another turn is ignored", () => {
+        startTurn(conversationId);
+        round(1, 100, 0, 10, 0.5, "a1");
+        round(2, 900, 0, 90, 5, "a2");
+        expect(getTurn(conversationId).usage?.inputTokens).toBe(100);
+    });
+
+    test("the final totals replace what the rounds added up to", () => {
+        startTurn(conversationId);
+        round(1, 1200, 0, 40, 0.01);
+        done("", "", "final");
+        expect(getTurn(conversationId).usage).toStrictEqual({
+            inputTokens: 0,
+            cachedInputTokens: 0,
+            outputTokens: 0,
+            calls: 0,
+            usd: 0,
+        });
     });
 });
 

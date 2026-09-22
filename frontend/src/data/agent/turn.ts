@@ -5,6 +5,7 @@ import type {
     AgentDonePayload,
     AgentToolFinishedPayload,
     AgentToolStartedPayload,
+    AgentUsagePayload,
 } from "../../generated/events.js";
 import type {
     AgentToolCall,
@@ -13,8 +14,9 @@ import type {
     TurnEnd,
     TurnReport,
     TurnStatus,
+    TurnUsage,
 } from "./model.js";
-import { cancelledCode, isActive, silenceAfterMs, toolCallStatus } from "./model.js";
+import { cancelledCode, isActive, noUsage, silenceAfterMs, toolCallStatus } from "./model.js";
 
 export type {
     AgentConfirmation,
@@ -249,6 +251,27 @@ export function applyConfirmResolved(payload: AgentConfirmResolvedPayload, at: n
     publish(held);
 }
 
+export function applyUsage(payload: AgentUsagePayload, at: number = Date.now()): void {
+    const held = reach(payload.conversationId);
+    const known = held.turn.assistantMessageId;
+    if (known !== null && known !== payload.messageId) {
+        return;
+    }
+    if (known === null) {
+        held.turn.assistantMessageId = payload.messageId;
+    }
+    touch(held, at);
+    const running: TurnUsage = held.turn.usage ?? noUsage;
+    held.turn.usage = {
+        inputTokens: running.inputTokens + payload.inputTokens,
+        cachedInputTokens: running.cachedInputTokens + payload.cachedInputTokens,
+        outputTokens: running.outputTokens + payload.outputTokens,
+        calls: Math.max(running.calls, payload.round),
+        usd: running.usd + payload.usd,
+    };
+    publish(held);
+}
+
 export function applyDone(payload: AgentDonePayload, at: number = Date.now()): void {
     const held = reach(payload.conversationId);
     if (payload.messageId !== "") {
@@ -259,7 +282,9 @@ export function applyDone(payload: AgentDonePayload, at: number = Date.now()): v
     }
     held.turn.usage = {
         inputTokens: payload.inputTokens,
+        cachedInputTokens: payload.cachedInputTokens,
         outputTokens: payload.outputTokens,
+        calls: payload.calls,
         usd: payload.usd,
     };
     held.turn.lastEventAt = at;

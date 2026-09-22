@@ -3,6 +3,7 @@ package agent_test
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"slices"
 	"strings"
 	"testing"
@@ -19,6 +20,7 @@ import (
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
+	agentrunner "github.com/davidmovas/postulator/internal/transport/agent"
 )
 
 func TestATurnStreamsItsAnswerAndRecordsTheSpend(t *testing.T) {
@@ -233,6 +235,95 @@ func TestTheModelFailureIsReportedAndTheLedgerRecordsIt(t *testing.T) {
 	listed, err := h.calls.List(t.Context(), domainllm.CallQuery{ConversationID: conversation}, paging.Request{Limit: 10})
 	if err != nil || len(listed.Items) != 1 || listed.Items[0].Status != domainllm.CallError {
 		t.Fatalf("the ledger holds %+v, %v", listed.Items, err)
+	}
+	if listed.Items[0].Step != agentrunner.ChatStep || listed.Items[0].ErrorCode == "" {
+		t.Fatalf("the failed round reads %+v", listed.Items[0])
+	}
+}
+
+func TestEveryModelCallOfATurnIsItsOwnLedgerRow(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	conversation := h.conversation(t, domainagent.ModeAutonomous)
+	h.send(t, conversation, "TOOL:pages_tree{}\nTOOL:pages_list{}\nFAKE: two reads and an answer")
+
+	listed, err := h.calls.List(t.Context(), domainllm.CallQuery{ConversationID: conversation},
+		paging.Request{Limit: 50})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(listed.Items) != 3 {
+		t.Fatalf("the ledger holds %d rows for a turn of three model calls", len(listed.Items))
+	}
+	for _, call := range listed.Items {
+		if call.Step != agentrunner.ChatStep || call.Status != domainllm.CallOK {
+			t.Fatalf("a round reads %+v", call)
+		}
+		if call.ConversationID != conversation || call.Usage.Total == 0 {
+			t.Fatalf("a round reads %+v", call)
+		}
+	}
+
+	finished, ok := h.payload(events.AgentDone).(events.AgentDonePayload)
+	if !ok {
+		t.Fatalf("the done payload is %+v", h.payload(events.AgentDone))
+	}
+
+	spend, err := h.calls.SumByConversation(t.Context(), conversation)
+	if err != nil {
+		t.Fatalf("SumByConversation: %v", err)
+	}
+	if spend.Calls != finished.Calls || spend.Calls != 3 {
+		t.Fatalf("the ledger counted %d calls and the turn reported %d", spend.Calls, finished.Calls)
+	}
+	if spend.Usage.Input != finished.InputTokens || spend.Usage.Output != finished.OutputTokens {
+		t.Fatalf("the ledger holds %+v and the turn reported %+v", spend.Usage, finished)
+	}
+	if spend.Usage.CachedInput != finished.CachedInputTokens {
+		t.Fatalf("the ledger cached %d and the turn reported %d", spend.Usage.CachedInput, finished.CachedInputTokens)
+	}
+	if math.Abs(spend.USD-finished.USD) > 1e-9 {
+		t.Fatalf("the ledger holds %v and the turn reported %v", spend.USD, finished.USD)
+	}
+}
+
+func TestEveryRoundOfATurnAnnouncesWhatItSpent(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	conversation := h.conversation(t, domainagent.ModeAutonomous)
+	h.send(t, conversation, "TOOL:pages_tree{}\nFAKE: one read and an answer")
+
+	rounds := make([]events.AgentUsagePayload, 0, 2)
+	for _, event := range h.bus.Events() {
+		if spent, ok := event.Payload.(events.AgentUsagePayload); ok {
+			rounds = append(rounds, spent)
+		}
+	}
+	if len(rounds) != 2 {
+		t.Fatalf("the bus saw %d usage events for a turn of two model calls: %+v", len(rounds), rounds)
+	}
+	for index, spent := range rounds {
+		if spent.Round != index+1 || spent.ConversationID != conversation {
+			t.Fatalf("round %d reads %+v", index+1, spent)
+		}
+		if spent.Provider != "openai" || spent.Model != "chat" || spent.MessageID == "" {
+			t.Fatalf("round %d reads %+v", index+1, spent)
+		}
+	}
+
+	finished, ok := h.payload(events.AgentDone).(events.AgentDonePayload)
+	if !ok || finished.Calls != 2 {
+		t.Fatalf("the done payload is %+v", h.payload(events.AgentDone))
+	}
+
+	counted := 0
+	for _, spent := range rounds {
+		counted += spent.InputTokens
+	}
+	if counted != finished.InputTokens {
+		t.Fatalf("the rounds counted %d input tokens and the turn reported %d", counted, finished.InputTokens)
 	}
 }
 

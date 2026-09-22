@@ -13,10 +13,16 @@ import (
 
 type quietStream struct {
 	deltas []string
+	rounds []agentapp.RoundUsage
 }
 
 func (q *quietStream) Delta(_ context.Context, _ int64, text string) error {
 	q.deltas = append(q.deltas, text)
+	return nil
+}
+
+func (q *quietStream) Spent(_ context.Context, round agentapp.RoundUsage) error {
+	q.rounds = append(q.rounds, round)
 	return nil
 }
 
@@ -44,12 +50,20 @@ func called(input, cached, output int) *gollem.ContentResponse {
 
 func watched(t *testing.T, rounds ...[]*gollem.ContentResponse) (
 	counted domainllm.Usage, said string, streamed []string) {
+	_, counted, said, streamed = billed(t, rounds...)
+	return counted, said, streamed
+}
+
+func billed(t *testing.T, rounds ...[]*gollem.ContentResponse) (
+	recorded []round, counted domainllm.Usage, said string, streamed []string) {
 	t.Helper()
 
 	stream := &quietStream{}
 	usage := &tally{}
 	spoken := &answer{}
-	middleware := observe(stream, usage, spoken, func(error) {})
+	middleware := observe(stream, usage, spoken, func(error) {}, func(done round) {
+		recorded = append(recorded, done)
+	})
 
 	for _, chunks := range rounds {
 		handler := middleware(func(context.Context, *gollem.ContentRequest) (<-chan *gollem.ContentResponse, error) {
@@ -68,7 +82,39 @@ func watched(t *testing.T, rounds ...[]*gollem.ContentResponse) (
 		for range served {
 		}
 	}
-	return usage.total(), spoken.String(), stream.deltas
+	return recorded, usage.total(), spoken.String(), stream.deltas
+}
+
+func TestEveryRoundIsHandedToTheLedgerInOrder(t *testing.T) {
+	t.Parallel()
+
+	recorded, counted, _, _ := billed(t,
+		[]*gollem.ContentResponse{called(1200, 0, 40), spent(1200, 0, 40)},
+		[]*gollem.ContentResponse{called(1800, 1152, 30), spent(1800, 1152, 30)},
+		[]*gollem.ContentResponse{text("Twelve entities."), spent(2400, 2048, 12)},
+	)
+
+	if len(recorded) != 3 {
+		t.Fatalf("the ledger was handed %d rounds, want one per model call", len(recorded))
+	}
+	for index, done := range recorded {
+		if done.index != index+1 || done.failure != nil {
+			t.Fatalf("round %d reads %+v", index+1, done)
+		}
+	}
+	if recorded[1].usage != (spend{input: 1800, cached: 1152, output: 30}) {
+		t.Fatalf("the second round spent %+v", recorded[1].usage)
+	}
+
+	summed := spend{}
+	for _, done := range recorded {
+		summed.input += done.usage.input
+		summed.cached += done.usage.cached
+		summed.output += done.usage.output
+	}
+	if summed.input != counted.Input || summed.cached != counted.CachedInput || summed.output != counted.Output {
+		t.Fatalf("the rounds sum to %+v and the turn counted %+v", summed, counted)
+	}
 }
 
 func TestARoundIsCountedOnceHoweverOftenItReportsItsUsage(t *testing.T) {

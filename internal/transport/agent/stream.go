@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gollem-dev/gollem"
 
@@ -29,12 +30,21 @@ func (s *spend) reading(chunk *gollem.ContentResponse) {
 	}
 }
 
+type round struct {
+	failure error
+	usage   spend
+	latency time.Duration
+	index   int
+}
+
 type tally struct {
 	mu     sync.Mutex
 	input  int
 	cached int
 	output int
+	usd    float64
 	seq    int64
+	rounds int
 }
 
 func (t *tally) add(round spend) {
@@ -50,6 +60,31 @@ func (t *tally) next() int64 {
 	defer t.mu.Unlock()
 	t.seq++
 	return t.seq
+}
+
+func (t *tally) enter() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.rounds++
+	return t.rounds
+}
+
+func (t *tally) charge(usd float64) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.usd += usd
+}
+
+func (t *tally) calls() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.rounds
+}
+
+func (t *tally) spent() float64 {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.usd
 }
 
 func (t *tally) total() domainllm.Usage {
@@ -119,27 +154,38 @@ func (w *watch) settle() {
 	w.spoken.spoke(w.said.String())
 }
 
-func observe(stream agentapp.Stream, usage *tally, spoken *answer, note func(error)) gollem.ContentStreamMiddleware {
+func observe(stream agentapp.Stream, usage *tally, spoken *answer, note func(error),
+	record func(round)) gollem.ContentStreamMiddleware {
 	return func(next gollem.ContentStreamHandler) gollem.ContentStreamHandler {
 		return func(ctx context.Context, req *gollem.ContentRequest) (<-chan *gollem.ContentResponse, error) {
+			index := usage.enter()
+			started := time.Now()
+
 			chunks, err := next(ctx, req)
 			if err != nil {
+				record(round{index: index, latency: time.Since(started), failure: err})
 				return nil, err
 			}
 
 			out := make(chan *gollem.ContentResponse)
 			go func() {
-				round := &watch{stream: stream, usage: usage, spoken: spoken, note: note}
+				watched := &watch{stream: stream, usage: usage, spoken: spoken, note: note}
+				stopped := false
 				defer func() {
-					round.settle()
+					watched.settle()
+					record(round{
+						index: index, usage: watched.round, latency: time.Since(started),
+						failure: stoppedBy(ctx, stopped),
+					})
 					close(out)
 				}()
 
 				for chunk := range chunks {
-					round.chunk(ctx, chunk)
+					watched.chunk(ctx, chunk)
 					select {
 					case out <- chunk:
 					case <-ctx.Done():
+						stopped = true
 						drain(chunks)
 						return
 					}
@@ -148,6 +194,13 @@ func observe(stream agentapp.Stream, usage *tally, spoken *answer, note func(err
 			return out, nil
 		}
 	}
+}
+
+func stoppedBy(ctx context.Context, stopped bool) error {
+	if !stopped {
+		return nil
+	}
+	return ctx.Err()
 }
 
 func drain(chunks <-chan *gollem.ContentResponse) {

@@ -13,6 +13,8 @@ import {
     Segmented,
     Stars2Icon,
 } from "../../../ui/index.js";
+import type { Spend } from "./model/spend.js";
+import { cachedPercent } from "./model/spend.js";
 
 const modes = [
     { value: "confirm", label: copy.agent.header.modeConfirm },
@@ -22,7 +24,7 @@ const modes = [
 export interface ConversationMetaProps {
     conversation: Conversation;
     siteName: string | null;
-    spend: { usd: number; calls: number } | null;
+    spend: Spend | null;
     model: string | null;
     toolCount: number | null;
     onModeChange: (mode: string) => void;
@@ -52,11 +54,16 @@ export function ConversationMeta({
                     <Stars2Icon size={12} />
                     <span className="font-mono">{model ?? copy.agent.header.modelUnset}</span>
                 </span>
-                <span className="font-mono">
+                <span className="font-mono" title={copy.agent.header.spendTooltip}>
                     {spend === null || spend.calls === 0
                         ? copy.agent.header.noSpend
                         : copy.agent.header.spend(usd(spend.usd), spend.calls)}
                 </span>
+                {spend === null || spend.cachedInput === 0 ? null : (
+                    <span className="font-mono text-ink-dim" title={copy.agent.header.spendTooltip}>
+                        {copy.agent.header.cached(cachedPercent(spend))}
+                    </span>
+                )}
                 {toolCount === null ? null : (
                     <button
                         type="button"

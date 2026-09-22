@@ -32,8 +32,19 @@ type SiteContext struct {
 
 type Stream interface {
 	Delta(ctx context.Context, seq int64, text string) error
+	Spent(ctx context.Context, round RoundUsage) error
 	ToolStarted(ctx context.Context, callID, tool string, args json.RawMessage) error
 	ToolFinished(ctx context.Context, outcome ToolOutcome) error
+}
+
+type RoundUsage struct {
+	Provider    string
+	Model       string
+	Round       int
+	Input       int
+	CachedInput int
+	Output      int
+	USD         float64
 }
 
 type ToolOutcome struct {
@@ -62,6 +73,7 @@ type RunSpec struct {
 type RunResult struct {
 	Text      string
 	ToolCalls int
+	Calls     int
 	Usage     domainllm.Usage
 	USD       float64
 }

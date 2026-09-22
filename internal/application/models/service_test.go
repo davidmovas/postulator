@@ -454,19 +454,25 @@ func TestUsageSummary(t *testing.T) {
 	t.Parallel()
 
 	book := spend{
-		run:          llm.Spend{Usage: llm.Usage{Input: 100, Output: 50, Total: 150}, USD: 1.5, Calls: 3},
-		conversation: llm.Spend{Usage: llm.Usage{Input: 10, Output: 5, Total: 15}, USD: 0.1, Calls: 1},
-		everything:   llm.Spend{Usage: llm.Usage{Input: 900, Output: 400, Total: 1300}, USD: 9.9, Calls: 27},
+		run: llm.Spend{Usage: llm.Usage{Input: 100, Output: 50, Total: 150}, USD: 1.5, Calls: 3},
+		conversation: llm.Spend{
+			Usage: llm.Usage{Input: 10, CachedInput: 8, Output: 5, Total: 15}, USD: 0.1, Calls: 1,
+		},
+		everything: llm.Spend{Usage: llm.Usage{Input: 900, Output: 400, Total: 1300}, USD: 9.9, Calls: 27},
 	}
 
 	cases := []struct {
-		name      string
-		req       models.UsageSummaryRequest
-		wantCalls int
-		wantErr   bool
+		name       string
+		req        models.UsageSummaryRequest
+		wantCalls  int
+		wantCached int
+		wantErr    bool
 	}{
 		{name: "by run", req: models.UsageSummaryRequest{RunID: "run-1"}, wantCalls: 3},
-		{name: "by conversation", req: models.UsageSummaryRequest{ConversationID: "chat-1"}, wantCalls: 1},
+		{
+			name: "by conversation", req: models.UsageSummaryRequest{ConversationID: "chat-1"},
+			wantCalls: 1, wantCached: 8,
+		},
 		{name: "neither names everything spent", req: models.UsageSummaryRequest{}, wantCalls: 27},
 		{name: "both", req: models.UsageSummaryRequest{RunID: "run-1", ConversationID: "chat-1"}, wantErr: true},
 	}
@@ -488,6 +494,9 @@ func TestUsageSummary(t *testing.T) {
 			}
 			if resp.Calls != tc.wantCalls {
 				t.Errorf("calls = %d, want %d", resp.Calls, tc.wantCalls)
+			}
+			if resp.Usage.CachedInput != tc.wantCached {
+				t.Errorf("cached input = %d, want %d", resp.Usage.CachedInput, tc.wantCached)
 			}
 		})
 	}

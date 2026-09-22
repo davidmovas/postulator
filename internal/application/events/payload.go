@@ -36,15 +36,29 @@ type AgentToolStartedPayload struct {
 	Args           json.RawMessage `json:"args"`
 }
 
+type AgentUsagePayload struct {
+	ConversationID    string  `json:"conversationId"`
+	MessageID         string  `json:"messageId"`
+	Provider          string  `json:"provider"`
+	Model             string  `json:"model"`
+	Round             int     `json:"round"`
+	InputTokens       int     `json:"inputTokens"`
+	CachedInputTokens int     `json:"cachedInputTokens"`
+	OutputTokens      int     `json:"outputTokens"`
+	USD               float64 `json:"usd"`
+}
+
 type AgentDonePayload struct {
-	ConversationID string  `json:"conversationId"`
-	MessageID      string  `json:"messageId"`
-	Text           string  `json:"text"`
-	Code           string  `json:"code"`
-	Error          string  `json:"error"`
-	InputTokens    int     `json:"inputTokens"`
-	OutputTokens   int     `json:"outputTokens"`
-	USD            float64 `json:"usd"`
+	ConversationID    string  `json:"conversationId"`
+	MessageID         string  `json:"messageId"`
+	Text              string  `json:"text"`
+	Code              string  `json:"code"`
+	Error             string  `json:"error"`
+	InputTokens       int     `json:"inputTokens"`
+	CachedInputTokens int     `json:"cachedInputTokens"`
+	OutputTokens      int     `json:"outputTokens"`
+	Calls             int     `json:"calls"`
+	USD               float64 `json:"usd"`
 }
 
 type AgentTitledPayload struct {

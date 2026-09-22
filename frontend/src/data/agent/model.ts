@@ -30,9 +30,19 @@ export interface AgentConfirmation {
 
 export interface TurnUsage {
     inputTokens: number;
+    cachedInputTokens: number;
     outputTokens: number;
+    calls: number;
     usd: number;
 }
+
+export const noUsage: TurnUsage = Object.freeze({
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    outputTokens: 0,
+    calls: 0,
+    usd: 0,
+});
 
 export interface Turn {
     status: TurnStatus;

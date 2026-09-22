@@ -13,6 +13,7 @@ import {
     applyDone,
     applyToolFinished,
     applyToolStarted,
+    applyUsage,
     silentConversationIds,
 } from "./agent/turn.js";
 import { publishDrop } from "./drops.js";
@@ -223,6 +224,18 @@ function handlersFor(client: QueryClient): Handlers {
                 keys.agent.messagesOf(envelope.payload.conversationId),
             );
             void reconcileConversation(client, envelope.payload.conversationId);
+        },
+        "agent.usage": (envelope) => {
+            const conversationId = envelope.payload.conversationId;
+            applyUsage(envelope.payload);
+            coalesce(
+                `agent-usage:${conversationId}`,
+                () => {
+                    invalidate(client, keys.models.usage({ conversationId }));
+                    invalidate(client, keys.models.usageAll());
+                },
+                usageCoalesceMs,
+            );
         },
         "agent.done": (envelope) => {
             applyDone(envelope.payload);

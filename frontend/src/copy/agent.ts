@@ -39,7 +39,10 @@ export const agent = {
         modeLabel: "Mode",
         modeConfirm: "Confirm",
         modeAutonomous: "Autonomous",
-        spend: (usd: string, calls: number) => `${usd} · ${calls === 1 ? "1 call" : `${calls} calls`}`,
+        spend: (usd: string, calls: number) => `${usd} · ${calls === 1 ? "1 model call" : `${calls} model calls`}`,
+        cached: (percent: number) => `${percent}% cached`,
+        spendTooltip:
+            "What this conversation has cost: one row per model call, and how much of the input the provider served from its cache.",
         noSpend: "Nothing spent yet",
         modelUnset: "Chat model not set",
         tools: (count: number) => (count === 1 ? "1 tool" : `${count} tools`),

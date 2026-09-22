@@ -29,9 +29,10 @@ type Profile struct {
 }
 
 type Usage struct {
-	Input  int `json:"input"`
-	Output int `json:"output"`
-	Total  int `json:"total"`
+	Input       int `json:"input"`
+	CachedInput int `json:"cachedInput"`
+	Output      int `json:"output"`
+	Total       int `json:"total"`
 }
 
 type ProviderKey struct {
@@ -64,5 +65,7 @@ func refView(ref llm.ModelRef) *ModelRef {
 }
 
 func usageView(usage llm.Usage) Usage {
-	return Usage{Input: usage.Input, Output: usage.Output, Total: usage.Total}
+	return Usage{
+		Input: usage.Input, CachedInput: usage.CachedInput, Output: usage.Output, Total: usage.Total,
+	}
 }

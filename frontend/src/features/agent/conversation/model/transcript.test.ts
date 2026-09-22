@@ -197,7 +197,7 @@ describe("rows over a live turn", () => {
             text: "final",
             status: "done",
             end: "answered",
-            usage: { inputTokens: 10, outputTokens: 2, usd: 0.01 },
+            usage: { inputTokens: 10, cachedInputTokens: 8, outputTokens: 2, calls: 2, usd: 0.01 },
         };
         const saved = [message(1, "user", "hi"), message(2, "assistant", "final", { id: "a1" })];
         const listed = rows(saved, turn, []);
