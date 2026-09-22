@@ -75,6 +75,30 @@ describe("rows over the saved transcript", () => {
         expect(listed[1]).toMatchObject({ kind: "confirm", id: "a1" });
     });
 
+    it("keeps a card where the call that raised it sits, before and after the answer lands", () => {
+        const proposed = { untrustedContent: true, status: "confirmationRequired", actionId: "a1" };
+        const call = message(2, "tool", "", { tool: "pages_delete", callId: "k1", payload: proposed });
+
+        const live: Turn = {
+            ...idle,
+            status: "working",
+            text: "Готовлю удаление",
+            tools: [{ callId: "k1", tool: "pages_delete", args: {}, status: "ok", result: proposed }],
+        };
+        const answering = rows([message(1, "user", "delete it")], live, [action("a1")]);
+        expect(answering.map((row) => row.kind)).toStrictEqual(["user", "tool", "confirm", "streaming"]);
+
+        const settled = rows([message(1, "user", "delete it"), call, message(3, "assistant", "Подтвердите")], idle, [
+            action("a1"),
+        ]);
+        expect(settled.map((row) => row.kind)).toStrictEqual(["user", "tool", "confirm", "assistant"]);
+    });
+
+    it("puts a card with no call of its own at the end rather than nowhere", () => {
+        const listed = rows([message(1, "user", "delete it")], idle, [action("a1")]);
+        expect(listed.map((row) => row.kind)).toStrictEqual(["user", "confirm"]);
+    });
+
     it("names the last thing the user asked", () => {
         const saved = [message(1, "user", "first"), message(2, "assistant", "ok"), message(3, "user", "second")];
         expect(lastUserText(rows(saved, idle, []))).toBe("second");

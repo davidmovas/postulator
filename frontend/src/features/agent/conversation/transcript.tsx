@@ -61,14 +61,19 @@ function ToolRow({ row }: ToolRowProps): ReactElement {
                     <Icon size={14} className={cx("shrink-0", toneClasses[tone].ink)} />
                 )}
                 <span className="min-w-0 flex-1 truncate text-xs text-ink-soft">{toolLabel(row.tool)}</span>
-                <span className={cx("shrink-0 text-2xs font-semibold tracking-label uppercase", toneClasses[tone].ink)}>
-                    {toolStatusLabel(row.status)}
-                </span>
                 {row.durationMs === null ? null : (
-                    <span className="w-12 shrink-0 text-right font-mono text-2xs text-ink-faint">
+                    <span className="shrink-0 text-right font-mono text-2xs text-ink-faint">
                         {copy.agent.transcript.tool.duration(row.durationMs)}
                     </span>
                 )}
+                <span
+                    className={cx(
+                        "min-w-12 shrink-0 text-right text-2xs font-semibold tracking-label uppercase",
+                        toneClasses[tone].ink,
+                    )}
+                >
+                    {toolStatusLabel(row.status)}
+                </span>
             </button>
             {open && summary !== null ? (
                 <div className={cx("border-t border-hairline px-2 py-1.5 text-xs", row.error === null ? "text-ink-dim" : "text-danger")}>

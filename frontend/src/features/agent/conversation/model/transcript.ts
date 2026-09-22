@@ -70,7 +70,7 @@ function partial(turn: Turn, answered: boolean): Row | null {
     };
 }
 
-function liveRows(turn: Turn, saved: readonly Message[], pending: readonly PendingAction[]): Row[] {
+function liveRows(turn: Turn, saved: readonly Message[]): Row[] {
     const out: Row[] = [];
     const savedCalls = new Set(saved.filter((held) => held.role === "tool").map((held) => held.callId ?? ""));
     const running = isActive(turn.status);
@@ -94,18 +94,6 @@ function liveRows(turn: Turn, saved: readonly Message[], pending: readonly Pendi
                 live: true,
             });
         }
-    }
-
-    const listed = new Set<string>();
-    for (const held of pending) {
-        if (held.status !== "pending") {
-            continue;
-        }
-        listed.add(held.id);
-        out.push({ kind: "confirm", id: held.id, action: held, live: null });
-    }
-    if (running && turn.confirm !== null && !listed.has(turn.confirm.confirmationId)) {
-        out.push({ kind: "confirm", id: turn.confirm.confirmationId, action: null, live: turn.confirm });
     }
 
     if (running) {
@@ -149,15 +137,61 @@ function liveRows(turn: Turn, saved: readonly Message[], pending: readonly Pendi
     return out;
 }
 
-export function rows(saved: readonly Message[], turn: Turn, pending: readonly PendingAction[]): Row[] {
+function actionIdOf(result: unknown): string | null {
+    if (typeof result !== "object" || result === null || Array.isArray(result)) {
+        return null;
+    }
+    const held = (result as Record<string, unknown>)["actionId"];
+    return typeof held === "string" && held !== "" ? held : null;
+}
+
+function cards(turn: Turn, pending: readonly PendingAction[]): Row[] {
     const out: Row[] = [];
+    const listed = new Set<string>();
+
+    const waiting = pending.filter((held) => held.status === "pending");
+    const ordered = [...waiting].sort((first, second) => (first.createdAt ?? "").localeCompare(second.createdAt ?? ""));
+    for (const held of ordered) {
+        listed.add(held.id);
+        out.push({ kind: "confirm", id: held.id, action: held, live: null });
+    }
+    if (isActive(turn.status) && turn.confirm !== null && !listed.has(turn.confirm.confirmationId)) {
+        out.push({ kind: "confirm", id: turn.confirm.confirmationId, action: null, live: turn.confirm });
+    }
+    return out;
+}
+
+function placed(base: readonly Row[], waiting: readonly Row[]): Row[] {
+    const after = new Map<number, Row[]>();
+    const trailing: Row[] = [];
+
+    for (const card of waiting) {
+        const at = base.findIndex((row) => row.kind === "tool" && actionIdOf(row.result) === card.id);
+        if (at === -1) {
+            trailing.push(card);
+            continue;
+        }
+        after.set(at, [...(after.get(at) ?? []), card]);
+    }
+
+    const out: Row[] = [];
+    for (let index = 0; index < base.length; index += 1) {
+        out.push(base[index]);
+        out.push(...(after.get(index) ?? []));
+    }
+    return [...out, ...trailing];
+}
+
+export function rows(saved: readonly Message[], turn: Turn, pending: readonly PendingAction[]): Row[] {
+    const base: Row[] = [];
     for (const message of saved) {
         const row = savedRow(message, turn);
         if (row !== null) {
-            out.push(row);
+            base.push(row);
         }
     }
-    return [...out, ...liveRows(turn, saved, pending)];
+    base.push(...liveRows(turn, saved));
+    return placed(base, cards(turn, pending));
 }
 
 export function lastUserText(list: readonly Row[]): string | null {

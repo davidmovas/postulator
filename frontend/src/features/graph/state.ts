@@ -7,6 +7,7 @@ export interface GraphSession {
     fold: FoldState | null;
     order: SortOrder;
     showRelated: boolean;
+    legend: boolean;
     minimap: boolean;
     queue: boolean;
     queueHeight: number;
@@ -16,6 +17,7 @@ const emptySession: GraphSession = Object.freeze({
     fold: null,
     order: "score",
     showRelated: false,
+    legend: true,
     minimap: true,
     queue: false,
     queueHeight: 264,

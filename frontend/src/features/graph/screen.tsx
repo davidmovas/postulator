@@ -28,6 +28,7 @@ import { EntityContextMenu } from "./actions/context-menu.js";
 import type { MenuTarget } from "./actions/context-menu.js";
 import type { MoveRequest } from "./actions/move-entity.js";
 import { Controls } from "./canvas/controls.js";
+import { Legend } from "./canvas/legend.js";
 import { GraphMap, pulseMs } from "./canvas/map.js";
 import type { MapHandle, Pulse } from "./canvas/map.js";
 import { Inspector } from "./inspector/panel.js";
@@ -350,6 +351,13 @@ export function GraphScreen(): ReactElement {
                 }}
                 onToggleRelated={() => {
                     patchSession({ showRelated: !session.showRelated });
+                }}
+            />
+            <Legend
+                open={session.legend}
+                proof={query.proof}
+                onToggle={() => {
+                    patchSession({ legend: !session.legend });
                 }}
             />
             {card === null || menu !== null ? null : <NodeCard index={index} hovered={card} hostWidth={card.width} />}

@@ -23,11 +23,16 @@ var narrowed = map[string]bool{
 var choiceNames = []string{
 	"kind", "source", "status", "scope", "wpType", "anchorStrategy", "role", "mode", "format",
 	"reasoningEffort", "risk", "relation", "linkClass", "publishMode", "step", "field", "action",
+	"reason", "origin",
 }
 
 var freeText = map[string]bool{
 	"provider": true,
 	"model":    true,
+}
+
+var prose = map[string]bool{
+	"graph_add_edge.parameters.reason": true,
 }
 
 func vocabularies(t *testing.T) map[string]string {
@@ -119,7 +124,7 @@ func TestEveryToolFieldThatNamesAChoiceOffersOne(t *testing.T) {
 
 	for name, schema := range schemas(t) {
 		eachProperty(schema, name+".parameters", func(path, field string, property *llm.Schema) {
-			if property.Type != llm.SchemaString || len(property.Enum) > 0 || freeText[field] {
+			if property.Type != llm.SchemaString || len(property.Enum) > 0 || freeText[field] || prose[path] {
 				return
 			}
 			if !slices.Contains(choiceNames, field) {
