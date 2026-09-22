@@ -102,7 +102,7 @@ func SyncSite(deps Deps) run.StepDef {
 				state.StartedAt = deps.now()
 			}
 
-			batch, next, err := pull(ctx, client, state, batchSize(deps), hostOf(owner.BaseURL))
+			batch, next, err := pull(ctx, client, state, batchSize(deps), pagemap.NewSite(owner.BaseURL))
 			if err != nil {
 				return run.Result{}, err
 			}
@@ -204,11 +204,12 @@ func samePlugin(current, next site.PluginState) bool {
 	return true
 }
 
-func pull(ctx context.Context, client *wp.Client, state SiteSyncResult, limit int, host string) ([]pulledItem, string, error) {
+func pull(ctx context.Context, client *wp.Client, state SiteSyncResult, limit int,
+	install pagemap.Site) ([]pulledItem, string, error) {
 	if state.Source == SourcePlugin {
 		return pullBulk(ctx, client, state.Cursor, limit)
 	}
-	return pullCore(ctx, client, state.Cursor, limit, host)
+	return pullCore(ctx, client, state.Cursor, limit, install)
 }
 
 func pullBulk(ctx context.Context, client *wp.Client, cursor string, limit int) ([]pulledItem, string, error) {
@@ -238,7 +239,8 @@ func pullBulk(ctx context.Context, client *wp.Client, cursor string, limit int) 
 	return out, next, nil
 }
 
-func pullCore(ctx context.Context, client *wp.Client, cursor string, limit int, host string) ([]pulledItem, string, error) {
+func pullCore(ctx context.Context, client *wp.Client, cursor string, limit int,
+	install pagemap.Site) ([]pulledItem, string, error) {
 	position, err := decodeCore(cursor)
 	if err != nil {
 		return nil, "", err
@@ -259,7 +261,7 @@ func pullCore(ctx context.Context, client *wp.Client, cursor string, limit int, 
 
 		out := make([]pulledItem, 0, len(page.Items))
 		for i := range page.Items {
-			converted, ok := fromCore(page.Items[i], itemType, host)
+			converted, ok := fromCore(page.Items[i], itemType, install)
 			if ok {
 				out = append(out, converted)
 			}
@@ -308,9 +310,9 @@ func encodeCore(position coreCursor) string {
 	return string(encoded)
 }
 
-func fromCore(item wp.Item, itemType wp.ItemType, host string) (pulledItem, bool) {
-	path, internal := pagemap.InternalPath(item.Link, host)
-	if !internal {
+func fromCore(item wp.Item, itemType wp.ItemType, install pagemap.Site) (pulledItem, bool) {
+	path, kind := install.Resolve(item.Link)
+	if kind == pagemap.LinkExternal || kind == pagemap.LinkUnresolved {
 		return pulledItem{}, false
 	}
 
@@ -325,7 +327,7 @@ func fromCore(item wp.Item, itemType wp.ItemType, host string) (pulledItem, bool
 	}
 	if doc, err := content.Parse(item.Content); err == nil {
 		pulled.H1 = headingOne(doc)
-		pulled.Links = internalLinks(doc, host)
+		pulled.Links = internalLinks(doc, install)
 	}
 	return pulled, true
 }
@@ -393,13 +395,13 @@ func headingOne(doc *content.Document) string {
 	return ""
 }
 
-func internalLinks(doc *content.Document, host string) []wp.ContentLink {
+func internalLinks(doc *content.Document, install pagemap.Site) []wp.ContentLink {
 	found := doc.Links()
 
 	out := make([]wp.ContentLink, 0, len(found))
 	for i := range found {
-		path, internal := pagemap.InternalPath(found[i].Href, host)
-		if !internal {
+		path, kind := install.Resolve(found[i].Href)
+		if kind != pagemap.LinkPath || path == "" {
 			continue
 		}
 		out = append(out, wp.ContentLink{Href: path, Anchor: found[i].Anchor})
@@ -454,7 +456,11 @@ func reconcile(ctx context.Context, deps Deps, owner site.Site, batch []pulledIt
 			byPath[next.Path] = next
 			byWPID[*next.WPID] = next
 
-			linkErr := deps.Links.ReplaceForPage(c, next.ID, pulledLinks(next, byPath, batch[i].Links, now))
+			ours, listErr := generatedTargets(c, deps, next.ID, known)
+			if listErr != nil {
+				return listErr
+			}
+			linkErr := deps.Links.ReplaceForPage(c, next.ID, pulledLinks(next, byPath, batch[i].Links, now, ours))
 			if linkErr != nil {
 				return linkErr
 			}
@@ -487,14 +493,14 @@ func merge(current pagemap.Page, known bool, item pulledItem, siteID string,
 
 	drifted = known && next.ContentHash != "" && next.ContentHash != item.ContentHash
 
-	if !authored(next) {
+	if !hasPlan(current, known) {
 		next.Path = item.Path
 		next.Slug = pagemap.Slug(item.Path)
-		next.Title = item.Title
-		next.H1 = item.H1
-		next.MetaTitle = item.Meta.Title
-		next.MetaDescription = item.Meta.Description
-		next.Canonical = item.Meta.Canonical
+		next.Title = orKept(item.Title, next.Title)
+		next.H1 = orKept(item.H1, next.H1)
+		next.MetaTitle = orKept(item.Meta.Title, next.MetaTitle)
+		next.MetaDescription = orKept(item.Meta.Description, next.MetaDescription)
+		next.Canonical = orKept(item.Meta.Canonical, next.Canonical)
 		next.Status = statusFor(item.Status)
 	}
 	next.WPType = wpTypeOrPage(item.Type)
@@ -512,8 +518,32 @@ func merge(current pagemap.Page, known bool, item pulledItem, siteID string,
 	return next, drifted
 }
 
-func authored(page pagemap.Page) bool {
-	return page.ContentHash != ""
+func hasPlan(current pagemap.Page, known bool) bool {
+	switch {
+	case !known:
+		return false
+	case current.Status == pagemap.StatusPlanned, current.ContentHash != "":
+		return true
+	default:
+		return current.Path != observedPath(current.Observed.Link) ||
+			current.Title != current.Observed.Title ||
+			current.H1 != current.Observed.H1
+	}
+}
+
+func observedPath(link string) string {
+	path, err := pagemap.NormalizePath(link)
+	if err != nil {
+		return link
+	}
+	return path
+}
+
+func orKept(reported, stored string) string {
+	if reported == "" {
+		return stored
+	}
+	return reported
 }
 
 func wpTypeOrPage(itemType pagemap.WPType) pagemap.WPType {
@@ -530,7 +560,26 @@ func statusFor(wpStatus string) pagemap.Status {
 	return pagemap.StatusExists
 }
 
-func pulledLinks(page pagemap.Page, byPath map[string]pagemap.Page, links []wp.ContentLink, at time.Time) []pagemap.PageLink {
+func generatedTargets(ctx context.Context, deps Deps, pageID string, known bool) (map[string]struct{}, error) {
+	if !known {
+		return nil, nil
+	}
+
+	stored, err := deps.Links.ListForPage(ctx, pageID)
+	if err != nil {
+		return nil, err
+	}
+	ours := make(map[string]struct{}, len(stored))
+	for i := range stored {
+		if stored[i].Origin == pagemap.OriginGenerated {
+			ours[stored[i].ToURL] = struct{}{}
+		}
+	}
+	return ours, nil
+}
+
+func pulledLinks(page pagemap.Page, byPath map[string]pagemap.Page, links []wp.ContentLink, at time.Time,
+	ours map[string]struct{}) []pagemap.PageLink {
 	out := make([]pagemap.PageLink, 0, len(links))
 	for i := range links {
 		path, err := pagemap.NormalizePath(links[i].Href)
@@ -538,9 +587,13 @@ func pulledLinks(page pagemap.Page, byPath map[string]pagemap.Page, links []wp.C
 			continue
 		}
 
+		origin := pagemap.OriginObserved
+		if _, generated := ours[path]; generated {
+			origin = pagemap.OriginGenerated
+		}
 		link := pagemap.PageLink{
 			ID: id.New(), SiteID: page.SiteID, FromPageID: page.ID, ToURL: path,
-			AnchorText: links[i].Anchor, Origin: pagemap.OriginObserved, ObservedAt: at,
+			AnchorText: links[i].Anchor, Origin: origin, ObservedAt: at,
 		}
 		if target, ok := byPath[path]; ok {
 			link.ToPageID = &target.ID
