@@ -74,6 +74,8 @@ export function ImportScreen(): ReactElement {
                         siteId={siteId}
                         mapping={flow.mapping}
                         options={flow.options}
+                        sheets={flow.sheets}
+                        headers={flow.headers}
                         onOptions={flow.setOptions}
                         onSaved={(mapping) => {
                             change({ ...query, mappingId: mapping.id ?? "" });
@@ -145,6 +147,7 @@ export function ImportScreen(): ReactElement {
                     sample={inspected?.sample ?? []}
                     columns={flow.columns}
                     detected={flow.detected}
+                    indentColumns={flow.options.indentColumns ?? []}
                     onAssign={(header: string, field: ImportField | null) => {
                         flow.setColumns(assign(flow.columns, header, field));
                     }}

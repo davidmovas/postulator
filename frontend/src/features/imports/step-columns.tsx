@@ -25,6 +25,7 @@ export interface StepColumnsProps {
     sample: readonly (readonly string[] | null)[];
     columns: ColumnMap | null;
     detected: ColumnMap | null;
+    indentColumns: readonly string[];
     onAssign: (header: string, field: ImportField | null) => void;
     onBack: () => void;
     onNext: () => void;
@@ -49,12 +50,13 @@ export function StepColumns({
     sample,
     columns,
     detected,
+    indentColumns,
     onAssign,
     onBack,
     onNext,
 }: StepColumnsProps): ReactElement {
     const ignored = unmappedHeaders(headers, columns);
-    const ready = usable(columns);
+    const ready = usable(columns, indentColumns);
 
     if (headers.length === 0) {
         return (

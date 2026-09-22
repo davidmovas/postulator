@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useApplySheet, useInspectSheet, usePreviewSheet } from "../../data/hooks/imports.js";
-import type { ImportMapping, ImportOptions } from "../../data/types.js";
+import type { ImportMapping, ImportOptions, ImportSheet } from "../../data/types.js";
 import type { ColumnMap } from "./columns.js";
 import { forget, readRecent, remember, writeRecent } from "./recent.js";
 import type { RecentFile } from "./recent.js";
@@ -13,6 +13,8 @@ export interface ImportFlow {
     columns: ColumnMap | null;
     detected: ColumnMap | null;
     options: ImportOptions;
+    sheets: readonly ImportSheet[];
+    headers: readonly string[];
     mapping: ImportMapping;
     recent: readonly RecentFile[];
     setColumns: (next: Record<string, string>) => void;
@@ -33,7 +35,12 @@ export function useImportFlow(siteId: string, path: string, previewing: boolean)
     const [chosen, setChosen] = useState<Record<string, string> | null>(null);
     const [options, setOptions] = useState<ImportOptions>({});
     const [recent, setRecent] = useState<readonly RecentFile[]>(() => readRecent(siteId));
+    const [sheets, setSheets] = useState<readonly ImportSheet[]>([]);
     const inspected = useRef("");
+    const reading = useMemo(
+        () => JSON.stringify([options.sheets ?? [], options.noHeader === true]),
+        [options.sheets, options.noHeader],
+    );
     const previewed = useRef("");
     const remembered = useRef("");
 
@@ -46,16 +53,26 @@ export function useImportFlow(siteId: string, path: string, previewing: boolean)
     }, [siteId]);
 
     useEffect(() => {
-        if (siteId === "" || path === "" || inspected.current === path) {
+        if (siteId === "" || path === "") {
             return;
         }
-        inspected.current = path;
+        const stamp = `${path}|${reading}`;
+        if (inspected.current === stamp) {
+            return;
+        }
+        const opened = inspected.current.split("|")[0] !== path;
+        inspected.current = stamp;
         previewed.current = "";
         setChosen(null);
-        setOptions({});
         applyReset();
-        inspectMutate({ siteId, path });
-    }, [siteId, path, inspectMutate, applyReset]);
+        if (opened) {
+            setSheets([]);
+            setOptions({});
+            inspectMutate({ siteId, path, sheets: [], noHeader: false });
+            return;
+        }
+        inspectMutate({ siteId, path, sheets: options.sheets ?? [], noHeader: options.noHeader === true });
+    }, [siteId, path, reading, options.sheets, options.noHeader, inspectMutate, applyReset]);
 
     const detected = inspect.data?.detected.columns ?? null;
 
@@ -70,6 +87,7 @@ export function useImportFlow(siteId: string, path: string, previewing: boolean)
             return;
         }
         remembered.current = path;
+        setSheets(answered.sheets ?? []);
         const next = remember(readRecent(siteId), { path, rows: answered.rows, at: new Date().toISOString() });
         writeRecent(siteId, next);
         setRecent(next);
@@ -122,6 +140,8 @@ export function useImportFlow(siteId: string, path: string, previewing: boolean)
         columns: mapping.columns,
         detected,
         options,
+        sheets,
+        headers: inspect.data?.headers ?? [],
         mapping,
         recent,
         setColumns: setChosen,

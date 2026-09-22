@@ -84,6 +84,7 @@ export type TokenUsage = Wire<CatalogModels.Usage>;
 export type UsageSummary = Wire<CatalogModels.UsageSummaryResponse>;
 export type ProviderKey = Wire<CatalogModels.ProviderKey>;
 
+export type ImportSheet = Wire<ImportModels.Sheet>;
 export type ImportMapping = Wire<ImportModels.Mapping>;
 export type ImportOptions = Wire<ImportModels.Options>;
 export type ImportFinding = Wire<ImportModels.Finding>;

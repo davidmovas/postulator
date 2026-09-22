@@ -18,6 +18,7 @@ type Options struct {
 	ListSeparator    string   `json:"listSeparator,omitempty"`
 	Sheets           []string `json:"sheets,omitempty"`
 	IndentColumns    []string `json:"indentColumns,omitempty"`
+	NoHeader         bool     `json:"noHeader,omitempty"`
 }
 
 func DefaultOptions() Options {

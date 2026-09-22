@@ -40,7 +40,10 @@ export function unmappedHeaders(headers: readonly string[], columns: ColumnMap |
     return headers.filter((header) => header !== "" && targetOf(columns, header) === null);
 }
 
-export function usable(columns: ColumnMap | null): boolean {
+export function usable(columns: ColumnMap | null, indentColumns: readonly string[] = []): boolean {
+    if (indentColumns.length > 0) {
+        return true;
+    }
     const mapped = mappedFields(columns);
     return mapped.includes("path") || mapped.includes("entity");
 }

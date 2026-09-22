@@ -1,9 +1,10 @@
 package imports
 
 type InspectRequest struct {
-	SiteID string   `json:"siteId"`
-	Path   string   `json:"path"`
-	Sheets []string `json:"sheets,omitempty"`
+	SiteID   string   `json:"siteId"`
+	Path     string   `json:"path"`
+	Sheets   []string `json:"sheets,omitempty"`
+	NoHeader bool     `json:"noHeader,omitempty"`
 }
 
 type InspectResponse struct {

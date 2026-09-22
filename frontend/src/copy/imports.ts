@@ -56,8 +56,17 @@ export const imports = {
         detected: "Matched automatically",
         unmapped: (count: number) =>
             count === 1 ? "1 column has no target and will be ignored." : `${count} columns have no target and will be ignored.`,
-        needsTarget: "Map a column to Path or to Entity before going on.",
+        needsTarget: "Map a column to Path or to Entity, or tick the columns that carry the hierarchy, before going on.",
         options: "Reading options",
+        sheets: "Sheets",
+        sheetsHint: "Sheets that do not carry the same columns have to be imported one at a time.",
+        sheetRows: (rows: number) => (rows === 1 ? "1 row" : `${rows} rows`),
+        noHeader: "The sheet has no header row",
+        noHeaderHint: "Every column is addressed by its spreadsheet letter and every row is read as data.",
+        indent: "Hierarchy by indentation",
+        unnamed: (letter: string) => `Column ${letter}`,
+        indentHint:
+            "Tick the columns whose position carries the hierarchy, left to right. A row's path is its own cell prefixed by the columns to its left.",
         pathPrefixStrip: "Strip from the start of every path",
         keywordSeparator: "Keywords separated by",
         anchorSeparator: "Anchors separated by",

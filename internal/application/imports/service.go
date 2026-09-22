@@ -101,7 +101,7 @@ func (s *Service) table(ctx context.Context, path string, options Options) (impo
 	return s.deps.Tables.Read(ctx, path, importmap.ReadOptions{
 		Sheets:  options.Sheets,
 		MaxRows: s.deps.MaxRows,
-		Letters: len(options.IndentColumns) > 0 && len(options.Sheets) == 0,
+		Letters: options.NoHeader,
 	})
 }
 

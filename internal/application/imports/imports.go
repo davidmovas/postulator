@@ -21,7 +21,7 @@ func (s *Service) Inspect(ctx context.Context, req InspectRequest) (InspectRespo
 		return InspectResponse{}, err
 	}
 
-	table, err := s.table(ctx, req.Path, Options{Sheets: req.Sheets})
+	table, err := s.table(ctx, req.Path, Options{Sheets: req.Sheets, NoHeader: req.NoHeader})
 	if err != nil {
 		return InspectResponse{}, err
 	}
