@@ -12,6 +12,7 @@ import {
     listEdges,
     listEntities,
     loadGraph,
+    moveEntity,
     proposeFromPages,
     proposeRelated,
     recomputeScores,
@@ -106,6 +107,17 @@ export function useAddEdge() {
     const client = useQueryClient();
     return useMutation({
         mutationFn: (request: Parameters<typeof addEdge>[0]) => addEdge(request),
+        onSuccess: (answered) => {
+            void client.invalidateQueries({ queryKey: keys.graph.edgeLists() });
+            void client.invalidateQueries({ queryKey: keys.graph.full(answered.edge.siteId) });
+        },
+    });
+}
+
+export function useMoveEntity() {
+    const client = useQueryClient();
+    return useMutation({
+        mutationFn: (request: Parameters<typeof moveEntity>[0]) => moveEntity(request),
         onSuccess: (answered) => {
             void client.invalidateQueries({ queryKey: keys.graph.edgeLists() });
             void client.invalidateQueries({ queryKey: keys.graph.full(answered.edge.siteId) });

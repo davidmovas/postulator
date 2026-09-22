@@ -15,9 +15,9 @@ import { rows as auditRows, showCounts } from "./model/audit.js";
 import { defaultQuery, narrowed, readQuery, searchOf, writeQuery } from "./model/params.js";
 import type { LinksQuery } from "./model/params.js";
 import { AuditPanel } from "./panel.js";
+import { relinkCap, relinkSelection } from "./model/relink.js";
 import { AuditTable } from "./table.js";
 
-export const relinkCap = 500;
 const relinkKind = "relink";
 
 export function LinksScreen(): ReactElement {
@@ -43,10 +43,9 @@ export function LinksScreen(): ReactElement {
         }
         return held;
     }, [pages]);
-    const relinkTargets = useMemo(() => rows.filter((row) => row.missing > 0 && row.skipReason === "").map((row) => row.pageId), [rows]);
+    const owed = useMemo(() => relinkSelection(rows), [rows]);
     const selected = pageId === null ? undefined : pages.find((row) => row.pageId === pageId);
-    const relinkCount = Math.min(relinkTargets.length, relinkCap);
-    const relinkCapped = relinkTargets.length > relinkCap;
+    const relinkCount = owed.pageIds.length;
 
     const change = (next: LinksQuery): void => {
         setSearchParams(writeQuery(next), { replace: true });
@@ -67,9 +66,13 @@ export function LinksScreen(): ReactElement {
                     variant="primary"
                     icon={PlayCircleIcon}
                     disabled={relinkCount === 0}
-                    title={relinkCount === 0 ? copy.links.relink.noneTitle : relinkCapped ? copy.links.relink.capped(relinkCap) : copy.links.relink.title}
+                    title={
+                        relinkCount === 0
+                            ? copy.links.relink.noneTitle
+                            : `${owed.capped ? copy.links.relink.capped(relinkCap) : copy.links.relink.title}. ${copy.links.relink.does}`
+                    }
                     onClick={() => {
-                        setRelinking(relinkTargets.slice(0, relinkCap));
+                        setRelinking(owed.pageIds);
                     }}
                 >
                     {relinkCount === 0 ? copy.links.relink.none : copy.links.relink.start(relinkCount)}

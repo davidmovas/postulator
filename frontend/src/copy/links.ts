@@ -25,6 +25,7 @@ export const links = {
         title: "Start a relink run over the pages with missing links",
         capped: (count: number) => `The worst ${count} pages; a run takes at most ${count} targets`,
         page: "Relink this page",
+        does: "A relink reads each page from WordPress, places the links its rules ask for and writes it back. It never rewrites the body and it calls no model, so it costs nothing.",
     },
     filters: {
         title: "Filters",

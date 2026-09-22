@@ -30,10 +30,21 @@ const templateAuto = "";
 const templateAutoValue = "auto";
 const listSize = 100;
 const defaultCap = "5.00";
+const defaultTokenCap = "0";
 
 function capOf(raw: string): number {
     const parsed = Number.parseFloat(raw);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+export function tokenCapOf(raw: string): number {
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+export function kindDoes(kind: string): string {
+    const said: Record<string, string> = copy.runs.start.kindDoes;
+    return said[kind] ?? "";
 }
 
 export interface StartRunDrawerProps {
@@ -58,6 +69,7 @@ export function StartRunDrawer({
     const [kind, setKind] = useState<string>(initialKind ?? kindGenerate);
     const [templateId, setTemplateId] = useState<string>(templateAuto);
     const [cap, setCap] = useState(defaultCap);
+    const [tokenCap, setTokenCap] = useState(defaultTokenCap);
     const [estimate, setEstimate] = useState<Estimate | null>(null);
 
     const priced = useEstimateRun();
@@ -74,6 +86,7 @@ export function StartRunDrawer({
         setKind(initialKind ?? kindGenerate);
         setTemplateId(templateAuto);
         setCap(defaultCap);
+        setTokenCap(defaultTokenCap);
         setEstimate(null);
         priced.reset();
         start.reset();
@@ -100,7 +113,7 @@ export function StartRunDrawer({
             pageIds: [...selected],
             publishMode,
             kind,
-            budget: { maxUsd: capOf(cap), maxTokens: 0 },
+            budget: { maxUsd: capOf(cap), maxTokens: tokenCapOf(tokenCap) },
         };
         if (templateId !== templateAuto) {
             built.templateId = templateId;
@@ -194,10 +207,11 @@ export function StartRunDrawer({
                             />
                         )}
                     </Field>
-                    <Field label={copy.runs.start.kind}>
+                    <Field label={copy.runs.start.kind} hint={kindDoes(kind)}>
                         {(control) => (
                             <Select
                                 id={control.id}
+                                aria-describedby={control["aria-describedby"]}
                                 value={kind}
                                 options={runKinds.map((value) => ({ value, label: kindLabel(value) }))}
                                 onValueChange={(next) => {
@@ -223,25 +237,47 @@ export function StartRunDrawer({
                     )}
                 </Field>
 
-                <Field
-                    label={copy.runs.start.cap}
-                    tooltip={copy.runs.start.capHint}
-                    hint={capValue === 0 ? copy.runs.start.capZero : undefined}
-                >
-                    {(control) => (
-                        <Input
-                            id={control.id}
-                            aria-describedby={control["aria-describedby"]}
-                            mono={true}
-                            inputMode="decimal"
-                            value={cap}
-                            onChange={(event) => {
-                                setCap(event.target.value);
-                                forget();
-                            }}
-                        />
-                    )}
-                </Field>
+                <div className="grid grid-cols-2 gap-2">
+                    <Field
+                        label={copy.runs.start.cap}
+                        tooltip={copy.runs.start.capHint}
+                        hint={capValue === 0 ? copy.runs.start.capZero : undefined}
+                    >
+                        {(control) => (
+                            <Input
+                                id={control.id}
+                                aria-describedby={control["aria-describedby"]}
+                                mono={true}
+                                inputMode="decimal"
+                                value={cap}
+                                onChange={(event) => {
+                                    setCap(event.target.value);
+                                    forget();
+                                }}
+                            />
+                        )}
+                    </Field>
+                    <Field
+                        label={copy.runs.start.tokenCap}
+                        tooltip={copy.runs.start.tokenCapHint}
+                        hint={tokenCapOf(tokenCap) === 0 ? copy.runs.start.tokenCapZero : undefined}
+                    >
+                        {(control) => (
+                            <Input
+                                id={control.id}
+                                aria-describedby={control["aria-describedby"]}
+                                data-run-token-cap={true}
+                                mono={true}
+                                inputMode="numeric"
+                                value={tokenCap}
+                                onChange={(event) => {
+                                    setTokenCap(event.target.value);
+                                    forget();
+                                }}
+                            />
+                        )}
+                    </Field>
+                </div>
 
                 {estimate === null ? null : (
                     <div className="flex items-baseline justify-between gap-2 rounded-md border border-hairline bg-inset px-2.5 py-2">

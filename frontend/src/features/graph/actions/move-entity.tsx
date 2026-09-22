@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
 import { react } from "../../../data/errors.js";
-import { useAddEdge, useDeleteEdge } from "../../../data/hooks/graph.js";
+import { useMoveEntity } from "../../../data/hooks/graph.js";
 import { pushToast } from "../../../data/toasts.js";
 import { AltRouteIcon, Checkbox, Dialog } from "../../../ui/index.js";
 import { cycleOf } from "../model/cycle.js";
@@ -14,6 +14,10 @@ export interface MoveRequest {
     parentId: string;
 }
 
+export function parentBeingReplaced(index: GraphIndex, childId: string): string | undefined {
+    return index.placementProposed.has(childId) ? undefined : index.placementParent.get(childId);
+}
+
 export interface MoveEntityDialogProps {
     siteId: string;
     index: GraphIndex;
@@ -21,24 +25,18 @@ export interface MoveEntityDialogProps {
     onClose: () => void;
 }
 
-export function MoveEntityDialog({ siteId, index, move, onClose }: MoveEntityDialogProps): ReactElement {
-    const addEdge = useAddEdge();
-    const deleteEdge = useDeleteEdge();
+export function MoveEntityDialog({ index, move, onClose }: MoveEntityDialogProps): ReactElement {
+    const moveEntity = useMoveEntity();
     const [keepBoth, setKeepBoth] = useState(false);
     const child = move === null ? undefined : index.byId.get(move.childId);
     const parent = move === null ? undefined : index.byId.get(move.parentId);
-    const previousId = child === undefined || index.placementProposed.has(child.id) ? undefined : index.placementParent.get(child.id);
+    const previousId = child === undefined ? undefined : parentBeingReplaced(index, child.id);
     const previous = previousId === undefined ? undefined : index.byId.get(previousId);
-    const previousEdge =
-        child === undefined || previousId === undefined
-            ? undefined
-            : index.edges.find((edge) => edge.kind === "parent" && edge.status === "approved" && edge.fromEntityId === child.id && edge.toEntityId === previousId);
 
     useEffect(() => {
         if (move !== null) {
             setKeepBoth(false);
-            addEdge.reset();
-            deleteEdge.reset();
+            moveEntity.reset();
         }
     }, [move?.childId, move?.parentId]);
 
@@ -47,10 +45,7 @@ export function MoveEntityDialog({ siteId, index, move, onClose }: MoveEntityDia
             return;
         }
         try {
-            await addEdge.mutateAsync({ siteId, fromEntityId: child.id, toEntityId: parent.id, kind: "parent", weight: 1 });
-            if (!keepBoth && previousEdge !== undefined) {
-                await deleteEdge.mutateAsync({ id: previousEdge.id });
-            }
+            await moveEntity.mutateAsync({ entityId: child.id, newParentId: parent.id, keepBoth });
             pushToast("info", copy.graph.move.moved(child.name, parent.name));
             onClose();
         } catch (thrown) {
@@ -78,7 +73,7 @@ export function MoveEntityDialog({ siteId, index, move, onClose }: MoveEntityDia
             confirmLabel={copy.graph.move.confirm}
             cancelLabel={copy.graph.move.cancel}
             icon={AltRouteIcon}
-            busy={addEdge.isPending || deleteEdge.isPending}
+            busy={moveEntity.isPending}
             onConfirm={() => {
                 void run();
             }}

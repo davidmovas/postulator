@@ -1,0 +1,43 @@
+import { describe, expect, it } from "vitest";
+
+import { runKinds } from "../../generated/vocab.js";
+import { kindDoes, tokenCapOf } from "./start.js";
+
+describe("what the drawer says a kind does", () => {
+    it("has one sentence for every kind a run can be", () => {
+        for (const kind of runKinds) {
+            const said = kindDoes(kind);
+            expect(said, kind).not.toBe("");
+            expect(said, kind).toMatch(/\.$/);
+        }
+    });
+
+    it("says nothing about a kind this build does not know", () => {
+        expect(kindDoes("teleport")).toBe("");
+    });
+
+    it("tells a relink apart from a generate", () => {
+        expect(kindDoes("relink")).not.toBe(kindDoes("generate"));
+        expect(kindDoes("relink")).toMatch(/no model/);
+        expect(kindDoes("repair")).toMatch(/No model/);
+    });
+});
+
+describe("the token cap the drawer sends", () => {
+    const cases: readonly (readonly [string, number])[] = [
+        ["0", 0],
+        ["", 0],
+        ["   ", 0],
+        ["-40", 0],
+        ["abc", 0],
+        ["120000", 120000],
+        ["12_000", 12],
+        ["4.9", 4],
+    ];
+
+    for (const [typed, want] of cases) {
+        it(`reads ${JSON.stringify(typed)} as ${want}`, () => {
+            expect(tokenCapOf(typed)).toBe(want);
+        });
+    }
+});

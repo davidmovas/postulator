@@ -13,6 +13,7 @@ export const addEdge = one(Graph.AddEdge);
 export const approveEdge = one(Graph.ApproveEdge);
 export const rejectEdge = one(Graph.RejectEdge);
 export const deleteEdge = one(Graph.DeleteEdge);
+export const moveEntity = one(Graph.MoveEntity);
 export const listEdges = listed<Parameters<typeof Graph.ListEdges>[0], Edge>(Graph.ListEdges);
 export const recomputeScores = one(Graph.RecomputeScores);
 export const proposeFromPages = one(Graph.ProposeFromPages);

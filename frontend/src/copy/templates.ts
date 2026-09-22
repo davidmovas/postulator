@@ -439,7 +439,7 @@ export const policies = {
         scopeHint: "Either every site in this workspace, or this site alone.",
     },
     rulesTitle: "Link rules on this policy",
-    rulesTooltip: "A run reads its link rules from the template it uses, not from here.",
+    rulesTooltip: "A template with its own link rules replaces these; one without them inherits them.",
     deleteTitle: "Delete this link policy?",
     deleteBody: "Sites that point at it fall back to the workspace default.",
     deleteConfirm: "Delete",
