@@ -77,6 +77,9 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (run.Run, template
 		version    int
 	)
 	if kind.PageScoped() {
+		if err := s.mapped(ctx, targets); err != nil {
+			return run.Run{}, template.TemplateSpec{}, err
+		}
 		for i, pageID := range targets {
 			resolved, resolveErr := s.specs.ResolveForPage(ctx, templates.ResolveForPageRequest{PageID: pageID})
 			if resolveErr != nil {
@@ -118,6 +121,30 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (run.Run, template
 		Budget:          req.Budget,
 		CreatedBy:       actor,
 	}, spec, nil
+}
+
+func (s *Service) mapped(ctx context.Context, targets []string) error {
+	unmapped := make([]string, 0, len(targets))
+	for _, pageID := range targets {
+		page, err := s.pages.Get(ctx, pageID)
+		if err != nil {
+			return err
+		}
+		if page.EntityID != nil && strings.TrimSpace(*page.EntityID) != "" {
+			continue
+		}
+		where := page.Path
+		if where == "" {
+			where = pageID
+		}
+		unmapped = append(unmapped, where)
+	}
+	if len(unmapped) == 0 {
+		return nil
+	}
+	return invalid("a run plans a page's links from the entity it is mapped to, and nothing is mapped to "+
+		strings.Join(unmapped, ", ")+"; map each of them on the Graph screen first", "pageIds").
+		WithDetail("paths", unmapped)
 }
 
 func recipeFor(kind run.Kind, requested, templated []template.StepSpec) ([]template.StepSpec, error) {

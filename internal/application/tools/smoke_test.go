@@ -150,7 +150,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		}),
 		Pages:     pages.New(pageRepo, linkRepo, entityRepo, siteRepo, store, bus, now, stubPreview{}),
 		Templates: templateService,
-		Runs:      runs.New(stubEngine{}, runRepo, itemRepo, artifactRepo, sqlite.NewRunEventRepo(store), templateService, domainrun.NewRegistry()),
+		Runs:      runs.New(stubEngine{}, runRepo, itemRepo, artifactRepo, sqlite.NewRunEventRepo(store), templateService, pageRepo, domainrun.NewRegistry()),
 		Sync:      sync.New(stubEngine{}, siteRepo, stubProbe{}, stubPacker{}, now),
 		Reports:   reportsService,
 		Imports: imports.New(imports.Deps{
@@ -167,7 +167,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		}),
 		Schedules: schedules.New(schedules.Deps{
 			Schedules: sqlite.NewScheduleRepo(store), Pages: pageRepo, Sites: siteRepo,
-			Runs:      runs.New(stubEngine{}, runRepo, itemRepo, artifactRepo, sqlite.NewRunEventRepo(store), templateService, domainrun.NewRegistry()),
+			Runs:      runs.New(stubEngine{}, runRepo, itemRepo, artifactRepo, sqlite.NewRunEventRepo(store), templateService, pageRepo, domainrun.NewRegistry()),
 			RunReader: runRepo, Publisher: bus, Clock: now,
 		}),
 		Actions:   sqlite.NewPendingActionRepo(store),

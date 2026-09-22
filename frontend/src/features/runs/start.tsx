@@ -51,6 +51,25 @@ export function takesATemplate(kind: string): boolean {
     return !(runKindsWithTheirOwnRecipe as readonly string[]).includes(kind);
 }
 
+export interface StartRefusal {
+    targets: string | null;
+    banner: string | null;
+}
+
+export function startRefusal(thrown: unknown): StartRefusal {
+    if (thrown === null || thrown === undefined) {
+        return { targets: null, banner: null };
+    }
+    const reaction = react(thrown);
+    if (reaction.kind === "silent" || reaction.kind === "unlock") {
+        return { targets: null, banner: null };
+    }
+    if (reaction.kind === "field" && reaction.field === "pageIds") {
+        return { targets: reaction.message, banner: null };
+    }
+    return { targets: null, banner: reaction.message };
+}
+
 
 export interface StartRunDrawerProps {
     open: boolean;
@@ -130,9 +149,7 @@ export function StartRunDrawer({
     const ready = selected.length > 0;
     const over = estimate !== null && capValue > 0 && estimate.usd > capValue;
     const thrown = start.error ?? priced.error;
-    const reaction = thrown === null || thrown === undefined ? null : react(thrown);
-    const problem =
-        reaction === null || reaction.kind === "silent" || reaction.kind === "unlock" ? null : reaction.message;
+    const refusal = startRefusal(thrown);
 
     return (
         <Drawer
@@ -190,6 +207,7 @@ export function StartRunDrawer({
                 <StartTargets
                     siteId={siteId}
                     selected={selected}
+                    problem={refusal.targets}
                     onToggle={(pageId) => {
                         setSelected((held) =>
                             held.includes(pageId) ? held.filter((id) => id !== pageId) : [...held, pageId],
@@ -300,7 +318,7 @@ export function StartRunDrawer({
                 ))}
 
                 {over ? <Banner tone="warn" title={copy.runs.start.overCap} /> : null}
-                {problem === null ? null : <Banner tone="danger" title={problem} />}
+                {refusal.banner === null ? null : <Banner tone="danger" title={refusal.banner} />}
             </div>
         </Drawer>
     );

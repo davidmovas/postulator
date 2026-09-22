@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { runKinds, runKindsWithTheirOwnRecipe } from "../../generated/vocab.js";
-import { kindDoes, takesATemplate, tokenCapOf } from "./start.js";
+import type { TransportError } from "../../lib/errors.js";
+import { kindDoes, startRefusal, takesATemplate, tokenCapOf } from "./start.js";
+
+function refused(cause: TransportError): Error {
+    return Object.assign(new Error(cause.message), { cause });
+}
 
 describe("what the drawer says a kind does", () => {
     it("has one sentence for every kind a run can be", () => {
@@ -57,6 +62,42 @@ describe("the template select the drawer offers", () => {
         for (const kind of runKindsWithTheirOwnRecipe) {
             expect(takesATemplate(kind), kind).toBe(false);
         }
+    });
+});
+
+describe("where the drawer puts a refusal", () => {
+    it("says nothing when nothing was refused", () => {
+        expect(startRefusal(null)).toEqual({ targets: null, banner: null });
+        expect(startRefusal(undefined)).toEqual({ targets: null, banner: null });
+    });
+
+    it("puts a refusal naming pageIds under the page list", () => {
+        const refusal = startRefusal(
+            refused({
+                code: "INVALID",
+                message: "nothing is mapped to /hub/child/",
+                details: { field: "pageIds", paths: ["/hub/child/"] },
+            }),
+        );
+        expect(refusal.targets).toBe("nothing is mapped to /hub/child/");
+        expect(refusal.banner).toBeNull();
+    });
+
+    it("puts a refusal naming another field in the banner", () => {
+        const refusal = startRefusal(
+            refused({
+                code: "INVALID",
+                message: "the step sync_site belongs to a run of its own",
+                details: { field: "recipe" },
+            }),
+        );
+        expect(refusal.targets).toBeNull();
+        expect(refusal.banner).toMatch(/sync_site/);
+    });
+
+    it("keeps a lock and a cancellation out of both", () => {
+        expect(startRefusal(refused({ code: "LOCKED", message: "locked" }))).toEqual({ targets: null, banner: null });
+        expect(startRefusal(refused({ code: "CANCELLED", message: "gone" }))).toEqual({ targets: null, banner: null });
     });
 });
 

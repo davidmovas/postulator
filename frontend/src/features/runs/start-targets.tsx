@@ -12,10 +12,11 @@ const pageSize = 100;
 export interface StartTargetsProps {
     siteId: string;
     selected: readonly string[];
+    problem?: string | null;
     onToggle: (pageId: string) => void;
 }
 
-export function StartTargets({ siteId, selected, onToggle }: StartTargetsProps): ReactElement {
+export function StartTargets({ siteId, selected, problem, onToggle }: StartTargetsProps): ReactElement {
     const [prefix, setPrefix] = useState("");
     const [applied, setApplied] = useState("");
 
@@ -84,6 +85,11 @@ export function StartTargets({ siteId, selected, onToggle }: StartTargetsProps):
                     </Button>
                 ) : null}
             </div>
+            {typeof problem === "string" && problem !== "" ? (
+                <p data-run-targets-problem={true} role="alert" className="text-xs text-danger">
+                    {problem}
+                </p>
+            ) : null}
         </div>
     );
 }

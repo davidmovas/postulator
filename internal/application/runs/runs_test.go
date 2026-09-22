@@ -13,6 +13,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	kctx "github.com/davidmovas/postulator/internal/kernel/ctx"
@@ -86,10 +87,27 @@ func (f *fakeSpecs) ResolveForPage(_ context.Context, req templates.ResolveForPa
 	}, nil
 }
 
+type fakePages struct {
+	unmapped map[string]string
+	err      error
+}
+
+func (f *fakePages) Get(_ context.Context, pageID string) (pagemap.Page, error) {
+	if f.err != nil {
+		return pagemap.Page{}, f.err
+	}
+	if path, ok := f.unmapped[pageID]; ok {
+		return pagemap.Page{ID: pageID, Path: path}, nil
+	}
+	entityID := "entity-" + pageID
+	return pagemap.Page{ID: pageID, Path: "/" + pageID + "/", EntityID: &entityID}, nil
+}
+
 type fixture struct {
 	service *runs.Service
 	engine  *fakeEngine
 	specs   *fakeSpecs
+	mapping *fakePages
 	runs    *sqlite.RunRepo
 	items   *sqlite.RunItemRepo
 	blobs   *sqlite.ArtifactRepo
@@ -125,11 +143,13 @@ func newFixture(t *testing.T) *fixture {
 	itemRepo := sqlite.NewRunItemRepo(store)
 	blobRepo := sqlite.NewArtifactRepo(store)
 	logRepo := sqlite.NewRunEventRepo(store)
+	mapping := &fakePages{unmapped: map[string]string{}}
 
 	return &fixture{
-		service: runs.New(engine, runRepo, itemRepo, blobRepo, logRepo, specs, stepRegistry(t)),
+		service: runs.New(engine, runRepo, itemRepo, blobRepo, logRepo, specs, mapping, stepRegistry(t)),
 		engine:  engine,
 		specs:   specs,
+		mapping: mapping,
 		runs:    runRepo,
 		items:   itemRepo,
 		blobs:   blobRepo,

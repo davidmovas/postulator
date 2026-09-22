@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
@@ -50,6 +51,10 @@ type specResolver interface {
 	ResolveForPage(ctx context.Context, req templates.ResolveForPageRequest) (templates.ResolveForPageResponse, error)
 }
 
+type pageReader interface {
+	Get(ctx context.Context, id string) (pagemap.Page, error)
+}
+
 type Service struct {
 	engine    engine
 	runs      runStore
@@ -57,13 +62,15 @@ type Service struct {
 	artifacts artifactStore
 	events    eventStore
 	specs     specResolver
+	pages     pageReader
 	steps     stepDefs
 }
 
 func New(engine engine, runs runStore, items itemStore, artifacts artifactStore, events eventStore,
-	specs specResolver, steps stepDefs) *Service {
+	specs specResolver, pages pageReader, steps stepDefs) *Service {
 	return &Service{
-		engine: engine, runs: runs, items: items, artifacts: artifacts, events: events, specs: specs, steps: steps,
+		engine: engine, runs: runs, items: items, artifacts: artifacts, events: events,
+		specs: specs, pages: pages, steps: steps,
 	}
 }
 
