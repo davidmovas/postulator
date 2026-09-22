@@ -363,6 +363,81 @@ func TestPublishMovesAFlatPageRatherThanDuplicatingIt(t *testing.T) {
 	}
 }
 
+func TestPublishRecordsWhatTheSiteReportedBack(t *testing.T) {
+	t.Parallel()
+
+	deps, _ := imageDeps(t)
+	written := &pageRecorder{}
+	deps.Pages = written
+
+	sc := publishContext(t)
+	sc.Run.PublishMode = run.PublishLive
+	published := runPublish(t, deps, sc)
+
+	if written.last.Observed.Link != published.URL {
+		t.Fatalf("the stored link = %q, want the address WordPress answered with (%q)",
+			written.last.Observed.Link, published.URL)
+	}
+	if written.last.Observed.Slug != "espresso" || written.last.Observed.Status != "publish" {
+		t.Fatalf("the stored mirror = %+v", written.last.Observed)
+	}
+	if written.last.Observed.Title != "Espresso guide" {
+		t.Errorf("the stored title = %q, want the title the site holds", written.last.Observed.Title)
+	}
+	if len(published.Mismatches) != 0 {
+		t.Errorf("mismatches = %+v, want none: the site agreed", published.Mismatches)
+	}
+}
+
+func TestPublishStopsWhenWordPressRenamesATakenSlug(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Slug: "espresso", Status: "publish"})
+	ours := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Slug: "other", Status: "publish"})
+
+	sc := publishContext(t)
+	sc.Page.WPID = &ours[0].ID
+
+	result, err := steps.Publish(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+	if result.Next != run.TransitionPause || result.Reason != run.PauseNeedsHuman {
+		t.Fatalf("Publish onto a taken slug = %q / %q, want a pause for a human", result.Next, result.Reason)
+	}
+	if !strings.Contains(result.Message, "espresso-2") {
+		t.Errorf("the pause message %q does not name the slug the site chose", result.Message)
+	}
+}
+
+func TestPublishStopsWhenTheAddressIsNotTheOneAskedFor(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	elsewhere := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Tea", Slug: "tea"})
+	wpID := elsewhere[0].ID
+
+	deps.Pages = pageList{items: []pagemap.Page{{
+		ID: "page-parent", SiteID: "site", Path: "/coffee/", Slug: "coffee", WPType: pagemap.WPPage,
+		Status: pagemap.StatusPublished, WPID: &wpID,
+	}}}
+
+	sc := nestedContext(t)
+	sc.Run.PublishMode = run.PublishLive
+
+	result, err := steps.Publish(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+	if result.Next != run.TransitionPause || result.Reason != run.PauseNeedsHuman {
+		t.Fatalf("Publish under a parent that sits elsewhere = %q / %q, want a pause", result.Next, result.Reason)
+	}
+	if !strings.Contains(result.Message, "/coffee/espresso/") || !strings.Contains(result.Message, "/tea/espresso/") {
+		t.Errorf("the pause message %q names neither the plan nor what is there", result.Message)
+	}
+}
+
 func TestPublishSkipsTheSEOMetaWithoutAMetaArtifact(t *testing.T) {
 	t.Parallel()
 

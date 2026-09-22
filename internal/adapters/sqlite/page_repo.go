@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	pageColumns       = `id, site_id, path, slug, parent_page_id, wp_type, wp_id, title, h1, meta_title, meta_description, canonical, status, entity_id, template_id, content_hash, wp_modified_at, last_synced_at, drift, created_at, updated_at`
-	insertPage        = `INSERT INTO pages (` + pageColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	updatePage        = `UPDATE pages SET path = ?, slug = ?, parent_page_id = ?, wp_type = ?, wp_id = ?, title = ?, h1 = ?, meta_title = ?, meta_description = ?, canonical = ?, status = ?, entity_id = ?, template_id = ?, content_hash = ?, wp_modified_at = ?, last_synced_at = ?, drift = ?, updated_at = ? WHERE id = ?`
+	pageColumns       = `id, site_id, path, slug, parent_page_id, wp_type, wp_id, title, h1, meta_title, meta_description, canonical, status, entity_id, template_id, content_hash, wp_link, wp_slug, wp_status, wp_title, wp_h1, wp_modified_at, last_synced_at, drift, created_at, updated_at`
+	insertPage        = `INSERT INTO pages (` + pageColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	updatePage        = `UPDATE pages SET path = ?, slug = ?, parent_page_id = ?, wp_type = ?, wp_id = ?, title = ?, h1 = ?, meta_title = ?, meta_description = ?, canonical = ?, status = ?, entity_id = ?, template_id = ?, content_hash = ?, wp_link = ?, wp_slug = ?, wp_status = ?, wp_title = ?, wp_h1 = ?, wp_modified_at = ?, last_synced_at = ?, drift = ?, updated_at = ? WHERE id = ?`
 	deletePage        = `DELETE FROM pages WHERE id = ?`
 	selectPage        = `SELECT ` + pageColumns + ` FROM pages WHERE id = ?`
 	selectPagesBySite = `SELECT ` + pageColumns + ` FROM pages WHERE site_id = ? ORDER BY path, id`
@@ -74,7 +74,8 @@ func (r *PageRepo) Insert(ctx context.Context, p pagemap.Page) error {
 	_, err := execWrite(ctx, r.store.writeFrom(ctx), insertPage, []any{
 		p.ID, p.SiteID, p.Path, p.Slug, nullString(p.ParentPageID), string(p.WPType), nullInt(p.WPID),
 		p.Title, p.H1, p.MetaTitle, p.MetaDescription, p.Canonical, string(p.Status), nullString(p.EntityID), nullString(p.TemplateID),
-		p.ContentHash, nullTime(p.WPModifiedAt), nullTime(p.LastSyncedAt), boolInt(p.Drift), formatTime(p.CreatedAt), formatTime(p.UpdatedAt),
+		p.ContentHash, p.Observed.Link, p.Observed.Slug, p.Observed.Status, p.Observed.Title, p.Observed.H1,
+		nullTime(p.WPModifiedAt), nullTime(p.LastSyncedAt), boolInt(p.Drift), formatTime(p.CreatedAt), formatTime(p.UpdatedAt),
 	}, pageConflict(p.Path), "insert the page")
 	return err
 }
@@ -83,7 +84,8 @@ func (r *PageRepo) Update(ctx context.Context, p pagemap.Page) error {
 	affected, err := execWrite(ctx, r.store.writeFrom(ctx), updatePage, []any{
 		p.Path, p.Slug, nullString(p.ParentPageID), string(p.WPType), nullInt(p.WPID),
 		p.Title, p.H1, p.MetaTitle, p.MetaDescription, p.Canonical, string(p.Status), nullString(p.EntityID), nullString(p.TemplateID),
-		p.ContentHash, nullTime(p.WPModifiedAt), nullTime(p.LastSyncedAt), boolInt(p.Drift), formatTime(p.UpdatedAt), p.ID,
+		p.ContentHash, p.Observed.Link, p.Observed.Slug, p.Observed.Status, p.Observed.Title, p.Observed.H1,
+		nullTime(p.WPModifiedAt), nullTime(p.LastSyncedAt), boolInt(p.Drift), formatTime(p.UpdatedAt), p.ID,
 	}, pageConflict(p.Path), "update the page")
 	return requireAffected(affected, err, pageNotFound(p.ID))
 }
@@ -159,7 +161,8 @@ func scanPage(rows *sql.Rows) (pagemap.Page, error) {
 		createdAt, updatedAt           string
 	)
 	if err := rows.Scan(&p.ID, &p.SiteID, &p.Path, &p.Slug, &parentID, &wpType, &wpID, &p.Title, &p.H1, &p.MetaTitle, &p.MetaDescription, &p.Canonical,
-		&status, &entityID, &templateID, &p.ContentHash, &wpModifiedAt, &lastSyncedAt, &drift, &createdAt, &updatedAt); err != nil {
+		&status, &entityID, &templateID, &p.ContentHash, &p.Observed.Link, &p.Observed.Slug, &p.Observed.Status,
+		&p.Observed.Title, &p.Observed.H1, &wpModifiedAt, &lastSyncedAt, &drift, &createdAt, &updatedAt); err != nil {
 		return pagemap.Page{}, err
 	}
 	p.ParentPageID = optString(parentID)

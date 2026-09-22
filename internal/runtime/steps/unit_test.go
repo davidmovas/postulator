@@ -69,6 +69,28 @@ func (p pageList) Insert(context.Context, pagemap.Page) error {
 	return p.err
 }
 
+type pageRecorder struct {
+	last pagemap.Page
+}
+
+func (p *pageRecorder) ListBySite(context.Context, string) ([]pagemap.Page, error) {
+	return nil, nil
+}
+
+func (p *pageRecorder) Get(_ context.Context, id string) (pagemap.Page, error) {
+	return pagemap.Page{}, errors.New(errors.NotFound, "no such page").WithDetail("pageId", id)
+}
+
+func (p *pageRecorder) Update(_ context.Context, page pagemap.Page) error {
+	p.last = page
+	return nil
+}
+
+func (p *pageRecorder) Insert(_ context.Context, page pagemap.Page) error {
+	p.last = page
+	return nil
+}
+
 type siteStub struct {
 	record site.Site
 	err    error

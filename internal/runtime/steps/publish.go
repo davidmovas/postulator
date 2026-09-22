@@ -3,6 +3,7 @@ package steps
 import (
 	"context"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
@@ -22,6 +23,8 @@ const (
 
 	ParentWaitLimit = 6
 
+	FieldParent = "parent"
+
 	checkpointParentWaits = "parentWaits"
 
 	publishTimeout = 2 * time.Minute
@@ -31,14 +34,15 @@ const (
 var editableStatuses = []string{"publish", "future", "draft", "pending", "private"}
 
 type PublishResult struct {
-	URL         string            `json:"url"`
-	Status      string            `json:"status"`
-	ContentHash string            `json:"contentHash"`
-	SEOApplied  []string          `json:"seoApplied"`
-	Skipped     []string          `json:"skipped"`
-	Findings    []content.Finding `json:"findings"`
-	WPID        int64             `json:"wpId"`
-	Created     bool              `json:"created"`
+	URL         string             `json:"url"`
+	Status      string             `json:"status"`
+	ContentHash string             `json:"contentHash"`
+	SEOApplied  []string           `json:"seoApplied"`
+	Skipped     []string           `json:"skipped"`
+	Findings    []content.Finding  `json:"findings"`
+	Mismatches  []pagemap.Mismatch `json:"mismatches"`
+	WPID        int64              `json:"wpId"`
+	Created     bool               `json:"created"`
 }
 
 func Publish(deps Deps) run.StepDef {
@@ -99,18 +103,32 @@ func Publish(deps Deps) run.StepDef {
 
 			rendered := string(body.Blob)
 			status := string(sc.Run.PublishMode)
-			written, err := upsert(ctx, client, itemType, writeRequest{
+			asked := writeRequest{
 				existing: existing, found: found, title: draft.Title, content: rendered,
 				slug: sc.Page.Slug, status: status, parent: parent, featured: featured.FeaturedID,
-			})
+			}
+			written, err := upsert(ctx, client, itemType, asked)
 			if err != nil {
 				return run.Result{}, err
+			}
+
+			mismatches := compare(sc, asked, written)
+			if len(mismatches) > 0 {
+				asked.existing, asked.found = written, true
+				if written, err = upsert(ctx, client, itemType, asked); err != nil {
+					return run.Result{}, err
+				}
+				mismatches = compare(sc, asked, written)
+			}
+			if len(mismatches) > 0 {
+				return refuseMismatch(sc, mismatches), nil
 			}
 
 			result := PublishResult{
 				WPID: written.ID, URL: written.Link, Status: written.Status,
 				ContentHash: wp.ContentHash(rendered), Created: !found,
 				SEOApplied: make([]string, 0), Skipped: make([]string, 0), Findings: findings,
+				Mismatches: mismatches,
 			}
 			seo, err := applySEO(ctx, client, sc, written.ID)
 			if err != nil {
@@ -133,6 +151,51 @@ func Publish(deps Deps) run.StepDef {
 				Message:   verb(found) + " " + sc.Page.Path + " as " + strconv.FormatInt(written.ID, 10),
 			}, nil
 		},
+	}
+}
+
+func compare(sc *run.StepContext, asked writeRequest, written wp.Item) []pagemap.Mismatch {
+	checked := sc.Page
+	checked.Slug = asked.slug
+	checked.Title = asked.title
+	checked.H1 = ""
+	checked.Status = statusOf(sc.Run.PublishMode)
+	checked.Observed = observedOf(written)
+
+	found := checked.Mismatches()
+	if written.Parent != asked.parent {
+		found = append(found, pagemap.Mismatch{
+			Field:   FieldParent,
+			Planned: strconv.FormatInt(asked.parent, 10),
+			Actual:  strconv.FormatInt(written.Parent, 10),
+		})
+	}
+	return found
+}
+
+func observedOf(item wp.Item) pagemap.Observed {
+	return pagemap.Observed{
+		Link: permalinkOf(item), Slug: item.Slug, Status: item.Status, Title: item.Title,
+	}
+}
+
+func permalinkOf(item wp.Item) string {
+	if strings.Contains(item.Link, "?") {
+		return ""
+	}
+	return item.Link
+}
+
+func refuseMismatch(sc *run.StepContext, mismatches []pagemap.Mismatch) run.Result {
+	said := make([]string, 0, len(mismatches))
+	for i := range mismatches {
+		said = append(said, mismatches[i].Field+" was asked for as "+mismatches[i].Planned+
+			" and the site answers "+mismatches[i].Actual)
+	}
+	return run.Result{
+		Next:    run.TransitionPause,
+		Reason:  run.PauseNeedsHuman,
+		Message: "the site did not take " + sc.Page.Path + " as it was asked for: " + strings.Join(said, "; "),
 	}
 }
 
@@ -387,6 +450,7 @@ func record(ctx context.Context, deps Deps, sc *run.StepContext, written wp.Item
 	next.WPID = &written.ID
 	next.Status = statusOf(sc.Run.PublishMode)
 	next.ContentHash = result.ContentHash
+	next.Observed = observedOf(written)
 	next.Drift = false
 	next.LastSyncedAt = &now
 	next.UpdatedAt = now

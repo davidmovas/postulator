@@ -77,6 +77,7 @@ type Page struct {
 	EntityID        *string
 	TemplateID      *string
 	ContentHash     string
+	Observed        Observed
 	WPModifiedAt    *time.Time
 	LastSyncedAt    *time.Time
 	Drift           bool
