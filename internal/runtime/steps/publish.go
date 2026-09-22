@@ -34,15 +34,17 @@ const (
 var editableStatuses = []string{"publish", "future", "draft", "pending", "private"}
 
 type PublishResult struct {
-	URL         string             `json:"url"`
-	Status      string             `json:"status"`
-	ContentHash string             `json:"contentHash"`
-	SEOApplied  []string           `json:"seoApplied"`
-	Skipped     []string           `json:"skipped"`
-	Findings    []content.Finding  `json:"findings"`
-	Mismatches  []pagemap.Mismatch `json:"mismatches"`
-	WPID        int64              `json:"wpId"`
-	Created     bool               `json:"created"`
+	URL                 string             `json:"url"`
+	Status              string             `json:"status"`
+	ContentHash         string             `json:"contentHash"`
+	PreviousContent     string             `json:"previousContent"`
+	PreviousContentHash string             `json:"previousContentHash"`
+	SEOApplied          []string           `json:"seoApplied"`
+	Skipped             []string           `json:"skipped"`
+	Findings            []content.Finding  `json:"findings"`
+	Mismatches          []pagemap.Mismatch `json:"mismatches"`
+	WPID                int64              `json:"wpId"`
+	Created             bool               `json:"created"`
 }
 
 func Publish(deps Deps) run.StepDef {
@@ -101,6 +103,11 @@ func Publish(deps Deps) run.StepDef {
 				findings = append(findings, driftFinding(sc.Page))
 			}
 
+			replaced, err := bodyBeingReplaced(ctx, client, existing, found)
+			if err != nil {
+				return run.Result{}, err
+			}
+
 			rendered := string(body.Blob)
 			status := string(sc.Run.PublishMode)
 			asked := writeRequest{
@@ -127,6 +134,7 @@ func Publish(deps Deps) run.StepDef {
 			result := PublishResult{
 				WPID: written.ID, URL: written.Link, Status: written.Status,
 				ContentHash: wp.ContentHash(rendered), Created: !found,
+				PreviousContent: replaced.Content, PreviousContentHash: replaced.ContentHash,
 				SEOApplied: make([]string, 0), Skipped: make([]string, 0), Findings: findings,
 				Mismatches: mismatches,
 			}
@@ -345,6 +353,22 @@ func bySlug(items []wp.Item, page pagemap.Page, parent int64) (wp.Item, bool, er
 			WithDetail("slug", page.Slug).
 			WithDetail("path", page.Path).
 			WithDetail("parent", parent)
+	}
+}
+
+func bodyBeingReplaced(ctx context.Context, client *wp.Client, existing wp.Item, found bool) (wp.RawContent, error) {
+	if !found {
+		return wp.RawContent{}, nil
+	}
+
+	raw, err := client.GetRaw(ctx, existing.ID)
+	switch {
+	case err == nil:
+		return raw, nil
+	case wp.IsPluginMissing(err), errors.IsCode(err, errors.NotFound):
+		return wp.RawContent{}, nil
+	default:
+		return wp.RawContent{}, err
 	}
 }
 

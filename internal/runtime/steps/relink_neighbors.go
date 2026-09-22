@@ -32,13 +32,19 @@ const (
 	relinkTimeout = 5 * time.Minute
 )
 
+type NeighborBefore struct {
+	Hash string `json:"hash"`
+	HTML string `json:"html"`
+}
+
 type NeighborResult struct {
-	PageID  string `json:"pageId"`
-	Path    string `json:"path"`
-	Outcome string `json:"outcome"`
-	Anchor  string `json:"anchor"`
-	Detail  string `json:"detail"`
-	WPID    int64  `json:"wpId"`
+	PageID  string         `json:"pageId"`
+	Path    string         `json:"path"`
+	Outcome string         `json:"outcome"`
+	Anchor  string         `json:"anchor"`
+	Detail  string         `json:"detail"`
+	Before  NeighborBefore `json:"before"`
+	WPID    int64          `json:"wpId"`
 }
 
 type RelinkResult struct {
@@ -267,6 +273,7 @@ func relinkOne(ctx context.Context, deps Deps, client *wp.Client, in neighborWor
 
 	outcome.Outcome = OutcomeLinked
 	outcome.Anchor = anchor
+	outcome.Before = NeighborBefore{Hash: raw.ContentHash, HTML: raw.Content}
 	if adoptErr := adopt(ctx, deps, in.neighbor, in.index, in.site, doc, hash); adoptErr != nil {
 		return NeighborResult{}, adoptErr
 	}
