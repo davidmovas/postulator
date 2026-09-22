@@ -267,10 +267,11 @@ Module coverage is 87.6% of 14439 statements; `domain` + `application` sit at 86
 
 ## Next steps
 
-0. Repair the seven pages the client's run published flat (WordPress ids 116 to 122 on the docker
-   stack): a `repair` run over them moves each under its parent and WordPress recomputes the
-   permalink. Nothing else on that stand is trustworthy until it is done, because a `sync_site`
-   over a flat page now records the disagreement rather than adopting it.
+0. The docker stand was reset to the state `docker/e2e/bootstrap.sh` leaves behind on 2026-09-22:
+   the seven pages the client's run published flat and the eight records of the earlier restaurant
+   session were deleted outright rather than repaired, so nothing on it predates the fixes. The
+   site's application password was not rotated, so `docker/e2e/.env.generated` still holds the
+   credentials. The next real test starts from an import.
 1. A human walk of what automation cannot see: dragging and snapping the frameless window, the
    close button's hover, a real provider key and a real WordPress, Tor on a machine with a
    different install path.
