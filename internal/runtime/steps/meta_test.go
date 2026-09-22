@@ -2,9 +2,11 @@ package steps_test
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -68,6 +70,9 @@ func TestGenerateMetaSettlesWhatTheModelReturns(t *testing.T) {
 				if meta.Title != "Espresso guide" {
 					t.Errorf("title = %q, want the draft title", meta.Title)
 				}
+				if len(meta.Findings) != 1 || meta.Findings[0].Code != steps.CodeMetaNotWritten {
+					t.Errorf("findings = %+v, want the borrowed snippet named", meta.Findings)
+				}
 				if meta.Description != "A short guide to espresso." {
 					t.Errorf("description = %q, want the draft summary", meta.Description)
 				}
@@ -102,6 +107,76 @@ func TestGenerateMetaSettlesWhatTheModelReturns(t *testing.T) {
 			tc.check(t, runMeta(t, tc.reply))
 		})
 	}
+}
+
+func TestGenerateMetaSaysWhenTheSnippetIsOnlyTheDraftAgain(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		reply string
+		want  []string
+	}{
+		{
+			name:  "the model answered with an empty object",
+			reply: `{}`,
+			want:  []string{"title", "description"},
+		},
+		{
+			name:  "the model wrote a title and nothing else",
+			reply: `{"title":"espresso | Shop"}`,
+			want:  []string{"description"},
+		},
+		{
+			name:  "the model answered in full",
+			reply: `{"title":"espresso | Shop","description":"How to pull a shot."}`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			meta := runMeta(t, tc.reply)
+			if tc.want == nil {
+				if len(meta.Findings) != 0 {
+					t.Fatalf("findings = %+v, want none", meta.Findings)
+				}
+				return
+			}
+
+			if len(meta.Findings) != 1 {
+				t.Fatalf("findings = %+v, want one", meta.Findings)
+			}
+			finding := meta.Findings[0]
+			if finding.Code != steps.CodeMetaNotWritten || finding.Severity != content.SeverityWarn {
+				t.Errorf("finding = %+v", finding)
+			}
+			if !strings.Contains(finding.Message, "/coffee/espresso/") {
+				t.Errorf("message = %q, want the page named", finding.Message)
+			}
+			if fields := detailList(finding.Details["fields"]); !slices.Equal(fields, tc.want) {
+				t.Errorf("fields = %v, want %v", fields, tc.want)
+			}
+		})
+	}
+}
+
+func detailList(held any) []string {
+	values, ok := held.([]any)
+	if !ok {
+		return nil
+	}
+
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		text, isText := value.(string)
+		if !isText {
+			return nil
+		}
+		out = append(out, text)
+	}
+	return out
 }
 
 func TestGenerateMetaCanonicalJoinsTheOriginOnce(t *testing.T) {

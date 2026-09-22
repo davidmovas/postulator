@@ -16,18 +16,29 @@ import (
 const (
 	NameGenerateMeta = string(run.StepGenerateMeta)
 
+	CodeMetaNotWritten = "meta_not_written"
+
 	metaTokens         = 512
 	primaryPlaceholder = "{primaryKeyword}"
 	sitePlaceholder    = "{siteName}"
 	ellipsis           = "…"
 )
 
-type Meta struct {
+type metaAnswer struct {
 	Title         string `json:"title" description:"The meta title of the page, following the title pattern"`
 	Description   string `json:"description" description:"The meta description, one sentence that earns the click"`
 	Canonical     string `json:"canonical" description:"The absolute canonical URL of the page"`
 	OGTitle       string `json:"ogTitle" description:"The Open Graph title, which may be shorter than the meta title"`
 	OGDescription string `json:"ogDescription" description:"The Open Graph description"`
+}
+
+type Meta struct {
+	Title         string            `json:"title"`
+	Description   string            `json:"description"`
+	Canonical     string            `json:"canonical"`
+	OGTitle       string            `json:"ogTitle"`
+	OGDescription string            `json:"ogDescription"`
+	Findings      []content.Finding `json:"findings,omitempty"`
 }
 
 type metaPrompt struct {
@@ -77,7 +88,7 @@ func GenerateMeta(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			meta, usage, err := port.Structured[Meta](ctx, deps.LLM, port.Request{
+			answer, usage, err := port.Structured[metaAnswer](ctx, deps.LLM, port.Request{
 				Ref:       ref,
 				System:    system,
 				Messages:  []port.Message{{Role: port.RoleUser, Text: user}},
@@ -88,7 +99,7 @@ func GenerateMeta(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			settled := settleMeta(meta, draft, canonical, sc.Spec.MetaRules)
+			settled := settleMeta(answer, draft, canonical, sc.Spec.MetaRules, sc.Page)
 			blob, err := encode(settled, "page meta")
 			if err != nil {
 				return run.Result{}, err
@@ -110,18 +121,24 @@ func titlePattern(pattern, primary, siteName string) string {
 	return strings.NewReplacer(primaryPlaceholder, primary, sitePlaceholder, siteName).Replace(pattern)
 }
 
-func settleMeta(meta Meta, draft content.ContentDraft, canonical string, rules template.MetaRules) Meta {
-	meta.Title = strings.TrimSpace(meta.Title)
-	meta.Description = strings.TrimSpace(meta.Description)
-	meta.Canonical = strings.TrimSpace(meta.Canonical)
-	meta.OGTitle = strings.TrimSpace(meta.OGTitle)
-	meta.OGDescription = strings.TrimSpace(meta.OGDescription)
+func settleMeta(answer metaAnswer, draft content.ContentDraft, canonical string, rules template.MetaRules,
+	page pagemap.Page) Meta {
+	meta := Meta{
+		Title:         strings.TrimSpace(answer.Title),
+		Description:   strings.TrimSpace(answer.Description),
+		Canonical:     strings.TrimSpace(answer.Canonical),
+		OGTitle:       strings.TrimSpace(answer.OGTitle),
+		OGDescription: strings.TrimSpace(answer.OGDescription),
+	}
 
+	borrowed := make([]string, 0, 2)
 	if meta.Title == "" {
 		meta.Title = strings.TrimSpace(draft.Title)
+		borrowed = append(borrowed, "title")
 	}
 	if meta.Description == "" {
 		meta.Description = strings.TrimSpace(draft.Summary)
+		borrowed = append(borrowed, "description")
 	}
 	if meta.Canonical == "" {
 		meta.Canonical = canonical
@@ -134,6 +151,16 @@ func settleMeta(meta Meta, draft content.ContentDraft, canonical string, rules t
 		meta.OGDescription = meta.Description
 	}
 	meta.OGDescription = clip(meta.OGDescription, rules.DescriptionMax)
+
+	if len(borrowed) > 0 {
+		meta.Findings = []content.Finding{{
+			Severity: content.SeverityWarn,
+			Code:     CodeMetaNotWritten,
+			Message: "the model returned no " + strings.Join(borrowed, " and no ") + " for " + page.Path +
+				", so the search snippet repeats what the page already says",
+			Details: map[string]any{"pageId": page.ID, "path": page.Path, "fields": borrowed},
+		}}
+	}
 	return meta
 }
 
