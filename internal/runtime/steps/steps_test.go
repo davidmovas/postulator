@@ -202,7 +202,7 @@ func TestTheShippedStepsRegisterInRecipeOrder(t *testing.T) {
 	for _, declared := range run.StepNames() {
 		want = append(want, string(declared))
 	}
-	want = append(want, run.RevertStep)
+	want = append(want, run.RelinkPageStep, run.RevertStep)
 	if len(names) != len(want) {
 		t.Fatalf("the registry holds %v", names)
 	}

@@ -183,7 +183,7 @@ func TestACallTheSchemaRefusesBecomesAFailedRowTheModelCanRead(t *testing.T) {
 		},
 		{
 			name:   "a required field missing inside a list",
-			script: `TOOL:graph_set_anchors{"entityId":"e1","anchors":[{"text":"espresso"}]}`,
+			script: `TOOL:graph_set_anchors{"entityId":"e1","anchors":[{"source":"user"}]}`,
 			reads:  "required parameter missing",
 		},
 	}

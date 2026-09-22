@@ -260,7 +260,7 @@ func TestCheckPluginReprobesASiteThatGainedThePlugin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CheckPlugin after the plugin was installed: %v", err)
 	}
-	if !present.Plugin.Installed || present.Plugin.Version != "1.1.0" {
+	if !present.Plugin.Installed || present.Plugin.Version != "1.2.0" {
 		t.Fatalf("plugin = %+v, want the companion reported as installed", present.Plugin)
 	}
 	if !slices.Contains(present.Plugin.Capabilities, "bulk") ||
