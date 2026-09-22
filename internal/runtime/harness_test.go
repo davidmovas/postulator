@@ -116,19 +116,20 @@ func (r *recorder) count(eventType events.Type) int {
 }
 
 type harness struct {
-	store    *sqlite.Store
-	runs     *sqlite.RunRepo
-	items    *sqlite.RunItemRepo
-	execs    *sqlite.StepExecRepo
-	blobs    *sqlite.ArtifactRepo
-	log      *sqlite.RunEventRepo
-	specs    *stubSpecs
-	spend    *stubSpend
-	bus      *recorder
-	pages    []string
-	siteID   string
-	logger   *zap.Logger
-	deadline time.Duration
+	store       *sqlite.Store
+	runs        *sqlite.RunRepo
+	items       *sqlite.RunItemRepo
+	engineItems itemStore
+	execs       *sqlite.StepExecRepo
+	blobs       *sqlite.ArtifactRepo
+	log         *sqlite.RunEventRepo
+	specs       *stubSpecs
+	spend       *stubSpend
+	bus         *recorder
+	pages       []string
+	siteID      string
+	logger      *zap.Logger
+	deadline    time.Duration
 }
 
 func newHarness(t *testing.T, targets int) *harness {
@@ -143,13 +144,15 @@ func newHarness(t *testing.T, targets int) *harness {
 		pages = append(pages, page.ID)
 	}
 
+	itemRepo := sqlite.NewRunItemRepo(store)
 	return &harness{
-		store: store,
-		runs:  sqlite.NewRunRepo(store),
-		items: sqlite.NewRunItemRepo(store),
-		execs: sqlite.NewStepExecRepo(store),
-		blobs: sqlite.NewArtifactRepo(store),
-		log:   sqlite.NewRunEventRepo(store),
+		store:       store,
+		runs:        sqlite.NewRunRepo(store),
+		items:       itemRepo,
+		engineItems: itemRepo,
+		execs:       sqlite.NewStepExecRepo(store),
+		blobs:       sqlite.NewArtifactRepo(store),
+		log:         sqlite.NewRunEventRepo(store),
 		specs: &stubSpecs{
 			version: 1,
 			spec: template.TemplateSpec{
@@ -182,7 +185,7 @@ func (h *harness) idle(t *testing.T, registry *run.Registry) *runtime.Engine {
 
 	return runtime.New(runtime.Deps{
 		Runs:       h.runs,
-		Items:      h.items,
+		Items:      h.engineItems,
 		Artifacts:  h.blobs,
 		Execs:      h.execs,
 		Events:     h.log,

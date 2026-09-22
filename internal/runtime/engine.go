@@ -2,6 +2,8 @@ package runtime
 
 import (
 	"context"
+	"maps"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -45,6 +47,7 @@ type Engine struct {
 	mu       sync.Mutex
 	inflight map[string]string
 	load     map[string]int
+	leased   map[string]int64
 	cancels  map[string]map[string]context.CancelFunc
 	release  context.CancelFunc
 }
@@ -61,6 +64,7 @@ func New(deps Deps, registry *run.Registry, cfg Config, clk clock.Clock, logger 
 		stop:     make(chan struct{}),
 		inflight: make(map[string]string),
 		load:     make(map[string]int),
+		leased:   make(map[string]int64),
 		cancels:  make(map[string]map[string]context.CancelFunc),
 	}
 }
@@ -118,6 +122,46 @@ func (e *Engine) Stop() {
 		release()
 	}
 	e.wg.Wait()
+	e.handBack(context.Background())
+}
+
+func (e *Engine) hold(itemID string, expectSeq int64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.leased[itemID] = expectSeq
+}
+
+func (e *Engine) forget(itemID string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	delete(e.leased, itemID)
+}
+
+func (e *Engine) handBack(ctx context.Context) {
+	e.mu.Lock()
+	leased := maps.Clone(e.leased)
+	clear(e.leased)
+	e.mu.Unlock()
+
+	if len(leased) == 0 {
+		return
+	}
+
+	now := e.now()
+	err := e.deps.UnitOfWork.Do(ctx, func(c context.Context) error {
+		for _, itemID := range slices.Sorted(maps.Keys(leased)) {
+			if _, requeueErr := e.deps.Items.Requeue(c, itemID, leased[itemID], run.StatusRunning, now); requeueErr != nil {
+				return requeueErr
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		e.logger.Warn("handing the items still running back to the queue failed; the lease sweep will re-arm them",
+			zap.Int("items", len(leased)),
+			zap.Error(err),
+		)
+	}
 }
 
 func (e *Engine) nudge() {

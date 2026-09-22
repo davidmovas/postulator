@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"time"
 
@@ -48,6 +49,7 @@ type outcome struct {
 	usd        float64
 	again      bool
 	reuse      bool
+	stopped    bool
 }
 
 func (e *Engine) advance(parent context.Context, itemID string) (bool, error) {
@@ -55,13 +57,34 @@ func (e *Engine) advance(parent context.Context, itemID string) (bool, error) {
 	if err != nil || held == nil {
 		return false, err
 	}
+	e.hold(held.item.ID, held.expectSeq)
 
+	out, err := e.work(parent, held)
+	if err != nil {
+		return false, err
+	}
+	if parent.Err() != nil && out.stopped {
+		return false, nil
+	}
+
+	again, err := e.settle(parent, held, out)
+	if err != nil {
+		return false, err
+	}
+	e.forget(held.item.ID)
+	return again, nil
+}
+
+func (e *Engine) work(parent context.Context, held *claim) (outcome, error) {
 	started := e.clock.Now().UTC()
-	if reused, ok, reuseErr := e.reuse(parent, held); reuseErr != nil {
-		return false, reuseErr
-	} else if ok {
+
+	reused, ok, err := e.reuse(parent, held)
+	if err != nil {
+		return outcome{}, err
+	}
+	if ok {
 		reused.startedAt = started
-		return e.settle(parent, held, reused)
+		return reused, nil
 	}
 
 	ctx, done := e.runContext(parent, held.record.ID, held.item.ID)
@@ -71,7 +94,7 @@ func (e *Engine) advance(parent context.Context, itemID string) (bool, error) {
 	out := e.outcomeOf(held, result, stepErr)
 	out.startedAt = started
 	out.duration = e.clock.Now().UTC().Sub(started)
-	return e.settle(parent, held, out)
+	return out, nil
 }
 
 func (e *Engine) claim(parent context.Context, itemID string) (*claim, error) {
@@ -227,6 +250,7 @@ func (e *Engine) outcomeOf(held *claim, result run.Result, stepErr error) outcom
 		usd:        result.USD,
 	}
 	if stepErr != nil {
+		out.stopped = stderrors.Is(stepErr, context.Canceled) || errors.IsCode(stepErr, errors.Cancelled)
 		return e.faultOutcome(held, out, stepErr)
 	}
 
@@ -333,7 +357,7 @@ func backoff(policy run.RetryPolicy, attempt int) time.Duration {
 func (e *Engine) settle(parent context.Context, held *claim, out outcome) (bool, error) {
 	var again bool
 
-	err := e.transact(parent, func(ctx context.Context, box *outbox) error {
+	err := e.transact(context.WithoutCancel(parent), func(ctx context.Context, box *outbox) error {
 		now := e.now()
 		next := held.item
 		next.Checkpoint = held.item.Checkpoint.MergedWith(out.checkpoint)
