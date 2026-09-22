@@ -120,14 +120,15 @@ export const stepNames = [
     "generate_images",
     "validate",
     "judge",
-    "repair_hierarchy",
     "publish",
     "relink_neighbors",
     "sync_back",
     "report",
-    "sync_site",
 ] as const;
 export type StepName = (typeof stepNames)[number];
+
+export const perKindStepNames = ["repair_hierarchy", "sync_site", "relink_page", "revert"] as const;
+export type PerKindStepName = (typeof perKindStepNames)[number];
 
 export const retryBlockedReasons = ["inputs_expired"] as const;
 export type RetryBlockedReason = (typeof retryBlockedReasons)[number];

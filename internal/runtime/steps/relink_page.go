@@ -13,7 +13,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
-const NameRelinkPage = run.RelinkPageStep
+const NameRelinkPage = string(run.StepRelinkPage)
 
 type PlacedLink struct {
 	PageID  string `json:"pageId"`

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { stepNames } from "../../generated/vocab.js";
+import { perKindStepNames, stepNames } from "../../generated/vocab.js";
 import { blankDraft } from "./blank.js";
 import { draftFromJson, specJsonOf } from "./spec.js";
 
@@ -36,6 +36,13 @@ describe("blankDraft", () => {
         expect(draft.recipe.every((step) => step.declared)).toBe(true);
         for (const step of draft.recipe) {
             expect(step.enabled).toBe(step.name !== "generate_images");
+        }
+    });
+
+    it("names no step a run kind owns, which runs.Start would refuse", () => {
+        expect(perKindStepNames.length).toBeGreaterThan(0);
+        for (const owned of perKindStepNames) {
+            expect(draft.recipe.map((step) => step.name)).not.toContain(owned);
         }
     });
 

@@ -13,7 +13,7 @@ type CreateRequest struct {
 	Status          string   `json:"status,omitempty" enum:"planned,exists,published,archived" description:"Target only pages in this state"`
 	Limit           int      `json:"limit,omitempty" minimum:"1" description:"The most pages one firing may take"`
 	TemplateID      string   `json:"templateId,omitempty" description:"The template to write with, left out to resolve each page's own"`
-	Steps           []string `json:"steps,omitempty" enum:"resolve_context,generate_body,generate_meta,insert_links,repair_links,generate_images,validate,judge,repair_hierarchy,publish,relink_neighbors,sync_back,report,sync_site" description:"The steps to run in order, left out to take the recipe of the resolved template"`
+	Steps           []string `json:"steps,omitempty" enum:"resolve_context,generate_body,generate_meta,insert_links,repair_links,generate_images,validate,judge,publish,relink_neighbors,sync_back,report" description:"The steps to run in order, left out to take the recipe of the resolved template"`
 	PublishMode     string   `json:"publishMode,omitempty" enum:"draft,publish" description:"Whether each run leaves a draft in WordPress or publishes it; leave it out for draft"`
 	MaxUSD          float64  `json:"maxUsd,omitempty" minimum:"0" description:"Stop a run once it has spent this many dollars"`
 	MaxTokens       int      `json:"maxTokens,omitempty" minimum:"0" description:"Stop a run once it has used this many tokens"`
@@ -33,7 +33,7 @@ type UpdateRequest struct {
 	Status          *string  `json:"status,omitempty" enum:"planned,exists,published,archived" description:"The new page state to target, left out to keep the current one"`
 	Limit           *int     `json:"limit,omitempty" minimum:"1" description:"The new ceiling on pages per firing, left out to keep the current one"`
 	TemplateID      *string  `json:"templateId,omitempty" description:"The new template, left out to keep the current one"`
-	Steps           []string `json:"steps,omitempty" enum:"resolve_context,generate_body,generate_meta,insert_links,repair_links,generate_images,validate,judge,repair_hierarchy,publish,relink_neighbors,sync_back,report,sync_site" description:"The whole new recipe in order, left out to keep the current one"`
+	Steps           []string `json:"steps,omitempty" enum:"resolve_context,generate_body,generate_meta,insert_links,repair_links,generate_images,validate,judge,publish,relink_neighbors,sync_back,report" description:"The whole new recipe in order, left out to keep the current one"`
 	PublishMode     *string  `json:"publishMode,omitempty" enum:"draft,publish" description:"The new publish mode, left out to keep the current one"`
 	MaxUSD          *float64 `json:"maxUsd,omitempty" minimum:"0" description:"The new dollar ceiling per run, left out to keep the current one"`
 	MaxTokens       *int     `json:"maxTokens,omitempty" minimum:"0" description:"The new token ceiling per run, left out to keep the current one"`

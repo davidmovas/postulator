@@ -88,6 +88,10 @@ func catalog() []vocabulary {
 		},
 		{export: "stepNames", tsType: "StepName", pkg: "internal/domain/run", typeName: "StepName"},
 		{
+			export: "perKindStepNames", tsType: "PerKindStepName", pkg: "internal/domain/run",
+			typeName: "PerKindStepName",
+		},
+		{
 			export: "retryBlockedReasons", tsType: "RetryBlockedReason", pkg: "internal/domain/run",
 			typeName: "RetryBlockedReason",
 		},

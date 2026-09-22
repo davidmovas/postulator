@@ -387,7 +387,6 @@ export const templates = {
         relink_neighbors: "Relink the neighbouring pages",
         sync_back: "Read the published page back",
         report: "Write the run report",
-        sync_site: "Read the whole site",
     },
 };
 

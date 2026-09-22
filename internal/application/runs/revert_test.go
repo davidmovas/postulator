@@ -51,7 +51,7 @@ func TestRevertEnqueuesOneItemPerPageTheRunPublished(t *testing.T) {
 	if len(queued.Targets) != 1 || queued.Targets[0] != item.TargetID {
 		t.Fatalf("the revert targets %v, want the page the run published", queued.Targets)
 	}
-	if len(queued.Recipe) != 1 || queued.Recipe[0].Name != run.RevertStep {
+	if len(queued.Recipe) != 1 || queued.Recipe[0].Name != string(run.StepRevert) {
 		t.Fatalf("the revert recipe is %+v", queued.Recipe)
 	}
 	if queued.Budget != (run.Budget{}) {

@@ -170,6 +170,34 @@ func TestAStepThatBelongsToAKindIsRefusedInAPageRecipe(t *testing.T) {
 	}
 }
 
+func TestTheRecipeABlankTemplateBuildsStartsAGenerateRun(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	fixture.specs.siteID = fixture.siteID
+
+	blank := make([]template.StepSpec, 0, len(run.StepNames()))
+	want := make([]string, 0, len(run.StepNames()))
+	for _, name := range run.StepNames() {
+		enabled := name != run.StepGenerateImages
+		blank = append(blank, template.StepSpec{Name: string(name), Enabled: enabled})
+		if enabled {
+			want = append(want, string(name))
+		}
+	}
+	fixture.specs.spec = template.TemplateSpec{Recipe: blank}
+
+	got := startedWith(t, fixture, runs.StartRequest{})
+	if !slices.Equal(got, want) {
+		t.Fatalf("a blank template ran %v, want %v", got, want)
+	}
+	for _, name := range got {
+		if run.PerKindStep(name) {
+			t.Fatalf("the blank recipe names %s, which belongs to a run of its own", name)
+		}
+	}
+}
+
 func TestARunOverAPageMappedToNothingIsRefusedBeforeItIsQueued(t *testing.T) {
 	t.Parallel()
 

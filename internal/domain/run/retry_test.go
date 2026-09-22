@@ -138,8 +138,7 @@ func TestTheStepNamesAreDeclaredInPipelineOrder(t *testing.T) {
 	want := []run.StepName{
 		run.StepResolveContext, run.StepGenerateBody, run.StepGenerateMeta, run.StepInsertLinks,
 		run.StepRepairLinks, run.StepGenerateImages, run.StepValidate, run.StepJudge,
-		run.StepRepairHierarchy, run.StepPublish, run.StepRelinkNeighbors, run.StepSyncBack,
-		run.StepReport, run.StepSyncSite,
+		run.StepPublish, run.StepRelinkNeighbors, run.StepSyncBack, run.StepReport,
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("StepNames() = %v, want %v", names, want)

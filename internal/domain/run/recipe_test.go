@@ -84,29 +84,22 @@ func TestTheGenerateRecipeWritesAndPublishesOnePage(t *testing.T) {
 func TestAStepBelongsToATemplateRecipeOrToAKindNeverBoth(t *testing.T) {
 	t.Parallel()
 
-	perKind := []string{"repair_hierarchy", "sync_site", "relink_page", "revert"}
+	perKind := run.PerKindStepNames()
+	if len(perKind) != 4 {
+		t.Fatalf("PerKindStepNames() = %v, want the four steps a kind recipe owns", perKind)
+	}
 
 	for _, name := range perKind {
-		if !run.PerKindStep(name) {
+		if !run.PerKindStep(string(name)) {
 			t.Errorf("%s is named by a kind recipe and is still offered to a template", name)
 		}
-	}
-	for _, name := range run.TemplateStepNames() {
-		if run.PerKindStep(string(name)) {
-			t.Errorf("a template recipe is offered %s, which only a kind may name", name)
-		}
-		if !slices.Contains(run.StepNames(), name) {
-			t.Errorf("%s is offered to a template and is no step name", name)
-		}
-	}
-
-	if len(run.TemplateStepNames()) != len(run.StepNames())-2 {
-		t.Fatalf("TemplateStepNames() = %v, want the step names without repair_hierarchy and sync_site",
-			run.TemplateStepNames())
-	}
-	for _, name := range []string{run.RelinkPageStep, run.RevertStep} {
 		if slices.Contains(run.StepNames(), run.StepName(name)) {
 			t.Errorf("%s is a step name, so a blank template recipe would carry it", name)
+		}
+	}
+	for _, name := range run.StepNames() {
+		if run.PerKindStep(string(name)) {
+			t.Errorf("a template recipe is offered %s, which only a kind may name", name)
 		}
 	}
 	if run.PerKindStep("publish") {

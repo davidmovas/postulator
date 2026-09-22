@@ -126,7 +126,7 @@ func TestARevertRunIsPricedAtNothing(t *testing.T) {
 
 	harness := newHarness(t, 2)
 	reverting := run.StepDef{
-		Name:     run.RevertStep,
+		Name:     string(run.StepRevert),
 		Produces: []run.ArtifactKind{run.ArtifactRevertResult},
 		Run:      func(context.Context, *run.StepContext) (run.Result, error) { return run.Result{}, nil },
 	}

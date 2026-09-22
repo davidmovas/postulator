@@ -4,6 +4,7 @@ import {
     artifactKinds,
     itemStatuses,
     pauseReasons,
+    perKindStepNames,
     retryBlockedReasons,
     runKinds,
     runStatuses,
@@ -27,6 +28,7 @@ const spoken = (label: string): void => {
 describe("the vocabulary never reaches the client as it is stored", () => {
     const cases: readonly (readonly [string, readonly string[], (value: string) => string])[] = [
         ["step", stepNames, stepLabel],
+        ["step a kind owns", perKindStepNames, stepLabel],
         ["run kind", runKinds, kindLabel],
         ["run status", runStatuses, statusLabel],
         ["item status", itemStatuses, statusLabel],

@@ -13,43 +13,39 @@ const (
 	StepGenerateImages  StepName = "generate_images"
 	StepValidate        StepName = "validate"
 	StepJudge           StepName = "judge"
-	StepRepairHierarchy StepName = "repair_hierarchy"
 	StepPublish         StepName = "publish"
 	StepRelinkNeighbors StepName = "relink_neighbors"
 	StepSyncBack        StepName = "sync_back"
 	StepReport          StepName = "report"
-	StepSyncSite        StepName = "sync_site"
 )
 
+type PerKindStepName string
+
 const (
-	RevertStep     = "revert"
-	RelinkPageStep = "relink_page"
+	StepRepairHierarchy PerKindStepName = "repair_hierarchy"
+	StepSyncSite        PerKindStepName = "sync_site"
+	StepRelinkPage      PerKindStepName = "relink_page"
+	StepRevert          PerKindStepName = "revert"
 )
 
 var stepNames = []StepName{
 	StepResolveContext, StepGenerateBody, StepGenerateMeta, StepInsertLinks, StepRepairLinks,
-	StepGenerateImages, StepValidate, StepJudge, StepRepairHierarchy, StepPublish, StepRelinkNeighbors, StepSyncBack,
-	StepReport, StepSyncSite,
+	StepGenerateImages, StepValidate, StepJudge, StepPublish, StepRelinkNeighbors, StepSyncBack,
+	StepReport,
 }
 
-var perKindSteps = []string{
-	string(StepRepairHierarchy), string(StepSyncSite), RelinkPageStep, RevertStep,
+var perKindSteps = []PerKindStepName{
+	StepRepairHierarchy, StepSyncSite, StepRelinkPage, StepRevert,
 }
 
 func StepNames() []StepName {
 	return slices.Clone(stepNames)
 }
 
-func PerKindStep(name string) bool {
-	return slices.Contains(perKindSteps, name)
+func PerKindStepNames() []PerKindStepName {
+	return slices.Clone(perKindSteps)
 }
 
-func TemplateStepNames() []StepName {
-	out := make([]StepName, 0, len(stepNames))
-	for _, name := range stepNames {
-		if !PerKindStep(string(name)) {
-			out = append(out, name)
-		}
-	}
-	return out
+func PerKindStep(name string) bool {
+	return slices.Contains(perKindSteps, PerKindStepName(name))
 }

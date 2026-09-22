@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	NameRevert = run.RevertStep
+	NameRevert = string(run.StepRevert)
 
 	OutcomeTrashed   = "trashed"
 	OutcomeRestored  = "restored"

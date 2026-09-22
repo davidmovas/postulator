@@ -78,7 +78,7 @@ func GenerateRecipe() []template.StepSpec {
 }
 
 func RelinkRecipe() []template.StepSpec {
-	return steps(string(StepResolveContext), RelinkPageStep, string(StepSyncBack), string(StepReport))
+	return steps(string(StepResolveContext), string(StepRelinkPage), string(StepSyncBack), string(StepReport))
 }
 
 func RepairRecipe() []template.StepSpec {
@@ -86,7 +86,7 @@ func RepairRecipe() []template.StepSpec {
 }
 
 func RevertRecipe() []template.StepSpec {
-	return steps(RevertStep)
+	return steps(string(StepRevert))
 }
 
 func SyncRecipe() []template.StepSpec {

@@ -14,12 +14,16 @@ export const runs = {
         generate_images: "Make images",
         validate: "Validate",
         judge: "Judge",
-        repair_hierarchy: "Move under the parent",
         publish: "Publish",
         relink_neighbors: "Relink neighbours",
         sync_back: "Read back",
         report: "Report",
+    },
+    perKindSteps: {
+        repair_hierarchy: "Move under the parent",
         sync_site: "Sync the site",
+        relink_page: "Place the links",
+        revert: "Put it back",
     },
     kinds: {
         generate: "Generate",
@@ -77,7 +81,6 @@ export const runs = {
         "Every page this run created goes to the WordPress trash and its row here goes back to planned. Every page it updated gets the body it replaced, and every neighbour it relinked gets the content it replaced. A page a human has edited since is left alone and held for you. Images it uploaded stay in the media library, and the SEO meta it wrote stays as it is.",
     revertConfirm: "Revert the run",
     revertKeep: "Leave it as it is",
-    revertStep: "Put it back",
     retryStep: "Retry this step",
     retryBusy: "The item has not stopped, so there is nothing to retry.",
     retryBlocked: {
