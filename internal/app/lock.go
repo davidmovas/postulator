@@ -8,9 +8,12 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/secrets/export"
 	"github.com/davidmovas/postulator/internal/adapters/secrets/masterkey"
+	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
+
+const rollbackPrefix = "postulator-import"
 
 func locked() error {
 	return errors.New(errors.Locked, "the application is locked")
@@ -174,15 +177,69 @@ func (c *Core) ImportBackup(ctx context.Context, path, password string) (err err
 	if retired.Store == nil {
 		return locked()
 	}
-
 	quiesce(retired)
-	if err = retired.Store.Restore(ctx, filepath.Join(restored, export.DatabaseName)); err != nil {
-		return stderrors.Join(err, retired.Store.Close())
+
+	kept, err := c.keep(ctx, retired.Store)
+	if err != nil {
+		return stderrors.Join(err, retired.Store.Close(), c.compose(ctx, key))
 	}
-	if closeErr := retired.Store.Close(); closeErr != nil {
-		return closeErr
+
+	if swapErr := c.swap(ctx, retired.Store, filepath.Join(restored, export.DatabaseName), key); swapErr != nil {
+		stranded, rolled := c.rollBack(ctx, key, filepath.Join(kept, export.DatabaseName), swapErr)
+		if stranded {
+			return rolled
+		}
+		return stderrors.Join(rolled, discard(kept))
+	}
+	return discard(kept)
+}
+
+func (c *Core) keep(ctx context.Context, store *sqlite.Store) (string, error) {
+	work, err := os.MkdirTemp("", rollbackPrefix)
+	if err != nil {
+		return "", errors.Wrap(err, errors.Internal, "create the working directory of the import")
+	}
+	if snapshotErr := store.Snapshot(ctx, filepath.Join(work, export.DatabaseName)); snapshotErr != nil {
+		return "", stderrors.Join(snapshotErr, discard(work))
+	}
+	return work, nil
+}
+
+func (c *Core) swap(ctx context.Context, store *sqlite.Store, from string, key []byte) error {
+	if err := store.Restore(ctx, from); err != nil {
+		return stderrors.Join(err, store.Close())
+	}
+	if err := store.Close(); err != nil {
+		return err
 	}
 	return c.compose(ctx, key)
+}
+
+func (c *Core) rollBack(ctx context.Context, key []byte, kept string, cause error) (stranded bool, err error) {
+	store, openErr := c.openStore(key)
+	if openErr != nil {
+		return true, stderrors.Join(cause, c.abandoned(kept, openErr))
+	}
+	if restoreErr := store.Restore(ctx, kept); restoreErr != nil {
+		return true, stderrors.Join(cause, c.abandoned(kept, restoreErr), store.Close())
+	}
+	if closeErr := store.Close(); closeErr != nil {
+		return true, stderrors.Join(cause, c.abandoned(kept, closeErr))
+	}
+	if composeErr := c.compose(ctx, key); composeErr != nil {
+		return true, stderrors.Join(cause, c.abandoned(kept, composeErr))
+	}
+	return false, cause
+}
+
+func (c *Core) abandoned(kept string, cause error) error {
+	return errors.Wrap(cause, errors.Internal,
+		"the import failed and the application stayed locked; the database it held before the import is kept at "+
+			kept+" and can be imported once the application starts again")
+}
+
+func discard(work string) error {
+	return errors.Wrap(os.RemoveAll(work), errors.Internal, "remove the working directory of the import")
 }
 
 func quiesce(retired kit) {

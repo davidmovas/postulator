@@ -34,9 +34,9 @@ func testRegistry(t *testing.T) *run.Registry {
 			Run:      noop,
 		},
 	}
-	for _, def := range defs {
-		if err := registry.Register(def); err != nil {
-			t.Fatalf("Register(%s): %v", def.Name, err)
+	for i := range defs {
+		if err := registry.Register(defs[i]); err != nil {
+			t.Fatalf("Register(%s): %v", defs[i].Name, err)
 		}
 	}
 	return registry

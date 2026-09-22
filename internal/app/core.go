@@ -78,6 +78,7 @@ type Config struct {
 	Provider      llmport.Client
 	AgentProvider AgentProvider
 	Environment   func(name string) string
+	Open          func(cfg sqlite.Config) (*sqlite.Store, error)
 }
 
 func (c Config) environment() func(string) string {
@@ -203,11 +204,18 @@ func (c *Core) compose(ctx context.Context, key []byte) error {
 	return nil
 }
 
+func (c *Core) openStore(key []byte) (*sqlite.Store, error) {
+	opened := sqlite.Config{Path: c.cfg.DatabasePath, Key: key, Recovery: c.cfg.recovery()}
+	if c.cfg.Open != nil {
+		return c.cfg.Open(opened)
+	}
+	return sqlite.Open(opened)
+}
+
 func (c *Core) build(ctx context.Context, key []byte) (kit, error) {
 	cfg, logger, relay := c.cfg, c.logger, c.Events
-	recovery := cfg.recovery()
 
-	store, err := sqlite.Open(sqlite.Config{Path: cfg.DatabasePath, Key: key, Recovery: recovery})
+	store, err := c.openStore(key)
 	if err != nil {
 		return kit{}, err
 	}

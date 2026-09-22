@@ -151,9 +151,9 @@ func stepRegistry(t *testing.T) *run.Registry {
 			Requires: []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML}},
 		{Name: string(run.StepSyncBack), Run: nothing, Requires: []run.ArtifactKind{run.ArtifactPublishResult}},
 	}
-	for _, def := range defs {
-		if err := registry.Register(def); err != nil {
-			t.Fatalf("register %s: %v", def.Name, err)
+	for i := range defs {
+		if err := registry.Register(defs[i]); err != nil {
+			t.Fatalf("register %s: %v", defs[i].Name, err)
 		}
 	}
 	return registry

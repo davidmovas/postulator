@@ -133,8 +133,9 @@ func all(deps Deps) []run.StepDef {
 }
 
 func Register(registry *run.Registry, deps Deps) error {
-	for _, def := range all(deps) {
-		if err := registry.Register(def); err != nil {
+	defs := all(deps)
+	for i := range defs {
+		if err := registry.Register(defs[i]); err != nil {
 			return err
 		}
 	}
