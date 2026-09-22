@@ -12,6 +12,13 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
+func EffectiveRules(policy, spec template.LinkRules) template.LinkRules {
+	if spec == (template.LinkRules{}) {
+		return policy
+	}
+	return spec
+}
+
 func policyView(p template.LinkPolicy) LinkPolicy {
 	return LinkPolicy{
 		ID:             p.ID,

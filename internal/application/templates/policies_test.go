@@ -117,6 +117,43 @@ func TestPolicyLifecycleAndEffectivePolicy(t *testing.T) {
 	}
 }
 
+func TestEffectiveRulesTakeTheTemplateOverThePolicy(t *testing.T) {
+	t.Parallel()
+
+	stored := template.LinkRules{
+		UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 12, MaxPerTarget: 1,
+		ParentLinkWithinParagraphs: 2, ChildrenSection: true,
+	}
+	opinionated := template.LinkRules{
+		UpDepth: 1, DownLinks: false, SiblingMinWeight: 0.7, MaxLinks: 8, MaxPerTarget: 2,
+		ParentLinkWithinParagraphs: 1,
+	}
+
+	cases := []struct {
+		name   string
+		policy template.LinkRules
+		spec   template.LinkRules
+		want   template.LinkRules
+	}{
+		{name: "a template that says nothing inherits the policy", policy: stored, spec: template.LinkRules{}, want: stored},
+		{name: "a template that carries rules replaces them whole", policy: stored, spec: opinionated, want: opinionated},
+		{
+			name:   "a template that only turns down links off still replaces them whole",
+			policy: stored, spec: template.LinkRules{UpDepth: 1}, want: template.LinkRules{UpDepth: 1},
+		},
+		{name: "neither says anything", policy: template.LinkRules{}, spec: template.LinkRules{}, want: template.LinkRules{}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := templates.EffectiveRules(tc.policy, tc.spec); got != tc.want {
+				t.Errorf("EffectiveRules = %+v, want %+v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestGetEffectivePolicyWithoutASeededDefault(t *testing.T) {
 	t.Parallel()
 

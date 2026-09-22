@@ -50,7 +50,7 @@ func (s *Service) LinkAudit(ctx context.Context, req LinkAuditRequest) (LinkAudi
 		if pages[i].Status == pagemap.StatusArchived {
 			continue
 		}
-		templateID, rules, skip, rulesErr := s.rulesFor(ctx, pages[i])
+		templateID, rules, skip, rulesErr := s.rulesFor(ctx, pages[i], state.policy.Rules)
 		if rulesErr != nil {
 			return LinkAuditResponse{}, rulesErr
 		}
@@ -75,7 +75,7 @@ func (s *Service) LinkAuditPage(ctx context.Context, req LinkAuditPageRequest) (
 	if err != nil {
 		return LinkAuditPageResponse{}, err
 	}
-	templateID, rules, skip, err := s.rulesFor(ctx, page)
+	templateID, rules, skip, err := s.rulesFor(ctx, page, state.policy.Rules)
 	if err != nil {
 		return LinkAuditPageResponse{}, err
 	}
@@ -141,7 +141,8 @@ func (s *Service) loadLinks(ctx context.Context, siteID string) (siteLinks, erro
 	}, nil
 }
 
-func (s *Service) rulesFor(ctx context.Context, page pagemap.Page) (string, template.LinkRules, SkipReason, error) {
+func (s *Service) rulesFor(ctx context.Context, page pagemap.Page,
+	base template.LinkRules) (string, template.LinkRules, SkipReason, error) {
 	if page.EntityID == nil {
 		return "", template.LinkRules{}, SkipUnmapped, nil
 	}
@@ -152,7 +153,7 @@ func (s *Service) rulesFor(ctx context.Context, page pagemap.Page) (string, temp
 	if err != nil {
 		return "", template.LinkRules{}, "", err
 	}
-	return resolved.TemplateID, resolved.Spec.LinkRules, "", nil
+	return resolved.TemplateID, templates.EffectiveRules(base, resolved.Spec.LinkRules), "", nil
 }
 
 func auditPage(state *siteLinks, page pagemap.Page, templateID string, rules template.LinkRules, skip SkipReason) pageDetail {
