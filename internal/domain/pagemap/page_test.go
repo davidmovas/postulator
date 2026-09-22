@@ -69,9 +69,9 @@ func TestNewPageRejects(t *testing.T) {
 		{name: "bad path", mutate: func(p *pagemap.Page) { p.Path = "/a b/" }, field: "path"},
 		{name: "unknown wp type", mutate: func(p *pagemap.Page) { p.WPType = "widget" }, field: "wpType"},
 		{name: "unknown status", mutate: func(p *pagemap.Page) { p.Status = "lost" }, field: "status"},
-		{name: "own parent", mutate: func(p *pagemap.Page) { p.ParentPageID = ptr(p.ID) }, field: "parentPageId"},
-		{name: "empty entity", mutate: func(p *pagemap.Page) { p.EntityID = ptr("") }, field: "entityId"},
-		{name: "empty template", mutate: func(p *pagemap.Page) { p.TemplateID = ptr("") }, field: "templateId"},
+		{name: "own parent", mutate: func(p *pagemap.Page) { p.ParentPageID = new(p.ID) }, field: "parentPageId"},
+		{name: "empty entity", mutate: func(p *pagemap.Page) { p.EntityID = new("") }, field: "entityId"},
+		{name: "empty template", mutate: func(p *pagemap.Page) { p.TemplateID = new("") }, field: "templateId"},
 	}
 
 	for _, tc := range cases {
@@ -93,7 +93,7 @@ func TestNewPageRejects(t *testing.T) {
 func TestNewPageLink(t *testing.T) {
 	t.Parallel()
 
-	valid := pagemap.PageLink{ID: "l1", SiteID: siteA, FromPageID: pageA, ToPageID: ptr(pageB), ToURL: " https://a/b/ ", AnchorText: " bags ", Origin: pagemap.OriginGenerated, ObservedAt: stamp}
+	valid := pagemap.PageLink{ID: "l1", SiteID: siteA, FromPageID: pageA, ToPageID: new(pageB), ToURL: " https://a/b/ ", AnchorText: " bags ", Origin: pagemap.OriginGenerated, ObservedAt: stamp}
 	link, err := pagemap.NewPageLink(valid)
 	if err != nil {
 		t.Fatalf("NewPageLink: %v", err)
@@ -110,7 +110,7 @@ func TestNewPageLink(t *testing.T) {
 		{name: "no id", mutate: func(l *pagemap.PageLink) { l.ID = "" }, field: "id"},
 		{name: "no site", mutate: func(l *pagemap.PageLink) { l.SiteID = "" }, field: "siteId"},
 		{name: "no source page", mutate: func(l *pagemap.PageLink) { l.FromPageID = "" }, field: "fromPageId"},
-		{name: "empty target page", mutate: func(l *pagemap.PageLink) { l.ToPageID = ptr("") }, field: "toPageId"},
+		{name: "empty target page", mutate: func(l *pagemap.PageLink) { l.ToPageID = new("") }, field: "toPageId"},
 		{name: "no target at all", mutate: func(l *pagemap.PageLink) { l.ToPageID = nil; l.ToURL = " " }, field: "toUrl"},
 		{name: "target page without a url", mutate: func(l *pagemap.PageLink) { l.ToURL = " " }, field: "toUrl"},
 		{name: "unknown origin", mutate: func(l *pagemap.PageLink) { l.Origin = "guessed" }, field: "origin"},
@@ -135,7 +135,7 @@ func TestNewPageLink(t *testing.T) {
 func TestUnmapped(t *testing.T) {
 	t.Parallel()
 
-	pages := []pagemap.Page{page(pageC, "/c/", nil), page(pageA, "/a/", ptr(entA)), page(pageB, "/b/", nil)}
+	pages := []pagemap.Page{page(pageC, "/c/", nil), page(pageA, "/a/", new(entA)), page(pageB, "/b/", nil)}
 	got := pagemap.Unmapped(pages)
 	if len(got) != 2 || got[0].Path != "/b/" || got[1].Path != "/c/" {
 		t.Errorf("Unmapped = %+v", got)
