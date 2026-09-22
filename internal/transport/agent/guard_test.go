@@ -151,6 +151,91 @@ func TestAnOversizedToolResultIsCappedBeforeItReachesTheModel(t *testing.T) {
 	}
 }
 
+func TestACallTheSchemaRefusesBecomesAFailedRowTheModelCanRead(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		script string
+		reads  string
+	}{
+		{
+			name:   "a value outside the enum",
+			script: `TOOL:graph_list_entities{"kind":"beverage"}`,
+			reads:  "value not in enum",
+		},
+		{
+			name:   "a number over the maximum",
+			script: `TOOL:graph_add_edge{"fromEntityId":"a","toEntityId":"b","kind":"related","weight":5}`,
+			reads:  "number too large",
+		},
+		{
+			name:   "a required field missing inside a list",
+			script: `TOOL:graph_set_anchors{"entityId":"e1","anchors":[{"text":"espresso"}]}`,
+			reads:  "required parameter missing",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			b := newBareRunner(t, 0)
+			stream := &recordingStream{}
+
+			if _, err := b.runner.Run(t.Context(), b.spec(tc.script+"\nFAKE: done", nil, stream)); err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+
+			settled := stream.settled()
+			if len(settled) != 1 || settled[0].Status != string(domainagent.CallError) {
+				t.Fatalf("the outcomes are %+v", settled)
+			}
+			if !strings.Contains(settled[0].Error, tc.reads) {
+				t.Fatalf("the row reads %q, which never says %q", settled[0].Error, tc.reads)
+			}
+		})
+	}
+}
+
+func TestASiteScopedToolInASiteLessConversationIsDenied(t *testing.T) {
+	t.Parallel()
+
+	b := newBareRunner(t, 0)
+	stream := &recordingStream{}
+
+	spec := b.spec("TOOL:pages_tree{}\nFAKE: done", nil, stream)
+	spec.Binding.SiteID = ""
+
+	if _, err := b.runner.Run(t.Context(), spec); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	settled := stream.settled()
+	if len(settled) != 1 || settled[0].Status != string(domainagent.CallDenied) {
+		t.Fatalf("the outcomes are %+v", settled)
+	}
+	if !strings.Contains(settled[0].Error, "this tool works inside one site") {
+		t.Fatalf("the denial reads %q", settled[0].Error)
+	}
+}
+
+func TestALoopLimitEndsTheTurnAsAnExhaustedBudget(t *testing.T) {
+	t.Parallel()
+
+	b := newBareRunner(t, 0)
+	stream := &recordingStream{}
+	script := strings.Repeat("TOOL:pages_tree{}\n", 8)
+
+	_, err := b.runner.Run(t.Context(), b.spec(script+"FAKE: done", nil, stream))
+	if !errors.IsCode(err, errors.BudgetExceeded) {
+		t.Fatalf("a turn that ran past its loop limit = %v, want a budget refusal", err)
+	}
+	if len(stream.settled()) == 0 {
+		t.Fatal("the rows the turn did run were never recorded")
+	}
+}
+
 func TestACappedListingStillDecodesAndSaysWhatWasDropped(t *testing.T) {
 	t.Parallel()
 
@@ -247,13 +332,50 @@ func TestARunNeedsAnInputAModelAndALoopLimit(t *testing.T) {
 	}
 }
 
-func TestAStreamFailureStopsTheTurn(t *testing.T) {
+func TestAStreamFailureKeepsTheAnswerAndSaysTheRecordIsIncomplete(t *testing.T) {
 	t.Parallel()
 
 	b := newBareRunner(t, 0)
 	stream := &recordingStream{err: errors.New(errors.External, "the bus is gone")}
 
-	if _, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_tree{}\nFAKE: done", nil, stream)); err == nil {
-		t.Fatal("a turn whose audit cannot be written must not report success")
+	result, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_tree{}\nFAKE: done", nil, stream))
+	if err != nil {
+		t.Fatalf("a turn that answered must not fail because its audit could not be written: %v", err)
+	}
+	if result.Text != "done" {
+		t.Fatalf("the answer was discarded: %q", result.Text)
+	}
+
+	warned := false
+	for _, outcome := range stream.settled() {
+		if outcome.Tool == "agent_audit" && strings.Contains(outcome.Error, "the bus is gone") {
+			warned = true
+		}
+	}
+	if !warned {
+		t.Fatalf("nothing told the client the record is incomplete: %+v", stream.settled())
+	}
+}
+
+func TestAToolNameTheRegistryDoesNotKnowBecomesAFailedRow(t *testing.T) {
+	t.Parallel()
+
+	b := newBareRunner(t, 0)
+	stream := &recordingStream{}
+
+	if _, err := b.runner.Run(t.Context(),
+		b.spec("TOOL:pages_invent{}\nFAKE: done", nil, stream)); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	settled := stream.settled()
+	if len(settled) != 1 {
+		t.Fatalf("the outcomes are %+v", settled)
+	}
+	if settled[0].Tool != "pages_invent" || settled[0].Status != string(domainagent.CallError) {
+		t.Fatalf("the outcome is %+v", settled[0])
+	}
+	if settled[0].Error != "pages_invent is not found" {
+		t.Fatalf("the row reads %q, not the message the model was given", settled[0].Error)
 	}
 }

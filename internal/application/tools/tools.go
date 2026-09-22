@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	stderrors "errors"
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/domain/agent"
@@ -84,8 +86,7 @@ func NewTool[In, Out any](def Def, fn func(ctx context.Context, b Binding, in In
 		decoder := json.NewDecoder(bytes.NewReader(args))
 		decoder.DisallowUnknownFields()
 		if err := decoder.Decode(&in); err != nil {
-			return in, errors.New(errors.Invalid, "the arguments of tool "+def.Name+" are not what it takes").
-				WithDetail("tool", def.Name).WithInternal(err)
+			return in, refused(def.Name, err)
 		}
 		return in, nil
 	}
@@ -104,6 +105,32 @@ func NewTool[In, Out any](def Def, fn func(ctx context.Context, b Binding, in In
 			return fn(ctx, b, in)
 		},
 	}
+}
+
+const unknownFieldPrefix = "json: unknown field "
+
+func refused(name string, err error) error {
+	var mistyped *json.UnmarshalTypeError
+	if stderrors.As(err, &mistyped) && mistyped.Field != "" {
+		return errors.New(errors.Invalid, "the tool "+name+" takes "+article(mistyped.Type.String())+
+			" for "+mistyped.Field+", and it was given "+mistyped.Value).
+			WithDetail("tool", name).WithDetail("field", mistyped.Field).WithInternal(err)
+	}
+	if field, unknown := strings.CutPrefix(err.Error(), unknownFieldPrefix); unknown {
+		named := strings.Trim(field, `"`)
+		return errors.New(errors.Invalid, "the tool "+name+" takes no field called "+named+
+			"; call it again with only the fields its schema declares").
+			WithDetail("tool", name).WithDetail("field", named)
+	}
+	return errors.New(errors.Invalid, "the arguments of tool "+name+" are not what it takes: "+err.Error()).
+		WithDetail("tool", name).WithInternal(err)
+}
+
+func article(kind string) string {
+	if strings.ContainsAny(kind[:1], "aeiou") {
+		return "an " + kind
+	}
+	return "a " + kind
 }
 
 func checking[In any](tool Tool, validate func(in In) error) Tool {

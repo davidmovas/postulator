@@ -94,6 +94,43 @@ func TestAConfirmedActionRunsThroughTheGuardChain(t *testing.T) {
 	}
 }
 
+func TestAnUndeliverableResumeIsWrittenOnTheAction(t *testing.T) {
+	t.Parallel()
+
+	proposer := newHarness(t)
+	doomed := sqlitetest.Page(t, proposer.store, proposer.siteID, "/coffee/stranded/")
+	conversation := proposer.conversation(t, domainagent.ModeConfirm)
+	proposer.send(t, conversation, `TOOL:pages_delete{"id":"`+doomed.ID+`"}`+"\nFAKE: waiting for you")
+
+	pending, err := proposer.service.ListPendingActions(t.Context(), agentapp.ListPendingActionsRequest{
+		ConversationID: conversation, Status: string(domainagent.ActionPending),
+	})
+	if err != nil || len(pending.Items) != 1 {
+		t.Fatalf("the pending actions are %+v, %v", pending, err)
+	}
+
+	settler := build(t, proposer.store, proposer.model, &applicationtest.Recorder{})
+	settler.siteID = proposer.siteID
+	settler.service.Close()
+
+	confirmed, err := settler.service.Confirm(t.Context(), agentapp.ConfirmRequest{
+		ActionID: pending.Items[0].ID, Approve: true,
+	})
+	if err != nil {
+		t.Fatalf("Confirm: %v", err)
+	}
+	if confirmed.Action.Status != string(domainagent.ActionExecuted) {
+		t.Fatalf("the action settled as %+v, and the tool did run", confirmed.Action)
+	}
+	if !strings.Contains(confirmed.Action.Error, "could not be told") {
+		t.Fatalf("the action says nothing about the undelivered result: %+v", confirmed.Action)
+	}
+
+	if _, getErr := proposer.pages.Get(t.Context(), doomed.ID); !errors.IsCode(getErr, errors.NotFound) {
+		t.Fatalf("the approved tool did not run: %v", getErr)
+	}
+}
+
 func ledgerRow(recorded []domainagent.ToolCall, callID string) *domainagent.ToolCall {
 	for i := range recorded {
 		if recorded[i].CallID == callID {

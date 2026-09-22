@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	stderrors "errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -161,6 +162,10 @@ func TestConvertNamesTheFailure(t *testing.T) {
 	}
 	if err := convert(gollem.ErrLoopLimitExceeded); !errors.IsCode(err, errors.BudgetExceeded) {
 		t.Errorf("an exhausted loop = %v", err)
+	}
+	overflow := convert(fmt.Errorf("session: %w", gollem.ErrTokenSizeExceeded))
+	if !errors.IsCode(overflow, errors.Invalid) || !strings.Contains(overflow.Error(), "context window") {
+		t.Errorf("a turn that outgrew the context window = %v", overflow)
 	}
 	if err := convert(json.Unmarshal([]byte("x"), &struct{}{})); !errors.IsCode(err, errors.External) {
 		t.Errorf("an unknown model failure = %v", err)

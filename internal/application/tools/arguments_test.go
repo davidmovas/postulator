@@ -147,6 +147,55 @@ func TestACallCarryingEveryFieldIsAccepted(t *testing.T) {
 	}
 }
 
+func TestARefusedCallNamesTheFieldTheModelGotWrong(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		tool string
+		args string
+		want []string
+	}{
+		{
+			name: "a field the tool does not take",
+			tool: "graph_create_entity",
+			args: `{"name":"Creatine","kind":"topic","shade":"blue"}`,
+			want: []string{"graph_create_entity", "shade", "only the fields its schema declares"},
+		},
+		{
+			name: "a nested field the tool does not take",
+			tool: "graph_create_entity",
+			args: `{"name":"Creatine","kind":"topic","anchors":[{"text":"c","hue":"blue"}]}`,
+			want: []string{"graph_create_entity", "hue"},
+		},
+		{
+			name: "a field of the wrong shape",
+			tool: "pages_create",
+			args: `{"path":"/coffee/","title":42}`,
+			want: []string{"pages_create", "title", "number"},
+		},
+	}
+
+	registry, binding, _ := wired(t)
+	binding.Mode = domainagent.ModeAutonomous
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := registry.Call(t.Context(), binding, tc.tool, json.RawMessage(tc.args))
+			if !errors.IsCode(err, errors.Invalid) {
+				t.Fatalf("the call answered %v, want an invalid argument", err)
+			}
+			for _, wanted := range tc.want {
+				if !strings.Contains(err.Error(), wanted) {
+					t.Errorf("the refusal reads %q and never says %q", err.Error(), wanted)
+				}
+			}
+		})
+	}
+}
+
 const itemToken = "[]"
 
 func requiredPaths(schema *llm.Schema, prefix []string) [][]string {

@@ -143,6 +143,7 @@ func (r *Runner) execute(ctx context.Context, client gollem.LLMClient, spec agen
 		gollem.WithStrategy(readTheStream{}),
 		gollem.WithContentStreamMiddleware(r.waiting.middleware(spec.Ref)),
 		gollem.WithContentStreamMiddleware(observe(spec.Stream, usage, spoken, guard.note)),
+		gollem.WithContentStreamMiddleware(guard.unknown(r.deps.Registry.Names())),
 		gollem.WithTools(adapted...),
 	}
 	for _, middleware := range guard.middlewares() {
@@ -159,7 +160,8 @@ func (r *Runner) execute(ctx context.Context, client gollem.LLMClient, spec agen
 		return agentapp.RunResult{}, convert(err)
 	}
 
-	return agentapp.RunResult{Text: spoken.String()}, guard.failure()
+	guard.settle(ctx)
+	return agentapp.RunResult{Text: spoken.String()}, nil
 }
 
 func (r *Runner) record(ctx context.Context, spec agentapp.RunSpec, usage *tally, latency time.Duration, failure error) {

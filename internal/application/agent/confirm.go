@@ -14,6 +14,9 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
+const undeliveredNote = "The tool ran, but this conversation could not be told, " +
+	"so the agent does not know the result; say so in the next message."
+
 func (s *Service) Confirm(ctx context.Context, req ConfirmRequest) (ConfirmResponse, error) {
 	actionID := strings.TrimSpace(req.ActionID)
 	if actionID == "" {
@@ -77,12 +80,22 @@ func (s *Service) execute(ctx context.Context, action domainagent.PendingAction)
 
 	status, encoded, failure := settleCall(outcome, callErr)
 	encoded = capped(encoded, s.maxToolResult())
+	if auditErr := s.audit(ctx, action, failure, errors.IsCode(callErr, errors.Unauthorized), elapsed); auditErr != nil {
+		return ConfirmResponse{}, auditErr
+	}
+	if _, err = s.append(ctx, conversation.ID, domainagent.Message{
+		Role: domainagent.RoleTool, Tool: action.Tool, CallID: action.ID, Payload: encoded, Text: failure,
+	}); err != nil {
+		return ConfirmResponse{}, err
+	}
+
+	if undelivered := s.resume(ctx, conversation, resumeText(action.Tool, encoded, failure)); undelivered != nil {
+		s.deps.Turns.Note(undelivered)
+		failure = strings.TrimSpace(failure + " " + undeliveredNote)
+	}
 	if _, err = s.deps.Actions.Transition(ctx, action.ID, domainagent.ActionApproved, status, encoded,
 		failure, s.now()); err != nil {
 		return ConfirmResponse{}, err
-	}
-	if auditErr := s.audit(ctx, action, failure, errors.IsCode(callErr, errors.Unauthorized), elapsed); auditErr != nil {
-		return ConfirmResponse{}, auditErr
 	}
 
 	settled, err := s.deps.Actions.Get(ctx, action.ID)
@@ -93,13 +106,6 @@ func (s *Service) execute(ctx context.Context, action domainagent.PendingAction)
 		ConversationID: action.ConversationID, ConfirmationID: action.ID, Tool: action.Tool,
 		Status: string(status), Result: encoded, Error: failure,
 	})
-
-	if _, err = s.append(ctx, conversation.ID, domainagent.Message{
-		Role: domainagent.RoleTool, Tool: action.Tool, CallID: action.ID, Payload: encoded, Text: failure,
-	}); err != nil {
-		return ConfirmResponse{}, err
-	}
-	s.deps.Turns.Note(s.resume(ctx, conversation, resumeText(action.Tool, encoded, failure)))
 	return ConfirmResponse{Action: actionView(settled)}, nil
 }
 
