@@ -71,14 +71,14 @@ func NewSite(baseURL string) Site {
 	return Site{Scheme: strings.ToLower(parsed.Scheme), Host: strings.ToLower(parsed.Host), Base: base}
 }
 
-func (s Site) BasePath() string {
+func (s Site) basePath() string {
 	if s.Base == "" {
 		return "/"
 	}
 	return s.Base
 }
 
-func (s Site) Origin() string {
+func (s Site) origin() string {
 	if s.Host == "" {
 		return ""
 	}
@@ -90,16 +90,16 @@ func (s Site) Origin() string {
 }
 
 func (s Site) URL(path string) string {
-	base := s.BasePath()
+	base := s.basePath()
 	switch {
 	case path == "":
-		return s.Origin() + base
+		return s.origin() + base
 	case !strings.HasPrefix(path, "/"):
-		return s.Origin() + base + path
+		return s.origin() + base + path
 	case base != "/" && !strings.HasPrefix(path, base):
-		return s.Origin() + base + strings.TrimPrefix(path, "/")
+		return s.origin() + base + strings.TrimPrefix(path, "/")
 	default:
-		return s.Origin() + path
+		return s.origin() + path
 	}
 }
 
@@ -129,7 +129,7 @@ func (s Site) Resolve(href string) (path string, kind LinkKind) {
 	case escaped[0] != '/' && parsed.Host != "":
 		return "", LinkExternal
 	case escaped[0] != '/':
-		escaped = s.BasePath() + escaped
+		escaped = s.basePath() + escaped
 	}
 
 	normalized, err := NormalizePath(escaped)

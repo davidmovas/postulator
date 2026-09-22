@@ -182,10 +182,6 @@ func TestTheLinkCapCountsGraphLinksOnBothSides(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := content.CountGraphLinks(mustParse(t, tc.body), lc); got != tc.graph {
-				t.Fatalf("CountGraphLinks = %d, want %d", got, tc.graph)
-			}
-
 			report := content.Compliance(mustParse(t, tc.body), lc, policy(rules), "self")
 			if hasCode(report, content.CodeTooManyLinks) != tc.capped {
 				t.Fatalf("the cap finding = %v, want capped=%t", codesOf(report), tc.capped)

@@ -62,7 +62,7 @@ func insert(doc *Document, lc LinkContext, policy template.LinkPolicy, wanted []
 
 	maxLinks := policy.Rules.MaxLinks
 	perTarget := max(policy.Rules.MaxPerTarget, 1)
-	placed := CountGraphLinks(doc, lc)
+	placed := countGraphLinks(doc, lc)
 
 	for _, target := range wanted {
 		existing := existingFor(doc, lc, target)
@@ -276,7 +276,7 @@ func existingFor(doc *Document, lc LinkContext, target LinkTarget) []*html.Node 
 	return out
 }
 
-func CountGraphLinks(doc *Document, lc LinkContext) int {
+func countGraphLinks(doc *Document, lc LinkContext) int {
 	total := 0
 	for _, link := range doc.Links() {
 		if lc.Resolve(link.Href).Class == ClassGraph {
