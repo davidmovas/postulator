@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Postulator companion plugin
-  version: 1.1.0
+  version: 1.2.0
   summary: The REST namespace the Postulator companion plugin adds to a WordPress site.
   description: >-
     Every route lives under the WordPress REST namespace postulator/v1 and is
@@ -94,6 +94,30 @@ paths:
         "404":
           $ref: "#/components/responses/NoRoute"
   /seo-meta/{id}:
+    get:
+      operationId: getSeoMeta
+      summary: Read the SEO meta of one post from whichever SEO plugin the site runs.
+      description: >-
+        Post-only; a taxonomy term id answers 404 with the code not_found. The
+        five fields are always present and a field the post does not carry
+        reads as the empty string. Advertised as the capability seo_meta_read
+        from plugin version 1.2.0; an older plugin answers 404 with the code
+        rest_no_route.
+      parameters:
+        - $ref: "#/components/parameters/PostID"
+      responses:
+        "200":
+          description: The stored SEO meta and the plugin it was read from.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeoMetaState"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
     put:
       operationId: setSeoMeta
       summary: Write SEO meta through whichever SEO plugin the site runs.
@@ -314,14 +338,16 @@ components:
         capabilities:
           type: array
           description: >-
-            For version 1.1.0 this is exactly bulk, seo_meta, content_hash, raw
-            and preview, in that order. A 1.0.0 plugin lists the first four and
-            has no preview route.
+            For version 1.2.0 this is exactly bulk, seo_meta, seo_meta_read,
+            content_hash, raw and preview, in that order. A 1.1.0 plugin lists
+            the same list without seo_meta_read and serves no read of the SEO
+            meta; a 1.0.0 plugin lists neither that nor preview.
           items:
             type: string
             enum:
               - bulk
               - seo_meta
+              - seo_meta_read
               - content_hash
               - raw
               - preview
@@ -463,7 +489,7 @@ components:
         Rank Math uses rank_math_title, rank_math_description,
         rank_math_canonical_url, rank_math_facebook_title and
         rank_math_facebook_description; with no SEO plugin the values go to
-        _postulator_title, _postulator_description, _postulator_canonical,
+        _postulator_seo_title, _postulator_seo_description, _postulator_canonical,
         _postulator_og_title and _postulator_og_description, which the plugin
         renders into the document head itself.
       properties:
@@ -477,6 +503,37 @@ components:
           type: string
         ogDescription:
           type: string
+    SeoMetaState:
+      type: object
+      description: >-
+        The SEO meta a post carries, read from the key set of the detected SEO
+        plugin. Every field is present; one the post does not carry is the
+        empty string, which is also what a write of that field would clear it
+        to.
+      required:
+        - title
+        - description
+        - canonical
+        - ogTitle
+        - ogDescription
+        - seoPlugin
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        canonical:
+          type: string
+        ogTitle:
+          type: string
+        ogDescription:
+          type: string
+        seoPlugin:
+          type: string
+          enum:
+            - yoast
+            - rankmath
+            - none
     SeoMetaResult:
       type: object
       required:

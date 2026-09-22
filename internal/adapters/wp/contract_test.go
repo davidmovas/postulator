@@ -55,7 +55,7 @@ func TestThePluginContractDocumentsEveryRoute(t *testing.T) {
 	want := map[string][]string{
 		"/manifest":             {"get"},
 		"/content":              {"get"},
-		"/seo-meta/{id}":        {"put"},
+		"/seo-meta/{id}":        {"get", "put"},
 		"/content/{id}/raw":     {"get", "put"},
 		"/content/{id}/preview": {"post"},
 	}
@@ -91,6 +91,7 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 		{name: "content item schema", snippet: "\n    ContentItem:\n"},
 		{name: "content link schema", snippet: "\n    ContentLink:\n"},
 		{name: "seo request schema", snippet: "\n    SeoMetaRequest:\n"},
+		{name: "seo state schema", snippet: "\n    SeoMetaState:\n"},
 		{name: "seo result schema", snippet: "\n    SeoMetaResult:\n"},
 		{name: "raw content schema", snippet: "\n    RawContent:\n"},
 		{name: "raw update schema", snippet: "\n    RawUpdateRequest:\n"},
@@ -103,7 +104,7 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 		{name: "nullable cursor", snippet: "- \"null\""},
 		{name: "yoast key", snippet: "_yoast_wpseo_title"},
 		{name: "rank math key", snippet: "rank_math_title"},
-		{name: "fallback key", snippet: "_postulator_title"},
+		{name: "fallback key", snippet: "_postulator_seo_title"},
 		{name: "basic auth", snippet: "scheme: basic"},
 		{name: "content hash property", snippet: "\n        contentHash:\n"},
 		{name: "next cursor property", snippet: "\n        nextCursor:\n"},
@@ -123,7 +124,8 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 		{name: "expires at property", snippet: "\n        expiresAt:\n"},
 		{name: "preview query argument", snippet: "postulator_preview"},
 		{name: "preview capability", snippet: "\n              - preview\n"},
-		{name: "plugin version", snippet: "\n  version: 1.1.0\n"},
+		{name: "seo read capability", snippet: "\n              - seo_meta_read\n"},
+		{name: "plugin version", snippet: "\n  version: 1.2.0\n"},
 	}
 
 	document := contractDocument(t)
@@ -153,6 +155,12 @@ func TestTheClientHitsOnlyDocumentedPluginRoutes(t *testing.T) {
 	}
 	if _, err := client.SetSEOMeta(t.Context(), seeded[0].ID, wp.SEOMeta{Title: "x"}); err != nil {
 		t.Fatalf("SetSEOMeta: %v", err)
+	}
+	if _, err := client.GetSEOMeta(t.Context(), seeded[0].ID); err != nil {
+		t.Fatalf("GetSEOMeta: %v", err)
+	}
+	if _, err := client.ReplaceSEOMeta(t.Context(), seeded[0].ID, wp.SEOMeta{}, []string{"title"}); err != nil {
+		t.Fatalf("ReplaceSEOMeta: %v", err)
 	}
 	raw, err := client.GetRaw(t.Context(), seeded[0].ID)
 	if err != nil {

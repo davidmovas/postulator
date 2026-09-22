@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Postulator Companion
- * Version: 1.1.0
+ * Version: 1.2.0
  * Requires at least: 6.4
  * Requires PHP: 8.1
  */
@@ -10,9 +10,9 @@ namespace Postulator\Companion;
 
 defined( 'ABSPATH' ) || exit;
 
-const VERSION             = '1.1.0';
+const VERSION             = '1.2.0';
 const NAMESPACE_PATH      = 'postulator/v1';
-const CAPABILITIES        = array( 'bulk', 'seo_meta', 'content_hash', 'raw', 'preview' );
+const CAPABILITIES        = array( 'bulk', 'seo_meta', 'seo_meta_read', 'content_hash', 'raw', 'preview' );
 const TYPES               = array( 'page', 'post', 'product', 'product_cat' );
 const TERM_TYPES          = array( 'product_cat' );
 const DEFAULT_LIMIT       = 100;

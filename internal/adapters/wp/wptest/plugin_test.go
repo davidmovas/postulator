@@ -33,8 +33,8 @@ func TestTheManifestReportsTheFrozenCapabilities(t *testing.T) {
 	}
 	decode(t, payload, &manifest)
 
-	want := []string{"bulk", "seo_meta", "content_hash", "raw", "preview"}
-	if manifest.Version != "1.1.0" || len(manifest.Capabilities) != len(want) {
+	want := []string{"bulk", "seo_meta", "seo_meta_read", "content_hash", "raw", "preview"}
+	if manifest.Version != "1.2.0" || len(manifest.Capabilities) != len(want) {
 		t.Fatalf("manifest = %+v", manifest)
 	}
 	for index, capability := range want {

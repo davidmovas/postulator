@@ -60,6 +60,7 @@ type cursor struct {
 func (s *Server) routePlugin(mux *http.ServeMux) {
 	mux.HandleFunc("GET "+pluginNamespace+"/manifest", s.handleManifest)
 	mux.HandleFunc("GET "+pluginNamespace+"/content", s.handleContent)
+	mux.HandleFunc("GET "+pluginNamespace+"/seo-meta/{id}", s.handleSEOMetaGet)
 	mux.HandleFunc("PUT "+pluginNamespace+"/seo-meta/{id}", s.handleSEOMeta)
 	mux.HandleFunc("GET "+pluginNamespace+"/content/{id}/raw", s.handleRawGet)
 	mux.HandleFunc("PUT "+pluginNamespace+"/content/{id}/raw", s.handleRawPut)
@@ -88,7 +89,7 @@ func (s *Server) handleManifest(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Unlock()
 
 	s.respond(w, http.StatusOK, map[string]any{
-		"version":      "1.1.0",
+		"version":      "1.2.0",
 		"capabilities": capabilities,
 		"seoPlugin":    plugin,
 		"wpVersion":    "6.9.1",
@@ -161,6 +162,35 @@ func (s *Server) handleContent(w http.ResponseWriter, r *http.Request) {
 	s.respond(w, http.StatusOK, map[string]any{"items": items, "nextCursor": next})
 }
 
+func (s *Server) handleSEOMetaGet(w http.ResponseWriter, r *http.Request) {
+	if s.pluginMissing(w) {
+		return
+	}
+
+	id, ok := pathID(r)
+	if !ok {
+		s.fail(w, http.StatusNotFound, "not_found", "No content with that id exists.")
+		return
+	}
+
+	s.mu.Lock()
+	stored, found := s.items[id]
+	if !found || !postType(stored.Type) {
+		s.mu.Unlock()
+		s.fail(w, http.StatusNotFound, "not_found", "No content with that id exists.")
+		return
+	}
+
+	keys := seoKeys[s.seoPlugin]
+	state := map[string]any{"seoPlugin": s.seoPlugin}
+	for _, field := range seoFieldOrder {
+		state[field] = stored.Meta[keys[field]]
+	}
+	s.mu.Unlock()
+
+	s.respond(w, http.StatusOK, state)
+}
+
 func (s *Server) handleSEOMeta(w http.ResponseWriter, r *http.Request) {
 	if s.pluginMissing(w) {
 		return
@@ -188,11 +218,21 @@ func (s *Server) handleSEOMeta(w http.ResponseWriter, r *http.Request) {
 	keys := seoKeys[s.seoPlugin]
 	applied := make([]string, 0, len(seoFieldOrder))
 	for _, field := range seoFieldOrder {
-		value := stringField(body, field)
-		if value == "" {
+		held, present := body[field]
+		if !present {
 			continue
 		}
-		stored.Meta[keys[field]] = value
+		value, isText := held.(string)
+		if !isText {
+			s.mu.Unlock()
+			s.fail(w, http.StatusBadRequest, "invalid_param", field+" must be a string.")
+			return
+		}
+		if value == "" {
+			delete(stored.Meta, keys[field])
+		} else {
+			stored.Meta[keys[field]] = value
+		}
 		applied = append(applied, field)
 	}
 	plugin := s.seoPlugin

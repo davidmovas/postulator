@@ -48,6 +48,16 @@ function read_post_seo( int $post_id ): array {
 	);
 }
 
+function read_post_seo_all( int $post_id ): array {
+	$map  = META_KEYS[ detect_plugin() ];
+	$read = array();
+
+	foreach ( $map as $field => $key ) {
+		$read[ $field ] = (string) get_post_meta( $post_id, $key, true );
+	}
+	return $read;
+}
+
 function read_term_seo( \WP_Term $term ): array {
 	$plugin = detect_plugin();
 

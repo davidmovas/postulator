@@ -13,13 +13,26 @@ import (
 )
 
 const (
-	CodePluginMissing  = "plugin_missing"
-	CodePluginOutdated = "plugin_outdated"
-	CapabilityPreview  = "preview"
+	CodePluginMissing     = "plugin_missing"
+	CodePluginOutdated    = "plugin_outdated"
+	CapabilityPreview     = "preview"
+	CapabilitySEOMetaRead = "seo_meta_read"
+
+	FieldSEOTitle         = "title"
+	FieldSEODescription   = "description"
+	FieldSEOCanonical     = "canonical"
+	FieldSEOOGTitle       = "ogTitle"
+	FieldSEOOGDescription = "ogDescription"
 
 	defaultContentLimit = 100
 	maxContentLimit     = 500
 )
+
+func SEOFields() []string {
+	return []string{
+		FieldSEOTitle, FieldSEODescription, FieldSEOCanonical, FieldSEOOGTitle, FieldSEOOGDescription,
+	}
+}
 
 type PreviewLink struct {
 	ExpiresAt time.Time
@@ -207,6 +220,31 @@ type seoResultPayload struct {
 	Applied   []string `json:"applied"`
 }
 
+type seoStatePayload struct {
+	Title         string `json:"title"`
+	Description   string `json:"description"`
+	Canonical     string `json:"canonical"`
+	OGTitle       string `json:"ogTitle"`
+	OGDescription string `json:"ogDescription"`
+}
+
+func (m SEOMeta) field(name string) (string, bool) {
+	switch name {
+	case FieldSEOTitle:
+		return m.Title, true
+	case FieldSEODescription:
+		return m.Description, true
+	case FieldSEOCanonical:
+		return m.Canonical, true
+	case FieldSEOOGTitle:
+		return m.OGTitle, true
+	case FieldSEOOGDescription:
+		return m.OGDescription, true
+	default:
+		return "", false
+	}
+}
+
 func pluginMissing() error {
 	return errors.New(errors.Invalid, "the Postulator companion plugin is not installed on this site").
 		WithDetail("code", CodePluginMissing)
@@ -331,6 +369,68 @@ func (c *Client) SetSEOMeta(ctx context.Context, id int64, meta SEOMeta) (SEORes
 	}
 
 	body, err := encodeJSON(meta)
+	if err != nil {
+		return SEOResult{}, err
+	}
+
+	_, raw, err := c.do(ctx, request{
+		method:      http.MethodPut,
+		namespace:   pluginNamespace,
+		path:        resourcePath("/seo-meta", id),
+		body:        body,
+		contentType: contentTypeJSON,
+	})
+	if err != nil {
+		return SEOResult{}, err
+	}
+
+	var payload seoResultPayload
+	if err := decodeJSON(raw, &payload); err != nil {
+		return SEOResult{}, err
+	}
+	return SEOResult{Applied: payload.Applied, SEOPlugin: payload.SEOPlugin}, nil
+}
+
+func (c *Client) GetSEOMeta(ctx context.Context, id int64) (SEOMeta, error) {
+	if err := c.requireCapability(ctx, CapabilitySEOMetaRead); err != nil {
+		return SEOMeta{}, err
+	}
+
+	_, body, err := c.do(ctx, request{
+		method:    http.MethodGet,
+		namespace: pluginNamespace,
+		path:      resourcePath("/seo-meta", id),
+	})
+	if err != nil {
+		return SEOMeta{}, err
+	}
+
+	var payload seoStatePayload
+	if err := decodeJSON(body, &payload); err != nil {
+		return SEOMeta{}, err
+	}
+	return SEOMeta(payload), nil
+}
+
+func (c *Client) ReplaceSEOMeta(ctx context.Context, id int64, meta SEOMeta, fields []string) (SEOResult, error) {
+	if err := c.requirePlugin(ctx); err != nil {
+		return SEOResult{}, err
+	}
+
+	written := make(map[string]string, len(fields))
+	for _, name := range fields {
+		value, known := meta.field(name)
+		if !known {
+			return SEOResult{}, errors.New(errors.Invalid, "the SEO meta has no field called "+name).
+				WithDetail("field", name)
+		}
+		written[name] = value
+	}
+	if len(written) == 0 {
+		return SEOResult{}, errors.New(errors.Invalid, "the SEO meta replacement names no field")
+	}
+
+	body, err := encodeJSON(written)
 	if err != nil {
 		return SEOResult{}, err
 	}

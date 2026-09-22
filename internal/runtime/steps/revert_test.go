@@ -184,6 +184,11 @@ func (s *revertStand) created(t *testing.T, pageID string) {
 
 func (s *revertStand) updated(t *testing.T, pageID, body string) {
 	t.Helper()
+	s.updatedOverMeta(t, pageID, body, nil)
+}
+
+func (s *revertStand) updatedOverMeta(t *testing.T, pageID, body string, previous *wp.SEOMeta) {
+	t.Helper()
 
 	wpID := s.wpIDs[pageID]
 	client := syncClient(t, s.server)
@@ -195,13 +200,83 @@ func (s *revertStand) updated(t *testing.T, pageID, body string) {
 	page.ContentHash = wp.ContentHash(body)
 	s.pages.items[pageID] = page
 
+	applied := []string{"title"}
+	if previous != nil {
+		applied = []string{"title", "description"}
+		if _, err := client.SetSEOMeta(t.Context(), wpID, wp.SEOMeta{
+			Title: "written by the run", Description: "written by the run",
+		}); err != nil {
+			t.Fatalf("write the run meta to %s: %v", pageID, err)
+		}
+	}
+
 	s.source.record(t, pageID, map[run.ArtifactKind]any{
 		run.ArtifactPublishResult: steps.PublishResult{
 			WPID: wpID, Created: false, ContentHash: wp.ContentHash(body),
 			PreviousContent: updatedBefore, PreviousContentHash: wp.ContentHash(updatedBefore),
-			SEOApplied: []string{"title"}, Skipped: []string{},
+			PreviousMeta: previous,
+			SEOApplied:   applied, Skipped: []string{},
 		},
 	})
+}
+
+func findingOf(reverted steps.RevertResult, code string) (content.Finding, bool) {
+	for i := range reverted.Findings {
+		if reverted.Findings[i].Code == code {
+			return reverted.Findings[i], true
+		}
+	}
+	return content.Finding{}, false
+}
+
+func TestRevertPutsBackTheSEOMetaTheRunReplaced(t *testing.T) {
+	t.Parallel()
+
+	stand := newRevertStand(t, wptest.WithSEOPlugin("yoast"))
+	stand.updatedOverMeta(t, "page-filter", runBody, &wp.SEOMeta{Title: "what a human wrote"})
+
+	reverted, _ := stand.revert(t, "page-filter")
+	if reverted.Outcome != steps.OutcomeRestored {
+		t.Fatalf("reverted = %+v", reverted)
+	}
+	if kept, found := findingOf(reverted, steps.CodeRevertMetaKept); found {
+		t.Fatalf("the revert gave up on meta it could put back: %+v", kept)
+	}
+
+	stored, ok := stand.server.Lookup(stand.wpIDs["page-filter"])
+	if !ok {
+		t.Fatal("the page is gone from the site")
+	}
+	if stored.Meta["_yoast_wpseo_title"] != "what a human wrote" {
+		t.Errorf("title = %q, want the value the run replaced", stored.Meta["_yoast_wpseo_title"])
+	}
+	if stored.Meta["_yoast_wpseo_metadesc"] != "" {
+		t.Errorf("description = %q, want a field that carried nothing before the run cleared",
+			stored.Meta["_yoast_wpseo_metadesc"])
+	}
+}
+
+func TestRevertKeepsTheSEOMetaItHasNoCopyOf(t *testing.T) {
+	t.Parallel()
+
+	stand := newRevertStand(t)
+	stand.updated(t, "page-filter", runBody)
+
+	reverted, _ := stand.revert(t, "page-filter")
+	if reverted.Outcome != steps.OutcomeRestored {
+		t.Fatalf("reverted = %+v", reverted)
+	}
+
+	kept, found := findingOf(reverted, steps.CodeRevertMetaKept)
+	if !found {
+		t.Fatalf("the revert said nothing about the meta it left: %+v", reverted.Findings)
+	}
+	if kept.Severity != content.SeverityWarn {
+		t.Errorf("the finding = %+v, want a warning", kept)
+	}
+	if kept.Details["reason"] != steps.ReasonRevertNoMeta {
+		t.Errorf("the finding = %+v, want the reason %q", kept, steps.ReasonRevertNoMeta)
+	}
 }
 
 func (s *revertStand) relinked(t *testing.T, pageID, neighborID, body string) {

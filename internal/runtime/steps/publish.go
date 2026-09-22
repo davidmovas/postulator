@@ -34,6 +34,7 @@ const (
 var editableStatuses = []string{"publish", "future", "draft", "pending", "private"}
 
 type PublishResult struct {
+	PreviousMeta        *wp.SEOMeta        `json:"previousMeta,omitempty"`
 	URL                 string             `json:"url"`
 	Status              string             `json:"status"`
 	ContentHash         string             `json:"contentHash"`
@@ -138,12 +139,13 @@ func Publish(deps Deps) run.StepDef {
 				SEOApplied: make([]string, 0), Skipped: make([]string, 0), Findings: findings,
 				Mismatches: mismatches,
 			}
-			seo, err := applySEO(ctx, client, sc, written.ID)
+			seo, err := applySEO(ctx, client, sc, written.ID, found)
 			if err != nil {
 				return run.Result{}, err
 			}
 			result.SEOApplied = seo.applied
 			result.Skipped = seo.skipped
+			result.PreviousMeta = seo.previous
 			result.Findings = append(result.Findings, seo.findings...)
 
 			if recordErr := record(ctx, deps, sc, written, result); recordErr != nil {
@@ -406,12 +408,13 @@ func upsert(ctx context.Context, client *wp.Client, itemType wp.ItemType, req wr
 }
 
 type seoWrite struct {
+	previous *wp.SEOMeta
 	applied  []string
 	skipped  []string
 	findings []content.Finding
 }
 
-func applySEO(ctx context.Context, client *wp.Client, sc *run.StepContext, wpID int64) (seoWrite, error) {
+func applySEO(ctx context.Context, client *wp.Client, sc *run.StepContext, wpID int64, updating bool) (seoWrite, error) {
 	meta, found, err := decodeArtifact[Meta](sc, run.ArtifactMeta)
 	if err != nil {
 		return seoWrite{}, err
@@ -431,6 +434,11 @@ func applySEO(ctx context.Context, client *wp.Client, sc *run.StepContext, wpID 
 		return metaNotWritten(sc.Page, ReasonNoSEOWriter), nil
 	}
 
+	previous, err := metaBeingReplaced(ctx, client, capabilities, wpID, updating)
+	if err != nil {
+		return seoWrite{}, err
+	}
+
 	result, err := client.SetSEOMeta(ctx, wpID, wp.SEOMeta{
 		Title:         meta.Title,
 		Description:   meta.Description,
@@ -445,10 +453,28 @@ func applySEO(ctx context.Context, client *wp.Client, sc *run.StepContext, wpID 
 		return seoWrite{}, err
 	}
 	return seoWrite{
+		previous: previous,
 		applied:  append(make([]string, 0, len(result.Applied)), result.Applied...),
 		skipped:  []string{},
 		findings: nil,
 	}, nil
+}
+
+func metaBeingReplaced(ctx context.Context, client *wp.Client, capabilities wp.Capabilities,
+	wpID int64, updating bool) (*wp.SEOMeta, error) {
+	if !updating || !capabilities.Has(wp.CapabilitySEOMetaRead) {
+		return nil, nil
+	}
+
+	held, err := client.GetSEOMeta(ctx, wpID)
+	switch {
+	case err == nil:
+		return &held, nil
+	case wp.IsPluginMissing(err), wp.IsPluginOutdated(err), errors.IsCode(err, errors.NotFound):
+		return nil, nil
+	default:
+		return nil, err
+	}
 }
 
 func noMetaGenerated() seoWrite {

@@ -15,12 +15,127 @@ type seoResult struct {
 	SEOPlugin string   `json:"seoPlugin"`
 }
 
+type seoState struct {
+	Title         string `json:"title"`
+	Description   string `json:"description"`
+	Canonical     string `json:"canonical"`
+	OGTitle       string `json:"ogTitle"`
+	OGDescription string `json:"ogDescription"`
+	SEOPlugin     string `json:"seoPlugin"`
+}
+
 func writeSEO(t *testing.T, c *client, id int, body map[string]string) seoResult {
 	t.Helper()
 
 	var out seoResult
 	c.expect(t, http.MethodPut, fmt.Sprintf("/wp-json/postulator/v1/seo-meta/%d", id), body, http.StatusOK, &out)
 	return out
+}
+
+func readSEO(t *testing.T, c *client, id int) seoState {
+	t.Helper()
+
+	var out seoState
+	c.expect(t, http.MethodGet, fmt.Sprintf("/wp-json/postulator/v1/seo-meta/%d", id), nil, http.StatusOK, &out)
+	return out
+}
+
+func TestSEOMetaReadsBackEveryFieldAWriteLeft(t *testing.T) {
+	c, env := newClient(t)
+
+	slug := uniqueSlug("seoread")
+	id := createPage(t, c, pageSpec{title: "Read", slug: slug, content: "<p>body</p>"})
+
+	empty := readSEO(t, c, id)
+	if empty.Title != "" || empty.Description != "" || empty.Canonical != "" ||
+		empty.OGTitle != "" || empty.OGDescription != "" {
+		t.Fatalf("a page that carries no SEO meta reads as %+v", empty)
+	}
+	if empty.SEOPlugin != env.seo {
+		t.Errorf("seoPlugin = %q, want %q", empty.SEOPlugin, env.seo)
+	}
+
+	written := map[string]string{
+		"title":         "Read title " + slug,
+		"description":   "Read description " + slug,
+		"canonical":     env.baseURL + "/" + slug + "/",
+		"ogTitle":       "OG read title " + slug,
+		"ogDescription": "OG read description " + slug,
+	}
+	writeSEO(t, c, id, written)
+
+	got := readSEO(t, c, id)
+	for field, want := range written {
+		var have string
+		switch field {
+		case "title":
+			have = got.Title
+		case "description":
+			have = got.Description
+		case "canonical":
+			have = got.Canonical
+		case "ogTitle":
+			have = got.OGTitle
+		case "ogDescription":
+			have = got.OGDescription
+		}
+		if have != want {
+			t.Errorf("%s = %q, want %q", field, have, want)
+		}
+	}
+}
+
+func TestSEOMetaReadFollowsAWriteThatClearsAField(t *testing.T) {
+	c, _ := newClient(t)
+
+	slug := uniqueSlug("seoclear")
+	id := createPage(t, c, pageSpec{title: "Clear", slug: slug, content: "<p>body</p>"})
+
+	writeSEO(t, c, id, map[string]string{"title": "kept", "description": "to be cleared"})
+	writeSEO(t, c, id, map[string]string{"description": ""})
+
+	got := readSEO(t, c, id)
+	if got.Title != "kept" {
+		t.Errorf("title = %q, want the field the second write did not name", got.Title)
+	}
+	if got.Description != "" {
+		t.Errorf("description = %q, want an empty write to clear the field", got.Description)
+	}
+}
+
+func TestSEOMetaReadRejectsAnUnknownIDAndATerm(t *testing.T) {
+	c, env := newClient(t)
+
+	status, body := c.request(t, http.MethodGet, "/wp-json/postulator/v1/seo-meta/98765432", nil)
+	if status != http.StatusNotFound {
+		t.Fatalf("status %d, want 404, body %s", status, body)
+	}
+	if !strings.Contains(string(body), `"not_found"`) {
+		t.Fatalf("body %s does not carry the not_found code", body)
+	}
+
+	requireWoo(t, env)
+	term := findBySlug(t, c, "product_cat", "postulator-koffein")
+
+	status, body = c.request(t, http.MethodGet,
+		fmt.Sprintf("/wp-json/postulator/v1/seo-meta/%d", term.ID), nil)
+	if status != http.StatusNotFound {
+		t.Fatalf("term id %d: status %d, want 404, body %s", term.ID, status, body)
+	}
+}
+
+func TestSEOMetaReadRequiresAuthentication(t *testing.T) {
+	c, _ := newClient(t)
+
+	slug := uniqueSlug("seoauth")
+	id := createPage(t, c, pageSpec{title: "Auth", slug: slug, content: "<p>body</p>"})
+
+	anonymous := &client{base: c.base, http: c.http}
+	status, body := anonymous.request(t, http.MethodGet,
+		fmt.Sprintf("/wp-json/postulator/v1/seo-meta/%d", id), nil)
+	if status != http.StatusUnauthorized {
+		t.Fatalf("anonymous read: status %d, want 401, body %s", status, body)
+	}
 }
 
 func TestSEOMetaRoundTripsAndRenders(t *testing.T) {

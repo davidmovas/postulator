@@ -29,11 +29,14 @@ func TestCapabilitiesAreFetchedOnceAndCached(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Capabilities: %v", err)
 	}
-	if first.SEOPlugin != "rankmath" || first.Version != "1.1.0" || first.Site != server.URL() {
+	if first.SEOPlugin != "rankmath" || first.Version != "1.2.0" || first.Site != server.URL() {
 		t.Errorf("capabilities = %+v", first)
 	}
 	if !first.Has("raw") || !first.Has("seo_meta") || !first.Has(wp.CapabilityPreview) || first.Has("telepathy") {
 		t.Errorf("names = %v", first.Names)
+	}
+	if !first.Has(wp.CapabilitySEOMetaRead) {
+		t.Errorf("names = %v, want the read of the SEO meta", first.Names)
 	}
 
 	if _, err = client.Capabilities(t.Context()); err != nil {
@@ -60,6 +63,14 @@ func TestEveryPluginMethodDegradesWhenThePluginIsAbsent(t *testing.T) {
 		{name: "content", call: func() error { _, err := client.ListContent(t.Context(), wp.ContentQuery{}); return err }},
 		{name: "seo meta", call: func() error {
 			_, err := client.SetSEOMeta(t.Context(), seeded[0].ID, wp.SEOMeta{Title: "x"})
+			return err
+		}},
+		{name: "seo meta read", call: func() error {
+			_, err := client.GetSEOMeta(t.Context(), seeded[0].ID)
+			return err
+		}},
+		{name: "seo meta replace", call: func() error {
+			_, err := client.ReplaceSEOMeta(t.Context(), seeded[0].ID, wp.SEOMeta{}, []string{"title"})
 			return err
 		}},
 		{name: "raw read", call: func() error { _, err := client.GetRaw(t.Context(), seeded[0].ID); return err }},
@@ -255,6 +266,99 @@ func TestSetSEOMetaReportsWhatWasWritten(t *testing.T) {
 
 	if _, err = client.SetSEOMeta(t.Context(), seeded[0].ID, wp.SEOMeta{}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("code = %q, want %q for an empty update", errors.CodeOf(err), errors.Invalid)
+	}
+}
+
+func TestGetSEOMetaReadsTheFiveFieldsTheSiteHolds(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t, wptest.WithSEOPlugin("yoast"))
+	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein"})
+	client := newClient(t, server)
+
+	before, err := client.GetSEOMeta(t.Context(), seeded[0].ID)
+	if err != nil {
+		t.Fatalf("GetSEOMeta: %v", err)
+	}
+	if before != (wp.SEOMeta{}) {
+		t.Fatalf("a post with no meta reads as %+v", before)
+	}
+
+	if _, err = client.SetSEOMeta(t.Context(), seeded[0].ID, wp.SEOMeta{
+		Title: "Koffein", Description: "about it",
+	}); err != nil {
+		t.Fatalf("SetSEOMeta: %v", err)
+	}
+
+	after, err := client.GetSEOMeta(t.Context(), seeded[0].ID)
+	if err != nil {
+		t.Fatalf("GetSEOMeta again: %v", err)
+	}
+	if after.Title != "Koffein" || after.Description != "about it" || after.Canonical != "" {
+		t.Fatalf("the read = %+v", after)
+	}
+}
+
+func TestReplaceSEOMetaPutsBackTheFieldsItIsGiven(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t, wptest.WithSEOPlugin("yoast"))
+	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein"})
+	client := newClient(t, server)
+
+	if _, err := client.SetSEOMeta(t.Context(), seeded[0].ID, wp.SEOMeta{
+		Title: "written by a run", Description: "written by a run", Canonical: "kept by a human",
+	}); err != nil {
+		t.Fatalf("SetSEOMeta: %v", err)
+	}
+
+	result, err := client.ReplaceSEOMeta(t.Context(), seeded[0].ID, wp.SEOMeta{Title: "what was there"},
+		[]string{"title", "description"})
+	if err != nil {
+		t.Fatalf("ReplaceSEOMeta: %v", err)
+	}
+	if len(result.Applied) != 2 {
+		t.Fatalf("applied = %v, want both named fields", result.Applied)
+	}
+
+	after, err := client.GetSEOMeta(t.Context(), seeded[0].ID)
+	if err != nil {
+		t.Fatalf("GetSEOMeta: %v", err)
+	}
+	if after.Title != "what was there" {
+		t.Errorf("title = %q, want the value it is given", after.Title)
+	}
+	if after.Description != "" {
+		t.Errorf("description = %q, want an empty value to clear the field", after.Description)
+	}
+	if after.Canonical != "kept by a human" {
+		t.Errorf("canonical = %q, want a field nobody named left alone", after.Canonical)
+	}
+
+	if _, err = client.ReplaceSEOMeta(t.Context(), seeded[0].ID, wp.SEOMeta{}, []string{"shade"}); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("a field the meta has no place for = %v, want invalid", err)
+	}
+	if _, err = client.ReplaceSEOMeta(t.Context(), seeded[0].ID, wp.SEOMeta{}, nil); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("a replacement of nothing = %v, want invalid", err)
+	}
+}
+
+func TestGetSEOMetaRefusesAPluginWithoutTheCapability(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t, wptest.WithCapabilities("bulk", "seo_meta", "content_hash", "raw", "preview"))
+	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein"})
+	client := newClient(t, server)
+
+	_, err := client.GetSEOMeta(t.Context(), seeded[0].ID)
+	if !wp.IsPluginOutdated(err) {
+		t.Fatalf("GetSEOMeta on a 1.1.0 plugin = %v, want plugin_outdated", err)
+	}
+	if got := detailOf(t, err, "capability"); got != wp.CapabilitySEOMetaRead {
+		t.Errorf("the refusal names %q", got)
+	}
+	if got := len(server.Requests()); got != 1 {
+		t.Errorf("the client asked the site %d times, want only the manifest", got)
 	}
 }
 

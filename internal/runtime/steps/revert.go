@@ -32,6 +32,10 @@ const (
 	ReasonRevertNoNeighbor = "the neighbor is no longer on the site"
 	ReasonRevertNoBefore   = "the run kept no copy of the neighbor content it replaced"
 
+	ReasonRevertNoMeta = "the run kept no copy of the SEO meta it replaced, which needs a companion " +
+		"plugin that can read it"
+	ReasonRevertNoMetaWriter = "the companion plugin on this site cannot put the SEO meta back"
+
 	revertTimeout = 5 * time.Minute
 )
 
@@ -217,10 +221,34 @@ func putTheBodyBack(ctx context.Context, deps Deps, sc *run.StepContext, result 
 	}
 	result.Outcome = OutcomeRestored
 	result.Detail = "the body the run replaced was written back"
-	if len(work.published.SEOApplied) > 0 {
-		result.Findings = append(result.Findings, metaKept(work.page, work.published.SEOApplied))
+	if reason, back := putTheMetaBack(ctx, work); !back {
+		result.Findings = append(result.Findings, metaKept(work.page, work.published.SEOApplied, reason))
 	}
 	return "", true
+}
+
+func putTheMetaBack(ctx context.Context, work revertWork) (string, bool) {
+	if len(work.published.SEOApplied) == 0 {
+		return "", true
+	}
+	if work.published.PreviousMeta == nil {
+		return ReasonRevertNoMeta, false
+	}
+
+	_, err := work.client.ReplaceSEOMeta(ctx, work.published.WPID, *work.published.PreviousMeta,
+		work.published.SEOApplied)
+	switch {
+	case err == nil:
+		return "", true
+	case wp.IsPluginMissing(err):
+		return ReasonRevertNoPlugin, false
+	case wp.IsPluginOutdated(err):
+		return ReasonRevertNoMetaWriter, false
+	case errors.IsCode(err, errors.NotFound):
+		return ReasonRevertGone, false
+	default:
+		return err.Error(), false
+	}
 }
 
 func undoNeighbor(ctx context.Context, deps Deps, sc *run.StepContext, result *RevertResult,
@@ -334,13 +362,14 @@ func readopt(ctx context.Context, deps Deps, sc *run.StepContext, page pagemap.P
 	return persist(ctx, deps, next, links)
 }
 
-func metaKept(page pagemap.Page, applied []string) content.Finding {
+func metaKept(page pagemap.Page, applied []string, reason string) content.Finding {
 	return content.Finding{
 		Severity: content.SeverityWarn,
 		Code:     CodeRevertMetaKept,
-		Message: "the SEO meta the run wrote to " + page.Path +
-			" stays as it is: the companion plugin offers no read of what was there before",
-		Details: map[string]any{"pageId": page.ID, "path": page.Path, "fields": applied},
+		Message:  "the SEO meta the run wrote to " + page.Path + " stays as it is: " + reason,
+		Details: map[string]any{
+			"pageId": page.ID, "path": page.Path, "fields": applied, "reason": reason,
+		},
 	}
 }
 

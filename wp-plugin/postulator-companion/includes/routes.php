@@ -29,9 +29,16 @@ function register_routes(): void {
 		NAMESPACE_PATH,
 		'/seo-meta/(?P<id>\d+)',
 		array(
-			'methods'             => \WP_REST_Server::EDITABLE,
-			'callback'            => __NAMESPACE__ . '\\seo_meta_update',
-			'permission_callback' => __NAMESPACE__ . '\\permission_check',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => __NAMESPACE__ . '\\seo_meta_get',
+				'permission_callback' => __NAMESPACE__ . '\\permission_check',
+			),
+			array(
+				'methods'             => \WP_REST_Server::EDITABLE,
+				'callback'            => __NAMESPACE__ . '\\seo_meta_update',
+				'permission_callback' => __NAMESPACE__ . '\\permission_check',
+			),
 		)
 	);
 
@@ -176,6 +183,21 @@ function editable_post( \WP_REST_Request $request ) {
 		return forbidden( 'editing this post is not allowed' );
 	}
 	return $post;
+}
+
+function seo_meta_get( \WP_REST_Request $request ) {
+	$post = editable_post( $request );
+	if ( is_wp_error( $post ) ) {
+		return $post;
+	}
+
+	return new \WP_REST_Response(
+		array_merge(
+			read_post_seo_all( (int) $post->ID ),
+			array( 'seoPlugin' => detect_plugin() )
+		),
+		200
+	);
 }
 
 function seo_meta_update( \WP_REST_Request $request ) {

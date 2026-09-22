@@ -130,6 +130,77 @@ func TestPublishSkipsTheSEOMetaWithoutThePlugin(t *testing.T) {
 	}
 }
 
+func TestPublishKeepsTheSEOMetaItReplaced(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDepsWith(t, wptest.WithSEOPlugin("yoast"))
+	seeded := server.Seed(wptest.Item{
+		Type: wptest.TypePage, Title: "Espresso", Slug: "espresso", Status: "draft",
+		Meta: map[string]string{
+			"_yoast_wpseo_title":    "what a human wrote",
+			"_yoast_wpseo_metadesc": "and the description with it",
+		},
+	})
+
+	published := runPublish(t, deps, publishContext(t))
+	if published.Created || published.WPID != seeded[0].ID {
+		t.Fatalf("publish = %+v, want an update of the seeded page", published)
+	}
+	if published.PreviousMeta == nil {
+		t.Fatal("the publish overwrote the SEO meta without keeping what was there")
+	}
+	if published.PreviousMeta.Title != "what a human wrote" {
+		t.Errorf("previousMeta.title = %q", published.PreviousMeta.Title)
+	}
+	if published.PreviousMeta.Description != "and the description with it" {
+		t.Errorf("previousMeta.description = %q", published.PreviousMeta.Description)
+	}
+	if published.PreviousMeta.Canonical != "" {
+		t.Errorf("previousMeta.canonical = %q, want the empty field the page carried", published.PreviousMeta.Canonical)
+	}
+
+	stored, _ := server.Lookup(published.WPID)
+	if stored.Meta["_yoast_wpseo_title"] != "espresso | Shop" {
+		t.Errorf("the run did not write its own meta: %v", stored.Meta)
+	}
+}
+
+func TestPublishKeepsNoPreviousMetaItCouldNotRead(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		options []wptest.Option
+		seed    bool
+	}{
+		{name: "a page it created", seed: false},
+		{
+			name: "a plugin too old to answer",
+			seed: true,
+			options: []wptest.Option{wptest.WithCapabilities(
+				"bulk", "seo_meta", "content_hash", "raw", "preview",
+			)},
+		},
+		{name: "a site without the plugin", seed: true, options: []wptest.Option{wptest.WithoutPlugin()}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps, server := imageDepsWith(t, tc.options...)
+			if tc.seed {
+				server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Slug: "espresso", Status: "draft"})
+			}
+
+			published := runPublish(t, deps, publishContext(t))
+			if published.PreviousMeta != nil {
+				t.Fatalf("previousMeta = %+v, want nothing that was never read", published.PreviousMeta)
+			}
+		})
+	}
+}
+
 func TestPublishReportsWhatItCannotDo(t *testing.T) {
 	t.Parallel()
 
