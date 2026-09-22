@@ -47,6 +47,7 @@ func GenerateMeta(deps Deps) run.StepDef {
 		Requires: []run.ArtifactKind{run.ArtifactDraft},
 		Produces: []run.ArtifactKind{run.ArtifactMeta},
 		Retry:    run.RetryPolicy{Max: 3},
+		Price:    run.Price{OutputTokens: metaTokens},
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			draft, err := draftOf(sc)
 			if err != nil {

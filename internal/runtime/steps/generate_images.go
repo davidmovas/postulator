@@ -57,6 +57,7 @@ func GenerateImages(deps Deps) run.StepDef {
 		Produces: []run.ArtifactKind{run.ArtifactImages, run.ArtifactBodyHTML},
 		Retry:    run.RetryPolicy{Max: 2},
 		Timeout:  imageStepTimeout,
+		Price:    run.Price{Unpriced: true},
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			wanted := wantedImages(sc.Spec.Images)
 			if wanted == 0 {

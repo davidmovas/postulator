@@ -10,7 +10,11 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
 
-const NameJudge = appcontent.NameJudge
+const (
+	NameJudge = appcontent.NameJudge
+
+	judgeOutputTokens = 1024
+)
 
 type JudgeReport = appcontent.JudgeReport
 
@@ -21,6 +25,7 @@ func Judge(deps Deps) run.StepDef {
 		Requires: []run.ArtifactKind{run.ArtifactBodyHTML},
 		Produces: []run.ArtifactKind{run.ArtifactJudgeReport},
 		Retry:    run.RetryPolicy{Max: 1},
+		Price:    run.Price{OutputTokens: judgeOutputTokens},
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			report, tokens, err := judgement(ctx, deps, sc)
 			if err != nil {

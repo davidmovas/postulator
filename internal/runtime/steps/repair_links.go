@@ -39,6 +39,12 @@ func RepairLinks(deps Deps) run.StepDef {
 		Requires: []run.ArtifactKind{run.ArtifactLinkContext, run.ArtifactBodyHTML},
 		Produces: []run.ArtifactKind{run.ArtifactBodyHTML},
 		Retry:    run.RetryPolicy{Max: 2},
+		Price: run.Price{
+			OutputTokens: repairTokens,
+			Calls: func(spec template.TemplateSpec, params map[string]any) int {
+				return iterations(params) * spec.LinkRules.UpDepth
+			},
+		},
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			lc, err := linkContextOf(sc)
 			if err != nil {
@@ -98,7 +104,11 @@ func RepairLinks(deps Deps) run.StepDef {
 }
 
 func iterationsOf(sc *run.StepContext) int {
-	value, ok := sc.Param(ParamIterations)
+	return iterations(sc.Params)
+}
+
+func iterations(params map[string]any) int {
+	value, ok := params[ParamIterations]
 	if !ok {
 		return defaultIterations
 	}

@@ -252,6 +252,10 @@ export function StartRunDrawer({
                     </div>
                 )}
 
+                {(estimate?.findings ?? []).map((finding) => (
+                    <Banner key={finding.code + finding.message} tone="info" title={finding.message} />
+                ))}
+
                 {over ? <Banner tone="warn" title={copy.runs.start.overCap} /> : null}
                 {problem === null ? null : <Banner tone="danger" title={problem} />}
             </div>

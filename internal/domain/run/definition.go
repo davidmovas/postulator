@@ -66,6 +66,12 @@ type Result struct {
 	USD        float64
 }
 
+type Price struct {
+	Calls        func(spec template.TemplateSpec, params map[string]any) int
+	OutputTokens int
+	Unpriced     bool
+}
+
 type StepDef struct {
 	Run      func(ctx context.Context, sc *StepContext) (Result, error)
 	Name     string
@@ -73,6 +79,7 @@ type StepDef struct {
 	Requires []ArtifactKind
 	Produces []ArtifactKind
 	Retry    RetryPolicy
+	Price    Price
 	Timeout  time.Duration
 }
 

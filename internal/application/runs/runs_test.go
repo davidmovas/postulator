@@ -109,7 +109,10 @@ func newFixture(t *testing.T) *fixture {
 		pages = append(pages, sqlitetest.Page(t, store, site.ID, path).ID)
 	}
 
-	engine := &fakeEngine{estimate: run.Estimate{Tokens: 4200, USD: 0.12}}
+	engine := &fakeEngine{estimate: run.Estimate{
+		Tokens: 4200, USD: 0.12,
+		Findings: []run.EstimateFinding{{Code: "unpriced_step", Message: "images are not priced"}},
+	}}
 	specs := &fakeSpecs{
 		siteID:  "s",
 		version: 2,
@@ -250,7 +253,9 @@ func TestEstimateAnswersTheCostWithoutEnqueuingAnything(t *testing.T) {
 	if marshalErr != nil {
 		t.Fatalf("Marshal: %v", marshalErr)
 	}
-	if string(encoded) != `{"estimate":{"tokens":4200,"usd":0.12}}` {
+	want := `{"estimate":{"tokens":4200,"usd":0.12,` +
+		`"findings":[{"code":"unpriced_step","message":"images are not priced"}]}}`
+	if string(encoded) != want {
 		t.Fatalf("Estimate = %s", encoded)
 	}
 
@@ -258,7 +263,8 @@ func TestEstimateAnswersTheCostWithoutEnqueuingAnything(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Start: %v", err)
 	}
-	if started.Estimate != answered.Estimate {
+	if started.Estimate.Tokens != answered.Estimate.Tokens || started.Estimate.USD != answered.Estimate.USD ||
+		len(started.Estimate.Findings) != len(answered.Estimate.Findings) {
 		t.Fatalf("Start estimated %+v, Estimate answered %+v", started.Estimate, answered.Estimate)
 	}
 }
