@@ -1084,3 +1084,63 @@ $0.39 on the provider's page.
   and `Config.AgentProvider` unset, seals the key into the harness home and skips the seeded runs,
   schedule and conversation, which would otherwise be real spend. That is how the numbers above
   were measured, against a seeded site and a home of its own rather than the client's.
+
+## 2026-09-22 — the hierarchy, the verifier, the repair and the import
+
+- **`parent: 0` means deliberately at the top level and never "unknown".** WordPress reads the
+  same zero both ways, and the publish step handed it that zero for a parent the page map does
+  not hold, for a dangling link and for a parent that is planned but not yet on the site.
+  Seventeen imported pages were published flat and nothing said so. A parent that is not there
+  yet holds the item as `waiting`, names what it waits for, and pauses for a human past
+  `ParentWaitLimit`; a parent the map does not hold is `INVALID`.
+- **The parent is read from the path, not from the cached link.** `parent_page_id` is a cache and
+  a cache can lie, so `parentOf` takes `ParentPath(page.Path)` as the truth, refuses a page whose
+  path names an ancestor the map has no page for, and refuses a link that disagrees with the
+  path. `ParentPath` of a depth-one page is `/`, which is a legitimate ancestor path and not a
+  WordPress ancestor, so a section is never nested under the front page even when the site has
+  one and `pages.Create` linked it there.
+- **Run items carry the order they were planned in.** Every item of a run was stamped with one
+  `created_at` truncated to the second, so `ORDER BY created_at, id` collapsed to a random UUID
+  order and a child published before its parent about half the time. `Engine.Enqueue` sorts the
+  targets ancestors first and writes the index into `run_items.seq`, which covers the window, the
+  agent and the scheduler at once.
+- **A publish is not finished until what came back has been compared with what was asked for.**
+  `Page.Observed` holds the site's own view beside the plan and `Page.Mismatches` is the pure
+  comparison, judging only a field the plan named. The publish step compares immediately, because
+  `relink_neighbors` downstream builds its links from the path; a disagreement is written once
+  more with the parent and the slug it asked for, and if the site still answers something else
+  the item pauses for a human naming both values.
+- **A draft has no address.** WordPress answers `/?page_id=42` until a page is published, so the
+  path is compared only once there is one, while the parent id and the slug, which are what
+  produce that address, are compared on every write.
+- **WordPress owns no field of the plan.** `sync_site.merge` assigned the path, slug, title,
+  heading and meta from whatever the site answered and then rebuilt the parent link from that
+  path, so one sync after a bad publish overwrote the imported plan with the damage. A page whose
+  content this application wrote — the same non-empty `ContentHash` the drift rule already uses —
+  keeps its plan; a page the sync discovers is adopted whole, because there is no plan to protect.
+- **A repair moves a page without rewriting it.** `repair_hierarchy` needs no artifact and sends
+  WordPress nothing but the parent and the slug, so the content and the title stand and WordPress
+  recomputes the permalink itself. It is its own run kind because the publish step needs a draft
+  and a body it would then write over.
+- **A page can be taken off the site, not only out of the map.** `Delete{onSite}` trashes the
+  WordPress page first, where a human can still restore it, and drops the local row only once the
+  site agreed; the application reaches WordPress through the seam the preview link already uses.
+- **A refusal a model reads is the message, not the details.** The agent saw "pause reason is not
+  recognized", concluded `runs_pause` was defective and stopped trying, because `details` never
+  reaches the model. The refusal now names the four reasons it would accept in its message.
+- **A graph node says where its page stands.** `LoadGraph` answers a state per mapped page and the
+  node is filled by it, with a disagreement above work in flight and work above the stored status,
+  so the loudest colour is always the page that needs a human. A legend explains each state in a
+  sentence and a badge names it in a word; they are two vocabularies because a badge has the width
+  of a column and a legend has a line.
+- **A workbook is more than its first sheet.** The reader took sheet one silently. Inspect names
+  every sheet with its shape, a mapping says which to read, rows carry the sheet and line they
+  came from, and sheets that do not agree on their columns are refused by name rather than
+  stacked. `indentColumns` builds the path from the column a cell sits in, which is how a client
+  who never had a path column writes one down, and `noHeader` addresses the columns by their
+  spreadsheet letters because such a sheet has no header to name them by.
+- **The agent gets a summary, the window gets the report.** `imports_preview` answered with one
+  entry per planned page and the 16 KB tool-result cap cut it into invalid JSON at about sixty
+  rows. The agent now reads counts, twenty sample pages and findings grouped by code with five
+  examples each; `ImportService.Preview` still answers the whole report, because a window has no
+  byte budget.

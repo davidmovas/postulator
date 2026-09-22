@@ -77,6 +77,32 @@ and answer in the language it was asked in, and `POSTULATOR_OPENAI_KEY` points t
 real provider. Verified on a live OpenAI key against the seeded site: an entity tree and a template
 each landed on the first call, from one card each.
 
+**The client's first run against a real WordPress on 2026-09-22 found the hierarchy broken and
+five faults behind it**, all fixed and recorded in `DECISIONS.md`. Seventeen imported pages were
+published at the top level because `parent: 0` meant both "deliberately at the top" and "I do not
+know", because every item of a run shared one `created_at` and therefore published in random UUID
+order, and because nothing compared the address WordPress answered with against the one that was
+asked for. A `sync_site` after such a publish overwrote the imported plan with the damage. The
+publish step now derives the parent from the path, holds an item whose parent is not on the site
+yet, compares the write against the plan and repairs once before pausing for a human; the sync
+records the site's view beside the plan instead of over it; `repair_hierarchy` and the `repair`
+run kind move a page without rewriting it, and `PagesService.Delete{onSite}` can take one off the
+site into the WordPress trash. Migrations 0023 and 0024 add `run_items.seq` and the five
+`pages.wp_*` mirror columns.
+
+**The Graph carries page state since 2026-09-22.** `LoadGraph` answers a state per mapped page —
+its status, whether a run is working on it and whether the site disagrees with the plan — and the
+map fills each node by it while the outline names it in a badge; the toolbar filters by state with
+counts and the legend explains each one.
+
+**The import reads a whole workbook since 2026-09-22.** Inspect names every sheet, a mapping picks
+which to read and rows carry the sheet and line they came from; `indentColumns` builds the path
+from the column a cell sits in and `noHeader` addresses columns by their spreadsheet letters.
+`imports_preview` answers the agent with a bounded summary rather than a report the 16 KB
+tool-result cap would cut into invalid JSON. `samples/messy-sheets.xlsx` is the client-shaped
+workbook that exercises all of it: seven sheets, about four thousand rows, three shapes and four
+deliberate faults.
+
 **Phase 13, the product frontend, landed on 2026-09-20 and 21** (plan:
 `docs/superpowers/plans/2026-09-20-phase-13-frontend.md`). Every screen sits on one screen
 contract (`ui/screen.tsx` with `Toolbar`, `Tabs`, `Segmented`, `Menu`, `Kbd`), the window is
@@ -241,6 +267,10 @@ Module coverage is 87.6% of 14439 statements; `domain` + `application` sit at 86
 
 ## Next steps
 
+0. Repair the seven pages the client's run published flat (WordPress ids 116 to 122 on the docker
+   stack): a `repair` run over them moves each under its parent and WordPress recomputes the
+   permalink. Nothing else on that stand is trustworthy until it is done, because a `sync_site`
+   over a flat page now records the disagreement rather than adopting it.
 1. A human walk of what automation cannot see: dragging and snapping the frameless window, the
    close button's hover, a real provider key and a real WordPress, Tor on a machine with a
    different install path.
