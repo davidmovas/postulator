@@ -17,7 +17,8 @@ import (
 )
 
 type tableStore interface {
-	Read(ctx context.Context, path string, maxRows int) (importmap.Table, error)
+	Read(ctx context.Context, path string, opts importmap.ReadOptions) (importmap.Table, error)
+	Sheets(path string) ([]importmap.SheetInfo, error)
 	Write(path string, table importmap.Table) error
 }
 
@@ -96,8 +97,12 @@ func (s *Service) requireSite(ctx context.Context, siteID string) error {
 	return err
 }
 
-func (s *Service) table(ctx context.Context, path string) (importmap.Table, error) {
-	return s.deps.Tables.Read(ctx, path, s.deps.MaxRows)
+func (s *Service) table(ctx context.Context, path string, options Options) (importmap.Table, error) {
+	return s.deps.Tables.Read(ctx, path, importmap.ReadOptions{
+		Sheets:  options.Sheets,
+		MaxRows: s.deps.MaxRows,
+		Letters: len(options.IndentColumns) > 0 && len(options.Sheets) == 0,
+	})
 }
 
 func (s *Service) announce(siteID string) error {

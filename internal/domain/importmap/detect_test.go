@@ -1,6 +1,7 @@
 package importmap_test
 
 import (
+	"reflect"
 	"slices"
 	"testing"
 
@@ -77,7 +78,7 @@ func TestAutoDetectIgnoresUnknownAndRepeatedHeaders(t *testing.T) {
 	if len(mapping.Columns) != 1 {
 		t.Fatalf("columns = %v, want only the path", mapping.Columns)
 	}
-	if mapping.Options != importmap.DefaultOptions() {
+	if !reflect.DeepEqual(mapping.Options, importmap.DefaultOptions()) {
 		t.Fatalf("options = %+v, want the defaults", mapping.Options)
 	}
 }

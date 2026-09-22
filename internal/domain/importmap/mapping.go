@@ -12,10 +12,12 @@ const (
 )
 
 type Options struct {
-	PathPrefixStrip  string `json:"pathPrefixStrip,omitempty"`
-	KeywordSeparator string `json:"keywordSeparator,omitempty"`
-	AnchorSeparator  string `json:"anchorSeparator,omitempty"`
-	ListSeparator    string `json:"listSeparator,omitempty"`
+	PathPrefixStrip  string   `json:"pathPrefixStrip,omitempty"`
+	KeywordSeparator string   `json:"keywordSeparator,omitempty"`
+	AnchorSeparator  string   `json:"anchorSeparator,omitempty"`
+	ListSeparator    string   `json:"listSeparator,omitempty"`
+	Sheets           []string `json:"sheets,omitempty"`
+	IndentColumns    []string `json:"indentColumns,omitempty"`
 }
 
 func DefaultOptions() Options {
@@ -96,7 +98,7 @@ func NewMapping(m Mapping) (Mapping, error) {
 		return Mapping{}, invalid("mapping site id must not be empty", "siteId")
 	case m.Name == "":
 		return Mapping{}, invalid("mapping name must not be empty", "name")
-	case len(m.Columns) == 0:
+	case len(m.Columns) == 0 && len(m.Options.IndentColumns) == 0:
 		return Mapping{}, invalid("mapping must map at least one column", "columns")
 	}
 
@@ -112,10 +114,23 @@ func NewMapping(m Mapping) (Mapping, error) {
 		columns[field] = trimmed
 	}
 
+	indent := make([]string, 0, len(m.Options.IndentColumns))
+	for _, column := range m.Options.IndentColumns {
+		trimmed := strings.TrimSpace(column)
+		if trimmed == "" {
+			return Mapping{}, invalid("an indent column must not be empty", "indentColumns")
+		}
+		indent = append(indent, trimmed)
+	}
+	if len(indent) == 0 {
+		indent = nil
+	}
+	m.Options.IndentColumns = indent
+
 	_, hasPath := columns[FieldPath]
 	_, hasEntity := columns[FieldEntity]
-	if !hasPath && !hasEntity {
-		return Mapping{}, invalid("mapping must carry a path or an entity column", "columns")
+	if !hasPath && !hasEntity && len(indent) == 0 {
+		return Mapping{}, invalid("mapping must carry a path, an entity column or indent columns", "columns")
 	}
 
 	m.Columns = columns
@@ -125,6 +140,7 @@ func NewMapping(m Mapping) (Mapping, error) {
 
 type Binding struct {
 	index   map[Field]int
+	indent  []int
 	options Options
 }
 
@@ -158,7 +174,17 @@ func (m Mapping) Bind(headers []string) (Binding, error) {
 			return Binding{}, invalid("import field is not recognized", "columns").WithDetail("importField", string(field))
 		}
 	}
-	return Binding{index: index, options: m.Options.OrDefault()}, nil
+
+	indent := make([]int, 0, len(m.Options.IndentColumns))
+	for _, column := range m.Options.IndentColumns {
+		at, found := positions[normalizeHeader(column)]
+		if !found {
+			return Binding{}, invalid("the indent column is not in the file", "indentColumns").
+				WithDetail("column", column)
+		}
+		indent = append(indent, at)
+	}
+	return Binding{index: index, indent: indent, options: m.Options.OrDefault()}, nil
 }
 
 func (b Binding) Options() Options {

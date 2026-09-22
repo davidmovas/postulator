@@ -1,14 +1,16 @@
 package imports
 
 type InspectRequest struct {
-	SiteID string `json:"siteId"`
-	Path   string `json:"path"`
+	SiteID string   `json:"siteId"`
+	Path   string   `json:"path"`
+	Sheets []string `json:"sheets,omitempty"`
 }
 
 type InspectResponse struct {
 	Headers  []string   `json:"headers"`
 	Sample   [][]string `json:"sample"`
 	Rows     int        `json:"rows"`
+	Sheets   []Sheet    `json:"sheets"`
 	Detected Mapping    `json:"detected"`
 	Saved    []Mapping  `json:"saved"`
 }

@@ -2,6 +2,7 @@ package sqlite_test
 
 import (
 	"maps"
+	"reflect"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
@@ -45,7 +46,7 @@ func TestImportMappingRepoUpsertsReadsAndDeletes(t *testing.T) {
 	if !maps.Equal(back.Columns, record.Columns) {
 		t.Fatalf("columns = %v, want %v", back.Columns, record.Columns)
 	}
-	if back.Options != record.Options || back.Name != record.Name || !back.CreatedAt.Equal(record.CreatedAt) {
+	if !reflect.DeepEqual(back.Options, record.Options) || back.Name != record.Name || !back.CreatedAt.Equal(record.CreatedAt) {
 		t.Fatalf("mapping = %+v, want %+v", back, record)
 	}
 

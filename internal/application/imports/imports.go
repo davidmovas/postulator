@@ -16,7 +16,12 @@ func (s *Service) Inspect(ctx context.Context, req InspectRequest) (InspectRespo
 		return InspectResponse{}, err
 	}
 
-	table, err := s.table(ctx, req.Path)
+	sheets, err := s.deps.Tables.Sheets(req.Path)
+	if err != nil {
+		return InspectResponse{}, err
+	}
+
+	table, err := s.table(ctx, req.Path, Options{Sheets: req.Sheets})
 	if err != nil {
 		return InspectResponse{}, err
 	}
@@ -37,6 +42,7 @@ func (s *Service) Inspect(ctx context.Context, req InspectRequest) (InspectRespo
 		Headers:  table.Headers,
 		Sample:   sample,
 		Rows:     len(table.Rows),
+		Sheets:   sheetViews(sheets),
 		Detected: mappingView(detected),
 		Saved:    mappingViews(saved),
 	}, nil
@@ -55,7 +61,7 @@ func (s *Service) compute(ctx context.Context, siteID, path string, mapping Mapp
 		return plan{}, err
 	}
 
-	table, err := s.table(ctx, path)
+	table, err := s.table(ctx, path, mapping.Options)
 	if err != nil {
 		return plan{}, err
 	}

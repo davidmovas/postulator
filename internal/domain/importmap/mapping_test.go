@@ -1,6 +1,7 @@
 package importmap_test
 
 import (
+	"reflect"
 	"slices"
 	"testing"
 
@@ -30,7 +31,7 @@ func TestNewMappingFillsTheSeparatorDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewMapping: %v", err)
 	}
-	if ready.Options != importmap.DefaultOptions() {
+	if !reflect.DeepEqual(ready.Options, importmap.DefaultOptions()) {
 		t.Fatalf("options = %+v, want %+v", ready.Options, importmap.DefaultOptions())
 	}
 }

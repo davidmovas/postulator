@@ -42,12 +42,36 @@ type plan struct {
 }
 
 func (p *plan) note(row int, field string, code FindingCode, message string) {
-	finding := Finding{Row: row, Field: field, Code: string(code), Message: message}
+	p.noteAt(importmap.Origin{Row: row}, field, code, message)
+}
+
+func (p *plan) noteAt(at importmap.Origin, field string, code FindingCode, message string) {
+	finding := Finding{Row: at.Row, Sheet: at.Sheet, Field: field, Code: string(code), Message: message}
 	if code.Blocking() {
 		p.report.Errors = append(p.report.Errors, finding)
 		return
 	}
 	p.report.Warnings = append(p.report.Warnings, finding)
+}
+
+func (p *plan) counts() Counts {
+	tally := Counts{Skipped: p.report.Skipped}
+	for i := range p.entities {
+		if p.entities[i].created {
+			tally.EntitiesCreated++
+			continue
+		}
+		tally.EntitiesUpdated++
+	}
+	tally.EdgesCreated = len(p.edges)
+	for i := range p.pages {
+		if p.pages[i].created {
+			tally.PagesCreated++
+			continue
+		}
+		tally.PagesUpdated++
+	}
+	return tally
 }
 
 func (p *plan) broken() bool {
@@ -173,16 +197,19 @@ func (s *Service) templateFor(ctx context.Context, siteID, pageKind string) (*st
 
 func read(binding importmap.Binding, table importmap.Table, p *plan) *drafts {
 	sheet := newDrafts()
+	walk := binding.Walk()
 	for i := range table.Rows {
-		row, number := table.Rows[i], i+2
-		if binding.Blank(row) {
+		row, at := table.Rows[i], table.Origin(i)
+		number := at.Row
+		path := walk.Path(row)
+		if binding.Blank(row) && path == "" {
 			p.report.Skipped++
 			continue
 		}
 
-		name, path := binding.Text(row, importmap.FieldEntity), binding.Path(row)
+		name := binding.Text(row, importmap.FieldEntity)
 		if name == "" && path == "" {
-			p.note(number, "", CodeNoTarget, "the row names neither a path nor an entity")
+			p.noteAt(at, "", CodeNoTarget, "the row names neither a path nor an entity")
 			p.report.Skipped++
 			continue
 		}
@@ -203,13 +230,14 @@ func read(binding importmap.Binding, table importmap.Table, p *plan) *drafts {
 
 		normalized, err := pagemap.NormalizePath(path)
 		if err != nil {
-			p.note(number, string(importmap.FieldPath), CodeBadPath, "the path cannot be read: "+path)
+			p.noteAt(at, string(importmap.FieldPath), CodeBadPath, "the path cannot be read: "+path)
 			continue
 		}
 
 		draft, known := sheet.page(normalized, number)
 		if known {
-			p.note(number, string(importmap.FieldPath), CodeDuplicatePath, "the path repeats an earlier row and was merged: "+normalized)
+			p.noteAt(at, string(importmap.FieldPath), CodeDuplicatePath,
+				"the path repeats an earlier row and was merged: "+normalized)
 		}
 		draft.merge(pageDraft{
 			title:     binding.Text(row, importmap.FieldTitle),

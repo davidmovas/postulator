@@ -287,7 +287,7 @@ func TestThePageKindPicksTheSiteTemplateOverTheGlobalOne(t *testing.T) {
 	if _, err := h.service.Export(t.Context(), imports.ExportRequest{SiteID: h.siteID, Path: exported}); err != nil {
 		t.Fatalf("Export: %v", err)
 	}
-	table, err := importer.Read(t.Context(), exported, 0)
+	table, err := importer.Read(t.Context(), exported, importer.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Read the export: %v", err)
 	}

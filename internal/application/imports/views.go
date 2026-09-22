@@ -43,10 +43,18 @@ func (c FindingCode) Blocking() bool {
 }
 
 type Options struct {
-	PathPrefixStrip  string `json:"pathPrefixStrip,omitempty" description:"Remove this prefix from every path in the sheet, such as a domain the export wrote in"`
-	KeywordSeparator string `json:"keywordSeparator,omitempty" description:"What separates several keywords inside one cell, a comma by default"`
-	AnchorSeparator  string `json:"anchorSeparator,omitempty" description:"What separates several anchors inside one cell, a comma by default"`
-	ListSeparator    string `json:"listSeparator,omitempty" description:"What separates any other list inside one cell, a comma by default"`
+	PathPrefixStrip  string   `json:"pathPrefixStrip,omitempty" description:"Remove this prefix from every path in the sheet, such as a domain the export wrote in"`
+	KeywordSeparator string   `json:"keywordSeparator,omitempty" description:"What separates several keywords inside one cell, a comma by default"`
+	AnchorSeparator  string   `json:"anchorSeparator,omitempty" description:"What separates several anchors inside one cell, a comma by default"`
+	ListSeparator    string   `json:"listSeparator,omitempty" description:"What separates any other list inside one cell, a comma by default"`
+	Sheets           []string `json:"sheets,omitempty" description:"Which sheets of the workbook to read, exactly as inspect named them; leave it out for the first sheet alone"`
+	IndentColumns    []string `json:"indentColumns,omitempty" description:"Columns whose position carries the hierarchy, shallowest first; a row's path is built from the cells of its own column and of the columns to its left"`
+}
+
+type Sheet struct {
+	Name    string   `json:"name"`
+	Headers []string `json:"headers"`
+	Rows    int      `json:"rows"`
 }
 
 type Mapping struct {
@@ -61,6 +69,7 @@ type Mapping struct {
 
 type Finding struct {
 	Row     int    `json:"row"`
+	Sheet   string `json:"sheet,omitempty"`
 	Field   string `json:"field,omitempty"`
 	Code    string `json:"code"`
 	Message string `json:"message"`
@@ -135,6 +144,18 @@ func mappingView(m importmap.Mapping) Mapping {
 		CreatedAt: dto.NewTime(m.CreatedAt),
 		UpdatedAt: dto.NewTime(m.UpdatedAt),
 	}
+}
+
+func sheetViews(list []importmap.SheetInfo) []Sheet {
+	out := make([]Sheet, 0, len(list))
+	for i := range list {
+		headers := list[i].Headers
+		if headers == nil {
+			headers = []string{}
+		}
+		out = append(out, Sheet{Name: list[i].Name, Headers: headers, Rows: list[i].Rows})
+	}
+	return out
 }
 
 func mappingViews(list []importmap.Mapping) []Mapping {
