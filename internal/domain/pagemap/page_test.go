@@ -112,6 +112,7 @@ func TestNewPageLink(t *testing.T) {
 		{name: "no source page", mutate: func(l *pagemap.PageLink) { l.FromPageID = "" }, field: "fromPageId"},
 		{name: "empty target page", mutate: func(l *pagemap.PageLink) { l.ToPageID = ptr("") }, field: "toPageId"},
 		{name: "no target at all", mutate: func(l *pagemap.PageLink) { l.ToPageID = nil; l.ToURL = " " }, field: "toUrl"},
+		{name: "target page without a url", mutate: func(l *pagemap.PageLink) { l.ToURL = " " }, field: "toUrl"},
 		{name: "unknown origin", mutate: func(l *pagemap.PageLink) { l.Origin = "guessed" }, field: "origin"},
 	}
 

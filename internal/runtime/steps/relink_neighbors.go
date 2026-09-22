@@ -328,9 +328,19 @@ func observedOn(page pagemap.Page, index pagemap.Index, site pagemap.Site, found
 		if target, ok := index.ByPath(path); ok {
 			link.ToPageID = &target.ID
 		}
-		out = append(out, link)
+		if built, ok := observedLink(link); ok {
+			out = append(out, built)
+		}
 	}
 	return out
+}
+
+func observedLink(link pagemap.PageLink) (pagemap.PageLink, bool) {
+	built, err := pagemap.NewPageLink(link)
+	if err != nil {
+		return pagemap.PageLink{}, false
+	}
+	return built, true
 }
 
 func hostOf(baseURL string) string {

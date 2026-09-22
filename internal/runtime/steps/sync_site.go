@@ -545,7 +545,9 @@ func pulledLinks(page pagemap.Page, byPath map[string]pagemap.Page, links []wp.C
 		if target, ok := byPath[path]; ok {
 			link.ToPageID = &target.ID
 		}
-		out = append(out, link)
+		if built, ok := observedLink(link); ok {
+			out = append(out, built)
+		}
 	}
 	return out
 }

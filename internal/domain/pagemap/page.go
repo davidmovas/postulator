@@ -150,8 +150,8 @@ func NewPageLink(l PageLink) (PageLink, error) {
 		return PageLink{}, invalid("link source page must not be empty", "fromPageId")
 	case emptyRef(l.ToPageID):
 		return PageLink{}, invalid("target page id must not be empty when set", "toPageId")
-	case l.ToPageID == nil && l.ToURL == "":
-		return PageLink{}, invalid("link needs a target page or a target url", "toUrl")
+	case l.ToURL == "":
+		return PageLink{}, invalid("link needs a target url, whether or not it names a target page", "toUrl")
 	case !l.Origin.Valid():
 		return PageLink{}, invalid("link origin is not recognized", "origin")
 	}
