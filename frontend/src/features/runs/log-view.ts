@@ -200,6 +200,7 @@ export function describe(record: RunEventRecord): FeedEntry {
             if (payload !== null) {
                 entry.itemId = payload.itemId;
                 entry.reason = payload.reason;
+                entry.message = payload.message;
             }
             return entry;
         }
