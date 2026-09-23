@@ -38,6 +38,7 @@ type itemStore interface {
 type artifactStore interface {
 	ReplaceStep(ctx context.Context, itemID, step string, artifacts []run.Artifact) error
 	ByItem(ctx context.Context, itemID string) ([]run.Artifact, error)
+	DeleteByItem(ctx context.Context, itemID string) error
 	PurgePublishedBefore(ctx context.Context, cutoff time.Time) (int64, error)
 }
 

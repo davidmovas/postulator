@@ -105,3 +105,12 @@ type RetryStepRequest struct {
 }
 
 type RetryStepResponse struct{}
+
+type RegenerateRequest struct {
+	RunID   string   `json:"runId" description:"The run the items belong to"`
+	ItemIDs []string `json:"itemIds" description:"Stopped items from runs_list_items; one that already wrote to the site is refused"`
+}
+
+type RegenerateResponse struct {
+	Restarted int `json:"restarted"`
+}

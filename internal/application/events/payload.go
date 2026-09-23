@@ -177,6 +177,11 @@ type ItemNeedsHumanPayload struct {
 	Message string `json:"message"`
 }
 
+type ItemRestartedPayload struct {
+	RunID  string `json:"runId"`
+	ItemID string `json:"itemId"`
+}
+
 type StepStartedPayload struct {
 	RunID  string `json:"runId"`
 	ItemID string `json:"itemId"`

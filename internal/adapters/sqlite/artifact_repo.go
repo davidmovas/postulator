@@ -13,6 +13,7 @@ const (
 	artifactColumns     = `id, run_id, item_id, step, kind, blob, size, hash, purged, expires_at, created_at`
 	insertArtifact      = `INSERT INTO artifacts (` + artifactColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	deleteStepArtifacts = `DELETE FROM artifacts WHERE item_id = ? AND step = ?`
+	deleteItemArtifacts = `DELETE FROM artifacts WHERE item_id = ?`
 	selectArtifact      = `SELECT ` + artifactColumns + ` FROM artifacts WHERE id = ?`
 	selectItemArtifacts = `SELECT ` + artifactColumns + ` FROM artifacts WHERE item_id = ? ORDER BY created_at, id`
 	selectPurgedKinds   = `SELECT item_id, kind FROM artifacts WHERE purged = 1 AND item_id IN `
@@ -53,6 +54,12 @@ func (r *ArtifactRepo) ReplaceStep(ctx context.Context, itemID, step string, art
 		}
 	}
 	return nil
+}
+
+func (r *ArtifactRepo) DeleteByItem(ctx context.Context, itemID string) error {
+	_, err := execWrite(ctx, r.store.writeFrom(ctx), deleteItemArtifacts, []any{itemID}, nil,
+		"drop the artifacts of the run item")
+	return err
 }
 
 func (r *ArtifactRepo) Get(ctx context.Context, id string) (run.Artifact, error) {

@@ -95,6 +95,13 @@ export function itemProgress(events: Events): ReadonlyMap<string, ItemProgress> 
                 }
                 break;
             }
+            case "item.restarted": {
+                const payload = payloadOf(record, "item.restarted");
+                if (payload !== null) {
+                    byItem.set(payload.itemId, blank(payload.itemId));
+                }
+                break;
+            }
             case "step.started": {
                 const payload = payloadOf(record, "step.started");
                 if (payload !== null) {

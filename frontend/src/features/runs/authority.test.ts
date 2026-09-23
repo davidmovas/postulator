@@ -27,6 +27,8 @@ function anItem(overrides: Partial<RunItem> = {}): RunItem {
         attempts: 1,
         pauseReason: "",
         error: "",
+        note: "",
+        waitingFor: null,
         retryable: true,
         retryBlockedReason: "",
         wakeAt: null,

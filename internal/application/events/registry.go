@@ -48,6 +48,7 @@ func NewRegistry() Registry {
 		{Type: ItemDone, Payload: ItemDonePayload{}, Run: true},
 		{Type: ItemFailed, Payload: ItemFailedPayload{}, Run: true},
 		{Type: ItemNeedsHuman, Payload: ItemNeedsHumanPayload{}, Run: true},
+		{Type: ItemRestarted, Payload: ItemRestartedPayload{}, Run: true},
 		{Type: StepStarted, Payload: StepStartedPayload{}, Run: true},
 		{Type: StepDone, Payload: StepDonePayload{}, Run: true},
 		{Type: StepFailed, Payload: StepFailedPayload{}, Run: true},

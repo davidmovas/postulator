@@ -77,6 +77,7 @@ func registered() []string {
 		"runs_resume",
 		"runs_cancel",
 		"runs_retry_step",
+		"runs_regenerate",
 		"runs_revert",
 		"sync_site",
 		"sync_check_plugin",
@@ -161,7 +162,7 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 }
 
 const (
-	schemaCeilingBytes = 74700
+	schemaCeilingBytes = 75100
 	charactersPerToken = 4
 )
 

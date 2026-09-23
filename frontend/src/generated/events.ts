@@ -15,6 +15,7 @@ export type EventType =
     | "item.done"
     | "item.failed"
     | "item.needs_human"
+    | "item.restarted"
     | "item.started"
     | "llm.usage"
     | "pages.changed"
@@ -52,6 +53,7 @@ export const eventTypes = [
     "item.done",
     "item.failed",
     "item.needs_human",
+    "item.restarted",
     "item.started",
     "llm.usage",
     "pages.changed",
@@ -184,6 +186,11 @@ export interface ItemNeedsHumanPayload {
     message: string;
 }
 
+export interface ItemRestartedPayload {
+    runId: string;
+    itemId: string;
+}
+
 export interface ItemStartedPayload {
     runId: string;
     itemId: string;
@@ -304,6 +311,7 @@ export interface EventPayloads {
     "item.done": ItemDonePayload;
     "item.failed": ItemFailedPayload;
     "item.needs_human": ItemNeedsHumanPayload;
+    "item.restarted": ItemRestartedPayload;
     "item.started": ItemStartedPayload;
     "llm.usage": LLMUsagePayload;
     "pages.changed": PagesChangedPayload;

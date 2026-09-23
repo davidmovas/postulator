@@ -460,6 +460,39 @@ func TestRunItemSweepQueries(t *testing.T) {
 	}
 }
 
+func TestArtifactRepoDropsEverythingAnItemProduced(t *testing.T) {
+	t.Parallel()
+
+	fixture := newRunFixture(t, 2)
+	dropped := fixture.insertItem(t, fixture.pages[0], "generate_body")
+	kept := fixture.insertItem(t, fixture.pages[1], "generate_body")
+
+	for _, item := range []run.Item{dropped, kept} {
+		for _, step := range []string{"resolve_context", "generate_body"} {
+			artifact, err := run.NewArtifact(run.Artifact{
+				ID: id.New(), RunID: fixture.run.ID, ItemID: item.ID, Step: step, Kind: run.ArtifactLinkContext,
+				Blob: []byte("{}"), CreatedAt: sqlitetest.Stamp,
+			})
+			if err != nil {
+				t.Fatalf("NewArtifact: %v", err)
+			}
+			if err = fixture.blobs.ReplaceStep(t.Context(), item.ID, step, []run.Artifact{artifact}); err != nil {
+				t.Fatalf("ReplaceStep: %v", err)
+			}
+		}
+	}
+
+	if err := fixture.blobs.DeleteByItem(t.Context(), dropped.ID); err != nil {
+		t.Fatalf("DeleteByItem: %v", err)
+	}
+	if left, err := fixture.blobs.ByItem(t.Context(), dropped.ID); err != nil || len(left) != 0 {
+		t.Fatalf("the dropped item still holds %d artifacts, %v", len(left), err)
+	}
+	if left, err := fixture.blobs.ByItem(t.Context(), kept.ID); err != nil || len(left) != 2 {
+		t.Fatalf("the other item holds %d artifacts, %v; want both untouched", len(left), err)
+	}
+}
+
 func TestArtifactRepoReplacesAndPurges(t *testing.T) {
 	t.Parallel()
 
