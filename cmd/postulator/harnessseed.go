@@ -38,6 +38,9 @@ const (
 
 	failingPath = "/grinders/single-dosing/"
 
+	heldParentPath = "/home-roasting/"
+	heldChildPath  = "/home-roasting/drums/"
+
 	absentPageID  = "00000000-0000-4000-8000-000000000000"
 	relinkedPath  = "/brewing/pre-infusion/"
 	revertedPath  = "/accessories/knock-boxes/"
@@ -53,6 +56,7 @@ var (
 	pausedRun    = []string{"/beans/blends/"}
 	cancelledRun = []string{"/beans/single-origin/"}
 	revertedRun  = []string{revertedPath}
+	heldRun      = []string{heldChildPath}
 )
 
 func harnessRecipe() []template.StepSpec {
@@ -79,6 +83,7 @@ func harnessReplies() []fake.Reply {
 	targets = append(targets, pausedRun...)
 	targets = append(targets, cancelledRun...)
 	targets = append(targets, revertedRun...)
+	targets = append(targets, heldChildPath, heldParentPath)
 
 	out := make([]fake.Reply, 0, 2*len(targets)+2)
 	for _, path := range targets {
@@ -511,6 +516,16 @@ func seedRuns(ctx context.Context, core *app.Core, siteID, guide string, byPath 
 		return revertErr
 	}
 
+	provider.failOn("Path: " + heldParentPath + "\n")
+	held, err := startRun(ctx, core, siteID, guide, byPath, heldRun)
+	if err != nil {
+		return err
+	}
+	if waitErr := waitForRun(ctx, core, held, run.StatusPaused); waitErr != nil {
+		return waitErr
+	}
+	provider.failOn("")
+
 	provider.hold()
 	running, err := startRun(ctx, core, siteID, guide, byPath, runningRun)
 	if err != nil {
@@ -620,6 +635,14 @@ func itemStates(ctx context.Context, core *app.Core, runID string) string {
 		item := listed.Items[i]
 		out.WriteString("; " + item.Status + " at " + item.CurrentStep + " " +
 			item.PauseReason + " " + item.Error)
+		if item.CurrentStep == steps.NameValidate {
+			report, reportErr := core.Runs.GetArtifact(ctx, runs.GetArtifactRequest{
+				ItemID: item.ID, Kind: string(run.ArtifactValidationReport),
+			})
+			if reportErr == nil {
+				out.WriteString(" " + report.Artifact.Content)
+			}
+		}
 	}
 	return out.String()
 }

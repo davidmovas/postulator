@@ -98,11 +98,11 @@ func TestTheHarnessSeedsASiteWorthLookingAt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadGraph: %v", err)
 	}
-	if len(loaded.Entities) != 41 {
-		t.Errorf("entities = %d, want 41", len(loaded.Entities))
+	if len(loaded.Entities) != 43 {
+		t.Errorf("entities = %d, want 43", len(loaded.Entities))
 	}
-	if len(loaded.Edges) != 46 {
-		t.Errorf("edges = %d, want 46", len(loaded.Edges))
+	if len(loaded.Edges) != 47 {
+		t.Errorf("edges = %d, want 47", len(loaded.Edges))
 	}
 
 	proposed := 0
@@ -146,11 +146,11 @@ func TestTheHarnessSeedsMappedAndUnmappedPages(t *testing.T) {
 		cursor = string(page.Next)
 	}
 
-	if total != 62 {
-		t.Errorf("pages = %d, want 62", total)
+	if total != 64 {
+		t.Errorf("pages = %d, want 64", total)
 	}
-	if mapped != 44 {
-		t.Errorf("mapped pages = %d, want 44", mapped)
+	if mapped != 46 {
+		t.Errorf("mapped pages = %d, want 46", mapped)
 	}
 }
 
@@ -165,11 +165,15 @@ func TestTheHarnessSeedsRunsInEveryStatusARealPathReaches(t *testing.T) {
 	seen := make(map[string]bool, len(listed.Items))
 	for _, item := range listed.Items {
 		seen[item.Status] = true
+		seen[item.Status+"/"+item.PauseReason] = true
 	}
 	for _, want := range []run.Status{run.StatusCompleted, run.StatusFailed, run.StatusRunning, run.StatusCancelled} {
 		if !seen[string(want)] {
 			t.Errorf("no run is %q; the seeded runs are %v", want, seen)
 		}
+	}
+	if !seen[string(run.StatusPaused)+"/"+string(run.PauseAwaitingParent)] {
+		t.Errorf("no run waits for a parent that failed; the seeded runs are %v", seen)
 	}
 
 	completed := ""
@@ -388,8 +392,8 @@ func TestASeededHomeIsNotSeededTwice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadGraph: %v", err)
 	}
-	if len(loaded.Entities) != 41 {
-		t.Fatalf("entities after the restart = %d, want the forty-one that were seeded", len(loaded.Entities))
+	if len(loaded.Entities) != 43 {
+		t.Fatalf("entities after the restart = %d, want the forty-three that were seeded", len(loaded.Entities))
 	}
 }
 
@@ -450,8 +454,8 @@ func TestTheSeededGraphIsATreeAndNotAFlatList(t *testing.T) {
 			t.Errorf("%s carries %d parents, want one", entity.Name, parents[entity.ID])
 		}
 	}
-	if rooted != 6 {
-		t.Errorf("entities without a parent = %d, want the six hubs", rooted)
+	if rooted != 7 {
+		t.Errorf("entities without a parent = %d, want the seven hubs", rooted)
 	}
 }
 
