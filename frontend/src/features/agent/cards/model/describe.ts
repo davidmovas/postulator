@@ -32,8 +32,7 @@ function humanKey(key: string): string {
 }
 
 function labelFor(key: string, schema: ToolSchema | null): string {
-    const property = schema?.properties?.[key];
-    const held = property?.description ?? property?.title;
+    const held = schema?.properties?.[key]?.description;
     return held === undefined || held === "" ? humanKey(key) : held;
 }
 
