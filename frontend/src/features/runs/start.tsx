@@ -6,24 +6,14 @@ import { flatten } from "../../data/call.js";
 import { react } from "../../data/errors.js";
 import { useEstimateRun, useStartRun } from "../../data/hooks/runs.js";
 import { useTemplates } from "../../data/hooks/templates.js";
-import type { Estimate } from "../../data/types.js";
-import { tokens as formatTokens, usd as formatUsd } from "../../domain/format.js";
+import type { AddedPage, Estimate } from "../../data/types.js";
 import { publishModes, runKinds, runKindsWithTheirOwnRecipe } from "../../generated/vocab.js";
 import type { SelectOption } from "../../ui/index.js";
-import {
-    Banner,
-    Button,
-    CalculateIcon,
-    Drawer,
-    Field,
-    Input,
-    PlayArrowIcon,
-    SectionLabel,
-    Select,
-} from "../../ui/index.js";
+import { Button, CalculateIcon, Drawer, Field, PlayArrowIcon, Select } from "../../ui/index.js";
 import { kindLabel, publishModeLabel } from "./labels.js";
-import { StartTargets } from "./start-targets.js";
-import { kindGenerate } from "./statuses.js";
+import { StartCaps, StartPrice } from "./start-price.js";
+import { TargetTree } from "./start-tree.js";
+import { kindGenerate, kindRevert } from "./statuses.js";
 
 const drawerWidth = 688;
 const templateAuto = "";
@@ -50,6 +40,8 @@ export function kindDoes(kind: string): string {
 export function takesATemplate(kind: string): boolean {
     return !(runKindsWithTheirOwnRecipe as readonly string[]).includes(kind);
 }
+
+export const startableKinds: readonly string[] = runKinds.filter((kind) => kind !== kindRevert);
 
 export interface StartRefusal {
     targets: string | null;
@@ -88,13 +80,14 @@ export function StartRunDrawer({
     initialKind,
     onStarted,
 }: StartRunDrawerProps): ReactElement | null {
-    const [selected, setSelected] = useState<readonly string[]>([]);
+    const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
     const [publishMode, setPublishMode] = useState<string>(publishModes[0]);
     const [kind, setKind] = useState<string>(initialKind ?? kindGenerate);
     const [templateId, setTemplateId] = useState<string>(templateAuto);
     const [cap, setCap] = useState(defaultCap);
     const [tokenCap, setTokenCap] = useState(defaultTokenCap);
     const [estimate, setEstimate] = useState<Estimate | null>(null);
+    const [added, setAdded] = useState<readonly AddedPage[]>([]);
 
     const priced = useEstimateRun();
     const start = useStartRun();
@@ -105,13 +98,14 @@ export function StartRunDrawer({
         if (!open) {
             return;
         }
-        setSelected(preselect ?? []);
+        setSelected(new Set(preselect ?? []));
         setPublishMode(publishModes[0]);
         setKind(initialKind ?? kindGenerate);
         setTemplateId(templateAuto);
         setCap(defaultCap);
         setTokenCap(defaultTokenCap);
         setEstimate(null);
+        setAdded([]);
         priced.reset();
         start.reset();
     }, [open, siteId]);
@@ -122,6 +116,7 @@ export function StartRunDrawer({
 
     const forget = (): void => {
         setEstimate(null);
+        setAdded([]);
         priced.reset();
     };
 
@@ -146,7 +141,7 @@ export function StartRunDrawer({
     };
 
     const capValue = capOf(cap);
-    const ready = selected.length > 0;
+    const ready = selected.size > 0;
     const over = estimate !== null && capValue > 0 && estimate.usd > capValue;
     const thrown = start.error ?? priced.error;
     const refusal = startRefusal(thrown);
@@ -178,6 +173,7 @@ export function StartRunDrawer({
                             priced.mutate(request(), {
                                 onSuccess: (answered) => {
                                     setEstimate(answered.estimate);
+                                    setAdded(answered.added ?? []);
                                 },
                             });
                         }}
@@ -204,14 +200,12 @@ export function StartRunDrawer({
             }
         >
             <div className="flex flex-col gap-3 p-3">
-                <StartTargets
+                <TargetTree
                     siteId={siteId}
                     selected={selected}
                     problem={refusal.targets}
-                    onToggle={(pageId) => {
-                        setSelected((held) =>
-                            held.includes(pageId) ? held.filter((id) => id !== pageId) : [...held, pageId],
-                        );
+                    onChange={(next) => {
+                        setSelected(next);
                         forget();
                     }}
                 />
@@ -236,7 +230,7 @@ export function StartRunDrawer({
                                 id={control.id}
                                 aria-describedby={control["aria-describedby"]}
                                 value={kind}
-                                options={runKinds.map((value) => ({ value, label: kindLabel(value) }))}
+                                options={startableKinds.map((value) => ({ value, label: kindLabel(value) }))}
                                 onValueChange={(next) => {
                                     setKind(next);
                                     forget();
@@ -262,63 +256,22 @@ export function StartRunDrawer({
                     </Field>
                 ) : null}
 
-                <div className="grid grid-cols-2 gap-2">
-                    <Field
-                        label={copy.runs.start.cap}
-                        tooltip={copy.runs.start.capHint}
-                        hint={capValue === 0 ? copy.runs.start.capZero : undefined}
-                    >
-                        {(control) => (
-                            <Input
-                                id={control.id}
-                                aria-describedby={control["aria-describedby"]}
-                                mono={true}
-                                inputMode="decimal"
-                                value={cap}
-                                onChange={(event) => {
-                                    setCap(event.target.value);
-                                    forget();
-                                }}
-                            />
-                        )}
-                    </Field>
-                    <Field
-                        label={copy.runs.start.tokenCap}
-                        tooltip={copy.runs.start.tokenCapHint}
-                        hint={tokenCapOf(tokenCap) === 0 ? copy.runs.start.tokenCapZero : undefined}
-                    >
-                        {(control) => (
-                            <Input
-                                id={control.id}
-                                aria-describedby={control["aria-describedby"]}
-                                data-run-token-cap={true}
-                                mono={true}
-                                inputMode="numeric"
-                                value={tokenCap}
-                                onChange={(event) => {
-                                    setTokenCap(event.target.value);
-                                    forget();
-                                }}
-                            />
-                        )}
-                    </Field>
-                </div>
+                <StartCaps
+                    cap={cap}
+                    tokenCap={tokenCap}
+                    capValue={capValue}
+                    tokenCapValue={tokenCapOf(tokenCap)}
+                    onCap={(next) => {
+                        setCap(next);
+                        forget();
+                    }}
+                    onTokenCap={(next) => {
+                        setTokenCap(next);
+                        forget();
+                    }}
+                />
 
-                {estimate === null ? null : (
-                    <div className="flex items-baseline justify-between gap-2 rounded-md border border-hairline bg-inset px-2.5 py-2">
-                        <SectionLabel>{copy.runs.start.estimate}</SectionLabel>
-                        <span className="font-mono text-sm text-ink">
-                            {copy.runs.start.estimated(formatUsd(estimate.usd), formatTokens(estimate.tokens))}
-                        </span>
-                    </div>
-                )}
-
-                {(estimate?.findings ?? []).map((finding) => (
-                    <Banner key={finding.code + finding.message} tone="info" title={finding.message} />
-                ))}
-
-                {over ? <Banner tone="warn" title={copy.runs.start.overCap} /> : null}
-                {refusal.banner === null ? null : <Banner tone="danger" title={refusal.banner} />}
+                <StartPrice estimate={estimate} added={added} over={over} refusal={refusal.banner} />
             </div>
         </Drawer>
     );
