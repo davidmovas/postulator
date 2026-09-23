@@ -20,5 +20,6 @@ coverage.html
 *.db-shm
 
 docker/e2e/.env.generated
+docker/e2e/.env.sandbox
 frontend/shots/
 .superpowers/

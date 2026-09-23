@@ -134,7 +134,28 @@ func loadEnvironment(t *testing.T) environment {
 			t.Fatalf("%s does not set %s", path, name)
 		}
 	}
+	refuseTheSandbox(t, path, env.baseURL)
 	return env
+}
+
+const (
+	sandboxPort = "8089"
+	testStack   = "http://localhost:8088"
+	testProject = "postulator-test"
+)
+
+func refuseTheSandbox(t *testing.T, path, baseURL string) {
+	t.Helper()
+
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
+		t.Fatalf("%s names %q, which is not an address: %v", path, baseURL, err)
+	}
+	if parsed.Port() == sandboxPort {
+		t.Fatalf("%s points at %s, the sandbox people test the app against; these suites write and delete "+
+			"content on the site they run on, so they run only on the stack `task e2e:up` starts on port 8088",
+			path, baseURL)
+	}
 }
 
 type client struct {

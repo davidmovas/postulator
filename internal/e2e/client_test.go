@@ -266,6 +266,11 @@ func TestTheClientLoopFromTheSamples(t *testing.T) {
 	live := newSite(t)
 	requirePlugin(t, live.env, true)
 	live.clearUnder(t, clientPrefixes...)
+	defer func() {
+		if !t.Failed() {
+			live.clearUnder(t, clientPrefixes...)
+		}
+	}()
 
 	script := &clientScript{}
 	core := openCoreWith(t, fake.NewScripted(script.replies()...))

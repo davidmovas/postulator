@@ -139,25 +139,63 @@ tasks:
       - go run ./cmd/covergate -profile coverage.out
 
   e2e:up:
-    summary: Starts the docker WordPress stack and provisions e2e credentials
+    summary: Starts the WordPress stack the e2e suites own, on port 8088, and provisions its credentials
     dir: docker/e2e
+    cmds:
+      - task: plugin:zip
+      - docker compose up -d --wait db wordpress
+      - docker compose run --rm bootstrap
     env:
+      COMPOSE_PROJECT_NAME: postulator-test
+      WP_PORT: "8088"
+      E2E_MODE: test
       E2E_SEO: '{{.E2E_SEO | default "none"}}'
       E2E_WOO: '{{.E2E_WOO | default "1"}}'
       E2E_PLUGIN: '{{.E2E_PLUGIN | default "1"}}'
-    cmds:
-      - docker compose up -d --wait db wordpress
-      - docker compose run --rm bootstrap
 
   e2e:down:
-    summary: Stops the docker WordPress stack and removes its volumes
+    summary: Stops the e2e WordPress stack and removes its volumes
     dir: docker/e2e
+    env:
+      COMPOSE_PROJECT_NAME: postulator-test
+      WP_PORT: "8088"
     cmds:
       - docker compose down -v --remove-orphans
       - cmd: powershell -NoProfile -Command "if (Test-Path .env.generated) { Remove-Item -Force .env.generated }"
         platforms: [windows]
       - cmd: rm -f .env.generated
         platforms: [linux, darwin]
+
+  sandbox:up:
+    summary: Starts the WordPress sandbox people test the app against, on port 8089, with the plugin from its zip
+    dir: docker/e2e
+    cmds:
+      - task: plugin:zip
+      - docker compose up -d --wait db wordpress
+      - docker compose run --rm bootstrap
+    env:
+      COMPOSE_PROJECT_NAME: postulator-e2e
+      WP_PORT: "8089"
+      E2E_MODE: sandbox
+
+  sandbox:down:
+    summary: Stops the WordPress sandbox and keeps its content
+    dir: docker/e2e
+    env:
+      COMPOSE_PROJECT_NAME: postulator-e2e
+      WP_PORT: "8089"
+    cmds:
+      - docker compose down --remove-orphans
+
+  sandbox:reset:
+    summary: Throws the sandbox content away and starts an empty sandbox
+    dir: docker/e2e
+    cmds:
+      - docker compose down -v --remove-orphans
+      - task: sandbox:up
+    env:
+      COMPOSE_PROJECT_NAME: postulator-e2e
+      WP_PORT: "8089"
 
   e2e:reset:
     summary: Recreates the docker WordPress stack from scratch
