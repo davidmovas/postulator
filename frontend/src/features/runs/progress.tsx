@@ -111,6 +111,9 @@ export function RunProgress({ run, view, stats, terminal, now }: RunProgressProp
                     {stats.needsHuman === null ? null : (
                         <span>{`${String(stats.needsHuman)} ${copy.runs.detail.needsHuman}`}</span>
                     )}
+                    {stats.waitingParent === null || stats.waitingParent === 0 ? null : (
+                        <span>{`${String(stats.waitingParent)} ${copy.runs.detail.waitingParent}`}</span>
+                    )}
                 </div>
             </div>
 

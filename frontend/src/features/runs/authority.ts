@@ -49,6 +49,7 @@ export interface StatsView {
     tokens: number;
     usd: number;
     needsHuman: number | null;
+    waitingParent: number | null;
     calls: number | null;
 }
 
@@ -64,6 +65,7 @@ export function statsView(stats: RunTotals | LiveStats): StatsView {
         tokens: stats.tokens,
         usd: stats.usd,
         needsHuman: isLive(stats) ? stats.needsHuman : null,
+        waitingParent: isLive(stats) ? stats.waitingParent : null,
         calls: isLive(stats) ? stats.calls : null,
     };
 }

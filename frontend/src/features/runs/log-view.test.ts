@@ -124,6 +124,20 @@ describe("feed", () => {
         expect(entry.step).toBe("judge");
     });
 
+    it("reads why an item paused off its own sentence", () => {
+        reset();
+        const entry = describeEvent(
+            event("item.needs_human", {
+                runId: "r",
+                itemId: "a",
+                reason: "awaiting_parent",
+                message: "/guides/x/ waits for its parent /guides/",
+            }),
+        );
+        expect(entry.reason).toBe("awaiting_parent");
+        expect(entry.message).toBe("/guides/x/ waits for its parent /guides/");
+    });
+
     it("leaves every field null for a payload it cannot read", () => {
         reset();
         const entry = describeEvent(event("step.done", null));

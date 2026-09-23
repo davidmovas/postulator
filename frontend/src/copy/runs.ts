@@ -141,6 +141,7 @@ export const runs = {
         done: "completed",
         failed: "failed",
         needsHuman: "need a human",
+        waitingParent: "wait for a parent",
         pending: "pending",
         spent: "Spent",
         spentOf: (spent: string, cap: string) => `${spent} of ${cap}`,

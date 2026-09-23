@@ -1,7 +1,9 @@
 import type { RunEventRecord } from "./decode.js";
 import { payloadOf } from "./decode.js";
 
-export type ItemState = "pending" | "running" | "retrying" | "needs_human" | "done" | "failed";
+export type ItemState = "pending" | "running" | "retrying" | "needs_human" | "held" | "done" | "failed";
+
+const awaitingParent = "awaiting_parent";
 
 export interface StepFailure {
     code: string;
@@ -22,6 +24,7 @@ export interface LiveStats {
     done: number;
     failed: number;
     needsHuman: number;
+    waitingParent: number;
     tokens: number;
     usd: number;
     calls: number;
@@ -91,7 +94,7 @@ export function itemProgress(events: Events): ReadonlyMap<string, ItemProgress> 
             case "item.needs_human": {
                 const payload = payloadOf(record, "item.needs_human");
                 if (payload !== null) {
-                    reach(byItem, payload.itemId).state = "needs_human";
+                    reach(byItem, payload.itemId).state = payload.reason === awaitingParent ? "held" : "needs_human";
                 }
                 break;
             }
@@ -153,24 +156,38 @@ export function liveStats(events: Events): LiveStats {
     if (cached !== undefined) {
         return cached;
     }
-    const totals: LiveStats = { items: 0, done: 0, failed: 0, needsHuman: 0, tokens: 0, usd: 0, calls: 0 };
+    const totals: LiveStats = {
+        items: 0,
+        done: 0,
+        failed: 0,
+        needsHuman: 0,
+        waitingParent: 0,
+        tokens: 0,
+        usd: 0,
+        calls: 0,
+    };
     for (const record of events) {
-        switch (record.type) {
-            case "run.queued": {
-                const payload = payloadOf(record, "run.queued");
-                if (payload !== null) {
-                    totals.items = payload.items;
-                }
-                break;
-            }
-            case "item.done":
+        if (record.type !== "run.queued") {
+            continue;
+        }
+        const payload = payloadOf(record, "run.queued");
+        if (payload !== null) {
+            totals.items = payload.items;
+        }
+    }
+    for (const held of itemProgress(events).values()) {
+        switch (held.state) {
+            case "done":
                 totals.done += 1;
                 break;
-            case "item.failed":
+            case "failed":
                 totals.failed += 1;
                 break;
-            case "item.needs_human":
+            case "needs_human":
                 totals.needsHuman += 1;
+                break;
+            case "held":
+                totals.waitingParent += 1;
                 break;
             default:
                 break;
