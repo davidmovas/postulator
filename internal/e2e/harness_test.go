@@ -18,6 +18,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
 	"github.com/davidmovas/postulator/internal/app"
+	llmport "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
 
@@ -322,12 +323,17 @@ func (s *site) byPath(t *testing.T, path string) (contentItem, bool) {
 
 func openCore(t *testing.T) *app.Core {
 	t.Helper()
+	return openCoreWith(t, fake.NewScripted(replies()...))
+}
+
+func openCoreWith(t *testing.T, provider llmport.Client) *app.Core {
+	t.Helper()
 
 	home := t.TempDir()
 	core, err := app.Open(t.Context(), app.Config{
 		DatabasePath: filepath.Join(home, "postulator.db"),
 		KeyDir:       home,
-		Provider:     fake.NewScripted(replies()...),
+		Provider:     provider,
 	}, zaptest.NewLogger(t))
 	if err != nil {
 		t.Fatalf("open the application: %v", err)
