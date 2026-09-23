@@ -6,7 +6,7 @@ import (
 )
 
 var aliases = map[Field][]string{
-	FieldPath:            {"path", "url", "slug", "uri", "link", "page url", "address"},
+	FieldPath:            {"path", "url", "slug", "uri", "link", "page url", "page path", "address", "page address"},
 	FieldTitle:           {"title", "name", "page title", "page name"},
 	FieldH1:              {"h1", "heading", "heading 1", "h1 heading"},
 	FieldPrimaryKeyword:  {"primary keyword", "main keyword", "focus keyword", "target keyword", "primary kw"},

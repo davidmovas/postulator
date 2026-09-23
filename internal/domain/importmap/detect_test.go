@@ -21,6 +21,8 @@ func TestAutoDetectReadsTheAliasTable(t *testing.T) {
 		{name: "slug", header: " slug ", want: importmap.FieldPath},
 		{name: "uri", header: "URI", want: importmap.FieldPath},
 		{name: "link", header: "Link", want: importmap.FieldPath},
+		{name: "page path", header: "Page path", want: importmap.FieldPath},
+		{name: "page address", header: "Page address", want: importmap.FieldPath},
 		{name: "title", header: "Title", want: importmap.FieldTitle},
 		{name: "page title", header: "Page Title", want: importmap.FieldTitle},
 		{name: "name", header: "Name", want: importmap.FieldTitle},
