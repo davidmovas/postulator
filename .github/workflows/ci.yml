@@ -23,28 +23,31 @@ jobs:
     name: Build and test
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install Task
+        shell: bash
         run: go install github.com/go-task/task/v3/cmd/task@${{ env.TASK_VERSION }}
 
       - name: Install Wails CLI
+        shell: bash
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
 
       - name: Install golangci-lint
+        shell: bash
         run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${{ env.GOLANGCI_LINT_VERSION }}
 
       - name: Check formatting
@@ -58,6 +61,7 @@ jobs:
           fi
 
       - name: Generate the TypeScript bindings
+        shell: bash
         run: task bindings
 
       - name: Use an npm that honours the release-age gate
@@ -76,25 +80,35 @@ jobs:
         run: npm run test:run
 
       - name: Build application
+        shell: bash
         run: task build
 
       - name: Check for Go comments
+        shell: bash
         run: task check:go:comments
 
       - name: Vet
+        shell: bash
         run: go vet ./...
 
       - name: Lint
+        shell: bash
         run: golangci-lint run
 
+      - name: Lint the end-to-end sources
+        shell: bash
+        run: task lint:e2e
+
       - name: Test
+        shell: bash
         run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
 
       - name: Coverage gate
+        shell: bash
         run: go run ./cmd/covergate -profile coverage.out
 
       - name: Upload executable
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: postulator
           path: bin/postulator.exe
@@ -103,10 +117,10 @@ jobs:
     name: Companion plugin
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -114,14 +128,8 @@ jobs:
       - name: Install Task
         run: go install github.com/go-task/task/v3/cmd/task@${{ env.TASK_VERSION }}
 
-      - name: Install golangci-lint
-        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${{ env.GOLANGCI_LINT_VERSION }}
-
       - name: Show the PHP version
         run: php -v
-
-      - name: Lint the end-to-end sources
-        run: task lint:e2e
 
       - name: Lint the plugin
         run: task plugin:lint
@@ -130,7 +138,7 @@ jobs:
         run: task plugin:zip
 
       - name: Upload the plugin package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: postulator-companion
           path: bin/postulator-companion.zip
