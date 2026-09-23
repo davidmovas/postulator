@@ -196,7 +196,8 @@ func bodyOf(sc *run.StepContext) (*content.Document, error) {
 func entityOf(ctx context.Context, deps Deps, sc *run.StepContext) (graph.Entity, error) {
 	if sc.Page.EntityID == nil {
 		return graph.Entity{}, errors.New(errors.Invalid, "the page is not mapped to an entity, so it has no graph context").
-			WithDetail("pageId", sc.Page.ID)
+			WithDetail("pageId", sc.Page.ID).
+			WithDetail("path", sc.Page.Path)
 	}
 
 	entities, err := deps.Entities.ListBySite(ctx, sc.Run.SiteID)

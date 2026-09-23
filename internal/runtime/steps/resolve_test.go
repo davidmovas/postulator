@@ -65,7 +65,7 @@ func TestResolveContextRefusesAPageWhoseEntityIsNotInTheGraph(t *testing.T) {
 			name:    "the page is mapped to nothing at all",
 			context: func(sc *run.StepContext) { sc.Page.EntityID = nil },
 			want:    errors.Invalid,
-			details: []string{"pageId"},
+			details: []string{"pageId", "path"},
 		},
 	}
 
