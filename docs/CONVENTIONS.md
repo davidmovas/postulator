@@ -135,11 +135,30 @@ closure test is what catches that transitive case.
   owns no shared state.
 - Coverage gates: `internal/domain` + `internal/application` ≥ 80%, repository total
   ≥ 70%, enforced by `go run ./cmd/covergate`. `internal/kernel` targets ≥ 90%.
-- Every test runs under `-race`.
+- Every test runs under `-race`, and on this machine with `-p 2`: the race detector's
+  memory use under the default parallelism is more than the paging file holds. The run
+  engine's step deadlines are real time, so the suite is run on its own — beside another
+  heavy job `internal/runtime` fails spuriously with cancelled WordPress requests.
 - No mocks of types we own where a fake is cheaper: `clock.Fake`, `wptest.Server`,
   the scripted LLM client and a real SQLite file are preferred over generated mocks.
+  A `fake.Reply` may carry a function of the request rather than fixed text, which is how
+  an end-to-end scenario answers from the prompt a step actually rendered.
 - LLM behaviour is tested by record/replay fixtures under `testdata/llm`, never by a
   live provider call.
+- **The frontend runs two vitest projects**, declared in `frontend/vitest.config.ts`:
+  `model` on `node` over `src/**/*.test.ts`, and `screens` on `jsdom` over
+  `src/**/*.test.tsx` with `@testing-library/react` and the extra
+  `vitest.screens.ts` setup, which gives every element a measured box and a
+  `ResizeObserver` that reports it so a virtualised table renders its rows. Two projects
+  rather than a per-file environment docblock, because `// @vitest-environment jsdom`
+  is a comment and this repository allows none. `src/testing/render.tsx` wraps a render
+  in a `MemoryRouter` for the components that carry links. `npm run test:run` runs both.
+- **The tool schema ceiling is a tripwire, not a wall.** Everything in the tool registry
+  is resent to the model on every round of every turn, so
+  `TestTheToolSchemasFitTheirCeiling` measures the wire bytes and fails over
+  `schemaCeilingBytes` in `internal/application/tools/registry_test.go`. A new tool raises
+  that constant deliberately, in the same commit, and a change that shrinks the schemas
+  lowers it again.
 
 ## Commits
 
@@ -148,6 +167,12 @@ Conventional commits: `<type>(<scope>): <subject>` with
 the package or the phase task (`feat(kernel): cursor pagination`). The commit-msg hook
 in `lefthook.yml` rejects anything else. Every commit ends with the attribution line
 the session was given. Commit on `rewrite/v2`; never amend, rebase or force-push.
+
+**`lefthook` is still not installed on the development machine**
+(`go install github.com/evilmartians/lefthook@latest && lefthook install`), so nothing
+enforces `lefthook.yml` there: `gofmt`, `goimports`, the Go comment check, the incremental
+lint and the conventional-commit subject are the author's own responsibility until it is.
+Run `gofmt -l .`, `task check:go:comments` and `golangci-lint run` before every commit.
 
 ## Verification
 
