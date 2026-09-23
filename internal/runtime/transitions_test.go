@@ -114,6 +114,63 @@ func TestAStepCanCompleteOrFailTheItemItself(t *testing.T) {
 	}
 }
 
+func TestARunWhoseEveryItemAsksForAHumanIsPausedNotLeftRunning(t *testing.T) {
+	t.Parallel()
+
+	harness := newHarness(t, 2)
+	asking := producing("generate_body", run.ArtifactBodyHTML, nil,
+		func(context.Context, *run.StepContext) (run.Result, error) {
+			return run.Result{Next: run.TransitionPause, Reason: run.PauseNeedsHuman}, nil
+		})
+
+	engine := harness.engine(t, mustRegister(t, asking))
+	queued, err := engine.Enqueue(t.Context(), harness.newRun(recipeOf("generate_body")))
+	if err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+
+	paused := harness.waitForRun(t, queued.ID, run.StatusPaused)
+	if paused.PauseReason != run.PauseNeedsHuman {
+		t.Fatalf("PauseReason = %q, want %q", paused.PauseReason, run.PauseNeedsHuman)
+	}
+	if paused.Stats.Items != len(harness.pages) || paused.Stats.Done != 0 {
+		t.Fatalf("Stats = %+v, want every item counted and none done", paused.Stats)
+	}
+	if paused.FinishedAt != nil {
+		t.Fatalf("a paused run is not finished, but it carries FinishedAt = %v", paused.FinishedAt)
+	}
+	waitFor(t, "run.paused to be published", func() bool { return harness.bus.count(events.RunPaused) == 1 })
+	assertGapless(t, harness, queued.ID)
+}
+
+func TestARunPausesOnceNothingIsLeftToAdvanceAndKeepsWhatFinished(t *testing.T) {
+	t.Parallel()
+
+	harness := newHarness(t, 2)
+	first := harness.pages[0]
+	mixed := producing("generate_body", run.ArtifactBodyHTML, nil,
+		func(_ context.Context, sc *run.StepContext) (run.Result, error) {
+			if sc.Page.ID == first {
+				return run.Result{Next: run.TransitionPause, Reason: run.PauseNeedsHuman}, nil
+			}
+			return run.Result{Artifacts: []run.Artifact{
+				{Kind: run.ArtifactBodyHTML, Blob: []byte("<p>written</p>")},
+			}}, nil
+		})
+
+	engine := harness.engine(t, mustRegister(t, mixed))
+	queued, err := engine.Enqueue(t.Context(), harness.newRun(recipeOf("generate_body")))
+	if err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+
+	paused := harness.waitForRun(t, queued.ID, run.StatusPaused)
+	if paused.Stats.Done != len(harness.pages)-1 {
+		t.Fatalf("Stats = %+v, want the item that could finish counted as done", paused.Stats)
+	}
+	assertGapless(t, harness, queued.ID)
+}
+
 func TestAnItemThatCannotBeSetUpIsAbandoned(t *testing.T) {
 	t.Parallel()
 

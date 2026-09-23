@@ -564,8 +564,20 @@ func (e *Engine) settleRun(ctx context.Context, box *outbox, record run.Run, now
 		return nil
 	}
 
-	if active(counts) {
+	if advanceable(counts) {
 		return e.deps.Runs.Update(ctx, current)
+	}
+
+	if counts[run.StatusPaused] > 0 {
+		current.Status = run.StatusPaused
+		current.PauseReason = run.PauseNeedsHuman
+		if updateErr := e.deps.Runs.Update(ctx, current); updateErr != nil {
+			return updateErr
+		}
+		box.add(ctx, current.ID, events.RunPaused, events.RunPausedPayload{
+			RunID: current.ID, Reason: string(run.PauseNeedsHuman),
+		})
+		return nil
 	}
 
 	current.FinishedAt = &now
@@ -631,9 +643,9 @@ func total(counts map[run.Status]int) int {
 	return sum
 }
 
-func active(counts map[run.Status]int) bool {
+func advanceable(counts map[run.Status]int) bool {
 	for status, count := range counts {
-		if count > 0 && status.Active() {
+		if count > 0 && status.Advanceable() {
 			return true
 		}
 	}
