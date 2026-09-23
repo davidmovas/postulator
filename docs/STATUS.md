@@ -50,7 +50,8 @@ Green on 2026-09-23 over the code at `e3f2478`; every commit after it is documen
 - `task bindings`: **15 services, 118 methods**; `task events` and `task vocab` leave no diff.
 - **89 tools**, 74,617 bytes of schema against the 74,700 the registry test allows.
 - `npm run typecheck` clean; `npx vitest run` **1081 tests in 109 files** over two projects.
-- `task ui:lint` 0 issues plus the harness tests, `task ui:walk` **68 routes** all read, and `task build`, `task package` and `task plugin:zip`.
+- `task ui:lint` 0 issues plus the harness tests (370 s), and `task build`, `task package` and
+  `task plugin:zip`. `task ui:walk` covers **68 routes**, last walked and read on 2026-09-23.
 - The docker suites were last run by hand on 2026-09-23, all green: `task e2e:test` 22 s,
   `task e2e:full` 1 m 30 s (the client scenario is 54 s of it), `task e2e:full:noplugin` 47 s.
 
@@ -73,10 +74,9 @@ frontend: npm run typecheck · npm run test:run
 `npm run test:run` runs two vitest projects: `model` on node over `*.test.ts` and `screens` on
 jsdom over `*.test.tsx`. The Go suite needs `-p 2` here, because the race detector under the
 default parallelism wants more than this machine's paging file holds, and it wants the machine
-to itself: the engine's step deadlines are real time, so beside another heavy job
-`internal/runtime` fails with cancelled WordPress requests that mean nothing. **Run `task
-build` before a tag**, not only `npm run typecheck`: `frontend/bindings/` is gitignored, only
-the build regenerates it, and the frontend import ban runs only there.
+to itself: the engine's deadlines are wall clock, so beside another heavy job `internal/runtime`
+fails with cancelled WordPress requests that mean nothing. **Run `task build` before a tag**,
+not only `npm run typecheck`: only the build regenerates the gitignored bindings.
 
 ## Phases
 
