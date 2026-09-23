@@ -173,6 +173,18 @@ func (g Graph) Roots() []Entity {
 	return out
 }
 
+func (g Graph) trail(cycle []string) string {
+	named := make([]string, 0, len(cycle))
+	for _, entityID := range cycle {
+		if entity, found := g.entities[entityID]; found && strings.TrimSpace(entity.Name) != "" {
+			named = append(named, entity.Name)
+			continue
+		}
+		named = append(named, entityID)
+	}
+	return strings.Join(named, " -> ")
+}
+
 func (g Graph) sortedParents(id string) []string {
 	ids := slices.Clone(g.parents[id])
 	slices.Sort(ids)
@@ -215,7 +227,8 @@ func (g Graph) ValidateAcyclic() error {
 			continue
 		}
 		if cycle := visit(id); cycle != nil {
-			return errors.New(errors.Invalid, "parent edges form a cycle").WithDetail("cycle", cycle)
+			return errors.New(errors.Invalid, "parent edges form a cycle: "+g.trail(cycle)).
+				WithDetail("cycle", cycle)
 		}
 	}
 	return nil

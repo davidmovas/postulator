@@ -3,6 +3,7 @@ package graph_test
 import (
 	stderrors "errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -156,6 +157,12 @@ func TestValidateAcyclic(t *testing.T) {
 	cycle, ok := kernel.Details["cycle"].([]string)
 	if !ok || !slices.Equal(cycle, []string{entA, entB, entC, entA}) {
 		t.Errorf("cycle = %v", kernel.Details["cycle"])
+	}
+	for _, name := range []string{"a", "b", "c"} {
+		if !strings.Contains(kernel.Message, name) {
+			t.Errorf("the refusal reads %q and does not name the entity %q a reader has to go and fix",
+				kernel.Message, name)
+		}
 	}
 
 	proposed, err := graph.New(
