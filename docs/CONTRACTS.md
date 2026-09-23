@@ -29,10 +29,10 @@ the composition root binds the two.
 |---|---|
 | `HealthService` | `Ping` |
 | `SitesService` | `Create Update Delete Get List TestConnection` |
-| `GraphService` | `LoadGraph CreateEntity UpdateEntity DeleteEntity GetEntity ListEntities SetAnchors AddEdge ApproveEdge RejectEdge DeleteEdge ListEdges RecomputeScores ProposeFromPages ProposeRelated` |
+| `GraphService` | `LoadGraph CreateEntity UpdateEntity DeleteEntity GetEntity ListEntities SetAnchors AddEdge ApproveEdge RejectEdge DeleteEdge ListEdges RecomputeScores ProposeFromPages ProposeRelated MoveEntity` |
 | `PagesService` | `Create Update Delete Get List Tree MapToEntity Unmap SetCanonical ReplaceLinks PreviewLink` |
 | `TemplatesService` | `CreateTemplate UpdateTemplate DeleteTemplate GetTemplate ListTemplates SetOverride DeleteOverride ResolveForPage CreatePolicy UpdatePolicy DeletePolicy GetPolicy ListPolicies GetEffectivePolicy` |
-| `RunsService` | `Start Estimate Get List ListItems ListEvents GetArtifact ListArtifacts Pause Resume Cancel RetryStep` |
+| `RunsService` | `Start Estimate Get List ListItems ListEvents GetArtifact ListArtifacts Pause Resume Cancel RetryStep RevertRun` |
 | `SyncService` | `SyncSite CheckPlugin SavePluginPackage` |
 | `ReportsService` | `SiteOverview LinkAudit LinkAuditPage PageReport RunReport JudgePage` |
 | `ImportService` | `Inspect Preview Apply Export SaveMapping ListMappings DeleteMapping` |
@@ -43,9 +43,16 @@ the composition root binds the two.
 | `BrowserService` | `Open Locate` |
 | `SettingsService` | `Schema Get Set SetProviderKey ProviderKeys DeleteProviderKey LockState Lock Unlock SetMasterPassword ExportBackup ImportBackup` |
 
-A hundred and sixteen methods. Where a use case answers with bytes the service writes them
+A hundred and eighteen methods. Where a use case answers with bytes the service writes them
 to the path the request names and returns it, because the webview has no filesystem;
 `SyncService.SavePluginPackage{path}` is the only such method.
+
+`GraphService.MoveEntity{entityId, newParentId, keepBoth?}` adds the parent edge, checks the
+graph is still acyclic and drops the approved parent edges it replaces inside one unit of
+work, and answers `removedEdgeIds`; running it again is quiet. `RunsService.RevertRun{runId}`
+enqueues the revert of a finished run and answers `{runId}`; it refuses a revert of a revert,
+a run that has not finished ("cancel it first"), a second revert while one is `completed` or
+still active, and a run that wrote nothing to the site.
 
 `ReportsService.JudgePage{pageId}` is synchronous: it pulls the live page, runs the shared
 judge rubric against it and answers with the report, one model call inside the request.
@@ -137,13 +144,60 @@ cursor it used to reach the current one.
 ## Long-running work
 
 Any mutation that can exceed a second returns `{runId}` immediately and never blocks;
-control is `Get Pause Resume Cancel RetryStep`. Progress is read two ways and both are
+control is `Get Pause Resume Cancel RetryStep RevertRun`. Progress is read two ways and both are
 required: `RunsService.ListEvents(runId, sinceSeq, limit)` is the durable log, gapless per
 run, and the live bus pushes the same records. Live delivery is best-effort — v3
 dispatches to the windows that exist at that instant and buffers nothing, so an event
 emitted while no window exists is dropped and a page reload discards the listener table.
 A client that has seen `seq` asks for everything after it on reconnect; this catch-up is
 mandatory, not an optimisation.
+
+## Run kinds and their recipes
+
+`run.Kind.Recipe()` is the one answer to whether a kind names its own steps. A kind that owns
+one hands it out and `runs.Start` refuses a request recipe that disagrees with it, naming the
+steps it will run; `runs.Start` also refuses any recipe, the request's or the template's, that
+enables a step another kind owns, for every kind but `custom`.
+
+| kind | recipe |
+|---|---|
+| `generate` | the template's, or `run.GenerateRecipe()` when neither the request nor the template names one |
+| `relink` | `resolve_context relink_page sync_back report` |
+| `repair` | `repair_hierarchy sync_back report` |
+| `sync` | `sync_site` |
+| `revert` | `revert`, and `runs.Start` refuses the kind: only `RunsService.RevertRun` can set `parentRunId` |
+| `audit`, `import` | none of its own |
+| `custom` | none of its own, and the one kind exempt from every step rule |
+
+`relink_page` and `revert` are untyped consts beside the `StepName` block rather than
+`StepName` values, so neither reaches `vocab.ts`, the blank template's recipe or the three
+tool step enums. `repair_hierarchy` and `sync_site` are still `StepName` values; a template
+recipe that enables one is refused by `runs.Start`.
+
+`RunsService.Estimate` answers zero for `relink`, `repair` and `sync`, because none of their
+steps declares a model role. It carries `findings []{code, message}`, and `unpriced_step`
+names every enabled step that declares no ceiling. `Budget` carries `maxUsd` and `maxTokens`
+and either one pauses the run with `budget_exceeded`.
+
+A run's status may become `paused` with `pauseReason: needs_human` without any item failing,
+because a run whose every remaining item is waiting for a person has nothing left to advance.
+
+## Artifacts
+
+`judge_report.score` and `final_report.score` are **optional**: absent means nothing scored
+the page, where a final report used to default to a perfect `1` and a judge that could not be
+reached used to store a `0`. Both carry `findings`, as `meta` and `images` now do; `images` is
+written even when the template asks for no image, because the step's `Produces` says it is.
+`publish_result` carries `previousContent`, `previousContentHash` and `previousMeta` — what
+the write replaced, kept only for an update and only where the site can answer — and
+`relink_result` carries `before {hash, html}` per neighbour. A relink run writes its own
+`RelinkPageResult` under the same `relink_result` kind, with `placed[]` rather than
+`neighbors`, so a revert does not try to restore a page nothing wrote to. `revert_result` is
+the artifact kind a revert produces. `ImagesResult` no longer carries `skipped`.
+
+New warning findings, each carrying `details.pageId` and `details.path`: `judge_unavailable`
+(`reason`), `artifact_purged` (`kind`), `image_not_placed` (`reason`), `meta_not_written`
+(`fields`).
 
 ## Events
 
@@ -174,12 +228,23 @@ The names and their payloads are the `EventType` union and the `EventPayloads` m
 [`frontend/src/generated/events.ts`](../frontend/src/generated/events.ts), which is the
 registry rendered. Run events are the `run.* item.* step.*` families plus `llm.usage`;
 application events are `graph.changed pages.changed templates.changed sites.changed
-schedules.changed settings.changed app.locked app.unlocked` and the agent family `agent.delta agent.tool.started agent.tool.finished
-agent.confirm.requested agent.confirm.resolved agent.done`, whose payloads all carry
+schedules.changed settings.changed app.locked app.unlocked files.dropped` and the agent family `agent.delta agent.tool.started agent.tool.finished
+agent.confirm.requested agent.confirm.resolved agent.titled agent.usage agent.waiting agent.done`, whose payloads all carry
 `conversationId` because a window may hold more than one conversation. The frontend
 subscribes with `on(type, handler)` from `frontend/src/lib/events.ts`, which narrows
 `payload` to the declared type. Events only travel Go → JS; every frontend-initiated
 action is a bound method call.
+
+A turn's spend is announced per model call, not per turn: `agent.usage{conversationId,
+messageId, provider, model, round, inputTokens, cachedInputTokens, outputTokens, usd}` is
+published once per round, and `agent.done` carries the authoritative totals with
+`cachedInputTokens` and `calls`, the number of model calls the turn made. A round the
+provider held back announces `agent.waiting{conversationId, messageId, reason, attempt,
+afterMs}`, where `reason` is the kernel code of the refusal, so a turn that is waiting is
+not silence. `llm.usage` is unchanged and stays a run event: it is published with a run
+sequence and an agent turn has no run. `run.budget_exceeded` carries `spentTokens` and
+`budgetTokens` beside `spentUsd` and `budgetUsd`, and is published for a token overrun as
+well as a money one.
 
 ## Opening a link
 
@@ -204,6 +269,14 @@ hour-long signed link the companion plugin issued and rotates on every call. A p
 WordPress id answers `INVALID` with `details.field = wpId`, an archived one with `details.field =
 status`. A site that cannot issue a link answers `INVALID` with `details.code` set to
 `plugin_missing` or, for a plugin older than 1.1.0, `plugin_outdated` with `details.capability`.
+
+## The companion plugin's version
+
+The shipped plugin is **1.2.0** and advertises `bulk seo_meta seo_meta_read content_hash raw
+preview`. A capability the manifest does not name is refused from the cached manifest, before
+any request: `GET /seo-meta/{id}` needs `seo_meta_read`, so a site still running 1.1.0 answers
+`plugin_outdated` with `details.capability` and a revert keeps its `revert_meta_kept` warning
+instead of restoring the search snippet. Everything else works against 1.1.0 unchanged.
 
 ## Agent chat
 
@@ -249,12 +322,45 @@ sites, starts a run, follows the events and the catch-up, and sends an agent mes
 
 A tool is `{Def{Name, Description, Risk(read|write|dangerous), Schema}, Authorize, Run}`,
 every tool lives in its own file and `Binding{SiteID, ConversationID, RunID, Mode}` scopes
-every call. The guard chain runs in this order and the order matters: `fence` wraps tool output as
+every call. Eighty-nine tools, `runs_revert` (`dangerous`) and `graph_move_entity` (`write`)
+among them, measuring 74,617 bytes of schema — about 18,700 tokens resent on every round of
+every turn, which `TestTheToolSchemasFitTheirCeiling` holds against `schemaCeilingBytes`.
+
+The guard chain runs in this order and the order matters: `fence` wraps tool output as
 untrusted data so a result cannot inject instructions into the model, `audit` writes the
-ledger row and emits the stream event, `capResult` truncates oversized JSON before it
+ledger row and emits the stream event, `capResult` shortens an oversized answer before it
 re-enters the model, `permission` checks the conversation allow-list and calls `Authorize`,
 denying with `UNAUTHORIZED`. The audit middleware records what the tool answered; the fence
-wraps the copy the model reads.
+wraps the copy the model reads. `Fence`, `Permit` and `Cap` live in
+`internal/application/agent`; transport adapts them to gollem middleware and `Confirm` calls
+them directly, so a confirmed tool is guarded exactly as the model's own call is.
+
+A result over the ceiling is shortened, not truncated: `Cap` halves the widest list, then the
+longest string at a rune boundary, and only when neither helps falls back to
+`{truncated, totalBytes, preview}`. The ordinary answer is
+`{truncated, totalBytes, droppedItems: {path: n}, shortenedText: n, result: <the document>}`,
+so a capped listing still decodes and still carries its `nextCursor` and `hasMore`. The
+in-turn ceiling is `agent.maxToolResultBytes`; what is replayed to the model on every later
+round is the smaller `agent.historyToolResultBytes` (int, default 4096, range 512–65536,
+group `agent`), read per turn so a change takes effect without a restart.
+
+A tool call ends in one of five states, and the transcript reads each differently:
+`running`, `ok`, `cut` (the answer was shortened, which names every list it dropped rows
+from), `denied` (nothing was read or written) and `error` (handed back to the agent with its
+reason). A live row carries the status from the event; a saved row carries `toolStatus` on
+`agent.Message`, read back from the `tool_calls` ledger.
+
+A field of a tool request is required only where its own schema says so, nested fields and
+list items included: the rule is that a field is required only when the use case refuses its
+absence, because gollem validates the whole tree before the tool runs and its refusal teaches
+the model nothing. `dto.Sort.desc`, `graph.Anchor.weight` and `.source`,
+`graph.AddEdgeRequest.weight`, `graph.SetAnchorsRequest.anchors`, `pages.CreateRequest.title`,
+`pages.ReplaceLinksRequest.links` and the five catalog fields of
+`models.UpsertModelRequest` are all optional. Where a tool's input reaches into
+`internal/domain/template` it takes a tool-owned argument struct instead of the window's DTO,
+so `templates_create` asks for a name, a page kind and one section with a heading rather than
+about thirty values. `runs_list_items` and `schedules_list` offer no `sort.field`, because
+their use cases read only `sort.desc`.
 
 In `confirm` mode a `write` or `dangerous` tool does not execute: it writes a
 `PendingAction` row and returns `{status:"confirmationRequired", actionId, summary}`, so a
