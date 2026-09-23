@@ -1,0 +1,207 @@
+package gollemclient
+
+import (
+	"context"
+	"encoding/json"
+	stderrors "errors"
+	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/gollem-dev/gollem"
+	"github.com/sashabaranov/go-openai"
+
+	"github.com/davidmovas/postulator/internal/kernel/errors"
+)
+
+func classify(ctx context.Context, err error) error {
+	if err == nil {
+		return nil
+	}
+	if ctx.Err() != nil {
+		return errors.New(errors.Cancelled, "the model call was cancelled").WithInternal(err)
+	}
+	if stderrors.Is(err, context.DeadlineExceeded) {
+		return errors.New(errors.External, "the model did not answer before the timeout").WithInternal(err).WithRetry(0)
+	}
+	if provider, ok := Provider(err); ok {
+		return provider
+	}
+	return errors.New(errors.External, "the model provider could not be reached").WithInternal(err).WithRetry(0)
+}
+
+func Provider(err error) (error, bool) {
+	if err == nil {
+		return nil, false
+	}
+	if stderrors.Is(err, gollem.ErrTokenSizeExceeded) {
+		return errors.New(errors.Invalid, "the prompt does not fit the model context window").WithInternal(err), true
+	}
+
+	status, after, ok := statusOf(err)
+	if !ok {
+		return nil, false
+	}
+	return fromStatus(status, after, err), true
+}
+
+const (
+	rejectedRequest = "the model provider rejected the request"
+	exhaustedOutput = "the model used its whole output budget before it answered"
+)
+
+var outputLimitParams = map[string]bool{"max_tokens": true, "max_completion_tokens": true}
+
+func outputLimited(err error) bool {
+	var apiErr *openai.APIError
+	if stderrors.As(err, &apiErr) && apiErr.Param != nil && outputLimitParams[*apiErr.Param] {
+		return true
+	}
+
+	told := strings.ToLower(messageOf(err))
+	if !strings.Contains(told, "max_tokens") {
+		return false
+	}
+	return strings.Contains(told, "limit") || strings.Contains(told, "reached")
+}
+
+func fromStatus(status int, after time.Duration, err error) error {
+	base := func(code errors.Code, message string) *errors.Error {
+		built := errors.New(code, message).WithDetail("status", status).WithInternal(err)
+		if told := maskKeys(messageOf(err)); told != "" {
+			built = built.WithDetail("providerMessage", told)
+		}
+		return built
+	}
+
+	switch {
+	case status == http.StatusUnauthorized:
+		return base(errors.Unauthorized, "the model provider rejected the api key")
+	case status == http.StatusForbidden:
+		return base(errors.Unauthorized, "the key has no access to this model")
+	case status == http.StatusNotFound:
+		return base(errors.NotFound, "the model provider has no such model")
+	case status == http.StatusTooManyRequests:
+		return base(errors.RateLimited, "the model provider is rate limiting this key").WithRetry(after)
+	case status >= http.StatusInternalServerError:
+		return base(errors.External, "the model provider returned a server error").WithRetry(after)
+	case status >= http.StatusBadRequest && outputLimited(err):
+		return base(errors.Invalid, exhaustedOutput)
+	case status >= http.StatusBadRequest:
+		return base(errors.Invalid, rejectedRequest)
+	default:
+		return base(errors.External, "the model provider returned an unexpected status")
+	}
+}
+
+const ellipsis = "…"
+
+var keyPattern = regexp.MustCompile(`sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{10,}`)
+
+func maskKeys(text string) string {
+	return keyPattern.ReplaceAllStringFunc(text, func(token string) string {
+		prefix := "sk-"
+		if strings.HasPrefix(token, "AIza") {
+			prefix = "AIza"
+		}
+		return prefix + ellipsis + token[len(token)-4:]
+	})
+}
+
+func messageOf(err error) string {
+	var apiErr *openai.APIError
+	if stderrors.As(err, &apiErr) {
+		return strings.TrimSpace(apiErr.Message)
+	}
+
+	var requestErr *openai.RequestError
+	if stderrors.As(err, &requestErr) {
+		return strings.TrimSpace(envelopeMessage(requestErr.Body))
+	}
+
+	var anthropicErr *anthropic.Error
+	if stderrors.As(err, &anthropicErr) {
+		return strings.TrimSpace(envelopeMessage([]byte(anthropicErr.RawJSON())))
+	}
+	return ""
+}
+
+func envelopeMessage(body []byte) string {
+	var envelope struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return ""
+	}
+	return envelope.Error.Message
+}
+
+func statusOf(err error) (status int, after time.Duration, ok bool) {
+	var apiErr *openai.APIError
+	if stderrors.As(err, &apiErr) {
+		return apiErr.HTTPStatusCode, statedDelay(messageOf(err)), true
+	}
+
+	var requestErr *openai.RequestError
+	if stderrors.As(err, &requestErr) {
+		return requestErr.HTTPStatusCode, statedDelay(messageOf(err)), true
+	}
+
+	var anthropicErr *anthropic.Error
+	if stderrors.As(err, &anthropicErr) {
+		held := retryAfter(anthropicErr.Response)
+		if held == 0 {
+			held = statedDelay(messageOf(err))
+		}
+		return anthropicErr.StatusCode, held, true
+	}
+	return 0, 0, false
+}
+
+const maxStatedDelay = 2 * time.Minute
+
+var statedDelayPattern = regexp.MustCompile(`(?i)try again in ((?:\d+(?:\.\d+)?(?:ms|s|m|h))+)`)
+
+func statedDelay(text string) time.Duration {
+	match := statedDelayPattern.FindStringSubmatch(text)
+	if match == nil {
+		return 0
+	}
+
+	delay, err := time.ParseDuration(strings.ToLower(match[1]))
+	if err != nil || delay <= 0 || delay > maxStatedDelay {
+		return 0
+	}
+	return delay
+}
+
+func retryAfter(resp *http.Response) time.Duration {
+	if resp == nil {
+		return 0
+	}
+
+	trimmed := strings.TrimSpace(resp.Header.Get("Retry-After"))
+	if trimmed == "" {
+		return 0
+	}
+	if seconds, err := strconv.Atoi(trimmed); err == nil {
+		if seconds <= 0 {
+			return 0
+		}
+		return time.Duration(seconds) * time.Second
+	}
+
+	when, err := http.ParseTime(trimmed)
+	if err != nil {
+		return 0
+	}
+	if delay := time.Until(when); delay > 0 {
+		return delay
+	}
+	return 0
+}

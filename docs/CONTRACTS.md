@@ -1,0 +1,379 @@
+# Contracts
+
+The rules every boundary obeys: Wails services to the frontend, the tool registry to the
+agents. Settled by the Phase 1 spike against Wails v3 `v3.0.0-beta.23`; Phase 11 filled in
+the catalogue without changing these shapes.
+
+## Method shape
+
+```go
+func (s *XService) Method(ctx context.Context, req ReqDTO) (RespDTO, error)
+```
+
+One request struct in, one response struct out, always a context, always an error. A
+field added to a struct is a compatible change, an extra argument is not. The generator
+strips the leading `context.Context`, so `Method(req)` is what TypeScript sees; name every
+parameter, because `_` is generated as `$0`. Every method body is `return s.<field>(ctx,
+req)` where the field was built by `wails.Wrap(logger, "<service>.<method>", fn)`: it puts
+`ctx.ActorUser` in the context, runs `middleware.Audit` over `middleware.Recover`, and
+converts every failure with `wails.Convert`.
+
+## Services
+
+One service per bounded context, all in `internal/transport/wails`, all thin: a method
+takes the use case's own request struct, hands it over and returns its response. A method
+exists only where a use case exists; each service declares the interface it consumes, so
+the composition root binds the two.
+
+| Service | Methods |
+|---|---|
+| `HealthService` | `Ping` |
+| `SitesService` | `Create Update Delete Get List TestConnection` |
+| `GraphService` | `LoadGraph CreateEntity UpdateEntity DeleteEntity GetEntity ListEntities SetAnchors AddEdge ApproveEdge RejectEdge DeleteEdge ListEdges RecomputeScores ProposeFromPages ProposeRelated MoveEntity` |
+| `PagesService` | `Create Update Delete Get List Tree MapToEntity Unmap SetCanonical ReplaceLinks PreviewLink` |
+| `TemplatesService` | `CreateTemplate UpdateTemplate DeleteTemplate GetTemplate ListTemplates SetOverride DeleteOverride ResolveForPage CreatePolicy UpdatePolicy DeletePolicy GetPolicy ListPolicies GetEffectivePolicy` |
+| `RunsService` | `Start Estimate Get List ListItems ListEvents GetArtifact ListArtifacts Pause Resume Cancel RetryStep RevertRun` |
+| `SyncService` | `SyncSite CheckPlugin SavePluginPackage` |
+| `ReportsService` | `SiteOverview LinkAudit LinkAuditPage PageReport RunReport JudgePage` |
+| `ImportService` | `Inspect Preview Apply Export SaveMapping ListMappings DeleteMapping` |
+| `ModelsService` | `ListModels UpsertModel DisableModel GetProfiles SetProfile TestProvider UsageSummary` |
+| `AgentService` | `CreateConversation SetMode RenameConversation DeleteConversation Send Status Confirm Cancel ListConversations ListMessages ListPendingActions` |
+| `SchedulesService` | `Create Update Delete Get List Enable Disable RunNow` |
+| `ToolsService` | `List` |
+| `BrowserService` | `Open Locate` |
+| `SettingsService` | `Schema Get Set SetProviderKey ProviderKeys DeleteProviderKey LockState Lock Unlock SetMasterPassword ExportBackup ImportBackup` |
+
+A hundred and eighteen methods. Where a use case answers with bytes the service writes them
+to the path the request names and returns it, because the webview has no filesystem;
+`SyncService.SavePluginPackage{path}` is the only such method.
+
+`GraphService.MoveEntity{entityId, newParentId, keepBoth?}` adds the parent edge, checks the
+graph is still acyclic and drops the approved parent edges it replaces inside one unit of
+work, and answers `removedEdgeIds`; running it again is quiet. `RunsService.RevertRun{runId}`
+enqueues the revert of a finished run and answers `{runId}`; it refuses a revert of a revert,
+a run that has not finished ("cancel it first"), a second revert while one is `completed` or
+still active, and a run that wrote nothing to the site.
+
+`ReportsService.JudgePage{pageId}` is synchronous: it pulls the live page, runs the shared
+judge rubric against it and answers with the report, one model call inside the request.
+`PageReport` and `RunReport` read what a run already recorded; `SiteOverview`,
+`LinkAudit{siteId}` and `LinkAuditPage{pageId}` read the graph and the page map. The audit
+plans every mapped page's link targets with the rules of the page's resolved template and the
+site's effective policy, exactly as `resolve_context` does, and answers one summary row per
+non-archived page; the page detail names each target, whether a stored link satisfies it and
+with which anchor, and every stored link the graph did not ask for. Both are unpaged reads of
+one site, like `Tree` and `LoadGraph`.
+
+Every method but `HealthService.Ping` and the four lock methods of `SettingsService`
+answers `LOCKED` while a master password is set and the application has not been unlocked,
+because a service resolves its use case per call and the composition does not exist yet.
+
+`SettingsService.Schema` renders the `kernel/settings` declarations as
+`{key, group, type, default, min?, max?, enum?, nonEmpty?}`, which is what a settings
+screen draws itself from. `Get{key}` answers the stored value or the declared default with
+`isDefault`; `Set{key, value}` validates against the declaration before it writes, then
+re-applies the whole stored map so the running process sees the new value. An undeclared
+key is `NOT_FOUND`, a rejected value is `INVALID` and nothing is written. No setting holds
+a secret: `SetProviderKey{provider, apiKey}` delegates to `models.SetProviderKey`, which
+puts the key in the encrypted store and answers with the provider name alone. It is the
+only method that accepts a credential.
+
+`LockState{}` answers `{locked, protected}`. `SetMasterPassword{current, new}` rewraps the
+master key, an empty `new` removes the password and returns to plain DPAPI, and a wrong
+`current` is `LOCKED`. `Unlock{password}` composes the store and every service and emits
+`app.unlocked`; `Lock{}` closes the store, zeroes the key and emits `app.locked`, and it
+refuses with `INVALID` while no password is set, because nothing could unlock it again.
+`ExportBackup{path, password}` writes one Argon2id and AES-256-GCM archive holding a
+consistent snapshot of the database and answers with its size; the master key is not in it.
+`ImportBackup{path, password}` decrypts and checks the whole archive first, then stops the
+engine, the scheduler and the agent, copies the snapshot into the encrypted database and
+composes the core again from what it restored. A wrong password or a truncated file is
+`INVALID` and nothing is touched.
+
+## DTOs
+
+- JSON is camelCase everywhere: `siteId`, `nextCursor`, `createdAt`. Never snake_case.
+- Timestamps are `kernel/dto.Time`: RFC3339 with a UTC offset, seconds precision, `null`
+  when zero.
+- Ids are UUID v4 lowercase text.
+- A nil slice marshals as `[]`, never as `null` — `paging.Slice[T]` exists for this.
+- Request and response structs are declared by the application use cases
+  (`internal/application/<context>`) and passed through unchanged; only `HealthService`,
+  `ToolsService` and `SettingsService`, which have no use case behind them, declare theirs
+  in `internal/transport/wails`. Domain types carry no JSON tags, except
+  `template.TemplateSpec` and the `llm` catalog types, whose persisted form is JSON.
+- Generics are allowed in exported signatures: `paging.List[T]` generates `List<T>`. A Go
+  type with a custom `MarshalJSON` generates as `any`, which is why `Slice<T>` and
+  `dto.Time` lose their shape; `frontend/src/lib/paging.ts` restores it with `List<T>` and
+  `listOf<T>()`. A bound service type may not itself be generic.
+
+## Errors
+
+Every error crossing a boundary is a `*kernel/errors.Error` with one of the frozen
+codes: `NOT_FOUND CONFLICT INVALID UNAUTHORIZED RATE_LIMITED BUDGET_EXCEEDED EXTERNAL
+INTERNAL CANCELLED NEEDS_HUMAN LOCKED`. A foreign error reports `INTERNAL`.
+
+Services are registered with `application.NewServiceWithOptions(instance,
+application.ServiceOptions{MarshalError: wails.MarshalError})`. The application-level
+`Options.MarshalError` is ignored by beta.23 and must not be used. The hook returns
+
+```json
+{"code":"NOT_FOUND","message":"site not found","details":{"siteId":"s1"},"retry":{"afterMs":2000}}
+```
+
+which Wails carries as the `cause` of the rejection, so `parseError(thrown)` from
+`frontend/src/lib/errors.ts` reads it back as `{code, message, details?, retry?}` and
+answers `{code:"INTERNAL", message:"unexpected internal error"}` when the cause is missing
+or unrecognised. `details` and `retry` are omitted when empty. `wails.Convert` rebuilds
+the error without its internal chain, so the rejection's `message` never carries a driver
+string, and `details` is dropped entirely for `INTERNAL`, which keeps a recovered panic's
+text out of the UI. A secret, a stack trace and a driver message go to `errors.log`, never
+into `details`.
+
+## Pagination
+
+Cursor pagination only; there is no offset anywhere in this codebase. A list request
+embeds `kernel/dto.ListRequest{cursor, limit, sort?}`, limit defaulting to 50 and clamping
+at 500; the response is `kernel/paging.List[T]` → `{items, nextCursor?, prevCursor?,
+hasMore}`. The cursor is an opaque base64url string that records the sort it was issued
+for, and replaying one against a different `ORDER BY` is `INVALID`. `cursor` is always the
+`nextCursor` of the previous page, `sort.field` is `createdAt` by default and `name` or
+`path` where a context offers it, and a client that needs the previous page replays the
+cursor it used to reach the current one.
+
+## Long-running work
+
+Any mutation that can exceed a second returns `{runId}` immediately and never blocks;
+control is `Get Pause Resume Cancel RetryStep RevertRun`. Progress is read two ways and both are
+required: `RunsService.ListEvents(runId, sinceSeq, limit)` is the durable log, gapless per
+run, and the live bus pushes the same records. Live delivery is best-effort — v3
+dispatches to the windows that exist at that instant and buffers nothing, so an event
+emitted while no window exists is dropped and a page reload discards the listener table.
+A client that has seen `seq` asks for everything after it on reconnect; this catch-up is
+mandatory, not an optimisation.
+
+## Run kinds and their recipes
+
+`run.Kind.Recipe()` is the one answer to whether a kind names its own steps. A kind that owns
+one hands it out and `runs.Start` refuses a request recipe that disagrees with it, naming the
+steps it will run; `runs.Start` also refuses any recipe, the request's or the template's, that
+enables a step another kind owns, for every kind but `custom`.
+
+| kind | recipe |
+|---|---|
+| `generate` | the template's, or `run.GenerateRecipe()` when neither the request nor the template names one |
+| `relink` | `resolve_context relink_page sync_back report` |
+| `repair` | `repair_hierarchy sync_back report` |
+| `sync` | `sync_site` |
+| `revert` | `revert`, and `runs.Start` refuses the kind: only `RunsService.RevertRun` can set `parentRunId` |
+| `audit`, `import` | none of its own |
+| `custom` | none of its own, and the one kind exempt from every step rule |
+
+`repair_hierarchy`, `sync_site`, `relink_page` and `revert` are `run.PerKindStepName` values,
+a type of their own, so none of them reaches `vocab.ts`, the blank template's recipe or the
+three tool step enums; `run.PerKindStep(name)` is the domain predicate and
+`run.StepNames()` is what a template recipe may draw from.
+
+`RunsService.Estimate` answers zero for `relink`, `repair` and `sync`, because none of their
+steps declares a model role. It carries `findings []{code, message}`, and `unpriced_step`
+names every enabled step that declares no ceiling. `Budget` carries `maxUsd` and `maxTokens`
+and either one pauses the run with `budget_exceeded`.
+
+A run's status may become `paused` with `pauseReason: needs_human` without any item failing,
+because a run whose every remaining item is waiting for a person has nothing left to advance.
+
+## Artifacts
+
+`judge_report.score` and `final_report.score` are **optional**: absent means nothing scored
+the page, where a final report used to default to a perfect `1` and a judge that could not be
+reached used to store a `0`. Both carry `findings`, as `meta` and `images` now do; `images` is
+written even when the template asks for no image, because the step's `Produces` says it is.
+`publish_result` carries `previousContent`, `previousContentHash` and `previousMeta` — what
+the write replaced, kept only for an update and only where the site can answer — and
+`relink_result` carries `before {hash, html}` per neighbour. A relink run writes its own
+`RelinkPageResult` under the same `relink_result` kind, with `placed[]` rather than
+`neighbors`, so a revert does not try to restore a page nothing wrote to. `revert_result` is
+the artifact kind a revert produces. `ImagesResult` no longer carries `skipped`.
+
+New warning findings, each carrying `details.pageId` and `details.path`: `judge_unavailable`
+(`reason`), `artifact_purged` (`kind`), `image_not_placed` (`reason`), `meta_not_written`
+(`fields`).
+
+## Events
+
+`internal/application/events` owns the names, the payload structs and the envelope;
+`frontend/src/generated/events.ts` is rendered from it by `task events` and a Go test
+fails when the committed file is stale. The generated module is never edited by hand and
+carries no header comment, because this repository forbids comments in TypeScript. The
+envelope is
+
+```json
+{"type":"step.done","seq":42,"runId":"<uuid>","at":"2026-09-17T10:30:00Z","payload":{}}
+```
+
+`runId` is present on run events only, `at` is RFC3339 UTC, and `seq` is per run and
+gapless. For application events `seq` is a counter held by the `EventBridge`, so it is
+process-wide only because the composition root constructs exactly one bridge; a second
+bridge would restart the numbering.
+
+`internal/transport/wails.EventBridge` is the only emitter: `Publish(type, payload)` for
+application events, `PublishRun(runId, seq, type, payload)` for run events, both rejecting
+an unknown name or a mismatched payload. `application.RegisterEvent` is deliberately
+unused.
+
+The generated module also exports `eventTypes`, the same names once more as a readonly
+tuple, so a window can build a handler map the compiler checks for exhaustiveness.
+
+The names and their payloads are the `EventType` union and the `EventPayloads` map in
+[`frontend/src/generated/events.ts`](../frontend/src/generated/events.ts), which is the
+registry rendered. Run events are the `run.* item.* step.*` families plus `llm.usage`;
+application events are `graph.changed pages.changed templates.changed sites.changed
+schedules.changed settings.changed app.locked app.unlocked files.dropped` and the agent family `agent.delta agent.tool.started agent.tool.finished
+agent.confirm.requested agent.confirm.resolved agent.titled agent.usage agent.waiting agent.done`, whose payloads all carry
+`conversationId` because a window may hold more than one conversation. The frontend
+subscribes with `on(type, handler)` from `frontend/src/lib/events.ts`, which narrows
+`payload` to the declared type. Events only travel Go → JS; every frontend-initiated
+action is a bound method call.
+
+A turn's spend is announced per model call, not per turn: `agent.usage{conversationId,
+messageId, provider, model, round, inputTokens, cachedInputTokens, outputTokens, usd}` is
+published once per round, and `agent.done` carries the authoritative totals with
+`cachedInputTokens` and `calls`, the number of model calls the turn made. A round the
+provider held back announces `agent.waiting{conversationId, messageId, reason, attempt,
+afterMs}`, where `reason` is the kernel code of the refusal, so a turn that is waiting is
+not silence. `llm.usage` is unchanged and stays a run event: it is published with a run
+sequence and an agent turn has no run. `run.budget_exceeded` carries `spentTokens` and
+`budgetTokens` beside `spentUsd` and `budgetUsd`, and is published for a token overrun as
+well as a money one.
+
+## Opening a link
+
+Nothing in this application opens the system browser. `BrowserService.Open{url}` refuses
+anything that is not `http` or `https` with `INVALID`, and otherwise starts Tor Browser
+detached on that address. `Locate{}` answers `{path, source, installed}` where `source` is
+`setting` when the `browser.torPath` setting named it, `detected` when it was found under
+`%USERPROFILE%\Desktop`, `%USERPROFILE%\OneDrive\Desktop`, `%LOCALAPPDATA%`,
+`%PROGRAMFILES%` or `%USERPROFILE%\Downloads` as `<root>\Tor Browser\Browser\firefox.exe`,
+and empty when nothing is installed. A candidate counts only when a `TorBrowser\` directory
+sits beside `firefox.exe`, which is what tells Tor Browser apart from a plain Firefox, and a
+configured path that fails that test is ignored rather than trusted. Nothing installed is
+`INVALID` with `details.code = tor_missing`; a launch that failed is `EXTERNAL`. The address
+never appears in a failure or a log line, because a preview link carries a signed token.
+
+## Page preview
+
+`PagesService.PreviewLink{pageId}` answers `{url, expiresAt, kind}`. `kind` is `public` for a
+published page, whose `url` is the site's base URL and the page path and whose `expiresAt` is
+null, and no site call is made; it is `preview` for any other page on the site, whose `url` is an
+hour-long signed link the companion plugin issued and rotates on every call. A page without a
+WordPress id answers `INVALID` with `details.field = wpId`, an archived one with `details.field =
+status`. A site that cannot issue a link answers `INVALID` with `details.code` set to
+`plugin_missing` or, for a plugin older than 1.1.0, `plugin_outdated` with `details.capability`.
+
+## The companion plugin's version
+
+The shipped plugin is **1.2.0** and advertises `bulk seo_meta seo_meta_read content_hash raw
+preview`. A capability the manifest does not name is refused from the cached manifest, before
+any request: `GET /seo-meta/{id}` needs `seo_meta_read`, so a site still running 1.1.0 answers
+`plugin_outdated` with `details.capability` and a revert keeps its `revert_meta_kept` warning
+instead of restoring the search snippet. Everything else works against 1.1.0 unchanged.
+
+## Agent chat
+
+`CreateConversation{siteId?, title?, mode}` opens a conversation in `confirm` or
+`autonomous` mode and `SetMode` switches it; `RenameConversation{conversationId, title}`
+retitles it and `DeleteConversation{conversationId}` stops a turn in flight and drops the
+conversation with its messages, pending actions, tool calls and history. An untitled
+conversation takes its first message as its title. `Send{conversationId, text}` returns
+`{messageId, assistantMessageId}` at once and the turn runs behind it: the assistant id is
+minted before the turn starts and is the id every event of that turn carries, so a window
+that receives the terminal event before `Send` returns can still match the two.
+`agent.delta` carries the streamed text, `agent.tool.started` and `agent.tool.finished` the
+tool calls, `agent.done` the end of the turn, and `Cancel{conversationId}` stops one in
+flight. `Status{conversationId}` answers `{running, messageId, startedAt, lastSeq}` from
+the turn registry, and zeroes all but `running` when nothing is answering, which is how a
+window that opened mid-turn learns there is one. `agent.done` carries a frozen `code`,
+empty on success, and an `error` redacted exactly as a binding error is; `CANCELLED` is
+the stop signal, whether the user stopped the turn or the `agent.turnTimeout` deadline did,
+and the message says which. The turn runs under that deadline for every provider and a
+panic underneath it ends the turn with `INTERNAL` rather than the process. In `confirm` mode a `write` or
+`dangerous` tool does not run: it writes a pending action and emits
+`agent.confirm.requested{conversationId, confirmationId, tool, args, risk, summary}`, which
+`Confirm{actionId, approve}` settles and `agent.confirm.resolved` announces. History is
+read with `ListConversations`, `ListMessages` and `ListPendingActions`, all of which
+survive a restart; `ToolsService.List` is the capability list the UI shows.
+
+## Bindings generation
+
+`wails3 generate bindings -f '<build flags>' -clean=true -ts -i ./...` writes the
+gitignored `frontend/bindings` deterministically and runs from `task bindings` and `task
+build`. The TypeScript module name comes from the Go service type name, not from
+`ServiceName()`, so the type names in the table above are the catalogue names. `ServiceName`, `ServiceStartup`, `ServiceShutdown` and `ServeHTTP` are
+excluded from bindings; every other exported method is public API, because
+`//wails:ignore` is a comment and comments are forbidden. A service closes its resources
+in `ServiceShutdown`, which runs in reverse registration order. `npm run typecheck` (`tsc --noEmit`) runs inside `task build` and
+covers `src` and the generated `bindings`; CI generates the bindings and typechecks
+against them as steps of their own, so a broken contract fails before the build does.
+`frontend/src/lib/api.ts` re-exports the generated modules under stable names and
+`frontend/src/smoke.ts` is the compile-time proof that the contract is usable: it lists
+sites, starts a run, follows the events and the catch-up, and sends an agent message.
+
+## Agent tools
+
+A tool is `{Def{Name, Description, Risk(read|write|dangerous), Schema}, Authorize, Run}`,
+every tool lives in its own file and `Binding{SiteID, ConversationID, RunID, Mode}` scopes
+every call. Eighty-nine tools, `runs_revert` (`dangerous`) and `graph_move_entity` (`write`)
+among them, measuring 74,617 bytes of schema — about 18,700 tokens resent on every round of
+every turn, which `TestTheToolSchemasFitTheirCeiling` holds against `schemaCeilingBytes`.
+
+The guard chain runs in this order and the order matters: `fence` wraps tool output as
+untrusted data so a result cannot inject instructions into the model, `audit` writes the
+ledger row and emits the stream event, `capResult` shortens an oversized answer before it
+re-enters the model, `permission` checks the conversation allow-list and calls `Authorize`,
+denying with `UNAUTHORIZED`. The audit middleware records what the tool answered; the fence
+wraps the copy the model reads. `Fence`, `Permit` and `Cap` live in
+`internal/application/agent`; transport adapts them to gollem middleware and `Confirm` calls
+them directly, so a confirmed tool is guarded exactly as the model's own call is.
+
+A result over the ceiling is shortened, not truncated: `Cap` halves the widest list, then the
+longest string at a rune boundary, and only when neither helps falls back to
+`{truncated, totalBytes, preview}`. The ordinary answer is
+`{truncated, totalBytes, droppedItems: {path: n}, shortenedText: n, result: <the document>}`,
+so a capped listing still decodes and still carries its `nextCursor` and `hasMore`. The
+in-turn ceiling is `agent.maxToolResultBytes`; what is replayed to the model on every later
+round is the smaller `agent.historyToolResultBytes` (int, default 4096, range 512–65536,
+group `agent`), read per turn so a change takes effect without a restart.
+
+A tool call ends in one of five states, and the transcript reads each differently:
+`running`, `ok`, `cut` (the answer was shortened, which names every list it dropped rows
+from), `denied` (nothing was read or written) and `error` (handed back to the agent with its
+reason). A live row carries the status from the event; a saved row carries `toolStatus` on
+`agent.Message`, read back from the `tool_calls` ledger.
+
+A field of a tool request is required only where its own schema says so, nested fields and
+list items included: the rule is that a field is required only when the use case refuses its
+absence, because gollem validates the whole tree before the tool runs and its refusal teaches
+the model nothing. `dto.Sort.desc`, `graph.Anchor.weight` and `.source`,
+`graph.AddEdgeRequest.weight`, `graph.SetAnchorsRequest.anchors`, `pages.CreateRequest.title`,
+`pages.ReplaceLinksRequest.links` and the five catalog fields of
+`models.UpsertModelRequest` are all optional. Where a tool's input reaches into
+`internal/domain/template` it takes a tool-owned argument struct instead of the window's DTO,
+so `templates_create` asks for a name, a page kind and one section with a heading rather than
+about thirty values. `runs_list_items` and `schedules_list` offer no `sort.field`, because
+their use cases read only `sort.desc`.
+
+In `confirm` mode a `write` or `dangerous` tool does not execute: it writes a
+`PendingAction` row and returns `{status:"confirmationRequired", actionId, summary}`, so a
+confirmation survives a restart. The arguments are decoded into the tool's own request type
+first, with `DisallowUnknownFields`, and a tool that declares a `Check` runs its domain
+validator too, so a call the domain would refuse is answered with the refusal rather than
+put in front of the user. A result that arrives while the conversation is already answering
+is queued and delivered as one turn when that turn ends, rather than dropped. Wails services call the use cases directly and typed;
+they never go through the registry. A tool that works inside one site declares `Authorize` and takes its site from the
+binding, so `siteId` leaves the schema the model sees and no conversation reaches another
+site through it. Every field that names a domain choice carries its values as an `enum` tag
+and every field of a write says what it is for; three tests in
+`internal/transport/wails/vocabgen` hold that against the Go const blocks `vocab.ts` is
+rendered from. `NewTool` derives that schema from the request type with the reflection
+rules of `application/llm.Structured`, which do not cover a Go map; the few requests that
+carry one take a tool-local argument type instead.

@@ -1,0 +1,42 @@
+pre-commit:
+  parallel: true
+  commands:
+    gofmt:
+      glob: "*.go"
+      run: gofmt -l -w {staged_files}
+      stage_fixed: true
+    goimports:
+      glob: "*.go"
+      run: goimports -local github.com/davidmovas/postulator -l -w {staged_files}
+      stage_fixed: true
+    comments:
+      glob: "*.go"
+      run: |
+        matches=$(grep -nE '^[[:space:]]*(//|/\*)|[^:[:space:]"][[:space:]]+//' {staged_files} | grep -vE '//(go:|nolint:)' | grep -vE '"[^"]*//' || true)
+        if [ -n "$matches" ]; then
+          echo "$matches"
+          echo "Go sources must carry no comments (CLAUDE.md rule 1); //go: and //nolint: directives are the only exception"
+          exit 1
+        fi
+    lint:
+      glob: "*.go"
+      run: golangci-lint run --new-from-rev=HEAD~1 {staged_files}
+      skip:
+        - merge
+        - rebase
+
+commit-msg:
+  commands:
+    conventional:
+      run: |
+        head -n1 {1} | grep -qE '^(feat|fix|perf|refactor|docs|test|style|chore|ci|build|revert)(\([a-z0-9,\.\-]+\))?!?: .{3,}' \
+          || { echo "commit message must follow conventional-commits: <type>(<scope>)?: <subject>"; exit 1; }
+
+pre-push:
+  commands:
+    build:
+      run: go build ./...
+    vet:
+      run: go vet ./...
+    test-short:
+      run: go test -short -race ./...

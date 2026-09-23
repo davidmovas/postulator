@@ -1,0 +1,32 @@
+{
+  "name": "Category",
+  "pageKind": "category",
+  "spec": {
+    "sections": [
+      {"heading": "Overview", "intent": "Say what the category contains and who shops it, in two short paragraphs above the product grid", "targetWords": 120, "required": true, "keywordRules": {"include": [], "primaryInHeading": true}},
+      {"heading": "What You Will Find Here", "intent": "One paragraph per child category or product group, each linking to its page", "targetWords": 200, "required": true, "keywordRules": {"include": [], "primaryInHeading": false}},
+      {"heading": "How to Choose", "intent": "The three criteria that separate the products in this category, written for a first-time buyer", "targetWords": 180, "required": true, "keywordRules": {"include": [], "primaryInHeading": false}}
+    ],
+    "tone": "Brief and helpful; written for a shopper scanning above and below a product grid; no repetition of product names already listed",
+    "length": {"min": 400, "max": 700},
+    "keywordRules": {"primaryInTitle": true, "primaryInH1": true, "primaryInFirstParagraph": true, "maxDensity": 0.03},
+    "linkRules": {"upDepth": 1, "downLinks": true, "siblingMinWeight": 0.5, "maxLinks": 15, "maxPerTarget": 1, "parentLinkWithinParagraphs": 1, "childrenSection": true},
+    "metaRules": {"titlePattern": "{primaryKeyword} | {siteName}", "descriptionMax": 155},
+    "images": {"featured": false, "inline": 0, "source": ""},
+    "modelProfiles": {},
+    "recipe": [
+      {"name": "resolve_context", "enabled": true},
+      {"name": "generate_body", "enabled": true},
+      {"name": "generate_meta", "enabled": true},
+      {"name": "insert_links", "enabled": true},
+      {"name": "repair_links", "enabled": true},
+      {"name": "generate_images", "enabled": false},
+      {"name": "validate", "enabled": true},
+      {"name": "judge", "enabled": false},
+      {"name": "publish", "enabled": true, "params": {"refuseDrift": true}},
+      {"name": "relink_neighbors", "enabled": true},
+      {"name": "sync_back", "enabled": true},
+      {"name": "report", "enabled": true}
+    ]
+  }
+}

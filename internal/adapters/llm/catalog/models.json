@@ -1,0 +1,293 @@
+{
+  "defaults": {
+    "writer": {
+      "provider": "openai",
+      "model": "gpt-5.6-sol"
+    },
+    "editor": {
+      "provider": "openai",
+      "model": "gpt-5.6-terra"
+    },
+    "linker": {
+      "provider": "openai",
+      "model": "gpt-5.6-luna"
+    },
+    "judge": {
+      "provider": "openai",
+      "model": "gpt-5.6-terra"
+    },
+    "chat": {
+      "provider": "openai",
+      "model": "gpt-5.6-terra"
+    },
+    "image": {
+      "provider": "openai",
+      "model": "gpt-image-2"
+    },
+    "titler": {
+      "provider": "openai",
+      "model": "gpt-5.6-luna"
+    }
+  },
+  "models": [
+    {
+      "ref": {
+        "provider": "openai",
+        "model": "gpt-5.6-sol"
+      },
+      "reasoningEffort": "medium",
+      "contextTokens": 1050000,
+      "maxOutputTokens": 128000,
+      "inputUsdPerM": 4.0,
+      "cachedInputUsdPerM": 0.4,
+      "outputUsdPerM": 20.0,
+      "rpm": 60,
+      "tpm": 120000,
+      "supportsStructured": true,
+      "supportsImages": true,
+      "reasoning": true
+    },
+    {
+      "ref": {
+        "provider": "openai",
+        "model": "gpt-5.6-terra"
+      },
+      "reasoningEffort": "medium",
+      "contextTokens": 1050000,
+      "maxOutputTokens": 128000,
+      "inputUsdPerM": 2.0,
+      "cachedInputUsdPerM": 0.2,
+      "outputUsdPerM": 12.0,
+      "rpm": 60,
+      "tpm": 120000,
+      "supportsStructured": true,
+      "supportsImages": true,
+      "reasoning": true
+    },
+    {
+      "ref": {
+        "provider": "openai",
+        "model": "gpt-5.6-luna"
+      },
+      "reasoningEffort": "low",
+      "contextTokens": 1050000,
+      "maxOutputTokens": 128000,
+      "inputUsdPerM": 0.2,
+      "cachedInputUsdPerM": 0.02,
+      "outputUsdPerM": 1.2,
+      "rpm": 60,
+      "tpm": 120000,
+      "supportsStructured": true,
+      "supportsImages": true,
+      "reasoning": true
+    },
+    {
+      "ref": {
+        "provider": "openai",
+        "model": "gpt-image-2"
+      },
+      "contextTokens": 1050000,
+      "maxOutputTokens": 128000,
+      "inputUsdPerM": 8.0,
+      "cachedInputUsdPerM": 1.25,
+      "outputUsdPerM": 30.0,
+      "rpm": 60,
+      "tpm": 120000,
+      "supportsStructured": false,
+      "supportsImages": true,
+      "reasoning": false
+    },
+    {
+      "ref": {
+        "provider": "anthropic",
+        "model": "claude-fable-5-1"
+      },
+      "contextTokens": 1000000,
+      "maxOutputTokens": 128000,
+      "inputUsdPerM": 10.0,
+      "cachedInputUsdPerM": 0.25,
+      "outputUsdPerM": 50.0,
+      "rpm": 60,
+      "tpm": 120000,
+      "supportsStructured": true,
+      "supportsImages": true,
+      "reasoning": true
+    },
+    {
+      "ref": {
+        "provider": "anthropic",
+        "model": "claude-opus-5"
+      },
+      "contextTokens": 1000000,
+      "maxOutputTokens": 128000,
+      "inputUsdPerM": 5.0,
+      "cachedInputUsdPerM": 0.5,
+      "outputUsdPerM": 25.0,
+      "rpm": 60,
+      "tpm": 120000,
+      "supportsStructured": true,
+      "supportsImages": true,
+      "reasoning": true
+    },
+    {
+      "ref": {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5"
+      },
+      "contextTokens": 1000000,
+      "maxOutputTokens": 128000,
+      "inputUsdPerM": 2.0,
+      "cachedInputUsdPerM": 0.2,
+      "outputUsdPerM": 10.0,
+      "rpm": 60,
+      "tpm": 120000,
+      "supportsStructured": true,
+      "supportsImages": true,
+      "reasoning": true
+    },
+    {
+      "ref": {
+        "provider": "anthropic",
+        "model": "claude-haiku-4-5"
+      },
+      "contextTokens": 200000,
+      "maxOutputTokens": 64000,
+      "inputUsdPerM": 1.0,
+      "cachedInputUsdPerM": 0.1,
+      "outputUsdPerM": 5.0,
+      "rpm": 60,
+      "tpm": 120000,
+      "supportsStructured": true,
+      "supportsImages": true,
+      "reasoning": true
+    },
+    {
+      "ref": {
+        "provider": "gemini",
+        "model": "gemini-3.5-flash"
+      },
+      "contextTokens": 1048576,
+      "maxOutputTokens": 65536,
+      "inputUsdPerM": 1.5,
+      "cachedInputUsdPerM": 0.15,
+      "outputUsdPerM": 9.0,
+      "rpm": 60,
+      "tpm": 120000,
+      "supportsStructured": true,
+      "supportsImages": true,
+      "reasoning": true
+    },
+    {
+      "ref": {
+        "provider": "gemini",
+        "model": "gemini-3.5-flash-lite"
+      },
+      "contextTokens": 1048576,
+      "maxOutputTokens": 65536,
+      "inputUsdPerM": 0.3,
+      "cachedInputUsdPerM": 0.03,
+      "outputUsdPerM": 2.5,
+      "rpm": 60,
+      "tpm": 120000,
+      "supportsStructured": true,
+      "supportsImages": true,
+      "reasoning": true
+    },
+    {
+      "ref": {
+        "provider": "gemini",
+        "model": "gemini-2.5-flash"
+      },
+      "contextTokens": 1048576,
+      "maxOutputTokens": 65536,
+      "inputUsdPerM": 0.3,
+      "cachedInputUsdPerM": 0.03,
+      "outputUsdPerM": 2.5,
+      "rpm": 60,
+      "tpm": 120000,
+      "supportsStructured": true,
+      "supportsImages": true,
+      "reasoning": true
+    },
+    {
+      "ref": {
+        "provider": "gemini",
+        "model": "gemini-2.5-flash-lite"
+      },
+      "contextTokens": 1048576,
+      "maxOutputTokens": 65536,
+      "inputUsdPerM": 0.1,
+      "cachedInputUsdPerM": 0.01,
+      "outputUsdPerM": 0.4,
+      "rpm": 60,
+      "tpm": 120000,
+      "supportsStructured": true,
+      "supportsImages": true,
+      "reasoning": true
+    },
+    {
+      "ref": {
+        "provider": "gemini-openai",
+        "model": "gemini-3.5-flash"
+      },
+      "contextTokens": 1048576,
+      "maxOutputTokens": 65536,
+      "inputUsdPerM": 1.5,
+      "cachedInputUsdPerM": 0.15,
+      "outputUsdPerM": 9.0,
+      "rpm": 60,
+      "tpm": 120000,
+      "supportsStructured": true,
+      "supportsImages": true,
+      "reasoning": true
+    },
+    {
+      "ref": {
+        "provider": "gemini-openai",
+        "model": "gemini-3.5-flash-lite"
+      },
+      "contextTokens": 1048576,
+      "maxOutputTokens": 65536,
+      "inputUsdPerM": 0.3,
+      "cachedInputUsdPerM": 0.03,
+      "outputUsdPerM": 2.5,
+      "rpm": 60,
+      "tpm": 120000,
+      "supportsStructured": true,
+      "supportsImages": true,
+      "reasoning": true
+    },
+    {
+      "ref": {
+        "provider": "gemini-openai",
+        "model": "gemini-2.5-flash"
+      },
+      "contextTokens": 1048576,
+      "maxOutputTokens": 65536,
+      "inputUsdPerM": 0.3,
+      "cachedInputUsdPerM": 0.03,
+      "outputUsdPerM": 2.5,
+      "rpm": 60,
+      "tpm": 120000,
+      "supportsStructured": true,
+      "supportsImages": true,
+      "reasoning": true
+    },
+    {
+      "ref": {
+        "provider": "gemini-openai",
+        "model": "gemini-2.5-flash-lite"
+      },
+      "contextTokens": 1048576,
+      "maxOutputTokens": 65536,
+      "inputUsdPerM": 0.1,
+      "cachedInputUsdPerM": 0.01,
+      "outputUsdPerM": 0.4,
+      "rpm": 60,
+      "tpm": 120000,
+      "supportsStructured": true,
+      "supportsImages": true,
+      "reasoning": true
+    }
+  ]
+}

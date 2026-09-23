@@ -1,0 +1,41 @@
+sku,name,category,price,url,description
+CAD-CM-VC500,Volt Commuter 500,Commuter E-Bikes,1899.00,http://localhost:8089/electric-bikes/commuter/volt-commuter-500/,"A 500Wh commuter e-bike with a rear hub motor, hydraulic discs and full mudguards."
+CAD-CM-VC700,Volt Commuter 700,Commuter E-Bikes,2299.00,http://localhost:8089/electric-bikes/commuter/volt-commuter-700/,"The long-range Volt with a 720Wh pack, a belt drive and an integrated rear light."
+CAD-CM-RC7,Ridgeline City 7,Commuter E-Bikes,2149.00,http://localhost:8089/electric-bikes/commuter/ridgeline-city-7/,A belt-driven city e-bike with a seven-speed hub gear and a torque sensor.
+CAD-CM-RC5,Ridgeline City 5,Commuter E-Bikes,1749.00,http://localhost:8089/electric-bikes/commuter/ridgeline-city-5/,"The five-speed Ridgeline, lighter and cheaper, for flat-city commuting."
+CAD-CM-STEP,Ridgeline Step-Through,Commuter E-Bikes,1949.00,http://localhost:8089/electric-bikes/commuter/ridgeline-step-through/,A low step-over frame with the same torque sensor and 500Wh pack.
+CAD-CG-HMAX,Hauler Cargo Max,Cargo E-Bikes,3699.00,http://localhost:8089/electric-bikes/cargo/hauler-cargo-max/,A longtail cargo e-bike rated for 200kg with a mid-drive motor and dual battery bays.
+CAD-CG-HMIN,Hauler Cargo Mini,Cargo E-Bikes,2899.00,http://localhost:8089/electric-bikes/cargo/hauler-cargo-mini/,A compact longtail for one child seat and a week of shopping.
+CAD-CG-HBOX,Hauler Box Front,Cargo E-Bikes,4499.00,http://localhost:8089/electric-bikes/cargo/hauler-box-front/,A front-loading box bike with a steering rod and a rain canopy.
+CAD-CG-SEAT,Hauler Child Seat,Cargo E-Bikes,129.00,http://localhost:8089/electric-bikes/cargo/hauler-child-seat/,A rear child seat that bolts to the Hauler deck rails.
+CAD-FD-SF20,Stowaway Fold 20,Folding E-Bikes,1599.00,http://localhost:8089/electric-bikes/folding/stowaway-fold-20/,A 20-inch folding e-bike that folds in under fifteen seconds.
+CAD-FD-SF16,Stowaway Fold 16,Folding E-Bikes,1449.00,http://localhost:8089/electric-bikes/folding/stowaway-fold-16/,"The smallest fold in the range, sized for a train luggage rack."
+CAD-FD-SFPRO,Stowaway Fold Pro,Folding E-Bikes,2099.00,http://localhost:8089/electric-bikes/folding/stowaway-fold-pro/,A carbon-forked folding e-bike with a 400Wh in-frame battery.
+CAD-FD-BAG,Stowaway Travel Bag,Folding E-Bikes,89.00,http://localhost:8089/electric-bikes/folding/stowaway-travel-bag/,A padded bag that takes a folded Stowaway on a plane or a coach.
+CAD-MT-ET9,Summit eTrail 9,Electric Mountain Bikes,5299.00,http://localhost:8089/electric-bikes/mountain/summit-etrail-9/,A 150mm full-suspension e-MTB with an 85Nm mid-drive motor.
+CAD-MT-ET5,Summit eTrail 5,Electric Mountain Bikes,3799.00,http://localhost:8089/electric-bikes/mountain/summit-etrail-5/,A hardtail e-MTB with a 120mm fork and a 630Wh pack.
+CAD-MT-ET3,Summit eTrail 3,Electric Mountain Bikes,2999.00,http://localhost:8089/electric-bikes/mountain/summit-etrail-3/,"The entry hardtail e-MTB, built around a 250W hub motor."
+CAD-MT-GUARD,Summit Motor Guard,Electric Mountain Bikes,49.00,http://localhost:8089/electric-bikes/mountain/summit-motor-guard/,A composite skid plate for the Summit mid-drive housing.
+CAD-BT-PC500,PowerCell 500Wh Pack,E-Bike Batteries,549.00,http://localhost:8089/components/batteries/powercell-500wh/,A 36V 500Wh in-frame pack with cell-level fusing and a two-year warranty.
+CAD-BT-PC720,PowerCell 720Wh Pack,E-Bike Batteries,749.00,http://localhost:8089/components/batteries/powercell-720wh/,A 48V 720Wh pack for long-range commuting and cargo duty.
+CAD-BT-PC360,PowerCell 360Wh Pack,E-Bike Batteries,429.00,http://localhost:8089/components/batteries/powercell-360wh/,A light 36V 360Wh pack for folding frames and short commutes.
+CAD-BT-RANGE,PowerCell Range Extender,E-Bike Batteries,389.00,http://localhost:8089/components/batteries/powercell-range-extender/,A bottle-cage 250Wh extender that chains to any PowerCell pack.
+CAD-BT-LOCK,PowerCell Lock Barrel,E-Bike Batteries,24.00,http://localhost:8089/components/batteries/powercell-lock-barrel/,A replacement keyed barrel for a PowerCell down-tube mount.
+CAD-MO-TQ1,TorqueOne Mid Drive,E-Bike Motors,899.00,http://localhost:8089/components/motors/torqueone-mid-drive/,An 85Nm mid-drive unit with a torque sensor and a walk-assist mode.
+CAD-MO-TQ2,TorqueOne Compact,E-Bike Motors,749.00,http://localhost:8089/components/motors/torqueone-compact/,A 65Nm mid-drive for lighter city frames.
+CAD-MO-HG250,HubGlide 250W Rear,E-Bike Motors,329.00,http://localhost:8089/components/motors/hubglide-250w/,A quiet 250W rear hub motor with a cassette body and a thru-axle option.
+CAD-MO-HG350,HubGlide 350W Rear,E-Bike Motors,379.00,http://localhost:8089/components/motors/hubglide-350w/,"The 350W HubGlide, for hillier commutes where the class allows it."
+CAD-MO-SENS,TorqueOne Sensor Kit,E-Bike Motors,119.00,http://localhost:8089/components/motors/torqueone-sensor-kit/,A replacement crank torque sensor and harness for the TorqueOne.
+CAD-CH-RV4,RapidVolt 4A Charger,E-Bike Chargers,109.00,http://localhost:8089/components/chargers/rapidvolt-4a/,A 4A charger that fills a 500Wh pack in roughly two and a half hours.
+CAD-CH-RV2,RapidVolt 2A Charger,E-Bike Chargers,69.00,http://localhost:8089/components/chargers/rapidvolt-2a/,"The standard 2A charger, gentler on cells for overnight charging."
+CAD-CH-RV6,RapidVolt 6A Fast Charger,E-Bike Chargers,159.00,http://localhost:8089/components/chargers/rapidvolt-6a/,"A 6A fast charger for fleet and cargo use, with an 80 per cent cut-off."
+CAD-CH-TRAV,RapidVolt Travel Charger,E-Bike Chargers,89.00,http://localhost:8089/components/chargers/rapidvolt-travel/,A folding-pin 2A charger that fits a pannier pocket.
+CAD-DS-CVC,ClearView Colour Display,E-Bike Displays,149.00,http://localhost:8089/components/displays/clearview-colour/,A 2.8-inch colour display with a USB-C port and navigation prompts.
+CAD-DS-CVM,ClearView Mono Display,E-Bike Displays,79.00,http://localhost:8089/components/displays/clearview-mono/,A sunlight-readable mono display with five assist levels.
+CAD-DS-CVR,ClearView Remote,E-Bike Displays,39.00,http://localhost:8089/components/displays/clearview-remote/,A thumb remote that moves the assist buttons off the display.
+CAD-DS-MNT,ClearView Stem Mount,E-Bike Displays,29.00,http://localhost:8089/components/displays/clearview-stem-mount/,A stem cap mount for any ClearView display.
+CAD-CM-VCPRO,Volt Commuter Pro,Commuter E-Bikes,2799.00,http://localhost:8089/electric-bikes/commuter/volt-commuter-pro/,A carbon-belt commuter with a 720Wh pack and an 85Nm TorqueOne motor.
+CAD-CG-HRACK,Hauler Deck Rails,Cargo E-Bikes,79.00,http://localhost:8089/electric-bikes/cargo/hauler-deck-rails/,"Tubular deck rails for the Hauler platform, rated to 60kg."
+CAD-BT-PC960,PowerCell 960Wh Pack,E-Bike Batteries,949.00,http://localhost:8089/components/batteries/powercell-960wh/,A 48V 960Wh pack for cargo frames with a dual bay.
+CAD-MO-HGFR,HubGlide 250W Front,E-Bike Motors,289.00,http://localhost:8089/components/motors/hubglide-250w-front/,A front hub motor for two-wheel-drive folding conversions.
+CAD-CH-DOCK,RapidVolt Wall Dock,E-Bike Chargers,59.00,http://localhost:8089/components/chargers/rapidvolt-wall-dock/,A wall bracket that holds a charger and coils its lead.

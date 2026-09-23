@@ -1,0 +1,13 @@
+{
+  "name": "postulator-samples-build",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Rebuilds the electric-bike sample sheets in samples/",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "exceljs": "4.4.0"
+  }
+}

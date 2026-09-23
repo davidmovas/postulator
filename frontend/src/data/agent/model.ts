@@ -1,0 +1,98 @@
+export type TurnStatus = "idle" | "working" | "awaiting-confirm" | "stopping" | "done" | "error";
+
+export type TurnEnd = "answered" | "stopped" | "failed" | "lost";
+
+export type ToolCallStatus = "running" | "ok" | "denied" | "error";
+
+export const budgetCode = "BUDGET_EXCEEDED";
+
+export const cancelledCode = "CANCELLED";
+
+export const silenceAfterMs = 30_000;
+
+export interface AgentToolCall {
+    callId: string;
+    tool: string;
+    args: unknown;
+    status: ToolCallStatus;
+    result?: unknown;
+    error?: string;
+    durationMs?: number;
+}
+
+export interface AgentConfirmation {
+    confirmationId: string;
+    tool: string;
+    args: unknown;
+    risk: string;
+    summary: string;
+}
+
+export interface TurnUsage {
+    inputTokens: number;
+    cachedInputTokens: number;
+    outputTokens: number;
+    calls: number;
+    usd: number;
+}
+
+export const noUsage: TurnUsage = Object.freeze({
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    outputTokens: 0,
+    calls: 0,
+    usd: 0,
+});
+
+export interface TurnWait {
+    reason: string;
+    attempt: number;
+    afterMs: number;
+    since: number;
+}
+
+export interface Turn {
+    status: TurnStatus;
+    end: TurnEnd | null;
+    assistantMessageId: string | null;
+    startedAt: number;
+    lastEventAt: number;
+    lastSeq: number;
+    text: string;
+    chunks: number;
+    tools: readonly AgentToolCall[];
+    confirm: AgentConfirmation | null;
+    code: string;
+    message: string;
+    usage: TurnUsage | null;
+    waiting: TurnWait | null;
+    turnSeq: number;
+}
+
+export function waitingUntil(turn: Turn): number {
+    return turn.waiting === null ? 0 : turn.waiting.since + turn.waiting.afterMs;
+}
+
+export interface TurnReport {
+    running: boolean;
+    messageId: string;
+    startedAt: string | null;
+    lastSeq: number;
+}
+
+export type ReconcileAction = "none" | "refetch" | "adopt";
+
+export function isActive(status: TurnStatus): boolean {
+    return status === "working" || status === "awaiting-confirm" || status === "stopping";
+}
+
+export function toolCallStatus(reported: string): ToolCallStatus {
+    switch (reported) {
+        case "ok":
+            return "ok";
+        case "denied":
+            return "denied";
+        default:
+            return "error";
+    }
+}

@@ -1,0 +1,181 @@
+package openai_test
+
+import (
+	"bytes"
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/davidmovas/postulator/internal/adapters/images"
+	"github.com/davidmovas/postulator/internal/adapters/images/openai"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
+)
+
+type vault struct {
+	key string
+	err error
+}
+
+func (v vault) Get(context.Context, string) (string, error) {
+	if v.err != nil {
+		return "", v.err
+	}
+	return v.key, nil
+}
+
+type call struct {
+	Model  string `json:"model"`
+	Prompt string `json:"prompt"`
+	Size   string `json:"size"`
+	Format string `json:"response_format"`
+	Count  int    `json:"n"`
+}
+
+func provider(t *testing.T, status int, body string, secrets vault) (*openai.Images, *call, *string) {
+	t.Helper()
+
+	recorded := &call{}
+	auth := new(string)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/images/generations" {
+			t.Errorf("path = %q", r.URL.Path)
+		}
+		*auth = r.Header.Get("Authorization")
+
+		payload, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("read the request: %v", err)
+		}
+		if err = json.Unmarshal(payload, recorded); err != nil {
+			t.Errorf("decode the request: %v", err)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		if _, err = w.Write([]byte(body)); err != nil {
+			t.Logf("write the response: %v", err)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	return openai.New(secrets, "gpt-image-test", openai.WithBaseURL(server.URL+"/v1"),
+		openai.WithHTTPClient(server.Client())), recorded, auth
+}
+
+func TestGenerateReturnsThePNG(t *testing.T) {
+	t.Parallel()
+
+	raw := []byte{0x89, 0x50, 0x4e, 0x47, 0x0d}
+	body := `{"data":[{"b64_json":"` + base64.StdEncoding.EncodeToString(raw) + `"}]}`
+
+	generator, recorded, auth := provider(t, http.StatusOK, body, vault{key: "sk-test"})
+	image, err := generator.Generate(t.Context(), images.Prompt{
+		Subject: "An espresso machine", Context: "on a wooden counter", Alt: "An espresso machine",
+	})
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	if !bytes.Equal(image.Bytes, raw) {
+		t.Errorf("bytes = %v, want %v", image.Bytes, raw)
+	}
+	if image.Filename != "an-espresso-machine.png" || image.ContentType != "image/png" {
+		t.Errorf("image = %+v", image)
+	}
+	if image.Alt != "An espresso machine" {
+		t.Errorf("alt = %q", image.Alt)
+	}
+	if *auth != "Bearer sk-test" {
+		t.Errorf("authorization = %q", *auth)
+	}
+	if recorded.Model != "gpt-image-test" || recorded.Count != 1 || recorded.Format != "b64_json" {
+		t.Errorf("request = %+v", recorded)
+	}
+	if recorded.Size != openai.DefaultSize {
+		t.Errorf("size = %q, want %q", recorded.Size, openai.DefaultSize)
+	}
+	if recorded.Prompt != "An espresso machine. on a wooden counter" {
+		t.Errorf("prompt = %q", recorded.Prompt)
+	}
+}
+
+func TestGenerateMapsTheProviderStatus(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		status int
+		body   string
+		want   errors.Code
+	}{
+		{name: "bad key", status: http.StatusUnauthorized, body: `{"error":{"message":"bad key"}}`, want: errors.Unauthorized},
+		{name: "rate limited", status: http.StatusTooManyRequests, body: `{}`, want: errors.RateLimited},
+		{name: "server error", status: http.StatusBadGateway, body: `{}`, want: errors.External},
+		{name: "rejected", status: http.StatusBadRequest, body: `{"error":{"message":"content policy"}}`, want: errors.Invalid},
+		{name: "no image", status: http.StatusOK, body: `{"data":[]}`, want: errors.External},
+		{name: "not base64", status: http.StatusOK, body: `{"data":[{"b64_json":"!!!"}]}`, want: errors.External},
+		{name: "not json", status: http.StatusOK, body: `nonsense`, want: errors.External},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			generator, _, _ := provider(t, tc.status, tc.body, vault{key: "sk-test"})
+			_, err := generator.Generate(t.Context(), images.Prompt{Subject: "An espresso machine"})
+			if !errors.IsCode(err, tc.want) {
+				t.Fatalf("code = %q, want %q (err %v)", errors.CodeOf(err), tc.want, err)
+			}
+		})
+	}
+}
+
+func TestGenerateRefusesWithoutASubjectOrAKey(t *testing.T) {
+	t.Parallel()
+
+	generator, _, _ := provider(t, http.StatusOK, `{"data":[]}`, vault{key: "sk-test"})
+	if _, err := generator.Generate(t.Context(), images.Prompt{}); !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("code = %q, want %q", errors.CodeOf(err), errors.Invalid)
+	}
+
+	locked, _, _ := provider(t, http.StatusOK, `{}`, vault{err: errors.New(errors.NotFound, "no key stored")})
+	if _, err := locked.Generate(t.Context(), images.Prompt{Subject: "x"}); !errors.IsCode(err, errors.NotFound) {
+		t.Fatalf("code = %q, want %q", errors.CodeOf(err), errors.NotFound)
+	}
+}
+
+func TestGenerateReportsACancelledCaller(t *testing.T) {
+	t.Parallel()
+
+	generator, _, _ := provider(t, http.StatusOK, `{"data":[]}`, vault{key: "sk-test"})
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	if _, err := generator.Generate(ctx, images.Prompt{Subject: "x"}); !errors.IsCode(err, errors.Cancelled) {
+		t.Fatalf("code = %q, want %q (err %v)", errors.CodeOf(err), errors.Cancelled, err)
+	}
+}
+
+func TestTheModelFallsBackToTheDefault(t *testing.T) {
+	t.Parallel()
+
+	raw := base64.StdEncoding.EncodeToString([]byte{0x89})
+	generator, recorded, _ := provider(t, http.StatusOK, `{"data":[{"b64_json":"`+raw+`"}]}`, vault{key: "sk"})
+
+	bare := openai.New(vault{key: "sk"}, "   ")
+	if bare == nil {
+		t.Fatal("New returned nothing")
+	}
+
+	if _, err := generator.Generate(t.Context(), images.Prompt{Subject: "Kettle", Size: "512x512"}); err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	if recorded.Size != "512x512" {
+		t.Errorf("size = %q", recorded.Size)
+	}
+}

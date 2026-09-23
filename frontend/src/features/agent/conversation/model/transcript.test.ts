@@ -1,0 +1,305 @@
+import { describe, expect, it } from "vitest";
+
+import type { Turn } from "../../../../data/agent/turn.js";
+import type { Message, PendingAction } from "../../../../data/types.js";
+import { lastUserText, rows } from "./transcript.js";
+
+const idle: Turn = {
+    status: "idle",
+    end: null,
+    assistantMessageId: null,
+    startedAt: 0,
+    lastEventAt: 0,
+    lastSeq: 0,
+    text: "",
+    chunks: 0,
+    tools: [],
+    confirm: null,
+    code: "",
+    message: "",
+    usage: null,
+    waiting: null,
+    turnSeq: 0,
+};
+
+function message(seq: number, role: string, text: string, extra: Partial<Message> = {}): Message {
+    return {
+        id: `m${seq}`,
+        conversationId: "c1",
+        seq,
+        role,
+        text,
+        createdAt: "2026-09-19T10:00:00Z",
+        ...extra,
+    };
+}
+
+function action(id: string, status = "pending"): PendingAction {
+    return {
+        id,
+        conversationId: "c1",
+        tool: "pages_delete",
+        args: { id: "p1" },
+        summary: "delete a page",
+        status,
+        createdAt: "2026-09-19T10:00:00Z",
+        updatedAt: "2026-09-19T10:00:00Z",
+    };
+}
+
+describe("rows over the saved transcript", () => {
+    it("turns saved messages into user, assistant and tool rows in sequence order", () => {
+        const saved = [
+            message(1, "user", "hello"),
+            message(2, "tool", "", { tool: "pages_list", callId: "k1", payload: { items: [] } }),
+            message(3, "assistant", "nothing there"),
+        ];
+        expect(rows(saved, idle, []).map((row) => row.kind)).toStrictEqual(["user", "tool", "assistant"]);
+        expect(rows(saved, idle, [])[1]).toMatchObject({
+            kind: "tool",
+            callId: "k1",
+            tool: "pages_list",
+            status: "ok",
+            live: false,
+        });
+    });
+
+    it("reads a saved tool failure off its text", () => {
+        const saved = [message(1, "tool", "no such page", { tool: "pages_get", callId: "k1", payload: null })];
+        expect(rows(saved, idle, [])[0]).toMatchObject({ kind: "tool", status: "error", error: "no such page" });
+    });
+
+    it("tells a saved refusal apart from a saved failure", () => {
+        const saved = [
+            message(1, "tool", "the tool pages_delete is not open to this conversation", {
+                tool: "pages_delete",
+                callId: "k1",
+                payload: null,
+                toolStatus: "denied",
+            }),
+        ];
+        expect(rows(saved, idle, [])[0]).toMatchObject({ kind: "tool", status: "denied" });
+    });
+
+    it("takes the saved status from the ledger, whatever the refusal sentence reads like", () => {
+        const cases: readonly { name: string; toolStatus: string; text: string; want: string }[] = [
+            { name: "a refusal worded another way", toolStatus: "denied", text: "нельзя", want: "denied" },
+            { name: "a failure that mentions the refusal sentence", toolStatus: "error", text: "the tool pages_delete is not open to this conversation, it said", want: "error" },
+            { name: "a call that worked and said nothing", toolStatus: "ok", text: "", want: "ok" },
+        ];
+
+        for (const tc of cases) {
+            const saved = [
+                message(1, "tool", tc.text, {
+                    tool: "pages_delete",
+                    callId: "k1",
+                    payload: null,
+                    toolStatus: tc.toolStatus,
+                }),
+            ];
+            expect(rows(saved, idle, [])[0], tc.name).toMatchObject({ kind: "tool", status: tc.want });
+        }
+    });
+
+    it("falls back to the sentence for a row saved before the ledger was read back", () => {
+        const saved = [
+            message(1, "tool", "the tool pages_delete is not open to this conversation", {
+                tool: "pages_delete",
+                callId: "k1",
+                payload: null,
+            }),
+        ];
+        expect(rows(saved, idle, [])[0]).toMatchObject({ kind: "tool", status: "denied" });
+    });
+
+    it("marks a saved answer that had to be shortened", () => {
+        const saved = [
+            message(1, "tool", "", {
+                tool: "pages_list",
+                callId: "k1",
+                payload: { truncated: true, totalBytes: 41_000, droppedItems: { items: 37 }, result: { items: [] } },
+            }),
+        ];
+        expect(rows(saved, idle, [])[0]).toMatchObject({ kind: "tool", status: "cut" });
+    });
+
+    it("lists every pending action as a card even when no turn is live", () => {
+        const saved = [message(1, "user", "delete it")];
+        const listed = rows(saved, idle, [action("a1"), action("a2", "executed")]);
+        expect(listed.map((row) => row.kind)).toStrictEqual(["user", "confirm"]);
+        expect(listed[1]).toMatchObject({ kind: "confirm", id: "a1" });
+    });
+
+    it("keeps a card where the call that raised it sits, before and after the answer lands", () => {
+        const proposed = { untrustedContent: true, status: "confirmationRequired", actionId: "a1" };
+        const call = message(2, "tool", "", { tool: "pages_delete", callId: "k1", payload: proposed });
+
+        const live: Turn = {
+            ...idle,
+            status: "working",
+            text: "Готовлю удаление",
+            tools: [{ callId: "k1", tool: "pages_delete", args: {}, status: "ok", result: proposed }],
+        };
+        const answering = rows([message(1, "user", "delete it")], live, [action("a1")]);
+        expect(answering.map((row) => row.kind)).toStrictEqual(["user", "tool", "confirm", "streaming"]);
+
+        const settled = rows([message(1, "user", "delete it"), call, message(3, "assistant", "Подтвердите")], idle, [
+            action("a1"),
+        ]);
+        expect(settled.map((row) => row.kind)).toStrictEqual(["user", "tool", "confirm", "assistant"]);
+    });
+
+    it("puts a card with no call of its own at the end rather than nowhere", () => {
+        const listed = rows([message(1, "user", "delete it")], idle, [action("a1")]);
+        expect(listed.map((row) => row.kind)).toStrictEqual(["user", "confirm"]);
+    });
+
+    it("names the last thing the user asked", () => {
+        const saved = [message(1, "user", "first"), message(2, "assistant", "ok"), message(3, "user", "second")];
+        expect(lastUserText(rows(saved, idle, []))).toBe("second");
+        expect(lastUserText([])).toBeNull();
+    });
+});
+
+describe("rows over a live turn", () => {
+    it("shows a working row while the answer has not started", () => {
+        const turn: Turn = { ...idle, status: "working" };
+        expect(rows([message(1, "user", "hi")], turn, []).map((row) => row.kind)).toStrictEqual([
+            "user",
+            "working",
+        ]);
+    });
+
+    it("streams the live text under the saved rows", () => {
+        const turn: Turn = { ...idle, assistantMessageId: "a1", text: "so far", chunks: 2, status: "working" };
+        const listed = rows([message(1, "user", "hi")], turn, []);
+        expect(listed.map((row) => row.kind)).toStrictEqual(["user", "streaming"]);
+        expect(listed[1]).toMatchObject({ kind: "streaming", text: "so far" });
+    });
+
+    it("hides a live tool call once its saved row has arrived", () => {
+        const turn: Turn = {
+            ...idle,
+            assistantMessageId: "a1",
+            status: "working",
+            tools: [
+                { callId: "k1", tool: "pages_list", args: {}, status: "ok", result: {}, durationMs: 5 },
+                { callId: "k2", tool: "pages_get", args: {}, status: "running" },
+            ],
+        };
+        const saved = [
+            message(1, "user", "hi"),
+            message(2, "tool", "", { tool: "pages_list", callId: "k1", payload: {} }),
+        ];
+        const listed = rows(saved, turn, []);
+        expect(listed.map((row) => row.kind)).toStrictEqual(["user", "tool", "tool", "working"]);
+        expect(listed[2]).toMatchObject({ callId: "k2", live: true, status: "running" });
+    });
+
+    it("carries a live refusal and a live shortening as their own row states", () => {
+        const turn: Turn = {
+            ...idle,
+            assistantMessageId: "a1",
+            status: "working",
+            tools: [
+                {
+                    callId: "k1",
+                    tool: "pages_delete",
+                    args: {},
+                    status: "denied",
+                    error: "the tool pages_delete is not open to this conversation",
+                },
+                {
+                    callId: "k2",
+                    tool: "pages_list",
+                    args: {},
+                    status: "ok",
+                    result: { truncated: true, totalBytes: 41_000, droppedItems: { items: 37 }, result: { items: [] } },
+                },
+            ],
+        };
+        const listed = rows([message(1, "user", "hi")], turn, []);
+        expect(listed[1]).toMatchObject({ kind: "tool", callId: "k1", status: "denied" });
+        expect(listed[2]).toMatchObject({ kind: "tool", callId: "k2", status: "cut" });
+    });
+
+    it("hides the live answer once the saved assistant row carries the same id", () => {
+        const turn: Turn = {
+            ...idle,
+            assistantMessageId: "a1",
+            text: "final",
+            status: "done",
+            end: "answered",
+            usage: { inputTokens: 10, cachedInputTokens: 8, outputTokens: 2, calls: 2, usd: 0.01 },
+        };
+        const saved = [message(1, "user", "hi"), message(2, "assistant", "final", { id: "a1" })];
+        const listed = rows(saved, turn, []);
+        expect(listed.map((row) => row.kind)).toStrictEqual(["user", "assistant"]);
+        expect(listed[1]).toMatchObject({ id: "a1", usage: { inputTokens: 10, outputTokens: 2, usd: 0.01 } });
+    });
+
+    it("shows the finished answer live until the saved row lands", () => {
+        const turn: Turn = { ...idle, assistantMessageId: "a1", text: "final", status: "done", end: "answered" };
+        const listed = rows([message(1, "user", "hi")], turn, []);
+        expect(listed[1]).toMatchObject({ kind: "assistant", id: "a1", text: "final", live: true });
+    });
+
+    it("renders a live confirmation from the turn until the pending list has it", () => {
+        const turn: Turn = {
+            ...idle,
+            assistantMessageId: "a1",
+            status: "awaiting-confirm",
+            confirm: {
+                confirmationId: "a1",
+                tool: "pages_delete",
+                args: {},
+                risk: "dangerous",
+                summary: "delete",
+            },
+        };
+        const fromTurn = rows([], turn, []);
+        expect(fromTurn.map((row) => row.kind)).toStrictEqual(["confirm"]);
+        expect(fromTurn[0]).toMatchObject({ id: "a1", action: null });
+        const fromList = rows([], turn, [action("a1")]);
+        expect(fromList).toHaveLength(1);
+        expect(fromList[0]).toMatchObject({ id: "a1", action: { id: "a1" } });
+    });
+
+    it("tells a stop, a failure and a lost answer apart by the turn's end", () => {
+        const stopped: Turn = {
+            ...idle,
+            status: "done",
+            end: "stopped",
+            code: "CANCELLED",
+            message: "you stopped the turn",
+        };
+        expect(rows([], stopped, [])[0]).toMatchObject({ kind: "stopped", detail: "you stopped the turn" });
+        const failed: Turn = {
+            ...idle,
+            status: "error",
+            end: "failed",
+            code: "EXTERNAL",
+            message: "the model could not answer",
+        };
+        expect(rows([], failed, [])[0]).toMatchObject({
+            kind: "failed",
+            code: "EXTERNAL",
+            message: "the model could not answer",
+        });
+        const lost: Turn = { ...idle, status: "error", end: "lost" };
+        expect(rows([], lost, []).map((row) => row.kind)).toStrictEqual(["lost"]);
+    });
+
+    it("keeps the partial answer above a stop marker", () => {
+        const stopped: Turn = {
+            ...idle,
+            assistantMessageId: "a1",
+            text: "half an ans",
+            status: "done",
+            end: "stopped",
+            code: "CANCELLED",
+            message: "you stopped the turn",
+        };
+        expect(rows([], stopped, []).map((row) => row.kind)).toStrictEqual(["assistant", "stopped"]);
+    });
+});
