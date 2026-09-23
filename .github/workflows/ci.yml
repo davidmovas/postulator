@@ -3,10 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - master
-      - dev
-      - rewrite/v2
-  pull_request:
+      - '**'
 
 permissions:
   contents: read
