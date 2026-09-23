@@ -455,6 +455,51 @@
     ]
   },
   {
+    "name": "run-waiting-for-parent",
+    "route": "#/s/:siteId/runs",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-run-pause=awaiting_parent]"
+      },
+      {
+        "wait": 1800
+      }
+    ]
+  },
+  {
+    "name": "run-waiting-for-parent-item",
+    "route": "#/s/:siteId/runs",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-run-pause=awaiting_parent]"
+      },
+      {
+        "wait": 1500
+      },
+      {
+        "click": "[data-item-status=paused]"
+      },
+      {
+        "wait": 1800
+      }
+    ]
+  },
+  {
+    "name": "run-failed-regenerate",
+    "route": "#/s/:siteId/runs",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-run-kind=generate][data-run-status=failed]"
+      },
+      {
+        "wait": 1800
+      }
+    ]
+  },
+  {
     "name": "run-finished",
     "route": "#/s/:siteId/runs",
     "wait": 1200,

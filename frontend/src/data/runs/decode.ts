@@ -13,6 +13,7 @@ export const runEventTypes = [
     "item.done",
     "item.failed",
     "item.needs_human",
+    "item.restarted",
     "step.started",
     "step.done",
     "step.failed",

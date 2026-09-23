@@ -160,7 +160,13 @@ export function RunDetailScreen(): ReactElement {
             }
         >
             <RunProgress run={run} view={view} stats={stats} terminal={progress.terminal} now={now} />
-            <RunNotices run={run} view={view} events={progress.events} gap={progress.gap} />
+            <RunNotices
+                run={run}
+                view={view}
+                events={progress.events}
+                gap={progress.gap}
+                failedItems={stats.failed}
+            />
 
             {listed.isPending ? (
                 <div className="min-h-0 flex-1 overflow-auto p-3">

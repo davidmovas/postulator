@@ -27,6 +27,8 @@ function anItem(overrides: Partial<RunItem> = {}): RunItem {
         attempts: 1,
         pauseReason: "",
         error: "",
+        note: "",
+        waitingFor: null,
         retryable: true,
         retryBlockedReason: "",
         wakeAt: null,
@@ -154,13 +156,24 @@ describe("statsView", () => {
     it("reads the row totals, which carry no needsHuman and no calls", () => {
         const view = statsView({ items: 4, done: 2, failed: 1, tokens: 1200, usd: 0.4 });
         expect(view.needsHuman).toBeNull();
+        expect(view.waitingParent).toBeNull();
         expect(view.calls).toBeNull();
         expect(view.done).toBe(2);
     });
 
     it("reads the live totals folded from the log", () => {
-        const view = statsView({ items: 4, done: 2, failed: 1, needsHuman: 1, tokens: 1200, usd: 0.4, calls: 9 });
+        const view = statsView({
+            items: 4,
+            done: 2,
+            failed: 1,
+            needsHuman: 1,
+            waitingParent: 2,
+            tokens: 1200,
+            usd: 0.4,
+            calls: 9,
+        });
         expect(view.needsHuman).toBe(1);
+        expect(view.waitingParent).toBe(2);
         expect(view.calls).toBe(9);
     });
 });

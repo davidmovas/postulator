@@ -61,6 +61,12 @@ export const settings = {
             record: "Record to files",
             replay: "Replay from files",
         },
+        "images.openaiQuality": {
+            low: "Low",
+            medium: "Medium",
+            high: "High",
+            auto: "Let OpenAI choose",
+        },
     },
     keys: {
         "agent.historyBudgetChars": {
@@ -94,6 +100,10 @@ export const settings = {
         "images.openaiModel": {
             label: "Model that draws images",
             help: "The OpenAI model asked for an image.",
+        },
+        "images.openaiQuality": {
+            label: "Image quality",
+            help: "Higher quality costs several times more per image. Letting OpenAI choose usually picks the dearest.",
         },
         "import.maxRows": {
             label: "Largest spreadsheet accepted",

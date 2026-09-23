@@ -76,11 +76,12 @@ func (c *client) anonymous(t *testing.T, target string) (status int, header http
 func expirePreview(t *testing.T, env environment, id int) {
 	t.Helper()
 
-	if !strings.HasPrefix(env.baseURL, "http://localhost:8089") {
+	if !strings.HasPrefix(env.baseURL, testStack) {
 		t.Skipf("forcing an expiry needs wp-cli on the docker stack, and %s is another site", env.baseURL)
 	}
 	compose := filepath.Join(repoRoot(t), "docker", "e2e", "compose.yaml")
-	command := exec.CommandContext(t.Context(), "docker", "compose", "-f", compose, "run", "--rm", "--no-deps", "-T",
+	command := exec.CommandContext(t.Context(), "docker", "compose", "-p", testProject, "-f", compose,
+		"run", "--rm", "--no-deps", "-T",
 		"--entrypoint", "wp", "bootstrap", "post", "meta", "update", fmt.Sprint(id), "_postulator_preview_expires", "1")
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("expire the preview through wp-cli: %v: %s", err, output)

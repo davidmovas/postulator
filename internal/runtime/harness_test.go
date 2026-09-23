@@ -142,6 +142,7 @@ type harness struct {
 	pages       []string
 	siteID      string
 	logger      *zap.Logger
+	clock       clock.Clock
 	deadline    time.Duration
 }
 
@@ -178,6 +179,7 @@ func newHarness(t *testing.T, targets int) *harness {
 		pages:    pages,
 		siteID:   site.ID,
 		logger:   zaptest.NewLogger(t),
+		clock:    clock.System{},
 		deadline: time.Hour,
 	}
 }
@@ -216,7 +218,7 @@ func (h *harness) idle(t *testing.T, registry *run.Registry) *runtime.Engine {
 		StepTimeout:   2 * time.Second,
 		LeaseDuration: 200 * time.Millisecond,
 		RunDeadline:   h.deadline,
-	}, clock.System{}, h.logger)
+	}, h.clock, h.logger)
 }
 
 func (h *harness) newRun(recipe []template.StepSpec) run.Run {
@@ -230,14 +232,19 @@ func (h *harness) waitForRun(t *testing.T, runID string, want run.Status) run.Ru
 	t.Helper()
 
 	var last run.Run
-	waitFor(t, "run "+runID+" to reach "+string(want), func() bool {
+	deadline := time.Now().Add(pollTimeout)
+	for time.Now().Before(deadline) {
 		record, err := h.runs.Get(t.Context(), runID)
-		if err != nil {
-			return false
+		if err == nil {
+			last = record
+			if record.Status == want {
+				return record
+			}
 		}
-		last = record
-		return record.Status == want
-	})
+		time.Sleep(pollInterval)
+	}
+	t.Fatalf("timed out waiting for run %s to reach %s; it is %s (%q, %q)",
+		runID, want, last.Status, last.PauseReason, last.Error)
 	return last
 }
 

@@ -339,10 +339,10 @@ func TestEveryRoleHasADefaultOnAFreshInstall(t *testing.T) {
 	}
 
 	want := map[string]string{
-		"writer": "gpt-5.6-sol",
-		"editor": "gpt-5.6-terra",
+		"writer": "gpt-5.6-terra",
+		"editor": "gpt-5.6-luna",
 		"linker": "gpt-5.6-luna",
-		"judge":  "gpt-5.6-terra",
+		"judge":  "gpt-5.6-luna",
 		"chat":   "gpt-5.6-terra",
 		"image":  "gpt-image-2",
 		"titler": "gpt-5.6-luna",

@@ -8,6 +8,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	kctx "github.com/davidmovas/postulator/internal/kernel/ctx"
@@ -99,8 +100,10 @@ func TestRunRepoRoundTrip(t *testing.T) {
 	}
 
 	started := sqlitetest.Stamp.Add(time.Minute)
+	rearmed := sqlitetest.Stamp.Add(5 * time.Hour)
 	stored.Status = run.StatusRunning
 	stored.StartedAt = &started
+	stored.DeadlineAt = rearmed
 	stored.Stats = run.Stats{Items: 1, Done: 1, Tokens: 42, USD: 0.5}
 	if err = fixture.runs.Update(t.Context(), stored); err != nil {
 		t.Fatalf("Update: %v", err)
@@ -112,6 +115,9 @@ func TestRunRepoRoundTrip(t *testing.T) {
 	}
 	if updated.Status != run.StatusRunning || updated.Stats.Tokens != 42 || updated.StartedAt == nil {
 		t.Fatalf("Get after update = %+v", updated)
+	}
+	if !updated.DeadlineAt.Equal(rearmed) {
+		t.Fatalf("the deadline read back as %v, want the re-armed %v", updated.DeadlineAt, rearmed)
 	}
 
 	if _, err = fixture.runs.Get(t.Context(), id.New()); !errors.IsCode(err, errors.NotFound) {
@@ -179,9 +185,110 @@ func TestRunRepoListsAndSweeps(t *testing.T) {
 		t.Fatalf("Active = %+v, %v", active, err)
 	}
 
+	paused := fixture.run
+	paused.ID = id.New()
+	paused.Status = run.StatusPaused
+	paused.PauseReason = run.PauseNeedsHuman
+	paused.CreatedAt = sqlitetest.Stamp.Add(2 * time.Minute)
+	if err = fixture.runs.Insert(t.Context(), paused); err != nil {
+		t.Fatalf("insert the paused run: %v", err)
+	}
+
 	stale, err := fixture.runs.PastDeadline(t.Context(), sqlitetest.Stamp.Add(90*time.Minute), 10)
 	if err != nil || len(stale) != 1 || stale[0].ID != fixture.run.ID {
-		t.Fatalf("PastDeadline = %+v, %v", stale, err)
+		t.Fatalf("PastDeadline = %+v, %v; a run paused for a human is not reaped", stale, err)
+	}
+}
+
+func TestRunItemNoteRoundTrips(t *testing.T) {
+	t.Parallel()
+
+	fixture := newRunFixture(t, 1)
+	item := fixture.insertItem(t, fixture.pages[0], "publish")
+
+	item.Status = run.StatusPaused
+	item.PauseReason = run.PauseAwaitingParent
+	item.Note = "waits for its parent /coffee/, which is not on the site yet"
+	item.UpdatedAt = sqlitetest.Stamp
+	if ok, err := fixture.items.Persist(t.Context(), item, 0); err != nil || !ok {
+		t.Fatalf("Persist = %v, %v", ok, err)
+	}
+	stored, err := fixture.items.Get(t.Context(), item.ID)
+	if err != nil || stored.Note != item.Note {
+		t.Fatalf("the note read back as %q, %v; want %q", stored.Note, err, item.Note)
+	}
+
+	if _, err = fixture.items.ResumeAll(t.Context(), fixture.run.ID, sqlitetest.Stamp); err != nil {
+		t.Fatalf("ResumeAll: %v", err)
+	}
+	resumed, err := fixture.items.Get(t.Context(), item.ID)
+	if err != nil || resumed.Note != "" || resumed.PauseReason != "" {
+		t.Fatalf("a resumed item kept its hold: %+v, %v", resumed, err)
+	}
+}
+
+func TestAwaitingParentFindsAChildOnlyOnceItsParentIsOnTheSite(t *testing.T) {
+	t.Parallel()
+
+	fixture := newRunFixture(t, 0)
+	pages := sqlite.NewPageRepo(fixture.store)
+	parent := sqlitetest.Page(t, fixture.store, fixture.run.SiteID, "/coffee/")
+	child := sqlitetest.Page(t, fixture.store, fixture.run.SiteID, "/coffee/espresso/")
+	sibling := sqlitetest.Page(t, fixture.store, fixture.run.SiteID, "/coffee/latte/")
+	for _, page := range []*pagemap.Page{&child, &sibling} {
+		page.ParentPageID = &parent.ID
+		if err := pages.Update(t.Context(), *page); err != nil {
+			t.Fatalf("link %s: %v", page.Path, err)
+		}
+	}
+
+	hold := func(target string, reason run.PauseReason) run.Item {
+		item := fixture.insertItem(t, target, "publish")
+		item.Status = run.StatusPaused
+		item.PauseReason = reason
+		item.UpdatedAt = sqlitetest.Stamp
+		if ok, err := fixture.items.Persist(t.Context(), item, 0); err != nil || !ok {
+			t.Fatalf("pause the item: %v, %v", ok, err)
+		}
+		return item
+	}
+	waiting := hold(child.ID, run.PauseAwaitingParent)
+	hold(sibling.ID, run.PauseNeedsHuman)
+
+	none, err := fixture.items.AwaitingParent(t.Context(), 10)
+	if err != nil || len(none) != 0 {
+		t.Fatalf("AwaitingParent before the parent is on the site = %+v, %v", none, err)
+	}
+
+	wpID := int64(12)
+	parent.WPID = &wpID
+	if err = pages.Update(t.Context(), parent); err != nil {
+		t.Fatalf("publish the parent: %v", err)
+	}
+	released, err := fixture.items.AwaitingParent(t.Context(), 10)
+	if err != nil || len(released) != 1 || released[0].ID != waiting.ID {
+		t.Fatalf("AwaitingParent = %+v, %v; want only the child that waits for its parent", released, err)
+	}
+
+	for _, reason := range []run.PauseReason{run.PauseUser, run.PauseBudgetExceeded} {
+		stopped := fixture.run
+		stopped.Status = run.StatusPaused
+		stopped.PauseReason = reason
+		if err = fixture.runs.Update(t.Context(), stopped); err != nil {
+			t.Fatalf("pause the run for %s: %v", reason, err)
+		}
+		if kept, keptErr := fixture.items.AwaitingParent(t.Context(), 10); keptErr != nil || len(kept) != 0 {
+			t.Fatalf("AwaitingParent of a run paused for %s = %+v, %v; a human or the budget holds it", reason, kept, keptErr)
+		}
+	}
+
+	cancelled := fixture.run
+	cancelled.Status = run.StatusCancelled
+	if err = fixture.runs.Update(t.Context(), cancelled); err != nil {
+		t.Fatalf("cancel the run: %v", err)
+	}
+	if gone, goneErr := fixture.items.AwaitingParent(t.Context(), 10); goneErr != nil || len(gone) != 0 {
+		t.Fatalf("AwaitingParent of a cancelled run = %+v, %v", gone, goneErr)
 	}
 }
 
@@ -350,6 +457,39 @@ func TestRunItemSweepQueries(t *testing.T) {
 	all, err := fixture.items.ByRun(t.Context(), fixture.run.ID)
 	if err != nil || len(all) != 3 {
 		t.Fatalf("ByRun = %+v, %v", all, err)
+	}
+}
+
+func TestArtifactRepoDropsEverythingAnItemProduced(t *testing.T) {
+	t.Parallel()
+
+	fixture := newRunFixture(t, 2)
+	dropped := fixture.insertItem(t, fixture.pages[0], "generate_body")
+	kept := fixture.insertItem(t, fixture.pages[1], "generate_body")
+
+	for _, item := range []run.Item{dropped, kept} {
+		for _, step := range []string{"resolve_context", "generate_body"} {
+			artifact, err := run.NewArtifact(run.Artifact{
+				ID: id.New(), RunID: fixture.run.ID, ItemID: item.ID, Step: step, Kind: run.ArtifactLinkContext,
+				Blob: []byte("{}"), CreatedAt: sqlitetest.Stamp,
+			})
+			if err != nil {
+				t.Fatalf("NewArtifact: %v", err)
+			}
+			if err = fixture.blobs.ReplaceStep(t.Context(), item.ID, step, []run.Artifact{artifact}); err != nil {
+				t.Fatalf("ReplaceStep: %v", err)
+			}
+		}
+	}
+
+	if err := fixture.blobs.DeleteByItem(t.Context(), dropped.ID); err != nil {
+		t.Fatalf("DeleteByItem: %v", err)
+	}
+	if left, err := fixture.blobs.ByItem(t.Context(), dropped.ID); err != nil || len(left) != 0 {
+		t.Fatalf("the dropped item still holds %d artifacts, %v", len(left), err)
+	}
+	if left, err := fixture.blobs.ByItem(t.Context(), kept.ID); err != nil || len(left) != 2 {
+		t.Fatalf("the other item holds %d artifacts, %v; want both untouched", len(left), err)
 	}
 }
 

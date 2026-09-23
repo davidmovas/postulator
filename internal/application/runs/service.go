@@ -19,6 +19,7 @@ type engine interface {
 	Resume(ctx context.Context, runID string) error
 	Cancel(ctx context.Context, runID string) error
 	RetryStep(ctx context.Context, itemID string) error
+	Regenerate(ctx context.Context, runID string, itemIDs []string) error
 }
 
 type runStore interface {
@@ -30,6 +31,7 @@ type runStore interface {
 type itemStore interface {
 	Get(ctx context.Context, id string) (run.Item, error)
 	ByRun(ctx context.Context, runID string) ([]run.Item, error)
+	ActiveBySite(ctx context.Context, siteID string) ([]run.Item, error)
 	List(ctx context.Context, q run.ItemQuery, page paging.Request) (paging.List[run.Item], error)
 }
 

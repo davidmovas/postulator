@@ -23,6 +23,7 @@ type RunsUseCase interface {
 	Resume(ctx context.Context, req runs.ResumeRequest) (runs.ResumeResponse, error)
 	Cancel(ctx context.Context, req runs.CancelRequest) (runs.CancelResponse, error)
 	RetryStep(ctx context.Context, req runs.RetryStepRequest) (runs.RetryStepResponse, error)
+	Regenerate(ctx context.Context, req runs.RegenerateRequest) (runs.RegenerateResponse, error)
 	Revert(ctx context.Context, req runs.RevertRequest) (runs.RevertResponse, error)
 }
 
@@ -39,6 +40,7 @@ type RunsService struct {
 	resume        middleware.Handler[runs.ResumeRequest, runs.ResumeResponse]
 	cancel        middleware.Handler[runs.CancelRequest, runs.CancelResponse]
 	retryStep     middleware.Handler[runs.RetryStepRequest, runs.RetryStepResponse]
+	regenerate    middleware.Handler[runs.RegenerateRequest, runs.RegenerateResponse]
 	revert        middleware.Handler[runs.RevertRequest, runs.RevertResponse]
 }
 
@@ -56,6 +58,7 @@ func NewRunsService(logger *zap.Logger, useCase Source[RunsUseCase]) *RunsServic
 		resume:        Wrap(logger, "runs.resume", call(useCase, RunsUseCase.Resume)),
 		cancel:        Wrap(logger, "runs.cancel", call(useCase, RunsUseCase.Cancel)),
 		retryStep:     Wrap(logger, "runs.retryStep", call(useCase, RunsUseCase.RetryStep)),
+		regenerate:    Wrap(logger, "runs.regenerate", call(useCase, RunsUseCase.Regenerate)),
 		revert:        Wrap(logger, "runs.revert", call(useCase, RunsUseCase.Revert)),
 	}
 }
@@ -106,6 +109,10 @@ func (s *RunsService) Cancel(c context.Context, req runs.CancelRequest) (runs.Ca
 
 func (s *RunsService) RetryStep(c context.Context, req runs.RetryStepRequest) (runs.RetryStepResponse, error) {
 	return s.retryStep(c, req)
+}
+
+func (s *RunsService) Regenerate(c context.Context, req runs.RegenerateRequest) (runs.RegenerateResponse, error) {
+	return s.regenerate(c, req)
 }
 
 func (s *RunsService) RevertRun(c context.Context, req runs.RevertRequest) (runs.RevertResponse, error) {

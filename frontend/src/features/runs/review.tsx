@@ -2,7 +2,8 @@ import type { ReactElement } from "react";
 import { useEffect, useMemo, useState } from "react";
 
 import { copy } from "../../copy/index.js";
-import { useArtifacts, useResumeRun, useRetryStep } from "../../data/hooks/runs.js";
+import { react } from "../../data/errors.js";
+import { useArtifacts, useRegenerate, useResumeRun, useRetryStep } from "../../data/hooks/runs.js";
 import { useSetting } from "../../data/hooks/settings.js";
 import type { Page, RunItem } from "../../data/types.js";
 import type { ArtifactKind } from "../../generated/vocab.js";
@@ -15,16 +16,15 @@ import {
     orderedKinds,
     pauseReasonText,
     retryBlockedText,
-    statusIcon,
-    statusLabel,
-    statusTone,
 } from "./labels.js";
 import type { RetryNotice, StepEntry } from "./log-view.js";
 import { ArtifactPane } from "./panes/index.js";
 import { driftRefusal } from "./refusal.js";
 import { neighbourOf, positionOf } from "./review-nav.js";
+import { heldForParent, itemBadge, regenerateState } from "./hold.js";
+import { ParentHold } from "./review-hold.js";
 import { DriftRefused, ReviewActions, ReviewEmpty, ReviewMeta, ReviewMissing, Timeline } from "./review-states.js";
-import { artifactBodyHtml, retentionDaysKey } from "./statuses.js";
+import { artifactBodyHtml, artifactPublishResult, retentionDaysKey } from "./statuses.js";
 import { stepText } from "./step-cell.js";
 
 const drawerWidth = 688;
@@ -80,6 +80,7 @@ export function ReviewDrawer({
     const listed = useArtifacts(itemId === "" ? null : itemId);
     const retention = useSetting(retentionDaysKey);
     const retryStep = useRetryStep();
+    const regenerate = useRegenerate();
     const resume = useResumeRun();
     const [active, setActive] = useState<ArtifactKind | null>(null);
 
@@ -126,6 +127,16 @@ export function ReviewDrawer({
     const blocked = state !== null && state.kind === "blocked" ? state.reason : null;
     const refusal = driftRefusal(item, page);
     const at = positionOf(siblings, itemId);
+    const regeneration =
+        item === null || listed.isPending ? null : regenerateState(item, kinds.includes(artifactPublishResult));
+    const regenerated = regenerate.error === null ? null : react(regenerate.error);
+    const regenerateRefusal =
+        regenerated === null || regenerated.kind === "silent" || regenerated.kind === "unlock"
+            ? null
+            : regenerated.message;
+    const restart = (runId: string, restartedId: string): void => {
+        regenerate.mutate({ runId, itemIds: [restartedId] });
+    };
 
     const tabs: readonly TabItem<ArtifactKind>[] = kinds.map((kind) => ({
         key: kind,
@@ -151,8 +162,8 @@ export function ReviewDrawer({
                                 {copy.runs.review.position(at, siblings.length)}
                             </span>
                         )}
-                        <StatusBadge tone={statusTone(item.status)} icon={statusIcon(item.status)}>
-                            {statusLabel(item.status)}
+                        <StatusBadge tone={itemBadge(item).tone} icon={itemBadge(item).icon}>
+                            {itemBadge(item).label}
                         </StatusBadge>
                     </span>
                 )
@@ -167,10 +178,15 @@ export function ReviewDrawer({
                         blocked={blocked}
                         state={state}
                         busy={retryStep.isPending}
+                        regeneration={regeneration}
+                        regenerating={regenerate.isPending}
                         onOpenPage={onOpenPage}
                         onRerun={onRerun}
                         onRetry={() => {
                             retryStep.mutate({ itemId: item.id });
+                        }}
+                        onRegenerate={() => {
+                            restart(item.runId, item.id);
                         }}
                     />
                 )
@@ -202,9 +218,29 @@ export function ReviewDrawer({
                                 resume.mutate({ runId: item.runId });
                             }}
                         />
+                    ) : heldForParent(item) && item.waitingFor !== null ? (
+                        <div className="shrink-0 px-3 pt-2">
+                            <ParentHold
+                                parent={item.waitingFor}
+                                busy={regenerate.isPending}
+                                onOpenItem={onMove}
+                                onRegenerate={(parentItemId) => {
+                                    restart(item.runId, parentItemId);
+                                }}
+                            />
+                        </div>
                     ) : item.pauseReason === "" ? null : (
                         <div className="shrink-0 px-3 pt-2">
-                            <Banner tone="warn" title={pauseReasonText(item.pauseReason)} />
+                            <Banner
+                                tone="warn"
+                                title={pauseReasonText(item.pauseReason)}
+                                body={item.note === "" ? undefined : item.note}
+                            />
+                        </div>
+                    )}
+                    {regenerateRefusal === null ? null : (
+                        <div className="shrink-0 px-3 pt-2">
+                            <Banner tone="danger" title={regenerateRefusal} />
                         </div>
                     )}
                     {item.error === "" ? null : (

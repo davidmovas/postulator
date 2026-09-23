@@ -22,6 +22,7 @@ type itemStore interface {
 	Due(ctx context.Context, now time.Time, limit int) ([]run.Item, error)
 	Stalled(ctx context.Context, now time.Time, limit int) ([]run.Item, error)
 	Runnable(ctx context.Context, now time.Time, limit int) ([]run.Item, error)
+	AwaitingParent(ctx context.Context, limit int) ([]run.Item, error)
 	Counts(ctx context.Context, runID string) (map[run.Status]int, error)
 	StopAll(ctx context.Context, runID string, from []run.Status, to run.Status, reason run.PauseReason, now time.Time) (int64, error)
 	ResumeAll(ctx context.Context, runID string, now time.Time) (int64, error)

@@ -1416,3 +1416,87 @@ the reasoning of each vector, in wave order.
 - **`task build` is part of the gate, not a formality.** `frontend/bindings/` is gitignored and only
   the build regenerates it, and the frontend import ban runs only there, so two defects of this wave
   were invisible to `npm run typecheck` and to `golangci-lint`.
+
+## 2026-09-23 — after 2.0.0: the hold, regeneration, the page tree, cost and two docker stacks
+
+The client's first real hour on OpenAI: fifteen pages, three parents failed validation on a
+template that was fixed afterwards, their children stopped at Publish as "Paused for a human
+decision" and stayed there, nothing could write a failed page again except a new run the agent
+put together, and $1.20 left the account.
+
+### A child and its parent
+
+- **A child whose parent is not on the site is held, not handed to a human.** The publish step
+  waited six sweeps and then paused `needs_human` with a sentence `settle` threw away, because a
+  message was kept only from a fault. It now pauses at once as `awaiting_parent`, the step's
+  sentence is kept in `run_items.note` and sent on `item.needs_human`, and the sweep's `unblock`
+  pass releases every held item whose parent page has a `wpId`. The key is the parent *page*, so
+  the same run, another run, a sync or a human publishing and syncing all release it; a run paused
+  by a person or by its budget is left alone.
+- **A paused run is waiting for a person, so its deadline no longer reaps it.** The deadline bounds
+  work, not waiting. Every path that sets a run going again — resume, retry, regenerate, release —
+  re-arms it from now. `updateRun` never wrote `deadline_at`, so a re-armed deadline could not have
+  been kept before this either.
+- **A run that publishes brings the parents that are not on the site.** Planning walks up from each
+  chosen page and adds every parent with no `wpId`, stopping at the first one that has one; a parent
+  another run is writing is left to it and the child waits. A parent mapped to nothing, a path whose
+  parent the map does not hold and a link that disagrees with its path are refused before anything
+  is queued. `Start` and `Estimate` answer what they added, so the window, the agent and the
+  scheduler see the same run.
+- **The item view names the parent it waits for** and, when that parent is an item of the same run,
+  its status and step, so the drawer can say "it failed at Validate — regenerate it".
+
+### Regenerating
+
+- **A regeneration happens inside the run.** `Engine.Regenerate` puts stopped items back at the
+  first step with a checkpoint whose `generation` is one higher; the checkpoint is part of every
+  input hash, so no earlier execution is replayed. The item's artifacts go and its step executions
+  stay as the record of what it cost. The template is resolved on every claim, so the regeneration
+  writes against the template as it is now.
+- **An item that wrote to the site is not regenerated in place.** Its `publish_result` holds what
+  it replaced, and a second publish would record the run's own first draft as the thing to put
+  back. The refusal names `published` and the window points at a new run instead.
+- **Live totals fold each item to where it stands.** They added up events, so a retried or
+  regenerated failure counted as failed and done at once.
+
+### Cost
+
+- **The writer is the mid tier and the editor and judge the cheapest.** writer `gpt-5.6-terra`,
+  editor and judge `gpt-5.6-luna`, chat stays on terra. Defaults are not copied into the database,
+  so an install follows them for every role nobody set by hand.
+- **An image is a ledger call and asks for a quality.** The image request named no quality, so
+  OpenAI chose, and the call went around the ledger: the spend tile, a run's totals and its budget
+  cap never saw an image. `images.openaiQuality` defaults to `medium`, the adapter reads the usage
+  the provider bills, and a decorator composed in the root writes one `llm_calls` row per image,
+  priced from the catalog and attributed like a completion. The pre-run estimate still leaves
+  images unpriced.
+
+### The docker stacks
+
+- **WordPress keeps its own copy of the plugin.** The plugin sources were bind-mounted read-write,
+  so deleting the plugin in wp-admin deleted them from the repository and a reinstall failed on the
+  mount point. `wp-cli` installs `bin/postulator-companion.zip` instead.
+- **The e2e suites run on a stack of their own.** They shared `localhost:8089` with the person
+  testing the app, force-deleted whole sections of it on start and left their scripted pages behind;
+  the pages the owner took for a generation bug were the e2e client script's, written at 09:12 that
+  morning, and three of them had become parents of real pages. `task e2e:*` runs the compose project
+  `postulator-test` on 8088 — Windows reserves 8091 to 8190 on this machine — both harnesses refuse
+  8089, and each whole-loop test removes what it wrote when it passes. `task sandbox:*` runs the
+  existing `postulator-e2e` project on 8089 through a bootstrap that never deletes an application
+  password or any content.
+- **A tool enum is the whole vocabulary or none of it.** `runs_pause` offers `awaiting_parent`
+  because the vocabulary test refuses a partial list, not because a person should pick it.
+
+### Tor Browser
+
+- **A link is a tab in the Tor Browser already open.** Every link started `firefox.exe` again, and
+  Tor Browser, which disables remoting unless it is started with `--allow-remote`, answered with its
+  "Close Tor Browser" dialog because its profile was in use. Postulator starts it with
+  `--allow-remote`; when the hidden `Mozilla_…_<profile>_RemoteWindow` of this installation is on
+  the desktop, the link goes with `-new-tab` and the second process exits at once. Checked on Tor
+  Browser 15.0.23: three https links, one window, no dialog.
+- **A Tor Browser opened by hand is left alone.** It takes no links, and a second start would only
+  raise the dialog, so the adapter answers `CONFLICT` with `tor_closed_to_links`; the window says to
+  close it and click again, and copies the link so it can be pasted into a tab meanwhile. An
+  `about:` page is refused from outside and opens an empty window instead, which is why the check
+  used https links.

@@ -21,11 +21,7 @@ const (
 	CodeSEOMetaSkipped   = "seo_meta_skipped"
 	CodePublishOverDrift = "publish_over_drift"
 
-	ParentWaitLimit = 6
-
 	FieldParent = "parent"
-
-	checkpointParentWaits = "parentWaits"
 
 	publishTimeout = 2 * time.Minute
 	lookupPerPage  = 100
@@ -78,7 +74,7 @@ func Publish(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 			if placement.pending {
-				return holdForParent(sc, placement)
+				return holdForParent(sc, placement), nil
 			}
 			parent := placement.wpID
 
@@ -290,26 +286,13 @@ func parentOf(ctx context.Context, deps Deps, page pagemap.Page) (placement, err
 	return placement{path: parent.Path, wpID: *parent.WPID}, nil
 }
 
-func holdForParent(sc *run.StepContext, parent placement) (run.Result, error) {
-	waits, _, err := run.Get[int](sc.Check, checkpointParentWaits)
-	if err != nil {
-		return run.Result{}, err
+func holdForParent(sc *run.StepContext, parent placement) run.Result {
+	return run.Result{
+		Next:   run.TransitionPause,
+		Reason: run.PauseAwaitingParent,
+		Message: sc.Page.Path + " waits for its parent " + parent.path +
+			", which is not on the site yet; it goes on by itself once " + parent.path + " is",
 	}
-
-	held := "the parent " + parent.path + " of " + sc.Page.Path + " is not on the site yet"
-	if waits >= ParentWaitLimit {
-		return run.Result{
-			Next:    run.TransitionPause,
-			Reason:  run.PauseNeedsHuman,
-			Message: held + ", so " + sc.Page.Path + " would be published at the top level",
-		}, nil
-	}
-
-	check := run.NewCheckpoint()
-	if setErr := run.Set(check, checkpointParentWaits, waits+1); setErr != nil {
-		return run.Result{}, setErr
-	}
-	return run.Result{Next: run.TransitionWait, Checkpoint: check, Message: held}, nil
 }
 
 func locate(ctx context.Context, client *wp.Client, itemType wp.ItemType, page pagemap.Page, parent int64) (wp.Item, bool, error) {

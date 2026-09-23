@@ -19,10 +19,18 @@ type StartRequest struct {
 type StartResponse struct {
 	RunID    string       `json:"runId"`
 	Estimate run.Estimate `json:"estimate"`
+	Added    []AddedPage  `json:"added"`
 }
 
 type EstimateResponse struct {
 	Estimate run.Estimate `json:"estimate"`
+	Added    []AddedPage  `json:"added"`
+}
+
+type AddedPage struct {
+	PageID   string `json:"pageId"`
+	Path     string `json:"path"`
+	NeededBy string `json:"neededBy"`
 }
 
 type GetRequest struct {
@@ -75,7 +83,7 @@ type ListArtifactsResponse struct {
 
 type PauseRequest struct {
 	RunID  string `json:"runId" description:"The id of the run to hold, exactly as runs_start or runs_list returned it"`
-	Reason string `json:"reason,omitempty" enum:"budget_exceeded,awaiting_confirmation,needs_human,user" description:"Which of the four reasons holds the run; leave it out and it is recorded as user"`
+	Reason string `json:"reason,omitempty" enum:"budget_exceeded,awaiting_confirmation,needs_human,user,awaiting_parent" description:"Which of the five reasons holds the run; leave it out and it is recorded as user"`
 }
 
 type PauseResponse struct{}
@@ -105,3 +113,12 @@ type RetryStepRequest struct {
 }
 
 type RetryStepResponse struct{}
+
+type RegenerateRequest struct {
+	RunID   string   `json:"runId" description:"The run the items belong to"`
+	ItemIDs []string `json:"itemIds" description:"Stopped items from runs_list_items; one that already wrote to the site is refused"`
+}
+
+type RegenerateResponse struct {
+	Restarted int `json:"restarted"`
+}

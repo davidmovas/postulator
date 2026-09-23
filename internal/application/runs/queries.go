@@ -62,9 +62,52 @@ func (s *Service) ListItems(ctx context.Context, req ListItemsRequest) (paging.L
 	if err != nil {
 		return paging.List[Item]{}, err
 	}
+	awaited, err := s.awaitedParents(ctx, runID, list.Items)
+	if err != nil {
+		return paging.List[Item]{}, err
+	}
 	return application.MapList(list, func(item run.Item) Item {
-		return itemView(item, blocked[item.ID])
+		return itemView(item, blocked[item.ID], awaited[item.ID])
 	}), nil
+}
+
+func (s *Service) awaitedParents(ctx context.Context, runID string, items []run.Item) (map[string]*AwaitedParent, error) {
+	awaited := make(map[string]*AwaitedParent)
+
+	var siblings []run.Item
+	for i := range items {
+		if items[i].PauseReason != run.PauseAwaitingParent {
+			continue
+		}
+		page, err := s.pages.Get(ctx, items[i].TargetID)
+		if err != nil {
+			return nil, err
+		}
+		if page.ParentPageID == nil {
+			continue
+		}
+		parent, err := s.pages.Get(ctx, *page.ParentPageID)
+		if err != nil {
+			return nil, err
+		}
+
+		if siblings == nil {
+			if siblings, err = s.items.ByRun(ctx, runID); err != nil {
+				return nil, err
+			}
+		}
+		ref := &AwaitedParent{PageID: parent.ID, Path: parent.Path}
+		for j := range siblings {
+			if siblings[j].TargetID != parent.ID {
+				continue
+			}
+			ref.ItemID = siblings[j].ID
+			ref.ItemStatus = string(siblings[j].Status)
+			ref.Step = siblings[j].CurrentStep
+		}
+		awaited[items[i].ID] = ref
+	}
+	return awaited, nil
 }
 
 func (s *Service) retryBlocks(ctx context.Context, items []run.Item) (map[string]run.RetryBlockedReason, error) {

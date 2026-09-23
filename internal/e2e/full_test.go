@@ -53,6 +53,11 @@ func TestTheWholeLoopReachesTheDockerSite(t *testing.T) {
 	live := newSite(t)
 	requirePlugin(t, live.env, true)
 	live.clear(t)
+	defer func() {
+		if !t.Failed() {
+			live.clear(t)
+		}
+	}()
 
 	menuID := live.publish(t, "Our Menu", "menu", menuBody, 0)
 	live.publish(t, "Main Courses", "main-courses", mainsBody, menuID)

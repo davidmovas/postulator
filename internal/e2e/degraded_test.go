@@ -53,6 +53,11 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 	live := newSite(t)
 	requirePlugin(t, live.env, false)
 	live.clearCore(t)
+	defer func() {
+		if !t.Failed() {
+			live.clearCore(t)
+		}
+	}()
 
 	menuID := live.publish(t, "Our Menu", "menu", menuBody, 0)
 	mainsID := live.publish(t, "Main Courses", "main-courses", mainsBody, menuID)

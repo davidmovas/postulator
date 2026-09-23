@@ -28,14 +28,15 @@ func (v vault) Get(context.Context, string) (string, error) {
 }
 
 type call struct {
-	Model  string `json:"model"`
-	Prompt string `json:"prompt"`
-	Size   string `json:"size"`
-	Format string `json:"response_format"`
-	Count  int    `json:"n"`
+	Model   string `json:"model"`
+	Prompt  string `json:"prompt"`
+	Size    string `json:"size"`
+	Format  string `json:"response_format"`
+	Quality string `json:"quality"`
+	Count   int    `json:"n"`
 }
 
-func provider(t *testing.T, status int, body string, secrets vault) (*openai.Images, *call, *string) {
+func provider(t *testing.T, status int, body string, secrets vault, opts ...openai.Option) (*openai.Images, *call, *string) {
 	t.Helper()
 
 	recorded := &call{}
@@ -62,8 +63,45 @@ func provider(t *testing.T, status int, body string, secrets vault) (*openai.Ima
 	}))
 	t.Cleanup(server.Close)
 
-	return openai.New(secrets, "gpt-image-test", openai.WithBaseURL(server.URL+"/v1"),
-		openai.WithHTTPClient(server.Client())), recorded, auth
+	opts = append([]openai.Option{openai.WithBaseURL(server.URL + "/v1"), openai.WithHTTPClient(server.Client())}, opts...)
+	return openai.New(secrets, "gpt-image-test", opts...), recorded, auth
+}
+
+func TestGenerateAsksForTheQualityAndReadsWhatItCost(t *testing.T) {
+	t.Parallel()
+
+	raw := base64.StdEncoding.EncodeToString([]byte{0x89, 0x50})
+	body := `{"data":[{"b64_json":"` + raw + `"}],"usage":{"total_tokens":1300,"input_tokens":240,` +
+		`"output_tokens":1060,"input_tokens_details":{"text_tokens":240,"cached_tokens":40}}}`
+
+	cases := []struct {
+		name string
+		opts []openai.Option
+		want string
+	}{
+		{name: "the default quality", want: openai.DefaultQuality},
+		{name: "a chosen quality", opts: []openai.Option{openai.WithQuality("low")}, want: "low"},
+		{name: "a blank choice keeps the default", opts: []openai.Option{openai.WithQuality("  ")}, want: openai.DefaultQuality},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			generator, recorded, _ := provider(t, http.StatusOK, body, vault{key: "sk"}, tc.opts...)
+			image, err := generator.Generate(t.Context(), images.Prompt{Subject: "Kettle"})
+			if err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+			if recorded.Quality != tc.want {
+				t.Fatalf("quality = %q, want %q", recorded.Quality, tc.want)
+			}
+			if image.Usage.Input != 240 || image.Usage.Output != 1060 || image.Usage.Total != 1300 ||
+				image.Usage.CachedInput != 40 {
+				t.Fatalf("usage = %+v, want what the provider billed", image.Usage)
+			}
+		})
+	}
 }
 
 func TestGenerateReturnsThePNG(t *testing.T) {

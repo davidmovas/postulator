@@ -29,6 +29,7 @@ type itemStore interface {
 	Due(ctx context.Context, now time.Time, limit int) ([]run.Item, error)
 	Stalled(ctx context.Context, now time.Time, limit int) ([]run.Item, error)
 	Runnable(ctx context.Context, now time.Time, limit int) ([]run.Item, error)
+	AwaitingParent(ctx context.Context, limit int) ([]run.Item, error)
 	Counts(ctx context.Context, runID string) (map[run.Status]int, error)
 	StopAll(ctx context.Context, runID string, from []run.Status, to run.Status, reason run.PauseReason, now time.Time) (int64, error)
 	ResumeAll(ctx context.Context, runID string, now time.Time) (int64, error)
@@ -37,6 +38,7 @@ type itemStore interface {
 type artifactStore interface {
 	ReplaceStep(ctx context.Context, itemID, step string, artifacts []run.Artifact) error
 	ByItem(ctx context.Context, itemID string) ([]run.Artifact, error)
+	DeleteByItem(ctx context.Context, itemID string) error
 	PurgePublishedBefore(ctx context.Context, cutoff time.Time) (int64, error)
 }
 

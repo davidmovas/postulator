@@ -6,53 +6,61 @@ import (
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	kctx "github.com/davidmovas/postulator/internal/kernel/ctx"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
+type planned struct {
+	record run.Run
+	spec   template.TemplateSpec
+	added  []AddedPage
+}
+
 func (s *Service) Start(ctx context.Context, req StartRequest) (StartResponse, error) {
-	record, spec, err := s.plan(ctx, req)
+	plan, err := s.plan(ctx, req)
 	if err != nil {
 		return StartResponse{}, err
 	}
 
-	estimate, err := s.engine.EstimateRun(ctx, record, spec)
+	estimate, err := s.engine.EstimateRun(ctx, plan.record, plan.spec)
 	if err != nil {
 		return StartResponse{}, err
 	}
 
-	record.ID = id.New()
-	queued, err := s.engine.Enqueue(ctx, record)
+	plan.record.ID = id.New()
+	queued, err := s.engine.Enqueue(ctx, plan.record)
 	if err != nil {
 		return StartResponse{}, err
 	}
-	return StartResponse{RunID: queued.ID, Estimate: estimate}, nil
+	return StartResponse{RunID: queued.ID, Estimate: estimate, Added: plan.added}, nil
 }
 
 func (s *Service) Estimate(ctx context.Context, req StartRequest) (EstimateResponse, error) {
-	record, spec, err := s.plan(ctx, req)
+	plan, err := s.plan(ctx, req)
 	if err != nil {
 		return EstimateResponse{}, err
 	}
 
-	estimate, err := s.engine.EstimateRun(ctx, record, spec)
+	estimate, err := s.engine.EstimateRun(ctx, plan.record, plan.spec)
 	if err != nil {
 		return EstimateResponse{}, err
 	}
-	return EstimateResponse{Estimate: estimate}, nil
+	return EstimateResponse{Estimate: estimate, Added: plan.added}, nil
 }
 
-func (s *Service) plan(ctx context.Context, req StartRequest) (run.Run, template.TemplateSpec, error) {
+func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
 	siteID := strings.TrimSpace(req.SiteID)
 	if siteID == "" {
-		return run.Run{}, template.TemplateSpec{}, invalid("a run needs a site", "siteId")
+		return planned{}, invalid("a run needs a site", "siteId")
 	}
 
 	targets, err := uniqueTargets(req.PageIDs)
 	if err != nil {
-		return run.Run{}, template.TemplateSpec{}, err
+		return planned{}, err
 	}
 
 	kind := run.Kind(req.Kind)
@@ -60,7 +68,7 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (run.Run, template
 		kind = run.KindGenerate
 	}
 	if !kind.Valid() {
-		return run.Run{}, template.TemplateSpec{}, invalid("run kind is not recognized", "kind")
+		return planned{}, invalid("run kind is not recognized", "kind")
 	}
 
 	mode := run.PublishMode(req.PublishMode)
@@ -68,7 +76,7 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (run.Run, template
 		mode = run.PublishDraft
 	}
 	if !mode.Valid() {
-		return run.Run{}, template.TemplateSpec{}, invalid("publish mode is not recognized", "publishMode")
+		return planned{}, invalid("publish mode is not recognized", "publishMode")
 	}
 
 	var (
@@ -77,32 +85,40 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (run.Run, template
 		version    int
 	)
 	if kind.PageScoped() {
-		if err := s.mapped(ctx, targets); err != nil {
-			return run.Run{}, template.TemplateSpec{}, err
+		if mappedErr := s.mapped(ctx, targets); mappedErr != nil {
+			return planned{}, mappedErr
 		}
-		for i, pageID := range targets {
-			resolved, resolveErr := s.specs.ResolveForPage(ctx, templates.ResolveForPageRequest{PageID: pageID})
-			if resolveErr != nil {
-				return run.Run{}, template.TemplateSpec{}, resolveErr
-			}
-			if resolved.SiteID != siteID {
-				return run.Run{}, template.TemplateSpec{}, invalid("a target page belongs to another site", "pageIds").
-					WithDetail("pageId", pageID).WithDetail("siteId", resolved.SiteID)
-			}
-			if i > 0 {
-				continue
-			}
-			spec = resolved.Spec
-			version = resolved.Version
-			if templateID == "" {
-				templateID = resolved.TemplateID
-			}
+		first, resolveErr := s.resolve(ctx, siteID, targets[0])
+		if resolveErr != nil {
+			return planned{}, resolveErr
+		}
+		spec = first.Spec
+		version = first.Version
+		if templateID == "" {
+			templateID = first.TemplateID
 		}
 	}
 
 	recipe, err := recipeFor(kind, req.Recipe, spec.Recipe)
 	if err != nil {
-		return run.Run{}, template.TemplateSpec{}, err
+		return planned{}, err
+	}
+
+	added := make([]AddedPage, 0)
+	if kind.PageScoped() && slices.Contains(stepsOf(recipe), string(run.StepPublish)) {
+		if added, err = s.ancestors(ctx, siteID, targets); err != nil {
+			return planned{}, err
+		}
+		for _, page := range added {
+			targets = append(targets, page.PageID)
+		}
+	}
+	if kind.PageScoped() {
+		for _, pageID := range targets[1:] {
+			if _, resolveErr := s.resolve(ctx, siteID, pageID); resolveErr != nil {
+				return planned{}, resolveErr
+			}
+		}
 	}
 
 	actor, ok := kctx.ActorFrom(ctx)
@@ -110,17 +126,113 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (run.Run, template
 		actor = kctx.ActorUser
 	}
 
-	return run.Run{
-		SiteID:          siteID,
-		Kind:            kind,
-		Targets:         targets,
-		Recipe:          recipe,
-		TemplateID:      templateID,
-		TemplateVersion: version,
-		PublishMode:     mode,
-		Budget:          req.Budget,
-		CreatedBy:       actor,
-	}, spec, nil
+	return planned{
+		record: run.Run{
+			SiteID:          siteID,
+			Kind:            kind,
+			Targets:         targets,
+			Recipe:          recipe,
+			TemplateID:      templateID,
+			TemplateVersion: version,
+			PublishMode:     mode,
+			Budget:          req.Budget,
+			CreatedBy:       actor,
+		},
+		spec:  spec,
+		added: added,
+	}, nil
+}
+
+func (s *Service) resolve(ctx context.Context, siteID, pageID string) (templates.ResolveForPageResponse, error) {
+	resolved, err := s.specs.ResolveForPage(ctx, templates.ResolveForPageRequest{PageID: pageID})
+	if err != nil {
+		return templates.ResolveForPageResponse{}, err
+	}
+	if resolved.SiteID != siteID {
+		return templates.ResolveForPageResponse{}, invalid("a target page belongs to another site", "pageIds").
+			WithDetail("pageId", pageID).WithDetail("siteId", resolved.SiteID)
+	}
+	return resolved, nil
+}
+
+func (s *Service) ancestors(ctx context.Context, siteID string, targets []string) ([]AddedPage, error) {
+	chosen := make(map[string]struct{}, len(targets))
+	for _, pageID := range targets {
+		chosen[pageID] = struct{}{}
+	}
+
+	active, err := s.items.ActiveBySite(ctx, siteID)
+	if err != nil {
+		return nil, err
+	}
+	underway := make(map[string]struct{}, len(active))
+	for i := range active {
+		underway[active[i].TargetID] = struct{}{}
+	}
+
+	added := make([]AddedPage, 0)
+	for _, pageID := range targets {
+		child, getErr := s.pages.Get(ctx, pageID)
+		if getErr != nil {
+			return nil, getErr
+		}
+		neededBy := child.Path
+
+		for {
+			parent, found, parentErr := s.parentOf(ctx, child)
+			if parentErr != nil || !found {
+				if parentErr != nil {
+					return nil, parentErr
+				}
+				break
+			}
+			if parent.WPID != nil {
+				break
+			}
+			if _, busy := underway[parent.ID]; busy {
+				break
+			}
+			if _, picked := chosen[parent.ID]; !picked {
+				if parent.EntityID == nil || strings.TrimSpace(*parent.EntityID) == "" {
+					return nil, invalid("the parent "+parent.Path+" of "+neededBy+" is not on the site and nothing is "+
+						"mapped to it, so it cannot be written first; map it on the Graph screen or publish it", "pageIds").
+						WithDetail("parentPath", parent.Path).WithDetail("path", neededBy)
+				}
+				chosen[parent.ID] = struct{}{}
+				added = append(added, AddedPage{PageID: parent.ID, Path: parent.Path, NeededBy: neededBy})
+			}
+			child = parent
+		}
+	}
+	return added, nil
+}
+
+func (s *Service) parentOf(ctx context.Context, child pagemap.Page) (pagemap.Page, bool, error) {
+	wanted := pagemap.ParentPath(child.Path)
+	if wanted == "" || wanted == "/" {
+		return pagemap.Page{}, false, nil
+	}
+
+	missing := invalid("the page map holds no page at "+wanted+", so "+child.Path+
+		" has no parent to sit under; add "+wanted+" to the page map first", "pageIds").
+		WithDetail("parentPath", wanted).WithDetail("path", child.Path)
+	if child.ParentPageID == nil {
+		return pagemap.Page{}, false, missing
+	}
+
+	parent, err := s.pages.Get(ctx, *child.ParentPageID)
+	if errors.IsCode(err, errors.NotFound) {
+		return pagemap.Page{}, false, missing
+	}
+	if err != nil {
+		return pagemap.Page{}, false, err
+	}
+	if parent.Path != wanted {
+		return pagemap.Page{}, false, invalid(child.Path+" is linked to "+parent.Path+" while its path asks for "+
+			wanted+"; fix the link on the Pages screen first", "pageIds").
+			WithDetail("parentPath", wanted).WithDetail("linkedPath", parent.Path).WithDetail("path", child.Path)
+	}
+	return parent, true, nil
 }
 
 func (s *Service) mapped(ctx context.Context, targets []string) error {

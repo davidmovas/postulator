@@ -171,9 +171,15 @@ type ItemFailedPayload struct {
 }
 
 type ItemNeedsHumanPayload struct {
+	RunID   string `json:"runId"`
+	ItemID  string `json:"itemId"`
+	Reason  string `json:"reason"`
+	Message string `json:"message"`
+}
+
+type ItemRestartedPayload struct {
 	RunID  string `json:"runId"`
 	ItemID string `json:"itemId"`
-	Reason string `json:"reason"`
 }
 
 type StepStartedPayload struct {

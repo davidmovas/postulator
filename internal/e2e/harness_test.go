@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -138,7 +139,24 @@ func loadEnvironment(t *testing.T) environment {
 	if env.baseURL == "" || env.user == "" || env.pass == "" {
 		t.Fatalf("%s does not carry the site, the user and the application password", path)
 	}
+	refuseTheSandbox(t, path, env.baseURL)
 	return env
+}
+
+const sandboxPort = "8089"
+
+func refuseTheSandbox(t *testing.T, path, baseURL string) {
+	t.Helper()
+
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
+		t.Fatalf("%s names %q, which is not an address: %v", path, baseURL, err)
+	}
+	if parsed.Port() == sandboxPort {
+		t.Fatalf("%s points at %s, the sandbox people test the app against; these suites delete whole "+
+			"sections of the site they run on, so they run only on the stack `task e2e:up` starts on port 8088",
+			path, baseURL)
+	}
 }
 
 var companionProbe struct {

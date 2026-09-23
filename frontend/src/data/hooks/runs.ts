@@ -10,6 +10,7 @@ import {
     listRunItems,
     listRuns,
     pauseRun,
+    regenerate,
     resumeRun,
     retryStep,
     revertRun,
@@ -174,6 +175,19 @@ export function useRetryStep() {
         onSettled: () => {
             void client.invalidateQueries({ queryKey: keys.runs.itemLists() });
             void client.invalidateQueries({ queryKey: keys.runs.details() });
+        },
+    });
+}
+
+export function useRegenerate() {
+    const client = useQueryClient();
+    return useMutation({
+        mutationFn: (request: Parameters<typeof regenerate>[0]) => regenerate(request),
+        onSettled: (_answered, _error, request) => {
+            void catchUpNow(request.runId);
+            void client.invalidateQueries({ queryKey: keys.runs.itemLists() });
+            void client.invalidateQueries({ queryKey: keys.runs.details() });
+            void client.invalidateQueries({ queryKey: keys.runs.lists() });
         },
     });
 }

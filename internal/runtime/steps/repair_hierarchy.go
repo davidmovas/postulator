@@ -39,7 +39,7 @@ func RepairHierarchy(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 			if placement.pending {
-				return holdForParent(sc, placement)
+				return holdForParent(sc, placement), nil
 			}
 
 			moved, err := client.UpdateItem(ctx, itemType, *sc.Page.WPID, wp.UpdateItem{

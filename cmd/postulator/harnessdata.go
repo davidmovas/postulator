@@ -83,6 +83,9 @@ func seedEntities() []seedEntity {
 		{Name: "Distribution tools", Kind: "product", Intent: "transactional", Keyword: "espresso distribution tool", Anchor: "distribution tools", Parent: "Accessories", Path: "/accessories/distribution-tools/", Title: "Distribution tools that earn their price", Status: statusExists},
 		{Name: "Espresso scales", Kind: "product", Intent: "transactional", Keyword: "espresso scale", Anchor: "espresso scales", Parent: "Accessories", Path: "/accessories/scales/", Title: "Espresso scales with a timer that keeps up", Status: statusPublished},
 		{Name: "Knock boxes", Kind: "product", Intent: "transactional", Keyword: "espresso knock box", Anchor: "knock boxes", Parent: "Accessories", Path: "/accessories/knock-boxes/", Title: "Knock boxes that stay quiet on the bench", Status: statusPlanned},
+
+		{Name: "Home roasting", Kind: "hub", Intent: "informational", Keyword: "home coffee roasting", Anchor: "home roasting", Path: "/home-roasting/", Title: "Home roasting: green beans to a first crack", Status: statusPlanned},
+		{Name: "Roasting drums", Kind: "topic", Intent: "informational", Keyword: "home roasting drum", Anchor: "roasting drums", Parent: "Home roasting", Path: "/home-roasting/drums/", Title: "Roasting drums that fit on a kitchen hob", Status: statusPlanned},
 	}
 }
 

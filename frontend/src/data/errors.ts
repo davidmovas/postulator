@@ -16,6 +16,8 @@ export const browserSettingsPath = "/settings/browser";
 
 export const torMissingCode = "tor_missing";
 
+export const torClosedToLinksCode = "tor_closed_to_links";
+
 export interface ReactionAction {
     label: string;
     to: string;
@@ -76,6 +78,9 @@ export function react(thrown: unknown): Reaction {
         case "NOT_FOUND":
             return { kind: "refetch", message: messages.NOT_FOUND };
         case "CONFLICT":
+            if (detailCodeOf(reported) === torClosedToLinksCode) {
+                return { kind: "external", message: copy.app.torClosedToLinks };
+            }
             return { kind: "refetch", message: messages.CONFLICT };
         case "UNAUTHORIZED":
             return { kind: "credentials", message: messages.UNAUTHORIZED };
@@ -102,6 +107,14 @@ export function providerMessageOf(reported: TransportError): string | null {
 export function detailCodeOf(reported: TransportError): string | null {
     const held = reported.details?.["code"];
     return typeof held === "string" && held !== "" ? held : null;
+}
+
+export function isTorClosedToLinks(thrown: unknown): boolean {
+    if (thrown === null || thrown === undefined || isCancellation(thrown)) {
+        return false;
+    }
+    const reported = parseError(thrown);
+    return reported.code === "CONFLICT" && detailCodeOf(reported) === torClosedToLinksCode;
 }
 
 export function pluginCodeOf(reported: TransportError): string | null {

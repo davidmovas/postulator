@@ -25,6 +25,7 @@ export const pauseBudgetExceeded: PauseReason = "budget_exceeded";
 export const pauseAwaitingConfirmation: PauseReason = "awaiting_confirmation";
 export const pauseNeedsHuman: PauseReason = "needs_human";
 export const pauseByUser: PauseReason = "user";
+export const pauseAwaitingParent: PauseReason = "awaiting_parent";
 
 export const retryInputsExpired: RetryBlockedReason = "inputs_expired";
 

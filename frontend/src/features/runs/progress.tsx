@@ -87,7 +87,10 @@ export interface RunProgressProps {
 
 export function RunProgress({ run, view, stats, terminal, now }: RunProgressProps): ReactElement {
     const counted = terminal ? copy.runs.detail.rowStats : copy.runs.detail.liveStats;
-    const pending = Math.max(stats.items - stats.done - stats.failed, 0);
+    const pending = Math.max(
+        stats.items - stats.done - stats.failed - (stats.needsHuman ?? 0) - (stats.waitingParent ?? 0),
+        0,
+    );
     const tokenCap = run.budget.maxTokens;
     const lasted = spanMs(run.startedAt, run.finishedAt, now);
 
@@ -110,6 +113,9 @@ export function RunProgress({ run, view, stats, terminal, now }: RunProgressProp
                     <span>{`${String(pending)} ${copy.runs.detail.pending}`}</span>
                     {stats.needsHuman === null ? null : (
                         <span>{`${String(stats.needsHuman)} ${copy.runs.detail.needsHuman}`}</span>
+                    )}
+                    {stats.waitingParent === null || stats.waitingParent === 0 ? null : (
+                        <span>{`${String(stats.waitingParent)} ${copy.runs.detail.waitingParent}`}</span>
                     )}
                 </div>
             </div>

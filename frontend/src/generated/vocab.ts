@@ -84,7 +84,13 @@ export const terminalRunStatuses: readonly RunStatus[] = ["completed", "failed",
 export const itemStatuses = runStatuses;
 export type ItemStatus = RunStatus;
 
-export const pauseReasons = ["budget_exceeded", "awaiting_confirmation", "needs_human", "user"] as const;
+export const pauseReasons = [
+    "budget_exceeded",
+    "awaiting_confirmation",
+    "needs_human",
+    "user",
+    "awaiting_parent",
+] as const;
 export type PauseReason = (typeof pauseReasons)[number];
 
 export const publishModes = ["draft", "publish"] as const;

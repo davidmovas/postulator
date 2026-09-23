@@ -1,6 +1,7 @@
 #!/bin/sh
 set -eu
 
+MODE="${E2E_MODE:-sandbox}"
 SITE_URL="${E2E_SITE_URL:-http://localhost:8089}"
 ADMIN_USER="${E2E_ADMIN_USER:-postulator}"
 ADMIN_EMAIL="${E2E_ADMIN_EMAIL:-postulator@example.test}"
@@ -8,7 +9,20 @@ ADMIN_PASSWORD="${E2E_ADMIN_PASSWORD:-postulator-admin}"
 SEO="${E2E_SEO:-none}"
 WOO="${E2E_WOO:-1}"
 PLUGIN="${E2E_PLUGIN:-1}"
-OUT="/e2e/.env.generated"
+PLUGIN_ZIP="/dist/postulator-companion.zip"
+
+case "$MODE" in
+	sandbox)
+		OUT="/e2e/.env.sandbox"
+		;;
+	test)
+		OUT="/e2e/.env.generated"
+		;;
+	*)
+		echo "E2E_MODE must be sandbox or test" >&2
+		exit 1
+		;;
+esac
 
 attempt=0
 until wp db check >/dev/null 2>&1; do
@@ -20,6 +34,7 @@ until wp db check >/dev/null 2>&1; do
 	sleep 2
 done
 
+fresh=0
 if ! wp core is-installed >/dev/null 2>&1; then
 	wp core install \
 		--url="$SITE_URL" \
@@ -28,7 +43,39 @@ if ! wp core is-installed >/dev/null 2>&1; then
 		--admin_password="$ADMIN_PASSWORD" \
 		--admin_email="$ADMIN_EMAIL" \
 		--skip-email
+	fresh=1
 fi
+
+install_plugin() {
+	if [ ! -f "$PLUGIN_ZIP" ]; then
+		echo "$PLUGIN_ZIP is missing; run task plugin:zip first" >&2
+		exit 1
+	fi
+	wp plugin install "$PLUGIN_ZIP" --force
+}
+
+if [ "$MODE" = "sandbox" ]; then
+	if [ "$PLUGIN" = "1" ]; then
+		install_plugin
+		wp plugin activate postulator-companion
+	fi
+	if [ "$fresh" = "1" ]; then
+		wp rewrite structure '/%postname%/' --hard
+		wp rewrite flush --hard
+	fi
+	if ! wp user application-password list "$ADMIN_USER" --field=name | grep -qx postulator-sandbox; then
+		APP_PASSWORD="$(wp user application-password create "$ADMIN_USER" postulator-sandbox --porcelain)"
+		{
+			echo "SANDBOX_WP_URL=$SITE_URL"
+			echo "SANDBOX_WP_USER=$ADMIN_USER"
+			echo "SANDBOX_WP_APP_PASSWORD=$APP_PASSWORD"
+		} > "$OUT"
+	fi
+	echo "the sandbox is ready at $SITE_URL"
+	exit 0
+fi
+
+install_plugin
 
 case "$PLUGIN" in
 	1)

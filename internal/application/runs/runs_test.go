@@ -23,15 +23,17 @@ import (
 )
 
 type fakeEngine struct {
-	queued     run.Run
-	estimate   run.Estimate
-	enqueueErr error
-	failWith   error
-	paused     string
-	reason     run.PauseReason
-	resumed    string
-	cancelled  string
-	retried    string
+	queued      run.Run
+	estimate    run.Estimate
+	enqueueErr  error
+	failWith    error
+	paused      string
+	reason      run.PauseReason
+	resumed     string
+	cancelled   string
+	retried     string
+	regenerated string
+	restarted   []string
 }
 
 func (f *fakeEngine) Enqueue(_ context.Context, record run.Run) (run.Run, error) {
@@ -69,6 +71,12 @@ func (f *fakeEngine) RetryStep(_ context.Context, itemID string) error {
 	return f.failWith
 }
 
+func (f *fakeEngine) Regenerate(_ context.Context, runID string, itemIDs []string) error {
+	f.regenerated = runID
+	f.restarted = itemIDs
+	return f.failWith
+}
+
 type fakeSpecs struct {
 	spec    template.TemplateSpec
 	siteID  string
@@ -89,12 +97,16 @@ func (f *fakeSpecs) ResolveForPage(_ context.Context, req templates.ResolveForPa
 
 type fakePages struct {
 	unmapped map[string]string
+	known    map[string]pagemap.Page
 	err      error
 }
 
 func (f *fakePages) Get(_ context.Context, pageID string) (pagemap.Page, error) {
 	if f.err != nil {
 		return pagemap.Page{}, f.err
+	}
+	if page, ok := f.known[pageID]; ok {
+		return page, nil
 	}
 	if path, ok := f.unmapped[pageID]; ok {
 		return pagemap.Page{ID: pageID, Path: path}, nil
@@ -274,7 +286,7 @@ func TestEstimateAnswersTheCostWithoutEnqueuingAnything(t *testing.T) {
 		t.Fatalf("Marshal: %v", marshalErr)
 	}
 	want := `{"estimate":{"tokens":4200,"usd":0.12,` +
-		`"findings":[{"code":"unpriced_step","message":"images are not priced"}]}}`
+		`"findings":[{"code":"unpriced_step","message":"images are not priced"}]},"added":[]}`
 	if string(encoded) != want {
 		t.Fatalf("Estimate = %s", encoded)
 	}
@@ -711,6 +723,19 @@ func TestControlForwardsToTheEngine(t *testing.T) {
 	if fixture.engine.resumed != "r1" || fixture.engine.cancelled != "r1" || fixture.engine.retried != "i1" {
 		t.Fatalf("the engine saw %q, %q, %q", fixture.engine.resumed, fixture.engine.cancelled, fixture.engine.retried)
 	}
+
+	regenerated, err := fixture.service.Regenerate(t.Context(), runs.RegenerateRequest{
+		RunID: " r1 ", ItemIDs: []string{" i1 ", "", "i2", "i1"},
+	})
+	if err != nil {
+		t.Fatalf("Regenerate: %v", err)
+	}
+	if fixture.engine.regenerated != "r1" || !slices.Equal(fixture.engine.restarted, []string{"i1", "i2"}) {
+		t.Fatalf("the engine regenerated %q %v, want r1 [i1 i2]", fixture.engine.regenerated, fixture.engine.restarted)
+	}
+	if regenerated.Restarted != 2 {
+		t.Fatalf("Restarted = %d, want 2", regenerated.Restarted)
+	}
 }
 
 func TestControlRejectsBadRequests(t *testing.T) {
@@ -744,6 +769,15 @@ func TestControlRejectsBadRequests(t *testing.T) {
 	if _, err := fixture.service.RetryStep(t.Context(), runs.RetryStepRequest{}); !errors.IsCode(err, errors.Invalid) {
 		t.Fatalf("RetryStep without an item = %v", err)
 	}
+	for _, req := range []runs.RegenerateRequest{
+		{ItemIDs: []string{"i1"}},
+		{RunID: "r1"},
+		{RunID: "r1", ItemIDs: []string{" ", ""}},
+	} {
+		if _, err := fixture.service.Regenerate(t.Context(), req); !errors.IsCode(err, errors.Invalid) {
+			t.Fatalf("Regenerate(%+v) = %v, want an invalid request", req, err)
+		}
+	}
 
 	fixture.engine.failWith = errors.New(errors.Conflict, "the run finished")
 	for _, call := range []func() error{
@@ -758,6 +792,10 @@ func TestControlRejectsBadRequests(t *testing.T) {
 		},
 		func() error {
 			_, err := fixture.service.RetryStep(t.Context(), runs.RetryStepRequest{ItemID: "i"})
+			return err
+		},
+		func() error {
+			_, err := fixture.service.Regenerate(t.Context(), runs.RegenerateRequest{RunID: "r", ItemIDs: []string{"i"}})
 			return err
 		},
 	} {
@@ -836,6 +874,61 @@ func TestListItemsReportsWhetherTheStepCanStillBeRetried(t *testing.T) {
 				t.Fatalf("RetryBlockedReason = %q, want %q", view.RetryBlockedReason, tc.reason)
 			}
 		})
+	}
+}
+
+func TestListItemsNamesTheParentAHeldItemWaitsFor(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	record, parentItem := fixture.seedRun(t, run.StatusPaused)
+	parentID, childID := fixture.pages[0], fixture.pages[1]
+
+	parentItem.Status = run.StatusFailed
+	parentItem.CurrentStep = string(run.StepValidate)
+	if ok, err := fixture.items.Persist(t.Context(), parentItem, parentItem.AdvanceSeq); err != nil || !ok {
+		t.Fatalf("fail the parent item: %v, %v", ok, err)
+	}
+
+	held := run.Item{
+		ID: id.New(), RunID: record.ID, SiteID: record.SiteID, TargetID: childID, Status: run.StatusPaused,
+		CurrentStep: string(run.StepPublish), PauseReason: run.PauseAwaitingParent,
+		Note:       "/hub/child/ waits for its parent /hub/, which is not on the site yet",
+		Checkpoint: run.NewCheckpoint(), CreatedAt: sqlitetest.Stamp.Add(time.Second), UpdatedAt: sqlitetest.Stamp,
+	}
+	if err := fixture.items.Insert(t.Context(), held); err != nil {
+		t.Fatalf("insert the held item: %v", err)
+	}
+
+	entity := "entity"
+	fixture.mapping.known = map[string]pagemap.Page{
+		parentID: {ID: parentID, Path: "/hub/", EntityID: &entity},
+		childID:  {ID: childID, Path: "/hub/child/", ParentPageID: &parentID, EntityID: &entity},
+	}
+
+	list, err := fixture.service.ListItems(t.Context(), runs.ListItemsRequest{RunID: record.ID})
+	if err != nil || len(list.Items) != 2 {
+		t.Fatalf("ListItems = %+v, %v", list, err)
+	}
+
+	byTarget := make(map[string]runs.Item, 2)
+	for _, view := range list.Items {
+		byTarget[view.TargetID] = view
+	}
+
+	child := byTarget[childID]
+	if child.Note != held.Note {
+		t.Fatalf("the held item's note = %q, want the step's own sentence", child.Note)
+	}
+	want := runs.AwaitedParent{
+		PageID: parentID, Path: "/hub/", ItemID: parentItem.ID,
+		ItemStatus: string(run.StatusFailed), Step: string(run.StepValidate),
+	}
+	if child.WaitingFor == nil || *child.WaitingFor != want {
+		t.Fatalf("the held item waits for %+v, want %+v", child.WaitingFor, want)
+	}
+	if parent := byTarget[parentID]; parent.WaitingFor != nil {
+		t.Fatalf("the parent item waits for %+v, want nothing", parent.WaitingFor)
 	}
 }
 

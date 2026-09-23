@@ -12,6 +12,10 @@ export const app = {
     loadingMore: "Loading more",
     openExternal: "Open in Tor Browser",
     torMissing: "Tor Browser is not installed, so the link was not opened.",
+    torClosedToLinks:
+        "Tor Browser was opened by hand, so it takes no links from Postulator. Close it and click the link again: Postulator opens it, and every later link becomes a new tab.",
+    torClosedCopied:
+        "Tor Browser was opened by hand, so it takes no links from Postulator. The link is copied: paste it into a new tab, or close Tor Browser and click again so every later link becomes a new tab.",
     torSetUp: "Set up Tor Browser",
     more: "More",
 };

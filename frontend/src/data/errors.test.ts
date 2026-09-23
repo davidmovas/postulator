@@ -2,7 +2,16 @@ import { describe, expect, test } from "vitest";
 
 import type { Code } from "../lib/errors.js";
 import { copy } from "../copy/index.js";
-import { browserSettingsPath, failure, messages, needsPlugin, pluginCodeOf, providerMessageOf, react } from "./errors.js";
+import {
+    browserSettingsPath,
+    failure,
+    isTorClosedToLinks,
+    messages,
+    needsPlugin,
+    pluginCodeOf,
+    providerMessageOf,
+    react,
+} from "./errors.js";
 
 function rejection(code: Code, message = "", extra: Record<string, unknown> = {}): unknown {
     return new Error("rejected", { cause: { code, message, ...extra } });
@@ -23,6 +32,15 @@ describe("the error reaction map", () => {
         expect(react(rejection("INVALID", "the path must start with a slash", { details: { field: "path" } }))).toEqual(
             { kind: "field", field: "path", message: "the path must start with a slash" },
         );
+    });
+
+    test("a Tor Browser that takes no links says how to make it take them", () => {
+        const thrown = rejection("CONFLICT", "Tor Browser is open but was started without taking links", {
+            details: { code: "tor_closed_to_links" },
+        });
+        expect(react(thrown)).toEqual({ kind: "external", message: copy.app.torClosedToLinks });
+        expect(isTorClosedToLinks(thrown)).toBe(true);
+        expect(isTorClosedToLinks(rejection("CONFLICT"))).toBe(false);
     });
 
     test("a missing Tor Browser is a setup reaction that names where to fix it", () => {

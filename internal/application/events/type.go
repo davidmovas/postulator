@@ -34,6 +34,7 @@ const (
 	ItemDone          Type = "item.done"
 	ItemFailed        Type = "item.failed"
 	ItemNeedsHuman    Type = "item.needs_human"
+	ItemRestarted     Type = "item.restarted"
 	StepStarted       Type = "step.started"
 	StepDone          Type = "step.done"
 	StepFailed        Type = "step.failed"

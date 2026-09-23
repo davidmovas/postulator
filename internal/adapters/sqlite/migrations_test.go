@@ -34,6 +34,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0023_run_item_seq.sql",
 		"0024_page_observed.sql",
 		"0025_run_kind_repair_revert.sql",
+		"0026_run_item_note.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -70,8 +71,8 @@ func TestMigrationsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("version after up: %v", err)
 	}
-	if version != 25 {
-		t.Fatalf("version after up = %d, want 25", version)
+	if version != 26 {
+		t.Fatalf("version after up = %d, want 26", version)
 	}
 
 	if _, err = provider.DownTo(t.Context(), 0); err != nil {
@@ -95,8 +96,8 @@ func TestMigrationsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("version after the second up: %v", err)
 	}
-	if version != 25 {
-		t.Errorf("version after the second up = %d, want 25", version)
+	if version != 26 {
+		t.Errorf("version after the second up = %d, want 26", version)
 	}
 }
 
