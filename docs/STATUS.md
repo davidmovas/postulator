@@ -3,7 +3,8 @@
 The handoff point between sessions. Read this first. The reasoning behind every phase and
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
-**Branch:** `rewrite/v2`, cut from `dev`. **Target release:** `v2.0.0`, not tagged yet.
+**Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
+**Released:** `v2.0.0` on 2026-09-23. `dev` carries the fixes after it, not tagged yet.
 
 ## Where we are
 
@@ -33,6 +34,27 @@ The hardening answered four complaints from the client's own use; the reasoning 
   `agent.waiting` says when a provider is holding one, the stored history replays a shortened
   tool result, and the tool schemas have a ceiling with a test on it.
 
+**After 2.0.0 (2026-09-23),** from the client's first real hour on OpenAI; the reasoning is under
+**2026-09-23 — after 2.0.0** in `DECISIONS.md`.
+
+- **A child waits for its parent.** Publish holds a child whose parent is not on the site as
+  `awaiting_parent` with a sentence naming the parent, and the sweep releases it as soon as the
+  parent page has a `wpId`, whoever published it. A paused run is no longer reaped, and every revival
+  re-arms its deadline. A run that publishes brings the parents that are not on the site.
+- **Regenerate from the start.** `RunsService.Regenerate` and `runs_regenerate` write stopped items
+  again from their first step inside the same run, against the template as it is now; an item that
+  already wrote to the site is refused so its revert stays exact. The drawer offers it, a run with
+  failed items offers it for all of them, and a held child names its parent and offers to open or
+  regenerate it.
+- **Start a run picks from the page tree**, with status, search, a not-on-the-site filter, whole
+  branches and the parents that will be written first.
+- **Cost.** The writer is `gpt-5.6-terra`, the editor and the judge `gpt-5.6-luna`; images ask for
+  `images.openaiQuality` (medium) and every image is a ledger call, so it counts in spend and budget.
+- **Two docker stacks.** `task sandbox:*` is the owner's WordPress on 8089, `task e2e:*` the suites'
+  own on 8088; the plugin is installed from its zip, never bind-mounted, and the suites clean up.
+- **Tor Browser.** A link opens as a new tab in the Tor Browser Postulator started; one the person
+  opened by hand is left alone with a toast that says what to do and copies the link.
+
 `relink`, `repair`, `sync` and `revert` own their recipes, so Relink no longer regenerates the
 page and a seeded template that names no recipe runs `run.GenerateRecipe()` instead of being
 refused. The companion plugin is **1.2.0**, adding `GET /seo-meta/{id}` behind the
@@ -42,18 +64,19 @@ a repair, a cancel, a byte-identical revert, a trash and a backup.
 
 ## The gate
 
-Green on 2026-09-23 over the code at `e3f2478`; every commit after it is documentation.
+Green on 2026-09-23 over the code at `a035b62` on `dev`; every commit after it is documentation.
 
 - `gofmt -l .` silent, `task check:go:comments`, `go build ./...`, `go vet ./...`.
 - `golangci-lint run` and `task lint:e2e` 0 issues; `go test -race -count=1 -p 2` green.
-- `go run ./cmd/covergate`: **domain+application 85.49% of 6567** (gate 80%), **total 86.40% of 17644** (gate 70%).
-- `task bindings`: **15 services, 118 methods**; `task events` and `task vocab` leave no diff.
-- **89 tools**, 74,617 bytes of schema against the 74,700 the registry test allows.
-- `npm run typecheck` clean; `npx vitest run` **1081 tests in 109 files** over two projects.
-- `task ui:lint` 0 issues plus the harness tests (370 s), and `task build`, `task package` and
-  `task plugin:zip`. `task ui:walk` covers **68 routes**, last walked and read on 2026-09-23.
-- The docker suites were last run by hand on 2026-09-23, all green: `task e2e:test` 22 s,
-  `task e2e:full` 1 m 30 s (the client scenario is 54 s of it), `task e2e:full:noplugin` 47 s.
+- `go run ./cmd/covergate`: **domain+application 85.60% of 6673** (gate 80%), **total 86.44% of 17973** (gate 70%).
+- `task bindings`: **15 services, 119 methods**; `task events` and `task vocab` leave no diff.
+- **90 tools**, 75,045 bytes of schema against the 75,100 the registry test allows.
+- `npm run typecheck` clean; `npx vitest run` **1116 tests in 113 files** over two projects.
+- `task ui:lint` 0 issues plus the harness tests, and `task build`. The seeded window was walked on
+  2026-09-23 for the held run, its child's drawer and the failed-items banner.
+- The docker suites ran on the e2e stack (8088) on 2026-09-23: `task e2e:test` 25 s, the whole-loop
+  package 76 s including the new held-parent scenario, and the stack held none of their pages after.
+- Tor Browser 15.0.23 by hand: three https links from the adapter, one window, no dialog.
 
 ## How to run
 
@@ -64,7 +87,8 @@ task package · plugin:zip         the NSIS installer and the plugin archive, in
 task ui:run · walk · shot · reset the harness window, seeded, DevTools on 9222
 task ui:lint                      lint and tests behind the uiharness build tag
 task lint:e2e                     the build-tagged sources golangci-lint run skips
-task e2e:up · test · full · full:noplugin · down     the docker WordPress stack
+task e2e:up · test · full · full:noplugin · down     the suites' WordPress on 8088
+task sandbox:up · down · reset    the owner's WordPress on 8089, plugin from its zip
 go test -race -count=1 -p 2 -covermode=atomic -coverprofile=coverage.out ./...
 go run ./cmd/covergate            the coverage gates on that profile
 $(go env GOPATH)/bin/golangci-lint.exe run
@@ -142,9 +166,15 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 
 ## Next steps
 
-1. A human walk of what automation cannot see: dragging and snapping the frameless window, a
-   real provider key, a real WordPress, Tor installed elsewhere.
-2. Push `rewrite/v2`, let CI go green, merge into `dev` and then into `master`, tag `v2.0.0`;
-   `release.yml` publishes the executable, the installer and the 1.2.0 plugin from that tag.
-3. The residue above: the denied tool row's decision, the four narrow-width UI items, the ledger
-   screen, `ProposeFromPages` and `Import.Apply` as runs, `settings.changed` for a declared value.
+1. Move the sandbox onto the new compose with `task sandbox:up` (it recreates the WordPress
+   container without the plugin mount and keeps the volumes), then regenerate the seven pages the
+   2026-09-23 e2e run left on it (`/components/`, `/electric-bikes/`, `/components/batteries/`,
+   `/electric-bikes/cargo/`, `/electric-bikes/commuter/`, `…/hauler-cargo-max/`,
+   `…/volt-commuter-500/`) with an ordinary run; they are parents of real pages, so they are
+   rewritten, not deleted.
+2. A human walk of the new flows on a real provider: a failed parent regenerated in place, its
+   children going on by themselves, the tree picker on a real site.
+3. When the owner says so: PR `dev` into `master` and a `v2.0.1` tag; `release.yml` publishes from it.
+4. The residue above: the denied tool row's decision, the four narrow-width UI items, the ledger
+   screen, `ProposeFromPages` and `Import.Apply` as runs, `settings.changed` for a declared value,
+   and pricing images in the pre-run estimate.
