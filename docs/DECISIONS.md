@@ -1326,11 +1326,11 @@ the reasoning of each vector, in wave order.
   is refused rather than quietly ignored, and `custom` is the one kind exempt from every step rule.
 - **A template with no recipe of its own runs the generate recipe.** All five shipped seeds carry
   none, so no seeded template could start a run at all; `run.GenerateRecipe()` is the fallback.
-- **A step a kind owns is not a `StepName`.** `relink_page` follows `revert` as an untyped const
-  beside the block, which keeps it out of `vocab.ts`, out of the blank template's recipe and out of
-  the three tool step enums at once. `run.PerKindStep` and `run.TemplateStepNames` put the rule in
-  the domain, and `runs.Start` refuses a recipe that enables a step another kind owns — which is
-  what stopped a blank template's first run from failing at `repair_hierarchy`.
+- **A step a kind owns is not a `StepName`.** The four of them are `run.PerKindStepName` values,
+  a type of their own, which keeps them out of `vocab.ts`, out of the blank template's recipe and
+  out of the three tool step enums at once; `run.PerKindStep` puts the predicate in the domain and
+  `runs.Start` refuses a recipe that enables one. That is what stopped a blank template's first
+  run from failing at `repair_hierarchy`, which the blank recipe had enabled before `publish`.
 - **A relink costs nothing and writes nothing but links.** It reads the page from the site, places
   what the page's own rules ask for against the page's own cap and writes back under a hash CAS. No
   model is called, so `Estimate` answers zero for `relink`, `repair` and `sync`.

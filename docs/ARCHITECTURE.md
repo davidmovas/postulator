@@ -94,10 +94,11 @@ recipe. `relink` (`resolve_context relink_page sync_back report`), `repair`
 (`repair_hierarchy sync_back report`), `sync` (`sync_site`) and `revert` (`revert`) hand out
 their own steps and refuse a recipe that disagrees; `generate` takes the template's, or
 `run.GenerateRecipe()` when neither the request nor the template names one; `custom` is the
-one kind exempt from every step rule. `relink_page` and `revert` are declared as untyped
-consts beside the `StepName` block, because `StepName` is the vocabulary a *template* recipe
-may draw from and it is rendered into `vocab.ts`, into the blank template's recipe and into
-three tool enums.
+one kind exempt from every step rule. The four steps a kind owns — `repair_hierarchy`,
+`sync_site`, `relink_page` and `revert` — are `PerKindStepName` values, a type of their own,
+because `StepName` is the vocabulary a *template* recipe may draw from and it is rendered into
+`vocab.ts`, into the blank template's recipe and into three tool enums. Sixteen steps are
+registered; twelve of them a template may name.
 
 `relink_page` places the links a page's own rules ask for against the page's own cap and
 writes the body back under a hash compare-and-swap. It calls no model, so a relink, a repair

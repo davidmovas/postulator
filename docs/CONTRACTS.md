@@ -169,10 +169,10 @@ enables a step another kind owns, for every kind but `custom`.
 | `audit`, `import` | none of its own |
 | `custom` | none of its own, and the one kind exempt from every step rule |
 
-`relink_page` and `revert` are untyped consts beside the `StepName` block rather than
-`StepName` values, so neither reaches `vocab.ts`, the blank template's recipe or the three
-tool step enums. `repair_hierarchy` and `sync_site` are still `StepName` values; a template
-recipe that enables one is refused by `runs.Start`.
+`repair_hierarchy`, `sync_site`, `relink_page` and `revert` are `run.PerKindStepName` values,
+a type of their own, so none of them reaches `vocab.ts`, the blank template's recipe or the
+three tool step enums; `run.PerKindStep(name)` is the domain predicate and
+`run.StepNames()` is what a template recipe may draw from.
 
 `RunsService.Estimate` answers zero for `relink`, `repair` and `sync`, because none of their
 steps declares a model role. It carries `findings []{code, message}`, and `unpriced_step`
