@@ -554,12 +554,6 @@
     "wait": 1800,
     "steps": [
       {
-        "click": "[data-tool-status=denied]"
-      },
-      {
-        "wait": 500
-      },
-      {
         "click": "[data-tool-status=error]"
       },
       {
@@ -635,6 +629,19 @@
       },
       {
         "wait": 500
+      }
+    ]
+  },
+  {
+    "name": "dock-closed",
+    "route": "#/s/:siteId/overview",
+    "wait": 1500,
+    "steps": [
+      {
+        "click": "[aria-label=\"Collapse the agent dock\"]"
+      },
+      {
+        "wait": 900
       }
     ]
   },
