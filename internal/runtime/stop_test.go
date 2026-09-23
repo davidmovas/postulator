@@ -59,6 +59,12 @@ func siteClient(t *testing.T, server *wptest.Server) *wp.Client {
 	return client
 }
 
+func onlyAStopInterrupts(def run.StepDef) run.StepDef {
+	def.Timeout = time.Minute
+	def.Retry = run.RetryPolicy{}
+	return def
+}
+
 func TestAStepThatWroteToTheSiteIsRecordedWhileTheEngineStops(t *testing.T) {
 	t.Parallel()
 
@@ -68,7 +74,7 @@ func TestAStepThatWroteToTheSiteIsRecordedWhileTheEngineStops(t *testing.T) {
 
 	calls := newCounter()
 	created := make(chan struct{})
-	writing := producing("publish", run.ArtifactPublishResult, nil,
+	writing := onlyAStopInterrupts(producing("publish", run.ArtifactPublishResult, nil,
 		func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			calls.hit(sc.Page.ID)
 			if _, err := client.CreateItem(ctx, wp.TypePage, wp.CreateItem{
@@ -83,7 +89,7 @@ func TestAStepThatWroteToTheSiteIsRecordedWhileTheEngineStops(t *testing.T) {
 				WakeAt:    time.Now().UTC().Add(200 * time.Millisecond),
 				Artifacts: []run.Artifact{{Kind: run.ArtifactPublishResult, Blob: []byte(`{"created":true}`)}},
 			}, nil
-		})
+		}))
 
 	first := harness.engine(t, mustRegister(t, writing))
 	queued, err := first.Enqueue(t.Context(), harness.newRun(recipeOf("publish")))
@@ -126,12 +132,12 @@ func TestAStepStoppedByTheEngineIsHandedBackNotFailed(t *testing.T) {
 
 	harness := newHarness(t, 1)
 	calls := newCounter()
-	waiting := producing("generate_body", run.ArtifactBodyHTML, nil,
+	waiting := onlyAStopInterrupts(producing("generate_body", run.ArtifactBodyHTML, nil,
 		func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			calls.hit(sc.Page.ID)
 			<-ctx.Done()
 			return run.Result{}, ctx.Err()
-		})
+		}))
 
 	engine := harness.engine(t, mustRegister(t, waiting))
 	queued, err := engine.Enqueue(t.Context(), harness.newRun(recipeOf("generate_body")))
@@ -171,12 +177,12 @@ func TestStopHandsBackAnItemWhoseSettleCouldNotBeWritten(t *testing.T) {
 
 	release := make(chan struct{})
 	calls := newCounter()
-	blocking := producing("generate_body", run.ArtifactBodyHTML, nil,
+	blocking := onlyAStopInterrupts(producing("generate_body", run.ArtifactBodyHTML, nil,
 		func(_ context.Context, sc *run.StepContext) (run.Result, error) {
 			calls.hit(sc.Page.ID)
 			<-release
 			return run.Result{Artifacts: []run.Artifact{{Kind: run.ArtifactBodyHTML, Blob: []byte("<p>ok</p>")}}}, nil
-		})
+		}))
 
 	engine := harness.engine(t, mustRegister(t, blocking))
 	queued, err := engine.Enqueue(t.Context(), harness.newRun(recipeOf("generate_body")))
