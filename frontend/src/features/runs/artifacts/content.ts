@@ -105,7 +105,7 @@ export interface PlacedImageView {
 
 export interface ImagesView {
     images: readonly PlacedImageView[];
-    skipped: readonly string[];
+    findings: readonly Finding[];
     featuredId: number | null;
 }
 
@@ -124,7 +124,7 @@ export function imagesView(held: unknown): ImagesView | null {
             });
         }
     }
-    return { images, skipped: stringsAt(held, "skipped"), featuredId: numberAt(held, "featuredId") };
+    return { images, findings: findingsAt(held, "findings"), featuredId: numberAt(held, "featuredId") };
 }
 
 export interface NeighbourView {

@@ -116,7 +116,7 @@ func TestGenerateImagesHonoursItsProducesWhenTheTemplateAsksForNone(t *testing.T
 	if len(result.Artifacts) != 1 || result.Artifacts[0].Kind != run.ArtifactImages {
 		t.Fatalf("the step produced %+v, want the empty manifest its Produces promises", result.Artifacts)
 	}
-	if len(manifest.Images) != 0 || len(manifest.Skipped) != 0 || len(manifest.Findings) != 0 {
+	if len(manifest.Images) != 0 || len(manifest.Findings) != 0 {
 		t.Fatalf("manifest = %+v, want an empty one", manifest)
 	}
 	if len(server.Uploads()) != 0 {
@@ -248,9 +248,6 @@ func TestGenerateImagesRecordsWhatItCouldNotDo(t *testing.T) {
 			}
 
 			manifest, _ := runImages(t, deps, imageContext(t, tc.spec))
-			if len(manifest.Skipped) != 1 || !strings.HasPrefix(manifest.Skipped[0], tc.want) {
-				t.Fatalf("skipped = %v, want one entry starting with %q", manifest.Skipped, tc.want)
-			}
 			if manifest.FeaturedID != 0 {
 				t.Fatalf("manifest = %+v, want no featured image", manifest)
 			}

@@ -48,13 +48,11 @@ type PlacedImage struct {
 
 type ImagesResult struct {
 	Images     []PlacedImage     `json:"images"`
-	Skipped    []string          `json:"skipped"`
 	Findings   []content.Finding `json:"findings"`
 	FeaturedID int64             `json:"featuredId"`
 }
 
 func (r *ImagesResult) skip(page pagemap.Page, code, message, reason string) {
-	r.Skipped = append(r.Skipped, code+": "+reason)
 	r.Findings = append(r.Findings, content.Finding{
 		Severity: content.SeverityWarn,
 		Code:     code,
@@ -74,7 +72,6 @@ func GenerateImages(deps Deps) run.StepDef {
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			result := ImagesResult{
 				Images:   make([]PlacedImage, 0),
-				Skipped:  make([]string, 0),
 				Findings: make([]content.Finding, 0),
 			}
 

@@ -242,9 +242,29 @@ describe("the remaining artifact shapes", () => {
     });
 
     it("reads images", () => {
-        const view = imagesView({ images: [{ role: "hero", url: "u", alt: "a", wpId: 3 }], skipped: [], featuredId: 3 });
+        const view = imagesView({ images: [{ role: "hero", url: "u", alt: "a", wpId: 3 }], findings: [], featuredId: 3 });
         expect(view?.images[0].wpId).toBe(3);
         expect(view?.featuredId).toBe(3);
+        expect(view?.findings).toStrictEqual([]);
+    });
+
+    it("reads what the image step could not do as findings", () => {
+        const view = imagesView({
+            images: [],
+            findings: [
+                {
+                    severity: "warn",
+                    code: "no_image_source",
+                    message: "the images of /coffee/espresso/ were not made: no image provider is configured",
+                    details: { pageId: "p1", path: "/coffee/espresso/", reason: "no image provider is configured" },
+                },
+            ],
+            featuredId: 0,
+        });
+        expect(view?.images).toStrictEqual([]);
+        expect(view?.findings).toHaveLength(1);
+        expect(view?.findings[0].code).toBe("no_image_source");
+        expect(view?.findings[0].message).toMatch(/\/coffee\/espresso\//);
     });
 
     it("reads a relink result under the Go field name", () => {

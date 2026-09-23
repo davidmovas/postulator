@@ -318,7 +318,11 @@ export const runs = {
             liveUrl: "Live URL",
         },
         draft: { sections: "Sections", summary: "Summary" },
-        images: { featured: "Featured image", skipped: "Skipped", none: "No image was placed." },
+        images: {
+            featured: "Featured image",
+            problems: "What the step could not do",
+            none: "No image was placed.",
+        },
         relink: {
             linked: "linked",
             conflicts: "conflicts",

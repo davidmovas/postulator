@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import { copy } from "../../../copy/index.js";
 import { HtmlPreview, SectionLabel } from "../../../ui/index.js";
 import { draftView, imagesView, metaView } from "../artifacts.js";
+import { FindingList } from "../findings.js";
 import { Rows, Unreadable } from "./shared.js";
 
 export interface PayloadPaneProps {
@@ -61,29 +62,38 @@ export function ImagesPane({ payload }: PayloadPaneProps): ReactElement {
     if (view === null) {
         return <Unreadable />;
     }
-    if (view.images.length === 0) {
+    if (view.images.length === 0 && view.findings.length === 0) {
         return <p className="px-3 py-2 text-xs text-ink-dim">{copy.runs.review.images.none}</p>;
     }
     return (
         <div className="flex flex-col gap-2 pb-3">
-            <ul className="flex flex-col">
-                {view.images.map((image) => (
-                    <li
-                        key={image.url}
-                        className="flex items-center gap-2 border-b border-inset px-3 py-1.5 text-xs last:border-b-0"
-                    >
-                        <span className="w-20 shrink-0 text-2xs text-ink-faint">{image.role}</span>
-                        <span className="min-w-0 flex-1 truncate font-mono text-ink-soft">{image.url}</span>
-                        <span className="w-40 shrink-0 truncate text-2xs text-ink-faint">{image.alt}</span>
-                    </li>
-                ))}
-            </ul>
+            {view.images.length === 0 ? (
+                <p className="px-3 py-2 text-xs text-ink-dim">{copy.runs.review.images.none}</p>
+            ) : (
+                <ul className="flex flex-col">
+                    {view.images.map((image) => (
+                        <li
+                            key={image.url}
+                            className="flex items-center gap-2 border-b border-inset px-3 py-1.5 text-xs last:border-b-0"
+                        >
+                            <span className="w-20 shrink-0 text-2xs text-ink-faint">{image.role}</span>
+                            <span className="min-w-0 flex-1 truncate font-mono text-ink-soft">{image.url}</span>
+                            <span className="w-40 shrink-0 truncate text-2xs text-ink-faint">{image.alt}</span>
+                        </li>
+                    ))}
+                </ul>
+            )}
             <Rows
                 entries={[
                     [copy.runs.review.images.featured, view.featuredId === null ? "" : String(view.featuredId)],
-                    [copy.runs.review.images.skipped, view.skipped.join(", ")],
                 ]}
             />
+            {view.findings.length === 0 ? null : (
+                <>
+                    <SectionLabel className="px-3">{copy.runs.review.images.problems}</SectionLabel>
+                    <FindingList findings={view.findings} empty={copy.runs.review.images.none} />
+                </>
+            )}
         </div>
     );
 }
