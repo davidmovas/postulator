@@ -74,13 +74,46 @@ policy, resolved global → site → page by JSON merge patch), `content` (an HT
 link context, link insertion, compliance and structure reports), `run`, `schedule`,
 `settings`, and the `llm` model catalog types.
 
-The heart of it is `content`: `BuildLinkContext` turns a graph plus a page index into
-the set of links a page owes, `InsertLinks` places them with a decision recorded per
-candidate, and `Compliance` grades the result back against the graph.
+The heart of it is `content`: `PlanLinks` turns a graph, a page index and a
+`content.Subject{Site, PageID, PagePath, EntityID}` into the set of links that page owes,
+`InsertLinks` places them with a decision recorded per candidate, and `Compliance` grades
+the result back against the graph. The subject is the page in hand, never its entity's
+canonical page, so a run's validation and the Linking screen bind "self" to the same page.
+
+There is one answer to where an href points, and it is `pagemap.Site{Scheme, Host, Base}`,
+built once per site from its `BaseURL`. `Site.Resolve` answers a normalised site path and a
+kind (`path`, `same_document`, `external`, `unresolved`) by mirroring the companion plugin's
+`internal_href_to_path` rule by rule, so what the plugin records and what the domain judges
+cannot drift. `content.LinkContext` carries that site and every classifier — insertion,
+compliance, the audit and the link counter — resolves through it.
 
 ## Run engine
 
-A run is a recipe of named steps over a set of target pages. `advance(itemID)` claims an
+A run is a recipe of named steps over a set of target pages, and a run kind may own that
+recipe. `relink` (`resolve_context relink_page sync_back report`), `repair`
+(`repair_hierarchy sync_back report`), `sync` (`sync_site`) and `revert` (`revert`) hand out
+their own steps and refuse a recipe that disagrees; `generate` takes the template's, or
+`run.GenerateRecipe()` when neither the request nor the template names one; `custom` is the
+one kind exempt from every step rule. `relink_page` and `revert` are declared as untyped
+consts beside the `StepName` block, because `StepName` is the vocabulary a *template* recipe
+may draw from and it is rendered into `vocab.ts`, into the blank template's recipe and into
+three tool enums.
+
+`relink_page` places the links a page's own rules ask for against the page's own cap and
+writes the body back under a hash compare-and-swap. It calls no model, so a relink, a repair
+and a sync are all estimated at nothing.
+
+A **revert** is a run like any other: kind `revert`, a parent run, one item per page the
+source run still holds a `publish_result` for, and a reversed order so a parent is never
+trashed before its children. A page the run created goes to the WordPress trash and its row
+returns to `planned` with no WordPress id, no hash, no mirror and no links; a page it updated
+has `previousContent` written back under a CAS and `previousMeta` restored through the
+plugin's `seo_meta_read`; every neighbour a relink rewrote has its `before.html` put back.
+A human edit since the run, a missing record, a page already gone or a site without the
+plugin holds that one item with both facts named, and every other item still goes back. Media
+stays.
+
+`advance(itemID)` claims an
 item in one SQLite transaction by compare-and-swap, runs its current step under a
 timeout, classifies the outcome into a `Fault`, and persists the new state, the
 checkpoint, a `StepExec` row and an appended event together. Large step outputs go to
@@ -105,6 +138,19 @@ goroutine, so a confirmation survives a restart. The composition root constructs
 one `EventBridge` per process, because the application-event `seq` is a counter held by
 that instance and a second bridge would restart it.
 
+The guard itself is not transport's. `Fence`, `Permit` and `Cap` live in
+`internal/application/agent`; `internal/transport/agent` adapts them to gollem middleware
+and `Confirm` calls them directly, so a confirmed tool is fenced, permitted and capped by
+construction rather than by a second implementation. Nothing is injected through `Deps` and
+nothing in `application` imports `transport`, so the dependency rule holds without a new
+seam.
+
+Every model call of an agent turn is its own `llm_calls` row with `step = "chat"`, priced
+against the catalog per round and written outside the turn's cancellation, so a stopped turn
+is still billed for the rounds that ran. The turn's cost is the sum of those rows, which is
+what makes the spend badge and the ledger agree by construction instead of by two independent
+pricings; each round also announces itself as `agent.usage`.
+
 ## The locked core
 
 `app.Open` reads `%APPDATA%/Postulator/master.key`, or refuses when `master.key.pw` says a
@@ -121,15 +167,19 @@ again from what it read.
 
 ## WordPress companion plugin
 
-`wp-plugin/postulator-companion` (PHP ≥ 8.1, WP ≥ 6.4, no dependencies) serves
-`/wp-json/postulator/v1`; every permission callback requires `edit_posts`, and the password
-must belong to an **administrator**, so **multisite is unsupported in v2.0**.
+`wp-plugin/postulator-companion` **1.2.0** (PHP ≥ 8.1, WP ≥ 6.4, no dependencies) serves
+`/wp-json/postulator/v1` and advertises `bulk seo_meta seo_meta_read content_hash raw
+preview`; every permission callback requires `edit_posts`, and the password must belong to an
+**administrator**, so **multisite is unsupported in v2.0**. A capability the manifest does not
+name is refused from the cached manifest before any request, so a site still on 1.1.0 answers
+`plugin_outdated` for the SEO read rather than a 404.
 
 | Route | Purpose |
 |---|---|
 | `GET /manifest` | version, capabilities, detected SEO plugin, WP version, site URL |
 | `GET /content` | keyset page over posts then `product_cat` terms: hash, links, h1, meta |
-| `PUT /seo-meta/{id}` | writes the SEO fields present in the body; posts only |
+| `PUT /seo-meta/{id}` | writes the SEO fields present in the body, deleting a key given an empty value; posts only |
+| `GET /seo-meta/{id}` | the five SEO fields the post holds and the detected SEO plugin, behind the `seo_meta_read` capability; posts only (since 1.2.0) |
 | `GET`/`PUT /content/{id}/raw` | raw `post_content` and its sha256; the write is a compare-and-swap returning `409 hash_mismatch` on a stale hash |
 | `POST /content/{id}/preview` | an hour-long link that renders a draft through the theme; the token is kept only as its sha256, and `posts_results` flips that one post to `publish` for that request, uncached and noindex (since 1.1.0) |
 
