@@ -16,9 +16,14 @@ const (
 	SourceSetting  = "setting"
 	SourceDetected = "detected"
 
+	ClosedToLinksCode = "tor_closed_to_links"
+
 	folderName     = "Tor Browser"
 	executableName = "firefox.exe"
 	markerName     = "TorBrowser"
+
+	allowRemote = "--allow-remote"
+	newTab      = "-new-tab"
 
 	profileVariable = "USERPROFILE"
 	localVariable   = "LOCALAPPDATA"
@@ -27,15 +32,36 @@ const (
 
 type Lookup func(name string) string
 
-type Browser struct {
-	lookup Lookup
+type desktop interface {
+	Accepting(profile string) (bool, error)
+	Running(exe string) (bool, error)
+	Start(path string, args ...string) error
 }
 
-func New(lookup Lookup) *Browser {
+type Option func(*Browser)
+
+func WithDesktop(d desktop) Option {
+	return func(b *Browser) {
+		if d != nil {
+			b.desktop = d
+		}
+	}
+}
+
+type Browser struct {
+	lookup  Lookup
+	desktop desktop
+}
+
+func New(lookup Lookup, opts ...Option) *Browser {
 	if lookup == nil {
 		lookup = os.Getenv
 	}
-	return &Browser{lookup: lookup}
+	browser := &Browser{lookup: lookup, desktop: system{}}
+	for _, opt := range opts {
+		opt(browser)
+	}
+	return browser
 }
 
 func (b *Browser) Locate(configured string) (path, source string, ok bool) {
@@ -82,15 +108,33 @@ func isTorBrowser(exe string) bool {
 }
 
 func (b *Browser) Open(path, url string) error {
-	started := command(path, url)
-	if err := started.Start(); err != nil {
-		return errors.Wrap(err, errors.External, "start Tor Browser")
+	accepting, err := b.desktop.Accepting(profileOf(path))
+	if err != nil {
+		return err
 	}
-	return errors.Wrap(started.Process.Release(), errors.External, "let Tor Browser run on its own")
+	if accepting {
+		return b.desktop.Start(path, allowRemote, newTab, url)
+	}
+
+	running, err := b.desktop.Running(path)
+	if err != nil {
+		return err
+	}
+	if running {
+		return errors.New(errors.Conflict, "Tor Browser is open but was started without taking links from "+
+			"other programs, so a new tab cannot be added to it; close Tor Browser and open the link again, "+
+			"and every link after that opens as a new tab").
+			WithDetail("code", ClosedToLinksCode)
+	}
+	return b.desktop.Start(path, allowRemote, url)
 }
 
-func command(path, url string) *exec.Cmd {
-	built := exec.Command(path, url)
+func profileOf(exe string) string {
+	return filepath.Join(filepath.Dir(exe), markerName, "Data", "Browser", "profile.default")
+}
+
+func command(path string, args ...string) *exec.Cmd {
+	built := exec.Command(path, args...)
 	built.Dir = filepath.Dir(path)
 	built.SysProcAttr = &syscall.SysProcAttr{
 		CreationFlags: windows.DETACHED_PROCESS | windows.CREATE_NEW_PROCESS_GROUP,

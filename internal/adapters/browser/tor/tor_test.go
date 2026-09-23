@@ -1,8 +1,11 @@
 package tor_test
 
 import (
+	stderrors "errors"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/browser/tor"
@@ -164,11 +167,136 @@ func TestLocateFindsNothingWithoutRoots(t *testing.T) {
 	}
 }
 
+type started struct {
+	path string
+	args []string
+}
+
+type desktop struct {
+	accepting  bool
+	running    bool
+	probeErr   error
+	startErr   error
+	asked      string
+	askedImage string
+	starts     []started
+}
+
+func (d *desktop) Accepting(profile string) (bool, error) {
+	d.asked = profile
+	return d.accepting, d.probeErr
+}
+
+func (d *desktop) Running(exe string) (bool, error) {
+	d.askedImage = exe
+	return d.running, d.probeErr
+}
+
+func (d *desktop) Start(path string, args ...string) error {
+	d.starts = append(d.starts, started{path: path, args: args})
+	return d.startErr
+}
+
+func TestOpenAddsATabOrStartsTorBrowserSoLaterLinksBecomeTabs(t *testing.T) {
+	t.Parallel()
+
+	exe := filepath.Join(t.TempDir(), "Tor Browser", "Browser", "firefox.exe")
+	profile := filepath.Join(filepath.Dir(exe), "TorBrowser", "Data", "Browser", "profile.default")
+	const address = "https://example.test/espresso-machines/"
+
+	cases := []struct {
+		name      string
+		desktop   desktop
+		wantArgs  []string
+		wantCode  errors.Code
+		wantLeave bool
+	}{
+		{
+			name:     "an open Tor Browser that takes links gets a new tab",
+			desktop:  desktop{accepting: true, running: true},
+			wantArgs: []string{"--allow-remote", "-new-tab", address},
+		},
+		{
+			name:     "a closed Tor Browser is started so it takes the links after this one",
+			desktop:  desktop{},
+			wantArgs: []string{"--allow-remote", address},
+		},
+		{
+			name:      "an open Tor Browser that takes no links is left alone",
+			desktop:   desktop{running: true},
+			wantCode:  errors.Conflict,
+			wantLeave: true,
+		},
+		{
+			name:      "a desktop that cannot be read starts nothing",
+			desktop:   desktop{probeErr: errors.New(errors.External, "the window list could not be read")},
+			wantCode:  errors.External,
+			wantLeave: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			seen := tc.desktop
+			err := tor.New(lookupOf(nil), tor.WithDesktop(&seen)).Open(exe, address)
+
+			if tc.wantCode != "" {
+				if !errors.IsCode(err, tc.wantCode) {
+					t.Fatalf("Open = %v, want %s", err, tc.wantCode)
+				}
+			} else if err != nil {
+				t.Fatalf("Open: %v", err)
+			}
+			if tc.wantLeave {
+				if len(seen.starts) != 0 {
+					t.Fatalf("Open started %+v; a second Tor Browser asks the person to close the first", seen.starts)
+				}
+				return
+			}
+
+			if seen.asked != profile {
+				t.Errorf("Open looked for the links of %q, want the profile %q", seen.asked, profile)
+			}
+			if len(seen.starts) != 1 || seen.starts[0].path != exe || !slices.Equal(seen.starts[0].args, tc.wantArgs) {
+				t.Fatalf("Open started %+v, want %s %v", seen.starts, exe, tc.wantArgs)
+			}
+		})
+	}
+}
+
+func TestOpenNamesWhatToDoWhenTorBrowserTakesNoLinks(t *testing.T) {
+	t.Parallel()
+
+	exe := filepath.Join(t.TempDir(), "Tor Browser", "Browser", "firefox.exe")
+	err := tor.New(lookupOf(nil), tor.WithDesktop(&desktop{running: true})).Open(exe, "https://example.test/")
+
+	var refusal *errors.Error
+	if !stderrors.As(err, &refusal) || refusal.Details["code"] != tor.ClosedToLinksCode {
+		t.Fatalf("Open = %v, want the %s code", err, tor.ClosedToLinksCode)
+	}
+	if !strings.Contains(err.Error(), "close Tor Browser") {
+		t.Fatalf("the refusal %q does not say what to do", err.Error())
+	}
+}
+
 func TestOpenStartsTheProcessAndReturns(t *testing.T) {
 	t.Setenv(childVariable, "1")
 
-	browser := tor.New(lookupOf(nil))
-	if err := browser.Open(os.Args[0], "https://example.test/espresso-machines/"); err != nil {
+	stand := filepath.Join(t.TempDir(), "Tor Browser", "Browser", "firefox.exe")
+	if err := os.MkdirAll(filepath.Dir(stand), 0o750); err != nil {
+		t.Fatalf("lay out the stand-in: %v", err)
+	}
+	binary, err := os.ReadFile(os.Args[0])
+	if err != nil {
+		t.Fatalf("read the test binary: %v", err)
+	}
+	if err = os.WriteFile(stand, binary, 0o700); err != nil {
+		t.Fatalf("write the stand-in: %v", err)
+	}
+
+	if err = tor.New(lookupOf(nil)).Open(stand, "https://example.test/espresso-machines/"); err != nil {
 		t.Fatalf("Open: %v", err)
 	}
 }

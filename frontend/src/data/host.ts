@@ -1,7 +1,10 @@
 import { Dialogs } from "@wailsio/runtime";
 
+import { copy } from "../copy/index.js";
 import { announceThrown } from "./client.js";
 import { openBrowser } from "./endpoints/browser.js";
+import { isTorClosedToLinks } from "./errors.js";
+import { pushToast } from "./toasts.js";
 
 export interface HostFilter {
     displayName: string;
@@ -70,7 +73,20 @@ export async function openExternal(url: string): Promise<boolean> {
         await openBrowser({ url });
         return true;
     } catch (thrown) {
+        if (isTorClosedToLinks(thrown)) {
+            pushToast("warning", (await copied(url)) ? copy.app.torClosedCopied : copy.app.torClosedToLinks, null, null);
+            return false;
+        }
         announceThrown(thrown);
+        return false;
+    }
+}
+
+async function copied(text: string): Promise<boolean> {
+    try {
+        await navigator.clipboard.writeText(text);
+        return true;
+    } catch {
         return false;
     }
 }
