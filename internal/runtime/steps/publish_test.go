@@ -201,6 +201,58 @@ func TestPublishKeepsNoPreviousMetaItCouldNotRead(t *testing.T) {
 	}
 }
 
+func TestPublishSaysWhenRetentionTookTheMetaBeforeItCouldBeWritten(t *testing.T) {
+	t.Parallel()
+
+	deps, _ := imageDeps(t)
+	sc := publishContext(t)
+	sc.Artifacts[run.ArtifactMeta] = run.Artifact{Kind: run.ArtifactMeta, Purged: true}
+
+	published := runPublish(t, deps, sc)
+
+	if len(published.SEOApplied) != 0 {
+		t.Fatalf("seoApplied = %v, want nothing written from an artifact that is gone", published.SEOApplied)
+	}
+	purged := make([]content.Finding, 0, 1)
+	for _, finding := range published.Findings {
+		if finding.Code == steps.CodeArtifactPurged {
+			purged = append(purged, finding)
+		}
+	}
+	if len(purged) != 1 {
+		t.Fatalf("the publish raised %d artifact_purged findings, want exactly one: %+v",
+			len(purged), published.Findings)
+	}
+	if purged[0].Severity != content.SeverityWarn {
+		t.Fatalf("severity = %q, want warn", purged[0].Severity)
+	}
+	if !strings.Contains(purged[0].Message, sc.Page.Path) {
+		t.Fatalf("the finding does not name the page: %q", purged[0].Message)
+	}
+	if purged[0].Details["kind"] != string(run.ArtifactMeta) {
+		t.Fatalf("details.kind = %v, want meta", purged[0].Details["kind"])
+	}
+	if purged[0].Details["pageId"] != sc.Page.ID {
+		t.Fatalf("details.pageId = %v, want %q", purged[0].Details["pageId"], sc.Page.ID)
+	}
+}
+
+func TestPublishStaysQuietWhenNoMetaWasEverGenerated(t *testing.T) {
+	t.Parallel()
+
+	deps, _ := imageDeps(t)
+	sc := publishContext(t)
+	delete(sc.Artifacts, run.ArtifactMeta)
+
+	published := runPublish(t, deps, sc)
+
+	for _, finding := range published.Findings {
+		if finding.Code == steps.CodeArtifactPurged {
+			t.Fatalf("a recipe without generate_meta raised %q", finding.Code)
+		}
+	}
+}
+
 func TestPublishReportsWhatItCannotDo(t *testing.T) {
 	t.Parallel()
 

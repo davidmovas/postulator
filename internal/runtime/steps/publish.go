@@ -420,6 +420,9 @@ func applySEO(ctx context.Context, client *wp.Client, sc *run.StepContext, wpID 
 		return seoWrite{}, err
 	}
 	if !found {
+		if artifact, held := sc.Artifacts[run.ArtifactMeta]; held && artifact.Purged {
+			return metaPurged(sc.Page), nil
+		}
 		return noMetaGenerated(), nil
 	}
 
@@ -479,6 +482,22 @@ func metaBeingReplaced(ctx context.Context, client *wp.Client, capabilities wp.C
 
 func noMetaGenerated() seoWrite {
 	return seoWrite{applied: []string{}, skipped: []string{CodeSEOMetaSkipped}}
+}
+
+func metaPurged(page pagemap.Page) seoWrite {
+	return seoWrite{
+		applied: []string{},
+		skipped: []string{CodeSEOMetaSkipped},
+		findings: []content.Finding{{
+			Severity: content.SeverityWarn,
+			Code:     CodeArtifactPurged,
+			Message: "the meta of " + page.Path + " was dropped by retention before it could be written, " +
+				"so the search snippet on the site is whatever was there before",
+			Details: map[string]any{
+				"pageId": page.ID, "path": page.Path, "kind": string(run.ArtifactMeta),
+			},
+		}},
+	}
 }
 
 func metaNotWritten(page pagemap.Page, reason string) seoWrite {
