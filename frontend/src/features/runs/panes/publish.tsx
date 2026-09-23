@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 import { copy } from "../../../copy/index.js";
 import { absoluteTime } from "../../../domain/format.js";
@@ -28,21 +28,22 @@ export function PublishPane({ payload }: PayloadPaneProps): ReactElement {
     if (view === null) {
         return <Unreadable />;
     }
+    const entries: (readonly [string, ReactNode])[] = [
+        [
+            copy.runs.review.publish.result,
+            view.created ? copy.runs.review.publish.created : copy.runs.review.publish.updated,
+        ],
+        [copy.runs.review.publish.status, view.status],
+        [copy.runs.review.publish.wpId, view.wpId === null ? "" : String(view.wpId)],
+        [copy.runs.review.publish.hash, view.contentHash],
+        [copy.runs.review.publish.seoApplied, view.seoApplied.join(", ")],
+    ];
+    if (view.skipped.length > 0) {
+        entries.push([copy.runs.review.publish.skipped, view.skipped.join(", ")]);
+    }
     return (
         <div className="flex flex-col gap-2 pb-3" title={copy.runs.review.noDiff}>
-            <Rows
-                entries={[
-                    [
-                        copy.runs.review.publish.result,
-                        view.created ? copy.runs.review.publish.created : copy.runs.review.publish.updated,
-                    ],
-                    [copy.runs.review.publish.status, view.status],
-                    [copy.runs.review.publish.wpId, view.wpId === null ? "" : String(view.wpId)],
-                    [copy.runs.review.publish.hash, view.contentHash],
-                    [copy.runs.review.publish.seoApplied, view.seoApplied.join(", ")],
-                    [copy.runs.review.publish.skipped, view.skipped.join(", ")],
-                ]}
-            />
+            <Rows entries={entries} />
             <LiveUrl url={view.url} />
             <FindingTotals findings={view.findings} />
             <FindingList findings={view.findings} empty={copy.runs.review.links.clean} />
