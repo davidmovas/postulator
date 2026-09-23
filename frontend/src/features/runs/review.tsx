@@ -16,15 +16,12 @@ import {
     orderedKinds,
     pauseReasonText,
     retryBlockedText,
-    statusIcon,
-    statusLabel,
-    statusTone,
 } from "./labels.js";
 import type { RetryNotice, StepEntry } from "./log-view.js";
 import { ArtifactPane } from "./panes/index.js";
 import { driftRefusal } from "./refusal.js";
 import { neighbourOf, positionOf } from "./review-nav.js";
-import { heldForParent, regenerateState } from "./hold.js";
+import { heldForParent, itemBadge, regenerateState } from "./hold.js";
 import { ParentHold } from "./review-hold.js";
 import { DriftRefused, ReviewActions, ReviewEmpty, ReviewMeta, ReviewMissing, Timeline } from "./review-states.js";
 import { artifactBodyHtml, artifactPublishResult, retentionDaysKey } from "./statuses.js";
@@ -165,8 +162,8 @@ export function ReviewDrawer({
                                 {copy.runs.review.position(at, siblings.length)}
                             </span>
                         )}
-                        <StatusBadge tone={statusTone(item.status)} icon={statusIcon(item.status)}>
-                            {statusLabel(item.status)}
+                        <StatusBadge tone={itemBadge(item).tone} icon={itemBadge(item).icon}>
+                            {itemBadge(item).label}
                         </StatusBadge>
                     </span>
                 )

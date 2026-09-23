@@ -250,7 +250,7 @@ export function ReviewActions({
                     busy={regenerating}
                     title={
                         regeneration === null || regeneration.kind === "ready"
-                            ? undefined
+                            ? copy.runs.regenerateHint
                             : regenerateRefusals[regeneration.kind]
                     }
                     onClick={onRegenerate}
