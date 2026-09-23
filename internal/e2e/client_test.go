@@ -3,6 +3,7 @@
 package e2e_test
 
 import (
+	"encoding/json"
 	"maps"
 	"net/http"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/app"
+	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/application/pages"
@@ -24,6 +26,8 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
 
 const (
@@ -36,7 +40,14 @@ const (
 
 	relinkTarget = "/electric-bikes/commuter/volt-commuter-500/"
 	repairTarget = "/electric-bikes/cargo/hauler-cargo-max/"
+	deleteTarget = "/components/batteries/powercell-500wh/"
 )
+
+var cancelTargets = []string{
+	"/electric-bikes/folding/",
+	"/electric-bikes/mountain/",
+	"/components/motors/",
+}
 
 var messySheets = []string{"Site map", "Bikes", "Components", "Guides", "shop crawl (old)", "Broken", "Notes"}
 
@@ -352,6 +363,225 @@ func TestTheClientLoopFromTheSamples(t *testing.T) {
 	relinkPutsOneStrippedLinkBack(t, core, siteID, relinkTarget, "/electric-bikes/commuter/")
 	repairPutsOneFlattenedPageBack(t, core, live, siteID, repairTarget)
 	assertTheAuditIsGreen(t, core, siteID, clientTargets)
+
+	aCancelledRunIsPutBack(t, core, live, siteID)
+	aDeletedPageGoesToTheTrash(t, core, live, siteID, deleteTarget)
+	assertABackupRoundTripKeepsTheAudit(t, core, siteID)
+}
+
+func aDeletedPageGoesToTheTrash(t *testing.T, core *app.Core, live *site, siteID, path string) {
+	t.Helper()
+
+	page := pageAt(t, core, siteID, path)
+	wpID := *page.WPID
+
+	if _, err := core.Pages.Delete(t.Context(), pages.DeleteRequest{ID: page.ID, OnSite: true}); err != nil {
+		t.Fatalf("delete %s: %v", path, err)
+	}
+
+	var trashed struct {
+		Status string `json:"status"`
+	}
+	live.call(t, http.MethodGet, "/wp-json/wp/v2/pages/"+strconv.FormatInt(wpID, 10)+"?context=edit",
+		nil, http.StatusOK, &trashed)
+	if trashed.Status != "trash" {
+		t.Fatalf("the site holds %s as %q, want it in the trash where a human can restore it", path, trashed.Status)
+	}
+
+	if _, still := pagesByPath(t, core.Pages, siteID)[path]; still {
+		t.Fatalf("the map still holds %s after it was deleted", path)
+	}
+	if _, err := core.Pages.Get(t.Context(), pages.GetRequest{ID: page.ID}); !errors.IsCode(err, errors.NotFound) {
+		t.Fatalf("reading the deleted %s back = %v, want a not-found refusal", path, err)
+	}
+}
+
+func assertABackupRoundTripKeepsTheAudit(t *testing.T, core *app.Core, siteID string) {
+	t.Helper()
+
+	before, err := core.Reports.LinkAudit(t.Context(), reports.LinkAuditRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("audit the links before the backup: %v", err)
+	}
+
+	archive := filepath.Join(t.TempDir(), "postulator.pstx")
+	written, err := core.ExportBackup(t.Context(), archive, "hunter2")
+	if err != nil {
+		t.Fatalf("export the backup: %v", err)
+	}
+	if written == 0 {
+		t.Fatal("the backup is empty")
+	}
+	if importErr := core.ImportBackup(t.Context(), archive, "hunter2"); importErr != nil {
+		t.Fatalf("read the backup back: %v", importErr)
+	}
+
+	after, err := core.Reports.LinkAudit(t.Context(), reports.LinkAuditRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("audit the links after the restore: %v", err)
+	}
+	if after.Totals != before.Totals {
+		t.Fatalf("the audit counts %+v after the restore, want the %+v it counted before",
+			after.Totals, before.Totals)
+	}
+	if !slices.EqualFunc(after.Pages, before.Pages, func(a, b reports.PageAudit) bool { return a == b }) {
+		t.Fatalf("the audit reads %d pages differently after the restore", len(after.Pages))
+	}
+	t.Logf("the backup of %d bytes restored %d audited pages unchanged", written, len(after.Pages))
+}
+
+type snapshot struct {
+	bodies map[string]string
+	metas  map[string]string
+	served []string
+}
+
+func take(t *testing.T, core *app.Core, live *site, siteID string) snapshot {
+	t.Helper()
+
+	client := wordpress(t, core, siteID)
+	listed := live.content(t)
+
+	shot := snapshot{
+		bodies: make(map[string]string, len(listed)),
+		metas:  make(map[string]string, len(listed)),
+		served: make([]string, 0, len(listed)),
+	}
+	for i := range listed {
+		item := listed[i]
+		if item.Type != "page" || !underClient(item.Path) {
+			continue
+		}
+		shot.served = append(shot.served, item.Path)
+
+		raw, err := client.GetRaw(t.Context(), int64(item.ID))
+		if err != nil {
+			t.Fatalf("read %s raw: %v", item.Path, err)
+		}
+		shot.bodies[item.Path] = raw.Content
+		shot.metas[item.Path] = item.Meta.Title + "\x00" + item.Meta.Description + "\x00" + item.Meta.Canonical
+	}
+	slices.Sort(shot.served)
+	return shot
+}
+
+func underClient(path string) bool {
+	for _, prefix := range clientPrefixes {
+		if strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s snapshot) diffFrom(t *testing.T, before snapshot) {
+	t.Helper()
+
+	if !slices.Equal(s.served, before.served) {
+		t.Fatalf("the site serves %v, want the %v it served before the run", s.served, before.served)
+	}
+	for _, path := range before.served {
+		if s.bodies[path] != before.bodies[path] {
+			t.Fatalf("the body of %s was not put back.\nbefore: %q\nafter:  %q",
+				path, before.bodies[path], s.bodies[path])
+		}
+		if s.metas[path] != before.metas[path] {
+			t.Fatalf("the search snippet of %s was not put back.\nbefore: %q\nafter:  %q",
+				path, before.metas[path], s.metas[path])
+		}
+	}
+}
+
+func aCancelledRunIsPutBack(t *testing.T, core *app.Core, live *site, siteID string) {
+	t.Helper()
+
+	stored := pagesByPath(t, core.Pages, siteID)
+	targets := make([]string, 0, len(cancelTargets))
+	for _, path := range cancelTargets {
+		page, ok := stored[path]
+		if !ok || page.Status != string(pagemap.StatusPlanned) {
+			t.Fatalf("the store holds %s as %+v, want a planned page the run can write", path, page)
+		}
+		targets = append(targets, page.ID)
+	}
+
+	before := take(t, core, live, siteID)
+
+	started, err := core.Runs.Start(t.Context(), runs.StartRequest{
+		SiteID: siteID, PageIDs: targets, PublishMode: string(run.PublishLive),
+	})
+	if err != nil {
+		t.Fatalf("start the second run: %v", err)
+	}
+
+	waitForPublish(t, core, started.RunID)
+	if _, cancelErr := core.Runs.Cancel(t.Context(), runs.CancelRequest{RunID: started.RunID}); cancelErr != nil {
+		t.Fatalf("cancel the second run: %v", cancelErr)
+	}
+	waitForTerminal(t, core, started.RunID)
+
+	reverted, err := core.Runs.Revert(t.Context(), runs.RevertRequest{RunID: started.RunID})
+	if err != nil {
+		t.Fatalf("revert the cancelled run: %v", err)
+	}
+	awaitRun(t, core.Runs, reverted.RunID)
+
+	take(t, core, live, siteID).diffFrom(t, before)
+
+	after := pagesByPath(t, core.Pages, siteID)
+	for _, path := range cancelTargets {
+		page, ok := after[path]
+		if !ok {
+			t.Fatalf("the revert took %s out of the map instead of planning it again", path)
+		}
+		if page.Status != string(pagemap.StatusPlanned) || page.WPID != nil {
+			t.Fatalf("the revert left %s as %q with the wordpress id %v, want a planned page with none",
+				path, page.Status, page.WPID)
+		}
+	}
+	assertTheAuditIsGreen(t, core, siteID, clientTargets)
+}
+
+func waitForPublish(t *testing.T, core *app.Core, runID string) {
+	t.Helper()
+
+	var seq int64
+	published := ""
+	waitFor(t, "the first item of run "+runID+" to reach the site", func() bool {
+		listed, err := core.Runs.ListEvents(t.Context(), runs.ListEventsRequest{
+			RunID: runID, SinceSeq: seq, Limit: 200,
+		})
+		if err != nil {
+			t.Fatalf("list the run events: %v", err)
+		}
+		for i := range listed.Events {
+			event := listed.Events[i]
+			seq = event.Seq
+			if events.Type(event.Type) != events.StepDone {
+				continue
+			}
+			var said events.StepDonePayload
+			if decodeErr := json.Unmarshal(event.Payload, &said); decodeErr != nil {
+				t.Fatalf("decode a step.done payload: %v", decodeErr)
+			}
+			if said.Step == steps.NamePublish {
+				published = said.ItemID
+			}
+		}
+		return published != ""
+	})
+}
+
+func waitForTerminal(t *testing.T, core *app.Core, runID string) {
+	t.Helper()
+
+	waitFor(t, "run "+runID+" to settle", func() bool {
+		held, err := core.Runs.Get(t.Context(), runs.GetRequest{RunID: runID})
+		if err != nil {
+			t.Fatalf("read the run back: %v", err)
+		}
+		return run.Status(held.Run.Status).Terminal()
+	})
 }
 
 func wordpress(t *testing.T, core *app.Core, siteID string) *wp.Client {
