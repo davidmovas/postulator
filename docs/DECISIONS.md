@@ -1144,3 +1144,275 @@ $0.39 on the provider's page.
   rows. The agent now reads counts, twenty sample pages and findings grouped by code with five
   examples each; `ImportService.Preview` still answers the whole report, because a window has no
   byte budget.
+
+## 2026-09-22 and 23 — production hardening before the release
+
+Four complaints came back from the client's own use: a link the body already carried was inserted
+again and then graded as an error, the agent could not finish a tool call, a run that went wrong
+had no way back, and the spend badge read three times the provider's invoice. Seven vectors were
+run as four waves of two agents over one working tree — disjoint files, a commit lock, one
+orchestrator gate on each wave's last commit — between `f739915` and `8da0391`. What follows is
+the reasoning of each vector, in wave order.
+
+### Links (V2)
+
+- **One resolver answers where an href points.** Four classifiers compared bytes:
+  `InsertLinks.existingFor`, `Compliance.classify` with an empty host, `LinkContext.ClassifyLink`
+  with the site host, and a lookup by URL. `/shop`, `/Shop/`, `/shop/?utm=x`, `/shop/#top` and
+  `https://own-host/shop/` were each a second insertion of a target the body already carried and
+  then an `external_link` error, while the Linking screen called the same link `graph`.
+  `pagemap.Site{Scheme, Host, Base}` is built once from the site's `BaseURL` and mirrors the
+  companion plugin's `internal_href_to_path` rule by rule, so what the plugin records and what the
+  domain judges cannot drift. `content.LinkContext` carries that site and every classifier resolves
+  through it.
+- **A same-document href is not a link between pages.** `#faq`, `?utm=1` and `href=""` resolve as
+  `same_document`: compliance skips them, so a table-of-contents anchor is not turned into an error
+  by `forbidSelf`, and nothing records a stored link with an empty target. `LinkClass` gained no new
+  value, because it is rendered into `vocab.ts` and pinned by a test; the distinction lives inside
+  Go as `Resolution.SameDocument`.
+- **Self is the page being written, not its entity's canonical page.** A run graded a second page's
+  link to the canonical page as `self_link` and failed the item, while the audit said the opposite.
+  `content.PlanLinks` takes a `Subject{Site, PageID, PagePath, EntityID}`, and a page that is not
+  its entity's canonical page carries that canonical page as an optional `up` target at depth 0 —
+  `up` so the opening paragraphs are where it lands, optional so a missing link cannot fail an item,
+  depth 0 so it is distinguishable from a real tree parent.
+- **The stored link-policy rules are the base a template overrides.** `LinkPolicy.Rules` was
+  written, validated, shown and read by nobody. `templates.EffectiveRules(policy, spec)` is the rule:
+  a spec carrying any link rules replaces the policy's whole, a spec whose `LinkRules` is the zero
+  value inherits them. `LinkRules` is a flat struct of primitives with no optionality, so a
+  per-field merge cannot tell `downLinks: false` on purpose from `downLinks` unmentioned;
+  whole-struct replacement is the only rule computable from what is stored, and it is what the
+  Templates screen already implies.
+- **A neighbour is relinked by its own rules or not at all.** `relink_neighbors` linked a neighbour
+  with the current item's policy through a synthetic one-target context, so it wrote a backlink the
+  neighbour's own plan never asked for and the audit then reported it as off-graph. The step
+  resolves the neighbour's template, plans the neighbour against the graph, inserts only a target
+  that plan names, and counts the cap over the neighbour's whole plan. A backlink nothing owes is a
+  skipped outcome with a reason, never a write.
+- **The cap counts the same thing on both sides.** Insertion counted graph links and compliance
+  counted every `<a>`, so a page with two graph links and four footer links was over the cap on one
+  side and under it on the other. Compliance counts links that resolve to a planned target and
+  `too_many_links` names what it counted.
+- **An anchor is a word.** `findFold` had no boundary check, so a target anchored on "art" linked
+  the middle of "cart"; a match now needs a rune boundary on both sides. `rotate` rotates, and
+  `childrenSection` is honoured by asking `generate_body` for a closing section that names every
+  down target verbatim — which is where a down link finds its anchor.
+- **A page path already carries the base path.** `owner.BaseURL + page.Path` produced
+  `https://h/blog/blog/shop/` on a subdirectory install; the canonical URL and the preview link join
+  the origin to the path through `Site.URL`.
+
+### Agent reliability (V4)
+
+- **A field is required only when the use case refuses its absence.** The schema generator marks a
+  field required unless it is a pointer or carries `omitempty`, gollem validates the whole tree
+  before the tool runs, and its refusal teaches the model nothing. Seventy-eight fields across
+  seventeen tools demanded values their own use case would have defaulted; `templates_create` went
+  from about thirty required values to two. Three tests over the whole registry hold the line by
+  removing each required field in turn and calling the real use case.
+- **A tool takes its own argument structs, not the window's.** This revises the 2026-09-22 ruling
+  that the tools take the domain structs directly and replace only the maps. A DTO written for the
+  Wails window carries the shape a form always fills; a model sends what it knows.
+  `internal/application/tools` owns `templateSpecArgs`, `sectionArgs`, `policiesCreateArgs` and the
+  rest, and converts them into the domain types.
+- **A listing offers only the order its use case honours.** `runs_list_items` and `schedules_list`
+  read `sort.desc` and ignore `sort.field`, so the field left their schemas rather than promising an
+  order nothing keeps.
+- **A cap shortens the answer, it does not truncate the bytes.** `Cap` halves the widest list, then
+  the longest string at a rune boundary, and only then falls back to a preview. The result is
+  `{truncated, totalBytes, droppedItems, shortenedText, result}`, so the model can read what it did
+  get and knows exactly what to ask less of.
+- **Every way a tool call can end reaches the client.** A name the registry does not hold was
+  answered by gollem before the middleware chain, so it reached no ledger, no event and no screen;
+  a content-stream middleware writes the same started/finished pair a real call writes. An unknown
+  field and a wrong type are named to the model in its own sentence. A shortened result is its own
+  row state, `cut`, so a capped answer no longer reads green.
+- **A turn that answered is not failed by its own bookkeeping.** A late audit failure closes the
+  turn with one synthetic row saying the record is incomplete; the answer stands.
+- **The fence, the allow list and the cap live in the application layer.** They were written twice,
+  once for the model's call and once for a confirmed one. `internal/application/agent/guard.go`
+  holds `Fence`, `Permit` and `Cap`; transport adapts them to gollem middleware and `Confirm` calls
+  them directly, so a confirmed tool is guarded by construction rather than by duplication.
+
+### Reversibility and the run engine (V1)
+
+- **A settle survives `Engine.Stop`.** `Stop` cancelled every item context and the base context, so
+  `settle` began its transaction on a cancelled context, a step whose WordPress write had already
+  happened lost its `step_execs` row, and the step ran again in full on the next start — creating a
+  second page on the site. `settle` runs on `context.WithoutCancel` of the item context, a step the
+  engine itself stopped is handed back rather than written down as a failure, and `Stop` requeues
+  every item it still holds a lease on so a restart resumes at once instead of waiting out the
+  lease.
+- **A write to the site keeps what it replaced.** `PublishResult.previousContent` and
+  `previousContentHash` are read before the write and only for an update; `NeighborResult.before`
+  keeps the neighbour's raw content. They live in artifacts those steps already produce: there is
+  no cheaper place, and nothing else can answer what was there before.
+- **A revert is a run.** It has a kind, a parent run, one item per page the source run wrote to and
+  one step, so it is paused, retried, watched and reported by everything that already handles runs.
+  It undoes in the reverse of the order the work was done, a created page goes to the WordPress
+  trash and its row returns to `planned`, an updated page has its body written back under a hash
+  CAS, and running it again is quiet because a site already holding the hash is not written to.
+- **A revert pauses the item, never the site.** A human edit since the run (both hashes named), a
+  missing record, a page already gone, a site without the plugin: each holds one item and every
+  other item still goes back. Media stays, for the reason the orphaned-media ruling already gives.
+- **`revert` is not a step a recipe may name.** `StepName` is the vocabulary a recipe may draw
+  from: `vocabgen` renders it into `vocab.ts`, the blank template builds its recipe from all of it
+  and three tool enums must equal it exactly. `run.RevertStep` is an untyped const beside that
+  block.
+- **Migration 0025 rebuilds the `runs.kind` CHECK.** The constraint from migration 0014 never
+  learned `repair`, so a repair run could not be inserted at all — the hierarchy repair the client's
+  first real run needed would have failed on the insert. It now accepts `repair` and `revert`, and
+  follows the 0016 pattern (`NO TRANSACTION`, foreign keys off, an explicit `BEGIN`/`COMMIT`)
+  because dropping `runs` with foreign keys on cascades into four tables.
+- **A sync knows which fields are a plan.** A page carries a plan when it is `planned`, when this
+  application wrote its content, or when its path, title or heading differ from the mirror the last
+  sync recorded. The mirror, not the site's current answer, is the comparison, because only the
+  mirror is stable when the site changes under an adopted page. A sync never replaces a stored value
+  with nothing, because core REST cannot see SEO meta at all and an empty answer means the site said
+  nothing.
+- **A link the run generated keeps its origin while the site still carries it.** Replacing every
+  generated row with an observed one lost the only record that the application put the link there.
+- **A step declares what one item of it costs.** The engine cannot know `generate_meta` is capped at
+  512 tokens or that `repair_links` makes one call per required parent per iteration; the step does.
+  An estimate over-prices rather than under-prices and names what it cannot price at all.
+  `Budget.MaxTokens` holds a run exactly as `MaxUSD` does.
+- **An import that fails puts back the database it replaced.** The live database is snapshotted
+  before the archive is restored over it, and any failure after the detach rolls back, recomposes
+  and returns the original error. The core stays locked only when the rollback itself cannot
+  recompose, and the refusal then names the file the previous database is kept in.
+- **A link needs a target url even when it names a target page**, and every producer goes through
+  the constructor that says so.
+
+### Agent cost and observability (V5)
+
+- **A round is a ledger row; a turn is their sum.** One `llm_calls` row was written per turn with
+  the summed usage of every round, so a twelve-round turn read as one call and the spend badge
+  under-counted by the whole loop. The per-turn row is gone rather than kept as a sum, and
+  `RunResult.USD` is the sum of the per-round costs, so what the badge shows and what the ledger
+  holds cannot drift through two independent pricings. Rows are written outside the turn's
+  cancellation, so a stopped turn is still billed for the rounds that ran.
+- **A retry inside a round is not a second call.** `patience` wraps `observe`, so a round is one row
+  however many attempts it took; the attempts are visible as `agent.waiting`, not as zero-token rows
+  that would inflate the count.
+- **Per-call usage for a conversation is an application event, not `llm.usage`.** `llm.usage` is a
+  run event published with a run sequence and an agent turn has no run — the fault that failed every
+  model call once a window was attached. `agent.usage` joins the `agent.*` family, which already
+  carries a `conversationId`.
+- **The model reads a whole tool result once and a shortened one ever after.** Every tool result the
+  model saw was replayed in full on every round of every later turn. The stored copy goes through
+  the same `Cap`, so it stays a document with its cursor intact, and the fence stays outermost
+  exactly as it was live.
+- **The tool schemas have a ceiling with a test on it.** Everything in the registry is resent on
+  every round of every turn. `TestTheToolSchemasFitTheirCeiling` measures what goes on the wire and
+  fails over `schemaCeilingBytes`, so a new tool is paid for consciously.
+- **A rate limit is read out of whatever the provider gives us.** `go-openai` throws the response
+  headers away on an error, so `Retry-After` is unreachable for OpenAI; the delay the provider
+  states in its own sentence is parsed instead and honoured up to two minutes, beyond which the
+  exponential backoff is the better answer than holding a turn open for six minutes. An Anthropic
+  header still beats the sentence.
+- **A turn that is waiting says so.** `agent.waiting` rather than a synthetic delta, which would
+  corrupt the answer being assembled, or a synthetic tool row, which would put a call in the
+  transcript and the ledger that nobody made. The silence rule holds off until the announced wait is
+  over.
+- **A saved row's status comes from the ledger, not from its sentence.** Matching prose for "is not
+  open to this conversation" mislabels a refusal worded any other way and a failure that quotes it.
+  `agent.Message` carries `toolStatus`.
+
+### Relink and repair as operations (V3)
+
+- **A run kind that owns its steps hands them out.** `run.Kind` had eight values and one of them
+  named a recipe, so the Linking screen's Relink button and the drawer's `relink` and `repair` kinds
+  fell through to the template's full generate recipe and republished the page. `Kind.Recipe()` is
+  the one answer: `relink`, `repair`, `sync` and `revert` own theirs, a request recipe that disagrees
+  is refused rather than quietly ignored, and `custom` is the one kind exempt from every step rule.
+- **A template with no recipe of its own runs the generate recipe.** All five shipped seeds carry
+  none, so no seeded template could start a run at all; `run.GenerateRecipe()` is the fallback.
+- **A step a kind owns is not a `StepName`.** `relink_page` follows `revert` as an untyped const
+  beside the block, which keeps it out of `vocab.ts`, out of the blank template's recipe and out of
+  the three tool step enums at once. `run.PerKindStep` and `run.TemplateStepNames` put the rule in
+  the domain, and `runs.Start` refuses a recipe that enables a step another kind owns — which is
+  what stopped a blank template's first run from failing at `repair_hierarchy`.
+- **A relink costs nothing and writes nothing but links.** It reads the page from the site, places
+  what the page's own rules ask for against the page's own cap and writes back under a hash CAS. No
+  model is called, so `Estimate` answers zero for `relink`, `repair` and `sync`.
+- **A relink of a page produces a publish result as well as a relink result.** `sync_back` requires
+  one and a recipe whose step requires an artifact nothing produces is refused; recording the page
+  as it stands also makes a relink run revertible as a quiet no-op rather than a pause. Its targets
+  go in a shape of their own, because a `relink_result` written by `relink_neighbors` lists pages
+  whose bodies were replaced and a revert walks them.
+- **A page a relink cannot verify holds the item; a site that cannot answer does not.** No plugin, a
+  page gone and unreadable content are warnings that let the run finish; a page not on the site and a
+  hash that moved under the write are pauses, and the CAS pause names both hashes.
+- **`previousMeta` is kept beside a write, and the plugin learned the read it needed.** Companion
+  plugin 1.2.0 serves `GET /seo-meta/{id}` behind the `seo_meta_read` capability, `wp.Client`
+  gained `GetSEOMeta` and a `ReplaceSEOMeta` that can send an empty value — because the publish
+  write must *not* be able to, and a revert must be able to clear a field that held nothing before
+  the run. A revert puts back exactly the fields the run wrote, so a field a human changed since is
+  untouched.
+- **A capability the plugin does not advertise is refused before the request**, so a 1.1.0 plugin
+  answers `plugin_outdated` from the cached manifest and the revert keeps its `revert_meta_kept`
+  warning.
+- **The fake WordPress is corrected to the plugin, not the other way round.** `wptest` skipped an
+  empty SEO value where the plugin deletes the key; the fake is a second implementation of the same
+  contract and a divergence there hides a real bug.
+- **A move of an entity is one unit of work.** Add, acyclic check and delete share the transaction,
+  so a failure cannot leave two parents, and running it again is quiet. An anchor's source is the
+  actor's when nobody says otherwise — `ai` for the agent, `user` for a person or a schedule.
+
+### The content steps (V6)
+
+- **A score is a pointer, and absent means nobody scored it.** `judge` swallowed a provider outage
+  into `Score: 0` and the report took the minimum, so one outage drove every page of a run to zero
+  while the window drew a dash for it. `JudgeReport.Score` and `FinalReport.Score` are `*float64`,
+  the report never takes a minimum with an absent score, and a failed judge raises a
+  `judge_unavailable` warning carrying the provider's own words.
+- **A type handed to a model and a type written to an artifact are two types.** `JudgeReport` and
+  `Meta` were both, so any field added for the report would have been offered to the model to fill.
+- **A step that could not do what its template asked writes a finding, not a string.** Every reason
+  `generate_images` gave up reached a manifest string and no human; the final report is assembled
+  from findings. A step also honours its own `Produces`, because the recipe validator only checks
+  `Requires`.
+- **A link context that says "no required phrases" must be the truth.** `resolve_context` answered
+  an empty context for an entity the graph does not hold — reachable, because the entities are read
+  twice — and the page went out with no internal links and scored 1. It refuses with `INVALID` and
+  names the targets the graph asks for that no page carries.
+- **A search snippet that is only the draft again says so.** A model answering `{}` produced a meta
+  identical to what the page already said, silently; the borrowed fields are named in a
+  `meta_not_written` warning.
+- **A report names what it could not read.** A purged artifact is an `artifact_purged` warning
+  rather than a section silently missing.
+- **A Go type name is not part of a schema.** `llm.SchemaFor` stamped `Title: t.Name()` on every
+  object, so a hundred and forty-three Go type names were resent on every round of every turn.
+- **A derived limit becomes a declared setting the first time its composition root is in reach.**
+  `agent.historyToolResultBytes` is read per turn through the Deps rather than once at startup
+  through `Config`, so a change takes effect without a restart.
+- **A budget a run outgrew names the tokens as well as the money**, so a run stopped by its token
+  budget is announced rather than only paused.
+
+### The client scenario (V7)
+
+- **A run is paused, not left running, once nothing is left to advance.** `settleRun` asked
+  `Status.Active`, which counts `paused`, so a run whose every item asked for a human stayed
+  `running` for ever — the screens spin and `Runs.Revert` refuses a source run that is not terminal.
+  It asks `Status.Advanceable` and pauses with `needs_human` and no `FinishedAt`. Found by the
+  plugin-less revert, the only path where every item pauses.
+- **A stop is read from the engine, not from a context.** An item context is cancelled by two
+  writers, `Engine.Stop` and the step's own deadline, so reading the context cannot tell them apart
+  and the same step was handed back or failed depending on which cancel won. `Stop` closes its
+  channel before it cancels anything; `advance` asks `e.stopping()`.
+- **`Document.HTML` is gone.** Its whole behaviour was to swallow the render error four steps now
+  read, so it was deleted rather than left as a trap.
+- **A fake reply may be a function of the request.** The bodies a scenario needs could not be
+  written by hand: the phrases a page must carry are the anchors its up-links need, known only once
+  the graph is in the store. `fake.Reply.Make` answers from the prompt the step actually rendered.
+- **A scale guard measures an algorithmic regression, not a load.** Five wall-clock budgets summing
+  to 1030 ms over a pass that costs 128 ms idle flaked under a loaded gate; one floor far above any
+  load this machine can impose and far below any quadratic catches what the guard is for.
+- **The frontend has two vitest projects**, `model` (node, `*.test.ts`) and `screens` (jsdom,
+  `*.test.tsx`), because a per-file environment docblock is a comment and this codebase allows none.
+- **A grid column that holds a badge or a label never opens with `minmax(0,…)`, and a control that
+  renders text the caller does not control truncates in the primitive.** Five tables and one header
+  painted over themselves at ordinary widths; every one of them was invisible to the tests and
+  visible in a screenshot.
+- **`task build` is part of the gate, not a formality.** `frontend/bindings/` is gitignored and only
+  the build regenerates it, and the frontend import ban runs only there, so two defects of this wave
+  were invisible to `npm run typecheck` and to `golangci-lint`.
