@@ -140,6 +140,7 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 	}
 
 	drafts := make(map[string]int64, len(degradedTargets))
+	standDowns := make([]string, 0, len(degradedTargets))
 	for i := range items.Items {
 		item := items.Items[i]
 		if item.Status != string(run.StatusCompleted) {
@@ -157,7 +158,7 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 		drafts[final.Path] = final.Publish.WPID
 
 		assertSEOWasSkippedNotLost(t, core, item.ID, final)
-		assertRelinkStoodDown(t, final)
+		standDowns = append(standDowns, assertRelinkStoodDown(t, final)...)
 		if final.Sync == nil || final.Sync.Source != "core" {
 			t.Fatalf("%s read back through %+v, want the core source", final.Path, final.Sync)
 		}
@@ -165,6 +166,10 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 
 	if len(drafts) != len(degradedTargets) {
 		t.Fatalf("the run wrote %d drafts, want %d: %v", len(drafts), len(degradedTargets), drafts)
+	}
+	if !slices.Contains(standDowns, steps.ReasonNoPlugin) {
+		t.Fatalf("no neighbor stood down for the missing plugin; they stood down for %v, so the gate "+
+			"that needs the plugin was never reached", standDowns)
 	}
 	for _, planned := range degradedTargets {
 		wpID, ok := drafts[planned.path]
@@ -214,8 +219,133 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 			"the relink that stood down cannot have realized more than were approved", overview.Edges)
 	}
 
+	degradedPaths := make([]string, 0, len(degradedTargets))
+	for _, planned := range degradedTargets {
+		degradedPaths = append(degradedPaths, planned.path)
+	}
+	assertTheAuditIsGreen(t, core, siteID, degradedPaths)
+
+	assertARevertWithoutThePluginPausesRatherThanFails(t, core, live, siteID, after)
+
 	t.Logf("%d drafts under /menu/main-courses/, %d pages in the store, %d of %d edges realized",
 		len(drafts), len(after), overview.Edges.Realized, overview.Edges.Approved)
+}
+
+func assertARevertWithoutThePluginPausesRatherThanFails(t *testing.T, core *app.Core, live *site,
+	siteID string, stored map[string]pages.Page) {
+	t.Helper()
+
+	targets := make([]string, 0, len(degradedTargets))
+	for _, planned := range degradedTargets {
+		targets = append(targets, stored[planned.path].ID)
+	}
+
+	written, err := core.Runs.Start(t.Context(), runs.StartRequest{
+		SiteID:      siteID,
+		PageIDs:     targets,
+		PublishMode: string(run.PublishDraft),
+		Recipe:      recipe(),
+	})
+	if err != nil {
+		t.Fatalf("start the run that updates the pages: %v", err)
+	}
+	awaitRun(t, core.Runs, written.RunID)
+
+	bodies := make(map[string]string, len(degradedTargets))
+	for _, planned := range degradedTargets {
+		page := stored[planned.path]
+		bodies[planned.path] = live.storedContent(t, "pages", int(*page.WPID))
+	}
+
+	reverted, err := core.Runs.Revert(t.Context(), runs.RevertRequest{RunID: written.RunID})
+	if err != nil {
+		t.Fatalf("revert the run that updated the pages: %v", err)
+	}
+	awaitPause(t, core.Runs, reverted.RunID)
+
+	items, err := core.Runs.ListItems(t.Context(), runs.ListItemsRequest{
+		RunID: reverted.RunID, ListRequest: dto.ListRequest{Limit: 50},
+	})
+	if err != nil {
+		t.Fatalf("list the revert items: %v", err)
+	}
+	if len(items.Items) != len(degradedTargets) {
+		t.Fatalf("the revert carries %d items, want %d", len(items.Items), len(degradedTargets))
+	}
+
+	for i := range items.Items {
+		item := items.Items[i]
+		if item.Status == string(run.StatusFailed) {
+			t.Fatalf("the revert of %s failed rather than asking for a human: %s", item.TargetID, item.Error)
+		}
+		if item.Status != string(run.StatusPaused) {
+			t.Fatalf("the revert of %s is %q, want it paused for a human", item.TargetID, item.Status)
+		}
+
+		result := revertResultOf(t, core, item.ID)
+		if result.Created || result.WPID == 0 {
+			t.Fatalf("the revert of %s undoes a page the run created (%+v); this run updated pages that "+
+				"were already on the site, which is the case the missing plugin makes hard", result.Path, result)
+		}
+		if result.Outcome != steps.OutcomeNeedsHand {
+			t.Fatalf("the revert of %s answered %q, want %q", result.Path, result.Outcome, steps.OutcomeNeedsHand)
+		}
+		finding, ok := findingOf(result.Findings, steps.CodeRevertNeedsHuman)
+		if !ok {
+			t.Fatalf("the revert of %s carries %+v, want a %q finding",
+				result.Path, result.Findings, steps.CodeRevertNeedsHuman)
+		}
+		reason, named := finding.Details["reason"].(string)
+		if !named || (reason != steps.ReasonRevertNoBody && reason != steps.ReasonRevertNoPlugin) {
+			t.Fatalf("the revert of %s names the reason %q; without the plugin it can only be the body "+
+				"it never kept or the plugin it does not have", result.Path, reason)
+		}
+	}
+
+	for path, before := range bodies {
+		page := pagesByPath(t, core.Pages, siteID)[path]
+		if after := live.storedContent(t, "pages", int(*page.WPID)); after != before {
+			t.Fatalf("the revert could not put %s back and said so, so it must have left the site "+
+				"exactly as the run left it.\nbefore: %q\nafter:  %q", path, before, after)
+		}
+	}
+}
+
+func awaitPause(t *testing.T, service *runs.Service, runID string) {
+	t.Helper()
+
+	last := ""
+	deadline := time.Now().Add(pollTimeout)
+	for time.Now().Before(deadline) {
+		held, err := service.Get(t.Context(), runs.GetRequest{RunID: runID})
+		if err != nil {
+			t.Fatalf("read the run back: %v", err)
+		}
+		last = held.Run.Status
+		status := run.Status(last)
+		if status.Terminal() || status == run.StatusPaused {
+			return
+		}
+		time.Sleep(pollInterval)
+	}
+	t.Fatalf("the run %s is still %q after %s%s", runID, last, pollTimeout, itemFailures(t, service, runID))
+}
+
+func revertResultOf(t *testing.T, core *app.Core, itemID string) steps.RevertResult {
+	t.Helper()
+
+	stored, err := core.Runs.GetArtifact(t.Context(), runs.GetArtifactRequest{
+		ItemID: itemID, Kind: string(run.ArtifactRevertResult),
+	})
+	if err != nil {
+		t.Fatalf("read the revert result of %s: %v", itemID, err)
+	}
+
+	var result steps.RevertResult
+	if decodeErr := json.Unmarshal([]byte(stored.Artifact.Content), &result); decodeErr != nil {
+		t.Fatalf("decode the revert result of %s: %v", itemID, decodeErr)
+	}
+	return result
 }
 
 func runSync(t *testing.T, core *app.Core, siteID string) string {
@@ -394,7 +524,7 @@ func assertSEOWasSkippedNotLost(t *testing.T, core *app.Core, itemID string, fin
 	}
 }
 
-func assertRelinkStoodDown(t *testing.T, final steps.FinalReport) {
+func assertRelinkStoodDown(t *testing.T, final steps.FinalReport) []string {
 	t.Helper()
 
 	if final.Relink == nil {
@@ -403,16 +533,28 @@ func assertRelinkStoodDown(t *testing.T, final steps.FinalReport) {
 	if final.Relink.Linked != 0 || final.Relink.Conflicts != 0 || final.Relink.Skipped == 0 {
 		t.Fatalf("%s relinked %+v, want every neighbor skipped", final.Path, final.Relink)
 	}
+
+	standing := []string{steps.ReasonNoPlugin, steps.ReasonNeighborOwesNothing,
+		steps.ReasonNeighborOwesTheCanonicalPage, steps.ReasonNeighborUnmapped, steps.ReasonNeighborNoTemplate}
+
+	reasons := make([]string, 0, len(final.Relink.Neighbors))
 	for i := range final.Relink.Neighbors {
 		neighbor := final.Relink.Neighbors[i]
-		if neighbor.Outcome != steps.OutcomeSkipped || neighbor.Detail != steps.ReasonNoPlugin {
-			t.Fatalf("the neighbor %s of %s is %+v", neighbor.Path, final.Path, neighbor)
+		if neighbor.Outcome != steps.OutcomeSkipped {
+			t.Fatalf("the neighbor %s of %s is %+v, want it skipped", neighbor.Path, final.Path, neighbor)
 		}
+		if !slices.Contains(standing, neighbor.Detail) {
+			t.Fatalf("the neighbor %s of %s stood down for %q, which is not a reason a site without the "+
+				"plugin can give", neighbor.Path, final.Path, neighbor.Detail)
+		}
+		reasons = append(reasons, neighbor.Detail)
 	}
+
 	if _, ok := findingOf(final.Relink.Findings, steps.CodeRelinkSkipped); !ok {
 		t.Fatalf("%s reports the findings %+v, want a %q warning", final.Path,
 			final.Relink.Findings, steps.CodeRelinkSkipped)
 	}
+	return reasons
 }
 
 func assertDraftLinksUp(t *testing.T, live *site, path string, wpID int) {
