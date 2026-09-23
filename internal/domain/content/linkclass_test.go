@@ -22,7 +22,7 @@ func TestClassifyLink(t *testing.T) {
 
 	fixture := multiParentDAG(t)
 	rules := template.LinkRules{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5}
-	lc := content.BuildLinkContext(fixture.g, fixture.index, "coffee", policy(rules))
+	lc := plannedFor(fixture, "coffee", rules)
 	lc.Site = pagemap.NewSite("https://shop.example.com")
 
 	cases := []struct {

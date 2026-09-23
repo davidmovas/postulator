@@ -11,6 +11,10 @@ import (
 
 const siteID = "site-1"
 
+func plannedFor(fixture dag, entityID string, rules template.LinkRules) content.LinkContext {
+	return content.PlanLinks(fixture.g, fixture.index, content.Subject{EntityID: entityID}, policy(rules)).Context
+}
+
 type dag struct {
 	g     graph.Graph
 	index pagemap.Index
@@ -111,12 +115,12 @@ func urls(targets []content.LinkTarget) []string {
 	return out
 }
 
-func TestBuildLinkContextOnAMultiParentDAG(t *testing.T) {
+func TestPlanLinksOnAMultiParentDAG(t *testing.T) {
 	t.Parallel()
 
 	fixture := multiParentDAG(t)
 	rules := template.LinkRules{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 10, MaxPerTarget: 1}
-	lc := content.BuildLinkContext(fixture.g, fixture.index, "coffee", policy(rules))
+	lc := plannedFor(fixture, "coffee", rules)
 
 	if lc.PageID != "page-coffee" || lc.PageURL != "/drinks/hot/coffee/" || lc.EntityID != "coffee" {
 		t.Fatalf("the context describes %+v", lc)
@@ -170,7 +174,7 @@ func TestBuildLinkContextOnAMultiParentDAG(t *testing.T) {
 	}
 }
 
-func TestBuildLinkContextRespectsThePolicy(t *testing.T) {
+func TestPlanLinksRespectsThePolicy(t *testing.T) {
 	t.Parallel()
 
 	fixture := multiParentDAG(t)
@@ -203,7 +207,7 @@ func TestBuildLinkContextRespectsThePolicy(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			lc := content.BuildLinkContext(fixture.g, fixture.index, "coffee", policy(tc.rules))
+			lc := plannedFor(fixture, "coffee", tc.rules)
 			got := urls(lc.Targets)
 			if len(got) != len(tc.want) {
 				t.Fatalf("targets = %v, want %v", got, tc.want)
@@ -217,13 +221,13 @@ func TestBuildLinkContextRespectsThePolicy(t *testing.T) {
 	}
 }
 
-func TestBuildLinkContextSkipsWhatCannotBeLinked(t *testing.T) {
+func TestPlanLinksSkipsWhatCannotBeLinked(t *testing.T) {
 	t.Parallel()
 
 	fixture := multiParentDAG(t)
 	rules := template.LinkRules{UpDepth: 3, DownLinks: true, SiblingMinWeight: 0.1}
 
-	lc := content.BuildLinkContext(fixture.g, fixture.index, "coffee", policy(rules))
+	lc := plannedFor(fixture, "coffee", rules)
 	for _, target := range lc.Targets {
 		if target.EntityID == "orphan" {
 			t.Fatal("an entity with no canonical page must never be a target")
@@ -233,12 +237,12 @@ func TestBuildLinkContextSkipsWhatCannotBeLinked(t *testing.T) {
 		}
 	}
 
-	unknown := content.BuildLinkContext(fixture.g, fixture.index, "absent", policy(rules))
+	unknown := plannedFor(fixture, "absent", rules)
 	if len(unknown.Targets) != 0 || unknown.PageID != "" {
 		t.Fatalf("an unknown entity = %+v", unknown)
 	}
 
-	anchorless := content.BuildLinkContext(fixture.g, fixture.index, "espresso", policy(rules))
+	anchorless := plannedFor(fixture, "espresso", rules)
 	for _, target := range anchorless.Targets {
 		if len(target.Anchors) == 0 {
 			t.Fatalf("target %s carries no anchor", target.URL)
@@ -263,7 +267,7 @@ func TestATargetFallsBackToTheEntityName(t *testing.T) {
 		page("page-parent", "/parent/", "parent"),
 	})
 
-	lc := content.BuildLinkContext(g, index, "child", policy(template.LinkRules{UpDepth: 1}))
+	lc := plannedFor(dag{g: g, index: index}, "child", template.LinkRules{UpDepth: 1})
 	if len(lc.Targets) != 1 || len(lc.Targets[0].Anchors) != 1 || lc.Targets[0].Anchors[0] != "Parent Topic" {
 		t.Fatalf("the fallback anchor = %+v", lc.Targets)
 	}

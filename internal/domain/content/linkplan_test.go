@@ -173,27 +173,11 @@ func TestPlanLinksBindsSelfToThePageBeingWritten(t *testing.T) {
 	}
 }
 
-func TestBuildLinkContextIsThePlanContext(t *testing.T) {
-	t.Parallel()
-
-	fixture := multiParentDAG(t)
-	for _, rules := range []template.LinkRules{
-		{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5},
-		{UpDepth: 1, SiblingMinWeight: 0.8},
-	} {
-		built := content.BuildLinkContext(fixture.g, fixture.index, "coffee", policy(rules))
-		planned := content.PlanLinks(fixture.g, fixture.index, content.Subject{EntityID: "coffee"}, policy(rules)).Context
-		if !reflect.DeepEqual(built, planned) {
-			t.Fatalf("BuildLinkContext = %+v, PlanLinks.Context = %+v", built, planned)
-		}
-	}
-}
-
 func TestByPageID(t *testing.T) {
 	t.Parallel()
 
 	fixture := multiParentDAG(t)
-	lc := content.BuildLinkContext(fixture.g, fixture.index, "coffee", policy(template.LinkRules{UpDepth: 1}))
+	lc := plannedFor(fixture, "coffee", template.LinkRules{UpDepth: 1})
 
 	target, ok := lc.ByPageID("page-root")
 	if !ok || target.URL != "/drinks/" {

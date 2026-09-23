@@ -81,10 +81,6 @@ type Subject struct {
 	EntityID string
 }
 
-func BuildLinkContext(g graph.Graph, index pagemap.Index, entityID string, policy template.LinkPolicy) LinkContext {
-	return PlanLinks(g, index, Subject{EntityID: entityID}, policy).Context
-}
-
 func PlanLinks(g graph.Graph, index pagemap.Index, subject Subject, policy template.LinkPolicy) LinkPlan {
 	plan := LinkPlan{
 		Context: LinkContext{
