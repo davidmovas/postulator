@@ -89,8 +89,8 @@ func TestRepairHierarchyWaitsForAParentThatIsNotThereYet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RepairHierarchy: %v", err)
 	}
-	if result.Next != run.TransitionWait {
-		t.Fatalf("a repair under an unpublished parent = %q, want a wait", result.Next)
+	if result.Next != run.TransitionPause || result.Reason != run.PauseAwaitingParent {
+		t.Fatalf("a repair under an unpublished parent = %q / %q, want a hold for the parent", result.Next, result.Reason)
 	}
 	if moved, ok := server.Lookup(flat[0].ID); !ok || moved.Parent != 0 {
 		t.Fatalf("the page is %+v, want it left alone", moved)

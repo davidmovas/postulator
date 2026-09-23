@@ -75,7 +75,7 @@ type ListArtifactsResponse struct {
 
 type PauseRequest struct {
 	RunID  string `json:"runId" description:"The id of the run to hold, exactly as runs_start or runs_list returned it"`
-	Reason string `json:"reason,omitempty" enum:"budget_exceeded,awaiting_confirmation,needs_human,user" description:"Which of the four reasons holds the run; leave it out and it is recorded as user"`
+	Reason string `json:"reason,omitempty" enum:"budget_exceeded,awaiting_confirmation,needs_human,user,awaiting_parent" description:"Which of the five reasons holds the run; leave it out and it is recorded as user"`
 }
 
 type PauseResponse struct{}

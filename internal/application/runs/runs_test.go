@@ -89,12 +89,16 @@ func (f *fakeSpecs) ResolveForPage(_ context.Context, req templates.ResolveForPa
 
 type fakePages struct {
 	unmapped map[string]string
+	known    map[string]pagemap.Page
 	err      error
 }
 
 func (f *fakePages) Get(_ context.Context, pageID string) (pagemap.Page, error) {
 	if f.err != nil {
 		return pagemap.Page{}, f.err
+	}
+	if page, ok := f.known[pageID]; ok {
+		return page, nil
 	}
 	if path, ok := f.unmapped[pageID]; ok {
 		return pagemap.Page{ID: pageID, Path: path}, nil
@@ -836,6 +840,61 @@ func TestListItemsReportsWhetherTheStepCanStillBeRetried(t *testing.T) {
 				t.Fatalf("RetryBlockedReason = %q, want %q", view.RetryBlockedReason, tc.reason)
 			}
 		})
+	}
+}
+
+func TestListItemsNamesTheParentAHeldItemWaitsFor(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	record, parentItem := fixture.seedRun(t, run.StatusPaused)
+	parentID, childID := fixture.pages[0], fixture.pages[1]
+
+	parentItem.Status = run.StatusFailed
+	parentItem.CurrentStep = string(run.StepValidate)
+	if ok, err := fixture.items.Persist(t.Context(), parentItem, parentItem.AdvanceSeq); err != nil || !ok {
+		t.Fatalf("fail the parent item: %v, %v", ok, err)
+	}
+
+	held := run.Item{
+		ID: id.New(), RunID: record.ID, SiteID: record.SiteID, TargetID: childID, Status: run.StatusPaused,
+		CurrentStep: string(run.StepPublish), PauseReason: run.PauseAwaitingParent,
+		Note:       "/hub/child/ waits for its parent /hub/, which is not on the site yet",
+		Checkpoint: run.NewCheckpoint(), CreatedAt: sqlitetest.Stamp.Add(time.Second), UpdatedAt: sqlitetest.Stamp,
+	}
+	if err := fixture.items.Insert(t.Context(), held); err != nil {
+		t.Fatalf("insert the held item: %v", err)
+	}
+
+	entity := "entity"
+	fixture.mapping.known = map[string]pagemap.Page{
+		parentID: {ID: parentID, Path: "/hub/", EntityID: &entity},
+		childID:  {ID: childID, Path: "/hub/child/", ParentPageID: &parentID, EntityID: &entity},
+	}
+
+	list, err := fixture.service.ListItems(t.Context(), runs.ListItemsRequest{RunID: record.ID})
+	if err != nil || len(list.Items) != 2 {
+		t.Fatalf("ListItems = %+v, %v", list, err)
+	}
+
+	byTarget := make(map[string]runs.Item, 2)
+	for _, view := range list.Items {
+		byTarget[view.TargetID] = view
+	}
+
+	child := byTarget[childID]
+	if child.Note != held.Note {
+		t.Fatalf("the held item's note = %q, want the step's own sentence", child.Note)
+	}
+	want := runs.AwaitedParent{
+		PageID: parentID, Path: "/hub/", ItemID: parentItem.ID,
+		ItemStatus: string(run.StatusFailed), Step: string(run.StepValidate),
+	}
+	if child.WaitingFor == nil || *child.WaitingFor != want {
+		t.Fatalf("the held item waits for %+v, want %+v", child.WaitingFor, want)
+	}
+	if parent := byTarget[parentID]; parent.WaitingFor != nil {
+		t.Fatalf("the parent item waits for %+v, want nothing", parent.WaitingFor)
 	}
 }
 

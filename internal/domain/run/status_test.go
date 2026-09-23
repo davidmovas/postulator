@@ -64,11 +64,15 @@ func TestTransitionAndPauseReasonAreClosedSets(t *testing.T) {
 
 	reasons := []run.PauseReason{
 		run.PauseBudgetExceeded, run.PauseAwaitingConfirmation, run.PauseNeedsHuman, run.PauseUser,
+		run.PauseAwaitingParent,
 	}
 	for _, reason := range reasons {
 		if !reason.Valid() {
 			t.Errorf("PauseReason(%q).Valid() = false", reason)
 		}
+	}
+	if len(run.PauseReasons()) != len(reasons) {
+		t.Errorf("PauseReasons() = %v, want every reason the engine can record", run.PauseReasons())
 	}
 	if run.PauseReason("bored").Valid() {
 		t.Error("an unknown pause reason must not validate")

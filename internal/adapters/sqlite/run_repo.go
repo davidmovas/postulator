@@ -20,12 +20,12 @@ const (
 	insertRun = `INSERT INTO runs (` + runColumns + `)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	updateRun = `UPDATE runs SET status = ?, stats_items = ?, stats_done = ?, stats_failed = ?, stats_tokens = ?,
-		stats_usd = ?, pause_reason = ?, error = ?, started_at = ?, finished_at = ? WHERE id = ?`
+		stats_usd = ?, pause_reason = ?, error = ?, deadline_at = ?, started_at = ?, finished_at = ? WHERE id = ?`
 	selectRun       = `SELECT ` + runColumns + ` FROM runs WHERE id = ?`
 	selectActiveRun = `SELECT ` + runColumns + ` FROM runs WHERE status IN ('pending', 'running', 'waiting')
 		ORDER BY created_at, id`
 	selectStaleRun = `SELECT ` + runColumns + ` FROM runs
-		WHERE status IN ('pending', 'running', 'waiting', 'paused') AND deadline_at <= ? ORDER BY created_at, id LIMIT ?`
+		WHERE status IN ('pending', 'running', 'waiting') AND deadline_at <= ? ORDER BY created_at, id LIMIT ?`
 	selectChildRuns = `SELECT ` + runColumns + ` FROM runs WHERE parent_run_id = ? ORDER BY created_at, id`
 )
 
@@ -67,7 +67,7 @@ func (r *RunRepo) Update(ctx context.Context, record run.Run) error {
 	affected, err := execWrite(ctx, r.store.writeFrom(ctx), updateRun, []any{
 		string(record.Status), record.Stats.Items, record.Stats.Done, record.Stats.Failed,
 		record.Stats.Tokens, record.Stats.USD, string(record.PauseReason), record.Error,
-		nullTime(record.StartedAt), nullTime(record.FinishedAt), record.ID,
+		formatTime(record.DeadlineAt), nullTime(record.StartedAt), nullTime(record.FinishedAt), record.ID,
 	}, nil, "update the run")
 	return requireAffected(affected, err, runNotFound(record.ID))
 }

@@ -14,14 +14,18 @@ import (
 
 const (
 	itemColumns = `id, run_id, site_id, target_id, status, current_step, attempts, seq, advance_seq, checkpoint,
-		lease_until, wake_at, pause_reason, error, created_at, updated_at, finished_at`
-	insertItem = `INSERT INTO run_items (` + itemColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		lease_until, wake_at, pause_reason, error, note, created_at, updated_at, finished_at`
+	prefixedItemColumns = `i.id, i.run_id, i.site_id, i.target_id, i.status, i.current_step, i.attempts,
+		i.seq, i.advance_seq, i.checkpoint, i.lease_until, i.wake_at, i.pause_reason, i.error, i.note, i.created_at,
+		i.updated_at, i.finished_at`
+	insertItem = `INSERT INTO run_items (` + itemColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	selectItem = `SELECT ` + itemColumns + ` FROM run_items WHERE id = ?`
 	claimItem  = `UPDATE run_items SET status = 'running', advance_seq = advance_seq + 1, lease_until = ?,
 		wake_at = NULL, updated_at = ? WHERE id = ? AND advance_seq = ?
 		AND status IN ('pending', 'running', 'waiting')`
 	persistItem = `UPDATE run_items SET status = ?, current_step = ?, attempts = ?, checkpoint = ?, lease_until = ?,
-		wake_at = ?, pause_reason = ?, error = ?, updated_at = ?, finished_at = ? WHERE id = ? AND advance_seq = ?`
+		wake_at = ?, pause_reason = ?, error = ?, note = ?, updated_at = ?, finished_at = ?
+		WHERE id = ? AND advance_seq = ?`
 	selectItemsByRun    = `SELECT ` + itemColumns + ` FROM run_items WHERE run_id = ? ORDER BY created_at, id`
 	selectItemsByTarget = `SELECT ` + itemColumns + ` FROM run_items WHERE target_id = ?
 		ORDER BY created_at DESC, id DESC LIMIT ?`
@@ -32,19 +36,28 @@ const (
 		WHERE status = 'waiting' AND wake_at IS NOT NULL AND wake_at <= ? ORDER BY wake_at, id LIMIT ?`
 	selectStalledItems = `SELECT ` + itemColumns + ` FROM run_items
 		WHERE status = 'running' AND lease_until IS NOT NULL AND lease_until <= ? ORDER BY lease_until, id LIMIT ?`
-	selectRunnableItems = `SELECT i.id, i.run_id, i.site_id, i.target_id, i.status, i.current_step, i.attempts,
-		i.seq, i.advance_seq, i.checkpoint, i.lease_until, i.wake_at, i.pause_reason, i.error, i.created_at,
-		i.updated_at, i.finished_at
+	selectRunnableItems = `SELECT ` + prefixedItemColumns + `
 		FROM run_items i JOIN runs r ON r.id = i.run_id
 		WHERE r.status IN ('pending', 'running') AND i.status = 'pending'
 		AND (i.lease_until IS NULL OR i.lease_until <= ?) ORDER BY i.seq, i.created_at, i.id LIMIT ?`
-	requeueItem = `UPDATE run_items SET status = 'pending', advance_seq = advance_seq + 1, lease_until = NULL,
-		wake_at = NULL, updated_at = ? WHERE id = ? AND advance_seq = ? AND status = ?`
+	selectItemsAwaitingParent = `SELECT ` + prefixedItemColumns + `
+		FROM run_items i
+		JOIN runs r ON r.id = i.run_id
+		JOIN pages child ON child.id = i.target_id
+		JOIN pages parent ON parent.id = child.parent_page_id
+		WHERE i.status = 'paused' AND i.pause_reason = 'awaiting_parent'
+		AND r.status IN ('pending', 'running', 'waiting', 'paused')
+		AND r.pause_reason IN ('', 'awaiting_parent', 'needs_human') AND parent.wp_id IS NOT NULL
+		ORDER BY i.seq, i.updated_at, i.id LIMIT ?`
+	requeueItem = `UPDATE run_items SET status = 'pending', pause_reason = '', note = '',
+		advance_seq = advance_seq + 1, lease_until = NULL, wake_at = NULL, updated_at = ?
+		WHERE id = ? AND advance_seq = ? AND status = ?`
 	countItemsByStatus = `SELECT status, count(*) FROM run_items WHERE run_id = ? GROUP BY status`
-	stopItemsOfRun     = `UPDATE run_items SET status = ?, pause_reason = ?, advance_seq = advance_seq + 1,
+	stopItemsOfRun     = `UPDATE run_items SET status = ?, pause_reason = ?, note = '', advance_seq = advance_seq + 1,
 		lease_until = NULL, wake_at = NULL, updated_at = ?, finished_at = ? WHERE run_id = ? AND status IN `
-	resumeItemsOfRun = `UPDATE run_items SET status = 'pending', pause_reason = '', advance_seq = advance_seq + 1,
-		lease_until = NULL, wake_at = NULL, updated_at = ? WHERE run_id = ? AND status = 'paused'`
+	resumeItemsOfRun = `UPDATE run_items SET status = 'pending', pause_reason = '', note = '',
+		advance_seq = advance_seq + 1, lease_until = NULL, wake_at = NULL, updated_at = ?
+		WHERE run_id = ? AND status = 'paused'`
 )
 
 var errNotClaimed = errors.New(errors.Conflict, "the run item moved on before it could be claimed")
@@ -70,7 +83,7 @@ func (r *RunItemRepo) Insert(ctx context.Context, item run.Item) error {
 	_, err = execWrite(ctx, r.store.writeFrom(ctx), insertItem, []any{
 		item.ID, item.RunID, item.SiteID, item.TargetID, string(item.Status), item.CurrentStep, item.Attempts,
 		item.Seq, item.AdvanceSeq, checkpoint, nullTime(item.LeaseUntil), nullTime(item.WakeAt), string(item.PauseReason), item.Error,
-		formatTime(item.CreatedAt), formatTime(item.UpdatedAt), nullTime(item.FinishedAt),
+		item.Note, formatTime(item.CreatedAt), formatTime(item.UpdatedAt), nullTime(item.FinishedAt),
 	}, errors.New(errors.Conflict, "a run item with this id already exists"), "insert the run item")
 	return err
 }
@@ -99,7 +112,7 @@ func (r *RunItemRepo) Persist(ctx context.Context, item run.Item, expectSeq int6
 
 	affected, err := execWrite(ctx, r.store.writeFrom(ctx), persistItem, []any{
 		string(item.Status), item.CurrentStep, item.Attempts, checkpoint, nullTime(item.LeaseUntil),
-		nullTime(item.WakeAt), string(item.PauseReason), item.Error, formatTime(item.UpdatedAt),
+		nullTime(item.WakeAt), string(item.PauseReason), item.Error, item.Note, formatTime(item.UpdatedAt),
 		nullTime(item.FinishedAt), item.ID, expectSeq,
 	}, nil, "persist the run item")
 	if err != nil {
@@ -130,6 +143,11 @@ func (r *RunItemRepo) Stalled(ctx context.Context, now time.Time, limit int) ([]
 func (r *RunItemRepo) Runnable(ctx context.Context, now time.Time, limit int) ([]run.Item, error) {
 	return selectAll(ctx, r.store.execFrom(ctx), selectRunnableItems, []any{formatTime(now), limit}, scanItem,
 		"list the runnable run items")
+}
+
+func (r *RunItemRepo) AwaitingParent(ctx context.Context, limit int) ([]run.Item, error) {
+	return selectAll(ctx, r.store.execFrom(ctx), selectItemsAwaitingParent, []any{limit}, scanItem,
+		"list the run items whose parent reached the site")
 }
 
 func (r *RunItemRepo) ActiveBySite(ctx context.Context, siteID string) ([]run.Item, error) {
@@ -247,7 +265,8 @@ func scanItem(rows *sql.Rows) (run.Item, error) {
 	)
 	if err := rows.Scan(
 		&item.ID, &item.RunID, &item.SiteID, &item.TargetID, &status, &item.CurrentStep, &item.Attempts, &item.Seq,
-		&item.AdvanceSeq, &checkpoint, &leaseUntil, &wakeAt, &pauseReason, &item.Error, &createdAt, &updatedAt, &finishedAt,
+		&item.AdvanceSeq, &checkpoint, &leaseUntil, &wakeAt, &pauseReason, &item.Error, &item.Note,
+		&createdAt, &updatedAt, &finishedAt,
 	); err != nil {
 		return run.Item{}, err
 	}

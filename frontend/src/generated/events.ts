@@ -181,6 +181,7 @@ export interface ItemNeedsHumanPayload {
     runId: string;
     itemId: string;
     reason: string;
+    message: string;
 }
 
 export interface ItemStartedPayload {

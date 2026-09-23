@@ -32,21 +32,31 @@ type Run struct {
 }
 
 type Item struct {
-	ID                 string   `json:"id"`
-	RunID              string   `json:"runId"`
-	SiteID             string   `json:"siteId"`
-	TargetID           string   `json:"targetId"`
-	Status             string   `json:"status"`
-	CurrentStep        string   `json:"currentStep"`
-	Attempts           int      `json:"attempts"`
-	PauseReason        string   `json:"pauseReason"`
-	Error              string   `json:"error"`
-	Retryable          bool     `json:"retryable"`
-	RetryBlockedReason string   `json:"retryBlockedReason"`
-	WakeAt             dto.Time `json:"wakeAt"`
-	CreatedAt          dto.Time `json:"createdAt"`
-	UpdatedAt          dto.Time `json:"updatedAt"`
-	FinishedAt         dto.Time `json:"finishedAt"`
+	ID                 string         `json:"id"`
+	RunID              string         `json:"runId"`
+	SiteID             string         `json:"siteId"`
+	TargetID           string         `json:"targetId"`
+	Status             string         `json:"status"`
+	CurrentStep        string         `json:"currentStep"`
+	Attempts           int            `json:"attempts"`
+	PauseReason        string         `json:"pauseReason"`
+	Error              string         `json:"error"`
+	Note               string         `json:"note"`
+	WaitingFor         *AwaitedParent `json:"waitingFor"`
+	Retryable          bool           `json:"retryable"`
+	RetryBlockedReason string         `json:"retryBlockedReason"`
+	WakeAt             dto.Time       `json:"wakeAt"`
+	CreatedAt          dto.Time       `json:"createdAt"`
+	UpdatedAt          dto.Time       `json:"updatedAt"`
+	FinishedAt         dto.Time       `json:"finishedAt"`
+}
+
+type AwaitedParent struct {
+	PageID     string `json:"pageId"`
+	Path       string `json:"path"`
+	ItemID     string `json:"itemId"`
+	ItemStatus string `json:"itemStatus"`
+	Step       string `json:"step"`
 }
 
 type Event struct {
@@ -115,7 +125,7 @@ func runView(record run.Run) Run {
 	}
 }
 
-func itemView(item run.Item, blocked run.RetryBlockedReason) Item {
+func itemView(item run.Item, blocked run.RetryBlockedReason, awaited *AwaitedParent) Item {
 	return Item{
 		ID:                 item.ID,
 		RunID:              item.RunID,
@@ -126,6 +136,8 @@ func itemView(item run.Item, blocked run.RetryBlockedReason) Item {
 		Attempts:           item.Attempts,
 		PauseReason:        string(item.PauseReason),
 		Error:              item.Error,
+		Note:               item.Note,
+		WaitingFor:         awaited,
 		Retryable:          blocked == "",
 		RetryBlockedReason: string(blocked),
 		WakeAt:             timeOf(item.WakeAt),

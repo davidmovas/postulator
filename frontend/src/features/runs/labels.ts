@@ -111,6 +111,7 @@ const pauseTones: Readonly<Record<PauseReason, Tone>> = {
     awaiting_confirmation: "info",
     needs_human: "warn",
     user: "muted",
+    awaiting_parent: "info",
 };
 
 export function pauseReasonTone(reason: string): Tone {

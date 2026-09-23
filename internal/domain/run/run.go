@@ -213,6 +213,7 @@ type Item struct {
 	WakeAt      *time.Time
 	PauseReason PauseReason
 	Error       string
+	Note        string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	FinishedAt  *time.Time

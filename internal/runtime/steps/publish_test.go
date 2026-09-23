@@ -345,7 +345,7 @@ func TestPublishReparentsUnderTheParentPage(t *testing.T) {
 	}
 }
 
-func TestPublishWaitsWhileTheParentIsNotOnTheSite(t *testing.T) {
+func TestPublishHoldsTheItemForAParentThatIsNotOnTheSite(t *testing.T) {
 	t.Parallel()
 
 	deps, server := imageDeps(t)
@@ -355,45 +355,17 @@ func TestPublishWaitsWhileTheParentIsNotOnTheSite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
-	if result.Next != run.TransitionWait {
-		t.Fatalf("Publish under an unpublished parent = %q, want a wait", result.Next)
+	if result.Next != run.TransitionPause || result.Reason != run.PauseAwaitingParent {
+		t.Fatalf("Publish under an unpublished parent = %q / %q, want a hold for the parent", result.Next, result.Reason)
+	}
+	if !strings.Contains(result.Message, "/coffee/") {
+		t.Errorf("the hold %q does not name the parent it waits for", result.Message)
 	}
 	if len(result.Artifacts) != 0 {
-		t.Fatalf("a waiting publish produced %+v", result.Artifacts)
+		t.Fatalf("a held publish produced %+v", result.Artifacts)
 	}
 	if len(server.Items()) != 0 {
 		t.Fatalf("the site holds %d items, want none while the parent is missing", len(server.Items()))
-	}
-}
-
-func TestPublishStopsOnceTheParentHasNotArrived(t *testing.T) {
-	t.Parallel()
-
-	deps, server := imageDeps(t)
-	sc := nestedContext(t)
-
-	var result run.Result
-	for attempt := 0; attempt <= steps.ParentWaitLimit; attempt++ {
-		var err error
-		result, err = steps.Publish(deps).Run(t.Context(), sc)
-		if err != nil {
-			t.Fatalf("Publish: %v", err)
-		}
-		sc.Check = sc.Check.MergedWith(result.Checkpoint)
-		if result.Next != run.TransitionWait {
-			break
-		}
-	}
-
-	if result.Next != run.TransitionPause || result.Reason != run.PauseNeedsHuman {
-		t.Fatalf("Publish after %d waits = %q / %q, want a pause for a human",
-			steps.ParentWaitLimit, result.Next, result.Reason)
-	}
-	if !strings.Contains(result.Message, "/coffee/") {
-		t.Errorf("the pause message %q does not name the parent path", result.Message)
-	}
-	if len(server.Items()) != 0 {
-		t.Fatalf("the site holds %d items, want none", len(server.Items()))
 	}
 }
 

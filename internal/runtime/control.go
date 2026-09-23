@@ -163,8 +163,7 @@ func (e *Engine) Resume(ctx context.Context, runID string) error {
 			return err
 		}
 
-		record.Status = run.StatusRunning
-		record.PauseReason = ""
+		e.revive(&record, now)
 		if updateErr := e.deps.Runs.Update(c, record); updateErr != nil {
 			return updateErr
 		}
@@ -234,6 +233,7 @@ func (e *Engine) RetryStep(ctx context.Context, itemID string) error {
 		next.Attempts = 0
 		next.Error = ""
 		next.PauseReason = ""
+		next.Note = ""
 		next.LeaseUntil = nil
 		next.WakeAt = nil
 		next.FinishedAt = nil
@@ -252,10 +252,7 @@ func (e *Engine) RetryStep(ctx context.Context, itemID string) error {
 		}
 
 		if record.Status.Terminal() || record.Status == run.StatusPaused {
-			record.Status = run.StatusRunning
-			record.PauseReason = ""
-			record.Error = ""
-			record.FinishedAt = nil
+			e.revive(&record, now)
 			if updateErr := e.deps.Runs.Update(c, record); updateErr != nil {
 				return updateErr
 			}

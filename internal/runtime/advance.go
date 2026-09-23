@@ -367,11 +367,15 @@ func (e *Engine) settle(parent context.Context, held *claim, out outcome) (bool,
 		next.Attempts = out.attempts
 		next.PauseReason = out.reason
 		next.Error = ""
+		next.Note = ""
 		next.LeaseUntil = nil
 		next.WakeAt = out.wakeAt
 		next.UpdatedAt = now
 		if out.fault != nil {
 			next.Error = out.fault.Message
+		}
+		if out.fault == nil && (out.status == run.StatusPaused || out.status == run.StatusWaiting) {
+			next.Note = out.message
 		}
 		if next.Status.Terminal() {
 			next.FinishedAt = &now
@@ -414,6 +418,7 @@ func (e *Engine) record(ctx context.Context, held *claim, out outcome, now time.
 	}
 	if out.status == run.StatusPaused {
 		status = run.ExecFailed
+		message = out.message
 		if out.fault != nil {
 			message = out.fault.Message
 		}
@@ -479,8 +484,12 @@ func (e *Engine) announce(ctx context.Context, box *outbox, held *claim, out out
 			RunID: runID, ItemID: itemID, Code: faultCode(out.fault), Message: out.message,
 		})
 	case run.StatusPaused:
+		message := next.Note
+		if message == "" {
+			message = out.message
+		}
 		box.add(ctx, runID, events.ItemNeedsHuman, events.ItemNeedsHumanPayload{
-			RunID: runID, ItemID: itemID, Reason: string(next.PauseReason),
+			RunID: runID, ItemID: itemID, Reason: string(next.PauseReason), Message: message,
 		})
 	}
 }
@@ -569,13 +578,17 @@ func (e *Engine) settleRun(ctx context.Context, box *outbox, record run.Run, now
 	}
 
 	if counts[run.StatusPaused] > 0 {
+		reason, reasonErr := e.heldFor(ctx, current.ID)
+		if reasonErr != nil {
+			return reasonErr
+		}
 		current.Status = run.StatusPaused
-		current.PauseReason = run.PauseNeedsHuman
+		current.PauseReason = reason
 		if updateErr := e.deps.Runs.Update(ctx, current); updateErr != nil {
 			return updateErr
 		}
 		box.add(ctx, current.ID, events.RunPaused, events.RunPausedPayload{
-			RunID: current.ID, Reason: string(run.PauseNeedsHuman),
+			RunID: current.ID, Reason: string(reason),
 		})
 		return nil
 	}
@@ -627,6 +640,27 @@ func (e *Engine) expire(ctx context.Context, box *outbox, record run.Run, now ti
 		RunID: record.ID, Code: run.CodeDeadlineExceeded, Message: record.Error,
 	})
 	return nil
+}
+
+func (e *Engine) heldFor(ctx context.Context, runID string) (run.PauseReason, error) {
+	items, err := e.deps.Items.ByRun(ctx, runID)
+	if err != nil {
+		return "", err
+	}
+	for i := range items {
+		if items[i].Status == run.StatusPaused && items[i].PauseReason != run.PauseAwaitingParent {
+			return run.PauseNeedsHuman, nil
+		}
+	}
+	return run.PauseAwaitingParent, nil
+}
+
+func (e *Engine) revive(record *run.Run, now time.Time) {
+	record.Status = run.StatusRunning
+	record.PauseReason = ""
+	record.Error = ""
+	record.FinishedAt = nil
+	record.DeadlineAt = now.Add(e.cfg.RunDeadline)
 }
 
 func overBudget(record run.Run, spend llm.Spend) bool {
