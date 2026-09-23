@@ -148,13 +148,13 @@ func TestATokenBudgetPausesTheRun(t *testing.T) {
 	t.Parallel()
 
 	harness := newHarness(t, 2)
-	harness.spend.set(llm.Spend{Usage: llm.Usage{Input: 900, Output: 600, Total: 1500}, USD: 0.02, Calls: 1})
+	harness.spend.set(llm.Spend{Usage: llm.Usage{Input: 30, Output: 20, Total: 50}, USD: 0.02, Calls: 1})
 
 	calls := newCounter()
 	engine := harness.engine(t, mustRegister(t, bodyStep(calls), validateStep(calls)))
 
 	record := harness.newRun(recipeOf("generate_body", "validate"))
-	record.Budget = run.Budget{MaxTokens: 1000}
+	record.Budget = run.Budget{MaxTokens: 10}
 	queued, err := engine.Enqueue(t.Context(), record)
 	if err != nil {
 		t.Fatalf("Enqueue: %v", err)
@@ -164,12 +164,19 @@ func TestATokenBudgetPausesTheRun(t *testing.T) {
 	if paused.PauseReason != run.PauseBudgetExceeded {
 		t.Fatalf("PauseReason = %q", paused.PauseReason)
 	}
-	if harness.bus.count(events.RunBudgetExceeded) != 0 {
-		t.Fatalf("run.budget_exceeded names only money and was published %d times",
-			harness.bus.count(events.RunBudgetExceeded))
-	}
 	if harness.bus.count(events.RunPaused) == 0 {
 		t.Fatal("the run was never announced as paused")
+	}
+
+	said := budgetExceeded(t, harness)
+	if said.RunID != queued.ID {
+		t.Fatalf("the event names the run %q, want %q", said.RunID, queued.ID)
+	}
+	if said.SpentTokens != 50 || said.BudgetTokens != 10 {
+		t.Fatalf("the event says %d of %d tokens, want 50 of 10", said.SpentTokens, said.BudgetTokens)
+	}
+	if said.BudgetUSD != 0 {
+		t.Fatalf("the event names a money cap of %v, want none", said.BudgetUSD)
 	}
 	assertGapless(t, harness, queued.ID)
 }

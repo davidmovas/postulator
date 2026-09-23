@@ -64,7 +64,7 @@ func (e *Engine) advance(parent context.Context, itemID string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if parent.Err() != nil && out.stopped {
+	if out.stopped && e.stopping() {
 		return false, nil
 	}
 
@@ -545,8 +545,7 @@ func (e *Engine) settleRun(ctx context.Context, box *outbox, record run.Run, now
 		USD:    spend.USD,
 	}
 
-	overMoney, overTokens := overBudget(current, spend)
-	if overMoney || overTokens {
+	if overBudget(current, spend) {
 		current.Status = run.StatusPaused
 		current.PauseReason = run.PauseBudgetExceeded
 		if _, stopErr := e.deps.Items.StopAll(ctx, current.ID, pausable, run.StatusPaused, run.PauseBudgetExceeded, now); stopErr != nil {
@@ -555,11 +554,10 @@ func (e *Engine) settleRun(ctx context.Context, box *outbox, record run.Run, now
 		if updateErr := e.deps.Runs.Update(ctx, current); updateErr != nil {
 			return updateErr
 		}
-		if overMoney {
-			box.add(ctx, current.ID, events.RunBudgetExceeded, events.RunBudgetExceededPayload{
-				RunID: current.ID, SpentUSD: spend.USD, BudgetUSD: current.Budget.MaxUSD,
-			})
-		}
+		box.add(ctx, current.ID, events.RunBudgetExceeded, events.RunBudgetExceededPayload{
+			RunID: current.ID, SpentUSD: spend.USD, BudgetUSD: current.Budget.MaxUSD,
+			SpentTokens: spend.Usage.Total, BudgetTokens: current.Budget.MaxTokens,
+		})
 		box.add(ctx, current.ID, events.RunPaused, events.RunPausedPayload{
 			RunID: current.ID, Reason: string(run.PauseBudgetExceeded),
 		})
@@ -619,10 +617,10 @@ func (e *Engine) expire(ctx context.Context, box *outbox, record run.Run, now ti
 	return nil
 }
 
-func overBudget(record run.Run, spend llm.Spend) (money, tokens bool) {
-	money = record.Budget.MaxUSD > 0 && spend.USD > record.Budget.MaxUSD
-	tokens = record.Budget.MaxTokens > 0 && spend.Usage.Total > record.Budget.MaxTokens
-	return money, tokens
+func overBudget(record run.Run, spend llm.Spend) bool {
+	overMoney := record.Budget.MaxUSD > 0 && spend.USD > record.Budget.MaxUSD
+	overTokens := record.Budget.MaxTokens > 0 && spend.Usage.Total > record.Budget.MaxTokens
+	return overMoney || overTokens
 }
 
 func total(counts map[run.Status]int) int {

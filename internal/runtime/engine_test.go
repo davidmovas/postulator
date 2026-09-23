@@ -283,7 +283,25 @@ func TestBudgetExhaustionPausesTheRun(t *testing.T) {
 	if harness.bus.count(events.RunBudgetExceeded) != 1 {
 		t.Fatalf("run.budget_exceeded was published %d times", harness.bus.count(events.RunBudgetExceeded))
 	}
+	said := budgetExceeded(t, harness)
+	if said.SpentUSD != 5 || said.BudgetUSD != 1 {
+		t.Fatalf("the event says %+v, want the 5 spent against the cap of 1", said)
+	}
 	assertGapless(t, harness, queued.ID)
+}
+
+func budgetExceeded(t *testing.T, harness *harness) events.RunBudgetExceededPayload {
+	t.Helper()
+
+	published := harness.bus.payloads(events.RunBudgetExceeded)
+	if len(published) != 1 {
+		t.Fatalf("run.budget_exceeded was published %d times", len(published))
+	}
+	said, ok := published[0].(events.RunBudgetExceededPayload)
+	if !ok {
+		t.Fatalf("run.budget_exceeded carried %T", published[0])
+	}
+	return said
 }
 
 func TestPauseResumeAndCancel(t *testing.T) {

@@ -105,6 +105,19 @@ func (r *recorder) types() []events.Type {
 	return out
 }
 
+func (r *recorder) payloads(eventType events.Type) []any {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	out := make([]any, 0, 1)
+	for _, row := range r.rows {
+		if row.eventType == eventType {
+			out = append(out, row.payload)
+		}
+	}
+	return out
+}
+
 func (r *recorder) count(eventType events.Type) int {
 	total := 0
 	for _, seen := range r.types() {

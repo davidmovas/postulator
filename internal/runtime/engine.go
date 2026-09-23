@@ -125,6 +125,15 @@ func (e *Engine) Stop() {
 	e.handBack(context.Background())
 }
 
+func (e *Engine) stopping() bool {
+	select {
+	case <-e.stop:
+		return true
+	default:
+		return false
+	}
+}
+
 func (e *Engine) hold(itemID string, expectSeq int64) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
