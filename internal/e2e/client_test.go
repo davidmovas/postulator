@@ -15,8 +15,13 @@ import (
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/imports"
+	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/reports"
+	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
 
@@ -32,6 +37,17 @@ const (
 var messySheets = []string{"Site map", "Bikes", "Components", "Guides", "shop crawl (old)", "Broken", "Notes"}
 
 var clientPrefixes = []string{"/electric-bikes", "/components", "/guides", "/maintenance", "/laws"}
+
+var clientTargets = []string{
+	"/electric-bikes/",
+	"/components/",
+	"/electric-bikes/commuter/",
+	"/electric-bikes/cargo/",
+	"/components/batteries/",
+	"/electric-bikes/commuter/volt-commuter-500/",
+	"/electric-bikes/cargo/hauler-cargo-max/",
+	"/components/batteries/powercell-500wh/",
+}
 
 func sample(t *testing.T, name string) string {
 	t.Helper()
@@ -295,6 +311,198 @@ func TestTheClientLoopFromTheSamples(t *testing.T) {
 	approved := proposeAndApproveRelated(t, core, script, siteID)
 	scores := recomputeScores(t, core, siteID)
 	t.Logf("%d related edges were approved and %d entities were scored", approved, len(scores))
+
+	stored := pagesByPath(t, core.Pages, siteID)
+	targets := make([]string, 0, len(clientTargets))
+	for _, path := range clientTargets {
+		page, ok := stored[path]
+		if !ok {
+			t.Fatalf("the import created no %s", path)
+		}
+		if page.Status != string(pagemap.StatusPlanned) {
+			t.Fatalf("%s is %q before the run, want planned", path, page.Status)
+		}
+		targets = append(targets, page.ID)
+	}
+
+	request := runs.StartRequest{SiteID: siteID, PageIDs: targets, PublishMode: string(run.PublishLive)}
+	priced, err := core.Runs.Estimate(t.Context(), request)
+	if err != nil {
+		t.Fatalf("estimate the run: %v", err)
+	}
+	if priced.Estimate.Tokens == 0 {
+		t.Fatalf("the estimate prices the run at no tokens: %+v", priced.Estimate)
+	}
+
+	started, err := core.Runs.Start(t.Context(), request)
+	if err != nil {
+		t.Fatalf("start the run: %v", err)
+	}
+	awaitRun(t, core.Runs, started.RunID)
+
+	assertEveryItemPublished(t, core, started.RunID, len(clientTargets))
+	assertTheRunCostWhatItWasPricedAt(t, core, started.RunID, priced.Estimate.Tokens)
+	assertTheAuditIsGreen(t, core, siteID, clientTargets)
+	assertTheSiteCarriesTheSameLinks(t, core, live, siteID, clientTargets)
+}
+
+func assertEveryItemPublished(t *testing.T, core *app.Core, runID string, want int) {
+	t.Helper()
+
+	items, err := core.Runs.ListItems(t.Context(), runs.ListItemsRequest{
+		RunID: runID, ListRequest: dto.ListRequest{Limit: 50},
+	})
+	if err != nil {
+		t.Fatalf("list the run items: %v", err)
+	}
+	if len(items.Items) != want {
+		t.Fatalf("the run carries %d items, want %d", len(items.Items), want)
+	}
+
+	for i := range items.Items {
+		item := items.Items[i]
+		if item.Status != string(run.StatusCompleted) {
+			t.Fatalf("the item for %s is %q at %s: %s%s", item.TargetID, item.Status, item.CurrentStep,
+				item.Error, artifactDump(t, core.Runs, item.ID, string(run.ArtifactValidationReport)))
+		}
+
+		final := finalReport(t, core.Runs, item.ID)
+		if final.Validation == nil {
+			t.Fatalf("%s carries no validation report", final.Path)
+		}
+		if final.Validation.Compliance.HasErrors() || final.Validation.Structure.HasErrors() {
+			t.Fatalf("%s validated with errors: compliance %+v, structure %+v",
+				final.Path, final.Validation.Compliance.Items, final.Validation.Structure.Items)
+		}
+		if final.Errors != 0 {
+			t.Fatalf("%s reports %d errors: %+v", final.Path, final.Errors, final.Findings)
+		}
+		if final.Score == nil || *final.Score <= 0 {
+			t.Fatalf("%s reports the score %v, want one the reviewer can read", final.Path, final.Score)
+		}
+		if final.Publish == nil || final.Publish.Status != "publish" || final.Publish.WPID == 0 {
+			t.Fatalf("%s reports %+v, want a published page on the site", final.Path, final.Publish)
+		}
+	}
+}
+
+func assertTheRunCostWhatItWasPricedAt(t *testing.T, core *app.Core, runID string, estimated int) {
+	t.Helper()
+
+	held, err := core.Runs.Get(t.Context(), runs.GetRequest{RunID: runID})
+	if err != nil {
+		t.Fatalf("read the run back: %v", err)
+	}
+	if held.Run.Stats.Tokens == 0 {
+		t.Fatalf("the run recorded no spend: %+v", held.Run.Stats)
+	}
+	if estimated < held.Run.Stats.Tokens {
+		t.Fatalf("the estimate of %d tokens is below the %d the run spent, so a budget set from it "+
+			"would have paused the run it priced", estimated, held.Run.Stats.Tokens)
+	}
+}
+
+func assertTheAuditIsGreen(t *testing.T, core *app.Core, siteID string, paths []string) {
+	t.Helper()
+
+	audit, err := core.Reports.LinkAudit(t.Context(), reports.LinkAuditRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("audit the links: %v", err)
+	}
+
+	byPath := make(map[string]reports.PageAudit, len(audit.Pages))
+	for i := range audit.Pages {
+		byPath[audit.Pages[i].Path] = audit.Pages[i]
+	}
+
+	for _, path := range paths {
+		page, ok := byPath[path]
+		if !ok {
+			t.Fatalf("the audit does not cover %s at all", path)
+		}
+		if page.SkipReason != "" {
+			t.Fatalf("the audit skipped %s: %q", path, page.SkipReason)
+		}
+		if page.Targets == 0 {
+			t.Fatalf("the audit offers %s no target at all, so it proves nothing", path)
+		}
+		if depthOf(path) > 1 && page.Required == 0 {
+			t.Fatalf("the audit asks %s for no required link, though it sits under a parent", path)
+		}
+		if page.MissingRequired != 0 {
+			t.Fatalf("%s is missing %d of the %d links the graph requires: %s",
+				path, page.MissingRequired, page.Required, missingOn(t, core, page.PageID))
+		}
+		if page.OffGraph != 0 {
+			t.Fatalf("%s carries %d links the graph does not know", path, page.OffGraph)
+		}
+		if page.Blocked != 0 {
+			t.Fatalf("%s carries %d links the policy blocked", path, page.Blocked)
+		}
+	}
+}
+
+func depthOf(path string) int {
+	trimmed := strings.Trim(path, "/")
+	if trimmed == "" {
+		return 0
+	}
+	return strings.Count(trimmed, "/") + 1
+}
+
+func missingOn(t *testing.T, core *app.Core, pageID string) string {
+	t.Helper()
+
+	audited, err := core.Reports.LinkAuditPage(t.Context(), reports.LinkAuditPageRequest{PageID: pageID})
+	if err != nil {
+		return "the page audit failed: " + err.Error()
+	}
+
+	out := strings.Builder{}
+	for i := range audited.Required {
+		row := audited.Required[i]
+		if row.Satisfied {
+			continue
+		}
+		out.WriteString("; " + row.Relation + " -> " + row.TargetPath + " (anchors " +
+			strings.Join(row.AnchorsAllowed, "|") + ", blocked " + row.BlockedReason + ")")
+	}
+	return out.String()
+}
+
+func assertTheSiteCarriesTheSameLinks(t *testing.T, core *app.Core, live *site, siteID string, paths []string) {
+	t.Helper()
+
+	served := make(map[string][]link, 32)
+	for _, item := range live.content(t) {
+		served[item.Path] = item.Links
+	}
+
+	stored := pagesByPath(t, core.Pages, siteID)
+	for _, path := range paths {
+		page, ok := stored[path]
+		if !ok {
+			t.Fatalf("the store lost %s", path)
+		}
+		read, err := core.Pages.Get(t.Context(), pages.GetRequest{ID: page.ID})
+		if err != nil {
+			t.Fatalf("read %s back: %v", path, err)
+		}
+
+		onSite, live := served[path]
+		if !live {
+			t.Fatalf("the site serves no %s, though the run published it", path)
+		}
+		for i := range read.Links {
+			if read.Links[i].ToURL == "" {
+				continue
+			}
+			if !linksTo(onSite, read.Links[i].ToURL) {
+				t.Fatalf("the store says %s links to %s; the site serves %+v",
+					path, read.Links[i].ToURL, onSite)
+			}
+		}
+	}
 }
 
 func proposeAndApproveRelated(t *testing.T, core *app.Core, script *clientScript, siteID string) int {
