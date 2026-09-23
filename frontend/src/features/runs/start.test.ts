@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { runKinds, runKindsWithTheirOwnRecipe } from "../../generated/vocab.js";
-import type { TransportError } from "../../lib/errors.js";
+import type { TransportError } from "../../data/errors.js";
 import { kindDoes, startRefusal, takesATemplate, tokenCapOf } from "./start.js";
 
 function refused(cause: TransportError): Error {
