@@ -46,14 +46,19 @@ if ! wp core is-installed >/dev/null 2>&1; then
 	fresh=1
 fi
 
-if [ ! -f "$PLUGIN_ZIP" ]; then
-	echo "$PLUGIN_ZIP is missing; run task plugin:zip first" >&2
-	exit 1
-fi
-wp plugin install "$PLUGIN_ZIP" --force
+install_plugin() {
+	if [ ! -f "$PLUGIN_ZIP" ]; then
+		echo "$PLUGIN_ZIP is missing; run task plugin:zip first" >&2
+		exit 1
+	fi
+	wp plugin install "$PLUGIN_ZIP" --force
+}
 
 if [ "$MODE" = "sandbox" ]; then
-	wp plugin activate postulator-companion
+	if [ "$PLUGIN" = "1" ]; then
+		install_plugin
+		wp plugin activate postulator-companion
+	fi
 	if [ "$fresh" = "1" ]; then
 		wp rewrite structure '/%postname%/' --hard
 		wp rewrite flush --hard
@@ -69,6 +74,8 @@ if [ "$MODE" = "sandbox" ]; then
 	echo "the sandbox is ready at $SITE_URL"
 	exit 0
 fi
+
+install_plugin
 
 case "$PLUGIN" in
 	1)

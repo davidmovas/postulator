@@ -4,7 +4,7 @@ The handoff point between sessions. Read this first. The reasoning behind every 
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
-**Released:** `v2.0.0` on 2026-09-23. `dev` carries the fixes after it, not tagged yet.
+**Released:** `v2.1.0` on 2026-09-23, from `master` after a PR from `dev`; `v2.0.0` the same morning.
 
 ## Where we are
 
@@ -88,7 +88,7 @@ task ui:run · walk · shot · reset the harness window, seeded, DevTools on 922
 task ui:lint                      lint and tests behind the uiharness build tag
 task lint:e2e                     the build-tagged sources golangci-lint run skips
 task e2e:up · test · full · full:noplugin · down     the suites' WordPress on 8088
-task sandbox:up · down · reset    the owner's WordPress on 8089, plugin from its zip
+task sandbox:up · down · reset    the owner's WordPress on 8089, bare unless E2E_PLUGIN=1
 go test -race -count=1 -p 2 -covermode=atomic -coverprofile=coverage.out ./...
 go run ./cmd/covergate            the coverage gates on that profile
 $(go env GOPATH)/bin/golangci-lint.exe run
@@ -166,15 +166,9 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 
 ## Next steps
 
-1. Move the sandbox onto the new compose with `task sandbox:up` (it recreates the WordPress
-   container without the plugin mount and keeps the volumes), then regenerate the seven pages the
-   2026-09-23 e2e run left on it (`/components/`, `/electric-bikes/`, `/components/batteries/`,
-   `/electric-bikes/cargo/`, `/electric-bikes/commuter/`, `…/hauler-cargo-max/`,
-   `…/volt-commuter-500/`) with an ordinary run; they are parents of real pages, so they are
-   rewritten, not deleted.
-2. A human walk of the new flows on a real provider: a failed parent regenerated in place, its
-   children going on by themselves, the tree picker on a real site.
-3. When the owner says so: PR `dev` into `master` and a `v2.0.1` tag; `release.yml` publishes from it.
-4. The residue above: the denied tool row's decision, the four narrow-width UI items, the ledger
+1. A human walk of the new flows on a real provider, from the empty home and the bare sandbox the
+   owner reset on 2026-09-23: install the plugin by hand, import, a failed parent regenerated in
+   place, its children going on by themselves, the tree picker, links as Tor Browser tabs.
+2. The residue above: the denied tool row's decision, the four narrow-width UI items, the ledger
    screen, `ProposeFromPages` and `Import.Apply` as runs, `settings.changed` for a declared value,
    and pricing images in the pre-run estimate.

@@ -167,7 +167,7 @@ tasks:
         platforms: [linux, darwin]
 
   sandbox:up:
-    summary: Starts the WordPress sandbox people test the app against, on port 8089, with the plugin from its zip
+    summary: Starts the WordPress sandbox people test the app against, on port 8089, bare unless E2E_PLUGIN=1
     dir: docker/e2e
     cmds:
       - task: plugin:zip
@@ -177,6 +177,7 @@ tasks:
       COMPOSE_PROJECT_NAME: postulator-e2e
       WP_PORT: "8089"
       E2E_MODE: sandbox
+      E2E_PLUGIN: '{{.E2E_PLUGIN | default "0"}}'
 
   sandbox:down:
     summary: Stops the WordPress sandbox and keeps its content
