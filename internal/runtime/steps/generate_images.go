@@ -188,6 +188,9 @@ func generated(ctx context.Context, deps Deps, sc *run.StepContext, entity graph
 	for index := range wanted {
 		drawn, err := deps.ImageProvider.Generate(ctx, images.Prompt{
 			SiteID:  sc.Run.SiteID,
+			RunID:   sc.Run.ID,
+			ItemID:  sc.Item.ID,
+			Step:    NameGenerateImages,
 			Subject: subject,
 			Context: sceneOf(sc.Spec, index),
 			Alt:     altOf(entity, subject),

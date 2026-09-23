@@ -21,6 +21,7 @@ const (
 	DefaultBaseURL = "https://api.openai.com/v1"
 	DefaultTimeout = 2 * time.Minute
 	DefaultSize    = "1024x1024"
+	DefaultQuality = images.DefaultOpenAIQuality
 
 	generationsPath = "/images/generations"
 	maxBodyBytes    = 32 << 20
@@ -49,11 +50,20 @@ func WithHTTPClient(client *http.Client) Option {
 	}
 }
 
+func WithQuality(quality string) Option {
+	return func(i *Images) {
+		if trimmed := strings.TrimSpace(quality); trimmed != "" {
+			i.quality = trimmed
+		}
+	}
+}
+
 type Images struct {
 	secrets secretStore
 	http    *http.Client
 	baseURL string
 	model   string
+	quality string
 }
 
 func New(secrets secretStore, model string, opts ...Option) *Images {
@@ -62,6 +72,7 @@ func New(secrets secretStore, model string, opts ...Option) *Images {
 		http:    &http.Client{Timeout: DefaultTimeout},
 		baseURL: DefaultBaseURL,
 		model:   strings.TrimSpace(model),
+		quality: DefaultQuality,
 	}
 	if generator.model == "" {
 		generator.model = images.DefaultOpenAIModel
@@ -73,21 +84,30 @@ func New(secrets secretStore, model string, opts ...Option) *Images {
 }
 
 type generationRequest struct {
-	Model  string `json:"model"`
-	Prompt string `json:"prompt"`
-	Size   string `json:"size"`
-	Format string `json:"response_format"`
-	Count  int    `json:"n"`
+	Model   string `json:"model"`
+	Prompt  string `json:"prompt"`
+	Size    string `json:"size"`
+	Format  string `json:"response_format"`
+	Quality string `json:"quality"`
+	Count   int    `json:"n"`
 }
 
 type generationResponse struct {
-	Data []struct {
-		B64JSON string `json:"b64_json"`
-	} `json:"data"`
 	Error *struct {
 		Message string `json:"message"`
 		Code    string `json:"code"`
 	} `json:"error"`
+	Data []struct {
+		B64JSON string `json:"b64_json"`
+	} `json:"data"`
+	Usage struct {
+		Details struct {
+			Cached int `json:"cached_tokens"`
+		} `json:"input_tokens_details"`
+		Total  int `json:"total_tokens"`
+		Input  int `json:"input_tokens"`
+		Output int `json:"output_tokens"`
+	} `json:"usage"`
 }
 
 func (i *Images) Generate(ctx context.Context, prompt images.Prompt) (images.Image, error) {
@@ -110,7 +130,7 @@ func (i *Images) Generate(ctx context.Context, prompt images.Prompt) (images.Ima
 	}
 
 	body, err := json.Marshal(generationRequest{
-		Model: i.model, Prompt: text, Size: size, Format: "b64_json", Count: 1,
+		Model: i.model, Prompt: text, Size: size, Format: "b64_json", Quality: i.quality, Count: 1,
 	})
 	if err != nil {
 		return images.Image{}, errors.Wrap(err, errors.Internal, "encode the image request")
@@ -159,6 +179,10 @@ func (i *Images) Generate(ctx context.Context, prompt images.Prompt) (images.Ima
 		ContentType: "image/png",
 		Alt:         alt(prompt),
 		Bytes:       raw,
+		Usage: domainllm.Usage{
+			Input: decoded.Usage.Input, CachedInput: decoded.Usage.Details.Cached,
+			Output: decoded.Usage.Output, Total: decoded.Usage.Total,
+		},
 	}, nil
 }
 

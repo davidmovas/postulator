@@ -20,8 +20,9 @@ import (
 const imageBody = "<h1>Espresso</h1><h2>About</h2><p>One.</p><h2>Brewing</h2><p>Two.</p>"
 
 type drawing struct {
-	calls int
-	err   error
+	err     error
+	prompts []images.Prompt
+	calls   int
 }
 
 func (d *drawing) Generate(_ context.Context, prompt images.Prompt) (images.Image, error) {
@@ -29,6 +30,7 @@ func (d *drawing) Generate(_ context.Context, prompt images.Prompt) (images.Imag
 		return images.Image{}, d.err
 	}
 	d.calls++
+	d.prompts = append(d.prompts, prompt)
 	return images.Image{
 		Filename:    "drawn.png",
 		ContentType: "image/png",
@@ -128,11 +130,18 @@ func TestGenerateImagesDrawsUploadsAndPlaces(t *testing.T) {
 	t.Parallel()
 
 	deps, server := imageDeps(t)
-	manifest, result := runImages(t, deps, imageContext(t,
-		template.Images{Featured: true, Inline: 1, Source: template.ImagesAI}))
+	drawn := &drawing{}
+	deps.ImageProvider = drawn
+	sc := imageContext(t, template.Images{Featured: true, Inline: 1, Source: template.ImagesAI})
+	manifest, result := runImages(t, deps, sc)
 
 	if len(server.Uploads()) != 2 {
 		t.Fatalf("the step uploaded %d files, want 2", len(server.Uploads()))
+	}
+	for _, prompt := range drawn.prompts {
+		if prompt.RunID != sc.Run.ID || prompt.ItemID != sc.Item.ID || prompt.Step != steps.NameGenerateImages {
+			t.Fatalf("the prompt = %+v, want it to name the run, the item and the step it is spent on", prompt)
+		}
 	}
 	if manifest.FeaturedID == 0 || len(manifest.Images) != 2 {
 		t.Fatalf("manifest = %+v", manifest)

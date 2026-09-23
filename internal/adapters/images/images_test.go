@@ -48,10 +48,17 @@ func TestTheSettingsCarryTheirDefaults(t *testing.T) {
 	if got := images.OpenAIModel(values); got != images.DefaultOpenAIModel {
 		t.Errorf("OpenAIModel = %q, want %q", got, images.DefaultOpenAIModel)
 	}
+	if got := images.OpenAIQuality(values); got != "medium" {
+		t.Errorf("OpenAIQuality = %q, want medium: auto lets the provider pick its dearest quality", got)
+	}
+	if err := settings.Default().Validate("images.openaiQuality", json.RawMessage(`"ultra"`)); err == nil {
+		t.Error("an image quality the provider does not offer was accepted")
+	}
 
 	stored := map[string]json.RawMessage{
-		"images.localDir":    json.RawMessage(`"C:\\pictures"`),
-		"images.openaiModel": json.RawMessage(`"gpt-image-2"`),
+		"images.localDir":      json.RawMessage(`"C:\\pictures"`),
+		"images.openaiModel":   json.RawMessage(`"gpt-image-2"`),
+		"images.openaiQuality": json.RawMessage(`"low"`),
 	}
 	if _, err := settings.Default().Apply(values, stored); err != nil {
 		t.Fatalf("Apply: %v", err)
@@ -61,5 +68,8 @@ func TestTheSettingsCarryTheirDefaults(t *testing.T) {
 	}
 	if got := images.OpenAIModel(values); got != "gpt-image-2" {
 		t.Errorf("OpenAIModel = %q", got)
+	}
+	if got := images.OpenAIQuality(values); got != "low" {
+		t.Errorf("OpenAIQuality = %q", got)
 	}
 }

@@ -73,6 +73,7 @@ export const placements: readonly Placement[] = [
     { key: "llm.gemini.projectId", section: "endpoints" },
     { key: "llm.gemini.location", section: "endpoints" },
     { key: "images.openaiModel", section: "images" },
+    { key: "images.openaiQuality", section: "images" },
     { key: "images.localDir", section: "images" },
     { key: "runs.workers", section: "pace", unit: "pages" },
     { key: "runs.perSite", section: "pace", unit: "pages" },

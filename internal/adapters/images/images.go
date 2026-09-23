@@ -3,19 +3,25 @@ package images
 import (
 	"path/filepath"
 	"strings"
+
+	"github.com/davidmovas/postulator/internal/domain/llm"
 )
 
 type Image struct {
-	Filename    string `json:"filename"`
-	ContentType string `json:"contentType"`
-	Alt         string `json:"alt"`
-	URL         string `json:"url"`
-	Bytes       []byte `json:"-"`
-	WPID        int64  `json:"wpId"`
+	Filename    string    `json:"filename"`
+	ContentType string    `json:"contentType"`
+	Alt         string    `json:"alt"`
+	URL         string    `json:"url"`
+	Bytes       []byte    `json:"-"`
+	Usage       llm.Usage `json:"-"`
+	WPID        int64     `json:"wpId"`
 }
 
 type Prompt struct {
 	SiteID  string
+	RunID   string
+	ItemID  string
+	Step    string
 	Subject string
 	Context string
 	Alt     string

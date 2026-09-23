@@ -16,6 +16,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/browser/tor"
 	"github.com/davidmovas/postulator/internal/adapters/images"
 	"github.com/davidmovas/postulator/internal/adapters/images/localfile"
+	"github.com/davidmovas/postulator/internal/adapters/images/metered"
 	imageopenai "github.com/davidmovas/postulator/internal/adapters/images/openai"
 	"github.com/davidmovas/postulator/internal/adapters/images/wpmedia"
 	"github.com/davidmovas/postulator/internal/adapters/importer"
@@ -275,20 +276,24 @@ func (c *Core) build(ctx context.Context, key []byte) (kit, error) {
 
 	stepRegistry := run.NewRegistry()
 	if err = steps.Register(stepRegistry, steps.Deps{
-		Entities:      entityRepo,
-		Edges:         edgeRepo,
-		Pages:         pageRepo,
-		Links:         linkRepo,
-		Items:         itemRepo,
-		Artifacts:     artifactRepo,
-		Sites:         siteRepo,
-		SiteWriter:    siteRepo,
-		WordPress:     wordpress,
-		Policies:      templateService,
-		Profiles:      modelProfiles,
-		Content:       contentService,
-		LLM:           client,
-		ImageProvider: imageopenai.New(secretStore, images.OpenAIModel(values)),
+		Entities:   entityRepo,
+		Edges:      edgeRepo,
+		Pages:      pageRepo,
+		Links:      linkRepo,
+		Items:      itemRepo,
+		Artifacts:  artifactRepo,
+		Sites:      siteRepo,
+		SiteWriter: siteRepo,
+		WordPress:  wordpress,
+		Policies:   templateService,
+		Profiles:   modelProfiles,
+		Content:    contentService,
+		LLM:        client,
+		ImageProvider: metered.New(
+			imageopenai.New(secretStore, images.OpenAIModel(values), imageopenai.WithQuality(images.OpenAIQuality(values))),
+			domainllm.ModelRef{Provider: imageopenai.Provider, Model: images.OpenAIModel(values)},
+			callRepo, modelCatalog, relay, now,
+		),
 		ImageSources: map[template.ImageSource]steps.ImageSource{
 			template.ImagesWPMedia: wpmedia.New(wordpress),
 			template.ImagesLocal:   localfile.New(images.LocalDir(values)),
