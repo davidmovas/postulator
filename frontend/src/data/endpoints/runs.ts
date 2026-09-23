@@ -14,4 +14,5 @@ export const pauseRun = one(Runs.Pause);
 export const resumeRun = one(Runs.Resume);
 export const cancelRun = one(Runs.Cancel);
 export const retryStep = one(Runs.RetryStep);
+export const regenerate = one(Runs.Regenerate);
 export const revertRun = one(Runs.RevertRun);

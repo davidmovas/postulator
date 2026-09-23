@@ -59,6 +59,27 @@ export const runs = {
         awaiting_parent: "waiting for parent",
     },
     unknownPauseReason: "Paused for a reason this build does not recognise.",
+    hold: {
+        badge: "Waiting",
+        title: (path: string) => `Waits for ${path}`,
+        short: (path: string) => `waits for ${path}`,
+        failed: (step: string) =>
+            `The parent failed at ${step} in this run. Regenerate it and this page goes on by itself.`,
+        stopped:
+            "The parent is paused in this run. Resume or regenerate it, and this page goes on by itself once the parent reaches the site.",
+        writing: "The parent is being written in this run. Once it reaches the site this page goes on by itself.",
+        elsewhere:
+            "The parent is not part of this run. Publish it, or start a run over it, and this page goes on by itself.",
+        openParent: (path: string) => `Open ${path}`,
+        regenerateParent: (path: string) => `Regenerate ${path}`,
+    },
+    regenerate: "Regenerate from the start",
+    regenerateBusy: "The item has not stopped, so there is nothing to regenerate.",
+    regeneratePublished: "Already on the site. Start a new run over this page so its revert stays exact.",
+    failedTitle: (count: number) => (count === 1 ? "1 page failed" : `${count} pages failed`),
+    failedBody:
+        "Fix the template first if it caused the failures. Regenerating writes each page again from its first step, and the pages waiting for them go on by themselves.",
+    regenerateFailed: (count: number) => (count === 1 ? "Regenerate the failed page" : `Regenerate the ${count} failed pages`),
     budgetPausedTitle: "This run stopped at its budget cap",
     budgetPausedBody:
         "A run carries the cap it was started with and there is no binding that raises it. Resuming lets the run continue until its next model call and then it pauses again. To finish the work, cancel this run and start a new one over the same pages with a higher cap.",

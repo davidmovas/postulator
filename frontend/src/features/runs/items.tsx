@@ -19,7 +19,8 @@ import {
 } from "../../ui/index.js";
 import type { SegmentedOption } from "../../ui/index.js";
 import { itemViews } from "./authority.js";
-import { statusIcon, statusLabel, statusTone } from "./labels.js";
+import { itemBadge, itemNote } from "./hold.js";
+import { statusLabel } from "./labels.js";
 import type { RetryNotice } from "./log-view.js";
 import type { PageIndex } from "./page-index.js";
 import { pathOf } from "./page-index.js";
@@ -118,6 +119,8 @@ export function RunItemTable({
                         return null;
                     }
                     const item = view.item;
+                    const badge = itemBadge(item);
+                    const note = itemNote(item);
                     const failure = item.error === "" ? view.stepFailure?.code : item.error;
                     return (
                         <TableRow
@@ -141,8 +144,8 @@ export function RunItemTable({
                                 {pathOf(index, item.targetId)}
                             </TableCell>
                             <TableCell>
-                                <StatusBadge tone={statusTone(item.status)} icon={statusIcon(item.status)}>
-                                    {statusLabel(item.status)}
+                                <StatusBadge tone={badge.tone} icon={badge.icon}>
+                                    {badge.label}
                                 </StatusBadge>
                             </TableCell>
                             <TableCell>
@@ -158,12 +161,20 @@ export function RunItemTable({
                             </TableCell>
                             <TableCell
                                 muted={true}
-                                title={item.error === "" ? (view.stepFailure?.message ?? "") : item.error}
+                                title={
+                                    item.error !== ""
+                                        ? item.error
+                                        : note !== ""
+                                          ? item.note
+                                          : (view.stepFailure?.message ?? "")
+                                }
                             >
-                                {item.error === "" ? (
-                                    (failure ?? "")
-                                ) : (
+                                {item.error !== "" ? (
                                     <span className="text-danger">{failure}</span>
+                                ) : note !== "" ? (
+                                    note
+                                ) : (
+                                    (failure ?? "")
                                 )}
                             </TableCell>
                             <TableCell mono={true} muted={true} title={absoluteTime(item.updatedAt)}>

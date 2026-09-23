@@ -66,6 +66,7 @@ export const confirmableArgs: Readonly<Record<string, Record<string, unknown>>> 
     runs_resume: { runId: "r1" },
     runs_cancel: { runId: "r1" },
     runs_retry_step: { itemId: "i1" },
+    runs_regenerate: { runId: "r1", itemIds: ["i1", "i2"] },
     sync_site: {},
     imports_apply: { path: "C:\\data\\pages.xlsx", mapping: { name: "Q3 sheet", columns: [{ field: "path", column: "URL" }, { field: "title", column: "Title" }], options: { keywordSeparator: ";" } }, saveMappingAs: "Q3 sheet" },
     imports_export: { path: "C:\\data\\export.xlsx" },

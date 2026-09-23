@@ -59,6 +59,8 @@ export type StepSpec = Wire<TemplateDomainModels.StepSpec>;
 
 export type Run = Wire<RunsModels.Run>;
 export type RunItem = Wire<RunsModels.Item>;
+export type AwaitedParent = Wire<RunsModels.AwaitedParent>;
+export type AddedPage = Wire<RunsModels.AddedPage>;
 export type RunArtifact = Wire<RunsModels.Artifact>;
 export type RunEventRow = Wire<RunsModels.Event>;
 export type RunFilter = ListFilter<RunsModels.ListRequest>;

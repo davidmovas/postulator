@@ -329,6 +329,9 @@ export const agent = {
             cancelBody: "Items already published stay published.",
             reason: (reason: string) => `Reason: ${reason}`,
             retry: "Retry the current step of the item",
+            regenerate: (count: number) =>
+                `Regenerate ${count === 1 ? "1 item" : `${count} items`} from the start in the run`,
+            regenerateBody: "Each item is written again with the template as it is now; nothing already on the site is touched.",
         },
         sync: {
             site: "Pull the site's live content into the page map",

@@ -10,6 +10,7 @@ import {
     HourglassEmptyIcon,
     Kbd,
     OpenInNewIcon,
+    RefreshIcon,
     RestartAltIcon,
     SmartToyIcon,
     SyncProblemIcon,
@@ -17,6 +18,7 @@ import {
 import { askAgent } from "../agent/index.js";
 import type { RetryState } from "./authority.js";
 import { countdown } from "./authority.js";
+import type { RegenerateState } from "./hold.js";
 import { retryBlockedText, stepLabel } from "./labels.js";
 import type { RetryNotice, StepEntry } from "./log-view.js";
 import type { DriftRefusal } from "./refusal.js";
@@ -176,10 +178,18 @@ export interface ReviewActionsProps {
     blocked: string | null;
     state: RetryState | null;
     busy: boolean;
+    regeneration: RegenerateState | null;
+    regenerating: boolean;
     onOpenPage: (pageId: string) => void;
     onRerun: (pageId: string) => void;
     onRetry: () => void;
+    onRegenerate: () => void;
 }
+
+const regenerateRefusals: Readonly<Record<Exclude<RegenerateState["kind"], "ready">, string>> = {
+    busy: copy.runs.regenerateBusy,
+    published: copy.runs.regeneratePublished,
+};
 
 export function ReviewActions({
     path,
@@ -189,9 +199,12 @@ export function ReviewActions({
     blocked,
     state,
     busy,
+    regeneration,
+    regenerating,
     onOpenPage,
     onRerun,
     onRetry,
+    onRegenerate,
 }: ReviewActionsProps): ReactElement {
     return (
         <div className="flex w-full items-center justify-between gap-2">
@@ -219,7 +232,7 @@ export function ReviewActions({
                 >
                     {copy.agent.askAbout}
                 </Button>
-                {blocked === null ? null : (
+                {blocked === null && regeneration?.kind !== "published" ? null : (
                     <Button
                         size="sm"
                         onClick={() => {
@@ -229,6 +242,21 @@ export function ReviewActions({
                         {copy.runs.rerunPage}
                     </Button>
                 )}
+                <Button
+                    size="sm"
+                    data-item-regenerate={true}
+                    icon={RefreshIcon}
+                    disabled={regeneration === null || regeneration.kind !== "ready"}
+                    busy={regenerating}
+                    title={
+                        regeneration === null || regeneration.kind === "ready"
+                            ? undefined
+                            : regenerateRefusals[regeneration.kind]
+                    }
+                    onClick={onRegenerate}
+                >
+                    {copy.runs.regenerate}
+                </Button>
                 <Button
                     size="sm"
                     variant="primary"
