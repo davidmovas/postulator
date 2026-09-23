@@ -1,6 +1,7 @@
 package fake_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
@@ -64,6 +65,49 @@ func TestScriptedStreams(t *testing.T) {
 	}
 	if text != "hello there" {
 		t.Fatalf("the stream carried %q", text)
+	}
+}
+
+func TestScriptedAnswersFromThePromptWhenTheReplyIsAFunction(t *testing.T) {
+	t.Parallel()
+
+	client := fake.NewScripted(fake.Reply{
+		Step: "generate_body",
+		Make: func(req port.Request) string {
+			return `{"h1":"` + strings.TrimPrefix(req.Messages[len(req.Messages)-1].Text, "write ") + `"}`
+		},
+	})
+
+	for _, prompt := range []string{"write Steaks", "write Pasta"} {
+		req := scriptedRequest("generate_body")
+		req.Messages = []port.Message{{Role: port.RoleUser, Text: prompt}}
+
+		got, err := client.Complete(t.Context(), req)
+		if err != nil {
+			t.Fatalf("Complete %q: %v", prompt, err)
+		}
+		want := `{"h1":"` + strings.TrimPrefix(prompt, "write ") + `"}`
+		if got.Text != want {
+			t.Fatalf("%q answered %q, want %q", prompt, got.Text, want)
+		}
+	}
+}
+
+func TestAScriptedTextOutranksItsOwnFunction(t *testing.T) {
+	t.Parallel()
+
+	client := fake.NewScripted(fake.Reply{
+		Step: "judge",
+		Text: `{"score":1}`,
+		Make: func(port.Request) string { return `{"score":0}` },
+	})
+
+	got, err := client.Complete(t.Context(), scriptedRequest("judge"))
+	if err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+	if got.Text != `{"score":1}` {
+		t.Fatalf("the reply answered %q, want the text it carries", got.Text)
 	}
 }
 

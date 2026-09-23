@@ -8,6 +8,7 @@ import (
 )
 
 type Reply struct {
+	Make  func(req port.Request) string
 	Step  string
 	Match string
 	Text  string
@@ -69,6 +70,9 @@ func (s *Scripted) reply(req port.Request) (string, bool) {
 		}
 		if reply.Match != "" && !strings.Contains(prompt, reply.Match) {
 			continue
+		}
+		if reply.Text == "" && reply.Make != nil {
+			return reply.Make(req), true
 		}
 		return reply.Text, true
 	}
