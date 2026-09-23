@@ -65,7 +65,7 @@ export function ModelsGroup({ draft, below, error, onChange }: ModelsGroupProps)
                 <Banner tone="warn" title={copy.templates.models.catalogEmpty} />
             ) : null}
             <section className="overflow-hidden rounded-lg border border-hairline bg-panel">
-                <header className="grid h-7 grid-cols-[120px_minmax(0,1fr)_28px] items-center gap-3 border-b border-hairline bg-inset px-3 text-2xs font-semibold tracking-label text-ink-faint uppercase">
+                <header className="grid h-7 grid-cols-[minmax(4rem,7rem)_minmax(0,1fr)_28px] items-center gap-2 border-b border-hairline bg-inset px-3 text-2xs font-semibold tracking-label text-ink-faint uppercase">
                     <div>{copy.templates.models.role}</div>
                     <div>{copy.templates.models.model}</div>
                     <div />
@@ -86,7 +86,7 @@ export function ModelsGroup({ draft, below, error, onChange }: ModelsGroupProps)
                         <div
                             key={role}
                             className={cx(
-                                "grid h-10 grid-cols-[120px_minmax(0,1fr)_28px] items-center gap-3 border-b border-inset px-3 last:border-b-0",
+                                "grid h-10 grid-cols-[minmax(4rem,7rem)_minmax(0,1fr)_28px] items-center gap-2 border-b border-inset px-3 last:border-b-0",
                                 changed && "shadow-[inset_2px_0_0_var(--color-accent)]",
                             )}
                         >

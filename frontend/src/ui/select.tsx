@@ -67,7 +67,9 @@ export function Select<T extends string>({
                 )}
                 {...aria}
             >
-                <RadixSelect.Value placeholder={placeholder} />
+                <span className="min-w-0 flex-1 truncate text-left">
+                    <RadixSelect.Value placeholder={placeholder} />
+                </span>
                 <RadixSelect.Icon asChild>
                     <KeyboardArrowDownIcon size={chevronSizes[size]} className="shrink-0 text-ink-faint" />
                 </RadixSelect.Icon>

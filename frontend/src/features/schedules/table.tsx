@@ -9,7 +9,7 @@ import { DenseTable, StatusBadge, Switch, TableCell, TableHead, TableRow } from 
 import { statusLabel, statusTone } from "../runs/labels.js";
 import { targetsSentence } from "./labels.js";
 
-const grid = "minmax(0,1.3fr) minmax(0,1.1fr) minmax(0,1.2fr) 6.5rem 10rem 2.5rem";
+const grid = "minmax(6rem,1.3fr) minmax(5rem,1.1fr) minmax(5rem,1.2fr) 6.5rem 10rem 2.5rem";
 
 export interface SchedulesTableProps {
     siteId: string;

@@ -34,10 +34,10 @@ export function Screen({
     return (
         <div className="flex h-full min-h-0 flex-col">
             <header className="flex h-10 shrink-0 items-center gap-2 border-b border-hairline px-4">
-                <h1 className="shrink-0 truncate text-lg font-semibold tracking-tight text-ink">{title}</h1>
+                <h1 className="min-w-0 truncate text-lg font-semibold tracking-tight text-ink">{title}</h1>
                 {badge}
                 {tabs === undefined ? null : (
-                    <div className="flex min-w-0 flex-1 justify-center self-stretch">{tabs}</div>
+                    <div className="flex min-w-0 flex-1 justify-center self-stretch overflow-hidden">{tabs}</div>
                 )}
                 {actions === undefined ? null : (
                     <div className={cx("flex shrink-0 items-center gap-2", tabs === undefined && "ml-auto")}>

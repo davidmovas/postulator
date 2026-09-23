@@ -22,7 +22,7 @@ import {
 import { kindLabel, statusLabel, statusTone } from "../runs/labels.js";
 import { finished } from "./model/runs.js";
 
-const grid = "minmax(0,1fr) 9rem 5rem 8rem 6rem";
+const grid = "minmax(11rem,1.4fr) minmax(6rem,1fr) 4rem 7rem 5rem";
 const pageSize = 100;
 
 export interface RunsTabProps {

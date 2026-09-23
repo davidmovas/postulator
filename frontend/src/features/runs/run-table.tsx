@@ -26,7 +26,7 @@ import {
 import { spanMs } from "./span.js";
 import { statusPaused } from "./statuses.js";
 
-const columns = "64px 152px minmax(120px,1fr) 80px 96px 72px";
+const columns = "64px 192px minmax(150px,1.3fr) 80px 96px 72px";
 const rowHeight = 28;
 
 interface RunRowProps {
