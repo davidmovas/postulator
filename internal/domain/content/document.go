@@ -112,14 +112,6 @@ func (d *Document) Render() (string, error) {
 	return builder.String(), nil
 }
 
-func (d *Document) HTML() string {
-	rendered, err := d.Render()
-	if err != nil {
-		return ""
-	}
-	return rendered
-}
-
 func (d *Document) Text() string {
 	return TextOf(d.root)
 }

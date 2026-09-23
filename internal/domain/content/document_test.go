@@ -20,6 +20,16 @@ func mustParse(t *testing.T, fragment string) *content.Document {
 	return doc
 }
 
+func bodyOf(t *testing.T, doc *content.Document) string {
+	t.Helper()
+
+	body, err := doc.Render()
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	return body
+}
+
 func TestDocumentReadsItsShape(t *testing.T) {
 	t.Parallel()
 
@@ -43,8 +53,8 @@ func TestDocumentReadsItsShape(t *testing.T) {
 	if got := len(doc.Words()); got != 9 {
 		t.Errorf("Words = %d (%v)", got, doc.Words())
 	}
-	if !strings.HasPrefix(doc.HTML(), "<h1>Espresso</h1>") {
-		t.Errorf("HTML = %q", doc.HTML())
+	if body := bodyOf(t, doc); !strings.HasPrefix(body, "<h1>Espresso</h1>") {
+		t.Errorf("Render = %q", body)
 	}
 }
 
@@ -91,8 +101,8 @@ func TestRenderSaysSoRatherThanAnsweringAnEmptyBody(t *testing.T) {
 			if !errors.IsCode(err, errors.Internal) {
 				t.Fatalf("Render = %q, %v; want an internal error rather than a silent empty body", rendered, err)
 			}
-			if doc.HTML() != "" {
-				t.Fatalf("HTML = %q, want the empty string the unchecked sibling has always answered", doc.HTML())
+			if rendered != "" {
+				t.Fatalf("Render = %q, want nothing beside the error", rendered)
 			}
 		})
 	}
@@ -159,11 +169,12 @@ func TestParseRefusesNothingButReportsBadInput(t *testing.T) {
 	t.Parallel()
 
 	doc := mustParse(t, "<p>unclosed")
-	if doc.HTML() != "<p>unclosed</p>" {
-		t.Errorf("HTML = %q", doc.HTML())
+	if body := bodyOf(t, doc); body != "<p>unclosed</p>" {
+		t.Errorf("Render = %q", body)
 	}
-	if empty := mustParse(t, ""); empty.HTML() != "" || empty.Text() != "" {
-		t.Errorf("the empty document = %q", empty.HTML())
+	empty := mustParse(t, "")
+	if body := bodyOf(t, empty); body != "" || empty.Text() != "" {
+		t.Errorf("the empty document = %q", body)
 	}
 }
 
@@ -199,8 +210,8 @@ func TestAssembleBuildsABody(t *testing.T) {
 		t.Fatalf("Assemble: %v", err)
 	}
 	want := "<h1>Espresso &amp; you</h1><h2>Beans</h2><p>Pick a roast.</p><p>No heading here.</p>"
-	if doc.HTML() != want {
-		t.Fatalf("Assemble = %q, want %q", doc.HTML(), want)
+	if body := bodyOf(t, doc); body != want {
+		t.Fatalf("Assemble = %q, want %q", body, want)
 	}
 }
 
@@ -280,8 +291,8 @@ func TestInsertAfterSection(t *testing.T) {
 			if err = doc.InsertAfterSection(tc.index, figure); err != nil {
 				t.Fatalf("InsertAfterSection: %v", err)
 			}
-			if got := doc.HTML(); got != tc.want {
-				t.Errorf("HTML =\n%s\nwant\n%s", got, tc.want)
+			if got := bodyOf(t, doc); got != tc.want {
+				t.Errorf("Render =\n%s\nwant\n%s", got, tc.want)
 			}
 		})
 	}

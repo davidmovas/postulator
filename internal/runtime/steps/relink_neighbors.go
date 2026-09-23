@@ -259,7 +259,11 @@ func relinkOne(ctx context.Context, deps Deps, client *wp.Client, in neighborWor
 		return outcome, nil
 	}
 
-	updated := doc.HTML()
+	updated, err := doc.Render()
+	if err != nil {
+		return skip(outcome, ReasonNeighborUnreadable), nil
+	}
+
 	hash, err := client.PutRaw(ctx, *in.neighbor.WPID, updated, raw.ContentHash)
 	if err != nil {
 		if errors.IsCode(err, errors.Conflict) {

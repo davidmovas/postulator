@@ -174,8 +174,8 @@ func TestInsertLinksGolden(t *testing.T) {
 			doc := mustParse(t, tc.body)
 			result := content.InsertLinks(doc, tc.context, policy(tc.rules))
 
-			if doc.HTML() != tc.want {
-				t.Fatalf("HTML =\n%s\nwant\n%s", doc.HTML(), tc.want)
+			if got := bodyOf(t, doc); got != tc.want {
+				t.Fatalf("Render =\n%s\nwant\n%s", got, tc.want)
 			}
 			if len(result.Placed) != tc.placed {
 				t.Errorf("Placed = %d, want %d (%+v)", len(result.Placed), tc.placed, result.Placed)
@@ -228,8 +228,8 @@ func TestInsertLinksFollowsTheAnchorStrategy(t *testing.T) {
 					ForbidExternal: true, ForbidSelf: true, AnchorStrategy: tc.strategy,
 				})
 
-			if doc.HTML() != tc.want {
-				t.Fatalf("HTML =\n%s\nwant\n%s", doc.HTML(), tc.want)
+			if got := bodyOf(t, doc); got != tc.want {
+				t.Fatalf("Render =\n%s\nwant\n%s", got, tc.want)
 			}
 			if len(result.Placed) != 2 {
 				t.Fatalf("Placed = %+v, want two", result.Placed)
@@ -255,11 +255,11 @@ func TestInsertLinksIsIdempotent(t *testing.T) {
 
 		doc := mustParse(t, body)
 		first := content.InsertLinks(doc, contextOf(targets...), policy(rules))
-		once := doc.HTML()
+		once := bodyOf(t, doc)
 
 		second := content.InsertLinks(doc, contextOf(targets...), policy(rules))
-		if doc.HTML() != once {
-			t.Fatalf("run %d: a second pass changed the body\nbefore %s\nafter  %s", run, once, doc.HTML())
+		if twice := bodyOf(t, doc); twice != once {
+			t.Fatalf("run %d: a second pass changed the body\nbefore %s\nafter  %s", run, once, twice)
 		}
 		if len(second.Placed) < len(first.Placed) {
 			t.Fatalf("run %d: the second pass lost placements: %d then %d", run, len(first.Placed), len(second.Placed))
@@ -315,8 +315,8 @@ func TestInsertLinksLeavesADocumentWithNoTargetsAlone(t *testing.T) {
 	doc := mustParse(t, "<p>Nothing to link.</p>")
 	result := content.InsertLinks(doc, contextOf(), policy(template.LinkRules{}))
 
-	if doc.HTML() != "<p>Nothing to link.</p>" {
-		t.Fatalf("HTML = %q", doc.HTML())
+	if body := bodyOf(t, doc); body != "<p>Nothing to link.</p>" {
+		t.Fatalf("Render = %q", body)
 	}
 	if len(result.Placed) != 0 || len(result.Missing) != 0 || len(result.Decisions) != 0 {
 		t.Fatalf("InsertLinks = %+v", result)
@@ -366,8 +366,8 @@ func TestInsertLinksLeavesNonProseZonesAlone(t *testing.T) {
 			content.InsertLinks(doc, contextOf(target("/coffee/", []string{"coffee"}, content.RelationDown, false)),
 				policy(template.LinkRules{MaxLinks: 5, MaxPerTarget: 1}))
 
-			if doc.HTML() != tc.want {
-				t.Fatalf("HTML =\n%s\nwant\n%s", doc.HTML(), tc.want)
+			if got := bodyOf(t, doc); got != tc.want {
+				t.Fatalf("Render =\n%s\nwant\n%s", got, tc.want)
 			}
 		})
 	}

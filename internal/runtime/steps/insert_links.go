@@ -32,13 +32,18 @@ func InsertLinks(deps Deps) run.StepDef {
 
 			result := content.InsertLinks(doc, lc, policy)
 
+			body, err := doc.Render()
+			if err != nil {
+				return run.Result{}, err
+			}
+
 			checkpoint := run.NewCheckpoint()
 			if setErr := run.Set(checkpoint, checkpointLinks, result); setErr != nil {
 				return run.Result{}, setErr
 			}
 
 			return run.Result{
-				Artifacts:  []run.Artifact{{Kind: run.ArtifactBodyHTML, Blob: []byte(doc.HTML())}},
+				Artifacts:  []run.Artifact{{Kind: run.ArtifactBodyHTML, Blob: []byte(body)}},
 				Checkpoint: checkpoint,
 				Message:    "placed " + plural(len(result.Placed)),
 			}, nil

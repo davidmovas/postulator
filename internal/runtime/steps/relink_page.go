@@ -100,7 +100,12 @@ func RelinkPage(deps Deps) run.StepDef {
 				return settleRelinkPage(work)
 			}
 
-			hash, err := client.PutRaw(ctx, *sc.Page.WPID, doc.HTML(), raw.ContentHash)
+			linked, err := doc.Render()
+			if err != nil {
+				return run.Result{}, err
+			}
+
+			hash, err := client.PutRaw(ctx, *sc.Page.WPID, linked, raw.ContentHash)
 			if err != nil {
 				if errors.IsCode(err, errors.Conflict) {
 					return run.Result{
