@@ -112,7 +112,6 @@ func parameterOf(schema *applicationllm.Schema) *gollem.Parameter {
 
 	parameter := &gollem.Parameter{
 		Type:        gollem.ParameterType(schema.Type),
-		Title:       schema.Title,
 		Description: schema.Description,
 		Enum:        schema.Enum,
 		Minimum:     schema.Minimum,

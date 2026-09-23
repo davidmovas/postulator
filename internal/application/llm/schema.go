@@ -27,7 +27,6 @@ type Schema struct {
 	Minimum     *float64           `json:"minimum,omitempty"`
 	Maximum     *float64           `json:"maximum,omitempty"`
 	Type        SchemaType         `json:"type"`
-	Title       string             `json:"title,omitempty"`
 	Description string             `json:"description,omitempty"`
 	Enum        []string           `json:"enum,omitempty"`
 	Required    []string           `json:"required,omitempty"`

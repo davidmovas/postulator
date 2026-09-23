@@ -2,6 +2,7 @@ package llm_test
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -200,25 +201,33 @@ func TestNoGoTypeNameReachesTheModel(t *testing.T) {
 			if err != nil {
 				t.Fatalf("SchemaFor: %v", err)
 			}
-			for _, titled := range titles(schema) {
-				t.Errorf("the schema carries the title %q, which names a Go type the model has no use for", titled)
+			if named := keywords(schema); len(named) != 0 {
+				t.Errorf("the schema carries %v, which names a Go type the model has no use for", named)
 			}
 		})
 	}
 }
 
-func titles(schema *llm.Schema) []string {
+func keywords(schema *llm.Schema) []string {
 	if schema == nil {
 		return nil
 	}
 
 	out := make([]string, 0)
-	if schema.Title != "" {
-		out = append(out, schema.Title)
+	encoded, err := json.Marshal(schema)
+	if err != nil {
+		return []string{err.Error()}
 	}
-	out = append(out, titles(schema.Items)...)
+	var fields map[string]json.RawMessage
+	if unmarshalErr := json.Unmarshal(encoded, &fields); unmarshalErr != nil {
+		return []string{unmarshalErr.Error()}
+	}
+	if held, ok := fields["title"]; ok {
+		out = append(out, "a title of "+string(held))
+	}
+	out = append(out, keywords(schema.Items)...)
 	for _, property := range schema.Properties {
-		out = append(out, titles(property)...)
+		out = append(out, keywords(property)...)
 	}
 	return out
 }

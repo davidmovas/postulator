@@ -258,7 +258,6 @@ func parameterOf(schema *port.Schema) *gollem.Parameter {
 	}
 
 	parameter := &gollem.Parameter{
-		Title:       schema.Title,
 		Type:        gollem.ParameterType(schema.Type),
 		Description: schema.Description,
 		Enum:        slices.Clone(schema.Enum),
