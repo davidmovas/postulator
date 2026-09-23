@@ -286,7 +286,7 @@ func TestEstimateAnswersTheCostWithoutEnqueuingAnything(t *testing.T) {
 		t.Fatalf("Marshal: %v", marshalErr)
 	}
 	want := `{"estimate":{"tokens":4200,"usd":0.12,` +
-		`"findings":[{"code":"unpriced_step","message":"images are not priced"}]}}`
+		`"findings":[{"code":"unpriced_step","message":"images are not priced"}]},"added":[]}`
 	if string(encoded) != want {
 		t.Fatalf("Estimate = %s", encoded)
 	}

@@ -19,10 +19,18 @@ type StartRequest struct {
 type StartResponse struct {
 	RunID    string       `json:"runId"`
 	Estimate run.Estimate `json:"estimate"`
+	Added    []AddedPage  `json:"added"`
 }
 
 type EstimateResponse struct {
 	Estimate run.Estimate `json:"estimate"`
+	Added    []AddedPage  `json:"added"`
+}
+
+type AddedPage struct {
+	PageID   string `json:"pageId"`
+	Path     string `json:"path"`
+	NeededBy string `json:"neededBy"`
 }
 
 type GetRequest struct {
