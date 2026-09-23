@@ -66,6 +66,18 @@ is not a state; run the commands and read the output.
 | 11 Wails services, events, TS generation | Opus x2 |
 | 12 Hardening and release | Opus x1 |
 
+## Waves, for work that is not a phase
+
+The production hardening of 2026-09-22 and 23 was not a phase and was not run as one. Seven
+vectors were cut so that no two of them owned the same file, then run as four waves of two
+agents in **one** working tree rather than in worktrees, because agent worktree isolation is
+refused on this machine. Each agent commits its own work with explicit paths under a commit
+lock — never `git add -A` — reports what it touched outside its ownership, and hands its
+leftovers to a named later vector rather than fixing them. The orchestrator takes the full
+gate on the last commit of each wave, not per agent, and keeps a ledger of every leftover. The
+docs are written last, by one agent, from the reports: a doc written mid-wave is stale before
+the wave ends.
+
 ## Rules that apply to every agent
 
 - Read `docs/STATUS.md` first. It is the handoff point between sessions.
