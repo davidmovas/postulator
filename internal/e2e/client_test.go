@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
+	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/imports"
@@ -32,6 +33,9 @@ const (
 
 	planRows = 61
 	planHubs = 5
+
+	relinkTarget = "/electric-bikes/commuter/volt-commuter-500/"
+	repairTarget = "/electric-bikes/cargo/hauler-cargo-max/"
 )
 
 var messySheets = []string{"Site map", "Bikes", "Components", "Guides", "shop crawl (old)", "Broken", "Notes"}
@@ -344,6 +348,167 @@ func TestTheClientLoopFromTheSamples(t *testing.T) {
 	assertTheRunCostWhatItWasPricedAt(t, core, started.RunID, priced.Estimate.Tokens)
 	assertTheAuditIsGreen(t, core, siteID, clientTargets)
 	assertTheSiteCarriesTheSameLinks(t, core, live, siteID, clientTargets)
+
+	relinkPutsOneStrippedLinkBack(t, core, siteID, relinkTarget, "/electric-bikes/commuter/")
+	repairPutsOneFlattenedPageBack(t, core, live, siteID, repairTarget)
+	assertTheAuditIsGreen(t, core, siteID, clientTargets)
+}
+
+func wordpress(t *testing.T, core *app.Core, siteID string) *wp.Client {
+	t.Helper()
+
+	client, err := core.WordPress.Client(t.Context(), siteID)
+	if err != nil {
+		t.Fatalf("build the WordPress client: %v", err)
+	}
+	return client
+}
+
+func pageAt(t *testing.T, core *app.Core, siteID, path string) pages.Page {
+	t.Helper()
+
+	page, ok := pagesByPath(t, core.Pages, siteID)[path]
+	if !ok {
+		t.Fatalf("the store holds no %s", path)
+	}
+	if page.WPID == nil {
+		t.Fatalf("%s is not on the site: %+v", path, page)
+	}
+	return page
+}
+
+func strippedOf(body, href string) (string, bool) {
+	opening := `<a href="` + href + `"`
+	start := strings.Index(body, opening)
+	if start < 0 {
+		return body, false
+	}
+	textAt := strings.Index(body[start:], ">")
+	if textAt < 0 {
+		return body, false
+	}
+	textAt += start + 1
+	closing := strings.Index(body[textAt:], "</a>")
+	if closing < 0 {
+		return body, false
+	}
+	closing += textAt
+	return body[:start] + body[textAt:closing] + body[closing+len("</a>"):], true
+}
+
+func anchorsGone(body string) string {
+	out := body
+	for {
+		start := strings.Index(out, "<a ")
+		if start < 0 {
+			break
+		}
+		opened := strings.Index(out[start:], ">")
+		if opened < 0 {
+			break
+		}
+		out = out[:start] + out[start+opened+1:]
+	}
+	return strings.ReplaceAll(out, "</a>", "")
+}
+
+func hrefsOf(body string) []string {
+	out := make([]string, 0, 8)
+	rest := body
+	for {
+		start := strings.Index(rest, `<a href="`)
+		if start < 0 {
+			slices.Sort(out)
+			return out
+		}
+		rest = rest[start+len(`<a href="`):]
+		end := strings.Index(rest, `"`)
+		if end < 0 {
+			slices.Sort(out)
+			return out
+		}
+		out = append(out, rest[:end])
+		rest = rest[end:]
+	}
+}
+
+func relinkPutsOneStrippedLinkBack(t *testing.T, core *app.Core, siteID, path, removed string) {
+	t.Helper()
+
+	page := pageAt(t, core, siteID, path)
+	client := wordpress(t, core, siteID)
+
+	before, err := client.GetRaw(t.Context(), *page.WPID)
+	if err != nil {
+		t.Fatalf("read %s back raw: %v", path, err)
+	}
+	stripped, found := strippedOf(before.Content, removed)
+	if !found {
+		t.Fatalf("%s carries no link to %s to take away: %s", path, removed, before.Content)
+	}
+	if _, putErr := client.PutRaw(t.Context(), *page.WPID, stripped, before.ContentHash); putErr != nil {
+		t.Fatalf("write %s back without its link to %s: %v", path, removed, putErr)
+	}
+
+	started, err := core.Runs.Start(t.Context(), runs.StartRequest{
+		SiteID: siteID, PageIDs: []string{page.ID}, Kind: string(run.KindRelink),
+	})
+	if err != nil {
+		t.Fatalf("start the relink of %s: %v", path, err)
+	}
+	awaitRun(t, core.Runs, started.RunID)
+
+	after, err := client.GetRaw(t.Context(), *page.WPID)
+	if err != nil {
+		t.Fatalf("read %s back after the relink: %v", path, err)
+	}
+	if !slices.Equal(hrefsOf(after.Content), hrefsOf(before.Content)) {
+		t.Fatalf("the relink of %s left the links %v, want the %v it carried before the link was taken away",
+			path, hrefsOf(after.Content), hrefsOf(before.Content))
+	}
+	if anchorsGone(after.Content) != anchorsGone(before.Content) {
+		t.Fatalf("the relink of %s rewrote the prose as well as the link.\nbefore: %q\nafter:  %q",
+			path, anchorsGone(before.Content), anchorsGone(after.Content))
+	}
+}
+
+func repairPutsOneFlattenedPageBack(t *testing.T, core *app.Core, live *site, siteID, path string) {
+	t.Helper()
+
+	page := pageAt(t, core, siteID, path)
+	parent, ok := live.byPath(t, parentOf(path))
+	if !ok {
+		t.Fatalf("the site serves no %s to be the parent of %s", parentOf(path), path)
+	}
+	before := live.storedContent(t, "pages", int(*page.WPID))
+
+	live.call(t, http.MethodPost, "/wp-json/wp/v2/pages/"+strconv.FormatInt(*page.WPID, 10),
+		map[string]any{"parent": 0}, http.StatusOK, nil)
+
+	flattened, served := live.byPath(t, path)
+	if served && flattened.Parent != 0 {
+		t.Fatalf("the hand edit left %s under the parent %d", path, flattened.Parent)
+	}
+
+	started, err := core.Runs.Start(t.Context(), runs.StartRequest{
+		SiteID: siteID, PageIDs: []string{page.ID}, Kind: string(run.KindRepair),
+	})
+	if err != nil {
+		t.Fatalf("start the repair of %s: %v", path, err)
+	}
+	awaitRun(t, core.Runs, started.RunID)
+
+	repaired, ok := live.byPath(t, path)
+	if !ok {
+		t.Fatalf("the site lost %s during the repair", path)
+	}
+	if repaired.Parent != parent.ID {
+		t.Fatalf("the repair left %s under the parent %d, want %d (%s)",
+			path, repaired.Parent, parent.ID, parentOf(path))
+	}
+	if after := live.storedContent(t, "pages", int(*page.WPID)); after != before {
+		t.Fatalf("the repair of %s rewrote the body.\nbefore: %q\nafter:  %q", path, before, after)
+	}
 }
 
 func assertEveryItemPublished(t *testing.T, core *app.Core, runID string, want int) {
