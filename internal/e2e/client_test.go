@@ -473,9 +473,10 @@ func missingOn(t *testing.T, core *app.Core, pageID string) string {
 func assertTheSiteCarriesTheSameLinks(t *testing.T, core *app.Core, live *site, siteID string, paths []string) {
 	t.Helper()
 
-	served := make(map[string][]link, 32)
-	for _, item := range live.content(t) {
-		served[item.Path] = item.Links
+	listed := live.content(t)
+	served := make(map[string][]link, len(listed))
+	for i := range listed {
+		served[listed[i].Path] = listed[i].Links
 	}
 
 	stored := pagesByPath(t, core.Pages, siteID)
