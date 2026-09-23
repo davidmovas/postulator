@@ -51,6 +51,7 @@ function ToolRow({ row }: ToolRowProps): ReactElement {
         <div className="flex flex-col rounded-md border border-hairline bg-inset">
             <button
                 type="button"
+                data-tool-status={row.status}
                 disabled={summary === null}
                 onClick={() => {
                     setOpen((held) => !held);

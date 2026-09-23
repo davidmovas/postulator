@@ -518,9 +518,60 @@
     ]
   },
   {
+    "name": "run-revert",
+    "route": "#/s/:siteId/runs",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-run-kind=revert][data-run-status=completed]"
+      },
+      {
+        "wait": 1800
+      }
+    ]
+  },
+  {
+    "name": "run-relink",
+    "route": "#/s/:siteId/runs",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-run-kind=relink][data-run-status=completed]"
+      },
+      {
+        "wait": 1800
+      }
+    ]
+  },
+  {
     "name": "agent",
     "route": "#/agent",
     "wait": 1200
+  },
+  {
+    "name": "agent-tool-outcomes",
+    "route": "#/agent",
+    "wait": 1800,
+    "steps": [
+      {
+        "click": "[data-tool-status=denied]"
+      },
+      {
+        "wait": 500
+      },
+      {
+        "click": "[data-tool-status=error]"
+      },
+      {
+        "wait": 500
+      },
+      {
+        "click": "[data-tool-status=cut]"
+      },
+      {
+        "wait": 900
+      }
+    ]
   },
   {
     "name": "agent-inbox",

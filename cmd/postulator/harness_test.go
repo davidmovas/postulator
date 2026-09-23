@@ -174,7 +174,8 @@ func TestTheHarnessSeedsRunsInEveryStatusARealPathReaches(t *testing.T) {
 
 	completed := ""
 	for _, item := range listed.Items {
-		if item.Status == string(run.StatusCompleted) && item.Kind == string(run.KindGenerate) {
+		if item.Status == string(run.StatusCompleted) && item.Kind == string(run.KindGenerate) &&
+			item.Stats.Items == len(completedRun) {
 			completed = item.ID
 		}
 	}
@@ -253,6 +254,95 @@ func TestTheHarnessSeedsAScheduleAndAConversationWaitingOnApproval(t *testing.T)
 	}
 	if pending.Items[0].Tool != "pages_update" {
 		t.Errorf("the pending action calls %q, want pages_update", pending.Items[0].Tool)
+	}
+}
+
+func TestTheSeededConversationShowsEveryToolOutcomeAScreenRenders(t *testing.T) {
+	core := seeded(t)
+
+	conversations, err := core.Agent.ListConversations(t.Context(), agent.ListConversationsRequest{
+		ListRequest: dto.ListRequest{Limit: 10},
+	})
+	if err != nil {
+		t.Fatalf("ListConversations: %v", err)
+	}
+	if len(conversations.Items) != 1 {
+		t.Fatalf("conversations = %d, want 1", len(conversations.Items))
+	}
+
+	messages, err := core.Agent.ListMessages(t.Context(), agent.ListMessagesRequest{
+		ConversationID: conversations.Items[0].ID, ListRequest: dto.ListRequest{Limit: 100},
+	})
+	if err != nil {
+		t.Fatalf("ListMessages: %v", err)
+	}
+
+	seen := make(map[string]string, 4)
+	cut := ""
+	for i := range messages.Items {
+		message := messages.Items[i]
+		if message.Tool == "" {
+			continue
+		}
+		seen[message.ToolStatus] = message.Tool
+		if truncated(t, message.Payload) {
+			cut = message.Tool
+		}
+	}
+
+	for _, status := range []string{"ok", "error"} {
+		if seen[status] == "" {
+			t.Errorf("no tool call in the seeded conversation is %q; the transcript shows %v", status, seen)
+		}
+	}
+	if cut == "" {
+		t.Errorf("no tool result in the seeded conversation was cut to fit, so the shortened row "+
+			"never renders; the transcript shows %v", seen)
+	}
+}
+
+func TestTheSeededConversationShowsADeniedToolCall(t *testing.T) {
+	t.Skip("a tool call can only be denied when agent.Deps.Allowed names fewer tools than the registry, " +
+		"and nothing sets it: internal/app/core.go builds the agent with no Allowed, so Permit always " +
+		"passes and the transcript's refused row, with the copy that says nothing was read or written, " +
+		"cannot be reached. A tool the registry does not carry is reported as an error, not a refusal. " +
+		"Either per-conversation tool permissions get a producer or the refused state goes.")
+}
+
+func truncated(t *testing.T, payload json.RawMessage) bool {
+	t.Helper()
+
+	if len(payload) == 0 {
+		return false
+	}
+	var held map[string]any
+	if err := json.Unmarshal(payload, &held); err != nil {
+		return false
+	}
+	return held[agent.TruncatedKey] == true
+}
+
+func TestTheSeededRunsCoverEveryKindAScreenOffers(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Runs.List(t.Context(), runs.ListRequest{ListRequest: dto.ListRequest{Limit: 50}})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+
+	settled := make(map[string]struct{}, len(listed.Items))
+	shown := make(map[string][]string, 4)
+	for i := range listed.Items {
+		held := listed.Items[i]
+		settled[held.Kind+":"+held.Status] = struct{}{}
+		shown[held.Kind] = append(shown[held.Kind], held.Status)
+	}
+
+	for _, kind := range []string{string(run.KindGenerate), string(run.KindRelink), string(run.KindRevert)} {
+		if _, ok := settled[kind+":"+string(run.StatusCompleted)]; !ok {
+			t.Errorf("the seeded runs hold no completed %s run, only %v; the screens cannot show one",
+				kind, shown[kind])
+		}
 	}
 }
 
@@ -505,22 +595,24 @@ func TestTheCompletedRunSucceedsOnEveryItem(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List runs: %v", err)
 	}
-	if len(listed.Items) != 1 {
-		t.Fatalf("completed generate runs = %d, want 1", len(listed.Items))
+	if len(listed.Items) < 1 {
+		t.Fatal("the seed left no completed generate run")
 	}
 
-	items, err := core.Runs.ListItems(t.Context(), runs.ListItemsRequest{
-		RunID: listed.Items[0].ID, ListRequest: dto.ListRequest{Limit: 20},
-	})
-	if err != nil {
-		t.Fatalf("ListItems: %v", err)
-	}
-	if len(items.Items) != len(completedRun) {
-		t.Fatalf("items = %d, want %d", len(items.Items), len(completedRun))
-	}
-	for _, item := range items.Items {
-		if item.Status != string(run.StatusCompleted) {
-			t.Errorf("the item for %s is %q: %s", item.TargetID, item.Status, item.Error)
+	for i := range listed.Items {
+		items, itemErr := core.Runs.ListItems(t.Context(), runs.ListItemsRequest{
+			RunID: listed.Items[i].ID, ListRequest: dto.ListRequest{Limit: 20},
+		})
+		if itemErr != nil {
+			t.Fatalf("ListItems: %v", itemErr)
+		}
+		if len(items.Items) == 0 {
+			t.Fatalf("the completed run %s carries no items", listed.Items[i].ID)
+		}
+		for _, item := range items.Items {
+			if item.Status != string(run.StatusCompleted) {
+				t.Errorf("the item for %s is %q: %s", item.TargetID, item.Status, item.Error)
+			}
 		}
 	}
 }

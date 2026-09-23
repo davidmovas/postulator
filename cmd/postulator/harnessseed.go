@@ -37,14 +37,22 @@ const (
 	pollFor   = 3 * time.Minute
 
 	failingPath = "/grinders/single-dosing/"
+
+	absentPageID  = "00000000-0000-4000-8000-000000000000"
+	relinkedPath  = "/brewing/pre-infusion/"
+	revertedPath  = "/accessories/knock-boxes/"
+	deniedEntity  = "espresso-blends"
+	deniedMessage = "Delete the espresso blends hub and everything under it; nobody searches for it."
+	deniedTool    = "graph_delete_subtree"
 )
 
 var (
-	completedRun = []string{"/brewing/pre-infusion/", "/brewing/channeling/", "/milk-drinks/cortado/", "/beans/freshness/", "/accessories/knock-boxes/"}
+	completedRun = []string{"/brewing/pre-infusion/", "/brewing/channeling/", "/milk-drinks/cortado/", "/beans/freshness/"}
 	failedRun    = []string{failingPath}
 	runningRun   = []string{"/grinders/flat-burr/", "/grinders/conical-burr/"}
 	pausedRun    = []string{"/beans/blends/"}
 	cancelledRun = []string{"/beans/single-origin/"}
+	revertedRun  = []string{revertedPath}
 )
 
 func harnessRecipe() []template.StepSpec {
@@ -70,6 +78,7 @@ func harnessReplies() []fake.Reply {
 	targets = append(targets, runningRun...)
 	targets = append(targets, pausedRun...)
 	targets = append(targets, cancelledRun...)
+	targets = append(targets, revertedRun...)
 
 	out := make([]fake.Reply, 0, 2*len(targets)+2)
 	for _, path := range targets {
@@ -148,10 +157,15 @@ func metaOf(subject string) string {
 
 type assistantScript struct {
 	page atomic.Pointer[string]
+	site atomic.Pointer[string]
 }
 
 func (a *assistantScript) naming(id string) {
 	a.page.Store(&id)
+}
+
+func (a *assistantScript) onSite(id string) {
+	a.site.Store(&id)
 }
 
 func (a *assistantScript) pageID() string {
@@ -161,10 +175,38 @@ func (a *assistantScript) pageID() string {
 	return ""
 }
 
+func (a *assistantScript) siteID() string {
+	if held := a.site.Load(); held != nil {
+		return *held
+	}
+	return ""
+}
+
 func (a *assistantScript) answer(prompt string) fake.Turn {
 	lowered := strings.ToLower(prompt)
 
 	switch {
+	case strings.Contains(lowered, "delete"):
+		return fake.Turn{
+			Tool: deniedTool,
+			Args: json.RawMessage(`{"entity":"` + deniedEntity + `"}`),
+			Text: "There is no tool that empties a hub in one call, and I will not take the entities out " +
+				"one at a time without you saying so. Nothing was read and nothing was written.",
+		}
+	case strings.Contains(lowered, "open the page"):
+		return fake.Turn{
+			Tool: "pages_get",
+			Args: json.RawMessage(`{"id":"` + absentPageID + `"}`),
+			Text: "There is no page with that id on this site. Give me the path instead and I will " +
+				"look it up in the map.",
+		}
+	case strings.Contains(lowered, "every page"):
+		return fake.Turn{
+			Tool: "pages_list",
+			Args: json.RawMessage(`{"siteId":"` + a.siteID() + `","limit":100}`),
+			Text: "The listing came back longer than one message can carry, so I read the opening of it. " +
+				"Ask me for one hub at a time and I will read each in full.",
+		}
 	case strings.Contains(lowered, "retitle") || strings.Contains(lowered, "rename"):
 		return fake.Turn{
 			Tool: "pages_update",
@@ -204,6 +246,7 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 		return err
 	}
 	script.naming(pagesByPath["/espresso-machines/under-500/"])
+	script.onSite(siteID)
 
 	guide, policy, err := seedTemplates(ctx, core, siteID)
 	if err != nil {
@@ -399,6 +442,16 @@ func seedConversation(ctx context.Context, core *app.Core, siteID string) error 
 	if askErr := exchange(ctx, core, conversation, "Which entities still have no canonical page?"); askErr != nil {
 		return askErr
 	}
+	if askErr := exchange(ctx, core, conversation,
+		"Open the page 00000000-0000-4000-8000-000000000000 and tell me what it links to."); askErr != nil {
+		return askErr
+	}
+	if askErr := exchange(ctx, core, conversation, "List every page on the site with its status."); askErr != nil {
+		return askErr
+	}
+	if askErr := exchange(ctx, core, conversation, deniedMessage); askErr != nil {
+		return askErr
+	}
 	return exchange(ctx, core, conversation,
 		"Retitle the espresso machines under $500 page so the meta title leads with the price.")
 }
@@ -451,6 +504,13 @@ func seedRuns(ctx context.Context, core *app.Core, siteID, guide string, byPath 
 	}
 	provider.failOn("")
 
+	if relinkErr := seedRelinkRun(ctx, core, siteID, byPath); relinkErr != nil {
+		return relinkErr
+	}
+	if revertErr := seedRevertRun(ctx, core, siteID, guide, byPath); revertErr != nil {
+		return revertErr
+	}
+
 	provider.hold()
 	running, err := startRun(ctx, core, siteID, guide, byPath, runningRun)
 	if err != nil {
@@ -474,6 +534,37 @@ func seedRuns(ctx context.Context, core *app.Core, siteID, guide string, byPath 
 	}
 	_, err = core.Runs.Cancel(ctx, runs.CancelRequest{RunID: cancelled})
 	return err
+}
+
+func seedRelinkRun(ctx context.Context, core *app.Core, siteID string, byPath map[string]string) error {
+	target, known := byPath[relinkedPath]
+	if !known {
+		return errors.New(errors.NotFound, "the harness seeded no page at "+relinkedPath)
+	}
+
+	started, err := core.Runs.Start(ctx, runs.StartRequest{
+		SiteID: siteID, PageIDs: []string{target}, Kind: string(run.KindRelink),
+	})
+	if err != nil {
+		return err
+	}
+	return waitForRun(ctx, core, started.RunID, run.StatusCompleted)
+}
+
+func seedRevertRun(ctx context.Context, core *app.Core, siteID, guide string, byPath map[string]string) error {
+	source, err := startRun(ctx, core, siteID, guide, byPath, revertedRun)
+	if err != nil {
+		return err
+	}
+	if waitErr := waitForRun(ctx, core, source, run.StatusCompleted); waitErr != nil {
+		return waitErr
+	}
+
+	started, err := core.Runs.Revert(ctx, runs.RevertRequest{RunID: source})
+	if err != nil {
+		return err
+	}
+	return waitForRun(ctx, core, started.RunID, run.StatusCompleted)
 }
 
 func startRun(ctx context.Context, core *app.Core, siteID, guide string, byPath map[string]string, paths []string) (string, error) {
@@ -502,8 +593,35 @@ func waitForRun(ctx context.Context, core *app.Core, runID string, want run.Stat
 		if err != nil {
 			return false, err
 		}
-		return got.Run.Status == string(want), nil
+		if got.Run.Status == string(want) {
+			return true, nil
+		}
+
+		settled := run.Status(got.Run.Status)
+		if !settled.Terminal() && settled != run.StatusPaused {
+			return false, nil
+		}
+		return false, errors.New(errors.Conflict, "the run settled as "+got.Run.Status+
+			" rather than "+string(want)+": "+got.Run.PauseReason+" "+got.Run.Error+
+			itemStates(ctx, core, runID)).WithDetail("runId", runID)
 	})
+}
+
+func itemStates(ctx context.Context, core *app.Core, runID string) string {
+	listed, err := core.Runs.ListItems(ctx, runs.ListItemsRequest{
+		RunID: runID, ListRequest: dto.ListRequest{Limit: 50},
+	})
+	if err != nil {
+		return "the items could not be listed: " + err.Error()
+	}
+
+	out := strings.Builder{}
+	for i := range listed.Items {
+		item := listed.Items[i]
+		out.WriteString("; " + item.Status + " at " + item.CurrentStep + " " +
+			item.PauseReason + " " + item.Error)
+	}
+	return out.String()
 }
 
 func waitFor(ctx context.Context, what string, done func() (bool, error)) error {
