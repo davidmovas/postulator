@@ -1,0 +1,40 @@
+import { copy } from "../../copy/index.js";
+import { isOneOf, pageStatuses } from "../../generated/vocab.js";
+import type { Tone } from "../../ui/index.js";
+import { noPage } from "./model/site.js";
+import type { CoverageReason } from "./model/site.js";
+import { publishModeLabel } from "../runs/labels.js";
+
+export function reasonLabel(reason: CoverageReason): string {
+    if (reason === noPage) {
+        return copy.reports.coverage.reasons.noPage;
+    }
+    return isOneOf(pageStatuses, reason) ? copy.reports.coverage.reasons[reason] : reason;
+}
+
+const reasonTones: Readonly<Record<string, Tone>> = {
+    noPage: "danger",
+    planned: "warn",
+    exists: "info",
+    archived: "muted",
+    published: "ok",
+};
+
+export function reasonTone(reason: CoverageReason): Tone {
+    return reasonTones[reason] ?? "muted";
+}
+
+export function publishStatusLabel(status: string): string {
+    return publishModeLabel(status);
+}
+
+export function shareOf(fraction: number): string {
+    return `${Math.round(fraction * 100)}%`;
+}
+
+export function shareTone(fraction: number): Tone {
+    if (fraction >= 0.9) {
+        return "ok";
+    }
+    return fraction >= 0.6 ? "warn" : "danger";
+}

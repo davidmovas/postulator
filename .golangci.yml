@@ -1,0 +1,79 @@
+version: "2"
+
+run:
+  timeout: 20m
+  modules-download-mode: readonly
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - unconvert
+    - unparam
+    - prealloc
+    - copyloopvar
+    - gocritic
+    - misspell
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+      settings:
+        shadow:
+          strict: false
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - hugeParam
+
+    misspell:
+      locale: US
+      ignore-rules:
+        - cancelled
+        - cancelling
+
+  exclusions:
+    presets:
+      - std-error-handling
+    rules:
+      - path: _test\.go
+        linters:
+          - unparam
+      - linters:
+          - govet
+        text: 'shadow: declaration of "(err|ok)"'
+        source: '^\s*(\}\s*else\s+)?(if|for|switch)\b.*:='
+    paths:
+      - third_party$
+      - builtin$
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+  settings:
+    gofmt:
+      simplify: true
+
+    goimports:
+      local-prefixes:
+        - github.com/davidmovas/postulator

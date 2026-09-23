@@ -1,0 +1,48 @@
+{{define "generate_body.system"}}
+You are an SEO editor writing body copy for a WordPress page in a network of topically connected pages.
+Write in English. Write in a {{if .Spec.Tone}}{{.Spec.Tone}}{{else}}clear and factual{{end}} tone.
+Return one JSON object with the fields title, h1, sections and summary. Every section carries a heading and
+an html field. The html field holds only body markup: paragraphs, lists, tables and inline emphasis. It never
+holds a heading tag, a script, a style, an iframe or an anchor.
+You may not invent links. Internal links are added by a later step, which needs the exact phrases listed
+under REQUIRED PHRASES to appear verbatim in the body text.
+{{end}}
+
+{{define "generate_body.user"}}
+PAGE
+Path: {{.Page.Path}}
+Title: {{if .Page.Title}}{{.Page.Title}}{{else}}{{.Entity.Name}}{{end}}
+H1: {{if .Page.H1}}{{.Page.H1}}{{else}}{{.Entity.Name}}{{end}}
+
+ENTITY
+Name: {{.Entity.Name}}
+Kind: {{.Entity.Kind}}
+{{if .Entity.Intent}}Search intent: {{.Entity.Intent}}{{end}}
+Primary keyword: {{.Entity.PrimaryKeyword}}
+{{if .Entity.SecondaryKeywords}}Secondary keywords: {{range $index, $keyword := .Entity.SecondaryKeywords}}{{if $index}}, {{end}}{{$keyword}}{{end}}{{end}}
+
+KEYWORD RULES
+{{if .Spec.KeywordRules.PrimaryInTitle}}The title contains the primary keyword.
+{{end}}{{if .Spec.KeywordRules.PrimaryInH1}}The h1 contains the primary keyword.
+{{end}}{{if .Spec.KeywordRules.PrimaryInFirstParagraph}}The first paragraph of the first section contains the primary keyword.
+{{end}}{{if .Spec.KeywordRules.MaxDensity}}Keep the primary keyword below {{.Spec.KeywordRules.MaxDensity}} of all words.
+{{end}}
+LENGTH
+{{if .Spec.Length.Min}}At least {{.Spec.Length.Min}} words in total.
+{{end}}{{if .Spec.Length.Max}}At most {{.Spec.Length.Max}} words in total.
+{{end}}
+SECTIONS
+{{range .Spec.Sections}}- {{.Heading}}{{if .Required}} (required){{end}}{{if .TargetWords}}, about {{.TargetWords}} words{{end}}{{if .Intent}}: {{.Intent}}{{end}}
+{{else}}- Write the sections the topic needs, each with its own heading.
+{{end}}
+REQUIRED PHRASES
+{{range .Phrases}}- {{.}}
+{{else}}- none
+{{end}}
+Each required phrase appears at least once, verbatim and in running body text, never inside a heading.
+{{if .Children}}
+CHILDREN
+The page closes with one more section, with a heading of your own, that walks through the pages below this
+one. Name each of these in it, verbatim and in running body text:
+{{range .Children}}- {{.}}
+{{end}}{{end}}{{end}}

@@ -1,0 +1,34 @@
+{
+  "name": "Product",
+  "pageKind": "product",
+  "spec": {
+    "sections": [
+      {"heading": "Overview", "intent": "State what the product is, the problem it solves and the one reason to choose it, in the customer's words", "targetWords": 150, "required": true, "keywordRules": {"include": [], "primaryInHeading": true}},
+      {"heading": "Key Features", "intent": "List the features that matter to the buyer as benefit-led bullets, each tied to a concrete use", "targetWords": 300, "required": true, "keywordRules": {"include": [], "primaryInHeading": false}},
+      {"heading": "Specifications", "intent": "Reproduce the supplied specifications exactly in a table; never invent a number", "targetWords": 200, "required": true, "keywordRules": {"include": [], "primaryInHeading": false}},
+      {"heading": "Who It Is For", "intent": "Describe the buyer this product fits and the one it does not, and link to the parent category and the closest alternative", "targetWords": 200, "required": true, "keywordRules": {"include": [], "primaryInHeading": false}},
+      {"heading": "Frequently Asked Questions", "intent": "Answer four purchase-blocking questions about compatibility, sizing, delivery and returns", "targetWords": 200, "required": true, "keywordRules": {"include": [], "primaryInHeading": false}}
+    ],
+    "tone": "Concrete and benefit-led; present tense; specific numbers over adjectives; no hype and no invented claims",
+    "length": {"min": 800, "max": 1400},
+    "keywordRules": {"primaryInTitle": true, "primaryInH1": true, "primaryInFirstParagraph": true, "maxDensity": 0.03},
+    "linkRules": {"upDepth": 2, "downLinks": false, "siblingMinWeight": 0.6, "maxLinks": 8, "maxPerTarget": 1, "parentLinkWithinParagraphs": 1, "childrenSection": false},
+    "metaRules": {"titlePattern": "{primaryKeyword} | {siteName}", "descriptionMax": 155},
+    "images": {"featured": true, "inline": 0, "source": "wpmedia"},
+    "modelProfiles": {},
+    "recipe": [
+      {"name": "resolve_context", "enabled": true},
+      {"name": "generate_body", "enabled": true},
+      {"name": "generate_meta", "enabled": true},
+      {"name": "insert_links", "enabled": true},
+      {"name": "repair_links", "enabled": true},
+      {"name": "generate_images", "enabled": true},
+      {"name": "validate", "enabled": true},
+      {"name": "judge", "enabled": true},
+      {"name": "publish", "enabled": true, "params": {"refuseDrift": true}},
+      {"name": "relink_neighbors", "enabled": true},
+      {"name": "sync_back", "enabled": true},
+      {"name": "report", "enabled": true}
+    ]
+  }
+}

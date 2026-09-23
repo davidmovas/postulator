@@ -1,0 +1,543 @@
+package importer_test
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"slices"
+	"testing"
+
+	"github.com/xuri/excelize/v2"
+
+	"github.com/davidmovas/postulator/internal/adapters/importer"
+	"github.com/davidmovas/postulator/internal/domain/importmap"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
+)
+
+func write(t *testing.T, name, body string) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatalf("write %s: %v", name, err)
+	}
+	return path
+}
+
+func sheet(t *testing.T, name string, rows [][]string) string {
+	t.Helper()
+
+	file := excelize.NewFile()
+	t.Cleanup(func() {
+		if err := file.Close(); err != nil {
+			t.Errorf("close the workbook: %v", err)
+		}
+	})
+
+	for i, row := range rows {
+		cell, err := excelize.CoordinatesToCellName(1, i+1)
+		if err != nil {
+			t.Fatalf("cell name: %v", err)
+		}
+		cells := make([]any, 0, len(row))
+		for _, value := range row {
+			cells = append(cells, value)
+		}
+		if err = file.SetSheetRow(file.GetSheetName(0), cell, &cells); err != nil {
+			t.Fatalf("set row %d: %v", i, err)
+		}
+	}
+
+	path := filepath.Join(t.TempDir(), name)
+	if err := file.SaveAs(path); err != nil {
+		t.Fatalf("save the workbook: %v", err)
+	}
+	return path
+}
+
+func TestReadFindsTheHeaderAndTheRows(t *testing.T) {
+	t.Parallel()
+
+	rows := [][]string{{"path", "title", "keywords"}, {"/", "Home", "home,main"}, {"/services/", "Services", "services"}}
+
+	cases := []struct {
+		name string
+		path func(*testing.T) string
+	}{
+		{
+			name: "comma",
+			path: func(t *testing.T) string {
+				return write(t, "map.csv", "path,title,keywords\r\n/,Home,\"home,main\"\r\n/services/,Services,services\r\n")
+			},
+		},
+		{
+			name: "semicolon",
+			path: func(t *testing.T) string {
+				return write(t, "map.csv", "path;title;keywords\n/;Home;home,main\n/services/;Services;services\n")
+			},
+		},
+		{
+			name: "tab",
+			path: func(t *testing.T) string {
+				return write(t, "map.csv", "path\ttitle\tkeywords\n/\tHome\thome,main\n/services/\tServices\tservices\n")
+			},
+		},
+		{
+			name: "byte order mark and leading blank lines",
+			path: func(t *testing.T) string {
+				return write(t, "map.csv", "\ufeff\n\npath,title,keywords\n/,Home,\"home,main\"\n\n/services/,Services,services\n")
+			},
+		},
+		{
+			name: "workbook",
+			path: func(t *testing.T) string {
+				return sheet(t, "map.xlsx", [][]string{{"", "", ""}, {"path", "title", "keywords"}, {"/", "Home", "home,main"}, {"", "", ""}, {"/services/", "Services", "services"}})
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			table, err := importer.Read(t.Context(), tc.path(t), importer.ReadOptions{MaxRows: 0})
+			if err != nil {
+				t.Fatalf("Read: %v", err)
+			}
+			if !slices.Equal(table.Headers, rows[0]) {
+				t.Fatalf("headers = %v, want %v", table.Headers, rows[0])
+			}
+			if len(table.Rows) != 2 {
+				t.Fatalf("rows = %v, want two", table.Rows)
+			}
+			for i, want := range rows[1:] {
+				if !slices.Equal(table.Rows[i], want) {
+					t.Fatalf("row %d = %v, want %v", i, table.Rows[i], want)
+				}
+			}
+		})
+	}
+}
+
+func TestReadRefusesWhatItCannotParse(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		path func(*testing.T) string
+		code errors.Code
+	}{
+		{name: "no path", path: func(*testing.T) string { return "" }, code: errors.Invalid},
+		{
+			name: "unknown extension",
+			path: func(t *testing.T) string { return write(t, "map.json", "{}") },
+			code: errors.Invalid,
+		},
+		{
+			name: "missing file",
+			path: func(t *testing.T) string { return filepath.Join(t.TempDir(), "absent.csv") },
+			code: errors.NotFound,
+		},
+		{
+			name: "empty sheet",
+			path: func(t *testing.T) string { return write(t, "map.csv", "\n\n") },
+			code: errors.Invalid,
+		},
+		{
+			name: "not a workbook",
+			path: func(t *testing.T) string { return write(t, "map.xlsx", "not a workbook") },
+			code: errors.Invalid,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := importer.Read(t.Context(), tc.path(t), importer.ReadOptions{MaxRows: 0})
+			if !errors.IsCode(err, tc.code) {
+				t.Fatalf("Read = %v, want %s", err, tc.code)
+			}
+		})
+	}
+}
+
+func TestReadStopsWhenTheContextIsDone(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	if _, err := importer.Read(ctx, write(t, "map.csv", "path\n/\n"), importer.ReadOptions{}); !errors.IsCode(err, errors.Cancelled) {
+		t.Fatalf("Read = %v, want cancelled", err)
+	}
+}
+
+func TestWriteProducesAWorkbookThatReadsBack(t *testing.T) {
+	t.Parallel()
+
+	table := importmap.Table{
+		Headers: []string{"path", "title"},
+		Rows:    [][]string{{"/", "Home"}, {"/services/", "Services"}},
+	}
+	path := filepath.Join(t.TempDir(), "export.xlsx")
+	if err := importer.Write(path, table); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+
+	back, err := importer.Read(t.Context(), path, importer.ReadOptions{MaxRows: 0})
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	if !slices.Equal(back.Headers, table.Headers) {
+		t.Fatalf("headers = %v", back.Headers)
+	}
+	for i, want := range table.Rows {
+		if !slices.Equal(back.Rows[i], want) {
+			t.Fatalf("row %d = %v, want %v", i, back.Rows[i], want)
+		}
+	}
+}
+
+func TestWriteRefusesWhatItCannotSave(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		path string
+	}{
+		{name: "no path", path: ""},
+		{name: "unknown extension", path: filepath.Join(t.TempDir(), "export.json")},
+		{name: "missing directory", path: filepath.Join(t.TempDir(), "absent", "export.xlsx")},
+		{name: "missing directory for a csv", path: filepath.Join(t.TempDir(), "absent", "export.csv")},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if err := importer.Write(tc.path, importmap.Table{Headers: []string{"path"}}); err == nil {
+				t.Fatal("Write accepted a path it cannot save to")
+			}
+		})
+	}
+}
+
+func TestReaderIsTheAdapterTheUseCasesHold(t *testing.T) {
+	t.Parallel()
+
+	reader := importer.New()
+	path := filepath.Join(t.TempDir(), "export.xlsx")
+	if err := reader.Write(path, importmap.Table{Headers: []string{"path"}, Rows: [][]string{{"/"}}}); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+
+	table, err := reader.Read(t.Context(), path, importer.ReadOptions{MaxRows: 0})
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	if len(table.Rows) != 1 || table.Rows[0][0] != "/" {
+		t.Fatalf("rows = %v", table.Rows)
+	}
+}
+
+func TestTheDelimiterIsSniffedOutsideQuotes(t *testing.T) {
+	t.Parallel()
+
+	path := write(t, "map.csv", "\"path;with;semicolons\",title\n\"/a;b/\",Home\n")
+	table, err := importer.Read(t.Context(), path, importer.ReadOptions{MaxRows: 0})
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	if !slices.Equal(table.Headers, []string{"path;with;semicolons", "title"}) {
+		t.Fatalf("headers = %v", table.Headers)
+	}
+	if !slices.Equal(table.Rows[0], []string{"/a;b/", "Home"}) {
+		t.Fatalf("row = %v", table.Rows[0])
+	}
+}
+
+func TestReadKeepsRaggedRowsAndTrimsTrailingBlanks(t *testing.T) {
+	t.Parallel()
+
+	path := write(t, "map.csv", "path,title,keywords\n/,Home\n/services/,Services,,\n")
+	table, err := importer.Read(t.Context(), path, importer.ReadOptions{MaxRows: 0})
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	if !slices.Equal(table.Rows[0], []string{"/", "Home"}) {
+		t.Fatalf("short row = %v", table.Rows[0])
+	}
+	if !slices.Equal(table.Rows[1], []string{"/services/", "Services"}) {
+		t.Fatalf("padded row = %v", table.Rows[1])
+	}
+}
+
+func TestReadStopsAtTheRowCap(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		path func(*testing.T) string
+		name string
+	}{
+		{
+			name: "separated values",
+			path: func(t *testing.T) string { return write(t, "cap.csv", "path\n/a/\n/b/\n/c/\n") },
+		},
+		{
+			name: "workbook",
+			path: func(t *testing.T) string {
+				return sheet(t, "cap.xlsx", [][]string{{"path"}, {"/a/"}, {"/b/"}, {"/c/"}})
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			path := tc.path(t)
+			if _, err := importer.Read(t.Context(), path, importer.ReadOptions{MaxRows: 2}); !errors.IsCode(err, errors.Invalid) {
+				t.Fatalf("Read past the cap = %v, want invalid", err)
+			}
+
+			table, err := importer.Read(t.Context(), path, importer.ReadOptions{MaxRows: 3})
+			if err != nil || len(table.Rows) != 3 {
+				t.Fatalf("Read at the cap = %+v, %v", table, err)
+			}
+		})
+	}
+}
+
+func TestWriteChoosesTheWriterFromTheExtension(t *testing.T) {
+	t.Parallel()
+
+	table := importmap.Table{
+		Headers: []string{"path", "title", "entity"},
+		Rows: [][]string{
+			{"/espresso-machines/", "Espresso machines", "Espresso machines"},
+			{"/grinders/hand/", `Hand grinders, "the good ones"`, "Hand grinders"},
+		},
+	}
+
+	cases := []struct {
+		name string
+		file string
+	}{
+		{name: "a workbook", file: "map.xlsx"},
+		{name: "separated values", file: "map.csv"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			path := filepath.Join(t.TempDir(), tc.file)
+			if err := importer.Write(path, table); err != nil {
+				t.Fatalf("Write: %v", err)
+			}
+
+			read, err := importer.Read(t.Context(), path, importer.ReadOptions{MaxRows: 100})
+			if err != nil {
+				t.Fatalf("Read back: %v", err)
+			}
+			if len(read.Headers) != len(table.Headers) {
+				t.Fatalf("headers = %v, want %v", read.Headers, table.Headers)
+			}
+			if len(read.Rows) != len(table.Rows) {
+				t.Fatalf("rows = %d, want %d", len(read.Rows), len(table.Rows))
+			}
+			for row := range table.Rows {
+				for cell := range table.Rows[row] {
+					if read.Rows[row][cell] != table.Rows[row][cell] {
+						t.Fatalf("row %d cell %d = %q, want %q",
+							row, cell, read.Rows[row][cell], table.Rows[row][cell])
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestWriteRefusesAFileItCannotWrite(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "map.json")
+	if err := importer.Write(path, importmap.Table{Headers: []string{"path"}}); !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("Write to a .json = %v, want INVALID", err)
+	}
+}
+
+func workbook(t *testing.T, name string, sheets map[string][][]string, order []string) string {
+	t.Helper()
+
+	file := excelize.NewFile()
+	t.Cleanup(func() {
+		if err := file.Close(); err != nil {
+			t.Errorf("close the workbook: %v", err)
+		}
+	})
+
+	for position, sheetName := range order {
+		if position == 0 {
+			if err := file.SetSheetName(file.GetSheetName(0), sheetName); err != nil {
+				t.Fatalf("rename the first sheet: %v", err)
+			}
+		} else if _, err := file.NewSheet(sheetName); err != nil {
+			t.Fatalf("add the sheet %s: %v", sheetName, err)
+		}
+		for i, row := range sheets[sheetName] {
+			cell, err := excelize.CoordinatesToCellName(1, i+1)
+			if err != nil {
+				t.Fatalf("cell name: %v", err)
+			}
+			cells := make([]any, 0, len(row))
+			for _, value := range row {
+				cells = append(cells, value)
+			}
+			if err = file.SetSheetRow(sheetName, cell, &cells); err != nil {
+				t.Fatalf("set row %d of %s: %v", i, sheetName, err)
+			}
+		}
+	}
+
+	path := filepath.Join(t.TempDir(), name)
+	if err := file.SaveAs(path); err != nil {
+		t.Fatalf("save the workbook: %v", err)
+	}
+	return path
+}
+
+func TestSheetsNamesEverySheetWithItsShape(t *testing.T) {
+	t.Parallel()
+
+	path := workbook(t, "plan.xlsx", map[string][][]string{
+		"Bikes":      {{"Page path", "Page title"}, {"/bikes/", "Bikes"}, {"/bikes/city/", "City"}},
+		"Components": {{"Page path", "Page title"}, {"/components/", "Components"}},
+		"Notes":      {},
+	}, []string{"Bikes", "Components", "Notes"})
+
+	found, err := importer.Sheets(path)
+	if err != nil {
+		t.Fatalf("Sheets: %v", err)
+	}
+	if len(found) != 3 {
+		t.Fatalf("Sheets = %+v, want one entry per sheet", found)
+	}
+	if found[0].Name != "Bikes" || found[0].Rows != 2 || !slices.Equal(found[0].Headers, []string{"Page path", "Page title"}) {
+		t.Errorf("the first sheet = %+v", found[0])
+	}
+	if found[1].Name != "Components" || found[1].Rows != 1 {
+		t.Errorf("the second sheet = %+v", found[1])
+	}
+	if found[2].Name != "Notes" || found[2].Rows != 0 || len(found[2].Headers) != 0 {
+		t.Errorf("an empty sheet = %+v, want it named and reported as empty", found[2])
+	}
+}
+
+func TestSheetsAnswersOneEntryForASeparatedFile(t *testing.T) {
+	t.Parallel()
+
+	path := write(t, "feed.csv", "sku,name\r\na-1,Anvil\r\n")
+	found, err := importer.Sheets(path)
+	if err != nil {
+		t.Fatalf("Sheets: %v", err)
+	}
+	if len(found) != 1 || found[0].Name != "" || found[0].Rows != 1 {
+		t.Fatalf("Sheets = %+v, want the single sheet a csv has", found)
+	}
+}
+
+func TestReadJoinsTheSheetsItIsAsked(t *testing.T) {
+	t.Parallel()
+
+	path := workbook(t, "plan.xlsx", map[string][][]string{
+		"Bikes":      {{"Page path", "Page title"}, {"/bikes/", "Bikes"}},
+		"Components": {{"Page path", "Page title"}, {"/components/", "Components"}},
+	}, []string{"Bikes", "Components"})
+
+	table, err := importer.Read(t.Context(), path, importer.ReadOptions{Sheets: []string{"Bikes", "Components"}})
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	if len(table.Rows) != 2 {
+		t.Fatalf("Read = %d rows, want both sheets", len(table.Rows))
+	}
+	if table.Origins[0].Sheet != "Bikes" || table.Origins[0].Row != 2 {
+		t.Errorf("the first row came from %+v, want row 2 of Bikes", table.Origins[0])
+	}
+	if table.Origins[1].Sheet != "Components" || table.Origins[1].Row != 2 {
+		t.Errorf("the second row came from %+v, want row 2 of Components", table.Origins[1])
+	}
+}
+
+func TestReadStillTakesTheFirstSheetWhenNoneIsNamed(t *testing.T) {
+	t.Parallel()
+
+	path := workbook(t, "plan.xlsx", map[string][][]string{
+		"Bikes":      {{"Page path"}, {"/bikes/"}},
+		"Components": {{"Page path"}, {"/components/"}},
+	}, []string{"Bikes", "Components"})
+
+	table, err := importer.Read(t.Context(), path, importer.ReadOptions{})
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	if len(table.Rows) != 1 || table.Rows[0][0] != "/bikes/" {
+		t.Fatalf("Read = %+v, want the first sheet alone", table.Rows)
+	}
+}
+
+func TestReadRefusesASheetTheWorkbookDoesNotHold(t *testing.T) {
+	t.Parallel()
+
+	path := workbook(t, "plan.xlsx", map[string][][]string{
+		"Bikes": {{"Page path"}, {"/bikes/"}},
+	}, []string{"Bikes"})
+
+	_, err := importer.Read(t.Context(), path, importer.ReadOptions{Sheets: []string{"Bikes", "Ghost"}})
+	if !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("Read of a missing sheet = %v, want an invalid error", err)
+	}
+}
+
+func TestReadRefusesSheetsThatDoNotAgreeOnTheirHeaders(t *testing.T) {
+	t.Parallel()
+
+	path := workbook(t, "plan.xlsx", map[string][][]string{
+		"Bikes":      {{"Page path", "Page title"}, {"/bikes/", "Bikes"}},
+		"Components": {{"Address", "Name"}, {"/components/", "Components"}},
+	}, []string{"Bikes", "Components"})
+
+	_, err := importer.Read(t.Context(), path, importer.ReadOptions{Sheets: []string{"Bikes", "Components"}})
+	if !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("Read of disagreeing sheets = %v, want an invalid error", err)
+	}
+}
+
+func TestReadAddressesTheColumnsByLetterWhenThereIsNoHeader(t *testing.T) {
+	t.Parallel()
+
+	path := workbook(t, "messy.xlsx", map[string][][]string{
+		"Topical plan": {
+			{},
+			{"", "somedomain.uk"},
+			{"", "", "/some-endpoint"},
+			{"", "", "", "/here-to-1"},
+		},
+	}, []string{"Topical plan"})
+
+	table, err := importer.Read(t.Context(), path, importer.ReadOptions{Letters: true})
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	if !slices.Equal(table.Headers, []string{"A", "B", "C", "D"}) {
+		t.Fatalf("Headers = %v, want the spreadsheet letters", table.Headers)
+	}
+	if len(table.Rows) != 3 {
+		t.Fatalf("Read = %+v, want every non-blank row as data", table.Rows)
+	}
+	if table.Rows[0][1] != "somedomain.uk" || table.Origins[0].Row != 2 {
+		t.Errorf("the first row = %v from %+v", table.Rows[0], table.Origins[0])
+	}
+}

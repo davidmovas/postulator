@@ -1,0 +1,203 @@
+version: '3'
+
+vars:
+  APP_NAME: "postulator"
+  MODULE: "github.com/davidmovas/postulator"
+  BIN_DIR: "bin"
+  VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
+  VERSION: '{{.VERSION | default "2.0.0-dev"}}'
+  UI_NAME: "postulator-ui"
+  UI_HOME: '{{.ROOT_DIR}}/.superpowers/ui-home'
+  UI_DEVTOOLS_PORT: '{{.UI_DEVTOOLS_PORT | default 9222}}'
+  COMMIT:
+    sh: git rev-parse --short HEAD
+  BUILD_DATE: '{{now | date "2006-01-02T15:04:05Z"}}'
+
+includes:
+  common: ./build/Taskfile.yml
+  windows: ./build/windows/Taskfile.yml
+
+tasks:
+  build:
+    summary: Builds the application
+    cmds:
+      - task: windows:build
+
+  package:
+    summary: Packages a production build of the application
+    cmds:
+      - task: windows:package
+
+  run:
+    summary: Runs the built application
+    cmds:
+      - task: windows:run
+
+  dev:
+    summary: Runs the application in development mode
+    cmds:
+      - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+
+  icons:
+    summary: Regenerates the application mark in every shape the build needs
+    cmds:
+      - go run ./cmd/appicon
+
+  bindings:
+    summary: Regenerates the TypeScript bindings
+    cmds:
+      - task: common:generate:bindings
+
+  events:
+    summary: Regenerates the TypeScript event module from the Go event registry
+    cmds:
+      - go run ./internal/transport/wails/gen
+
+  vocab:
+    summary: Regenerates the TypeScript vocabulary module from the Go const blocks
+    cmds:
+      - go run ./internal/transport/wails/vocabgen
+
+  ui:build:
+    summary: Builds the harness executable, which composes the window over the fakes and seeds a site
+    deps:
+      - task: common:build:frontend
+        vars:
+          BUILD_FLAGS: '-tags uiharness'
+          DEV: 'false'
+    cmds:
+      - go build -tags uiharness -o "{{.BIN_DIR}}/{{.UI_NAME}}.exe" ./cmd/postulator
+    env:
+      GOOS: windows
+      CGO_ENABLED: '0'
+
+  ui:run:
+    summary: Launches the harness window detached with its own home and the devtools endpoint open
+    deps:
+      - task: ui:build
+    env:
+      POSTULATOR_HOME: '{{.UI_HOME}}'
+      POSTULATOR_DEVTOOLS_PORT: '{{.UI_DEVTOOLS_PORT}}'
+    cmds:
+      - cmd: powershell -NoProfile -Command 'Start-Process -FilePath "{{.ROOT_DIR}}/{{.BIN_DIR}}/{{.UI_NAME}}.exe"'
+        platforms: [windows]
+
+  ui:reset:
+    summary: Stops the harness window and deletes the home it seeded
+    cmds:
+      - cmd: powershell -NoProfile -Command 'Get-Process -Name "{{.UI_NAME}}" -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep -Milliseconds 500; if (Test-Path "{{.UI_HOME}}") { Remove-Item -Recurse -Force "{{.UI_HOME}}" }'
+        platforms: [windows]
+
+  ui:shot:
+    summary: Screenshots one route of the running harness window into frontend/shots
+    dir: frontend
+    cmds:
+      - node scripts/shot.mjs --port {{.UI_DEVTOOLS_PORT}} {{.CLI_ARGS}}
+
+  ui:walk:
+    summary: Screenshots every route in frontend/scripts/routes.json into frontend/shots
+    dir: frontend
+    cmds:
+      - node scripts/shot.mjs --port {{.UI_DEVTOOLS_PORT}} --routes scripts/routes.json --out-dir shots
+
+  ui:lint:
+    summary: Lints and tests the harness sources, which the default lint and test runs never see
+    vars:
+      GOPATH:
+        sh: go env GOPATH
+    cmds:
+      - '"{{.GOPATH}}/bin/golangci-lint.exe" run --build-tags uiharness ./cmd/postulator/...'
+      - go test -tags uiharness -count=1 -timeout 15m ./cmd/postulator/...
+
+  test:
+    summary: Runs the Go test suite with the race detector
+    cmds:
+      - go test -race -cover ./...
+
+  check:go:comments:
+    summary: Fails when Go sources carry comments, which CLAUDE.md rule 1 forbids
+    cmds:
+      - cmd: |
+          matches=$(git grep -nIE --untracked '^[[:space:]]*(//|/\*)|[^:[:space:]"][[:space:]]+//' -- '*.go' | grep -vE '//(go:|nolint:)' | grep -vE '"[^"]*//' || true)
+          if [ -n "$matches" ]; then
+            echo "$matches"
+            echo "Go sources must carry no comments (CLAUDE.md rule 1); //go: and //nolint: directives are the only exception"
+            exit 1
+          fi
+
+  lint:
+    summary: Runs the comment check, go vet and golangci-lint
+    cmds:
+      - task: check:go:comments
+      - go vet ./...
+      - golangci-lint run
+
+  coverage:
+    summary: Runs the test suite and enforces the coverage gates
+    cmds:
+      - go test -race -coverprofile=coverage.out -covermode=atomic ./...
+      - go run ./cmd/covergate -profile coverage.out
+
+  e2e:up:
+    summary: Starts the docker WordPress stack and provisions e2e credentials
+    dir: docker/e2e
+    env:
+      E2E_SEO: '{{.E2E_SEO | default "none"}}'
+      E2E_WOO: '{{.E2E_WOO | default "1"}}'
+      E2E_PLUGIN: '{{.E2E_PLUGIN | default "1"}}'
+    cmds:
+      - docker compose up -d --wait db wordpress
+      - docker compose run --rm bootstrap
+
+  e2e:down:
+    summary: Stops the docker WordPress stack and removes its volumes
+    dir: docker/e2e
+    cmds:
+      - docker compose down -v --remove-orphans
+      - cmd: powershell -NoProfile -Command "if (Test-Path .env.generated) { Remove-Item -Force .env.generated }"
+        platforms: [windows]
+      - cmd: rm -f .env.generated
+        platforms: [linux, darwin]
+
+  e2e:reset:
+    summary: Recreates the docker WordPress stack from scratch
+    cmds:
+      - task: e2e:down
+      - task: e2e:up
+
+  e2e:test:
+    summary: Runs the docker end-to-end suite
+    cmds:
+      - go test -tags e2e -count=1 ./internal/adapters/wp/e2e/...
+
+  e2e:full:
+    summary: Runs the whole loop against the docker WordPress stack
+    cmds:
+      - task: e2e:up
+      - go test -tags e2e -count=1 -timeout 20m ./internal/e2e/...
+
+  e2e:full:noplugin:
+    summary: Runs the degraded loop against a stack that carries the plugin deactivated
+    cmds:
+      - task: e2e:up
+        vars:
+          E2E_PLUGIN: '0'
+      - go test -tags e2e -count=1 -timeout 20m -run TestTheWholeLoopDegradesWithoutThePlugin ./internal/e2e/...
+
+  plugin:lint:
+    summary: Runs php -l over every companion plugin source file
+    cmds:
+      - cmd: docker compose -f docker/e2e/compose.yaml run --rm --no-deps -T phplint -c 'find /plugin -name "*.php" -print0 | xargs -0 -n1 php -l'
+        platforms: [windows]
+      - cmd: find wp-plugin -name "*.php" -print0 | xargs -0 -n1 php -l
+        platforms: [linux, darwin]
+
+  plugin:zip:
+    summary: Packages the companion plugin deterministically
+    cmds:
+      - go run ./cmd/pluginzip -source wp-plugin/postulator-companion -out {{.BIN_DIR}}/postulator-companion.zip
+
+  lint:e2e:
+    summary: Lints the build-tagged end-to-end sources
+    cmds:
+      - golangci-lint run --build-tags e2e ./internal/adapters/wp/e2e/... ./internal/e2e/...

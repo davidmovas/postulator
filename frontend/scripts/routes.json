@@ -1,0 +1,795 @@
+[
+  {
+    "name": "sites",
+    "route": "#/sites"
+  },
+  {
+    "name": "overview",
+    "route": "#/s/:siteId/overview",
+    "wait": 1500
+  },
+  {
+    "name": "graph",
+    "route": "#/s/:siteId/graph",
+    "wait": 1400
+  },
+  {
+    "name": "pages",
+    "route": "#/s/:siteId/pages",
+    "wait": 1200
+  },
+  {
+    "name": "links",
+    "route": "#/s/:siteId/links",
+    "wait": 1200
+  },
+  {
+    "name": "runs",
+    "route": "#/s/:siteId/runs",
+    "wait": 1200
+  },
+  {
+    "name": "run-running",
+    "route": "#/s/:siteId/runs",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-run-kind=generate][data-run-status=running]"
+      },
+      {
+        "wait": 1800
+      }
+    ]
+  },
+  {
+    "name": "templates",
+    "route": "#/s/:siteId/templates",
+    "wait": 1200
+  },
+  {
+    "name": "templates-960",
+    "route": "#/s/:siteId/templates",
+    "width": 960,
+    "height": 600,
+    "wait": 1200
+  },
+  {
+    "name": "templates-policies",
+    "route": "#/s/:siteId/templates/policies",
+    "wait": 1200
+  },
+  {
+    "name": "schedules",
+    "route": "#/s/:siteId/schedules",
+    "wait": 1200
+  },
+  {
+    "name": "schedules-new",
+    "route": "#/s/:siteId/schedules?action=new",
+    "wait": 1000
+  },
+  {
+    "name": "schedules-off",
+    "route": "#/s/:siteId/schedules?show=off",
+    "wait": 1000
+  },
+  {
+    "name": "import-file",
+    "route": "#/s/:siteId/import",
+    "wait": 1000
+  },
+  {
+    "name": "import-export",
+    "route": "#/s/:siteId/import?tab=export",
+    "wait": 900
+  },
+  {
+    "name": "reports-site",
+    "route": "#/s/:siteId/reports",
+    "wait": 1800
+  },
+  {
+    "name": "reports-runs",
+    "route": "#/s/:siteId/reports?tab=runs",
+    "wait": 1500,
+    "steps": [
+      {
+        "click": "[data-run-id]"
+      },
+      {
+        "wait": 900
+      }
+    ]
+  },
+  {
+    "name": "reports-pages",
+    "route": "#/s/:siteId/reports?tab=pages",
+    "wait": 1500,
+    "steps": [
+      {
+        "click": "[data-page-id]"
+      },
+      {
+        "wait": 900
+      }
+    ]
+  },
+  {
+    "name": "templates-new",
+    "route": "#/s/:siteId/templates",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-template-new]"
+      },
+      {
+        "wait": 700
+      }
+    ]
+  },
+  {
+    "name": "template-editor-global",
+    "route": "#/s/:siteId/templates",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-template-row]"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "click": "[data-open-editor]"
+      },
+      {
+        "wait": 1200
+      }
+    ]
+  },
+  {
+    "name": "template-editor-rules",
+    "route": "#/s/:siteId/templates",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-template-row]"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "click": "[data-open-editor]"
+      },
+      {
+        "wait": 1200
+      },
+      {
+        "click": "[data-editor-group=rules]"
+      },
+      {
+        "wait": 600
+      }
+    ]
+  },
+  {
+    "name": "template-editor-models",
+    "route": "#/s/:siteId/templates",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-template-row]"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "click": "[data-open-editor]"
+      },
+      {
+        "wait": 1200
+      },
+      {
+        "click": "[data-editor-group=models]"
+      },
+      {
+        "wait": 600
+      }
+    ]
+  },
+  {
+    "name": "template-editor-recipe",
+    "route": "#/s/:siteId/templates",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-template-row]"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "click": "[data-open-editor]"
+      },
+      {
+        "wait": 1200
+      },
+      {
+        "click": "[data-editor-group=recipe]"
+      },
+      {
+        "wait": 600
+      }
+    ]
+  },
+  {
+    "name": "template-editor-site",
+    "route": "#/s/:siteId/templates",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-template-row]"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "click": "[data-open-editor]"
+      },
+      {
+        "wait": 1200
+      },
+      {
+        "click": "[role=radio]:has-text(\"This site\")"
+      },
+      {
+        "wait": 700
+      },
+      {
+        "click": "[data-editor-group=overrides]"
+      },
+      {
+        "wait": 700
+      }
+    ]
+  },
+  {
+    "name": "template-editor-960",
+    "route": "#/s/:siteId/templates",
+    "width": 960,
+    "height": 600,
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-template-row]"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "click": "[data-open-editor]"
+      },
+      {
+        "wait": 1200
+      }
+    ]
+  },
+  {
+    "name": "pages-tree",
+    "route": "#/s/:siteId/pages?view=tree",
+    "wait": 1600
+  },
+  {
+    "name": "pages-create",
+    "route": "#/s/:siteId/pages",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-page-create]"
+      },
+      {
+        "wait": 600
+      }
+    ]
+  },
+  {
+    "name": "pages-drawer-details",
+    "route": "#/s/:siteId/pages",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-page-row]"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "click": "[data-page-open]"
+      },
+      {
+        "wait": 900
+      }
+    ]
+  },
+  {
+    "name": "pages-drawer-links",
+    "route": "#/s/:siteId/pages",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-page-row]"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "click": "[data-page-open]"
+      },
+      {
+        "wait": 900
+      },
+      {
+        "click": "[role=tab]:has-text(\"Links\")"
+      },
+      {
+        "wait": 500
+      }
+    ]
+  },
+  {
+    "name": "pages-drawer-mapping",
+    "route": "#/s/:siteId/pages",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-page-row]"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "click": "[data-page-open]"
+      },
+      {
+        "wait": 900
+      },
+      {
+        "click": "[role=tab]:has-text(\"Mapping\")"
+      },
+      {
+        "wait": 700
+      }
+    ]
+  },
+  {
+    "name": "pages-drawer-report",
+    "route": "#/s/:siteId/pages",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-page-row]"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "click": "[data-page-open]"
+      },
+      {
+        "wait": 900
+      },
+      {
+        "click": "[role=tab]:has-text(\"Report\")"
+      },
+      {
+        "wait": 700
+      }
+    ]
+  },
+  {
+    "name": "pages-drawer-preview",
+    "route": "#/s/:siteId/pages?status=exists",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-page-open]"
+      },
+      {
+        "wait": 900
+      },
+      {
+        "click": "[role=tab]:has-text(\"Preview\")"
+      },
+      {
+        "wait": 2000
+      }
+    ]
+  },
+  {
+    "name": "pages-drawer-preview-draft",
+    "route": "#/s/:siteId/pages?status=exists",
+    "wait": 1500,
+    "steps": [
+      {
+        "click": ":nth-match([data-page-row], 3)"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "click": "[data-page-open]"
+      },
+      {
+        "wait": 900
+      },
+      {
+        "click": "[role=tab]:has-text(\"Preview\")"
+      },
+      {
+        "wait": 2500
+      }
+    ]
+  },
+  {
+    "name": "runs-start",
+    "route": "#/s/:siteId/runs",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-run-start]"
+      },
+      {
+        "wait": 900
+      },
+      {
+        "click": "[data-run-target] label"
+      },
+      {
+        "wait": 300
+      },
+      {
+        "click": "[data-run-estimate]"
+      },
+      {
+        "wait": 1800
+      }
+    ]
+  },
+  {
+    "name": "run-finished",
+    "route": "#/s/:siteId/runs",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-run-kind=generate][data-run-status=completed]"
+      },
+      {
+        "wait": 1800
+      }
+    ]
+  },
+  {
+    "name": "review-body",
+    "route": "#/s/:siteId/runs",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-run-kind=generate][data-run-status=completed]"
+      },
+      {
+        "wait": 1800
+      },
+      {
+        "click": "[data-item-status=completed]"
+      },
+      {
+        "wait": 1400
+      },
+      {
+        "click": "[role=tab]:has-text(\"Body\")"
+      },
+      {
+        "wait": 900
+      }
+    ]
+  },
+  {
+    "name": "review-publish",
+    "route": "#/s/:siteId/runs",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-run-kind=generate][data-run-status=completed]"
+      },
+      {
+        "wait": 1800
+      },
+      {
+        "click": "[data-item-status=completed]"
+      },
+      {
+        "wait": 1400
+      },
+      {
+        "click": "[role=tab]:has-text(\"Publish\")"
+      },
+      {
+        "wait": 900
+      }
+    ]
+  },
+  {
+    "name": "run-revert",
+    "route": "#/s/:siteId/runs",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-run-kind=revert][data-run-status=completed]"
+      },
+      {
+        "wait": 1800
+      }
+    ]
+  },
+  {
+    "name": "run-relink",
+    "route": "#/s/:siteId/runs",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-run-kind=relink][data-run-status=completed]"
+      },
+      {
+        "wait": 1800
+      }
+    ]
+  },
+  {
+    "name": "agent",
+    "route": "#/agent",
+    "wait": 1200
+  },
+  {
+    "name": "agent-tool-outcomes",
+    "route": "#/agent",
+    "wait": 1800,
+    "steps": [
+      {
+        "click": "[data-tool-status=error]"
+      },
+      {
+        "wait": 500
+      },
+      {
+        "click": "[data-tool-status=cut]"
+      },
+      {
+        "wait": 900
+      }
+    ]
+  },
+  {
+    "name": "agent-inbox",
+    "route": "#/agent/inbox"
+  },
+  {
+    "name": "settings-models",
+    "route": "#/settings/models"
+  },
+  {
+    "name": "settings-runs",
+    "route": "#/settings/runs"
+  },
+  {
+    "name": "settings-agent",
+    "route": "#/settings/agent"
+  },
+  {
+    "name": "settings-browser",
+    "route": "#/settings/browser"
+  },
+  {
+    "name": "settings-security",
+    "route": "#/settings/security"
+  },
+  {
+    "name": "settings-about",
+    "route": "#/settings/about"
+  },
+  {
+    "name": "settings-models-960",
+    "route": "#/settings/models",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "palette",
+    "route": "#/s/:siteId/pages",
+    "wait": 1200,
+    "steps": [
+      {
+        "key": "Control+K"
+      },
+      {
+        "wait": 300
+      },
+      {
+        "type": "[data-palette-query]=a"
+      },
+      {
+        "wait": 700
+      }
+    ]
+  },
+  {
+    "name": "site-drawer",
+    "route": "#/sites",
+    "steps": [
+      {
+        "click": "[data-site-edit]"
+      },
+      {
+        "wait": 500
+      }
+    ]
+  },
+  {
+    "name": "dock-closed",
+    "route": "#/s/:siteId/overview",
+    "wait": 1500,
+    "steps": [
+      {
+        "click": "[aria-label=\"Collapse the agent dock\"]"
+      },
+      {
+        "wait": 900
+      }
+    ]
+  },
+  {
+    "name": "dock-narrow",
+    "route": "#/s/:siteId/overview",
+    "wait": 1500,
+    "steps": [
+      {
+        "click": "[aria-label=\"Expand the agent dock\"]"
+      },
+      {
+        "wait": 1200
+      }
+    ]
+  },
+  {
+    "name": "dock-wide",
+    "route": "#/s/:siteId/overview",
+    "wait": 1500,
+    "steps": [
+      {
+        "click": "[aria-label=\"Dock width\"] [role=radio]:last-of-type"
+      },
+      {
+        "wait": 1200
+      }
+    ]
+  },
+  {
+    "name": "dock-narrow-960",
+    "route": "#/s/:siteId/overview",
+    "width": 960,
+    "height": 600,
+    "wait": 1500,
+    "steps": [
+      {
+        "click": "[aria-label=\"Dock width\"] [role=radio]:first-of-type"
+      },
+      {
+        "wait": 1200
+      }
+    ]
+  },
+  {
+    "name": "agent-inbox-960",
+    "route": "#/agent/inbox",
+    "width": 960,
+    "height": 600,
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[aria-label=\"Collapse the agent dock\"]"
+      },
+      {
+        "wait": 800
+      }
+    ]
+  },
+  {
+    "name": "rail-nosite",
+    "route": "#/sites"
+  },
+  {
+    "name": "rail-site",
+    "route": "#/s/:siteId/overview"
+  },
+  {
+    "name": "sites-960",
+    "route": "#/sites",
+    "width": 960,
+    "height": 600
+  },
+  {
+    "name": "overview-960",
+    "route": "#/s/:siteId/overview",
+    "width": 960,
+    "height": 600,
+    "wait": 1500
+  },
+  {
+    "name": "pages-960",
+    "route": "#/s/:siteId/pages",
+    "width": 960,
+    "height": 600,
+    "wait": 1200
+  },
+  {
+    "name": "runs-960",
+    "route": "#/s/:siteId/runs",
+    "width": 960,
+    "height": 600,
+    "wait": 1200
+  },
+  {
+    "name": "agent-960",
+    "route": "#/agent",
+    "width": 960,
+    "height": 600,
+    "wait": 1200
+  },
+  {
+    "name": "rail-site-960",
+    "route": "#/s/:siteId/graph",
+    "width": 960,
+    "height": 600,
+    "wait": 1400
+  },
+  {
+    "name": "palette-960",
+    "route": "#/s/:siteId/pages",
+    "width": 960,
+    "height": 600,
+    "wait": 1200,
+    "steps": [
+      {
+        "key": "Control+K"
+      },
+      {
+        "wait": 300
+      },
+      {
+        "type": "[data-palette-query]=a"
+      },
+      {
+        "wait": 700
+      }
+    ]
+  },
+  {
+    "name": "schedules-960",
+    "route": "#/s/:siteId/schedules",
+    "width": 960,
+    "height": 600,
+    "wait": 1200
+  },
+  {
+    "name": "import-960",
+    "route": "#/s/:siteId/import",
+    "width": 960,
+    "height": 600,
+    "wait": 1000
+  },
+  {
+    "name": "reports-960",
+    "route": "#/s/:siteId/reports",
+    "width": 960,
+    "height": 600,
+    "wait": 1800
+  }
+]
