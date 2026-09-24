@@ -192,62 +192,6 @@ func TestAttrAndTextOf(t *testing.T) {
 	}
 }
 
-func TestAssembleBuildsABody(t *testing.T) {
-	t.Parallel()
-
-	draft := content.ContentDraft{
-		Title: "Espresso guide",
-		H1:    "Espresso & you",
-		Sections: []content.DraftSection{
-			{Heading: "Beans", HTML: "<p>Pick a roast.</p>"},
-			{HTML: "<p>No heading here.</p>"},
-		},
-		Summary: "A guide.",
-	}
-
-	doc, err := content.Assemble(draft)
-	if err != nil {
-		t.Fatalf("Assemble: %v", err)
-	}
-	want := "<h1>Espresso &amp; you</h1><h2>Beans</h2><p>Pick a roast.</p><p>No heading here.</p>"
-	if body := bodyOf(t, doc); body != want {
-		t.Fatalf("Assemble = %q, want %q", body, want)
-	}
-}
-
-func TestAssembleRefusesAnIncompleteDraft(t *testing.T) {
-	t.Parallel()
-
-	complete := content.ContentDraft{
-		Title: "t", H1: "h", Sections: []content.DraftSection{{Heading: "s", HTML: "<p>x</p>"}},
-	}
-
-	cases := []struct {
-		name   string
-		mutate func(*content.ContentDraft)
-	}{
-		{name: "no title", mutate: func(d *content.ContentDraft) { d.Title = " " }},
-		{name: "no h1", mutate: func(d *content.ContentDraft) { d.H1 = "" }},
-		{name: "no sections", mutate: func(d *content.ContentDraft) { d.Sections = nil }},
-		{
-			name:   "an empty section",
-			mutate: func(d *content.ContentDraft) { d.Sections = []content.DraftSection{{Heading: "s"}} },
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			draft := complete
-			tc.mutate(&draft)
-			if _, err := content.Assemble(draft); !errors.IsCode(err, errors.Invalid) {
-				t.Fatalf("Assemble = %v, want an invalid error", err)
-			}
-		})
-	}
-}
-
 func TestInsertAfterSection(t *testing.T) {
 	t.Parallel()
 

@@ -68,7 +68,7 @@ func GenerateBody(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			draft, usage, err := port.Structured[content.ContentDraft](ctx, deps.LLM, port.Request{
+			answer, usage, err := port.Structured[content.DraftAnswer](ctx, deps.LLM, port.Request{
 				Ref:       ref,
 				System:    system,
 				Messages:  []port.Message{{Role: port.RoleUser, Text: user}},
@@ -79,7 +79,7 @@ func GenerateBody(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			doc, err := content.Assemble(draft)
+			draft, doc, err := content.Assemble(answer, content.NewBrief(sc.Spec, sc.Page, entity, lc))
 			if err != nil {
 				return run.Result{}, err
 			}

@@ -395,13 +395,13 @@ func TestGenerateBodyReportsWhatItCannotDo(t *testing.T) {
 			want:      errors.External,
 		},
 		{
-			name: "the draft is incomplete",
+			name: "the draft is incomplete, which the engine may try again",
 			deps: func(d steps.Deps) steps.Deps {
 				d.LLM = llmStub{reply: `{"title":"t","h1":"","sections":[]}`}
 				return d
 			},
 			artifacts: map[run.ArtifactKind][]byte{run.ArtifactLinkContext: blob},
-			want:      errors.Invalid,
+			want:      errors.External,
 		},
 	}
 
