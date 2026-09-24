@@ -55,7 +55,7 @@ func Page(t testing.TB, store *sqlite.Store, siteID, path string) pagemap.Page {
 
 	record := pagemap.Page{
 		ID: id.New(), SiteID: siteID, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPPage,
-		Title: path, H1: path, Status: pagemap.StatusPlanned, CreatedAt: Stamp, UpdatedAt: Stamp,
+		Title: path, H1: path, Keywords: []string{}, Status: pagemap.StatusPlanned, CreatedAt: Stamp, UpdatedAt: Stamp,
 	}
 	if err := sqlite.NewPageRepo(store).Insert(t.Context(), record); err != nil {
 		t.Fatalf("insert the page fixture: %v", err)

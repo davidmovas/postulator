@@ -2,6 +2,7 @@ package pagemap_test
 
 import (
 	stderrors "errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -47,12 +48,17 @@ func TestNewPageNormalises(t *testing.T) {
 
 	p := page(pageA, "/Shop/Bags", nil)
 	p.Title = "  Bags  "
+	p.PrimaryKeyword = " leather bags "
+	p.Keywords = []string{" totes", "Totes", "", "clutches"}
 	got, err := pagemap.NewPage(p)
 	if err != nil {
 		t.Fatalf("NewPage: %v", err)
 	}
 	if got.Path != "/shop/bags/" || got.Slug != "bags" || got.Title != "Bags" {
 		t.Errorf("NewPage = path %q slug %q title %q", got.Path, got.Slug, got.Title)
+	}
+	if got.PrimaryKeyword != "leather bags" || !slices.Equal(got.Keywords, []string{"totes", "clutches"}) {
+		t.Errorf("NewPage keywords = %q %v, want them trimmed and deduplicated", got.PrimaryKeyword, got.Keywords)
 	}
 }
 

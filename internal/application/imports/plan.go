@@ -128,6 +128,7 @@ func sameRef(a, b *string) bool {
 func samePage(a, b pagemap.Page) bool {
 	return a.Title == b.Title && a.H1 == b.H1 && a.MetaTitle == b.MetaTitle &&
 		a.MetaDescription == b.MetaDescription && a.WPType == b.WPType &&
+		a.PrimaryKeyword == b.PrimaryKeyword && slices.Equal(a.Keywords, b.Keywords) &&
 		sameRef(a.EntityID, b.EntityID) && sameRef(a.TemplateID, b.TemplateID)
 }
 
@@ -243,6 +244,8 @@ func read(binding importmap.Binding, table importmap.Table, p *plan) *drafts {
 			wpType:    binding.Text(row, importmap.FieldWPType),
 			pageKind:  binding.Text(row, importmap.FieldPageKind),
 			entity:    name,
+			primary:   binding.Text(row, importmap.FieldPrimaryKeyword),
+			keywords:  binding.List(row, importmap.FieldKeywords),
 		})
 	}
 	return sheet
@@ -451,7 +454,8 @@ func (s *Service) resolvePages(ctx context.Context, sheet *drafts, state siteSta
 			page, err := pagemap.NewPage(pagemap.Page{
 				ID: id.New(), SiteID: state.siteID, Path: path, WPType: wpTypeOr(wpType),
 				Title: fill(draft.title, titleFrom(path)), H1: draft.h1, MetaTitle: draft.metaTitle,
-				MetaDescription: draft.metaDesc, Status: pagemap.StatusPlanned, EntityID: entityID,
+				MetaDescription: draft.metaDesc, PrimaryKeyword: draft.primary, Keywords: draft.keywords,
+				Status: pagemap.StatusPlanned, EntityID: entityID,
 				TemplateID: templateID, CreatedAt: now, UpdatedAt: now,
 			})
 			if err != nil {
@@ -467,6 +471,8 @@ func (s *Service) resolvePages(ctx context.Context, sheet *drafts, state siteSta
 		next.H1 = fill(next.H1, draft.h1)
 		next.MetaTitle = fill(next.MetaTitle, draft.metaTitle)
 		next.MetaDescription = fill(next.MetaDescription, draft.metaDesc)
+		next.PrimaryKeyword = fill(next.PrimaryKeyword, draft.primary)
+		next.Keywords = union(next.Keywords, draft.keywords)
 		if wpType != "" {
 			next.WPType = wpType
 		}

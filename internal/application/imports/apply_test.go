@@ -1,6 +1,7 @@
 package imports_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/application/events"
@@ -336,5 +337,56 @@ func TestApplyLinksEveryCreatedPageToItsParentPath(t *testing.T) {
 	}
 	if root, ok := byPath["/"]; ok {
 		t.Fatalf("the import planned the root of the site: %+v", root)
+	}
+}
+
+func TestApplyKeepsTheKeywordsOfARowOnItsPage(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	sheet := "path,title,primary keyword,keywords\n" +
+		"/shoes/trail/,Trail shoes,trail running shoes,trail shoes;best trail shoes\n" +
+		"/shoes/road/,Road shoes,,\n"
+	mapping := h.mapping(map[string]string{
+		string(importmap.FieldPath):           "path",
+		string(importmap.FieldTitle):          "title",
+		string(importmap.FieldPrimaryKeyword): "primary keyword",
+		string(importmap.FieldKeywords):       "keywords",
+	})
+	mapping.Options.KeywordSeparator = ";"
+
+	report := h.preview(t, h.file(t, "keywords.csv", sheet), mapping)
+	previewed, ok := page(report, "/shoes/trail/")
+	if !ok || previewed.PrimaryKeyword != "trail running shoes" || len(previewed.Keywords) != 2 {
+		t.Fatalf("the preview drops the keywords of the row: %+v", previewed)
+	}
+
+	h.apply(t, h.file(t, "keywords.csv", sheet), mapping)
+
+	byPath := make(map[string]pagemap.Page)
+	for _, stored := range h.pages(t) {
+		byPath[stored.Path] = stored
+	}
+	trail := byPath["/shoes/trail/"]
+	if trail.PrimaryKeyword != "trail running shoes" || !slices.Equal(trail.Keywords, []string{"trail shoes", "best trail shoes"}) {
+		t.Fatalf("the page lost the keywords of its row: %+v", trail)
+	}
+	if road := byPath["/shoes/road/"]; road.PrimaryKeyword != "" || len(road.Keywords) != 0 {
+		t.Fatalf("a row without keywords gave its page some: %+v", road)
+	}
+	if len(h.entities(t)) != 0 {
+		t.Fatal("a row that names no entity created one")
+	}
+
+	again := "path,title,primary keyword,keywords\n/shoes/trail/,Trail shoes,,trail footwear\n"
+	h.apply(t, h.file(t, "again.csv", again), mapping)
+	trail = h.pages(t)[0]
+	for _, stored := range h.pages(t) {
+		if stored.Path == "/shoes/trail/" {
+			trail = stored
+		}
+	}
+	if trail.PrimaryKeyword != "trail running shoes" || !slices.Equal(trail.Keywords, []string{"trail shoes", "best trail shoes", "trail footwear"}) {
+		t.Fatalf("a second import must keep the primary keyword and union the rest: %+v", trail)
 	}
 }

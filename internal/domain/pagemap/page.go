@@ -1,6 +1,7 @@
 package pagemap
 
 import (
+	"github.com/davidmovas/postulator/internal/domain/graph"
 	"slices"
 	"strings"
 	"time"
@@ -73,6 +74,8 @@ type Page struct {
 	MetaTitle       string
 	MetaDescription string
 	Canonical       string
+	PrimaryKeyword  string
+	Keywords        []string
 	Status          Status
 	EntityID        *string
 	TemplateID      *string
@@ -135,6 +138,8 @@ func NewPage(p Page) (Page, error) {
 	p.MetaTitle = strings.TrimSpace(p.MetaTitle)
 	p.MetaDescription = strings.TrimSpace(p.MetaDescription)
 	p.Canonical = strings.TrimSpace(p.Canonical)
+	p.PrimaryKeyword = strings.TrimSpace(p.PrimaryKeyword)
+	p.Keywords = graph.CleanKeywords(p.Keywords)
 	return p, nil
 }
 

@@ -17,6 +17,8 @@ function page(id: string, path: string): Page {
         metaTitle: "",
         metaDescription: "",
         canonical: "",
+        primaryKeyword: "",
+        keywords: [],
         status: "planned",
         entityId: null,
         templateId: null,

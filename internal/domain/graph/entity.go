@@ -108,7 +108,7 @@ func NewEntity(e Entity) (Entity, error) {
 		return Entity{}, invalid("canonical page id must not be empty when set", "canonicalPageId")
 	}
 
-	e.SecondaryKeywords = cleanKeywords(e.SecondaryKeywords)
+	e.SecondaryKeywords = CleanKeywords(e.SecondaryKeywords)
 	anchors, err := NewAnchors(e.Anchors)
 	if err != nil {
 		return Entity{}, err
@@ -117,7 +117,7 @@ func NewEntity(e Entity) (Entity, error) {
 	return e, nil
 }
 
-func cleanKeywords(raw []string) []string {
+func CleanKeywords(raw []string) []string {
 	out := make([]string, 0, len(raw))
 	seen := make(map[string]struct{}, len(raw))
 	for _, keyword := range raw {
