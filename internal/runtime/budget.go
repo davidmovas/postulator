@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	tokensPerWord       = 1.4
+	tokensPerWord       = 2.2
 	promptOverhead      = 800
 	fallbackTargetWords = 800
 	inputShareOfOutput  = 0.5

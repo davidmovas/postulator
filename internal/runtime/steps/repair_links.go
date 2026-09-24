@@ -39,6 +39,7 @@ func RepairLinks(deps Deps) run.StepDef {
 		Requires: []run.ArtifactKind{run.ArtifactLinkContext, run.ArtifactBodyHTML},
 		Produces: []run.ArtifactKind{run.ArtifactBodyHTML},
 		Retry:    run.RetryPolicy{Max: 2},
+		Timeout:  editorTimeout,
 		Price: run.Price{
 			OutputTokens: repairTokens,
 			Calls: func(spec template.TemplateSpec, params map[string]any) int {

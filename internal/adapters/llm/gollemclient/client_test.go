@@ -528,6 +528,54 @@ func TestCompleteHonoursTheTimeout(t *testing.T) {
 	}
 }
 
+func TestACallUnderADeadlineRunsToThatDeadline(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(120 * time.Millisecond)
+		writeJSON(t, w, openaiCompletion)
+	}))
+	t.Cleanup(server.Close)
+
+	values := newValues(t, map[string]string{"llm.openai.baseUrl": server.URL})
+	factory := gollemclient.NewFactory(vault{gollemclient.SecretRef(gollemclient.ProviderOpenAI): "key"}, nil, values)
+	client := gollemclient.New(factory, nil, 20*time.Millisecond)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	resp, err := client.Complete(ctx, port.Request{Ref: openaiRef(), Messages: []port.Message{{Role: port.RoleUser, Text: "write"}}})
+	if err != nil {
+		t.Fatalf("a caller with a deadline of its own was cut by the client's timeout: %v", err)
+	}
+	if resp.Text == "" {
+		t.Error("the answer is empty")
+	}
+}
+
+func TestAnExhaustedOutputBudgetIsATruncatedAnswer(t *testing.T) {
+	t.Parallel()
+
+	client, _ := newClient(t, gollemclient.ProviderOpenAI, "llm.openai.baseUrl", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		if _, err := w.Write([]byte(`{"error":{"message":"Could not finish the message because max_tokens or model output limit was reached.","type":"invalid_request_error","param":"max_completion_tokens","code":null}}`)); err != nil {
+			t.Errorf("write the refusal: %v", err)
+		}
+	})
+
+	resp, err := client.Complete(t.Context(), port.Request{
+		Ref:       openaiRef(),
+		Messages:  []port.Message{{Role: port.RoleUser, Text: "write"}},
+		MaxTokens: 64,
+	})
+	if err != nil {
+		t.Fatalf("Complete: %v, want a truncated answer rather than a refusal", err)
+	}
+	if resp.FinishReason != port.FinishLength || resp.Text != "" {
+		t.Errorf("response = %+v, want an empty answer that stopped for length", resp)
+	}
+}
+
 func TestStreamReportsAFailedStart(t *testing.T) {
 	t.Parallel()
 

@@ -27,11 +27,14 @@ func allowance(effort llm.ReasoningEffort) int {
 }
 
 func budget(asked int, info llm.ModelInfo) int {
-	if asked <= 0 || !info.Reasoning {
+	if asked <= 0 {
 		return asked
 	}
 
-	ceiling := asked + allowance(info.ReasoningEffort)
+	ceiling := asked
+	if info.Reasoning {
+		ceiling += allowance(info.ReasoningEffort)
+	}
 	if info.MaxOutputTokens > 0 && ceiling > info.MaxOutputTokens {
 		return info.MaxOutputTokens
 	}

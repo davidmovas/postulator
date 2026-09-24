@@ -28,6 +28,12 @@ func TestBudget(t *testing.T) {
 			want:  256,
 		},
 		{
+			name:  "a model that does not reason is held to its own ceiling",
+			asked: 8192,
+			info:  llm.ModelInfo{MaxOutputTokens: 4096},
+			want:  4096,
+		},
+		{
 			name:  "an effort of none reasons with nothing and needs no allowance",
 			asked: 256,
 			info:  llm.ModelInfo{Reasoning: true, ReasoningEffort: llm.EffortNone, MaxOutputTokens: 128000},

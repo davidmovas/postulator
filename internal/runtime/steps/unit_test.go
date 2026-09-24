@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	appcontent "github.com/davidmovas/postulator/internal/application/content"
@@ -388,10 +389,10 @@ func TestGenerateBodyReportsWhatItCannotDo(t *testing.T) {
 			want:      errors.RateLimited,
 		},
 		{
-			name:      "the model does not answer with json",
+			name:      "the model does not answer with json, which the engine may try again",
 			deps:      func(d steps.Deps) steps.Deps { d.LLM = llmStub{reply: "sure thing"}; return d },
 			artifacts: map[run.ArtifactKind][]byte{run.ArtifactLinkContext: blob},
-			want:      errors.Invalid,
+			want:      errors.External,
 		},
 		{
 			name: "the draft is incomplete",
@@ -657,6 +658,69 @@ func TestRepairLinksHonoursTheIterationParameter(t *testing.T) {
 				t.Fatalf("result = %+v", result)
 			}
 		})
+	}
+}
+
+type ceilingRecorder struct {
+	reply    string
+	ceilings []int
+}
+
+func (r *ceilingRecorder) Complete(_ context.Context, req port.Request) (port.Response, error) {
+	r.ceilings = append(r.ceilings, req.MaxTokens)
+	return port.Response{Text: r.reply, Usage: domainllm.Usage{Input: 1, Output: 2, Total: 3}}, nil
+}
+
+func (r *ceilingRecorder) Stream(context.Context, port.Request) (<-chan port.Delta, error) {
+	return nil, errors.New(errors.Internal, "the unit stub does not stream")
+}
+
+func TestWriterCeilingGrowsWithTheTemplateAndTheAttempt(t *testing.T) {
+	t.Parallel()
+
+	deps := unitDeps()
+	blob := linkContextBlob(t, deps)
+	recorder := &ceilingRecorder{reply: goodDraft}
+	deps.LLM = recorder
+
+	long := spec()
+	long.Sections = []template.Section{{Heading: "Overview", TargetWords: 1800, Required: true}}
+	short := template.TemplateSpec{Length: template.Length{Max: 200}, LinkRules: spec().LinkRules}
+
+	for _, tc := range []struct {
+		name     string
+		spec     template.TemplateSpec
+		attempts int
+		want     int
+	}{
+		{name: "a long template asks for three tokens a word and a thousand more", spec: long, attempts: 0, want: 1800*3 + 1024},
+		{name: "a short template still gets room to answer", spec: short, attempts: 0, want: 4096},
+		{name: "the second attempt doubles the room", spec: long, attempts: 1, want: (1800*3 + 1024) * 2},
+		{name: "the room stops doubling after three attempts", spec: long, attempts: 7, want: (1800*3 + 1024) * 8},
+	} {
+		sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: blob})
+		sc.Spec = tc.spec
+		sc.Item.Attempts = tc.attempts
+		if _, err := steps.GenerateBody(deps).Run(t.Context(), sc); err != nil {
+			t.Fatalf("%s: GenerateBody: %v", tc.name, err)
+		}
+		if got := recorder.ceilings[len(recorder.ceilings)-1]; got != tc.want {
+			t.Errorf("%s: ceiling = %d, want %d", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestTheModelStepsDeclareTheirOwnTimeouts(t *testing.T) {
+	t.Parallel()
+
+	deps := unitDeps()
+	if got := steps.GenerateBody(deps).Timeout; got != 15*time.Minute {
+		t.Errorf("the writer step runs under %s, want fifteen minutes", got)
+	}
+	for _, def := range []run.StepDef{steps.GenerateMeta(deps), steps.RepairLinks(deps)} {
+		if def.Timeout != 3*time.Minute {
+			t.Errorf("%s runs under %s, want three minutes", def.Name, def.Timeout)
+		}
 	}
 }
 

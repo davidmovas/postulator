@@ -44,6 +44,7 @@ func GenerateBody(deps Deps) run.StepDef {
 		Requires: []run.ArtifactKind{run.ArtifactLinkContext},
 		Produces: []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML},
 		Retry:    run.RetryPolicy{Max: 3},
+		Timeout:  writerTimeout,
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			lc, err := linkContextOf(sc)
 			if err != nil {
@@ -71,7 +72,7 @@ func GenerateBody(deps Deps) run.StepDef {
 				Ref:       ref,
 				System:    system,
 				Messages:  []port.Message{{Role: port.RoleUser, Text: user}},
-				MaxTokens: maxTokens(sc.Spec),
+				MaxTokens: writerCeiling(sc.Spec, sc.Item.Attempts),
 				Meta:      callMeta(sc, NameGenerateBody),
 			})
 			if err != nil {

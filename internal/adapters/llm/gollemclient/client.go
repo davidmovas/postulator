@@ -51,6 +51,9 @@ func (c *Client) Complete(ctx context.Context, req port.Request) (port.Response,
 		if stderrors.Is(err, gollem.ErrProhibitedContent) {
 			return port.Response{FinishReason: port.FinishContentFilter}, nil
 		}
+		if ctx.Err() == nil && outputLimited(err) {
+			return port.Response{FinishReason: port.FinishLength}, nil
+		}
 		return port.Response{}, classify(ctx, err)
 	}
 
@@ -122,7 +125,7 @@ func (c *Client) ceiling(ctx context.Context, req port.Request) int {
 }
 
 func (c *Client) withTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
-	if c.timeout <= 0 {
+	if _, bounded := ctx.Deadline(); bounded || c.timeout <= 0 {
 		return context.WithCancel(ctx)
 	}
 	return context.WithTimeout(ctx, c.timeout)
