@@ -1,11 +1,11 @@
 package pagemap
 
 import (
-	"github.com/davidmovas/postulator/internal/domain/graph"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
