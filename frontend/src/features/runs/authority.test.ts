@@ -24,6 +24,8 @@ function anItem(overrides: Partial<RunItem> = {}): RunItem {
         targetId: "p1",
         status: "running",
         currentStep: "generate_body",
+        seq: 0,
+        blockedBy: "",
         attempts: 1,
         pauseReason: "",
         error: "",

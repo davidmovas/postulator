@@ -19,7 +19,7 @@ import {
 } from "../../ui/index.js";
 import type { SegmentedOption } from "../../ui/index.js";
 import { itemViews } from "./authority.js";
-import { itemBadge, itemNote } from "./hold.js";
+import { itemBadge, itemNote, queuedAfter } from "./hold.js";
 import { statusLabel } from "./labels.js";
 import type { RetryNotice } from "./log-view.js";
 import type { PageIndex } from "./page-index.js";
@@ -27,7 +27,7 @@ import { pathOf } from "./page-index.js";
 import { StepCell } from "./step-cell.js";
 import { VirtualRows } from "../../ui/index.js";
 
-const columns = "minmax(110px,2fr) 104px minmax(110px,2.2fr) 36px minmax(80px,1.6fr) 72px";
+const columns = "minmax(110px,2fr) 104px minmax(110px,2.2fr) minmax(70px,1.2fr) 36px minmax(80px,1.6fr) 72px";
 const rowHeight = 28;
 
 export interface ItemStatusTabsProps {
@@ -105,6 +105,7 @@ export function RunItemTable({
                 <div>{copy.runs.columns.path}</div>
                 <div>{copy.runs.columns.status}</div>
                 <div>{copy.runs.columns.step}</div>
+                <div>{copy.runs.columns.after}</div>
                 <div className="text-right">{copy.runs.columns.attempts}</div>
                 <div>{copy.runs.columns.error}</div>
                 <div>{copy.runs.columns.updated}</div>
@@ -122,6 +123,7 @@ export function RunItemTable({
                     const badge = itemBadge(item);
                     const note = itemNote(item);
                     const failure = item.error === "" ? view.stepFailure?.code : item.error;
+                    const after = queuedAfter(item);
                     return (
                         <TableRow
                             data-item-row={true}
@@ -155,6 +157,13 @@ export function RunItemTable({
                                     retry={retries.get(item.id)}
                                     now={now}
                                 />
+                            </TableCell>
+                            <TableCell
+                                mono={true}
+                                muted={true}
+                                title={after === "" || item.waitingFor === null ? undefined : item.waitingFor.itemStatus}
+                            >
+                                {after === "" ? "" : copy.runs.after(after)}
                             </TableCell>
                             <TableCell mono={true} align="right" muted={true}>
                                 {item.attempts}

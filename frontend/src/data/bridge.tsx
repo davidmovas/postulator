@@ -143,7 +143,9 @@ function handlersFor(client: QueryClient): Handlers {
         "item.restarted": (envelope) => {
             itemChanged(client, envelope, true);
         },
-        "step.started": stepOnly,
+        "step.started": (envelope) => {
+            itemChanged(client, envelope, false);
+        },
         "step.done": stepOnly,
         "step.failed": stepOnly,
         "step.retrying": stepOnly,

@@ -21,7 +21,7 @@ import type { RetryNotice, StepEntry } from "./log-view.js";
 import { ArtifactPane } from "./panes/index.js";
 import { driftRefusal } from "./refusal.js";
 import { neighbourOf, positionOf } from "./review-nav.js";
-import { heldForParent, itemBadge, regenerateState } from "./hold.js";
+import { heldForParent, itemBadge, primaryAction, regenerateState } from "./hold.js";
 import { ParentHold } from "./review-hold.js";
 import { DriftRefused, ReviewActions, ReviewEmpty, ReviewMeta, ReviewMissing, Timeline } from "./review-states.js";
 import { artifactBodyHtml, artifactPublishResult, retentionDaysKey } from "./statuses.js";
@@ -122,6 +122,7 @@ export function ReviewDrawer({
 
     const retentionDays = retentionOf(retention.data?.value);
     const state = item === null ? null : retryState(item);
+    const primary = item === null ? null : primaryAction(item);
     const wake = item === null ? null : remainingMs(waitingUntil(item), now);
     const retryLeft = retry === undefined ? null : dueMs(retry.at, retry.afterMs, now);
     const blocked = state !== null && state.kind === "blocked" ? state.reason : null;
@@ -177,6 +178,7 @@ export function ReviewDrawer({
                         pageId={item.targetId}
                         blocked={blocked}
                         state={state}
+                        primary={primary}
                         busy={retryStep.isPending}
                         regeneration={regeneration}
                         regenerating={regenerate.isPending}
@@ -184,6 +186,9 @@ export function ReviewDrawer({
                         onRerun={onRerun}
                         onRetry={() => {
                             retryStep.mutate({ itemId: item.id });
+                        }}
+                        onAccept={() => {
+                            retryStep.mutate({ itemId: item.id, acceptFindings: true });
                         }}
                         onRegenerate={() => {
                             restart(item.runId, item.id);

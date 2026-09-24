@@ -78,6 +78,7 @@ export function stepTimeline(events: Events, itemId: string): readonly StepEntry
                 }
                 open.finishedAt = record.at;
                 open.durationMs = payload.durationMs;
+                open.message = payload.message === "" ? null : payload.message;
                 open = null;
                 break;
             }
@@ -218,6 +219,7 @@ export function describe(record: RunEventRecord): FeedEntry {
                 entry.itemId = payload.itemId;
                 entry.step = payload.step;
                 entry.durationMs = payload.durationMs;
+                entry.message = payload.message === "" ? null : payload.message;
             }
             return entry;
         }
@@ -238,6 +240,8 @@ export function describe(record: RunEventRecord): FeedEntry {
                 entry.step = payload.step;
                 entry.attempt = payload.attempt;
                 entry.afterMs = payload.afterMs;
+                entry.code = payload.code === "" ? null : payload.code;
+                entry.message = payload.message === "" ? null : payload.message;
             }
             return entry;
         }

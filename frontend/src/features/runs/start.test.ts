@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { runKinds, runKindsWithTheirOwnRecipe } from "../../generated/vocab.js";
 import type { TransportError } from "../../data/errors.js";
-import { kindDoes, startableKinds, startRefusal, takesATemplate, tokenCapOf } from "./start.js";
+import { blockingFindings, kindDoes, startableKinds, startRefusal, takesATemplate, tokenCapOf } from "./start.js";
 
 function refused(cause: TransportError): Error {
     return Object.assign(new Error(cause.message), { cause });
@@ -106,3 +106,18 @@ describe("where the drawer puts a refusal", () => {
     });
 });
 
+
+describe("what blocks a start", () => {
+    it("counts the findings graded as errors and nothing else", () => {
+        expect(blockingFindings(null)).toBe(0);
+        expect(
+            blockingFindings({
+                findings: [
+                    { severity: "error", code: "provider_key_missing", message: "no key" },
+                    { severity: "warn", code: "plugin_missing", message: "no plugin" },
+                    { severity: "error", code: "entity_missing", message: "unmapped", pageId: "p", path: "/p/" },
+                ],
+            }),
+        ).toBe(2);
+    });
+});

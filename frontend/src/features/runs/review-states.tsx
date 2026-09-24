@@ -14,11 +14,12 @@ import {
     RestartAltIcon,
     SmartToyIcon,
     SyncProblemIcon,
+    TaskAltIcon,
 } from "../../ui/index.js";
 import { askAgent } from "../agent/index.js";
 import type { RetryState } from "./authority.js";
 import { countdown } from "./authority.js";
-import type { RegenerateState } from "./hold.js";
+import type { ItemAction, RegenerateState } from "./hold.js";
 import { retryBlockedText, stepLabel } from "./labels.js";
 import type { RetryNotice, StepEntry } from "./log-view.js";
 import type { DriftRefusal } from "./refusal.js";
@@ -177,12 +178,14 @@ export interface ReviewActionsProps {
     pageId: string;
     blocked: string | null;
     state: RetryState | null;
+    primary: ItemAction | null;
     busy: boolean;
     regeneration: RegenerateState | null;
     regenerating: boolean;
     onOpenPage: (pageId: string) => void;
     onRerun: (pageId: string) => void;
     onRetry: () => void;
+    onAccept: () => void;
     onRegenerate: () => void;
 }
 
@@ -198,14 +201,17 @@ export function ReviewActions({
     pageId,
     blocked,
     state,
+    primary,
     busy,
     regeneration,
     regenerating,
     onOpenPage,
     onRerun,
     onRetry,
+    onAccept,
     onRegenerate,
 }: ReviewActionsProps): ReactElement {
+    const retryReady = state !== null && state.kind === "ready";
     return (
         <div className="flex w-full items-center justify-between gap-2">
             <span className="flex shrink-0 items-center gap-1.5 text-2xs text-ink-faint">
@@ -245,6 +251,7 @@ export function ReviewActions({
                 <Button
                     size="sm"
                     data-item-regenerate={true}
+                    variant={primary === "regenerate" ? "primary" : undefined}
                     icon={RefreshIcon}
                     disabled={regeneration === null || regeneration.kind !== "ready"}
                     busy={regenerating}
@@ -259,10 +266,11 @@ export function ReviewActions({
                 </Button>
                 <Button
                     size="sm"
-                    variant="primary"
+                    data-item-retry={true}
+                    variant={primary === "retry" ? "primary" : undefined}
                     icon={RestartAltIcon}
-                    disabled={state === null || state.kind !== "ready"}
-                    busy={busy}
+                    disabled={!retryReady}
+                    busy={busy && primary !== "accept"}
                     title={
                         state !== null && state.kind === "busy"
                             ? copy.runs.retryBusy
@@ -274,6 +282,20 @@ export function ReviewActions({
                 >
                     {copy.runs.retryStep}
                 </Button>
+                {primary === "accept" ? (
+                    <Button
+                        size="sm"
+                        data-item-accept={true}
+                        variant="primary"
+                        icon={TaskAltIcon}
+                        disabled={!retryReady}
+                        busy={busy}
+                        title={copy.runs.acceptHint}
+                        onClick={onAccept}
+                    >
+                        {copy.runs.accept}
+                    </Button>
+                ) : null}
             </div>
         </div>
     );

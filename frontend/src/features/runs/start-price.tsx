@@ -3,7 +3,19 @@ import type { ReactElement } from "react";
 import { copy } from "../../copy/index.js";
 import type { AddedPage, Estimate } from "../../data/types.js";
 import { tokens as formatTokens, usd as formatUsd } from "../../domain/format.js";
+import type { Tone } from "../../ui/index.js";
 import { Banner, Field, Input, SectionLabel } from "../../ui/index.js";
+
+const findingTones: Readonly<Record<string, Tone>> = { error: "danger", warn: "warn", info: "info" };
+
+export function findingTone(severity: string): Tone {
+    return findingTones[severity] ?? "info";
+}
+
+export function findingTitle(finding: { path?: string; message: string }): string {
+    const path = finding.path ?? "";
+    return path === "" ? finding.message : copy.runs.start.findingAt(path, finding.message);
+}
 
 export interface StartCapsProps {
     cap: string;
@@ -92,7 +104,11 @@ export function StartPrice({ estimate, added, over, refusal }: StartPriceProps):
             )}
 
             {(estimate?.findings ?? []).map((finding) => (
-                <Banner key={finding.code + finding.message} tone="info" title={finding.message} />
+                <Banner
+                    key={`${finding.code}:${finding.pageId ?? ""}:${finding.message}`}
+                    tone={findingTone(finding.severity)}
+                    title={findingTitle(finding)}
+                />
             ))}
 
             {over ? <Banner tone="warn" title={copy.runs.start.overCap} /> : null}

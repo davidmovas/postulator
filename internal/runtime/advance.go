@@ -470,7 +470,7 @@ func (e *Engine) announce(ctx context.Context, box *outbox, held *claim, out out
 	case out.status == run.StatusWaiting && out.attempts > 0:
 		box.add(ctx, runID, events.StepRetrying, events.StepRetryingPayload{
 			RunID: runID, ItemID: itemID, Step: step, Attempt: out.attempts,
-			AfterMs: e.delayMs(out.wakeAt),
+			AfterMs: e.delayMs(out.wakeAt), Code: faultCode(out.fault), Message: out.message,
 		})
 	case out.fault != nil:
 		box.add(ctx, runID, events.StepFailed, events.StepFailedPayload{
@@ -478,7 +478,7 @@ func (e *Engine) announce(ctx context.Context, box *outbox, held *claim, out out
 		})
 	default:
 		box.add(ctx, runID, events.StepDone, events.StepDonePayload{
-			RunID: runID, ItemID: itemID, Step: step, DurationMs: out.duration.Milliseconds(),
+			RunID: runID, ItemID: itemID, Step: step, DurationMs: out.duration.Milliseconds(), Message: out.message,
 		})
 	}
 

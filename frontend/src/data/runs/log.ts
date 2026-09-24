@@ -3,7 +3,7 @@ import { isCancellation } from "../call.js";
 import { listRunEvents } from "../endpoints/runs.js";
 import { failure } from "../errors.js";
 import type { RawRunEvent, RunEventRecord } from "./decode.js";
-import { decode, seqOf, terminalRunEventTypes } from "./decode.js";
+import { decode, revivingRunEventTypes, seqOf, terminalRunEventTypes } from "./decode.js";
 
 export type LogPhase = "idle" | "catching-up" | "live" | "gap" | "error";
 
@@ -26,6 +26,8 @@ interface RunLog {
     phase: LogPhase;
     error: TransportError | null;
     terminal: boolean;
+    terminalSeq: number;
+    revivedSeq: number;
     settled: boolean;
     version: number;
     snapshot: RunEventsState;
@@ -117,6 +119,8 @@ function log(runId: string): RunLog {
         phase: "idle",
         error: null,
         terminal: false,
+        terminalSeq: 0,
+        revivedSeq: 0,
         settled: false,
         version: 0,
         snapshot: emptyState,
@@ -167,8 +171,16 @@ function insert(target: RunLog, record: RunEventRecord): boolean {
         }
     }
     if (terminalRunEventTypes.has(record.type)) {
-        target.terminal = true;
+        target.terminalSeq = Math.max(target.terminalSeq, record.seq);
     }
+    if (revivingRunEventTypes.has(record.type)) {
+        target.revivedSeq = Math.max(target.revivedSeq, record.seq);
+    }
+    const terminal = target.terminalSeq > target.revivedSeq;
+    if (target.terminal && !terminal) {
+        target.settled = false;
+    }
+    target.terminal = terminal;
     return true;
 }
 
@@ -338,6 +350,8 @@ export function dropAllLogs(): void {
         held.phase = "idle";
         held.error = null;
         held.terminal = false;
+        held.terminalSeq = 0;
+        held.revivedSeq = 0;
         held.settled = false;
         held.version = 0;
         held.pending = null;

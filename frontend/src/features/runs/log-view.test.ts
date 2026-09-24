@@ -145,3 +145,37 @@ describe("feed", () => {
         expect(entry.durationMs).toBeNull();
     });
 });
+
+describe("the sentences of the steps", () => {
+    it("carries what a finished step said and why a step is tried again", () => {
+        reset();
+        const done = describeEvent(
+            event("step.done", { runId: "r", itemId: "a", step: "generate_body", durationMs: 1200, message: "wrote the body of /a/" }),
+        );
+        expect(done.message).toBe("wrote the body of /a/");
+        expect(done.durationMs).toBe(1200);
+
+        const retrying = describeEvent(
+            event("step.retrying", {
+                runId: "r", itemId: "a", step: "generate_body", attempt: 1, afterMs: 1000,
+                code: "EXTERNAL", message: "the answer stopped short",
+            }),
+        );
+        expect(retrying.code).toBe("EXTERNAL");
+        expect(retrying.message).toBe("the answer stopped short");
+
+        const silent = describeEvent(
+            event("step.done", { runId: "r", itemId: "a", step: "insert_links", durationMs: 3, message: "" }),
+        );
+        expect(silent.message).toBeNull();
+    });
+
+    it("keeps the sentence of a finished step on the timeline", () => {
+        reset();
+        const events = [
+            event("step.started", { runId: "r", itemId: "a", step: "generate_body" }),
+            event("step.done", { runId: "r", itemId: "a", step: "generate_body", durationMs: 1200, message: "wrote the body of /a/" }),
+        ];
+        expect(stepTimeline(events, "a")[0].message).toBe("wrote the body of /a/");
+    });
+});

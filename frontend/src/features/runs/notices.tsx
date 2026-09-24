@@ -20,13 +20,14 @@ export interface RunNoticesProps {
     events: RunEventsState;
     gap: boolean;
     failedItems: number;
+    heldItems: number;
 }
 
-export function RunNotices({ run, view, events, gap, failedItems }: RunNoticesProps): ReactElement | null {
+export function RunNotices({ run, view, events, gap, failedItems, heldItems }: RunNoticesProps): ReactElement | null {
     const logFailed = events.phase === "error" && events.error !== null;
     const failed = view.status === statusFailed && run.error !== "";
     const uncapped = !view.capped && !view.terminal;
-    const shown = gap || logFailed || view.paused || failed || uncapped || failedItems > 0;
+    const shown = gap || logFailed || view.paused || failed || uncapped || failedItems > 0 || heldItems > 0;
 
     if (!shown) {
         return null;
@@ -49,6 +50,13 @@ export function RunNotices({ run, view, events, gap, failedItems }: RunNoticesPr
                 <Banner tone={pauseReasonTone(run.pauseReason)} title={pauseReasonText(run.pauseReason)} />
             ) : null}
             {failed ? <Banner tone="danger" title={copy.runs.detail.failure} body={run.error} /> : null}
+            {heldItems > 0 ? (
+                <Banner
+                    tone="warn"
+                    title={copy.runs.decisionTitle(heldItems)}
+                    body={copy.runs.decisionBody}
+                />
+            ) : null}
             {failedItems > 0 ? <FailedItems runId={run.id} count={failedItems} /> : null}
             {uncapped ? <Banner tone="warn" title={copy.runs.detail.noCap} body={copy.runs.detail.noCapBody} /> : null}
         </div>
