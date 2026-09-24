@@ -102,7 +102,7 @@ func TestPreviewFromPagesWritesNothing(t *testing.T) {
 		t.Fatalf("a proposal naming an entity that exists does not say so: %+v", byName["Espresso"])
 	}
 	if byName["Espresso"].Parent != "/coffee/" || !slices.Equal(byName["Espresso"].Related, []string{"/coffee/filter/"}) {
-		t.Fatalf("the espresso proposal lost its neighbours: %+v", byName["Espresso"])
+		t.Fatalf("the espresso proposal lost its neighbors: %+v", byName["Espresso"])
 	}
 
 	entities, err := f.service.ListEntities(t.Context(), appgraph.ListEntitiesRequest{SiteID: f.siteID})
