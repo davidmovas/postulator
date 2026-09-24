@@ -24,12 +24,12 @@ func Judge(deps Deps) run.StepDef {
 		Role:     domainllm.RoleJudge,
 		Requires: []run.ArtifactKind{run.ArtifactBodyHTML},
 		Produces: []run.ArtifactKind{run.ArtifactJudgeReport},
-		Retry:    run.RetryPolicy{Max: 1},
+		Retry:    run.RetryPolicy{Max: 2},
 		Price:    run.Price{OutputTokens: appcontent.JudgeTokens},
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			report, tokens, err := judgement(ctx, deps, sc)
 			if err != nil {
-				if ctx.Err() != nil {
+				if stopped(ctx) {
 					return run.Result{}, err
 				}
 				report = unreachable(sc, err)

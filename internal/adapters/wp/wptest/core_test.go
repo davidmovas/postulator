@@ -42,6 +42,39 @@ func TestListReportsTheWordPressPagingHeaders(t *testing.T) {
 	}
 }
 
+func TestAPostIgnoresTheParentItIsSent(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	parent := seedPages(t, server, 1)[0]
+
+	body, err := json.Marshal(map[string]any{"title": "Post", "content": "<p>body</p>", "status": "draft", "parent": parent.ID})
+	if err != nil {
+		t.Fatalf("encode the post: %v", err)
+	}
+	response, payload := call(t, server, http.MethodPost, "/wp-json/wp/v2/posts", body, true)
+	if response.StatusCode != http.StatusCreated {
+		t.Fatalf("status = %d, want 201: %s", response.StatusCode, payload)
+	}
+	var created map[string]any
+	decode(t, payload, &created)
+	if _, carried := created["parent"]; carried {
+		t.Fatalf("a post answers a parent, which WordPress never does: %v", created)
+	}
+
+	page, err := json.Marshal(map[string]any{"title": "Child", "content": "<p>body</p>", "status": "draft", "parent": parent.ID})
+	if err != nil {
+		t.Fatalf("encode the page: %v", err)
+	}
+	_, pagePayload := call(t, server, http.MethodPost, "/wp-json/wp/v2/pages", page, true)
+	var nested map[string]any
+	decode(t, pagePayload, &nested)
+	got, isNumber := nested["parent"].(float64)
+	if !isNumber || int64(got) != parent.ID {
+		t.Fatalf("a page under a parent answers %v, want %d", nested["parent"], parent.ID)
+	}
+}
+
 func TestAPageNumberPastTheEndIsAFourHundred(t *testing.T) {
 	t.Parallel()
 

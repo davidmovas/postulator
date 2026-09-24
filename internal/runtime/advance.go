@@ -412,6 +412,9 @@ func (e *Engine) record(ctx context.Context, held *claim, out outcome, now time.
 
 	status := run.ExecDone
 	message := ""
+	if out.status == run.StatusWaiting && out.fault == nil && len(out.artifacts) == 0 && len(out.checkpoint) == 0 {
+		status = run.ExecStarted
+	}
 	if out.status == run.StatusFailed || (out.fault != nil && out.fault.Action != run.ActionPause) {
 		status = run.ExecFailed
 		message = out.fault.Message

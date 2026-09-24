@@ -46,6 +46,14 @@ func TestWaitingIsWokenOnDemand(t *testing.T) {
 	}
 	harness.waitForRun(t, queued.ID, run.StatusCompleted)
 
+	if hits := calls.get(harness.pages[0]); hits != 2 {
+		t.Fatalf("the step ran %d times, want twice: a step that asked to wait is not replayed from its own record", hits)
+	}
+	stored, err := harness.blobs.ByItem(t.Context(), itemID)
+	if err != nil || len(stored) != 1 || stored[0].Kind != run.ArtifactBodyHTML {
+		t.Fatalf("artifacts after the wake = %+v, %v; want the body the second call wrote", stored, err)
+	}
+
 	if err = engine.Wake(t.Context(), itemID); !errors.IsCode(err, errors.Conflict) {
 		t.Fatalf("Wake of a finished item = %v", err)
 	}

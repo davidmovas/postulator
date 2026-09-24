@@ -225,6 +225,14 @@ func (s *Server) filter(itemType string, query url.Values) []*Item {
 }
 
 func (s *Server) itemPayload(stored *Item) map[string]any {
+	payload := s.itemFields(stored)
+	if !hierarchical(stored.Type) {
+		delete(payload, "parent")
+	}
+	return payload
+}
+
+func (s *Server) itemFields(stored *Item) map[string]any {
 	stamp := stored.Modified.UTC().Format(wpTimeLayout)
 	return map[string]any{
 		"id":             stored.ID,
@@ -279,7 +287,7 @@ func applyUpdate(stored *Item, body map[string]any) {
 	if value, ok := body["template"].(string); ok {
 		stored.Template = value
 	}
-	if value, ok := body["parent"].(float64); ok {
+	if value, ok := body["parent"].(float64); ok && hierarchical(stored.Type) {
 		stored.Parent = int64(value)
 	}
 	if value, ok := body["menu_order"].(float64); ok {

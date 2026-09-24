@@ -3,6 +3,7 @@ package steps
 import (
 	"context"
 	"encoding/json"
+	stderrors "errors"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
@@ -242,6 +243,10 @@ func plannedWords(spec template.TemplateSpec) int {
 func writerCeiling(spec template.TemplateSpec, attempts int) int {
 	ceiling := max(leastWriterTokens, plannedWords(spec)*tokensPerWord+tokenHeadroom)
 	return ceiling << min(max(attempts, 0), ceilingDoublings)
+}
+
+func stopped(ctx context.Context) bool {
+	return stderrors.Is(ctx.Err(), context.Canceled)
 }
 
 func callMeta(sc *run.StepContext, step string) llm.CallMeta {

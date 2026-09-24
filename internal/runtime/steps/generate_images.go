@@ -28,7 +28,7 @@ const (
 	CodeUploadFailed   = "image_upload_failed"
 	CodeImageNotPlaced = "image_not_placed"
 
-	imageStepTimeout = 5 * time.Minute
+	imageStepTimeout = 15 * time.Minute
 )
 
 type ImageProvider interface {
@@ -98,7 +98,7 @@ func GenerateImages(deps Deps) run.StepDef {
 			for i := range acquired {
 				stored, uploadErr := store(ctx, deps, sc, acquired[i])
 				if uploadErr != nil {
-					if ctx.Err() != nil {
+					if stopped(ctx) {
 						return run.Result{}, uploadErr
 					}
 					result.skip(sc.Page, CodeUploadFailed,
@@ -164,7 +164,7 @@ func acquire(ctx context.Context, deps Deps, sc *run.StepContext, entity graph.E
 		SiteID: sc.Run.SiteID, Term: subjectOf(sc, entity), Limit: wanted,
 	})
 	if err != nil {
-		if ctx.Err() != nil {
+		if stopped(ctx) {
 			return nil, err
 		}
 		result.skip(sc.Page, CodeImagesFailed,
@@ -196,7 +196,7 @@ func generated(ctx context.Context, deps Deps, sc *run.StepContext, entity graph
 			Alt:     altOf(entity, subject),
 		})
 		if err != nil {
-			if ctx.Err() != nil {
+			if stopped(ctx) {
 				return nil, err
 			}
 			result.skip(sc.Page, CodeImagesFailed,

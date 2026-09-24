@@ -77,6 +77,43 @@ func (f runFixture) insertItem(t *testing.T, pageID, step string) run.Item {
 	return item
 }
 
+func TestItemsAreListedInTheOrderTheyRun(t *testing.T) {
+	t.Parallel()
+
+	fixture := newRunFixture(t, 3)
+	for i, seq := range []int{2, 0, 1} {
+		item := run.Item{
+			ID: id.New(), RunID: fixture.run.ID, SiteID: fixture.run.SiteID, TargetID: fixture.pages[i],
+			Status: run.StatusPending, CurrentStep: "generate_body", Seq: seq,
+			Checkpoint: run.NewCheckpoint(), CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+		}
+		if err := fixture.items.Insert(t.Context(), item); err != nil {
+			t.Fatalf("insert the run item: %v", err)
+		}
+	}
+
+	all, err := fixture.items.ByRun(t.Context(), fixture.run.ID)
+	if err != nil {
+		t.Fatalf("ByRun: %v", err)
+	}
+	if seqs := []int{all[0].Seq, all[1].Seq, all[2].Seq}; seqs[0] != 0 || seqs[1] != 1 || seqs[2] != 2 {
+		t.Fatalf("ByRun answers the sequence %v, want the working order", seqs)
+	}
+
+	first, err := fixture.items.List(t.Context(), run.ItemQuery{RunID: fixture.run.ID}, paging.Request{Limit: 2})
+	if err != nil || len(first.Items) != 2 || first.Items[0].Seq != 0 || first.Items[1].Seq != 1 {
+		t.Fatalf("the first page = %+v, %v; want the working order", first.Items, err)
+	}
+	second, err := fixture.items.List(t.Context(), run.ItemQuery{RunID: fixture.run.ID}, paging.Request{Limit: 2, After: first.Next})
+	if err != nil || len(second.Items) != 1 || second.Items[0].Seq != 2 {
+		t.Fatalf("the second page = %+v, %v; want the last of the working order", second.Items, err)
+	}
+	reversed, err := fixture.items.List(t.Context(), run.ItemQuery{RunID: fixture.run.ID, Desc: true}, paging.Request{Limit: 3})
+	if err != nil || len(reversed.Items) != 3 || reversed.Items[0].Seq != 2 {
+		t.Fatalf("the reversed listing = %+v, %v", reversed.Items, err)
+	}
+}
+
 func TestRunRepoRoundTrip(t *testing.T) {
 	t.Parallel()
 

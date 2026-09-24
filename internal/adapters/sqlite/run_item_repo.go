@@ -26,7 +26,7 @@ const (
 	persistItem = `UPDATE run_items SET status = ?, current_step = ?, attempts = ?, checkpoint = ?, lease_until = ?,
 		wake_at = ?, pause_reason = ?, error = ?, note = ?, updated_at = ?, finished_at = ?
 		WHERE id = ? AND advance_seq = ?`
-	selectItemsByRun    = `SELECT ` + itemColumns + ` FROM run_items WHERE run_id = ? ORDER BY created_at, id`
+	selectItemsByRun    = `SELECT ` + itemColumns + ` FROM run_items WHERE run_id = ? ORDER BY seq, created_at, id`
 	selectItemsByTarget = `SELECT ` + itemColumns + ` FROM run_items WHERE target_id = ?
 		ORDER BY created_at DESC, id DESC LIMIT ?`
 	selectActiveItems = `SELECT ` + itemColumns + ` FROM run_items
@@ -232,7 +232,7 @@ func itemKeyset(q run.ItemQuery) paging.Keyset[run.Item] {
 		IDColumn: "id",
 		ID:       func(i run.Item) string { return i.ID },
 		Keys: []paging.SortKey[run.Item]{
-			paging.TimeKey[run.Item]("createdAt", "created_at", func(i run.Item) any { return i.CreatedAt }),
+			paging.IntKey[run.Item]("seq", "seq", func(i run.Item) any { return i.Seq }),
 		},
 		Desc: q.Desc,
 	}

@@ -69,14 +69,17 @@ func Publish(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			placement, err := parentOf(ctx, deps, sc.Page)
-			if err != nil {
-				return run.Result{}, err
+			parent := int64(0)
+			if hierarchical(sc.Page) {
+				placement, placeErr := parentOf(ctx, deps, sc.Page)
+				if placeErr != nil {
+					return run.Result{}, placeErr
+				}
+				if placement.pending {
+					return holdForParent(sc, placement), nil
+				}
+				parent = placement.wpID
 			}
-			if placement.pending {
-				return holdForParent(sc, placement), nil
-			}
-			parent := placement.wpID
 
 			featured, _, err := decodeArtifact[ImagesResult](sc, run.ArtifactImages)
 			if err != nil {
@@ -169,7 +172,7 @@ func compare(sc *run.StepContext, asked writeRequest, written wp.Item) []pagemap
 	checked.Observed = observedOf(written)
 
 	found := checked.Mismatches()
-	if written.Parent != asked.parent {
+	if hierarchical(sc.Page) && written.Parent != asked.parent {
 		found = append(found, pagemap.Mismatch{
 			Field:   FieldParent,
 			Planned: strconv.FormatInt(asked.parent, 10),
@@ -219,6 +222,10 @@ func verb(found bool) string {
 		return "updated"
 	}
 	return "created"
+}
+
+func hierarchical(page pagemap.Page) bool {
+	return page.WPType == pagemap.WPPage
 }
 
 func itemTypeOf(page pagemap.Page) (wp.ItemType, error) {
@@ -372,7 +379,9 @@ func upsert(ctx context.Context, client *wp.Client, itemType wp.ItemType, req wr
 	if !req.found {
 		in := wp.CreateItem{
 			Title: req.title, Content: req.content, Slug: req.slug, Status: req.status,
-			Parent: &req.parent,
+		}
+		if itemType == wp.TypePage {
+			in.Parent = &req.parent
 		}
 		if req.featured != 0 {
 			in.FeaturedMedia = &req.featured
@@ -382,7 +391,9 @@ func upsert(ctx context.Context, client *wp.Client, itemType wp.ItemType, req wr
 
 	in := wp.UpdateItem{
 		Title: &req.title, Content: &req.content, Slug: &req.slug, Status: &req.status,
-		Parent: &req.parent,
+	}
+	if itemType == wp.TypePage {
+		in.Parent = &req.parent
 	}
 	if req.featured != 0 {
 		in.FeaturedMedia = &req.featured
