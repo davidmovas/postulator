@@ -7,10 +7,11 @@ import { CreateEntityDrawer } from "./actions/create-entity.js";
 import { DeleteEntityDialog } from "./actions/delete-entity.js";
 import { MoveEntityDialog } from "./actions/move-entity.js";
 import type { MoveRequest } from "./actions/move-entity.js";
-import { ProposeFromPagesDialog, ProposeRelatedDialog } from "./actions/propose.js";
+import { ProposeEntitiesDrawer } from "./actions/propose-entities.js";
+import { ProposeRelatedDialog } from "./actions/propose.js";
 import type { GraphIndex } from "./model/index.js";
 
-export type Proposing = "pages" | "related" | null;
+export type Proposing = "pages" | "keywords" | "related" | null;
 
 export interface Creating {
     parentId: string | null;
@@ -93,14 +94,16 @@ export function GraphOverlays({
                     onMovingChange(null);
                 }}
             />
-            <ProposeFromPagesDialog
-                open={proposing === "pages"}
+            <ProposeEntitiesDrawer
+                open={proposing === "pages" || proposing === "keywords"}
                 onOpenChange={(open) => {
                     if (!open) {
                         onProposingChange(null);
                     }
                 }}
                 siteId={siteId}
+                source={proposing === "keywords" ? "keywords" : "pages"}
+                index={index}
                 onReview={onReviewQueue}
             />
             <ProposeRelatedDialog

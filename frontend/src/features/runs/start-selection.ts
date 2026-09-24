@@ -1,44 +1,13 @@
 import type { Page, PageTreeNode } from "../../data/types.js";
+import type { PickIndex, Tick } from "../pages/pick/model.js";
+import { branchOf as branchBelow, everyPage, indexTree, narrowTree as narrowBy, tick, toggled } from "../pages/pick/model.js";
 
-export interface PickIndex {
-    byId: ReadonlyMap<string, Page>;
-    parentOf: ReadonlyMap<string, string>;
-    childrenOf: ReadonlyMap<string, readonly string[]>;
-}
-
-export type Tick = "on" | "off" | "some";
+export type { PickIndex, Tick };
+export { indexTree, tick, toggled };
 
 export type Scope = "all" | "missing" | "present";
 
 export const scopes: readonly Scope[] = ["all", "missing", "present"];
-
-function childrenOf(node: PageTreeNode): readonly PageTreeNode[] {
-    return node.children ?? [];
-}
-
-export function indexTree(roots: readonly PageTreeNode[] | null | undefined): PickIndex {
-    const byId = new Map<string, Page>();
-    const parentOf = new Map<string, string>();
-    const children = new Map<string, string[]>();
-    const stack: PageTreeNode[] = [...(roots ?? [])];
-    while (stack.length > 0) {
-        const node = stack.pop();
-        if (node === undefined) {
-            break;
-        }
-        byId.set(node.page.id, node.page);
-        const below = childrenOf(node);
-        children.set(
-            node.page.id,
-            below.map((child) => child.page.id),
-        );
-        for (const child of below) {
-            parentOf.set(child.page.id, node.page.id);
-            stack.push(child);
-        }
-    }
-    return { byId, parentOf, childrenOf: children };
-}
 
 export function onSite(page: Page): boolean {
     return page.wpId !== null;
@@ -68,71 +37,18 @@ export function requiredParents(selected: ReadonlySet<string>, index: PickIndex)
 }
 
 export function branchOf(id: string, index: PickIndex): string[] {
-    const out: string[] = [];
-    const stack = [id];
-    while (stack.length > 0) {
-        const next = stack.shift();
-        if (next === undefined) {
-            break;
-        }
-        const page = index.byId.get(next);
-        if (page !== undefined && pickable(page)) {
-            out.push(next);
-        }
-        stack.push(...(index.childrenOf.get(next) ?? []));
-    }
-    return out;
+    return branchBelow(id, index, pickable);
 }
 
-export function tick(
-    id: string,
-    selected: ReadonlySet<string>,
-    required: ReadonlyMap<string, string>,
-    index: PickIndex,
-): Tick {
-    if (selected.has(id) || required.has(id)) {
-        return "on";
-    }
-    const stack = [...(index.childrenOf.get(id) ?? [])];
-    while (stack.length > 0) {
-        const next = stack.pop();
-        if (next === undefined) {
-            break;
-        }
-        if (selected.has(next)) {
-            return "some";
-        }
-        stack.push(...(index.childrenOf.get(next) ?? []));
-    }
-    return "off";
-}
-
-function inScope(page: Page, scope: Scope): boolean {
+export function inScope(scope: Scope): (page: Page) => boolean {
     switch (scope) {
         case "missing":
-            return !onSite(page);
+            return (page) => !onSite(page);
         case "present":
-            return onSite(page);
+            return onSite;
         default:
-            return true;
+            return everyPage;
     }
-}
-
-function matches(page: Page, query: string, scope: Scope): boolean {
-    if (!inScope(page, scope)) {
-        return false;
-    }
-    return query === "" || page.path.toLowerCase().includes(query) || page.title.toLowerCase().includes(query);
-}
-
-function narrowed(node: PageTreeNode, query: string, scope: Scope): PageTreeNode | null {
-    const kept = childrenOf(node)
-        .map((child) => narrowed(child, query, scope))
-        .filter((child): child is PageTreeNode => child !== null);
-    if (kept.length > 0 || matches(node.page, query, scope)) {
-        return { page: node.page, children: kept };
-    }
-    return null;
 }
 
 export function narrowTree(
@@ -140,12 +56,5 @@ export function narrowTree(
     query: string,
     scope: Scope,
 ): readonly PageTreeNode[] {
-    const needle = query.trim().toLowerCase();
-    if (roots === null || roots === undefined) {
-        return [];
-    }
-    if (needle === "" && scope === "all") {
-        return roots;
-    }
-    return roots.map((root) => narrowed(root, needle, scope)).filter((root): root is PageTreeNode => root !== null);
+    return narrowBy(roots, query, inScope(scope));
 }
