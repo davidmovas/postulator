@@ -200,7 +200,7 @@ func (p *pipeline) start(t *testing.T) *runtime.Engine {
 	t.Helper()
 
 	specs := templates.New(
-		sqlite.NewTemplateRepo(p.store), sqlite.NewLinkPolicyRepo(p.store), p.pages,
+		sqlite.NewTemplateRepo(p.store), sqlite.NewLinkPolicyRepo(p.store), p.pages, sqlite.NewEntityRepo(p.store),
 		sqlite.NewSiteRepo(p.store), p.store, silentPublisher{}, clock.System{},
 	)
 

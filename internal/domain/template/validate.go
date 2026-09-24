@@ -21,6 +21,17 @@ func Validate(spec TemplateSpec) error {
 		if strings.TrimSpace(spec.Sections[i].Heading) == "" {
 			return invalid("section heading must not be empty", field+".heading")
 		}
+		if err := validatePlaceholders(spec.Sections[i].Heading, field+".heading"); err != nil {
+			return err
+		}
+		if err := validatePlaceholders(spec.Sections[i].Intent, field+".intent"); err != nil {
+			return err
+		}
+		for j, phrase := range spec.Sections[i].KeywordRules.Include {
+			if err := validatePlaceholders(phrase, field+".keywordRules.include["+strconv.Itoa(j)+"]"); err != nil {
+				return err
+			}
+		}
 		if spec.Sections[i].TargetWords < 0 {
 			return invalid("section target words must not be negative", field+".targetWords")
 		}
@@ -35,6 +46,9 @@ func Validate(spec TemplateSpec) error {
 		return invalid("keyword density must be between 0 and 1", "keywordRules.maxDensity")
 	}
 	if err := ValidateLinkRules(spec.LinkRules); err != nil {
+		return err
+	}
+	if err := validatePlaceholders(spec.MetaRules.TitlePattern, "metaRules.titlePattern"); err != nil {
 		return err
 	}
 	if spec.MetaRules.DescriptionMax < 0 {
@@ -71,6 +85,17 @@ func Validate(spec TemplateSpec) error {
 		seen[name] = struct{}{}
 	}
 	return nil
+}
+
+func validatePlaceholders(text, field string) error {
+	unknown := UnknownPlaceholders(text)
+	if len(unknown) == 0 {
+		return nil
+	}
+	return invalid("nothing fills the placeholder "+strings.Join(unknown, ", ")+"; the ones that are filled in per page are "+
+		strings.Join(Placeholders(), ", ")+", written with single braces", field).
+		WithDetail("unknown", unknown).
+		WithDetail("placeholders", Placeholders())
 }
 
 func ValidateLinkRules(rules LinkRules) error {

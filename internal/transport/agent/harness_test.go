@@ -152,7 +152,7 @@ func buildTuned(t *testing.T, store *sqlite.Store, model *fake.Gollem, bus *appl
 	callRepo := sqlite.NewLLMCallRepo(store)
 
 	templateService := templates.New(sqlite.NewTemplateRepo(store), sqlite.NewLinkPolicyRepo(store),
-		pageRepo, siteRepo, store, bus, now)
+		pageRepo, sqlite.NewEntityRepo(store), siteRepo, store, bus, now)
 	registered := tools.New(tools.Deps{
 		Sites:     sites.New(siteRepo, nil, store, nil, bus, now),
 		Pages:     pages.New(pageRepo, linkRepo, entityRepo, siteRepo, store, bus, now, stubPreview{}),

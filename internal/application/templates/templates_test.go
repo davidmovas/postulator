@@ -11,10 +11,13 @@ import (
 	"github.com/davidmovas/postulator/internal/application/applicationtest"
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
 type harness struct {
@@ -33,7 +36,7 @@ func newHarness(t *testing.T) harness {
 	recorder := &applicationtest.Recorder{}
 	clk := clock.NewFake(time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC))
 	return harness{
-		service:  templates.New(sqlite.NewTemplateRepo(store), sqlite.NewLinkPolicyRepo(store), sqlite.NewPageRepo(store), sqlite.NewSiteRepo(store), store, recorder, clk),
+		service:  templates.New(sqlite.NewTemplateRepo(store), sqlite.NewLinkPolicyRepo(store), sqlite.NewPageRepo(store), sqlite.NewEntityRepo(store), sqlite.NewSiteRepo(store), store, recorder, clk),
 		store:    store,
 		recorder: recorder,
 		clock:    clk,
@@ -286,5 +289,71 @@ func TestOverridesAndResolveForPage(t *testing.T) {
 	afterDelete, err := h.service.ResolveForPage(t.Context(), templates.ResolveForPageRequest{PageID: page.ID})
 	if err != nil || afterDelete.Spec.Tone != hub.Spec.Tone || afterDelete.Spec.Length.Min != 100 {
 		t.Errorf("ResolveForPage after deleting the site override = %+v, %v", afterDelete.Spec, err)
+	}
+}
+
+func TestResolveForPageFillsThePlaceholdersFromThePageItsEntityAndItsSite(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	seed := template.Seed()[3]
+	spec := seed.Spec
+	spec.Sections[0].Heading = "Why {primaryKeyword} matter on {siteName}"
+	spec.Sections[1].Intent = "Introduce {entityName} to a reader of {pageTitle}"
+	spec.MetaRules.TitlePattern = "{primaryKeyword} | {siteName}"
+	created, err := h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Name: "Keyed hub", PageKind: seed.PageKind, Spec: spec})
+	if err != nil {
+		t.Fatalf("CreateTemplate: %v", err)
+	}
+
+	entity, err := graph.NewEntity(graph.Entity{
+		ID: id.New(), SiteID: h.siteID, Name: "Trail Shoes", Kind: graph.KindTopic, PrimaryKeyword: "trail running shoes",
+		Source: graph.SourceUser, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+	})
+	if err != nil {
+		t.Fatalf("build the entity: %v", err)
+	}
+	if err = sqlite.NewEntityRepo(h.store).Insert(t.Context(), entity); err != nil {
+		t.Fatalf("insert the entity: %v", err)
+	}
+
+	mapped := sqlitetest.Page(t, h.store, h.siteID, "/shoes/trail/")
+	mapped.Title = "Trail shoes compared"
+	mapped.EntityID = &entity.ID
+	mapped.TemplateID = &created.Template.ID
+	unmapped := sqlitetest.Page(t, h.store, h.siteID, "/shoes/road/")
+	unmapped.Title = "Road shoes"
+	unmapped.TemplateID = &created.Template.ID
+	for _, page := range []pagemap.Page{mapped, unmapped} {
+		if err = sqlite.NewPageRepo(h.store).Update(t.Context(), page); err != nil {
+			t.Fatalf("update %s: %v", page.Path, err)
+		}
+	}
+
+	resolved, err := h.service.ResolveForPage(t.Context(), templates.ResolveForPageRequest{PageID: mapped.ID})
+	if err != nil {
+		t.Fatalf("ResolveForPage: %v", err)
+	}
+	if resolved.Spec.Sections[0].Heading != "Why trail running shoes matter on shop" {
+		t.Errorf("heading = %q", resolved.Spec.Sections[0].Heading)
+	}
+	if resolved.Spec.Sections[1].Intent != "Introduce Trail Shoes to a reader of Trail shoes compared" {
+		t.Errorf("intent = %q", resolved.Spec.Sections[1].Intent)
+	}
+	if resolved.Spec.MetaRules.TitlePattern != "trail running shoes | shop" {
+		t.Errorf("title pattern = %q", resolved.Spec.MetaRules.TitlePattern)
+	}
+
+	fallback, err := h.service.ResolveForPage(t.Context(), templates.ResolveForPageRequest{PageID: unmapped.ID})
+	if err != nil {
+		t.Fatalf("ResolveForPage for an unmapped page: %v", err)
+	}
+	if fallback.Spec.Sections[0].Heading != "Why Road shoes matter on shop" {
+		t.Errorf("an unmapped page falls back to its title: heading = %q", fallback.Spec.Sections[0].Heading)
+	}
+
+	stored, err := h.service.GetTemplate(t.Context(), templates.GetTemplateRequest{ID: created.Template.ID})
+	if err != nil || stored.Template.Spec.Sections[0].Heading != "Why {primaryKeyword} matter on {siteName}" {
+		t.Fatalf("the stored template lost its placeholders: %+v, %v", stored.Template.Spec.Sections[0], err)
 	}
 }

@@ -246,7 +246,7 @@ func (c *Core) build(ctx context.Context, key []byte) (kit, error) {
 		return kit{}, stderrors.Join(err, store.Close())
 	}
 
-	templateService := templates.New(templateRepo, policyRepo, pageRepo, siteRepo, store, relay, now)
+	templateService := templates.New(templateRepo, policyRepo, pageRepo, entityRepo, siteRepo, store, relay, now)
 	modelProfiles := profiles.New(profileRepo, siteRepo, modelCatalog, now)
 	var providers AgentProvider = gollemclient.NewFactory(secretStore, modelCatalog, values)
 	if cfg.AgentProvider != nil {

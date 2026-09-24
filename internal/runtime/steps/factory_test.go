@@ -240,7 +240,7 @@ func (f *factory) engine(t *testing.T) *runtime.Engine {
 
 	specs := templates.New(
 		sqlite.NewTemplateRepo(f.store), sqlite.NewLinkPolicyRepo(f.store), sqlite.NewPageRepo(f.store),
-		sqlite.NewSiteRepo(f.store), f.store, silentPublisher{}, clock.System{},
+		sqlite.NewEntityRepo(f.store), sqlite.NewSiteRepo(f.store), f.store, silentPublisher{}, clock.System{},
 	)
 
 	registry := run.NewRegistry()

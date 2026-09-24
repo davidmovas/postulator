@@ -31,7 +31,7 @@ func (a sectionKeywordRulesArgs) rules() template.SectionKeywordRules {
 }
 
 type sectionArgs struct {
-	Heading      string                   `json:"heading" description:"The heading the section opens with, which may carry {primaryKeyword}"`
+	Heading      string                   `json:"heading" description:"The heading; {primaryKeyword}, {entityName}, {siteName} and {pageTitle} are filled in per page, other braces are refused"`
 	Intent       string                   `json:"intent,omitempty" description:"What the section has to cover, one short sentence to the writer"`
 	TargetWords  int                      `json:"targetWords,omitempty" minimum:"0" description:"About how many words the section should run to; leave it out to let the writer decide"`
 	Required     bool                     `json:"required,omitempty" description:"The page is not valid without this section"`

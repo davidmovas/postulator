@@ -137,7 +137,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 	client := fake.New()
 	book := ledger.New(client, callRepo, built, bus, now)
 	modelProfiles := profiles.New(sqlite.NewModelProfileRepo(store), siteRepo, built, now)
-	templateService := templates.New(templateRepo, sqlite.NewLinkPolicyRepo(store), pageRepo, siteRepo, store, bus, now)
+	templateService := templates.New(templateRepo, sqlite.NewLinkPolicyRepo(store), pageRepo, entityRepo, siteRepo, store, bus, now)
 	reportsService := reports.New(reports.Deps{
 		Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,
 		Runs: runRepo, Items: itemRepo, Artifacts: artifactRepo,
