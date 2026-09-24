@@ -106,7 +106,7 @@ func newPipeline(t *testing.T, opts ...wptest.Option) *pipeline {
 
 	owner := site.Site{
 		ID: id.New(), Name: "Shop", BaseURL: server.URL(), Username: wptest.DefaultUser,
-		Status: site.StatusActive, AllowInsecure: true, Plugin: site.PluginState{Capabilities: []string{}},
+		Status: site.StatusActive, AllowInsecure: true, Plugin: site.PluginState{Installed: true, Capabilities: []string{}},
 		Defaults: site.Defaults{
 			TemplateID: &guide.ID, LinkPolicyID: &policy.ID,
 			ModelProfiles: map[domainllm.Role]domainllm.ModelRef{},
@@ -228,7 +228,7 @@ func (p *pipeline) start(t *testing.T) *runtime.Engine {
 	engine := runtime.New(runtime.Deps{
 		Runs: p.runs, Items: p.items, Artifacts: p.blobs, Execs: sqlite.NewStepExecRepo(p.store),
 		Events: sqlite.NewRunEventRepo(p.store), Pages: p.pages, Specs: specs,
-		Spend: sqlite.NewLLMCallRepo(p.store), Catalog: stubCatalog{}, Profiles: stubProfiles{},
+		Keys: stubKeys{}, Spend: sqlite.NewLLMCallRepo(p.store), Catalog: stubCatalog{}, Profiles: stubProfiles{},
 		UnitOfWork: p.store, Publisher: &recorder{},
 	}, registry, runtime.Config{
 		Workers: 1, PerSite: 1, SweepInterval: 20 * time.Millisecond,
@@ -501,7 +501,7 @@ func TestARelinkRunAndARepairRunCostNothing(t *testing.T) {
 		recipe, _ := kind.Recipe()
 		estimate, err := engine.EstimateRun(t.Context(), run.Run{
 			SiteID: p.siteID, Kind: kind, Targets: []string{p.pageID}, Recipe: recipe,
-		}, template.TemplateSpec{})
+		})
 		if err != nil {
 			t.Fatalf("EstimateRun for %s: %v", kind, err)
 		}

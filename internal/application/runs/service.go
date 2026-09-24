@@ -6,7 +6,6 @@ import (
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
-	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
@@ -14,7 +13,7 @@ import (
 
 type engine interface {
 	Enqueue(ctx context.Context, record run.Run) (run.Run, error)
-	EstimateRun(ctx context.Context, record run.Run, spec template.TemplateSpec) (run.Estimate, error)
+	EstimateRun(ctx context.Context, record run.Run) (run.Estimate, error)
 	Pause(ctx context.Context, runID string, reason run.PauseReason) error
 	Resume(ctx context.Context, runID string) error
 	Cancel(ctx context.Context, runID string) error

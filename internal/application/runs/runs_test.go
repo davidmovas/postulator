@@ -13,6 +13,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -24,6 +25,7 @@ import (
 
 type fakeEngine struct {
 	queued      run.Run
+	estimated   run.Run
 	estimate    run.Estimate
 	enqueueErr  error
 	failWith    error
@@ -45,10 +47,11 @@ func (f *fakeEngine) Enqueue(_ context.Context, record run.Run) (run.Run, error)
 	return record, nil
 }
 
-func (f *fakeEngine) EstimateRun(context.Context, run.Run, template.TemplateSpec) (run.Estimate, error) {
+func (f *fakeEngine) EstimateRun(_ context.Context, record run.Run) (run.Estimate, error) {
 	if f.failWith != nil {
 		return run.Estimate{}, f.failWith
 	}
+	f.estimated = record
 	return f.estimate, nil
 }
 
@@ -147,7 +150,9 @@ func newFixture(t *testing.T) *fixture {
 
 	engine := &fakeEngine{estimate: run.Estimate{
 		Tokens: 4200, USD: 0.12,
-		Findings: []run.EstimateFinding{{Code: "unpriced_step", Message: "images are not priced"}},
+		Findings: []run.EstimateFinding{{
+			Severity: content.SeverityWarn, Code: "unpriced_step", Message: "images are not priced",
+		}},
 	}}
 	specs := &fakeSpecs{
 		siteID:  "s",
@@ -292,7 +297,7 @@ func TestEstimateAnswersTheCostWithoutEnqueuingAnything(t *testing.T) {
 		t.Fatalf("Marshal: %v", marshalErr)
 	}
 	want := `{"estimate":{"tokens":4200,"usd":0.12,` +
-		`"findings":[{"code":"unpriced_step","message":"images are not priced"}]},"added":[]}`
+		`"findings":[{"severity":"warn","code":"unpriced_step","message":"images are not priced"}]},"added":[]}`
 	if string(encoded) != want {
 		t.Fatalf("Estimate = %s", encoded)
 	}
@@ -1021,4 +1026,43 @@ func (f *fixture) artifact(t *testing.T, record run.Run, item run.Item, kind run
 	}
 	artifact.Purged = purged
 	return artifact
+}
+
+func TestStartRefusesARunTheEstimateFindsBlocked(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	fixture.specs.siteID = fixture.siteID
+	blocking := run.EstimateFinding{
+		Severity: content.SeverityError, Code: "provider_key_missing", PageID: fixture.pages[0], Path: "/hub/",
+		Message: "the provider openai holds no key",
+	}
+	fixture.engine.estimate.Findings = append(fixture.engine.estimate.Findings, blocking)
+
+	_, err := fixture.service.Start(t.Context(), runs.StartRequest{SiteID: fixture.siteID, PageIDs: fixture.pages})
+	if !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("Start = %v, want invalid", err)
+	}
+	var refusal *errors.Error
+	if !stderrors.As(err, &refusal) {
+		t.Fatalf("the refusal is not a kernel error: %v", err)
+	}
+	named, ok := refusal.Details["findings"].([]run.EstimateFinding)
+	if !ok || len(named) != 1 || named[0] != blocking {
+		t.Fatalf("the refusal carries %v, want the blocking finding alone", refusal.Details["findings"])
+	}
+	if !strings.Contains(err.Error(), "holds no key") {
+		t.Fatalf("the message does not say what blocks the run: %v", err)
+	}
+	if fixture.engine.queued.SiteID != "" {
+		t.Fatalf("a blocked run reached the queue: %+v", fixture.engine.queued)
+	}
+
+	previewed, err := fixture.service.Estimate(t.Context(), runs.StartRequest{SiteID: fixture.siteID, PageIDs: fixture.pages})
+	if err != nil {
+		t.Fatalf("Estimate: %v", err)
+	}
+	if len(previewed.Estimate.Findings) != 2 || fixture.engine.estimated.SiteID != fixture.siteID {
+		t.Fatalf("Estimate = %+v, want both findings shown and the planned run priced", previewed.Estimate)
+	}
 }

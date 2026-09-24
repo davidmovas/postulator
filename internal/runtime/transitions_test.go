@@ -305,7 +305,7 @@ func TestAnEngineWithNoConfigurationStillRuns(t *testing.T) {
 	engine := runtime.New(runtime.Deps{
 		Runs: harness.runs, Items: harness.items, Artifacts: harness.blobs, Execs: harness.execs,
 		Events: harness.log, Pages: pageRepoOf(harness), Specs: harness.specs, Spend: harness.spend,
-		Catalog: stubCatalog{}, Profiles: stubProfiles{}, UnitOfWork: harness.store, Publisher: harness.bus,
+		Keys: harness.keys, Catalog: &stubCatalog{}, Profiles: &stubProfiles{}, UnitOfWork: harness.store, Publisher: harness.bus,
 	}, mustRegister(t, bodyStep(calls)), runtime.Config{}, systemClock(), harness.logger)
 
 	if err := engine.Start(t.Context()); err != nil {

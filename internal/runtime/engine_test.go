@@ -431,7 +431,7 @@ func TestEstimateRunPricesEveryModelBackedStep(t *testing.T) {
 	engine := harness.engine(t, mustRegister(t, writer, pure))
 	record := harness.newRun(recipeOf("generate_body", "insert_links"))
 
-	estimate, err := engine.EstimateRun(t.Context(), record, harness.specs.spec)
+	estimate, err := engine.EstimateRun(t.Context(), record)
 	if err != nil {
 		t.Fatalf("EstimateRun: %v", err)
 	}
@@ -441,7 +441,7 @@ func TestEstimateRunPricesEveryModelBackedStep(t *testing.T) {
 
 	single := record
 	single.Targets = harness.pages[:1]
-	half, err := engine.EstimateRun(t.Context(), single, harness.specs.spec)
+	half, err := engine.EstimateRun(t.Context(), single)
 	if err != nil {
 		t.Fatalf("EstimateRun for one target: %v", err)
 	}
@@ -451,7 +451,7 @@ func TestEstimateRunPricesEveryModelBackedStep(t *testing.T) {
 
 	unknown := record
 	unknown.Recipe = append(slices.Clone(record.Recipe), template.StepSpec{Name: "summon", Enabled: true})
-	if _, err = engine.EstimateRun(t.Context(), unknown, harness.specs.spec); !errors.IsCode(err, errors.NotFound) {
+	if _, err = engine.EstimateRun(t.Context(), unknown); !errors.IsCode(err, errors.NotFound) {
 		t.Fatalf("EstimateRun of an unknown step = %v", err)
 	}
 }

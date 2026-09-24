@@ -55,6 +55,12 @@ func (stubCatalog) Lookup(context.Context, domainllm.ModelRef) (domainllm.ModelI
 	return domainllm.ModelInfo{InputUSDPerM: 1, OutputUSDPerM: 2}, nil
 }
 
+type stubKeys struct{}
+
+func (stubKeys) Has(context.Context, string) (bool, error) {
+	return true, nil
+}
+
 type recorder struct {
 	types []events.Type
 	mu    sync.Mutex
@@ -258,7 +264,7 @@ func (f *factory) engine(t *testing.T) *runtime.Engine {
 
 	engine := runtime.New(runtime.Deps{
 		Runs: f.runs, Items: f.items, Artifacts: f.blobs, Execs: sqlite.NewStepExecRepo(f.store),
-		Events: f.log, Pages: sqlite.NewPageRepo(f.store), Specs: specs,
+		Events: f.log, Pages: sqlite.NewPageRepo(f.store), Specs: specs, Keys: stubKeys{},
 		Spend: sqlite.NewLLMCallRepo(f.store), Catalog: stubCatalog{}, Profiles: stubProfiles{},
 		UnitOfWork: f.store, Publisher: f.bus,
 	}, registry, runtime.Config{

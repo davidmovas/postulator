@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	kctx "github.com/davidmovas/postulator/internal/kernel/ctx"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -116,14 +117,27 @@ type Budget struct {
 }
 
 type EstimateFinding struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
+	Severity content.Severity `json:"severity"`
+	Code     string           `json:"code"`
+	Message  string           `json:"message"`
+	PageID   string           `json:"pageId,omitempty"`
+	Path     string           `json:"path,omitempty"`
 }
 
 type Estimate struct {
 	Tokens   int               `json:"tokens"`
 	USD      float64           `json:"usd"`
 	Findings []EstimateFinding `json:"findings"`
+}
+
+func (e Estimate) Blocking() []EstimateFinding {
+	out := make([]EstimateFinding, 0)
+	for i := range e.Findings {
+		if e.Findings[i].Severity == content.SeverityError {
+			out = append(out, e.Findings[i])
+		}
+	}
+	return out
 }
 
 type Stats struct {

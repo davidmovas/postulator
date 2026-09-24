@@ -23,6 +23,7 @@ type Deps struct {
 	Events     eventStore
 	Pages      pageReader
 	Specs      specResolver
+	Keys       keyStore
 	Spend      spendReader
 	Catalog    modelCatalog
 	Profiles   profileResolver

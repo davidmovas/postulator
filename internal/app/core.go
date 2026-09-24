@@ -294,6 +294,7 @@ func (c *Core) build(ctx context.Context, key []byte) (kit, error) {
 			domainllm.ModelRef{Provider: imageopenai.Provider, Model: images.OpenAIModel(values)},
 			callRepo, modelCatalog, relay, now,
 		),
+		ImageModel: &domainllm.ModelRef{Provider: imageopenai.Provider, Model: images.OpenAIModel(values)},
 		ImageSources: map[template.ImageSource]steps.ImageSource{
 			template.ImagesWPMedia: wpmedia.New(wordpress),
 			template.ImagesLocal:   localfile.New(images.LocalDir(values)),
@@ -314,6 +315,7 @@ func (c *Core) build(ctx context.Context, key []byte) (kit, error) {
 		Events:     eventRepo,
 		Pages:      pageRepo,
 		Specs:      templateService,
+		Keys:       secretStore,
 		Spend:      callRepo,
 		Catalog:    modelCatalog,
 		Profiles:   modelProfiles,

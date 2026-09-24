@@ -34,11 +34,12 @@ type SyncResult struct {
 
 func SyncBack(deps Deps) run.StepDef {
 	return run.StepDef{
-		Name:     NameSyncBack,
-		Requires: []run.ArtifactKind{run.ArtifactPublishResult},
-		Produces: []run.ArtifactKind{run.ArtifactSyncResult},
-		Retry:    run.RetryPolicy{Max: 3},
-		Timeout:  syncBackTimeout,
+		Name:      NameSyncBack,
+		Preflight: pluginPreflight(deps, NameSyncBack, "reads the page back through core, without its SEO meta"),
+		Requires:  []run.ArtifactKind{run.ArtifactPublishResult},
+		Produces:  []run.ArtifactKind{run.ArtifactSyncResult},
+		Retry:     run.RetryPolicy{Max: 3},
+		Timeout:   syncBackTimeout,
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			published, found, err := decodeArtifact[PublishResult](sc, run.ArtifactPublishResult)
 			if err != nil {

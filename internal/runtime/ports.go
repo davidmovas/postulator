@@ -62,6 +62,10 @@ type specResolver interface {
 	ResolveForPage(ctx context.Context, req templates.ResolveForPageRequest) (templates.ResolveForPageResponse, error)
 }
 
+type keyStore interface {
+	Has(ctx context.Context, ref string) (bool, error)
+}
+
 type spendReader interface {
 	SumByRun(ctx context.Context, runID string) (llm.Spend, error)
 }

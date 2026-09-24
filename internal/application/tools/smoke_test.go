@@ -29,7 +29,6 @@ import (
 	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
 	domainrun "github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
-	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -64,7 +63,7 @@ func (stubEngine) Enqueue(_ context.Context, record domainrun.Run) (domainrun.Ru
 	return record, nil
 }
 
-func (stubEngine) EstimateRun(context.Context, domainrun.Run, template.TemplateSpec) (domainrun.Estimate, error) {
+func (stubEngine) EstimateRun(context.Context, domainrun.Run) (domainrun.Estimate, error) {
 	return domainrun.Estimate{}, nil
 }
 

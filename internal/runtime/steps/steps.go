@@ -125,6 +125,7 @@ type Deps struct {
 	Content       judgeService
 	LLM           llm.Client
 	ImageProvider ImageProvider
+	ImageModel    *domainllm.ModelRef
 	ImageSources  map[template.ImageSource]ImageSource
 	UnitOfWork    unitOfWork
 	Publisher     application.Publisher

@@ -46,11 +46,12 @@ type PublishResult struct {
 
 func Publish(deps Deps) run.StepDef {
 	return run.StepDef{
-		Name:     NamePublish,
-		Requires: []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML},
-		Produces: []run.ArtifactKind{run.ArtifactPublishResult},
-		Retry:    run.RetryPolicy{Max: 3},
-		Timeout:  publishTimeout,
+		Name:      NamePublish,
+		Preflight: pluginPreflight(deps, NamePublish, "writes no SEO meta"),
+		Requires:  []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML},
+		Produces:  []run.ArtifactKind{run.ArtifactPublishResult},
+		Retry:     run.RetryPolicy{Max: 3},
+		Timeout:   publishTimeout,
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			body, err := sc.Artifact(run.ArtifactBodyHTML)
 			if err != nil {
