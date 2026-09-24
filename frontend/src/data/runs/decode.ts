@@ -44,6 +44,11 @@ export const terminalRunEventTypes: ReadonlySet<RunEventType> = new Set<RunEvent
     "run.cancelled",
 ]);
 
+export const revivingRunEventTypes: ReadonlySet<RunEventType> = new Set<RunEventType>([
+    "run.started",
+    "run.resumed",
+]);
+
 export function seqOf(row: RawRunEvent): number | null {
     const held = row.seq;
     return typeof held === "number" && Number.isFinite(held) && held > 0 ? held : null;

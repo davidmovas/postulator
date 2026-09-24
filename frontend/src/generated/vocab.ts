@@ -205,6 +205,7 @@ export const importFindingCodes = [
     "unknown_entity_kind",
     "unknown_page_kind",
     "unknown_wp_type",
+    "root_page_skipped",
 ] as const;
 export type ImportFindingCode = (typeof importFindingCodes)[number];
 

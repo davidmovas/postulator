@@ -171,3 +171,58 @@ func TestRetryStepRefusesAnItemWhoseInputsExpired(t *testing.T) {
 		})
 	}
 }
+
+func TestAcceptLetsAHeldStepGoOnWithItsFindings(t *testing.T) {
+	t.Parallel()
+
+	harness := newHarness(t, 1)
+	grader := producing("validate", run.ArtifactValidationReport, nil,
+		func(_ context.Context, sc *run.StepContext) (run.Result, error) {
+			result := run.Result{Artifacts: []run.Artifact{{Kind: run.ArtifactValidationReport, Blob: []byte("{}")}}}
+			if sc.Accepted() {
+				return result, nil
+			}
+			result.Next = run.TransitionPause
+			result.Reason = run.PauseNeedsHuman
+			result.Message = "2 findings need a decision"
+			return result, nil
+		})
+
+	engine := harness.engine(t, mustRegister(t, grader))
+	queued, err := engine.Enqueue(t.Context(), harness.newRun(recipeOf("validate")))
+	if err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+
+	paused := harness.waitForRun(t, queued.ID, run.StatusPaused)
+	if paused.PauseReason != run.PauseNeedsHuman {
+		t.Fatalf("the run is paused for %s", paused.PauseReason)
+	}
+	items, err := harness.items.ByRun(t.Context(), queued.ID)
+	if err != nil || len(items) != 1 {
+		t.Fatalf("ByRun = %+v, %v", items, err)
+	}
+	if items[0].Note != "2 findings need a decision" {
+		t.Fatalf("the note reads %q", items[0].Note)
+	}
+
+	if err = engine.Accept(t.Context(), items[0].ID); err != nil {
+		t.Fatalf("Accept: %v", err)
+	}
+	finished := harness.waitForRun(t, queued.ID, run.StatusCompleted)
+	if finished.Stats.Done != 1 {
+		t.Fatalf("Stats = %+v", finished.Stats)
+	}
+	accepted, err := harness.items.Get(t.Context(), items[0].ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	step, found, err := run.Get[string](accepted.Checkpoint, run.CheckpointAccept)
+	if err != nil || !found || step != "validate" {
+		t.Fatalf("the checkpoint records the acceptance as %q, %t, %v", step, found, err)
+	}
+	if accepted.Note != "" || accepted.PauseReason != "" {
+		t.Fatalf("the accepted item still reads %+v", accepted)
+	}
+	assertGapless(t, harness, queued.ID)
+}

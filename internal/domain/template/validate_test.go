@@ -48,6 +48,23 @@ func validSpec() template.TemplateSpec {
 	}
 }
 
+func TestAnUnknownPlaceholderIsRefusedByNameWithTheOnesThatWork(t *testing.T) {
+	t.Parallel()
+
+	spec := validSpec()
+	spec.Sections[0].Heading = "Best {entity} for {primaryKeyword}"
+
+	err := template.Validate(spec)
+	if err == nil {
+		t.Fatal("Validate accepted a placeholder nothing fills")
+	}
+	for _, want := range []string{"{entity}", "{primaryKeyword}", "{entityName}", "{siteName}", "{pageTitle}"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the refusal %q does not name %s", err.Error(), want)
+		}
+	}
+}
+
 func TestValidateSpec(t *testing.T) {
 	t.Parallel()
 
@@ -59,6 +76,11 @@ func TestValidateSpec(t *testing.T) {
 		{name: "valid", mutate: func(*template.TemplateSpec) {}},
 		{name: "no sections", mutate: func(s *template.TemplateSpec) { s.Sections = nil }, field: "sections"},
 		{name: "blank heading", mutate: func(s *template.TemplateSpec) { s.Sections[1].Heading = " " }, field: "sections[1].heading"},
+		{name: "unknown heading placeholder", mutate: func(s *template.TemplateSpec) { s.Sections[1].Heading = "Best {entity} guide" }, field: "sections[1].heading"},
+		{name: "double-braced heading placeholder", mutate: func(s *template.TemplateSpec) { s.Sections[0].Heading = "{{primaryKeyword}} tips" }, field: "sections[0].heading"},
+		{name: "unknown intent placeholder", mutate: func(s *template.TemplateSpec) { s.Sections[0].Intent = "Cover {topic}" }, field: "sections[0].intent"},
+		{name: "unknown pinned phrase placeholder", mutate: func(s *template.TemplateSpec) { s.Sections[0].KeywordRules.Include = []string{"{keyword} guide"} }, field: "sections[0].keywordRules.include[0]"},
+		{name: "unknown title placeholder", mutate: func(s *template.TemplateSpec) { s.MetaRules.TitlePattern = "{title} | {siteName}" }, field: "metaRules.titlePattern"},
 		{name: "negative target words", mutate: func(s *template.TemplateSpec) { s.Sections[0].TargetWords = -1 }, field: "sections[0].targetWords"},
 		{name: "negative min", mutate: func(s *template.TemplateSpec) { s.Length.Min = -1 }, field: "length.min"},
 		{name: "max below min", mutate: func(s *template.TemplateSpec) { s.Length.Max = 100 }, field: "length.max"},

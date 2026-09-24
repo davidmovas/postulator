@@ -29,15 +29,32 @@ const (
 
 type stubSpecs struct {
 	spec    template.TemplateSpec
+	perPage map[string]template.TemplateSpec
 	version int
 	err     error
 }
 
-func (s *stubSpecs) ResolveForPage(context.Context, templates.ResolveForPageRequest) (templates.ResolveForPageResponse, error) {
+func (s *stubSpecs) ResolveForPage(_ context.Context, req templates.ResolveForPageRequest) (templates.ResolveForPageResponse, error) {
 	if s.err != nil {
 		return templates.ResolveForPageResponse{}, s.err
 	}
-	return templates.ResolveForPageResponse{TemplateID: "template", Version: s.version, Spec: s.spec}, nil
+	spec := s.spec
+	if own, ok := s.perPage[req.PageID]; ok {
+		spec = own
+	}
+	return templates.ResolveForPageResponse{TemplateID: "template", Version: s.version, Spec: spec}, nil
+}
+
+type stubKeys struct {
+	missing string
+	err     error
+}
+
+func (k *stubKeys) Has(_ context.Context, ref string) (bool, error) {
+	if k.err != nil {
+		return false, k.err
+	}
+	return ref != k.missing, nil
 }
 
 type stubSpend struct {
@@ -62,7 +79,7 @@ type stubCatalog struct {
 	err  error
 }
 
-func (c stubCatalog) Lookup(context.Context, llm.ModelRef) (llm.ModelInfo, error) {
+func (c *stubCatalog) Lookup(context.Context, llm.ModelRef) (llm.ModelInfo, error) {
 	return c.info, c.err
 }
 
@@ -71,7 +88,7 @@ type stubProfiles struct {
 	err error
 }
 
-func (p stubProfiles) Resolve(context.Context, string, llm.Role, map[llm.Role]llm.ModelRef) (llm.ModelRef, error) {
+func (p *stubProfiles) Resolve(context.Context, string, llm.Role, map[llm.Role]llm.ModelRef) (llm.ModelRef, error) {
 	return p.ref, p.err
 }
 
@@ -137,6 +154,9 @@ type harness struct {
 	blobs       *sqlite.ArtifactRepo
 	log         *sqlite.RunEventRepo
 	specs       *stubSpecs
+	keys        *stubKeys
+	catalog     *stubCatalog
+	profiles    *stubProfiles
 	spend       *stubSpend
 	bus         *recorder
 	pages       []string
@@ -174,6 +194,9 @@ func newHarness(t *testing.T, targets int) *harness {
 				Length:   template.Length{Min: 200, Max: 900},
 			},
 		},
+		keys:     &stubKeys{},
+		catalog:  &stubCatalog{info: llm.ModelInfo{InputUSDPerM: 1, OutputUSDPerM: 2}},
+		profiles: &stubProfiles{ref: llm.ModelRef{Provider: "openai", Model: "test"}},
 		spend:    &stubSpend{},
 		bus:      &recorder{},
 		pages:    pages,
@@ -206,9 +229,10 @@ func (h *harness) idle(t *testing.T, registry *run.Registry) *runtime.Engine {
 		Events:     h.log,
 		Pages:      sqlite.NewPageRepo(h.store),
 		Specs:      h.specs,
+		Keys:       h.keys,
 		Spend:      h.spend,
-		Catalog:    stubCatalog{info: llm.ModelInfo{InputUSDPerM: 1, OutputUSDPerM: 2}},
-		Profiles:   stubProfiles{ref: llm.ModelRef{Provider: "openai", Model: "test"}},
+		Catalog:    h.catalog,
+		Profiles:   h.profiles,
 		UnitOfWork: h.store,
 		Publisher:  h.bus,
 	}, registry, runtime.Config{

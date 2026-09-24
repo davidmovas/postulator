@@ -3,12 +3,9 @@ import { useEffect, useRef, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
 import { react } from "../../../data/errors.js";
-import { useProposeFromPages, useProposeRelated } from "../../../data/hooks/graph.js";
-import { useSiteOverview } from "../../../data/hooks/reports.js";
+import { useProposeRelated } from "../../../data/hooks/graph.js";
 import { Dialog, Stars2Icon } from "../../../ui/index.js";
 import type { GraphIndex } from "../model/index.js";
-
-const pagesPerCall = 40;
 
 interface Outcome {
     line: string;
@@ -52,96 +49,6 @@ function messageOf(thrown: unknown): string | null {
     }
     const reaction = react(thrown);
     return reaction.kind === "silent" || reaction.kind === "unlock" ? null : reaction.message;
-}
-
-export interface ProposeFromPagesDialogProps {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    siteId: string;
-    onReview: () => void;
-}
-
-export function ProposeFromPagesDialog({ open, onOpenChange, siteId, onReview }: ProposeFromPagesDialogProps): ReactElement {
-    const overview = useSiteOverview(open ? siteId : null);
-    const propose = useProposeFromPages();
-    const controller = useRef<AbortController | null>(null);
-    const [outcome, setOutcome] = useState<Outcome | null>(null);
-    const [stopped, setStopped] = useState(false);
-    const seconds = useElapsed(propose.isPending);
-    const unmapped = overview.data?.pages.unmapped ?? 0;
-    const calls = Math.ceil(unmapped / pagesPerCall);
-
-    useEffect(() => {
-        if (open) {
-            setOutcome(null);
-            setStopped(false);
-            propose.reset();
-        }
-    }, [open]);
-
-    const start = (): void => {
-        const held = new AbortController();
-        controller.current = held;
-        setStopped(false);
-        propose.mutate(
-            { request: { siteId }, signal: held.signal },
-            {
-                onSuccess: (answered) => {
-                    const entities = answered.entities?.length ?? 0;
-                    const edges = answered.edges?.length ?? 0;
-                    setOutcome({
-                        line: entities + edges === 0 ? copy.graph.ai.nothingProposed : copy.graph.ai.fromPagesDone(entities, edges, answered.skipped),
-                        tokens: answered.tokens,
-                    });
-                },
-            },
-        );
-    };
-
-    const stop = (): void => {
-        controller.current?.abort();
-        setStopped(true);
-    };
-
-    const close = (next: boolean): void => {
-        if (!next && propose.isPending) {
-            stop();
-        }
-        onOpenChange(next);
-    };
-
-    const error = messageOf(propose.error);
-
-    return (
-        <Dialog
-            open={open}
-            onOpenChange={close}
-            title={copy.graph.ai.fromPagesTitle}
-            description={overview.isPending ? copy.graph.ai.counting : copy.graph.ai.fromPagesBody(unmapped, calls)}
-            icon={Stars2Icon}
-            confirmLabel={outcome === null ? copy.graph.ai.start : copy.graph.ai.review}
-            cancelLabel={propose.isPending ? copy.graph.ai.stop : outcome === null ? copy.graph.ai.cancel : copy.graph.ai.close}
-            busy={propose.isPending}
-            status={propose.isPending ? <Running seconds={seconds} /> : undefined}
-            onCancel={propose.isPending ? stop : undefined}
-            onConfirm={() => {
-                if (outcome !== null) {
-                    onOpenChange(false);
-                    onReview();
-                } else if (unmapped > 0 && !propose.isPending) {
-                    start();
-                }
-            }}
-        >
-            {outcome === null ? null : (
-                <p className="text-xs text-ink-soft">
-                    {outcome.line} <span className="font-mono text-2xs text-ink-faint">· {copy.graph.ai.tokens(outcome.tokens)}</span>
-                </p>
-            )}
-            {stopped && !propose.isPending ? <p className="text-xs text-ink-dim">{copy.graph.ai.cancelled}</p> : null}
-            {error === null ? null : <p className="text-xs text-danger">{error}</p>}
-        </Dialog>
-    );
 }
 
 export interface ProposeRelatedDialogProps {

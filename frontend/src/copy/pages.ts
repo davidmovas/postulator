@@ -97,6 +97,15 @@ export const pages = {
         lastWritten: "Last synced",
         wpModified: "WordPress modified",
     },
+    pick: {
+        search: "Find a page",
+        searchHint: "Path or title",
+        noMatch: "No page matches.",
+        expand: "Expand",
+        collapse: "Collapse",
+        branch: "Select the whole branch",
+        unavailable: "This page cannot be picked here.",
+    },
     tree: {
         title: "Page tree",
         unbounded:

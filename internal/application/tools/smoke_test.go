@@ -29,7 +29,6 @@ import (
 	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
 	domainrun "github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
-	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -64,7 +63,7 @@ func (stubEngine) Enqueue(_ context.Context, record domainrun.Run) (domainrun.Ru
 	return record, nil
 }
 
-func (stubEngine) EstimateRun(context.Context, domainrun.Run, template.TemplateSpec) (domainrun.Estimate, error) {
+func (stubEngine) EstimateRun(context.Context, domainrun.Run) (domainrun.Estimate, error) {
 	return domainrun.Estimate{}, nil
 }
 
@@ -75,6 +74,8 @@ func (stubEngine) Resume(context.Context, string) error { return nil }
 func (stubEngine) Cancel(context.Context, string) error { return nil }
 
 func (stubEngine) RetryStep(context.Context, string) error { return nil }
+
+func (stubEngine) Accept(context.Context, string) error { return nil }
 
 func (stubEngine) Regenerate(context.Context, string, []string) error { return nil }
 
@@ -137,7 +138,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 	client := fake.New()
 	book := ledger.New(client, callRepo, built, bus, now)
 	modelProfiles := profiles.New(sqlite.NewModelProfileRepo(store), siteRepo, built, now)
-	templateService := templates.New(templateRepo, sqlite.NewLinkPolicyRepo(store), pageRepo, siteRepo, store, bus, now)
+	templateService := templates.New(templateRepo, sqlite.NewLinkPolicyRepo(store), pageRepo, entityRepo, siteRepo, store, bus, now)
 	reportsService := reports.New(reports.Deps{
 		Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,
 		Runs: runRepo, Items: itemRepo, Artifacts: artifactRepo,

@@ -35,11 +35,12 @@ type RelinkPageResult struct {
 
 func RelinkPage(deps Deps) run.StepDef {
 	return run.StepDef{
-		Name:     NameRelinkPage,
-		Requires: []run.ArtifactKind{run.ArtifactLinkContext},
-		Produces: []run.ArtifactKind{run.ArtifactPublishResult, run.ArtifactRelinkResult},
-		Retry:    run.RetryPolicy{Max: 2},
-		Timeout:  relinkTimeout,
+		Name:      NameRelinkPage,
+		Preflight: pluginPreflight(deps, NameRelinkPage, "cannot read or write the page and stands down"),
+		Requires:  []run.ArtifactKind{run.ArtifactLinkContext},
+		Produces:  []run.ArtifactKind{run.ArtifactPublishResult, run.ArtifactRelinkResult},
+		Retry:     run.RetryPolicy{Max: 2},
+		Timeout:   relinkTimeout,
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			lc, err := linkContextOf(sc)
 			if err != nil {

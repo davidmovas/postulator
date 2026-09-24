@@ -9,8 +9,11 @@ import {
     itemRunning,
     itemWaiting,
     pauseAwaitingParent,
+    pauseNeedsHuman,
     statusCancelled,
     statusFailed,
+    stepGenerateBody,
+    stepValidate,
 } from "./statuses.js";
 
 export type RegenerateState = { kind: "ready" } | { kind: "busy" } | { kind: "published" };
@@ -30,6 +33,31 @@ export function regenerateState(item: RunItem, published: boolean): RegenerateSt
 
 export function heldForParent(item: RunItem): boolean {
     return item.status === itemPaused && item.pauseReason === pauseAwaitingParent;
+}
+
+export type ItemAction = "accept" | "retry" | "regenerate" | "parent";
+
+export function primaryAction(item: RunItem): ItemAction | null {
+    if (heldForParent(item)) {
+        return "parent";
+    }
+    if (item.status === itemPaused && item.pauseReason === pauseNeedsHuman) {
+        return item.currentStep === stepValidate ? "accept" : "retry";
+    }
+    if (item.status === statusFailed) {
+        return item.currentStep === stepGenerateBody ? "regenerate" : "retry";
+    }
+    if (item.status === statusCancelled) {
+        return "regenerate";
+    }
+    return null;
+}
+
+export function queuedAfter(item: RunItem): string {
+    if (item.blockedBy === "" || item.waitingFor === null) {
+        return "";
+    }
+    return item.waitingFor.path;
 }
 
 export interface ItemBadge {

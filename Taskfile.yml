@@ -5,7 +5,7 @@ vars:
   MODULE: "github.com/davidmovas/postulator"
   BIN_DIR: "bin"
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
-  VERSION: '{{.VERSION | default "2.0.0-dev"}}'
+  VERSION: '{{.VERSION | default "2.2.0-dev"}}'
   UI_NAME: "postulator-ui"
   UI_HOME: '{{.ROOT_DIR}}/.superpowers/ui-home'
   UI_DEVTOOLS_PORT: '{{.UI_DEVTOOLS_PORT | default 9222}}'

@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
+	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
@@ -145,11 +146,15 @@ func TestAMissingAnchorIsRepairedByTheLinker(t *testing.T) {
 			t.Fatalf("the body does not link to %s:\n%s", href, body)
 		}
 	}
-	if !strings.Contains(body, "It sits in our drinks range") {
-		t.Fatalf("the repaired sentence is missing:\n%s", body)
+	doc, err := content.Parse(body)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
 	}
-	if calls := f.llm.CallsTo(steps.NameRepairLinks); calls == 0 {
-		t.Fatal("the linker never ran although two anchors were missing")
+	if text := doc.Text(); strings.Count(text, "It sits in our drinks range") != 1 {
+		t.Fatalf("the repaired sentence is not there exactly once:\n%s", body)
+	}
+	if calls := f.llm.CallsTo(steps.NameRepairLinks); calls != 1 {
+		t.Fatalf("the linker ran %d times, want one sentence to settle both anchors", calls)
 	}
 
 	if report := f.report(t, item.ID); len(report.Links.Missing) != 0 {
@@ -222,7 +227,13 @@ func TestTheShippedStepsRegisterInRecipeOrder(t *testing.T) {
 	}
 }
 
-func TestValidateStopsAnItemUnlessErrorsAreAllowed(t *testing.T) {
+func heldByTheLinkBudget() template.TemplateSpec {
+	tight := spec()
+	tight.LinkRules.MaxLinks = 1
+	return tight
+}
+
+func TestValidateHoldsAPageWithErrorsForAHumanUnlessTheyAreAllowed(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -230,7 +241,7 @@ func TestValidateStopsAnItemUnlessErrorsAreAllowed(t *testing.T) {
 		params map[string]any
 		want   run.Status
 	}{
-		{name: "an error finding fails the item", want: run.StatusFailed},
+		{name: "an error finding holds the page", want: run.StatusPaused},
 		{name: "allowErrors lets it through", params: map[string]any{steps.ParamAllowErrors: true}, want: run.StatusCompleted},
 	}
 
@@ -238,7 +249,7 @@ func TestValidateStopsAnItemUnlessErrorsAreAllowed(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			f := newFactory(t, keywordlessDraft)
+			f := newFactoryWithSpec(t, goodDraft, heldByTheLinkBudget())
 			recipe := recipe()
 			recipe[len(recipe)-1].Params = tc.params
 
@@ -261,9 +272,56 @@ func TestValidateStopsAnItemUnlessErrorsAreAllowed(t *testing.T) {
 			if report.Score >= 1 {
 				t.Fatalf("score = %v, want a penalty", report.Score)
 			}
-			if !report.Structure.HasErrors() {
-				t.Fatalf("structure findings = %+v", report.Structure.Items)
+			if !report.Compliance.HasErrors() {
+				t.Fatalf("compliance findings = %+v", report.Compliance.Items)
+			}
+			if tc.want != run.StatusPaused {
+				return
+			}
+			if items[0].PauseReason != run.PauseNeedsHuman || !strings.Contains(items[0].Note, "/drinks/") {
+				t.Fatalf("the item is held as %s with the note %q", items[0].PauseReason, items[0].Note)
+			}
+			if items[0].Error != "" {
+				t.Fatalf("a held page carries the error %q", items[0].Error)
+			}
+			paused := f.waitForRun(t, queued.ID, run.StatusPaused)
+			if paused.PauseReason != run.PauseNeedsHuman {
+				t.Fatalf("the run is paused for %s", paused.PauseReason)
 			}
 		})
+	}
+}
+
+func TestAcceptingAHeldValidationLetsThePageGoOn(t *testing.T) {
+	t.Parallel()
+
+	f := newFactoryWithSpec(t, goodDraft, heldByTheLinkBudget())
+	engine := f.engine(t)
+	queued, err := engine.Enqueue(t.Context(), run.Run{
+		ID: newID(), SiteID: f.siteID, Kind: run.KindGenerate, Targets: []string{f.pageID},
+		Recipe: recipe(), TemplateID: "template", TemplateVersion: 1, PublishMode: run.PublishDraft,
+	})
+	if err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+	waitForItem(t, f, queued.ID, run.StatusPaused)
+	f.waitForRun(t, queued.ID, run.StatusPaused)
+
+	items, err := f.items.ByRun(t.Context(), queued.ID)
+	if err != nil || len(items) != 1 {
+		t.Fatalf("ByRun = %+v, %v", items, err)
+	}
+	if err = engine.Accept(t.Context(), items[0].ID); err != nil {
+		t.Fatalf("Accept: %v", err)
+	}
+
+	f.waitForRun(t, queued.ID, run.StatusCompleted)
+	waitForItem(t, f, queued.ID, run.StatusCompleted)
+	report := f.report(t, items[0].ID)
+	if !report.Compliance.HasErrors() {
+		t.Fatalf("the accepted report lost its findings: %+v", report.Compliance.Items)
+	}
+	if f.llm.CallsTo(steps.NameGenerateBody) != 1 {
+		t.Fatalf("the writer ran %d times for an accepted page", f.llm.CallsTo(steps.NameGenerateBody))
 	}
 }

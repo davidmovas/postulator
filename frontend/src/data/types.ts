@@ -43,6 +43,10 @@ export type Edge = Wire<GraphModels.Edge>;
 export type Anchor = Wire<GraphModels.Anchor>;
 export type EntityPage = Wire<GraphModels.EntityPage>;
 export type EntityFilter = ListFilter<GraphModels.ListEntitiesRequest>;
+export type ProposedEntity = Wire<GraphModels.ProposedEntity>;
+export type PreviewFromPagesResponse = Wire<GraphModels.PreviewFromPagesResponse>;
+export type ProposeFromKeywordsResponse = Wire<GraphModels.ProposeFromKeywordsResponse>;
+export type ApplyProposalsResponse = Wire<GraphModels.ApplyProposalsResponse>;
 export type EdgeFilter = ListFilter<GraphModels.ListEdgesRequest>;
 
 export type Template = Wire<TemplatesModels.Template>;

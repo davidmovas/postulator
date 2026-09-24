@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
+	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
@@ -34,28 +36,36 @@ func (e *Engine) Enqueue(ctx context.Context, record run.Run) (run.Run, error) {
 		record.DeadlineAt = record.CreatedAt.Add(e.cfg.RunDeadline)
 	}
 	record.Stats.Items = len(record.Targets)
-	record.Targets = e.inWorkingOrder(ctx, record.Kind, record.Targets)
+	pages := e.targetPages(ctx, record.Targets)
+	record.Targets = inWorkingOrder(record.Kind, record.Targets, pages)
 
 	validated, err := run.NewRun(record)
 	if err != nil {
 		return run.Run{}, err
 	}
+	queueBehindParents := validated.Kind != run.KindRevert && publishes(enabled)
 
 	err = e.transact(ctx, func(c context.Context, box *outbox) error {
 		if insertErr := e.deps.Runs.Insert(c, validated); insertErr != nil {
 			return insertErr
 		}
+		itemIDs := make(map[string]string, len(validated.Targets))
 		for seq, targetID := range validated.Targets {
-			item, itemErr := run.NewItem(run.Item{
+			item := run.Item{
 				ID: id.New(), RunID: validated.ID, SiteID: validated.SiteID, TargetID: targetID,
 				CurrentStep: first, Seq: seq, CreatedAt: now, UpdatedAt: now,
-			})
+			}
+			if queueBehindParents {
+				item.BlockedBy = blockerOf(pages[targetID], pages, itemIDs)
+			}
+			item, itemErr := run.NewItem(item)
 			if itemErr != nil {
 				return itemErr
 			}
 			if insertErr := e.deps.Items.Insert(c, item); insertErr != nil {
 				return insertErr
 			}
+			itemIDs[targetID] = item.ID
 		}
 		box.add(c, validated.ID, events.RunQueued, events.RunQueuedPayload{
 			RunID: validated.ID, Kind: string(validated.Kind), Items: len(validated.Targets),
@@ -70,8 +80,23 @@ func (e *Engine) Enqueue(ctx context.Context, record run.Run) (run.Run, error) {
 	return validated, nil
 }
 
-func (e *Engine) inWorkingOrder(ctx context.Context, kind run.Kind, targets []string) []string {
-	ordered := e.ancestorsFirst(ctx, targets)
+func (e *Engine) targetPages(ctx context.Context, targets []string) map[string]pagemap.Page {
+	pages := make(map[string]pagemap.Page, len(targets))
+	if e.deps.Pages == nil {
+		return pages
+	}
+	for _, targetID := range targets {
+		page, err := e.deps.Pages.Get(ctx, targetID)
+		if err != nil {
+			continue
+		}
+		pages[targetID] = page
+	}
+	return pages
+}
+
+func inWorkingOrder(kind run.Kind, targets []string, pages map[string]pagemap.Page) []string {
+	ordered := ancestorsFirst(targets, pages)
 	if kind != run.KindRevert {
 		return ordered
 	}
@@ -80,24 +105,15 @@ func (e *Engine) inWorkingOrder(ctx context.Context, kind run.Kind, targets []st
 	return reversed
 }
 
-func (e *Engine) ancestorsFirst(ctx context.Context, targets []string) []string {
-	if len(targets) < 2 || e.deps.Pages == nil {
+func ancestorsFirst(targets []string, pages map[string]pagemap.Page) []string {
+	if len(targets) < 2 {
 		return targets
-	}
-
-	paths := make(map[string]string, len(targets))
-	for _, targetID := range targets {
-		page, err := e.deps.Pages.Get(ctx, targetID)
-		if err != nil {
-			continue
-		}
-		paths[targetID] = page.Path
 	}
 
 	ordered := slices.Clone(targets)
 	slices.SortStableFunc(ordered, func(a, b string) int {
-		left, leftKnown := paths[a]
-		right, rightKnown := paths[b]
+		left, leftKnown := pages[a]
+		right, rightKnown := pages[b]
 		switch {
 		case !leftKnown && !rightKnown:
 			return 0
@@ -106,12 +122,32 @@ func (e *Engine) ancestorsFirst(ctx context.Context, targets []string) []string 
 		case !rightKnown:
 			return -1
 		}
-		if depth := strings.Count(left, "/") - strings.Count(right, "/"); depth != 0 {
+		if depth := strings.Count(left.Path, "/") - strings.Count(right.Path, "/"); depth != 0 {
 			return depth
 		}
-		return strings.Compare(left, right)
+		return strings.Compare(left.Path, right.Path)
 	})
 	return ordered
+}
+
+func publishes(recipe []template.StepSpec) bool {
+	for i := range recipe {
+		if recipe[i].Name == string(run.StepPublish) {
+			return true
+		}
+	}
+	return false
+}
+
+func blockerOf(page pagemap.Page, pages map[string]pagemap.Page, itemIDs map[string]string) string {
+	if page.WPType != pagemap.WPPage || page.ParentPageID == nil {
+		return ""
+	}
+	parent, targeted := pages[*page.ParentPageID]
+	if !targeted || parent.WPID != nil {
+		return ""
+	}
+	return itemIDs[parent.ID]
 }
 
 func (e *Engine) Pause(ctx context.Context, runID string, reason run.PauseReason) error {
@@ -211,6 +247,17 @@ func (e *Engine) Cancel(ctx context.Context, runID string) error {
 }
 
 func (e *Engine) RetryStep(ctx context.Context, itemID string) error {
+	return e.requeueStep(ctx, itemID, nil)
+}
+
+func (e *Engine) Accept(ctx context.Context, itemID string) error {
+	return e.requeueStep(ctx, itemID, func(item *run.Item) error {
+		item.Checkpoint = item.Checkpoint.Clone()
+		return run.Set(item.Checkpoint, run.CheckpointAccept, item.CurrentStep)
+	})
+}
+
+func (e *Engine) requeueStep(ctx context.Context, itemID string, amend func(*run.Item) error) error {
 	err := e.transact(ctx, func(c context.Context, box *outbox) error {
 		item, err := e.deps.Items.Get(c, itemID)
 		if err != nil {
@@ -240,6 +287,11 @@ func (e *Engine) RetryStep(ctx context.Context, itemID string) error {
 		next.WakeAt = nil
 		next.FinishedAt = nil
 		next.UpdatedAt = now
+		if amend != nil {
+			if amendErr := amend(&next); amendErr != nil {
+				return amendErr
+			}
+		}
 
 		requeued, err := e.deps.Items.Requeue(c, itemID, item.AdvanceSeq, item.Status, now)
 		if err != nil {

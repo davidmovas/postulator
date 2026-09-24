@@ -16,6 +16,7 @@ export interface GraphActionsProps {
     onStopConnect: () => void;
     onReview: () => void;
     onProposeFromPages: () => void;
+    onProposeFromKeywords: () => void;
     onProposeRelated: () => void;
     onRecompute: () => void;
 }
@@ -31,6 +32,7 @@ export function GraphActions({
     onStopConnect,
     onReview,
     onProposeFromPages,
+    onProposeFromKeywords,
     onProposeRelated,
     onRecompute,
 }: GraphActionsProps): ReactElement {
@@ -38,6 +40,7 @@ export function GraphActions({
     const selectedName = selectedId === null ? null : (index.byId.get(selectedId)?.name ?? null);
     const model: readonly MenuEntry[] = [
         { key: "pages", label: copy.graph.ai.fromPages, icon: Stars2Icon, onSelect: onProposeFromPages },
+        { key: "keywords", label: copy.graph.ai.fromKeywords, icon: Stars2Icon, onSelect: onProposeFromKeywords },
         {
             key: "related",
             label: selectedName === null ? copy.graph.ai.related : copy.graph.ai.relatedFor(selectedName),

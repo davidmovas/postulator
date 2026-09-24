@@ -1,57 +1,46 @@
 import type { ReactElement } from "react";
 
-import { copy } from "../../copy/index.js";
-import type { Page } from "../../data/types.js";
-import { AccountTreeIcon, Checkbox, ChevronRightIcon, cx, IconButton, StatusBadge } from "../../ui/index.js";
-import { pageStatusLabel, statusTone as pageStatusTone } from "../pages/labels.js";
-import type { Tick } from "./start-selection.js";
+import { copy } from "../../../copy/index.js";
+import type { Page } from "../../../data/types.js";
+import { AccountTreeIcon, Checkbox, ChevronRightIcon, cx, IconButton, StatusBadge } from "../../../ui/index.js";
+import { pageStatusLabel, statusTone as pageStatusTone } from "../labels.js";
+import type { Tick } from "./model.js";
 
 const indentPx = 14;
 
-export interface TargetRowProps {
+export interface PageRowProps {
     page: Page;
     depth: number;
     childCount: number;
     expanded: boolean;
     tick: Tick;
-    neededBy: string | null;
-    writable: boolean;
+    refusal: string | null;
+    note: string | null;
     onToggle: () => void;
     onExpand: () => void;
     onBranch: () => void;
 }
 
-function segmentOf(path: string): string {
+export function segmentOf(path: string): string {
     const parts = path.split("/").filter((part) => part !== "");
     return parts.length === 0 ? "/" : `${parts[parts.length - 1]}/`;
 }
 
-function refusalOf(writable: boolean, neededBy: string | null): string | undefined {
-    if (!writable) {
-        return copy.runs.start.unmapped;
-    }
-    if (neededBy !== null) {
-        return copy.runs.start.required(neededBy);
-    }
-    return undefined;
-}
-
-export function TargetRow({
+export function PageRow({
     page,
     depth,
     childCount,
     expanded,
     tick,
-    neededBy,
-    writable,
+    refusal,
+    note,
     onToggle,
     onExpand,
     onBranch,
-}: TargetRowProps): ReactElement {
-    const refusal = refusalOf(writable, neededBy);
+}: PageRowProps): ReactElement {
     return (
         <div
-            data-run-target={page.id}
+            data-page-pick={page.id}
             className="flex h-7 shrink-0 items-center gap-1.5 rounded-sm pr-1 hover:bg-raised"
             style={{ paddingLeft: depth * indentPx }}
             title={refusal ?? page.path}
@@ -59,7 +48,7 @@ export function TargetRow({
             {childCount > 0 ? (
                 <button
                     type="button"
-                    aria-label={expanded ? copy.runs.start.collapse : copy.runs.start.expand}
+                    aria-label={expanded ? copy.pages.pick.collapse : copy.pages.pick.expand}
                     aria-expanded={expanded}
                     className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm text-ink-dim hover:bg-raised hover:text-ink"
                     onClick={onExpand}
@@ -72,14 +61,12 @@ export function TargetRow({
             <Checkbox
                 checked={tick === "on"}
                 indeterminate={tick === "some"}
-                disabled={!writable || neededBy !== null}
+                disabled={refusal !== null}
                 label={segmentOf(page.path)}
                 onChange={onToggle}
             />
             <span className="min-w-0 flex-1 truncate text-xs text-ink-faint">{page.title}</span>
-            {neededBy === null ? null : (
-                <span className="shrink-0 text-2xs text-accent">{copy.runs.start.writtenFirst}</span>
-            )}
+            {note === null ? null : <span className="shrink-0 text-2xs text-accent">{note}</span>}
             <StatusBadge tone={pageStatusTone(page.status)} dot={false}>
                 {pageStatusLabel(page.status)}
             </StatusBadge>
@@ -88,8 +75,8 @@ export function TargetRow({
                     size="sm"
                     variant="ghost"
                     icon={AccountTreeIcon}
-                    label={copy.runs.start.branch}
-                    title={copy.runs.start.branch}
+                    label={copy.pages.pick.branch}
+                    title={copy.pages.pick.branch}
                     onClick={onBranch}
                 />
             ) : null}

@@ -1500,3 +1500,112 @@ put together, and $1.20 left the account.
   close it and click again, and copies the link so it can be pasted into a tab meanwhile. An
   `about:` page is refused from outside and opens an empty window instead, which is why the check
   used https links.
+
+## 2026-09-24 — 2.2.0: the pipeline that stops itself less, and control over what becomes an entity
+
+Eighteen pages on the client's site: a third of them held for a human, links not placed, the
+order wrong, every retry paid for again, and "the result does not satisfy the template" on a
+heading the agent had written as `{primaryKeyword}`. The reasoning below is grouped by what the
+client asked for; the code is under `internal/domain/content`, `internal/domain/template`,
+`internal/runtime`, `internal/runtime/steps` and `internal/application/graph`.
+
+### The import and the graph
+
+- **An import never plans `/`.** `fillGaps` stops one level above the root, because the root of a
+  site exists on WordPress before anything is imported; an explicit `/` row merges into the root
+  the sync found or is skipped with `root_page_skipped`, and the pages of the first level keep no
+  parent, which is what publish and start already expected.
+- **A page keeps the keywords its row carried.** `pages.primary_keyword` and `pages.keywords`
+  (migration 0027) hold what the import row said even when the row names no entity, so nothing is
+  lost between the workbook and the proposal.
+- **An entity is proposed for chosen pages and written only once reviewed.** `PreviewFromPages`
+  answers proposals without writing, `ApplyProposals` writes the ones a person kept, and
+  `ProposeFromPages` keeps doing both for the agent and takes `pageIds` or a `pathPrefix`.
+  `ProposeFromKeywords` turns a pasted list into the same shape, one entity per keyword unless the
+  model folds a near variant in, and the same apply writes it. The root is never proposed for.
+
+### Placeholders
+
+- **A placeholder is expanded once, for the page, before anyone reads the spec.** `{primaryKeyword}
+  {entityName} {siteName} {pageTitle}` are the whole list; `template.Validate` refuses any other
+  `{…}`, naming the four, so the agent corrects itself on the first answer, and
+  `templates.ResolveForPage` expands them from the entity, the page and the site. The engine, the
+  writer, the validator and the tool that resolves a template all see the expanded spec, so a
+  heading is never compared with its own placeholder again.
+
+### The writer and the linker
+
+- **A draft is assembled from the brief, not trusted.** `content.NewBrief` says what the page owes
+  (planned title and h1, numbered sections with their headings, the phrases the links need and
+  where), the writer answers `DraftAnswer` with a slot per section, and `content.Assemble` puts the
+  brief's headings on the sections, takes the plan's title and h1 first, falls back with a warning,
+  strips markup a body may not carry, and turns a missing required section into `incomplete_answer`,
+  which the engine tries again with more room. `section_missing` cannot happen by construction.
+- **An answer that stopped short is tried again, not failed.** `llm.Structured` reads the finish
+  reason first: a content filter holds the page, a length stop is `EXTERNAL output_truncated`,
+  a malformed answer gets one repair round that shows the model its own answer, then `EXTERNAL`.
+  The writer's ceiling is `max(4096, words × 3 + 1024)` doubled per attempt up to three times,
+  the adapter clamps it to the model's maximum for every model, its own timeout no longer cuts a
+  call the step already bounds, and the step allows fifteen minutes.
+- **The linker owes phrases, not luck.** `repair_links` works out the required phrases the body
+  still lacks (the first anchor of each required target where its link may go, the primary keyword
+  in the first paragraph when the template asks), gives the model `iterations` tries per phrase,
+  and then writes a plain sentence itself with a `phrase_templated` warning; a body without a
+  paragraph gets one at the top. It never fails a page; only the run stopping stops it.
+- **Validation grades; a person decides.** The draft's findings and the linker's repairs join the
+  report, a planned h1 that lacks the keyword is a warning because the plan wins, and residual
+  errors hold the page as `needs_human` with a note that lists them. `Engine.Accept`, reached as
+  `RetryStep{acceptFindings: true}`, records `accept=<step>` in the checkpoint and the step goes on
+  with its findings as they are; `allowErrors` on the recipe still waives them for a whole run.
+- **No step fails a page on its own clock.** The judge and the image step turn their own deadline
+  into a warning and keep what they placed, a cancellation still stops them, and the image step's
+  timeout scales with the images asked for. A post is sent no parent and compared on none, because
+  WordPress keeps none, and the fake mirrors that.
+- **A bare wait is recorded as started, not done.** A step that answered `TransitionWait` with no
+  artifact and no checkpoint used to be recorded `done` and skipped when the item woke.
+
+### The queue
+
+- **A child is queued behind its parent.** An item of a run that publishes records the item of its
+  parent page in `run_items.blocked_by` (migration 0028, no foreign key so the down migration
+  round-trips) when the parent is a planned page of the same run; the dispatcher skips it until
+  the blocker completes or the parent page has a `wpId`, so a child never pays for a body it cannot
+  publish yet. When the blocker fails, is cancelled or is held, the sweep parks the child as
+  `awaiting_parent` with a note that names the parent and what to do, announces it and settles the
+  run; it repeats until grandchildren are parked too. The release rule is one predicate for the
+  dispatcher and the sweep: the blocker's page when there is a blocker, else the parent from the
+  map. A post, a revert and a recipe without publish take no blocker.
+- **Items are listed in the order they run**, by `seq`, and the view carries `blockedBy` and the
+  page a queued item sits behind.
+
+### Before the run costs anything
+
+- **The estimate prices every page on its own template** and runs the preflight each step declares:
+  a page mapped to nothing, a required link target without a page, an image source that is not
+  configured, a template whose recipe differs from the run's, a site whose record says it has no
+  companion plugin. The engine checks each model role it will call — a profile, an API key for the
+  provider through `Keys.Has(llm.SecretRef(provider))`, a catalog entry — and prices images on the
+  model that draws them (`Price.Ref`, 1,056 output tokens an image). A finding carries a severity
+  and, where it concerns one page, its id and path; `Start` refuses a run with a blocking finding
+  and `Estimate` shows them all. The finding for a differing recipe is not raised for a kind that
+  owns its recipe.
+
+### What the window sees
+
+- **Every step leaves a sentence.** `step.done` carries the step's message and `step.retrying` the
+  fault's code and sentence, so the feed and the timeline say what happened.
+- **A resumed run is live again.** The log keeps the sequence of the last terminal event and of the
+  last `run.started` or `run.resumed`; the run is terminal only while the terminal one is later, so
+  a regeneration or a resume after completion refills the feed instead of freezing it. `step.started`
+  refreshes the item rows, which is what made a run look paused while its steps moved.
+- **The drawer picks its primary action from what stopped the page**: accept at validate, retry
+  after exhausted attempts, regenerate after the writer gave up, the parent for a held child; the
+  header counts the pages that wait for a decision, the items table names the page each item is
+  queued after, and the start dialog grades each finding and refuses to start while one blocks.
+
+### Decided without asking
+
+- A post never waits for a parent in the queue and never gets one on the site.
+- `primaryInHeading` on an ordinary section is a request to the model and a warning when it is not
+  met, never an error; the heading is the template's.
+- The seeded templates are unchanged on an existing install; only a fresh install sees them.

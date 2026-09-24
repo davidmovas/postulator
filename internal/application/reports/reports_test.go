@@ -46,7 +46,7 @@ func newFixture(t *testing.T) *fixture {
 	artifactRepo := sqlite.NewArtifactRepo(store)
 	siteRepo := sqlite.NewSiteRepo(store)
 	templateService := templates.New(sqlite.NewTemplateRepo(store), sqlite.NewLinkPolicyRepo(store),
-		pageRepo, siteRepo, store, &applicationtest.Recorder{}, clock.NewFake(sqlitetest.Stamp))
+		pageRepo, sqlite.NewEntityRepo(store), siteRepo, store, &applicationtest.Recorder{}, clock.NewFake(sqlitetest.Stamp))
 	if err := templateService.EnsureSeeded(t.Context()); err != nil {
 		t.Fatalf("seed the templates: %v", err)
 	}

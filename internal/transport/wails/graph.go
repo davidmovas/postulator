@@ -27,45 +27,54 @@ type GraphUseCase interface {
 	RecomputeScores(ctx context.Context, req graph.RecomputeScoresRequest) (graph.RecomputeScoresResponse, error)
 	ProposeFromPages(ctx context.Context, req graph.ProposeFromPagesRequest) (graph.ProposeFromPagesResponse, error)
 	ProposeRelated(ctx context.Context, req graph.ProposeRelatedRequest) (graph.ProposeRelatedResponse, error)
+	PreviewFromPages(ctx context.Context, req graph.PreviewFromPagesRequest) (graph.PreviewFromPagesResponse, error)
+	ProposeFromKeywords(ctx context.Context, req graph.ProposeFromKeywordsRequest) (graph.ProposeFromKeywordsResponse, error)
+	ApplyProposals(ctx context.Context, req graph.ApplyProposalsRequest) (graph.ApplyProposalsResponse, error)
 }
 
 type GraphService struct {
-	loadGraph        middleware.Handler[graph.LoadGraphRequest, graph.LoadGraphResponse]
-	createEntity     middleware.Handler[graph.CreateEntityRequest, graph.CreateEntityResponse]
-	updateEntity     middleware.Handler[graph.UpdateEntityRequest, graph.UpdateEntityResponse]
-	deleteEntity     middleware.Handler[graph.DeleteEntityRequest, graph.DeleteEntityResponse]
-	getEntity        middleware.Handler[graph.GetEntityRequest, graph.GetEntityResponse]
-	listEntities     middleware.Handler[graph.ListEntitiesRequest, paging.List[graph.Entity]]
-	setAnchors       middleware.Handler[graph.SetAnchorsRequest, graph.SetAnchorsResponse]
-	addEdge          middleware.Handler[graph.AddEdgeRequest, graph.AddEdgeResponse]
-	approveEdge      middleware.Handler[graph.ApproveEdgeRequest, graph.ApproveEdgeResponse]
-	rejectEdge       middleware.Handler[graph.RejectEdgeRequest, graph.RejectEdgeResponse]
-	deleteEdge       middleware.Handler[graph.DeleteEdgeRequest, graph.DeleteEdgeResponse]
-	moveEntity       middleware.Handler[graph.MoveEntityRequest, graph.MoveEntityResponse]
-	listEdges        middleware.Handler[graph.ListEdgesRequest, paging.List[graph.Edge]]
-	recomputeScores  middleware.Handler[graph.RecomputeScoresRequest, graph.RecomputeScoresResponse]
-	proposeFromPages middleware.Handler[graph.ProposeFromPagesRequest, graph.ProposeFromPagesResponse]
-	proposeRelated   middleware.Handler[graph.ProposeRelatedRequest, graph.ProposeRelatedResponse]
+	loadGraph           middleware.Handler[graph.LoadGraphRequest, graph.LoadGraphResponse]
+	createEntity        middleware.Handler[graph.CreateEntityRequest, graph.CreateEntityResponse]
+	updateEntity        middleware.Handler[graph.UpdateEntityRequest, graph.UpdateEntityResponse]
+	deleteEntity        middleware.Handler[graph.DeleteEntityRequest, graph.DeleteEntityResponse]
+	getEntity           middleware.Handler[graph.GetEntityRequest, graph.GetEntityResponse]
+	listEntities        middleware.Handler[graph.ListEntitiesRequest, paging.List[graph.Entity]]
+	setAnchors          middleware.Handler[graph.SetAnchorsRequest, graph.SetAnchorsResponse]
+	addEdge             middleware.Handler[graph.AddEdgeRequest, graph.AddEdgeResponse]
+	approveEdge         middleware.Handler[graph.ApproveEdgeRequest, graph.ApproveEdgeResponse]
+	rejectEdge          middleware.Handler[graph.RejectEdgeRequest, graph.RejectEdgeResponse]
+	deleteEdge          middleware.Handler[graph.DeleteEdgeRequest, graph.DeleteEdgeResponse]
+	moveEntity          middleware.Handler[graph.MoveEntityRequest, graph.MoveEntityResponse]
+	listEdges           middleware.Handler[graph.ListEdgesRequest, paging.List[graph.Edge]]
+	recomputeScores     middleware.Handler[graph.RecomputeScoresRequest, graph.RecomputeScoresResponse]
+	proposeFromPages    middleware.Handler[graph.ProposeFromPagesRequest, graph.ProposeFromPagesResponse]
+	proposeRelated      middleware.Handler[graph.ProposeRelatedRequest, graph.ProposeRelatedResponse]
+	previewFromPages    middleware.Handler[graph.PreviewFromPagesRequest, graph.PreviewFromPagesResponse]
+	proposeFromKeywords middleware.Handler[graph.ProposeFromKeywordsRequest, graph.ProposeFromKeywordsResponse]
+	applyProposals      middleware.Handler[graph.ApplyProposalsRequest, graph.ApplyProposalsResponse]
 }
 
 func NewGraphService(logger *zap.Logger, useCase Source[GraphUseCase]) *GraphService {
 	return &GraphService{
-		loadGraph:        Wrap(logger, "graph.loadGraph", call(useCase, GraphUseCase.LoadGraph)),
-		createEntity:     Wrap(logger, "graph.createEntity", call(useCase, GraphUseCase.CreateEntity)),
-		updateEntity:     Wrap(logger, "graph.updateEntity", call(useCase, GraphUseCase.UpdateEntity)),
-		deleteEntity:     Wrap(logger, "graph.deleteEntity", call(useCase, GraphUseCase.DeleteEntity)),
-		getEntity:        Wrap(logger, "graph.getEntity", call(useCase, GraphUseCase.GetEntity)),
-		listEntities:     Wrap(logger, "graph.listEntities", call(useCase, GraphUseCase.ListEntities)),
-		setAnchors:       Wrap(logger, "graph.setAnchors", call(useCase, GraphUseCase.SetAnchors)),
-		addEdge:          Wrap(logger, "graph.addEdge", call(useCase, GraphUseCase.AddEdge)),
-		approveEdge:      Wrap(logger, "graph.approveEdge", call(useCase, GraphUseCase.ApproveEdge)),
-		rejectEdge:       Wrap(logger, "graph.rejectEdge", call(useCase, GraphUseCase.RejectEdge)),
-		deleteEdge:       Wrap(logger, "graph.deleteEdge", call(useCase, GraphUseCase.DeleteEdge)),
-		moveEntity:       Wrap(logger, "graph.moveEntity", call(useCase, GraphUseCase.MoveEntity)),
-		listEdges:        Wrap(logger, "graph.listEdges", call(useCase, GraphUseCase.ListEdges)),
-		recomputeScores:  Wrap(logger, "graph.recomputeScores", call(useCase, GraphUseCase.RecomputeScores)),
-		proposeFromPages: Wrap(logger, "graph.proposeFromPages", call(useCase, GraphUseCase.ProposeFromPages)),
-		proposeRelated:   Wrap(logger, "graph.proposeRelated", call(useCase, GraphUseCase.ProposeRelated)),
+		loadGraph:           Wrap(logger, "graph.loadGraph", call(useCase, GraphUseCase.LoadGraph)),
+		createEntity:        Wrap(logger, "graph.createEntity", call(useCase, GraphUseCase.CreateEntity)),
+		updateEntity:        Wrap(logger, "graph.updateEntity", call(useCase, GraphUseCase.UpdateEntity)),
+		deleteEntity:        Wrap(logger, "graph.deleteEntity", call(useCase, GraphUseCase.DeleteEntity)),
+		getEntity:           Wrap(logger, "graph.getEntity", call(useCase, GraphUseCase.GetEntity)),
+		listEntities:        Wrap(logger, "graph.listEntities", call(useCase, GraphUseCase.ListEntities)),
+		setAnchors:          Wrap(logger, "graph.setAnchors", call(useCase, GraphUseCase.SetAnchors)),
+		addEdge:             Wrap(logger, "graph.addEdge", call(useCase, GraphUseCase.AddEdge)),
+		approveEdge:         Wrap(logger, "graph.approveEdge", call(useCase, GraphUseCase.ApproveEdge)),
+		rejectEdge:          Wrap(logger, "graph.rejectEdge", call(useCase, GraphUseCase.RejectEdge)),
+		deleteEdge:          Wrap(logger, "graph.deleteEdge", call(useCase, GraphUseCase.DeleteEdge)),
+		moveEntity:          Wrap(logger, "graph.moveEntity", call(useCase, GraphUseCase.MoveEntity)),
+		listEdges:           Wrap(logger, "graph.listEdges", call(useCase, GraphUseCase.ListEdges)),
+		recomputeScores:     Wrap(logger, "graph.recomputeScores", call(useCase, GraphUseCase.RecomputeScores)),
+		proposeFromPages:    Wrap(logger, "graph.proposeFromPages", call(useCase, GraphUseCase.ProposeFromPages)),
+		proposeRelated:      Wrap(logger, "graph.proposeRelated", call(useCase, GraphUseCase.ProposeRelated)),
+		previewFromPages:    Wrap(logger, "graph.previewFromPages", call(useCase, GraphUseCase.PreviewFromPages)),
+		proposeFromKeywords: Wrap(logger, "graph.proposeFromKeywords", call(useCase, GraphUseCase.ProposeFromKeywords)),
+		applyProposals:      Wrap(logger, "graph.applyProposals", call(useCase, GraphUseCase.ApplyProposals)),
 	}
 }
 
@@ -131,4 +140,16 @@ func (s *GraphService) ProposeFromPages(c context.Context, req graph.ProposeFrom
 
 func (s *GraphService) ProposeRelated(c context.Context, req graph.ProposeRelatedRequest) (graph.ProposeRelatedResponse, error) {
 	return s.proposeRelated(c, req)
+}
+
+func (s *GraphService) PreviewFromPages(c context.Context, req graph.PreviewFromPagesRequest) (graph.PreviewFromPagesResponse, error) {
+	return s.previewFromPages(c, req)
+}
+
+func (s *GraphService) ProposeFromKeywords(c context.Context, req graph.ProposeFromKeywordsRequest) (graph.ProposeFromKeywordsResponse, error) {
+	return s.proposeFromKeywords(c, req)
+}
+
+func (s *GraphService) ApplyProposals(c context.Context, req graph.ApplyProposalsRequest) (graph.ApplyProposalsResponse, error) {
+	return s.applyProposals(c, req)
 }

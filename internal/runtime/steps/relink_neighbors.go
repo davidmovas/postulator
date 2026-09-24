@@ -56,11 +56,12 @@ type RelinkResult struct {
 
 func RelinkNeighbors(deps Deps) run.StepDef {
 	return run.StepDef{
-		Name:     NameRelinkNeighbors,
-		Requires: []run.ArtifactKind{run.ArtifactLinkContext, run.ArtifactPublishResult},
-		Produces: []run.ArtifactKind{run.ArtifactRelinkResult},
-		Retry:    run.RetryPolicy{Max: 2},
-		Timeout:  relinkTimeout,
+		Name:      NameRelinkNeighbors,
+		Preflight: pluginPreflight(deps, NameRelinkNeighbors, "cannot read or write the neighbors and stands down"),
+		Requires:  []run.ArtifactKind{run.ArtifactLinkContext, run.ArtifactPublishResult},
+		Produces:  []run.ArtifactKind{run.ArtifactRelinkResult},
+		Retry:     run.RetryPolicy{Max: 2},
+		Timeout:   relinkTimeout,
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			lc, err := linkContextOf(sc)
 			if err != nil {

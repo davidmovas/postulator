@@ -42,6 +42,8 @@ function node(id: string, drift: boolean, children: PageTreeNode[] = []): PageTr
             metaTitle: "",
             metaDescription: "",
             canonical: "",
+            primaryKeyword: "",
+            keywords: [],
             status: "published",
             entityId: null,
             templateId: null,

@@ -38,6 +38,8 @@ type Item struct {
 	TargetID           string         `json:"targetId"`
 	Status             string         `json:"status"`
 	CurrentStep        string         `json:"currentStep"`
+	Seq                int            `json:"seq"`
+	BlockedBy          string         `json:"blockedBy"`
 	Attempts           int            `json:"attempts"`
 	PauseReason        string         `json:"pauseReason"`
 	Error              string         `json:"error"`
@@ -133,6 +135,8 @@ func itemView(item run.Item, blocked run.RetryBlockedReason, awaited *AwaitedPar
 		TargetID:           item.TargetID,
 		Status:             string(item.Status),
 		CurrentStep:        item.CurrentStep,
+		Seq:                item.Seq,
+		BlockedBy:          item.BlockedBy,
 		Attempts:           item.Attempts,
 		PauseReason:        string(item.PauseReason),
 		Error:              item.Error,

@@ -57,6 +57,24 @@ func runPublish(t *testing.T, deps steps.Deps, sc *run.StepContext) steps.Publis
 	return published
 }
 
+func TestPublishWritesAPostWithoutAParent(t *testing.T) {
+	t.Parallel()
+
+	deps, _ := imageDeps(t)
+	sc := nestedContext(t)
+	sc.Page.WPType = pagemap.WPPost
+
+	published := runPublish(t, deps, sc)
+	if !published.Created || len(published.Mismatches) != 0 {
+		t.Fatalf("a post under a parent that is not on the site = %+v, want it written without waiting", published)
+	}
+
+	held, err := steps.Publish(deps).Run(t.Context(), nestedContext(t))
+	if err != nil || held.Next != run.TransitionPause || held.Reason != run.PauseAwaitingParent {
+		t.Fatalf("the same path as a page = %+v, %v; want it held for its parent", held, err)
+	}
+}
+
 func TestPublishCreatesThenUpdates(t *testing.T) {
 	t.Parallel()
 

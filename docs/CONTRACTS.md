@@ -29,7 +29,7 @@ the composition root binds the two.
 |---|---|
 | `HealthService` | `Ping` |
 | `SitesService` | `Create Update Delete Get List TestConnection` |
-| `GraphService` | `LoadGraph CreateEntity UpdateEntity DeleteEntity GetEntity ListEntities SetAnchors AddEdge ApproveEdge RejectEdge DeleteEdge ListEdges RecomputeScores ProposeFromPages ProposeRelated MoveEntity` |
+| `GraphService` | `LoadGraph CreateEntity UpdateEntity DeleteEntity GetEntity ListEntities SetAnchors AddEdge ApproveEdge RejectEdge DeleteEdge ListEdges RecomputeScores ProposeFromPages PreviewFromPages ProposeFromKeywords ApplyProposals ProposeRelated MoveEntity` |
 | `PagesService` | `Create Update Delete Get List Tree MapToEntity Unmap SetCanonical ReplaceLinks PreviewLink` |
 | `TemplatesService` | `CreateTemplate UpdateTemplate DeleteTemplate GetTemplate ListTemplates SetOverride DeleteOverride ResolveForPage CreatePolicy UpdatePolicy DeletePolicy GetPolicy ListPolicies GetEffectivePolicy` |
 | `RunsService` | `Start Estimate Get List ListItems ListEvents GetArtifact ListArtifacts Pause Resume Cancel RetryStep RevertRun` |
@@ -175,9 +175,19 @@ three tool step enums; `run.PerKindStep(name)` is the domain predicate and
 `run.StepNames()` is what a template recipe may draw from.
 
 `RunsService.Estimate` answers zero for `relink`, `repair` and `sync`, because none of their
-steps declares a model role. It carries `findings []{code, message}`, and `unpriced_step`
-names every enabled step that declares no ceiling. `Budget` carries `maxUsd` and `maxTokens`
-and either one pauses the run with `budget_exceeded`.
+steps declares a model role. It prices every target on the template that resolves for it and
+carries `findings []{severity, code, message, pageId?, path?}`: `unpriced_step` names an
+enabled step that declares no ceiling and no model, `template_unresolved`, `entity_missing`,
+`required_target_unplaced`, `provider_key_missing` and `model_unresolved` are graded `error`
+and `RunsService.Start` refuses the run with `INVALID` and `details.findings` while they
+stand, and `recipe_differs`, `model_unknown`, `image_source_unavailable` and `plugin_missing`
+are warnings. `Budget` carries `maxUsd` and `maxTokens` and either one pauses the run with
+`budget_exceeded`.
+
+`RunsService.RetryStep{itemId, acceptFindings?}` requeues the current step; with
+`acceptFindings` a page held at `validate` goes on with its findings as they are. An item
+carries `seq`, its place in the run, and `blockedBy`, the item of the parent it is queued
+behind, and `waitingFor` names that parent's page whenever the item has a blocker.
 
 A run's status may become `paused` with `pauseReason: needs_human` without any item failing,
 because a run whose every remaining item is waiting for a person has nothing left to advance.
@@ -210,6 +220,9 @@ envelope is
 ```json
 {"type":"step.done","seq":42,"runId":"<uuid>","at":"2026-09-17T10:30:00Z","payload":{}}
 ```
+
+`step.done` carries `message`, the sentence the step returned, and `step.retrying` carries
+`code` and `message`, the fault that made the engine try again, beside `attempt` and `afterMs`.
 
 `runId` is present on run events only, `at` is RFC3339 UTC, and `seq` is per run and
 gapless. For application events `seq` is a counter held by the `EventBridge`, so it is
@@ -322,9 +335,11 @@ sites, starts a run, follows the events and the catch-up, and sends an agent mes
 
 A tool is `{Def{Name, Description, Risk(read|write|dangerous), Schema}, Authorize, Run}`,
 every tool lives in its own file and `Binding{SiteID, ConversationID, RunID, Mode}` scopes
-every call. Eighty-nine tools, `runs_revert` (`dangerous`) and `graph_move_entity` (`write`)
-among them, measuring 74,617 bytes of schema — about 18,700 tokens resent on every round of
-every turn, which `TestTheToolSchemasFitTheirCeiling` holds against `schemaCeilingBytes`.
+every call. Ninety-three tools, `runs_revert` (`dangerous`), `graph_move_entity` (`write`),
+`graph_preview_from_pages` (`read`), `graph_propose_from_keywords` (`read`) and
+`graph_apply_proposals` (`write`) among them, measuring 78,971 bytes of schema — about 19,700
+tokens resent on every round of every turn, which `TestTheToolSchemasFitTheirCeiling` holds
+against `schemaCeilingBytes` (79,000).
 
 The guard chain runs in this order and the order matters: `fence` wraps tool output as
 untrusted data so a result cannot inject instructions into the model, `audit` writes the

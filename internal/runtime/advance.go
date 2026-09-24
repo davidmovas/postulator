@@ -73,6 +73,9 @@ func (e *Engine) advance(parent context.Context, itemID string) (bool, error) {
 		return false, err
 	}
 	e.forget(held.item.ID)
+	if !out.status.Advanceable() {
+		e.nudge()
+	}
 	return again, nil
 }
 
@@ -412,6 +415,9 @@ func (e *Engine) record(ctx context.Context, held *claim, out outcome, now time.
 
 	status := run.ExecDone
 	message := ""
+	if out.status == run.StatusWaiting && out.fault == nil && len(out.artifacts) == 0 && len(out.checkpoint) == 0 {
+		status = run.ExecStarted
+	}
 	if out.status == run.StatusFailed || (out.fault != nil && out.fault.Action != run.ActionPause) {
 		status = run.ExecFailed
 		message = out.fault.Message
@@ -464,7 +470,7 @@ func (e *Engine) announce(ctx context.Context, box *outbox, held *claim, out out
 	case out.status == run.StatusWaiting && out.attempts > 0:
 		box.add(ctx, runID, events.StepRetrying, events.StepRetryingPayload{
 			RunID: runID, ItemID: itemID, Step: step, Attempt: out.attempts,
-			AfterMs: e.delayMs(out.wakeAt),
+			AfterMs: e.delayMs(out.wakeAt), Code: faultCode(out.fault), Message: out.message,
 		})
 	case out.fault != nil:
 		box.add(ctx, runID, events.StepFailed, events.StepFailedPayload{
@@ -472,7 +478,7 @@ func (e *Engine) announce(ctx context.Context, box *outbox, held *claim, out out
 		})
 	default:
 		box.add(ctx, runID, events.StepDone, events.StepDonePayload{
-			RunID: runID, ItemID: itemID, Step: step, DurationMs: out.duration.Milliseconds(),
+			RunID: runID, ItemID: itemID, Step: step, DurationMs: out.duration.Milliseconds(), Message: out.message,
 		})
 	}
 

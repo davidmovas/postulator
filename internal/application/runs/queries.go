@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/application"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -76,29 +77,27 @@ func (s *Service) awaitedParents(ctx context.Context, runID string, items []run.
 
 	var siblings []run.Item
 	for i := range items {
-		if items[i].PauseReason != run.PauseAwaitingParent {
+		if items[i].BlockedBy == "" && items[i].PauseReason != run.PauseAwaitingParent {
 			continue
 		}
-		page, err := s.pages.Get(ctx, items[i].TargetID)
-		if err != nil {
-			return nil, err
-		}
-		if page.ParentPageID == nil {
-			continue
-		}
-		parent, err := s.pages.Get(ctx, *page.ParentPageID)
-		if err != nil {
-			return nil, err
-		}
-
 		if siblings == nil {
-			if siblings, err = s.items.ByRun(ctx, runID); err != nil {
+			listed, err := s.items.ByRun(ctx, runID)
+			if err != nil {
 				return nil, err
 			}
+			siblings = listed
 		}
-		ref := &AwaitedParent{PageID: parent.ID, Path: parent.Path}
+
+		gate, err := s.gateOf(ctx, items[i], siblings)
+		if err != nil {
+			return nil, err
+		}
+		if gate == nil {
+			continue
+		}
+		ref := &AwaitedParent{PageID: gate.ID, Path: gate.Path}
 		for j := range siblings {
-			if siblings[j].TargetID != parent.ID {
+			if siblings[j].TargetID != gate.ID {
 				continue
 			}
 			ref.ItemID = siblings[j].ID
@@ -108,6 +107,34 @@ func (s *Service) awaitedParents(ctx context.Context, runID string, items []run.
 		awaited[items[i].ID] = ref
 	}
 	return awaited, nil
+}
+
+func (s *Service) gateOf(ctx context.Context, item run.Item, siblings []run.Item) (*pagemap.Page, error) {
+	if item.BlockedBy != "" {
+		for j := range siblings {
+			if siblings[j].ID != item.BlockedBy {
+				continue
+			}
+			blocker, err := s.pages.Get(ctx, siblings[j].TargetID)
+			if err != nil {
+				return nil, err
+			}
+			return &blocker, nil
+		}
+	}
+
+	page, err := s.pages.Get(ctx, item.TargetID)
+	if err != nil {
+		return nil, err
+	}
+	if page.ParentPageID == nil {
+		return nil, nil
+	}
+	parent, err := s.pages.Get(ctx, *page.ParentPageID)
+	if err != nil {
+		return nil, err
+	}
+	return &parent, nil
 }
 
 func (s *Service) retryBlocks(ctx context.Context, items []run.Item) (map[string]run.RetryBlockedReason, error) {

@@ -22,7 +22,7 @@ import { actionLabel, actionTone, edgeKindLabel } from "./labels.js";
 type Sheet = "pages" | "entities" | "edges";
 
 const grids: Readonly<Record<Sheet, string>> = {
-    pages: "minmax(0,2fr) minmax(0,1.6fr) minmax(0,1fr) 6rem",
+    pages: "minmax(0,2fr) minmax(0,1.6fr) minmax(0,1.2fr) minmax(0,1fr) 6rem",
     entities: "minmax(0,1.4fr) 7rem minmax(0,1.4fr) 6rem",
     edges: "minmax(0,1.4fr) minmax(0,1.4fr) 7rem 6rem",
 };
@@ -90,6 +90,7 @@ export function StepPreview({ report, onBack, onApply }: StepPreviewProps): Reac
                             <>
                                 <span>{copy.imports.preview.columnPath}</span>
                                 <span>{copy.imports.preview.columnTitle}</span>
+                                <span>{copy.imports.preview.columnKeyword}</span>
                                 <span>{copy.imports.preview.columnEntity}</span>
                                 <span>{copy.imports.preview.columnAction}</span>
                             </>
@@ -116,6 +117,9 @@ export function StepPreview({ report, onBack, onApply }: StepPreviewProps): Reac
                                       {page.path}
                                   </TableCell>
                                   <TableCell title={page.title}>{page.title}</TableCell>
+                                  <TableCell muted={true} title={page.primaryKeyword ?? ""}>
+                                      {page.primaryKeyword ?? ""}
+                                  </TableCell>
                                   <TableCell muted={true}>{page.entity ?? ""}</TableCell>
                                   <TableCell>
                                       <StatusBadge tone={actionTone(page.action)} dot={false}>

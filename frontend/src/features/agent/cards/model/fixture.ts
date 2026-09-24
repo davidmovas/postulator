@@ -46,6 +46,12 @@ export const confirmableArgs: Readonly<Record<string, Record<string, unknown>>> 
     graph_recompute_scores: {},
     graph_propose_from_pages: {},
     graph_propose_related: { entityId: "e1" },
+    graph_apply_proposals: {
+        entities: [
+            { pageId: "p1", path: "/mugs/travel/", name: "Travel Mugs", kind: "topic", primaryKeyword: "travel mugs", parent: "/mugs/" },
+            { name: "Insulated Mugs", kind: "topic", primaryKeyword: "insulated mugs", parent: "Mugs" },
+        ],
+    },
     pages_create: { path: "/mugs/travel/", title: "Travel Mugs", h1: "Travel mugs", wpType: "page", status: "planned", entityId: "e2", templateId: "t1", metaTitle: "", metaDescription: "", canonical: "" },
     pages_update: { id: "p1", title: "Travel mugs that keep coffee hot", status: "exists" },
     pages_delete: { id: "p1" },

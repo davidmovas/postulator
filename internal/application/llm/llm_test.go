@@ -3,6 +3,7 @@ package llm_test
 import (
 	"context"
 	"encoding/json"
+	stderrors "errors"
 	"strings"
 	"testing"
 
@@ -264,7 +265,8 @@ func TestStructured(t *testing.T) {
 		wantTitle string
 		wantUsage domain.Usage
 		wantCalls int
-		wantErr   bool
+		wantCode  errors.Code
+		wantWhy   string
 	}{
 		{
 			name:      "decodes the first answer",
@@ -291,7 +293,28 @@ func TestStructured(t *testing.T) {
 			},
 			wantUsage: domain.Usage{Input: 20, Output: 4, Total: 24},
 			wantCalls: 2,
-			wantErr:   true,
+			wantCode:  errors.External,
+			wantWhy:   llm.ReasonMalformedAnswer,
+		},
+		{
+			name: "does not repair an answer that stopped for length",
+			responses: []llm.Response{
+				{Text: `{"heading":"Koff`, Usage: domain.Usage{Input: 10, Output: 8, Total: 18}, FinishReason: llm.FinishLength},
+			},
+			wantUsage: domain.Usage{Input: 10, Output: 8, Total: 18},
+			wantCalls: 1,
+			wantCode:  errors.External,
+			wantWhy:   llm.ReasonOutputTruncated,
+		},
+		{
+			name: "holds a filtered answer for a human",
+			responses: []llm.Response{
+				{Text: "", Usage: domain.Usage{Input: 10, Output: 0, Total: 10}, FinishReason: llm.FinishContentFilter},
+			},
+			wantUsage: domain.Usage{Input: 10, Output: 0, Total: 10},
+			wantCalls: 1,
+			wantCode:  errors.NeedsHuman,
+			wantWhy:   llm.ReasonContentFilter,
 		},
 	}
 
@@ -306,9 +329,12 @@ func TestStructured(t *testing.T) {
 				Messages: userMessage("write a section"),
 			})
 
-			if tc.wantErr {
-				if !errors.IsCode(err, errors.Invalid) {
-					t.Fatalf("Structured error = %v, want %s", err, errors.Invalid)
+			if tc.wantCode != "" {
+				if !errors.IsCode(err, tc.wantCode) {
+					t.Fatalf("Structured error = %v, want %s", err, tc.wantCode)
+				}
+				if why := reasonOf(err); why != tc.wantWhy {
+					t.Fatalf("Structured error reason = %v, want %s", why, tc.wantWhy)
 				}
 			} else if err != nil {
 				t.Fatalf("Structured: %v", err)
@@ -332,8 +358,9 @@ func TestStructured(t *testing.T) {
 			}
 			if tc.wantCalls > 1 {
 				repaired := client.seen[1].Messages
-				if len(repaired) != 2 || !strings.Contains(repaired[1].Text, "could not be decoded") {
-					t.Errorf("repair messages = %+v, want the decoder error appended", repaired)
+				if len(repaired) != 3 || repaired[1].Role != llm.RoleAssistant || repaired[1].Text != "not json" ||
+					!strings.Contains(repaired[2].Text, "could not be decoded") {
+					t.Errorf("repair messages = %+v, want the answer shown back with the decoder error", repaired)
 				}
 				if len(first.Messages) != 1 {
 					t.Errorf("first request messages = %+v, want the original single message", first.Messages)
@@ -362,4 +389,16 @@ func TestStructuredRejectsAnUnsupportedType(t *testing.T) {
 	if len(client.seen) != 0 {
 		t.Errorf("calls = %d, want the schema to fail before the request", len(client.seen))
 	}
+}
+
+func reasonOf(err error) string {
+	var kernel *errors.Error
+	if !stderrors.As(err, &kernel) {
+		return ""
+	}
+	reason, ok := kernel.Details["reason"].(string)
+	if !ok {
+		return ""
+	}
+	return reason
 }

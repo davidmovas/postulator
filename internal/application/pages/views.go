@@ -34,6 +34,8 @@ type Page struct {
 	MetaTitle       string     `json:"metaTitle"`
 	MetaDescription string     `json:"metaDescription"`
 	Canonical       string     `json:"canonical"`
+	PrimaryKeyword  string     `json:"primaryKeyword"`
+	Keywords        []string   `json:"keywords"`
 	Status          string     `json:"status"`
 	EntityID        *string    `json:"entityId"`
 	TemplateID      *string    `json:"templateId"`
@@ -90,6 +92,8 @@ func view(p pagemap.Page) Page {
 		H1:              p.H1,
 		MetaTitle:       p.MetaTitle,
 		MetaDescription: p.MetaDescription,
+		PrimaryKeyword:  p.PrimaryKeyword,
+		Keywords:        keywordsOf(p.Keywords),
 		Canonical:       p.Canonical,
 		Status:          string(p.Status),
 		EntityID:        p.EntityID,
@@ -152,4 +156,11 @@ func conflicts(evidence []pagemap.Evidence) []Conflict {
 		out = append(out, Conflict{PageID: evidence[i].PageID, Path: evidence[i].Path, Reason: string(evidence[i].Reason), EntityID: evidence[i].EntityID})
 	}
 	return out
+}
+
+func keywordsOf(keywords []string) []string {
+	if keywords == nil {
+		return []string{}
+	}
+	return keywords
 }

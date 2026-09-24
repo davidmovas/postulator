@@ -145,7 +145,7 @@ func TestExportAndImportRoundTripTheWholeSite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Export: %v", err)
 	}
-	if got.Pages != 3 || got.Entities != 4 {
+	if got.Pages != 2 || got.Entities != 4 {
 		t.Fatalf("export = %+v", got)
 	}
 
@@ -273,7 +273,7 @@ func TestThePageKindPicksTheSiteTemplateOverTheGlobalOne(t *testing.T) {
 	}
 
 	mapping := h.mapping(map[string]string{string(importmap.FieldPath): "path", string(importmap.FieldPageKind): "page type"})
-	got := h.apply(t, h.file(t, "kinds.csv", "path,page type\n/,"+seed.PageKind+"\n"), mapping)
+	got := h.apply(t, h.file(t, "kinds.csv", "path,page type\n/hub/,"+seed.PageKind+"\n"), mapping)
 	if len(got.Report.Warnings) != 0 {
 		t.Fatalf("warnings = %+v", got.Report.Warnings)
 	}

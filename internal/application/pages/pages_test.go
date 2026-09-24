@@ -3,6 +3,7 @@ package pages_test
 import (
 	"encoding/json"
 	stderrors "errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -448,5 +449,36 @@ func TestDeleteOnSiteNeedsAPageThatIsOnTheSite(t *testing.T) {
 	_, err := h.service.Delete(t.Context(), pages.DeleteRequest{ID: planned.ID, OnSite: true})
 	if !errors.IsCode(err, errors.Invalid) || fieldOf(err) != "wpId" {
 		t.Fatalf("Delete = %v, want an invalid error naming wpId", err)
+	}
+}
+
+func TestCreateAndUpdateCarryTheKeywordsOfThePage(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	created, err := h.service.Create(t.Context(), pages.CreateRequest{
+		SiteID: h.siteID, Path: "/shoes/", Title: "Shoes", PrimaryKeyword: " running shoes ", Keywords: []string{"trail shoes", "Trail Shoes", ""},
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if created.Page.PrimaryKeyword != "running shoes" || !slices.Equal(created.Page.Keywords, []string{"trail shoes"}) {
+		t.Fatalf("Create answered %q %v", created.Page.PrimaryKeyword, created.Page.Keywords)
+	}
+
+	updated, err := h.service.Update(t.Context(), pages.UpdateRequest{ID: created.Page.ID, Keywords: []string{"road shoes"}})
+	if err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if updated.Page.PrimaryKeyword != "running shoes" || !slices.Equal(updated.Page.Keywords, []string{"road shoes"}) {
+		t.Fatalf("Update answered %q %v, want the primary kept and the list replaced", updated.Page.PrimaryKeyword, updated.Page.Keywords)
+	}
+
+	bare, err := h.service.Create(t.Context(), pages.CreateRequest{SiteID: h.siteID, Path: "/socks/"})
+	if err != nil {
+		t.Fatalf("Create without keywords: %v", err)
+	}
+	if bare.Page.Keywords == nil {
+		t.Fatal("a page without keywords answers null instead of an empty list")
 	}
 }

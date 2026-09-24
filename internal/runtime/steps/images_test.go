@@ -277,6 +277,43 @@ func TestGenerateImagesRecordsWhatItCouldNotDo(t *testing.T) {
 	}
 }
 
+func TestGenerateImagesKeepsWhatItPlacedWhenTimeRunsOut(t *testing.T) {
+	t.Parallel()
+
+	deps, _ := imageDeps(t)
+	deps.ImageProvider = &drawing{err: errors.New(errors.Cancelled, "the image model ran out of time")}
+	ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+	defer cancel()
+
+	result, err := steps.GenerateImages(deps).Run(ctx, imageContext(t, template.Images{Featured: true, Source: template.ImagesAI}))
+	if err != nil {
+		t.Fatalf("an image step that ran out of its own time failed the item: %v", err)
+	}
+	var manifest steps.ImagesResult
+	if err = json.Unmarshal(result.Artifacts[0].Blob, &manifest); err != nil {
+		t.Fatalf("decode the manifest: %v", err)
+	}
+	if len(manifest.Findings) != 1 || manifest.Findings[0].Code != steps.CodeImagesFailed {
+		t.Fatalf("findings = %+v, want the images_failed warning", manifest.Findings)
+	}
+	if steps.GenerateImages(deps).Timeout < 10*time.Minute {
+		t.Errorf("the image step runs under %s, want room for every image", steps.GenerateImages(deps).Timeout)
+	}
+}
+
+func TestGenerateImagesStopsForACancelledRun(t *testing.T) {
+	t.Parallel()
+
+	deps, _ := imageDeps(t)
+	deps.ImageProvider = &drawing{err: errors.New(errors.Cancelled, "the run was stopped")}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	if _, err := steps.GenerateImages(deps).Run(ctx, imageContext(t, template.Images{Featured: true, Source: template.ImagesAI})); !errors.IsCode(err, errors.Cancelled) {
+		t.Fatalf("a stopped run must hand the step back, got %v", err)
+	}
+}
+
 func TestGenerateImagesReportsAnImageItCouldNotPlace(t *testing.T) {
 	t.Parallel()
 

@@ -1,19 +1,23 @@
 {{define "generate_body.system"}}
 You are an SEO editor writing body copy for a WordPress page in a network of topically connected pages.
 Write in English. Write in a {{if .Spec.Tone}}{{.Spec.Tone}}{{else}}clear and factual{{end}} tone.
-Return one JSON object with the fields title, h1, sections and summary. Every section carries a heading and
-an html field. The html field holds only body markup: paragraphs, lists, tables and inline emphasis. It never
-holds a heading tag, a script, a style, an iframe or an anchor.
+Return one JSON object with the fields title, h1, sections and summary. Every section carries slot, heading
+and html. The slot is the number of the section in the brief below, or 0 for a section of your own. The
+heading is the heading the brief gives, exactly as written. The html field holds only body markup:
+paragraphs, lists, tables and inline emphasis. It never holds a heading tag, a script, a style, an iframe or
+an anchor.
 You may not invent links. Internal links are added by a later step, which needs the exact phrases listed
-under REQUIRED PHRASES to appear verbatim in the body text.
+under REQUIRED PHRASES to appear verbatim in the body text, where the brief says.
 {{end}}
 
 {{define "generate_body.user"}}
 PAGE
 Path: {{.Page.Path}}
-Title: {{if .Page.Title}}{{.Page.Title}}{{else}}{{.Entity.Name}}{{end}}
-H1: {{if .Page.H1}}{{.Page.H1}}{{else}}{{.Entity.Name}}{{end}}
-
+{{if .Brief.PlannedTitle}}Title: {{.Brief.Title}} (planned; answer with it as it is)
+{{else}}Title: write one{{if .Brief.TitleRule}} that carries the primary keyword{{end}}
+{{end}}{{if .Brief.PlannedH1}}H1: {{.Brief.H1}} (planned; answer with it as it is)
+{{else}}H1: write one{{if .Brief.H1Rule}} that carries the primary keyword{{end}}
+{{end}}
 ENTITY
 Name: {{.Entity.Name}}
 Kind: {{.Entity.Kind}}
@@ -22,9 +26,7 @@ Primary keyword: {{.Entity.PrimaryKeyword}}
 {{if .Entity.SecondaryKeywords}}Secondary keywords: {{range $index, $keyword := .Entity.SecondaryKeywords}}{{if $index}}, {{end}}{{$keyword}}{{end}}{{end}}
 
 KEYWORD RULES
-{{if .Spec.KeywordRules.PrimaryInTitle}}The title contains the primary keyword.
-{{end}}{{if .Spec.KeywordRules.PrimaryInH1}}The h1 contains the primary keyword.
-{{end}}{{if .Spec.KeywordRules.PrimaryInFirstParagraph}}The first paragraph of the first section contains the primary keyword.
+{{if .Brief.LeadRule}}The first paragraph of section 1 contains the primary keyword.
 {{end}}{{if .Spec.KeywordRules.MaxDensity}}Keep the primary keyword below {{.Spec.KeywordRules.MaxDensity}} of all words.
 {{end}}
 LENGTH
@@ -32,17 +34,18 @@ LENGTH
 {{end}}{{if .Spec.Length.Max}}At most {{.Spec.Length.Max}} words in total.
 {{end}}
 SECTIONS
-{{range .Spec.Sections}}- {{.Heading}}{{if .Required}} (required){{end}}{{if .TargetWords}}, about {{.TargetWords}} words{{end}}{{if .Intent}}: {{.Intent}}{{end}}
-{{else}}- Write the sections the topic needs, each with its own heading.
+{{if .Brief.Sections}}Write these sections in this order. Number each with its slot and use its heading exactly as written.
+{{range .Brief.Sections}}{{.Slot}}. {{.Heading}}{{if .Required}} (required){{end}}{{if .Words}}, about {{.Words}} words{{end}}{{if .Intent}}: {{.Intent}}{{end}}{{if .PrimaryInHeading}} (the heading may add the primary keyword as long as the words above stay in it){{end}}
+{{end}}{{else}}Write the sections the topic needs, each with slot 0 and a heading of your own.
 {{end}}
 REQUIRED PHRASES
-{{range .Phrases}}- {{.}}
+{{range .Brief.Phrases}}- {{.Text}}{{if .Lead}}, in the first paragraph of section 1{{else if .Within}}, within the first {{.Within}} paragraphs of the page{{end}}: {{.Why}}
 {{else}}- none
 {{end}}
 Each required phrase appears at least once, verbatim and in running body text, never inside a heading.
 {{if .Children}}
 CHILDREN
-The page closes with one more section, with a heading of your own, that walks through the pages below this
-one. Name each of these in it, verbatim and in running body text:
+The page closes with one more section, with slot 0 and a heading of your own, that walks through the pages
+below this one. Name each of these in it, verbatim and in running body text:
 {{range .Children}}- {{.}}
 {{end}}{{end}}{{end}}

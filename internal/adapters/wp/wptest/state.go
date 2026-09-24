@@ -147,6 +147,9 @@ func (s *Server) itemPath(stored *Item) string {
 }
 
 func (s *Server) add(item Item) Item {
+	if !hierarchical(item.Type) {
+		item.Parent = 0
+	}
 	if item.Type == "" {
 		item.Type = TypePage
 	}

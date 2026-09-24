@@ -192,62 +192,6 @@ func TestAttrAndTextOf(t *testing.T) {
 	}
 }
 
-func TestAssembleBuildsABody(t *testing.T) {
-	t.Parallel()
-
-	draft := content.ContentDraft{
-		Title: "Espresso guide",
-		H1:    "Espresso & you",
-		Sections: []content.DraftSection{
-			{Heading: "Beans", HTML: "<p>Pick a roast.</p>"},
-			{HTML: "<p>No heading here.</p>"},
-		},
-		Summary: "A guide.",
-	}
-
-	doc, err := content.Assemble(draft)
-	if err != nil {
-		t.Fatalf("Assemble: %v", err)
-	}
-	want := "<h1>Espresso &amp; you</h1><h2>Beans</h2><p>Pick a roast.</p><p>No heading here.</p>"
-	if body := bodyOf(t, doc); body != want {
-		t.Fatalf("Assemble = %q, want %q", body, want)
-	}
-}
-
-func TestAssembleRefusesAnIncompleteDraft(t *testing.T) {
-	t.Parallel()
-
-	complete := content.ContentDraft{
-		Title: "t", H1: "h", Sections: []content.DraftSection{{Heading: "s", HTML: "<p>x</p>"}},
-	}
-
-	cases := []struct {
-		name   string
-		mutate func(*content.ContentDraft)
-	}{
-		{name: "no title", mutate: func(d *content.ContentDraft) { d.Title = " " }},
-		{name: "no h1", mutate: func(d *content.ContentDraft) { d.H1 = "" }},
-		{name: "no sections", mutate: func(d *content.ContentDraft) { d.Sections = nil }},
-		{
-			name:   "an empty section",
-			mutate: func(d *content.ContentDraft) { d.Sections = []content.DraftSection{{Heading: "s"}} },
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			draft := complete
-			tc.mutate(&draft)
-			if _, err := content.Assemble(draft); !errors.IsCode(err, errors.Invalid) {
-				t.Fatalf("Assemble = %v, want an invalid error", err)
-			}
-		})
-	}
-}
-
 func TestInsertAfterSection(t *testing.T) {
 	t.Parallel()
 
@@ -323,5 +267,63 @@ func TestInsertAfterSectionRefusesNonsense(t *testing.T) {
 				t.Fatalf("code = %q, want %q (err %v)", errors.CodeOf(err), errors.Invalid, err)
 			}
 		})
+	}
+}
+
+func TestPrependParagraph(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		body string
+		text string
+		want string
+	}{
+		{
+			name: "after a leading h1",
+			body: "<h1>Espresso</h1><h2>About</h2><ul><li>One.</li></ul>",
+			text: "This page is about espresso.",
+			want: "<h1>Espresso</h1><p>This page is about espresso.</p><h2>About</h2><ul><li>One.</li></ul>",
+		},
+		{
+			name: "at the top of a body without an h1",
+			body: "<h2>About</h2><ul><li>One.</li></ul>",
+			text: "Read more about coffee.",
+			want: "<p>Read more about coffee.</p><h2>About</h2><ul><li>One.</li></ul>",
+		},
+		{
+			name: "into an empty body",
+			body: "",
+			text: "Read more about <coffee> & tea.",
+			want: "<p>Read more about &lt;coffee&gt; &amp; tea.</p>",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc, err := content.Parse(tc.body)
+			if err != nil {
+				t.Fatalf("Parse: %v", err)
+			}
+			if err = doc.PrependParagraph(tc.text); err != nil {
+				t.Fatalf("PrependParagraph: %v", err)
+			}
+			if got := bodyOf(t, doc); got != tc.want {
+				t.Errorf("Render =\n%s\nwant\n%s", got, tc.want)
+			}
+			if paragraphs := doc.Paragraphs(); len(paragraphs) != 1 {
+				t.Errorf("the body holds %d paragraphs, want the one prepended", len(paragraphs))
+			}
+		})
+	}
+
+	doc, err := content.Parse("<p>One.</p>")
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if err = doc.PrependParagraph("   "); !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("PrependParagraph with nothing to say = %v, want an invalid error", err)
 	}
 }

@@ -151,8 +151,10 @@ func InternalPath(href, siteHost string) (path string, internal bool) {
 	}
 }
 
+const RootPath = "/"
+
 func ParentPath(path string) string {
-	if path == "" || path == "/" {
+	if path == "" || path == RootPath {
 		return ""
 	}
 	trimmed := strings.TrimSuffix(path, "/")

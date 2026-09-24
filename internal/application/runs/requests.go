@@ -109,7 +109,8 @@ type RevertResponse struct {
 }
 
 type RetryStepRequest struct {
-	ItemID string `json:"itemId" description:"The id of the failed run item to try again, exactly as runs_list_items returned it"`
+	ItemID         string `json:"itemId" description:"The id of the stopped run item to try again, exactly as runs_list_items returned it"`
+	AcceptFindings bool   `json:"acceptFindings,omitempty" description:"Let a page held at validate go on with its findings as they are"`
 }
 
 type RetryStepResponse struct{}

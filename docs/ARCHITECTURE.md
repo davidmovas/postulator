@@ -121,10 +121,27 @@ checkpoint, a `StepExec` row and an appended event together. Large step outputs 
 `Artifact` rows and the checkpoint keeps their ids.
 
 Steps are idempotent: a step is skipped if a `StepExec` already records it done for an
-input hash of `(step, params, required artifact hashes, template version)`. A sweep
-daemon re-arms waiting items, reclaims items whose lease expired because the process
-died mid-step, and fails runs past their deadline. Crash recovery is one sweep at
+input hash of `(step, params, required artifact hashes, template version, checkpoint)`. A
+sweep daemon re-arms waiting items, reclaims items whose lease expired because the process
+died mid-step, releases held children whose parent reached the site, parks the children of
+an item that stopped, and fails runs past their deadline. Crash recovery is one sweep at
 startup, not a separate mechanism.
+
+The queue knows the page tree. `Enqueue` orders the targets ancestors first and, in a run
+that publishes, records in `blocked_by` the item of the parent page when that parent is a
+planned page of the same run. The dispatcher skips a blocked item until its blocker completes
+or the parent page has a `wpId`, so a child never pays for a body it cannot publish yet; when
+the blocker fails, is cancelled or is held for a decision, the sweep parks the child as
+`awaiting_parent` with a note naming the parent and what to do, and repeats until the
+grandchildren are parked too. The release rule is the same for the dispatcher and the sweep:
+the blocker's page when there is a blocker, else the parent from the page map. A regeneration
+of the parent keeps the item id, so the relation holds.
+
+Before a run costs anything, `EstimateRun` resolves the template of every target, runs the
+preflight each step declares, checks each model role it will call (profile, API key, catalog
+entry) and prices every page on its own spec; a finding graded `error` stops `Start`. A page
+whose validation finds an error is held as `needs_human`, and `Engine.Accept` requeues the step
+with `accept=<step>` in the checkpoint, which `StepContext.Accepted()` reads.
 
 An item that fails never fails the run. The run completes with `Stats.Failed > 0`, or
 fails only when every item failed.

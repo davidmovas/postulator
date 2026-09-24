@@ -16,7 +16,6 @@ import (
 
 type planned struct {
 	record run.Run
-	spec   template.TemplateSpec
 	added  []AddedPage
 }
 
@@ -26,9 +25,12 @@ func (s *Service) Start(ctx context.Context, req StartRequest) (StartResponse, e
 		return StartResponse{}, err
 	}
 
-	estimate, err := s.engine.EstimateRun(ctx, plan.record, plan.spec)
+	estimate, err := s.engine.EstimateRun(ctx, plan.record)
 	if err != nil {
 		return StartResponse{}, err
+	}
+	if blocking := estimate.Blocking(); len(blocking) > 0 {
+		return StartResponse{}, refusedByPreflight(blocking)
 	}
 
 	plan.record.ID = id.New()
@@ -45,11 +47,20 @@ func (s *Service) Estimate(ctx context.Context, req StartRequest) (EstimateRespo
 		return EstimateResponse{}, err
 	}
 
-	estimate, err := s.engine.EstimateRun(ctx, plan.record, plan.spec)
+	estimate, err := s.engine.EstimateRun(ctx, plan.record)
 	if err != nil {
 		return EstimateResponse{}, err
 	}
 	return EstimateResponse{Estimate: estimate, Added: plan.added}, nil
+}
+
+func refusedByPreflight(blocking []run.EstimateFinding) error {
+	messages := make([]string, 0, len(blocking))
+	for i := range blocking {
+		messages = append(messages, blocking[i].Message)
+	}
+	return invalid("the run cannot start until this is settled: "+strings.Join(messages, "; "), "pageIds").
+		WithDetail("findings", blocking)
 }
 
 func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
@@ -138,7 +149,6 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
 			Budget:          req.Budget,
 			CreatedBy:       actor,
 		},
-		spec:  spec,
 		added: added,
 	}, nil
 }

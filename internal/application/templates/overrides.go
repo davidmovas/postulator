@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -101,12 +103,12 @@ func (s *Service) ResolveForPage(ctx context.Context, req ResolveForPageRequest)
 		return ResolveForPageResponse{}, err
 	}
 
+	owner, err := s.sites.Get(ctx, page.SiteID)
+	if err != nil {
+		return ResolveForPageResponse{}, err
+	}
 	templateID := page.TemplateID
 	if templateID == nil {
-		owner, siteErr := s.sites.Get(ctx, page.SiteID)
-		if siteErr != nil {
-			return ResolveForPageResponse{}, siteErr
-		}
 		templateID = owner.Defaults.TemplateID
 	}
 	if templateID == nil {
@@ -129,5 +131,26 @@ func (s *Service) ResolveForPage(ctx context.Context, req ResolveForPageRequest)
 	if err != nil {
 		return ResolveForPageResponse{}, err
 	}
-	return ResolveForPageResponse{TemplateID: base.ID, SiteID: page.SiteID, Version: base.Version, Spec: spec}, nil
+	vars, err := s.varsFor(ctx, page, owner)
+	if err != nil {
+		return ResolveForPageResponse{}, err
+	}
+	return ResolveForPageResponse{TemplateID: base.ID, SiteID: page.SiteID, Version: base.Version, Spec: spec.Expanded(vars)}, nil
+}
+
+func (s *Service) varsFor(ctx context.Context, page pagemap.Page, owner site.Site) (template.Vars, error) {
+	vars := template.Vars{SiteName: owner.Name, PageTitle: page.Title}
+	if page.EntityID == nil {
+		return vars, nil
+	}
+	entity, err := s.entities.Get(ctx, *page.EntityID)
+	if errors.IsCode(err, errors.NotFound) {
+		return vars, nil
+	}
+	if err != nil {
+		return template.Vars{}, err
+	}
+	vars.PrimaryKeyword = entity.PrimaryKeyword
+	vars.EntityName = entity.Name
+	return vars, nil
 }
