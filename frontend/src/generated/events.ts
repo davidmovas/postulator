@@ -268,6 +268,7 @@ export interface StepDonePayload {
     itemId: string;
     step: string;
     durationMs: number;
+    message: string;
 }
 
 export interface StepFailedPayload {
@@ -284,6 +285,8 @@ export interface StepRetryingPayload {
     step: string;
     attempt: number;
     afterMs: number;
+    code: string;
+    message: string;
 }
 
 export interface StepStartedPayload {

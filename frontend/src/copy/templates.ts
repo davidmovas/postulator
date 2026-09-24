@@ -277,6 +277,7 @@ export const templates = {
         empty: "No sections yet",
         emptyBody: "A template needs at least one section before a run can use it.",
         heading: "Heading",
+        headingHint: "{primaryKeyword}, {entityName}, {siteName} and {pageTitle} are filled in per page.",
         intent: "What this section has to do",
         intentHint: "Written for the model, not for the reader.",
         targetWords: "Target words",
@@ -328,7 +329,7 @@ export const templates = {
     meta: {
         title: "Meta",
         titlePattern: "Title pattern",
-        titlePatternHint: "Placeholders such as {primaryKeyword} and {siteName} are filled in per page.",
+        titlePatternHint: "{primaryKeyword}, {entityName}, {siteName} and {pageTitle} are filled in per page.",
         descriptionMax: "Longest description",
         descriptionMaxHint: "Characters. Google truncates around 155.",
         images: "Images",

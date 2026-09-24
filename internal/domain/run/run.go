@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	kctx "github.com/davidmovas/postulator/internal/kernel/ctx"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -116,14 +117,27 @@ type Budget struct {
 }
 
 type EstimateFinding struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
+	Severity content.Severity `json:"severity"`
+	Code     string           `json:"code"`
+	Message  string           `json:"message"`
+	PageID   string           `json:"pageId,omitempty"`
+	Path     string           `json:"path,omitempty"`
 }
 
 type Estimate struct {
 	Tokens   int               `json:"tokens"`
 	USD      float64           `json:"usd"`
 	Findings []EstimateFinding `json:"findings"`
+}
+
+func (e Estimate) Blocking() []EstimateFinding {
+	out := make([]EstimateFinding, 0)
+	for i := range e.Findings {
+		if e.Findings[i].Severity == content.SeverityError {
+			out = append(out, e.Findings[i])
+		}
+	}
+	return out
 }
 
 type Stats struct {
@@ -208,6 +222,7 @@ type Item struct {
 	Attempts    int
 	Seq         int
 	AdvanceSeq  int64
+	BlockedBy   string
 	Checkpoint  Checkpoint
 	LeaseUntil  *time.Time
 	WakeAt      *time.Time
@@ -244,6 +259,8 @@ func NewItem(i Item) (Item, error) {
 		return Item{}, invalid("item attempts must not be negative", "attempts")
 	case i.PauseReason != "" && !i.PauseReason.Valid():
 		return Item{}, invalid("pause reason is not recognized", "pauseReason")
+	case i.BlockedBy == i.ID:
+		return Item{}, invalid("an item cannot wait for itself", "blockedBy")
 	}
 	return i, nil
 }

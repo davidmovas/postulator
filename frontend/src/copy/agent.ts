@@ -250,6 +250,8 @@ export const agent = {
             proposeBody: "One model call per forty unmapped pages. Nothing is approved on its own.",
             proposeRelated: "Propose related edges",
             proposeAround: "Only pairs that involve",
+            applyProposals: (count: number) => (count === 1 ? "Write one proposed entity" : `Write ${count} proposed entities`),
+            applyProposalsBody: "Each one is created, its page mapped to it and its edges proposed. Nothing is approved on its own.",
         },
         pages: {
             create: (path: string) => `Plan page ${path}`,

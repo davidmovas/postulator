@@ -97,6 +97,22 @@ func (f proposeFixture) page(t *testing.T, path, title string) pagemap.Page {
 	return record
 }
 
+func (f proposeFixture) entity(t *testing.T, name string) graphdomain.Entity {
+	t.Helper()
+
+	record, err := graphdomain.NewEntity(graphdomain.Entity{
+		ID: id.New(), SiteID: f.siteID, Name: name, Kind: graphdomain.KindTopic, Source: graphdomain.SourceUser,
+		CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+	})
+	if err != nil {
+		t.Fatalf("build the entity: %v", err)
+	}
+	if err = sqlite.NewEntityRepo(f.store).Insert(t.Context(), record); err != nil {
+		t.Fatalf("insert the entity: %v", err)
+	}
+	return record
+}
+
 const proposal = `{"entities":[
 	{"path":"/coffee/","name":"Coffee","kind":"hub","intent":"choose a brew","primaryKeyword":"coffee",
 	 "secondaryKeywords":["beans"],"anchors":["coffee"],"parentPath":"","relatedPaths":[]},
@@ -170,6 +186,25 @@ func TestProposeFromPagesBuildsTheGraph(t *testing.T) {
 	}
 	if len(again.Entities) != 0 || len(again.Edges) != 0 {
 		t.Fatalf("a page that is already mapped must not be proposed again: %+v", again)
+	}
+}
+
+func TestProposeFromPagesLeavesTheRootOfTheSiteAlone(t *testing.T) {
+	t.Parallel()
+
+	f := newProposeFixture(t, &scriptedModel{replies: []string{proposal}}, fixedProfiles{})
+	f.page(t, "/", "Home")
+	f.page(t, "/coffee/", "Coffee")
+	f.page(t, "/coffee/espresso/", "Espresso")
+	f.page(t, "/coffee/filter/", "Filter coffee")
+
+	if _, err := f.service.ProposeFromPages(t.Context(), appgraph.ProposeFromPagesRequest{SiteID: f.siteID}); err != nil {
+		t.Fatalf("ProposeFromPages: %v", err)
+	}
+
+	prompt := f.model.calls[0].Messages[0].Text
+	if strings.Contains(prompt, "- / ") || strings.Contains(prompt, "Home") {
+		t.Fatalf("the prompt offers the root of the site to the model:\n%s", prompt)
 	}
 }
 

@@ -41,6 +41,25 @@ export function takesATemplate(kind: string): boolean {
     return !(runKindsWithTheirOwnRecipe as readonly string[]).includes(kind);
 }
 
+export interface GradedFinding {
+    severity: string;
+    code?: string;
+    message?: string;
+    pageId?: string;
+    path?: string;
+}
+
+export interface GradedFindings {
+    findings?: readonly GradedFinding[] | null;
+}
+
+export function blockingFindings(estimate: GradedFindings | null): number {
+    if (estimate === null) {
+        return 0;
+    }
+    return (estimate.findings ?? []).filter((finding) => finding.severity === "error").length;
+}
+
 export const startableKinds: readonly string[] = runKinds.filter((kind) => kind !== kindRevert);
 
 export interface StartRefusal {
@@ -143,6 +162,7 @@ export function StartRunDrawer({
     const capValue = capOf(cap);
     const ready = selected.size > 0;
     const over = estimate !== null && capValue > 0 && estimate.usd > capValue;
+    const blocked = blockingFindings(estimate);
     const thrown = start.error ?? priced.error;
     const refusal = startRefusal(thrown);
 
@@ -183,9 +203,15 @@ export function StartRunDrawer({
                     <Button
                         variant="primary"
                         icon={PlayArrowIcon}
-                        disabled={estimate === null}
+                        disabled={estimate === null || blocked > 0}
                         busy={start.isPending}
-                        title={estimate === null ? copy.runs.start.estimateFirst : undefined}
+                        title={
+                            estimate === null
+                                ? copy.runs.start.estimateFirst
+                                : blocked > 0
+                                  ? copy.runs.start.blocked
+                                  : undefined
+                        }
                         onClick={() => {
                             start.mutate(request(), {
                                 onSuccess: (answered) => {

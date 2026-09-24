@@ -2,19 +2,17 @@ package steps
 
 import (
 	"context"
-	"encoding/json"
+	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/run"
-	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 const (
 	NameValidate     = string(run.StepValidate)
 	ParamAllowErrors = "allowErrors"
-
-	CodeTitleMissingKeyword = "primary_missing_in_title"
 )
 
 type ValidationReport struct {
@@ -54,6 +52,14 @@ func Validate(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
+			repairs, _, err := run.Get[[]content.Finding](sc.Check, CheckpointRepairs)
+			if err != nil {
+				return run.Result{}, err
+			}
+			draft, drafted, err := decodeArtifact[content.ContentDraft](sc, run.ArtifactDraft)
+			if err != nil {
+				return run.Result{}, err
+			}
 
 			report := ValidationReport{
 				PageID:     sc.Page.ID,
@@ -61,7 +67,10 @@ func Validate(deps Deps) run.StepDef {
 				Structure:  content.Structure(doc, entity.PrimaryKeyword, entity.SecondaryKeywords, sc.Spec),
 				Links:      links,
 			}
-			report.Structure.Items = append(report.Structure.Items, titleFindings(sc, entity.PrimaryKeyword)...)
+			if drafted {
+				report.Structure.Items = append(report.Structure.Items, draft.Findings...)
+			}
+			report.Structure.Items = plannedH1Wins(append(report.Structure.Items, repairs...))
 			report.Structure.Score = content.ScoreOf(report.Structure.Items)
 			report.Score = min(report.Compliance.Score, report.Structure.Score)
 
@@ -74,36 +83,46 @@ func Validate(deps Deps) run.StepDef {
 				Artifacts: []run.Artifact{{Kind: run.ArtifactValidationReport, Blob: blob}},
 				Message:   "validation scored " + strconv.FormatFloat(report.Score, 'f', 2, 64),
 			}
-			if !sc.BoolParam(ParamAllowErrors) && (report.Compliance.HasErrors() || report.Structure.HasErrors()) {
-				return result, errors.New(errors.Invalid, "the page does not satisfy its template and its graph").
-					WithDetail("pageId", sc.Page.ID).WithDetail("score", report.Score)
+			clean := !report.Compliance.HasErrors() && !report.Structure.HasErrors()
+			if clean || sc.BoolParam(ParamAllowErrors) || sc.Accepted() {
+				return result, nil
 			}
+
+			result.Next = run.TransitionPause
+			result.Reason = run.PauseNeedsHuman
+			result.Message = heldMessage(report)
 			return result, nil
 		},
 	}
 }
 
-func titleFindings(sc *run.StepContext, primary string) []content.Finding {
-	if !sc.Spec.KeywordRules.PrimaryInTitle || primary == "" {
-		return nil
+func plannedH1Wins(items []content.Finding) []content.Finding {
+	planned := slices.ContainsFunc(items, func(item content.Finding) bool {
+		return item.Code == content.CodePlanH1LacksKeyword
+	})
+	if !planned {
+		return items
 	}
+	for i := range items {
+		if items[i].Code == content.CodePrimaryMissingInH1 {
+			items[i].Severity = content.SeverityWarn
+			items[i].Message += ", because the planned h1 of the page does not carry it; edit the page or leave the rule off"
+		}
+	}
+	return items
+}
 
-	draft, err := sc.Artifact(run.ArtifactDraft)
-	if err != nil {
-		return nil
+func heldMessage(report ValidationReport) string {
+	messages := make([]string, 0)
+	for _, item := range slices.Concat(report.Compliance.Items, report.Structure.Items) {
+		if item.Severity == content.SeverityError {
+			messages = append(messages, item.Message)
+		}
 	}
-
-	var decoded content.ContentDraft
-	if unmarshalErr := json.Unmarshal(draft.Blob, &decoded); unmarshalErr != nil {
-		return nil
+	noun := " findings need"
+	if len(messages) == 1 {
+		noun = " finding needs"
 	}
-	if _, _, found := content.FindFold(decoded.Title, primary); found {
-		return nil
-	}
-
-	return []content.Finding{{
-		Severity: content.SeverityError, Code: CodeTitleMissingKeyword,
-		Message: "the meta title does not carry the primary keyword",
-		Details: map[string]any{"title": decoded.Title, "primaryKeyword": primary},
-	}}
+	return strconv.Itoa(len(messages)) + noun + " a decision: " + strings.Join(messages, "; ") +
+		". Accept the page as it is or regenerate it."
 }

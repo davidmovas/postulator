@@ -103,7 +103,9 @@ func TestPublishRunCarriesTheRunSequence(t *testing.T) {
 	bridge, emitter := newBridge()
 	const runID = "6f3b2a11-0c9d-4e7a-8b25-1f4c6d7e8a90"
 
-	if err := bridge.PublishRun(runID, 42, events.StepDone, events.StepDonePayload{RunID: runID, ItemID: "i1", Step: "validate", DurationMs: 120}); err != nil {
+	if err := bridge.PublishRun(runID, 42, events.StepDone, events.StepDonePayload{
+		RunID: runID, ItemID: "i1", Step: "validate", DurationMs: 120, Message: "validation scored 1.00",
+	}); err != nil {
 		t.Fatalf("PublishRun: %v", err)
 	}
 
@@ -112,7 +114,7 @@ func TestPublishRunCarriesTheRunSequence(t *testing.T) {
 		t.Fatalf("Marshal: %v", err)
 	}
 
-	const want = `{"type":"step.done","seq":42,"runId":"6f3b2a11-0c9d-4e7a-8b25-1f4c6d7e8a90","at":"2026-09-17T10:30:00Z","payload":{"runId":"6f3b2a11-0c9d-4e7a-8b25-1f4c6d7e8a90","itemId":"i1","step":"validate","durationMs":120}}`
+	const want = `{"type":"step.done","seq":42,"runId":"6f3b2a11-0c9d-4e7a-8b25-1f4c6d7e8a90","at":"2026-09-17T10:30:00Z","payload":{"runId":"6f3b2a11-0c9d-4e7a-8b25-1f4c6d7e8a90","itemId":"i1","step":"validate","durationMs":120,"message":"validation scored 1.00"}}`
 	if string(encoded) != want {
 		t.Fatalf("envelope = %s, want %s", encoded, want)
 	}

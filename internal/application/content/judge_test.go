@@ -379,7 +379,7 @@ func TestAssessRefusesAnUnreadableBody(t *testing.T) {
 	_, err := service.Assess(t.Context(), appcontent.AssessRequest{
 		SiteID: "site", Page: pages()[1], Entity: entities()[1], Body: "<p>hello</p>",
 	})
-	if !errors.IsCode(err, errors.Invalid) {
-		t.Fatalf("Assess of an unreadable reply = %v", err)
+	if !errors.IsCode(err, errors.External) {
+		t.Fatalf("Assess of an unreadable reply = %v, want EXTERNAL so the engine tries again", err)
 	}
 }

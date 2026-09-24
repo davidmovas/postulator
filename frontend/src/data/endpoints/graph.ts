@@ -18,3 +18,6 @@ export const listEdges = listed<Parameters<typeof Graph.ListEdges>[0], Edge>(Gra
 export const recomputeScores = one(Graph.RecomputeScores);
 export const proposeFromPages = one(Graph.ProposeFromPages);
 export const proposeRelated = one(Graph.ProposeRelated);
+export const previewFromPages = one(Graph.PreviewFromPages);
+export const proposeFromKeywords = one(Graph.ProposeFromKeywords);
+export const applyProposals = one(Graph.ApplyProposals);

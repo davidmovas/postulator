@@ -78,7 +78,7 @@ function Card({ section, index, total, error, onChange, onMove, onRemove }: Card
                 />
             </header>
             <div className="flex flex-col gap-2 p-2.5">
-                {headingError === null ? null : <p className="text-2xs text-danger">{headingError}</p>}
+                {headingError === null ? <p className="text-2xs text-ink-faint">{copy.templates.sections.headingHint}</p> : <p className="text-2xs text-danger">{headingError}</p>}
                 <Textarea
                     rows={3}
                     value={section.intent}

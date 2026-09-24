@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	pageColumns       = `id, site_id, path, slug, parent_page_id, wp_type, wp_id, title, h1, meta_title, meta_description, canonical, status, entity_id, template_id, content_hash, wp_link, wp_slug, wp_status, wp_title, wp_h1, wp_modified_at, last_synced_at, drift, created_at, updated_at`
-	insertPage        = `INSERT INTO pages (` + pageColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	updatePage        = `UPDATE pages SET path = ?, slug = ?, parent_page_id = ?, wp_type = ?, wp_id = ?, title = ?, h1 = ?, meta_title = ?, meta_description = ?, canonical = ?, status = ?, entity_id = ?, template_id = ?, content_hash = ?, wp_link = ?, wp_slug = ?, wp_status = ?, wp_title = ?, wp_h1 = ?, wp_modified_at = ?, last_synced_at = ?, drift = ?, updated_at = ? WHERE id = ?`
+	pageColumns       = `id, site_id, path, slug, parent_page_id, wp_type, wp_id, title, h1, meta_title, meta_description, canonical, primary_keyword, keywords, status, entity_id, template_id, content_hash, wp_link, wp_slug, wp_status, wp_title, wp_h1, wp_modified_at, last_synced_at, drift, created_at, updated_at`
+	insertPage        = `INSERT INTO pages (` + pageColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	updatePage        = `UPDATE pages SET path = ?, slug = ?, parent_page_id = ?, wp_type = ?, wp_id = ?, title = ?, h1 = ?, meta_title = ?, meta_description = ?, canonical = ?, primary_keyword = ?, keywords = ?, status = ?, entity_id = ?, template_id = ?, content_hash = ?, wp_link = ?, wp_slug = ?, wp_status = ?, wp_title = ?, wp_h1 = ?, wp_modified_at = ?, last_synced_at = ?, drift = ?, updated_at = ? WHERE id = ?`
 	deletePage        = `DELETE FROM pages WHERE id = ?`
 	selectPage        = `SELECT ` + pageColumns + ` FROM pages WHERE id = ?`
 	selectPagesBySite = `SELECT ` + pageColumns + ` FROM pages WHERE site_id = ? ORDER BY path, id`
@@ -71,9 +71,13 @@ func optInt(raw sql.NullInt64) *int64 {
 }
 
 func (r *PageRepo) Insert(ctx context.Context, p pagemap.Page) error {
-	_, err := execWrite(ctx, r.store.writeFrom(ctx), insertPage, []any{
+	keywords, err := encodeJSON(orEmpty(p.Keywords))
+	if err != nil {
+		return err
+	}
+	_, err = execWrite(ctx, r.store.writeFrom(ctx), insertPage, []any{
 		p.ID, p.SiteID, p.Path, p.Slug, nullString(p.ParentPageID), string(p.WPType), nullInt(p.WPID),
-		p.Title, p.H1, p.MetaTitle, p.MetaDescription, p.Canonical, string(p.Status), nullString(p.EntityID), nullString(p.TemplateID),
+		p.Title, p.H1, p.MetaTitle, p.MetaDescription, p.Canonical, p.PrimaryKeyword, keywords, string(p.Status), nullString(p.EntityID), nullString(p.TemplateID),
 		p.ContentHash, p.Observed.Link, p.Observed.Slug, p.Observed.Status, p.Observed.Title, p.Observed.H1,
 		nullTime(p.WPModifiedAt), nullTime(p.LastSyncedAt), boolInt(p.Drift), formatTime(p.CreatedAt), formatTime(p.UpdatedAt),
 	}, pageConflict(p.Path), "insert the page")
@@ -81,9 +85,13 @@ func (r *PageRepo) Insert(ctx context.Context, p pagemap.Page) error {
 }
 
 func (r *PageRepo) Update(ctx context.Context, p pagemap.Page) error {
+	keywords, err := encodeJSON(orEmpty(p.Keywords))
+	if err != nil {
+		return err
+	}
 	affected, err := execWrite(ctx, r.store.writeFrom(ctx), updatePage, []any{
 		p.Path, p.Slug, nullString(p.ParentPageID), string(p.WPType), nullInt(p.WPID),
-		p.Title, p.H1, p.MetaTitle, p.MetaDescription, p.Canonical, string(p.Status), nullString(p.EntityID), nullString(p.TemplateID),
+		p.Title, p.H1, p.MetaTitle, p.MetaDescription, p.Canonical, p.PrimaryKeyword, keywords, string(p.Status), nullString(p.EntityID), nullString(p.TemplateID),
 		p.ContentHash, p.Observed.Link, p.Observed.Slug, p.Observed.Status, p.Observed.Title, p.Observed.H1,
 		nullTime(p.WPModifiedAt), nullTime(p.LastSyncedAt), boolInt(p.Drift), formatTime(p.UpdatedAt), p.ID,
 	}, pageConflict(p.Path), "update the page")
@@ -159,10 +167,14 @@ func scanPage(rows *sql.Rows) (pagemap.Page, error) {
 		wpModifiedAt, lastSyncedAt     sql.NullString
 		drift                          int64
 		createdAt, updatedAt           string
+		keywords                       string
 	)
 	if err := rows.Scan(&p.ID, &p.SiteID, &p.Path, &p.Slug, &parentID, &wpType, &wpID, &p.Title, &p.H1, &p.MetaTitle, &p.MetaDescription, &p.Canonical,
-		&status, &entityID, &templateID, &p.ContentHash, &p.Observed.Link, &p.Observed.Slug, &p.Observed.Status,
+		&p.PrimaryKeyword, &keywords, &status, &entityID, &templateID, &p.ContentHash, &p.Observed.Link, &p.Observed.Slug, &p.Observed.Status,
 		&p.Observed.Title, &p.Observed.H1, &wpModifiedAt, &lastSyncedAt, &drift, &createdAt, &updatedAt); err != nil {
+		return pagemap.Page{}, err
+	}
+	if err := decodeJSON(keywords, &p.Keywords, "decode the page keywords"); err != nil {
 		return pagemap.Page{}, err
 	}
 	p.ParentPageID = optString(parentID)

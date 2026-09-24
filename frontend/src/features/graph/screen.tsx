@@ -413,6 +413,9 @@ export function GraphScreen(): ReactElement {
                     onProposeFromPages={() => {
                         setProposing("pages");
                     }}
+                    onProposeFromKeywords={() => {
+                        setProposing("keywords");
+                    }}
                     onProposeRelated={() => {
                         setProposing("related");
                     }}

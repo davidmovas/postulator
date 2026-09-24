@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/run"
@@ -140,6 +141,29 @@ func TestJudgeReportsAnUnscoredPageInTheFinalReport(t *testing.T) {
 	}
 	if final.Warnings != 2 {
 		t.Errorf("warnings = %d, want the structure warning and the judge that could not be reached", final.Warnings)
+	}
+}
+
+func TestJudgeOutOfTimeLeavesThePageUnscored(t *testing.T) {
+	t.Parallel()
+
+	deps := judgeDeps(llmStub{err: errors.New(errors.Cancelled, "the call ran out of time")})
+	ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+	defer cancel()
+
+	result, err := steps.Judge(deps).Run(ctx, judgeContext(t))
+	if err != nil {
+		t.Fatalf("a judge that ran out of its own time failed the item: %v", err)
+	}
+	var report steps.JudgeReport
+	if err = json.Unmarshal(result.Artifacts[0].Blob, &report); err != nil {
+		t.Fatalf("decode the report: %v", err)
+	}
+	if report.Score != nil || len(report.Findings) != 1 || report.Findings[0].Code != steps.CodeJudgeUnavailable {
+		t.Fatalf("report = %+v, want no score and the judge_unavailable warning", report)
+	}
+	if steps.Judge(deps).Retry.Max != 2 {
+		t.Errorf("the judge is allowed %d attempts, want 2", steps.Judge(deps).Retry.Max)
 	}
 }
 

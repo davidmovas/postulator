@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	appcontent "github.com/davidmovas/postulator/internal/application/content"
@@ -388,19 +389,19 @@ func TestGenerateBodyReportsWhatItCannotDo(t *testing.T) {
 			want:      errors.RateLimited,
 		},
 		{
-			name:      "the model does not answer with json",
+			name:      "the model does not answer with json, which the engine may try again",
 			deps:      func(d steps.Deps) steps.Deps { d.LLM = llmStub{reply: "sure thing"}; return d },
 			artifacts: map[run.ArtifactKind][]byte{run.ArtifactLinkContext: blob},
-			want:      errors.Invalid,
+			want:      errors.External,
 		},
 		{
-			name: "the draft is incomplete",
+			name: "the draft is incomplete, which the engine may try again",
 			deps: func(d steps.Deps) steps.Deps {
 				d.LLM = llmStub{reply: `{"title":"t","h1":"","sections":[]}`}
 				return d
 			},
 			artifacts: map[run.ArtifactKind][]byte{run.ArtifactLinkContext: blob},
-			want:      errors.Invalid,
+			want:      errors.External,
 		},
 	}
 
@@ -532,16 +533,20 @@ func TestInsertLinksAndValidateReadTheirArtifacts(t *testing.T) {
 	}
 }
 
-func TestValidateReportsATitleWithoutTheKeyword(t *testing.T) {
+func TestValidateCarriesTheDraftAndRepairFindingsAndLetsThePlanWin(t *testing.T) {
 	t.Parallel()
 
 	deps := unitDeps()
 	blob := linkContextBlob(t, deps)
-	body := []byte("<h1>Espresso</h1><h2>About</h2><p>Espresso is a kind of coffee.</p>")
+	body := []byte(`<h1>A guide</h1><h2>About</h2><p>Espresso is a kind of <a href="/coffee/">coffee</a>.</p>`)
 
 	draft, err := json.Marshal(content.ContentDraft{
-		Title: "Our drinks range", H1: "Espresso",
+		Title: "A guide", H1: "A guide",
 		Sections: []content.DraftSection{{Heading: "About", HTML: "<p>Espresso.</p>"}},
+		Findings: []content.Finding{
+			{Severity: content.SeverityWarn, Code: content.CodePlanTitleLacksKeyword, Message: "the plan's title lacks it"},
+			{Severity: content.SeverityWarn, Code: content.CodePlanH1LacksKeyword, Message: "the plan's h1 lacks it"},
+		},
 	})
 	if err != nil {
 		t.Fatalf("encode the draft: %v", err)
@@ -550,25 +555,102 @@ func TestValidateReportsATitleWithoutTheKeyword(t *testing.T) {
 	sc := unitContext(t, map[run.ArtifactKind][]byte{
 		run.ArtifactLinkContext: blob, run.ArtifactBodyHTML: body, run.ArtifactDraft: draft,
 	})
-	sc.Spec.KeywordRules.PrimaryInTitle = true
-	sc.Params = map[string]any{steps.ParamAllowErrors: true}
+	sc.Spec.KeywordRules.PrimaryInH1 = true
+	if err = run.Set(sc.Check, steps.CheckpointRepairs, []content.Finding{{
+		Severity: content.SeverityWarn, Code: steps.CodePhraseTemplated, Message: "a plain sentence was added",
+	}}); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
 
 	result, err := steps.Validate(deps).Run(t.Context(), sc)
 	if err != nil {
 		t.Fatalf("Validate: %v", err)
+	}
+	if result.Next != "" && result.Next != run.TransitionContinue {
+		t.Fatalf("result = %+v, want the item to go on", result)
 	}
 
 	var decoded steps.ValidationReport
 	if unmarshalErr := json.Unmarshal(result.Artifacts[0].Blob, &decoded); unmarshalErr != nil {
 		t.Fatalf("decode the report: %v", unmarshalErr)
 	}
-	if !hasFinding(decoded, steps.CodeTitleMissingKeyword) {
-		t.Fatalf("structure findings = %+v", decoded.Structure.Items)
+	for _, code := range []string{
+		content.CodePlanTitleLacksKeyword, content.CodePlanH1LacksKeyword, steps.CodePhraseTemplated, content.CodePrimaryMissingInH1,
+	} {
+		if !hasFinding(decoded, code) {
+			t.Fatalf("the report lacks %s: %+v", code, decoded.Structure.Items)
+		}
+	}
+	if decoded.Structure.HasErrors() {
+		t.Fatalf("the planned h1 was graded as an error: %+v", decoded.Structure.Items)
+	}
+	if decoded.Score >= 1 {
+		t.Fatalf("score = %v, want the warnings to cost something", decoded.Score)
+	}
+}
+
+func TestValidateHoldsAPageWithErrorsUnlessTheyAreAllowedOrAccepted(t *testing.T) {
+	t.Parallel()
+
+	deps := unitDeps()
+	blob := linkContextBlob(t, deps)
+	body := []byte("<h1>Espresso</h1><h2>About</h2><p>Espresso is a kind of coffee.</p>")
+
+	cases := []struct {
+		name     string
+		params   map[string]any
+		accepted bool
+		held     bool
+	}{
+		{name: "the missing parent link holds the page for a human", held: true},
+		{name: "allowErrors lets it through", params: map[string]any{steps.ParamAllowErrors: true}},
+		{name: "an accepted validation lets it through", accepted: true},
 	}
 
-	sc.Params = map[string]any{}
-	if _, err = steps.Validate(deps).Run(t.Context(), sc); !errors.IsCode(err, errors.Invalid) {
-		t.Fatalf("Validate without allowErrors = %v", err)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: blob, run.ArtifactBodyHTML: body})
+			sc.Item.CurrentStep = steps.NameValidate
+			if tc.params != nil {
+				sc.Params = tc.params
+			}
+			if tc.accepted {
+				if err := run.Set(sc.Check, run.CheckpointAccept, steps.NameValidate); err != nil {
+					t.Fatalf("Set: %v", err)
+				}
+			}
+
+			result, err := steps.Validate(deps).Run(t.Context(), sc)
+			if err != nil {
+				t.Fatalf("Validate: %v", err)
+			}
+			if len(result.Artifacts) != 1 {
+				t.Fatalf("the report was not written: %+v", result)
+			}
+
+			var decoded steps.ValidationReport
+			if unmarshalErr := json.Unmarshal(result.Artifacts[0].Blob, &decoded); unmarshalErr != nil {
+				t.Fatalf("decode the report: %v", unmarshalErr)
+			}
+			if !decoded.Compliance.HasErrors() {
+				t.Fatalf("compliance findings = %+v, want the missing link", decoded.Compliance.Items)
+			}
+
+			if !tc.held {
+				if result.Next == run.TransitionPause {
+					t.Fatalf("the page was held: %+v", result)
+				}
+				return
+			}
+			if result.Next != run.TransitionPause || result.Reason != run.PauseNeedsHuman {
+				t.Fatalf("result = %+v, want a pause for a human", result)
+			}
+			if !strings.Contains(result.Message, "/coffee/") || !strings.Contains(result.Message, "ccept") {
+				t.Fatalf("the note %q neither names the finding nor says what to do", result.Message)
+			}
+		})
 	}
 }
 
@@ -581,41 +663,183 @@ func hasFinding(report steps.ValidationReport, code string) bool {
 	return false
 }
 
-func TestRepairLinksRefusesASentenceWithoutThePhrase(t *testing.T) {
+type callCounter struct {
+	reply string
+	err   error
+	calls int
+}
+
+func (c *callCounter) Complete(_ context.Context, _ port.Request) (port.Response, error) {
+	c.calls++
+	if c.err != nil {
+		return port.Response{}, c.err
+	}
+	return port.Response{Text: c.reply, Usage: domainllm.Usage{Input: 10, Output: 20, Total: 30}}, nil
+}
+
+func (c *callCounter) Stream(context.Context, port.Request) (<-chan port.Delta, error) {
+	return nil, errors.New(errors.Internal, "the unit stub does not stream")
+}
+
+func repairsOf(t *testing.T, result run.Result) []content.Finding {
+	t.Helper()
+
+	findings, _, err := run.Get[[]content.Finding](result.Checkpoint, steps.CheckpointRepairs)
+	if err != nil {
+		t.Fatalf("read the repairs: %v", err)
+	}
+	return findings
+}
+
+func TestRepairLinksFallsBackToAPlainSentenceWhenTheLinkerKeepsMissingThePhrase(t *testing.T) {
 	t.Parallel()
 
-	deps := unitDeps()
-	deps.LLM = llmStub{reply: `{"sentence":"A sentence with no anchor at all."}`}
-	blob := linkContextBlob(t, deps)
-
-	sc := unitContext(t, map[run.ArtifactKind][]byte{
-		run.ArtifactLinkContext: blob,
-		run.ArtifactBodyHTML:    []byte("<h1>Espresso</h1><p>Nothing to match here.</p>"),
-	})
-
-	if _, err := steps.RepairLinks(deps).Run(t.Context(), sc); !errors.IsCode(err, errors.Invalid) {
-		t.Fatalf("RepairLinks = %v, want an invalid error", err)
+	cases := []struct {
+		name   string
+		client *callCounter
+	}{
+		{name: "the linker answers without the phrase", client: &callCounter{reply: `{"sentence":"A sentence with no anchor at all."}`}},
+		{name: "the linker answers with nothing", client: &callCounter{reply: `{"sentence":""}`}},
+		{name: "the provider is down", client: &callCounter{err: errors.New(errors.External, "upstream is down")}},
 	}
 
-	deps.LLM = llmStub{reply: `{"sentence":""}`}
-	if _, err := steps.RepairLinks(deps).Run(t.Context(), sc); !errors.IsCode(err, errors.Invalid) {
-		t.Fatalf("RepairLinks with an empty sentence = %v", err)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps := unitDeps()
+			deps.LLM = tc.client
+			blob := linkContextBlob(t, deps)
+			sc := unitContext(t, map[run.ArtifactKind][]byte{
+				run.ArtifactLinkContext: blob,
+				run.ArtifactBodyHTML:    []byte("<h1>Espresso</h1><p>Nothing to match here.</p>"),
+			})
+
+			result, err := steps.RepairLinks(deps).Run(t.Context(), sc)
+			if err != nil {
+				t.Fatalf("RepairLinks: %v", err)
+			}
+			if tc.client.calls != 4 {
+				t.Fatalf("the linker was called %d times, want two tries for each of the two phrases", tc.client.calls)
+			}
+
+			body := string(result.Artifacts[0].Blob)
+			want := `<h1>Espresso</h1><p>Nothing to match here. This page is about espresso. Read more about <a href="/coffee/">coffee</a>.</p>`
+			if body != want {
+				t.Fatalf("body =\n%s\nwant\n%s", body, want)
+			}
+
+			repairs := repairsOf(t, result)
+			if len(repairs) != 2 {
+				t.Fatalf("repairs = %+v, want one templated finding per phrase", repairs)
+			}
+			for _, finding := range repairs {
+				if finding.Code != steps.CodePhraseTemplated || finding.Severity != content.SeverityWarn {
+					t.Fatalf("finding = %+v", finding)
+				}
+			}
+			if !strings.Contains(result.Message, "2") {
+				t.Fatalf("message = %q", result.Message)
+			}
+		})
 	}
 }
 
-func TestRepairLinksNeedsAParagraph(t *testing.T) {
+func TestRepairLinksPutsTheKeywordInTheLeadAndTheAnchorWhereTheParentLinkMayGo(t *testing.T) {
 	t.Parallel()
 
 	deps := unitDeps()
-	deps.LLM = llmStub{reply: `{"sentence":"It belongs to our coffee range."}`}
+	client := &callCounter{reply: `{"sentence":"Espresso belongs to our coffee range."}`}
+	deps.LLM = client
 	blob := linkContextBlob(t, deps)
 
 	sc := unitContext(t, map[run.ArtifactKind][]byte{
 		run.ArtifactLinkContext: blob,
-		run.ArtifactBodyHTML:    []byte("<h1>Espresso</h1>"),
+		run.ArtifactBodyHTML:    []byte("<h1>Espresso</h1><p>A shot of the good stuff.</p><p>Second thoughts.</p>"),
 	})
-	if _, err := steps.RepairLinks(deps).Run(t.Context(), sc); !errors.IsCode(err, errors.Invalid) {
-		t.Fatalf("RepairLinks without a paragraph = %v", err)
+	sc.Spec.LinkRules.ParentLinkWithinParagraphs = 1
+
+	result, err := steps.RepairLinks(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("RepairLinks: %v", err)
+	}
+	if client.calls != 1 {
+		t.Fatalf("the linker was called %d times, want one sentence to settle both phrases", client.calls)
+	}
+	body := string(result.Artifacts[0].Blob)
+	if !strings.HasPrefix(body, `<h1>Espresso</h1><p>A shot of the good stuff. Espresso belongs to our <a href="/coffee/">coffee</a> range.</p>`) {
+		t.Fatalf("the sentence did not land in the first paragraph:\n%s", body)
+	}
+	if repairs := repairsOf(t, result); len(repairs) != 0 {
+		t.Fatalf("repairs = %+v, want none", repairs)
+	}
+	if result.Tokens != 30 {
+		t.Fatalf("tokens = %d", result.Tokens)
+	}
+}
+
+func TestRepairLinksOpensABodyWithoutAParagraph(t *testing.T) {
+	t.Parallel()
+
+	deps := unitDeps()
+	deps.LLM = llmStub{reply: `{"sentence":"Espresso is the strongest coffee we pull."}`}
+	blob := linkContextBlob(t, deps)
+
+	sc := unitContext(t, map[run.ArtifactKind][]byte{
+		run.ArtifactLinkContext: blob,
+		run.ArtifactBodyHTML:    []byte("<h1>Espresso</h1><h2>About</h2><ul><li>Short.</li></ul>"),
+	})
+
+	result, err := steps.RepairLinks(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("RepairLinks: %v", err)
+	}
+	body := string(result.Artifacts[0].Blob)
+	if !strings.HasPrefix(body, `<h1>Espresso</h1><p>Espresso is the strongest <a href="/coffee/">coffee</a> we pull.</p><h2>About</h2>`) {
+		t.Fatalf("the body did not get an opening paragraph:\n%s", body)
+	}
+}
+
+func TestRepairLinksStopsWhenTheRunStops(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		ctx  func() context.Context
+		llm  port.Client
+	}{
+		{
+			name: "the provider reports the cancellation",
+			ctx:  context.Background,
+			llm:  llmStub{err: errors.New(errors.Cancelled, "the call was cancelled")},
+		},
+		{
+			name: "the step context is already done",
+			ctx: func() context.Context {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				return ctx
+			},
+			llm: llmStub{reply: `{"sentence":"Espresso belongs to our coffee range."}`},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps := unitDeps()
+			deps.LLM = tc.llm
+			blob := linkContextBlob(t, deps)
+			sc := unitContext(t, map[run.ArtifactKind][]byte{
+				run.ArtifactLinkContext: blob,
+				run.ArtifactBodyHTML:    []byte("<h1>Espresso</h1><p>Nothing to match here.</p>"),
+			})
+
+			if _, err := steps.RepairLinks(deps).Run(tc.ctx(), sc); !errors.IsCode(err, errors.Cancelled) {
+				t.Fatalf("RepairLinks = %v, want the cancellation passed on", err)
+			}
+		})
 	}
 }
 
@@ -623,23 +847,26 @@ func TestRepairLinksHonoursTheIterationParameter(t *testing.T) {
 	t.Parallel()
 
 	deps := unitDeps()
-	deps.LLM = llmStub{reply: `{"sentence":"It belongs to our coffee range."}`}
 	blob := linkContextBlob(t, deps)
 
 	cases := []struct {
 		name  string
 		param any
+		calls int
 	}{
-		{name: "the default"},
-		{name: "a number from json", param: float64(1)},
-		{name: "a value of the wrong type", param: "two"},
-		{name: "a value above the ceiling", param: float64(99)},
+		{name: "the default", calls: 4},
+		{name: "a number from json", param: float64(1), calls: 2},
+		{name: "a value of the wrong type", param: "two", calls: 4},
+		{name: "a value above the ceiling", param: float64(99), calls: 8},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
+			client := &callCounter{reply: `{"sentence":"A sentence that never carries the phrase."}`}
+			local := unitDeps()
+			local.LLM = client
 			sc := unitContext(t, map[run.ArtifactKind][]byte{
 				run.ArtifactLinkContext: blob,
 				run.ArtifactBodyHTML:    []byte("<h1>Espresso</h1><p>A shot of the good stuff.</p>"),
@@ -649,14 +876,80 @@ func TestRepairLinksHonoursTheIterationParameter(t *testing.T) {
 			}
 			sc.Spec.LinkRules.ParentLinkWithinParagraphs = 1
 
-			result, err := steps.RepairLinks(deps).Run(t.Context(), sc)
+			result, err := steps.RepairLinks(local).Run(t.Context(), sc)
 			if err != nil {
 				t.Fatalf("RepairLinks: %v", err)
 			}
-			if len(result.Artifacts) != 1 || result.Tokens == 0 {
+			if len(result.Artifacts) != 1 || result.Tokens != 30*tc.calls {
 				t.Fatalf("result = %+v", result)
 			}
+			if client.calls != tc.calls {
+				t.Fatalf("the linker was called %d times, want %d", client.calls, tc.calls)
+			}
 		})
+	}
+}
+
+type ceilingRecorder struct {
+	reply    string
+	ceilings []int
+}
+
+func (r *ceilingRecorder) Complete(_ context.Context, req port.Request) (port.Response, error) {
+	r.ceilings = append(r.ceilings, req.MaxTokens)
+	return port.Response{Text: r.reply, Usage: domainllm.Usage{Input: 1, Output: 2, Total: 3}}, nil
+}
+
+func (r *ceilingRecorder) Stream(context.Context, port.Request) (<-chan port.Delta, error) {
+	return nil, errors.New(errors.Internal, "the unit stub does not stream")
+}
+
+func TestWriterCeilingGrowsWithTheTemplateAndTheAttempt(t *testing.T) {
+	t.Parallel()
+
+	deps := unitDeps()
+	blob := linkContextBlob(t, deps)
+	recorder := &ceilingRecorder{reply: goodDraft}
+	deps.LLM = recorder
+
+	long := spec()
+	long.Sections = []template.Section{{Heading: "Overview", TargetWords: 1800, Required: true}}
+	short := template.TemplateSpec{Length: template.Length{Max: 200}, LinkRules: spec().LinkRules}
+
+	for _, tc := range []struct {
+		name     string
+		spec     template.TemplateSpec
+		attempts int
+		want     int
+	}{
+		{name: "a long template asks for three tokens a word and a thousand more", spec: long, attempts: 0, want: 1800*3 + 1024},
+		{name: "a short template still gets room to answer", spec: short, attempts: 0, want: 4096},
+		{name: "the second attempt doubles the room", spec: long, attempts: 1, want: (1800*3 + 1024) * 2},
+		{name: "the room stops doubling after three attempts", spec: long, attempts: 7, want: (1800*3 + 1024) * 8},
+	} {
+		sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: blob})
+		sc.Spec = tc.spec
+		sc.Item.Attempts = tc.attempts
+		if _, err := steps.GenerateBody(deps).Run(t.Context(), sc); err != nil {
+			t.Fatalf("%s: GenerateBody: %v", tc.name, err)
+		}
+		if got := recorder.ceilings[len(recorder.ceilings)-1]; got != tc.want {
+			t.Errorf("%s: ceiling = %d, want %d", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestTheModelStepsDeclareTheirOwnTimeouts(t *testing.T) {
+	t.Parallel()
+
+	deps := unitDeps()
+	if got := steps.GenerateBody(deps).Timeout; got != 15*time.Minute {
+		t.Errorf("the writer step runs under %s, want fifteen minutes", got)
+	}
+	for _, def := range []run.StepDef{steps.GenerateMeta(deps), steps.RepairLinks(deps)} {
+		if def.Timeout != 3*time.Minute {
+			t.Errorf("%s runs under %s, want three minutes", def.Name, def.Timeout)
+		}
 	}
 }
 
@@ -707,4 +1000,34 @@ func (r *promptRecorder) Complete(_ context.Context, req port.Request) (port.Res
 
 func (r *promptRecorder) Stream(context.Context, port.Request) (<-chan port.Delta, error) {
 	return nil, errors.New(errors.Internal, "the unit stub does not stream")
+}
+
+func TestTheWriterPromptCarriesTheBrief(t *testing.T) {
+	t.Parallel()
+
+	deps := unitDeps()
+	recorder := &promptRecorder{reply: goodDraft}
+	deps.LLM = recorder
+	blob := linkContextBlob(t, deps)
+
+	sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: blob})
+	sc.Spec.LinkRules.ParentLinkWithinParagraphs = 2
+	sc.Spec.Sections[0].KeywordRules.PrimaryInHeading = true
+
+	if _, err := steps.GenerateBody(deps).Run(t.Context(), sc); err != nil {
+		t.Fatalf("GenerateBody: %v", err)
+	}
+	for _, want := range []string{
+		"Title: Espresso (planned",
+		"H1: write one that carries the primary keyword",
+		"1. About (required), about 120 words: Explain the topic",
+		"2. Brewing, about 120 words",
+		"exactly as written",
+		"- espresso, in the first paragraph of section 1",
+		"- coffee, within the first 2 paragraphs of the page",
+	} {
+		if !strings.Contains(recorder.last, want) {
+			t.Fatalf("the prompt lacks %q:\n%s", want, recorder.last)
+		}
+	}
 }

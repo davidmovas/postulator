@@ -33,6 +33,8 @@ export const kindGenerate: RunKind = "generate";
 export const kindRevert: RunKind = "revert";
 
 export const stepPublish: StepName = "publish";
+export const stepValidate: StepName = "validate";
+export const stepGenerateBody: StepName = "generate_body";
 
 export const artifactLinkContext: ArtifactKind = "link_context";
 export const artifactDraft: ArtifactKind = "draft";

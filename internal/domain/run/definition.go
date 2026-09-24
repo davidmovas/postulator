@@ -15,7 +15,10 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
-const MaxRetryAttempts = 10
+const (
+	MaxRetryAttempts = 10
+	CheckpointAccept = "accept"
+)
 
 type RetryPolicy struct {
 	Backoff func(attempt int) time.Duration
@@ -45,6 +48,11 @@ func (c *StepContext) Artifact(kind ArtifactKind) (Artifact, error) {
 	return artifact, nil
 }
 
+func (c *StepContext) Accepted() bool {
+	step, found, err := Get[string](c.Check, CheckpointAccept)
+	return err == nil && found && step == c.Item.CurrentStep
+}
+
 func (c *StepContext) Param(name string) (any, bool) {
 	value, ok := c.Params[name]
 	return value, ok
@@ -68,19 +76,28 @@ type Result struct {
 
 type Price struct {
 	Calls        func(spec template.TemplateSpec, params map[string]any) int
+	Ref          *llm.ModelRef
 	OutputTokens int
 	Unpriced     bool
 }
 
+type Target struct {
+	Page pagemap.Page
+	Spec template.TemplateSpec
+}
+
+type Preflight func(ctx context.Context, record Run, targets map[string]Target) ([]EstimateFinding, error)
+
 type StepDef struct {
-	Run      func(ctx context.Context, sc *StepContext) (Result, error)
-	Name     string
-	Role     llm.Role
-	Requires []ArtifactKind
-	Produces []ArtifactKind
-	Retry    RetryPolicy
-	Price    Price
-	Timeout  time.Duration
+	Run       func(ctx context.Context, sc *StepContext) (Result, error)
+	Preflight Preflight
+	Name      string
+	Role      llm.Role
+	Requires  []ArtifactKind
+	Produces  []ArtifactKind
+	Retry     RetryPolicy
+	Price     Price
+	Timeout   time.Duration
 }
 
 type Definition struct {

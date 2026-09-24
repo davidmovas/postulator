@@ -78,7 +78,7 @@ type SectionKeywordRules struct {
 }
 
 type Section struct {
-	Heading      string              `json:"heading" description:"The heading the section opens with, which may carry {primaryKeyword}"`
+	Heading      string              `json:"heading" description:"The heading; {primaryKeyword}, {entityName}, {siteName} and {pageTitle} are filled in per page"`
 	Intent       string              `json:"intent" description:"What the section has to cover, one short sentence to the writer"`
 	TargetWords  int                 `json:"targetWords" minimum:"0" description:"About how many words the section should run to"`
 	Required     bool                `json:"required" description:"The page is not valid without this section"`
@@ -108,7 +108,7 @@ type LinkRules struct {
 }
 
 type MetaRules struct {
-	TitlePattern   string `json:"titlePattern" description:"How to build the SEO title, for example {primaryKeyword} | {siteName}"`
+	TitlePattern   string `json:"titlePattern" description:"How to build the SEO title, for example {primaryKeyword} | {siteName}; {entityName} and {pageTitle} work too"`
 	DescriptionMax int    `json:"descriptionMax" minimum:"0" description:"The most characters the SEO description may run to"`
 }
 

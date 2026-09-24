@@ -141,6 +141,37 @@ describe("the run event log", () => {
         expect(fetchEvents).toHaveBeenCalledTimes(2);
     });
 
+    test("goes live again when a finished run is resumed or regenerated", async () => {
+        fetchEvents.mockResolvedValueOnce({ events: [row(1, "run.queued"), row(2, "run.completed")] });
+        fetchEvents.mockResolvedValue({ events: [] });
+
+        await catchUpNow("revived");
+        await catchUpNow("revived");
+        await tick();
+        expect(getSnapshot("revived").terminal).toBe(true);
+
+        ingestLive("revived", row(3, "run.resumed"));
+        await tick();
+        expect(getSnapshot("revived").terminal).toBe(false);
+
+        fetchEvents.mockReset();
+        fetchEvents.mockResolvedValueOnce({ events: [row(4, "step.started"), row(5, "run.completed")] });
+        fetchEvents.mockResolvedValue({ events: [] });
+        await catchUpNow("revived");
+        await tick();
+
+        expect(fetchEvents).toHaveBeenCalled();
+        expect(getSnapshot("revived").terminal).toBe(true);
+        expect(getSnapshot("revived").contiguousSeq).toBe(5);
+    });
+
+    test("does not call a run finished because a late terminal event arrived before its restart", async () => {
+        ingestReplay("late", [row(3, "run.resumed"), row(2, "run.completed"), row(1, "run.queued")]);
+        await tick();
+
+        expect(getSnapshot("late").terminal).toBe(false);
+    });
+
     test("keeps one frozen snapshot identity between emissions", async () => {
         ingestReplay("identity", [row(1)]);
         await tick();

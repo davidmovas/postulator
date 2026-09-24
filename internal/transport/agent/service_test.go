@@ -48,7 +48,7 @@ func blocked(t *testing.T) (*agentapp.Service, string, *blockingRunner) {
 	siteRepo := sqlite.NewSiteRepo(store)
 	pageRepo := sqlite.NewPageRepo(store)
 	templateService := templates.New(sqlite.NewTemplateRepo(store), sqlite.NewLinkPolicyRepo(store),
-		pageRepo, siteRepo, store, &applicationtest.Recorder{}, now)
+		pageRepo, sqlite.NewEntityRepo(store), siteRepo, store, &applicationtest.Recorder{}, now)
 
 	service := agentapp.New(agentapp.Deps{
 		Conversations: sqlite.NewConversationRepo(store),

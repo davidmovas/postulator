@@ -193,6 +193,7 @@ type StepDonePayload struct {
 	ItemID     string `json:"itemId"`
 	Step       string `json:"step"`
 	DurationMs int64  `json:"durationMs"`
+	Message    string `json:"message"`
 }
 
 type StepFailedPayload struct {
@@ -209,6 +210,8 @@ type StepRetryingPayload struct {
 	Step    string `json:"step"`
 	Attempt int    `json:"attempt"`
 	AfterMs int64  `json:"afterMs"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
 }
 
 type LLMUsagePayload struct {

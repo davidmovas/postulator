@@ -6,6 +6,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -43,6 +44,10 @@ type siteReader interface {
 	Get(ctx context.Context, id string) (site.Site, error)
 }
 
+type entityReader interface {
+	Get(ctx context.Context, id string) (graph.Entity, error)
+}
+
 type unitOfWork interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
 }
@@ -51,14 +56,15 @@ type Service struct {
 	templates templateStore
 	policies  policyStore
 	pages     pageReader
+	entities  entityReader
 	sites     siteReader
 	uow       unitOfWork
 	publisher application.Publisher
 	clock     clock.Clock
 }
 
-func New(templates templateStore, policies policyStore, pages pageReader, sites siteReader, uow unitOfWork, publisher application.Publisher, clk clock.Clock) *Service {
-	return &Service{templates: templates, policies: policies, pages: pages, sites: sites, uow: uow, publisher: publisher, clock: clk}
+func New(templates templateStore, policies policyStore, pages pageReader, entities entityReader, sites siteReader, uow unitOfWork, publisher application.Publisher, clk clock.Clock) *Service {
+	return &Service{templates: templates, policies: policies, pages: pages, entities: entities, sites: sites, uow: uow, publisher: publisher, clock: clk}
 }
 
 func (s *Service) now() time.Time {

@@ -13,6 +13,8 @@ RULES
 6. The parent path is the path of the page one level up in the same subject, empty when the page is a root.
    Related paths are at most three sibling pages of the same subject, never the parent and never the page.
 7. Skip a page you cannot place rather than inventing a topic for it.
+8. When a page carries a primary keyword, the entity stands for that keyword: copy it into primaryKeyword
+   exactly as given and build the name from it, not from the title.
 {{end}}
 
 {{define "propose_from_pages.user"}}
@@ -23,7 +25,42 @@ SITE
 {{range .Known}}- {{.Name}} ({{.Kind}}){{if .Path}} at {{.Path}}{{end}}
 {{end}}
 {{end}}PAGES
-{{range .Pages}}- {{.Path}}{{if .Title}} — title: {{.Title}}{{end}}{{if .H1}} — h1: {{.H1}}{{end}}{{if .MetaDescription}} — description: {{.MetaDescription}}{{end}}
+{{range .Pages}}- {{.Path}}{{if .Title}} — title: {{.Title}}{{end}}{{if .H1}} — h1: {{.H1}}{{end}}{{if .MetaDescription}} — description: {{.MetaDescription}}{{end}}{{if .PrimaryKeyword}} — primary keyword: {{.PrimaryKeyword}}{{end}}{{if .Keywords}} — keywords: {{.Keywords}}{{end}}
+{{end}}
+{{end}}
+
+{{define "propose_from_keywords.system"}}
+You turn a list of search keywords into the entities of one website. An entity is one topic a page will be
+written about. Write in English. Return one JSON object with the field entities, holding one object per
+keyword you place.
+
+RULES
+1. One entity per keyword. Copy the keyword into the keyword field exactly as it was given to you.
+2. When two given keywords mean the same topic in other words, keep one entity for the first and list the
+   other under its secondaryKeywords instead of proposing it again.
+3. The name is the topic, two to four words, in title case, built from the keyword, never a sentence.
+4. The kind is hub for a topic that introduces a family of child topics, category for a listing, product for
+   one thing sold, and topic for everything else.
+5. Anchors are at most four link texts another page could use to point here, in lower case, each reading as
+   running prose. Reuse the keyword itself as one of them.
+6. The parent name is the name of the entity one level up in the same subject, taken from the entities that
+   already exist or from the ones you propose; empty when the topic stands on its own.
+7. Related names are at most three names of entities of the same subject, never the parent and never itself.
+8. Skip a keyword you cannot place rather than inventing a topic for it.
+{{end}}
+
+{{define "propose_from_keywords.user"}}
+SITE
+{{.SiteName}}
+
+{{if .Parent}}PARENT
+Every proposed entity sits under {{.Parent}} unless the subject clearly asks for another parent.
+
+{{end}}{{if .Known}}ENTITIES THAT ALREADY EXIST
+{{range .Known}}- {{.Name}} ({{.Kind}})
+{{end}}
+{{end}}KEYWORDS
+{{range .Keywords}}- {{.}}
 {{end}}
 {{end}}
 

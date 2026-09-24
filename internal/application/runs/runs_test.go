@@ -13,6 +13,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -24,6 +25,7 @@ import (
 
 type fakeEngine struct {
 	queued      run.Run
+	estimated   run.Run
 	estimate    run.Estimate
 	enqueueErr  error
 	failWith    error
@@ -32,6 +34,7 @@ type fakeEngine struct {
 	resumed     string
 	cancelled   string
 	retried     string
+	accepted    string
 	regenerated string
 	restarted   []string
 }
@@ -44,10 +47,11 @@ func (f *fakeEngine) Enqueue(_ context.Context, record run.Run) (run.Run, error)
 	return record, nil
 }
 
-func (f *fakeEngine) EstimateRun(context.Context, run.Run, template.TemplateSpec) (run.Estimate, error) {
+func (f *fakeEngine) EstimateRun(_ context.Context, record run.Run) (run.Estimate, error) {
 	if f.failWith != nil {
 		return run.Estimate{}, f.failWith
 	}
+	f.estimated = record
 	return f.estimate, nil
 }
 
@@ -68,6 +72,11 @@ func (f *fakeEngine) Cancel(_ context.Context, runID string) error {
 
 func (f *fakeEngine) RetryStep(_ context.Context, itemID string) error {
 	f.retried = itemID
+	return f.failWith
+}
+
+func (f *fakeEngine) Accept(_ context.Context, itemID string) error {
+	f.accepted = itemID
 	return f.failWith
 }
 
@@ -141,7 +150,9 @@ func newFixture(t *testing.T) *fixture {
 
 	engine := &fakeEngine{estimate: run.Estimate{
 		Tokens: 4200, USD: 0.12,
-		Findings: []run.EstimateFinding{{Code: "unpriced_step", Message: "images are not priced"}},
+		Findings: []run.EstimateFinding{{
+			Severity: content.SeverityWarn, Code: "unpriced_step", Message: "images are not priced",
+		}},
 	}}
 	specs := &fakeSpecs{
 		siteID:  "s",
@@ -206,7 +217,7 @@ func (f *fixture) seedRun(t *testing.T, status run.Status) (run.Run, run.Item) {
 
 	item := run.Item{
 		ID: id.New(), RunID: record.ID, SiteID: record.SiteID, TargetID: f.pages[0], Status: run.StatusCompleted,
-		CurrentStep: "generate_body", Checkpoint: run.NewCheckpoint(),
+		CurrentStep: "generate_body", Seq: 4, Checkpoint: run.NewCheckpoint(),
 		CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 	}
 	if err := f.items.Insert(t.Context(), item); err != nil {
@@ -286,7 +297,7 @@ func TestEstimateAnswersTheCostWithoutEnqueuingAnything(t *testing.T) {
 		t.Fatalf("Marshal: %v", marshalErr)
 	}
 	want := `{"estimate":{"tokens":4200,"usd":0.12,` +
-		`"findings":[{"code":"unpriced_step","message":"images are not priced"}]},"added":[]}`
+		`"findings":[{"severity":"warn","code":"unpriced_step","message":"images are not priced"}]},"added":[]}`
 	if string(encoded) != want {
 		t.Fatalf("Estimate = %s", encoded)
 	}
@@ -453,8 +464,8 @@ func TestGetAndListReadTheSnapshots(t *testing.T) {
 	if err != nil || len(items.Items) != 1 || items.Items[0].ID != item.ID {
 		t.Fatalf("ListItems = %+v, %v", items, err)
 	}
-	if items.Items[0].CurrentStep != "generate_body" || items.Items[0].TargetID != fixture.pages[0] {
-		t.Fatalf("ListItems = %+v", items.Items[0])
+	if items.Items[0].CurrentStep != "generate_body" || items.Items[0].TargetID != fixture.pages[0] || items.Items[0].Seq != 4 {
+		t.Fatalf("ListItems = %+v, want the working order carried", items.Items[0])
 	}
 }
 
@@ -723,6 +734,12 @@ func TestControlForwardsToTheEngine(t *testing.T) {
 	if fixture.engine.resumed != "r1" || fixture.engine.cancelled != "r1" || fixture.engine.retried != "i1" {
 		t.Fatalf("the engine saw %q, %q, %q", fixture.engine.resumed, fixture.engine.cancelled, fixture.engine.retried)
 	}
+	if _, err := fixture.service.RetryStep(t.Context(), runs.RetryStepRequest{ItemID: " i2 ", AcceptFindings: true}); err != nil {
+		t.Fatalf("RetryStep with acceptFindings: %v", err)
+	}
+	if fixture.engine.accepted != "i2" || fixture.engine.retried != "i1" {
+		t.Fatalf("the engine accepted %q and retried %q", fixture.engine.accepted, fixture.engine.retried)
+	}
 
 	regenerated, err := fixture.service.Regenerate(t.Context(), runs.RegenerateRequest{
 		RunID: " r1 ", ItemIDs: []string{" i1 ", "", "i2", "i1"},
@@ -892,7 +909,7 @@ func TestListItemsNamesTheParentAHeldItemWaitsFor(t *testing.T) {
 
 	held := run.Item{
 		ID: id.New(), RunID: record.ID, SiteID: record.SiteID, TargetID: childID, Status: run.StatusPaused,
-		CurrentStep: string(run.StepPublish), PauseReason: run.PauseAwaitingParent,
+		CurrentStep: string(run.StepPublish), PauseReason: run.PauseAwaitingParent, BlockedBy: parentItem.ID,
 		Note:       "/hub/child/ waits for its parent /hub/, which is not on the site yet",
 		Checkpoint: run.NewCheckpoint(), CreatedAt: sqlitetest.Stamp.Add(time.Second), UpdatedAt: sqlitetest.Stamp,
 	}
@@ -920,6 +937,9 @@ func TestListItemsNamesTheParentAHeldItemWaitsFor(t *testing.T) {
 	if child.Note != held.Note {
 		t.Fatalf("the held item's note = %q, want the step's own sentence", child.Note)
 	}
+	if child.BlockedBy != parentItem.ID {
+		t.Fatalf("the held item is queued behind %q, want %s", child.BlockedBy, parentItem.ID)
+	}
 	want := runs.AwaitedParent{
 		PageID: parentID, Path: "/hub/", ItemID: parentItem.ID,
 		ItemStatus: string(run.StatusFailed), Step: string(run.StepValidate),
@@ -927,8 +947,45 @@ func TestListItemsNamesTheParentAHeldItemWaitsFor(t *testing.T) {
 	if child.WaitingFor == nil || *child.WaitingFor != want {
 		t.Fatalf("the held item waits for %+v, want %+v", child.WaitingFor, want)
 	}
-	if parent := byTarget[parentID]; parent.WaitingFor != nil {
-		t.Fatalf("the parent item waits for %+v, want nothing", parent.WaitingFor)
+	if parent := byTarget[parentID]; parent.WaitingFor != nil || parent.BlockedBy != "" {
+		t.Fatalf("the parent item waits for %+v behind %q, want nothing", parent.WaitingFor, parent.BlockedBy)
+	}
+}
+
+func TestListItemsNamesTheBlockerAQueuedItemSitsBehind(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	record, parentItem := fixture.seedRun(t, run.StatusRunning)
+	parentID, childID := fixture.pages[0], fixture.pages[1]
+
+	queued := run.Item{
+		ID: id.New(), RunID: record.ID, SiteID: record.SiteID, TargetID: childID, Status: run.StatusPending,
+		CurrentStep: string(run.StepResolveContext), Seq: 5, BlockedBy: parentItem.ID,
+		Checkpoint: run.NewCheckpoint(), CreatedAt: sqlitetest.Stamp.Add(time.Second), UpdatedAt: sqlitetest.Stamp,
+	}
+	if err := fixture.items.Insert(t.Context(), queued); err != nil {
+		t.Fatalf("insert the queued item: %v", err)
+	}
+	fixture.mapping.known = map[string]pagemap.Page{
+		parentID: {ID: parentID, Path: "/hub/"},
+		childID:  {ID: childID, Path: "/hub/child/", ParentPageID: &parentID},
+	}
+
+	list, err := fixture.service.ListItems(t.Context(), runs.ListItemsRequest{RunID: record.ID})
+	if err != nil || len(list.Items) != 2 {
+		t.Fatalf("ListItems = %+v, %v", list, err)
+	}
+	if list.Items[0].TargetID != parentID || list.Items[1].TargetID != childID {
+		t.Fatalf("the items are listed as %s then %s, want the parent first", list.Items[0].TargetID, list.Items[1].TargetID)
+	}
+	want := runs.AwaitedParent{
+		PageID: parentID, Path: "/hub/", ItemID: parentItem.ID,
+		ItemStatus: string(parentItem.Status), Step: parentItem.CurrentStep,
+	}
+	child := list.Items[1]
+	if child.BlockedBy != parentItem.ID || child.WaitingFor == nil || *child.WaitingFor != want {
+		t.Fatalf("the queued item sits behind %q and waits for %+v, want %+v", child.BlockedBy, child.WaitingFor, want)
 	}
 }
 
@@ -969,4 +1026,43 @@ func (f *fixture) artifact(t *testing.T, record run.Run, item run.Item, kind run
 	}
 	artifact.Purged = purged
 	return artifact
+}
+
+func TestStartRefusesARunTheEstimateFindsBlocked(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	fixture.specs.siteID = fixture.siteID
+	blocking := run.EstimateFinding{
+		Severity: content.SeverityError, Code: "provider_key_missing", PageID: fixture.pages[0], Path: "/hub/",
+		Message: "the provider openai holds no key",
+	}
+	fixture.engine.estimate.Findings = append(fixture.engine.estimate.Findings, blocking)
+
+	_, err := fixture.service.Start(t.Context(), runs.StartRequest{SiteID: fixture.siteID, PageIDs: fixture.pages})
+	if !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("Start = %v, want invalid", err)
+	}
+	var refusal *errors.Error
+	if !stderrors.As(err, &refusal) {
+		t.Fatalf("the refusal is not a kernel error: %v", err)
+	}
+	named, ok := refusal.Details["findings"].([]run.EstimateFinding)
+	if !ok || len(named) != 1 || named[0] != blocking {
+		t.Fatalf("the refusal carries %v, want the blocking finding alone", refusal.Details["findings"])
+	}
+	if !strings.Contains(err.Error(), "holds no key") {
+		t.Fatalf("the message does not say what blocks the run: %v", err)
+	}
+	if fixture.engine.queued.SiteID != "" {
+		t.Fatalf("a blocked run reached the queue: %+v", fixture.engine.queued)
+	}
+
+	previewed, err := fixture.service.Estimate(t.Context(), runs.StartRequest{SiteID: fixture.siteID, PageIDs: fixture.pages})
+	if err != nil {
+		t.Fatalf("Estimate: %v", err)
+	}
+	if len(previewed.Estimate.Findings) != 2 || fixture.engine.estimated.SiteID != fixture.siteID {
+		t.Fatalf("Estimate = %+v, want both findings shown and the planned run priced", previewed.Estimate)
+	}
 }

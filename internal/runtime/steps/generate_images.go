@@ -28,7 +28,8 @@ const (
 	CodeUploadFailed   = "image_upload_failed"
 	CodeImageNotPlaced = "image_not_placed"
 
-	imageStepTimeout = 5 * time.Minute
+	imageStepTimeout  = 15 * time.Minute
+	imageOutputTokens = 1056
 )
 
 type ImageProvider interface {
@@ -63,12 +64,23 @@ func (r *ImagesResult) skip(page pagemap.Page, code, message, reason string) {
 
 func GenerateImages(deps Deps) run.StepDef {
 	return run.StepDef{
-		Name:     NameGenerateImages,
-		Requires: []run.ArtifactKind{run.ArtifactBodyHTML},
-		Produces: []run.ArtifactKind{run.ArtifactImages, run.ArtifactBodyHTML},
-		Retry:    run.RetryPolicy{Max: 2},
-		Timeout:  imageStepTimeout,
-		Price:    run.Price{Unpriced: true},
+		Name:      NameGenerateImages,
+		Preflight: imagesPreflight(deps),
+		Requires:  []run.ArtifactKind{run.ArtifactBodyHTML},
+		Produces:  []run.ArtifactKind{run.ArtifactImages, run.ArtifactBodyHTML},
+		Retry:     run.RetryPolicy{Max: 2},
+		Timeout:   imageStepTimeout,
+		Price: run.Price{
+			Ref:          deps.ImageModel,
+			OutputTokens: imageOutputTokens,
+			Unpriced:     deps.ImageModel == nil,
+			Calls: func(spec template.TemplateSpec, _ map[string]any) int {
+				if spec.Images.Source != template.ImagesAI {
+					return 0
+				}
+				return wantedImages(spec.Images)
+			},
+		},
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			result := ImagesResult{
 				Images:   make([]PlacedImage, 0),
@@ -98,7 +110,7 @@ func GenerateImages(deps Deps) run.StepDef {
 			for i := range acquired {
 				stored, uploadErr := store(ctx, deps, sc, acquired[i])
 				if uploadErr != nil {
-					if ctx.Err() != nil {
+					if stopped(ctx) {
 						return run.Result{}, uploadErr
 					}
 					result.skip(sc.Page, CodeUploadFailed,
@@ -164,7 +176,7 @@ func acquire(ctx context.Context, deps Deps, sc *run.StepContext, entity graph.E
 		SiteID: sc.Run.SiteID, Term: subjectOf(sc, entity), Limit: wanted,
 	})
 	if err != nil {
-		if ctx.Err() != nil {
+		if stopped(ctx) {
 			return nil, err
 		}
 		result.skip(sc.Page, CodeImagesFailed,
@@ -196,7 +208,7 @@ func generated(ctx context.Context, deps Deps, sc *run.StepContext, entity graph
 			Alt:     altOf(entity, subject),
 		})
 		if err != nil {
-			if ctx.Err() != nil {
+			if stopped(ctx) {
 				return nil, err
 			}
 			result.skip(sc.Page, CodeImagesFailed,

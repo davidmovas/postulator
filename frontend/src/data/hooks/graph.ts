@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Cursor, List } from "../../lib/paging.js";
 import {
     addEdge,
+    applyProposals,
     approveEdge,
     createEntity,
     deleteEdge,
@@ -13,6 +14,8 @@ import {
     listEntities,
     loadGraph,
     moveEntity,
+    previewFromPages,
+    proposeFromKeywords,
     proposeFromPages,
     proposeRelated,
     recomputeScores,
@@ -222,6 +225,22 @@ export function useProposeFromPages() {
 
 export function useProposeRelated() {
     return useGraphBatch((request: Parameters<typeof proposeRelated>[0], signal?: AbortSignal) => proposeRelated(request, signal));
+}
+
+export function usePreviewFromPages() {
+    return useMutation({
+        mutationFn: (input: BatchInput<Parameters<typeof previewFromPages>[0]>) => previewFromPages(input.request, input.signal),
+    });
+}
+
+export function useProposeFromKeywords() {
+    return useMutation({
+        mutationFn: (input: BatchInput<Parameters<typeof proposeFromKeywords>[0]>) => proposeFromKeywords(input.request, input.signal),
+    });
+}
+
+export function useApplyProposals() {
+    return useGraphBatch((request: Parameters<typeof applyProposals>[0], signal?: AbortSignal) => applyProposals(request, signal));
 }
 
 export function useRecomputeScores() {

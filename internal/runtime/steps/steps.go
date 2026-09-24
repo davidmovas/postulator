@@ -3,6 +3,7 @@ package steps
 import (
 	"context"
 	"encoding/json"
+	stderrors "errors"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
@@ -42,10 +43,14 @@ const (
 const (
 	checkpointLinks = "links"
 
-	wordsPerToken     = 1.6
-	tokenHeadroom     = 512
-	fallbackMaxTokens = 2048
+	tokensPerWord     = 3
+	tokenHeadroom     = 1024
+	leastWriterTokens = 4096
+	fallbackWords     = 800
+	ceilingDoublings  = 3
 	pureStepTimeout   = 30 * time.Second
+	writerTimeout     = 15 * time.Minute
+	editorTimeout     = 3 * time.Minute
 )
 
 type entityReader interface {
@@ -120,6 +125,7 @@ type Deps struct {
 	Content       judgeService
 	LLM           llm.Client
 	ImageProvider ImageProvider
+	ImageModel    *domainllm.ModelRef
 	ImageSources  map[template.ImageSource]ImageSource
 	UnitOfWork    unitOfWork
 	Publisher     application.Publisher
@@ -221,7 +227,7 @@ func encode(value any, what string) ([]byte, error) {
 	return encoded, nil
 }
 
-func maxTokens(spec template.TemplateSpec) int {
+func plannedWords(spec template.TemplateSpec) int {
 	words := 0
 	for i := range spec.Sections {
 		words += spec.Sections[i].TargetWords
@@ -230,9 +236,18 @@ func maxTokens(spec template.TemplateSpec) int {
 		words = spec.Length.Max
 	}
 	if words == 0 {
-		return fallbackMaxTokens
+		return fallbackWords
 	}
-	return int(float64(words)*wordsPerToken) + tokenHeadroom
+	return words
+}
+
+func writerCeiling(spec template.TemplateSpec, attempts int) int {
+	ceiling := max(leastWriterTokens, plannedWords(spec)*tokensPerWord+tokenHeadroom)
+	return ceiling << min(max(attempts, 0), ceilingDoublings)
+}
+
+func stopped(ctx context.Context) bool {
+	return stderrors.Is(ctx.Err(), context.Canceled)
 }
 
 func callMeta(sc *run.StepContext, step string) llm.CallMeta {

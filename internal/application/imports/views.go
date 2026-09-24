@@ -32,6 +32,7 @@ const (
 	CodeUnknownEntityKind FindingCode = "unknown_entity_kind"
 	CodeUnknownPageKind   FindingCode = "unknown_page_kind"
 	CodeUnknownWPType     FindingCode = "unknown_wp_type"
+	CodeRootPageSkipped   FindingCode = "root_page_skipped"
 )
 
 var blockingFindingCodes = []FindingCode{
@@ -77,16 +78,18 @@ type Finding struct {
 }
 
 type PreviewPage struct {
-	Path            string `json:"path"`
-	Title           string `json:"title"`
-	H1              string `json:"h1,omitempty"`
-	MetaTitle       string `json:"metaTitle,omitempty"`
-	MetaDescription string `json:"metaDescription,omitempty"`
-	WPType          string `json:"wpType"`
-	PageKind        string `json:"pageKind,omitempty"`
-	Entity          string `json:"entity,omitempty"`
-	Action          string `json:"action"`
-	Generated       bool   `json:"generated,omitempty"`
+	Path            string   `json:"path"`
+	Title           string   `json:"title"`
+	H1              string   `json:"h1,omitempty"`
+	MetaTitle       string   `json:"metaTitle,omitempty"`
+	MetaDescription string   `json:"metaDescription,omitempty"`
+	PrimaryKeyword  string   `json:"primaryKeyword,omitempty"`
+	Keywords        []string `json:"keywords"`
+	WPType          string   `json:"wpType"`
+	PageKind        string   `json:"pageKind,omitempty"`
+	Entity          string   `json:"entity,omitempty"`
+	Action          string   `json:"action"`
+	Generated       bool     `json:"generated,omitempty"`
 }
 
 type PreviewEntity struct {
@@ -206,16 +209,19 @@ func (r *PreviewReport) settle() {
 	}
 }
 
-func entityView(e graph.Entity, action Action) PreviewEntity {
-	keywords := e.SecondaryKeywords
-	if keywords == nil {
-		keywords = []string{}
+func listOf(values []string) []string {
+	if values == nil {
+		return []string{}
 	}
+	return values
+}
+
+func entityView(e graph.Entity, action Action) PreviewEntity {
 	return PreviewEntity{
 		Name:           e.Name,
 		Kind:           string(e.Kind),
 		PrimaryKeyword: e.PrimaryKeyword,
-		Keywords:       keywords,
+		Keywords:       listOf(e.SecondaryKeywords),
 		Anchors:        anchorTexts(e.Anchors),
 		Action:         string(action),
 	}
@@ -228,6 +234,8 @@ func pageView(p pagemap.Page, draft *pageDraft, action Action) PreviewPage {
 		H1:              p.H1,
 		MetaTitle:       p.MetaTitle,
 		MetaDescription: p.MetaDescription,
+		PrimaryKeyword:  p.PrimaryKeyword,
+		Keywords:        listOf(p.Keywords),
 		WPType:          string(p.WPType),
 		PageKind:        draft.pageKind,
 		Entity:          draft.entity,

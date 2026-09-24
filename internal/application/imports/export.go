@@ -135,12 +135,16 @@ func row(page *pagemap.Page, entity *graph.Entity, pageKind string, g graph.Grap
 		cells[importmap.FieldMetaDescription] = page.MetaDescription
 		cells[importmap.FieldWPType] = string(page.WPType)
 		cells[importmap.FieldPageKind] = pageKind
+		cells[importmap.FieldPrimaryKeyword] = page.PrimaryKeyword
+		cells[importmap.FieldKeywords] = options.Join(importmap.FieldKeywords, page.Keywords)
 	}
 	if entity.ID != "" {
 		cells[importmap.FieldEntity] = entity.Name
 		cells[importmap.FieldEntityKind] = string(entity.Kind)
-		cells[importmap.FieldPrimaryKeyword] = entity.PrimaryKeyword
-		cells[importmap.FieldKeywords] = options.Join(importmap.FieldKeywords, entity.SecondaryKeywords)
+		cells[importmap.FieldPrimaryKeyword] = fill(cells[importmap.FieldPrimaryKeyword], entity.PrimaryKeyword)
+		if cells[importmap.FieldKeywords] == "" {
+			cells[importmap.FieldKeywords] = options.Join(importmap.FieldKeywords, entity.SecondaryKeywords)
+		}
 		cells[importmap.FieldAnchors] = options.Join(importmap.FieldAnchors, anchorTexts(entity.Anchors))
 		if parents := g.Parents(entity.ID, 1); len(parents) > 0 {
 			cells[importmap.FieldParentEntity] = parents[0].Name

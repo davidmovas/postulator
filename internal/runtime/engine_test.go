@@ -3,6 +3,7 @@ package runtime_test
 import (
 	"context"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -151,7 +152,40 @@ func TestATransientFaultIsRetriedAndThenSucceeds(t *testing.T) {
 	if harness.bus.count(events.StepRetrying) != 1 {
 		t.Fatalf("step.retrying was published %d times", harness.bus.count(events.StepRetrying))
 	}
+	retrying, ok := harness.bus.payloads(events.StepRetrying)[0].(events.StepRetryingPayload)
+	if !ok || retrying.Code != "EXTERNAL" || !strings.Contains(retrying.Message, "hung up") {
+		t.Fatalf("step.retrying = %+v, want the fault's code and sentence", harness.bus.payloads(events.StepRetrying)[0])
+	}
 	assertGapless(t, harness, queued.ID)
+}
+
+func TestStepDoneCarriesTheSentenceOfTheStep(t *testing.T) {
+	t.Parallel()
+
+	harness := newHarness(t, 1)
+	writer := producing("generate_body", run.ArtifactBodyHTML, nil,
+		func(_ context.Context, sc *run.StepContext) (run.Result, error) {
+			return run.Result{
+				Artifacts: []run.Artifact{{Kind: run.ArtifactBodyHTML, Blob: []byte("<p>ok</p>")}},
+				Message:   "wrote the body of " + sc.Page.Path,
+			}, nil
+		})
+
+	engine := harness.engine(t, mustRegister(t, writer))
+	queued, err := engine.Enqueue(t.Context(), harness.newRun(recipeOf("generate_body")))
+	if err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+	harness.waitForRun(t, queued.ID, run.StatusCompleted)
+
+	done := harness.bus.payloads(events.StepDone)
+	if len(done) != 1 {
+		t.Fatalf("step.done was published %d times", len(done))
+	}
+	payload, ok := done[0].(events.StepDonePayload)
+	if !ok || payload.Message != "wrote the body of /page-a/" || payload.Step != "generate_body" {
+		t.Fatalf("step.done = %+v, want the step's own sentence", done[0])
+	}
 }
 
 func TestAnExhaustedStepFailsTheItemButNotTheRun(t *testing.T) {
@@ -431,7 +465,7 @@ func TestEstimateRunPricesEveryModelBackedStep(t *testing.T) {
 	engine := harness.engine(t, mustRegister(t, writer, pure))
 	record := harness.newRun(recipeOf("generate_body", "insert_links"))
 
-	estimate, err := engine.EstimateRun(t.Context(), record, harness.specs.spec)
+	estimate, err := engine.EstimateRun(t.Context(), record)
 	if err != nil {
 		t.Fatalf("EstimateRun: %v", err)
 	}
@@ -441,7 +475,7 @@ func TestEstimateRunPricesEveryModelBackedStep(t *testing.T) {
 
 	single := record
 	single.Targets = harness.pages[:1]
-	half, err := engine.EstimateRun(t.Context(), single, harness.specs.spec)
+	half, err := engine.EstimateRun(t.Context(), single)
 	if err != nil {
 		t.Fatalf("EstimateRun for one target: %v", err)
 	}
@@ -451,7 +485,7 @@ func TestEstimateRunPricesEveryModelBackedStep(t *testing.T) {
 
 	unknown := record
 	unknown.Recipe = append(slices.Clone(record.Recipe), template.StepSpec{Name: "summon", Enabled: true})
-	if _, err = engine.EstimateRun(t.Context(), unknown, harness.specs.spec); !errors.IsCode(err, errors.NotFound) {
+	if _, err = engine.EstimateRun(t.Context(), unknown); !errors.IsCode(err, errors.NotFound) {
 		t.Fatalf("EstimateRun of an unknown step = %v", err)
 	}
 }

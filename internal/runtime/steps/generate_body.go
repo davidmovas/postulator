@@ -18,7 +18,7 @@ type bodyPrompt struct {
 	Page     pagemap.Page
 	Entity   graph.Entity
 	Spec     template.TemplateSpec
-	Phrases  []string
+	Brief    content.Brief
 	Children []string
 }
 
@@ -44,6 +44,7 @@ func GenerateBody(deps Deps) run.StepDef {
 		Requires: []run.ArtifactKind{run.ArtifactLinkContext},
 		Produces: []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML},
 		Retry:    run.RetryPolicy{Max: 3},
+		Timeout:  writerTimeout,
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			lc, err := linkContextOf(sc)
 			if err != nil {
@@ -53,32 +54,37 @@ func GenerateBody(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
+			policy, err := effectivePolicy(ctx, deps, sc)
+			if err != nil {
+				return run.Result{}, err
+			}
 
 			ref, err := deps.Profiles.Resolve(ctx, sc.Run.SiteID, domainllm.RoleWriter, sc.Spec.ModelProfiles)
 			if err != nil {
 				return run.Result{}, err
 			}
 
+			brief := content.NewBrief(sc.Spec, policy.Rules, sc.Page, entity, lc)
 			system, user, err := render(NameGenerateBody, bodyPrompt{
-				Page: sc.Page, Entity: entity, Spec: sc.Spec, Phrases: lc.Phrases(),
+				Page: sc.Page, Entity: entity, Spec: sc.Spec, Brief: brief,
 				Children: childAnchors(lc, sc.Spec.LinkRules.ChildrenSection),
 			})
 			if err != nil {
 				return run.Result{}, err
 			}
 
-			draft, usage, err := port.Structured[content.ContentDraft](ctx, deps.LLM, port.Request{
+			answer, usage, err := port.Structured[content.DraftAnswer](ctx, deps.LLM, port.Request{
 				Ref:       ref,
 				System:    system,
 				Messages:  []port.Message{{Role: port.RoleUser, Text: user}},
-				MaxTokens: maxTokens(sc.Spec),
+				MaxTokens: writerCeiling(sc.Spec, sc.Item.Attempts),
 				Meta:      callMeta(sc, NameGenerateBody),
 			})
 			if err != nil {
 				return run.Result{}, err
 			}
 
-			doc, err := content.Assemble(draft)
+			draft, doc, err := content.Assemble(answer, brief)
 			if err != nil {
 				return run.Result{}, err
 			}

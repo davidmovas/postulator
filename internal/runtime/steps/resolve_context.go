@@ -15,10 +15,11 @@ const NameResolveContext = string(run.StepResolveContext)
 
 func ResolveContext(deps Deps) run.StepDef {
 	return run.StepDef{
-		Name:     NameResolveContext,
-		Produces: []run.ArtifactKind{run.ArtifactLinkContext},
-		Retry:    run.RetryPolicy{Max: 3},
-		Timeout:  pureStepTimeout,
+		Name:      NameResolveContext,
+		Preflight: graphPreflight(deps),
+		Produces:  []run.ArtifactKind{run.ArtifactLinkContext},
+		Retry:     run.RetryPolicy{Max: 3},
+		Timeout:   pureStepTimeout,
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			entity, err := entityOf(ctx, deps, sc)
 			if err != nil {

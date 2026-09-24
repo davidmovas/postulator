@@ -32,10 +32,10 @@ func (s *Service) PreviewSummary(ctx context.Context, req PreviewRequest) (Previ
 	if err != nil {
 		return PreviewSummaryResponse{}, err
 	}
-	return summarize(computed.report, computed.counts(), req.Mapping.Options.Sheets), nil
+	return summarize(computed.report, computed.counts(), req.Mapping.Options.Sheets, computed.rows), nil
 }
 
-func summarize(report PreviewReport, counts Counts, sheets []string) PreviewSummaryResponse {
+func summarize(report PreviewReport, counts Counts, sheets []string, rows int) PreviewSummaryResponse {
 	pages := report.Pages
 	more := len(pages) > SummaryPages
 	if more {
@@ -45,13 +45,12 @@ func summarize(report PreviewReport, counts Counts, sheets []string) PreviewSumm
 		sheets = []string{}
 	}
 
-	rows := counts.PagesCreated + counts.PagesUpdated + counts.Skipped
 	return PreviewSummaryResponse{
 		Counts:   counts,
 		Sheets:   sheets,
 		Findings: group(report),
 		Pages:    slices.Clone(pages),
-		Rows:     max(rows, len(report.Pages)),
+		Rows:     rows,
 		Blocking: len(report.Errors) > 0,
 		More:     more,
 	}

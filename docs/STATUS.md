@@ -4,7 +4,9 @@ The handoff point between sessions. Read this first. The reasoning behind every 
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
-**Released:** `v2.1.0` on 2026-09-23, from `master` after a PR from `dev`; `v2.0.0` the same morning.
+**Released:** `v2.1.0` on 2026-09-23; **`v2.2.0` is on `dev` awaiting the owner's build and tag**
+(this session ran on Linux, so `task build`, `task e2e:full` and the sandbox walk are listed
+under **Next steps** rather than under **The gate**).
 
 ## Where we are
 
@@ -16,67 +18,56 @@ and fifteen bound services behind one screen contract. A master password locks t
 a backup round trips through one encrypted archive, and the sweep retires artifacts and run
 events on their own windows.
 
-The hardening answered four complaints from the client's own use; the reasoning is under
-**2026-09-22 and 23** in `DECISIONS.md`.
+**2.2.0 (2026-09-24)** answers the client's second week: eighteen pages, a third of them held
+for a human, links not placed, the order wrong, every retry paid for again. The reasoning is
+under **2026-09-24 — 2.2.0** in `DECISIONS.md`.
 
-- **Links.** One `pagemap.Site` answers where an href points, for a run's validation and the
-  Linking screen alike, so a link the body carries is no longer inserted twice and then graded
-  an error. A template's link rules replace the policy's whole, a neighbour is relinked by its
-  own rules, and "self" is the page being written.
-- **The agent.** A field is required only where the use case refuses its absence, a tool takes
-  its own argument structs, a call ends in the transcript as one of five states (`running ok
-  cut denied error`), and an answer over the cap is shortened into a readable document.
-- **Reversibility.** `RunsService.RevertRun` enqueues a `revert` run that trashes what the run
-  created and writes back the body and the SEO meta it replaced, holding an item rather than
-  overwriting a human's edit. A finished step is recorded even while the engine stops, and a
-  failed `ImportBackup` puts back the database it replaced.
-- **Cost.** Every model call is its own ledger row, `agent.usage` announces each round and
-  `agent.waiting` says when a provider is holding one, the stored history replays a shortened
-  tool result, and the tool schemas have a ceiling with a test on it.
+- **The import never plans `/`**, and a row's keywords land on the page (`pages.primary_keyword`,
+  `pages.keywords`, migration 0027) even when the row names no entity.
+- **Entities are proposed for chosen pages or pasted keywords and written only once reviewed.**
+  `GraphService.PreviewFromPages`, `ProposeFromKeywords` and `ApplyProposals`, the three tools
+  beside them, and a three-step dialog on the Graph screen: pick pages or paste keywords, preview,
+  keep the proposals you want.
+- **Placeholders work on the first try.** `{primaryKeyword} {entityName} {siteName} {pageTitle}`
+  are expanded per page in `ResolveForPage`, anything else is refused by `Validate`, and the writer
+  gets the brief's headings back through `content.Assemble`, so `section_missing` cannot happen.
+- **The pipeline stops itself less.** A truncated or malformed answer is tried again with more room
+  and a repair round; the linker writes the phrases the body owes and falls back to a plain sentence
+  with a warning; validation only grades and holds a page with residual errors for a decision that
+  `Engine.Accept` settles in one click; the judge and the image step never fail a page on their own
+  clock; a post is sent no parent.
+- **The queue knows the tree.** A child is queued behind its parent (`run_items.blocked_by`,
+  migration 0028), never runs before it, and is parked with an explanation when the parent stops;
+  items are listed in the order they run and the table names the page each waits after.
+- **Before the run costs anything**, the estimate prices every page on its own template, checks
+  each model role (profile, key, catalog), prices images on the image model, runs each step's
+  preflight and refuses a run a finding blocks.
+- **The window follows.** Every step event carries the step's sentence, a resumed or regenerated
+  run stays live, `step.started` refreshes the rows, the drawer picks its primary action from what
+  stopped the page, and the header counts the pages that wait for a decision.
 
-**After 2.0.0 (2026-09-23),** from the client's first real hour on OpenAI; the reasoning is under
-**2026-09-23 — after 2.0.0** in `DECISIONS.md`.
-
-- **A child waits for its parent.** Publish holds a child whose parent is not on the site as
-  `awaiting_parent` with a sentence naming the parent, and the sweep releases it as soon as the
-  parent page has a `wpId`, whoever published it. A paused run is no longer reaped, and every revival
-  re-arms its deadline. A run that publishes brings the parents that are not on the site.
-- **Regenerate from the start.** `RunsService.Regenerate` and `runs_regenerate` write stopped items
-  again from their first step inside the same run, against the template as it is now; an item that
-  already wrote to the site is refused so its revert stays exact. The drawer offers it, a run with
-  failed items offers it for all of them, and a held child names its parent and offers to open or
-  regenerate it.
-- **Start a run picks from the page tree**, with status, search, a not-on-the-site filter, whole
-  branches and the parents that will be written first.
-- **Cost.** The writer is `gpt-5.6-terra`, the editor and the judge `gpt-5.6-luna`; images ask for
-  `images.openaiQuality` (medium) and every image is a ledger call, so it counts in spend and budget.
-- **Two docker stacks.** `task sandbox:*` is the owner's WordPress on 8089, `task e2e:*` the suites'
-  own on 8088; the plugin is installed from its zip, never bind-mounted, and the suites clean up.
-- **Tor Browser.** A link opens as a new tab in the Tor Browser Postulator started; one the person
-  opened by hand is left alone with a toast that says what to do and copies the link.
-
-`relink`, `repair`, `sync` and `revert` own their recipes, so Relink no longer regenerates the
-page and a seeded template that names no recipe runs `run.GenerateRecipe()` instead of being
-refused. The companion plugin is **1.2.0**, adding `GET /seo-meta/{id}` behind the
-`seo_meta_read` capability. `TestTheClientLoopFromTheSamples` drives the whole loop from the
-client's own workbooks against docker: import, eight live pages, a green link audit, a relink,
-a repair, a cancel, a byte-identical revert, a trash and a backup.
+`relink`, `repair`, `sync` and `revert` own their recipes. The companion plugin is **1.2.0**.
+`TestTheClientLoopFromTheSamples` drives the whole loop from the client's own workbooks against
+docker, and `TestAChildWaitsForItsParentAndGoesOnOnceTheParentIsRegenerated` now stops the parent
+by exhausting the writer, because an incomplete draft is tried again instead of failing at validate.
 
 ## The gate
 
-Green on 2026-09-23 over the code at `a035b62` on `dev`; every commit after it is documentation.
+Green on 2026-09-24 over the code at the head of `claude/gallant-volta-nd2lv9`, on Linux, where
+`cmd/postulator`, `internal/app`, `adapters/browser/tor` and `adapters/secrets/{dpapi,masterkey}`
+build only under `GOOS=windows` and `TestDSN` in `adapters/sqlite` fails on the path separator
+alone.
 
-- `gofmt -l .` silent, `task check:go:comments`, `go build ./...`, `go vet ./...`.
-- `golangci-lint run` and `task lint:e2e` 0 issues; `go test -race -count=1 -p 2` green.
-- `go run ./cmd/covergate`: **domain+application 85.60% of 6673** (gate 80%), **total 86.44% of 17973** (gate 70%).
-- `task bindings`: **15 services, 119 methods**; `task events` and `task vocab` leave no diff.
-- **90 tools**, 75,045 bytes of schema against the 75,100 the registry test allows.
-- `npm run typecheck` clean; `npx vitest run` **1116 tests in 113 files** over two projects.
-- `task ui:lint` 0 issues plus the harness tests, and `task build`. The seeded window was walked on
-  2026-09-23 for the held run, its child's drawer and the failed-items banner.
-- The docker suites ran on the e2e stack (8088) on 2026-09-23: `task e2e:test` 25 s, the whole-loop
-  package 76 s including the new held-parent scenario, and the stack held none of their pages after.
-- Tor Browser 15.0.23 by hand: three https links from the adapter, one window, no dialog.
+- `gofmt -l .` silent, the comment check of `task check:go:comments`, `GOOS=windows go build ./...`
+  and `GOOS=windows go vet -tags e2e ./internal/e2e/...`.
+- `golangci-lint run` (v2.13.2 built with go1.27) and the e2e sources 0 issues;
+  `go test -race -count=1 -p 2` green over every package that builds on Linux.
+- `go run ./cmd/covergate`: **domain+application 85.98% of 7191** (gate 80%), **total 86.88% of
+  18038** (gate 70%).
+- `wails3 generate bindings`: **15 services, 122 methods**; `task events` and `task vocab` leave no
+  diff; migrations up to **0028**.
+- **93 tools**, 78,971 bytes of schema against the 79,000 the registry test allows.
+- `npm run typecheck` clean; `npx vitest run` **1142 tests in 115 files** over two projects.
 
 ## How to run
 
@@ -166,9 +157,13 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 
 ## Next steps
 
-1. A human walk of the new flows on a real provider, from the empty home and the bare sandbox the
-   owner reset on 2026-09-23: install the plugin by hand, import, a failed parent regenerated in
-   place, its children going on by themselves, the tree picker, links as Tor Browser tabs.
+1. **Owner, before the 2.2.0 tag, on Windows and docker:** `task build` (the bindings and the
+   frontend under the real toolchain), `task ui:lint`, `task e2e:full` (the held-parent scenario
+   now exhausts the writer), and `task package`; then a walk on the sandbox with a real provider:
+   import a workbook with a `/` row and keywords, preview and apply entities for one branch and for
+   a pasted keyword list, a template with `{primaryKeyword}` in a heading, a run over a parent and
+   two children with one page held at validate and accepted, a regenerated parent whose children go
+   on by themselves, and the start dialog refusing a run whose provider has no key.
 2. The residue above: the denied tool row's decision, the four narrow-width UI items, the ledger
-   screen, `ProposeFromPages` and `Import.Apply` as runs, `settings.changed` for a declared value,
-   and pricing images in the pre-run estimate.
+   screen, `ProposeFromPages` and `Import.Apply` as runs, and `settings.changed` for a declared
+   value.

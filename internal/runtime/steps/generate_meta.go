@@ -18,10 +18,8 @@ const (
 
 	CodeMetaNotWritten = "meta_not_written"
 
-	metaTokens         = 512
-	primaryPlaceholder = "{primaryKeyword}"
-	sitePlaceholder    = "{siteName}"
-	ellipsis           = "…"
+	metaTokens = 512
+	ellipsis   = "…"
 )
 
 type metaAnswer struct {
@@ -58,6 +56,7 @@ func GenerateMeta(deps Deps) run.StepDef {
 		Requires: []run.ArtifactKind{run.ArtifactDraft},
 		Produces: []run.ArtifactKind{run.ArtifactMeta},
 		Retry:    run.RetryPolicy{Max: 3},
+		Timeout:  editorTimeout,
 		Price:    run.Price{OutputTokens: metaTokens},
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			draft, err := draftOf(sc)
@@ -82,7 +81,9 @@ func GenerateMeta(deps Deps) run.StepDef {
 				Page: sc.Page, Entity: entity, Spec: sc.Spec, Draft: draft,
 				SiteName:  owner.Name,
 				Canonical: canonical,
-				Pattern:   titlePattern(sc.Spec.MetaRules.TitlePattern, entity.PrimaryKeyword, owner.Name),
+				Pattern: template.Expand(sc.Spec.MetaRules.TitlePattern, template.Vars{
+					PrimaryKeyword: entity.PrimaryKeyword, EntityName: entity.Name, SiteName: owner.Name, PageTitle: sc.Page.Title,
+				}),
 			})
 			if err != nil {
 				return run.Result{}, err
@@ -112,13 +113,6 @@ func GenerateMeta(deps Deps) run.StepDef {
 			}, nil
 		},
 	}
-}
-
-func titlePattern(pattern, primary, siteName string) string {
-	if pattern == "" {
-		return ""
-	}
-	return strings.NewReplacer(primaryPlaceholder, primary, sitePlaceholder, siteName).Replace(pattern)
 }
 
 func settleMeta(answer metaAnswer, draft content.ContentDraft, canonical string, rules template.MetaRules,

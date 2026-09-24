@@ -136,6 +136,23 @@ func (d *Document) AppendSentence(paragraphIndex int, sentence string) error {
 	return nil
 }
 
+func (d *Document) PrependParagraph(text string) error {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return errors.New(errors.Invalid, "there is no sentence to open the body with")
+	}
+
+	paragraph := &html.Node{Type: html.ElementNode, Data: "p", DataAtom: atom.P}
+	paragraph.AppendChild(&html.Node{Type: html.TextNode, Data: trimmed})
+
+	before := d.root.FirstChild
+	if before != nil && before.Type == html.ElementNode && before.Data == "h1" {
+		before = before.NextSibling
+	}
+	d.root.InsertBefore(paragraph, before)
+	return nil
+}
+
 func (d *Document) sectionHeadings() []*html.Node {
 	out := make([]*html.Node, 0)
 	for child := d.root.FirstChild; child != nil; child = child.NextSibling {

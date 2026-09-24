@@ -55,6 +55,8 @@ type pageDraft struct {
 	wpType    string
 	pageKind  string
 	entity    string
+	primary   string
+	keywords  []string
 	generated bool
 	row       int
 }
@@ -116,4 +118,6 @@ func (p *pageDraft) merge(other pageDraft) {
 	p.wpType = fill(p.wpType, other.wpType)
 	p.pageKind = fill(p.pageKind, other.pageKind)
 	p.entity = fill(p.entity, other.entity)
+	p.primary = fill(p.primary, other.primary)
+	p.keywords = union(p.keywords, other.keywords)
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { RunItem } from "../../data/types.js";
-import { holdBody, itemBadge, itemNote, parentRegenerable, regenerateState } from "./hold.js";
+import { holdBody, itemBadge, itemNote, parentRegenerable, primaryAction, queuedAfter, regenerateState } from "./hold.js";
 
 function anItem(overrides: Partial<RunItem> = {}): RunItem {
     return {
@@ -11,6 +11,8 @@ function anItem(overrides: Partial<RunItem> = {}): RunItem {
         targetId: "p1",
         status: "failed",
         currentStep: "validate",
+        seq: 0,
+        blockedBy: "",
         attempts: 0,
         pauseReason: "",
         error: "",
@@ -99,5 +101,36 @@ describe("parentRegenerable", () => {
         );
         expect(parentRegenerable({ pageId: "p0", path: "/g/", itemId: "", itemStatus: "", step: "" })).toBe(false);
         expect(parentRegenerable(null)).toBe(false);
+    });
+});
+
+describe("primaryAction", () => {
+    it.each([
+        { name: "a page held at validate is accepted", item: anItem({ status: "paused", pauseReason: "needs_human", currentStep: "validate" }), want: "accept" },
+        { name: "a page held elsewhere for a human is retried", item: anItem({ status: "paused", pauseReason: "needs_human", currentStep: "publish" }), want: "retry" },
+        { name: "a page whose writer gave up is regenerated", item: anItem({ status: "failed", currentStep: "generate_body" }), want: "regenerate" },
+        { name: "a page that failed elsewhere is retried", item: anItem({ status: "failed", currentStep: "publish" }), want: "retry" },
+        { name: "a cancelled page is regenerated", item: anItem({ status: "cancelled" }), want: "regenerate" },
+        { name: "a child waiting for its parent points at the parent", item: heldChild, want: "parent" },
+        { name: "a running page has nothing to decide", item: anItem({ status: "running" }), want: null },
+        { name: "a finished page has nothing to decide", item: anItem({ status: "completed" }), want: null },
+    ])("$name", ({ item, want }) => {
+        expect(primaryAction(item)).toBe(want);
+    });
+});
+
+describe("queuedAfter", () => {
+    it("names the page a queued item sits behind", () => {
+        const queued = anItem({
+            status: "pending",
+            blockedBy: "i0",
+            waitingFor: { pageId: "p0", path: "/guides/", itemId: "i0", itemStatus: "running", step: "publish" },
+        });
+        expect(queuedAfter(queued)).toBe("/guides/");
+    });
+
+    it("says nothing for an item that waits for no one", () => {
+        expect(queuedAfter(anItem({ status: "pending" }))).toBe("");
+        expect(queuedAfter(anItem({ status: "pending", blockedBy: "i0", waitingFor: null }))).toBe("");
     });
 });
