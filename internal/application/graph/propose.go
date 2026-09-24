@@ -5,7 +5,6 @@ import (
 	"embed"
 	"slices"
 	"strings"
-	"time"
 	"unicode/utf8"
 
 	"github.com/davidmovas/postulator/internal/application/llm"
@@ -63,10 +62,19 @@ type knownEntity struct {
 	Path string
 }
 
+type pagePromptLine struct {
+	Path            string
+	Title           string
+	H1              string
+	MetaDescription string
+	PrimaryKeyword  string
+	Keywords        string
+}
+
 type pagesPrompt struct {
 	SiteName string
 	Known    []knownEntity
-	Pages    []pagemap.Page
+	Pages    []pagePromptLine
 }
 
 type relatedPair struct {
@@ -82,35 +90,57 @@ type relatedPrompt struct {
 }
 
 func (s *Service) ProposeFromPages(ctx context.Context, req ProposeFromPagesRequest) (ProposeFromPagesResponse, error) {
-	siteID := strings.TrimSpace(req.SiteID)
-	if err := requireSite(siteID); err != nil {
+	proposed, err := s.previewFromPages(ctx, req.SiteID, req.PageIDs, req.PathPrefix)
+	if err != nil {
 		return ProposeFromPagesResponse{}, err
+	}
+	if len(proposed.Entities) == 0 {
+		return ProposeFromPagesResponse{Entities: []Entity{}, Edges: []Edge{}, Skipped: proposed.Skipped, Tokens: proposed.Tokens}, nil
+	}
+
+	applied, err := s.ApplyProposals(ctx, ApplyProposalsRequest{SiteID: req.SiteID, Entities: proposed.Entities})
+	if err != nil {
+		return ProposeFromPagesResponse{}, err
+	}
+	return ProposeFromPagesResponse{
+		Entities: applied.Entities, Edges: applied.Edges,
+		Skipped: proposed.Skipped + applied.Skipped, Tokens: proposed.Tokens,
+	}, nil
+}
+
+func (s *Service) PreviewFromPages(ctx context.Context, req PreviewFromPagesRequest) (PreviewFromPagesResponse, error) {
+	return s.previewFromPages(ctx, req.SiteID, req.PageIDs, req.PathPrefix)
+}
+
+func (s *Service) previewFromPages(ctx context.Context, rawSiteID string, pageIDs []string, pathPrefix string) (PreviewFromPagesResponse, error) {
+	siteID := strings.TrimSpace(rawSiteID)
+	if err := requireSite(siteID); err != nil {
+		return PreviewFromPagesResponse{}, err
 	}
 
 	owner, err := s.sites.Get(ctx, siteID)
 	if err != nil {
-		return ProposeFromPagesResponse{}, err
+		return PreviewFromPagesResponse{}, err
 	}
 	ref, err := s.model(ctx, siteID)
 	if err != nil {
-		return ProposeFromPagesResponse{}, err
+		return PreviewFromPagesResponse{}, err
 	}
-
 	state, err := s.snapshot(ctx, siteID)
 	if err != nil {
-		return ProposeFromPagesResponse{}, err
+		return PreviewFromPagesResponse{}, err
 	}
 
-	unmapped := unmappedPages(state.pages)
-	if len(unmapped) == 0 {
-		return ProposeFromPagesResponse{Entities: []Entity{}, Edges: []Edge{}}, nil
+	chosen, err := chosenPages(state.pages, pageIDs, pathPrefix)
+	if err != nil {
+		return PreviewFromPagesResponse{}, err
 	}
 
-	response := ProposeFromPagesResponse{Entities: []Entity{}, Edges: []Edge{}}
-	for batch := range slices.Chunk(unmapped, PagesPerCall) {
+	response := PreviewFromPagesResponse{Entities: []ProposedEntity{}, Pages: len(chosen)}
+	for batch := range slices.Chunk(chosen, PagesPerCall) {
 		system, user, renderErr := prompts.Render(NameProposeFromPages, pagesPromptOf(owner.Name, state, batch))
 		if renderErr != nil {
-			return ProposeFromPagesResponse{}, renderErr
+			return PreviewFromPagesResponse{}, renderErr
 		}
 
 		proposal, usage, callErr := llm.Structured[pagesProposal](ctx, s.llm, llm.Request{
@@ -121,25 +151,89 @@ func (s *Service) ProposeFromPages(ctx context.Context, req ProposeFromPagesRequ
 			Meta:      llm.CallMeta{Step: NameProposeFromPages},
 		})
 		if callErr != nil {
-			return ProposeFromPagesResponse{}, callErr
+			return PreviewFromPagesResponse{}, callErr
 		}
 		response.Tokens += usage.Total
 
-		if applyErr := s.applyPages(ctx, siteID, batch, proposal, &state, &response); applyErr != nil {
-			return ProposeFromPagesResponse{}, applyErr
+		inBatch := make(map[string]pagemap.Page, len(batch))
+		for i := range batch {
+			inBatch[batch[i].Path] = batch[i]
+		}
+		for i := range proposal.Entities {
+			proposed := &proposal.Entities[i]
+			page, known := inBatch[strings.TrimSpace(proposed.Path)]
+			name := strings.TrimSpace(proposed.Name)
+			if !known || name == "" {
+				response.Skipped++
+				continue
+			}
+			response.Entities = append(response.Entities, ProposedEntity{
+				PageID:            page.ID,
+				Path:              page.Path,
+				Name:              name,
+				Kind:              string(kindOf(proposed.Kind)),
+				Intent:            strings.TrimSpace(proposed.Intent),
+				PrimaryKeyword:    strings.TrimSpace(proposed.PrimaryKeyword),
+				SecondaryKeywords: graphdomain.CleanKeywords(proposed.SecondaryKeywords),
+				Anchors:           graphdomain.CleanKeywords(proposed.Anchors),
+				Parent:            strings.TrimSpace(proposed.ParentPath),
+				Related:           graphdomain.CleanKeywords(proposed.RelatedPaths),
+				ExistingEntityID:  state.byName[fold(name)],
+			})
 		}
 	}
-
-	if len(response.Entities) == 0 && len(response.Edges) == 0 {
-		return response, nil
-	}
-	if changedErr := s.changed(siteID); changedErr != nil {
-		return ProposeFromPagesResponse{}, changedErr
-	}
-	if pagesErr := s.pagesChanged(siteID); pagesErr != nil {
-		return ProposeFromPagesResponse{}, pagesErr
-	}
 	return response, nil
+}
+
+func chosenPages(pages []pagemap.Page, pageIDs []string, pathPrefix string) ([]pagemap.Page, error) {
+	unmapped := unmappedPages(pages)
+	prefix := strings.TrimSpace(pathPrefix)
+
+	if len(pageIDs) == 0 {
+		if prefix == "" {
+			return unmapped, nil
+		}
+		out := make([]pagemap.Page, 0, len(unmapped))
+		for i := range unmapped {
+			if strings.HasPrefix(unmapped[i].Path, prefix) {
+				out = append(out, unmapped[i])
+			}
+		}
+		return out, nil
+	}
+
+	byID := make(map[string]pagemap.Page, len(pages))
+	for i := range pages {
+		byID[pages[i].ID] = pages[i]
+	}
+	out := make([]pagemap.Page, 0, len(pageIDs))
+	mapped := make([]string, 0)
+	seen := make(map[string]struct{}, len(pageIDs))
+	for _, raw := range pageIDs {
+		pageID := strings.TrimSpace(raw)
+		if _, twice := seen[pageID]; twice || pageID == "" {
+			continue
+		}
+		seen[pageID] = struct{}{}
+		page, known := byID[pageID]
+		if !known {
+			return nil, errors.New(errors.NotFound, "page not found").WithDetail("pageId", pageID)
+		}
+		if page.EntityID != nil {
+			mapped = append(mapped, page.Path)
+			continue
+		}
+		if page.Path == pagemap.RootPath || page.Status == pagemap.StatusArchived {
+			continue
+		}
+		out = append(out, page)
+	}
+	if len(mapped) > 0 {
+		return nil, errors.New(errors.Invalid, "an entity is proposed only for a page that has none, and "+
+			strings.Join(mapped, ", ")+" already carry one; unmap them first or leave them out").
+			WithDetail("field", "pageIds").WithDetail("paths", mapped)
+	}
+	return out, nil
 }
 
 func (s *Service) ProposeRelated(ctx context.Context, req ProposeRelatedRequest) (ProposeRelatedResponse, error) {
@@ -277,147 +371,14 @@ func pagesPromptOf(siteName string, state siteGraph, batch []pagemap.Page) pages
 	}
 	slices.SortFunc(known, func(a, b knownEntity) int { return strings.Compare(a.Name, b.Name) })
 
-	return pagesPrompt{SiteName: siteName, Known: known, Pages: batch}
-}
-
-func (s *Service) applyPages(ctx context.Context, siteID string, batch []pagemap.Page, proposal pagesProposal,
-	state *siteGraph, out *ProposeFromPagesResponse) error {
-	inBatch := make(map[string]pagemap.Page, len(batch))
+	lines := make([]pagePromptLine, 0, len(batch))
 	for i := range batch {
-		inBatch[batch[i].Path] = batch[i]
-	}
-
-	now := s.now()
-	return s.uow.Do(ctx, func(c context.Context) error {
-		for i := range proposal.Entities {
-			proposed := &proposal.Entities[i]
-			page, known := inBatch[strings.TrimSpace(proposed.Path)]
-			if !known {
-				out.Skipped++
-				continue
-			}
-			if _, taken := state.byPath[page.Path]; taken {
-				out.Skipped++
-				continue
-			}
-
-			entityID, err := s.adopt(c, siteID, page, proposed, state, out, now)
-			if err != nil {
-				return err
-			}
-			if entityID == "" {
-				out.Skipped++
-				continue
-			}
-			state.byPath[page.Path] = entityID
-		}
-		return s.connect(c, siteID, proposal, state, out, now)
-	})
-}
-
-func (s *Service) adopt(ctx context.Context, siteID string, page pagemap.Page, proposed *entityProposal,
-	state *siteGraph, out *ProposeFromPagesResponse, now time.Time) (string, error) {
-	name := strings.TrimSpace(proposed.Name)
-	if name == "" {
-		return "", nil
-	}
-
-	entityID, exists := state.byName[fold(name)]
-	if !exists {
-		entity, err := graphdomain.NewEntity(graphdomain.Entity{
-			ID:                id.New(),
-			SiteID:            siteID,
-			Name:              name,
-			Kind:              kindOf(proposed.Kind),
-			Intent:            proposed.Intent,
-			PrimaryKeyword:    proposed.PrimaryKeyword,
-			SecondaryKeywords: proposed.SecondaryKeywords,
-			Anchors:           proposedAnchors(proposed.Anchors),
-			Source:            graphdomain.SourceAI,
-			CreatedAt:         now,
-			UpdatedAt:         now,
+		lines = append(lines, pagePromptLine{
+			Path: batch[i].Path, Title: batch[i].Title, H1: batch[i].H1, MetaDescription: batch[i].MetaDescription,
+			PrimaryKeyword: batch[i].PrimaryKeyword, Keywords: strings.Join(batch[i].Keywords, ", "),
 		})
-		if err != nil {
-			return "", nil
-		}
-		if insertErr := s.entities.Insert(ctx, entity); insertErr != nil {
-			return "", insertErr
-		}
-		state.entities = append(state.entities, entity)
-		state.byName[fold(name)] = entity.ID
-		entityID = entity.ID
-		out.Entities = append(out.Entities, entityView(entity))
 	}
-
-	next := page
-	next.EntityID = &entityID
-	next.UpdatedAt = now
-	if err := s.pages.Update(ctx, next); err != nil {
-		return "", err
-	}
-	if !exists {
-		if err := s.entities.SetCanonicalPage(ctx, entityID, &page.ID, now); err != nil {
-			return "", err
-		}
-	}
-	return entityID, nil
-}
-
-func (s *Service) connect(ctx context.Context, siteID string, proposal pagesProposal, state *siteGraph,
-	out *ProposeFromPagesResponse, now time.Time) error {
-	for i := range proposal.Entities {
-		proposed := &proposal.Entities[i]
-		from, known := state.byPath[strings.TrimSpace(proposed.Path)]
-		if !known {
-			continue
-		}
-
-		path := strings.TrimSpace(proposed.Path)
-		if parentPath := strings.TrimSpace(proposed.ParentPath); parentPath != "" {
-			if parent, ok := state.byPath[parentPath]; ok {
-				reason := parentReason(path, parentPath)
-				if err := s.propose(ctx, siteID, from, parent, graphdomain.EdgeParent, 1, reason, state, out, now); err != nil {
-					return err
-				}
-			}
-		}
-		for _, raw := range proposed.RelatedPaths {
-			relatedPath := strings.TrimSpace(raw)
-			related, ok := state.byPath[relatedPath]
-			if !ok {
-				continue
-			}
-			reason := relatedReason(path, relatedPath)
-			if err := s.propose(ctx, siteID, from, related, graphdomain.EdgeRelated, 0.5, reason, state, out, now); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (s *Service) propose(ctx context.Context, siteID, from, to string, kind graphdomain.EdgeKind,
-	weight float64, reason string, state *siteGraph, out *ProposeFromPagesResponse, now time.Time) error {
-	edge, err := graphdomain.NewEdge(graphdomain.Edge{
-		ID: id.New(), SiteID: siteID, FromEntityID: from, ToEntityID: to, Kind: kind, Weight: weight,
-		Source: graphdomain.SourceAI, Status: graphdomain.StatusProposed, Reason: clip(reason), CreatedAt: now,
-	})
-	if err != nil {
-		return nil
-	}
-	if connected(state.edges, edge) {
-		return nil
-	}
-	if insertErr := s.edges.Insert(ctx, edge); insertErr != nil {
-		if errors.IsCode(insertErr, errors.Conflict) {
-			return nil
-		}
-		return insertErr
-	}
-
-	state.edges = append(state.edges, edge)
-	out.Edges = append(out.Edges, edgeView(edge))
-	return nil
+	return pagesPrompt{SiteName: siteName, Known: known, Pages: lines}
 }
 
 func (s *Service) applyRelated(ctx context.Context, siteID string, proposal relatedProposals, state *siteGraph,

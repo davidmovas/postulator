@@ -77,13 +77,25 @@ func (f graphFake) ProposeRelated(context.Context, graph.ProposeRelatedRequest) 
 	return answer[graph.ProposeRelatedResponse](f.mode)
 }
 
+func (f graphFake) PreviewFromPages(context.Context, graph.PreviewFromPagesRequest) (graph.PreviewFromPagesResponse, error) {
+	return answer[graph.PreviewFromPagesResponse](f.mode)
+}
+
+func (f graphFake) ProposeFromKeywords(context.Context, graph.ProposeFromKeywordsRequest) (graph.ProposeFromKeywordsResponse, error) {
+	return answer[graph.ProposeFromKeywordsResponse](f.mode)
+}
+
+func (f graphFake) ApplyProposals(context.Context, graph.ApplyProposalsRequest) (graph.ApplyProposalsResponse, error) {
+	return answer[graph.ApplyProposalsResponse](f.mode)
+}
+
 func TestGraphServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
 	assertMethodNames(t, wails.NewGraphService(zap.NewNop(), ready[wails.GraphUseCase](graphFake{})), []string{
-		"AddEdge", "ApproveEdge", "CreateEntity", "DeleteEdge", "DeleteEntity", "GetEntity",
-		"ListEdges", "ListEntities", "LoadGraph", "MoveEntity", "ProposeFromPages", "ProposeRelated",
-		"RecomputeScores", "RejectEdge", "SetAnchors", "UpdateEntity",
+		"AddEdge", "ApplyProposals", "ApproveEdge", "CreateEntity", "DeleteEdge", "DeleteEntity", "GetEntity",
+		"ListEdges", "ListEntities", "LoadGraph", "MoveEntity", "PreviewFromPages", "ProposeFromKeywords",
+		"ProposeFromPages", "ProposeRelated", "RecomputeScores", "RejectEdge", "SetAnchors", "UpdateEntity",
 	})
 	assertEveryMethodConverts(t, wails.NewGraphService(zap.NewNop(), ready[wails.GraphUseCase](graphFake{mode: missing})), missingBody)
 	assertEveryMethodConverts(t, wails.NewGraphService(zap.NewNop(), ready[wails.GraphUseCase](graphFake{mode: panicking})), panicBody)

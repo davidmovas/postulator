@@ -98,6 +98,15 @@ export const describeGraph: Describer = (tool, args) => {
             return view(said.recompute, [line("note", said.recomputeBody)]);
         case "graph_propose_from_pages":
             return view(said.proposeFromPages, [line("money", said.proposeBody)]);
+        case "graph_apply_proposals": {
+            const proposals = records(args, "entities");
+            const names = proposals.map((held) => text(held, "name") ?? "").filter((name) => name !== "");
+            const lines: Line[] = [line("note", said.applyProposalsBody)];
+            if (names.length > 0) {
+                lines.unshift(line("target", listed(names)));
+            }
+            return view(said.applyProposals(proposals.length), lines);
+        }
         case "graph_propose_related": {
             const entity = text(args, "entityId");
             const lines: Line[] = [line("money", said.proposeBody)];

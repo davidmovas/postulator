@@ -97,6 +97,22 @@ func (f proposeFixture) page(t *testing.T, path, title string) pagemap.Page {
 	return record
 }
 
+func (f proposeFixture) entity(t *testing.T, name string) graphdomain.Entity {
+	t.Helper()
+
+	record, err := graphdomain.NewEntity(graphdomain.Entity{
+		ID: id.New(), SiteID: f.siteID, Name: name, Kind: graphdomain.KindTopic, Source: graphdomain.SourceUser,
+		CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+	})
+	if err != nil {
+		t.Fatalf("build the entity: %v", err)
+	}
+	if err = sqlite.NewEntityRepo(f.store).Insert(t.Context(), record); err != nil {
+		t.Fatalf("insert the entity: %v", err)
+	}
+	return record
+}
+
 const proposal = `{"entities":[
 	{"path":"/coffee/","name":"Coffee","kind":"hub","intent":"choose a brew","primaryKeyword":"coffee",
 	 "secondaryKeywords":["beans"],"anchors":["coffee"],"parentPath":"","relatedPaths":[]},
