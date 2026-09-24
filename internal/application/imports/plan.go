@@ -16,8 +16,6 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
-const homeTitle = "Home"
-
 type plannedEntity struct {
 	entity  graph.Entity
 	created bool
@@ -39,6 +37,7 @@ type plan struct {
 	edges     []graph.Edge
 	pages     []plannedPage
 	canonical []canonical
+	rows      int
 }
 
 func (p *plan) note(row int, field string, code FindingCode, message string) {
@@ -80,9 +79,6 @@ func (p *plan) broken() bool {
 
 func titleFrom(path string) string {
 	slug := pagemap.Slug(path)
-	if slug == "" {
-		return homeTitle
-	}
 	words := strings.FieldsFunc(slug, func(r rune) bool { return r == '-' || r == '_' })
 	for i, word := range words {
 		runes := []rune(word)
@@ -254,7 +250,7 @@ func read(binding importmap.Binding, table importmap.Table, p *plan) *drafts {
 
 func fillGaps(sheet *drafts, state siteState, p *plan) {
 	for _, path := range sheet.sortedPaths() {
-		for parent := pagemap.ParentPath(path); parent != ""; parent = pagemap.ParentPath(parent) {
+		for parent := pagemap.ParentPath(path); parent != "" && parent != pagemap.RootPath; parent = pagemap.ParentPath(parent) {
 			if _, planned := sheet.pages[parent]; planned {
 				continue
 			}
@@ -446,6 +442,11 @@ func (s *Service) resolvePages(ctx context.Context, sheet *drafts, state siteSta
 		}
 
 		current, exists := state.byPath[path]
+		if !exists && path == pagemap.RootPath {
+			p.note(draft.row, string(importmap.FieldPath), CodeRootPageSkipped,
+				"the root of the site already exists on WordPress, so the import does not plan it; sync the site first to map it")
+			continue
+		}
 		if !exists {
 			page, err := pagemap.NewPage(pagemap.Page{
 				ID: id.New(), SiteID: state.siteID, Path: path, WPType: wpTypeOr(wpType),
@@ -586,7 +587,7 @@ func (s *Service) plan(ctx context.Context, siteID string, table importmap.Table
 	}
 
 	now := s.now()
-	p := plan{}
+	p := plan{rows: len(table.Rows)}
 	sheet := read(binding, table, &p)
 	fillGaps(sheet, state, &p)
 

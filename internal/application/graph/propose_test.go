@@ -173,6 +173,25 @@ func TestProposeFromPagesBuildsTheGraph(t *testing.T) {
 	}
 }
 
+func TestProposeFromPagesLeavesTheRootOfTheSiteAlone(t *testing.T) {
+	t.Parallel()
+
+	f := newProposeFixture(t, &scriptedModel{replies: []string{proposal}}, fixedProfiles{})
+	f.page(t, "/", "Home")
+	f.page(t, "/coffee/", "Coffee")
+	f.page(t, "/coffee/espresso/", "Espresso")
+	f.page(t, "/coffee/filter/", "Filter coffee")
+
+	if _, err := f.service.ProposeFromPages(t.Context(), appgraph.ProposeFromPagesRequest{SiteID: f.siteID}); err != nil {
+		t.Fatalf("ProposeFromPages: %v", err)
+	}
+
+	prompt := f.model.calls[0].Messages[0].Text
+	if strings.Contains(prompt, "- / ") || strings.Contains(prompt, "Home") {
+		t.Fatalf("the prompt offers the root of the site to the model:\n%s", prompt)
+	}
+}
+
 func TestProposeFromPagesBatchesTheCalls(t *testing.T) {
 	t.Parallel()
 

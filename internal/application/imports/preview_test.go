@@ -4,9 +4,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/davidmovas/postulator/internal/adapters/sqlite"
+	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
 func TestInspectOpensTheFilePreMapped(t *testing.T) {
@@ -97,7 +101,7 @@ func TestPreviewReadsTheGraphWithoutWriting(t *testing.T) {
 	if len(report.Errors) != 0 {
 		t.Fatalf("errors = %+v", report.Errors)
 	}
-	if len(report.Entities) != 3 || len(report.Pages) != 3 {
+	if len(report.Entities) != 3 || len(report.Pages) != 2 {
 		t.Fatalf("entities = %d, pages = %d", len(report.Entities), len(report.Pages))
 	}
 
@@ -173,7 +177,14 @@ func TestPreviewFlagsWhatTheSheetGetsWrong(t *testing.T) {
 			sheet:    "path,entity,parent\n/a/b/c/,Alpha,\n",
 			code:     imports.CodeIntermediatePath,
 			errored:  false,
-			expected: 3,
+			expected: 2,
+		},
+		{
+			name:     "a root row the site does not hold",
+			sheet:    "path,entity,parent\n/,Alpha,\n",
+			code:     imports.CodeRootPageSkipped,
+			errored:  false,
+			expected: 1,
 		},
 		{
 			name:     "a row that names nothing",
@@ -221,7 +232,7 @@ func TestPreviewCreatesTheIntermediatePathsItNeeds(t *testing.T) {
 	report := h.preview(t, h.file(t, "deep.csv", "path,title\n/services/web/react/,React\n"),
 		h.mapping(map[string]string{string(importmap.FieldPath): "path", string(importmap.FieldTitle): "title"}))
 
-	for _, path := range []string{"/", "/services/", "/services/web/", "/services/web/react/"} {
+	for _, path := range []string{"/services/", "/services/web/", "/services/web/react/"} {
 		found, ok := page(report, path)
 		if !ok {
 			t.Fatalf("%s is missing from %+v", path, report.Pages)
@@ -239,8 +250,75 @@ func TestPreviewCreatesTheIntermediatePathsItNeeds(t *testing.T) {
 	if title, _ := page(report, "/services/web/"); title.Title != "Web" {
 		t.Fatalf("the generated title = %q, want Web", title.Title)
 	}
-	if home, _ := page(report, "/"); home.Title != "Home" {
-		t.Fatalf("the root title = %q, want Home", home.Title)
+	if root, ok := page(report, "/"); ok {
+		t.Fatalf("the import planned the root of the site: %+v", root)
+	}
+	if got := findings(report.Warnings, imports.CodeIntermediatePath); len(got) != 2 {
+		t.Fatalf("intermediate findings = %+v, want the two sections and no root", got)
+	}
+}
+
+func TestPreviewSkipsARootRowTheSiteDoesNotHold(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	report := h.preview(t, h.file(t, "root.csv", "path,title,entity\n/,Home,Shop\n/hosting/,Hosting,Hosting\n"),
+		h.mapping(map[string]string{
+			string(importmap.FieldPath):   "path",
+			string(importmap.FieldTitle):  "title",
+			string(importmap.FieldEntity): "entity",
+		}))
+
+	if _, ok := page(report, "/"); ok {
+		t.Fatalf("the root was planned: %+v", report.Pages)
+	}
+	if _, ok := page(report, "/hosting/"); !ok {
+		t.Fatalf("the section is missing from %+v", report.Pages)
+	}
+	if got := findings(report.Warnings, imports.CodeRootPageSkipped); len(got) != 1 || got[0].Row != 2 {
+		t.Fatalf("root findings = %+v, want one on row 2", got)
+	}
+	if _, ok := entity(report, "Shop"); !ok {
+		t.Fatalf("the entity of the root row was dropped with it: %+v", report.Entities)
+	}
+	if len(report.Pages) != 1 || report.Skipped != 0 {
+		t.Fatalf("pages = %+v, skipped = %d; want one page and no skipped row", report.Pages, report.Skipped)
+	}
+}
+
+func TestPreviewMergesARootRowIntoTheRootTheSiteHolds(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	wpID := int64(1)
+	root, err := pagemap.NewPage(pagemap.Page{
+		ID: id.New(), SiteID: h.siteID, Path: "/", WPType: pagemap.WPPage, WPID: &wpID, Title: "Front page",
+		Status: pagemap.StatusPublished, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+	})
+	if err != nil {
+		t.Fatalf("build the root: %v", err)
+	}
+	if err = sqlite.NewPageRepo(h.store).Insert(t.Context(), root); err != nil {
+		t.Fatalf("insert the root: %v", err)
+	}
+
+	report := h.preview(t, h.file(t, "root.csv", "path,title,h1,entity\n/,Home,Welcome,Shop\n"),
+		h.mapping(map[string]string{
+			string(importmap.FieldPath):   "path",
+			string(importmap.FieldTitle):  "title",
+			string(importmap.FieldH1):     "h1",
+			string(importmap.FieldEntity): "entity",
+		}))
+
+	merged, ok := page(report, "/")
+	if !ok || merged.Action != string(imports.ActionUpdate) || merged.H1 != "Welcome" {
+		t.Fatalf("the root row = %+v, want an update carrying the h1", merged)
+	}
+	if got := findings(report.Warnings, imports.CodeRootPageSkipped); len(got) != 0 {
+		t.Fatalf("the root was skipped although the site holds it: %+v", got)
+	}
+	if len(report.Pages) != 1 {
+		t.Fatalf("pages = %+v, want the root alone", report.Pages)
 	}
 }
 

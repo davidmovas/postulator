@@ -18,7 +18,7 @@ func TestApplyWritesTheGraphAndThePageMapOnce(t *testing.T) {
 	path := h.file(t, "graph.csv", graphSheet)
 	got := h.apply(t, path, graphMapping(h))
 
-	want := imports.Counts{EntitiesCreated: 3, EdgesCreated: 3, PagesCreated: 3}
+	want := imports.Counts{EntitiesCreated: 3, EdgesCreated: 3, PagesCreated: 2}
 	if got.Counts != want {
 		t.Fatalf("counts = %+v, want %+v", got.Counts, want)
 	}
@@ -31,8 +31,8 @@ func TestApplyWritesTheGraphAndThePageMapOnce(t *testing.T) {
 		if entities[i].Source != graph.SourceImport {
 			t.Fatalf("%s source = %s", entities[i].Name, entities[i].Source)
 		}
-		if entities[i].CanonicalPageID == nil {
-			t.Fatalf("%s has no canonical page", entities[i].Name)
+		if (entities[i].CanonicalPageID == nil) != (entities[i].Name == "Shop") {
+			t.Fatalf("%s canonical page = %v; only the entity of the root row has none", entities[i].Name, entities[i].CanonicalPageID)
 		}
 	}
 
@@ -53,8 +53,8 @@ func TestApplyWritesTheGraphAndThePageMapOnce(t *testing.T) {
 	}
 
 	pages := h.pages(t)
-	if len(pages) != 3 {
-		t.Fatalf("pages = %d", len(pages))
+	if len(pages) != 2 {
+		t.Fatalf("pages = %d, want the two sections and no root", len(pages))
 	}
 	for i := range pages {
 		if pages[i].EntityID == nil {
@@ -83,7 +83,7 @@ func TestApplyIsIdempotent(t *testing.T) {
 	if again.Counts != (imports.Counts{}) {
 		t.Fatalf("the second apply = %+v, want nothing written", again.Counts)
 	}
-	if len(h.entities(t)) != 3 || len(h.edges(t)) != 3 || len(h.pages(t)) != 3 {
+	if len(h.entities(t)) != 3 || len(h.edges(t)) != 3 || len(h.pages(t)) != 2 {
 		t.Fatal("the second apply changed the site")
 	}
 	for i := range again.Report.Entities {
@@ -125,8 +125,8 @@ func TestApplyMergesIntoWhatTheSiteAlreadyHolds(t *testing.T) {
 		t.Fatalf("entity = %+v", entities[0])
 	}
 	pages := h.pages(t)
-	if len(pages) != 2 {
-		t.Fatalf("pages = %d, want the imported page and the root", len(pages))
+	if len(pages) != 1 {
+		t.Fatalf("pages = %d, want the imported page alone", len(pages))
 	}
 	for i := range pages {
 		if pages[i].Path == "/hosting/" && pages[i].Title != "Hosting" {
@@ -148,8 +148,8 @@ func TestApplyMergesRepeatedPathsAndFillsTheGaps(t *testing.T) {
 			string(importmap.FieldKeywords): "keywords",
 		}))
 
-	if got.Counts.PagesCreated != 3 {
-		t.Fatalf("pages created = %d, want the merged page plus two intermediates", got.Counts.PagesCreated)
+	if got.Counts.PagesCreated != 2 {
+		t.Fatalf("pages created = %d, want the merged page plus one intermediate", got.Counts.PagesCreated)
 	}
 	if got.Counts.EntitiesCreated != 1 {
 		t.Fatalf("entities created = %d", got.Counts.EntitiesCreated)
@@ -296,7 +296,7 @@ func TestApplySavesTheMappingUnderTheSameNameTwice(t *testing.T) {
 	if len(listed.Mappings) != 1 {
 		t.Fatalf("mappings = %+v, want the one name reused", listed.Mappings)
 	}
-	if len(h.entities(t)) != 3 || len(h.pages(t)) != 3 {
+	if len(h.entities(t)) != 3 || len(h.pages(t)) != 2 {
 		t.Fatal("the second apply rolled the site back")
 	}
 }
@@ -320,7 +320,6 @@ func TestApplyLinksEveryCreatedPageToItsParentPath(t *testing.T) {
 	}
 
 	for child, parent := range map[string]string{
-		"/menu/":              "/",
 		"/menu/mains/":        "/menu/",
 		"/menu/mains/steaks/": "/menu/mains/",
 	} {
@@ -332,7 +331,10 @@ func TestApplyLinksEveryCreatedPageToItsParentPath(t *testing.T) {
 			t.Fatalf("%s carries the parent %v, want %s", child, page.ParentPageID, parent)
 		}
 	}
-	if root, ok := byPath["/"]; !ok || root.ParentPageID != nil {
-		t.Fatalf("the top of the tree carries a parent: %+v", root)
+	if top := byPath["/menu/"]; top.ParentPageID != nil {
+		t.Fatalf("the top of the tree carries a parent: %+v", top)
+	}
+	if root, ok := byPath["/"]; ok {
+		t.Fatalf("the import planned the root of the site: %+v", root)
 	}
 }

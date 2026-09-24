@@ -256,7 +256,7 @@ func (s *Service) snapshot(ctx context.Context, siteID string) (siteGraph, error
 func unmappedPages(pages []pagemap.Page) []pagemap.Page {
 	out := make([]pagemap.Page, 0, len(pages))
 	for i := range pages {
-		if pages[i].EntityID != nil || pages[i].Status == pagemap.StatusArchived {
+		if pages[i].EntityID != nil || pages[i].Status == pagemap.StatusArchived || pages[i].Path == pagemap.RootPath {
 			continue
 		}
 		out = append(out, pages[i])

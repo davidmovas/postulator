@@ -164,6 +164,7 @@ export const imports = {
         unknown_entity_kind: "The entity kind is not one Postulator knows",
         unknown_page_kind: "The page kind is not one Postulator knows",
         unknown_wp_type: "The WordPress type is not one Postulator knows",
+        root_page_skipped: "The root of the site already exists on WordPress, so the import leaves it alone",
     },
     actions: {
         create: "new",

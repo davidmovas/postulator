@@ -32,6 +32,7 @@ const (
 	CodeUnknownEntityKind FindingCode = "unknown_entity_kind"
 	CodeUnknownPageKind   FindingCode = "unknown_page_kind"
 	CodeUnknownWPType     FindingCode = "unknown_wp_type"
+	CodeRootPageSkipped   FindingCode = "root_page_skipped"
 )
 
 var blockingFindingCodes = []FindingCode{
