@@ -57,7 +57,11 @@ func (s *Service) RetryStep(ctx context.Context, req RetryStepRequest) (RetrySte
 	if itemID == "" {
 		return RetryStepResponse{}, invalid("a retry needs a run item", "itemId")
 	}
-	if err := s.engine.RetryStep(ctx, itemID); err != nil {
+	requeue := s.engine.RetryStep
+	if req.AcceptFindings {
+		requeue = s.engine.Accept
+	}
+	if err := requeue(ctx, itemID); err != nil {
 		return RetryStepResponse{}, err
 	}
 	return RetryStepResponse{}, nil

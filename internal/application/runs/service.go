@@ -19,6 +19,7 @@ type engine interface {
 	Resume(ctx context.Context, runID string) error
 	Cancel(ctx context.Context, runID string) error
 	RetryStep(ctx context.Context, itemID string) error
+	Accept(ctx context.Context, itemID string) error
 	Regenerate(ctx context.Context, runID string, itemIDs []string) error
 }
 

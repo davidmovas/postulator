@@ -3,6 +3,7 @@
 package e2e_test
 
 import (
+	"strings"
 	"sync"
 	"testing"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/sites"
 	appsync "github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
@@ -26,24 +28,26 @@ const (
 	childTopic = "house cocktails"
 )
 
+const writerAttempts = 3
+
 func unfinishedDraftOf(keyword string) string {
 	return `{"title":"How we serve ` + keyword + `: Step-by-Step Guide | Shop",` +
 		`"h1":"How we serve ` + keyword + `",` +
-		`"sections":[{"heading":"Introduction","html":"<p>This guide to ` + keyword + ` stops after its ` +
-		`first section, so the template finds the rest of it missing.</p>"}],` +
+		`"sections":[{"slot":1,"heading":"Introduction","html":"<p>This guide to ` + keyword + ` stops after its ` +
+		`first section, so the brief finds the rest of it missing.</p>"}],` +
 		`"summary":"A guide to ` + keyword + ` that stops early."}`
 }
 
-type firstDraftFails struct {
+type firstDraftsFail struct {
 	mu    sync.Mutex
 	calls int
 }
 
-func (f *firstDraftFails) reply(port.Request) string {
+func (f *firstDraftsFail) reply(port.Request) string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls++
-	if f.calls == 1 {
+	if f.calls <= writerAttempts {
 		return unfinishedDraftOf("drinks and cocktails")
 	}
 	return draftOf("drinks and cocktails")
@@ -62,7 +66,7 @@ func TestAChildWaitsForItsParentAndGoesOnOnceTheParentIsRegenerated(t *testing.T
 	menuID := live.publish(t, "Our Menu", "menu", menuBody, 0)
 	live.publish(t, "Main Courses", "main-courses", mainsBody, menuID)
 
-	parentBody := &firstDraftFails{}
+	parentBody := &firstDraftsFail{}
 	script := append([]fake.Reply{
 		{Step: steps.NameGenerateBody, Match: "Path: " + heldChild + "\n", Text: draftOf(childTopic)},
 		{Step: steps.NameGenerateMeta, Match: heldChild, Text: metaOf(childTopic)},
@@ -117,8 +121,12 @@ func TestAChildWaitsForItsParentAndGoesOnOnceTheParentIsRegenerated(t *testing.T
 	}
 	byPath := itemsByTarget(t, core.Runs, started.RunID)
 	failed, held := byPath[parent.ID], byPath[child.ID]
-	if failed.Status != string(run.StatusFailed) || failed.CurrentStep != steps.NameValidate {
-		t.Fatalf("the parent item is %s at %s, want it failed at validate: %s", failed.Status, failed.CurrentStep, failed.Error)
+	if failed.Status != string(run.StatusFailed) || failed.CurrentStep != steps.NameGenerateBody {
+		t.Fatalf("the parent item is %s at %s, want it failed at the writer once its attempts ran out: %s",
+			failed.Status, failed.CurrentStep, failed.Error)
+	}
+	if !strings.Contains(failed.Error, content.ReasonIncompleteAnswer) && !strings.Contains(failed.Error, "left out") {
+		t.Fatalf("the parent failed with %q, want the incomplete draft named", failed.Error)
 	}
 	if held.Status != string(run.StatusPaused) || held.PauseReason != string(run.PauseAwaitingParent) {
 		t.Fatalf("the child item is %s/%s, want it waiting for its parent", held.Status, held.PauseReason)

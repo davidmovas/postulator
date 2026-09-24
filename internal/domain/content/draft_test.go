@@ -26,7 +26,7 @@ func guideBrief(page pagemap.Page) content.Brief {
 		{URL: "/coffee/", Anchors: []string{"coffee"}, Relation: content.RelationUp, Required: true},
 		{URL: "/coffee/filter/", Anchors: []string{"filter coffee"}, Relation: content.RelationSibling},
 	}}
-	return content.NewBrief(spec, page, entity, lc)
+	return content.NewBrief(spec, template.LinkRules{ParentLinkWithinParagraphs: 2}, page, entity, lc)
 }
 
 func reasonOf(t *testing.T, err error) string {
@@ -65,6 +65,9 @@ func TestNewBriefTakesThePlanFirstAndListsWhatThePageOwes(t *testing.T) {
 	}
 	if !brief.Phrases[0].Lead || brief.Phrases[1].Lead {
 		t.Fatalf("only the keyword opens the page: %+v", brief.Phrases)
+	}
+	if brief.Phrases[0].Within != 0 || brief.Phrases[1].Within != 2 {
+		t.Fatalf("phrases = %+v, want the parent anchor within the first two paragraphs and the lead unbounded", brief.Phrases)
 	}
 	if got := brief.RequiredHeadings(); len(got) != 2 || got[1] != "Brewing" {
 		t.Fatalf("required headings = %v", got)

@@ -40,11 +40,6 @@ const (
 		`{"heading":"Brewing","html":"<p>Use fresh water and a fine grind for a sweeter cup at home.</p>"}` +
 		`],"summary":"A short guide to espresso."}`
 
-	keywordlessDraft = `{"title":"A guide","h1":"A guide","sections":[` +
-		`{"heading":"About","html":"<p>It is a way to make coffee, part of our drinks range.</p>"},` +
-		`{"heading":"Brewing","html":"<p>Use fresh water and a fine grind for a sweeter cup at home.</p>"}` +
-		`],"summary":"A short guide."}`
-
 	repairSentence = `{"sentence":"It sits in our drinks range next to every other coffee we sell."}`
 )
 
@@ -112,6 +107,11 @@ func spec() template.TemplateSpec {
 
 func newFactory(t *testing.T, draft string) *factory {
 	t.Helper()
+	return newFactoryWithSpec(t, draft, spec())
+}
+
+func newFactoryWithSpec(t *testing.T, draft string, chosen template.TemplateSpec) *factory {
+	t.Helper()
 
 	store := sqlitetest.Open(t)
 	at := sqlitetest.Stamp
@@ -119,7 +119,7 @@ func newFactory(t *testing.T, draft string) *factory {
 	policyRepo := sqlite.NewLinkPolicyRepo(store)
 	policy := template.LinkPolicy{
 		ID: id.New(), Scope: template.ScopeGlobal, Name: templates.DefaultPolicyName,
-		Rules:          spec().LinkRules,
+		Rules:          chosen.LinkRules,
 		ForbidExternal: true, ForbidSelf: true, AnchorStrategy: template.AnchorPreferUser,
 		CreatedAt: at, UpdatedAt: at,
 	}
@@ -130,7 +130,7 @@ func newFactory(t *testing.T, draft string) *factory {
 	templateRepo := sqlite.NewTemplateRepo(store)
 	base := template.Template{
 		ID: id.New(), Scope: template.ScopeGlobal, Name: "Guide", PageKind: "guide", Version: 1,
-		Spec: spec(), CreatedAt: at, UpdatedAt: at,
+		Spec: chosen, CreatedAt: at, UpdatedAt: at,
 	}
 	if err := templateRepo.Insert(t.Context(), base); err != nil {
 		t.Fatalf("insert the template: %v", err)

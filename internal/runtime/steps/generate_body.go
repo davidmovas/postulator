@@ -18,7 +18,7 @@ type bodyPrompt struct {
 	Page     pagemap.Page
 	Entity   graph.Entity
 	Spec     template.TemplateSpec
-	Phrases  []string
+	Brief    content.Brief
 	Children []string
 }
 
@@ -54,14 +54,19 @@ func GenerateBody(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
+			policy, err := effectivePolicy(ctx, deps, sc)
+			if err != nil {
+				return run.Result{}, err
+			}
 
 			ref, err := deps.Profiles.Resolve(ctx, sc.Run.SiteID, domainllm.RoleWriter, sc.Spec.ModelProfiles)
 			if err != nil {
 				return run.Result{}, err
 			}
 
+			brief := content.NewBrief(sc.Spec, policy.Rules, sc.Page, entity, lc)
 			system, user, err := render(NameGenerateBody, bodyPrompt{
-				Page: sc.Page, Entity: entity, Spec: sc.Spec, Phrases: lc.Phrases(),
+				Page: sc.Page, Entity: entity, Spec: sc.Spec, Brief: brief,
 				Children: childAnchors(lc, sc.Spec.LinkRules.ChildrenSection),
 			})
 			if err != nil {
@@ -79,7 +84,7 @@ func GenerateBody(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			draft, doc, err := content.Assemble(answer, content.NewBrief(sc.Spec, sc.Page, entity, lc))
+			draft, doc, err := content.Assemble(answer, brief)
 			if err != nil {
 				return run.Result{}, err
 			}

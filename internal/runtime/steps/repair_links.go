@@ -18,18 +18,31 @@ import (
 const (
 	NameRepairLinks   = string(run.StepRepairLinks)
 	ParamIterations   = "iterations"
+	CheckpointRepairs = "repairs"
+
+	CodePhraseTemplated = "phrase_templated"
+
 	defaultIterations = 2
 	maxIterations     = 4
 	repairTokens      = 256
+
+	leadWhy = "The template asks the first paragraph of the page to carry the primary keyword, and it does not yet."
 )
 
 type repairPrompt struct {
 	Page      pagemap.Page
 	Entity    graph.Entity
 	Phrase    string
-	TargetURL string
-	Relation  string
+	Why       string
 	Paragraph string
+}
+
+type owedPhrase struct {
+	text  string
+	why   string
+	url   string
+	index int
+	lead  bool
 }
 
 func RepairLinks(deps Deps) run.StepDef {
@@ -43,7 +56,11 @@ func RepairLinks(deps Deps) run.StepDef {
 		Price: run.Price{
 			OutputTokens: repairTokens,
 			Calls: func(spec template.TemplateSpec, params map[string]any) int {
-				return iterations(params) * spec.LinkRules.UpDepth
+				phrases := spec.LinkRules.UpDepth
+				if spec.KeywordRules.PrimaryInFirstParagraph {
+					phrases++
+				}
+				return iterations(params) * phrases
 			},
 		},
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
@@ -68,24 +85,32 @@ func RepairLinks(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			result := content.InsertLinks(doc, lc, policy)
-			tokens := 0
-			repaired := 0
+			linker := sentenceWriter{deps: deps, sc: sc, entity: entity, ref: ref, tries: iterationsOf(sc)}
+			findings := make([]content.Finding, 0)
+			settled := make(map[string]struct{})
+			tokens, written := 0, 0
 
-			for range iterationsOf(sc) {
-				outstanding := requiredMissing(result)
-				if len(outstanding) == 0 {
+			result := content.InsertLinks(doc, lc, policy)
+			for {
+				owed, ok := nextOwed(doc, result, policy, sc.Spec, entity, settled)
+				if !ok {
 					break
 				}
+				settled[owed.text] = struct{}{}
 
-				for i := range outstanding {
-					used, sentenceErr := appendSentence(ctx, deps, doc, sc, entity, ref, outstanding[i])
-					if sentenceErr != nil {
-						return run.Result{}, sentenceErr
-					}
-					tokens += used
-					repaired++
+				sentence, used, writeErr := linker.write(ctx, doc, owed)
+				tokens += used
+				if writeErr != nil {
+					return run.Result{}, writeErr
 				}
+				if sentence == "" {
+					sentence = templated(owed)
+					findings = append(findings, templatedFinding(owed, linker.tries))
+				}
+				if placeErr := settleSentence(doc, owed.index, sentence); placeErr != nil {
+					return run.Result{}, placeErr
+				}
+				written++
 				result = content.InsertLinks(doc, lc, policy)
 			}
 
@@ -98,12 +123,15 @@ func RepairLinks(deps Deps) run.StepDef {
 			if setErr := run.Set(checkpoint, checkpointLinks, result); setErr != nil {
 				return run.Result{}, setErr
 			}
+			if setErr := run.Set(checkpoint, CheckpointRepairs, findings); setErr != nil {
+				return run.Result{}, setErr
+			}
 
 			return run.Result{
 				Artifacts:  []run.Artifact{{Kind: run.ArtifactBodyHTML, Blob: []byte(body)}},
 				Checkpoint: checkpoint,
 				Tokens:     tokens,
-				Message:    "repaired " + strconv.Itoa(repaired) + " required links",
+				Message:    repairMessage(written, len(findings)),
 			}, nil
 		},
 	}
@@ -126,67 +154,154 @@ func iterations(params map[string]any) int {
 	return min(max(int(count), 1), maxIterations)
 }
 
-func requiredMissing(result content.InsertResult) []content.LinkTarget {
-	out := make([]content.LinkTarget, 0, len(result.Missing))
-	for _, target := range result.Missing {
-		if target.Required && len(target.Anchors) > 0 {
-			out = append(out, target)
+func nextOwed(doc *content.Document, result content.InsertResult, policy template.LinkPolicy,
+	spec template.TemplateSpec, entity graph.Entity, settled map[string]struct{}) (owedPhrase, bool) {
+	primary := strings.TrimSpace(entity.PrimaryKeyword)
+	if spec.KeywordRules.PrimaryInFirstParagraph && primary != "" {
+		if _, done := settled[primary]; !done && !leadCarries(doc, primary) {
+			return owedPhrase{text: primary, why: leadWhy, lead: true}, true
 		}
 	}
-	return out
+
+	for i := range result.Decisions {
+		decision := &result.Decisions[i]
+		target := decision.Target
+		if !target.Required || len(target.Anchors) == 0 {
+			continue
+		}
+		if decision.Outcome != content.OutcomeAnchorNotFound && decision.Outcome != content.OutcomePositionRule {
+			continue
+		}
+		if _, done := settled[target.Anchors[0]]; done {
+			continue
+		}
+		return owedPhrase{
+			text:  target.Anchors[0],
+			url:   target.URL,
+			index: insertionPoint(doc, policy),
+			why: "The page has to link to " + target.URL + ", which sits " + string(target.Relation) +
+				" of this page in the entity graph, and no paragraph where that link may go carries an anchor for it yet.",
+		}, true
+	}
+	return owedPhrase{}, false
 }
 
-func appendSentence(ctx context.Context, deps Deps, doc *content.Document, sc *run.StepContext,
-	entity graph.Entity, ref domainllm.ModelRef, target content.LinkTarget) (int, error) {
+func leadCarries(doc *content.Document, phrase string) bool {
 	paragraphs := doc.Paragraphs()
 	if len(paragraphs) == 0 {
-		return 0, errors.New(errors.Invalid, "the body carries no paragraph to repair").
-			WithDetail("pageId", sc.Page.ID)
+		return false
 	}
-	index := insertionPoint(doc, sc.Spec)
-
-	system, user, err := render(NameRepairLinks, repairPrompt{
-		Page: sc.Page, Entity: entity, Phrase: target.Anchors[0], TargetURL: target.URL,
-		Relation: string(target.Relation), Paragraph: content.TextOf(paragraphs[index]),
-	})
-	if err != nil {
-		return 0, err
-	}
-
-	response, usage, err := port.Structured[content.RepairResponse](ctx, deps.LLM, port.Request{
-		Ref:       ref,
-		System:    system,
-		Messages:  []port.Message{{Role: port.RoleUser, Text: user}},
-		MaxTokens: repairTokens,
-		Meta:      callMeta(sc, NameRepairLinks),
-	})
-	if err != nil {
-		return 0, err
-	}
-
-	sentence := strings.TrimSpace(response.Sentence)
-	if sentence == "" {
-		return usage.Total, errors.New(errors.Invalid, "the model returned no sentence to insert").
-			WithDetail("phrase", target.Anchors[0])
-	}
-	if _, _, found := content.FindFold(sentence, target.Anchors[0]); !found {
-		return usage.Total, errors.New(errors.Invalid, "the sentence does not carry the phrase it was asked for").
-			WithDetail("phrase", target.Anchors[0])
-	}
-
-	if appendErr := doc.AppendSentence(index, sentence); appendErr != nil {
-		return usage.Total, appendErr
-	}
-	return usage.Total, nil
+	_, _, found := content.FindFold(content.TextOf(paragraphs[0]), phrase)
+	return found
 }
 
-func insertionPoint(doc *content.Document, spec template.TemplateSpec) int {
+func insertionPoint(doc *content.Document, policy template.LinkPolicy) int {
 	paragraphs := doc.Paragraphs()
 	if len(paragraphs) == 0 {
 		return 0
 	}
-	if limit := spec.LinkRules.ParentLinkWithinParagraphs; limit > 0 {
+	if limit := policy.Rules.ParentLinkWithinParagraphs; limit > 0 {
 		return min(limit, len(paragraphs)) - 1
 	}
 	return 0
+}
+
+func settleSentence(doc *content.Document, index int, sentence string) error {
+	paragraphs := doc.Paragraphs()
+	if len(paragraphs) == 0 {
+		return doc.PrependParagraph(sentence)
+	}
+	return doc.AppendSentence(min(index, len(paragraphs)-1), sentence)
+}
+
+type sentenceWriter struct {
+	deps   Deps
+	sc     *run.StepContext
+	entity graph.Entity
+	ref    domainllm.ModelRef
+	tries  int
+}
+
+func (w sentenceWriter) write(ctx context.Context, doc *content.Document, owed owedPhrase) (sentence string, used int, err error) {
+	for range w.tries {
+		if err := ctx.Err(); err != nil {
+			return "", used, stoppedWhileWriting(err, owed)
+		}
+
+		system, user, renderErr := render(NameRepairLinks, repairPrompt{
+			Page: w.sc.Page, Entity: w.entity, Phrase: owed.text, Why: owed.why, Paragraph: contextParagraph(doc, owed.index),
+		})
+		if renderErr != nil {
+			return "", used, renderErr
+		}
+
+		response, usage, callErr := port.Structured[content.RepairResponse](ctx, w.deps.LLM, port.Request{
+			Ref:       w.ref,
+			System:    system,
+			Messages:  []port.Message{{Role: port.RoleUser, Text: user}},
+			MaxTokens: repairTokens,
+			Meta:      callMeta(w.sc, NameRepairLinks),
+		})
+		used += usage.Total
+		if callErr != nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return "", used, stoppedWhileWriting(ctxErr, owed)
+			}
+			if errors.IsCode(callErr, errors.Cancelled) {
+				return "", used, callErr
+			}
+			continue
+		}
+
+		answered := strings.TrimSpace(response.Sentence)
+		if _, _, found := content.FindFold(answered, owed.text); answered != "" && found {
+			return answered, used, nil
+		}
+	}
+	return "", used, nil
+}
+
+func stoppedWhileWriting(cause error, owed owedPhrase) error {
+	return errors.Wrap(cause, errors.Cancelled, "the run stopped before a sentence carrying "+
+		strconv.Quote(owed.text)+" was written")
+}
+
+func contextParagraph(doc *content.Document, index int) string {
+	paragraphs := doc.Paragraphs()
+	if len(paragraphs) == 0 {
+		return ""
+	}
+	return content.TextOf(paragraphs[min(index, len(paragraphs)-1)])
+}
+
+func templated(owed owedPhrase) string {
+	if owed.lead {
+		return "This page is about " + owed.text + "."
+	}
+	return "Read more about " + owed.text + "."
+}
+
+func templatedFinding(owed owedPhrase, tries int) content.Finding {
+	details := map[string]any{"phrase": owed.text, "paragraphIndex": owed.index, "tries": tries, "lead": owed.lead}
+	if owed.url != "" {
+		details["url"] = owed.url
+	}
+	return content.Finding{
+		Severity: content.SeverityWarn,
+		Code:     CodePhraseTemplated,
+		Message: "the linker wrote no sentence carrying " + strconv.Quote(owed.text) + " in " + strconv.Itoa(tries) +
+			" tries, so a plain one was added to the body; rewrite it on the site if it reads poorly",
+		Details: details,
+	}
+}
+
+func repairMessage(written, templatedCount int) string {
+	if written == 0 {
+		return "every required phrase was already in place"
+	}
+	message := "wrote " + strconv.Itoa(written) + " required phrases into the body"
+	if templatedCount > 0 {
+		message += ", " + strconv.Itoa(templatedCount) + " of them as plain sentences"
+	}
+	return message
 }

@@ -32,6 +32,7 @@ type fakeEngine struct {
 	resumed     string
 	cancelled   string
 	retried     string
+	accepted    string
 	regenerated string
 	restarted   []string
 }
@@ -68,6 +69,11 @@ func (f *fakeEngine) Cancel(_ context.Context, runID string) error {
 
 func (f *fakeEngine) RetryStep(_ context.Context, itemID string) error {
 	f.retried = itemID
+	return f.failWith
+}
+
+func (f *fakeEngine) Accept(_ context.Context, itemID string) error {
+	f.accepted = itemID
 	return f.failWith
 }
 
@@ -722,6 +728,12 @@ func TestControlForwardsToTheEngine(t *testing.T) {
 	}
 	if fixture.engine.resumed != "r1" || fixture.engine.cancelled != "r1" || fixture.engine.retried != "i1" {
 		t.Fatalf("the engine saw %q, %q, %q", fixture.engine.resumed, fixture.engine.cancelled, fixture.engine.retried)
+	}
+	if _, err := fixture.service.RetryStep(t.Context(), runs.RetryStepRequest{ItemID: " i2 ", AcceptFindings: true}); err != nil {
+		t.Fatalf("RetryStep with acceptFindings: %v", err)
+	}
+	if fixture.engine.accepted != "i2" || fixture.engine.retried != "i1" {
+		t.Fatalf("the engine accepted %q and retried %q", fixture.engine.accepted, fixture.engine.retried)
 	}
 
 	regenerated, err := fixture.service.Regenerate(t.Context(), runs.RegenerateRequest{

@@ -22,12 +22,14 @@ func TestEveryStepSaysWhatOneItemOfItCosts(t *testing.T) {
 		params   map[string]any
 		output   int
 		calls    int
+		lead     bool
 		unpriced bool
 	}{
 		{name: "generate_body", output: 0, calls: 1},
 		{name: "generate_meta", output: 512, calls: 1},
 		{name: "repair_links", output: 256, calls: 4},
 		{name: "repair_links", params: map[string]any{"iterations": float64(1)}, output: 256, calls: 2},
+		{name: "repair_links", lead: true, output: 256, calls: 6},
 		{name: "judge", output: 1024, calls: 1},
 		{name: "generate_images", calls: 1, unpriced: true},
 		{name: "insert_links", calls: 1},
@@ -48,9 +50,11 @@ func TestEveryStepSaysWhatOneItemOfItCosts(t *testing.T) {
 				t.Errorf("unpriced = %t, want %t", def.Price.Unpriced, tc.unpriced)
 			}
 
+			priced := spec
+			priced.KeywordRules.PrimaryInFirstParagraph = tc.lead
 			calls := 1
 			if def.Price.Calls != nil {
-				calls = def.Price.Calls(spec, tc.params)
+				calls = def.Price.Calls(priced, tc.params)
 			}
 			if calls != tc.calls {
 				t.Errorf("calls = %d, want %d", calls, tc.calls)

@@ -269,3 +269,61 @@ func TestInsertAfterSectionRefusesNonsense(t *testing.T) {
 		})
 	}
 }
+
+func TestPrependParagraph(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		body string
+		text string
+		want string
+	}{
+		{
+			name: "after a leading h1",
+			body: "<h1>Espresso</h1><h2>About</h2><ul><li>One.</li></ul>",
+			text: "This page is about espresso.",
+			want: "<h1>Espresso</h1><p>This page is about espresso.</p><h2>About</h2><ul><li>One.</li></ul>",
+		},
+		{
+			name: "at the top of a body without an h1",
+			body: "<h2>About</h2><ul><li>One.</li></ul>",
+			text: "Read more about coffee.",
+			want: "<p>Read more about coffee.</p><h2>About</h2><ul><li>One.</li></ul>",
+		},
+		{
+			name: "into an empty body",
+			body: "",
+			text: "Read more about <coffee> & tea.",
+			want: "<p>Read more about &lt;coffee&gt; &amp; tea.</p>",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc, err := content.Parse(tc.body)
+			if err != nil {
+				t.Fatalf("Parse: %v", err)
+			}
+			if err = doc.PrependParagraph(tc.text); err != nil {
+				t.Fatalf("PrependParagraph: %v", err)
+			}
+			if got := bodyOf(t, doc); got != tc.want {
+				t.Errorf("Render =\n%s\nwant\n%s", got, tc.want)
+			}
+			if paragraphs := doc.Paragraphs(); len(paragraphs) != 1 {
+				t.Errorf("the body holds %d paragraphs, want the one prepended", len(paragraphs))
+			}
+		})
+	}
+
+	doc, err := content.Parse("<p>One.</p>")
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if err = doc.PrependParagraph("   "); !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("PrependParagraph with nothing to say = %v, want an invalid error", err)
+	}
+}

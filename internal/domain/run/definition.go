@@ -15,7 +15,10 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
-const MaxRetryAttempts = 10
+const (
+	MaxRetryAttempts = 10
+	CheckpointAccept = "accept"
+)
 
 type RetryPolicy struct {
 	Backoff func(attempt int) time.Duration
@@ -43,6 +46,11 @@ func (c *StepContext) Artifact(kind ArtifactKind) (Artifact, error) {
 			WithDetail("kind", string(kind))
 	}
 	return artifact, nil
+}
+
+func (c *StepContext) Accepted() bool {
+	step, found, err := Get[string](c.Check, CheckpointAccept)
+	return err == nil && found && step == c.Item.CurrentStep
 }
 
 func (c *StepContext) Param(name string) (any, bool) {

@@ -18,9 +18,10 @@ type BriefSection struct {
 }
 
 type BriefPhrase struct {
-	Text string `json:"text"`
-	Lead bool   `json:"lead"`
-	Why  string `json:"why"`
+	Text   string `json:"text"`
+	Lead   bool   `json:"lead"`
+	Within int    `json:"within"`
+	Why    string `json:"why"`
 }
 
 type Brief struct {
@@ -36,7 +37,7 @@ type Brief struct {
 	Phrases        []BriefPhrase  `json:"phrases"`
 }
 
-func NewBrief(spec template.TemplateSpec, page pagemap.Page, entity graph.Entity, lc LinkContext) Brief {
+func NewBrief(spec template.TemplateSpec, rules template.LinkRules, page pagemap.Page, entity graph.Entity, lc LinkContext) Brief {
 	brief := Brief{
 		Title:          strings.TrimSpace(page.Title),
 		H1:             strings.TrimSpace(page.H1),
@@ -71,8 +72,12 @@ func NewBrief(spec template.TemplateSpec, page pagemap.Page, entity graph.Entity
 		if len(target.Anchors) == 0 || !target.Required {
 			continue
 		}
+		within := 0
+		if target.Relation == RelationUp {
+			within = rules.ParentLinkWithinParagraphs
+		}
 		brief.Phrases = append(brief.Phrases, BriefPhrase{
-			Text: target.Anchors[0], Why: "the page links to " + target.URL + " with it",
+			Text: target.Anchors[0], Within: within, Why: "the page links to " + target.URL + " with it",
 		})
 	}
 	return brief

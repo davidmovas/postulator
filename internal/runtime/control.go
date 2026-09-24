@@ -211,6 +211,17 @@ func (e *Engine) Cancel(ctx context.Context, runID string) error {
 }
 
 func (e *Engine) RetryStep(ctx context.Context, itemID string) error {
+	return e.requeueStep(ctx, itemID, nil)
+}
+
+func (e *Engine) Accept(ctx context.Context, itemID string) error {
+	return e.requeueStep(ctx, itemID, func(item *run.Item) error {
+		item.Checkpoint = item.Checkpoint.Clone()
+		return run.Set(item.Checkpoint, run.CheckpointAccept, item.CurrentStep)
+	})
+}
+
+func (e *Engine) requeueStep(ctx context.Context, itemID string, amend func(*run.Item) error) error {
 	err := e.transact(ctx, func(c context.Context, box *outbox) error {
 		item, err := e.deps.Items.Get(c, itemID)
 		if err != nil {
@@ -240,6 +251,11 @@ func (e *Engine) RetryStep(ctx context.Context, itemID string) error {
 		next.WakeAt = nil
 		next.FinishedAt = nil
 		next.UpdatedAt = now
+		if amend != nil {
+			if amendErr := amend(&next); amendErr != nil {
+				return amendErr
+			}
+		}
 
 		requeued, err := e.deps.Items.Requeue(c, itemID, item.AdvanceSeq, item.Status, now)
 		if err != nil {

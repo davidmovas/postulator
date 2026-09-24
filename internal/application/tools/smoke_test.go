@@ -76,6 +76,8 @@ func (stubEngine) Cancel(context.Context, string) error { return nil }
 
 func (stubEngine) RetryStep(context.Context, string) error { return nil }
 
+func (stubEngine) Accept(context.Context, string) error { return nil }
+
 func (stubEngine) Regenerate(context.Context, string, []string) error { return nil }
 
 type stubPacker struct{}

@@ -51,6 +51,14 @@ func Report(deps Deps) run.StepDef {
 				report.Score = &validation.Score
 				report.Findings = append(report.Findings, validation.Compliance.Items...)
 				report.Findings = append(report.Findings, validation.Structure.Items...)
+			} else {
+				draft, drafted, draftErr := decodeArtifact[content.ContentDraft](sc, run.ArtifactDraft)
+				if draftErr != nil {
+					return run.Result{}, draftErr
+				}
+				if drafted {
+					report.Findings = append(report.Findings, draft.Findings...)
+				}
 			}
 
 			judged, found, err := decodeArtifact[JudgeReport](sc, run.ArtifactJudgeReport)
