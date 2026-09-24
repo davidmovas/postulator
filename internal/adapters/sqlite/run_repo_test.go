@@ -791,3 +791,170 @@ func TestThePurgeSparesAnItemThatNeverPublished(t *testing.T) {
 		t.Fatalf("an unpublished body must survive: %+v, %v", stored, err)
 	}
 }
+
+func TestAChildQueuedBehindABlockerRunsOnlyOnceTheBlockerIsDone(t *testing.T) {
+	t.Parallel()
+
+	fixture := newRunFixture(t, 0)
+	running := fixture.run
+	running.Status = run.StatusRunning
+	if err := fixture.runs.Update(t.Context(), running); err != nil {
+		t.Fatalf("update the run: %v", err)
+	}
+	pages := sqlite.NewPageRepo(fixture.store)
+	parent := sqlitetest.Page(t, fixture.store, fixture.run.SiteID, "/coffee/")
+	child := sqlitetest.Page(t, fixture.store, fixture.run.SiteID, "/coffee/espresso/")
+	child.ParentPageID = &parent.ID
+	if err := pages.Update(t.Context(), child); err != nil {
+		t.Fatalf("link the child: %v", err)
+	}
+
+	blocker := fixture.insertItem(t, parent.ID, "publish")
+	behind := run.Item{
+		ID: id.New(), RunID: fixture.run.ID, SiteID: fixture.run.SiteID, TargetID: child.ID, Status: run.StatusPending,
+		CurrentStep: "generate_body", Seq: 1, BlockedBy: blocker.ID,
+		Checkpoint: run.NewCheckpoint(), CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+	}
+	if err := fixture.items.Insert(t.Context(), behind); err != nil {
+		t.Fatalf("insert the child item: %v", err)
+	}
+	stored, err := fixture.items.Get(t.Context(), behind.ID)
+	if err != nil || stored.BlockedBy != blocker.ID {
+		t.Fatalf("the stored child is blocked by %q, %v; want %s", stored.BlockedBy, err, blocker.ID)
+	}
+
+	setBlocker := func(status run.Status, reason run.PauseReason) {
+		t.Helper()
+		current, getErr := fixture.items.Get(t.Context(), blocker.ID)
+		if getErr != nil {
+			t.Fatalf("read the blocker: %v", getErr)
+		}
+		current.Status = status
+		current.PauseReason = reason
+		current.UpdatedAt = sqlitetest.Stamp
+		if ok, persistErr := fixture.items.Persist(t.Context(), current, current.AdvanceSeq); persistErr != nil || !ok {
+			t.Fatalf("set the blocker to %s: %v, %v", status, ok, persistErr)
+		}
+	}
+	runnableIDs := func() []string {
+		t.Helper()
+		listed, listErr := fixture.items.Runnable(t.Context(), sqlitetest.Stamp, 10)
+		if listErr != nil {
+			t.Fatalf("Runnable: %v", listErr)
+		}
+		ids := make([]string, 0, len(listed))
+		for i := range listed {
+			ids = append(ids, listed[i].ID)
+		}
+		return ids
+	}
+	behindIDs := func() []string {
+		t.Helper()
+		listed, listErr := fixture.items.BehindStoppedBlockers(t.Context(), 10)
+		if listErr != nil {
+			t.Fatalf("BehindStoppedBlockers: %v", listErr)
+		}
+		ids := make([]string, 0, len(listed))
+		for i := range listed {
+			ids = append(ids, listed[i].ID)
+		}
+		return ids
+	}
+
+	if got := runnableIDs(); !slices.Equal(got, []string{blocker.ID}) {
+		t.Fatalf("Runnable with a pending blocker = %v, want only the blocker", got)
+	}
+	if got := behindIDs(); len(got) != 0 {
+		t.Fatalf("BehindStoppedBlockers with a pending blocker = %v, want none", got)
+	}
+
+	for _, tc := range []struct {
+		status run.Status
+		reason run.PauseReason
+	}{
+		{status: run.StatusRunning}, {status: run.StatusWaiting},
+	} {
+		setBlocker(tc.status, tc.reason)
+		if got := runnableIDs(); len(got) != 0 {
+			t.Fatalf("Runnable with a %s blocker = %v, want none", tc.status, got)
+		}
+		if got := behindIDs(); len(got) != 0 {
+			t.Fatalf("BehindStoppedBlockers with a %s blocker = %v, want none", tc.status, got)
+		}
+	}
+	for _, tc := range []struct {
+		status run.Status
+		reason run.PauseReason
+	}{
+		{status: run.StatusFailed}, {status: run.StatusPaused, reason: run.PauseNeedsHuman},
+		{status: run.StatusPaused, reason: run.PauseAwaitingParent}, {status: run.StatusCancelled},
+	} {
+		setBlocker(tc.status, tc.reason)
+		if got := runnableIDs(); len(got) != 0 {
+			t.Fatalf("Runnable with a %s blocker = %v, want none", tc.status, got)
+		}
+		if got := behindIDs(); !slices.Equal(got, []string{behind.ID}) {
+			t.Fatalf("BehindStoppedBlockers with a %s blocker = %v, want the child", tc.status, got)
+		}
+	}
+
+	setBlocker(run.StatusCompleted, "")
+	if got := runnableIDs(); !slices.Equal(got, []string{behind.ID}) {
+		t.Fatalf("Runnable with a completed blocker = %v, want the child", got)
+	}
+	if got := behindIDs(); len(got) != 0 {
+		t.Fatalf("BehindStoppedBlockers with a completed blocker = %v, want none", got)
+	}
+
+	setBlocker(run.StatusFailed, "")
+	wpID := int64(9)
+	parent.WPID = &wpID
+	if err = pages.Update(t.Context(), parent); err != nil {
+		t.Fatalf("put the parent on the site: %v", err)
+	}
+	if got := runnableIDs(); !slices.Equal(got, []string{behind.ID}) {
+		t.Fatalf("Runnable with a failed blocker whose page is on the site = %v, want the child", got)
+	}
+	if got := behindIDs(); len(got) != 0 {
+		t.Fatalf("BehindStoppedBlockers once the page is on the site = %v, want none", got)
+	}
+}
+
+func TestAwaitingParentReleasesAChildByItsBlockerWhenItHasOne(t *testing.T) {
+	t.Parallel()
+
+	fixture := newRunFixture(t, 0)
+	pages := sqlite.NewPageRepo(fixture.store)
+	parent := sqlitetest.Page(t, fixture.store, fixture.run.SiteID, "/coffee/")
+	child := sqlitetest.Page(t, fixture.store, fixture.run.SiteID, "/coffee/espresso/")
+	child.ParentPageID = &parent.ID
+	if err := pages.Update(t.Context(), child); err != nil {
+		t.Fatalf("link the child: %v", err)
+	}
+
+	blocker := fixture.insertItem(t, parent.ID, "publish")
+	held := run.Item{
+		ID: id.New(), RunID: fixture.run.ID, SiteID: fixture.run.SiteID, TargetID: child.ID, Status: run.StatusPaused,
+		PauseReason: run.PauseAwaitingParent, CurrentStep: "generate_body", Seq: 1, BlockedBy: blocker.ID,
+		Checkpoint: run.NewCheckpoint(), CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+	}
+	if err := fixture.items.Insert(t.Context(), held); err != nil {
+		t.Fatalf("insert the held item: %v", err)
+	}
+
+	none, err := fixture.items.AwaitingParent(t.Context(), 10)
+	if err != nil || len(none) != 0 {
+		t.Fatalf("AwaitingParent while the blocker is pending = %+v, %v", none, err)
+	}
+
+	done := blocker
+	done.Status = run.StatusCompleted
+	done.UpdatedAt = sqlitetest.Stamp
+	if ok, persistErr := fixture.items.Persist(t.Context(), done, 0); persistErr != nil || !ok {
+		t.Fatalf("complete the blocker: %v, %v", ok, persistErr)
+	}
+	released, err := fixture.items.AwaitingParent(t.Context(), 10)
+	if err != nil || len(released) != 1 || released[0].ID != held.ID {
+		t.Fatalf("AwaitingParent once the blocker completed = %+v, %v; want the child", released, err)
+	}
+}

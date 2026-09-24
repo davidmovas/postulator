@@ -208,6 +208,7 @@ type Item struct {
 	Attempts    int
 	Seq         int
 	AdvanceSeq  int64
+	BlockedBy   string
 	Checkpoint  Checkpoint
 	LeaseUntil  *time.Time
 	WakeAt      *time.Time
@@ -244,6 +245,8 @@ func NewItem(i Item) (Item, error) {
 		return Item{}, invalid("item attempts must not be negative", "attempts")
 	case i.PauseReason != "" && !i.PauseReason.Valid():
 		return Item{}, invalid("pause reason is not recognized", "pauseReason")
+	case i.BlockedBy == i.ID:
+		return Item{}, invalid("an item cannot wait for itself", "blockedBy")
 	}
 	return i, nil
 }

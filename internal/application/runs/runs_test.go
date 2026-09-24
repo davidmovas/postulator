@@ -904,7 +904,7 @@ func TestListItemsNamesTheParentAHeldItemWaitsFor(t *testing.T) {
 
 	held := run.Item{
 		ID: id.New(), RunID: record.ID, SiteID: record.SiteID, TargetID: childID, Status: run.StatusPaused,
-		CurrentStep: string(run.StepPublish), PauseReason: run.PauseAwaitingParent,
+		CurrentStep: string(run.StepPublish), PauseReason: run.PauseAwaitingParent, BlockedBy: parentItem.ID,
 		Note:       "/hub/child/ waits for its parent /hub/, which is not on the site yet",
 		Checkpoint: run.NewCheckpoint(), CreatedAt: sqlitetest.Stamp.Add(time.Second), UpdatedAt: sqlitetest.Stamp,
 	}
@@ -932,6 +932,9 @@ func TestListItemsNamesTheParentAHeldItemWaitsFor(t *testing.T) {
 	if child.Note != held.Note {
 		t.Fatalf("the held item's note = %q, want the step's own sentence", child.Note)
 	}
+	if child.BlockedBy != parentItem.ID {
+		t.Fatalf("the held item is queued behind %q, want %s", child.BlockedBy, parentItem.ID)
+	}
 	want := runs.AwaitedParent{
 		PageID: parentID, Path: "/hub/", ItemID: parentItem.ID,
 		ItemStatus: string(run.StatusFailed), Step: string(run.StepValidate),
@@ -939,8 +942,45 @@ func TestListItemsNamesTheParentAHeldItemWaitsFor(t *testing.T) {
 	if child.WaitingFor == nil || *child.WaitingFor != want {
 		t.Fatalf("the held item waits for %+v, want %+v", child.WaitingFor, want)
 	}
-	if parent := byTarget[parentID]; parent.WaitingFor != nil {
-		t.Fatalf("the parent item waits for %+v, want nothing", parent.WaitingFor)
+	if parent := byTarget[parentID]; parent.WaitingFor != nil || parent.BlockedBy != "" {
+		t.Fatalf("the parent item waits for %+v behind %q, want nothing", parent.WaitingFor, parent.BlockedBy)
+	}
+}
+
+func TestListItemsNamesTheBlockerAQueuedItemSitsBehind(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	record, parentItem := fixture.seedRun(t, run.StatusRunning)
+	parentID, childID := fixture.pages[0], fixture.pages[1]
+
+	queued := run.Item{
+		ID: id.New(), RunID: record.ID, SiteID: record.SiteID, TargetID: childID, Status: run.StatusPending,
+		CurrentStep: string(run.StepResolveContext), Seq: 5, BlockedBy: parentItem.ID,
+		Checkpoint: run.NewCheckpoint(), CreatedAt: sqlitetest.Stamp.Add(time.Second), UpdatedAt: sqlitetest.Stamp,
+	}
+	if err := fixture.items.Insert(t.Context(), queued); err != nil {
+		t.Fatalf("insert the queued item: %v", err)
+	}
+	fixture.mapping.known = map[string]pagemap.Page{
+		parentID: {ID: parentID, Path: "/hub/"},
+		childID:  {ID: childID, Path: "/hub/child/", ParentPageID: &parentID},
+	}
+
+	list, err := fixture.service.ListItems(t.Context(), runs.ListItemsRequest{RunID: record.ID})
+	if err != nil || len(list.Items) != 2 {
+		t.Fatalf("ListItems = %+v, %v", list, err)
+	}
+	if list.Items[0].TargetID != parentID || list.Items[1].TargetID != childID {
+		t.Fatalf("the items are listed as %s then %s, want the parent first", list.Items[0].TargetID, list.Items[1].TargetID)
+	}
+	want := runs.AwaitedParent{
+		PageID: parentID, Path: "/hub/", ItemID: parentItem.ID,
+		ItemStatus: string(parentItem.Status), Step: parentItem.CurrentStep,
+	}
+	child := list.Items[1]
+	if child.BlockedBy != parentItem.ID || child.WaitingFor == nil || *child.WaitingFor != want {
+		t.Fatalf("the queued item sits behind %q and waits for %+v, want %+v", child.BlockedBy, child.WaitingFor, want)
 	}
 }
 

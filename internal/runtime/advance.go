@@ -73,6 +73,9 @@ func (e *Engine) advance(parent context.Context, itemID string) (bool, error) {
 		return false, err
 	}
 	e.forget(held.item.ID)
+	if !out.status.Advanceable() {
+		e.nudge()
+	}
 	return again, nil
 }
 

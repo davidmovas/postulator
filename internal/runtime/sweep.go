@@ -16,6 +16,9 @@ func (e *Engine) sweep(ctx context.Context) error {
 	if err := e.unblock(ctx); err != nil {
 		return err
 	}
+	if err := e.holdBlocked(ctx); err != nil {
+		return err
+	}
 	if err := e.reap(ctx); err != nil {
 		return err
 	}
@@ -104,6 +107,90 @@ func (e *Engine) unblock(ctx context.Context) error {
 		e.nudge()
 	}
 	return nil
+}
+
+func (e *Engine) holdBlocked(ctx context.Context) error {
+	for {
+		behind, err := e.deps.Items.BehindStoppedBlockers(ctx, sweepBatch)
+		if err != nil {
+			return err
+		}
+		held := 0
+		for i := range behind {
+			if e.holdBehind(ctx, behind[i]) {
+				held++
+			}
+		}
+		if held == 0 {
+			return nil
+		}
+	}
+}
+
+func (e *Engine) holdBehind(ctx context.Context, item run.Item) bool {
+	held := false
+	err := e.transact(ctx, func(c context.Context, box *outbox) error {
+		blocker, err := e.deps.Items.Get(c, item.BlockedBy)
+		if err != nil {
+			return err
+		}
+		gate, err := e.deps.Pages.Get(c, blocker.TargetID)
+		if err != nil {
+			return err
+		}
+		own, err := e.deps.Pages.Get(c, item.TargetID)
+		if err != nil {
+			return err
+		}
+		record, err := e.deps.Runs.Get(c, item.RunID)
+		if err != nil {
+			return err
+		}
+
+		now := e.now()
+		next := item
+		next.Status = run.StatusPaused
+		next.PauseReason = run.PauseAwaitingParent
+		next.Note = heldBehind(own.Path, gate.Path, blocker)
+		next.LeaseUntil = nil
+		next.WakeAt = nil
+		next.UpdatedAt = now
+		persisted, err := e.deps.Items.Persist(c, next, item.AdvanceSeq)
+		if err != nil || !persisted {
+			return err
+		}
+		held = true
+
+		box.add(c, item.RunID, events.ItemNeedsHuman, events.ItemNeedsHumanPayload{
+			RunID: item.RunID, ItemID: item.ID, Reason: string(run.PauseAwaitingParent), Message: next.Note,
+		})
+		return e.settleRun(c, box, record, now)
+	})
+	if err != nil {
+		e.logger.Warn("holding a run item behind its stopped parent failed; the next sweep will try again",
+			zap.String("itemId", item.ID),
+			zap.Error(err),
+		)
+		return false
+	}
+	return held
+}
+
+func heldBehind(own, gate string, blocker run.Item) string {
+	switch {
+	case blocker.Status == run.StatusFailed:
+		return own + " waits for " + gate + ", which failed at " + blocker.CurrentStep + "; regenerate " + gate +
+			" and " + own + " goes on by itself"
+	case blocker.Status == run.StatusCancelled:
+		return own + " waits for " + gate + ", which was cancelled; start a new run over " + gate +
+			" and " + own + " goes on by itself"
+	case blocker.PauseReason == run.PauseAwaitingParent:
+		return own + " waits for " + gate + ", which waits for its own parent; " + own +
+			" goes on by itself once " + gate + " is on the site"
+	default:
+		return own + " waits for " + gate + ", which is held at " + blocker.CurrentStep + " for a decision; settle " +
+			gate + " and " + own + " goes on by itself"
+	}
 }
 
 func (e *Engine) reap(ctx context.Context) error {
