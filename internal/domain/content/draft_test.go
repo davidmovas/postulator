@@ -2,6 +2,7 @@ package content_test
 
 import (
 	stderrors "errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -60,14 +61,14 @@ func TestNewBriefTakesThePlanFirstAndListsWhatThePageOwes(t *testing.T) {
 	if len(brief.Sections) != 3 || brief.Sections[0].Slot != 1 || brief.Sections[2].Slot != 3 || !brief.Sections[0].PrimaryInHeading {
 		t.Fatalf("sections = %+v", brief.Sections)
 	}
-	if got := brief.PhraseTexts(); len(got) != 2 || got[0] != "espresso" || got[1] != "coffee" {
-		t.Fatalf("phrases = %v, want the lead keyword and the required anchor, not the sibling", got)
+	if got := brief.PhraseTexts(); len(got) != 3 || got[0] != "espresso" || got[1] != "coffee" || got[2] != "filter coffee" {
+		t.Fatalf("phrases = %v, want the lead keyword, the parent anchor and the sibling anchor", got)
 	}
-	if !brief.Phrases[0].Lead || brief.Phrases[1].Lead {
+	if !brief.Phrases[0].Lead || brief.Phrases[1].Lead || brief.Phrases[2].Lead {
 		t.Fatalf("only the keyword opens the page: %+v", brief.Phrases)
 	}
-	if brief.Phrases[0].Within != 0 || brief.Phrases[1].Within != 2 {
-		t.Fatalf("phrases = %+v, want the parent anchor within the first two paragraphs and the lead unbounded", brief.Phrases)
+	if brief.Phrases[0].Within != 0 || brief.Phrases[1].Within != 2 || brief.Phrases[2].Within != 0 {
+		t.Fatalf("phrases = %+v, want the parent anchor within the first two paragraphs and the others unbounded", brief.Phrases)
 	}
 	if got := brief.RequiredHeadings(); len(got) != 2 || got[1] != "Brewing" {
 		t.Fatalf("required headings = %v", got)
@@ -76,6 +77,61 @@ func TestNewBriefTakesThePlanFirstAndListsWhatThePageOwes(t *testing.T) {
 	bare := guideBrief(pagemap.Page{})
 	if bare.PlannedTitle || bare.PlannedH1 {
 		t.Fatalf("a page without a plan claims one: %+v", bare)
+	}
+}
+
+func TestNewBriefOwesEveryLinkTheBudgetAllows(t *testing.T) {
+	t.Parallel()
+
+	lc := content.LinkContext{Targets: []content.LinkTarget{
+		{URL: "/coffee/", Anchors: []string{"coffee"}, Relation: content.RelationUp, Required: true},
+		{URL: "/coffee/espresso/ristretto/", Anchors: []string{"ristretto"}, Relation: content.RelationDown},
+		{URL: "/coffee/espresso/lungo/", Relation: content.RelationDown},
+		{URL: "/coffee/filter/", Anchors: []string{"filter coffee"}, Relation: content.RelationSibling},
+	}}
+	entity := graph.Entity{Name: "Espresso", PrimaryKeyword: "espresso"}
+
+	cases := []struct {
+		name     string
+		rules    template.LinkRules
+		phrases  []string
+		children []string
+	}{
+		{
+			name:    "every target in running text",
+			rules:   template.LinkRules{ParentLinkWithinParagraphs: 2},
+			phrases: []string{"coffee", "ristretto", "filter coffee"},
+		},
+		{
+			name:     "the children in a section of their own",
+			rules:    template.LinkRules{ParentLinkWithinParagraphs: 2, ChildrenSection: true},
+			phrases:  []string{"coffee", "filter coffee"},
+			children: []string{"ristretto"},
+		},
+		{
+			name:    "a budget that ends before the sibling",
+			rules:   template.LinkRules{ParentLinkWithinParagraphs: 2, MaxLinks: 3},
+			phrases: []string{"coffee", "ristretto"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			brief := content.NewBrief(template.TemplateSpec{}, tc.rules, pagemap.Page{}, entity, lc)
+			if got := brief.PhraseTexts(); !slices.Equal(got, tc.phrases) {
+				t.Fatalf("phrases = %v, want %v", got, tc.phrases)
+			}
+			if !slices.Equal(brief.Children, tc.children) {
+				t.Fatalf("children = %v, want %v", brief.Children, tc.children)
+			}
+			for _, phrase := range brief.Phrases {
+				if phrase.Why == "" || !strings.Contains(phrase.Why, "/coffee/") {
+					t.Fatalf("phrase %+v, want it to say which page it links to", phrase)
+				}
+			}
+		})
 	}
 }
 

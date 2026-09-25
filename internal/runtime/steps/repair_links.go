@@ -166,7 +166,7 @@ func nextOwed(doc *content.Document, result content.InsertResult, policy templat
 	for i := range result.Decisions {
 		decision := &result.Decisions[i]
 		target := decision.Target
-		if !target.Required || len(target.Anchors) == 0 {
+		if len(target.Anchors) == 0 {
 			continue
 		}
 		if decision.Outcome != content.OutcomeAnchorNotFound && decision.Outcome != content.OutcomePositionRule {
@@ -178,12 +178,32 @@ func nextOwed(doc *content.Document, result content.InsertResult, policy templat
 		return owedPhrase{
 			text:  target.Anchors[0],
 			url:   target.URL,
-			index: insertionPoint(doc, policy),
-			why: "The page has to link to " + target.URL + ", which sits " + string(target.Relation) +
-				" of this page in the entity graph, and no paragraph where that link may go carries an anchor for it yet.",
+			index: placeFor(doc, policy, target),
+			why:   whyOwed(target),
 		}, true
 	}
 	return owedPhrase{}, false
+}
+
+func placeFor(doc *content.Document, policy template.LinkPolicy, target content.LinkTarget) int {
+	if target.Relation == content.RelationUp {
+		return insertionPoint(doc, policy)
+	}
+	return max(len(doc.Paragraphs())-1, 0)
+}
+
+func whyOwed(target content.LinkTarget) string {
+	switch target.Relation {
+	case content.RelationDown:
+		return "The page has to link down to " + target.URL + ", a page below it in the entity graph, " +
+			"and no paragraph carries an anchor for it yet; the sentence closes the page."
+	case content.RelationSibling:
+		return "The page has to link to " + target.URL + ", a page related to it in the entity graph, " +
+			"and no paragraph carries an anchor for it yet; the sentence closes the page."
+	default:
+		return "The page has to link to " + target.URL + ", which sits " + string(target.Relation) +
+			" of this page in the entity graph, and no paragraph where that link may go carries an anchor for it yet."
+	}
 }
 
 func leadCarries(doc *content.Document, phrase string) bool {
@@ -297,9 +317,9 @@ func templatedFinding(owed owedPhrase, tries int) content.Finding {
 
 func repairMessage(written, templatedCount int) string {
 	if written == 0 {
-		return "every required phrase was already in place"
+		return "every owed phrase was already in place"
 	}
-	message := "wrote " + strconv.Itoa(written) + " required phrases into the body"
+	message := "wrote " + strconv.Itoa(written) + " owed phrases into the body"
 	if templatedCount > 0 {
 		message += ", " + strconv.Itoa(templatedCount) + " of them as plain sentences"
 	}

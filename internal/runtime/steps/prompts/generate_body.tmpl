@@ -43,9 +43,9 @@ REQUIRED PHRASES
 {{else}}- none
 {{end}}
 Each required phrase appears at least once, verbatim and in running body text, never inside a heading.
-{{if .Children}}
+{{if .Brief.Children}}
 CHILDREN
 The page closes with one more section, with slot 0 and a heading of your own, that walks through the pages
 below this one. Name each of these in it, verbatim and in running body text:
-{{range .Children}}- {{.}}
+{{range .Brief.Children}}- {{.}}
 {{end}}{{end}}{{end}}
