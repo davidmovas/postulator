@@ -19,13 +19,15 @@ const (
 	Provider = "openai"
 
 	DefaultBaseURL = "https://api.openai.com/v1"
-	DefaultTimeout = 2 * time.Minute
+	DefaultTimeout = 4 * time.Minute
 	DefaultSize    = "1024x1024"
 	DefaultQuality = images.DefaultOpenAIQuality
 
 	generationsPath = "/images/generations"
 	maxBodyBytes    = 32 << 20
 	contentTypeJSON = "application/json"
+	dallEPrefix     = "dall-e"
+	dallEFormat     = "b64_json"
 )
 
 type secretStore interface {
@@ -87,8 +89,8 @@ type generationRequest struct {
 	Model   string `json:"model"`
 	Prompt  string `json:"prompt"`
 	Size    string `json:"size"`
-	Format  string `json:"response_format"`
-	Quality string `json:"quality"`
+	Format  string `json:"response_format,omitempty"`
+	Quality string `json:"quality,omitempty"`
 	Count   int    `json:"n"`
 }
 
@@ -129,9 +131,13 @@ func (i *Images) Generate(ctx context.Context, prompt images.Prompt) (images.Ima
 		size = DefaultSize
 	}
 
-	body, err := json.Marshal(generationRequest{
-		Model: i.model, Prompt: text, Size: size, Format: "b64_json", Quality: i.quality, Count: 1,
-	})
+	request := generationRequest{Model: i.model, Prompt: text, Size: size, Count: 1}
+	if dallE(i.model) {
+		request.Format = dallEFormat
+	} else {
+		request.Quality = i.quality
+	}
+	body, err := json.Marshal(request)
 	if err != nil {
 		return images.Image{}, errors.Wrap(err, errors.Internal, "encode the image request")
 	}
@@ -184,6 +190,10 @@ func (i *Images) Generate(ctx context.Context, prompt images.Prompt) (images.Ima
 			Output: decoded.Usage.Output, Total: decoded.Usage.Total,
 		},
 	}, nil
+}
+
+func dallE(model string) bool {
+	return strings.HasPrefix(strings.ToLower(model), dallEPrefix)
 }
 
 func classify(status int, decoded generationResponse) error {
