@@ -36,15 +36,8 @@ func (s *Service) Start(ctx context.Context, req StartRequest) (StartResponse, e
 		return StartResponse{}, refusedByPreflight(blocking)
 	}
 
-	if len(plan.picked) > 0 {
-		if err = run.ValidateRecipe(s.steps, plan.record.Recipe); err != nil {
-			return StartResponse{}, err
-		}
-		if _, err = s.assigner.AssignTemplate(ctx, pages.AssignTemplateRequest{
-			SiteID: plan.record.SiteID, PageIDs: plan.picked, TemplateID: plan.record.TemplateID,
-		}); err != nil {
-			return StartResponse{}, err
-		}
+	if assignErr := s.assign(ctx, plan); assignErr != nil {
+		return StartResponse{}, assignErr
 	}
 
 	plan.record.ID = id.New()
@@ -185,15 +178,28 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
 	}, nil
 }
 
-func assignment(chosen []string, templateID string) (map[string]string, []string) {
+func assignment(chosen []string, templateID string) (assigned map[string]string, picked []string) {
 	if templateID == "" {
 		return nil, nil
 	}
-	assigned := make(map[string]string, len(chosen))
+	assigned = make(map[string]string, len(chosen))
 	for _, pageID := range chosen {
 		assigned[pageID] = templateID
 	}
 	return assigned, chosen
+}
+
+func (s *Service) assign(ctx context.Context, plan planned) error {
+	if len(plan.picked) == 0 {
+		return nil
+	}
+	if err := run.ValidateRecipe(s.steps, plan.record.Recipe); err != nil {
+		return err
+	}
+	_, err := s.assigner.AssignTemplate(ctx, pages.AssignTemplateRequest{
+		SiteID: plan.record.SiteID, PageIDs: plan.picked, TemplateID: plan.record.TemplateID,
+	})
+	return err
 }
 
 func (s *Service) resolve(ctx context.Context, siteID, pageID, templateID string) (templates.ResolveForPageResponse, error) {

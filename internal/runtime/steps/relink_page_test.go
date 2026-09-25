@@ -208,7 +208,10 @@ func TestRelinkPageBackfillsWhatThePageOwes(t *testing.T) {
 			deps, server, _, wpID := relinkPageDeps(t, tc.body)
 			if tc.deps != nil {
 				deps = tc.deps(deps)
-				listed, _ := deps.Pages.(pageList)
+				listed, ok := deps.Pages.(pageList)
+				if !ok {
+					t.Fatalf("the pages are a %T, want the page list stub", deps.Pages)
+				}
 				for i := range listed.items {
 					if listed.items[i].ID == "page-child" {
 						listed.items[i].WPID = &wpID

@@ -38,8 +38,9 @@ func Supersedes(seed, stored Template) bool {
 	if sameSpec(stored.Spec, seed.Spec) {
 		return false
 	}
-	for _, earlier := range Superseded() {
-		if strings.EqualFold(earlier.Name, seed.Name) && sameSpec(stored.Spec, earlier.Spec) {
+	earlier := Superseded()
+	for i := range earlier {
+		if strings.EqualFold(earlier[i].Name, seed.Name) && sameSpec(stored.Spec, earlier[i].Spec) {
 			return true
 		}
 	}

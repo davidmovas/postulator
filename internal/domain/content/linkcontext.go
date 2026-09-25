@@ -208,21 +208,24 @@ func MayLinkTo(g graph.Graph, entityID string) []graph.Entity {
 		return true
 	}
 
-	for _, parent := range g.Parents(entityID, 1) {
-		keep(parent)
+	parents := g.Parents(entityID, 1)
+	for i := range parents {
+		keep(parents[i])
 	}
 	queue := []string{entityID}
 	for len(queue) > 0 {
 		current := queue[0]
 		queue = queue[1:]
-		for _, child := range g.Children(current) {
-			if keep(child) {
-				queue = append(queue, child.ID)
+		children := g.Children(current)
+		for i := range children {
+			if keep(children[i]) {
+				queue = append(queue, children[i].ID)
 			}
 		}
 	}
-	for _, neighbor := range g.Related(entityID, 0) {
-		keep(neighbor.Entity)
+	related := g.Related(entityID, 0)
+	for i := range related {
+		keep(related[i].Entity)
 	}
 	return out
 }

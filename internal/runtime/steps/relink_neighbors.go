@@ -98,7 +98,9 @@ func RelinkNeighbors(deps Deps) run.StepDef {
 				Findings:  make([]content.Finding, 0),
 			}
 
-			for _, candidate := range candidatesOf(lc, neighborhood, entity) {
+			candidates := candidatesOf(lc, neighborhood, entity)
+			for i := range candidates {
+				candidate := &candidates[i]
 				neighbor := candidate.page
 				if neighbor.WPID == nil || neighbor.ID == sc.Page.ID {
 					continue
@@ -200,11 +202,12 @@ func candidatesOf(lc content.LinkContext, around neighborWork, entity graph.Enti
 		seen[page.ID] = struct{}{}
 		out = append(out, candidate{page: page, planned: true})
 	}
-	for _, other := range content.MayLinkTo(around.graph, entity.ID) {
-		if other.CanonicalPageID == nil {
+	others := content.MayLinkTo(around.graph, entity.ID)
+	for i := range others {
+		if others[i].CanonicalPageID == nil {
 			continue
 		}
-		page, ok := around.index.ByID(*other.CanonicalPageID)
+		page, ok := around.index.ByID(*others[i].CanonicalPageID)
 		if !ok {
 			continue
 		}
@@ -372,12 +375,12 @@ func relinkOne(ctx context.Context, deps Deps, client *wp.Client, in neighborWor
 }
 
 func backfill(doc *content.Document, lc content.LinkContext, policy template.LinkPolicy,
-	target content.LinkTarget) (content.InsertResult, string) {
-	placement := content.InsertTarget(doc, lc, policy, target)
+	target content.LinkTarget) (placement content.InsertResult, sentence string) {
+	placement = content.InsertTarget(doc, lc, policy, target)
 	if _, inserted := insertedAnchor(placement); inserted || !writable(placement) || len(target.Anchors) == 0 {
 		return placement, ""
 	}
-	sentence := templated(owedPhrase{text: target.Anchors[0]})
+	sentence = templated(owedPhrase{text: target.Anchors[0]})
 	if err := settleSentence(doc, placeFor(doc, policy, target), sentence); err != nil {
 		return placement, ""
 	}

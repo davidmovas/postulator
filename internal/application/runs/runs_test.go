@@ -171,9 +171,9 @@ func newFixture(t *testing.T) *fixture {
 	store := sqlitetest.Open(t)
 	site := sqlitetest.Site(t, store, "shop")
 
-	pages := make([]string, 0, 2)
+	pageIDs := make([]string, 0, 2)
 	for _, path := range []string{"/hub/", "/hub/child/"} {
-		pages = append(pages, sqlitetest.Page(t, store, site.ID, path).ID)
+		pageIDs = append(pageIDs, sqlitetest.Page(t, store, site.ID, path).ID)
 	}
 
 	engine := &fakeEngine{estimate: run.Estimate{
@@ -208,7 +208,7 @@ func newFixture(t *testing.T) *fixture {
 		blobs:    blobRepo,
 		log:      logRepo,
 		siteID:   site.ID,
-		pages:    pages,
+		pages:    pageIDs,
 	}
 }
 
