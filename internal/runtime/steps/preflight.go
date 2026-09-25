@@ -115,7 +115,7 @@ func imagesPreflight(deps Deps) run.Preflight {
 		findings := make([]run.EstimateFinding, 0)
 		for _, targetID := range record.Targets {
 			target := targets[targetID]
-			wanted := wantedImages(target.Spec.Images)
+			wanted := target.Spec.Images.Wanted()
 			if wanted == 0 {
 				continue
 			}

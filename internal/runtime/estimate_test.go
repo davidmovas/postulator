@@ -124,6 +124,89 @@ func TestEstimateNamesTheStepItCannotPrice(t *testing.T) {
 	}
 }
 
+func TestEstimateWarnsWhenAPageWantsImagesTheRecipeWillNotDraw(t *testing.T) {
+	t.Parallel()
+
+	drawn := template.Images{Featured: true, Inline: 1, Source: template.ImagesAI}
+	disabled := recipeOf("generate_body", "generate_images")
+	disabled[1].Enabled = false
+
+	cases := []struct {
+		name   string
+		recipe []template.StepSpec
+		images template.Images
+		warned bool
+	}{
+		{name: "the recipe leaves the image step out", recipe: recipeOf("generate_body"), images: drawn, warned: true},
+		{name: "the recipe turns the image step off", recipe: disabled, images: drawn, warned: true},
+		{name: "the recipe draws them", recipe: recipeOf("generate_body", "generate_images"), images: drawn},
+		{name: "the page wants none", recipe: recipeOf("generate_body")},
+		{name: "the run writes no body", recipe: recipeOf("generate_images")[:0], images: drawn},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			harness := newHarness(t, 1)
+			body := pricedStep("generate_body", llm.RoleWriter, run.Price{})
+			images := run.StepDef{
+				Name:     "generate_images",
+				Requires: []run.ArtifactKind{run.ArtifactBodyHTML},
+				Produces: []run.ArtifactKind{run.ArtifactImages},
+				Run:      func(context.Context, *run.StepContext) (run.Result, error) { return run.Result{}, nil },
+				Price:    run.Price{Calls: func(template.TemplateSpec, map[string]any) int { return 0 }},
+			}
+			engine := harness.engine(t, mustRegister(t, body, images))
+			harness.specs.spec = template.TemplateSpec{Images: tc.images}
+
+			estimate, err := engine.EstimateRun(t.Context(), harness.newRun(tc.recipe))
+			if err != nil {
+				t.Fatalf("EstimateRun: %v", err)
+			}
+
+			warned := 0
+			for _, finding := range estimate.Findings {
+				if finding.Code != runtime.CodeImagesStepOff {
+					continue
+				}
+				warned++
+				if finding.Severity != content.SeverityWarn || finding.PageID != harness.pages[0] ||
+					finding.Path != "/page-a/" {
+					t.Fatalf("finding = %+v, want a warning that names the page", finding)
+				}
+			}
+			if (warned == 1) != tc.warned || warned > 1 {
+				t.Fatalf("findings = %+v, want the image step named %v", estimate.Findings, tc.warned)
+			}
+		})
+	}
+}
+
+func TestAStepThatMakesNoCallIsNotReportedUnpriced(t *testing.T) {
+	t.Parallel()
+
+	harness := newHarness(t, 1)
+	images := run.StepDef{
+		Name:     "generate_images",
+		Produces: []run.ArtifactKind{run.ArtifactImages},
+		Run:      func(context.Context, *run.StepContext) (run.Result, error) { return run.Result{}, nil },
+		Price: run.Price{
+			Unpriced: true,
+			Calls:    func(spec template.TemplateSpec, _ map[string]any) int { return spec.Images.Wanted() },
+		},
+	}
+	engine := harness.engine(t, mustRegister(t, images))
+
+	estimate, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_images")))
+	if err != nil {
+		t.Fatalf("EstimateRun: %v", err)
+	}
+	if len(estimate.Findings) != 0 {
+		t.Fatalf("findings = %+v, want none for a page that asks for no image", estimate.Findings)
+	}
+}
+
 func TestARevertRunIsPricedAtNothing(t *testing.T) {
 	t.Parallel()
 

@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"slices"
+	"strconv"
 
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/content"
@@ -25,6 +26,7 @@ const (
 	CodeModelUnresolved    = "model_unresolved"
 	CodeModelUnknown       = "model_unknown"
 	CodeProviderKeyMissing = "provider_key_missing"
+	CodeImagesStepOff      = "images_step_off"
 )
 
 type pricing struct {
@@ -101,6 +103,7 @@ func (e *Engine) planTargets(ctx context.Context, record run.Run, priced *pricin
 	}
 
 	_, ownsRecipe := record.Kind.Recipe()
+	undrawn := writesWithoutImages(record.Recipe)
 	pages := e.targetPages(ctx, record.Targets)
 	for _, targetID := range record.Targets {
 		target := run.Target{Page: pages[targetID]}
@@ -126,8 +129,20 @@ func (e *Engine) planTargets(ctx context.Context, record run.Run, priced *pricin
 					" names other steps than this run follows; the run's recipe applies to every page",
 			})
 		}
+		if wanted := resolved.Spec.Images.Wanted(); undrawn && wanted > 0 {
+			priced.add(run.EstimateFinding{
+				Severity: content.SeverityWarn, Code: CodeImagesStepOff, PageID: targetID, Path: target.Page.Path,
+				Message: "the template of " + pathOrID(target.Page, targetID) + " asks for " + strconv.Itoa(wanted) +
+					" images, but this run's recipe leaves the image step out, so the page is written without them",
+			})
+		}
 	}
 	return targets, nil
+}
+
+func writesWithoutImages(recipe []template.StepSpec) bool {
+	names := stepNames(recipe)
+	return slices.Contains(names, string(run.StepGenerateBody)) && !slices.Contains(names, string(run.StepGenerateImages))
 }
 
 func (e *Engine) pricedTargets(record run.Run, targets map[string]run.Target) []run.Target {
@@ -142,16 +157,15 @@ func (e *Engine) pricedTargets(record run.Run, targets map[string]run.Target) []
 }
 
 func (e *Engine) price(ctx context.Context, record run.Run, def run.StepDef, target *run.Target, priced *pricing) error {
+	calls := callsOf(def, target.Spec, run.ParamsFor(record.Recipe, def.Name))
+	if calls == 0 {
+		return nil
+	}
 	if def.Price.Unpriced {
 		priced.add(run.EstimateFinding{
 			Severity: content.SeverityWarn, Code: CodeUnpricedStep,
 			Message: "the step " + def.Name + " may call an image model, which this estimate does not price",
 		})
-		return nil
-	}
-
-	calls := callsOf(def, target.Spec, run.ParamsFor(record.Recipe, def.Name))
-	if calls == 0 {
 		return nil
 	}
 

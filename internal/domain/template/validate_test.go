@@ -280,3 +280,29 @@ func TestSpecJSONIsCamelCase(t *testing.T) {
 		}
 	}
 }
+
+func TestImagesCountWhatThePageAsksFor(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		images template.Images
+		want   int
+	}{
+		{name: "none", images: template.Images{}, want: 0},
+		{name: "a featured image", images: template.Images{Featured: true, Source: template.ImagesAI}, want: 1},
+		{name: "inline images", images: template.Images{Inline: 2, Source: template.ImagesAI}, want: 2},
+		{name: "both", images: template.Images{Featured: true, Inline: 3, Source: template.ImagesWPMedia}, want: 4},
+		{name: "a negative count asks for none", images: template.Images{Inline: -2}, want: 0},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := tc.images.Wanted(); got != tc.want {
+				t.Fatalf("Wanted() = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}

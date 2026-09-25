@@ -78,7 +78,7 @@ func GenerateImages(deps Deps) run.StepDef {
 				if spec.Images.Source != template.ImagesAI {
 					return 0
 				}
-				return wantedImages(spec.Images)
+				return spec.Images.Wanted()
 			},
 		},
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
@@ -87,7 +87,7 @@ func GenerateImages(deps Deps) run.StepDef {
 				Findings: make([]content.Finding, 0),
 			}
 
-			wanted := wantedImages(sc.Spec.Images)
+			wanted := sc.Spec.Images.Wanted()
 			if wanted == 0 {
 				return manifest(result, nil, "the template asks for no image")
 			}
@@ -148,14 +148,6 @@ func manifest(result ImagesResult, body []byte, message string) (run.Result, err
 	}
 	artifacts = append(artifacts, run.Artifact{Kind: run.ArtifactImages, Blob: blob})
 	return run.Result{Artifacts: artifacts, Message: message}, nil
-}
-
-func wantedImages(spec template.Images) int {
-	count := max(spec.Inline, 0)
-	if spec.Featured {
-		count++
-	}
-	return count
 }
 
 func acquire(ctx context.Context, deps Deps, sc *run.StepContext, entity graph.Entity, wanted int,
