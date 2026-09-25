@@ -117,6 +117,33 @@ func TestRelinkAddsTheMissingEdgeToANeighbor(t *testing.T) {
 	}
 }
 
+func TestANeighborWithoutRulesOfItsOwnFollowsTheSitePolicy(t *testing.T) {
+	t.Parallel()
+
+	deps, server, _, wpID := relinkDeps(t, parentBody)
+	deps.Policies = policyStub{
+		rules: template.LinkRules{UpDepth: 1, DownLinks: true, MaxPerTarget: 1},
+		specs: map[string]template.LinkRules{"page-parent": {}},
+	}
+	sc := relinkContext(t, deps)
+	sc.Spec.LinkRules = template.LinkRules{UpDepth: 1, MaxPerTarget: 1}
+
+	result, err := steps.RelinkNeighbors(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("RelinkNeighbors: %v", err)
+	}
+	var relinked steps.RelinkResult
+	if err = json.Unmarshal(result.Artifacts[0].Blob, &relinked); err != nil {
+		t.Fatalf("decode the relink result: %v", err)
+	}
+	if relinked.Linked != 1 {
+		t.Fatalf("relinked = %+v, want the parent to link down as the site policy asks", relinked)
+	}
+	if stored, _ := server.Lookup(wpID); !strings.Contains(stored.Content, `href="/coffee/espresso/"`) {
+		t.Fatalf("the parent holds %q", stored.Content)
+	}
+}
+
 func TestRelinkLeavesANeighborThatAlreadyLinks(t *testing.T) {
 	t.Parallel()
 

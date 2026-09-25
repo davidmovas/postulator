@@ -71,7 +71,7 @@ func RelinkNeighbors(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			policy, err := effectivePolicy(ctx, deps, sc)
+			sitePolicy, err := effectivePolicyFor(ctx, deps, sc.Run.SiteID, template.TemplateSpec{})
 			if err != nil {
 				return run.Result{}, err
 			}
@@ -106,7 +106,7 @@ func RelinkNeighbors(deps Deps) run.StepDef {
 				work.neighbor = neighbor
 				work.site = pagemap.NewSite(owner.BaseURL)
 				work.page = sc.Page
-				work.base = policy
+				work.base = sitePolicy
 
 				outcome, relinkErr := relinkOne(ctx, deps, client, work)
 				if relinkErr != nil {
