@@ -112,6 +112,13 @@ export const runs = {
     decisionTitle: (count: number) =>
         count === 1 ? "1 page waits for your decision" : `${count} pages wait for your decision`,
     decisionBody: "Open each held page to accept it as it is or to regenerate it.",
+    noted: {
+        badge: "Done, check",
+        title: (count: number) =>
+            count === 1 ? "1 page finished with something to check" : `${count} pages finished with something to check`,
+        body: "Each is marked Done, check. Its row says what it lacks: a link it owes, a link to a page that is not published yet, or the images its template asked for. The Linking screen shows the links as they stand now.",
+        drawer: "The page went through every step. Links & compliance lists the links it owes as they stood at validation, Images says what the image step could not do, and the Linking screen shows the links as they stand now.",
+    },
     after: (path: string) => `after ${path}`,
     retryBlocked: {
         inputs_expired: "Inputs expired — re-run the page",

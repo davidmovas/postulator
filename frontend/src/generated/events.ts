@@ -170,6 +170,7 @@ export interface GraphChangedPayload {
 export interface ItemDonePayload {
     runId: string;
     itemId: string;
+    note: string;
 }
 
 export interface ItemFailedPayload {

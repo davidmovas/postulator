@@ -45,6 +45,7 @@ type outcome struct {
 	nextStep   string
 	reason     run.PauseReason
 	message    string
+	notice     string
 	attempts   int
 	tokens     int
 	usd        float64
@@ -249,6 +250,7 @@ func (e *Engine) outcomeOf(held *claim, result run.Result, stepErr error) outcom
 		checkpoint: result.Checkpoint,
 		artifacts:  result.Artifacts,
 		message:    result.Message,
+		notice:     result.Notice,
 		nextStep:   held.step.Name,
 		tokens:     result.Tokens,
 		usd:        result.USD,
@@ -380,6 +382,9 @@ func (e *Engine) settle(parent context.Context, held *claim, out outcome) (bool,
 		if out.fault == nil && (out.status == run.StatusPaused || out.status == run.StatusWaiting) {
 			next.Note = out.message
 		}
+		if out.status == run.StatusCompleted {
+			next.Note = out.notice
+		}
 		if next.Status.Terminal() {
 			next.FinishedAt = &now
 		}
@@ -484,7 +489,7 @@ func (e *Engine) announce(ctx context.Context, box *outbox, held *claim, out out
 
 	switch next.Status {
 	case run.StatusCompleted:
-		box.add(ctx, runID, events.ItemDone, events.ItemDonePayload{RunID: runID, ItemID: itemID})
+		box.add(ctx, runID, events.ItemDone, events.ItemDonePayload{RunID: runID, ItemID: itemID, Note: next.Note})
 	case run.StatusFailed:
 		box.add(ctx, runID, events.ItemFailed, events.ItemFailedPayload{
 			RunID: runID, ItemID: itemID, Code: faultCode(out.fault), Message: out.message,

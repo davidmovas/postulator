@@ -161,6 +161,7 @@ type ItemStartedPayload struct {
 type ItemDonePayload struct {
 	RunID  string `json:"runId"`
 	ItemID string `json:"itemId"`
+	Note   string `json:"note"`
 }
 
 type ItemFailedPayload struct {

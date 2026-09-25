@@ -41,6 +41,27 @@ describe("itemProgress", () => {
     });
 });
 
+describe("a finished page that lacks something", () => {
+    it("keeps the note the page finished with and counts it apart", () => {
+        const events = [
+            event(1, "run.queued", { runId: "r", kind: "generate", items: 3 }),
+            event(2, "item.done", { runId: "r", itemId: "clean", note: "" }),
+            event(3, "item.done", { runId: "r", itemId: "short", note: "1 owed link is missing" }),
+            event(4, "item.done", { runId: "r", itemId: "again", note: "0 of 1 images placed" }),
+            event(5, "item.restarted", { runId: "r", itemId: "again" }),
+        ];
+
+        const progress = itemProgress(events);
+        const stats = liveStats(events);
+
+        expect(progress.get("clean")?.note).toBe("");
+        expect(progress.get("short")?.note).toBe("1 owed link is missing");
+        expect(progress.get("again")?.note).toBe("");
+        expect(stats.done).toBe(2);
+        expect(stats.noted).toBe(1);
+    });
+});
+
 describe("liveStats", () => {
     it("counts every item by where it stands now, so a regenerated failure is not counted twice", () => {
         const events = [

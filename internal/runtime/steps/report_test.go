@@ -3,6 +3,7 @@ package steps_test
 import (
 	"encoding/json"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/content"
@@ -68,6 +69,93 @@ func TestReportAggregatesEveryArtifact(t *testing.T) {
 	}
 	if report.Errors != 1 || report.Warnings != 2 {
 		t.Errorf("errors = %d, warnings = %d", report.Errors, report.Warnings)
+	}
+}
+
+func TestReportNoticesWhatThePageLacks(t *testing.T) {
+	t.Parallel()
+
+	validation := func(items, decisions string) []byte {
+		return []byte(`{"pageId":"page-child","score":0.9,"compliance":{"items":[` + items + `],"score":0.9},` +
+			`"structure":{"items":[],"score":1},"links":{"placed":[],"missing":[],"decisions":[` + decisions + `]}}`)
+	}
+	missing := `{"severity":"warn","code":"target_missing","message":"the page does not link to /a/"}`
+	unpublished := `{"severity":"warn","code":"target_not_published","message":"the page links to /b/"}`
+	capped := `{"target":{"url":"/a/"},"outcome":"cap_reached","detail":"spent"}`
+
+	cases := []struct {
+		name      string
+		artifacts map[run.ArtifactKind][]byte
+		want      string
+	}{
+		{
+			name:      "a page that lacks nothing",
+			artifacts: map[run.ArtifactKind][]byte{run.ArtifactValidationReport: validation("", "")},
+		},
+		{
+			name:      "one owed link is missing",
+			artifacts: map[run.ArtifactKind][]byte{run.ArtifactValidationReport: validation(missing, "")},
+			want:      "1 owed link is missing",
+		},
+		{
+			name: "the budget is spent",
+			artifacts: map[run.ArtifactKind][]byte{
+				run.ArtifactValidationReport: validation(missing+","+missing, capped),
+			},
+			want: "2 owed links are missing, the link budget of the page is spent",
+		},
+		{
+			name:      "a link leads to a page not on the site",
+			artifacts: map[run.ArtifactKind][]byte{run.ArtifactValidationReport: validation(unpublished, "")},
+			want:      "1 link leads to a page that is not on the site yet",
+		},
+		{
+			name: "a neighbor could not link back",
+			artifacts: map[run.ArtifactKind][]byte{
+				run.ArtifactRelinkResult: []byte(`{"neighbors":[],"findings":[{"severity":"warn",` +
+					`"code":"neighbor_link_missing","message":"no room"}],"missing":1}`),
+			},
+			want: "1 neighbor could not link to this page",
+		},
+		{
+			name: "fewer images than asked for",
+			artifacts: map[run.ArtifactKind][]byte{
+				run.ArtifactImages: []byte(`{"wanted":3,"images":[{"role":"featured","wpId":3}],"findings":[]}`),
+			},
+			want: "1 of 3 images placed",
+		},
+		{
+			name: "all of it",
+			artifacts: map[run.ArtifactKind][]byte{
+				run.ArtifactValidationReport: validation(missing+","+unpublished, ""),
+				run.ArtifactImages:           []byte(`{"wanted":1,"images":[],"findings":[]}`),
+			},
+			want: "1 owed link is missing; 1 link leads to a page that is not on the site yet; 0 of 1 images placed",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			result, err := steps.Report(unitDeps()).Run(t.Context(), unitContext(t, tc.artifacts))
+			if err != nil {
+				t.Fatalf("Report: %v", err)
+			}
+			if result.Notice != tc.want {
+				t.Fatalf("notice = %q, want %q", result.Notice, tc.want)
+			}
+			var report steps.FinalReport
+			if err = json.Unmarshal(result.Artifacts[0].Blob, &report); err != nil {
+				t.Fatalf("decode the final report: %v", err)
+			}
+			if report.Notice != tc.want {
+				t.Fatalf("report notice = %q, want %q", report.Notice, tc.want)
+			}
+			if tc.want != "" && !strings.Contains(result.Message, tc.want) {
+				t.Fatalf("message = %q, want the notice in it", result.Message)
+			}
+		})
 	}
 }
 

@@ -70,6 +70,7 @@ type Result struct {
 	Next       Transition
 	Reason     PauseReason
 	Message    string
+	Notice     string
 	Tokens     int
 	USD        float64
 }

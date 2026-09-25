@@ -48,6 +48,7 @@ function aProgress(overrides: Partial<ItemProgress> = {}): ItemProgress {
         stepStartedAt: "2026-09-19T10:05:00Z",
         attempt: 2,
         lastError: { code: "EXTERNAL", message: "the judge could not be reached" },
+        note: "",
         state: "retrying",
         ...overrides,
     };
@@ -159,6 +160,7 @@ describe("statsView", () => {
         const view = statsView({ items: 4, done: 2, failed: 1, tokens: 1200, usd: 0.4 });
         expect(view.needsHuman).toBeNull();
         expect(view.waitingParent).toBeNull();
+        expect(view.noted).toBeNull();
         expect(view.calls).toBeNull();
         expect(view.done).toBe(2);
     });
@@ -170,11 +172,13 @@ describe("statsView", () => {
             failed: 1,
             needsHuman: 1,
             waitingParent: 2,
+            noted: 3,
             tokens: 1200,
             usd: 0.4,
             calls: 9,
         });
         expect(view.needsHuman).toBe(1);
+        expect(view.noted).toBe(3);
         expect(view.waitingParent).toBe(2);
         expect(view.calls).toBe(9);
     });
