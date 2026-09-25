@@ -192,6 +192,41 @@ func (p *planner) siblings(entityID string, minWeight float64) {
 	}
 }
 
+func MayLinkTo(g graph.Graph, entityID string) []graph.Entity {
+	if _, known := g.Entity(entityID); !known {
+		return []graph.Entity{}
+	}
+
+	seen := map[string]struct{}{entityID: {}}
+	out := make([]graph.Entity, 0)
+	keep := func(entity graph.Entity) bool {
+		if _, dup := seen[entity.ID]; dup {
+			return false
+		}
+		seen[entity.ID] = struct{}{}
+		out = append(out, entity)
+		return true
+	}
+
+	for _, parent := range g.Parents(entityID, 1) {
+		keep(parent)
+	}
+	queue := []string{entityID}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		for _, child := range g.Children(current) {
+			if keep(child) {
+				queue = append(queue, child.ID)
+			}
+		}
+	}
+	for _, neighbor := range g.Related(entityID, 0) {
+		keep(neighbor.Entity)
+	}
+	return out
+}
+
 func canonical(index pagemap.Index, entity graph.Entity) (pagemap.Page, bool) {
 	if entity.CanonicalPageID == nil {
 		return pagemap.Page{}, false

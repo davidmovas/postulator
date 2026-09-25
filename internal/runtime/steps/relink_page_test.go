@@ -2,10 +2,12 @@ package steps_test
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
@@ -140,6 +142,110 @@ func TestRelinkPagePlacesTheLinksTheGraphAsksThePageFor(t *testing.T) {
 	}
 	if result.Next == run.TransitionPause {
 		t.Fatal("a relink that did its work must not hold the item")
+	}
+}
+
+func parentOnTheSite(deps steps.Deps) steps.Deps {
+	listed, ok := deps.Pages.(pageList)
+	if !ok {
+		return deps
+	}
+	items := make([]pagemap.Page, 0, len(listed.items))
+	for i := range listed.items {
+		page := listed.items[i]
+		if page.WPID == nil {
+			wpID := int64(500 + i)
+			page.WPID = &wpID
+		}
+		items = append(items, page)
+	}
+	listed.items = items
+	deps.Pages = listed
+	return deps
+}
+
+func TestRelinkPageBackfillsWhatThePageOwes(t *testing.T) {
+	t.Parallel()
+
+	bare := `<h1>Espresso</h1><p>Espresso is the shortest way to make a strong cup at home.</p>` +
+		`<p>A grinder helps, and so does fresh water.</p>`
+
+	cases := []struct {
+		name     string
+		body     string
+		deps     func(steps.Deps) steps.Deps
+		cap      int
+		linked   int
+		sentence bool
+		codes    []string
+		content  string
+	}{
+		{
+			name: "a parent on the site whose anchor the page lacks", body: bare, deps: parentOnTheSite,
+			linked: 1, sentence: true, codes: []string{steps.CodeRelinkPhraseTemplated},
+			content: `Espresso is the shortest way to make a strong cup at home. Read more about <a href="/coffee/">coffee</a>.`,
+		},
+		{
+			name: "a parent that is not on the site", body: bare,
+			codes: []string{},
+		},
+		{
+			name: "a planned parent the page already names", body: espressoBody,
+			linked: 1, codes: []string{content.CodeTargetNotPublished},
+			content: `make <a href="/coffee/">coffee</a> at home`,
+		},
+		{
+			name: "a parent the budget cannot hold", body: `<h1>Espresso</h1><p>It sits in our <a href="/drinks/">drinks</a> range.</p>`,
+			deps: func(d steps.Deps) steps.Deps { return parentOnTheSite(withGrandparent(d, 0)) }, cap: 1,
+			codes: []string{content.CodeTargetMissing},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps, server, _, wpID := relinkPageDeps(t, tc.body)
+			if tc.deps != nil {
+				deps = tc.deps(deps)
+				listed, _ := deps.Pages.(pageList)
+				for i := range listed.items {
+					if listed.items[i].ID == "page-child" {
+						listed.items[i].WPID = &wpID
+					}
+				}
+				deps.Pages = listed
+			}
+			sc := relinkPageContext(t, deps, wpID)
+			if tc.cap > 0 {
+				sc.Spec.LinkRules.MaxLinks = tc.cap
+			}
+
+			relinked, _, result := runRelinkPage(t, deps, sc)
+			if relinked.Linked != tc.linked {
+				t.Fatalf("linked = %d, want %d: %+v", relinked.Linked, tc.linked, relinked.Placed)
+			}
+			if got := findingCodes(relinked.Findings); !slices.Equal(got, tc.codes) {
+				t.Fatalf("findings = %+v, want %v", relinked.Findings, tc.codes)
+			}
+			wrote := false
+			for _, placed := range relinked.Placed {
+				wrote = wrote || placed.Sentence != ""
+			}
+			if wrote != tc.sentence {
+				t.Fatalf("placed = %+v, want a written sentence %v", relinked.Placed, tc.sentence)
+			}
+			stored, _ := server.Lookup(wpID)
+			if tc.content == "" && stored.Content != tc.body {
+				t.Fatalf("the page was rewritten: %q", stored.Content)
+			}
+			if tc.content != "" && !strings.Contains(stored.Content, tc.content) {
+				t.Fatalf("the page holds %q, want %q in it", stored.Content, tc.content)
+			}
+			if result.Next == run.TransitionPause {
+				t.Fatalf("result = %+v, want the item to go on", result)
+			}
+		})
 	}
 }
 
