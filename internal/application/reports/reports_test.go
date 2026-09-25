@@ -98,6 +98,10 @@ func (f *fixture) page(t *testing.T, repo *sqlite.PageRepo, path string, status 
 		ID: id.New(), SiteID: f.siteID, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPPage,
 		Title: path, H1: path, Status: status, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 	}
+	if status != pagemap.StatusPlanned {
+		wpID := int64(len(f.pages) + 10)
+		record.WPID = &wpID
+	}
 	if err := repo.Insert(t.Context(), record); err != nil {
 		t.Fatalf("insert the page %s: %v", path, err)
 	}
@@ -234,8 +238,8 @@ func TestSiteOverviewCountsTheGraphAndThePageMap(t *testing.T) {
 	if overview.Pages.ByStatus["published"] != 2 || overview.Pages.ByStatus["planned"] != 1 {
 		t.Errorf("pages by status = %+v", overview.Pages.ByStatus)
 	}
-	if overview.Pages.Orphans != 2 {
-		t.Errorf("orphans = %d, want the two pages nothing links to", overview.Pages.Orphans)
+	if overview.Pages.Orphans != 1 {
+		t.Errorf("orphans = %d, want the one page on the site nothing links to, not the planned one", overview.Pages.Orphans)
 	}
 	if overview.Edges.Approved != 3 || overview.Edges.Realized != 2 {
 		t.Errorf("edges = %+v", overview.Edges)

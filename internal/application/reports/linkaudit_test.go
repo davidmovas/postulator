@@ -51,11 +51,12 @@ func auditFixture(t *testing.T) *fixture {
 	return f
 }
 
-func (f *fixture) row(path, status, entity, skip string, counts [10]int, orphan bool) reports.PageAudit {
+func (f *fixture) row(path, status, entity, skip string, counts [10]int, orphan, onSite bool) reports.PageAudit {
 	row := reports.PageAudit{
-		PageID: f.pages[path].ID, Path: path, Status: status, SkipReason: skip,
+		PageID: f.pages[path].ID, Path: path, Status: status, SkipReason: skip, OnSite: onSite,
 		Targets: counts[0], Required: counts[1], Satisfied: counts[2], Missing: counts[3], MissingRequired: counts[4],
-		Blocked: counts[5], OffGraph: counts[6], Inbound: counts[7], Orphan: orphan,
+		Blocked: counts[5], OffGraph: counts[6], Inbound: counts[7], Pending: counts[8], Unpublished: counts[9],
+		Orphan: orphan,
 	}
 	if entity != "" {
 		row.EntityID = f.entities[entity].ID
@@ -74,18 +75,18 @@ func TestLinkAuditAuditsEveryMappedPage(t *testing.T) {
 	}
 
 	want := []reports.PageAudit{
-		f.row("/coffee/", "published", "Coffee", "", [10]int{3, 0, 0, 2, 0, 1, 0, 1}, false),
-		f.row("/coffee/espresso/", "published", "Espresso", "", [10]int{2, 1, 1, 1, 0, 0, 3, 1}, false),
-		f.row("/coffee/filter/", "planned", "Filter", "", [10]int{2, 1, 1, 1, 1, 0, 0, 0}, true),
-		f.row("/tea/", "exists", "", "unmapped", [10]int{0, 0, 0, 0, 0, 0, 0, 1}, false),
+		f.row("/coffee/", "published", "Coffee", "", [10]int{3, 0, 0, 1, 0, 1, 0, 1, 1, 0}, false, true),
+		f.row("/coffee/espresso/", "published", "Espresso", "", [10]int{2, 1, 1, 0, 0, 0, 3, 1, 1, 0}, false, true),
+		f.row("/coffee/filter/", "planned", "Filter", "", [10]int{2, 1, 1, 0, 0, 0, 0, 0, 1, 0}, false, false),
+		f.row("/tea/", "exists", "", "unmapped", [10]int{0, 0, 0, 0, 0, 0, 0, 1, 0, 0}, false, true),
 	}
 	if !reflect.DeepEqual(got.Pages, want) {
 		t.Fatalf("pages =\n%+v\nwant\n%+v", got.Pages, want)
 	}
 
 	totals := reports.LinkTotals{
-		Pages: 4, Audited: 3, Targets: 7, Required: 2, Satisfied: 2, Missing: 4, MissingRequired: 1,
-		Blocked: 1, OffGraph: 3, Orphans: 1,
+		Pages: 4, Audited: 3, Targets: 7, Required: 2, Satisfied: 2, Missing: 1, MissingRequired: 0,
+		Blocked: 1, OffGraph: 3, Orphans: 0, Pending: 3, Unpublished: 0,
 	}
 	if got.Totals != totals {
 		t.Fatalf("totals = %+v, want %+v", got.Totals, totals)
@@ -140,11 +141,12 @@ func TestLinkAuditPageAgreesWithTheSiteAudit(t *testing.T) {
 			Relation: "up", Required: true, TargetEntityID: coffee.ID, TargetEntityName: "Coffee",
 			TargetPageID: f.pages["/coffee/"].ID, TargetPath: "/coffee/", Satisfied: true, Anchor: "Coffee",
 			AnchorAllowed: true, AnchorsAllowed: []string{"Coffee"}, Weight: 1, Depth: 1,
+			State: string(reports.LinkPlaced), TargetOnSite: true,
 		},
 		{
 			Relation: "sibling", TargetEntityID: filter.ID, TargetEntityName: "Filter",
 			TargetPageID: f.pages["/coffee/filter/"].ID, TargetPath: "/coffee/filter/",
-			AnchorsAllowed: []string{"Filter"}, Weight: 1, Depth: 1,
+			AnchorsAllowed: []string{"Filter"}, Weight: 1, Depth: 1, State: string(reports.LinkAwaitingTarget),
 		},
 	}
 	if !reflect.DeepEqual(espresso.Required, wantRequired) {
@@ -166,6 +168,7 @@ func TestLinkAuditPageAgreesWithTheSiteAudit(t *testing.T) {
 	beans := reports.RequiredLink{
 		Relation: "down", TargetEntityID: f.entities["Beans"].ID, TargetEntityName: "Beans",
 		AnchorsAllowed: []string{}, Weight: 0.9, Depth: 1, BlockedReason: "no_canonical_page",
+		State: string(reports.LinkBlocked),
 	}
 	if !reflect.DeepEqual(blocked[2], beans) {
 		t.Fatalf("the blocked child = %+v, want %+v", blocked[2], beans)
@@ -173,6 +176,65 @@ func TestLinkAuditPageAgreesWithTheSiteAudit(t *testing.T) {
 
 	if tea := details["/tea/"]; len(tea.Required) != 0 || len(tea.Extra) != 0 || tea.TemplateID != "" {
 		t.Fatalf("an unmapped page = %+v", tea)
+	}
+}
+
+func TestTheAuditSaysWhyALinkIsAbsent(t *testing.T) {
+	t.Parallel()
+
+	f := auditFixture(t)
+	coffee, filter := f.pages["/coffee/"], f.pages["/coffee/filter/"]
+	f.replaceLinks(t, coffee, f.storedLink(coffee, &filter.ID, "/coffee/filter/", "Filter", 0))
+
+	cases := []struct {
+		page   string
+		states map[string]reports.LinkState
+		onSite bool
+	}{
+		{
+			page:   "/coffee/",
+			states: map[string]reports.LinkState{"/coffee/espresso/": reports.LinkMissing, "/coffee/filter/": reports.LinkTargetUnpublished, "": reports.LinkBlocked},
+			onSite: true,
+		},
+		{
+			page:   "/coffee/espresso/",
+			states: map[string]reports.LinkState{"/coffee/": reports.LinkPlaced, "/coffee/filter/": reports.LinkAwaitingTarget},
+			onSite: true,
+		},
+		{
+			page:   "/coffee/filter/",
+			states: map[string]reports.LinkState{"/coffee/": reports.LinkAwaitingPage, "/coffee/espresso/": reports.LinkPlaced},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.page, func(t *testing.T) {
+			t.Parallel()
+
+			detail, err := f.service.LinkAuditPage(t.Context(), reports.LinkAuditPageRequest{PageID: f.pages[tc.page].ID})
+			if err != nil {
+				t.Fatalf("LinkAuditPage: %v", err)
+			}
+			if detail.Page.OnSite != tc.onSite {
+				t.Fatalf("onSite = %v, want %v", detail.Page.OnSite, tc.onSite)
+			}
+			if len(detail.Required) != len(tc.states) {
+				t.Fatalf("required = %+v, want %d rows", detail.Required, len(tc.states))
+			}
+			for _, row := range detail.Required {
+				if want := tc.states[row.TargetPath]; row.State != string(want) {
+					t.Errorf("%s -> %q = %q, want %q", tc.page, row.TargetPath, row.State, want)
+				}
+			}
+		})
+	}
+
+	coffeeRow, err := f.service.LinkAuditPage(t.Context(), reports.LinkAuditPageRequest{PageID: coffee.ID})
+	if err != nil {
+		t.Fatalf("LinkAuditPage: %v", err)
+	}
+	if coffeeRow.Page.Unpublished != 1 || coffeeRow.Page.Missing != 1 || coffeeRow.Page.Satisfied != 1 {
+		t.Fatalf("the hub = %+v, want one placed link to a page not on the site and one missing", coffeeRow.Page)
 	}
 }
 

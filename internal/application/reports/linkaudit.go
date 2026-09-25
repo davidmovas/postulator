@@ -158,10 +158,11 @@ func (s *Service) rulesFor(ctx context.Context, page pagemap.Page,
 
 func auditPage(state *siteLinks, page pagemap.Page, templateID string, rules template.LinkRules, skip SkipReason) pageDetail {
 	inbound := state.incoming[page.ID]
+	onSite := page.WPID != nil
 	detail := pageDetail{
 		summary: PageAudit{
-			PageID: page.ID, Path: page.Path, Status: string(page.Status), SkipReason: string(skip),
-			Inbound: inbound, Orphan: inbound == 0 && page.Status != pagemap.StatusArchived,
+			PageID: page.ID, Path: page.Path, Status: string(page.Status), SkipReason: string(skip), OnSite: onSite,
+			Inbound: inbound, Orphan: onSite && inbound == 0 && page.Status != pagemap.StatusArchived,
 		},
 		required: make([]RequiredLink, 0),
 		extra:    make([]ExtraLink, 0),
@@ -193,11 +194,16 @@ func auditPage(state *siteLinks, page pagemap.Page, templateID string, rules tem
 			TargetPageID: target.PageID, TargetPath: target.URL,
 			AnchorsAllowed: slices.Clone(target.Anchors), Weight: target.Weight, Depth: target.Depth,
 		}
-		if link, ok := firstLinkTo(lc, links, target); ok {
+		if targetPage, known := state.index.ByID(target.PageID); known {
+			row.TargetOnSite = targetPage.WPID != nil
+		}
+		link, placed := firstLinkTo(lc, links, target)
+		if placed {
 			row.Satisfied = true
 			row.Anchor = link.AnchorText
 			row.AnchorAllowed = content.AnchorAllowed(target, link.AnchorText)
 		}
+		row.State = string(stateOf(placed, onSite, row.TargetOnSite))
 		detail.required = append(detail.required, row)
 	}
 	for _, blocked := range plan.Blocked {
@@ -205,7 +211,7 @@ func auditPage(state *siteLinks, page pagemap.Page, templateID string, rules tem
 			Relation: string(blocked.Relation), Required: blocked.Required,
 			TargetEntityID: blocked.EntityID, TargetEntityName: state.entities[blocked.EntityID].Name,
 			AnchorsAllowed: []string{}, Weight: blocked.Weight, Depth: blocked.Depth,
-			BlockedReason: string(blocked.Reason),
+			BlockedReason: string(blocked.Reason), State: string(LinkBlocked),
 		})
 	}
 	for i := range links {
@@ -228,12 +234,17 @@ func auditPage(state *siteLinks, page pagemap.Page, templateID string, rules tem
 		if row.Required {
 			summary.Required++
 		}
-		switch {
-		case row.BlockedReason != "":
+		switch LinkState(row.State) {
+		case LinkBlocked:
 			summary.Blocked++
-		case row.Satisfied:
+		case LinkPlaced:
 			summary.Satisfied++
-		default:
+		case LinkTargetUnpublished:
+			summary.Satisfied++
+			summary.Unpublished++
+		case LinkAwaitingPage, LinkAwaitingTarget:
+			summary.Pending++
+		case LinkMissing:
 			summary.Missing++
 			if row.Required {
 				summary.MissingRequired++
@@ -241,6 +252,21 @@ func auditPage(state *siteLinks, page pagemap.Page, templateID string, rules tem
 		}
 	}
 	return detail
+}
+
+func stateOf(placed, pageOnSite, targetOnSite bool) LinkState {
+	switch {
+	case placed && targetOnSite:
+		return LinkPlaced
+	case placed:
+		return LinkTargetUnpublished
+	case !pageOnSite:
+		return LinkAwaitingPage
+	case !targetOnSite:
+		return LinkAwaitingTarget
+	default:
+		return LinkMissing
+	}
 }
 
 func firstLinkTo(lc content.LinkContext, links []pagemap.PageLink, target content.LinkTarget) (pagemap.PageLink, bool) {
@@ -271,6 +297,8 @@ func tally(totals *LinkTotals, row PageAudit) {
 	totals.MissingRequired += row.MissingRequired
 	totals.Blocked += row.Blocked
 	totals.OffGraph += row.OffGraph
+	totals.Pending += row.Pending
+	totals.Unpublished += row.Unpublished
 	if row.Orphan {
 		totals.Orphans++
 	}

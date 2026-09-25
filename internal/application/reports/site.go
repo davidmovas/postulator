@@ -96,7 +96,7 @@ func pageTotals(pages []pagemap.Page, incoming map[string]int) PageTotals {
 		if page.EntityID == nil {
 			totals.Unmapped++
 		}
-		if page.Status == pagemap.StatusArchived {
+		if page.Status == pagemap.StatusArchived || page.WPID == nil {
 			continue
 		}
 		if incoming[page.ID] == 0 {
