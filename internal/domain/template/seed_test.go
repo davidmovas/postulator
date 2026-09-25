@@ -49,6 +49,119 @@ func TestSeedRecipesUseTheStepCatalogue(t *testing.T) {
 	}
 }
 
+func TestTheBuiltInsAskForNoImage(t *testing.T) {
+	t.Parallel()
+
+	seeds := template.Seed()
+	for i := range seeds {
+		if wanted := seeds[i].Spec.Images.Wanted(); wanted != 0 {
+			t.Errorf("%s asks for %d images, want a built-in without images", seeds[i].Name, wanted)
+		}
+	}
+}
+
+func TestEverySupersededSpecPrecedesASeed(t *testing.T) {
+	t.Parallel()
+
+	seeds := template.Seed()
+	superseded := template.Superseded()
+	if len(superseded) == 0 {
+		t.Fatal("no superseded built-in is shipped")
+	}
+	for i := range superseded {
+		old := superseded[i]
+		index := slices.IndexFunc(seeds, func(seed template.Template) bool { return seed.Name == old.Name })
+		if index < 0 {
+			t.Errorf("the superseded %s names no current built-in", old.Name)
+			continue
+		}
+		current := seeds[index]
+		if old.PageKind != current.PageKind || old.Scope != template.ScopeGlobal {
+			t.Errorf("the superseded %s = %+v, want the kind and scope of the current one", old.Name, old)
+		}
+		if template.Supersedes(current, current) {
+			t.Errorf("the current %s supersedes itself, so every start would refresh it again", current.Name)
+		}
+		if !template.Supersedes(current, old) {
+			t.Errorf("the shipped %s does not refresh its earlier copy", current.Name)
+		}
+		if err := template.Validate(old.Spec); err != nil {
+			t.Errorf("the superseded %s: %v", old.Name, err)
+		}
+	}
+}
+
+func TestSupersedes(t *testing.T) {
+	t.Parallel()
+
+	seeds := template.Seed()
+	hub := seeds[slices.IndexFunc(seeds, func(seed template.Template) bool { return seed.Name == "Hub" })]
+	superseded := template.Superseded()
+	old := superseded[slices.IndexFunc(superseded, func(seed template.Template) bool { return seed.Name == "Hub" })]
+	site := "site-1"
+
+	cases := []struct {
+		name   string
+		stored func() template.Template
+		want   bool
+	}{
+		{name: "an untouched earlier copy", stored: func() template.Template { return old }, want: true},
+		{name: "the current copy", stored: func() template.Template { return hub }},
+		{
+			name: "an edited earlier copy",
+			stored: func() template.Template {
+				edited := template.Superseded()[slices.IndexFunc(superseded, func(seed template.Template) bool { return seed.Name == "Hub" })]
+				edited.Spec.Tone = "Warm"
+				return edited
+			},
+		},
+		{
+			name: "another page kind",
+			stored: func() template.Template {
+				other := old
+				other.PageKind = "guide"
+				return other
+			},
+		},
+		{
+			name: "a site template of the same name",
+			stored: func() template.Template {
+				scoped := old
+				scoped.Scope = template.ScopeSite
+				scoped.SiteID = &site
+				return scoped
+			},
+		},
+		{
+			name: "the name in another case",
+			stored: func() template.Template {
+				lower := old
+				lower.Name = "hub"
+				return lower
+			},
+			want: true,
+		},
+		{
+			name: "another name",
+			stored: func() template.Template {
+				renamed := old
+				renamed.Name = "Hub copy"
+				return renamed
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := template.Supersedes(hub, tc.stored()); got != tc.want {
+				t.Fatalf("Supersedes = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestSeedReturnsFreshCopies(t *testing.T) {
 	t.Parallel()
 

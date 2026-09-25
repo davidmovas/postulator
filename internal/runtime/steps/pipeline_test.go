@@ -74,7 +74,9 @@ func guideSpec(t *testing.T) template.Template {
 	seeds := template.Seed()
 	for i := range seeds {
 		if seeds[i].PageKind == "guide" {
-			return seeds[i]
+			guide := seeds[i]
+			guide.Spec.Images = template.Images{Featured: true, Inline: 2, Source: template.ImagesAI}
+			return guide
 		}
 	}
 	t.Fatal("the seed templates carry no guide")

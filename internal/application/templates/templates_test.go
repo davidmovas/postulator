@@ -99,6 +99,90 @@ func TestEnsureSeededIsIdempotent(t *testing.T) {
 	}
 }
 
+func builtIn(t *testing.T, from []template.Template, name string) template.Template {
+	t.Helper()
+	for i := range from {
+		if from[i].Name == name {
+			return from[i]
+		}
+	}
+	t.Fatalf("no built-in named %s", name)
+	return template.Template{}
+}
+
+func TestEnsureSeededRefreshesOnlyAnUntouchedBuiltIn(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	repo := sqlite.NewTemplateRepo(h.store)
+	earlier := template.Superseded()
+	stored := func(from template.Template, version int, edit func(*template.Template)) template.Template {
+		t.Helper()
+		record := from
+		record.ID = id.New()
+		record.Version = version
+		record.CreatedAt = h.clock.Now()
+		record.UpdatedAt = h.clock.Now()
+		if edit != nil {
+			edit(&record)
+		}
+		if err := repo.Insert(t.Context(), record); err != nil {
+			t.Fatalf("insert %s: %v", record.Name, err)
+		}
+		return record
+	}
+
+	untouched := stored(builtIn(t, earlier, "Hub"), 1, nil)
+	edited := stored(builtIn(t, earlier, "Guide"), 2, func(record *template.Template) { record.Spec.Tone = "Warm" })
+	current := stored(builtIn(t, template.Seed(), "Category"), 1, nil)
+	overridden := stored(builtIn(t, earlier, "Comparison"), 1, nil)
+	if _, err := repo.UpsertOverride(t.Context(), template.Override{
+		ID: id.New(), TemplateID: overridden.ID, Scope: template.OverrideSite, TargetID: h.siteID,
+		Patch: json.RawMessage(`{"images":{"inline":3}}`), CreatedAt: h.clock.Now(), UpdatedAt: h.clock.Now(),
+	}); err != nil {
+		t.Fatalf("UpsertOverride: %v", err)
+	}
+	h.clock.Advance(time.Hour)
+
+	for range 2 {
+		if err := h.service.EnsureSeeded(t.Context()); err != nil {
+			t.Fatalf("EnsureSeeded: %v", err)
+		}
+	}
+
+	read := func(record template.Template) template.Template {
+		t.Helper()
+		got, err := repo.Get(t.Context(), record.ID)
+		if err != nil {
+			t.Fatalf("Get %s: %v", record.Name, err)
+		}
+		return got
+	}
+
+	refreshed := read(untouched)
+	if refreshed.Version != 2 || refreshed.Spec.Images.Wanted() != 0 || !refreshed.UpdatedAt.Equal(h.clock.Now()) ||
+		!refreshed.CreatedAt.Equal(untouched.CreatedAt) {
+		t.Errorf("the untouched Hub = %+v, want the current built-in as version 2", refreshed)
+	}
+	if kept := read(edited); kept.Version != 2 || kept.Spec.Tone != "Warm" || kept.Spec.Images.Wanted() == 0 {
+		t.Errorf("the edited Guide = %+v, want it left as the person saved it", kept)
+	}
+	if kept := read(current); kept.Version != 1 {
+		t.Errorf("the current Category = %+v, want it left at version 1", kept)
+	}
+	if kept := read(overridden); kept.Version != 1 || kept.Spec.Images.Wanted() == 0 {
+		t.Errorf("the Comparison = %+v, want it left alone while an override needs its image source", kept)
+	}
+
+	listed, err := h.service.ListTemplates(t.Context(), templates.ListTemplatesRequest{Scope: "global"})
+	if err != nil || len(listed.Items) != 5 {
+		t.Fatalf("global templates = %d, %v, want the missing Product added beside the four", len(listed.Items), err)
+	}
+	if len(h.recorder.Events()) != 0 {
+		t.Error("refreshing at startup must not publish")
+	}
+}
+
 func TestTemplateLifecycle(t *testing.T) {
 	t.Parallel()
 
@@ -234,7 +318,7 @@ func TestOverridesAndResolveForPage(t *testing.T) {
 	if err = sqlite.NewPageRepo(h.store).Update(t.Context(), page); err != nil {
 		t.Fatalf("assign the page template: %v", err)
 	}
-	if _, err = h.service.SetOverride(t.Context(), templates.SetOverrideRequest{TemplateID: hub.ID, Scope: "page", TargetID: page.ID, Patch: json.RawMessage(`{"length":{"min":100,"max":200},"images":{"inline":3}}`)}); err != nil {
+	if _, err = h.service.SetOverride(t.Context(), templates.SetOverrideRequest{TemplateID: hub.ID, Scope: "page", TargetID: page.ID, Patch: json.RawMessage(`{"length":{"min":100,"max":200},"images":{"inline":3,"source":"ai"}}`)}); err != nil {
 		t.Fatalf("SetOverride page: %v", err)
 	}
 	h.wantEvents(t, 1)
@@ -243,7 +327,8 @@ func TestOverridesAndResolveForPage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveForPage: %v", err)
 	}
-	if resolved.Spec.Tone != "warm" || resolved.Spec.LinkRules.MaxLinks != 5 || resolved.Spec.Length.Min != 100 || resolved.Spec.Images.Inline != 3 || !resolved.Spec.Images.Featured {
+	if resolved.Spec.Tone != "warm" || resolved.Spec.LinkRules.MaxLinks != 5 || resolved.Spec.Length.Min != 100 ||
+		resolved.Spec.Images.Inline != 3 || resolved.Spec.Images.Source != template.ImagesAI || resolved.Spec.Images.Featured {
 		t.Errorf("ResolveForPage = %+v", resolved.Spec)
 	}
 

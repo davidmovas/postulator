@@ -14,7 +14,7 @@
     "keywordRules": {"primaryInTitle": true, "primaryInH1": true, "primaryInFirstParagraph": true, "maxDensity": 0.02},
     "linkRules": {"upDepth": 2, "downLinks": false, "siblingMinWeight": 0.7, "maxLinks": 10, "maxPerTarget": 1, "parentLinkWithinParagraphs": 2, "childrenSection": false},
     "metaRules": {"titlePattern": "{primaryKeyword}: Which Is Better? | {siteName}", "descriptionMax": 155},
-    "images": {"featured": false, "inline": 0, "source": ""},
+    "images": {"featured": true, "inline": 1, "source": "ai"},
     "modelProfiles": {},
     "recipe": [
       {"name": "resolve_context", "enabled": true},

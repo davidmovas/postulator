@@ -14,7 +14,7 @@
     "keywordRules": {"primaryInTitle": true, "primaryInH1": true, "primaryInFirstParagraph": true, "maxDensity": 0.025},
     "linkRules": {"upDepth": 1, "downLinks": true, "siblingMinWeight": 0.5, "maxLinks": 20, "maxPerTarget": 1, "parentLinkWithinParagraphs": 2, "childrenSection": true},
     "metaRules": {"titlePattern": "{primaryKeyword}: The Complete Guide | {siteName}", "descriptionMax": 155},
-    "images": {"featured": false, "inline": 0, "source": ""},
+    "images": {"featured": true, "inline": 0, "source": "ai"},
     "modelProfiles": {},
     "recipe": [
       {"name": "resolve_context", "enabled": true},
