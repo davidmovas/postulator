@@ -377,6 +377,54 @@ func TestOverridesAndResolveForPage(t *testing.T) {
 	}
 }
 
+func TestResolveForPageTakesTheTemplateItIsHanded(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	hub := h.hub(t)
+	guideSeed := builtIn(t, template.Seed(), "Guide")
+	guide, err := h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{
+		Name: "Guide", PageKind: guideSeed.PageKind, Spec: guideSeed.Spec,
+	})
+	if err != nil {
+		t.Fatalf("CreateTemplate: %v", err)
+	}
+	other := sqlitetest.Site(t, h.store, "elsewhere")
+	foreign, err := h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{
+		Scope: "site", SiteID: &other.ID, Name: "Local", PageKind: guideSeed.PageKind, Spec: guideSeed.Spec,
+	})
+	if err != nil {
+		t.Fatalf("CreateTemplate for another site: %v", err)
+	}
+
+	page := sqlitetest.Page(t, h.store, h.siteID, "/shop/")
+	page.TemplateID = &hub.ID
+	if err = sqlite.NewPageRepo(h.store).Update(t.Context(), page); err != nil {
+		t.Fatalf("assign the page template: %v", err)
+	}
+
+	own, err := h.service.ResolveForPage(t.Context(), templates.ResolveForPageRequest{PageID: page.ID})
+	if err != nil || own.TemplateID != hub.ID {
+		t.Fatalf("ResolveForPage = %s, %v, want the page's own template", own.TemplateID, err)
+	}
+	handed, err := h.service.ResolveForPage(t.Context(), templates.ResolveForPageRequest{
+		PageID: page.ID, TemplateID: guide.Template.ID,
+	})
+	if err != nil || handed.TemplateID != guide.Template.ID || handed.Spec.Tone != guideSeed.Spec.Tone {
+		t.Fatalf("ResolveForPage with a template = %s, %v, want the template it was handed", handed.TemplateID, err)
+	}
+	if _, err = h.service.ResolveForPage(t.Context(), templates.ResolveForPageRequest{
+		PageID: page.ID, TemplateID: foreign.Template.ID,
+	}); !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("a template of another site code = %q, want INVALID", errors.CodeOf(err))
+	}
+	if _, err = h.service.ResolveForPage(t.Context(), templates.ResolveForPageRequest{
+		PageID: page.ID, TemplateID: id.New(),
+	}); !errors.IsCode(err, errors.NotFound) {
+		t.Fatalf("an unknown template code = %q, want NOT_FOUND", errors.CodeOf(err))
+	}
+}
+
 func TestResolveForPageFillsThePlaceholdersFromThePageItsEntityAndItsSite(t *testing.T) {
 	t.Parallel()
 

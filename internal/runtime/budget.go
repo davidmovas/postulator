@@ -46,14 +46,14 @@ func (p *pricing) add(finding run.EstimateFinding) {
 	p.findings = append(p.findings, finding)
 }
 
-func (e *Engine) EstimateRun(ctx context.Context, record run.Run) (run.Estimate, error) {
+func (e *Engine) EstimateRun(ctx context.Context, record run.Run, assigned map[string]string) (run.Estimate, error) {
 	defs, err := e.enabledDefs(record.Recipe)
 	if err != nil {
 		return run.Estimate{}, err
 	}
 
 	priced := &pricing{findings: make([]run.EstimateFinding, 0), seen: make(map[string]struct{})}
-	targets, err := e.planTargets(ctx, record, priced)
+	targets, err := e.planTargets(ctx, record, assigned, priced)
 	if err != nil {
 		return run.Estimate{}, err
 	}
@@ -96,7 +96,8 @@ func (e *Engine) enabledDefs(recipe []template.StepSpec) ([]run.StepDef, error) 
 	return defs, nil
 }
 
-func (e *Engine) planTargets(ctx context.Context, record run.Run, priced *pricing) (map[string]run.Target, error) {
+func (e *Engine) planTargets(ctx context.Context, record run.Run, assigned map[string]string,
+	priced *pricing) (map[string]run.Target, error) {
 	targets := make(map[string]run.Target, len(record.Targets))
 	if !record.Kind.PageScoped() {
 		return targets, nil
@@ -107,7 +108,9 @@ func (e *Engine) planTargets(ctx context.Context, record run.Run, priced *pricin
 	pages := e.targetPages(ctx, record.Targets)
 	for _, targetID := range record.Targets {
 		target := run.Target{Page: pages[targetID]}
-		resolved, err := e.deps.Specs.ResolveForPage(ctx, templates.ResolveForPageRequest{PageID: targetID})
+		resolved, err := e.deps.Specs.ResolveForPage(ctx, templates.ResolveForPageRequest{
+			PageID: targetID, TemplateID: assigned[targetID],
+		})
 		if err != nil {
 			if !errors.IsCode(err, errors.NotFound) && !errors.IsCode(err, errors.Invalid) {
 				return nil, err

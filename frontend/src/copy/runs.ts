@@ -250,7 +250,8 @@ export const runs = {
         kind: "Kind",
         template: "Template",
         templateAuto: "Resolved per page",
-        templateHint: "Left automatic, each page uses the template its own overrides resolve to.",
+        templateHint:
+            "Picking a template moves the chosen pages to it, for this run and every later one. Left automatic, each page keeps the template it has, or the site default.",
         cap: "Dollar cap",
         capHint: "The run pauses itself once spend passes this. Zero means no cap at all.",
         capZero: "With no cap this run will not stop itself on spend.",

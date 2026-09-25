@@ -195,6 +195,51 @@ func (s *Service) Update(ctx context.Context, req UpdateRequest) (UpdateResponse
 	return UpdateResponse{Page: view(updated)}, nil
 }
 
+func (s *Service) AssignTemplate(ctx context.Context, req AssignTemplateRequest) (AssignTemplateResponse, error) {
+	if err := requireSite(req.SiteID); err != nil {
+		return AssignTemplateResponse{}, err
+	}
+	templateID := strings.TrimSpace(req.TemplateID)
+	if templateID == "" {
+		return AssignTemplateResponse{}, errors.New(errors.Invalid, "a template to assign is required").
+			WithDetail("field", "templateId")
+	}
+
+	changed := 0
+	err := s.uow.Do(ctx, func(c context.Context) error {
+		for _, pageID := range req.PageIDs {
+			current, getErr := s.pages.Get(c, pageID)
+			if getErr != nil {
+				return getErr
+			}
+			if current.SiteID != req.SiteID {
+				return errors.New(errors.Invalid, "the page "+current.Path+" belongs to another site").
+					WithDetail("field", "pageIds").WithDetail("pageId", current.ID)
+			}
+			if current.TemplateID != nil && *current.TemplateID == templateID {
+				continue
+			}
+			next := current
+			next.TemplateID = &templateID
+			next.UpdatedAt = s.now()
+			if updateErr := s.pages.Update(c, next); updateErr != nil {
+				return updateErr
+			}
+			changed++
+		}
+		return nil
+	})
+	if err != nil {
+		return AssignTemplateResponse{}, err
+	}
+	if changed > 0 {
+		if publishErr := s.changed(req.SiteID); publishErr != nil {
+			return AssignTemplateResponse{}, publishErr
+		}
+	}
+	return AssignTemplateResponse{Changed: changed}, nil
+}
+
 func (s *Service) Delete(ctx context.Context, req DeleteRequest) (DeleteResponse, error) {
 	current, err := s.pages.Get(ctx, req.ID)
 	if err != nil {

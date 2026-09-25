@@ -239,6 +239,54 @@ func TestUpdate(t *testing.T) {
 	}
 }
 
+func TestAssignTemplateMovesTheNamedPagesOnly(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	picked := sqlitetest.Template(t, h.store, "Guide")
+	first := h.page(t, "/shop/", nil)
+	second := h.page(t, "/shop/mugs/", nil)
+	untouched := h.page(t, "/about/", nil)
+	elsewhere := sqlitetest.Page(t, h.store, sqlitetest.Site(t, h.store, "elsewhere").ID, "/away/")
+	h.recorder.Reset()
+
+	if _, err := h.service.AssignTemplate(t.Context(), pages.AssignTemplateRequest{
+		SiteID: h.siteID, PageIDs: []string{first.ID, elsewhere.ID}, TemplateID: picked.ID,
+	}); !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("a page of another site code = %q, want INVALID", errors.CodeOf(err))
+	}
+	if kept, err := h.service.Get(t.Context(), pages.GetRequest{ID: first.ID}); err != nil || kept.Page.TemplateID != nil {
+		t.Fatalf("a refused assignment moved %+v, %v", kept.Page, err)
+	}
+	h.wantEvents(t)
+
+	assigned, err := h.service.AssignTemplate(t.Context(), pages.AssignTemplateRequest{
+		SiteID: h.siteID, PageIDs: []string{first.ID, second.ID}, TemplateID: picked.ID,
+	})
+	if err != nil || assigned.Changed != 2 {
+		t.Fatalf("AssignTemplate = %+v, %v, want both pages moved", assigned, err)
+	}
+	h.wantEvents(t, events.PagesChanged)
+
+	for _, pageID := range []string{first.ID, second.ID} {
+		got, getErr := h.service.Get(t.Context(), pages.GetRequest{ID: pageID})
+		if getErr != nil || got.Page.TemplateID == nil || *got.Page.TemplateID != picked.ID {
+			t.Errorf("page %s = %+v, %v, want it on the picked template", pageID, got.Page, getErr)
+		}
+	}
+	if got, getErr := h.service.Get(t.Context(), pages.GetRequest{ID: untouched.ID}); getErr != nil || got.Page.TemplateID != nil {
+		t.Errorf("a page nobody named = %+v, %v, want it left alone", got.Page, getErr)
+	}
+
+	again, err := h.service.AssignTemplate(t.Context(), pages.AssignTemplateRequest{
+		SiteID: h.siteID, PageIDs: []string{first.ID}, TemplateID: picked.ID,
+	})
+	if err != nil || again.Changed != 0 {
+		t.Fatalf("AssignTemplate again = %+v, %v, want nothing to change", again, err)
+	}
+	h.wantEvents(t)
+}
+
 func TestMapUnmapAndCanonical(t *testing.T) {
 	t.Parallel()
 

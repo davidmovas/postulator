@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
@@ -15,8 +16,10 @@ import (
 )
 
 type planned struct {
-	record run.Run
-	added  []AddedPage
+	record   run.Run
+	added    []AddedPage
+	assigned map[string]string
+	picked   []string
 }
 
 func (s *Service) Start(ctx context.Context, req StartRequest) (StartResponse, error) {
@@ -25,12 +28,23 @@ func (s *Service) Start(ctx context.Context, req StartRequest) (StartResponse, e
 		return StartResponse{}, err
 	}
 
-	estimate, err := s.engine.EstimateRun(ctx, plan.record)
+	estimate, err := s.engine.EstimateRun(ctx, plan.record, plan.assigned)
 	if err != nil {
 		return StartResponse{}, err
 	}
 	if blocking := estimate.Blocking(); len(blocking) > 0 {
 		return StartResponse{}, refusedByPreflight(blocking)
+	}
+
+	if len(plan.picked) > 0 {
+		if err = run.ValidateRecipe(s.steps, plan.record.Recipe); err != nil {
+			return StartResponse{}, err
+		}
+		if _, err = s.assigner.AssignTemplate(ctx, pages.AssignTemplateRequest{
+			SiteID: plan.record.SiteID, PageIDs: plan.picked, TemplateID: plan.record.TemplateID,
+		}); err != nil {
+			return StartResponse{}, err
+		}
 	}
 
 	plan.record.ID = id.New()
@@ -47,7 +61,7 @@ func (s *Service) Estimate(ctx context.Context, req StartRequest) (EstimateRespo
 		return EstimateResponse{}, err
 	}
 
-	estimate, err := s.engine.EstimateRun(ctx, plan.record)
+	estimate, err := s.engine.EstimateRun(ctx, plan.record, plan.assigned)
 	if err != nil {
 		return EstimateResponse{}, err
 	}
@@ -82,6 +96,10 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
 		return planned{}, invalid("run kind is not recognized", "kind")
 	}
 
+	if req.Budget.MaxUSD < 0 || req.Budget.MaxTokens < 0 {
+		return planned{}, invalid("a budget must not be negative", "budget")
+	}
+
 	mode := run.PublishMode(req.PublishMode)
 	if req.PublishMode == "" {
 		mode = run.PublishDraft
@@ -94,18 +112,22 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
 		spec       template.TemplateSpec
 		templateID = strings.TrimSpace(req.TemplateID)
 		version    int
+		picked     string
 	)
+	if _, owns := kind.Recipe(); kind.PageScoped() && !owns {
+		picked = templateID
+	}
 	if kind.PageScoped() {
 		if mappedErr := s.mapped(ctx, targets); mappedErr != nil {
 			return planned{}, mappedErr
 		}
-		first, resolveErr := s.resolve(ctx, siteID, targets[0])
+		first, resolveErr := s.resolve(ctx, siteID, targets[0], picked)
 		if resolveErr != nil {
 			return planned{}, resolveErr
 		}
 		spec = first.Spec
 		version = first.Version
-		if templateID == "" {
+		if templateID == "" || picked != "" {
 			templateID = first.TemplateID
 		}
 	}
@@ -115,6 +137,7 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
 		return planned{}, err
 	}
 
+	chosen := slices.Clone(targets)
 	added := make([]AddedPage, 0)
 	if kind.PageScoped() && slices.Contains(stepsOf(recipe), string(run.StepPublish)) {
 		if added, err = s.ancestors(ctx, siteID, targets); err != nil {
@@ -125,12 +148,19 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
 		}
 	}
 	if kind.PageScoped() {
-		for _, pageID := range targets[1:] {
-			if _, resolveErr := s.resolve(ctx, siteID, pageID); resolveErr != nil {
+		for _, pageID := range chosen[1:] {
+			if _, resolveErr := s.resolve(ctx, siteID, pageID, picked); resolveErr != nil {
+				return planned{}, resolveErr
+			}
+		}
+		for _, page := range added {
+			if _, resolveErr := s.resolve(ctx, siteID, page.PageID, ""); resolveErr != nil {
 				return planned{}, resolveErr
 			}
 		}
 	}
+
+	assigned, assign := assignment(chosen, picked)
 
 	actor, ok := kctx.ActorFrom(ctx)
 	if !ok {
@@ -149,12 +179,25 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
 			Budget:          req.Budget,
 			CreatedBy:       actor,
 		},
-		added: added,
+		added:    added,
+		assigned: assigned,
+		picked:   assign,
 	}, nil
 }
 
-func (s *Service) resolve(ctx context.Context, siteID, pageID string) (templates.ResolveForPageResponse, error) {
-	resolved, err := s.specs.ResolveForPage(ctx, templates.ResolveForPageRequest{PageID: pageID})
+func assignment(chosen []string, templateID string) (map[string]string, []string) {
+	if templateID == "" {
+		return nil, nil
+	}
+	assigned := make(map[string]string, len(chosen))
+	for _, pageID := range chosen {
+		assigned[pageID] = templateID
+	}
+	return assigned, chosen
+}
+
+func (s *Service) resolve(ctx context.Context, siteID, pageID, templateID string) (templates.ResolveForPageResponse, error) {
+	resolved, err := s.specs.ResolveForPage(ctx, templates.ResolveForPageRequest{PageID: pageID, TemplateID: templateID})
 	if err != nil {
 		return templates.ResolveForPageResponse{}, err
 	}

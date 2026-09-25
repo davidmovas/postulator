@@ -125,3 +125,13 @@ type PreviewLinkResponse struct {
 	ExpiresAt dto.Time `json:"expiresAt"`
 	Kind      string   `json:"kind"`
 }
+
+type AssignTemplateRequest struct {
+	SiteID     string   `json:"siteId"`
+	PageIDs    []string `json:"pageIds"`
+	TemplateID string   `json:"templateId"`
+}
+
+type AssignTemplateResponse struct {
+	Changed int `json:"changed"`
+}

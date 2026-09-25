@@ -3,6 +3,7 @@ package templates
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/site"
@@ -107,7 +108,11 @@ func (s *Service) ResolveForPage(ctx context.Context, req ResolveForPageRequest)
 	if err != nil {
 		return ResolveForPageResponse{}, err
 	}
+	picked := strings.TrimSpace(req.TemplateID)
 	templateID := page.TemplateID
+	if picked != "" {
+		templateID = &picked
+	}
 	if templateID == nil {
 		templateID = owner.Defaults.TemplateID
 	}
@@ -118,6 +123,11 @@ func (s *Service) ResolveForPage(ctx context.Context, req ResolveForPageRequest)
 	base, err := s.templates.Get(ctx, *templateID)
 	if err != nil {
 		return ResolveForPageResponse{}, err
+	}
+	if picked != "" && base.Scope == template.ScopeSite && (base.SiteID == nil || *base.SiteID != page.SiteID) {
+		return ResolveForPageResponse{}, errors.New(errors.Invalid, "the template "+base.Name+
+			" belongs to another site, so it cannot write "+page.Path).
+			WithDetail("field", "templateId").WithDetail("pageId", page.ID)
 	}
 	siteOverride, err := s.patch(ctx, base.ID, template.OverrideSite, page.SiteID)
 	if err != nil {

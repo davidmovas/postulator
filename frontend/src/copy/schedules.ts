@@ -39,7 +39,7 @@ export const schedules = {
         },
         work: "What it runs",
         template: "Template",
-        anyTemplate: "The site default",
+        anyTemplate: "Each page's own",
         publish: "Publishing",
         targets: "What it picks up",
         status: "Page status",

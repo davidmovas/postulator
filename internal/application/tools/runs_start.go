@@ -12,7 +12,7 @@ const runsStartName = "runs_start"
 
 type runsStartArgs struct {
 	PageIDs     []string `json:"pageIds" description:"The ids of the pages to work on, exactly as a read tool returned them"`
-	TemplateID  string   `json:"templateId,omitempty" description:"The template to write with, left out to resolve each page's own"`
+	TemplateID  string   `json:"templateId,omitempty" description:"The template the pages move to, left out to keep each page's own"`
 	Steps       []string `json:"steps,omitempty" enum:"resolve_context,generate_body,generate_meta,insert_links,repair_links,generate_images,validate,judge,publish,relink_neighbors,sync_back,report" description:"The steps to run in order, left out to take the recipe of the resolved template"`
 	PublishMode string   `json:"publishMode,omitempty" enum:"draft,publish" description:"Whether the run leaves a draft in WordPress or publishes it; leave it out for draft"`
 	Kind        string   `json:"kind,omitempty" enum:"generate,relink,audit,sync,import,repair,revert,custom" description:"What the run is for; leave it out and the steps decide"`

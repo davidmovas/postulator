@@ -503,7 +503,7 @@ func TestARelinkRunAndARepairRunCostNothing(t *testing.T) {
 		recipe, _ := kind.Recipe()
 		estimate, err := engine.EstimateRun(t.Context(), run.Run{
 			SiteID: p.siteID, Kind: kind, Targets: []string{p.pageID}, Recipe: recipe,
-		})
+		}, nil)
 		if err != nil {
 			t.Fatalf("EstimateRun for %s: %v", kind, err)
 		}

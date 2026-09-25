@@ -170,7 +170,12 @@ func Enabled(recipe []template.StepSpec) []template.StepSpec {
 	return out
 }
 
-func ValidateRecipe(registry *Registry, recipe []template.StepSpec) error {
+type StepCatalog interface {
+	Lookup(name string) (StepDef, bool)
+	Names() []string
+}
+
+func ValidateRecipe(registry StepCatalog, recipe []template.StepSpec) error {
 	enabled := Enabled(recipe)
 	if len(enabled) == 0 {
 		return invalid("the recipe enables no step", "recipe")

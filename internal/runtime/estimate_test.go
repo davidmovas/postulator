@@ -35,11 +35,11 @@ func TestEstimatePricesAStepAtTheCeilingItDeclares(t *testing.T) {
 		Sections: []template.Section{{Heading: "Intro", TargetWords: 3000}},
 	}
 
-	whole, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body", "generate_meta")))
+	whole, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body", "generate_meta")), nil)
 	if err != nil {
 		t.Fatalf("EstimateRun: %v", err)
 	}
-	bodyOnly, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body")))
+	bodyOnly, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body")), nil)
 	if err != nil {
 		t.Fatalf("EstimateRun of the body alone: %v", err)
 	}
@@ -67,12 +67,12 @@ func TestEstimatePricesOneCallPerRepairIteration(t *testing.T) {
 	engine := harness.engine(t, mustRegister(t, repair))
 
 	harness.specs.spec = template.TemplateSpec{LinkRules: template.LinkRules{UpDepth: 1}}
-	one, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("repair_links")))
+	one, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("repair_links")), nil)
 	if err != nil {
 		t.Fatalf("EstimateRun: %v", err)
 	}
 	harness.specs.spec = template.TemplateSpec{LinkRules: template.LinkRules{UpDepth: 3}}
-	three, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("repair_links")))
+	three, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("repair_links")), nil)
 	if err != nil {
 		t.Fatalf("EstimateRun: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestEstimatePricesOneCallPerRepairIteration(t *testing.T) {
 	}
 
 	harness.specs.spec = template.TemplateSpec{}
-	none, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("repair_links")))
+	none, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("repair_links")), nil)
 	if err != nil {
 		t.Fatalf("EstimateRun: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestEstimateNamesTheStepItCannotPrice(t *testing.T) {
 	}
 	engine := harness.engine(t, mustRegister(t, body, images))
 
-	estimate, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body", "generate_images")))
+	estimate, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body", "generate_images")), nil)
 	if err != nil {
 		t.Fatalf("EstimateRun: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestEstimateNamesTheStepItCannotPrice(t *testing.T) {
 		t.Fatalf("an unpriced step is graded %q, want a warning", estimate.Findings[0].Severity)
 	}
 
-	without, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body")))
+	without, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body")), nil)
 	if err != nil {
 		t.Fatalf("EstimateRun: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestEstimateWarnsWhenAPageWantsImagesTheRecipeWillNotDraw(t *testing.T) {
 			engine := harness.engine(t, mustRegister(t, body, images))
 			harness.specs.spec = template.TemplateSpec{Images: tc.images}
 
-			estimate, err := engine.EstimateRun(t.Context(), harness.newRun(tc.recipe))
+			estimate, err := engine.EstimateRun(t.Context(), harness.newRun(tc.recipe), nil)
 			if err != nil {
 				t.Fatalf("EstimateRun: %v", err)
 			}
@@ -198,12 +198,39 @@ func TestAStepThatMakesNoCallIsNotReportedUnpriced(t *testing.T) {
 	}
 	engine := harness.engine(t, mustRegister(t, images))
 
-	estimate, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_images")))
+	estimate, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_images")), nil)
 	if err != nil {
 		t.Fatalf("EstimateRun: %v", err)
 	}
 	if len(estimate.Findings) != 0 {
 		t.Fatalf("findings = %+v, want none for a page that asks for no image", estimate.Findings)
+	}
+}
+
+func TestEstimateResolvesAnAssignedTemplate(t *testing.T) {
+	t.Parallel()
+
+	harness := newHarness(t, 2)
+	body := pricedStep("generate_body", llm.RoleWriter, run.Price{})
+	engine := harness.engine(t, mustRegister(t, body))
+
+	harness.specs.spec = template.TemplateSpec{Sections: []template.Section{{Heading: "Intro", TargetWords: 300}}}
+	harness.specs.byTemplate = map[string]template.TemplateSpec{
+		"long": {Sections: []template.Section{{Heading: "Intro", TargetWords: 3000}}},
+	}
+
+	own, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body")), nil)
+	if err != nil {
+		t.Fatalf("EstimateRun: %v", err)
+	}
+	assigned, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body")),
+		map[string]string{harness.pages[0]: "long"})
+	if err != nil {
+		t.Fatalf("EstimateRun with a template: %v", err)
+	}
+	if assigned.Tokens <= own.Tokens*2 {
+		t.Fatalf("the page moved to the long template is priced at %d against %d on its own; "+
+			"the estimate must price the template the start will assign", assigned.Tokens, own.Tokens)
 	}
 }
 
@@ -221,7 +248,7 @@ func TestARevertRunIsPricedAtNothing(t *testing.T) {
 	record := harness.newRun(run.RevertRecipe())
 	record.Kind = run.KindRevert
 
-	estimate, err := engine.EstimateRun(t.Context(), record)
+	estimate, err := engine.EstimateRun(t.Context(), record, nil)
 	if err != nil {
 		t.Fatalf("EstimateRun: %v", err)
 	}
@@ -278,12 +305,12 @@ func TestEstimateSumsEveryTargetOnItsOwnTemplate(t *testing.T) {
 	long := template.TemplateSpec{Sections: []template.Section{{Heading: "Intro", TargetWords: 3000}}}
 	harness.specs.perPage = map[string]template.TemplateSpec{harness.pages[0]: short, harness.pages[1]: long}
 
-	both, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body")))
+	both, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body")), nil)
 	if err != nil {
 		t.Fatalf("EstimateRun: %v", err)
 	}
 	harness.pages = harness.pages[:1]
-	first, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body")))
+	first, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body")), nil)
 	if err != nil {
 		t.Fatalf("EstimateRun of the short page: %v", err)
 	}
@@ -342,7 +369,7 @@ func TestEstimateReportsWhatWouldStopTheRunBeforeItStarts(t *testing.T) {
 			body := pricedStep("generate_body", llm.RoleWriter, run.Price{})
 			engine := harness.engine(t, mustRegister(t, body))
 
-			estimate, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body")))
+			estimate, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body")), nil)
 			if err != nil {
 				t.Fatalf("EstimateRun: %v", err)
 			}
@@ -383,7 +410,7 @@ func TestEstimateRunsThePreflightOfEveryStepOnce(t *testing.T) {
 	}
 	engine := harness.engine(t, mustRegister(t, checked))
 
-	estimate, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body")))
+	estimate, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body")), nil)
 	if err != nil {
 		t.Fatalf("EstimateRun: %v", err)
 	}
@@ -415,12 +442,12 @@ func TestEstimatePricesImagesOnTheModelThatDrawsThem(t *testing.T) {
 	engine := harness.engine(t, mustRegister(t, images))
 
 	harness.specs.spec = template.TemplateSpec{Images: template.Images{Inline: 3, Source: template.ImagesAI}}
-	three, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_images")))
+	three, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_images")), nil)
 	if err != nil {
 		t.Fatalf("EstimateRun: %v", err)
 	}
 	harness.specs.spec = template.TemplateSpec{Images: template.Images{Inline: 1, Source: template.ImagesAI}}
-	one, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_images")))
+	one, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_images")), nil)
 	if err != nil {
 		t.Fatalf("EstimateRun: %v", err)
 	}
@@ -432,7 +459,7 @@ func TestEstimatePricesImagesOnTheModelThatDrawsThem(t *testing.T) {
 	}
 
 	harness.keys.missing = llm.SecretRef(drawer.Provider)
-	unkeyed, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_images")))
+	unkeyed, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_images")), nil)
 	if err != nil {
 		t.Fatalf("EstimateRun: %v", err)
 	}

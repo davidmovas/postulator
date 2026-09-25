@@ -343,7 +343,8 @@ func (c *Core) build(ctx context.Context, key []byte) (kit, error) {
 		MaxRows:    imports.MaxRows(values),
 	})
 	modelsService := models.New(modelCatalog, modelRepo, modelProfiles, book, secretStore, client, relay, now)
-	runsService := runs.New(engine, runRepo, itemRepo, artifactRepo, eventRepo, templateService, pageRepo, stepRegistry)
+	runsService := runs.New(engine, runRepo, itemRepo, artifactRepo, eventRepo, templateService, pageRepo, stepRegistry,
+		pagesService)
 	syncService := sync.New(engine, siteRepo, wordpress, packer{}, now)
 	reportsService := reports.New(reports.Deps{
 		Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,
