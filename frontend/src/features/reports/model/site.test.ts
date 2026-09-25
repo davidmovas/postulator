@@ -61,6 +61,7 @@ function audit(overrides: Partial<PageAudit> = {}): PageAudit {
         entityId: "e-1",
         entityName: "Alpha",
         skipReason: "",
+        onSite: true,
         targets: 3,
         required: 2,
         satisfied: 2,
@@ -68,6 +69,8 @@ function audit(overrides: Partial<PageAudit> = {}): PageAudit {
         missingRequired: 0,
         blocked: 0,
         offGraph: 0,
+        pending: 0,
+        unpublished: 0,
         inbound: 1,
         orphan: false,
         ...overrides,
@@ -204,11 +207,39 @@ describe("auditCard", () => {
                 blocked: 0,
                 offGraph: 3,
                 orphans: 1,
+                pending: 0,
+                unpublished: 0,
             },
         );
         expect(held.compliant).toBe(1);
         expect(held.compliantShare).toBe(0.5);
         expect(held.audited).toBe(2);
         expect(held.offGraph).toBe(3);
+    });
+
+    it("measures compliance over the pages on the site and counts what waits apart", () => {
+        const held = auditCard(
+            [
+                audit({ pageId: "p-1" }),
+                audit({ pageId: "p-2", status: "planned", onSite: false, satisfied: 0, pending: 3 }),
+                audit({ pageId: "p-3", missing: 1 }),
+            ],
+            {
+                pages: 3,
+                audited: 3,
+                required: 6,
+                satisfied: 2,
+                missing: 1,
+                missingRequired: 0,
+                blocked: 0,
+                offGraph: 0,
+                orphans: 0,
+                pending: 3,
+                unpublished: 0,
+            },
+        );
+        expect(held.compliant).toBe(1);
+        expect(held.compliantShare).toBe(0.5);
+        expect(held.pending).toBe(3);
     });
 });

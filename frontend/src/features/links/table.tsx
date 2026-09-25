@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 
 import { copy } from "../../copy/index.js";
 import type { PageAudit } from "../../data/types.js";
+import type { PageStatus } from "../../generated/vocab.js";
 import {
     Button,
     cx,
@@ -20,7 +21,8 @@ import { pageStatusLabel, statusTone } from "../pages/labels.js";
 import { severityTone } from "./labels.js";
 import { severityOf } from "./model/audit.js";
 
-const columns = "minmax(160px, 2.2fr) minmax(120px, 1.4fr) 64px 96px 64px 64px 76px 84px";
+const columns = "minmax(160px, 2.2fr) minmax(120px, 1.4fr) 64px 132px 64px 64px 76px 84px";
+const pagePlanned: PageStatus = "planned";
 const rowHeight = 28;
 
 export interface AuditTableProps {
@@ -97,12 +99,23 @@ export function AuditTable({ siteId, rows, selectedId, narrowed, onOpen, onReset
                     {skipped ? "" : copy.links.cell.ofTargets(held.satisfied, held.targets)}
                 </TableCell>
                 <TableCell>
-                    {held.missing === 0 ? null : (
+                    {skipped ? null : !held.onSite ? (
+                        <StatusBadge tone="info" dot={false}>
+                            {held.status === pagePlanned ? copy.links.cell.notWritten : copy.links.cell.notOnSite}
+                        </StatusBadge>
+                    ) : (
                         <span className="flex items-center gap-1">
-                            <span className={cx("font-mono text-xs", held.missingRequired > 0 ? "text-danger" : "text-warn")}>{held.missing}</span>
+                            {held.missing === 0 ? null : (
+                                <span className={cx("font-mono text-xs", held.missingRequired > 0 ? "text-danger" : "text-warn")}>{held.missing}</span>
+                            )}
                             {held.missingRequired > 0 ? (
                                 <StatusBadge tone="danger" dot={false}>
                                     {copy.links.cell.required(held.missingRequired)}
+                                </StatusBadge>
+                            ) : null}
+                            {held.pending > 0 ? (
+                                <StatusBadge tone="info" dot={false}>
+                                    {copy.links.cell.pending(held.pending)}
                                 </StatusBadge>
                             ) : null}
                         </span>

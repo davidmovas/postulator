@@ -12,6 +12,7 @@ import {
     CloseIcon,
     cx,
     ErrorIcon,
+    HourglassTopIcon,
     IconButton,
     LinkOffIcon,
     PlayCircleIcon,
@@ -20,6 +21,7 @@ import {
     StatusBadge,
     toneClasses,
 } from "../../ui/index.js";
+import type { IconComponent, Tone } from "../../ui/index.js";
 import { pageStatusLabel, statusTone } from "../pages/labels.js";
 import { classLabel, classTone, relationIcon } from "./labels.js";
 import { groups } from "./model/detail.js";
@@ -29,19 +31,44 @@ interface RequiredRowProps {
     link: RequiredLink;
 }
 
+function stateTone(link: RequiredLink): Tone {
+    switch (link.state) {
+        case "placed":
+            return "ok";
+        case "target_unpublished":
+            return "warn";
+        case "awaiting_page":
+        case "awaiting_target":
+            return "info";
+        default:
+            return link.required ? "danger" : "warn";
+    }
+}
+
+function stateIcon(link: RequiredLink): IconComponent {
+    switch (link.state) {
+        case "placed":
+            return CheckCircleIcon;
+        case "awaiting_page":
+        case "awaiting_target":
+            return HourglassTopIcon;
+        default:
+            return ErrorIcon;
+    }
+}
+
 function RequiredRow({ siteId, link }: RequiredRowProps): ReactElement {
     const Icon = relationIcon(link.relation);
-    const tone = link.satisfied ? "ok" : link.required ? "danger" : "warn";
     return (
-        <li className="flex flex-col gap-0.5 rounded-md px-1 py-1 hover:bg-inset">
+        <li className="flex flex-col gap-0.5 rounded-md px-1 py-1 hover:bg-inset" title={copy.links.stateHints[link.state]}>
             <span className="flex items-center gap-2 text-xs">
                 <Icon size={14} className="shrink-0 text-ink-faint" />
                 <Link to={`/s/${siteId}/graph/${link.targetEntityId}`} className="min-w-0 flex-1 truncate text-ink-soft hover:text-ink">
                     {link.targetEntityName}
                 </Link>
                 {link.required ? <span className="text-2xs text-ink-faint">{copy.links.panel.required}</span> : null}
-                <StatusBadge tone={tone} icon={link.satisfied ? CheckCircleIcon : ErrorIcon} dot={false}>
-                    {link.satisfied ? copy.links.panel.satisfied : copy.links.panel.missing}
+                <StatusBadge tone={stateTone(link)} icon={stateIcon(link)} dot={false}>
+                    {copy.links.states[link.state] ?? (link.satisfied ? copy.links.panel.satisfied : copy.links.panel.missing)}
                 </StatusBadge>
             </span>
             <span className="flex items-center gap-2 pl-6 font-mono text-2xs text-ink-faint">
@@ -134,6 +161,7 @@ export function AuditPanel({ siteId, row, onClose, onRelink }: AuditPanelProps):
     const grouped = useMemo(() => (detail.data === undefined ? null : groups(detail.data)), [detail.data]);
     const rules = detail.data?.rules ?? null;
     const skipped = row.skipReason !== "";
+    const unwritten = !skipped && !row.onSite;
 
     return (
         <section aria-label={copy.links.panel.title} className="flex h-full min-h-0 flex-col bg-panel">
@@ -156,6 +184,14 @@ export function AuditPanel({ siteId, row, onClose, onRelink }: AuditPanelProps):
             </header>
 
             <div className="flex flex-col gap-4 p-3">
+                {unwritten ? (
+                    <Banner
+                        tone="info"
+                        icon={HourglassTopIcon}
+                        title={row.status === "planned" ? copy.links.panel.notWritten : copy.links.panel.notOnSite}
+                        body={row.status === "planned" ? copy.links.panel.notWrittenBody : copy.links.panel.notOnSiteBody}
+                    />
+                ) : null}
                 {skipped ? (
                     <Banner tone="muted" title={copy.links.cell.skipped[row.skipReason] ?? row.skipReason} body={copy.links.panel.skipped[row.skipReason] ?? ""} />
                 ) : detail.isPending || grouped === null ? (
@@ -166,12 +202,24 @@ export function AuditPanel({ siteId, row, onClose, onRelink }: AuditPanelProps):
                             <li>
                                 <span className={cx("font-mono", toneClasses.ok.ink)}>{grouped.counts.satisfied}</span> {copy.links.panel.satisfied}
                             </li>
-                            <li>
-                                <span className={cx("font-mono", grouped.counts.missingRequired > 0 ? toneClasses.danger.ink : toneClasses.warn.ink)}>
-                                    {grouped.counts.missing}
-                                </span>{" "}
-                                {copy.links.panel.missing}
-                            </li>
+                            {grouped.counts.missing > 0 ? (
+                                <li>
+                                    <span className={cx("font-mono", grouped.counts.missingRequired > 0 ? toneClasses.danger.ink : toneClasses.warn.ink)}>
+                                        {grouped.counts.missing}
+                                    </span>{" "}
+                                    {copy.links.panel.missing}
+                                </li>
+                            ) : null}
+                            {grouped.counts.unpublished > 0 ? (
+                                <li>
+                                    <span className={cx("font-mono", toneClasses.warn.ink)}>{grouped.counts.unpublished}</span> {copy.links.panel.unpublished}
+                                </li>
+                            ) : null}
+                            {grouped.counts.pending > 0 ? (
+                                <li>
+                                    <span className={cx("font-mono", toneClasses.info.ink)}>{grouped.counts.pending}</span> {copy.links.panel.waiting}
+                                </li>
+                            ) : null}
                             {grouped.counts.blocked > 0 ? (
                                 <li>
                                     <span className={cx("font-mono", toneClasses.danger.ink)}>{grouped.counts.blocked}</span> {copy.links.panel.blocked.toLowerCase()}
@@ -245,7 +293,7 @@ export function AuditPanel({ siteId, row, onClose, onRelink }: AuditPanelProps):
                         size="sm"
                         variant="secondary"
                         icon={PlayCircleIcon}
-                        disabled={skipped}
+                        disabled={skipped || unwritten}
                         onClick={() => {
                             onRelink(row.pageId);
                         }}

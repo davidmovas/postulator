@@ -3,7 +3,7 @@ import type { PageAudit } from "../../data/types.js";
 import { describe, expect, it } from "vitest";
 
 import { copy } from "../../copy/index.js";
-import { auditRows, row } from "./model/fixture.js";
+import { auditRows, plannedRow, row } from "./model/fixture.js";
 import { AuditTable } from "./table.js";
 
 function table(rows: readonly PageAudit[] = auditRows, narrowed = false) {
@@ -72,6 +72,22 @@ describe("the audit table", () => {
         table([row({ pageId: "p-blocked", path: "/blocked/", entityName: "Blocked", targets: 3, required: 1, satisfied: 3, blocked: 1 })]);
 
         expect(dotOf("/blocked/").className).toContain("bg-danger");
+    });
+
+    it("says a planned page is not written yet instead of counting its links as missing", () => {
+        table([plannedRow]);
+
+        const held = within(rowFor("/pottery/cups/"));
+        expect(held.getByText(copy.links.cell.notWritten)).toBeDefined();
+        expect(held.queryByText(copy.links.cell.required(1))).toBeNull();
+        expect(held.queryByText(copy.links.cell.orphan)).toBeNull();
+        expect(dotOf("/pottery/cups/").className).toContain("bg-info");
+    });
+
+    it("counts the links that wait for their target apart from the missing ones", () => {
+        table([row({ pageId: "p-hub", path: "/hub/", entityName: "Hub", targets: 3, satisfied: 1, missing: 1, pending: 1 })]);
+
+        expect(within(rowFor("/hub/")).getByText(copy.links.cell.pending(1))).toBeDefined();
     });
 
     it("offers the graph when there is nothing to audit and a reset when the filters hid it", () => {

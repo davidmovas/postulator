@@ -14,10 +14,13 @@ interface Segment {
 
 function segmentsOf(totals: LinkTotals): Segment[] {
     const optional = Math.max(totals.missing - totals.missingRequired, 0);
+    const placed = Math.max(totals.satisfied - totals.unpublished, 0);
     return [
-        { key: "satisfied", label: copy.links.meters.satisfied, count: totals.satisfied, className: toneClasses.ok.solid },
+        { key: "satisfied", label: copy.links.meters.satisfied, count: placed, className: toneClasses.ok.solid },
+        { key: "unpublished", label: copy.links.meters.unpublished, count: totals.unpublished, className: "bg-warn/45" },
         { key: "missingRequired", label: copy.links.meters.missingRequired, count: totals.missingRequired, className: toneClasses.danger.solid },
         { key: "missingOptional", label: copy.links.meters.missingOptional, count: optional, className: toneClasses.warn.solid },
+        { key: "pending", label: copy.links.meters.pending, count: totals.pending, className: toneClasses.info.solid },
         { key: "blocked", label: copy.links.meters.blocked, count: totals.blocked, className: "bg-danger/45" },
     ];
 }

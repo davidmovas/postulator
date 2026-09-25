@@ -39,6 +39,8 @@ function audited(rows: readonly PageAudit[]): LinkAudit {
             blocked: 0,
             offGraph: 0,
             orphans: 0,
+            pending: 0,
+            unpublished: 0,
         },
         pages: [...rows],
     };

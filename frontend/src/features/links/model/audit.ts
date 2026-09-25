@@ -3,9 +3,9 @@ import type { GraphIndex } from "../../graph/model/index.js";
 import type { LinksQuery, Show } from "./params.js";
 import { shows } from "./params.js";
 
-export type Severity = "danger" | "warn" | "ok" | "muted";
+export type Severity = "danger" | "warn" | "info" | "ok" | "muted";
 
-const rank: Readonly<Record<Severity, number>> = { danger: 0, warn: 1, ok: 2, muted: 3 };
+const rank: Readonly<Record<Severity, number>> = { danger: 0, warn: 1, info: 2, ok: 3, muted: 4 };
 
 export function severityOf(row: PageAudit): Severity {
     if (row.skipReason !== "") {
@@ -14,11 +14,17 @@ export function severityOf(row: PageAudit): Severity {
     if (row.missingRequired > 0 || row.blocked > 0) {
         return "danger";
     }
-    return row.missing > 0 ? "warn" : "ok";
+    if (row.missing > 0 || row.unpublished > 0) {
+        return "warn";
+    }
+    if (!row.onSite || row.pending > 0) {
+        return "info";
+    }
+    return "ok";
 }
 
 export function hasProblem(row: PageAudit): boolean {
-    return row.missing > 0 || row.blocked > 0 || row.offGraph > 0 || row.orphan;
+    return row.missing > 0 || row.blocked > 0 || row.offGraph > 0 || row.unpublished > 0 || row.orphan;
 }
 
 function shown(row: PageAudit, show: Show): boolean {
@@ -33,6 +39,10 @@ function shown(row: PageAudit, show: Show): boolean {
             return row.blocked > 0;
         case "offGraph":
             return row.offGraph > 0;
+        case "unpublished":
+            return row.unpublished > 0;
+        case "pending":
+            return row.pending > 0;
         case "orphans":
             return row.orphan;
         case "skipped":
@@ -68,7 +78,7 @@ function compareBySeverity(left: PageAudit, right: PageAudit): number {
     if (bySeverity !== 0) {
         return bySeverity;
     }
-    for (const key of ["missingRequired", "blocked", "missing"] as const) {
+    for (const key of ["missingRequired", "blocked", "missing", "unpublished", "pending"] as const) {
         if (left[key] !== right[key]) {
             return right[key] - left[key];
         }

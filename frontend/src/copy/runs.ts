@@ -328,6 +328,8 @@ export const runs = {
         },
         links: {
             owed: "Owed to the graph",
+            snapshot:
+                "As the page stood at validation. A link placed later, when a page it owes was published, shows on the Linking screen, which reads the site as it is now.",
             owedEmpty: "The graph asked this page for no links.",
             satisfied: "satisfied",
             missing: "missing",

@@ -14,6 +14,8 @@ export interface DetailCounts {
     blocked: number;
     offGraph: number;
     anchorNotAllowed: number;
+    pending: number;
+    unpublished: number;
 }
 
 export interface DetailGroups {
@@ -25,6 +27,10 @@ export interface DetailGroups {
     counts: DetailCounts;
 }
 
+export function waiting(link: RequiredLink): boolean {
+    return link.state === "awaiting_page" || link.state === "awaiting_target";
+}
+
 export function groups(detail: LinkAuditPage): DetailGroups {
     const required = detail.required ?? [];
     const extra = detail.extra ?? [];
@@ -34,7 +40,16 @@ export function groups(detail: LinkAuditPage): DetailGroups {
         sibling: [],
         blocked: [],
         extra: [],
-        counts: { satisfied: 0, missing: 0, missingRequired: 0, blocked: 0, offGraph: extra.length, anchorNotAllowed: 0 },
+        counts: {
+            satisfied: 0,
+            missing: 0,
+            missingRequired: 0,
+            blocked: 0,
+            offGraph: extra.length,
+            anchorNotAllowed: 0,
+            pending: 0,
+            unpublished: 0,
+        },
     };
     for (const link of required) {
         if (link.blockedReason !== "") {
@@ -54,6 +69,11 @@ export function groups(detail: LinkAuditPage): DetailGroups {
             if (!link.anchorAllowed) {
                 out.counts.anchorNotAllowed += 1;
             }
+            if (link.state === "target_unpublished") {
+                out.counts.unpublished += 1;
+            }
+        } else if (waiting(link)) {
+            out.counts.pending += 1;
         } else {
             out.counts.missing += 1;
             if (link.required) {

@@ -1,6 +1,16 @@
 import { isOneOf, pageStatuses } from "../../../generated/vocab.js";
 
-export const shows = ["all", "missing", "missingRequired", "blocked", "offGraph", "orphans", "skipped"] as const;
+export const shows = [
+    "all",
+    "missing",
+    "missingRequired",
+    "blocked",
+    "offGraph",
+    "unpublished",
+    "pending",
+    "orphans",
+    "skipped",
+] as const;
 
 export type Show = (typeof shows)[number];
 

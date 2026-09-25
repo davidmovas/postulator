@@ -294,8 +294,20 @@ export function GraphMap({
         if (current === null) {
             return;
         }
-        const proofFill: Readonly<Record<Severity, string>> = { ok: colors.okSoft, warn: colors.warnSoft, danger: colors.dangerSoft, muted: colors.mutedSoft };
-        const proofStroke: Readonly<Record<Severity, string>> = { ok: colors.ok, warn: colors.warn, danger: colors.danger, muted: colors.hairline };
+        const proofFill: Readonly<Record<Severity, string>> = {
+            ok: colors.okSoft,
+            warn: colors.warnSoft,
+            info: colors.infoSoft,
+            danger: colors.dangerSoft,
+            muted: colors.mutedSoft,
+        };
+        const proofStroke: Readonly<Record<Severity, string>> = {
+            ok: colors.ok,
+            warn: colors.warn,
+            info: colors.info,
+            danger: colors.danger,
+            muted: colors.hairline,
+        };
         const stateFill: Readonly<Record<NodeState, string>> = {
             mismatch: colors.dangerSoft,
             working: colors.accentSoft,

@@ -151,6 +151,7 @@ export function ValidationPane({ itemId, payload }: ValidationPaneProps): ReactE
                     </span>
                 )}
             </div>
+            <p className="px-3 text-2xs text-ink-faint">{copy.runs.review.links.snapshot}</p>
             {owed.length === 0 ? (
                 <p className="px-3 text-xs text-ink-dim">{copy.runs.review.links.owedEmpty}</p>
             ) : (
