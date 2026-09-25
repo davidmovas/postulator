@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { profileRows, refOf, refText } from "./profiles.js";
+import { modelRoles } from "../../../generated/vocab.js";
+import { pickableRoles, profileRows, refOf, refText } from "./profiles.js";
 
 const roles = ["writer", "chat", "image"] as const;
 
@@ -45,5 +46,12 @@ describe("refText and refOf", () => {
 
     it.each(["", "openai", "/model", "openai/"])("refuses %s", (text) => {
         expect(refOf(text)).toBeNull();
+    });
+});
+
+describe("pickableRoles", () => {
+    it("offers every role but the one the Images setting answers", () => {
+        expect(pickableRoles).not.toContain("image");
+        expect(pickableRoles).toStrictEqual(modelRoles.filter((role) => role !== "image"));
     });
 });

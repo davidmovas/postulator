@@ -17,6 +17,7 @@ export interface ItemProgress {
     attempt: number;
     lastError: StepFailure | null;
     state: ItemState;
+    note: string;
 }
 
 export interface LiveStats {
@@ -25,6 +26,7 @@ export interface LiveStats {
     failed: number;
     needsHuman: number;
     waitingParent: number;
+    noted: number;
     tokens: number;
     usd: number;
     calls: number;
@@ -46,7 +48,7 @@ const statsCache = new WeakMap<Events, LiveStats>();
 const phaseCache = new WeakMap<Events, RunPhase | null>();
 
 function blank(itemId: string): ItemProgress {
-    return { itemId, step: null, stepStartedAt: null, attempt: 0, lastError: null, state: "pending" };
+    return { itemId, step: null, stepStartedAt: null, attempt: 0, lastError: null, state: "pending", note: "" };
 }
 
 function reach(into: Map<string, ItemProgress>, itemId: string): ItemProgress {
@@ -78,7 +80,9 @@ export function itemProgress(events: Events): ReadonlyMap<string, ItemProgress> 
             case "item.done": {
                 const payload = payloadOf(record, "item.done");
                 if (payload !== null) {
-                    reach(byItem, payload.itemId).state = "done";
+                    const held = reach(byItem, payload.itemId);
+                    held.state = "done";
+                    held.note = typeof payload.note === "string" ? payload.note : "";
                 }
                 break;
             }
@@ -162,6 +166,7 @@ export function liveStats(events: Events): LiveStats {
         failed: 0,
         needsHuman: 0,
         waitingParent: 0,
+        noted: 0,
         tokens: 0,
         usd: 0,
         calls: 0,
@@ -179,6 +184,9 @@ export function liveStats(events: Events): LiveStats {
         switch (held.state) {
             case "done":
                 totals.done += 1;
+                if (held.note !== "") {
+                    totals.noted += 1;
+                }
                 break;
             case "failed":
                 totals.failed += 1;

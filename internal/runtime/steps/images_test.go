@@ -196,6 +196,108 @@ func TestGenerateImagesPicksFromASource(t *testing.T) {
 	}
 }
 
+func TestGenerateImagesSaysWhenALibraryPicksTooFew(t *testing.T) {
+	t.Parallel()
+
+	picked := []images.Image{
+		{WPID: 41, URL: "https://shop.example.com/a.png", Alt: "a cup"},
+		{WPID: 42, URL: "https://shop.example.com/b.png", Alt: "a mug"},
+	}
+
+	cases := []struct {
+		name   string
+		items  []images.Image
+		placed int
+		short  string
+	}{
+		{name: "nothing matched", items: nil, placed: 0, short: "0 of 2"},
+		{name: "one of two matched", items: picked[:1], placed: 1, short: "1 of 2"},
+		{name: "both matched", items: picked, placed: 2},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps, _ := imageDeps(t)
+			deps.ImageSources = map[template.ImageSource]steps.ImageSource{
+				template.ImagesWPMedia: library{items: tc.items},
+			}
+
+			manifest, result := runImages(t, deps, imageContext(t,
+				template.Images{Featured: true, Inline: 1, Source: template.ImagesWPMedia}))
+			if manifest.Wanted != 2 || len(manifest.Images) != tc.placed {
+				t.Fatalf("manifest = %+v, want %d of 2 placed", manifest, tc.placed)
+			}
+			if tc.short == "" {
+				if len(manifest.Findings) != 0 {
+					t.Fatalf("findings = %+v, want none", manifest.Findings)
+				}
+				return
+			}
+			if len(manifest.Findings) != 1 || manifest.Findings[0].Code != steps.CodeImagesShort ||
+				manifest.Findings[0].Severity != content.SeverityWarn {
+				t.Fatalf("findings = %+v, want the shortfall named", manifest.Findings)
+			}
+			message := manifest.Findings[0].Message
+			for _, want := range []string{tc.short, "wpmedia", "Espresso", "/coffee/espresso/"} {
+				if !strings.Contains(message, want) {
+					t.Errorf("message = %q, want it to carry %q", message, want)
+				}
+			}
+			if !strings.Contains(result.Message, message) {
+				t.Errorf("the step says %q, want the reason in it", result.Message)
+			}
+		})
+	}
+}
+
+func TestGenerateImagesSaysHowManyOfTheImagesItPlaced(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		with func(steps.Deps) steps.Deps
+		spec template.Images
+		want string
+	}{
+		{
+			name: "every image placed",
+			spec: template.Images{Featured: true, Inline: 1, Source: template.ImagesAI},
+			want: "placed 2 of 2 images on /coffee/espresso/",
+		},
+		{
+			name: "none asked for",
+			spec: template.Images{Source: template.ImagesAI},
+			want: "the template asks for no image",
+		},
+		{
+			name: "the model failed",
+			with: func(d steps.Deps) steps.Deps {
+				d.ImageProvider = &drawing{err: errors.New(errors.Invalid, "Unknown parameter: 'response_format'")}
+				return d
+			},
+			spec: template.Images{Featured: true, Inline: 1, Source: template.ImagesAI},
+			want: "placed 0 of 2 images on /coffee/espresso/; the image model stopped after 0 of 2 images",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps, _ := imageDeps(t)
+			if tc.with != nil {
+				deps = tc.with(deps)
+			}
+			_, result := runImages(t, deps, imageContext(t, tc.spec))
+			if !strings.HasPrefix(result.Message, tc.want) {
+				t.Fatalf("message = %q, want it to open with %q", result.Message, tc.want)
+			}
+		})
+	}
+}
+
 func TestGenerateImagesRecordsWhatItCouldNotDo(t *testing.T) {
 	t.Parallel()
 

@@ -3,6 +3,7 @@ package runs
 import (
 	"context"
 
+	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
@@ -13,7 +14,7 @@ import (
 
 type engine interface {
 	Enqueue(ctx context.Context, record run.Run) (run.Run, error)
-	EstimateRun(ctx context.Context, record run.Run) (run.Estimate, error)
+	EstimateRun(ctx context.Context, record run.Run, assigned map[string]string) (run.Estimate, error)
 	Pause(ctx context.Context, runID string, reason run.PauseReason) error
 	Resume(ctx context.Context, runID string) error
 	Cancel(ctx context.Context, runID string) error
@@ -43,6 +44,7 @@ type artifactStore interface {
 
 type stepDefs interface {
 	Lookup(name string) (run.StepDef, bool)
+	Names() []string
 }
 
 type eventStore interface {
@@ -57,6 +59,10 @@ type pageReader interface {
 	Get(ctx context.Context, id string) (pagemap.Page, error)
 }
 
+type templateAssigner interface {
+	AssignTemplate(ctx context.Context, req pages.AssignTemplateRequest) (pages.AssignTemplateResponse, error)
+}
+
 type Service struct {
 	engine    engine
 	runs      runStore
@@ -66,13 +72,14 @@ type Service struct {
 	specs     specResolver
 	pages     pageReader
 	steps     stepDefs
+	assigner  templateAssigner
 }
 
 func New(engine engine, runs runStore, items itemStore, artifacts artifactStore, events eventStore,
-	specs specResolver, pages pageReader, steps stepDefs) *Service {
+	specs specResolver, pageMap pageReader, steps stepDefs, assigner templateAssigner) *Service {
 	return &Service{
 		engine: engine, runs: runs, items: items, artifacts: artifacts, events: events,
-		specs: specs, pages: pages, steps: steps,
+		specs: specs, pages: pageMap, steps: steps, assigner: assigner,
 	}
 }
 

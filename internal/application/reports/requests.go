@@ -103,6 +103,17 @@ const (
 	SkipNoTemplate SkipReason = "no_template"
 )
 
+type LinkState string
+
+const (
+	LinkPlaced            LinkState = "placed"
+	LinkTargetUnpublished LinkState = "target_unpublished"
+	LinkMissing           LinkState = "missing"
+	LinkAwaitingTarget    LinkState = "awaiting_target"
+	LinkAwaitingPage      LinkState = "awaiting_page"
+	LinkBlocked           LinkState = "blocked"
+)
+
 type LinkAuditRequest struct {
 	SiteID string `json:"siteId"`
 }
@@ -126,6 +137,8 @@ type LinkTotals struct {
 	Blocked         int `json:"blocked"`
 	OffGraph        int `json:"offGraph"`
 	Orphans         int `json:"orphans"`
+	Pending         int `json:"pending"`
+	Unpublished     int `json:"unpublished"`
 }
 
 type PageAudit struct {
@@ -135,6 +148,7 @@ type PageAudit struct {
 	EntityID        string `json:"entityId"`
 	EntityName      string `json:"entityName"`
 	SkipReason      string `json:"skipReason"`
+	OnSite          bool   `json:"onSite"`
 	Targets         int    `json:"targets"`
 	Required        int    `json:"required"`
 	Satisfied       int    `json:"satisfied"`
@@ -142,6 +156,8 @@ type PageAudit struct {
 	MissingRequired int    `json:"missingRequired"`
 	Blocked         int    `json:"blocked"`
 	OffGraph        int    `json:"offGraph"`
+	Pending         int    `json:"pending"`
+	Unpublished     int    `json:"unpublished"`
 	Inbound         int    `json:"inbound"`
 	Orphan          bool   `json:"orphan"`
 }
@@ -171,6 +187,8 @@ type RequiredLink struct {
 	Weight           float64  `json:"weight"`
 	Depth            int      `json:"depth"`
 	BlockedReason    string   `json:"blockedReason"`
+	State            string   `json:"state"`
+	TargetOnSite     bool     `json:"targetOnSite"`
 }
 
 type ExtraLink struct {

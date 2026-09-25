@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/davidmovas/postulator/internal/domain/template"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
@@ -40,6 +41,9 @@ func (s *Service) EnsureSeeded(ctx context.Context) error {
 				return err
 			}
 			if len(existing.Items) > 0 {
+				if refreshErr := s.refresh(c, seed, existing.Items[0]); refreshErr != nil {
+					return refreshErr
+				}
 				continue
 			}
 			now := s.now()
@@ -71,4 +75,42 @@ func (s *Service) EnsureSeeded(ctx context.Context) error {
 		}
 		return s.policies.Insert(c, policy)
 	})
+}
+
+func (s *Service) refresh(ctx context.Context, seed, stored template.Template) error {
+	if !template.Supersedes(seed, stored) {
+		return nil
+	}
+	next := stored
+	next.Spec = seed.Spec
+	fits, err := s.overridesFit(ctx, &next)
+	if err != nil || !fits {
+		return err
+	}
+	next.Version = stored.Version + 1
+	next.UpdatedAt = s.now()
+	if validErr := next.Validate(); validErr != nil {
+		return validErr
+	}
+	return s.templates.Update(ctx, next)
+}
+
+func (s *Service) overridesFit(ctx context.Context, next *template.Template) (bool, error) {
+	overrides, err := s.templates.ListOverrides(ctx, next.ID)
+	if err != nil {
+		return false, err
+	}
+	for i := range overrides {
+		siteOverride, pageOverride, chainErr := s.chain(ctx, next, &overrides[i])
+		if errors.IsCode(chainErr, errors.NotFound) {
+			continue
+		}
+		if chainErr != nil {
+			return false, chainErr
+		}
+		if _, resolveErr := template.Resolve(next.Spec, siteOverride, pageOverride); resolveErr != nil {
+			return false, nil
+		}
+	}
+	return true, nil
 }

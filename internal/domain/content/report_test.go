@@ -1,6 +1,7 @@
 package content_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/content"
@@ -113,6 +114,49 @@ func TestComplianceOnHandWrittenBodies(t *testing.T) {
 			}
 			if report.Score < tc.score-0.001 || report.Score > tc.score+0.001 {
 				t.Fatalf("Score = %v, want %v", report.Score, tc.score)
+			}
+		})
+	}
+}
+
+func TestUnpublishedTargetsAreNamed(t *testing.T) {
+	t.Parallel()
+
+	parent := target("/drinks/", []string{"drinks"}, content.RelationUp, true)
+	child := target("/coffee/beans/", []string{"beans"}, content.RelationDown, false)
+	sibling := target("/coffee/filter/", []string{"filter coffee"}, content.RelationSibling, false)
+	lc := contextOf(parent, child, sibling)
+	doc := mustParse(t, `<p>Part of our <a href="/drinks/">drinks</a> range.</p>`+
+		`<p>Read about <a href="/coffee/beans/">beans</a>.</p>`)
+
+	cases := []struct {
+		name string
+		live map[string]bool
+		want []string
+	}{
+		{name: "every linked page is on the site", live: map[string]bool{parent.PageID: true, child.PageID: true}},
+		{name: "a linked child is not", live: map[string]bool{parent.PageID: true}, want: []string{child.URL}},
+		{name: "nothing is", live: map[string]bool{}, want: []string{parent.URL, child.URL}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			found := content.Unpublished(doc, lc, tc.live, "self")
+			if len(found) != len(tc.want) {
+				t.Fatalf("findings = %+v, want %v", found, tc.want)
+			}
+			for i, finding := range found {
+				if finding.Code != content.CodeTargetNotPublished || finding.Severity != content.SeverityWarn {
+					t.Fatalf("finding = %+v, want a target_not_published warning", finding)
+				}
+				if finding.Details["targetPageId"] != "p-"+tc.want[i] || finding.Details["pageId"] != "self" {
+					t.Fatalf("details = %+v, want the page and the target named", finding.Details)
+				}
+				if !strings.Contains(finding.Message, tc.want[i]) {
+					t.Fatalf("message = %q, want %s named", finding.Message, tc.want[i])
+				}
 			}
 		})
 	}

@@ -69,7 +69,7 @@ func TestTheGenerateRecipeWritesAndPublishesOnePage(t *testing.T) {
 
 	want := []string{
 		"resolve_context", "generate_body", "generate_meta", "insert_links", "repair_links",
-		"validate", "judge", "publish", "relink_neighbors", "sync_back", "report",
+		"generate_images", "validate", "judge", "publish", "relink_neighbors", "sync_back", "report",
 	}
 	if got := names(run.GenerateRecipe()); !slices.Equal(got, want) {
 		t.Fatalf("GenerateRecipe() = %v, want %v", got, want)

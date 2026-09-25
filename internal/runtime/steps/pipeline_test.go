@@ -74,7 +74,9 @@ func guideSpec(t *testing.T) template.Template {
 	seeds := template.Seed()
 	for i := range seeds {
 		if seeds[i].PageKind == "guide" {
-			return seeds[i]
+			guide := seeds[i]
+			guide.Spec.Images = template.Images{Featured: true, Inline: 2, Source: template.ImagesAI}
+			return guide
 		}
 	}
 	t.Fatal("the seed templates carry no guide")
@@ -501,7 +503,7 @@ func TestARelinkRunAndARepairRunCostNothing(t *testing.T) {
 		recipe, _ := kind.Recipe()
 		estimate, err := engine.EstimateRun(t.Context(), run.Run{
 			SiteID: p.siteID, Kind: kind, Targets: []string{p.pageID}, Recipe: recipe,
-		})
+		}, nil)
 		if err != nil {
 			t.Fatalf("EstimateRun for %s: %v", kind, err)
 		}

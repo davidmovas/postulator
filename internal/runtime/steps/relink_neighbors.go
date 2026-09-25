@@ -24,9 +24,11 @@ const (
 	OutcomeConflict  = "conflict"
 	OutcomeSkipped   = "skipped"
 
-	CodeRelinkConflict = "relink_conflict"
-	CodeRelinkSkipped  = "relink_skipped"
-	ClassNeedsHuman    = "needs_human"
+	CodeRelinkConflict        = "relink_conflict"
+	CodeRelinkSkipped         = "relink_skipped"
+	CodeRelinkPhraseTemplated = "relink_phrase_templated"
+	CodeNeighborLinkMissing   = "neighbor_link_missing"
+	ClassNeedsHuman           = "needs_human"
 
 	relinkTimeout = 5 * time.Minute
 )
@@ -37,13 +39,15 @@ type NeighborBefore struct {
 }
 
 type NeighborResult struct {
-	PageID  string         `json:"pageId"`
-	Path    string         `json:"path"`
-	Outcome string         `json:"outcome"`
-	Anchor  string         `json:"anchor"`
-	Detail  string         `json:"detail"`
-	Before  NeighborBefore `json:"before"`
-	WPID    int64          `json:"wpId"`
+	PageID   string         `json:"pageId"`
+	Path     string         `json:"path"`
+	Outcome  string         `json:"outcome"`
+	Anchor   string         `json:"anchor"`
+	Sentence string         `json:"sentence,omitempty"`
+	Detail   string         `json:"detail"`
+	Before   NeighborBefore `json:"before"`
+	WPID     int64          `json:"wpId"`
+	missing  bool
 }
 
 type RelinkResult struct {
@@ -52,6 +56,7 @@ type RelinkResult struct {
 	Linked    int               `json:"linked"`
 	Conflicts int               `json:"conflicts"`
 	Skipped   int               `json:"skipped"`
+	Missing   int               `json:"missing"`
 }
 
 func RelinkNeighbors(deps Deps) run.StepDef {
@@ -71,7 +76,7 @@ func RelinkNeighbors(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			policy, err := effectivePolicy(ctx, deps, sc)
+			sitePolicy, err := effectivePolicyFor(ctx, deps, sc.Run.SiteID, template.TemplateSpec{})
 			if err != nil {
 				return run.Result{}, err
 			}
@@ -93,12 +98,11 @@ func RelinkNeighbors(deps Deps) run.StepDef {
 				Findings:  make([]content.Finding, 0),
 			}
 
-			for i := range lc.Targets {
-				neighbor, ok := neighborhood.index.ByID(lc.Targets[i].PageID)
-				switch {
-				case !ok, neighbor.WPID == nil, neighbor.ID == sc.Page.ID:
-					continue
-				case lc.Targets[i].EntityID == entity.ID:
+			candidates := candidatesOf(lc, neighborhood, entity)
+			for i := range candidates {
+				candidate := &candidates[i]
+				neighbor := candidate.page
+				if neighbor.WPID == nil || neighbor.ID == sc.Page.ID {
 					continue
 				}
 
@@ -106,23 +110,32 @@ func RelinkNeighbors(deps Deps) run.StepDef {
 				work.neighbor = neighbor
 				work.site = pagemap.NewSite(owner.BaseURL)
 				work.page = sc.Page
-				work.base = policy
+				work.base = sitePolicy
 
 				outcome, relinkErr := relinkOne(ctx, deps, client, work)
 				if relinkErr != nil {
 					return run.Result{}, relinkErr
 				}
+				if !candidate.planned && quiet(outcome) {
+					continue
+				}
 				result.Neighbors = append(result.Neighbors, outcome)
 
-				switch outcome.Outcome {
-				case OutcomeLinked:
+				switch {
+				case outcome.Outcome == OutcomeLinked:
 					result.Linked++
-				case OutcomeConflict:
+					if outcome.Sentence != "" {
+						result.Findings = append(result.Findings, templatedNeighborFinding(outcome, sc.Page))
+					}
+				case outcome.Outcome == OutcomeConflict:
 					result.Conflicts++
 					result.Findings = append(result.Findings, conflictFinding(outcome))
-				case OutcomeSkipped:
+				case outcome.Outcome == OutcomeSkipped:
 					result.Skipped++
 					result.Findings = append(result.Findings, skippedFinding(outcome))
+				case outcome.missing:
+					result.Missing++
+					result.Findings = append(result.Findings, missingNeighborFinding(outcome, sc.Page))
 				}
 			}
 
@@ -165,6 +178,81 @@ func aroundThePage(ctx context.Context, deps Deps, sc *run.StepContext) (neighbo
 		return neighborWork{}, err
 	}
 	return neighborWork{index: pagemap.NewIndex(pages), graph: built}, nil
+}
+
+type candidate struct {
+	page    pagemap.Page
+	planned bool
+}
+
+func candidatesOf(lc content.LinkContext, around neighborWork, entity graph.Entity) []candidate {
+	seen := make(map[string]struct{}, len(lc.Targets))
+	out := make([]candidate, 0, len(lc.Targets))
+	for i := range lc.Targets {
+		if lc.Targets[i].EntityID == entity.ID {
+			continue
+		}
+		page, ok := around.index.ByID(lc.Targets[i].PageID)
+		if !ok {
+			continue
+		}
+		if _, dup := seen[page.ID]; dup {
+			continue
+		}
+		seen[page.ID] = struct{}{}
+		out = append(out, candidate{page: page, planned: true})
+	}
+	others := content.MayLinkTo(around.graph, entity.ID)
+	for i := range others {
+		if others[i].CanonicalPageID == nil {
+			continue
+		}
+		page, ok := around.index.ByID(*others[i].CanonicalPageID)
+		if !ok {
+			continue
+		}
+		if _, dup := seen[page.ID]; dup {
+			continue
+		}
+		seen[page.ID] = struct{}{}
+		out = append(out, candidate{page: page})
+	}
+	return out
+}
+
+func quiet(outcome NeighborResult) bool {
+	switch outcome.Outcome {
+	case OutcomeSkipped:
+		return outcome.Detail == ReasonNeighborOwesNothing || outcome.Detail == ReasonNeighborNoTemplate ||
+			outcome.Detail == ReasonNeighborUnmapped || outcome.Detail == ReasonNeighborOwesTheCanonicalPage
+	case OutcomeUnchanged:
+		return !outcome.missing
+	default:
+		return false
+	}
+}
+
+func templatedNeighborFinding(outcome NeighborResult, page pagemap.Page) content.Finding {
+	return content.Finding{
+		Severity: content.SeverityWarn,
+		Code:     CodeRelinkPhraseTemplated,
+		Message: "the neighbor " + outcome.Path + " owed " + page.Path + " a link and carried no anchor for it, so " +
+			"a plain sentence was added to it; rewrite it on the site if it reads poorly",
+		Details: map[string]any{
+			"pageId": outcome.PageID, "wpId": outcome.WPID, "sentence": outcome.Sentence, "targetPageId": page.ID,
+		},
+	}
+}
+
+func missingNeighborFinding(outcome NeighborResult, page pagemap.Page) content.Finding {
+	return content.Finding{
+		Severity: content.SeverityWarn,
+		Code:     CodeNeighborLinkMissing,
+		Message:  "the neighbor " + outcome.Path + " owes " + page.Path + " a link that could not be placed: " + outcome.Detail,
+		Details: map[string]any{
+			"pageId": outcome.PageID, "wpId": outcome.WPID, "reason": outcome.Detail, "targetPageId": page.ID,
+		},
+	}
 }
 
 func skippedFinding(outcome NeighborResult) content.Finding {
@@ -252,11 +340,12 @@ func relinkOne(ctx context.Context, deps Deps, client *wp.Client, in neighborWor
 		return skip(outcome, ReasonNeighborUnreadable), nil
 	}
 
-	placement := content.InsertTarget(doc, lc, policy, target)
+	placement, sentence := backfill(doc, lc, policy, target)
 	anchor, inserted := insertedAnchor(placement)
 	if !inserted {
 		outcome.Outcome = OutcomeUnchanged
 		outcome.Detail = firstDetail(placement)
+		outcome.missing = !alreadyLinked(placement)
 		return outcome, nil
 	}
 
@@ -277,11 +366,37 @@ func relinkOne(ctx context.Context, deps Deps, client *wp.Client, in neighborWor
 
 	outcome.Outcome = OutcomeLinked
 	outcome.Anchor = anchor
+	outcome.Sentence = sentence
 	outcome.Before = NeighborBefore{Hash: raw.ContentHash, HTML: raw.Content}
 	if adoptErr := adopt(ctx, deps, in.neighbor, in.index, in.site, doc, hash); adoptErr != nil {
 		return NeighborResult{}, adoptErr
 	}
 	return outcome, nil
+}
+
+func backfill(doc *content.Document, lc content.LinkContext, policy template.LinkPolicy,
+	target content.LinkTarget) (placement content.InsertResult, sentence string) {
+	placement = content.InsertTarget(doc, lc, policy, target)
+	if _, inserted := insertedAnchor(placement); inserted || !writable(placement) || len(target.Anchors) == 0 {
+		return placement, ""
+	}
+	sentence = templated(owedPhrase{text: target.Anchors[0]})
+	if err := settleSentence(doc, placeFor(doc, policy, target), sentence); err != nil {
+		return placement, ""
+	}
+	return content.InsertTarget(doc, lc, policy, target), sentence
+}
+
+func writable(placement content.InsertResult) bool {
+	if len(placement.Decisions) == 0 {
+		return false
+	}
+	outcome := placement.Decisions[0].Outcome
+	return outcome == content.OutcomeAnchorNotFound || outcome == content.OutcomePositionRule
+}
+
+func alreadyLinked(placement content.InsertResult) bool {
+	return len(placement.Decisions) > 0 && placement.Decisions[0].Outcome == content.OutcomeAlreadyLinked
 }
 
 func skip(outcome NeighborResult, reason string) NeighborResult {

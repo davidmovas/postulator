@@ -94,16 +94,16 @@ export const settings = {
             help: "The file Tor Browser starts from. Left empty, the usual places are searched.",
         },
         "images.localDir": {
-            label: "Folder for generated images",
-            help: "Where generated images are written. Empty means the workspace folder.",
+            label: "Folder of images to pick from",
+            help: "The folder a template whose images come from a folder picks them from, by file name. Empty means no folder, and such a template gets no image. Takes effect after a restart.",
         },
         "images.openaiModel": {
             label: "Model that draws images",
-            help: "The OpenAI model asked for an image.",
+            help: "The OpenAI model asked for every drawn image, gpt-image-2 unless you name another. Takes effect after a restart.",
         },
         "images.openaiQuality": {
             label: "Image quality",
-            help: "Higher quality costs several times more per image. Letting OpenAI choose usually picks the dearest.",
+            help: "Higher quality costs several times more per image. Letting OpenAI choose usually picks the dearest. Takes effect after a restart.",
         },
         "import.maxRows": {
             label: "Largest spreadsheet accepted",
@@ -239,6 +239,7 @@ export const settings = {
                 image: "Images",
                 titler: "Titles",
             },
+            imagesElsewhere: "Images are drawn by the model named under Settings, Images.",
         },
         catalog: {
             open: "Manage models",

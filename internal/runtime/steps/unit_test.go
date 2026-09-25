@@ -462,12 +462,18 @@ func TestGenerateBodyNamesTheChildrenWhenTheRulesAskFor(t *testing.T) {
 	}
 
 	cases := []struct {
-		name    string
-		section bool
-		want    bool
+		name   string
+		rules  template.LinkRules
+		policy template.LinkRules
+		want   bool
 	}{
-		{name: "the rules ask for a children section", section: true, want: true},
-		{name: "the rules do not", section: false},
+		{name: "the rules ask for a children section", rules: template.LinkRules{UpDepth: 1, ChildrenSection: true}, want: true},
+		{name: "the rules do not", rules: template.LinkRules{UpDepth: 1}},
+		{
+			name:   "the template inherits a site policy that asks for one",
+			policy: template.LinkRules{UpDepth: 1, DownLinks: true, ChildrenSection: true},
+			want:   true,
+		},
 	}
 
 	for _, tc := range cases {
@@ -477,8 +483,9 @@ func TestGenerateBodyNamesTheChildrenWhenTheRulesAskFor(t *testing.T) {
 			deps := unitDeps()
 			recorder := &promptRecorder{reply: goodDraft}
 			deps.LLM = recorder
+			deps.Policies = policyStub{rules: tc.policy}
 			sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: down})
-			sc.Spec.LinkRules.ChildrenSection = tc.section
+			sc.Spec.LinkRules = tc.rules
 
 			if _, runErr := steps.GenerateBody(deps).Run(t.Context(), sc); runErr != nil {
 				t.Fatalf("GenerateBody: %v", runErr)
@@ -487,8 +494,80 @@ func TestGenerateBodyNamesTheChildrenWhenTheRulesAskFor(t *testing.T) {
 				t.Fatalf("the prompt asks for a children section = %t, want %t:\n%s",
 					!tc.want, tc.want, recorder.last)
 			}
-			if tc.want && !strings.Contains(recorder.last, "grinding for espresso") {
-				t.Fatalf("the prompt does not name the child:\n%s", recorder.last)
+			if !strings.Contains(recorder.last, "grinding for espresso") {
+				t.Fatalf("the prompt does not name the child, which the page owes a link:\n%s", recorder.last)
+			}
+		})
+	}
+}
+
+func onTheSite(deps steps.Deps) steps.Deps {
+	listed, ok := deps.Pages.(pageList)
+	if !ok {
+		return deps
+	}
+	items := make([]pagemap.Page, 0, len(listed.items))
+	for i := range listed.items {
+		page := listed.items[i]
+		wpID := int64(100 + i)
+		page.WPID = &wpID
+		items = append(items, page)
+	}
+	listed.items = items
+	deps.Pages = listed
+	return deps
+}
+
+func TestValidateNamesALinkToAPageThatIsNotOnTheSite(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		deps   func(steps.Deps) steps.Deps
+		within []string
+		named  bool
+	}{
+		{name: "the parent is on the site", deps: onTheSite},
+		{name: "the parent is written by this run", within: []string{"page-child", "page-parent"}},
+		{name: "the parent is only planned", named: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps := unitDeps()
+			if tc.deps != nil {
+				deps = tc.deps(deps)
+			}
+			sc := unitContext(t, map[run.ArtifactKind][]byte{
+				run.ArtifactLinkContext: linkContextBlob(t, deps),
+				run.ArtifactBodyHTML:    []byte(`<h1>Espresso</h1><h2>About</h2><p>Espresso is a kind of <a href="/coffee/">coffee</a>.</p>`),
+			})
+			sc.Run.Targets = tc.within
+
+			result, err := steps.Validate(deps).Run(t.Context(), sc)
+			if err != nil {
+				t.Fatalf("Validate: %v", err)
+			}
+			if result.Next == run.TransitionPause {
+				t.Fatalf("result = %+v, want a link to a planned page never to hold the page", result)
+			}
+			var decoded steps.ValidationReport
+			if err = json.Unmarshal(result.Artifacts[0].Blob, &decoded); err != nil {
+				t.Fatalf("decode the report: %v", err)
+			}
+			named := false
+			for _, item := range decoded.Compliance.Items {
+				if item.Code == content.CodeTargetNotPublished {
+					named = true
+				}
+			}
+			if named != tc.named {
+				t.Fatalf("compliance = %+v, want target_not_published %v", decoded.Compliance.Items, tc.named)
+			}
+			if tc.named && decoded.Compliance.Score >= 1 {
+				t.Fatalf("score = %v, want the warning to count", decoded.Compliance.Score)
 			}
 		})
 	}
@@ -497,7 +576,7 @@ func TestGenerateBodyNamesTheChildrenWhenTheRulesAskFor(t *testing.T) {
 func TestInsertLinksAndValidateReadTheirArtifacts(t *testing.T) {
 	t.Parallel()
 
-	deps := unitDeps()
+	deps := onTheSite(unitDeps())
 	blob := linkContextBlob(t, deps)
 	body := []byte("<h1>Espresso</h1><h2>About</h2><p>Espresso is a kind of coffee.</p>")
 
@@ -742,6 +821,94 @@ func TestRepairLinksFallsBackToAPlainSentenceWhenTheLinkerKeepsMissingThePhrase(
 				t.Fatalf("message = %q", result.Message)
 			}
 		})
+	}
+}
+
+func owingContext(t *testing.T) []byte {
+	t.Helper()
+
+	blob, err := json.Marshal(content.LinkContext{
+		PageID: "page-child", PageURL: "/coffee/espresso/", EntityID: "child",
+		Targets: []content.LinkTarget{
+			{
+				EntityID: "parent", PageID: "page-parent", URL: "/coffee/", Anchors: []string{"coffee"},
+				Relation: content.RelationUp, Required: true, Weight: 1, Depth: 1,
+			},
+			{
+				EntityID: "ristretto", PageID: "page-ristretto", URL: "/coffee/espresso/ristretto/",
+				Anchors: []string{"ristretto"}, Relation: content.RelationDown, Weight: 1, Depth: 1,
+			},
+			{
+				EntityID: "filter", PageID: "page-filter", URL: "/coffee/filter/", Anchors: []string{"filter coffee"},
+				Relation: content.RelationSibling, Weight: 0.8, Depth: 1,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("encode the link context: %v", err)
+	}
+	return blob
+}
+
+func TestRepairLinksWritesAPhraseForEveryOwedLinkWhereItMayGo(t *testing.T) {
+	t.Parallel()
+
+	deps := unitDeps()
+	client := &callCounter{reply: `{"sentence":"A sentence with no anchor at all."}`}
+	deps.LLM = client
+	sc := unitContext(t, map[run.ArtifactKind][]byte{
+		run.ArtifactLinkContext: owingContext(t),
+		run.ArtifactBodyHTML:    []byte("<h1>Espresso</h1><p>Our espresso starts with the coffee we roast.</p><p>Last words.</p>"),
+	})
+
+	result, err := steps.RepairLinks(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("RepairLinks: %v", err)
+	}
+	if client.calls != 4 {
+		t.Fatalf("the linker was called %d times, want two tries for the child and two for the sibling", client.calls)
+	}
+
+	body := string(result.Artifacts[0].Blob)
+	want := `<h1>Espresso</h1><p>Our espresso starts with the <a href="/coffee/">coffee</a> we roast.</p>` +
+		`<p>Last words. Read more about <a href="/coffee/espresso/ristretto/">ristretto</a>. ` +
+		`Read more about <a href="/coffee/filter/">filter coffee</a>.</p>`
+	if body != want {
+		t.Fatalf("body =\n%s\nwant\n%s", body, want)
+	}
+
+	repairs := repairsOf(t, result)
+	if len(repairs) != 2 || repairs[0].Details["url"] != "/coffee/espresso/ristretto/" ||
+		repairs[1].Details["url"] != "/coffee/filter/" {
+		t.Fatalf("repairs = %+v, want the child and the sibling named", repairs)
+	}
+	if !strings.Contains(result.Message, "2 owed phrases") {
+		t.Fatalf("message = %q", result.Message)
+	}
+}
+
+func TestRepairLinksLeavesALinkTheBudgetCannotHold(t *testing.T) {
+	t.Parallel()
+
+	deps := unitDeps()
+	client := &callCounter{reply: `{"sentence":"A sentence with no anchor at all."}`}
+	deps.LLM = client
+	sc := unitContext(t, map[run.ArtifactKind][]byte{
+		run.ArtifactLinkContext: owingContext(t),
+		run.ArtifactBodyHTML:    []byte("<h1>Espresso</h1><p>Our espresso starts with the coffee we roast.</p>"),
+	})
+	sc.Spec.LinkRules.MaxLinks = 1
+
+	result, err := steps.RepairLinks(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("RepairLinks: %v", err)
+	}
+	if client.calls != 0 || len(repairsOf(t, result)) != 0 {
+		t.Fatalf("the linker was called %d times with repairs %+v, want nothing written past the budget",
+			client.calls, repairsOf(t, result))
+	}
+	if strings.Contains(string(result.Artifacts[0].Blob), "ristretto") {
+		t.Fatalf("the body names the child the budget cannot link: %s", result.Artifacts[0].Blob)
 	}
 }
 

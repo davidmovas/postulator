@@ -152,6 +152,7 @@ export interface AuditCard {
     blocked: number;
     offGraph: number;
     orphans: number;
+    pending: number;
 }
 
 export function auditCard(pages: readonly PageAudit[], totals: {
@@ -164,8 +165,10 @@ export function auditCard(pages: readonly PageAudit[], totals: {
     blocked: number;
     offGraph: number;
     orphans: number;
+    pending: number;
+    unpublished: number;
 }): AuditCard {
-    const audited = pages.filter((page) => page.skipReason === "");
+    const audited = pages.filter((page) => page.skipReason === "" && page.onSite);
     const compliant = audited.filter((page) => page.missing === 0 && page.blocked === 0).length;
     return {
         audited: totals.audited,
@@ -177,5 +180,6 @@ export function auditCard(pages: readonly PageAudit[], totals: {
         blocked: totals.blocked,
         offGraph: totals.offGraph,
         orphans: totals.orphans,
+        pending: totals.pending,
     };
 }

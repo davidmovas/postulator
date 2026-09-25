@@ -3,6 +3,7 @@ package steps
 import (
 	"context"
 	"strconv"
+	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/run"
@@ -27,6 +28,7 @@ type FinalReport struct {
 	Findings   []content.Finding `json:"findings"`
 	Errors     int               `json:"errors"`
 	Warnings   int               `json:"warnings"`
+	Notice     string            `json:"notice"`
 }
 
 func Report(deps Deps) run.StepDef {
@@ -116,14 +118,20 @@ func Report(deps Deps) run.StepDef {
 			}
 
 			report.Errors, report.Warnings = weigh(report.Findings)
+			report.Notice = noticeOf(report)
 
 			blob, err := encode(report, "final report")
 			if err != nil {
 				return run.Result{}, err
 			}
+			message := scoreline(report)
+			if report.Notice != "" {
+				message += "; " + report.Notice
+			}
 			return run.Result{
 				Artifacts: []run.Artifact{{Kind: run.ArtifactFinalReport, Blob: blob}},
-				Message:   scoreline(report),
+				Message:   message,
+				Notice:    report.Notice,
 			}, nil
 		},
 	}
@@ -163,6 +171,57 @@ func lower(running, candidate *float64) *float64 {
 	default:
 		return running
 	}
+}
+
+func noticeOf(report FinalReport) string {
+	parts := make([]string, 0, 4)
+	if missing := countCode(report.Findings, content.CodeTargetMissing); missing > 0 {
+		part := counted(missing, "owed link is", "owed links are") + " missing"
+		if budgetSpent(report.Validation) {
+			part += ", the link budget of the page is spent"
+		}
+		parts = append(parts, part)
+	}
+	if unpublished := countCode(report.Findings, content.CodeTargetNotPublished); unpublished > 0 {
+		parts = append(parts, counted(unpublished, "link leads", "links lead")+" to a page that is not on the site yet")
+	}
+	if neighbors := countCode(report.Findings, CodeNeighborLinkMissing); neighbors > 0 {
+		parts = append(parts, counted(neighbors, "neighbor", "neighbors")+" could not link to this page")
+	}
+	if report.Images != nil && len(report.Images.Images) < report.Images.Wanted {
+		parts = append(parts, strconv.Itoa(len(report.Images.Images))+" of "+strconv.Itoa(report.Images.Wanted)+
+			" images placed")
+	}
+	return strings.Join(parts, "; ")
+}
+
+func countCode(findings []content.Finding, code string) int {
+	total := 0
+	for i := range findings {
+		if findings[i].Code == code {
+			total++
+		}
+	}
+	return total
+}
+
+func counted(count int, one, many string) string {
+	if count == 1 {
+		return "1 " + one
+	}
+	return strconv.Itoa(count) + " " + many
+}
+
+func budgetSpent(validation *ValidationReport) bool {
+	if validation == nil {
+		return false
+	}
+	for i := range validation.Links.Decisions {
+		if validation.Links.Decisions[i].Outcome == content.OutcomeCapReached {
+			return true
+		}
+	}
+	return false
 }
 
 func scoreline(report FinalReport) string {

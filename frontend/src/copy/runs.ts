@@ -112,6 +112,13 @@ export const runs = {
     decisionTitle: (count: number) =>
         count === 1 ? "1 page waits for your decision" : `${count} pages wait for your decision`,
     decisionBody: "Open each held page to accept it as it is or to regenerate it.",
+    noted: {
+        badge: "Done, check",
+        title: (count: number) =>
+            count === 1 ? "1 page finished with something to check" : `${count} pages finished with something to check`,
+        body: "Each is marked Done, check. Its row says what it lacks: a link it owes, a link to a page that is not published yet, or the images its template asked for. The Linking screen shows the links as they stand now.",
+        drawer: "The page went through every step. Links & compliance lists the links it owes as they stood at validation, Images says what the image step could not do, and the Linking screen shows the links as they stand now.",
+    },
     after: (path: string) => `after ${path}`,
     retryBlocked: {
         inputs_expired: "Inputs expired — re-run the page",
@@ -250,7 +257,8 @@ export const runs = {
         kind: "Kind",
         template: "Template",
         templateAuto: "Resolved per page",
-        templateHint: "Left automatic, each page uses the template its own overrides resolve to.",
+        templateHint:
+            "Picking a template moves the chosen pages to it, for this run and every later one. Left automatic, each page keeps the template it has, or the site default.",
         cap: "Dollar cap",
         capHint: "The run pauses itself once spend passes this. Zero means no cap at all.",
         capZero: "With no cap this run will not stop itself on spend.",
@@ -320,6 +328,8 @@ export const runs = {
         },
         links: {
             owed: "Owed to the graph",
+            snapshot:
+                "As the page stood at validation. A link placed later, when a page it owes was published, shows on the Linking screen, which reads the site as it is now.",
             owedEmpty: "The graph asked this page for no links.",
             satisfied: "satisfied",
             missing: "missing",

@@ -16,11 +16,12 @@ import (
 const NameRelinkPage = string(run.StepRelinkPage)
 
 type PlacedLink struct {
-	PageID  string `json:"pageId"`
-	Path    string `json:"path"`
-	Anchor  string `json:"anchor"`
-	Outcome string `json:"outcome"`
-	Detail  string `json:"detail"`
+	PageID   string `json:"pageId"`
+	Path     string `json:"path"`
+	Anchor   string `json:"anchor"`
+	Sentence string `json:"sentence,omitempty"`
+	Outcome  string `json:"outcome"`
+	Detail   string `json:"detail"`
 }
 
 type RelinkPageResult struct {
@@ -92,10 +93,15 @@ func RelinkPage(deps Deps) run.StepDef {
 				return standDown(work, sc, ReasonPageUnreadable)
 			}
 
+			pages, err := deps.Pages.ListBySite(ctx, sc.Run.SiteID)
+			if err != nil {
+				return run.Result{}, err
+			}
+
 			work.published.ContentHash = raw.ContentHash
 			work.published.PreviousContent = raw.Content
 			work.published.PreviousContentHash = raw.ContentHash
-			placeTargets(&work, doc, lc, policy, sc.Page.ID)
+			placeTargets(&work, doc, lc, policy, sc.Page, onTheSite(pages))
 
 			if work.result.Linked == 0 {
 				return settleRelinkPage(work)
@@ -120,10 +126,6 @@ func RelinkPage(deps Deps) run.StepDef {
 			}
 			work.published.ContentHash = hash
 
-			pages, err := deps.Pages.ListBySite(ctx, sc.Run.SiteID)
-			if err != nil {
-				return run.Result{}, err
-			}
 			owner, err := deps.Sites.Get(ctx, sc.Run.SiteID)
 			if err != nil {
 				return run.Result{}, err
@@ -143,21 +145,80 @@ type pageRelink struct {
 }
 
 func placeTargets(work *pageRelink, doc *content.Document, lc content.LinkContext,
-	policy template.LinkPolicy, pageID string) {
+	policy template.LinkPolicy, page pagemap.Page, live map[string]bool) {
 	for i := range lc.Targets {
-		if lc.Targets[i].PageID == pageID || lc.Targets[i].PageID == "" {
+		target := lc.Targets[i]
+		if target.PageID == page.ID || target.PageID == "" {
 			continue
 		}
 
-		placement := content.InsertTarget(doc, lc, policy, lc.Targets[i])
-		row := PlacedLink{PageID: lc.Targets[i].PageID, Path: lc.Targets[i].URL}
+		var (
+			placement content.InsertResult
+			sentence  string
+		)
+		if live[target.PageID] {
+			placement, sentence = backfill(doc, lc, policy, target)
+		} else {
+			placement = content.InsertTarget(doc, lc, policy, target)
+		}
+
+		row := PlacedLink{PageID: target.PageID, Path: target.URL}
 		if anchor, inserted := insertedAnchor(placement); inserted {
-			row.Outcome, row.Anchor = OutcomeLinked, anchor
+			row.Outcome, row.Anchor, row.Sentence = OutcomeLinked, anchor, sentence
 			work.result.Linked++
+			if sentence != "" {
+				work.result.Findings = append(work.result.Findings, templatedPageFinding(page, target, sentence))
+			}
 		} else {
 			row.Outcome, row.Detail = OutcomeUnchanged, firstDetail(placement)
+			if missing, owed := unplaced(placement, target, live[target.PageID], page); owed {
+				work.result.Findings = append(work.result.Findings, missing)
+			} else if !live[target.PageID] && !alreadyLinked(placement) {
+				row.Detail = "it is linked once " + target.URL + " is published"
+			}
 		}
 		work.result.Placed = append(work.result.Placed, row)
+	}
+	work.result.Findings = append(work.result.Findings, content.Unpublished(doc, lc, live, page.ID)...)
+}
+
+func onTheSite(pages []pagemap.Page) map[string]bool {
+	live := make(map[string]bool, len(pages))
+	for i := range pages {
+		if pages[i].WPID != nil {
+			live[pages[i].ID] = true
+		}
+	}
+	return live
+}
+
+func unplaced(placement content.InsertResult, target content.LinkTarget, live bool,
+	page pagemap.Page) (content.Finding, bool) {
+	if len(placement.Decisions) == 0 || alreadyLinked(placement) {
+		return content.Finding{}, false
+	}
+	budget := placement.Decisions[0].Outcome == content.OutcomeCapReached
+	if !budget && !live {
+		return content.Finding{}, false
+	}
+	return content.Finding{
+		Severity: content.SeverityWarn,
+		Code:     content.CodeTargetMissing,
+		Message:  "the page does not link to " + target.URL + ": " + placement.Decisions[0].Detail,
+		Details: map[string]any{
+			"pageId": page.ID, "targetPageId": target.PageID, "relation": string(target.Relation),
+			"reason": string(placement.Decisions[0].Outcome),
+		},
+	}, true
+}
+
+func templatedPageFinding(page pagemap.Page, target content.LinkTarget, sentence string) content.Finding {
+	return content.Finding{
+		Severity: content.SeverityWarn,
+		Code:     CodeRelinkPhraseTemplated,
+		Message: "the page " + page.Path + " carried no anchor for " + target.URL + ", so a plain sentence was added " +
+			"to it; rewrite it on the site if it reads poorly",
+		Details: map[string]any{"pageId": page.ID, "targetPageId": target.PageID, "sentence": sentence},
 	}
 }
 

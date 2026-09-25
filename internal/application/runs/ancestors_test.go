@@ -2,6 +2,7 @@ package runs_test
 
 import (
 	stderrors "errors"
+	"maps"
 	"slices"
 	"strings"
 	"testing"
@@ -196,5 +197,144 @@ func TestARunThatDoesNotPublishAddsNoAncestor(t *testing.T) {
 	}
 	if len(resp.Added) != 0 || !slices.Equal(fixture.engine.queued.Targets, []string{"cargo"}) {
 		t.Fatalf("a relink added %+v", resp.Added)
+	}
+}
+
+func pickedRecipe() []template.StepSpec {
+	return []template.StepSpec{
+		{Name: "resolve_context", Enabled: true}, {Name: "generate_body", Enabled: true}, {Name: "publish", Enabled: true},
+	}
+}
+
+func TestStartAssignsThePickedTemplateToTheChosenPagesOnly(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	fixture.chain(
+		chain{id: "bikes", path: "/bikes/", mapped: true},
+		chain{id: "cargo", path: "/bikes/cargo/", parent: "bikes", mapped: true},
+		chain{id: "max", path: "/bikes/cargo/max/", parent: "cargo", mapped: true},
+	)
+	fixture.specs.byTemplate = map[string]template.TemplateSpec{"picked": {Recipe: pickedRecipe()}}
+
+	if _, err := fixture.service.Start(t.Context(), runs.StartRequest{
+		SiteID: fixture.siteID, PageIDs: []string{"max"}, TemplateID: "picked",
+	}); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	if len(fixture.assigner.calls) != 1 {
+		t.Fatalf("assigned %d times, want once", len(fixture.assigner.calls))
+	}
+	call := fixture.assigner.calls[0]
+	if call.SiteID != fixture.siteID || call.TemplateID != "picked" || !slices.Equal(call.PageIDs, []string{"max"}) {
+		t.Fatalf("assigned %+v, want the picked template on the chosen page alone", call)
+	}
+	if fixture.specs.handed["max"] != "picked" || fixture.specs.handed["cargo"] != "" || fixture.specs.handed["bikes"] != "" {
+		t.Fatalf("resolved with %v, want the parents the run added on their own templates", fixture.specs.handed)
+	}
+	if want := map[string]string{"max": "picked"}; !maps.Equal(fixture.engine.assigned, want) {
+		t.Fatalf("the estimate priced %v, want %v", fixture.engine.assigned, want)
+	}
+	queued := fixture.engine.queued
+	if queued.TemplateID != "picked" || queued.TemplateVersion != 7 || len(queued.Recipe) != len(pickedRecipe()) {
+		t.Fatalf("queued %s@%d with %v, want the picked template's recipe", queued.TemplateID, queued.TemplateVersion,
+			queued.Recipe)
+	}
+}
+
+func TestEstimateAssignsNothing(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	fixture.chain(chain{id: "max", path: "/max/", mapped: true})
+	fixture.specs.byTemplate = map[string]template.TemplateSpec{"picked": {Recipe: pickedRecipe()}}
+
+	if _, err := fixture.service.Estimate(t.Context(), runs.StartRequest{
+		SiteID: fixture.siteID, PageIDs: []string{"max"}, TemplateID: "picked",
+	}); err != nil {
+		t.Fatalf("Estimate: %v", err)
+	}
+	if len(fixture.assigner.calls) != 0 {
+		t.Fatalf("the estimate assigned %+v", fixture.assigner.calls)
+	}
+	if fixture.engine.assigned["max"] != "picked" {
+		t.Fatalf("the estimate priced %v, want the picked template", fixture.engine.assigned)
+	}
+}
+
+func TestARefusedStartAssignsNothing(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		arrange func(*fixture)
+		request runs.StartRequest
+	}{
+		{
+			name: "the estimate blocks the run",
+			arrange: func(f *fixture) {
+				f.engine.estimate.Findings = []run.EstimateFinding{{Severity: "error", Code: "provider_key_missing", Message: "no key"}}
+			},
+			request: runs.StartRequest{PageIDs: []string{"max"}, TemplateID: "picked"},
+		},
+		{
+			name:    "a kind that owns its recipe",
+			request: runs.StartRequest{PageIDs: []string{"max"}, TemplateID: "picked", Kind: string(run.KindRelink)},
+		},
+		{
+			name:    "no template was picked",
+			request: runs.StartRequest{PageIDs: []string{"max"}},
+		},
+		{
+			name: "the picked template's recipe cannot run",
+			arrange: func(f *fixture) {
+				f.specs.byTemplate["picked"] = template.TemplateSpec{Recipe: []template.StepSpec{{Name: "publish", Enabled: true}}}
+			},
+			request: runs.StartRequest{PageIDs: []string{"max"}, TemplateID: "picked"},
+		},
+		{
+			name:    "a negative budget",
+			request: runs.StartRequest{PageIDs: []string{"max"}, TemplateID: "picked", Budget: run.Budget{MaxUSD: -1}},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			fixture := newFixture(t)
+			fixture.chain(chain{id: "max", path: "/max/", mapped: true})
+			fixture.specs.byTemplate = map[string]template.TemplateSpec{"picked": {Recipe: pickedRecipe()}}
+			if tc.arrange != nil {
+				tc.arrange(fixture)
+			}
+			request := tc.request
+			request.SiteID = fixture.siteID
+
+			_, err := fixture.service.Start(t.Context(), request)
+			if len(fixture.assigner.calls) != 0 {
+				t.Fatalf("assigned %+v, want nothing", fixture.assigner.calls)
+			}
+			if tc.request.TemplateID != "" && tc.request.Kind == "" && err == nil {
+				t.Fatal("Start went ahead, want it refused before anything was assigned")
+			}
+		})
+	}
+}
+
+func TestAFailedAssignmentQueuesNothing(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	fixture.chain(chain{id: "max", path: "/max/", mapped: true})
+	fixture.specs.byTemplate = map[string]template.TemplateSpec{"picked": {Recipe: pickedRecipe()}}
+	fixture.assigner.err = errors.New(errors.Invalid, "the page belongs to another site")
+
+	_, err := fixture.service.Start(t.Context(), runs.StartRequest{
+		SiteID: fixture.siteID, PageIDs: []string{"max"}, TemplateID: "picked",
+	})
+	if !errors.IsCode(err, errors.Invalid) || fixture.engine.queued.ID != "" {
+		t.Fatalf("Start = %v, queued %+v; want the assignment's refusal and no run", err, fixture.engine.queued)
 	}
 }

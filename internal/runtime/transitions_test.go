@@ -122,6 +122,43 @@ func TestAStepCanCompleteOrFailTheItemItself(t *testing.T) {
 	}
 }
 
+func TestAFinishedItemKeepsTheNoticeOfItsLastStep(t *testing.T) {
+	t.Parallel()
+
+	harness := newHarness(t, 1)
+	written := producing("generate_body", run.ArtifactBodyHTML, nil,
+		func(context.Context, *run.StepContext) (run.Result, error) {
+			return run.Result{
+				Artifacts: []run.Artifact{{Kind: run.ArtifactBodyHTML, Blob: []byte("<p>ok</p>")}},
+				Notice:    "a notice nobody reads, because a later step settles the item",
+			}, nil
+		})
+	reported := producing("report", run.ArtifactFinalReport, nil,
+		func(context.Context, *run.StepContext) (run.Result, error) {
+			return run.Result{
+				Artifacts: []run.Artifact{{Kind: run.ArtifactFinalReport, Blob: []byte("{}")}},
+				Notice:    "1 owed link is missing",
+			}, nil
+		})
+
+	engine := harness.engine(t, mustRegister(t, written, reported))
+	queued, err := engine.Enqueue(t.Context(), harness.newRun(recipeOf("generate_body", "report")))
+	if err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+	harness.waitForRun(t, queued.ID, run.StatusCompleted)
+
+	items, err := harness.items.ByRun(t.Context(), queued.ID)
+	if err != nil || len(items) != 1 || items[0].Note != "1 owed link is missing" {
+		t.Fatalf("items = %+v, %v; want the finished item to keep what its last step noticed", items, err)
+	}
+	waitFor(t, "the item to be announced", func() bool { return harness.bus.count(events.ItemDone) == 1 })
+	done, ok := harness.bus.payloads(events.ItemDone)[0].(events.ItemDonePayload)
+	if !ok || done.Note != "1 owed link is missing" {
+		t.Fatalf("item.done = %+v, want the notice on it", harness.bus.payloads(events.ItemDone)[0])
+	}
+}
+
 func TestARunWhoseEveryItemAsksForAHumanIsPausedNotLeftRunning(t *testing.T) {
 	t.Parallel()
 

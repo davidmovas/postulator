@@ -49,6 +49,9 @@ export interface SpecDraft {
     recipe: StepDraft[];
 }
 
+export const imageStep = "generate_images";
+const drawnSource = "ai";
+
 export function isJsonObject(value: JsonValue | undefined): value is JsonObject {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -227,6 +230,24 @@ export function specJsonOf(draft: SpecDraft): JsonObject {
 
 export function specOf(draft: SpecDraft): TemplateSpec {
     return specJsonOf(draft) as unknown as TemplateSpec;
+}
+
+export function asksForImages(draft: SpecDraft): boolean {
+    return draft.featuredImage || draft.inlineImages > 0;
+}
+
+export function readyForImages(before: SpecDraft, next: SpecDraft): SpecDraft {
+    if (asksForImages(before) || !asksForImages(next)) {
+        return next;
+    }
+    const ownRecipe = next.recipe.some((step) => step.enabled || step.declared);
+    return {
+        ...next,
+        imageSource: next.imageSource === "" ? drawnSource : next.imageSource,
+        recipe: ownRecipe
+            ? next.recipe.map((step) => (step.name === imageStep ? { ...step, enabled: true, declared: true } : step))
+            : next.recipe,
+    };
 }
 
 export function emptySection(): SectionDraft {

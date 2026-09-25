@@ -1,8 +1,7 @@
 import { copy } from "../../copy/index.js";
 import { stepNames } from "../../generated/vocab.js";
 import type { SpecDraft } from "./spec.js";
-
-const imageStep = "generate_images";
+import { imageStep } from "./spec.js";
 
 export function blankDraft(): SpecDraft {
     return {

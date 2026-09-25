@@ -73,8 +73,8 @@ func steps(names ...string) []template.StepSpec {
 func GenerateRecipe() []template.StepSpec {
 	return steps(
 		string(StepResolveContext), string(StepGenerateBody), string(StepGenerateMeta),
-		string(StepInsertLinks), string(StepRepairLinks), string(StepValidate), string(StepJudge),
-		string(StepPublish), string(StepRelinkNeighbors), string(StepSyncBack), string(StepReport),
+		string(StepInsertLinks), string(StepRepairLinks), string(StepGenerateImages), string(StepValidate),
+		string(StepJudge), string(StepPublish), string(StepRelinkNeighbors), string(StepSyncBack), string(StepReport),
 	)
 }
 

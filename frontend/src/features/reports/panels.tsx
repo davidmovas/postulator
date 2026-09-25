@@ -80,6 +80,7 @@ export function LinkAuditPanel({ card, siteId }: AuditPanelProps): ReactElement 
                 <p className="text-2xs text-ink-faint">{copy.reports.audit.audited(card.audited, card.pages)}</p>
                 <Line label={copy.reports.audit.missingRequired} value={card.missingRequired} warn={true} />
                 <Line label={copy.reports.audit.missing} value={card.missing} />
+                <Line label={copy.reports.audit.pending} value={card.pending} />
                 <Line label={copy.reports.audit.blocked} value={card.blocked} warn={true} />
                 <Line label={copy.reports.audit.offGraph} value={card.offGraph} />
                 <Line label={copy.reports.audit.orphans} value={card.orphans} />

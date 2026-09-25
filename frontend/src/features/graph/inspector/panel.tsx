@@ -67,8 +67,9 @@ function AuditRows({ siteId, entityId, audit }: AuditRowsProps): ReactElement {
                                     {row.skipReason !== ""
                                         ? (copy.links.cell.skipped[row.skipReason] ?? row.skipReason)
                                         : [
-                                              copy.graph.inspector.linksRow(row.satisfied, row.targets),
+                                              row.onSite ? copy.graph.inspector.linksRow(row.satisfied, row.targets) : copy.graph.inspector.linksNotWritten,
                                               row.missing > 0 ? copy.graph.inspector.linksMissing(row.missing, row.missingRequired) : null,
+                                              row.pending > 0 && row.onSite ? copy.graph.inspector.linksPending(row.pending) : null,
                                               row.blocked > 0 ? copy.graph.inspector.linksBlocked(row.blocked) : null,
                                           ]
                                               .filter((part) => part !== null)

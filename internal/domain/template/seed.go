@@ -6,10 +6,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"strings"
 )
 
-//go:embed seed/*.json
+//go:embed seed/*.json seed/superseded/*.json
 var seedFiles embed.FS
+
+const (
+	seedPattern       = "seed/*.json"
+	supersededPattern = "seed/superseded/*.json"
+)
 
 type seedFile struct {
 	Name     string       `json:"name"`
@@ -18,7 +24,37 @@ type seedFile struct {
 }
 
 func Seed() []Template {
-	names, err := fs.Glob(seedFiles, "seed/*.json")
+	return seedsAt(seedPattern, true)
+}
+
+func Superseded() []Template {
+	return seedsAt(supersededPattern, false)
+}
+
+func Supersedes(seed, stored Template) bool {
+	if stored.Scope != ScopeGlobal || !strings.EqualFold(stored.Name, seed.Name) || stored.PageKind != seed.PageKind {
+		return false
+	}
+	if sameSpec(stored.Spec, seed.Spec) {
+		return false
+	}
+	earlier := Superseded()
+	for i := range earlier {
+		if strings.EqualFold(earlier[i].Name, seed.Name) && sameSpec(stored.Spec, earlier[i].Spec) {
+			return true
+		}
+	}
+	return false
+}
+
+func sameSpec(a, b TemplateSpec) bool {
+	left, leftErr := json.Marshal(a)
+	right, rightErr := json.Marshal(b)
+	return leftErr == nil && rightErr == nil && bytes.Equal(left, right)
+}
+
+func seedsAt(pattern string, strict bool) []Template {
+	names, err := fs.Glob(seedFiles, pattern)
 	if err != nil {
 		panic(fmt.Errorf("list seed templates: %w", err))
 	}
@@ -32,7 +68,9 @@ func Seed() []Template {
 
 		var file seedFile
 		decoder := json.NewDecoder(bytes.NewReader(body))
-		decoder.DisallowUnknownFields()
+		if strict {
+			decoder.DisallowUnknownFields()
+		}
 		if decodeErr := decoder.Decode(&file); decodeErr != nil {
 			panic(fmt.Errorf("decode seed template %s: %w", name, decodeErr))
 		}

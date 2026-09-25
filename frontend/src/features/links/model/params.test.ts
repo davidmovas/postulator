@@ -15,6 +15,11 @@ describe("readQuery and writeQuery", () => {
         expect(readQuery(new URLSearchParams(written))).toStrictEqual(query);
     });
 
+    it("reads the filters for what waits and for links to unpublished pages", () => {
+        expect(readQuery(new URLSearchParams("show=pending")).show).toBe("pending");
+        expect(readQuery(new URLSearchParams("show=unpublished")).show).toBe("unpublished");
+    });
+
     it("falls back on values it does not know", () => {
         expect(readQuery(new URLSearchParams("show=bogus&status=nope&sort=weird"))).toStrictEqual(defaultQuery);
     });

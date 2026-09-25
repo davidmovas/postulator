@@ -21,7 +21,7 @@ import type { RetryNotice, StepEntry } from "./log-view.js";
 import { ArtifactPane } from "./panes/index.js";
 import { driftRefusal } from "./refusal.js";
 import { neighbourOf, positionOf } from "./review-nav.js";
-import { heldForParent, itemBadge, primaryAction, regenerateState } from "./hold.js";
+import { finishedShort, heldForParent, itemBadge, primaryAction, regenerateState } from "./hold.js";
 import { ParentHold } from "./review-hold.js";
 import { DriftRefused, ReviewActions, ReviewEmpty, ReviewMeta, ReviewMissing, Timeline } from "./review-states.js";
 import { artifactBodyHtml, artifactPublishResult, retentionDaysKey } from "./statuses.js";
@@ -233,6 +233,10 @@ export function ReviewDrawer({
                                     restart(item.runId, parentItemId);
                                 }}
                             />
+                        </div>
+                    ) : finishedShort(item) ? (
+                        <div className="shrink-0 px-3 pt-2">
+                            <Banner tone="warn" title={item.note} body={copy.runs.noted.drawer} />
                         </div>
                     ) : item.pauseReason === "" ? null : (
                         <div className="shrink-0 px-3 pt-2">

@@ -3,7 +3,8 @@
 The handoff point between sessions. Read this first. The reasoning behind every phase and
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
-**Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
+**Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks. The
+2026-09-25 work is on `claude/cool-archimedes-5qgsre`, to reach `dev` when the owner asks.
 **Released:** `v2.1.0` on 2026-09-23; **`v2.2.0` is on `dev` awaiting the owner's build and tag**
 (this session ran on Linux, so `task build`, `task e2e:full` and the sandbox walk are listed
 under **Next steps** rather than under **The gate**).
@@ -46,6 +47,29 @@ under **2026-09-24 — 2.2.0** in `DECISIONS.md`.
   run stays live, `step.started` refreshes the rows, the drawer picks its primary action from what
   stopped the page, and the header counts the pages that wait for a decision.
 
+**2026-09-25** answers the owner's third week, on `claude/cool-archimedes-5qgsre`: the reasoning is
+under **2026-09-25** in `DECISIONS.md`.
+
+- **The built-ins ask for no image**, and a built-in nobody edited is refreshed to the new version
+  on start from the copies under `domain/template/seed/superseded`; an edited one is left alone.
+- **Images are drawn when a template asks for them.** The OpenAI adapter no longer sends the
+  `response_format` GPT image models reject, the generate recipe carries the image step, the
+  estimate warns (`images_step_off`) when a run will not draw what a page asks for, the editor
+  turns the step on with the images, and the step says "placed N of M images" and why.
+- **A template picked at the start is assigned to the chosen pages** (the drawer, schedules and
+  `runs_start`); it used to be a label.
+- **An owed link is placed or said.** The brief and `repair_links` owe every target within the
+  budget, down and sideways included, the children section follows the effective rules, a link to
+  a page not on the site is named (`target_not_published`), and after a publish every neighbor
+  that owes the page a link gets it, in a plain sentence when it has no anchor, or says why not
+  (`relink_phrase_templated`, `neighbor_link_missing`). A neighbor is planned on its own rules
+  over the site policy.
+- **A finished page says what it lacks**: the report's notice is the item's `note` and rides on
+  `item.done`; the item table marks it **Done, check** and the run header counts such pages.
+- **The Linking screen is honest**: every owed link has a state, a planned page reads **Not
+  written yet** instead of missing everything and being an orphan, and what waits for a page to
+  be written or published is counted apart from what is missing.
+
 `relink`, `repair`, `sync` and `revert` own their recipes. The companion plugin is **1.2.0**.
 `TestTheClientLoopFromTheSamples` drives the whole loop from the client's own workbooks against
 docker, and `TestAChildWaitsForItsParentAndGoesOnOnceTheParentIsRegenerated` now stops the parent
@@ -53,21 +77,21 @@ by exhausting the writer, because an incomplete draft is tried again instead of 
 
 ## The gate
 
-Green on 2026-09-24 over the code at the head of `claude/gallant-volta-nd2lv9`, on Linux, where
+Green on 2026-09-25 over the head of `claude/cool-archimedes-5qgsre`, on Linux, where
 `cmd/postulator`, `internal/app`, `adapters/browser/tor` and `adapters/secrets/{dpapi,masterkey}`
-build only under `GOOS=windows` and `TestDSN` in `adapters/sqlite` fails on the path separator
-alone.
+build only under `GOOS=windows`, `transport/wails` needs GTK to build its tests, and `TestDSN` in
+`adapters/sqlite` fails on the path separator alone.
 
-- `gofmt -l .` silent, the comment check of `task check:go:comments`, `GOOS=windows go build ./...`
+- `gofmt -l .` silent, the comment check of `task check:go:comments`, `GOOS=windows go vet ./...`
   and `GOOS=windows go vet -tags e2e ./internal/e2e/...`.
-- `golangci-lint run` (v2.13.2 built with go1.27) and the e2e sources 0 issues;
-  `go test -race -count=1 -p 2` green over every package that builds on Linux.
-- `go run ./cmd/covergate`: **domain+application 85.98% of 7191** (gate 80%), **total 86.88% of
-  18038** (gate 70%).
+- `golangci-lint run` (v2.13.2 built with go1.27, run with `GOOS=windows`) and the e2e sources
+  0 issues; `go test -race -count=1 -p 2` green over every package that builds on Linux.
+- `go run ./cmd/covergate`: **domain+application 86.17% of 7353** (gate 80%), **total 86.80% of
+  18013** (gate 70%).
 - `wails3 generate bindings`: **15 services, 122 methods**; `task events` and `task vocab` leave no
-  diff; migrations up to **0028**.
-- **93 tools**, 78,971 bytes of schema against the 79,000 the registry test allows.
-- `npm run typecheck` clean; `npx vitest run` **1142 tests in 115 files** over two projects.
+  diff; migrations up to **0028**, none added.
+- **93 tools**, 78,973 bytes of schema against the 79,000 the registry test allows.
+- `npm run typecheck` clean; `npx vitest run` **1162 tests in 115 files** over two projects.
 
 ## How to run
 
@@ -121,6 +145,12 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
   state and its copy go.
 - **`LinkAudit` resolves the template of every mapped page**, one `ResolveForPage` each, so
   five thousand mapped pages cost about two seconds. The frontend caches it for thirty seconds.
+  `relink_neighbors` does the same for every page that may owe a newly published page a link, so
+  publishing the root of a large tree resolves every descendant once.
+- **The estimate prices the linker on up links and the lead keyword**, not on the down and
+  sideways phrases `repair_links` now writes when the body lacks them (256 output tokens each).
+- **The image settings apply after a restart**: the adapter and the price reference are built
+  with the composition, and the Settings copy says so.
 - **What a revert cannot put back:** media a run uploaded, because a delete needs `force=true`
   and sweeping media a human may have reused is worse; and, against plugin 1.1.0, the SEO meta,
   because the read is refused from the manifest and `revert_meta_kept` names it instead.
@@ -157,13 +187,20 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 
 ## Next steps
 
-1. **Owner, before the 2.2.0 tag, on Windows and docker:** `task build` (the bindings and the
+1. **Owner, on Windows and docker, for the 2026-09-25 work:** `task build`, `task ui:lint`,
+   `task e2e:full` (the client loop now asks the linker for down and sideways phrases and sees
+   `target_not_published` on a parent written before its children), then a sandbox walk with a
+   real provider: a hub and a child in one run, where the hub links to the child and a missing
+   link reads **Done, check** on the row; a template with AI images picked in the start drawer,
+   which moves the pages to it and draws the images; a planned page on the Linking screen, which
+   reads **Not written yet**; and an untouched built-in, which shows as version 2 without images.
+2. **Owner, before the 2.2.0 tag, on Windows and docker:** `task build` (the bindings and the
    frontend under the real toolchain), `task ui:lint`, `task e2e:full` (the held-parent scenario
    now exhausts the writer), and `task package`; then a walk on the sandbox with a real provider:
    import a workbook with a `/` row and keywords, preview and apply entities for one branch and for
    a pasted keyword list, a template with `{primaryKeyword}` in a heading, a run over a parent and
    two children with one page held at validate and accepted, a regenerated parent whose children go
    on by themselves, and the start dialog refusing a run whose provider has no key.
-2. The residue above: the denied tool row's decision, the four narrow-width UI items, the ledger
+3. The residue above: the denied tool row's decision, the four narrow-width UI items, the ledger
    screen, `ProposeFromPages` and `Import.Apply` as runs, and `settings.changed` for a declared
    value.

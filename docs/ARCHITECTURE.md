@@ -102,7 +102,12 @@ registered; twelve of them a template may name.
 
 `relink_page` places the links a page's own rules ask for against the page's own cap and
 writes the body back under a hash compare-and-swap. It calls no model, so a relink, a repair
-and a sync are all estimated at nothing.
+and a sync are all estimated at nothing. For a target on the site whose anchor the body lacks it
+writes a plain sentence carrying the link and says so; for a target that is not on the site it
+only wraps an anchor that is already there. `relink_neighbors`, after a publish, visits the
+page's own targets and every page that may owe it a link (`content.MayLinkTo`: its parents, all
+its descendants and its related pages), plans each on the site policy its own template
+overrides, and back-fills the same way.
 
 A **revert** is a run like any other: kind `revert`, a parent run, one item per page the
 source run still holds a `publish_result` for, and a reversed order so a parent is never
@@ -137,9 +142,12 @@ grandchildren are parked too. The release rule is the same for the dispatcher an
 the blocker's page when there is a blocker, else the parent from the page map. A regeneration
 of the parent keeps the item id, so the relation holds.
 
-Before a run costs anything, `EstimateRun` resolves the template of every target, runs the
-preflight each step declares, checks each model role it will call (profile, API key, catalog
-entry) and prices every page on its own spec; a finding graded `error` stops `Start`. A page
+Before a run costs anything, `EstimateRun` resolves the template of every target, or the
+template the start is about to assign to it, runs the preflight each step declares, checks each
+model role it will call (profile, API key, catalog entry) and prices every page on its own spec;
+a finding graded `error` stops `Start`. The step that completes an item may return a notice, which
+the engine keeps as the item's note and sends on `item.done`; the report step words what the
+page lacks there. A page
 whose validation finds an error is held as `needs_human`, and `Engine.Accept` requeues the step
 with `accept=<step>` in the checkpoint, which `StepContext.Accepted()` reads.
 

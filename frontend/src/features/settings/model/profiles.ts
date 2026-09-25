@@ -1,3 +1,5 @@
+import { modelRoles } from "../../../generated/vocab.js";
+
 export type ProfileSource = "global" | "seeded" | "none";
 
 export interface ModelRefLike {
@@ -19,6 +21,10 @@ export interface ProfileRow {
 }
 
 export const refSeparator = "/";
+
+const imageRole = "image";
+
+export const pickableRoles: readonly string[] = modelRoles.filter((role) => role !== imageRole);
 
 export function refText(ref: ModelRefLike | null): string {
     return ref === null ? "" : `${ref.provider}${refSeparator}${ref.model}`;

@@ -134,3 +134,20 @@ describe("queuedAfter", () => {
         expect(queuedAfter(anItem({ status: "pending", blockedBy: "i0", waitingFor: null }))).toBe("");
     });
 });
+
+describe("a page that finished with something to check", () => {
+    const noted = anItem({ status: "completed", currentStep: "report", note: "1 owed link is missing" });
+
+    it("reads as done with a warning and shows what it lacks", () => {
+        const badge = itemBadge(noted);
+        expect(badge.tone).toBe("warn");
+        expect(badge.label).not.toBe(itemBadge(anItem({ status: "completed", currentStep: "report" })).label);
+        expect(itemNote(noted)).toBe("1 owed link is missing");
+    });
+
+    it("reads a page that finished clean as plainly done", () => {
+        const clean = anItem({ status: "completed", currentStep: "report" });
+        expect(itemBadge(clean).tone).not.toBe("warn");
+        expect(itemNote(clean)).toBe("");
+    });
+});

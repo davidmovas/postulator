@@ -118,6 +118,14 @@ type Images struct {
 	Source   ImageSource `json:"source" enum:"ai,wpmedia,local" description:"Where the images come from: drawn by a model, picked from the WordPress library, or read from a folder"`
 }
 
+func (i Images) Wanted() int {
+	count := max(i.Inline, 0)
+	if i.Featured {
+		count++
+	}
+	return count
+}
+
 type StepSpec struct {
 	Name    string         `json:"name"`
 	Enabled bool           `json:"enabled"`

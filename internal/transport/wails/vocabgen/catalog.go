@@ -54,6 +54,7 @@ func catalog() []vocabulary {
 			export: "linkAuditSkipReasons", tsType: "LinkAuditSkipReason", pkg: "internal/application/reports",
 			typeName: "SkipReason",
 		},
+		{export: "linkStates", tsType: "LinkState", pkg: "internal/application/reports", typeName: "LinkState"},
 		{
 			export: "runKinds", tsType: "RunKind", pkg: "internal/domain/run", typeName: "Kind",
 			derived: []derivation{

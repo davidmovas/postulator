@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import type { JsonObject } from "../../domain/merge-patch.js";
 import { stepNames } from "../../generated/vocab.js";
-import { draftFromJson, moved, specJsonOf } from "./spec.js";
+import type { SpecDraft } from "./spec.js";
+import { draftFromJson, imageStep, moved, readyForImages, specJsonOf } from "./spec.js";
 
 const hub: JsonObject = {
     sections: [
@@ -136,5 +137,43 @@ describe("moved", () => {
 
     it("refuses a position off the end", () => {
         expect(moved(["a", "b"], 0, 5)).toStrictEqual(["a", "b"]);
+    });
+});
+
+describe("readyForImages", () => {
+    const bare = draftFromJson({ ...hub, images: { featured: false, inline: 0, source: "" } });
+    const imageRow = (draft: SpecDraft) => draft.recipe.find((step) => step.name === imageStep);
+
+    it("turns the image step on and picks a source when images are first asked for", () => {
+        const next = readyForImages(bare, { ...bare, inlineImages: 2 });
+        expect(imageRow(bare)?.enabled).toBe(false);
+        expect(imageRow(next)).toMatchObject({ enabled: true, declared: true });
+        expect(next.imageSource).toBe("ai");
+        expect(specJsonOf(next)["recipe"]).toContainEqual({ name: imageStep, enabled: true });
+    });
+
+    it("keeps a source the person already chose", () => {
+        const next = readyForImages({ ...bare, imageSource: "wpmedia" }, { ...bare, imageSource: "wpmedia", featuredImage: true });
+        expect(next.imageSource).toBe("wpmedia");
+        expect(imageRow(next)?.enabled).toBe(true);
+    });
+
+    it("leaves a template with no recipe of its own on the generate recipe, which draws images already", () => {
+        const empty = draftFromJson({ ...hub, recipe: [], images: { featured: false, inline: 0, source: "" } });
+        const next = readyForImages(empty, { ...empty, featuredImage: true });
+        expect(next.recipe).toStrictEqual(empty.recipe);
+        expect(specJsonOf(next)["recipe"]).toStrictEqual([]);
+    });
+
+    it("does not switch the step back on once images were already asked for", () => {
+        const drawn = readyForImages(bare, { ...bare, inlineImages: 1 });
+        const off = { ...drawn, recipe: drawn.recipe.map((step) => (step.name === imageStep ? { ...step, enabled: false } : step)) };
+        const next = readyForImages(off, { ...off, inlineImages: 3 });
+        expect(imageRow(next)?.enabled).toBe(false);
+    });
+
+    it("changes nothing when no image is asked for", () => {
+        const next = readyForImages(bare, { ...bare, tone: "Plain" });
+        expect(next).toStrictEqual({ ...bare, tone: "Plain" });
     });
 });

@@ -85,6 +85,34 @@ func TestTemplateRepoRoundTrip(t *testing.T) {
 	}
 }
 
+func TestAStoredEarlierBuiltInReadsBackAsShipped(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	repo := sqlite.NewTemplateRepo(store)
+	current := make(map[string]template.Template)
+	for _, seed := range template.Seed() {
+		current[seed.Name] = seed
+	}
+
+	for _, earlier := range template.Superseded() {
+		record := earlier
+		record.ID = id.New()
+		record.CreatedAt = sqlitetest.Stamp
+		record.UpdatedAt = sqlitetest.Stamp
+		if err := repo.Insert(t.Context(), record); err != nil {
+			t.Fatalf("Insert %s: %v", record.Name, err)
+		}
+		read, err := repo.Get(t.Context(), record.ID)
+		if err != nil {
+			t.Fatalf("Get %s: %v", record.Name, err)
+		}
+		if !template.Supersedes(current[record.Name], read) {
+			t.Errorf("the stored %s no longer reads as the copy an earlier release shipped", record.Name)
+		}
+	}
+}
+
 func TestTemplateRepoListAndFilters(t *testing.T) {
 	t.Parallel()
 

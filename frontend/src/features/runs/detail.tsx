@@ -167,6 +167,7 @@ export function RunDetailScreen(): ReactElement {
                 gap={progress.gap}
                 failedItems={stats.failed}
                 heldItems={stats.needsHuman ?? 0}
+                notedItems={stats.noted ?? 0}
             />
 
             {listed.isPending ? (

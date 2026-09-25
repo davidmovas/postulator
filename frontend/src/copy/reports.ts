@@ -26,10 +26,11 @@ export const reports = {
     },
     audit: {
         title: "Link audit",
-        compliant: "pages carry every link the graph asks for",
+        compliant: "of the pages on the site carry every link the graph asks for",
         audited: (audited: number, pages: number) => `${audited} of ${pages} pages audited`,
         missingRequired: "Missing required links",
         missing: "Missing links",
+        pending: "Links waiting for a page to be written or published",
         blocked: "Blocked, the target has no page",
         offGraph: "Links outside the graph",
         orphans: "Orphan pages",

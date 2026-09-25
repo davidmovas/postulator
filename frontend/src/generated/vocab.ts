@@ -52,6 +52,16 @@ export type LinkBlockedReason = (typeof linkBlockedReasons)[number];
 export const linkAuditSkipReasons = ["unmapped", "no_template"] as const;
 export type LinkAuditSkipReason = (typeof linkAuditSkipReasons)[number];
 
+export const linkStates = [
+    "placed",
+    "target_unpublished",
+    "missing",
+    "awaiting_target",
+    "awaiting_page",
+    "blocked",
+] as const;
+export type LinkState = (typeof linkStates)[number];
+
 export const runKinds = [
     "generate",
     "relink",

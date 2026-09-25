@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { copy } from "../../copy/index.js";
 import type { LinkAuditPage, PageAudit } from "../../data/types.js";
 import { renderScreen } from "../../testing/render.js";
-import { auditRows, mugsDetail, row } from "./model/fixture.js";
+import { auditRows, mugsDetail, plannedDetail, plannedRow, row } from "./model/fixture.js";
 
 const held: { detail: LinkAuditPage | undefined; pending: boolean } = { detail: mugsDetail, pending: false };
 
@@ -47,6 +47,21 @@ describe("the audit panel", () => {
 
         fireEvent.click(screen.getByRole("button", { name: copy.links.relink.page }));
         expect(asked).toStrictEqual(["p-mugs"]);
+    });
+
+    it("says a planned page owes its links once it is written", () => {
+        held.detail = plannedDetail;
+        try {
+            panel(plannedRow);
+
+            expect(screen.getByText(copy.links.panel.notWritten)).toBeDefined();
+            expect(screen.getAllByText(copy.links.states.awaiting_page ?? "").length).toBe(3);
+            expect(screen.queryByText(copy.links.panel.missing)).toBeNull();
+            const button = screen.getByRole("button", { name: copy.links.relink.page });
+            expect(button.hasAttribute("disabled")).toBe(true);
+        } finally {
+            held.detail = mugsDetail;
+        }
     });
 
     it("refuses to relink a page the audit skipped", () => {

@@ -14,8 +14,11 @@ export interface RowSeed {
     missingRequired?: number;
     blocked?: number;
     offGraph?: number;
+    pending?: number;
+    unpublished?: number;
     inbound?: number;
     orphan?: boolean;
+    onSite?: boolean;
 }
 
 export function row(seed: RowSeed): PageAudit {
@@ -26,6 +29,7 @@ export function row(seed: RowSeed): PageAudit {
         entityId: seed.entityId ?? "",
         entityName: seed.entityName ?? "",
         skipReason: seed.skipReason ?? "",
+        onSite: seed.onSite ?? (seed.status ?? "published") !== "planned",
         targets: seed.targets ?? 0,
         required: seed.required ?? 0,
         satisfied: seed.satisfied ?? 0,
@@ -33,6 +37,8 @@ export function row(seed: RowSeed): PageAudit {
         missingRequired: seed.missingRequired ?? 0,
         blocked: seed.blocked ?? 0,
         offGraph: seed.offGraph ?? 0,
+        pending: seed.pending ?? 0,
+        unpublished: seed.unpublished ?? 0,
         inbound: seed.inbound ?? 0,
         orphan: seed.orphan ?? false,
     };
@@ -75,6 +81,8 @@ export function required(seed: Partial<RequiredLink> & { relation: string; targe
         weight: seed.weight ?? 1,
         depth: seed.depth ?? 1,
         blockedReason: seed.blockedReason ?? "",
+        state: seed.state ?? ((seed.blockedReason ?? "") !== "" ? "blocked" : (seed.satisfied ?? false) ? "placed" : "missing"),
+        targetOnSite: seed.targetOnSite ?? true,
     };
 }
 
@@ -104,4 +112,27 @@ export const mugsDetail: LinkAuditPage = {
         extra({ kind: "unknown_internal", toUrl: "/blog/diary/", toPageId: "p-blog", anchor: "diary" }),
         extra({ kind: "self", toUrl: "/pottery/mugs/", toPageId: "p-mugs", anchor: "here" }),
     ],
+};
+
+export const plannedRow: PageAudit = row({
+    pageId: "p-cups",
+    path: "/pottery/cups/",
+    status: "planned",
+    entityId: "cups",
+    entityName: "Cups",
+    targets: 3,
+    required: 1,
+    pending: 3,
+});
+
+export const plannedDetail: LinkAuditPage = {
+    page: plannedRow,
+    templateId: "tpl-hub",
+    rules: mugsDetail.rules,
+    required: [
+        required({ relation: "up", required: true, targetEntityId: "pottery", state: "awaiting_page" }),
+        required({ relation: "down", targetEntityId: "espresso-cup", state: "awaiting_page", targetOnSite: false }),
+        required({ relation: "sibling", targetEntityId: "glazing", state: "awaiting_page" }),
+    ],
+    extra: [],
 };

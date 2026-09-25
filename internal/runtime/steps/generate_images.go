@@ -27,6 +27,7 @@ const (
 	CodeImagesFailed   = "images_failed"
 	CodeUploadFailed   = "image_upload_failed"
 	CodeImageNotPlaced = "image_not_placed"
+	CodeImagesShort    = "images_short"
 
 	imageStepTimeout  = 15 * time.Minute
 	imageOutputTokens = 1056
@@ -51,6 +52,7 @@ type ImagesResult struct {
 	Images     []PlacedImage     `json:"images"`
 	Findings   []content.Finding `json:"findings"`
 	FeaturedID int64             `json:"featuredId"`
+	Wanted     int               `json:"wanted"`
 }
 
 func (r *ImagesResult) skip(page pagemap.Page, code, message, reason string) {
@@ -78,7 +80,7 @@ func GenerateImages(deps Deps) run.StepDef {
 				if spec.Images.Source != template.ImagesAI {
 					return 0
 				}
-				return wantedImages(spec.Images)
+				return spec.Images.Wanted()
 			},
 		},
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
@@ -87,7 +89,8 @@ func GenerateImages(deps Deps) run.StepDef {
 				Findings: make([]content.Finding, 0),
 			}
 
-			wanted := wantedImages(sc.Spec.Images)
+			wanted := sc.Spec.Images.Wanted()
+			result.Wanted = wanted
 			if wanted == 0 {
 				return manifest(result, nil, "the template asks for no image")
 			}
@@ -130,10 +133,18 @@ func GenerateImages(deps Deps) run.StepDef {
 				body = []byte(rendered)
 			}
 
-			return manifest(result, body,
-				"placed "+strconv.Itoa(len(result.Images))+" images on "+sc.Page.Path)
+			return manifest(result, body, placedMessage(result, sc.Page))
 		},
 	}
+}
+
+func placedMessage(result ImagesResult, page pagemap.Page) string {
+	message := "placed " + strconv.Itoa(len(result.Images)) + " of " + strconv.Itoa(result.Wanted) +
+		" images on " + page.Path
+	if len(result.Images) < result.Wanted && len(result.Findings) > 0 {
+		message += "; " + result.Findings[0].Message
+	}
+	return message
 }
 
 func manifest(result ImagesResult, body []byte, message string) (run.Result, error) {
@@ -150,14 +161,6 @@ func manifest(result ImagesResult, body []byte, message string) (run.Result, err
 	return run.Result{Artifacts: artifacts, Message: message}, nil
 }
 
-func wantedImages(spec template.Images) int {
-	count := max(spec.Inline, 0)
-	if spec.Featured {
-		count++
-	}
-	return count
-}
-
 func acquire(ctx context.Context, deps Deps, sc *run.StepContext, entity graph.Entity, wanted int,
 	result *ImagesResult) ([]images.Image, error) {
 	if sc.Spec.Images.Source == template.ImagesAI {
@@ -172,9 +175,8 @@ func acquire(ctx context.Context, deps Deps, sc *run.StepContext, entity graph.E
 		return nil, nil
 	}
 
-	picked, err := source.Pick(ctx, images.Query{
-		SiteID: sc.Run.SiteID, Term: subjectOf(sc, entity), Limit: wanted,
-	})
+	term := subjectOf(sc, entity)
+	picked, err := source.Pick(ctx, images.Query{SiteID: sc.Run.SiteID, Term: term, Limit: wanted})
 	if err != nil {
 		if stopped(ctx) {
 			return nil, err
@@ -182,6 +184,12 @@ func acquire(ctx context.Context, deps Deps, sc *run.StepContext, entity graph.E
 		result.skip(sc.Page, CodeImagesFailed,
 			"the image library answered nothing for "+sc.Page.Path+": "+err.Error(), err.Error())
 		return nil, nil
+	}
+	if len(picked) < wanted {
+		result.skip(sc.Page, CodeImagesShort,
+			"the "+string(sc.Spec.Images.Source)+" library found "+strconv.Itoa(len(picked))+" of "+
+				strconv.Itoa(wanted)+" images matching "+strconv.Quote(term)+" for "+sc.Page.Path+
+				", so the page carries fewer images than its template asks for", string(sc.Spec.Images.Source))
 	}
 	return picked, nil
 }

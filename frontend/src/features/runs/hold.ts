@@ -1,7 +1,7 @@
 import { copy } from "../../copy/index.js";
 import type { AwaitedParent, RunItem } from "../../data/types.js";
 import type { IconComponent, Tone } from "../../ui/index.js";
-import { HourglassTopIcon } from "../../ui/index.js";
+import { HourglassTopIcon, TaskAltIcon } from "../../ui/index.js";
 import { statusIcon, statusLabel, statusTone, stepLabel } from "./labels.js";
 import {
     itemPaused,
@@ -11,6 +11,7 @@ import {
     pauseAwaitingParent,
     pauseNeedsHuman,
     statusCancelled,
+    statusCompleted,
     statusFailed,
     stepGenerateBody,
     stepValidate,
@@ -66,14 +67,24 @@ export interface ItemBadge {
     label: string;
 }
 
+export function finishedShort(item: RunItem): boolean {
+    return item.status === statusCompleted && item.note !== "";
+}
+
 export function itemBadge(item: RunItem): ItemBadge {
     if (heldForParent(item)) {
         return { tone: "info", icon: HourglassTopIcon, label: copy.runs.hold.badge };
+    }
+    if (finishedShort(item)) {
+        return { tone: "warn", icon: TaskAltIcon, label: copy.runs.noted.badge };
     }
     return { tone: statusTone(item.status), icon: statusIcon(item.status), label: statusLabel(item.status) };
 }
 
 export function itemNote(item: RunItem): string {
+    if (finishedShort(item)) {
+        return item.note;
+    }
     if (item.status !== itemPaused) {
         return "";
     }

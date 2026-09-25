@@ -28,15 +28,19 @@ const (
 )
 
 type stubSpecs struct {
-	spec    template.TemplateSpec
-	perPage map[string]template.TemplateSpec
-	version int
-	err     error
+	spec       template.TemplateSpec
+	perPage    map[string]template.TemplateSpec
+	byTemplate map[string]template.TemplateSpec
+	version    int
+	err        error
 }
 
 func (s *stubSpecs) ResolveForPage(_ context.Context, req templates.ResolveForPageRequest) (templates.ResolveForPageResponse, error) {
 	if s.err != nil {
 		return templates.ResolveForPageResponse{}, s.err
+	}
+	if picked, ok := s.byTemplate[req.TemplateID]; ok {
+		return templates.ResolveForPageResponse{TemplateID: req.TemplateID, Version: s.version, Spec: picked}, nil
 	}
 	spec := s.spec
 	if own, ok := s.perPage[req.PageID]; ok {

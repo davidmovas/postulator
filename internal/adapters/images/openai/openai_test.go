@@ -28,15 +28,22 @@ func (v vault) Get(context.Context, string) (string, error) {
 }
 
 type call struct {
-	Model   string `json:"model"`
-	Prompt  string `json:"prompt"`
-	Size    string `json:"size"`
-	Format  string `json:"response_format"`
-	Quality string `json:"quality"`
-	Count   int    `json:"n"`
+	Keys    map[string]any `json:"-"`
+	Model   string         `json:"model"`
+	Prompt  string         `json:"prompt"`
+	Size    string         `json:"size"`
+	Format  string         `json:"response_format"`
+	Quality string         `json:"quality"`
+	Count   int            `json:"n"`
 }
 
 func provider(t *testing.T, status int, body string, secrets vault, opts ...openai.Option) (*openai.Images, *call, *string) {
+	t.Helper()
+	return providerOf(t, "gpt-image-test", status, body, secrets, opts...)
+}
+
+func providerOf(t *testing.T, model string, status int, body string, secrets vault,
+	opts ...openai.Option) (*openai.Images, *call, *string) {
 	t.Helper()
 
 	recorded := &call{}
@@ -54,6 +61,9 @@ func provider(t *testing.T, status int, body string, secrets vault, opts ...open
 		if err = json.Unmarshal(payload, recorded); err != nil {
 			t.Errorf("decode the request: %v", err)
 		}
+		if err = json.Unmarshal(payload, &recorded.Keys); err != nil {
+			t.Errorf("decode the request keys: %v", err)
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status)
@@ -64,7 +74,7 @@ func provider(t *testing.T, status int, body string, secrets vault, opts ...open
 	t.Cleanup(server.Close)
 
 	opts = append([]openai.Option{openai.WithBaseURL(server.URL + "/v1"), openai.WithHTTPClient(server.Client())}, opts...)
-	return openai.New(secrets, "gpt-image-test", opts...), recorded, auth
+	return openai.New(secrets, model, opts...), recorded, auth
 }
 
 func TestGenerateAsksForTheQualityAndReadsWhatItCost(t *testing.T) {
@@ -130,7 +140,7 @@ func TestGenerateReturnsThePNG(t *testing.T) {
 	if *auth != "Bearer sk-test" {
 		t.Errorf("authorization = %q", *auth)
 	}
-	if recorded.Model != "gpt-image-test" || recorded.Count != 1 || recorded.Format != "b64_json" {
+	if recorded.Model != "gpt-image-test" || recorded.Count != 1 {
 		t.Errorf("request = %+v", recorded)
 	}
 	if recorded.Size != openai.DefaultSize {
@@ -138,6 +148,48 @@ func TestGenerateReturnsThePNG(t *testing.T) {
 	}
 	if recorded.Prompt != "An espresso machine. on a wooden counter" {
 		t.Errorf("prompt = %q", recorded.Prompt)
+	}
+}
+
+func TestGenerateSendsOnlyWhatTheModelTakes(t *testing.T) {
+	t.Parallel()
+
+	body := `{"data":[{"b64_json":"` + base64.StdEncoding.EncodeToString([]byte{0x89, 0x50}) + `"}]}`
+
+	cases := []struct {
+		model   string
+		format  string
+		quality string
+	}{
+		{model: "gpt-image-2", quality: openai.DefaultQuality},
+		{model: "gpt-image-1", quality: openai.DefaultQuality},
+		{model: "gpt-image-1.5", quality: openai.DefaultQuality},
+		{model: "dall-e-3", format: "b64_json"},
+		{model: "dall-e-2", format: "b64_json"},
+		{model: "DALL-E-3", format: "b64_json"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.model, func(t *testing.T) {
+			t.Parallel()
+
+			generator, recorded, _ := providerOf(t, tc.model, http.StatusOK, body, vault{key: "sk"})
+			if _, err := generator.Generate(t.Context(), images.Prompt{Subject: "Kettle"}); err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+
+			format, sentFormat := recorded.Keys["response_format"]
+			if (tc.format != "") != sentFormat || (sentFormat && format != tc.format) {
+				t.Errorf("response_format = %v (sent %v), want %q", format, sentFormat, tc.format)
+			}
+			quality, sentQuality := recorded.Keys["quality"]
+			if (tc.quality != "") != sentQuality || (sentQuality && quality != tc.quality) {
+				t.Errorf("quality = %v (sent %v), want %q", quality, sentQuality, tc.quality)
+			}
+			if recorded.Model != tc.model {
+				t.Errorf("model = %q, want %q", recorded.Model, tc.model)
+			}
+		})
 	}
 }
 

@@ -182,6 +182,8 @@ export const graph = {
         linksMissing: (missing: number, required: number) =>
             required > 0 ? `${missing} missing, ${required} required` : `${missing} missing`,
         linksBlocked: (count: number) => `${count} blocked`,
+        linksPending: (count: number) => `${count} waiting for a page`,
+        linksNotWritten: "not written yet",
         linksOff: "Turn on the link proof to see how its pages link.",
         linksNone: "No audited page",
     },

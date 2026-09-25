@@ -117,6 +117,156 @@ func TestRelinkAddsTheMissingEdgeToANeighbor(t *testing.T) {
 	}
 }
 
+func TestANeighborWithoutRulesOfItsOwnFollowsTheSitePolicy(t *testing.T) {
+	t.Parallel()
+
+	deps, server, _, wpID := relinkDeps(t, parentBody)
+	deps.Policies = policyStub{
+		rules: template.LinkRules{UpDepth: 1, DownLinks: true, MaxPerTarget: 1},
+		specs: map[string]template.LinkRules{"page-parent": {}},
+	}
+	sc := relinkContext(t, deps)
+	sc.Spec.LinkRules = template.LinkRules{UpDepth: 1, MaxPerTarget: 1}
+
+	result, err := steps.RelinkNeighbors(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("RelinkNeighbors: %v", err)
+	}
+	var relinked steps.RelinkResult
+	if err = json.Unmarshal(result.Artifacts[0].Blob, &relinked); err != nil {
+		t.Fatalf("decode the relink result: %v", err)
+	}
+	if relinked.Linked != 1 {
+		t.Fatalf("relinked = %+v, want the parent to link down as the site policy asks", relinked)
+	}
+	if stored, _ := server.Lookup(wpID); !strings.Contains(stored.Content, `href="/coffee/espresso/"`) {
+		t.Fatalf("the parent holds %q", stored.Content)
+	}
+}
+
+func findingCodes(findings []content.Finding) []string {
+	out := make([]string, 0, len(findings))
+	for i := range findings {
+		out = append(out, findings[i].Code)
+	}
+	return out
+}
+
+func TestRelinkWritesAPlainSentenceWhereTheNeighborHasNoAnchor(t *testing.T) {
+	t.Parallel()
+
+	bare := `<h1>Coffee</h1><p>We roast beans every week.</p><p>Visit the shop.</p>`
+	deps, server, _, wpID := relinkDeps(t, bare)
+	relinked := runRelink(t, deps)
+
+	if relinked.Linked != 1 || len(relinked.Neighbors) != 1 {
+		t.Fatalf("relinked = %+v, want the parent linked", relinked)
+	}
+	neighbor := relinked.Neighbors[0]
+	if neighbor.Outcome != steps.OutcomeLinked || neighbor.Sentence == "" || neighbor.Before.HTML != bare {
+		t.Fatalf("neighbor = %+v, want a written sentence and the body it replaced", neighbor)
+	}
+	stored, _ := server.Lookup(wpID)
+	want := `<h1>Coffee</h1><p>We roast beans every week.</p>` +
+		`<p>Visit the shop. Read more about <a href="/coffee/espresso/">espresso</a>.</p>`
+	if stored.Content != want {
+		t.Fatalf("the parent holds\n%s\nwant\n%s", stored.Content, want)
+	}
+	if codes := findingCodes(relinked.Findings); len(codes) != 1 || codes[0] != steps.CodeRelinkPhraseTemplated {
+		t.Fatalf("findings = %+v, want the plain sentence named", relinked.Findings)
+	}
+	if !strings.Contains(relinked.Findings[0].Message, "/coffee/") {
+		t.Fatalf("message = %q, want the neighbor named", relinked.Findings[0].Message)
+	}
+}
+
+func TestRelinkNamesALinkItCouldNotPlace(t *testing.T) {
+	t.Parallel()
+
+	body := `<h1>Coffee</h1><p>We roast every espresso blend beside our ` +
+		`<a href="/coffee/filter/">filter</a> range.</p>`
+	deps, server, _, wpID := relinkDeps(t, body)
+	deps.Entities = entityList{items: append(unitEntities(), graph.Entity{
+		ID: "filter", SiteID: "site", Name: "Filter", PrimaryKeyword: "filter",
+		Anchors: []graph.Anchor{{Text: "filter", Source: graph.AnchorUser, Weight: 1}},
+		Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-filter"),
+	})}
+	deps.Edges = edgeList{items: append(unitEdges(), graph.Edge{
+		ID: "e2", SiteID: "site", FromEntityID: "parent", ToEntityID: "filter",
+		Kind: graph.EdgeRelated, Weight: 1, Source: graph.SourceUser, Status: graph.StatusApproved,
+	})}
+	deps.Pages = pageList{items: append(relinkPages(wpID), pagemap.Page{
+		ID: "page-filter", SiteID: "site", Path: "/coffee/filter/", Slug: "filter",
+		WPType: pagemap.WPPage, Status: pagemap.StatusPublished, EntityID: pointer("filter"),
+	})}
+	deps.Policies = policyStub{specs: map[string]template.LinkRules{
+		"page-parent": {UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 1, MaxPerTarget: 1},
+	}}
+
+	relinked := runRelink(t, deps)
+	if relinked.Linked != 0 || relinked.Missing != 1 {
+		t.Fatalf("relinked = %+v, want the owed link counted as missing", relinked)
+	}
+	if codes := findingCodes(relinked.Findings); len(codes) != 1 || codes[0] != steps.CodeNeighborLinkMissing {
+		t.Fatalf("findings = %+v, want the missing link named", relinked.Findings)
+	}
+	if stored, _ := server.Lookup(wpID); stored.Content != body {
+		t.Fatalf("the parent was rewritten: %q", stored.Content)
+	}
+}
+
+func TestRelinkReachesANeighborThatOwesThePageALink(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		rules   template.LinkRules
+		visited bool
+	}{
+		{name: "a parent whose rules link down", rules: template.LinkRules{UpDepth: 1, DownLinks: true, MaxPerTarget: 1}, visited: true},
+		{name: "a parent whose rules do not", rules: template.LinkRules{UpDepth: 1, MaxPerTarget: 1}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps, server, _, wpID := relinkDeps(t, parentBody)
+			deps.Policies = policyStub{specs: map[string]template.LinkRules{"page-parent": tc.rules}}
+			sc := relinkContext(t, deps)
+			alone, err := json.Marshal(content.LinkContext{
+				PageID: "page-child", PageURL: "/coffee/espresso/", EntityID: "child", Targets: []content.LinkTarget{},
+			})
+			if err != nil {
+				t.Fatalf("encode the link context: %v", err)
+			}
+			sc.Artifacts[run.ArtifactLinkContext] = run.Artifact{Kind: run.ArtifactLinkContext, Blob: alone}
+
+			result, err := steps.RelinkNeighbors(deps).Run(t.Context(), sc)
+			if err != nil {
+				t.Fatalf("RelinkNeighbors: %v", err)
+			}
+			var relinked steps.RelinkResult
+			if err = json.Unmarshal(result.Artifacts[0].Blob, &relinked); err != nil {
+				t.Fatalf("decode the relink result: %v", err)
+			}
+
+			if !tc.visited {
+				if len(relinked.Neighbors) != 0 || len(relinked.Findings) != 0 {
+					t.Fatalf("relinked = %+v, want a page that owes nothing left out quietly", relinked)
+				}
+				return
+			}
+			if relinked.Linked != 1 {
+				t.Fatalf("relinked = %+v, want the parent reached although the child plans no link to it", relinked)
+			}
+			if stored, _ := server.Lookup(wpID); !strings.Contains(stored.Content, `href="/coffee/espresso/"`) {
+				t.Fatalf("the parent holds %q", stored.Content)
+			}
+		})
+	}
+}
+
 func TestRelinkLeavesANeighborThatAlreadyLinks(t *testing.T) {
 	t.Parallel()
 

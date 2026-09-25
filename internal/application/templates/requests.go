@@ -70,7 +70,8 @@ type DeleteOverrideRequest struct {
 type DeleteOverrideResponse struct{}
 
 type ResolveForPageRequest struct {
-	PageID string `json:"pageId" description:"The id of the page whose template is wanted, exactly as a read tool returned it"`
+	PageID     string `json:"pageId" description:"The id of the page whose template is wanted, exactly as a read tool returned it"`
+	TemplateID string `json:"templateId,omitempty" description:"The template to resolve in place of the page's own, left out for the page's own"`
 }
 
 type ResolveForPageResponse struct {

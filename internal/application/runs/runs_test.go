@@ -11,6 +11,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
+	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/content"
@@ -24,6 +25,7 @@ import (
 )
 
 type fakeEngine struct {
+	assigned    map[string]string
 	queued      run.Run
 	estimated   run.Run
 	estimate    run.Estimate
@@ -47,11 +49,12 @@ func (f *fakeEngine) Enqueue(_ context.Context, record run.Run) (run.Run, error)
 	return record, nil
 }
 
-func (f *fakeEngine) EstimateRun(_ context.Context, record run.Run) (run.Estimate, error) {
+func (f *fakeEngine) EstimateRun(_ context.Context, record run.Run, assigned map[string]string) (run.Estimate, error) {
 	if f.failWith != nil {
 		return run.Estimate{}, f.failWith
 	}
 	f.estimated = record
+	f.assigned = assigned
 	return f.estimate, nil
 }
 
@@ -87,11 +90,13 @@ func (f *fakeEngine) Regenerate(_ context.Context, runID string, itemIDs []strin
 }
 
 type fakeSpecs struct {
-	spec    template.TemplateSpec
-	siteID  string
-	version int
-	seen    []string
-	err     error
+	byTemplate map[string]template.TemplateSpec
+	handed     map[string]string
+	spec       template.TemplateSpec
+	siteID     string
+	version    int
+	seen       []string
+	err        error
 }
 
 func (f *fakeSpecs) ResolveForPage(_ context.Context, req templates.ResolveForPageRequest) (templates.ResolveForPageResponse, error) {
@@ -99,9 +104,31 @@ func (f *fakeSpecs) ResolveForPage(_ context.Context, req templates.ResolveForPa
 		return templates.ResolveForPageResponse{}, f.err
 	}
 	f.seen = append(f.seen, req.PageID)
+	if f.handed == nil {
+		f.handed = make(map[string]string)
+	}
+	f.handed[req.PageID] = req.TemplateID
+	if spec, ok := f.byTemplate[req.TemplateID]; ok {
+		return templates.ResolveForPageResponse{
+			TemplateID: req.TemplateID, SiteID: f.siteID, Version: 7, Spec: spec,
+		}, nil
+	}
 	return templates.ResolveForPageResponse{
 		TemplateID: "template-1", SiteID: f.siteID, Version: f.version, Spec: f.spec,
 	}, nil
+}
+
+type fakeAssigner struct {
+	calls []pages.AssignTemplateRequest
+	err   error
+}
+
+func (f *fakeAssigner) AssignTemplate(_ context.Context, req pages.AssignTemplateRequest) (pages.AssignTemplateResponse, error) {
+	f.calls = append(f.calls, req)
+	if f.err != nil {
+		return pages.AssignTemplateResponse{}, f.err
+	}
+	return pages.AssignTemplateResponse{Changed: len(req.PageIDs)}, nil
 }
 
 type fakePages struct {
@@ -125,16 +152,17 @@ func (f *fakePages) Get(_ context.Context, pageID string) (pagemap.Page, error) 
 }
 
 type fixture struct {
-	service *runs.Service
-	engine  *fakeEngine
-	specs   *fakeSpecs
-	mapping *fakePages
-	runs    *sqlite.RunRepo
-	items   *sqlite.RunItemRepo
-	blobs   *sqlite.ArtifactRepo
-	log     *sqlite.RunEventRepo
-	siteID  string
-	pages   []string
+	service  *runs.Service
+	assigner *fakeAssigner
+	engine   *fakeEngine
+	specs    *fakeSpecs
+	mapping  *fakePages
+	runs     *sqlite.RunRepo
+	items    *sqlite.RunItemRepo
+	blobs    *sqlite.ArtifactRepo
+	log      *sqlite.RunEventRepo
+	siteID   string
+	pages    []string
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -143,9 +171,9 @@ func newFixture(t *testing.T) *fixture {
 	store := sqlitetest.Open(t)
 	site := sqlitetest.Site(t, store, "shop")
 
-	pages := make([]string, 0, 2)
+	pageIDs := make([]string, 0, 2)
 	for _, path := range []string{"/hub/", "/hub/child/"} {
-		pages = append(pages, sqlitetest.Page(t, store, site.ID, path).ID)
+		pageIDs = append(pageIDs, sqlitetest.Page(t, store, site.ID, path).ID)
 	}
 
 	engine := &fakeEngine{estimate: run.Estimate{
@@ -167,18 +195,20 @@ func newFixture(t *testing.T) *fixture {
 	blobRepo := sqlite.NewArtifactRepo(store)
 	logRepo := sqlite.NewRunEventRepo(store)
 	mapping := &fakePages{unmapped: map[string]string{}}
+	assigner := &fakeAssigner{}
 
 	return &fixture{
-		service: runs.New(engine, runRepo, itemRepo, blobRepo, logRepo, specs, mapping, stepRegistry(t)),
-		engine:  engine,
-		specs:   specs,
-		mapping: mapping,
-		runs:    runRepo,
-		items:   itemRepo,
-		blobs:   blobRepo,
-		log:     logRepo,
-		siteID:  site.ID,
-		pages:   pages,
+		service:  runs.New(engine, runRepo, itemRepo, blobRepo, logRepo, specs, mapping, stepRegistry(t), assigner),
+		assigner: assigner,
+		engine:   engine,
+		specs:    specs,
+		mapping:  mapping,
+		runs:     runRepo,
+		items:    itemRepo,
+		blobs:    blobRepo,
+		log:      logRepo,
+		siteID:   site.ID,
+		pages:    pageIDs,
 	}
 }
 
@@ -189,7 +219,8 @@ func stepRegistry(t *testing.T) *run.Registry {
 	registry := run.NewRegistry()
 	defs := []run.StepDef{
 		{Name: string(run.StepResolveContext), Run: nothing, Produces: []run.ArtifactKind{run.ArtifactLinkContext}},
-		{Name: string(run.StepGenerateBody), Run: nothing, Requires: []run.ArtifactKind{run.ArtifactLinkContext}},
+		{Name: string(run.StepGenerateBody), Run: nothing, Requires: []run.ArtifactKind{run.ArtifactLinkContext},
+			Produces: []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML}},
 		{Name: string(run.StepPublish), Run: nothing,
 			Requires: []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML}},
 		{Name: string(run.StepSyncBack), Run: nothing, Requires: []run.ArtifactKind{run.ArtifactPublishResult}},

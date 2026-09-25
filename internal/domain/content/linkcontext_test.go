@@ -1,6 +1,7 @@
 package content_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/content"
@@ -270,5 +271,37 @@ func TestATargetFallsBackToTheEntityName(t *testing.T) {
 	lc := plannedFor(dag{g: g, index: index}, "child", template.LinkRules{UpDepth: 1})
 	if len(lc.Targets) != 1 || len(lc.Targets[0].Anchors) != 1 || lc.Targets[0].Anchors[0] != "Parent Topic" {
 		t.Fatalf("the fallback anchor = %+v", lc.Targets)
+	}
+}
+
+func TestMayLinkToNamesEveryEntityThatCanOweALink(t *testing.T) {
+	t.Parallel()
+
+	fixture := multiParentDAG(t)
+
+	cases := []struct {
+		entity string
+		want   []string
+	}{
+		{entity: "coffee", want: []string{"beans", "espresso", "grinder", "orphan", "root", "second", "tea"}},
+		{entity: "root", want: []string{"beans", "coffee", "espresso", "grinder", "orphan", "second"}},
+		{entity: "espresso", want: []string{"coffee"}},
+		{entity: "missing", want: []string{}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.entity, func(t *testing.T) {
+			t.Parallel()
+
+			found := content.MayLinkTo(fixture.g, tc.entity)
+			ids := make([]string, 0, len(found))
+			for i := range found {
+				ids = append(ids, found[i].ID)
+			}
+			slices.Sort(ids)
+			if !slices.Equal(ids, tc.want) {
+				t.Fatalf("MayLinkTo(%s) = %v, want %v", tc.entity, ids, tc.want)
+			}
+		})
 	}
 }

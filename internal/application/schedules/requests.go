@@ -12,7 +12,7 @@ type CreateRequest struct {
 	EntityID        string   `json:"entityId,omitempty" description:"Target only the pages of this entity, exactly as a read tool returned its id"`
 	Status          string   `json:"status,omitempty" enum:"planned,exists,published,archived" description:"Target only pages in this state"`
 	Limit           int      `json:"limit,omitempty" minimum:"1" description:"The most pages one firing may take"`
-	TemplateID      string   `json:"templateId,omitempty" description:"The template to write with, left out to resolve each page's own"`
+	TemplateID      string   `json:"templateId,omitempty" description:"The template the pages move to, left out to keep each page's own"`
 	Steps           []string `json:"steps,omitempty" enum:"resolve_context,generate_body,generate_meta,insert_links,repair_links,generate_images,validate,judge,publish,relink_neighbors,sync_back,report" description:"The steps to run in order, left out to take the recipe of the resolved template"`
 	PublishMode     string   `json:"publishMode,omitempty" enum:"draft,publish" description:"Whether each run leaves a draft in WordPress or publishes it; leave it out for draft"`
 	MaxUSD          float64  `json:"maxUsd,omitempty" minimum:"0" description:"Stop a run once it has spent this many dollars"`

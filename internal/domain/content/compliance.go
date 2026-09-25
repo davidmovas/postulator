@@ -37,12 +37,13 @@ func (r Report) HasErrors() bool {
 }
 
 const (
-	CodeTargetMissing    = "target_missing"
-	CodeExternalLink     = "external_link"
-	CodeSelfLink         = "self_link"
-	CodeUnknownInternal  = "unknown_internal_link"
-	CodeAnchorNotAllowed = "anchor_not_allowed"
-	CodeTooManyLinks     = "too_many_links"
+	CodeTargetMissing      = "target_missing"
+	CodeTargetNotPublished = "target_not_published"
+	CodeExternalLink       = "external_link"
+	CodeSelfLink           = "self_link"
+	CodeUnknownInternal    = "unknown_internal_link"
+	CodeAnchorNotAllowed   = "anchor_not_allowed"
+	CodeTooManyLinks       = "too_many_links"
 
 	CountedGraphLinks = "graph_links"
 
@@ -124,6 +125,22 @@ func Compliance(doc *Document, lc LinkContext, policy template.LinkPolicy, pageI
 
 	report.Score = scoreOf(report.Items)
 	return report
+}
+
+func Unpublished(doc *Document, lc LinkContext, live map[string]bool, pageID string) []Finding {
+	out := make([]Finding, 0)
+	for _, target := range lc.Targets {
+		if live[target.PageID] || len(existingFor(doc, lc, target)) == 0 {
+			continue
+		}
+		out = append(out, Finding{
+			Severity: SeverityWarn, Code: CodeTargetNotPublished,
+			Message: "the page links to " + target.URL + ", which is not on the site yet, so the link leads " +
+				"nowhere until that page is published",
+			Details: map[string]any{"pageId": pageID, "targetPageId": target.PageID, "relation": string(target.Relation)},
+		})
+	}
+	return out
 }
 
 func ScoreOf(items []Finding) float64 {

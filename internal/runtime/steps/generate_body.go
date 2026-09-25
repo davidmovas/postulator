@@ -15,26 +15,10 @@ import (
 const NameGenerateBody = string(run.StepGenerateBody)
 
 type bodyPrompt struct {
-	Page     pagemap.Page
-	Entity   graph.Entity
-	Spec     template.TemplateSpec
-	Brief    content.Brief
-	Children []string
-}
-
-func childAnchors(lc content.LinkContext, wanted bool) []string {
-	if !wanted {
-		return nil
-	}
-
-	out := make([]string, 0, len(lc.Targets))
-	for i := range lc.Targets {
-		if lc.Targets[i].Relation != content.RelationDown || len(lc.Targets[i].Anchors) == 0 {
-			continue
-		}
-		out = append(out, lc.Targets[i].Anchors[0])
-	}
-	return out
+	Page   pagemap.Page
+	Entity graph.Entity
+	Spec   template.TemplateSpec
+	Brief  content.Brief
 }
 
 func GenerateBody(deps Deps) run.StepDef {
@@ -67,7 +51,6 @@ func GenerateBody(deps Deps) run.StepDef {
 			brief := content.NewBrief(sc.Spec, policy.Rules, sc.Page, entity, lc)
 			system, user, err := render(NameGenerateBody, bodyPrompt{
 				Page: sc.Page, Entity: entity, Spec: sc.Spec, Brief: brief,
-				Children: childAnchors(lc, sc.Spec.LinkRules.ChildrenSection),
 			})
 			if err != nil {
 				return run.Result{}, err
