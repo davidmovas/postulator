@@ -1609,3 +1609,97 @@ client asked for; the code is under `internal/domain/content`, `internal/domain/
 - `primaryInHeading` on an ordinary section is a request to the model and a warning when it is not
   met, never an error; the heading is the template's.
 - The seeded templates are unchanged on an existing install; only a fresh install sees them.
+
+## 2026-09-25 — built-ins without images, images that are drawn, links that are owed and said
+
+The owner's third week: the built-in templates asked for photos, a run over a template "with
+photos" drew none and said nothing, a parent passed validation without its link to the child
+the same run wrote, and the Linking screen called a page that only exists in the plan broken.
+Links are what the product is for, so the rule of this section is that an owed link is placed or
+said, never dropped in silence.
+
+### Templates and images
+
+- **The built-ins ask for no image.** Comparison, Guide, Hub and Product carry
+  `images {featured: false, inline: 0, source: ""}`; their `generate_images` step stays enabled,
+  because it is a no-op for a page that asks for none and it lets an override that turns images on
+  draw them. This **supersedes** "the seeded templates are unchanged on an existing install": the
+  copies the earlier releases shipped are embedded under `domain/template/seed/superseded`, and
+  `EnsureSeeded` replaces a stored built-in whose spec still equals one of them with the current
+  seed as a new version, unless one of its overrides would no longer resolve on it. An edited
+  built-in is left as its owner saved it; the comparison decodes both sides through
+  `TemplateSpec`, so a field added later cannot make an untouched copy look edited.
+- **The OpenAI image adapter sends only what the model takes.** GPT image models reject
+  `response_format` with a 400 and answer in base64 anyway, so every drawn image failed and the
+  step recorded a warning nobody read. A `dall-e` model gets `response_format` and no quality, a
+  GPT image model gets quality and no `response_format`, and one image may take four minutes.
+- **The generate recipe draws what the template asks.** `run.GenerateRecipe()` carries
+  `generate_images`; the estimate raises `images_step_off` for each page whose template asks for
+  images the run's recipe will not draw; the template editor enables the step, and picks drawn
+  images when no source is set, on the first edit that asks for an image. `template.Validate`
+  does not refuse the combination, because `Resolve` validates and stored templates and overrides
+  in that state would stop resolving.
+- **The image step says how many it placed.** The manifest carries `wanted`, a library that
+  picks fewer raises `images_short`, and the sentence is "placed N of M images", with the first
+  reason when the page is short. Validation checks no image, on the owner's word.
+- **The image model has one control**, `images.openaiModel`; the Images role left the model
+  pickers because nothing read it, and the settings copy says the image settings apply after a
+  restart.
+
+### A template picked at the start
+
+- **A template picked in the start drawer, a schedule or `runs_start` is assigned to the chosen
+  pages**, and the run follows it. It was a label while every page was written, estimated and
+  audited on its own template. `ResolveForPage` takes a template in place of the page's own and
+  refuses one of another site; the estimate resolves each chosen page on the picked template
+  without writing anything; `Start` checks the recipe, assigns through `pages.AssignTemplate` and
+  then queues. The parents a run adds keep their own templates and a kind that owns its recipe
+  assigns nothing. Assignment and queueing are not one transaction, because `Enqueue` owns its
+  own and wakes the dispatcher after its commit; the only gap left is a database failure at
+  enqueue, and then the pages keep the template the person picked.
+
+### Owed links
+
+- **The writer is told every link the budget allows.** The brief lists the anchor of every
+  target within `maxLinks`, up, down and sideways, and puts the children in their own closing
+  section when the *effective* rules ask for one; `generate_body` read the template's raw rules,
+  so a template that inherits the site policy was never asked for its children.
+- **The linker owes those phrases too.** `repair_links` asks for a sentence for any target whose
+  anchor the body lacks, writes a plain one with `phrase_templated` when the model does not,
+  places an up phrase where a parent link may go and a down or sibling phrase at the close of the
+  page, and leaves a target the budget cannot hold. A down link the budget cannot hold stays a
+  warning, on the owner's word, and is said on the finished page (below).
+- **A link to a page that is not on the site is placed and named.** Linking to a planned path is
+  what lets the link be there the moment the page is published; validation raises
+  `target_not_published` for a link to a page with no WordPress id that this run does not write.
+- **A neighbor that owes a page a link gets one.** After a publish, `relink_neighbors` visits the
+  page's own targets and every page that may owe it a link (its parents, all its descendants and
+  its related pages, `content.MayLinkTo`), keeping quiet about those that owe nothing; a neighbor
+  that owes the link and carries no anchor for it gets a plain sentence with the link where its
+  rules allow it (`relink_phrase_templated`, put back by a revert with the rest of the body), and
+  a link that still cannot be placed raises `neighbor_link_missing`. A neighbor is planned on the
+  site policy its own template overrides, not on the new page's rules. `relink_page` back-fills a
+  target on the site the same way and names a spent budget as `target_missing`, but never writes
+  a sentence for a page that is not on the site. This **supersedes** "a relink writes nothing but
+  links": it writes a plain sentence carrying a link when the page owes one and has no anchor for
+  it, and says so.
+
+### What a finished page lacks
+
+- **A finished page says what it lacks.** The report step words a notice (owed links missing and
+  whether the budget was spent, links to pages not on the site yet, neighbors that could not link
+  back, images short of what was asked for) and returns it as `run.Result.Notice`; the engine
+  keeps the notice of the step that completes an item in `run_items.note` and sends it on
+  `item.done`. The item table marks the page **Done, check**, the drawer opens on the notice and
+  the run header counts such pages. No migration: the note column already carried a held
+  page's sentence.
+
+### The Linking screen
+
+- **A link has a state**: placed, placed to a page not on the site yet, missing, waiting for its
+  target, waiting for the page to be written, or blocked. A page is on the site when it has a
+  WordPress id, the rule the engine uses. `Missing` counts real misses only; `Pending` and
+  `Unpublished` carry the rest; an orphan is a page on the site that nothing links to, in the
+  audit and in the site overview. The table says **Not written yet** for a planned page, the panel
+  labels each owed link by its state and does not offer to relink a page that is not on the site,
+  and the run's Links & compliance pane says it is the page as it stood at validation.

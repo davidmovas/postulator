@@ -62,7 +62,13 @@ plans every mapped page's link targets with the rules of the page's resolved tem
 site's effective policy, exactly as `resolve_context` does, and answers one summary row per
 non-archived page; the page detail names each target, whether a stored link satisfies it and
 with which anchor, and every stored link the graph did not ask for. Both are unpaged reads of
-one site, like `Tree` and `LoadGraph`.
+one site, like `Tree` and `LoadGraph`. Each owed link carries a `state` from `linkStates` in
+`vocab.ts` (`placed`, `target_unpublished`, `missing`, `awaiting_target`, `awaiting_page`,
+`blocked`) and `targetOnSite`; a row carries `onSite` (the page has a WordPress id), and
+`missing` and `missingRequired` count real misses only, while `pending` counts the links that
+wait for a page to be written or published and `unpublished` the placed links to a page that is
+not on the site yet. `orphan` holds only for a page on the site, in the audit and in
+`SiteOverview` alike.
 
 Every method but `HealthService.Ping` and the four lock methods of `SettingsService`
 answers `LOCKED` while a master password is set and the application has not been unlocked,
@@ -161,7 +167,7 @@ enables a step another kind owns, for every kind but `custom`.
 
 | kind | recipe |
 |---|---|
-| `generate` | the template's, or `run.GenerateRecipe()` when neither the request nor the template names one |
+| `generate` | the template's, or `run.GenerateRecipe()` (which carries `generate_images`) when neither the request nor the template names one |
 | `relink` | `resolve_context relink_page sync_back report` |
 | `repair` | `repair_hierarchy sync_back report` |
 | `sync` | `sync_site` |
@@ -181,8 +187,17 @@ enabled step that declares no ceiling and no model, `template_unresolved`, `enti
 `required_target_unplaced`, `provider_key_missing` and `model_unresolved` are graded `error`
 and `RunsService.Start` refuses the run with `INVALID` and `details.findings` while they
 stand, and `recipe_differs`, `model_unknown`, `image_source_unavailable` and `plugin_missing`
-are warnings. `Budget` carries `maxUsd` and `maxTokens` and either one pauses the run with
-`budget_exceeded`.
+are warnings, as is `images_step_off`, raised per page whose template asks for images the run's
+recipe will not draw. `Budget` carries `maxUsd` and `maxTokens` and either one pauses the run with
+`budget_exceeded`, and a negative one is refused.
+
+`StartRequest.templateId` assigns that template to the chosen pages: `Estimate` prices and
+preflights every chosen page on it without writing anything, and `Start`, once the estimate lets
+the run through and its recipe checks out, moves the chosen pages to it before it queues the run.
+The parents a run adds keep their own templates, a kind that owns its recipe assigns nothing, and
+a schedule's `templateId` does the same on every firing. `ResolveForPageRequest.templateId`
+resolves that template in place of the page's own and refuses one of another site with
+`INVALID`.
 
 `RunsService.RetryStep{itemId, acceptFindings?}` requeues the current step; with
 `acceptFindings` a page held at `validate` goes on with its findings as they are. An item
@@ -209,6 +224,16 @@ New warning findings, each carrying `details.pageId` and `details.path`: `judge_
 (`reason`), `artifact_purged` (`kind`), `image_not_placed` (`reason`), `meta_not_written`
 (`fields`).
 
+`images` carries `wanted`, the images the page asked for, and `images_short` names a library
+that picked fewer. `relink_result.neighbors[]` carries `sentence` when a plain sentence was
+written to carry the link, and the result counts `missing`, the neighbors that owe the page a
+link that could not be placed; a relink run's `placed[]` carries `sentence` likewise.
+`final_report.notice` is the sentence that says what the page lacks, empty when it lacks
+nothing. Warning findings added on 2026-09-25: `target_not_published` (`targetPageId`,
+`relation`) from `validate` and `relink_page`, `images_short`, `relink_phrase_templated`
+(`sentence`, `targetPageId`), `neighbor_link_missing` (`reason`, `targetPageId`), and
+`target_missing` from `relink_page` when the page's budget is spent.
+
 ## Events
 
 `internal/application/events` owns the names, the payload structs and the envelope;
@@ -223,6 +248,8 @@ envelope is
 
 `step.done` carries `message`, the sentence the step returned, and `step.retrying` carries
 `code` and `message`, the fault that made the engine try again, beside `attempt` and `afterMs`.
+`item.done` carries `note`, what the finished page lacks as the report step worded it, the same
+sentence the item's `note` keeps; it is empty for a page that lacks nothing.
 
 `runId` is present on run events only, `at` is RFC3339 UTC, and `seq` is per run and
 gapless. For application events `seq` is a counter held by the `EventBridge`, so it is
