@@ -9,7 +9,7 @@ import { changedGroups } from "./outline.js";
 import type { Layer } from "./patch.js";
 import { layered, patchBetween, patchObject } from "./patch.js";
 import type { SpecDraft } from "./spec.js";
-import { draftOf } from "./spec.js";
+import { draftOf, readyForImages } from "./spec.js";
 
 export interface LayerState {
     template: Template | undefined;
@@ -109,7 +109,7 @@ export function useDraft(key: string, state: LayerState, layer: Layer): DraftSta
             if (draft === null) {
                 return;
             }
-            setEdited({ key, opened: held?.opened ?? state.stamp, draft: { ...draft, ...patch } });
+            setEdited({ key, opened: held?.opened ?? state.stamp, draft: readyForImages(draft, { ...draft, ...patch }) });
         },
         clear: () => {
             setEdited(null);

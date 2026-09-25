@@ -3,9 +3,9 @@ import { useMemo } from "react";
 
 import { copy } from "../../../copy/index.js";
 import { useModelCatalog } from "../../../data/hooks/models.js";
-import { modelRoles } from "../../../generated/vocab.js";
 import type { SelectOption } from "../../../ui/index.js";
 import { Banner, cx, IconButton, RestartAltIcon, Select } from "../../../ui/index.js";
+import { pickableRoles } from "../../settings/model/profiles.js";
 import { fieldErrorOf } from "../controls.js";
 import { roleLabel } from "../labels.js";
 import type { ProfileDraft, SpecDraft } from "../spec.js";
@@ -35,10 +35,8 @@ export function ModelsGroup({ draft, below, error, onChange }: ModelsGroupProps)
     const catalog = useModelCatalog();
     const models = useMemo(() => catalog.data?.models ?? [], [catalog.data]);
     const roles = useMemo(() => {
-        const extra = draft.profiles
-            .map((profile) => profile.role)
-            .filter((role) => !(modelRoles as readonly string[]).includes(role));
-        return [...modelRoles, ...extra];
+        const extra = draft.profiles.map((profile) => profile.role).filter((role) => !pickableRoles.includes(role));
+        return [...pickableRoles, ...extra];
     }, [draft.profiles]);
 
     const catalogOptions: readonly SelectOption<string>[] = models.map((model) => ({

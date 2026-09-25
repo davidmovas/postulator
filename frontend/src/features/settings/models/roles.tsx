@@ -3,7 +3,6 @@ import type { ReactElement } from "react";
 import { copy } from "../../../copy/index.js";
 import { formErrorOf } from "../../../data/errors.js";
 import { useModelCatalog, useRoleProfiles, useSetProfile } from "../../../data/hooks/models.js";
-import { modelRoles } from "../../../generated/vocab.js";
 import {
     Banner,
     EmptyState,
@@ -13,7 +12,7 @@ import {
     Select,
     StatusBadge,
 } from "../../../ui/index.js";
-import { profileRows, refOf, refText } from "../model/profiles.js";
+import { pickableRoles, profileRows, refOf, refText } from "../model/profiles.js";
 
 const said = copy.settings.models.profiles;
 const roleLabels = said.labels as Readonly<Record<string, string>>;
@@ -28,7 +27,7 @@ export function RoleTable(): ReactElement {
         value: refText({ provider: model.provider, model: model.model }),
         label: refText({ provider: model.provider, model: model.model }),
     }));
-    const rows = profileRows([...modelRoles], profiles.data?.profiles ?? []);
+    const rows = profileRows(pickableRoles, profiles.data?.profiles ?? []);
 
     return (
         <Panel>
@@ -72,6 +71,7 @@ export function RoleTable(): ReactElement {
                     ))}
                 </div>
             )}
+            <p className="border-t border-hairline px-3 py-2 text-xs text-ink-dim">{said.imagesElsewhere}</p>
             {formErrorOf(choose.error) === null ? null : (
                 <div className="px-3 pb-3">
                     <Banner tone="danger" title={formErrorOf(choose.error) ?? ""} />
