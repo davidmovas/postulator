@@ -501,10 +501,82 @@ func TestGenerateBodyNamesTheChildrenWhenTheRulesAskFor(t *testing.T) {
 	}
 }
 
+func onTheSite(deps steps.Deps) steps.Deps {
+	listed, ok := deps.Pages.(pageList)
+	if !ok {
+		return deps
+	}
+	items := make([]pagemap.Page, 0, len(listed.items))
+	for i := range listed.items {
+		page := listed.items[i]
+		wpID := int64(100 + i)
+		page.WPID = &wpID
+		items = append(items, page)
+	}
+	listed.items = items
+	deps.Pages = listed
+	return deps
+}
+
+func TestValidateNamesALinkToAPageThatIsNotOnTheSite(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		deps   func(steps.Deps) steps.Deps
+		within []string
+		named  bool
+	}{
+		{name: "the parent is on the site", deps: onTheSite},
+		{name: "the parent is written by this run", within: []string{"page-child", "page-parent"}},
+		{name: "the parent is only planned", named: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps := unitDeps()
+			if tc.deps != nil {
+				deps = tc.deps(deps)
+			}
+			sc := unitContext(t, map[run.ArtifactKind][]byte{
+				run.ArtifactLinkContext: linkContextBlob(t, deps),
+				run.ArtifactBodyHTML:    []byte(`<h1>Espresso</h1><h2>About</h2><p>Espresso is a kind of <a href="/coffee/">coffee</a>.</p>`),
+			})
+			sc.Run.Targets = tc.within
+
+			result, err := steps.Validate(deps).Run(t.Context(), sc)
+			if err != nil {
+				t.Fatalf("Validate: %v", err)
+			}
+			if result.Next == run.TransitionPause {
+				t.Fatalf("result = %+v, want a link to a planned page never to hold the page", result)
+			}
+			var decoded steps.ValidationReport
+			if err = json.Unmarshal(result.Artifacts[0].Blob, &decoded); err != nil {
+				t.Fatalf("decode the report: %v", err)
+			}
+			named := false
+			for _, item := range decoded.Compliance.Items {
+				if item.Code == content.CodeTargetNotPublished {
+					named = true
+				}
+			}
+			if named != tc.named {
+				t.Fatalf("compliance = %+v, want target_not_published %v", decoded.Compliance.Items, tc.named)
+			}
+			if tc.named && decoded.Compliance.Score >= 1 {
+				t.Fatalf("score = %v, want the warning to count", decoded.Compliance.Score)
+			}
+		})
+	}
+}
+
 func TestInsertLinksAndValidateReadTheirArtifacts(t *testing.T) {
 	t.Parallel()
 
-	deps := unitDeps()
+	deps := onTheSite(unitDeps())
 	blob := linkContextBlob(t, deps)
 	body := []byte("<h1>Espresso</h1><h2>About</h2><p>Espresso is a kind of coffee.</p>")
 

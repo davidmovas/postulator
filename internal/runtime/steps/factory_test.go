@@ -235,6 +235,10 @@ func seedPage(t *testing.T, repo *sqlite.PageRepo, siteID, path, entityID string
 	if entityID != "" {
 		record.EntityID = &entityID
 	}
+	if status == pagemap.StatusPublished {
+		wpID := int64(len(path))
+		record.WPID = &wpID
+	}
 	if err := repo.Insert(t.Context(), record); err != nil {
 		t.Fatalf("insert the page %s: %v", path, err)
 	}

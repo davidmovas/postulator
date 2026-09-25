@@ -61,12 +61,19 @@ func Validate(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
+			live, err := livePages(ctx, deps, sc)
+			if err != nil {
+				return run.Result{}, err
+			}
+
 			report := ValidationReport{
 				PageID:     sc.Page.ID,
 				Compliance: content.Compliance(doc, lc, policy, sc.Page.ID),
 				Structure:  content.Structure(doc, entity.PrimaryKeyword, entity.SecondaryKeywords, sc.Spec),
 				Links:      links,
 			}
+			report.Compliance.Items = append(report.Compliance.Items, content.Unpublished(doc, lc, live, sc.Page.ID)...)
+			report.Compliance.Score = content.ScoreOf(report.Compliance.Items)
 			if drafted {
 				report.Structure.Items = append(report.Structure.Items, draft.Findings...)
 			}
@@ -94,6 +101,23 @@ func Validate(deps Deps) run.StepDef {
 			return result, nil
 		},
 	}
+}
+
+func livePages(ctx context.Context, deps Deps, sc *run.StepContext) (map[string]bool, error) {
+	pages, err := deps.Pages.ListBySite(ctx, sc.Run.SiteID)
+	if err != nil {
+		return nil, err
+	}
+	live := make(map[string]bool, len(pages)+len(sc.Run.Targets))
+	for i := range pages {
+		if pages[i].WPID != nil {
+			live[pages[i].ID] = true
+		}
+	}
+	for _, target := range sc.Run.Targets {
+		live[target] = true
+	}
+	return live, nil
 }
 
 func plannedH1Wins(items []content.Finding) []content.Finding {
