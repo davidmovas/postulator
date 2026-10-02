@@ -36,6 +36,8 @@ const (
 	pollEvery = 100 * time.Millisecond
 	pollFor   = 3 * time.Minute
 
+	scriptedProviderKey = "sk-harness-scripted"
+
 	failingPath = "/grinders/single-dosing/"
 
 	heldParentPath = "/home-roasting/"
@@ -272,6 +274,9 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 		_, keyErr := core.Models.SetProviderKey(ctx, models.SetProviderKeyRequest{Provider: "openai", APIKey: key})
 		return keyErr
 	}
+	if keyErr := keyTheProviders(ctx, core); keyErr != nil {
+		return keyErr
+	}
 	if runErr := seedRuns(ctx, core, siteID, guide, pagesByPath, provider); runErr != nil {
 		return runErr
 	}
@@ -279,6 +284,30 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 		return scheduleErr
 	}
 	return seedConversation(ctx, core, siteID)
+}
+
+func keyTheProviders(ctx context.Context, core *app.Core) error {
+	profiles, err := core.Models.GetProfiles(ctx, models.GetProfilesRequest{})
+	if err != nil {
+		return err
+	}
+	keyed := make(map[string]struct{}, len(profiles.Profiles))
+	for _, profile := range profiles.Profiles {
+		if profile.Effective == nil {
+			continue
+		}
+		provider := profile.Effective.Provider
+		if _, done := keyed[provider]; done {
+			continue
+		}
+		keyed[provider] = struct{}{}
+		if _, keyErr := core.Models.SetProviderKey(ctx, models.SetProviderKeyRequest{
+			Provider: provider, APIKey: scriptedProviderKey,
+		}); keyErr != nil {
+			return keyErr
+		}
+	}
+	return nil
 }
 
 func adoptTheSite(ctx context.Context, core *app.Core, site *wptest.Server, siteID string) error {

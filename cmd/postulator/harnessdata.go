@@ -107,9 +107,9 @@ func seedRelated() []seedEdge {
 
 func seedSecondaryPages() []seedPage {
 	return []seedPage{
-		{Path: "/espresso-machines/under-500/breville-bambino-plus-review/", Title: "Breville Bambino Plus review: a year on the counter", Status: statusPublished, Entity: "Espresso machines under $500"},
-		{Path: "/grinders/hand/1zpresso-jx-pro-review/", Title: "1Zpresso JX-Pro review: espresso from a hand grinder", Status: statusPublished, Entity: "Hand grinders"},
-		{Path: "/milk-drinks/latte-art/rosetta-tutorial/", Title: "Pouring a rosetta: the wiggle, the cut, the finish", Status: statusPublished, Entity: "Latte art"},
+		{Path: "/breville-bambino-plus-review/", Title: "Breville Bambino Plus review: a year on the counter", Status: statusPublished, Entity: "Espresso machines under $500"},
+		{Path: "/1zpresso-jx-pro-review/", Title: "1Zpresso JX-Pro review: espresso from a hand grinder", Status: statusPublished, Entity: "Hand grinders"},
+		{Path: "/rosetta-tutorial/", Title: "Pouring a rosetta: the wiggle, the cut, the finish", Status: statusPublished, Entity: "Latte art"},
 	}
 }
 
