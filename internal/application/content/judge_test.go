@@ -402,6 +402,30 @@ func TestTheJudgeIsToldTheKeywordsThePageIsWrittenFor(t *testing.T) {
 	}
 }
 
+func TestTheJudgeNamesAnEntityWhoseNameIsSharedWithItsParent(t *testing.T) {
+	t.Parallel()
+
+	model := &llmStub{reply: `{"score":0.5}`}
+	service := newService(model, func(d *appcontent.Deps) {
+		shared := entities()
+		shared[1].ScopeID = pointer("parent")
+		shared = append(shared,
+			graph.Entity{ID: "tea", SiteID: "site", Name: "Tea", Kind: graph.KindTopic, Source: graph.SourceUser},
+			graph.Entity{
+				ID: "tea-espresso", SiteID: "site", Name: "Espresso", Kind: graph.KindTopic, Source: graph.SourceUser,
+				ScopeID: pointer("tea"),
+			},
+		)
+		d.Entities = entityStub{items: shared}
+	})
+	if _, err := service.Judge(t.Context(), appcontent.JudgeRequest{PageID: "page-child"}); err != nil {
+		t.Fatalf("Judge: %v", err)
+	}
+	if !strings.Contains(model.last.Messages[0].Text, "Topic: Coffee Espresso\n") {
+		t.Fatalf("the judge is not told which Espresso the page is about:\n%s", model.last.Messages[0].Text)
+	}
+}
+
 func TestAssessRefusesAnUnreadableBody(t *testing.T) {
 	t.Parallel()
 

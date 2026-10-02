@@ -212,7 +212,9 @@ func entityOf(ctx context.Context, deps Deps, sc *run.StepContext) (graph.Entity
 	}
 	for i := range entities {
 		if entities[i].ID == *sc.Page.EntityID {
-			return entities[i], nil
+			entity := entities[i]
+			entity.Name = graph.Labels(entities)[entity.ID]
+			return entity, nil
 		}
 	}
 	return graph.Entity{}, errors.New(errors.NotFound, "the entity the page is mapped to is gone").

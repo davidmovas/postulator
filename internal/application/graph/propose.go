@@ -270,11 +270,7 @@ func (s *Service) ProposeRelated(ctx context.Context, req ProposeRelatedRequest)
 
 	focus := ""
 	if entityID := strings.TrimSpace(req.EntityID); entityID != "" {
-		for i := range state.entities {
-			if state.entities[i].ID == entityID {
-				focus = state.entities[i].Name
-			}
-		}
+		focus = state.labels[entityID]
 		if focus == "" {
 			return ProposeRelatedResponse{}, errors.New(errors.NotFound, "entity not found").
 				WithDetail("entityId", entityID)
@@ -282,7 +278,7 @@ func (s *Service) ProposeRelated(ctx context.Context, req ProposeRelatedRequest)
 	}
 
 	system, user, err := prompts.Render(NameProposeRelated, relatedPrompt{
-		SiteName: owner.Name, Focus: focus, Entities: state.entities, Existing: pairsOf(state),
+		SiteName: owner.Name, Focus: focus, Entities: state.labeled(), Existing: pairsOf(state),
 	})
 	if err != nil {
 		return ProposeRelatedResponse{}, err
@@ -323,8 +319,17 @@ type siteGraph struct {
 	entities []graphdomain.Entity
 	edges    []graphdomain.Edge
 	pages    []pagemap.Page
+	labels   map[string]string
 	byName   map[string]string
 	byPath   map[string]string
+}
+
+func (g siteGraph) labeled() []graphdomain.Entity {
+	out := slices.Clone(g.entities)
+	for i := range out {
+		out[i].Name = g.labels[out[i].ID]
+	}
+	return out
 }
 
 func (s *Service) snapshot(ctx context.Context, siteID string) (siteGraph, error) {
@@ -342,11 +347,11 @@ func (s *Service) snapshot(ctx context.Context, siteID string) (siteGraph, error
 	}
 
 	state := siteGraph{
-		entities: entities, edges: edges, pages: pages,
+		entities: entities, edges: edges, pages: pages, labels: graphdomain.Labels(entities),
 		byName: make(map[string]string, len(entities)), byPath: make(map[string]string, len(pages)),
 	}
 	for i := range entities {
-		state.byName[fold(entities[i].Name)] = entities[i].ID
+		state.byName[fold(state.labels[entities[i].ID])] = entities[i].ID
 	}
 	for i := range pages {
 		if pages[i].EntityID != nil {
@@ -370,7 +375,7 @@ func unmappedPages(pages []pagemap.Page) []pagemap.Page {
 func pagesPromptOf(siteName string, state siteGraph, batch []pagemap.Page) pagesPrompt {
 	known := make([]knownEntity, 0, len(state.entities))
 	for i := range state.entities {
-		entry := knownEntity{Name: state.entities[i].Name, Kind: string(state.entities[i].Kind)}
+		entry := knownEntity{Name: state.labels[state.entities[i].ID], Kind: string(state.entities[i].Kind)}
 		for path, entityID := range state.byPath {
 			if entityID == state.entities[i].ID {
 				entry.Path = path
@@ -440,15 +445,10 @@ func connected(edges []graphdomain.Edge, candidate graphdomain.Edge) bool {
 }
 
 func pairsOf(state siteGraph) []relatedPair {
-	names := make(map[string]string, len(state.entities))
-	for i := range state.entities {
-		names[state.entities[i].ID] = state.entities[i].Name
-	}
-
 	pairs := make([]relatedPair, 0, len(state.edges))
 	for i := range state.edges {
 		pairs = append(pairs, relatedPair{
-			From: names[state.edges[i].FromEntityID], To: names[state.edges[i].ToEntityID],
+			From: state.labels[state.edges[i].FromEntityID], To: state.labels[state.edges[i].ToEntityID],
 		})
 	}
 	return pairs

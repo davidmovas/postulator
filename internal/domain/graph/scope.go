@@ -56,11 +56,15 @@ func scopeKey(scope *string) string {
 	return *scope
 }
 
+func nameKey(name string) string {
+	return strings.ToLower(strings.TrimSpace(name))
+}
+
 func ScopeClashes(entities []Entity) []Clash {
 	held := make(map[string]int, len(entities))
 	clashes := make([]Clash, 0)
 	for i := range entities {
-		key := scopeKey(entities[i].ScopeID) + "\x00" + strings.ToLower(strings.TrimSpace(entities[i].Name))
+		key := scopeKey(entities[i].ScopeID) + "\x00" + nameKey(entities[i].Name)
 		at, seen := held[key]
 		if !seen {
 			held[key] = -1 - i
@@ -108,25 +112,35 @@ func Settle(entities []Entity, edges []Edge) ([]Entity, error) {
 }
 
 func (g Graph) Label(id string) string {
-	entity, found := g.entities[id]
-	if !found {
-		return ""
-	}
-	if entity.ScopeID == nil || !g.shared(entity) {
-		return entity.Name
-	}
-	parent, found := g.entities[*entity.ScopeID]
-	if !found {
-		return entity.Name
-	}
-	return parent.Name + " " + entity.Name
+	return g.labels[id]
 }
 
-func (g Graph) shared(entity Entity) bool {
-	for i := range g.ordered {
-		if g.ordered[i].ID != entity.ID && strings.EqualFold(g.ordered[i].Name, entity.Name) {
-			return true
-		}
+func Labels(entities []Entity) map[string]string {
+	byID := make(map[string]Entity, len(entities))
+	uses := make(map[string]int, len(entities))
+	for i := range entities {
+		byID[entities[i].ID] = entities[i]
+		uses[nameKey(entities[i].Name)]++
 	}
-	return false
+
+	labels := make(map[string]string, len(entities))
+	for i := range entities {
+		labels[entities[i].ID] = labelOf(entities[i], byID, uses, map[string]struct{}{})
+	}
+	return labels
+}
+
+func labelOf(entity Entity, byID map[string]Entity, uses map[string]int, climbed map[string]struct{}) string {
+	if entity.ScopeID == nil || uses[nameKey(entity.Name)] < 2 {
+		return entity.Name
+	}
+	parent, found := byID[*entity.ScopeID]
+	if _, looped := climbed[entity.ID]; !found || looped {
+		return entity.Name
+	}
+	climbed[entity.ID] = struct{}{}
+	if uses[nameKey(parent.Name)] < 2 {
+		return parent.Name + " " + entity.Name
+	}
+	return labelOf(parent, byID, uses, climbed) + " " + entity.Name
 }

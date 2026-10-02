@@ -69,11 +69,7 @@ func (s *Service) ProposeFromKeywords(ctx context.Context, req ProposeFromKeywor
 
 	parent := ""
 	if parentID := strings.TrimSpace(req.ParentEntityID); parentID != "" {
-		for i := range state.entities {
-			if state.entities[i].ID == parentID {
-				parent = state.entities[i].Name
-			}
-		}
+		parent = state.labels[parentID]
 		if parent == "" {
 			return ProposeFromKeywordsResponse{}, errors.New(errors.NotFound, "entity not found").
 				WithDetail("entityId", parentID)
@@ -144,7 +140,7 @@ func answeredKeywords(answered keyword.Keyword, others []string, asked map[strin
 func knownEntitiesOf(state siteGraph) []knownEntity {
 	known := make([]knownEntity, 0, len(state.entities))
 	for i := range state.entities {
-		known = append(known, knownEntity{Name: state.entities[i].Name, Kind: string(state.entities[i].Kind)})
+		known = append(known, knownEntity{Name: state.labels[state.entities[i].ID], Kind: string(state.entities[i].Kind)})
 	}
 	slices.SortFunc(known, func(a, b knownEntity) int { return strings.Compare(a.Name, b.Name) })
 	return known

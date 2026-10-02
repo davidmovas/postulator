@@ -543,3 +543,59 @@ func TestResolveForPageTakesThePrimaryKeywordFromThePageBeforeItsEntity(t *testi
 		})
 	}
 }
+
+func TestResolveForPageNamesAnEntityWhoseNameIsSharedWithItsParent(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	seed := template.Seed()[3]
+	spec := seed.Spec
+	spec.Sections[0].Heading = "About {entityName}"
+	created, err := h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Name: "Named product", PageKind: seed.PageKind, Spec: spec})
+	if err != nil {
+		t.Fatalf("CreateTemplate: %v", err)
+	}
+
+	entities := sqlite.NewEntityRepo(h.store)
+	underParent := func(name string, parent graph.Entity) graph.Entity {
+		entity := sqlitetest.Entity(t, h.store, h.siteID, name)
+		if scopeErr := entities.SetScope(t.Context(), entity.ID, &parent.ID, sqlitetest.Stamp); scopeErr != nil {
+			t.Fatalf("put %s under %s: %v", name, parent.Name, scopeErr)
+		}
+		return entity
+	}
+	bpc := sqlitetest.Entity(t, h.store, h.siteID, "BPC-157")
+	tb := sqlitetest.Entity(t, h.store, h.siteID, "TB-500")
+	bpcLiquid := underParent("Liquid", bpc)
+	underParent("Liquid", tb)
+	powder := underParent("Powder", bpc)
+
+	cases := []struct {
+		name    string
+		path    string
+		entity  graph.Entity
+		heading string
+	}{
+		{name: "a shared name carries its parent", path: "/bpc-157/liquid/", entity: bpcLiquid, heading: "About BPC-157 Liquid"},
+		{name: "a name used once stays as it is", path: "/bpc-157/powder/", entity: powder, heading: "About Powder"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			page := sqlitetest.Page(t, h.store, h.siteID, tc.path)
+			page.TemplateID = &created.Template.ID
+			page.EntityID = &tc.entity.ID
+			if updateErr := sqlite.NewPageRepo(h.store).Update(t.Context(), page); updateErr != nil {
+				t.Fatalf("update %s: %v", page.Path, updateErr)
+			}
+
+			resolved, resolveErr := h.service.ResolveForPage(t.Context(), templates.ResolveForPageRequest{PageID: page.ID})
+			if resolveErr != nil {
+				t.Fatalf("ResolveForPage: %v", resolveErr)
+			}
+			if resolved.Spec.Sections[0].Heading != tc.heading {
+				t.Fatalf("heading = %q, want %q", resolved.Spec.Sections[0].Heading, tc.heading)
+			}
+		})
+	}
+}

@@ -117,6 +117,7 @@ func (s *Service) adopt(ctx context.Context, siteID string, proposed *ProposedEn
 			return insertErr
 		}
 		state.entities = append(state.entities, entity)
+		state.labels[entity.ID] = name
 		state.byName[fold(name)] = entity.ID
 		entityID = entity.ID
 		out.Entities = append(out.Entities, entityView(entity))

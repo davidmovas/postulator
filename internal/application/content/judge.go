@@ -158,6 +158,7 @@ func (s *Service) context(ctx context.Context, page pagemap.Page,
 	planned := contentdomain.PlanLinks(built, pagemap.NewIndex(pages), contentdomain.Subject{
 		PageID: page.ID, PagePath: page.Path, EntityID: entity.ID,
 	}, policy)
+	entity.Name = built.Label(entity.ID)
 	return entity, planned.Context.Targets, nil
 }
 

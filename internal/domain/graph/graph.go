@@ -25,6 +25,7 @@ type Graph struct {
 	related  map[string][]neighbor
 	ordered  []Entity
 	edges    []Edge
+	labels   map[string]string
 }
 
 func New(entities []Entity, edges []Edge) (Graph, error) {
@@ -52,6 +53,7 @@ func New(entities []Entity, edges []Edge) (Graph, error) {
 		g.ordered = append(g.ordered, *e)
 	}
 	slices.SortFunc(g.ordered, byName)
+	g.labels = Labels(g.ordered)
 
 	seen := make(map[string]struct{}, len(edges))
 	for i := range edges {
@@ -176,8 +178,8 @@ func (g Graph) Roots() []Entity {
 func (g Graph) trail(cycle []string) string {
 	named := make([]string, 0, len(cycle))
 	for _, entityID := range cycle {
-		if entity, found := g.entities[entityID]; found && strings.TrimSpace(entity.Name) != "" {
-			named = append(named, entity.Name)
+		if label := g.Label(entityID); strings.TrimSpace(label) != "" {
+			named = append(named, label)
 			continue
 		}
 		named = append(named, entityID)

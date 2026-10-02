@@ -252,26 +252,67 @@ func TestPlanLinksSkipsWhatCannotBeLinked(t *testing.T) {
 	}
 }
 
+func scoped(record graph.Entity, scope string) graph.Entity {
+	record.ScopeID = ref(scope)
+	return record
+}
+
 func TestATargetFallsBackToTheEntityName(t *testing.T) {
 	t.Parallel()
 
-	entities := []graph.Entity{
-		entity("child", "Child", 0.5, nil, "page-child"),
-		entity("parent", "Parent Topic", 1, nil, "page-parent"),
-	}
-	g, err := graph.New(entities, []graph.Edge{parentEdge("e1", "child", "parent")})
-	if err != nil {
-		t.Fatalf("graph.New: %v", err)
+	cases := []struct {
+		name     string
+		entities []graph.Entity
+		edges    []graph.Edge
+		pages    []pagemap.Page
+		subject  string
+		rules    template.LinkRules
+		want     string
+	}{
+		{
+			name: "a name used once",
+			entities: []graph.Entity{
+				entity("child", "Child", 0.5, nil, "page-child"),
+				entity("parent", "Parent Topic", 1, nil, "page-parent"),
+			},
+			edges:   []graph.Edge{parentEdge("e1", "child", "parent")},
+			pages:   []pagemap.Page{page("page-child", "/child/", "child"), page("page-parent", "/parent/", "parent")},
+			subject: "child",
+			rules:   template.LinkRules{UpDepth: 1},
+			want:    "Parent Topic",
+		},
+		{
+			name: "a name another entity shares carries its parent",
+			entities: []graph.Entity{
+				entity("bpc", "BPC-157", 1, []string{"bpc 157"}, "page-bpc"),
+				entity("tb", "TB-500", 1, []string{"tb 500"}, "page-tb"),
+				scoped(entity("bpc-liquid", "Liquid", 0.5, nil, "page-bpc-liquid"), "bpc"),
+				scoped(entity("tb-liquid", "Liquid", 0.5, nil, "page-tb-liquid"), "tb"),
+			},
+			edges: []graph.Edge{parentEdge("e1", "bpc-liquid", "bpc"), parentEdge("e2", "tb-liquid", "tb")},
+			pages: []pagemap.Page{
+				page("page-bpc", "/bpc-157/", "bpc"), page("page-tb", "/tb-500/", "tb"),
+				page("page-bpc-liquid", "/bpc-157/liquid/", "bpc-liquid"), page("page-tb-liquid", "/tb-500/liquid/", "tb-liquid"),
+			},
+			subject: "bpc",
+			rules:   template.LinkRules{DownLinks: true},
+			want:    "BPC-157 Liquid",
+		},
 	}
 
-	index := pagemap.NewIndex([]pagemap.Page{
-		page("page-child", "/child/", "child"),
-		page("page-parent", "/parent/", "parent"),
-	})
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	lc := plannedFor(dag{g: g, index: index}, "child", template.LinkRules{UpDepth: 1})
-	if len(lc.Targets) != 1 || len(lc.Targets[0].Anchors) != 1 || lc.Targets[0].Anchors[0] != "Parent Topic" {
-		t.Fatalf("the fallback anchor = %+v", lc.Targets)
+			g, err := graph.New(tc.entities, tc.edges)
+			if err != nil {
+				t.Fatalf("graph.New: %v", err)
+			}
+			lc := plannedFor(dag{g: g, index: pagemap.NewIndex(tc.pages)}, tc.subject, tc.rules)
+			if len(lc.Targets) != 1 || len(lc.Targets[0].Anchors) != 1 || lc.Targets[0].Anchors[0] != tc.want {
+				t.Fatalf("the fallback anchor = %+v, want %q", lc.Targets, tc.want)
+			}
+		})
 	}
 }
 

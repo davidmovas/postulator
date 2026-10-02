@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -153,14 +154,15 @@ func (s *Service) varsFor(ctx context.Context, page pagemap.Page, owner site.Sit
 	if page.EntityID == nil {
 		return vars, nil
 	}
-	entity, err := s.entities.Get(ctx, *page.EntityID)
-	if errors.IsCode(err, errors.NotFound) {
-		return vars, nil
-	}
+	entities, err := s.entities.ListBySite(ctx, page.SiteID)
 	if err != nil {
 		return template.Vars{}, err
 	}
-	vars.PrimaryKeyword = pagemap.Keywords(page, entity).Main()
-	vars.EntityName = entity.Name
+	for i := range entities {
+		if entities[i].ID == *page.EntityID {
+			vars.PrimaryKeyword = pagemap.Keywords(page, entities[i]).Main()
+			vars.EntityName = graph.Labels(entities)[entities[i].ID]
+		}
+	}
 	return vars, nil
 }

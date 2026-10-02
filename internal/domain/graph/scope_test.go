@@ -201,22 +201,79 @@ func TestSettleRefusesTwoNamesUnderOneParent(t *testing.T) {
 func TestALabelNamesTheParentOnlyWhenTheNameIsShared(t *testing.T) {
 	t.Parallel()
 
-	entities := []graph.Entity{
-		named(entA, "BPC-157", nil), named(entB, "TB-500", nil),
-		named(entC, "Liquid", new(entA)), named(entD, "liquid", new(entB)), named(entE, "Powder", new(entA)),
-	}
-	g, err := graph.New(entities, nil)
-	if err != nil {
-		t.Fatalf("New: %v", err)
+	const (
+		entF = "f6f6f6f6-f6f6-4f6f-8f6f-f6f6f6f6f6f6"
+		entG = "a7a7a7a7-a7a7-4a7a-8a7a-a7a7a7a7a7a7"
+		entH = "b8b8b8b8-b8b8-4b8b-8b8b-b8b8b8b8b8b8"
+		entI = "c9c9c9c9-c9c9-4c9c-8c9c-c9c9c9c9c9c9"
+	)
+
+	cases := []struct {
+		name     string
+		entities []graph.Entity
+		want     map[string]string
+	}{
+		{
+			name: "a name used once is its own label",
+			entities: []graph.Entity{
+				named(entA, "BPC-157", nil), named(entE, "Powder", new(entA)),
+			},
+			want: map[string]string{entA: "BPC-157", entE: "Powder"},
+		},
+		{
+			name: "a shared name carries its parent, whatever its case",
+			entities: []graph.Entity{
+				named(entA, "BPC-157", nil), named(entB, "TB-500", nil),
+				named(entC, "Liquid", new(entA)), named(entD, "liquid", new(entB)), named(entE, "Powder", new(entA)),
+			},
+			want: map[string]string{entA: "BPC-157", entE: "Powder", entC: "BPC-157 Liquid", entD: "TB-500 liquid"},
+		},
+		{
+			name: "a shared name at the top has no parent to carry",
+			entities: []graph.Entity{
+				named(entA, "Liquid", nil), named(entB, "TB-500", nil), named(entC, "Liquid", new(entB)),
+			},
+			want: map[string]string{entA: "Liquid", entC: "TB-500 Liquid"},
+		},
+		{
+			name: "a parent whose name is shared too is labeled in turn",
+			entities: []graph.Entity{
+				named(entA, "BPC-157", nil), named(entB, "TB-500", nil),
+				named(entC, "Generic", new(entA)), named(entD, "Generic", new(entB)),
+				named(entE, "Liquid", new(entC)), named(entF, "Liquid", new(entD)),
+			},
+			want: map[string]string{entE: "BPC-157 Generic Liquid", entF: "TB-500 Generic Liquid"},
+		},
+		{
+			name: "a parent that is gone leaves the name alone",
+			entities: []graph.Entity{
+				named(entG, "Liquid", new(entH)), named(entI, "Liquid", nil),
+			},
+			want: map[string]string{entG: "Liquid", entI: "Liquid"},
+		},
 	}
 
-	cases := map[string]string{
-		entA: "BPC-157", entE: "Powder", entC: "BPC-157 Liquid", entD: "TB-500 liquid", "missing": "",
-	}
-	for id, want := range cases {
-		if got := g.Label(id); got != want {
-			t.Errorf("Label(%s) = %q, want %q", id, got, want)
-		}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			labels := graph.Labels(tc.entities)
+			g, err := graph.New(tc.entities, nil)
+			if err != nil {
+				t.Fatalf("New: %v", err)
+			}
+			for id, want := range tc.want {
+				if got := labels[id]; got != want {
+					t.Errorf("Labels[%s] = %q, want %q", id, got, want)
+				}
+				if got := g.Label(id); got != want {
+					t.Errorf("Label(%s) = %q, want %q", id, got, want)
+				}
+			}
+			if got := g.Label("missing"); got != "" {
+				t.Errorf("Label(missing) = %q, want nothing", got)
+			}
+		})
 	}
 }
 

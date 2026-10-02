@@ -1326,3 +1326,65 @@ func TestTheWriterPromptSaysWhenAPageHasNoKeywords(t *testing.T) {
 		t.Fatalf("a page without keywords owes no lead phrase:\n%s", recorder.last)
 	}
 }
+
+func sharedNameEntities() []graph.Entity {
+	entities := unitEntities()
+	entities[1].ScopeID = pointer("parent")
+	return append(entities,
+		graph.Entity{ID: "tea", SiteID: "site", Name: "Tea", Kind: graph.KindTopic, Source: graph.SourceUser},
+		graph.Entity{
+			ID: "tea-espresso", SiteID: "site", Name: "Espresso", Kind: graph.KindTopic, Source: graph.SourceUser,
+			ScopeID: pointer("tea"),
+		},
+	)
+}
+
+func TestAPromptNamesAnEntityWhoseNameIsSharedWithItsParent(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		run  func(t *testing.T, deps steps.Deps) error
+		want []string
+	}{
+		{
+			name: "the writer",
+			run: func(t *testing.T, deps steps.Deps) error {
+				sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: linkContextBlob(t, deps)})
+				_, err := steps.GenerateBody(deps).Run(t.Context(), sc)
+				return err
+			},
+			want: []string{"Name: Coffee Espresso\n"},
+		},
+		{
+			name: "the meta writer and its title pattern",
+			run: func(t *testing.T, deps steps.Deps) error {
+				sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactDraft: []byte(goodDraft)})
+				sc.Spec.MetaRules = template.MetaRules{TitlePattern: "{entityName} | {siteName}", DescriptionMax: 155}
+				_, err := steps.GenerateMeta(deps).Run(t.Context(), sc)
+				return err
+			},
+			want: []string{"Name: Coffee Espresso\n", "The title follows this shape exactly: Coffee Espresso | "},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps := unitDeps()
+			deps.Entities = entityList{items: sharedNameEntities()}
+			recorder := &promptRecorder{reply: goodDraft}
+			deps.LLM = recorder
+
+			if err := tc.run(t, deps); err != nil {
+				t.Fatalf("run: %v", err)
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(recorder.last, want) {
+					t.Fatalf("the prompt lacks %q:\n%s", want, recorder.last)
+				}
+			}
+		})
+	}
+}
