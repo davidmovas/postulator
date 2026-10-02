@@ -375,7 +375,7 @@ func pagesPromptOf(siteName string, state siteGraph, batch []pagemap.Page) pages
 	for i := range batch {
 		lines = append(lines, pagePromptLine{
 			Path: batch[i].Path, Title: batch[i].Title, H1: batch[i].H1, MetaDescription: batch[i].MetaDescription,
-			PrimaryKeyword: batch[i].PrimaryKeyword, Keywords: strings.Join(batch[i].Keywords, ", "),
+			PrimaryKeyword: batch[i].Keywords.Main(), Keywords: strings.Join(batch[i].Keywords.Rest(), ", "),
 		})
 	}
 	return pagesPrompt{SiteName: siteName, Known: known, Pages: lines}

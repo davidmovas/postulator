@@ -156,7 +156,7 @@ func iterations(params map[string]any) int {
 
 func nextOwed(doc *content.Document, result content.InsertResult, policy template.LinkPolicy,
 	spec template.TemplateSpec, entity graph.Entity, settled map[string]struct{}) (owedPhrase, bool) {
-	primary := strings.TrimSpace(entity.PrimaryKeyword)
+	primary := entity.Keywords.Main()
 	if spec.KeywordRules.PrimaryInFirstParagraph && primary != "" {
 		if _, done := settled[primary]; !done && !leadCarries(doc, primary) {
 			return owedPhrase{text: primary, why: leadWhy, lead: true}, true

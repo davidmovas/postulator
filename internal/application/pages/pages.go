@@ -40,8 +40,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (CreateResponse
 		MetaTitle:       req.MetaTitle,
 		MetaDescription: req.MetaDescription,
 		Canonical:       req.Canonical,
-		PrimaryKeyword:  req.PrimaryKeyword,
-		Keywords:        req.Keywords,
+		Keywords:        keywordList(req.PrimaryKeyword, req.Keywords),
 		Status:          status,
 		EntityID:        req.EntityID,
 		TemplateID:      req.TemplateID,
@@ -120,11 +119,15 @@ func applyUpdate(current *pagemap.Page, req *UpdateRequest) (pagemap.Page, error
 	if req.Canonical != nil {
 		next.Canonical = *req.Canonical
 	}
+	primary, rest := next.Keywords.Main(), next.Keywords.Rest()
 	if req.PrimaryKeyword != nil {
-		next.PrimaryKeyword = *req.PrimaryKeyword
+		primary = *req.PrimaryKeyword
 	}
 	if req.Keywords != nil {
-		next.Keywords = req.Keywords
+		rest = req.Keywords
+	}
+	if req.PrimaryKeyword != nil || req.Keywords != nil {
+		next.Keywords = keywordList(primary, rest)
 	}
 	if req.Status != nil {
 		next.Status = pagemap.Status(*req.Status)

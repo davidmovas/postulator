@@ -122,7 +122,7 @@ func TestApplyMergesIntoWhatTheSiteAlreadyHolds(t *testing.T) {
 	if len(entities) != 1 {
 		t.Fatalf("entities = %d, want the case-insensitive merge", len(entities))
 	}
-	if len(entities[0].SecondaryKeywords) != 2 || len(entities[0].Anchors) != 2 {
+	if !slices.Equal(entities[0].Keywords.Texts(), []string{"hosting", "servers"}) || len(entities[0].Anchors) != 2 {
 		t.Fatalf("entity = %+v", entities[0])
 	}
 	pages := h.pages(t)
@@ -155,8 +155,8 @@ func TestApplyMergesRepeatedPathsAndFillsTheGaps(t *testing.T) {
 	if got.Counts.EntitiesCreated != 1 {
 		t.Fatalf("entities created = %d", got.Counts.EntitiesCreated)
 	}
-	if entities := h.entities(t); len(entities[0].SecondaryKeywords) != 2 {
-		t.Fatalf("keywords = %v, want both rows", entities[0].SecondaryKeywords)
+	if entities := h.entities(t); !slices.Equal(entities[0].Keywords.Texts(), []string{"hosting", "servers"}) {
+		t.Fatalf("keywords = %v, want both rows", entities[0].Keywords.Texts())
 	}
 }
 
@@ -368,10 +368,10 @@ func TestApplyKeepsTheKeywordsOfARowOnItsPage(t *testing.T) {
 		byPath[stored.Path] = stored
 	}
 	trail := byPath["/shoes/trail/"]
-	if trail.PrimaryKeyword != "trail running shoes" || !slices.Equal(trail.Keywords, []string{"trail shoes", "best trail shoes"}) {
+	if !slices.Equal(trail.Keywords.Texts(), []string{"trail running shoes", "trail shoes", "best trail shoes"}) {
 		t.Fatalf("the page lost the keywords of its row: %+v", trail)
 	}
-	if road := byPath["/shoes/road/"]; road.PrimaryKeyword != "" || len(road.Keywords) != 0 {
+	if road := byPath["/shoes/road/"]; len(road.Keywords) != 0 {
 		t.Fatalf("a row without keywords gave its page some: %+v", road)
 	}
 	if len(h.entities(t)) != 0 {
@@ -386,7 +386,7 @@ func TestApplyKeepsTheKeywordsOfARowOnItsPage(t *testing.T) {
 			trail = stored
 		}
 	}
-	if trail.PrimaryKeyword != "trail running shoes" || !slices.Equal(trail.Keywords, []string{"trail shoes", "best trail shoes", "trail footwear"}) {
-		t.Fatalf("a second import must keep the primary keyword and union the rest: %+v", trail)
+	if !slices.Equal(trail.Keywords.Texts(), []string{"trail running shoes", "trail shoes", "best trail shoes", "trail footwear"}) {
+		t.Fatalf("a second import must keep the main keyword and union the rest: %+v", trail)
 	}
 }

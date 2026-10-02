@@ -36,17 +36,16 @@ func (s *Service) CreateEntity(ctx context.Context, req CreateEntityRequest) (Cr
 	}
 	now := s.now()
 	entity, err := graphdomain.NewEntity(graphdomain.Entity{
-		ID:                id.New(),
-		SiteID:            req.SiteID,
-		Name:              req.Name,
-		Kind:              graphdomain.Kind(req.Kind),
-		Intent:            req.Intent,
-		PrimaryKeyword:    req.PrimaryKeyword,
-		SecondaryKeywords: req.SecondaryKeywords,
-		Anchors:           anchorsOf(ctx, req.Anchors),
-		Source:            source,
-		CreatedAt:         now,
-		UpdatedAt:         now,
+		ID:        id.New(),
+		SiteID:    req.SiteID,
+		Name:      req.Name,
+		Kind:      graphdomain.Kind(req.Kind),
+		Intent:    req.Intent,
+		Keywords:  keywordList(req.PrimaryKeyword, req.SecondaryKeywords),
+		Anchors:   anchorsOf(ctx, req.Anchors),
+		Source:    source,
+		CreatedAt: now,
+		UpdatedAt: now,
 	})
 	if err != nil {
 		return CreateEntityResponse{}, err
@@ -72,11 +71,15 @@ func (s *Service) UpdateEntity(ctx context.Context, req UpdateEntityRequest) (Up
 		if req.Intent != nil {
 			next.Intent = *req.Intent
 		}
+		primary, secondary := next.Keywords.Main(), next.Keywords.Rest()
 		if req.PrimaryKeyword != nil {
-			next.PrimaryKeyword = *req.PrimaryKeyword
+			primary = *req.PrimaryKeyword
 		}
 		if req.SecondaryKeywords != nil {
-			next.SecondaryKeywords = *req.SecondaryKeywords
+			secondary = *req.SecondaryKeywords
+		}
+		if req.PrimaryKeyword != nil || req.SecondaryKeywords != nil {
+			next.Keywords = keywordList(primary, secondary)
 		}
 	})
 	if err != nil {

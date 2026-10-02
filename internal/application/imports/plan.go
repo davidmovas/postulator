@@ -10,6 +10,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -108,9 +109,12 @@ func edgeKey(e graph.Edge) string {
 	return string(e.Kind) + "|" + e.FromEntityID + "|" + e.ToEntityID
 }
 
+func keywordList(primary string, rest []string) keyword.List {
+	return keyword.Of(append([]string{primary}, rest...)...)
+}
+
 func sameEntity(a, b graph.Entity) bool {
-	return a.Kind == b.Kind && a.PrimaryKeyword == b.PrimaryKeyword &&
-		slices.Equal(a.SecondaryKeywords, b.SecondaryKeywords) &&
+	return a.Kind == b.Kind && a.Keywords.Equal(b.Keywords) &&
 		slices.Equal(anchorTexts(a.Anchors), anchorTexts(b.Anchors))
 }
 
@@ -128,7 +132,7 @@ func sameRef(a, b *string) bool {
 func samePage(a, b pagemap.Page) bool {
 	return a.Title == b.Title && a.H1 == b.H1 && a.MetaTitle == b.MetaTitle &&
 		a.MetaDescription == b.MetaDescription && a.WPType == b.WPType &&
-		a.PrimaryKeyword == b.PrimaryKeyword && slices.Equal(a.Keywords, b.Keywords) &&
+		a.Keywords.Equal(b.Keywords) &&
 		sameRef(a.EntityID, b.EntityID) && sameRef(a.TemplateID, b.TemplateID)
 }
 
@@ -287,7 +291,7 @@ func resolveEntities(sheet *drafts, state siteState, now time.Time, p *plan) (ma
 			}
 			entity, err := graph.NewEntity(graph.Entity{
 				ID: id.New(), SiteID: state.siteID, Name: draft.name, Kind: kind,
-				PrimaryKeyword: draft.primary, SecondaryKeywords: draft.keywords, Anchors: anchorsOf(draft.anchors),
+				Keywords: keywordList(draft.primary, draft.keywords), Anchors: anchorsOf(draft.anchors),
 				Source: graph.SourceImport, CreatedAt: now, UpdatedAt: now,
 			})
 			if err != nil {
@@ -303,8 +307,7 @@ func resolveEntities(sheet *drafts, state siteState, now time.Time, p *plan) (ma
 		if kind != "" {
 			next.Kind = kind
 		}
-		next.PrimaryKeyword = fill(next.PrimaryKeyword, draft.primary)
-		next.SecondaryKeywords = union(next.SecondaryKeywords, draft.keywords)
+		next.Keywords = keywordList(fill(next.Keywords.Main(), draft.primary), union(next.Keywords.Rest(), draft.keywords))
 		next.Anchors = anchorsOf(union(anchorTexts(next.Anchors), draft.anchors))
 		next.UpdatedAt = now
 		entity, err := graph.NewEntity(next)
@@ -454,7 +457,7 @@ func (s *Service) resolvePages(ctx context.Context, sheet *drafts, state siteSta
 			page, err := pagemap.NewPage(pagemap.Page{
 				ID: id.New(), SiteID: state.siteID, Path: path, WPType: wpTypeOr(wpType),
 				Title: fill(draft.title, titleFrom(path)), H1: draft.h1, MetaTitle: draft.metaTitle,
-				MetaDescription: draft.metaDesc, PrimaryKeyword: draft.primary, Keywords: draft.keywords,
+				MetaDescription: draft.metaDesc, Keywords: keywordList(draft.primary, draft.keywords),
 				Status: pagemap.StatusPlanned, EntityID: entityID,
 				TemplateID: templateID, CreatedAt: now, UpdatedAt: now,
 			})
@@ -471,8 +474,7 @@ func (s *Service) resolvePages(ctx context.Context, sheet *drafts, state siteSta
 		next.H1 = fill(next.H1, draft.h1)
 		next.MetaTitle = fill(next.MetaTitle, draft.metaTitle)
 		next.MetaDescription = fill(next.MetaDescription, draft.metaDesc)
-		next.PrimaryKeyword = fill(next.PrimaryKeyword, draft.primary)
-		next.Keywords = union(next.Keywords, draft.keywords)
+		next.Keywords = keywordList(fill(next.Keywords.Main(), draft.primary), union(next.Keywords.Rest(), draft.keywords))
 		if wpType != "" {
 			next.WPType = wpType
 		}

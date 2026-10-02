@@ -86,17 +86,16 @@ func (s *Service) adopt(ctx context.Context, siteID string, proposed *ProposedEn
 	entityID, exists := state.byName[fold(name)]
 	if !exists {
 		entity, buildErr := graphdomain.NewEntity(graphdomain.Entity{
-			ID:                id.New(),
-			SiteID:            siteID,
-			Name:              name,
-			Kind:              kindOf(proposed.Kind),
-			Intent:            strings.TrimSpace(proposed.Intent),
-			PrimaryKeyword:    proposed.PrimaryKeyword,
-			SecondaryKeywords: proposed.SecondaryKeywords,
-			Anchors:           proposedAnchors(proposed.Anchors),
-			Source:            graphdomain.SourceAI,
-			CreatedAt:         now,
-			UpdatedAt:         now,
+			ID:        id.New(),
+			SiteID:    siteID,
+			Name:      name,
+			Kind:      kindOf(proposed.Kind),
+			Intent:    strings.TrimSpace(proposed.Intent),
+			Keywords:  keywordList(proposed.PrimaryKeyword, proposed.SecondaryKeywords),
+			Anchors:   proposedAnchors(proposed.Anchors),
+			Source:    graphdomain.SourceAI,
+			CreatedAt: now,
+			UpdatedAt: now,
 		})
 		if buildErr != nil {
 			out.Skipped++

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -74,8 +74,8 @@ type Page struct {
 	MetaTitle       string
 	MetaDescription string
 	Canonical       string
-	PrimaryKeyword  string
-	Keywords        []string
+	Keywords        keyword.List
+	Notes           []Note
 	Status          Status
 	EntityID        *string
 	TemplateID      *string
@@ -138,8 +138,8 @@ func NewPage(p Page) (Page, error) {
 	p.MetaTitle = strings.TrimSpace(p.MetaTitle)
 	p.MetaDescription = strings.TrimSpace(p.MetaDescription)
 	p.Canonical = strings.TrimSpace(p.Canonical)
-	p.PrimaryKeyword = strings.TrimSpace(p.PrimaryKeyword)
-	p.Keywords = graph.CleanKeywords(p.Keywords)
+	p.Keywords = keyword.New(p.Keywords)
+	p.Notes = NewNotes(p.Notes)
 	return p, nil
 }
 

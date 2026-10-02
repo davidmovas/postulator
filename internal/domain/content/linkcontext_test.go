@@ -6,6 +6,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/template"
 )
@@ -32,7 +33,7 @@ func entity(id, name string, score float64, anchors []string, canonical string) 
 	}
 
 	record := graph.Entity{
-		ID: id, SiteID: siteID, Name: name, Kind: graph.KindTopic, PrimaryKeyword: name,
+		ID: id, SiteID: siteID, Name: name, Kind: graph.KindTopic, Keywords: keyword.Of(name),
 		Anchors: list, Source: graph.SourceUser, Score: score,
 	}
 	if canonical != "" {

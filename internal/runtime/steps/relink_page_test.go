@@ -9,6 +9,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
@@ -45,7 +46,7 @@ func relinkPageDeps(t *testing.T, body string, opts ...wptest.Option) (steps.Dep
 
 func withGrandparent(deps steps.Deps, wpID int64) steps.Deps {
 	deps.Entities = entityList{items: append(unitEntities(), graph.Entity{
-		ID: "grand", SiteID: "site", Name: "Drinks", PrimaryKeyword: "drinks",
+		ID: "grand", SiteID: "site", Name: "Drinks", Keywords: keyword.Of("drinks"),
 		Anchors: []graph.Anchor{{Text: "drinks", Source: graph.AnchorUser, Weight: 1}},
 		Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-grand"),
 	})}

@@ -184,6 +184,58 @@ func TestTextsAreTheKeywordsInOrder(t *testing.T) {
 	}
 }
 
+func TestRestIsEveryKeywordAfterTheMainOne(t *testing.T) {
+	t.Parallel()
+
+	list := keyword.New([]keyword.Keyword{{Text: "bpc-157"}, {Text: "bpc 157", Volume: new(12000)}, {Text: "bpc dosage"}})
+	rest := list.Rest()
+	if len(rest) != 2 || rest[0] != "bpc-157" || rest[1] != "bpc dosage" {
+		t.Fatalf("Rest = %v", rest)
+	}
+	for _, short := range []keyword.List{keyword.New(nil), keyword.Of("only")} {
+		if got := short.Rest(); got == nil || len(got) != 0 {
+			t.Fatalf("Rest of %s = %#v, want an empty slice that is not nil", describe(short), got)
+		}
+	}
+}
+
+func TestEqualComparesPhrasesVolumesAndOrder(t *testing.T) {
+	t.Parallel()
+
+	base := keyword.New([]keyword.Keyword{{Text: "bpc 157", Volume: new(12000)}, {Text: "bpc-157"}})
+
+	cases := []struct {
+		name  string
+		other keyword.List
+		want  bool
+	}{
+		{name: "the same list", other: keyword.New([]keyword.Keyword{{Text: "bpc 157", Volume: new(12000)}, {Text: "bpc-157"}}), want: true},
+		{name: "another volume", other: keyword.New([]keyword.Keyword{{Text: "bpc 157", Volume: new(9000)}, {Text: "bpc-157"}})},
+		{name: "a volume gone", other: keyword.Of("bpc 157", "bpc-157")},
+		{name: "a volume gained", other: keyword.New([]keyword.Keyword{{Text: "bpc 157", Volume: new(12000)}, {Text: "bpc-157", Volume: new(1)}})},
+		{name: "another spelling", other: keyword.New([]keyword.Keyword{{Text: "BPC 157", Volume: new(12000)}, {Text: "bpc-157"}})},
+		{name: "a keyword more", other: keyword.New([]keyword.Keyword{{Text: "bpc 157", Volume: new(12000)}, {Text: "bpc-157"}, {Text: "tb 500"}})},
+		{name: "nothing", other: keyword.New(nil)},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := base.Equal(tc.other); got != tc.want {
+				t.Fatalf("Equal = %v, want %v", got, tc.want)
+			}
+			if got := tc.other.Equal(base); got != tc.want {
+				t.Fatalf("Equal the other way = %v, want %v", got, tc.want)
+			}
+		})
+	}
+
+	if !keyword.New(nil).Equal(nil) {
+		t.Fatal("an empty list must equal no list")
+	}
+}
+
 func TestMergeTakesWhatTheFileSaysAndKeepsTheRest(t *testing.T) {
 	t.Parallel()
 

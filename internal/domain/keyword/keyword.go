@@ -83,6 +83,22 @@ func (l List) Texts() []string {
 	return texts
 }
 
+func (l List) Rest() []string {
+	if len(l) < 2 {
+		return []string{}
+	}
+	return l[1:].Texts()
+}
+
+func (l List) Equal(other List) bool {
+	return slices.EqualFunc(l, other, func(a, b Keyword) bool {
+		if a.Text != b.Text || (a.Volume == nil) != (b.Volume == nil) {
+			return false
+		}
+		return a.Volume == nil || *a.Volume == *b.Volume
+	})
+}
+
 func (l List) Merge(file List) List {
 	merged := New(l)
 	held := make(map[string]int, len(merged))

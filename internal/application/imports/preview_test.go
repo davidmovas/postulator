@@ -109,8 +109,8 @@ func TestPreviewReadsTheGraphWithoutWriting(t *testing.T) {
 	if !found || hosting.Action != string(imports.ActionCreate) || hosting.Kind != "topic" {
 		t.Fatalf("hosting = %+v", hosting)
 	}
-	if len(hosting.Keywords) != 2 || hosting.Keywords[0] != "hosting" || hosting.Keywords[1] != "servers" {
-		t.Fatalf("hosting keywords = %v", hosting.Keywords)
+	if hosting.PrimaryKeyword != "hosting" || len(hosting.Keywords) != 1 || hosting.Keywords[0] != "servers" {
+		t.Fatalf("hosting keywords = %q then %v, want the first keyword of the cell to lead", hosting.PrimaryKeyword, hosting.Keywords)
 	}
 	if len(report.Edges) != 3 {
 		t.Fatalf("edges = %+v", report.Edges)

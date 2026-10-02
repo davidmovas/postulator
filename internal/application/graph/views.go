@@ -4,6 +4,7 @@ import (
 	"context"
 
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	kctx "github.com/davidmovas/postulator/internal/kernel/ctx"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
@@ -52,11 +53,11 @@ type EntityPage struct {
 	Mismatch bool   `json:"mismatch"`
 }
 
+func keywordList(primary string, secondary []string) keyword.List {
+	return keyword.Of(append([]string{primary}, secondary...)...)
+}
+
 func entityView(e graphdomain.Entity) Entity {
-	keywords := e.SecondaryKeywords
-	if keywords == nil {
-		keywords = []string{}
-	}
 	anchors := make([]Anchor, 0, len(e.Anchors))
 	for _, anchor := range e.Anchors {
 		anchors = append(anchors, Anchor{Text: anchor.Text, Source: string(anchor.Source), Weight: anchor.Weight})
@@ -67,8 +68,8 @@ func entityView(e graphdomain.Entity) Entity {
 		Name:              e.Name,
 		Kind:              string(e.Kind),
 		Intent:            e.Intent,
-		PrimaryKeyword:    e.PrimaryKeyword,
-		SecondaryKeywords: keywords,
+		PrimaryKeyword:    e.Keywords.Main(),
+		SecondaryKeywords: e.Keywords.Rest(),
 		Anchors:           anchors,
 		CanonicalPageID:   e.CanonicalPageID,
 		Score:             e.Score,

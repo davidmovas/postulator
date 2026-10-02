@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -48,8 +49,11 @@ func TestNewPageNormalises(t *testing.T) {
 
 	p := page(pageA, "/Shop/Bags", nil)
 	p.Title = "  Bags  "
-	p.PrimaryKeyword = " leather bags "
-	p.Keywords = []string{" totes", "Totes", "", "clutches"}
+	p.Keywords = keyword.List{{Text: " totes"}, {Text: "Totes"}, {Text: ""}, {Text: "clutches"}, {Text: " leather bags ", Volume: new(700)}}
+	p.Notes = []pagemap.Note{
+		{Label: " Intent Owner ", Text: " GEO Commercial "}, {Label: "Notes", Text: "  "}, {Label: " ", Text: "no label"},
+		{Label: "intent owner", Text: "said twice"}, {Label: "Reason", Text: "one form of the product"},
+	}
 	got, err := pagemap.NewPage(p)
 	if err != nil {
 		t.Fatalf("NewPage: %v", err)
@@ -57,8 +61,27 @@ func TestNewPageNormalises(t *testing.T) {
 	if got.Path != "/shop/bags/" || got.Slug != "bags" || got.Title != "Bags" {
 		t.Errorf("NewPage = path %q slug %q title %q", got.Path, got.Slug, got.Title)
 	}
-	if got.PrimaryKeyword != "leather bags" || !slices.Equal(got.Keywords, []string{"totes", "clutches"}) {
-		t.Errorf("NewPage keywords = %q %v, want them trimmed and deduplicated", got.PrimaryKeyword, got.Keywords)
+	if !slices.Equal(got.Keywords.Texts(), []string{"leather bags", "totes", "clutches"}) {
+		t.Errorf("NewPage keywords = %v, want them trimmed, deduplicated and ordered by volume", got.Keywords.Texts())
+	}
+	wantNotes := []pagemap.Note{{Label: "Intent Owner", Text: "GEO Commercial"}, {Label: "Reason", Text: "one form of the product"}}
+	if !slices.Equal(got.Notes, wantNotes) {
+		t.Errorf("NewPage notes = %+v, want %+v", got.Notes, wantNotes)
+	}
+}
+
+func TestNewPageWithoutKeywordsOrNotesCarriesEmptyLists(t *testing.T) {
+	t.Parallel()
+
+	got, err := pagemap.NewPage(page(pageA, "/a/", nil))
+	if err != nil {
+		t.Fatalf("NewPage: %v", err)
+	}
+	if got.Keywords == nil || len(got.Keywords) != 0 {
+		t.Errorf("Keywords = %#v, want an empty list that is not nil", got.Keywords)
+	}
+	if got.Notes == nil || len(got.Notes) != 0 {
+		t.Errorf("Notes = %#v, want an empty list that is not nil", got.Notes)
 	}
 }
 

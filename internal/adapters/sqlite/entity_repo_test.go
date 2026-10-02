@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
@@ -15,10 +16,12 @@ import (
 
 func fullEntity(siteID, name string, at time.Time) graph.Entity {
 	return graph.Entity{
-		ID: id.New(), SiteID: siteID, Name: name, Kind: graph.KindTopic, Intent: "informational", PrimaryKeyword: name + " keyword",
-		SecondaryKeywords: []string{name + " one", name + " two"},
-		Anchors:           []graph.Anchor{{Text: name, Source: graph.AnchorUser, Weight: 1}, {Text: "best " + name, Source: graph.AnchorAI, Weight: 0.4}},
-		Score:             0.5, Source: graph.SourceImport, CreatedAt: at, UpdatedAt: at,
+		ID: id.New(), SiteID: siteID, Name: name, Kind: graph.KindTopic, Intent: "informational",
+		Keywords: keyword.New([]keyword.Keyword{
+			{Text: name + " keyword", Volume: new(12000)}, {Text: name + " one", Volume: new(0)}, {Text: name + " two"},
+		}),
+		Anchors: []graph.Anchor{{Text: name, Source: graph.AnchorUser, Weight: 1}, {Text: "best " + name, Source: graph.AnchorAI, Weight: 0.4}},
+		Score:   0.5, Source: graph.SourceImport, CreatedAt: at, UpdatedAt: at,
 	}
 }
 
@@ -60,7 +63,7 @@ func TestEntityRepoRoundTrip(t *testing.T) {
 
 	want.Name = "Running Shoes"
 	want.Anchors = []graph.Anchor{{Text: "running shoes", Source: graph.AnchorUser, Weight: 0.9}}
-	want.SecondaryKeywords = []string{}
+	want.Keywords = keyword.Of()
 	want.UpdatedAt = sqlitetest.Stamp.Add(time.Minute)
 	if err = repo.Update(t.Context(), want); err != nil {
 		t.Fatalf("Update: %v", err)

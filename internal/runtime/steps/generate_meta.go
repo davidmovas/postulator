@@ -82,7 +82,7 @@ func GenerateMeta(deps Deps) run.StepDef {
 				SiteName:  owner.Name,
 				Canonical: canonical,
 				Pattern: template.Expand(sc.Spec.MetaRules.TitlePattern, template.Vars{
-					PrimaryKeyword: entity.PrimaryKeyword, EntityName: entity.Name, SiteName: owner.Name, PageTitle: sc.Page.Title,
+					PrimaryKeyword: entity.Keywords.Main(), EntityName: entity.Name, SiteName: owner.Name, PageTitle: sc.Page.Title,
 				}),
 			})
 			if err != nil {

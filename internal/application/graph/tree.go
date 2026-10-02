@@ -39,17 +39,16 @@ func (s *Service) CreateEntities(ctx context.Context, req CreateEntitiesRequest)
 	for i := range req.Entities {
 		field := "entities[" + strconv.Itoa(i) + "]"
 		entity, err := graphdomain.NewEntity(graphdomain.Entity{
-			ID:                id.New(),
-			SiteID:            req.SiteID,
-			Name:              req.Entities[i].Name,
-			Kind:              graphdomain.Kind(req.Entities[i].Kind),
-			Intent:            req.Entities[i].Intent,
-			PrimaryKeyword:    req.Entities[i].PrimaryKeyword,
-			SecondaryKeywords: req.Entities[i].SecondaryKeywords,
-			Anchors:           anchorsOf(ctx, req.Entities[i].Anchors),
-			Source:            source,
-			CreatedAt:         now,
-			UpdatedAt:         now,
+			ID:        id.New(),
+			SiteID:    req.SiteID,
+			Name:      req.Entities[i].Name,
+			Kind:      graphdomain.Kind(req.Entities[i].Kind),
+			Intent:    req.Entities[i].Intent,
+			Keywords:  keywordList(req.Entities[i].PrimaryKeyword, req.Entities[i].SecondaryKeywords),
+			Anchors:   anchorsOf(ctx, req.Entities[i].Anchors),
+			Source:    source,
+			CreatedAt: now,
+			UpdatedAt: now,
 		})
 		if err != nil {
 			return CreateEntitiesResponse{}, errors.New(errors.CodeOf(err), err.Error()).WithDetail("field", field)

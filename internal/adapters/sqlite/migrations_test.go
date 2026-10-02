@@ -8,6 +8,8 @@ import (
 	"testing"
 )
 
+const latestMigration = 29
+
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
 
@@ -37,6 +39,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0026_run_item_note.sql",
 		"0027_page_keywords.sql",
 		"0028_run_item_blocked_by.sql",
+		"0029_keyword_lists.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -73,8 +76,8 @@ func TestMigrationsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("version after up: %v", err)
 	}
-	if version != 28 {
-		t.Fatalf("version after up = %d, want 28", version)
+	if version != latestMigration {
+		t.Fatalf("version after up = %d, want %d", version, latestMigration)
 	}
 
 	if _, err = provider.DownTo(t.Context(), 0); err != nil {
@@ -98,8 +101,124 @@ func TestMigrationsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("version after the second up: %v", err)
 	}
-	if version != 28 {
-		t.Errorf("version after the second up = %d, want 28", version)
+	if version != latestMigration {
+		t.Errorf("version after the second up = %d, want %d", version, latestMigration)
+	}
+}
+
+func TestKeywordListsMigrationCarriesTheOldKeywordsOver(t *testing.T) {
+	t.Parallel()
+
+	store := openStore(t, nil)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	if _, err = provider.DownTo(t.Context(), 28); err != nil {
+		t.Fatalf("down to 28: %v", err)
+	}
+
+	exec := func(query string, args ...any) {
+		t.Helper()
+		if _, execErr := store.writer.ExecContext(t.Context(), query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	text := func(query string, args ...any) string {
+		t.Helper()
+		var value string
+		if scanErr := store.writer.QueryRowContext(t.Context(), query, args...).Scan(&value); scanErr != nil {
+			t.Fatalf("%s: %v", query, scanErr)
+		}
+		return value
+	}
+	const at = "2026-09-18T09:00:00Z"
+
+	cases := []struct {
+		name      string
+		id        string
+		primary   string
+		rest      string
+		list      string
+		backFirst string
+		backRest  string
+	}{
+		{
+			name: "the primary keyword leads and its repeat is dropped", id: "k1",
+			primary: "running shoes", rest: `["trail shoes","Running Shoes"," road shoes ",""]`,
+			list:      `[{"text":"running shoes"},{"text":"trail shoes"},{"text":"road shoes"}]`,
+			backFirst: "running shoes", backRest: `["trail shoes","road shoes"]`,
+		},
+		{
+			name: "secondary keywords alone keep their order", id: "k2",
+			primary: "", rest: `["first","second"]`,
+			list:      `[{"text":"first"},{"text":"second"}]`,
+			backFirst: "first", backRest: `["second"]`,
+		},
+		{
+			name: "a primary keyword alone is trimmed", id: "k3",
+			primary: " solo ", rest: `[]`,
+			list:      `[{"text":"solo"}]`,
+			backFirst: "solo", backRest: `[]`,
+		},
+		{
+			name: "no keywords at all", id: "k4",
+			primary: "", rest: `[]`,
+			list:      `[]`,
+			backFirst: "", backRest: `[]`,
+		},
+	}
+
+	exec(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at)
+	for _, tc := range cases {
+		exec(`INSERT INTO entities (id, site_id, name, kind, primary_keyword, secondary_keywords, source, created_at, updated_at) VALUES (?, 's1', ?, 'topic', ?, ?, 'user', ?, ?)`,
+			tc.id, tc.id, tc.primary, tc.rest, at, at)
+		exec(`INSERT INTO pages (id, site_id, path, slug, wp_type, status, primary_keyword, keywords, created_at, updated_at) VALUES (?, 's1', ?, ?, 'page', 'planned', ?, ?, ?, ?)`,
+			tc.id, "/"+tc.id+"/", tc.id, tc.primary, tc.rest, at, at)
+	}
+
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up: %v", err)
+	}
+	for _, tc := range cases {
+		if got := text(`SELECT keywords FROM entities WHERE id = ?`, tc.id); got != tc.list {
+			t.Errorf("%s: entity keywords = %s, want %s", tc.name, got, tc.list)
+		}
+		if got := text(`SELECT keywords FROM pages WHERE id = ?`, tc.id); got != tc.list {
+			t.Errorf("%s: page keywords = %s, want %s", tc.name, got, tc.list)
+		}
+		if got := text(`SELECT notes FROM pages WHERE id = ?`, tc.id); got != `[]` {
+			t.Errorf("%s: page notes = %s, want an empty list", tc.name, got)
+		}
+	}
+
+	exec(`UPDATE entities SET keywords = '[{"text":"measured","volume":900},{"text":"plain"}]' WHERE id = 'k4'`)
+	exec(`UPDATE pages SET keywords = '[{"text":"measured","volume":900},{"text":"plain"}]', notes = '[{"label":"Notes","text":"kept"}]' WHERE id = 'k4'`)
+
+	if _, err = provider.DownTo(t.Context(), 28); err != nil {
+		t.Fatalf("down again: %v", err)
+	}
+	for _, tc := range cases {
+		first, rest := tc.backFirst, tc.backRest
+		if tc.id == "k4" {
+			first, rest = "measured", `["plain"]`
+		}
+		if got := text(`SELECT primary_keyword FROM entities WHERE id = ?`, tc.id); got != first {
+			t.Errorf("%s: entity primary keyword after the down = %q, want %q", tc.name, got, first)
+		}
+		if got := text(`SELECT secondary_keywords FROM entities WHERE id = ?`, tc.id); got != rest {
+			t.Errorf("%s: entity secondary keywords after the down = %s, want %s", tc.name, got, rest)
+		}
+		if got := text(`SELECT primary_keyword FROM pages WHERE id = ?`, tc.id); got != first {
+			t.Errorf("%s: page primary keyword after the down = %q, want %q", tc.name, got, first)
+		}
+		if got := text(`SELECT keywords FROM pages WHERE id = ?`, tc.id); got != rest {
+			t.Errorf("%s: page keywords after the down = %s, want %s", tc.name, got, rest)
+		}
+	}
+
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up after the down: %v", err)
 	}
 }
 

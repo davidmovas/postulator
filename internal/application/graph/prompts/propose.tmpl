@@ -86,7 +86,7 @@ SITE
 Propose pairs that involve {{.Focus}}.
 
 {{end}}ENTITIES
-{{range .Entities}}- {{.Name}} ({{.Kind}}){{if .PrimaryKeyword}} — keyword: {{.PrimaryKeyword}}{{end}}{{if .Intent}} — intent: {{.Intent}}{{end}}
+{{range .Entities}}- {{.Name}} ({{.Kind}}){{if .Keywords.Main}} — keyword: {{.Keywords.Main}}{{end}}{{if .Intent}} — intent: {{.Intent}}{{end}}
 {{end}}
 {{if .Existing}}ALREADY CONNECTED
 {{range .Existing}}- {{.From}} and {{.To}}

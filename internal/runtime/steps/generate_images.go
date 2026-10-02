@@ -240,8 +240,8 @@ func subjectOf(sc *run.StepContext, entity graph.Entity) string {
 }
 
 func altOf(entity graph.Entity, subject string) string {
-	if entity.PrimaryKeyword != "" {
-		return entity.PrimaryKeyword
+	if main := entity.Keywords.Main(); main != "" {
+		return main
 	}
 	return subject
 }

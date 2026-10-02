@@ -160,7 +160,7 @@ func (s *Service) varsFor(ctx context.Context, page pagemap.Page, owner site.Sit
 	if err != nil {
 		return template.Vars{}, err
 	}
-	vars.PrimaryKeyword = entity.PrimaryKeyword
+	vars.PrimaryKeyword = entity.Keywords.Main()
 	vars.EntityName = entity.Name
 	return vars, nil
 }

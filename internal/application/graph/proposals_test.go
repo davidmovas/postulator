@@ -7,6 +7,7 @@ import (
 
 	appgraph "github.com/davidmovas/postulator/internal/application/graph"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -227,8 +228,7 @@ func TestThePagesPromptCarriesTheKeywordsOfThePage(t *testing.T) {
 
 	f := newProposeFixture(t, &scriptedModel{replies: []string{proposal}}, fixedProfiles{})
 	keyed := f.page(t, "/coffee/", "Coffee")
-	keyed.PrimaryKeyword = "best coffee beans"
-	keyed.Keywords = []string{"arabica", "robusta"}
+	keyed.Keywords = keyword.Of("best coffee beans", "arabica", "robusta")
 	if err := f.pages.Update(t.Context(), keyed); err != nil {
 		t.Fatalf("update the page: %v", err)
 	}

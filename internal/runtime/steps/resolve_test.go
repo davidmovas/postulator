@@ -10,6 +10,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -108,12 +109,12 @@ func TestResolveContextSaysWhatTheGraphAsksForAndNoPageCarries(t *testing.T) {
 	deps := unitDeps()
 	deps.Entities = entityList{items: []graph.Entity{
 		{
-			ID: "parent", SiteID: "site", Name: "Coffee", PrimaryKeyword: "coffee",
+			ID: "parent", SiteID: "site", Name: "Coffee", Keywords: keyword.Of("coffee"),
 			Anchors: []graph.Anchor{{Text: "coffee", Source: graph.AnchorUser, Weight: 1}},
 			Kind:    graph.KindTopic, Source: graph.SourceUser,
 		},
 		{
-			ID: "child", SiteID: "site", Name: "Espresso", PrimaryKeyword: "espresso",
+			ID: "child", SiteID: "site", Name: "Espresso", Keywords: keyword.Of("espresso"),
 			Anchors: []graph.Anchor{{Text: "espresso", Source: graph.AnchorUser, Weight: 1}},
 			Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-child"),
 		},

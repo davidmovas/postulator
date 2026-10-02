@@ -8,6 +8,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -22,7 +23,7 @@ func guideBrief(page pagemap.Page) content.Brief {
 		},
 		KeywordRules: template.KeywordRules{PrimaryInTitle: true, PrimaryInH1: true, PrimaryInFirstParagraph: true},
 	}
-	entity := graph.Entity{Name: "Espresso", PrimaryKeyword: "espresso"}
+	entity := graph.Entity{Name: "Espresso", Keywords: keyword.Of("espresso")}
 	lc := content.LinkContext{Targets: []content.LinkTarget{
 		{URL: "/coffee/", Anchors: []string{"coffee"}, Relation: content.RelationUp, Required: true},
 		{URL: "/coffee/filter/", Anchors: []string{"filter coffee"}, Relation: content.RelationSibling},
@@ -89,7 +90,7 @@ func TestNewBriefOwesEveryLinkTheBudgetAllows(t *testing.T) {
 		{URL: "/coffee/espresso/lungo/", Relation: content.RelationDown},
 		{URL: "/coffee/filter/", Anchors: []string{"filter coffee"}, Relation: content.RelationSibling},
 	}}
-	entity := graph.Entity{Name: "Espresso", PrimaryKeyword: "espresso"}
+	entity := graph.Entity{Name: "Espresso", Keywords: keyword.Of("espresso")}
 
 	cases := []struct {
 		name     string

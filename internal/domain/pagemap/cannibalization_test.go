@@ -4,11 +4,12 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
 
-func entityWith(id, keyword string, canonical *string) graph.Entity {
-	return graph.Entity{ID: id, SiteID: siteA, Name: id, Kind: graph.KindTopic, PrimaryKeyword: keyword, CanonicalPageID: canonical, Source: graph.SourceUser, CreatedAt: stamp, UpdatedAt: stamp}
+func entityWith(id, phrase string, canonical *string) graph.Entity {
+	return graph.Entity{ID: id, SiteID: siteA, Name: id, Kind: graph.KindTopic, Keywords: keyword.Of(phrase), CanonicalPageID: canonical, Source: graph.SourceUser, CreatedAt: stamp, UpdatedAt: stamp}
 }
 
 func TestCannibalization(t *testing.T) {

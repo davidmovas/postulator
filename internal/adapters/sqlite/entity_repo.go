@@ -9,14 +9,15 @@ import (
 	"github.com/Masterminds/squirrel"
 
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
 const (
-	entityColumns         = `id, site_id, name, kind, intent, primary_keyword, secondary_keywords, canonical_page_id, score, source, created_at, updated_at`
-	insertEntity          = `INSERT INTO entities (` + entityColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	updateEntity          = `UPDATE entities SET name = ?, kind = ?, intent = ?, primary_keyword = ?, secondary_keywords = ?, canonical_page_id = ?, score = ?, source = ?, updated_at = ? WHERE id = ?`
+	entityColumns         = `id, site_id, name, kind, intent, keywords, canonical_page_id, score, source, created_at, updated_at`
+	insertEntity          = `INSERT INTO entities (` + entityColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	updateEntity          = `UPDATE entities SET name = ?, kind = ?, intent = ?, keywords = ?, canonical_page_id = ?, score = ?, source = ?, updated_at = ? WHERE id = ?`
 	updateEntityScore     = `UPDATE entities SET score = ? WHERE id = ?`
 	updateEntityCanonical = `UPDATE entities SET canonical_page_id = ?, updated_at = ? WHERE id = ?`
 	deleteEntity          = `DELETE FROM entities WHERE id = ?`
@@ -48,12 +49,12 @@ func anchorConflict(entityID string) *errors.Error {
 }
 
 func (r *EntityRepo) Insert(ctx context.Context, e graph.Entity) error {
-	keywords, err := encodeJSON(orEmpty(e.SecondaryKeywords))
+	keywords, err := encodeJSON(keyword.New(e.Keywords))
 	if err != nil {
 		return err
 	}
 	if _, err = execWrite(ctx, r.store.writeFrom(ctx), insertEntity, []any{
-		e.ID, e.SiteID, e.Name, string(e.Kind), e.Intent, e.PrimaryKeyword, keywords, nullString(e.CanonicalPageID),
+		e.ID, e.SiteID, e.Name, string(e.Kind), e.Intent, keywords, nullString(e.CanonicalPageID),
 		e.Score, string(e.Source), formatTime(e.CreatedAt), formatTime(e.UpdatedAt),
 	}, entityConflict(e.Name), "insert the entity"); err != nil {
 		return err
@@ -62,12 +63,12 @@ func (r *EntityRepo) Insert(ctx context.Context, e graph.Entity) error {
 }
 
 func (r *EntityRepo) Update(ctx context.Context, e graph.Entity) error {
-	keywords, err := encodeJSON(orEmpty(e.SecondaryKeywords))
+	keywords, err := encodeJSON(keyword.New(e.Keywords))
 	if err != nil {
 		return err
 	}
 	affected, err := execWrite(ctx, r.store.writeFrom(ctx), updateEntity, []any{
-		e.Name, string(e.Kind), e.Intent, e.PrimaryKeyword, keywords, nullString(e.CanonicalPageID),
+		e.Name, string(e.Kind), e.Intent, keywords, nullString(e.CanonicalPageID),
 		e.Score, string(e.Source), formatTime(e.UpdatedAt), e.ID,
 	}, entityConflict(e.Name), "update the entity")
 	if updateErr := requireAffected(affected, err, entityNotFound(e.ID)); updateErr != nil {
@@ -90,11 +91,12 @@ func (r *EntityRepo) writeAnchors(ctx context.Context, entityID string, anchors 
 	return nil
 }
 
-func orEmpty(values []string) []string {
-	if values == nil {
-		return []string{}
+func decodeKeywords(raw, message string) (keyword.List, error) {
+	var stored []keyword.Keyword
+	if err := decodeJSON(raw, &stored, message); err != nil {
+		return nil, err
 	}
-	return values
+	return keyword.New(stored), nil
 }
 
 var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
@@ -254,17 +256,17 @@ func scanEntity(rows *sql.Rows) (graph.Entity, error) {
 		canonical            sql.NullString
 		createdAt, updatedAt string
 	)
-	if err := rows.Scan(&e.ID, &e.SiteID, &e.Name, &kind, &e.Intent, &e.PrimaryKeyword, &keywords, &canonical, &e.Score, &source, &createdAt, &updatedAt); err != nil {
+	if err := rows.Scan(&e.ID, &e.SiteID, &e.Name, &kind, &e.Intent, &keywords, &canonical, &e.Score, &source, &createdAt, &updatedAt); err != nil {
 		return graph.Entity{}, err
 	}
 	e.Kind = graph.Kind(kind)
 	e.Source = graph.Source(source)
 	e.CanonicalPageID = optString(canonical)
-	if err := decodeJSON(keywords, &e.SecondaryKeywords, "decode the entity keywords"); err != nil {
-		return graph.Entity{}, err
-	}
 
 	var err error
+	if e.Keywords, err = decodeKeywords(keywords, "decode the entity keywords"); err != nil {
+		return graph.Entity{}, err
+	}
 	if e.CreatedAt, err = parseTime(createdAt); err != nil {
 		return graph.Entity{}, err
 	}

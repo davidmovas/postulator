@@ -209,19 +209,12 @@ func (r *PreviewReport) settle() {
 	}
 }
 
-func listOf(values []string) []string {
-	if values == nil {
-		return []string{}
-	}
-	return values
-}
-
 func entityView(e graph.Entity, action Action) PreviewEntity {
 	return PreviewEntity{
 		Name:           e.Name,
 		Kind:           string(e.Kind),
-		PrimaryKeyword: e.PrimaryKeyword,
-		Keywords:       listOf(e.SecondaryKeywords),
+		PrimaryKeyword: e.Keywords.Main(),
+		Keywords:       e.Keywords.Rest(),
 		Anchors:        anchorTexts(e.Anchors),
 		Action:         string(action),
 	}
@@ -234,8 +227,8 @@ func pageView(p pagemap.Page, draft *pageDraft, action Action) PreviewPage {
 		H1:              p.H1,
 		MetaTitle:       p.MetaTitle,
 		MetaDescription: p.MetaDescription,
-		PrimaryKeyword:  p.PrimaryKeyword,
-		Keywords:        listOf(p.Keywords),
+		PrimaryKeyword:  p.Keywords.Main(),
+		Keywords:        p.Keywords.Rest(),
 		WPType:          string(p.WPType),
 		PageKind:        draft.pageKind,
 		Entity:          draft.entity,

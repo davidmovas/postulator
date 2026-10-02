@@ -14,6 +14,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
@@ -179,7 +180,7 @@ func TestCreateRefusesCannibalization(t *testing.T) {
 	}
 
 	rival := h.entity(t, "Rival")
-	rival.PrimaryKeyword = "SHOES"
+	rival.Keywords = keyword.Of("SHOES")
 	if err = sqlite.NewEntityRepo(h.store).Update(t.Context(), rival); err != nil {
 		t.Fatalf("give the rival the same keyword: %v", err)
 	}

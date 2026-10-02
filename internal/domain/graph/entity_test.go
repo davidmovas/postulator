@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -36,7 +37,9 @@ func validEntity() graph.Entity {
 	at := time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC)
 	return graph.Entity{
 		ID: entA, SiteID: siteA, Name: " Running Shoes ", Kind: graph.KindHub, Intent: "commercial",
-		PrimaryKeyword: "running shoes", SecondaryKeywords: []string{"trail shoes", " Trail Shoes ", "", "road shoes"},
+		Keywords: keyword.List{
+			{Text: "trail shoes"}, {Text: " Trail Shoes "}, {Text: ""}, {Text: "road shoes", Volume: new(400)}, {Text: " running shoes ", Volume: new(9000)},
+		},
 		Anchors: []graph.Anchor{{Text: "running shoes", Source: graph.AnchorUser, Weight: 1}},
 		Source:  graph.SourceUser, CreatedAt: at, UpdatedAt: at,
 	}
@@ -52,8 +55,25 @@ func TestNewEntityNormalises(t *testing.T) {
 	if entity.Name != "Running Shoes" {
 		t.Errorf("Name = %q, want trimmed", entity.Name)
 	}
-	if !slices.Equal(entity.SecondaryKeywords, []string{"trail shoes", "road shoes"}) {
-		t.Errorf("SecondaryKeywords = %v, want trimmed and deduplicated", entity.SecondaryKeywords)
+	if !slices.Equal(entity.Keywords.Texts(), []string{"running shoes", "road shoes", "trail shoes"}) {
+		t.Errorf("Keywords = %v, want them trimmed, deduplicated and ordered by volume", entity.Keywords.Texts())
+	}
+	if entity.Keywords.Main() != "running shoes" {
+		t.Errorf("main keyword = %q, want the one with the highest volume", entity.Keywords.Main())
+	}
+}
+
+func TestNewEntityWithoutKeywordsCarriesAnEmptyList(t *testing.T) {
+	t.Parallel()
+
+	bare := validEntity()
+	bare.Keywords = nil
+	entity, err := graph.NewEntity(bare)
+	if err != nil {
+		t.Fatalf("NewEntity: %v", err)
+	}
+	if entity.Keywords == nil || len(entity.Keywords) != 0 {
+		t.Errorf("Keywords = %#v, want an empty list that is not nil", entity.Keywords)
 	}
 }
 

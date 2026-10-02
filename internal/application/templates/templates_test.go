@@ -12,6 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
@@ -440,7 +441,7 @@ func TestResolveForPageFillsThePlaceholdersFromThePageItsEntityAndItsSite(t *tes
 	}
 
 	entity, err := graph.NewEntity(graph.Entity{
-		ID: id.New(), SiteID: h.siteID, Name: "Trail Shoes", Kind: graph.KindTopic, PrimaryKeyword: "trail running shoes",
+		ID: id.New(), SiteID: h.siteID, Name: "Trail Shoes", Kind: graph.KindTopic, Keywords: keyword.Of("trail running shoes"),
 		Source: graph.SourceUser, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 	})
 	if err != nil {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -19,8 +20,9 @@ func fullPage(siteID, path string, at time.Time) pagemap.Page {
 	return pagemap.Page{
 		ID: id.New(), SiteID: siteID, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPPost, WPID: &wpID,
 		Title: "Title", H1: "Heading", MetaTitle: "Meta", MetaDescription: "Description", Canonical: "https://shop.example.com" + path,
-		PrimaryKeyword: "title keyword", Keywords: []string{"one", "two"},
-		Status: pagemap.StatusExists, ContentHash: "abc", WPModifiedAt: &modified, LastSyncedAt: &at, Drift: true, CreatedAt: at, UpdatedAt: at,
+		Keywords: keyword.New([]keyword.Keyword{{Text: "title keyword", Volume: new(5400)}, {Text: "one", Volume: new(0)}, {Text: "two"}}),
+		Notes:    []pagemap.Note{{Label: "Intent Owner", Text: "GEO Commercial"}, {Label: "Notes", Text: "the liquid form"}},
+		Status:   pagemap.StatusExists, ContentHash: "abc", WPModifiedAt: &modified, LastSyncedAt: &at, Drift: true, CreatedAt: at, UpdatedAt: at,
 		Observed: pagemap.Observed{
 			Link: "https://shop.example.com" + path, Slug: pagemap.Slug(path), Status: "draft",
 			Title: "Title", H1: "Heading",

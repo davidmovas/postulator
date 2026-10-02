@@ -42,7 +42,7 @@ func NewBrief(spec template.TemplateSpec, rules template.LinkRules, page pagemap
 	brief := Brief{
 		Title:          strings.TrimSpace(page.Title),
 		H1:             strings.TrimSpace(page.H1),
-		PrimaryKeyword: strings.TrimSpace(entity.PrimaryKeyword),
+		PrimaryKeyword: entity.Keywords.Main(),
 		TitleRule:      spec.KeywordRules.PrimaryInTitle,
 		H1Rule:         spec.KeywordRules.PrimaryInH1,
 		LeadRule:       spec.KeywordRules.PrimaryInFirstParagraph,

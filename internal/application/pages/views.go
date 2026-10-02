@@ -3,6 +3,7 @@ package pages
 import (
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
@@ -92,8 +93,8 @@ func view(p pagemap.Page) Page {
 		H1:              p.H1,
 		MetaTitle:       p.MetaTitle,
 		MetaDescription: p.MetaDescription,
-		PrimaryKeyword:  p.PrimaryKeyword,
-		Keywords:        keywordsOf(p.Keywords),
+		PrimaryKeyword:  p.Keywords.Main(),
+		Keywords:        p.Keywords.Rest(),
 		Canonical:       p.Canonical,
 		Status:          string(p.Status),
 		EntityID:        p.EntityID,
@@ -158,9 +159,6 @@ func conflicts(evidence []pagemap.Evidence) []Conflict {
 	return out
 }
 
-func keywordsOf(keywords []string) []string {
-	if keywords == nil {
-		return []string{}
-	}
-	return keywords
+func keywordList(primary string, rest []string) keyword.List {
+	return keyword.Of(append([]string{primary}, rest...)...)
 }

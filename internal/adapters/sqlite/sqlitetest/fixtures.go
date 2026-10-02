@@ -6,6 +6,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/site"
@@ -40,9 +41,9 @@ func Entity(t testing.TB, store *sqlite.Store, siteID, name string) graph.Entity
 	t.Helper()
 
 	record := graph.Entity{
-		ID: id.New(), SiteID: siteID, Name: name, Kind: graph.KindTopic, PrimaryKeyword: name,
-		SecondaryKeywords: []string{}, Anchors: []graph.Anchor{{Text: name, Source: graph.AnchorUser, Weight: 1}},
-		Source: graph.SourceUser, CreatedAt: Stamp, UpdatedAt: Stamp,
+		ID: id.New(), SiteID: siteID, Name: name, Kind: graph.KindTopic, Keywords: keyword.Of(name),
+		Anchors: []graph.Anchor{{Text: name, Source: graph.AnchorUser, Weight: 1}},
+		Source:  graph.SourceUser, CreatedAt: Stamp, UpdatedAt: Stamp,
 	}
 	if err := sqlite.NewEntityRepo(store).Insert(t.Context(), record); err != nil {
 		t.Fatalf("insert the entity fixture: %v", err)
@@ -55,7 +56,7 @@ func Page(t testing.TB, store *sqlite.Store, siteID, path string) pagemap.Page {
 
 	record := pagemap.Page{
 		ID: id.New(), SiteID: siteID, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPPage,
-		Title: path, H1: path, Keywords: []string{}, Status: pagemap.StatusPlanned, CreatedAt: Stamp, UpdatedAt: Stamp,
+		Title: path, H1: path, Keywords: keyword.Of(), Notes: []pagemap.Note{}, Status: pagemap.StatusPlanned, CreatedAt: Stamp, UpdatedAt: Stamp,
 	}
 	if err := sqlite.NewPageRepo(store).Insert(t.Context(), record); err != nil {
 		t.Fatalf("insert the page fixture: %v", err)

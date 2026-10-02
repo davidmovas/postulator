@@ -15,6 +15,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
@@ -213,10 +214,9 @@ func seedEntity(t *testing.T, repo *sqlite.EntityRepo, siteID, name, anchor stri
 	t.Helper()
 
 	record := graph.Entity{
-		ID: id.New(), SiteID: siteID, Name: name, Kind: graph.KindTopic, PrimaryKeyword: anchor,
-		SecondaryKeywords: []string{},
-		Anchors:           []graph.Anchor{{Text: anchor, Source: graph.AnchorUser, Weight: 1}},
-		Source:            graph.SourceUser, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+		ID: id.New(), SiteID: siteID, Name: name, Kind: graph.KindTopic, Keywords: keyword.Of(anchor),
+		Anchors: []graph.Anchor{{Text: anchor, Source: graph.AnchorUser, Weight: 1}},
+		Source:  graph.SourceUser, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 	}
 	if err := repo.Insert(t.Context(), record); err != nil {
 		t.Fatalf("insert the entity %s: %v", name, err)

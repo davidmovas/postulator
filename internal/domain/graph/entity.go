@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -67,19 +68,18 @@ type Anchor struct {
 }
 
 type Entity struct {
-	ID                string
-	SiteID            string
-	Name              string
-	Kind              Kind
-	Intent            string
-	PrimaryKeyword    string
-	SecondaryKeywords []string
-	Anchors           []Anchor
-	CanonicalPageID   *string
-	Score             float64
-	Source            Source
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	ID              string
+	SiteID          string
+	Name            string
+	Kind            Kind
+	Intent          string
+	Keywords        keyword.List
+	Anchors         []Anchor
+	CanonicalPageID *string
+	Score           float64
+	Source          Source
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 func invalid(message, field string) *errors.Error {
@@ -89,7 +89,6 @@ func invalid(message, field string) *errors.Error {
 func NewEntity(e Entity) (Entity, error) {
 	e.Name = strings.TrimSpace(e.Name)
 	e.Intent = strings.TrimSpace(e.Intent)
-	e.PrimaryKeyword = strings.TrimSpace(e.PrimaryKeyword)
 
 	switch {
 	case e.ID == "":
@@ -108,7 +107,7 @@ func NewEntity(e Entity) (Entity, error) {
 		return Entity{}, invalid("canonical page id must not be empty when set", "canonicalPageId")
 	}
 
-	e.SecondaryKeywords = CleanKeywords(e.SecondaryKeywords)
+	e.Keywords = keyword.New(e.Keywords)
 	anchors, err := NewAnchors(e.Anchors)
 	if err != nil {
 		return Entity{}, err

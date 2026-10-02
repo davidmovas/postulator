@@ -9,6 +9,7 @@ import (
 	port "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -156,12 +157,12 @@ func pages() []pagemap.Page {
 func entities() []graph.Entity {
 	return []graph.Entity{
 		{
-			ID: "parent", SiteID: "site", Name: "Coffee", PrimaryKeyword: "coffee", Kind: graph.KindTopic,
+			ID: "parent", SiteID: "site", Name: "Coffee", Keywords: keyword.Of("coffee"), Kind: graph.KindTopic,
 			Source: graph.SourceUser, CanonicalPageID: pointer("page-parent"),
 			Anchors: []graph.Anchor{{Text: "coffee", Source: graph.AnchorUser, Weight: 1}},
 		},
 		{
-			ID: "child", SiteID: "site", Name: "Espresso", PrimaryKeyword: "espresso", Kind: graph.KindTopic,
+			ID: "child", SiteID: "site", Name: "Espresso", Keywords: keyword.Of("espresso"), Kind: graph.KindTopic,
 			Source: graph.SourceUser, CanonicalPageID: pointer("page-child"),
 			Anchors: []graph.Anchor{{Text: "espresso", Source: graph.AnchorUser, Weight: 1}},
 		},

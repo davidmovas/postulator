@@ -45,11 +45,11 @@ func Cannibalization(candidate Page, entity graph.Entity, index Index, g graph.G
 		}
 	}
 
-	if entity.PrimaryKeyword != "" {
+	if main := entity.Keywords.Main(); main != "" {
 		others := g.Entities()
 		for i := range others {
 			other := &others[i]
-			if other.ID == entity.ID || other.CanonicalPageID == nil || !strings.EqualFold(other.PrimaryKeyword, entity.PrimaryKeyword) {
+			if other.ID == entity.ID || other.CanonicalPageID == nil || !strings.EqualFold(other.Keywords.Main(), main) {
 				continue
 			}
 			owner, ok := index.byID[*other.CanonicalPageID]

@@ -9,6 +9,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -187,7 +188,7 @@ func TestRelinkNamesALinkItCouldNotPlace(t *testing.T) {
 		`<a href="/coffee/filter/">filter</a> range.</p>`
 	deps, server, _, wpID := relinkDeps(t, body)
 	deps.Entities = entityList{items: append(unitEntities(), graph.Entity{
-		ID: "filter", SiteID: "site", Name: "Filter", PrimaryKeyword: "filter",
+		ID: "filter", SiteID: "site", Name: "Filter", Keywords: keyword.Of("filter"),
 		Anchors: []graph.Anchor{{Text: "filter", Source: graph.AnchorUser, Weight: 1}},
 		Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-filter"),
 	})}
@@ -408,7 +409,7 @@ func TestRelinkSpendsTheNeighborsOwnBudget(t *testing.T) {
 
 			deps, server, _, wpID := relinkDeps(t, body)
 			deps.Entities = entityList{items: append(unitEntities(), graph.Entity{
-				ID: "filter", SiteID: "site", Name: "Filter", PrimaryKeyword: "filter",
+				ID: "filter", SiteID: "site", Name: "Filter", Keywords: keyword.Of("filter"),
 				Anchors: []graph.Anchor{{Text: "filter", Source: graph.AnchorUser, Weight: 1}},
 				Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-filter"),
 			})}

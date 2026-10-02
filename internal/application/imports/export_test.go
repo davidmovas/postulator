@@ -83,8 +83,8 @@ func snapshot(t *testing.T, h harness, kinds map[string]string) shape {
 			anchors = append(anchors, anchor.Text)
 		}
 		out.entities = append(out.entities, strings.Join([]string{
-			entities[i].Name, string(entities[i].Kind), entities[i].PrimaryKeyword,
-			strings.Join(entities[i].SecondaryKeywords, ","), strings.Join(anchors, ","),
+			entities[i].Name, string(entities[i].Kind), entities[i].Keywords.Main(),
+			strings.Join(entities[i].Keywords.Rest(), ","), strings.Join(anchors, ","),
 		}, "|"))
 	}
 

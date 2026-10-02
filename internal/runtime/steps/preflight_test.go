@@ -7,6 +7,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/images"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
@@ -54,7 +55,7 @@ func TestResolveContextPreflightNamesWhatTheGraphLacks(t *testing.T) {
 	orphaned := unitEntities()
 	orphaned[0].CanonicalPageID = nil
 	orphaned = append(orphaned, graph.Entity{
-		ID: "latte", SiteID: "site", Name: "Latte", PrimaryKeyword: "latte",
+		ID: "latte", SiteID: "site", Name: "Latte", Keywords: keyword.Of("latte"),
 		Anchors: []graph.Anchor{{Text: "latte", Source: graph.AnchorUser, Weight: 1}},
 		Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-latte"),
 	})
