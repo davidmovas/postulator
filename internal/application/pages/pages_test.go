@@ -559,3 +559,39 @@ func keywordTexts(keywords []dto.Keyword) []string {
 	}
 	return out
 }
+
+func TestAPageShowsTheNotesItCarries(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	noted, bare := h.page(t, "/bpc-157/", nil), h.page(t, "/tb-500/", nil)
+	repo := sqlite.NewPageRepo(h.store)
+	stored, err := repo.Get(t.Context(), noted.ID)
+	if err != nil {
+		t.Fatalf("read the page: %v", err)
+	}
+	stored.Notes = []pagemap.Note{{Label: "Intent Owner", Text: "Commercial"}}
+	if err = repo.Update(t.Context(), stored); err != nil {
+		t.Fatalf("store the notes: %v", err)
+	}
+
+	cases := []struct {
+		name   string
+		pageID string
+		want   []pages.Note
+	}{
+		{name: "a page with notes", pageID: noted.ID, want: []pages.Note{{Label: "Intent Owner", Text: "Commercial"}}},
+		{name: "a page without any", pageID: bare.ID, want: []pages.Note{}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, getErr := h.service.Get(t.Context(), pages.GetRequest{ID: tc.pageID})
+			if getErr != nil {
+				t.Fatalf("Get: %v", getErr)
+			}
+			if !slices.Equal(got.Page.Notes, tc.want) || got.Page.Notes == nil {
+				t.Fatalf("notes = %#v, want %#v", got.Page.Notes, tc.want)
+			}
+		})
+	}
+}

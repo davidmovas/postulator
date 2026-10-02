@@ -18,6 +18,7 @@ function page(id: string, path: string): Page {
         metaDescription: "",
         canonical: "",
         keywords: [],
+        notes: [],
         status: "planned",
         entityId: null,
         templateId: null,

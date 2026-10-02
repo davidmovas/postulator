@@ -128,7 +128,7 @@ func sameRef(a, b *string) bool {
 func samePage(a, b pagemap.Page) bool {
 	return a.Title == b.Title && a.H1 == b.H1 && a.MetaTitle == b.MetaTitle &&
 		a.MetaDescription == b.MetaDescription && a.WPType == b.WPType &&
-		a.Keywords.Equal(b.Keywords) &&
+		a.Keywords.Equal(b.Keywords) && slices.Equal(a.Notes, b.Notes) &&
 		sameRef(a.EntityID, b.EntityID) && sameRef(a.TemplateID, b.TemplateID)
 }
 
@@ -412,7 +412,7 @@ func (s *Service) resolvePages(ctx context.Context, b *builder, now time.Time) e
 			page, err := pagemap.NewPage(pagemap.Page{
 				ID: id.New(), SiteID: b.state.siteID, Path: path, WPType: wpTypeOr(wpType),
 				Title: fill(draft.title, titleFrom(path)), H1: draft.h1, MetaTitle: draft.metaTitle,
-				MetaDescription: draft.metaDesc, Keywords: draft.keywords,
+				MetaDescription: draft.metaDesc, Keywords: draft.keywords, Notes: draft.notes,
 				Status: pagemap.StatusPlanned, EntityID: entityID,
 				TemplateID: templateID, CreatedAt: now, UpdatedAt: now,
 			})
@@ -430,6 +430,7 @@ func (s *Service) resolvePages(ctx context.Context, b *builder, now time.Time) e
 		next.MetaTitle = fill(next.MetaTitle, draft.metaTitle)
 		next.MetaDescription = fill(next.MetaDescription, draft.metaDesc)
 		next.Keywords = next.Keywords.Merge(draft.keywords)
+		next.Notes = pagemap.MergeNotes(next.Notes, draft.notes)
 		if wpType != "" {
 			next.WPType = wpType
 		}

@@ -25,3 +25,20 @@ func NewNotes(notes []Note) []Note {
 	}
 	return out
 }
+
+func MergeNotes(stored, file []Note) []Note {
+	merged := NewNotes(stored)
+	at := make(map[string]int, len(merged))
+	for i := range merged {
+		at[strings.ToLower(merged[i].Label)] = i
+	}
+	for _, incoming := range NewNotes(file) {
+		if i, held := at[strings.ToLower(incoming.Label)]; held {
+			merged[i].Text = incoming.Text
+			continue
+		}
+		at[strings.ToLower(incoming.Label)] = len(merged)
+		merged = append(merged, incoming)
+	}
+	return merged
+}

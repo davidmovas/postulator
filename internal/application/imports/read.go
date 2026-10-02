@@ -26,6 +26,7 @@ type rowDraft struct {
 	wpType    string
 	pageKind  string
 	keywords  keyword.List
+	notes     []pagemap.Note
 	name      string
 	own       ownership
 	kind      string
@@ -109,6 +110,7 @@ func readRows(binding importmap.Binding, table importmap.Table, p *plan) []rowDr
 			related:   binding.List(row, importmap.FieldRelated),
 			parent:    binding.Text(row, importmap.FieldParentEntity),
 			levels:    chainOf(binding.Levels(row)),
+			notes:     binding.Notes(row),
 		}
 		if draft.name == "" && raw == "" && len(draft.levels) == 0 {
 			p.noteAt(at, "", CodeNoTarget, "the row names neither a path, an entity nor a group")

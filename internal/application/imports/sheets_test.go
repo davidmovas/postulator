@@ -1,6 +1,7 @@
 package imports_test
 
 import (
+	"path/filepath"
 	"slices"
 	"testing"
 
@@ -365,6 +366,56 @@ func TestARowsGroupSaysWhichParentItMeans(t *testing.T) {
 		return
 	}
 	t.Fatal("Drops was not created")
+}
+
+func notesAt(t *testing.T, h harness, path string) []pagemap.Note {
+	t.Helper()
+
+	stored := h.pages(t)
+	for i := range stored {
+		if stored[i].Path == path {
+			return stored[i].Notes
+		}
+	}
+	t.Fatalf("no page at %s", path)
+	return nil
+}
+
+func TestNoteColumnsTravelWithThePage(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	first := h.file(t, "notes.csv", "URL,Title,Intent Owner,Notes\n/bpc-157/,BPC-157,Commercial,Sold as a 10 ml vial\n/tb-500/,TB-500,,\n")
+	mapping := h.detected(t, first)
+	if !slices.Equal(mapping.Options.NoteColumns, []string{"Intent Owner", "Notes"}) {
+		t.Fatalf("note columns = %v", mapping.Options.NoteColumns)
+	}
+	h.apply(t, first, mapping)
+
+	want := []pagemap.Note{{Label: "Intent Owner", Text: "Commercial"}, {Label: "Notes", Text: "Sold as a 10 ml vial"}}
+	if got := notesAt(t, h, "/bpc-157/"); !slices.Equal(got, want) {
+		t.Fatalf("notes = %+v, want %+v", got, want)
+	}
+	if got := notesAt(t, h, "/tb-500/"); len(got) != 0 {
+		t.Fatalf("an empty note cell gave the page %+v", got)
+	}
+
+	second := h.file(t, "again.csv", "URL,Title,Notes\n/bpc-157/,BPC-157,Now a 5 ml vial\n/tb-500/,TB-500,\n")
+	h.apply(t, second, h.detected(t, second))
+	want = []pagemap.Note{{Label: "Intent Owner", Text: "Commercial"}, {Label: "Notes", Text: "Now a 5 ml vial"}}
+	if got := notesAt(t, h, "/bpc-157/"); !slices.Equal(got, want) {
+		t.Fatalf("notes after a second import = %+v, want %+v", got, want)
+	}
+
+	exported := filepath.Join(h.dir, "export.xlsx")
+	if _, err := h.service.Export(t.Context(), imports.ExportRequest{SiteID: h.siteID, Path: exported}); err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+	target := newHarness(t)
+	target.apply(t, exported, target.detected(t, exported))
+	if got := notesAt(t, target, "/bpc-157/"); !slices.Equal(got, want) {
+		t.Fatalf("notes after an export and an import = %+v, want %+v", got, want)
+	}
 }
 
 func TestAnUnpublishedAncestorWithoutAnEntityGetsOne(t *testing.T) {

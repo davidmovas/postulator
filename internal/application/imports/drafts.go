@@ -6,6 +6,7 @@ import (
 	"unicode"
 
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
 
 func key(name string) string {
@@ -54,6 +55,7 @@ type pageDraft struct {
 	pageKind  string
 	entity    string
 	keywords  keyword.List
+	notes     []pagemap.Note
 	own       ownership
 	rows      []int
 	unit      int
@@ -99,6 +101,7 @@ func (p *pageDraft) merge(row *rowDraft, at int) {
 	p.wpType = fill(p.wpType, row.wpType)
 	p.pageKind = fill(p.pageKind, row.pageKind)
 	p.keywords = p.keywords.Merge(row.keywords)
+	p.notes = pagemap.MergeNotes(p.notes, row.notes)
 	if p.own == ownUnset {
 		p.own = row.own
 	}

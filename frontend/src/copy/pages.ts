@@ -160,6 +160,8 @@ export const pages = {
         keywords: "Keywords",
         keywordsOwn: "The page is written for these. The most searched comes first and is the main keyword.",
         keywordsInherited: "None of its own, so the page is written for the keywords of its entity.",
+        notes: "Notes from the sheet",
+        notesHint: "The writer reads these as context and never copies them; an export writes them back as columns.",
         keyword: "Keyword",
         volume: "Volume",
         removeKeyword: "Remove",

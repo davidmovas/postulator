@@ -1327,6 +1327,50 @@ func TestTheWriterPromptSaysWhenAPageHasNoKeywords(t *testing.T) {
 	}
 }
 
+func TestTheWriterReadsTheNotesOfThePageAsContext(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		notes []pagemap.Note
+		want  []string
+		gone  []string
+	}{
+		{
+			name:  "a page with notes",
+			notes: []pagemap.Note{{Label: "Intent Owner", Text: "Commercial"}, {Label: "Notes", Text: "Sold as a 10 ml vial"}},
+			want:  []string{"NOTES\n", "- Intent Owner: Commercial\n", "- Notes: Sold as a 10 ml vial\n", "never copy"},
+		},
+		{name: "a page without notes", gone: []string{"NOTES\n"}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps := unitDeps()
+			recorder := &promptRecorder{reply: goodDraft}
+			deps.LLM = recorder
+			sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: linkContextBlob(t, deps)})
+			sc.Page.Notes = tc.notes
+
+			if _, err := steps.GenerateBody(deps).Run(t.Context(), sc); err != nil {
+				t.Fatalf("GenerateBody: %v", err)
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(recorder.last, want) {
+					t.Fatalf("the prompt lacks %q:\n%s", want, recorder.last)
+				}
+			}
+			for _, gone := range tc.gone {
+				if strings.Contains(recorder.last, gone) {
+					t.Fatalf("the prompt carries %q:\n%s", gone, recorder.last)
+				}
+			}
+		})
+	}
+}
+
 func sharedNameEntities() []graph.Entity {
 	entities := unitEntities()
 	entities[1].ScopeID = pointer("parent")

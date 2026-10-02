@@ -29,7 +29,11 @@ KEYWORDS
 {{range .Brief.Keywords}}{{.Rank}}) {{.Text}}{{with .Volume}} ({{.}} a month){{end}}{{if not .Required}} (optional){{end}}
 {{end}}Use every keyword that is not marked optional at least once, word for word, in running body text. The higher a keyword stands, the earlier and the more prominently it appears. A keyword is never repeated to pad the text, and one marked optional is used only where it reads naturally.
 {{else}}none
-{{end}}
+{{end}}{{if .Page.Notes}}
+NOTES
+What the site owner wrote about this page. Read them as context for what the page is and whom it is for; never copy them into the body:
+{{range .Page.Notes}}- {{.Label}}: {{.Text}}
+{{end}}{{end}}
 KEYWORD RULES
 {{if .Brief.LeadRule}}The first paragraph of section 1 contains the primary keyword.
 {{end}}{{if .Spec.KeywordRules.MaxDensity}}Keep the primary keyword below {{.Spec.KeywordRules.MaxDensity}} of all words.

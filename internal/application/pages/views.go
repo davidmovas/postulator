@@ -22,6 +22,11 @@ type Mismatch struct {
 	Actual  string `json:"actual"`
 }
 
+type Note struct {
+	Label string `json:"label"`
+	Text  string `json:"text"`
+}
+
 type Page struct {
 	ID              string        `json:"id"`
 	SiteID          string        `json:"siteId"`
@@ -36,6 +41,7 @@ type Page struct {
 	MetaDescription string        `json:"metaDescription"`
 	Canonical       string        `json:"canonical"`
 	Keywords        []dto.Keyword `json:"keywords"`
+	Notes           []Note        `json:"notes"`
 	Status          string        `json:"status"`
 	EntityID        *string       `json:"entityId"`
 	TemplateID      *string       `json:"templateId"`
@@ -93,6 +99,7 @@ func view(p pagemap.Page) Page {
 		MetaTitle:       p.MetaTitle,
 		MetaDescription: p.MetaDescription,
 		Keywords:        application.KeywordViews(p.Keywords),
+		Notes:           noteViews(p.Notes),
 		Canonical:       p.Canonical,
 		Status:          string(p.Status),
 		EntityID:        p.EntityID,
@@ -109,6 +116,14 @@ func view(p pagemap.Page) Page {
 		CreatedAt:    dto.NewTime(p.CreatedAt),
 		UpdatedAt:    dto.NewTime(p.UpdatedAt),
 	}
+}
+
+func noteViews(notes []pagemap.Note) []Note {
+	out := make([]Note, 0, len(notes))
+	for _, note := range notes {
+		out = append(out, Note{Label: note.Label, Text: note.Text})
+	}
+	return out
 }
 
 func mismatchViews(p pagemap.Page) []Mismatch {

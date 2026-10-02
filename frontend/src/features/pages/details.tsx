@@ -213,6 +213,20 @@ export function PageDetails({ page, siteId, search }: PageDetailsProps): ReactEl
                     />
                 )}
             </Field>
+            {(page.notes ?? []).length === 0 ? null : (
+                <section aria-label={copy.pages.detail.notes} className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-ink-dim">{copy.pages.detail.notes}</span>
+                    <dl className="flex flex-col gap-1 rounded-md border border-hairline bg-inset px-2.5 py-2 text-xs">
+                        {(page.notes ?? []).map((note) => (
+                            <div key={note.label} className="flex gap-2">
+                                <dt className="shrink-0 text-ink-faint">{note.label}</dt>
+                                <dd className="min-w-0 text-ink-soft">{note.text}</dd>
+                            </div>
+                        ))}
+                    </dl>
+                    <p className="text-2xs text-ink-faint">{copy.pages.detail.notesHint}</p>
+                </section>
+            )}
             <Field
                 label={copy.pages.detail.metaTitle}
                 hint={copy.pages.detail.characters(draft.metaTitle.length)}
