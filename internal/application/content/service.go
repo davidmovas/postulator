@@ -7,6 +7,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/templates"
 	contentdomain "github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -66,11 +67,12 @@ type Snippet struct {
 }
 
 type judgePrompt struct {
-	Page    pagemap.Page
-	Entity  graph.Entity
-	Spec    template.TemplateSpec
-	Body    string
-	Meta    Snippet
-	HasMeta bool
-	Targets []contentdomain.LinkTarget
+	Page     pagemap.Page
+	Entity   graph.Entity
+	Keywords keyword.List
+	Spec     template.TemplateSpec
+	Body     string
+	Meta     Snippet
+	HasMeta  bool
+	Targets  []contentdomain.LinkTarget
 }

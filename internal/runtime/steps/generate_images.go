@@ -11,6 +11,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -213,7 +214,7 @@ func generated(ctx context.Context, deps Deps, sc *run.StepContext, entity graph
 			Step:    NameGenerateImages,
 			Subject: subject,
 			Context: sceneOf(sc.Spec, index),
-			Alt:     altOf(entity, subject),
+			Alt:     altOf(pagemap.Keywords(sc.Page, entity), subject),
 		})
 		if err != nil {
 			if stopped(ctx) {
@@ -239,8 +240,8 @@ func subjectOf(sc *run.StepContext, entity graph.Entity) string {
 	return sc.Page.Path
 }
 
-func altOf(entity graph.Entity, subject string) string {
-	if main := entity.Keywords.Main(); main != "" {
+func altOf(keywords keyword.List, subject string) string {
+	if main := keywords.Main(); main != "" {
 		return main
 	}
 	return subject

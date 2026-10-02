@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
 
@@ -69,7 +70,7 @@ func Validate(deps Deps) run.StepDef {
 			report := ValidationReport{
 				PageID:     sc.Page.ID,
 				Compliance: content.Compliance(doc, lc, policy, sc.Page.ID),
-				Structure:  content.Structure(doc, entity.Keywords.Main(), entity.Keywords.Rest(), sc.Spec),
+				Structure:  content.Structure(doc, pagemap.Keywords(sc.Page, entity), sc.Spec),
 				Links:      links,
 			}
 			report.Compliance.Items = append(report.Compliance.Items, content.Unpublished(doc, lc, live, sc.Page.ID)...)

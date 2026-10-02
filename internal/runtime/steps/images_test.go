@@ -11,6 +11,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -123,6 +124,24 @@ func TestGenerateImagesHonoursItsProducesWhenTheTemplateAsksForNone(t *testing.T
 	}
 	if len(server.Uploads()) != 0 {
 		t.Fatalf("the step uploaded %+v", server.Uploads())
+	}
+}
+
+func TestGenerateImagesDescribesAPictureWithTheMainKeywordOfThePage(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	sc := imageContext(t, template.Images{Featured: true, Source: template.ImagesAI})
+	sc.Page.Keywords = keyword.New([]keyword.Keyword{{Text: "moka pot"}, {Text: "espresso at home", Volume: new(800)}})
+	manifest, _ := runImages(t, deps, sc)
+
+	if len(manifest.Images) != 1 || manifest.Images[0].Alt != "espresso at home" {
+		t.Fatalf("manifest = %+v, want the page's main keyword as alternative text", manifest.Images)
+	}
+	for _, uploaded := range server.Uploads() {
+		if uploaded.Alt != "espresso at home" {
+			t.Errorf("upload = %+v, want the page's main keyword as alternative text", uploaded)
+		}
 	}
 }
 

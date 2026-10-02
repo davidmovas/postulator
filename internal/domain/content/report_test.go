@@ -1,10 +1,12 @@
 package content_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/template"
 )
 
@@ -275,56 +277,69 @@ func TestStructureChecksTheTemplateRules(t *testing.T) {
 	}
 
 	cases := []struct {
-		name      string
-		body      string
-		primary   string
-		secondary []string
-		codes     []string
+		name     string
+		body     string
+		keywords keyword.List
+		codes    []string
 	}{
 		{
 			name: "a compliant body",
 			body: "<h1>Coffee guide</h1><p>This coffee guide explains the basics of brewing at home today.</p>" +
 				"<h2>Beans</h2><p>Pick a roast that suits your grinder and your palate.</p>" +
 				"<h2>Brewing</h2><p>Use water just off the boil for the best extraction.</p>",
-			primary:   "coffee",
-			secondary: []string{"roast"},
-			codes:     []string{},
+			keywords: keyword.Of("coffee", "roast"),
+			codes:    []string{},
 		},
 		{
-			name: "the primary keyword is missing from the h1 and the lead",
+			name: "the main keyword is nowhere on the page",
 			body: "<h1>Guide</h1><p>This explains the basics of brewing at home today for everyone.</p>" +
 				"<h2>Beans</h2><p>Pick a roast that suits your grinder and your palate.</p>" +
 				"<h2>Brewing</h2><p>Use water just off the boil for the best extraction here.</p>",
-			primary: "coffee",
-			codes:   []string{content.CodePrimaryMissingInH1, content.CodePrimaryMissingInLead},
+			keywords: keyword.Of("coffee"),
+			codes:    []string{content.CodePrimaryMissingInH1, content.CodePrimaryMissingInLead, content.CodeKeywordsMissing},
+		},
+		{
+			name: "the main keyword is in the body and not where the template wants it",
+			body: "<h1>Guide</h1><p>This explains the basics of brewing at home today for everyone.</p>" +
+				"<h2>Beans</h2><p>Pick a coffee that suits your grinder and your palate.</p>" +
+				"<h2>Brewing</h2><p>Use water just off the boil for the best extraction here.</p>",
+			keywords: keyword.Of("coffee"),
+			codes:    []string{content.CodePrimaryMissingInH1, content.CodePrimaryMissingInLead},
 		},
 		{
 			name: "a required section is missing",
 			body: "<h1>Coffee guide</h1><p>This coffee guide explains the basics of brewing at home today.</p>" +
 				"<h2>Beans</h2><p>Pick a roast that suits your grinder and your palate for sure.</p>",
-			primary: "coffee",
-			codes:   []string{content.CodeSectionMissing},
+			keywords: keyword.Of("coffee"),
+			codes:    []string{content.CodeSectionMissing},
 		},
 		{
-			name:    "a short body with an empty heading",
-			body:    "<h1>Coffee</h1><h2></h2><p>Coffee.</p><h2>Beans</h2><h2>Brewing</h2>",
-			primary: "coffee",
-			codes:   []string{content.CodeEmptyHeading, content.CodeWordCount, content.CodeKeywordDensity},
+			name:     "a short body with an empty heading",
+			body:     "<h1>Coffee</h1><h2></h2><p>Coffee.</p><h2>Beans</h2><h2>Brewing</h2>",
+			keywords: keyword.Of("coffee"),
+			codes:    []string{content.CodeEmptyHeading, content.CodeWordCount, content.CodeKeywordDensity},
 		},
 		{
-			name: "a secondary keyword is missing",
+			name: "the keywords the body does not use are one finding",
 			body: "<h1>Coffee guide</h1><p>This coffee guide explains the basics of brewing at home today.</p>" +
 				"<h2>Beans</h2><p>Pick a bean that suits your grinder and your palate for sure.</p>" +
 				"<h2>Brewing</h2><p>Use water just off the boil for the best extraction here.</p>",
-			primary:   "coffee",
-			secondary: []string{"roast", "  "},
-			codes:     []string{content.CodeSecondaryMissing},
+			keywords: keyword.Of("coffee", "roast", "grinder", "arabica beans"),
+			codes:    []string{content.CodeKeywordsMissing},
 		},
 		{
-			name:    "the keyword is repeated too often",
-			body:    "<h1>Coffee</h1><p>Coffee coffee coffee coffee.</p><h2>Beans</h2><h2>Brewing</h2>",
-			primary: "coffee",
-			codes:   []string{content.CodeKeywordDensity, content.CodeWordCount},
+			name:     "the keyword is repeated too often",
+			body:     "<h1>Coffee</h1><p>Coffee coffee coffee coffee.</p><h2>Beans</h2><h2>Brewing</h2>",
+			keywords: keyword.Of("coffee"),
+			codes:    []string{content.CodeKeywordDensity, content.CodeWordCount},
+		},
+		{
+			name: "a page without keywords raises no keyword finding",
+			body: "<h1>Guide</h1><p>This explains the basics of brewing at home today for everyone.</p>" +
+				"<h2>Beans</h2><p>Pick a roast that suits your grinder and your palate.</p>" +
+				"<h2>Brewing</h2><p>Use water just off the boil for the best extraction here.</p>",
+			keywords: keyword.Of(),
+			codes:    []string{},
 		},
 	}
 
@@ -332,7 +347,7 @@ func TestStructureChecksTheTemplateRules(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			report := content.Structure(mustParse(t, tc.body), tc.primary, tc.secondary, spec)
+			report := content.Structure(mustParse(t, tc.body), tc.keywords, spec)
 			if len(report.Items) != len(tc.codes) {
 				t.Fatalf("findings = %v, want %v", codesOf(report), tc.codes)
 			}
@@ -345,10 +360,78 @@ func TestStructureChecksTheTemplateRules(t *testing.T) {
 	}
 }
 
+func TestStructureNamesTheMissingKeywordsMostImportantFirst(t *testing.T) {
+	t.Parallel()
+
+	body := "<h1>Coffee guide</h1><p>This coffee guide explains the basics of brewing at home today.</p>" +
+		"<h2>Beans</h2><p>Pick a bean that suits your grinder and your palate for sure.</p>"
+	keywords := keyword.New([]keyword.Keyword{
+		{Text: "arabica beans"}, {Text: "coffee", Volume: new(9000)}, {Text: "roast", Volume: new(40)},
+		{Text: "grinder", Volume: new(700)}, {Text: "espresso", Volume: new(2000)},
+	})
+
+	report := content.Structure(mustParse(t, body), keywords, template.TemplateSpec{})
+	missing, ok := detailsOf(report, content.CodeKeywordsMissing)["keywords"].([]string)
+	if !ok || !slices.Equal(missing, []string{"espresso", "roast", "arabica beans"}) {
+		t.Fatalf("missing keywords = %v, want them in the order of the list", detailsOf(report, content.CodeKeywordsMissing))
+	}
+
+	var finding content.Finding
+	for _, item := range report.Items {
+		if item.Code == content.CodeKeywordsMissing {
+			finding = item
+		}
+	}
+	if finding.Severity != content.SeverityWarn {
+		t.Fatalf("severity = %q, want a warning", finding.Severity)
+	}
+	if want := "the body does not use 3 of the 5 keywords of the page: espresso, roast, arabica beans"; finding.Message != want {
+		t.Fatalf("message = %q, want %q", finding.Message, want)
+	}
+}
+
+func TestStructureAsksOnlyForTheKeywordsTheTemplateRequires(t *testing.T) {
+	t.Parallel()
+
+	body := "<h1>Coffee guide</h1><p>This coffee guide explains the basics of brewing at home today.</p>" +
+		"<h2>Beans</h2><p>Pick a bean that suits your grinder and your palate for sure.</p>"
+	keywords := keyword.Of("coffee", "espresso", "grinder", "roast")
+
+	cases := []struct {
+		name     string
+		required *int
+		missing  []string
+	}{
+		{name: "a template that does not say asks for them all", required: nil, missing: []string{"espresso", "roast"}},
+		{name: "the first two", required: new(2), missing: []string{"espresso"}},
+		{name: "the first alone, which the body uses", required: new(1), missing: nil},
+		{name: "none", required: new(0), missing: nil},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			spec := template.TemplateSpec{KeywordRules: template.KeywordRules{RequiredKeywords: tc.required}}
+			report := content.Structure(mustParse(t, body), keywords, spec)
+			if tc.missing == nil {
+				if hasCode(report, content.CodeKeywordsMissing) {
+					t.Fatalf("findings = %v, want no missing keyword", codesOf(report))
+				}
+				return
+			}
+			missing, ok := detailsOf(report, content.CodeKeywordsMissing)["keywords"].([]string)
+			if !ok || !slices.Equal(missing, tc.missing) {
+				t.Fatalf("missing = %v, want %v", detailsOf(report, content.CodeKeywordsMissing), tc.missing)
+			}
+		})
+	}
+}
+
 func TestStructureOnAnEmptyBody(t *testing.T) {
 	t.Parallel()
 
-	report := content.Structure(mustParse(t, "<p>Nothing at all.</p>"), "", nil, template.TemplateSpec{})
+	report := content.Structure(mustParse(t, "<p>Nothing at all.</p>"), nil, template.TemplateSpec{})
 	if !hasCode(report, content.CodeNoHeadings) || len(report.Items) != 1 {
 		t.Fatalf("findings = %v", codesOf(report))
 	}
@@ -356,7 +439,7 @@ func TestStructureOnAnEmptyBody(t *testing.T) {
 		t.Fatalf("report = %+v", report)
 	}
 
-	long := content.Structure(mustParse(t, "<h1>x</h1><p>one two three</p>"), "", nil,
+	long := content.Structure(mustParse(t, "<h1>x</h1><p>one two three</p>"), nil,
 		template.TemplateSpec{Length: template.Length{Max: 2}})
 	if !hasCode(long, content.CodeWordCount) {
 		t.Fatalf("findings = %v", codesOf(long))

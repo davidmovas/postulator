@@ -946,6 +946,71 @@ func TestRepairLinksPutsTheKeywordInTheLeadAndTheAnchorWhereTheParentLinkMayGo(t
 	}
 }
 
+func TestRepairLinksOwesTheLeadTheMainKeywordOfThePage(t *testing.T) {
+	t.Parallel()
+
+	deps := unitDeps()
+	recorder := &promptRecorder{reply: `{"sentence":"Pulling espresso at home starts with the grind."}`}
+	deps.LLM = recorder
+	blob := linkContextBlob(t, deps)
+
+	sc := unitContext(t, map[run.ArtifactKind][]byte{
+		run.ArtifactLinkContext: blob,
+		run.ArtifactBodyHTML:    []byte(`<h1>Espresso</h1><p>Espresso is a kind of <a href="/coffee/">coffee</a>.</p>`),
+	})
+	sc.Page.Keywords = keyword.New([]keyword.Keyword{{Text: "moka pot"}, {Text: "espresso at home", Volume: new(800)}})
+
+	result, err := steps.RepairLinks(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("RepairLinks: %v", err)
+	}
+	if !strings.Contains(recorder.last, "espresso at home") {
+		t.Fatalf("the linker was not asked for the page's main keyword:\n%s", recorder.last)
+	}
+	if body := string(result.Artifacts[0].Blob); !strings.Contains(body, "Pulling espresso at home starts with the grind.") {
+		t.Fatalf("the sentence did not land in the body:\n%s", body)
+	}
+}
+
+func TestValidateGradesTheKeywordsOfThePage(t *testing.T) {
+	t.Parallel()
+
+	deps := onTheSite(unitDeps())
+	blob := linkContextBlob(t, deps)
+	body := []byte(`<h1>Espresso at home</h1><h2>About</h2><p>Espresso at home is a kind of <a href="/coffee/">coffee</a>.</p>`)
+
+	sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: blob, run.ArtifactBodyHTML: body})
+	sc.Page.Keywords = keyword.New([]keyword.Keyword{
+		{Text: "moka pot"}, {Text: "espresso beans", Volume: new(300)}, {Text: "espresso at home", Volume: new(800)},
+	})
+
+	result, err := steps.Validate(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+	var decoded steps.ValidationReport
+	if unmarshalErr := json.Unmarshal(result.Artifacts[0].Blob, &decoded); unmarshalErr != nil {
+		t.Fatalf("decode the report: %v", unmarshalErr)
+	}
+
+	missing := 0
+	for _, item := range decoded.Structure.Items {
+		if item.Code != content.CodeKeywordsMissing {
+			continue
+		}
+		missing++
+		if want := "the body does not use 2 of the 3 keywords of the page: espresso beans, moka pot"; item.Message != want {
+			t.Fatalf("message = %q, want %q", item.Message, want)
+		}
+	}
+	if missing != 1 {
+		t.Fatalf("the report carries %d findings about missing keywords, want one: %+v", missing, decoded.Structure.Items)
+	}
+	if decoded.Structure.HasErrors() {
+		t.Fatalf("missing keywords must not be errors: %+v", decoded.Structure.Items)
+	}
+}
+
 func TestRepairLinksOpensABodyWithoutAParagraph(t *testing.T) {
 	t.Parallel()
 
@@ -1193,9 +1258,71 @@ func TestTheWriterPromptCarriesTheBrief(t *testing.T) {
 		"exactly as written",
 		"- espresso, in the first paragraph of section 1",
 		"- coffee, within the first 2 paragraphs of the page",
+		"Primary keyword: espresso",
+		"1) espresso\n",
 	} {
 		if !strings.Contains(recorder.last, want) {
 			t.Fatalf("the prompt lacks %q:\n%s", want, recorder.last)
 		}
+	}
+}
+
+func TestTheWriterPromptListsTheKeywordsOfThePageMostImportantFirst(t *testing.T) {
+	t.Parallel()
+
+	deps := unitDeps()
+	recorder := &promptRecorder{reply: goodDraft}
+	deps.LLM = recorder
+	blob := linkContextBlob(t, deps)
+
+	sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: blob})
+	sc.Page.Keywords = keyword.New([]keyword.Keyword{
+		{Text: "moka pot"}, {Text: "espresso beans", Volume: new(300)}, {Text: "espresso at home", Volume: new(800)},
+	})
+	sc.Spec.KeywordRules.RequiredKeywords = new(2)
+
+	if _, err := steps.GenerateBody(deps).Run(t.Context(), sc); err != nil {
+		t.Fatalf("GenerateBody: %v", err)
+	}
+	for _, want := range []string{
+		"Primary keyword: espresso at home",
+		"1) espresso at home (800 a month)\n",
+		"2) espresso beans (300 a month)\n",
+		"3) moka pot (optional)\n",
+		"Use every keyword that is not marked optional at least once",
+		"- espresso at home, in the first paragraph of section 1",
+	} {
+		if !strings.Contains(recorder.last, want) {
+			t.Fatalf("the prompt lacks %q:\n%s", want, recorder.last)
+		}
+	}
+	for _, gone := range []string{"Secondary keywords", "Primary keyword: espresso\n"} {
+		if strings.Contains(recorder.last, gone) {
+			t.Fatalf("the prompt still carries %q:\n%s", gone, recorder.last)
+		}
+	}
+}
+
+func TestTheWriterPromptSaysWhenAPageHasNoKeywords(t *testing.T) {
+	t.Parallel()
+
+	deps := unitDeps()
+	bare := unitEntities()
+	for i := range bare {
+		bare[i].Keywords = keyword.Of()
+	}
+	deps.Entities = entityList{items: bare}
+	recorder := &promptRecorder{reply: goodDraft}
+	deps.LLM = recorder
+	blob := linkContextBlob(t, deps)
+
+	if _, err := steps.GenerateBody(deps).Run(t.Context(), unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: blob})); err != nil {
+		t.Fatalf("GenerateBody: %v", err)
+	}
+	if !strings.Contains(recorder.last, "KEYWORDS\nnone\n") {
+		t.Fatalf("the prompt does not say the page has no keywords:\n%s", recorder.last)
+	}
+	if strings.Contains(recorder.last, "in the first paragraph of section 1") {
+		t.Fatalf("a page without keywords owes no lead phrase:\n%s", recorder.last)
 	}
 }

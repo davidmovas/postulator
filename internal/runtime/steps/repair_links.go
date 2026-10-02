@@ -92,7 +92,7 @@ func RepairLinks(deps Deps) run.StepDef {
 
 			result := content.InsertLinks(doc, lc, policy)
 			for {
-				owed, ok := nextOwed(doc, result, policy, sc.Spec, entity, settled)
+				owed, ok := nextOwed(doc, result, policy, sc.Spec, pagemap.Keywords(sc.Page, entity).Main(), settled)
 				if !ok {
 					break
 				}
@@ -155,8 +155,7 @@ func iterations(params map[string]any) int {
 }
 
 func nextOwed(doc *content.Document, result content.InsertResult, policy template.LinkPolicy,
-	spec template.TemplateSpec, entity graph.Entity, settled map[string]struct{}) (owedPhrase, bool) {
-	primary := entity.Keywords.Main()
+	spec template.TemplateSpec, primary string, settled map[string]struct{}) (owedPhrase, bool) {
 	if spec.KeywordRules.PrimaryInFirstParagraph && primary != "" {
 		if _, done := settled[primary]; !done && !leadCarries(doc, primary) {
 			return owedPhrase{text: primary, why: leadWhy, lead: true}, true

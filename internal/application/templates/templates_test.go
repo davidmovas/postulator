@@ -491,3 +491,55 @@ func TestResolveForPageFillsThePlaceholdersFromThePageItsEntityAndItsSite(t *tes
 		t.Fatalf("the stored template lost its placeholders: %+v, %v", stored.Template.Spec.Sections[0], err)
 	}
 }
+
+func TestResolveForPageTakesThePrimaryKeywordFromThePageBeforeItsEntity(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	seed := template.Seed()[3]
+	spec := seed.Spec
+	spec.Sections[0].Heading = "About {primaryKeyword}"
+	created, err := h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Name: "Keyed product", PageKind: seed.PageKind, Spec: spec})
+	if err != nil {
+		t.Fatalf("CreateTemplate: %v", err)
+	}
+	entity := sqlitetest.Entity(t, h.store, h.siteID, "BPC-157")
+
+	cases := []struct {
+		name     string
+		path     string
+		keywords keyword.List
+		mapped   bool
+		heading  string
+	}{
+		{
+			name: "the main keyword of the page", path: "/bpc/liquid/", mapped: true,
+			keywords: keyword.New([]keyword.Keyword{{Text: "liquid bpc"}, {Text: "bpc 157 liquid", Volume: new(900)}}),
+			heading:  "About bpc 157 liquid",
+		},
+		{name: "the keyword of the entity when the page carries none", path: "/bpc/", mapped: true, keywords: keyword.Of(), heading: "About BPC-157"},
+		{name: "a page with keywords and no entity", path: "/lab/", keywords: keyword.Of("about the lab"), heading: "About about the lab"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			page := sqlitetest.Page(t, h.store, h.siteID, tc.path)
+			page.Keywords = tc.keywords
+			page.TemplateID = &created.Template.ID
+			if tc.mapped {
+				page.EntityID = &entity.ID
+			}
+			if updateErr := sqlite.NewPageRepo(h.store).Update(t.Context(), page); updateErr != nil {
+				t.Fatalf("update %s: %v", page.Path, updateErr)
+			}
+
+			resolved, resolveErr := h.service.ResolveForPage(t.Context(), templates.ResolveForPageRequest{PageID: page.ID})
+			if resolveErr != nil {
+				t.Fatalf("ResolveForPage: %v", resolveErr)
+			}
+			if resolved.Spec.Sections[0].Heading != tc.heading {
+				t.Fatalf("heading = %q, want %q", resolved.Spec.Sections[0].Heading, tc.heading)
+			}
+		})
+	}
+}

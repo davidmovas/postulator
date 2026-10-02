@@ -40,7 +40,7 @@ func (s *Service) Assess(ctx context.Context, req AssessRequest) (AssessResponse
 	}
 
 	system, user, err := render(NameJudge, judgePrompt{
-		Page: req.Page, Entity: req.Entity, Spec: req.Spec, Body: req.Body,
+		Page: req.Page, Entity: req.Entity, Keywords: pagemap.Keywords(req.Page, req.Entity), Spec: req.Spec, Body: req.Body,
 		Meta: req.Snippet, HasMeta: req.HasSnippet, Targets: req.Targets,
 	})
 	if err != nil {

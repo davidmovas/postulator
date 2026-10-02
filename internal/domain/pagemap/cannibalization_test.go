@@ -12,6 +12,47 @@ func entityWith(id, phrase string, canonical *string) graph.Entity {
 	return graph.Entity{ID: id, SiteID: siteA, Name: id, Kind: graph.KindTopic, Keywords: keyword.Of(phrase), CanonicalPageID: canonical, Source: graph.SourceUser, CreatedAt: stamp, UpdatedAt: stamp}
 }
 
+func withKeywords(p pagemap.Page, phrases ...string) pagemap.Page {
+	p.Keywords = keyword.Of(phrases...)
+	return p
+}
+
+func TestCannibalizationReadsTheKeywordsOfTheRivalPage(t *testing.T) {
+	t.Parallel()
+
+	index := pagemap.NewIndex([]pagemap.Page{
+		withKeywords(page(pageA, "/shoes/", ptr(entA)), "trail shoes"),
+		page(pageB, "/boots/", ptr(entB)),
+	})
+	owner := entityWith(entA, "running shoes", ptr(pageA))
+	rival := entityWith(entB, "winter boots", ptr(pageB))
+	g, err := graph.New([]graph.Entity{owner, rival}, nil)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	cases := []struct {
+		name    string
+		phrase  string
+		allowed bool
+	}{
+		{name: "the keyword the rival page is written for", phrase: "Trail Shoes"},
+		{name: "the keyword of the rival entity, which its page does not use", phrase: "running shoes", allowed: true},
+		{name: "the keyword of an entity whose page has none of its own", phrase: "winter boots"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			verdict := pagemap.Cannibalization(page(pageC, "/trainers/", ptr("e-new")), entityWith("e-new", tc.phrase, nil), index, g)
+			if verdict.Allowed != tc.allowed {
+				t.Fatalf("Allowed = %v, evidence %+v", verdict.Allowed, verdict.Evidence)
+			}
+		})
+	}
+}
+
 func TestCannibalization(t *testing.T) {
 	t.Parallel()
 
@@ -68,6 +109,18 @@ func TestCannibalization(t *testing.T) {
 			entity:    entityWith("e-new", "RUNNING shoes", nil),
 			reasons:   []pagemap.Reason{pagemap.ReasonSamePrimaryKeyword, pagemap.ReasonSamePrimaryKeyword},
 			pages:     []string{pageA, pageB},
+		},
+		{
+			name:      "a page is judged by its own keywords before those of its entity",
+			candidate: withKeywords(page(pageC, "/trainers/", ptr("e-new")), "running shoes", "trainers"),
+			entity:    entityWith("e-new", "unique phrase", nil),
+			reasons:   []pagemap.Reason{pagemap.ReasonSamePrimaryKeyword, pagemap.ReasonSamePrimaryKeyword},
+			pages:     []string{pageA, pageB},
+		},
+		{
+			name:      "keywords of its own free a page from the keyword of its entity",
+			candidate: withKeywords(page(pageC, "/trainers/", ptr("e-new")), "light trainers"),
+			entity:    entityWith("e-new", "running shoes", nil),
 		},
 	}
 

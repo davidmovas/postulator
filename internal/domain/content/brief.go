@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/template"
 )
@@ -24,12 +25,20 @@ type BriefPhrase struct {
 	Why    string `json:"why"`
 }
 
+type BriefKeyword struct {
+	Rank     int    `json:"rank"`
+	Text     string `json:"text"`
+	Volume   *int   `json:"volume,omitempty"`
+	Required bool   `json:"required"`
+}
+
 type Brief struct {
 	Title          string         `json:"title"`
 	H1             string         `json:"h1"`
 	PlannedTitle   bool           `json:"plannedTitle"`
 	PlannedH1      bool           `json:"plannedH1"`
 	PrimaryKeyword string         `json:"primaryKeyword"`
+	Keywords       []BriefKeyword `json:"keywords"`
 	TitleRule      bool           `json:"titleRule"`
 	H1Rule         bool           `json:"h1Rule"`
 	LeadRule       bool           `json:"leadRule"`
@@ -38,11 +47,29 @@ type Brief struct {
 	Children       []string       `json:"children"`
 }
 
+func RequiredKeywords(keywords keyword.List, rules template.KeywordRules) keyword.List {
+	if rules.RequiredKeywords == nil || *rules.RequiredKeywords >= len(keywords) {
+		return keywords
+	}
+	return keywords[:max(*rules.RequiredKeywords, 0)]
+}
+
+func briefKeywords(keywords keyword.List, rules template.KeywordRules) []BriefKeyword {
+	required := len(RequiredKeywords(keywords, rules))
+	out := make([]BriefKeyword, 0, len(keywords))
+	for at, item := range keywords {
+		out = append(out, BriefKeyword{Rank: at + 1, Text: item.Text, Volume: item.Volume, Required: at < required})
+	}
+	return out
+}
+
 func NewBrief(spec template.TemplateSpec, rules template.LinkRules, page pagemap.Page, entity graph.Entity, lc LinkContext) Brief {
+	keywords := pagemap.Keywords(page, entity)
 	brief := Brief{
 		Title:          strings.TrimSpace(page.Title),
 		H1:             strings.TrimSpace(page.H1),
-		PrimaryKeyword: entity.Keywords.Main(),
+		PrimaryKeyword: keywords.Main(),
+		Keywords:       briefKeywords(keywords, spec.KeywordRules),
 		TitleRule:      spec.KeywordRules.PrimaryInTitle,
 		H1Rule:         spec.KeywordRules.PrimaryInH1,
 		LeadRule:       spec.KeywordRules.PrimaryInFirstParagraph,

@@ -45,6 +45,9 @@ func Validate(spec TemplateSpec) error {
 	if spec.KeywordRules.MaxDensity < 0 || spec.KeywordRules.MaxDensity > 1 {
 		return invalid("keyword density must be between 0 and 1", "keywordRules.maxDensity")
 	}
+	if spec.KeywordRules.RequiredKeywords != nil && *spec.KeywordRules.RequiredKeywords < 0 {
+		return invalid("the number of required keywords must not be negative", "keywordRules.requiredKeywords")
+	}
 	if err := ValidateLinkRules(spec.LinkRules); err != nil {
 		return err
 	}

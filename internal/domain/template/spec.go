@@ -95,6 +95,7 @@ type KeywordRules struct {
 	PrimaryInH1             bool    `json:"primaryInH1" description:"The primary keyword must appear in the first heading"`
 	PrimaryInFirstParagraph bool    `json:"primaryInFirstParagraph" description:"The primary keyword must appear in the opening paragraph"`
 	MaxDensity              float64 `json:"maxDensity" minimum:"0" maximum:"1" description:"The largest share of the words the primary keyword may take, between 0 and 1"`
+	RequiredKeywords        *int    `json:"requiredKeywords,omitempty" minimum:"0" description:"How many of the page's keywords, the most searched first, the body must use; left out, it must use every one"`
 }
 
 type LinkRules struct {

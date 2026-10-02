@@ -85,6 +85,7 @@ func TestValidateSpec(t *testing.T) {
 		{name: "negative min", mutate: func(s *template.TemplateSpec) { s.Length.Min = -1 }, field: "length.min"},
 		{name: "max below min", mutate: func(s *template.TemplateSpec) { s.Length.Max = 100 }, field: "length.max"},
 		{name: "density above one", mutate: func(s *template.TemplateSpec) { s.KeywordRules.MaxDensity = 1.5 }, field: "keywordRules.maxDensity"},
+		{name: "negative required keywords", mutate: func(s *template.TemplateSpec) { s.KeywordRules.RequiredKeywords = new(-1) }, field: "keywordRules.requiredKeywords"},
 		{name: "negative up depth", mutate: func(s *template.TemplateSpec) { s.LinkRules.UpDepth = -1 }, field: "linkRules.upDepth"},
 		{name: "sibling weight", mutate: func(s *template.TemplateSpec) { s.LinkRules.SiblingMinWeight = 2 }, field: "linkRules.siblingMinWeight"},
 		{name: "max links", mutate: func(s *template.TemplateSpec) { s.LinkRules.MaxLinks = -1 }, field: "linkRules.maxLinks"},

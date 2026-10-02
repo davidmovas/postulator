@@ -22,9 +22,14 @@ ENTITY
 Name: {{.Entity.Name}}
 Kind: {{.Entity.Kind}}
 {{if .Entity.Intent}}Search intent: {{.Entity.Intent}}{{end}}
-Primary keyword: {{.Entity.Keywords.Main}}
-{{if .Entity.Keywords.Rest}}Secondary keywords: {{range $index, $keyword := .Entity.Keywords.Rest}}{{if $index}}, {{end}}{{$keyword}}{{end}}{{end}}
+Primary keyword: {{.Brief.PrimaryKeyword}}
 
+KEYWORDS
+{{if .Brief.Keywords}}The searches this page is written for, the most important first, each with how often it is searched in a month where that is known:
+{{range .Brief.Keywords}}{{.Rank}}) {{.Text}}{{with .Volume}} ({{.}} a month){{end}}{{if not .Required}} (optional){{end}}
+{{end}}Use every keyword that is not marked optional at least once, word for word, in running body text. The higher a keyword stands, the earlier and the more prominently it appears. A keyword is never repeated to pad the text, and one marked optional is used only where it reads naturally.
+{{else}}none
+{{end}}
 KEYWORD RULES
 {{if .Brief.LeadRule}}The first paragraph of section 1 contains the primary keyword.
 {{end}}{{if .Spec.KeywordRules.MaxDensity}}Keep the primary keyword below {{.Spec.KeywordRules.MaxDensity}} of all words.

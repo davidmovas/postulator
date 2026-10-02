@@ -7,6 +7,7 @@ import (
 	port "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
@@ -42,6 +43,7 @@ type Meta struct {
 type metaPrompt struct {
 	Page      pagemap.Page
 	Entity    graph.Entity
+	Keywords  keyword.List
 	Spec      template.TemplateSpec
 	Draft     content.ContentDraft
 	SiteName  string
@@ -77,12 +79,13 @@ func GenerateMeta(deps Deps) run.StepDef {
 			}
 
 			canonical := pagemap.NewSite(owner.BaseURL).URL(sc.Page.Path)
+			keywords := pagemap.Keywords(sc.Page, entity)
 			system, user, err := render(NameGenerateMeta, metaPrompt{
-				Page: sc.Page, Entity: entity, Spec: sc.Spec, Draft: draft,
+				Page: sc.Page, Entity: entity, Keywords: keywords, Spec: sc.Spec, Draft: draft,
 				SiteName:  owner.Name,
 				Canonical: canonical,
 				Pattern: template.Expand(sc.Spec.MetaRules.TitlePattern, template.Vars{
-					PrimaryKeyword: entity.Keywords.Main(), EntityName: entity.Name, SiteName: owner.Name, PageTitle: sc.Page.Title,
+					PrimaryKeyword: keywords.Main(), EntityName: entity.Name, SiteName: owner.Name, PageTitle: sc.Page.Title,
 				}),
 			})
 			if err != nil {

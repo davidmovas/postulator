@@ -149,7 +149,7 @@ func (s *Service) ResolveForPage(ctx context.Context, req ResolveForPageRequest)
 }
 
 func (s *Service) varsFor(ctx context.Context, page pagemap.Page, owner site.Site) (template.Vars, error) {
-	vars := template.Vars{SiteName: owner.Name, PageTitle: page.Title}
+	vars := template.Vars{SiteName: owner.Name, PageTitle: page.Title, PrimaryKeyword: page.Keywords.Main()}
 	if page.EntityID == nil {
 		return vars, nil
 	}
@@ -160,7 +160,7 @@ func (s *Service) varsFor(ctx context.Context, page pagemap.Page, owner site.Sit
 	if err != nil {
 		return template.Vars{}, err
 	}
-	vars.PrimaryKeyword = entity.Keywords.Main()
+	vars.PrimaryKeyword = pagemap.Keywords(page, entity).Main()
 	vars.EntityName = entity.Name
 	return vars, nil
 }

@@ -373,6 +373,35 @@ func TestJudgeReadsThePageOnDemandWithoutASnippet(t *testing.T) {
 	}
 }
 
+func TestTheJudgeIsToldTheKeywordsThePageIsWrittenFor(t *testing.T) {
+	t.Parallel()
+
+	keyed := &llmStub{reply: `{"score":0.5}`}
+	service := newService(keyed, func(d *appcontent.Deps) {
+		own := pages()
+		own[1].Keywords = keyword.New([]keyword.Keyword{{Text: "moka pot"}, {Text: "espresso at home", Volume: new(800)}})
+		d.Pages = pageStub{items: own}
+	})
+	if _, err := service.Judge(t.Context(), appcontent.JudgeRequest{PageID: "page-child"}); err != nil {
+		t.Fatalf("Judge: %v", err)
+	}
+	for _, want := range []string{
+		"Primary keyword: espresso at home", "Keywords, the most searched first: espresso at home, moka pot",
+	} {
+		if !strings.Contains(keyed.last.Messages[0].Text, want) {
+			t.Errorf("the prompt lacks %q:\n%s", want, keyed.last.Messages[0].Text)
+		}
+	}
+
+	plain := &llmStub{reply: `{"score":0.5}`}
+	if _, err := newService(plain, nil).Judge(t.Context(), appcontent.JudgeRequest{PageID: "page-child"}); err != nil {
+		t.Fatalf("Judge: %v", err)
+	}
+	if !strings.Contains(plain.last.Messages[0].Text, "Primary keyword: espresso\n") {
+		t.Errorf("a page without keywords must be judged on those of its entity:\n%s", plain.last.Messages[0].Text)
+	}
+}
+
 func TestAssessRefusesAnUnreadableBody(t *testing.T) {
 	t.Parallel()
 
