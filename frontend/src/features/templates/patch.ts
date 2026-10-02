@@ -16,6 +16,7 @@ export const paths = {
     primaryInH1: ["keywordRules", "primaryInH1"],
     primaryInFirstParagraph: ["keywordRules", "primaryInFirstParagraph"],
     maxDensity: ["keywordRules", "maxDensity"],
+    requiredKeywords: ["keywordRules", "requiredKeywords"],
     upDepth: ["linkRules", "upDepth"],
     downLinks: ["linkRules", "downLinks"],
     siblingMinWeight: ["linkRules", "siblingMinWeight"],

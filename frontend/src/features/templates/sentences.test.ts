@@ -59,6 +59,23 @@ describe("sentencesOf", () => {
         expect(sentencesOf(draft, { length: { max: 900 } })).toStrictEqual(["caps the page at 900 words"]);
     });
 
+    it("says how many of a page's keywords the body must use", () => {
+        expect(sentencesOf(draft, { keywordRules: { requiredKeywords: 3 } })).toStrictEqual([
+            "requires the first 3 keywords of a page in its body",
+        ]);
+        expect(sentencesOf(draft, { keywordRules: { requiredKeywords: 1 } })).toStrictEqual([
+            "requires the first keyword of a page in its body",
+        ]);
+        expect(sentencesOf(draft, { keywordRules: { requiredKeywords: 0 } })).toStrictEqual([
+            "offers the keywords of a page to the writer and requires none",
+        ]);
+
+        const counted = draftFromJson({ ...base, keywordRules: { primaryInTitle: true, requiredKeywords: 2 } });
+        expect(sentencesOf(counted, { keywordRules: { requiredKeywords: null } })).toStrictEqual([
+            "requires every keyword of a page in its body",
+        ]);
+    });
+
     it("renders keyword and link rules as prose", () => {
         expect(
             sentencesOf(draft, { keywordRules: { maxDensity: 0.015 }, linkRules: { maxLinks: 8, downLinks: false } }),

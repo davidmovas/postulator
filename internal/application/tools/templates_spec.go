@@ -74,6 +74,7 @@ type keywordRulesArgs struct {
 	PrimaryInH1             bool    `json:"primaryInH1,omitempty" description:"The primary keyword must appear in the first heading"`
 	PrimaryInFirstParagraph bool    `json:"primaryInFirstParagraph,omitempty" description:"The primary keyword must appear in the opening paragraph"`
 	MaxDensity              float64 `json:"maxDensity,omitempty" minimum:"0" maximum:"1" description:"The largest share of the words the primary keyword may take, between 0 and 1; leave it out for no ceiling"`
+	RequiredKeywords        *int    `json:"requiredKeywords,omitempty" minimum:"0" description:"How many of the page's keywords the body must use, the most searched first; leave it out for all"`
 }
 
 func (a keywordRulesArgs) rules() template.KeywordRules {
@@ -82,6 +83,7 @@ func (a keywordRulesArgs) rules() template.KeywordRules {
 		PrimaryInH1:             a.PrimaryInH1,
 		PrimaryInFirstParagraph: a.PrimaryInFirstParagraph,
 		MaxDensity:              a.MaxDensity,
+		RequiredKeywords:        a.RequiredKeywords,
 	}
 }
 

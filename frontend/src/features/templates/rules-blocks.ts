@@ -95,6 +95,31 @@ export const ruleBlocks: readonly RuleBlock[] = [
                 write: (maxDensity) => ({ maxDensity }),
                 show: (draft) => percent(draft.maxDensity),
             },
+            {
+                kind: "switch",
+                key: "everyKeyword",
+                label: copy.templates.content.everyKeyword,
+                hint: copy.templates.content.everyKeywordHint,
+                field: "keywordRules.requiredKeywords",
+                path: paths.requiredKeywords,
+                read: (draft) => draft.requiredKeywords === null,
+                write: (every) => ({ requiredKeywords: every ? null : 0 }),
+            },
+            {
+                kind: "number",
+                key: "requiredKeywords",
+                label: copy.templates.content.requiredKeywords,
+                hint: copy.templates.content.requiredKeywordsHint,
+                field: "keywordRules.requiredKeywords",
+                path: paths.requiredKeywords,
+                min: 0,
+                read: (draft) => draft.requiredKeywords ?? 0,
+                write: (requiredKeywords) => ({ requiredKeywords }),
+                show: (draft) =>
+                    draft.requiredKeywords === null
+                        ? copy.templates.content.requiredKeywordsEvery
+                        : String(draft.requiredKeywords),
+            },
         ],
     },
     {

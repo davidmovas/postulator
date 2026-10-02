@@ -33,6 +33,7 @@ export interface SpecDraft {
     primaryInH1: boolean;
     primaryInFirstParagraph: boolean;
     maxDensity: number;
+    requiredKeywords: number | null;
     upDepth: number;
     downLinks: boolean;
     siblingMinWeight: number;
@@ -72,6 +73,11 @@ function text(parent: JsonObject | null, key: string): string {
 function count(parent: JsonObject | null, key: string): number {
     const held = parent === null ? undefined : parent[key];
     return typeof held === "number" && Number.isFinite(held) ? held : 0;
+}
+
+function countOrNone(parent: JsonObject | null, key: string): number | null {
+    const held = parent === null ? undefined : parent[key];
+    return typeof held === "number" && Number.isFinite(held) ? held : null;
 }
 
 function flag(parent: JsonObject | null, key: string): boolean {
@@ -159,6 +165,7 @@ export function draftFromJson(value: JsonValue): SpecDraft {
         primaryInH1: flag(keywords, "primaryInH1"),
         primaryInFirstParagraph: flag(keywords, "primaryInFirstParagraph"),
         maxDensity: count(keywords, "maxDensity"),
+        requiredKeywords: countOrNone(keywords, "requiredKeywords"),
         upDepth: count(links, "upDepth"),
         downLinks: flag(links, "downLinks"),
         siblingMinWeight: count(links, "siblingMinWeight"),
@@ -196,6 +203,15 @@ export function specJsonOf(draft: SpecDraft): JsonObject {
         }
         recipe.push(row);
     }
+    const keywordRules: JsonObject = {
+        primaryInTitle: draft.primaryInTitle,
+        primaryInH1: draft.primaryInH1,
+        primaryInFirstParagraph: draft.primaryInFirstParagraph,
+        maxDensity: draft.maxDensity,
+    };
+    if (draft.requiredKeywords !== null) {
+        keywordRules["requiredKeywords"] = draft.requiredKeywords;
+    }
     return {
         sections: draft.sections.map((section) => ({
             heading: section.heading,
@@ -206,12 +222,7 @@ export function specJsonOf(draft: SpecDraft): JsonObject {
         })),
         tone: draft.tone,
         length: { min: draft.lengthMin, max: draft.lengthMax },
-        keywordRules: {
-            primaryInTitle: draft.primaryInTitle,
-            primaryInH1: draft.primaryInH1,
-            primaryInFirstParagraph: draft.primaryInFirstParagraph,
-            maxDensity: draft.maxDensity,
-        },
+        keywordRules,
         linkRules: {
             upDepth: draft.upDepth,
             downLinks: draft.downLinks,

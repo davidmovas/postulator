@@ -42,6 +42,7 @@ function keywordSentences(after: SpecDraft, held: JsonValue | undefined): string
         "primaryInH1",
         "primaryInFirstParagraph",
         "maxDensity",
+        "requiredKeywords",
     ])) {
         if (key === "primaryInTitle") {
             out.push(said.primaryInTitle(after.primaryInTitle));
@@ -49,6 +50,8 @@ function keywordSentences(after: SpecDraft, held: JsonValue | undefined): string
             out.push(said.primaryInH1(after.primaryInH1));
         } else if (key === "primaryInFirstParagraph") {
             out.push(said.primaryInFirstParagraph(after.primaryInFirstParagraph));
+        } else if (key === "requiredKeywords") {
+            out.push(said.requiredKeywords(after.requiredKeywords));
         } else {
             out.push(said.maxDensity(percent(after.maxDensity)));
         }

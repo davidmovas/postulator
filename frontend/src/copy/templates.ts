@@ -230,6 +230,14 @@ export const templates = {
                 ? "requires the primary keyword in the first paragraph"
                 : "stops requiring the primary keyword in the first paragraph",
         maxDensity: (percent: string) => `caps keyword density at ${percent}`,
+        requiredKeywords: (count: number | null) =>
+            count === null
+                ? "requires every keyword of a page in its body"
+                : count === 0
+                  ? "offers the keywords of a page to the writer and requires none"
+                  : count === 1
+                    ? "requires the first keyword of a page in its body"
+                    : `requires the first ${count} keywords of a page in its body`,
         upDepth: (levels: number) =>
             levels === 0
                 ? "stops linking up to parent pages"
@@ -309,6 +317,11 @@ export const templates = {
         primaryInFirstParagraph: "In the first paragraph",
         maxDensity: "Highest density",
         maxDensityHint: "As a share of all words. 0.025 is 2.5%.",
+        everyKeyword: "Body uses every keyword",
+        everyKeywordHint: "A page's keywords are ordered by search volume. Switch this off to require only the first few.",
+        requiredKeywords: "Keywords the body must use",
+        requiredKeywordsHint: "Counted from the most searched. The rest are offered to the writer and not required.",
+        requiredKeywordsEvery: "every one",
     },
     links: {
         title: "Link rules",

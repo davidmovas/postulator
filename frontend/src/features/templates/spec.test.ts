@@ -57,6 +57,35 @@ describe("template spec drafts", () => {
         expect(draft.profiles).toStrictEqual([]);
     });
 
+    it("reads how many keywords the body must use, and every one when the spec does not say", () => {
+        expect(draftFromJson(hub).requiredKeywords).toBeNull();
+
+        const counted = { ...hub, keywordRules: { primaryInTitle: true, maxDensity: 0.025, requiredKeywords: 3 } };
+        expect(draftFromJson(counted).requiredKeywords).toBe(3);
+
+        const none = { ...hub, keywordRules: { primaryInTitle: true, maxDensity: 0.025, requiredKeywords: 0 } };
+        expect(draftFromJson(none).requiredKeywords).toBe(0);
+    });
+
+    it("writes the keyword count only when the template sets one", () => {
+        const every = specJsonOf(draftFromJson(hub));
+        expect(every["keywordRules"]).toStrictEqual({
+            primaryInTitle: true,
+            primaryInH1: true,
+            primaryInFirstParagraph: true,
+            maxDensity: 0.025,
+        });
+
+        const counted = specJsonOf({ ...draftFromJson(hub), requiredKeywords: 2 });
+        expect(counted["keywordRules"]).toStrictEqual({
+            primaryInTitle: true,
+            primaryInH1: true,
+            primaryInFirstParagraph: true,
+            maxDensity: 0.025,
+            requiredKeywords: 2,
+        });
+    });
+
     it("lists the recipe in pipeline order with the declared steps switched on", () => {
         const draft = draftFromJson(hub);
         expect(draft.recipe.map((step) => step.name)).toStrictEqual([...stepNames]);

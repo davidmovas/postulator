@@ -3,6 +3,7 @@ package tools_test
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/importer"
@@ -255,6 +256,47 @@ const minimalSpec = `{"sections":[{"heading":"Overview","intent":"what it is","t
 	`"parentLinkWithinParagraphs":2,"childrenSection":false},` +
 	`"metaRules":{"titlePattern":"{primaryKeyword}","descriptionMax":155},` +
 	`"images":{"featured":false,"inline":0,"source":"ai"}}`
+
+func TestATemplateToolSaysHowManyKeywordsThePageMustUse(t *testing.T) {
+	t.Parallel()
+
+	registry, binding, _ := wired(t)
+	binding.Mode = domainagent.ModeAutonomous
+
+	cases := []struct {
+		name string
+		rule string
+		want string
+	}{
+		{name: "the first three", rule: `,"requiredKeywords":3`, want: `"requiredKeywords":3`},
+		{name: "none of them", rule: `,"requiredKeywords":0`, want: `"requiredKeywords":0`},
+		{name: "every one when the tool does not say", rule: ``, want: ``},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := strings.Replace(minimalSpec, `"maxDensity":0.02}`, `"maxDensity":0.02`+tc.rule+`}`, 1)
+			out, err := registry.Call(t.Context(), binding, "templates_create",
+				json.RawMessage(`{"name":"Keyed `+tc.name+`","pageKind":"guide","spec":`+spec+`}`))
+			if err != nil {
+				t.Fatalf("templates_create: %v", err)
+			}
+			encoded, err := json.Marshal(out)
+			if err != nil {
+				t.Fatalf("encode the answer: %v", err)
+			}
+			if tc.want == "" {
+				if strings.Contains(string(encoded), "requiredKeywords") {
+					t.Fatalf("the template carries a keyword count nobody set: %s", encoded)
+				}
+				return
+			}
+			if !strings.Contains(string(encoded), tc.want) {
+				t.Fatalf("the template lost %s: %s", tc.want, encoded)
+			}
+		})
+	}
+}
 
 func argumentsFor(name string) json.RawMessage {
 	switch name {
