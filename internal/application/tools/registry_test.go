@@ -165,7 +165,7 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 }
 
 const (
-	schemaCeilingBytes = 80100
+	schemaCeilingBytes = 80600
 	charactersPerToken = 4
 )
 

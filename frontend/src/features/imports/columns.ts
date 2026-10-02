@@ -40,12 +40,30 @@ export function unmappedHeaders(headers: readonly string[], columns: ColumnMap |
     return headers.filter((header) => header !== "" && targetOf(columns, header) === null);
 }
 
-export function usable(columns: ColumnMap | null, indentColumns: readonly string[] = []): boolean {
-    if (indentColumns.length > 0) {
+export function usable(
+    columns: ColumnMap | null,
+    indentColumns: readonly string[] = [],
+    levelColumns: readonly string[] = [],
+): boolean {
+    if (indentColumns.length > 0 || levelColumns.length > 0) {
         return true;
     }
     const mapped = mappedFields(columns);
     return mapped.includes("path") || mapped.includes("entity");
+}
+
+export function freeHeaders(headers: readonly string[], columns: ColumnMap | null, elsewhere: readonly string[]): string[] {
+    return unmappedHeaders(headers, columns).filter((header) => !elsewhere.includes(header));
+}
+
+export function toggled(chosen: readonly string[], header: string, headers: readonly string[]): string[] {
+    const held = new Set(chosen);
+    if (held.has(header)) {
+        held.delete(header);
+    } else {
+        held.add(header);
+    }
+    return headers.filter((each) => held.has(each));
 }
 
 export function takenFrom(columns: ColumnMap | null, detected: ColumnMap | null, header: string): boolean {

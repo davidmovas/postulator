@@ -56,7 +56,8 @@ export const imports = {
         detected: "Matched automatically",
         unmapped: (count: number) =>
             count === 1 ? "1 column has no target and will be ignored." : `${count} columns have no target and will be ignored.`,
-        needsTarget: "Map a column to Path or to Entity, or tick the columns that carry the hierarchy, before going on.",
+        needsTarget:
+            "Map a column to Path or to Entity, or tick the columns that carry the hierarchy or name the groups, before going on.",
         options: "Reading options",
         sheets: "Sheets",
         sheetsHint: "Sheets that do not carry the same columns have to be imported one at a time.",
@@ -72,8 +73,16 @@ export const imports = {
         unnamed: (letter: string) => `Column ${letter}`,
         indentHint:
             "Tick the columns whose position carries the hierarchy, left to right. A row's path is its own cell prefixed by the columns to its left.",
+        levels: "Group columns",
+        levelsHint:
+            "Tick the columns that name the groups a row sits in, such as Root Entity, Category and Subcategory, outermost first. Rows that repeat the same names belong to the same group.",
+        notes: "Notes for the writer",
+        notesHint:
+            "Tick the columns to keep on each page as notes, such as Notes or Intent Owner. The writer reads them as context and an export writes them back.",
+        noFreeColumns: "Every column is already read as a field.",
         pathPrefixStrip: "Strip from the start of every path",
-        keywordSeparator: "Keywords separated by",
+        keywordsFormat:
+            "Keywords sit in one cell, separated by commas, each with its monthly searches in brackets when known: bpc 157 (12000), buy bpc 157 (5,400), bpc-157. The most searched keyword leads.",
         anchorSeparator: "Anchors separated by",
         listSeparator: "Other lists separated by",
         empty: "The sheet has no readable header row.",
@@ -150,6 +159,7 @@ export const imports = {
         meta_title: "Meta title",
         meta_description: "Meta description",
         wp_type: "WordPress type",
+        own_entity: "Is an entity (yes or no)",
     },
     findings: {
         bad_path: "The path cannot be used",
@@ -165,6 +175,7 @@ export const imports = {
         unknown_page_kind: "The page kind is not one Postulator knows",
         unknown_wp_type: "The WordPress type is not one Postulator knows",
         root_page_skipped: "The root of the site already exists on WordPress, so the import leaves it alone",
+        bad_volume: "A search volume in the keywords cannot be read, so that keyword was kept without one",
     },
     actions: {
         create: "new",

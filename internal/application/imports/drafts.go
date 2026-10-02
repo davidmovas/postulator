@@ -3,6 +3,8 @@ package imports
 import (
 	"slices"
 	"strings"
+
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 )
 
 func key(name string) string {
@@ -38,8 +40,7 @@ func fill(current, next string) string {
 type entityDraft struct {
 	name     string
 	kind     string
-	primary  string
-	keywords []string
+	keywords keyword.List
 	anchors  []string
 	parent   string
 	related  []string
@@ -55,8 +56,7 @@ type pageDraft struct {
 	wpType    string
 	pageKind  string
 	entity    string
-	primary   string
-	keywords  []string
+	keywords  keyword.List
 	generated bool
 	row       int
 }
@@ -103,9 +103,8 @@ func (d *drafts) sortedPaths() []string {
 
 func (e *entityDraft) merge(other entityDraft) {
 	e.kind = fill(e.kind, other.kind)
-	e.primary = fill(e.primary, other.primary)
 	e.parent = fill(e.parent, other.parent)
-	e.keywords = union(e.keywords, other.keywords)
+	e.keywords = e.keywords.Merge(other.keywords)
 	e.anchors = union(e.anchors, other.anchors)
 	e.related = union(e.related, other.related)
 }
@@ -118,6 +117,5 @@ func (p *pageDraft) merge(other pageDraft) {
 	p.wpType = fill(p.wpType, other.wpType)
 	p.pageKind = fill(p.pageKind, other.pageKind)
 	p.entity = fill(p.entity, other.entity)
-	p.primary = fill(p.primary, other.primary)
-	p.keywords = union(p.keywords, other.keywords)
+	p.keywords = p.keywords.Merge(other.keywords)
 }

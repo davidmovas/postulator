@@ -377,6 +377,47 @@ func TestPreviewFallsBackOnUnknownVocabulary(t *testing.T) {
 	}
 }
 
+func TestPreviewReadsTheEntityLevelsTheClientWrites(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		cell string
+		want string
+	}{
+		{cell: "Category", want: "category"},
+		{cell: "Commercial Taxonomy", want: "category"},
+		{cell: "Compound/Product", want: "product"},
+		{cell: "compound", want: "product"},
+		{cell: "Product Owner", want: "product"},
+		{cell: "GEO", want: "custom"},
+		{cell: "Geographic Entity", want: "custom"},
+		{cell: "Root", want: "hub"},
+		{cell: "Pillar", want: "hub"},
+		{cell: "hub", want: "hub"},
+		{cell: "Topic", want: "topic"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.cell, func(t *testing.T) {
+			t.Parallel()
+
+			h := newHarness(t)
+			report := h.preview(t, h.file(t, "levels.csv", "url,entity name,entity level\n/a/,Alpha,"+tc.cell+"\n"),
+				h.mapping(map[string]string{
+					string(importmap.FieldPath):       "url",
+					string(importmap.FieldEntity):     "entity name",
+					string(importmap.FieldEntityKind): "entity level",
+				}))
+			if alpha, _ := entity(report, "Alpha"); alpha.Kind != tc.want {
+				t.Fatalf("kind = %q, want %q", alpha.Kind, tc.want)
+			}
+			if len(findings(report.Warnings, imports.CodeUnknownEntityKind)) != 0 {
+				t.Fatalf("a level the client writes is reported unknown: %+v", report.Warnings)
+			}
+		})
+	}
+}
+
 func TestPreviewRefusesAMappingTheFileDoesNotCarry(t *testing.T) {
 	t.Parallel()
 
@@ -410,6 +451,7 @@ func TestTheFindingCodesDeclareWhichOnesBlockAnApply(t *testing.T) {
 		{code: imports.CodeUnknownEntityKind, blocking: false},
 		{code: imports.CodeUnknownPageKind, blocking: false},
 		{code: imports.CodeUnknownWPType, blocking: false},
+		{code: imports.CodeBadVolume, blocking: false},
 		{code: imports.FindingCode("invented"), blocking: false},
 	}
 

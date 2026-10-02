@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/importmap"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -55,6 +56,19 @@ func TestNewMappingRejectsWhatCannotBeImported(t *testing.T) {
 				m.Columns = map[importmap.Field]string{importmap.FieldTitle: "Title"}
 			},
 		},
+		{name: "a blank level column", change: func(m *importmap.Mapping) { m.Options.LevelColumns = []string{"Category", " "} }},
+		{name: "a blank note column", change: func(m *importmap.Mapping) { m.Options.NoteColumns = []string{""} }},
+		{
+			name:   "a level column that is also a field",
+			change: func(m *importmap.Mapping) { m.Options.LevelColumns = []string{"Title"} },
+		},
+		{
+			name: "a note column that is also a level",
+			change: func(m *importmap.Mapping) {
+				m.Options.LevelColumns = []string{"Category"}
+				m.Options.NoteColumns = []string{"category"}
+			},
+		},
 	}
 
 	for _, tc := range cases {
@@ -65,6 +79,118 @@ func TestNewMappingRejectsWhatCannotBeImported(t *testing.T) {
 			tc.change(&broken)
 			if _, err := importmap.NewMapping(broken); !errors.IsCode(err, errors.Invalid) {
 				t.Fatalf("NewMapping = %v, want an invalid error", err)
+			}
+		})
+	}
+}
+
+func TestNewMappingTakesLevelColumnsInPlaceOfAPath(t *testing.T) {
+	t.Parallel()
+
+	ready, err := importmap.NewMapping(importmap.Mapping{
+		ID: "m1", SiteID: "s1", Name: "groups",
+		Columns: map[importmap.Field]string{importmap.FieldTitle: "Title"},
+		Options: importmap.Options{LevelColumns: []string{" Category ", "Subcategory"}, NoteColumns: []string{"Notes "}},
+	})
+	if err != nil {
+		t.Fatalf("NewMapping: %v", err)
+	}
+	if !slices.Equal(ready.Options.LevelColumns, []string{"Category", "Subcategory"}) ||
+		!slices.Equal(ready.Options.NoteColumns, []string{"Notes"}) {
+		t.Fatalf("options = %+v, want the columns trimmed", ready.Options)
+	}
+}
+
+func TestBindPrefersTheHeaderExactlyAsWritten(t *testing.T) {
+	t.Parallel()
+
+	m := importmap.Mapping{Columns: map[importmap.Field]string{
+		importmap.FieldPath: "URL", importmap.FieldOwnEntity: "Entity?", importmap.FieldEntity: "entity",
+	}}
+	binding, err := m.Bind([]string{"Entity", "URL", "Entity?"})
+	if err != nil {
+		t.Fatalf("Bind: %v", err)
+	}
+	row := []string{"Liquid", "/bpc-157/liquid/", "NO"}
+	if got := binding.Text(row, importmap.FieldOwnEntity); got != "NO" {
+		t.Fatalf("own entity = %q, want the cell of the column named Entity?", got)
+	}
+	if got := binding.Text(row, importmap.FieldEntity); got != "Liquid" {
+		t.Fatalf("entity = %q, want the cell of the column named Entity", got)
+	}
+}
+
+func TestBindReadsTheLevelsAndTheNotesOfARow(t *testing.T) {
+	t.Parallel()
+
+	m := importmap.Mapping{
+		Columns: map[importmap.Field]string{importmap.FieldPath: "URL"},
+		Options: importmap.Options{
+			LevelColumns: []string{"Root Entity", "Category", "Subcategory"},
+			NoteColumns:  []string{"Intent Owner", "Notes"},
+		},
+	}
+	binding, err := m.Bind([]string{"Root Entity", "Category", "Subcategory", "URL", "Intent Owner", "Notes"})
+	if err != nil {
+		t.Fatalf("Bind: %v", err)
+	}
+
+	cases := []struct {
+		name   string
+		row    []string
+		levels []string
+		notes  []pagemap.Note
+	}{
+		{
+			name:   "every level and note filled",
+			row:    []string{"Peptides", " BPC-157 ", "Liquid", "/bpc-157/liquid/", "Commercial", "Sold as a 10 ml vial"},
+			levels: []string{"Peptides", "BPC-157", "Liquid"},
+			notes:  []pagemap.Note{{Label: "Intent Owner", Text: "Commercial"}, {Label: "Notes", Text: "Sold as a 10 ml vial"}},
+		},
+		{
+			name:   "a placeholder is an empty level",
+			row:    []string{"Peptides", "BPC-157", "—", "/bpc-157/"},
+			levels: []string{"Peptides", "BPC-157", ""},
+			notes:  []pagemap.Note{},
+		},
+		{
+			name:   "every placeholder the sheets carry",
+			row:    []string{"-", "N/A", "none", "/about/", " ", ""},
+			levels: []string{"", "", ""},
+			notes:  []pagemap.Note{},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := binding.Levels(tc.row); !slices.Equal(got, tc.levels) {
+				t.Errorf("Levels = %q, want %q", got, tc.levels)
+			}
+			if got := binding.Notes(tc.row); !reflect.DeepEqual(got, tc.notes) {
+				t.Errorf("Notes = %+v, want %+v", got, tc.notes)
+			}
+		})
+	}
+	if binding.Blank([]string{"Peptides", "", "", "", "", ""}) {
+		t.Fatal("a row that names only a level is reported blank")
+	}
+}
+
+func TestBindRejectsALevelOrNoteColumnTheFileDoesNotCarry(t *testing.T) {
+	t.Parallel()
+
+	for name, options := range map[string]importmap.Options{
+		"a level": {LevelColumns: []string{"Category"}},
+		"a note":  {NoteColumns: []string{"Notes"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			m := importmap.Mapping{Columns: map[importmap.Field]string{importmap.FieldPath: "URL"}, Options: options}
+			if _, err := m.Bind([]string{"URL"}); !errors.IsCode(err, errors.Invalid) {
+				t.Fatalf("Bind = %v, want an invalid error", err)
 			}
 		})
 	}

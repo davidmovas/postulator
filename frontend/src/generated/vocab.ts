@@ -199,6 +199,7 @@ export const importFields = [
     "meta_title",
     "meta_description",
     "wp_type",
+    "own_entity",
 ] as const;
 export type ImportField = (typeof importFields)[number];
 
@@ -216,6 +217,7 @@ export const importFindingCodes = [
     "unknown_page_kind",
     "unknown_wp_type",
     "root_page_skipped",
+    "bad_volume",
 ] as const;
 export type ImportFindingCode = (typeof importFindingCodes)[number];
 

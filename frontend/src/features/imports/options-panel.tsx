@@ -6,7 +6,7 @@ import { fieldErrorOf, formErrorOf } from "../../data/errors.js";
 import { useSaveMapping } from "../../data/hooks/imports.js";
 import type { ImportMapping, ImportOptions, ImportSheet } from "../../data/types.js";
 import { Banner, Button, Field, Input, Panel, PanelHeader, Switch } from "../../ui/index.js";
-import { usable } from "./columns.js";
+import { freeHeaders, toggled, usable } from "./columns.js";
 
 function letterOf(at: number): string {
     let name = "";
@@ -18,13 +18,49 @@ function letterOf(at: number): string {
     return name;
 }
 
-type SeparatorKey = "keywordSeparator" | "anchorSeparator" | "listSeparator";
+type SeparatorKey = "anchorSeparator" | "listSeparator";
 
 const separators: readonly [SeparatorKey, string, string][] = [
-    ["keywordSeparator", copy.imports.columns.keywordSeparator, ","],
     ["anchorSeparator", copy.imports.columns.anchorSeparator, "|"],
     ["listSeparator", copy.imports.columns.listSeparator, ","],
 ];
+
+interface ColumnChecklistProps {
+    title: string;
+    hint: string;
+    choices: readonly string[];
+    chosen: readonly string[];
+    onToggle: (header: string) => void;
+}
+
+function ColumnChecklist({ title, hint, choices, chosen, onToggle }: ColumnChecklistProps): ReactElement {
+    return (
+        <Panel>
+            <PanelHeader title={title} />
+            <div className="flex flex-col gap-2 p-3">
+                <p className="text-2xs text-ink-faint">{hint}</p>
+                {choices.length === 0 ? (
+                    <p className="text-2xs text-ink-dim">{copy.imports.columns.noFreeColumns}</p>
+                ) : (
+                    <ul className="flex flex-col">
+                        {choices.map((header) => (
+                            <li key={header} className="flex h-7 items-center">
+                                <Switch
+                                    className="w-full"
+                                    label={header}
+                                    checked={chosen.includes(header)}
+                                    onChange={() => {
+                                        onToggle(header);
+                                    }}
+                                />
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+        </Panel>
+    );
+}
 
 export interface OptionsPanelProps {
     siteId: string;
@@ -67,14 +103,10 @@ export function OptionsPanel({
     const reading = chosenSheets.length > 0 ? chosenSheets : sheets.slice(0, 1).map((each) => each.name);
     const indent = options.indentColumns ?? [];
     const toggleIndent = (column: string): void => {
-        const held = new Set(indent);
-        if (held.has(column)) {
-            held.delete(column);
-        } else {
-            held.add(column);
-        }
-        onOptions({ ...options, indentColumns: headers.filter((each) => held.has(each)) });
+        onOptions({ ...options, indentColumns: toggled(indent, column, headers) });
     };
+    const levels = options.levelColumns ?? [];
+    const notes = options.noteColumns ?? [];
 
     return (
         <div className="flex flex-col gap-3 p-3">
@@ -112,7 +144,13 @@ export function OptionsPanel({
                         title={copy.imports.columns.noHeaderHint}
                         checked={options.noHeader === true}
                         onChange={(event) => {
-                            onOptions({ ...options, noHeader: event.target.checked, indentColumns: [] });
+                            onOptions({
+                                ...options,
+                                noHeader: event.target.checked,
+                                indentColumns: [],
+                                levelColumns: [],
+                                noteColumns: [],
+                            });
                         }}
                     />
                     <p className="text-2xs text-ink-faint">{copy.imports.columns.indentHint}</p>
@@ -132,9 +170,28 @@ export function OptionsPanel({
                     </ul>
                 </div>
             </Panel>
+            <ColumnChecklist
+                title={copy.imports.columns.levels}
+                hint={copy.imports.columns.levelsHint}
+                choices={freeHeaders(headers, mapping.columns, notes)}
+                chosen={levels}
+                onToggle={(header) => {
+                    onOptions({ ...options, levelColumns: toggled(levels, header, headers) });
+                }}
+            />
+            <ColumnChecklist
+                title={copy.imports.columns.notes}
+                hint={copy.imports.columns.notesHint}
+                choices={freeHeaders(headers, mapping.columns, levels)}
+                chosen={notes}
+                onToggle={(header) => {
+                    onOptions({ ...options, noteColumns: toggled(notes, header, headers) });
+                }}
+            />
             <Panel>
                 <PanelHeader title={copy.imports.columns.options} />
                 <div className="flex flex-col gap-3 p-3">
+                    <p className="text-2xs text-ink-faint">{copy.imports.columns.keywordsFormat}</p>
                     <Field label={copy.imports.columns.pathPrefixStrip}>
                         {(control) => (
                             <Input
@@ -189,7 +246,7 @@ export function OptionsPanel({
                         variant="secondary"
                         data-mapping-save={true}
                         busy={save.isPending}
-                        disabled={name.trim() === "" || !usable(mapping.columns, indent)}
+                        disabled={name.trim() === "" || !usable(mapping.columns, indent, levels)}
                         onClick={() => {
                             save.mutate(
                                 { mapping: { ...mapping, name: name.trim(), siteId } },

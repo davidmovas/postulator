@@ -3,7 +3,7 @@ package tools
 import "github.com/davidmovas/postulator/internal/application/imports"
 
 type columnArgs struct {
-	Field  string `json:"field" enum:"path,title,h1,primary_keyword,keywords,anchors,entity,entity_kind,parent_entity,related,page_kind,meta_title,meta_description,wp_type" description:"The page field this column fills"`
+	Field  string `json:"field" enum:"path,title,h1,primary_keyword,keywords,anchors,entity,entity_kind,parent_entity,related,page_kind,meta_title,meta_description,wp_type,own_entity" description:"The page field this column fills"`
 	Column string `json:"column" description:"The spreadsheet header the field is read from"`
 }
 

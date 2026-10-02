@@ -41,7 +41,6 @@ func richMapping(h harness) imports.Mapping {
 		string(importmap.FieldMetaDescription): "meta description",
 		string(importmap.FieldWPType):          "post type",
 	})
-	mapping.Options.KeywordSeparator = "|"
 	return mapping
 }
 
@@ -155,8 +154,11 @@ func TestExportAndImportRoundTripTheWholeSite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Inspect the export: %v", err)
 	}
-	if len(detected.Detected.Columns) != len(importmap.Fields()) {
-		t.Fatalf("the export is not fully auto-detected: %+v", detected.Detected.Columns)
+	if len(detected.Detected.Columns) != len(detected.Headers) {
+		t.Fatalf("the export is not fully auto-detected: %+v from %v", detected.Detected.Columns, detected.Headers)
+	}
+	if _, primary := detected.Detected.Columns[string(importmap.FieldPrimaryKeyword)]; primary {
+		t.Fatalf("the export writes the keywords in two columns: %v", detected.Headers)
 	}
 
 	applied := target.apply(t, exported, detected.Detected)
@@ -176,6 +178,43 @@ func TestExportAndImportRoundTripTheWholeSite(t *testing.T) {
 	}
 	if !slices.Equal(before.pages, after.pages) {
 		t.Fatalf("pages\n before %v\n after  %v", before.pages, after.pages)
+	}
+}
+
+func TestExportWritesTheKeywordsWithTheirVolumesInOneColumn(t *testing.T) {
+	t.Parallel()
+
+	source := newHarness(t)
+	mapping := source.mapping(map[string]string{
+		string(importmap.FieldPath): "url", string(importmap.FieldTitle): "title", string(importmap.FieldKeywords): "keywords",
+	})
+	source.apply(t, source.file(t, "volumes.csv",
+		"url,title,keywords\n/bpc-157/,BPC-157,\"bpc 157 (12000), buy bpc 157 (5,400), bpc-157\"\n"), mapping)
+
+	exported := filepath.Join(source.dir, "export.xlsx")
+	if _, err := source.service.Export(t.Context(), imports.ExportRequest{SiteID: source.siteID, Path: exported}); err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+	table, err := importer.Read(t.Context(), exported, importer.ReadOptions{})
+	if err != nil {
+		t.Fatalf("Read the export: %v", err)
+	}
+	binding, err := importmap.AutoDetect(table.Headers).Bind(table.Headers)
+	if err != nil {
+		t.Fatalf("Bind: %v", err)
+	}
+	if got := binding.Text(table.Rows[0], importmap.FieldKeywords); got != "bpc 157 (12000), buy bpc 157 (5400), bpc-157" {
+		t.Fatalf("the keywords cell = %q", got)
+	}
+
+	target := newHarness(t)
+	detected, err := target.service.Inspect(t.Context(), imports.InspectRequest{SiteID: target.siteID, Path: exported})
+	if err != nil {
+		t.Fatalf("Inspect: %v", err)
+	}
+	target.apply(t, exported, detected.Detected)
+	if before, after := source.pages(t)[0].Keywords, target.pages(t)[0].Keywords; !after.Equal(before) {
+		t.Fatalf("keywords after the round trip = %+v, want %+v", after, before)
 	}
 }
 
@@ -337,8 +376,8 @@ func TestExportWritesTheFormatItIsAsked(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Inspect what was written: %v", err)
 			}
-			if len(detected.Detected.Columns) != len(importmap.Fields()) {
-				t.Fatalf("the export is not fully auto-detected: %+v", detected.Detected.Columns)
+			if len(detected.Detected.Columns) != len(detected.Headers) {
+				t.Fatalf("the export is not fully auto-detected: %+v from %v", detected.Detected.Columns, detected.Headers)
 			}
 		})
 	}

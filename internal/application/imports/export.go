@@ -116,8 +116,18 @@ func refOf(ref *string) string {
 	return *ref
 }
 
+func exportedFields() []importmap.Field {
+	out := make([]importmap.Field, 0, len(importmap.Fields()))
+	for _, field := range importmap.Fields() {
+		if field != importmap.FieldPrimaryKeyword && field != importmap.FieldOwnEntity {
+			out = append(out, field)
+		}
+	}
+	return out
+}
+
 func headers() []string {
-	fields := importmap.Fields()
+	fields := exportedFields()
 	out := make([]string, 0, len(fields))
 	for _, field := range fields {
 		out = append(out, string(field))
@@ -135,16 +145,12 @@ func row(page *pagemap.Page, entity *graph.Entity, pageKind string, g graph.Grap
 		cells[importmap.FieldMetaDescription] = page.MetaDescription
 		cells[importmap.FieldWPType] = string(page.WPType)
 		cells[importmap.FieldPageKind] = pageKind
-		cells[importmap.FieldPrimaryKeyword] = page.Keywords.Main()
-		cells[importmap.FieldKeywords] = options.Join(importmap.FieldKeywords, page.Keywords.Rest())
+		cells[importmap.FieldKeywords] = page.Keywords.Cell()
 	}
 	if entity.ID != "" {
 		cells[importmap.FieldEntity] = entity.Name
 		cells[importmap.FieldEntityKind] = string(entity.Kind)
-		cells[importmap.FieldPrimaryKeyword] = fill(cells[importmap.FieldPrimaryKeyword], entity.Keywords.Main())
-		if cells[importmap.FieldKeywords] == "" {
-			cells[importmap.FieldKeywords] = options.Join(importmap.FieldKeywords, entity.Keywords.Rest())
-		}
+		cells[importmap.FieldKeywords] = fill(cells[importmap.FieldKeywords], entity.Keywords.Cell())
 		cells[importmap.FieldAnchors] = options.Join(importmap.FieldAnchors, anchorTexts(entity.Anchors))
 		if parents := g.Parents(entity.ID, 1); len(parents) > 0 {
 			cells[importmap.FieldParentEntity] = parents[0].Name
@@ -152,7 +158,7 @@ func row(page *pagemap.Page, entity *graph.Entity, pageKind string, g graph.Grap
 		cells[importmap.FieldRelated] = options.Join(importmap.FieldRelated, relatedNames(g, entity.ID))
 	}
 
-	fields := importmap.Fields()
+	fields := exportedFields()
 	out := make([]string, 0, len(fields))
 	for _, field := range fields {
 		out = append(out, cells[field])

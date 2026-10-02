@@ -148,6 +148,7 @@ export function ImportScreen(): ReactElement {
                     columns={flow.columns}
                     detected={flow.detected}
                     indentColumns={flow.options.indentColumns ?? []}
+                    levelColumns={flow.options.levelColumns ?? []}
                     onAssign={(header: string, field: ImportField | null) => {
                         flow.setColumns(assign(flow.columns, header, field));
                     }}

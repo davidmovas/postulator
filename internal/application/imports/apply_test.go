@@ -204,10 +204,12 @@ func TestApplySavesTheMappingWhenAsked(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
+	mapping := graphMapping(h)
+	mapping.Options.AnchorSeparator = ";"
 	_, err := h.service.Apply(t.Context(), imports.ApplyRequest{
 		SiteID:  h.siteID,
 		Path:    h.file(t, "graph.csv", graphSheet),
-		Mapping: graphMapping(h),
+		Mapping: mapping,
 		Options: imports.ApplyOptions{SaveMappingAs: "the client sheet"},
 	})
 	if err != nil {
@@ -221,7 +223,7 @@ func TestApplySavesTheMappingWhenAsked(t *testing.T) {
 	if len(listed.Mappings) != 1 || listed.Mappings[0].Name != "the client sheet" {
 		t.Fatalf("mappings = %+v", listed.Mappings)
 	}
-	if listed.Mappings[0].Options.KeywordSeparator != ";" {
+	if listed.Mappings[0].Options.AnchorSeparator != ";" {
 		t.Fatalf("options = %+v", listed.Mappings[0].Options)
 	}
 }
@@ -369,7 +371,7 @@ func TestApplyKeepsTheKeywordsOfARowOnItsPage(t *testing.T) {
 
 	h := newHarness(t)
 	sheet := "path,title,primary keyword,keywords\n" +
-		"/shoes/trail/,Trail shoes,trail running shoes,trail shoes;best trail shoes\n" +
+		"/shoes/trail/,Trail shoes,trail running shoes,\"trail shoes (900); best trail shoes (2,400), trail footwear (12x)\"\n" +
 		"/shoes/road/,Road shoes,,\n"
 	mapping := h.mapping(map[string]string{
 		string(importmap.FieldPath):           "path",
@@ -377,40 +379,59 @@ func TestApplyKeepsTheKeywordsOfARowOnItsPage(t *testing.T) {
 		string(importmap.FieldPrimaryKeyword): "primary keyword",
 		string(importmap.FieldKeywords):       "keywords",
 	})
-	mapping.Options.KeywordSeparator = ";"
 
 	report := h.preview(t, h.file(t, "keywords.csv", sheet), mapping)
 	previewed, ok := page(report, "/shoes/trail/")
-	if !ok || len(previewed.Keywords) != 3 || previewed.Keywords[0].Text != "trail running shoes" {
-		t.Fatalf("the preview drops the keywords of the row: %+v", previewed)
+	if !ok || len(previewed.Keywords) != 4 || previewed.Keywords[0].Text != "best trail shoes" ||
+		previewed.Keywords[0].Volume == nil || *previewed.Keywords[0].Volume != 2400 {
+		t.Fatalf("the preview drops the keywords of the row or their order: %+v", previewed)
+	}
+	if !hasFinding(report.Warnings, imports.CodeBadVolume) {
+		t.Fatalf("a volume that cannot be read is not reported: %+v", report.Warnings)
+	}
+	if len(report.Errors) != 0 {
+		t.Fatalf("a volume that cannot be read blocks the import: %+v", report.Errors)
 	}
 
 	h.apply(t, h.file(t, "keywords.csv", sheet), mapping)
 
-	byPath := make(map[string]pagemap.Page)
-	for _, stored := range h.pages(t) {
-		byPath[stored.Path] = stored
+	pathOf := func() map[string]pagemap.Page {
+		byPath := make(map[string]pagemap.Page)
+		for _, stored := range h.pages(t) {
+			byPath[stored.Path] = stored
+		}
+		return byPath
 	}
-	trail := byPath["/shoes/trail/"]
-	if !slices.Equal(trail.Keywords.Texts(), []string{"trail running shoes", "trail shoes", "best trail shoes"}) {
-		t.Fatalf("the page lost the keywords of its row: %+v", trail)
+	trail := pathOf()["/shoes/trail/"]
+	if want := []string{"best trail shoes", "trail shoes", "trail running shoes", "trail footwear"}; !slices.Equal(trail.Keywords.Texts(), want) {
+		t.Fatalf("keywords = %v, want %v", trail.Keywords.Texts(), want)
 	}
-	if road := byPath["/shoes/road/"]; len(road.Keywords) != 0 {
+	if road := pathOf()["/shoes/road/"]; len(road.Keywords) != 0 {
 		t.Fatalf("a row without keywords gave its page some: %+v", road)
 	}
 	if len(h.entities(t)) != 0 {
 		t.Fatal("a row that names no entity created one")
 	}
 
-	again := "path,title,primary keyword,keywords\n/shoes/trail/,Trail shoes,,trail footwear\n"
+	again := "path,title,primary keyword,keywords\n/shoes/trail/,Trail shoes,,\"trail shoes (3000), trail boots\"\n"
 	h.apply(t, h.file(t, "again.csv", again), mapping)
-	trail = h.pages(t)[0]
-	for _, stored := range h.pages(t) {
-		if stored.Path == "/shoes/trail/" {
-			trail = stored
+	trail = pathOf()["/shoes/trail/"]
+	if want := []string{"trail shoes", "best trail shoes", "trail running shoes", "trail footwear", "trail boots"}; !slices.Equal(trail.Keywords.Texts(), want) {
+		t.Fatalf("after a second import keywords = %v, want the new volume to win and nothing dropped: %v", trail.Keywords.Texts(), want)
+	}
+
+	blank := "path,title,primary keyword,keywords\n/shoes/trail/,Trail shoes,,\n"
+	h.apply(t, h.file(t, "blank.csv", blank), mapping)
+	if kept := pathOf()["/shoes/trail/"]; !kept.Keywords.Equal(trail.Keywords) {
+		t.Fatalf("an empty keywords cell changed the page: %v, want %v", kept.Keywords.Texts(), trail.Keywords.Texts())
+	}
+}
+
+func hasFinding(findings []imports.Finding, code imports.FindingCode) bool {
+	for _, finding := range findings {
+		if finding.Code == string(code) {
+			return true
 		}
 	}
-	if !slices.Equal(trail.Keywords.Texts(), []string{"trail running shoes", "trail shoes", "best trail shoes", "trail footwear"}) {
-		t.Fatalf("a second import must keep the main keyword and union the rest: %+v", trail)
-	}
+	return false
 }

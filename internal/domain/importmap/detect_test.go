@@ -56,6 +56,12 @@ func TestAutoDetectReadsTheAliasTable(t *testing.T) {
 		{name: "description", header: "Description", want: importmap.FieldMetaDescription},
 		{name: "post type", header: "Post Type", want: importmap.FieldWPType},
 		{name: "wp type", header: "wp_type", want: importmap.FieldWPType},
+		{name: "recommended url layer", header: "Recommended URL Layer", want: importmap.FieldPath},
+		{name: "canonical url", header: "Canonical URL", want: importmap.FieldPath},
+		{name: "entity level", header: "Entity Level", want: importmap.FieldEntityKind},
+		{name: "parent product entity", header: "Parent Product Entity", want: importmap.FieldParentEntity},
+		{name: "own entity", header: "Own entity", want: importmap.FieldOwnEntity},
+		{name: "is entity", header: "is_entity", want: importmap.FieldOwnEntity},
 	}
 
 	for _, tc := range cases {
@@ -101,6 +107,93 @@ func TestAutoDetectCarriesTheClientSample(t *testing.T) {
 	}
 }
 
+func TestAQuestionIsNeverDetected(t *testing.T) {
+	t.Parallel()
+
+	for _, header := range []string{"Entity?", "Entity ?", "Is it an entity?", "Category?"} {
+		if field, known := importmap.Detect(header); known {
+			t.Errorf("Detect(%q) = %s, want nothing", header, field)
+		}
+	}
+	mapping := importmap.AutoDetect([]string{"URL", "Entity?", "Category?"})
+	if len(mapping.Columns) != 1 || len(mapping.Options.LevelColumns) != 0 || len(mapping.Options.NoteColumns) != 0 {
+		t.Fatalf("mapping = %+v, want the path alone", mapping)
+	}
+}
+
+func TestAutoDetectReadsTheClientSheets(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		headers []string
+		columns map[importmap.Field]string
+		levels  []string
+		notes   []string
+	}{
+		{
+			name:    "the root, category and subcategory sheet",
+			headers: []string{"Root Entity", "Category", "Subcategory", "Recommended URL Layer", "Title", "H1", "Keywords"},
+			columns: map[importmap.Field]string{
+				importmap.FieldPath: "Recommended URL Layer", importmap.FieldTitle: "Title", importmap.FieldH1: "H1",
+				importmap.FieldKeywords: "Keywords",
+			},
+			levels: []string{"Root Entity", "Category", "Subcategory"},
+		},
+		{
+			name:    "the category and subcategory sheet",
+			headers: []string{"Category", "Subcategory", "URL", "Title", "H1", "Keywords"},
+			columns: map[importmap.Field]string{
+				importmap.FieldPath: "URL", importmap.FieldTitle: "Title", importmap.FieldH1: "H1", importmap.FieldKeywords: "Keywords",
+			},
+			levels: []string{"Category", "Subcategory"},
+		},
+		{
+			name: "the wide sheet an assistant wrote",
+			headers: []string{
+				"Entity ID", "Primary Entity", "Entity Level", "Entity Type", "Entity Name", "Canonical URL", "Parent Entity",
+				"Category", "Subcategory", "Title", "H1", "Intent Owner", "Page Template", "Notes",
+			},
+			columns: map[importmap.Field]string{
+				importmap.FieldEntityKind: "Entity Level", importmap.FieldEntity: "Entity Name", importmap.FieldPath: "Canonical URL",
+				importmap.FieldParentEntity: "Parent Entity", importmap.FieldTitle: "Title", importmap.FieldH1: "H1",
+				importmap.FieldPageKind: "Page Template",
+			},
+			levels: []string{"Category", "Subcategory"},
+			notes:  []string{"Intent Owner", "Notes"},
+		},
+		{
+			name:    "the variation sheet",
+			headers: []string{"Parent Product Entity", "URL", "Detected Form / Variation", "Entity?", "Reason"},
+			columns: map[importmap.Field]string{importmap.FieldParentEntity: "Parent Product Entity", importmap.FieldPath: "URL"},
+			notes:   []string{"Detected Form / Variation", "Reason"},
+		},
+		{
+			name:    "levels are ordered from the outermost whatever the order of the columns",
+			headers: []string{"Subcategory", "URL", "Category", "Root"},
+			columns: map[importmap.Field]string{importmap.FieldPath: "URL"},
+			levels:  []string{"Root", "Category", "Subcategory"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			mapping := importmap.AutoDetect(tc.headers)
+			if !reflect.DeepEqual(mapping.Columns, tc.columns) {
+				t.Errorf("columns = %v, want %v", mapping.Columns, tc.columns)
+			}
+			if !slices.Equal(mapping.Options.LevelColumns, tc.levels) {
+				t.Errorf("levels = %v, want %v", mapping.Options.LevelColumns, tc.levels)
+			}
+			if !slices.Equal(mapping.Options.NoteColumns, tc.notes) {
+				t.Errorf("notes = %v, want %v", mapping.Options.NoteColumns, tc.notes)
+			}
+		})
+	}
+}
+
 func TestFieldsAreTheCanonicalColumnOrder(t *testing.T) {
 	t.Parallel()
 
@@ -109,7 +202,7 @@ func TestFieldsAreTheCanonicalColumnOrder(t *testing.T) {
 		importmap.FieldPath, importmap.FieldTitle, importmap.FieldH1, importmap.FieldPrimaryKeyword,
 		importmap.FieldKeywords, importmap.FieldAnchors, importmap.FieldEntity, importmap.FieldEntityKind,
 		importmap.FieldParentEntity, importmap.FieldRelated, importmap.FieldPageKind, importmap.FieldMetaTitle,
-		importmap.FieldMetaDescription, importmap.FieldWPType,
+		importmap.FieldMetaDescription, importmap.FieldWPType, importmap.FieldOwnEntity,
 	}
 	if !slices.Equal(fields, want) {
 		t.Fatalf("Fields() = %v, want %v", fields, want)

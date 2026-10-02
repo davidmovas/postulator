@@ -21,7 +21,10 @@ func savedMapping(siteID, name string) importmap.Mapping {
 			importmap.FieldPath:  "URL",
 			importmap.FieldTitle: "Title",
 		},
-		Options:   importmap.Options{PathPrefixStrip: "https://shop.example.com", KeywordSeparator: ";", AnchorSeparator: "|", ListSeparator: ","},
+		Options: importmap.Options{
+			PathPrefixStrip: "https://shop.example.com", AnchorSeparator: "|", ListSeparator: ",",
+			LevelColumns: []string{"Category", "Subcategory"}, NoteColumns: []string{"Notes"},
+		},
 		CreatedAt: sqlitetest.Stamp,
 		UpdatedAt: sqlitetest.Stamp,
 	}

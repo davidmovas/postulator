@@ -110,8 +110,17 @@ func edgeKey(e graph.Edge) string {
 	return string(e.Kind) + "|" + e.FromEntityID + "|" + e.ToEntityID
 }
 
-func keywordList(primary string, rest []string) keyword.List {
-	return keyword.Of(append([]string{primary}, rest...)...)
+func rowKeywords(binding importmap.Binding, row []string, at importmap.Origin, p *plan) keyword.List {
+	items := make([]keyword.Keyword, 0)
+	for _, field := range []importmap.Field{importmap.FieldPrimaryKeyword, importmap.FieldKeywords} {
+		list, unreadable := keyword.Parse(binding.Text(row, field))
+		for _, fragment := range unreadable {
+			p.noteAt(at, string(field), CodeBadVolume,
+				"the search volume of "+fragment+" cannot be read, so the keyword was kept without one")
+		}
+		items = append(items, list...)
+	}
+	return keyword.New(items)
 }
 
 func sameEntity(a, b graph.Entity) bool {
@@ -216,11 +225,11 @@ func read(binding importmap.Binding, table importmap.Table, p *plan) *drafts {
 			continue
 		}
 
+		keywords := rowKeywords(binding, row, at, p)
 		if name != "" {
 			sheet.entity(name, number).merge(entityDraft{
 				kind:     binding.Text(row, importmap.FieldEntityKind),
-				primary:  binding.Text(row, importmap.FieldPrimaryKeyword),
-				keywords: binding.List(row, importmap.FieldKeywords),
+				keywords: keywords,
 				anchors:  binding.List(row, importmap.FieldAnchors),
 				parent:   binding.Text(row, importmap.FieldParentEntity),
 				related:  binding.List(row, importmap.FieldRelated),
@@ -249,8 +258,7 @@ func read(binding importmap.Binding, table importmap.Table, p *plan) *drafts {
 			wpType:    binding.Text(row, importmap.FieldWPType),
 			pageKind:  binding.Text(row, importmap.FieldPageKind),
 			entity:    name,
-			primary:   binding.Text(row, importmap.FieldPrimaryKeyword),
-			keywords:  binding.List(row, importmap.FieldKeywords),
+			keywords:  keywords,
 		})
 	}
 	return sheet
@@ -278,11 +286,10 @@ func resolveEntities(sheet *drafts, state siteState, now time.Time, p *plan) (ma
 	for _, at := range sheet.order {
 		draft := sheet.entities[at]
 
-		kind := graph.Kind(strings.ToLower(draft.kind))
-		if draft.kind != "" && !kind.Valid() {
+		kind, known := kindOf(draft.kind)
+		if !known {
 			p.note(draft.row, string(importmap.FieldEntityKind), CodeUnknownEntityKind,
 				"the entity kind is not recognized and was read as a topic: "+draft.kind)
-			kind = ""
 		}
 
 		current, found := state.byName[at]
@@ -292,7 +299,7 @@ func resolveEntities(sheet *drafts, state siteState, now time.Time, p *plan) (ma
 			}
 			entity, err := graph.NewEntity(graph.Entity{
 				ID: id.New(), SiteID: state.siteID, Name: draft.name, Kind: kind,
-				Keywords: keywordList(draft.primary, draft.keywords), Anchors: anchorsOf(draft.anchors),
+				Keywords: draft.keywords, Anchors: anchorsOf(draft.anchors),
 				Source: graph.SourceImport, CreatedAt: now, UpdatedAt: now,
 			})
 			if err != nil {
@@ -308,7 +315,7 @@ func resolveEntities(sheet *drafts, state siteState, now time.Time, p *plan) (ma
 		if kind != "" {
 			next.Kind = kind
 		}
-		next.Keywords = keywordList(fill(next.Keywords.Main(), draft.primary), union(next.Keywords.Rest(), draft.keywords))
+		next.Keywords = next.Keywords.Merge(draft.keywords)
 		next.Anchors = anchorsOf(union(anchorTexts(next.Anchors), draft.anchors))
 		next.UpdatedAt = now
 		entity, err := graph.NewEntity(next)
@@ -458,7 +465,7 @@ func (s *Service) resolvePages(ctx context.Context, sheet *drafts, state siteSta
 			page, err := pagemap.NewPage(pagemap.Page{
 				ID: id.New(), SiteID: state.siteID, Path: path, WPType: wpTypeOr(wpType),
 				Title: fill(draft.title, titleFrom(path)), H1: draft.h1, MetaTitle: draft.metaTitle,
-				MetaDescription: draft.metaDesc, Keywords: keywordList(draft.primary, draft.keywords),
+				MetaDescription: draft.metaDesc, Keywords: draft.keywords,
 				Status: pagemap.StatusPlanned, EntityID: entityID,
 				TemplateID: templateID, CreatedAt: now, UpdatedAt: now,
 			})
@@ -475,7 +482,7 @@ func (s *Service) resolvePages(ctx context.Context, sheet *drafts, state siteSta
 		next.H1 = fill(next.H1, draft.h1)
 		next.MetaTitle = fill(next.MetaTitle, draft.metaTitle)
 		next.MetaDescription = fill(next.MetaDescription, draft.metaDesc)
-		next.Keywords = keywordList(fill(next.Keywords.Main(), draft.primary), union(next.Keywords.Rest(), draft.keywords))
+		next.Keywords = next.Keywords.Merge(draft.keywords)
 		if wpType != "" {
 			next.WPType = wpType
 		}

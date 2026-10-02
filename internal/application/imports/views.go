@@ -34,6 +34,7 @@ const (
 	CodeUnknownPageKind   FindingCode = "unknown_page_kind"
 	CodeUnknownWPType     FindingCode = "unknown_wp_type"
 	CodeRootPageSkipped   FindingCode = "root_page_skipped"
+	CodeBadVolume         FindingCode = "bad_volume"
 )
 
 var blockingFindingCodes = []FindingCode{
@@ -45,13 +46,14 @@ func (c FindingCode) Blocking() bool {
 }
 
 type Options struct {
-	PathPrefixStrip  string   `json:"pathPrefixStrip,omitempty" description:"Remove this prefix from every path in the sheet, such as a domain the export wrote in"`
-	KeywordSeparator string   `json:"keywordSeparator,omitempty" description:"What separates several keywords inside one cell, a comma by default"`
-	AnchorSeparator  string   `json:"anchorSeparator,omitempty" description:"What separates several anchors inside one cell, a comma by default"`
-	ListSeparator    string   `json:"listSeparator,omitempty" description:"What separates any other list inside one cell, a comma by default"`
-	Sheets           []string `json:"sheets,omitempty" description:"Which sheets of the workbook to read, exactly as inspect named them; leave it out for the first sheet alone"`
-	IndentColumns    []string `json:"indentColumns,omitempty" description:"Columns whose position carries the hierarchy, shallowest first; a row's path is built from the cells of its own column and of the columns to its left"`
-	NoHeader         bool     `json:"noHeader,omitempty" description:"The sheet carries no header row, so every column is addressed by its spreadsheet letter and every row is data"`
+	PathPrefixStrip string   `json:"pathPrefixStrip,omitempty" description:"Remove this prefix from every path in the sheet, such as a domain the export wrote in"`
+	AnchorSeparator string   `json:"anchorSeparator,omitempty" description:"What separates several anchors inside one cell, a comma by default"`
+	ListSeparator   string   `json:"listSeparator,omitempty" description:"What separates any other list inside one cell, a comma by default"`
+	Sheets          []string `json:"sheets,omitempty" description:"Which sheets of the workbook to read, exactly as inspect named them; leave it out for the first sheet alone"`
+	IndentColumns   []string `json:"indentColumns,omitempty" description:"Columns whose position carries the hierarchy, shallowest first; a row's path is built from the cells of its own column and of the columns to its left"`
+	LevelColumns    []string `json:"levelColumns,omitempty" description:"Group columns, outermost first, such as Category then Subcategory"`
+	NoteColumns     []string `json:"noteColumns,omitempty" description:"Columns kept on the page as notes for the writer"`
+	NoHeader        bool     `json:"noHeader,omitempty" description:"The sheet carries no header row, so every column is addressed by its spreadsheet letter and every row is data"`
 }
 
 type Sheet struct {
