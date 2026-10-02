@@ -1703,3 +1703,105 @@ said, never dropped in silence.
   audit and in the site overview. The table says **Not written yet** for a planned page, the panel
   labels each owed link by its state and does not offer to relink a page that is not on the site,
   and the run's Links & compliance pane says it is the page as it stood at validation.
+
+## 2026-10-02 — the client's sheets: keywords with volumes, an entity for every row, names under their parent
+
+The client's SEO workbooks did not import: a list of keywords with their monthly volume in one
+cell, `Root Entity | Category | Subcategory` level columns, a wide sheet an assistant wrote with
+columns that mean nothing, and a variation sheet whose `Entity?` column would have created
+entities named Yes and No. The client cannot share the files, so the work follows their headers.
+The owner's rules for all of it: the file is the source of truth, used as it is; what it lacks is
+generated; any cell may be empty and an empty cell erases nothing; everything is an entity except
+a technical page; and no content is hard-coded, because a template says it. The WooCommerce half
+of the approved plan was taken out by the owner and handed to its own session.
+
+### Keywords
+
+- **A page and an entity carry one ordered keyword list**, `keyword.List` of `{text, volume?}`,
+  in place of a primary keyword and secondary keywords (migration 0029). The list is trimmed,
+  deduplicated without case and sorted by volume, highest first, with unmeasured keywords after;
+  the first is the main keyword, so `primaryInTitle` and `{primaryKeyword}` keep their names and
+  read it. This **supersedes** "an existing entity keeps its spelling and its primary keyword"
+  and "a page keeps the keywords its row carried": the volume decides the order, never the column.
+- **A keyword cell reads `bpc 157 (12000), buy bpc 157 (5,400), bpc-157`.** Commas, semicolons,
+  pipes and line breaks separate keywords outside brackets; a volume is the digits in trailing
+  `(…)` or `[…]`, with `1,200`, `1 200` and `1.2k` read alike; a bracket holding words stays part
+  of the keyword; a volume that cannot be read is a `bad_volume` warning and the keyword is kept
+  without one. The export writes the same grammar in one column, so the keyword separator setting
+  is gone; a `primary_keyword` column still reads, placed before the list is sorted.
+- **A re-import merges** (`List.Merge`): the file's volume replaces the stored one, new keywords
+  are added, none is dropped, and an empty cell changes nothing.
+- **Generation reads the page's keywords, or its entity's** when the page carries none
+  (`pagemap.Keywords`), in the brief, the placeholders, the writer, the meta, the image alt, the
+  judge, `repair_links`, validation and cannibalization. The writer gets them numbered with their
+  volume; `keywordRules.requiredKeywords` in a template says how many must appear, all by default;
+  the missing ones are one `keywords_missing` warning in order of importance.
+
+### Entities and names
+
+- **An entity's name is unique under its parent, not across the site** (the owner's choice over
+  qualifying names or a separate notion of variants). Liquid under BPC-157 and Liquid under TB-500
+  are two entities named as the file names them. `entities.scope_entity_id` is the parent the name
+  is unique under (migration 0030 rebuilds the table, with the unique index on
+  `(site_id, coalesce(scope_entity_id, ''), name)`); the earliest approved parent edge sets it, a
+  move or a removed edge settles it again (`graph.Settle`), and a clash is a conflict that names
+  the parent.
+- **A shared name is told apart by its parent wherever it is read.** `graph.Labels` gives "BPC-157
+  Liquid" to the writer, the meta, the judge, the image alt, a link's fallback anchor,
+  `{entityName}`, the link audit and the graph proposals, which resolve the model's answer by the
+  same label; a name used once stays as it is, and a parent whose name is shared too is climbed.
+  Lists, filters and search on the screens show "BPC-157 › Liquid".
+
+### The import
+
+- **The client's headers are read.** Recommended URL Layer and Canonical URL are the path, Entity
+  Level is the kind (Compound/Product reads as product, GEO as custom, Commercial Taxonomy as
+  category, Root and Pillar as hub), Parent Product Entity is the parent. A header that ends in a
+  question mark is never detected, so `Entity?` stays ignored; `own_entity` is a field the client
+  maps by hand, and `no` makes a technical page. Bind prefers the header exactly as written.
+- **Level columns and note columns are options of a mapping**, detected and ticked in the wizard.
+  A level cell of `-`, `—`, `n/a` or `none` is empty. A note column is kept on the page as
+  `{label, text}`, shown on the page card, read by the writer as context it never copies, merged by
+  label on a re-import and written back by the export.
+- **Every row with a page gets an entity**, named by its entity cell, else its H1, else its title,
+  else its slug; a row whose path the site already maps and that names none keeps that entity. The
+  root row is the exception: it makes an entity only when it names one or the site holds the root.
+- **A parent comes from the parent cell, else the row's deepest group, else the URL tree**, which
+  also gives an entity to the intermediate pages the import fills in and to an unpublished,
+  unmapped ancestor on the site. A technical page above a sheet page is `technical_parent`, because
+  a run refuses a child whose unpublished parent carries no entity. When a parent the URL tree gave
+  bears the child's own name, the two rows are one entity with two pages.
+- **The level columns build a tree of groups, and a group takes a page only on evidence:** a row
+  of its own level named as it, a row whose slug is its name, a row above all its other rows, or a
+  free page above all of them whose slug is its name. Nothing is placed by position; a group
+  without a page is kept and reported as `group_without_page`.
+- **Entities are matched by their parent and their name**, parents first: under the same parent,
+  else an orphan of that name at the top (adopted, and settled under its new parent), else, when
+  the row gives no parent or only the URL tree's, the one entity of that name on the site. A name
+  or a parent more than one entity carries is a blocking `ambiguous_entity` or `ambiguous_parent`;
+  a named parent is looked for under the row's group first. A repeated import changes nothing.
+- **The preview says what each column became** (`Mapping.Uses`: field, group, note, hierarchy or
+  ignored), lists the groups with their pages and names each entity with its parent.
+
+### Links past a group without a page
+
+- **An entity that no page carries at all is passed through.** The link plan records it as an
+  optional blocked target, `no_page`, and walks on to its parents or its children, so a form links
+  up to its product's category; `MayLinkTo` climbs past it the same way. An entity that has pages
+  but no canonical one still blocks, required, as `no_canonical_page`. This **supersedes** the
+  rule that every parent is a required target, which made a group the sheet named without a page
+  a link nobody could place.
+
+### The pages screen
+
+- **The page list filters by an entity and everything under it** (`includeDescendants`,
+  `graph.Descendants`), so a category lists its subcategories' and products' pages.
+
+### Decided without asking
+
+- A revert treats a relink's before-copy as missing only when it has no hash: an empty neighbour
+  that the relink wrote a sentence into is emptied again instead of handed to a human.
+- The UI harness seed stores a key for each provider its profiles name, as the e2e harness does,
+  and declares its posts at the flat addresses WordPress gives posts.
+- The products stage is out of this branch: its plan, the owner's words and the research live in
+  the handoff file the owner keeps, not in the repository.

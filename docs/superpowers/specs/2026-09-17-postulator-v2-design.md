@@ -93,13 +93,13 @@ Dependency rule (enforced by a test in `internal/app` using `go list -deps`): `d
 `Site{ID, Name, BaseURL, SecretRef, Status(active|paused|error), Plugin PluginState{Installed bool, Version string, Capabilities []string, SEOPlugin string}, Defaults{TemplateID, LinkPolicyID, ModelProfiles map[Role]ModelRef}, CreatedAt, UpdatedAt}`. Invariant: `BaseURL` https unless `AllowInsecure`.
 
 ### 5.2 Entity Graph (`domain/graph`)
-- `Entity{ID, SiteID, Name, Kind(hub|product|topic|category|custom), Intent, PrimaryKeyword, SecondaryKeywords []string, Anchors []Anchor, CanonicalPageID *string, Score float64, Source(import|user|ai), CreatedAt, UpdatedAt}`; `Anchor{Text, Source(user|ai), Weight}`.
+- `Entity{ID, SiteID, Name, Kind(hub|product|topic|category|custom), Intent, Keywords keyword.List, Anchors []Anchor, ScopeID *string, CanonicalPageID *string, Score float64, Source(import|user|ai), CreatedAt, UpdatedAt}`; `Anchor{Text, Source(user|ai), Weight}`. `keyword.List` is `[]{Text, Volume *int}` sorted by volume; the name is unique under `ScopeID`, the parent it was named under. *(Amended 2026-10-02.)*
 - `Edge{ID, SiteID, FromEntityID, ToEntityID, Kind(parent|related), Weight float64, Source(import|user|ai), Status(approved|proposed|rejected), CreatedAt}`. `parent` is directed child→parent; `related` is stored with `FromEntityID < ToEntityID`.
 - `Graph` value type built from entities+edges with pure methods: `Parents(id, depth)`, `Children(id)`, `Related(id, minWeight)`, `Roots()`, `ValidateAcyclic() error`, `Score()` (PageRank-like over approved edges, damping 0.85, 30 iterations).
 - Invariants: no self edges, no cycles on parent edges, edge endpoints in the same site.
 
 ### 5.3 Page Map (`domain/pagemap`)
-- `Page{ID, SiteID, Path, Slug, ParentPageID *string, WPType(page|post|product|product_cat), WPID *int64, Title, H1, MetaTitle, MetaDescription, Canonical, Status(planned|exists|published|archived), EntityID *string, TemplateID *string, ContentHash, WPModifiedAt *time, LastSyncedAt *time, Drift bool, CreatedAt, UpdatedAt}`.
+- `Page{ID, SiteID, Path, Slug, ParentPageID *string, WPType(page|post|product|product_cat), WPID *int64, Title, H1, MetaTitle, MetaDescription, Canonical, Keywords keyword.List, Notes []{Label, Text}, Status(planned|exists|published|archived), EntityID *string, TemplateID *string, ContentHash, WPModifiedAt *time, LastSyncedAt *time, Drift bool, CreatedAt, UpdatedAt}`. A page's keywords win over its entity's; the notes come from an import's note columns. *(Amended 2026-10-02.)*
 - `PageLink{ID, SiteID, FromPageID, ToPageID *string, ToURL, AnchorText, Origin(generated|observed), ObservedAt}`.
 - Pure helpers: `NormalizePath`, `ParentPath`, `BuildTree(pages)`, `Unmapped(pages)`.
 - `Index` value type: `NewIndex(pages []Page) Index` with `ByID(id) (Page, bool)`, `ByEntity(entityID) []Page`, `ByPath(path) (Page, bool)`.
@@ -230,8 +230,8 @@ Port `type ImageProvider interface { Generate(ctx, Prompt) (Image, error) }` for
 
 ### 9.6 Importer (`adapters/importer`)
 - `xlsx` (excelize) and `csv` readers → `[]Row{Cells map[string]string}` with header detection.
-- `Mapping{ID, SiteID, Name, Columns map[Field]string, Options{PathPrefixStrip, KeywordSeparator, AnchorSeparator}}` where `Field ∈ {path, title, h1, primary_keyword, keywords, anchors, entity, entity_kind, parent_entity, related, page_kind, meta_title, meta_description, wp_type}`. `AutoDetect(headers []string) Mapping` uses a normalised-header alias table per field (shape of Archond `internal/modules/imports/parser/mapper.go`, English aliases only) so the preview opens pre-mapped.
-- `Preview(rows, mapping) PreviewReport{Pages, Entities, Edges, Warnings, Errors}`; `Apply` in one transaction; missing intermediate paths auto-created; duplicate paths merged; entity names deduplicated case-insensitively.
+- `Mapping{ID, SiteID, Name, Columns map[Field]string, Options{PathPrefixStrip, AnchorSeparator, ListSeparator, Sheets, IndentColumns, LevelColumns, NoteColumns, NoHeader}}` where `Field ∈ {path, title, h1, primary_keyword, keywords, anchors, entity, entity_kind, parent_entity, related, page_kind, meta_title, meta_description, wp_type, own_entity}`. `AutoDetect(headers []string) Mapping` uses a normalised-header alias table per field (shape of Archond `internal/modules/imports/parser/mapper.go`, English aliases only) so the preview opens pre-mapped, offers level columns (Root, Category, Subcategory) and note columns, and never detects a header that ends in a question mark. A keyword cell is read with the `keyword` grammar, `text (volume), text`. *(Amended 2026-10-02; the mapping lives in `domain/importmap`.)*
+- `Preview(rows, mapping) PreviewReport{Columns, Pages, Entities, Groups, Edges, Warnings, Errors}`; `Apply` in one transaction; missing intermediate paths auto-created; duplicate paths merged. Every row with a page gets an entity unless `own_entity` says no; level columns name groups that take a page only on evidence; an entity is matched by its parent and its name, case-insensitively, and an ambiguous one is an error. *(Amended 2026-10-02.)*
 
 ## 10. Documentation and Orchestration Policy
 

@@ -3,13 +3,33 @@
 The handoff point between sessions. Read this first. The reasoning behind every phase and
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
-**Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks. The
-2026-09-25 work is on `claude/cool-archimedes-5qgsre`, to reach `dev` when the owner asks.
-**Released:** `v2.1.0` on 2026-09-23; **`v2.2.0` is on `dev` awaiting the owner's build and tag**
-(this session ran on Linux, so `task build`, `task e2e:full` and the sandbox walk are listed
-under **Next steps** rather than under **The gate**).
+**Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
+**Released:** `v2.3.0` on 2026-09-25 (2.2.0 and the 2026-09-25 work). **The 2026-10-02 work is on
+`dev`**, not yet released; what its gate did and did not run is under **The gate**.
 
 ## Where we are
+
+**2026-10-02** makes the client's SEO workbooks import: the reasoning is under **2026-10-02** in
+`DECISIONS.md`, and `samples/client-sheets.xlsx` carries the four sheet shapes the client uses.
+
+- **Keywords are one list with volumes** on pages and entities (migration 0029), read from one
+  cell as `bpc 157 (12000), buy bpc 157 (5,400), bpc-157`, sorted by volume, merged on a
+  re-import, and given to the writer numbered with their volume; a template says how many must
+  appear (`keywordRules.requiredKeywords`) and the missing ones are one `keywords_missing` warning.
+- **An entity's name is unique under its parent** (`entities.scope_entity_id`, migration 0030),
+  so a form's name repeats under every product; a shared name is labelled with its parent for the
+  model and the anchors, and shown as a path on the screens.
+- **The import reads the client's headers**: level columns (`Root Entity | Category |
+  Subcategory`) make groups that take a page only on evidence, every row with a page gets an
+  entity, a parent comes from the parent cell, the group or the URL tree, `Entity?` and other
+  questions stay ignored, `own_entity: no` makes a technical page, the entity level reads as the
+  kind, note columns travel with the page to the writer and back out, and the preview says what
+  each column became. Matching is by parent and name, an ambiguous name is a blocking finding, and
+  a repeated import changes nothing.
+- **A group without a page is passed through by the link plan** (`no_page`, optional), and the
+  page list filters by an entity and everything under it.
+- **WooCommerce products** were taken out of this work by the owner and are planned in their own
+  session; nothing about products is on `dev`.
 
 **Phases 0 through 13 are complete, and the production hardening of 2026-09-22 and 23 with
 them.** The application composes a Wails v3 window over an adiantum-encrypted SQLite store:
@@ -23,8 +43,8 @@ events on their own windows.
 for a human, links not placed, the order wrong, every retry paid for again. The reasoning is
 under **2026-09-24 — 2.2.0** in `DECISIONS.md`.
 
-- **The import never plans `/`**, and a row's keywords land on the page (`pages.primary_keyword`,
-  `pages.keywords`, migration 0027) even when the row names no entity.
+- **The import never plans `/`**, and a row's keywords land on the page (migration 0027; one
+  list with volumes since 0029) even when the row names no entity.
 - **Entities are proposed for chosen pages or pasted keywords and written only once reviewed.**
   `GraphService.PreviewFromPages`, `ProposeFromKeywords` and `ApplyProposals`, the three tools
   beside them, and a three-step dialog on the Graph screen: pick pages or paste keywords, preview,
@@ -76,6 +96,16 @@ docker, and `TestAChildWaitsForItsParentAndGoesOnOnceTheParentIsRegenerated` now
 by exhausting the writer, because an incomplete draft is tried again instead of failing at validate.
 
 ## The gate
+
+**2026-10-02, on Windows, partial.** Run: `gofmt -l .` silent, the comment check,
+`golangci-lint run` 0 issues, `go vet -tags uiharness` and `go vet -tags e2e` clean, `task ui:lint`
+green (at `116a77c`), `npm run typecheck` clean and **1202 vitest tests in 119 files**; `go test
+-race -count=1 -p 2 ./...` green through `0701b03` apart from the wall-clock flakes of
+`internal/runtime`, each green alone, and every later commit green over the packages it touches,
+because the full run for `9d84f48` was stopped by the machine running low on memory. Migrations
+end at **0030**; **93 tools**, schema ceiling 80,700 bytes. **Not run:** `go run ./cmd/covergate`,
+`task build`, `task lint:e2e`, `task e2e:full`; the import side of the e2e client loop was checked
+without docker and holds (61 entities, 56 edges, the planted faults with their rows).
 
 Green on 2026-09-25 over the head of `claude/cool-archimedes-5qgsre`, on Linux, where
 `cmd/postulator`, `internal/app`, `adapters/browser/tor` and `adapters/secrets/{dpapi,masterkey}`
@@ -187,20 +217,14 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 
 ## Next steps
 
-1. **Owner, on Windows and docker, for the 2026-09-25 work:** `task build`, `task ui:lint`,
-   `task e2e:full` (the client loop now asks the linker for down and sideways phrases and sees
-   `target_not_published` on a parent written before its children), then a sandbox walk with a
-   real provider: a hub and a child in one run, where the hub links to the child and a missing
-   link reads **Done, check** on the row; a template with AI images picked in the start drawer,
-   which moves the pages to it and draws the images; a planned page on the Linking screen, which
-   reads **Not written yet**; and an untouched built-in, which shows as version 2 without images.
-2. **Owner, before the 2.2.0 tag, on Windows and docker:** `task build` (the bindings and the
-   frontend under the real toolchain), `task ui:lint`, `task e2e:full` (the held-parent scenario
-   now exhausts the writer), and `task package`; then a walk on the sandbox with a real provider:
-   import a workbook with a `/` row and keywords, preview and apply entities for one branch and for
-   a pasted keyword list, a template with `{primaryKeyword}` in a heading, a run over a parent and
-   two children with one page held at validate and accepted, a regenerated parent whose children go
-   on by themselves, and the start dialog refusing a run whose provider has no key.
-3. The residue above: the denied tool row's decision, the four narrow-width UI items, the ledger
+1. **The rest of the 2026-10-02 gate, when the machine has the memory:** the full `go test -race
+   -count=1 -p 2 ./...` with the coverage profile and `go run ./cmd/covergate`, `task build`,
+   `task lint:e2e` and `task e2e:full`.
+2. **A sandbox walk with the client's sheets and a real provider:** import the four sheets of
+   `samples/client-sheets.xlsx` one after another, check the preview's columns, groups and
+   keyword order, then run one product form and read the writer's prompt (numbered keywords, the
+   notes block) and the page's link to its group's parent.
+3. **WooCommerce products**, in their own session, from the handoff the owner keeps.
+4. The residue above: the denied tool row's decision, the four narrow-width UI items, the ledger
    screen, `ProposeFromPages` and `Import.Apply` as runs, and `settings.changed` for a declared
    value.

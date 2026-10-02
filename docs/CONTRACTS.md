@@ -68,7 +68,24 @@ one site, like `Tree` and `LoadGraph`. Each owed link carries a `state` from `li
 `missing` and `missingRequired` count real misses only, while `pending` counts the links that
 wait for a page to be written or published and `unpublished` the placed links to a page that is
 not on the site yet. `orphan` holds only for a page on the site, in the audit and in
-`SiteOverview` alike.
+`SiteOverview` alike. A blocked target carries `blockedReason` from `linkBlockedReasons`:
+`no_canonical_page` for an entity that has pages but no canonical one, which stays required, and
+`no_page` for an entity no page carries at all, which is optional and passed through to its own
+parents or children. Entity names in the audit are labels: a name another entity shares carries
+its parent.
+
+`ImportService.Preview` and `Apply` answer a report whose `columns` say, for every header of the
+sheet in order, what it became (`use` from `importColumnUses`: `field` with the `field` it fills,
+`level`, `note`, `indent` or `ignored`); `groups` list the chains the level columns name, with the
+page each took (`page`, empty for none) and the rows under it; each entity carries its `parent`.
+A keyword cell reads `text (volume), text`, separated by `, ; |` or a line break outside brackets;
+`levelColumns` and `noteColumns` are mapping options, and `own_entity` is a field. Findings
+`ambiguous_parent` and `ambiguous_entity` block an apply like an unknown parent; `bad_volume`,
+`technical_parent`, `group_without_page` and `unknown_own_entity` are warnings.
+
+`PagesService.List` takes `includeDescendants` with an `entityId` and keeps the pages of that
+entity and of every entity under it; it refuses the flag alone. A page carries `notes`, each
+`{label, text}`, from the note columns of an import.
 
 Every method but `HealthService.Ping` and the four lock methods of `SettingsService`
 answers `LOCKED` while a master password is set and the application has not been unlocked,

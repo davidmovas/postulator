@@ -10,7 +10,7 @@ code path.
 ```
 cmd/postulator        Wails bootstrap only
 internal/kernel       errors, paging, id, clock, log, ctx, dto, settings, middleware
-internal/domain       pure logic: site graph pagemap template content run schedule settings llm
+internal/domain       pure logic: site graph pagemap keyword importmap template content run schedule settings llm
 internal/application  use cases, UnitOfWork, tool registry, event registry
 internal/adapters     sqlite, wp, llm, images, secrets, importer
 internal/runtime      the run engine and its step catalog
@@ -69,10 +69,13 @@ The shared vocabulary every layer is allowed to speak.
 ## Domain
 
 Value types and pure functions. `site`, `graph` (a DAG on `parent` edges plus weighted
-undirected `related` edges), `pagemap` (paths, tree, index), `template` (spec plus link
-policy, resolved global → site → page by JSON merge patch), `content` (an HTML document,
-link context, link insertion, compliance and structure reports), `run`, `schedule`,
-`settings`, and the `llm` model catalog types.
+undirected `related` edges, an entity's name unique under the parent it is scoped to, and the
+labels that tell a shared name apart), `pagemap` (paths, tree, index, a page's keywords and
+notes), `keyword` (the ordered list with volumes and the one cell grammar), `importmap` (the
+mapping of a sheet's headers, its level and note columns, and what each column became),
+`template` (spec plus link policy, resolved global → site → page by JSON merge patch),
+`content` (an HTML document, link context, link insertion, compliance and structure reports),
+`run`, `schedule`, `settings`, and the `llm` model catalog types.
 
 The heart of it is `content`: `PlanLinks` turns a graph, a page index and a
 `content.Subject{Site, PageID, PagePath, EntityID}` into the set of links that page owes,
