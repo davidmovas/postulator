@@ -2,6 +2,7 @@ package sqlite_test
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -108,6 +109,56 @@ func TestEntityRepoRoundTrip(t *testing.T) {
 	}
 	if _, err = repo.Get(t.Context(), want.ID); !errors.IsCode(err, errors.NotFound) {
 		t.Errorf("Get missing code = %q, want NOT_FOUND", errors.CodeOf(err))
+	}
+}
+
+func TestEntityRepoKeepsANameUniqueUnderItsParent(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	repo := sqlite.NewEntityRepo(store)
+	insert := func(name string, scope *string) graph.Entity {
+		t.Helper()
+		record := fullEntity(owner.ID, name, sqlitetest.Stamp)
+		record.ScopeID = scope
+		if err := repo.Insert(t.Context(), record); err != nil {
+			t.Fatalf("Insert %s: %v", name, err)
+		}
+		return record
+	}
+
+	bpc := insert("BPC-157", nil)
+	tb := insert("TB-500", nil)
+	liquid := insert("Liquid", &bpc.ID)
+	insert("Liquid", &tb.ID)
+
+	got, err := repo.Get(t.Context(), liquid.ID)
+	if err != nil || got.ScopeID == nil || *got.ScopeID != bpc.ID {
+		t.Fatalf("Get = %+v, %v; want the scope kept", got, err)
+	}
+
+	twin := fullEntity(owner.ID, "liquid", sqlitetest.Stamp)
+	twin.ScopeID = &bpc.ID
+	err = repo.Insert(t.Context(), twin)
+	if !errors.IsCode(err, errors.Conflict) {
+		t.Fatalf("the same name twice under one parent = %v, want CONFLICT", err)
+	}
+	if !strings.Contains(err.Error(), "under the same parent") {
+		t.Fatalf("the conflict does not say where the name is taken: %v", err)
+	}
+
+	if err = repo.SetScope(t.Context(), liquid.ID, &tb.ID, sqlitetest.Stamp.Add(time.Minute)); !errors.IsCode(err, errors.Conflict) {
+		t.Fatalf("moving a name next to its twin = %v, want CONFLICT", err)
+	}
+	if err = repo.SetScope(t.Context(), liquid.ID, nil, sqlitetest.Stamp.Add(time.Minute)); err != nil {
+		t.Fatalf("SetScope to the top: %v", err)
+	}
+	if got, err = repo.Get(t.Context(), liquid.ID); err != nil || got.ScopeID != nil || !got.UpdatedAt.Equal(sqlitetest.Stamp.Add(time.Minute)) {
+		t.Fatalf("after SetScope = %+v, %v", got, err)
+	}
+	if err = repo.SetScope(t.Context(), "missing", nil, sqlitetest.Stamp); !errors.IsCode(err, errors.NotFound) {
+		t.Fatalf("SetScope of a missing entity = %v, want NOT_FOUND", err)
 	}
 }
 

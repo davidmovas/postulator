@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-const latestMigration = 29
+const latestMigration = 30
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -40,6 +40,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0027_page_keywords.sql",
 		"0028_run_item_blocked_by.sql",
 		"0029_keyword_lists.sql",
+		"0030_entity_scope.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -219,6 +220,117 @@ func TestKeywordListsMigrationCarriesTheOldKeywordsOver(t *testing.T) {
 
 	if _, err = provider.Up(t.Context()); err != nil {
 		t.Fatalf("up after the down: %v", err)
+	}
+}
+
+func TestAnEntityNameIsUniqueUnderItsParent(t *testing.T) {
+	t.Parallel()
+
+	store := openStore(t, nil)
+	exec := func(query string, args ...any) error {
+		_, err := store.writer.ExecContext(t.Context(), query, args...)
+		return err
+	}
+	const at = "2026-10-02T09:00:00Z"
+	entity := func(id, name string, scope any) error {
+		return exec(`INSERT INTO entities (id, site_id, name, kind, scope_entity_id, source, created_at, updated_at) VALUES (?, 's1', ?, 'topic', ?, 'import', ?, ?)`,
+			id, name, scope, at, at)
+	}
+
+	if err := exec(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at); err != nil {
+		t.Fatalf("site: %v", err)
+	}
+	for _, step := range []struct {
+		id, name string
+		scope    any
+		ok       bool
+		why      string
+	}{
+		{id: "bpc", name: "BPC-157", ok: true, why: "a root"},
+		{id: "tb", name: "TB-500", ok: true, why: "another root"},
+		{id: "bpc-liquid", name: "Liquid", scope: "bpc", ok: true, why: "a name under one parent"},
+		{id: "tb-liquid", name: "Liquid", scope: "tb", ok: true, why: "the same name under another parent"},
+		{id: "bpc-liquid-2", name: "liquid", scope: "bpc", ok: false, why: "the same name twice under one parent"},
+		{id: "bpc-root", name: "bpc-157", ok: false, why: "the same name twice at the top"},
+		{id: "self", name: "Self", scope: "self", ok: false, why: "an entity under itself"},
+	} {
+		err := entity(step.id, step.name, step.scope)
+		if step.ok && err != nil {
+			t.Fatalf("%s: %v", step.why, err)
+		}
+		if !step.ok && err == nil {
+			t.Fatalf("%s was accepted", step.why)
+		}
+	}
+
+	if err := exec(`DELETE FROM entities WHERE id = 'bpc'`); err != nil {
+		t.Fatalf("delete a parent: %v", err)
+	}
+	var scope sql.NullString
+	if err := store.reader.QueryRowContext(t.Context(), `SELECT scope_entity_id FROM entities WHERE id = 'bpc-liquid'`).Scan(&scope); err != nil || scope.Valid {
+		t.Fatalf("the scope of a child whose parent is gone = %v, %v; want NULL", scope, err)
+	}
+}
+
+func TestEntityScopeMigrationTakesTheParentAnEntityHas(t *testing.T) {
+	t.Parallel()
+
+	store := openStore(t, nil)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	if _, err = provider.DownTo(t.Context(), 29); err != nil {
+		t.Fatalf("down to 29: %v", err)
+	}
+	exec := func(query string, args ...any) {
+		t.Helper()
+		if _, execErr := store.writer.ExecContext(t.Context(), query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	text := func(query string) string {
+		t.Helper()
+		var value sql.NullString
+		if scanErr := store.writer.QueryRowContext(t.Context(), query).Scan(&value); scanErr != nil {
+			t.Fatalf("%s: %v", query, scanErr)
+		}
+		return value.String
+	}
+	const at = "2026-10-02T09:00:00Z"
+
+	exec(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at)
+	for _, row := range [][2]string{{"a", "Peptides"}, {"b", "Healing"}, {"c", "BPC-157"}, {"d", "Lone"}} {
+		exec(`INSERT INTO entities (id, site_id, name, kind, source, created_at, updated_at) VALUES (?, 's1', ?, 'topic', 'import', ?, ?)`, row[0], row[1], at, at)
+	}
+	exec(`INSERT INTO edges (id, site_id, from_entity_id, to_entity_id, kind, weight, source, status, created_at) VALUES ('g1', 's1', 'c', 'b', 'parent', 1, 'import', 'approved', '2026-10-02T09:05:00Z')`)
+	exec(`INSERT INTO edges (id, site_id, from_entity_id, to_entity_id, kind, weight, source, status, created_at) VALUES ('g2', 's1', 'c', 'a', 'parent', 1, 'import', 'approved', '2026-10-02T09:01:00Z')`)
+	exec(`INSERT INTO edges (id, site_id, from_entity_id, to_entity_id, kind, weight, source, status, created_at) VALUES ('g3', 's1', 'b', 'a', 'parent', 1, 'import', 'proposed', ?)`, at)
+
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up: %v", err)
+	}
+	if got := text(`SELECT scope_entity_id FROM entities WHERE id = 'c'`); got != "a" {
+		t.Fatalf("the scope of an entity with two parents = %q, want the earlier one", got)
+	}
+	for _, id := range []string{"a", "b", "d"} {
+		if got := text(`SELECT scope_entity_id FROM entities WHERE id = '` + id + `'`); got != "" {
+			t.Fatalf("%s took the scope %q, want none", id, got)
+		}
+	}
+	if got := text(`SELECT keywords FROM entities WHERE id = 'c'`); got != "[]" {
+		t.Fatalf("the rebuild lost the keywords column: %q", got)
+	}
+
+	exec(`INSERT INTO entities (id, site_id, name, kind, scope_entity_id, source, created_at, updated_at) VALUES ('e', 's1', 'Healing', 'topic', 'c', 'import', ?, ?)`, at, at)
+	if _, err = provider.DownTo(t.Context(), 29); err != nil {
+		t.Fatalf("down with a shared name: %v", err)
+	}
+	if got := text(`SELECT count(DISTINCT lower(name)) FROM entities`); got != "5" {
+		t.Fatalf("the down migration left %s distinct names for 5 entities", got)
+	}
+	if got := text(`SELECT name FROM entities WHERE id = 'b'`); got != "Healing" {
+		t.Fatalf("the first of a shared name was renamed to %q", got)
 	}
 }
 

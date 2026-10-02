@@ -340,6 +340,30 @@ func TestApplyLinksEveryCreatedPageToItsParentPath(t *testing.T) {
 	}
 }
 
+func TestApplyPutsAnEntityUnderTheParentItsRowNames(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	h.apply(t, h.file(t, "tree.csv", "path,entity,parent entity\n/peptides/,Peptides,\n/peptides/bpc/,BPC-157,Peptides\n"),
+		h.mapping(map[string]string{
+			string(importmap.FieldPath):         "path",
+			string(importmap.FieldEntity):       "entity",
+			string(importmap.FieldParentEntity): "parent entity",
+		}))
+
+	byName := make(map[string]graph.Entity)
+	for _, stored := range h.entities(t) {
+		byName[stored.Name] = stored
+	}
+	child, parent := byName["BPC-157"], byName["Peptides"]
+	if child.ScopeID == nil || *child.ScopeID != parent.ID {
+		t.Fatalf("BPC-157 sits under %v, want Peptides (%s)", child.ScopeID, parent.ID)
+	}
+	if parent.ScopeID != nil {
+		t.Fatalf("Peptides sits under %v, want the top", *parent.ScopeID)
+	}
+}
+
 func TestApplyKeepsTheKeywordsOfARowOnItsPage(t *testing.T) {
 	t.Parallel()
 

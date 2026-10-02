@@ -54,7 +54,10 @@ func (s *Service) ApplyProposals(ctx context.Context, req ApplyProposalsRequest)
 				return adoptErr
 			}
 		}
-		return s.connect(c, siteID, req.Entities, &state, &response, now)
+		if connectErr := s.connect(c, siteID, req.Entities, &state, &response, now); connectErr != nil {
+			return connectErr
+		}
+		return s.settleScopes(c, siteID)
 	})
 	if err != nil {
 		return ApplyProposalsResponse{}, err

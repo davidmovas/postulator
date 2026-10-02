@@ -33,6 +33,7 @@ type canonical struct {
 }
 
 type plan struct {
+	siteID    string
 	report    PreviewReport
 	entities  []plannedEntity
 	edges     []graph.Edge
@@ -595,7 +596,7 @@ func (s *Service) plan(ctx context.Context, siteID string, table importmap.Table
 	}
 
 	now := s.now()
-	p := plan{rows: len(table.Rows)}
+	p := plan{siteID: siteID, rows: len(table.Rows)}
 	sheet := read(binding, table, &p)
 	fillGaps(sheet, state, &p)
 

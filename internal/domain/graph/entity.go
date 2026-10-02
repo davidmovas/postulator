@@ -75,6 +75,7 @@ type Entity struct {
 	Intent          string
 	Keywords        keyword.List
 	Anchors         []Anchor
+	ScopeID         *string
 	CanonicalPageID *string
 	Score           float64
 	Source          Source
@@ -105,6 +106,10 @@ func NewEntity(e Entity) (Entity, error) {
 		return Entity{}, invalid("entity score must not be negative", "score")
 	case e.CanonicalPageID != nil && *e.CanonicalPageID == "":
 		return Entity{}, invalid("canonical page id must not be empty when set", "canonicalPageId")
+	case e.ScopeID != nil && *e.ScopeID == "":
+		return Entity{}, invalid("the entity a name sits under must not be empty when set", "scopeId")
+	case e.ScopeID != nil && *e.ScopeID == e.ID:
+		return Entity{}, invalid("an entity cannot sit under itself", "scopeId")
 	}
 
 	e.Keywords = keyword.New(e.Keywords)

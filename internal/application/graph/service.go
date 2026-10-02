@@ -25,6 +25,7 @@ type entityStore interface {
 	List(ctx context.Context, q graphdomain.EntityQuery, page paging.Request) (paging.List[graphdomain.Entity], error)
 	ListBySite(ctx context.Context, siteID string) ([]graphdomain.Entity, error)
 	SetScore(ctx context.Context, id string, score float64) error
+	SetScope(ctx context.Context, id string, scopeID *string, updatedAt time.Time) error
 	SetCanonicalPage(ctx context.Context, id string, pageID *string, updatedAt time.Time) error
 }
 

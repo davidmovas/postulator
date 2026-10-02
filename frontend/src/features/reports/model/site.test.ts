@@ -42,6 +42,7 @@ function entity(overrides: Partial<Entity> = {}): Entity {
         intent: "",
         keywords: null,
         anchors: null,
+        scopeEntityId: null,
         canonicalPageId: "p-1",
         score: 0,
         source: "user",

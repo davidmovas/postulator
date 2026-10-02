@@ -231,7 +231,6 @@ export const graph = {
         submit: "Create the entity",
         cancel: "Cancel",
         created: (name: string) => `${name} created`,
-        attachFailed: (name: string) => `${name} was created but could not be attached to its parent`,
     },
     connect: {
         start: "Connect",

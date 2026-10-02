@@ -3,7 +3,9 @@ package imports
 import (
 	"context"
 	"strings"
+	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -143,7 +145,28 @@ func (s *Service) write(ctx context.Context, computed *plan) (Counts, error) {
 			return Counts{}, err
 		}
 	}
-	return counts, nil
+	return counts, s.settleScopes(ctx, computed.siteID, now)
+}
+
+func (s *Service) settleScopes(ctx context.Context, siteID string, now time.Time) error {
+	entities, err := s.deps.Entities.ListBySite(ctx, siteID)
+	if err != nil {
+		return err
+	}
+	edges, err := s.deps.Edges.ListBySite(ctx, siteID)
+	if err != nil {
+		return err
+	}
+	moved, err := graph.Settle(entities, edges)
+	if err != nil {
+		return err
+	}
+	for i := range moved {
+		if setErr := s.deps.Entities.SetScope(ctx, moved[i].ID, moved[i].ScopeID, now); setErr != nil {
+			return setErr
+		}
+	}
+	return nil
 }
 
 func (s *Service) remember(ctx context.Context, req ApplyRequest) error {

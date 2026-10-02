@@ -2,6 +2,7 @@ package graph
 
 import (
 	"context"
+	"strings"
 
 	"github.com/davidmovas/postulator/internal/application"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
@@ -39,6 +40,10 @@ func (s *Service) CreateEntity(ctx context.Context, req CreateEntityRequest) (Cr
 	if err != nil {
 		return CreateEntityResponse{}, err
 	}
+	var scope *string
+	if parentID := strings.TrimSpace(req.ParentID); parentID != "" {
+		scope = &parentID
+	}
 	now := s.now()
 	entity, err := graphdomain.NewEntity(graphdomain.Entity{
 		ID:        id.New(),
@@ -48,6 +53,7 @@ func (s *Service) CreateEntity(ctx context.Context, req CreateEntityRequest) (Cr
 		Intent:    req.Intent,
 		Keywords:  keywords,
 		Anchors:   anchorsOf(ctx, req.Anchors),
+		ScopeID:   scope,
 		Source:    source,
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -56,7 +62,24 @@ func (s *Service) CreateEntity(ctx context.Context, req CreateEntityRequest) (Cr
 		return CreateEntityResponse{}, err
 	}
 
-	if doErr := s.uow.Do(ctx, func(c context.Context) error { return s.entities.Insert(c, entity) }); doErr != nil {
+	doErr := s.uow.Do(ctx, func(c context.Context) error {
+		if scope == nil {
+			return s.entities.Insert(c, entity)
+		}
+		parent, getErr := s.entities.Get(c, *scope)
+		if getErr != nil {
+			return getErr
+		}
+		if parent.SiteID != entity.SiteID {
+			return invalidField("the parent belongs to another site", "parentId")
+		}
+		if insertErr := s.entities.Insert(c, entity); insertErr != nil {
+			return insertErr
+		}
+		_, edgeErr := s.parentEdge(c, nil, entity.SiteID, entity.ID, parent.ID)
+		return edgeErr
+	})
+	if doErr != nil {
 		return CreateEntityResponse{}, doErr
 	}
 	if publishErr := s.changed(entity.SiteID); publishErr != nil {
@@ -141,6 +164,9 @@ func (s *Service) DeleteEntity(ctx context.Context, req DeleteEntityRequest) (De
 			return getErr
 		}
 		siteID = current.SiteID
+		if settleErr := s.settleScopesWithout(c, siteID, req.ID); settleErr != nil {
+			return settleErr
+		}
 		return s.entities.Delete(c, req.ID)
 	})
 	if err != nil {

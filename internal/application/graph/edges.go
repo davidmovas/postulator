@@ -189,7 +189,10 @@ func (s *Service) AddEdge(ctx context.Context, req AddEdgeRequest) (AddEdgeRespo
 		if checkErr := s.checkAcyclic(c, edge); checkErr != nil {
 			return checkErr
 		}
-		return s.edges.Insert(c, edge)
+		if insertErr := s.edges.Insert(c, edge); insertErr != nil {
+			return insertErr
+		}
+		return s.settleScopes(c, edge.SiteID)
 	})
 	if doErr != nil {
 		return AddEdgeResponse{}, doErr
@@ -224,7 +227,7 @@ func (s *Service) setStatus(ctx context.Context, edgeID string, status graphdoma
 		}
 		edge.Status = status
 		changed = true
-		return nil
+		return s.settleScopes(c, edge.SiteID)
 	})
 	if err != nil {
 		return graphdomain.Edge{}, err
@@ -261,7 +264,10 @@ func (s *Service) DeleteEdge(ctx context.Context, req DeleteEdgeRequest) (Delete
 			return getErr
 		}
 		siteID = current.SiteID
-		return s.edges.Delete(c, req.ID)
+		if deleteErr := s.edges.Delete(c, req.ID); deleteErr != nil {
+			return deleteErr
+		}
+		return s.settleScopes(c, siteID)
 	})
 	if err != nil {
 		return DeleteEdgeResponse{}, err

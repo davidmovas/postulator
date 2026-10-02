@@ -15,9 +15,10 @@ import (
 )
 
 const (
-	entityColumns         = `id, site_id, name, kind, intent, keywords, canonical_page_id, score, source, created_at, updated_at`
-	insertEntity          = `INSERT INTO entities (` + entityColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	updateEntity          = `UPDATE entities SET name = ?, kind = ?, intent = ?, keywords = ?, canonical_page_id = ?, score = ?, source = ?, updated_at = ? WHERE id = ?`
+	entityColumns         = `id, site_id, name, kind, intent, keywords, scope_entity_id, canonical_page_id, score, source, created_at, updated_at`
+	insertEntity          = `INSERT INTO entities (` + entityColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	updateEntity          = `UPDATE entities SET name = ?, kind = ?, intent = ?, keywords = ?, scope_entity_id = ?, canonical_page_id = ?, score = ?, source = ?, updated_at = ? WHERE id = ?`
+	updateEntityScope     = `UPDATE entities SET scope_entity_id = ?, updated_at = ? WHERE id = ?`
 	updateEntityScore     = `UPDATE entities SET score = ? WHERE id = ?`
 	updateEntityCanonical = `UPDATE entities SET canonical_page_id = ?, updated_at = ? WHERE id = ?`
 	deleteEntity          = `DELETE FROM entities WHERE id = ?`
@@ -41,7 +42,7 @@ func entityNotFound(id string) *errors.Error {
 }
 
 func entityConflict(name string) *errors.Error {
-	return errors.New(errors.Conflict, "an entity with this name already exists in the site").WithDetail("name", name)
+	return errors.New(errors.Conflict, "an entity named "+name+" already sits under the same parent").WithDetail("name", name)
 }
 
 func anchorConflict(entityID string) *errors.Error {
@@ -54,7 +55,7 @@ func (r *EntityRepo) Insert(ctx context.Context, e graph.Entity) error {
 		return err
 	}
 	if _, err = execWrite(ctx, r.store.writeFrom(ctx), insertEntity, []any{
-		e.ID, e.SiteID, e.Name, string(e.Kind), e.Intent, keywords, nullString(e.CanonicalPageID),
+		e.ID, e.SiteID, e.Name, string(e.Kind), e.Intent, keywords, nullString(e.ScopeID), nullString(e.CanonicalPageID),
 		e.Score, string(e.Source), formatTime(e.CreatedAt), formatTime(e.UpdatedAt),
 	}, entityConflict(e.Name), "insert the entity"); err != nil {
 		return err
@@ -68,7 +69,7 @@ func (r *EntityRepo) Update(ctx context.Context, e graph.Entity) error {
 		return err
 	}
 	affected, err := execWrite(ctx, r.store.writeFrom(ctx), updateEntity, []any{
-		e.Name, string(e.Kind), e.Intent, keywords, nullString(e.CanonicalPageID),
+		e.Name, string(e.Kind), e.Intent, keywords, nullString(e.ScopeID), nullString(e.CanonicalPageID),
 		e.Score, string(e.Source), formatTime(e.UpdatedAt), e.ID,
 	}, entityConflict(e.Name), "update the entity")
 	if updateErr := requireAffected(affected, err, entityNotFound(e.ID)); updateErr != nil {
@@ -107,6 +108,13 @@ func escapeLike(s string) string {
 
 func (r *EntityRepo) Delete(ctx context.Context, id string) error {
 	affected, err := execWrite(ctx, r.store.writeFrom(ctx), deleteEntity, []any{id}, nil, "delete the entity")
+	return requireAffected(affected, err, entityNotFound(id))
+}
+
+func (r *EntityRepo) SetScope(ctx context.Context, id string, scopeID *string, updatedAt time.Time) error {
+	affected, err := execWrite(ctx, r.store.writeFrom(ctx), updateEntityScope, []any{nullString(scopeID), formatTime(updatedAt), id},
+		errors.New(errors.Conflict, "another entity of the same name already sits under that parent").WithDetail("entityId", id),
+		"update the entity scope")
 	return requireAffected(affected, err, entityNotFound(id))
 }
 
@@ -253,14 +261,15 @@ func scanEntity(rows *sql.Rows) (graph.Entity, error) {
 		e                    graph.Entity
 		kind, source         string
 		keywords             string
-		canonical            sql.NullString
+		scope, canonical     sql.NullString
 		createdAt, updatedAt string
 	)
-	if err := rows.Scan(&e.ID, &e.SiteID, &e.Name, &kind, &e.Intent, &keywords, &canonical, &e.Score, &source, &createdAt, &updatedAt); err != nil {
+	if err := rows.Scan(&e.ID, &e.SiteID, &e.Name, &kind, &e.Intent, &keywords, &scope, &canonical, &e.Score, &source, &createdAt, &updatedAt); err != nil {
 		return graph.Entity{}, err
 	}
 	e.Kind = graph.Kind(kind)
 	e.Source = graph.Source(source)
+	e.ScopeID = optString(scope)
 	e.CanonicalPageID = optString(canonical)
 
 	var err error

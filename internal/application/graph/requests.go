@@ -9,6 +9,7 @@ type CreateEntityRequest struct {
 	Intent   string        `json:"intent,omitempty" description:"What a reader wants from the page, one short sentence"`
 	Keywords []dto.Keyword `json:"keywords,omitempty" description:"Search phrases; ordered by volume, the first is the main one"`
 	Anchors  []Anchor      `json:"anchors,omitempty" description:"The link texts another page may point here with; leave it out and the anchors can be set later"`
+	ParentID string        `json:"parentId,omitempty" description:"The entity it sits under, left out for a root"`
 	Source   string        `json:"source,omitempty" enum:"import,user,ai" description:"Who asked for the entity; leave it out and it is recorded as user"`
 }
 

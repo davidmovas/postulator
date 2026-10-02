@@ -23,6 +23,7 @@ type Entity struct {
 	Intent          string        `json:"intent"`
 	Keywords        []dto.Keyword `json:"keywords"`
 	Anchors         []Anchor      `json:"anchors"`
+	ScopeEntityID   *string       `json:"scopeEntityId"`
 	CanonicalPageID *string       `json:"canonicalPageId"`
 	Score           float64       `json:"score"`
 	Source          string        `json:"source"`
@@ -65,6 +66,7 @@ func entityView(e graphdomain.Entity) Entity {
 		Intent:          e.Intent,
 		Keywords:        application.KeywordViews(e.Keywords),
 		Anchors:         anchors,
+		ScopeEntityID:   e.ScopeID,
 		CanonicalPageID: e.CanonicalPageID,
 		Score:           e.Score,
 		Source:          string(e.Source),

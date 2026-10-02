@@ -26,6 +26,7 @@ type entityStore interface {
 	Insert(ctx context.Context, e graph.Entity) error
 	Update(ctx context.Context, e graph.Entity) error
 	ListBySite(ctx context.Context, siteID string) ([]graph.Entity, error)
+	SetScope(ctx context.Context, id string, scopeID *string, updatedAt time.Time) error
 	SetCanonicalPage(ctx context.Context, id string, pageID *string, updatedAt time.Time) error
 }
 

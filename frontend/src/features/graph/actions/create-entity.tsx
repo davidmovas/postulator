@@ -2,7 +2,7 @@ import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
-import { useAddEdge, useCreateEntity } from "../../../data/hooks/graph.js";
+import { useCreateEntity } from "../../../data/hooks/graph.js";
 import { pushToast } from "../../../data/toasts.js";
 import type { Keyword } from "../../../data/types.js";
 import { entityKinds } from "../../../generated/vocab.js";
@@ -28,7 +28,6 @@ export interface CreateEntityDrawerProps {
 
 export function CreateEntityDrawer({ open, onOpenChange, siteId, index, parentId, onCreated }: CreateEntityDrawerProps): ReactElement {
     const create = useCreateEntity();
-    const addEdge = useAddEdge();
     const [name, setName] = useState("");
     const [kind, setKind] = useState<string>(entityKinds[2]);
     const [intent, setIntent] = useState("");
@@ -45,7 +44,6 @@ export function CreateEntityDrawer({ open, onOpenChange, siteId, index, parentId
             setKeywords([]);
             setAnchors([]);
             create.reset();
-            addEdge.reset();
         }
     }, [open, parentId]);
 
@@ -57,15 +55,9 @@ export function CreateEntityDrawer({ open, onOpenChange, siteId, index, parentId
             intent: intent.trim(),
             keywords,
             anchors: anchors.map((text) => ({ text, source: "user", weight: 1 })),
+            ...(parent === undefined ? {} : { parentId: parent.id }),
         });
         const id = created.entity.id;
-        if (parent !== undefined) {
-            try {
-                await addEdge.mutateAsync({ siteId, fromEntityId: id, toEntityId: parent.id, kind: "parent", weight: 1 });
-            } catch {
-                pushToast("warning", copy.graph.create.attachFailed(created.entity.name));
-            }
-        }
         pushToast("info", copy.graph.create.created(created.entity.name));
         onOpenChange(false);
         onCreated(id);
@@ -92,7 +84,7 @@ export function CreateEntityDrawer({ open, onOpenChange, siteId, index, parentId
                     </Button>
                     <Button
                         variant="primary"
-                        busy={create.isPending || addEdge.isPending}
+                        busy={create.isPending}
                         disabled={name.trim() === ""}
                         onClick={() => {
                             void submit().catch(() => undefined);
