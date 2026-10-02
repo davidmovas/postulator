@@ -1,4 +1,5 @@
 import type { Entity } from "../../../data/types.js";
+import { keywordList, mainKeyword } from "../../../domain/keywords.js";
 import type { GraphIndex } from "./index.js";
 
 export interface IndexDiff {
@@ -14,7 +15,7 @@ function changed(before: Entity, after: Entity): boolean {
         before.kind !== after.kind ||
         before.score !== after.score ||
         before.canonicalPageId !== after.canonicalPageId ||
-        before.primaryKeyword !== after.primaryKeyword
+        mainKeyword(keywordList(before.keywords)) !== mainKeyword(keywordList(after.keywords))
     );
 }
 

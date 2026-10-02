@@ -14,8 +14,15 @@ interface Calls {
 const calls: Calls = { previewed: [], keyworded: [], applied: [] };
 
 const proposals: ProposedEntity[] = [
-    { pageId: "mugs", path: "/shop/mugs/", name: "Mugs", kind: "category", primaryKeyword: "mugs", parent: "/shop/" },
-    { pageId: "travel", path: "/shop/mugs/travel/", name: "Travel Mugs", kind: "topic", primaryKeyword: "travel mugs", parent: "/shop/mugs/" },
+    { pageId: "mugs", path: "/shop/mugs/", name: "Mugs", kind: "category", keywords: [{ text: "mugs" }], parent: "/shop/" },
+    {
+        pageId: "travel",
+        path: "/shop/mugs/travel/",
+        name: "Travel Mugs",
+        kind: "topic",
+        keywords: [{ text: "travel mugs" }],
+        parent: "/shop/mugs/",
+    },
 ];
 
 function aPage(id: string, path: string, overrides: Partial<Page> = {}): Page {
@@ -32,7 +39,6 @@ function aPage(id: string, path: string, overrides: Partial<Page> = {}): Page {
         metaTitle: "",
         metaDescription: "",
         canonical: "",
-        primaryKeyword: "",
         keywords: [],
         status: "planned",
         entityId: null,

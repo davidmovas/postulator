@@ -5,6 +5,7 @@ import { copy } from "../../../copy/index.js";
 import { react } from "../../../data/errors.js";
 import { useApplyProposals, usePreviewFromPages, useProposeFromKeywords } from "../../../data/hooks/graph.js";
 import type { ApplyProposalsResponse, Page, ProposedEntity } from "../../../data/types.js";
+import { keywordList, mainKeyword } from "../../../domain/keywords.js";
 import type { SegmentedOption, SelectOption } from "../../../ui/index.js";
 import {
     Button,
@@ -392,8 +393,8 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, source: init
                                         ) : null}
                                     </TableCell>
                                     <TableCell muted={true}>{kindLabel(proposal.kind ?? "")}</TableCell>
-                                    <TableCell muted={true} title={proposal.primaryKeyword ?? ""}>
-                                        {proposal.primaryKeyword ?? ""}
+                                    <TableCell muted={true} title={mainKeyword(keywordList(proposal.keywords))}>
+                                        {mainKeyword(keywordList(proposal.keywords))}
                                     </TableCell>
                                     <TableCell mono={true} muted={true} title={placeOf(proposal)}>
                                         {placeOf(proposal)}

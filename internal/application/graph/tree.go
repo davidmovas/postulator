@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/application"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -38,13 +39,17 @@ func (s *Service) CreateEntities(ctx context.Context, req CreateEntitiesRequest)
 	minted := make(map[string]string, len(req.Entities))
 	for i := range req.Entities {
 		field := "entities[" + strconv.Itoa(i) + "]"
+		keywords, keywordsErr := application.KeywordList(req.Entities[i].Keywords, field+".keywords")
+		if keywordsErr != nil {
+			return CreateEntitiesResponse{}, keywordsErr
+		}
 		entity, err := graphdomain.NewEntity(graphdomain.Entity{
 			ID:        id.New(),
 			SiteID:    req.SiteID,
 			Name:      req.Entities[i].Name,
 			Kind:      graphdomain.Kind(req.Entities[i].Kind),
 			Intent:    req.Entities[i].Intent,
-			Keywords:  keywordList(req.Entities[i].PrimaryKeyword, req.Entities[i].SecondaryKeywords),
+			Keywords:  keywords,
 			Anchors:   anchorsOf(ctx, req.Entities[i].Anchors),
 			Source:    source,
 			CreatedAt: now,

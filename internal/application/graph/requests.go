@@ -3,14 +3,13 @@ package graph
 import "github.com/davidmovas/postulator/internal/kernel/dto"
 
 type CreateEntityRequest struct {
-	SiteID            string   `json:"siteId"`
-	Name              string   `json:"name" description:"What the entity is about, two to four words in title case"`
-	Kind              string   `json:"kind" enum:"hub,product,topic,category,custom" description:"Where the entity sits in the graph: a hub is a subject root, a category groups topics, a topic is one subject, a product is a thing sold, custom is anything else"`
-	Intent            string   `json:"intent,omitempty" description:"What a reader wants from the page, one short sentence"`
-	PrimaryKeyword    string   `json:"primaryKeyword,omitempty" description:"The phrase a reader searches to reach the page"`
-	SecondaryKeywords []string `json:"secondaryKeywords,omitempty" description:"Further phrases the page can rank for, at most four"`
-	Anchors           []Anchor `json:"anchors,omitempty" description:"The link texts another page may point here with; leave it out and the anchors can be set later"`
-	Source            string   `json:"source,omitempty" enum:"import,user,ai" description:"Who asked for the entity; leave it out and it is recorded as user"`
+	SiteID   string        `json:"siteId"`
+	Name     string        `json:"name" description:"What the entity is about, two to four words in title case"`
+	Kind     string        `json:"kind" enum:"hub,product,topic,category,custom" description:"Where the entity sits in the graph: a hub is a subject root, a category groups topics, a topic is one subject, a product is a thing sold, custom is anything else"`
+	Intent   string        `json:"intent,omitempty" description:"What a reader wants from the page, one short sentence"`
+	Keywords []dto.Keyword `json:"keywords,omitempty" description:"Search phrases; ordered by volume, the first is the main one"`
+	Anchors  []Anchor      `json:"anchors,omitempty" description:"The link texts another page may point here with; leave it out and the anchors can be set later"`
+	Source   string        `json:"source,omitempty" enum:"import,user,ai" description:"Who asked for the entity; leave it out and it is recorded as user"`
 }
 
 type CreateEntityResponse struct {
@@ -18,13 +17,12 @@ type CreateEntityResponse struct {
 }
 
 type EntityInput struct {
-	Name              string   `json:"name" description:"What the entity is about, two to four words in title case"`
-	Kind              string   `json:"kind" enum:"hub,product,topic,category,custom" description:"Where the entity sits in the graph: a hub is a subject root, a category groups topics, a topic is one subject, a product is a thing sold, custom is anything else"`
-	Intent            string   `json:"intent,omitempty" description:"What a reader wants from the page, one short sentence"`
-	PrimaryKeyword    string   `json:"primaryKeyword,omitempty" description:"The phrase a reader searches to reach the page"`
-	SecondaryKeywords []string `json:"secondaryKeywords,omitempty" description:"Further phrases the page can rank for, at most four"`
-	Anchors           []Anchor `json:"anchors,omitempty" description:"The link texts another page may point here with"`
-	ParentName        string   `json:"parentName,omitempty" description:"The name of the entity one level up, spelled exactly as it is written in this list or as it already exists on the site; leave it out for a root of the tree"`
+	Name       string        `json:"name" description:"What the entity is about, two to four words in title case"`
+	Kind       string        `json:"kind" enum:"hub,product,topic,category,custom" description:"Where the entity sits in the graph: a hub is a subject root, a category groups topics, a topic is one subject, a product is a thing sold, custom is anything else"`
+	Intent     string        `json:"intent,omitempty" description:"What a reader wants from the page, one short sentence"`
+	Keywords   []dto.Keyword `json:"keywords,omitempty" description:"Search phrases; ordered by volume, the first is the main one"`
+	Anchors    []Anchor      `json:"anchors,omitempty" description:"The link texts another page may point here with"`
+	ParentName string        `json:"parentName,omitempty" description:"The name of the entity one level up, spelled exactly as it is written in this list or as it already exists on the site; leave it out for a root of the tree"`
 }
 
 type CreateEntitiesRequest struct {
@@ -39,12 +37,11 @@ type CreateEntitiesResponse struct {
 }
 
 type UpdateEntityRequest struct {
-	ID                string    `json:"id" description:"The id of the entity, exactly as a read tool returned it"`
-	Name              *string   `json:"name,omitempty" description:"The new name, left out to keep the current one"`
-	Kind              *string   `json:"kind,omitempty" enum:"hub,product,topic,category,custom" description:"The new kind, left out to keep the current one"`
-	Intent            *string   `json:"intent,omitempty" description:"The new reader intent, left out to keep the current one"`
-	PrimaryKeyword    *string   `json:"primaryKeyword,omitempty" description:"The new primary keyword, left out to keep the current one"`
-	SecondaryKeywords *[]string `json:"secondaryKeywords,omitempty" description:"The whole new list of secondary keywords, left out to keep the current one"`
+	ID       string         `json:"id" description:"The id of the entity, exactly as a read tool returned it"`
+	Name     *string        `json:"name,omitempty" description:"The new name, left out to keep the current one"`
+	Kind     *string        `json:"kind,omitempty" enum:"hub,product,topic,category,custom" description:"The new kind, left out to keep the current one"`
+	Intent   *string        `json:"intent,omitempty" description:"The new reader intent, left out to keep the current one"`
+	Keywords *[]dto.Keyword `json:"keywords,omitempty" description:"The whole new keyword list, left out to keep the current one"`
 }
 
 type UpdateEntityResponse struct {

@@ -357,7 +357,7 @@ func TestApplyKeepsTheKeywordsOfARowOnItsPage(t *testing.T) {
 
 	report := h.preview(t, h.file(t, "keywords.csv", sheet), mapping)
 	previewed, ok := page(report, "/shoes/trail/")
-	if !ok || previewed.PrimaryKeyword != "trail running shoes" || len(previewed.Keywords) != 2 {
+	if !ok || len(previewed.Keywords) != 3 || previewed.Keywords[0].Text != "trail running shoes" {
 		t.Fatalf("the preview drops the keywords of the row: %+v", previewed)
 	}
 

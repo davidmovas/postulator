@@ -2,6 +2,7 @@ package graph_test
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -48,9 +49,25 @@ func ptr[T any](v T) *T {
 	return &v
 }
 
+func phrases(texts ...string) []dto.Keyword {
+	out := make([]dto.Keyword, 0, len(texts))
+	for _, text := range texts {
+		out = append(out, dto.Keyword{Text: text})
+	}
+	return out
+}
+
+func texts(keywords []dto.Keyword) []string {
+	out := make([]string, 0, len(keywords))
+	for _, item := range keywords {
+		out = append(out, item.Text)
+	}
+	return out
+}
+
 func (h harness) entity(t *testing.T, name, kind string) graph.Entity {
 	t.Helper()
-	created, err := h.service.CreateEntity(t.Context(), graph.CreateEntityRequest{SiteID: h.siteID, Name: name, Kind: kind, PrimaryKeyword: name})
+	created, err := h.service.CreateEntity(t.Context(), graph.CreateEntityRequest{SiteID: h.siteID, Name: name, Kind: kind, Keywords: phrases(name)})
 	if err != nil {
 		t.Fatalf("CreateEntity %s: %v", name, err)
 	}
@@ -88,14 +105,15 @@ func TestCreateEntity(t *testing.T) {
 
 	h := newHarness(t)
 	created, err := h.service.CreateEntity(t.Context(), graph.CreateEntityRequest{
-		SiteID: h.siteID, Name: " Running Shoes ", Kind: "hub", Intent: "commercial", PrimaryKeyword: "running shoes",
-		SecondaryKeywords: []string{"trail shoes", "trail shoes"}, Anchors: []graph.Anchor{{Text: "running shoes", Source: "user", Weight: 1}},
+		SiteID: h.siteID, Name: " Running Shoes ", Kind: "hub", Intent: "commercial",
+		Keywords: []dto.Keyword{{Text: "trail shoes"}, {Text: "running shoes", Volume: ptr(9000)}, {Text: "Trail Shoes"}},
+		Anchors:  []graph.Anchor{{Text: "running shoes", Source: "user", Weight: 1}},
 	})
 	if err != nil {
 		t.Fatalf("CreateEntity: %v", err)
 	}
 	got := created.Entity
-	if got.ID == "" || got.Name != "Running Shoes" || got.Kind != "hub" || got.Source != "user" || len(got.SecondaryKeywords) != 1 || len(got.Anchors) != 1 || got.Score != 0 {
+	if got.ID == "" || got.Name != "Running Shoes" || got.Kind != "hub" || got.Source != "user" || len(got.Keywords) != 2 || len(got.Anchors) != 1 || got.Score != 0 {
 		t.Errorf("CreateEntity = %+v", got)
 	}
 	h.wantEvents(t, events.GraphChanged)
@@ -104,7 +122,7 @@ func TestCreateEntity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
-	for _, key := range []string{`"siteId"`, `"primaryKeyword"`, `"secondaryKeywords":["trail shoes"]`, `"anchors":[{"text":"running shoes","source":"user","weight":1}]`, `"canonicalPageId":null`, `"createdAt":"2026-09-18T09:00:00Z"`} {
+	for _, key := range []string{`"siteId"`, `"keywords":[{"text":"running shoes","volume":9000},{"text":"trail shoes"}]`, `"anchors":[{"text":"running shoes","source":"user","weight":1}]`, `"canonicalPageId":null`, `"createdAt":"2026-09-18T09:00:00Z"`} {
 		if !strings.Contains(string(encoded), key) {
 			t.Errorf("view lacks %s: %s", key, encoded)
 		}
@@ -135,12 +153,24 @@ func TestUpdateSetAnchorsAndGet(t *testing.T) {
 	h.recorder.Reset()
 	h.clock.Advance(time.Minute)
 
-	updated, err := h.service.UpdateEntity(t.Context(), graph.UpdateEntityRequest{ID: entity.ID, Name: ptr("Footwear"), Intent: ptr("informational"), SecondaryKeywords: ptr([]string{"boots"})})
+	renamed, err := h.service.UpdateEntity(t.Context(), graph.UpdateEntityRequest{ID: entity.ID, Name: ptr("Footwear"), Intent: ptr("informational")})
 	if err != nil {
 		t.Fatalf("UpdateEntity: %v", err)
 	}
-	if updated.Entity.Name != "Footwear" || updated.Entity.Kind != "hub" || updated.Entity.PrimaryKeyword != "Shoes" || updated.Entity.Intent != "informational" || updated.Entity.UpdatedAt.String() != "2026-09-18T09:01:00Z" {
-		t.Errorf("UpdateEntity = %+v", updated.Entity)
+	if renamed.Entity.Name != "Footwear" || renamed.Entity.Kind != "hub" || !slices.Equal(texts(renamed.Entity.Keywords), []string{"Shoes"}) ||
+		renamed.Entity.Intent != "informational" || renamed.Entity.UpdatedAt.String() != "2026-09-18T09:01:00Z" {
+		t.Errorf("an update that leaves the keywords out must keep them: %+v", renamed.Entity)
+	}
+	h.wantEvents(t, events.GraphChanged)
+
+	updated, err := h.service.UpdateEntity(t.Context(), graph.UpdateEntityRequest{
+		ID: entity.ID, Keywords: ptr([]dto.Keyword{{Text: "boots"}, {Text: "footwear", Volume: ptr(400)}}),
+	})
+	if err != nil {
+		t.Fatalf("UpdateEntity keywords: %v", err)
+	}
+	if !slices.Equal(texts(updated.Entity.Keywords), []string{"footwear", "boots"}) {
+		t.Errorf("keywords = %v, want the whole new list ordered by volume", texts(updated.Entity.Keywords))
 	}
 	h.wantEvents(t, events.GraphChanged)
 

@@ -3,7 +3,7 @@ package pages
 import (
 	"time"
 
-	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
@@ -23,31 +23,30 @@ type Mismatch struct {
 }
 
 type Page struct {
-	ID              string     `json:"id"`
-	SiteID          string     `json:"siteId"`
-	Path            string     `json:"path"`
-	Slug            string     `json:"slug"`
-	ParentPageID    *string    `json:"parentPageId"`
-	WPType          string     `json:"wpType"`
-	WPID            *int64     `json:"wpId"`
-	Title           string     `json:"title"`
-	H1              string     `json:"h1"`
-	MetaTitle       string     `json:"metaTitle"`
-	MetaDescription string     `json:"metaDescription"`
-	Canonical       string     `json:"canonical"`
-	PrimaryKeyword  string     `json:"primaryKeyword"`
-	Keywords        []string   `json:"keywords"`
-	Status          string     `json:"status"`
-	EntityID        *string    `json:"entityId"`
-	TemplateID      *string    `json:"templateId"`
-	ContentHash     string     `json:"contentHash"`
-	Observed        Observed   `json:"observed"`
-	Mismatches      []Mismatch `json:"mismatches"`
-	WPModifiedAt    dto.Time   `json:"wpModifiedAt"`
-	LastSyncedAt    dto.Time   `json:"lastSyncedAt"`
-	Drift           bool       `json:"drift"`
-	CreatedAt       dto.Time   `json:"createdAt"`
-	UpdatedAt       dto.Time   `json:"updatedAt"`
+	ID              string        `json:"id"`
+	SiteID          string        `json:"siteId"`
+	Path            string        `json:"path"`
+	Slug            string        `json:"slug"`
+	ParentPageID    *string       `json:"parentPageId"`
+	WPType          string        `json:"wpType"`
+	WPID            *int64        `json:"wpId"`
+	Title           string        `json:"title"`
+	H1              string        `json:"h1"`
+	MetaTitle       string        `json:"metaTitle"`
+	MetaDescription string        `json:"metaDescription"`
+	Canonical       string        `json:"canonical"`
+	Keywords        []dto.Keyword `json:"keywords"`
+	Status          string        `json:"status"`
+	EntityID        *string       `json:"entityId"`
+	TemplateID      *string       `json:"templateId"`
+	ContentHash     string        `json:"contentHash"`
+	Observed        Observed      `json:"observed"`
+	Mismatches      []Mismatch    `json:"mismatches"`
+	WPModifiedAt    dto.Time      `json:"wpModifiedAt"`
+	LastSyncedAt    dto.Time      `json:"lastSyncedAt"`
+	Drift           bool          `json:"drift"`
+	CreatedAt       dto.Time      `json:"createdAt"`
+	UpdatedAt       dto.Time      `json:"updatedAt"`
 }
 
 type PageLink struct {
@@ -93,8 +92,7 @@ func view(p pagemap.Page) Page {
 		H1:              p.H1,
 		MetaTitle:       p.MetaTitle,
 		MetaDescription: p.MetaDescription,
-		PrimaryKeyword:  p.Keywords.Main(),
-		Keywords:        p.Keywords.Rest(),
+		Keywords:        application.KeywordViews(p.Keywords),
 		Canonical:       p.Canonical,
 		Status:          string(p.Status),
 		EntityID:        p.EntityID,
@@ -157,8 +155,4 @@ func conflicts(evidence []pagemap.Evidence) []Conflict {
 		out = append(out, Conflict{PageID: evidence[i].PageID, Path: evidence[i].Path, Reason: string(evidence[i].Reason), EntityID: evidence[i].EntityID})
 	}
 	return out
-}
-
-func keywordList(primary string, rest []string) keyword.List {
-	return keyword.Of(append([]string{primary}, rest...)...)
 }

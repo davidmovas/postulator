@@ -29,6 +29,10 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (CreateResponse
 	if req.WPType == "" {
 		wpType = pagemap.WPPage
 	}
+	keywords, err := application.KeywordList(req.Keywords, "keywords")
+	if err != nil {
+		return CreateResponse{}, err
+	}
 	now := s.now()
 	page, err := pagemap.NewPage(pagemap.Page{
 		ID:              id.New(),
@@ -40,7 +44,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (CreateResponse
 		MetaTitle:       req.MetaTitle,
 		MetaDescription: req.MetaDescription,
 		Canonical:       req.Canonical,
-		Keywords:        keywordList(req.PrimaryKeyword, req.Keywords),
+		Keywords:        keywords,
 		Status:          status,
 		EntityID:        req.EntityID,
 		TemplateID:      req.TemplateID,
@@ -119,15 +123,12 @@ func applyUpdate(current *pagemap.Page, req *UpdateRequest) (pagemap.Page, error
 	if req.Canonical != nil {
 		next.Canonical = *req.Canonical
 	}
-	primary, rest := next.Keywords.Main(), next.Keywords.Rest()
-	if req.PrimaryKeyword != nil {
-		primary = *req.PrimaryKeyword
-	}
 	if req.Keywords != nil {
-		rest = req.Keywords
-	}
-	if req.PrimaryKeyword != nil || req.Keywords != nil {
-		next.Keywords = keywordList(primary, rest)
+		keywords, err := application.KeywordList(*req.Keywords, "keywords")
+		if err != nil {
+			return pagemap.Page{}, err
+		}
+		next.Keywords = keywords
 	}
 	if req.Status != nil {
 		next.Status = pagemap.Status(*req.Status)

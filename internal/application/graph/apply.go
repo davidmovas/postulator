@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/application"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -30,9 +31,13 @@ func (s *Service) ApplyProposals(ctx context.Context, req ApplyProposalsRequest)
 			WithDetail("field", "entities")
 	}
 	for i := range req.Entities {
+		field := "entities[" + strconv.Itoa(i) + "]"
 		if strings.TrimSpace(req.Entities[i].Name) == "" {
 			return ApplyProposalsResponse{}, errors.New(errors.Invalid, "a proposal needs a name").
-				WithDetail("field", "entities["+strconv.Itoa(i)+"].name")
+				WithDetail("field", field+".name")
+		}
+		if _, keywordsErr := application.KeywordList(req.Entities[i].Keywords, field+".keywords"); keywordsErr != nil {
+			return ApplyProposalsResponse{}, keywordsErr
 		}
 	}
 
@@ -85,13 +90,17 @@ func (s *Service) adopt(ctx context.Context, siteID string, proposed *ProposedEn
 
 	entityID, exists := state.byName[fold(name)]
 	if !exists {
+		keywords, keywordsErr := application.KeywordList(proposed.Keywords, "keywords")
+		if keywordsErr != nil {
+			return keywordsErr
+		}
 		entity, buildErr := graphdomain.NewEntity(graphdomain.Entity{
 			ID:        id.New(),
 			SiteID:    siteID,
 			Name:      name,
 			Kind:      kindOf(proposed.Kind),
 			Intent:    strings.TrimSpace(proposed.Intent),
-			Keywords:  keywordList(proposed.PrimaryKeyword, proposed.SecondaryKeywords),
+			Keywords:  keywords,
 			Anchors:   proposedAnchors(proposed.Anchors),
 			Source:    graphdomain.SourceAI,
 			CreatedAt: now,

@@ -301,9 +301,9 @@ func seedGraph(ctx context.Context, core *app.Core, siteID string) (map[string]s
 		entity := &declared[index]
 		created, err := core.Graph.CreateEntity(ctx, graph.CreateEntityRequest{
 			SiteID: siteID, Name: entity.Name, Kind: entity.Kind, Intent: entity.Intent,
-			PrimaryKeyword: entity.Keyword, SecondaryKeywords: []string{entity.Anchor},
-			Anchors: []graph.Anchor{{Text: entity.Anchor, Source: "user", Weight: 1}},
-			Source:  "user",
+			Keywords: []dto.Keyword{{Text: entity.Keyword}, {Text: entity.Anchor}},
+			Anchors:  []graph.Anchor{{Text: entity.Anchor, Source: "user", Weight: 1}},
+			Source:   "user",
 		})
 		if err != nil {
 			return nil, err

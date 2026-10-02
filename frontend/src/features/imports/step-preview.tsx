@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 
 import { copy } from "../../copy/index.js";
 import type { PreviewReport } from "../../data/types.js";
+import { keywordsLine } from "../../domain/keywords.js";
 import { importActions } from "../../generated/vocab.js";
 import {
     Banner,
@@ -117,8 +118,8 @@ export function StepPreview({ report, onBack, onApply }: StepPreviewProps): Reac
                                       {page.path}
                                   </TableCell>
                                   <TableCell title={page.title}>{page.title}</TableCell>
-                                  <TableCell muted={true} title={page.primaryKeyword ?? ""}>
-                                      {page.primaryKeyword ?? ""}
+                                  <TableCell muted={true} title={keywordsLine(page.keywords)}>
+                                      {keywordsLine(page.keywords)}
                                   </TableCell>
                                   <TableCell muted={true}>{page.entity ?? ""}</TableCell>
                                   <TableCell>
@@ -133,8 +134,8 @@ export function StepPreview({ report, onBack, onApply }: StepPreviewProps): Reac
                                 <TableRow key={`${entity.name}-${at}`}>
                                     <TableCell title={entity.name}>{entity.name}</TableCell>
                                     <TableCell muted={true}>{entityKindLabel(entity.kind)}</TableCell>
-                                    <TableCell mono={true} muted={true}>
-                                        {entity.primaryKeyword ?? ""}
+                                    <TableCell mono={true} muted={true} title={keywordsLine(entity.keywords)}>
+                                        {keywordsLine(entity.keywords)}
                                     </TableCell>
                                     <TableCell>
                                         <StatusBadge tone={actionTone(entity.action)} dot={false}>

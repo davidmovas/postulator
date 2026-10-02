@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { copy } from "../../../copy/index.js";
 import { useAddEdge, useCreateEntity } from "../../../data/hooks/graph.js";
 import { pushToast } from "../../../data/toasts.js";
+import type { Keyword } from "../../../data/types.js";
 import { entityKinds } from "../../../generated/vocab.js";
-import { Button, ChipInput, Drawer, Field, Input, Select, Textarea, toneClasses } from "../../../ui/index.js";
+import { Button, ChipInput, Drawer, Field, Input, KeywordInput, Select, Textarea, toneClasses } from "../../../ui/index.js";
 import type { SelectOption } from "../../../ui/index.js";
 import { entityIcon, kindLabel, kindTone } from "../labels.js";
 import type { GraphIndex } from "../model/index.js";
@@ -31,8 +32,7 @@ export function CreateEntityDrawer({ open, onOpenChange, siteId, index, parentId
     const [name, setName] = useState("");
     const [kind, setKind] = useState<string>(entityKinds[2]);
     const [intent, setIntent] = useState("");
-    const [primaryKeyword, setPrimaryKeyword] = useState("");
-    const [secondaryKeywords, setSecondaryKeywords] = useState<string[]>([]);
+    const [keywords, setKeywords] = useState<Keyword[]>([]);
     const [anchors, setAnchors] = useState<string[]>([]);
     const parent = parentId === null ? undefined : index.byId.get(parentId);
     const ParentIcon = entityIcon(parent?.kind ?? "");
@@ -42,8 +42,7 @@ export function CreateEntityDrawer({ open, onOpenChange, siteId, index, parentId
             setName("");
             setKind(parent === undefined ? entityKinds[0] : entityKinds[2]);
             setIntent("");
-            setPrimaryKeyword("");
-            setSecondaryKeywords([]);
+            setKeywords([]);
             setAnchors([]);
             create.reset();
             addEdge.reset();
@@ -56,8 +55,7 @@ export function CreateEntityDrawer({ open, onOpenChange, siteId, index, parentId
             name: name.trim(),
             kind,
             intent: intent.trim(),
-            primaryKeyword: primaryKeyword.trim() === "" ? name.trim().toLowerCase() : primaryKeyword.trim(),
-            secondaryKeywords,
+            keywords,
             anchors: anchors.map((text) => ({ text, source: "user", weight: 1 })),
         });
         const id = created.entity.id;
@@ -142,29 +140,17 @@ export function CreateEntityDrawer({ open, onOpenChange, siteId, index, parentId
                         <Select id={control.id} aria-describedby={control["aria-describedby"]} invalid={control.invalid} value={kind} options={kindOptions} onValueChange={setKind} />
                     )}
                 </Field>
-                <Field label={copy.graph.form.primaryKeyword} error={fieldErrorOf(create.error, "primaryKeyword")}>
+                <Field label={copy.graph.form.keywords} hint={copy.graph.form.keywordsHint} error={fieldErrorOf(create.error, "keywords")}>
                     {(control) => (
-                        <Input
-                            {...control}
-                            mono={true}
-                            placeholder={name.trim().toLowerCase()}
-                            value={primaryKeyword}
-                            onChange={(event) => {
-                                setPrimaryKeyword(event.target.value);
-                            }}
-                        />
-                    )}
-                </Field>
-                <Field label={copy.graph.form.secondaryKeywords} hint={copy.graph.form.keywordsHint} error={fieldErrorOf(create.error, "secondaryKeywords")}>
-                    {(control) => (
-                        <ChipInput
+                        <KeywordInput
                             id={control.id}
                             aria-describedby={control["aria-describedby"]}
                             invalid={control.invalid}
-                            mono={true}
-                            values={secondaryKeywords}
+                            values={keywords}
                             removeLabel={copy.graph.form.remove}
-                            onChange={setSecondaryKeywords}
+                            phraseLabel={copy.graph.form.keyword}
+                            volumeLabel={copy.graph.form.volume}
+                            onChange={setKeywords}
                         />
                     )}
                 </Field>

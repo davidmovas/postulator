@@ -21,6 +21,8 @@ export { Field, Input, Textarea } from "./field.js";
 export type { ControlBinding, ControlSize, FieldProps, InputProps, TextareaProps } from "./field.js";
 export { BudgetGauge } from "./gauge.js";
 export type { BudgetGaugeProps } from "./gauge.js";
+export { KeywordInput } from "./keyword-input.js";
+export type { KeywordInputProps } from "./keyword-input.js";
 export { Kbd } from "./kbd.js";
 export type { KbdProps } from "./kbd.js";
 export { Menu } from "./menu.js";

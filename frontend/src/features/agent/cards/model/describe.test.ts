@@ -42,8 +42,7 @@ describe("the graph cards", () => {
         const view = describeAction("graph_create_entity", confirmableArgs["graph_create_entity"] ?? {}, null, none);
         expect(texts(view.title).join("")).toBe('Create entity "Travel Mugs"');
         const joined = view.lines.map((line) => texts(line.parts).join("")).join("\n");
-        expect(joined).toContain("travel mug");
-        expect(joined).toContain("insulated mug, mug with lid");
+        expect(joined).toContain("Keywords travel mug (2,400), insulated mug, mug with lid");
         expect(joined).toContain("travel mugs");
     });
 });

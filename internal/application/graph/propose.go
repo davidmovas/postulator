@@ -7,10 +7,13 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/llm"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
@@ -168,21 +171,27 @@ func (s *Service) previewFromPages(ctx context.Context, rawSiteID string, pageID
 				continue
 			}
 			response.Entities = append(response.Entities, ProposedEntity{
-				PageID:            page.ID,
-				Path:              page.Path,
-				Name:              name,
-				Kind:              string(kindOf(proposed.Kind)),
-				Intent:            strings.TrimSpace(proposed.Intent),
-				PrimaryKeyword:    strings.TrimSpace(proposed.PrimaryKeyword),
-				SecondaryKeywords: graphdomain.CleanKeywords(proposed.SecondaryKeywords),
-				Anchors:           graphdomain.CleanKeywords(proposed.Anchors),
-				Parent:            strings.TrimSpace(proposed.ParentPath),
-				Related:           graphdomain.CleanKeywords(proposed.RelatedPaths),
-				ExistingEntityID:  state.byName[fold(name)],
+				PageID:           page.ID,
+				Path:             page.Path,
+				Name:             name,
+				Kind:             string(kindOf(proposed.Kind)),
+				Intent:           strings.TrimSpace(proposed.Intent),
+				Keywords:         proposedKeywords(page.Keywords, proposed.PrimaryKeyword, proposed.SecondaryKeywords),
+				Anchors:          graphdomain.CleanKeywords(proposed.Anchors),
+				Parent:           strings.TrimSpace(proposed.ParentPath),
+				Related:          graphdomain.CleanKeywords(proposed.RelatedPaths),
+				ExistingEntityID: state.byName[fold(name)],
 			})
 		}
 	}
 	return response, nil
+}
+
+func proposedKeywords(own keyword.List, primary string, secondary []string) []dto.Keyword {
+	if len(own) > 0 {
+		return application.KeywordViews(own)
+	}
+	return application.KeywordViews(keyword.Of(append([]string{primary}, secondary...)...))
 }
 
 func chosenPages(pages []pagemap.Page, pageIDs []string, pathPrefix string) ([]pagemap.Page, error) {

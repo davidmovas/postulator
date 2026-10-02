@@ -97,7 +97,7 @@ export const imports = {
         columnKind: "Kind",
         columnAction: "Action",
         columnName: "Name",
-        columnKeyword: "Primary keyword",
+        columnKeyword: "Keywords, most searched first",
         columnFrom: "From",
         columnTo: "To",
         columnRelation: "Relation",

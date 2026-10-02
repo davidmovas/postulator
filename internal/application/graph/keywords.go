@@ -5,8 +5,10 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/llm"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -42,10 +44,14 @@ func (s *Service) ProposeFromKeywords(ctx context.Context, req ProposeFromKeywor
 	if err := requireSite(siteID); err != nil {
 		return ProposeFromKeywordsResponse{}, err
 	}
-	keywords := graphdomain.CleanKeywords(req.Keywords)
-	if len(keywords) == 0 {
+	given, _ := keyword.Parse(strings.Join(req.Keywords, "\n"))
+	if len(given) == 0 {
 		return ProposeFromKeywordsResponse{}, errors.New(errors.Invalid, "a proposal from keywords needs at least one keyword").
 			WithDetail("field", "keywords")
+	}
+	asked := make(map[string]keyword.Keyword, len(given))
+	for _, item := range given {
+		asked[fold(item.Text)] = item
 	}
 
 	owner, err := s.sites.Get(ctx, siteID)
@@ -75,7 +81,7 @@ func (s *Service) ProposeFromKeywords(ctx context.Context, req ProposeFromKeywor
 	}
 
 	response := ProposeFromKeywordsResponse{Entities: []ProposedEntity{}}
-	for batch := range slices.Chunk(keywords, KeywordsPerCall) {
+	for batch := range slices.Chunk(given.Texts(), KeywordsPerCall) {
 		system, user, renderErr := prompts.Render(NameProposeFromKeywords, keywordsPrompt{
 			SiteName: owner.Name, Parent: parent, Known: knownEntitiesOf(state), Keywords: batch,
 		})
@@ -97,9 +103,9 @@ func (s *Service) ProposeFromKeywords(ctx context.Context, req ProposeFromKeywor
 
 		for i := range proposal.Entities {
 			proposed := &proposal.Entities[i]
-			keyword := strings.TrimSpace(proposed.Keyword)
+			answered, known := asked[fold(proposed.Keyword)]
 			name := strings.TrimSpace(proposed.Name)
-			if name == "" || !containsFold(batch, keyword) {
+			if name == "" || !known {
 				response.Skipped++
 				continue
 			}
@@ -108,19 +114,31 @@ func (s *Service) ProposeFromKeywords(ctx context.Context, req ProposeFromKeywor
 				parentName = parent
 			}
 			response.Entities = append(response.Entities, ProposedEntity{
-				Name:              name,
-				Kind:              string(kindOf(proposed.Kind)),
-				Intent:            strings.TrimSpace(proposed.Intent),
-				PrimaryKeyword:    strings.ToLower(keyword),
-				SecondaryKeywords: graphdomain.CleanKeywords(proposed.SecondaryKeywords),
-				Anchors:           graphdomain.CleanKeywords(proposed.Anchors),
-				Parent:            parentName,
-				Related:           graphdomain.CleanKeywords(proposed.RelatedNames),
-				ExistingEntityID:  state.byName[fold(name)],
+				Name:             name,
+				Kind:             string(kindOf(proposed.Kind)),
+				Intent:           strings.TrimSpace(proposed.Intent),
+				Keywords:         application.KeywordViews(answeredKeywords(answered, proposed.SecondaryKeywords, asked)),
+				Anchors:          graphdomain.CleanKeywords(proposed.Anchors),
+				Parent:           parentName,
+				Related:          graphdomain.CleanKeywords(proposed.RelatedNames),
+				ExistingEntityID: state.byName[fold(name)],
 			})
 		}
 	}
 	return response, nil
+}
+
+func answeredKeywords(answered keyword.Keyword, others []string, asked map[string]keyword.Keyword) keyword.List {
+	listed := make([]keyword.Keyword, 0, len(others)+1)
+	listed = append(listed, answered)
+	for _, other := range others {
+		if given, known := asked[fold(other)]; known {
+			listed = append(listed, given)
+			continue
+		}
+		listed = append(listed, keyword.Keyword{Text: other})
+	}
+	return keyword.New(listed)
 }
 
 func knownEntitiesOf(state siteGraph) []knownEntity {
@@ -130,13 +148,4 @@ func knownEntitiesOf(state siteGraph) []knownEntity {
 	}
 	slices.SortFunc(known, func(a, b knownEntity) int { return strings.Compare(a.Name, b.Name) })
 	return known
-}
-
-func containsFold(values []string, wanted string) bool {
-	for _, value := range values {
-		if strings.EqualFold(strings.TrimSpace(value), strings.TrimSpace(wanted)) {
-			return true
-		}
-	}
-	return false
 }

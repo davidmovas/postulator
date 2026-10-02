@@ -5,6 +5,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -34,6 +35,10 @@ func (s *Service) CreateEntity(ctx context.Context, req CreateEntityRequest) (Cr
 	if req.Source == "" {
 		source = graphdomain.SourceUser
 	}
+	keywords, err := application.KeywordList(req.Keywords, "keywords")
+	if err != nil {
+		return CreateEntityResponse{}, err
+	}
 	now := s.now()
 	entity, err := graphdomain.NewEntity(graphdomain.Entity{
 		ID:        id.New(),
@@ -41,7 +46,7 @@ func (s *Service) CreateEntity(ctx context.Context, req CreateEntityRequest) (Cr
 		Name:      req.Name,
 		Kind:      graphdomain.Kind(req.Kind),
 		Intent:    req.Intent,
-		Keywords:  keywordList(req.PrimaryKeyword, req.SecondaryKeywords),
+		Keywords:  keywords,
 		Anchors:   anchorsOf(ctx, req.Anchors),
 		Source:    source,
 		CreatedAt: now,
@@ -61,6 +66,14 @@ func (s *Service) CreateEntity(ctx context.Context, req CreateEntityRequest) (Cr
 }
 
 func (s *Service) UpdateEntity(ctx context.Context, req UpdateEntityRequest) (UpdateEntityResponse, error) {
+	var keywords keyword.List
+	if req.Keywords != nil {
+		listed, err := application.KeywordList(*req.Keywords, "keywords")
+		if err != nil {
+			return UpdateEntityResponse{}, err
+		}
+		keywords = listed
+	}
 	updated, err := s.rewriteEntity(ctx, req.ID, func(next *graphdomain.Entity) {
 		if req.Name != nil {
 			next.Name = *req.Name
@@ -71,15 +84,8 @@ func (s *Service) UpdateEntity(ctx context.Context, req UpdateEntityRequest) (Up
 		if req.Intent != nil {
 			next.Intent = *req.Intent
 		}
-		primary, secondary := next.Keywords.Main(), next.Keywords.Rest()
-		if req.PrimaryKeyword != nil {
-			primary = *req.PrimaryKeyword
-		}
-		if req.SecondaryKeywords != nil {
-			secondary = *req.SecondaryKeywords
-		}
-		if req.PrimaryKeyword != nil || req.SecondaryKeywords != nil {
-			next.Keywords = keywordList(primary, secondary)
+		if req.Keywords != nil {
+			next.Keywords = keywords
 		}
 	})
 	if err != nil {

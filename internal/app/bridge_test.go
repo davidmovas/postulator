@@ -18,6 +18,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
+	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/transport/wails"
 )
 
@@ -74,7 +75,7 @@ func plannedPage(t *testing.T, core *app.Core) (siteID, pageID string) {
 	}
 
 	entity, err := core.Graph.CreateEntity(t.Context(), graph.CreateEntityRequest{
-		SiteID: owner.Site.ID, Name: "running shoes", Kind: "topic", PrimaryKeyword: "running shoes",
+		SiteID: owner.Site.ID, Name: "running shoes", Kind: "topic", Keywords: []dto.Keyword{{Text: "running shoes"}},
 	})
 	if err != nil {
 		t.Fatalf("create the entity: %v", err)

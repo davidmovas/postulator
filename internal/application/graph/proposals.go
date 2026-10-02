@@ -1,5 +1,7 @@
 package graph
 
+import "github.com/davidmovas/postulator/internal/kernel/dto"
+
 type ProposeFromPagesRequest struct {
 	SiteID     string   `json:"siteId"`
 	PageIDs    []string `json:"pageIds,omitempty" description:"Propose only for these pages, exactly as pages_list returned their ids; leave it out for every page that carries no entity"`
@@ -20,17 +22,16 @@ type PreviewFromPagesRequest struct {
 }
 
 type ProposedEntity struct {
-	PageID            string   `json:"pageId,omitempty" description:"The page it is about, as previewed; empty for one from a keyword"`
-	Path              string   `json:"path,omitempty" description:"The path of that page"`
-	Name              string   `json:"name" description:"The name, two to four words"`
-	Kind              string   `json:"kind,omitempty" enum:"hub,product,topic,category,custom" description:"What it is; a topic when left out"`
-	Intent            string   `json:"intent,omitempty" description:"What a reader wants from it"`
-	PrimaryKeyword    string   `json:"primaryKeyword,omitempty" description:"The phrase a reader searches for"`
-	SecondaryKeywords []string `json:"secondaryKeywords,omitempty" description:"Further phrases it can rank for"`
-	Anchors           []string `json:"anchors,omitempty" description:"Link texts another page may use"`
-	Parent            string   `json:"parent,omitempty" description:"The parent page path or entity name"`
-	Related           []string `json:"related,omitempty" description:"Sibling page paths or entity names"`
-	ExistingEntityID  string   `json:"existingEntityId,omitempty" description:"The entity of that name that already exists"`
+	PageID           string        `json:"pageId,omitempty" description:"The page it is about, as previewed; empty for one from a keyword"`
+	Path             string        `json:"path,omitempty" description:"The path of that page"`
+	Name             string        `json:"name" description:"The name, two to four words"`
+	Kind             string        `json:"kind,omitempty" enum:"hub,product,topic,category,custom" description:"What it is; a topic when left out"`
+	Intent           string        `json:"intent,omitempty" description:"What a reader wants from it"`
+	Keywords         []dto.Keyword `json:"keywords,omitempty" description:"The phrases a reader searches for, the main one first"`
+	Anchors          []string      `json:"anchors,omitempty" description:"Link texts another page may use"`
+	Parent           string        `json:"parent,omitempty" description:"The parent page path or entity name"`
+	Related          []string      `json:"related,omitempty" description:"Sibling page paths or entity names"`
+	ExistingEntityID string        `json:"existingEntityId,omitempty" description:"The entity of that name that already exists"`
 }
 
 type PreviewFromPagesResponse struct {
@@ -42,7 +43,7 @@ type PreviewFromPagesResponse struct {
 
 type ProposeFromKeywordsRequest struct {
 	SiteID         string   `json:"siteId"`
-	Keywords       []string `json:"keywords" description:"The search keywords to turn into entities, one phrase each"`
+	Keywords       []string `json:"keywords" description:"The search keywords to turn into entities, one phrase each; a monthly search volume may follow in brackets, as in bpc 157 (1200)"`
 	ParentEntityID string   `json:"parentEntityId,omitempty" description:"The entity every proposed one sits under unless the model says otherwise; leave it out for none"`
 }
 

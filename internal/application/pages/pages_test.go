@@ -506,21 +506,41 @@ func TestCreateAndUpdateCarryTheKeywordsOfThePage(t *testing.T) {
 
 	h := newHarness(t)
 	created, err := h.service.Create(t.Context(), pages.CreateRequest{
-		SiteID: h.siteID, Path: "/shoes/", Title: "Shoes", PrimaryKeyword: " running shoes ", Keywords: []string{"trail shoes", "Trail Shoes", ""},
+		SiteID: h.siteID, Path: "/shoes/", Title: "Shoes",
+		Keywords: []dto.Keyword{{Text: "trail shoes"}, {Text: " running shoes ", Volume: new(9000)}, {Text: "Trail Shoes"}},
 	})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	if created.Page.PrimaryKeyword != "running shoes" || !slices.Equal(created.Page.Keywords, []string{"trail shoes"}) {
-		t.Fatalf("Create answered %q %v", created.Page.PrimaryKeyword, created.Page.Keywords)
+	if got := keywordTexts(created.Page.Keywords); !slices.Equal(got, []string{"running shoes", "trail shoes"}) {
+		t.Fatalf("Create answered %v, want the list trimmed, deduplicated and ordered by volume", got)
+	}
+	if volume := created.Page.Keywords[0].Volume; volume == nil || *volume != 9000 {
+		t.Fatalf("Create answered %+v, want the volume kept", created.Page.Keywords[0])
 	}
 
-	updated, err := h.service.Update(t.Context(), pages.UpdateRequest{ID: created.Page.ID, Keywords: []string{"road shoes"}})
+	renamed, err := h.service.Update(t.Context(), pages.UpdateRequest{ID: created.Page.ID, Title: new("Running shoes")})
+	if err != nil {
+		t.Fatalf("Update the title: %v", err)
+	}
+	if got := keywordTexts(renamed.Page.Keywords); !slices.Equal(got, []string{"running shoes", "trail shoes"}) {
+		t.Fatalf("an update that leaves the keywords out answered %v, want them kept", got)
+	}
+
+	updated, err := h.service.Update(t.Context(), pages.UpdateRequest{ID: created.Page.ID, Keywords: &[]dto.Keyword{{Text: "road shoes"}}})
 	if err != nil {
 		t.Fatalf("Update: %v", err)
 	}
-	if updated.Page.PrimaryKeyword != "running shoes" || !slices.Equal(updated.Page.Keywords, []string{"road shoes"}) {
-		t.Fatalf("Update answered %q %v, want the primary kept and the list replaced", updated.Page.PrimaryKeyword, updated.Page.Keywords)
+	if got := keywordTexts(updated.Page.Keywords); !slices.Equal(got, []string{"road shoes"}) {
+		t.Fatalf("Update answered %v, want the whole list replaced", got)
+	}
+
+	cleared, err := h.service.Update(t.Context(), pages.UpdateRequest{ID: created.Page.ID, Keywords: &[]dto.Keyword{}})
+	if err != nil {
+		t.Fatalf("Update to no keywords: %v", err)
+	}
+	if cleared.Page.Keywords == nil || len(cleared.Page.Keywords) != 0 {
+		t.Fatalf("an empty list answered %#v, want the page to carry none", cleared.Page.Keywords)
 	}
 
 	bare, err := h.service.Create(t.Context(), pages.CreateRequest{SiteID: h.siteID, Path: "/socks/"})
@@ -530,4 +550,12 @@ func TestCreateAndUpdateCarryTheKeywordsOfThePage(t *testing.T) {
 	if bare.Page.Keywords == nil {
 		t.Fatal("a page without keywords answers null instead of an empty list")
 	}
+}
+
+func keywordTexts(keywords []dto.Keyword) []string {
+	out := make([]string, 0, len(keywords))
+	for _, item := range keywords {
+		out = append(out, item.Text)
+	}
+	return out
 }

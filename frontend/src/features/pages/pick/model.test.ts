@@ -17,7 +17,6 @@ function aPage(id: string, path: string, overrides: Partial<Page> = {}): Page {
         metaTitle: "",
         metaDescription: "",
         canonical: "",
-        primaryKeyword: "",
         keywords: [],
         status: "planned",
         entityId: null,

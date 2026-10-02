@@ -1,4 +1,5 @@
 import type { Entity } from "../../../data/types.js";
+import { keywordList } from "../../../domain/keywords.js";
 import { compareNames } from "./index.js";
 
 export type SearchField = "name" | "primaryKeyword" | "secondaryKeyword";
@@ -50,10 +51,9 @@ export function rank(entities: readonly Entity[], query: string, limit: number):
             }
         };
         consider("name", held.name);
-        consider("primaryKeyword", held.primaryKeyword);
-        for (const keyword of held.secondaryKeywords ?? []) {
-            consider("secondaryKeyword", keyword);
-        }
+        keywordList(held.keywords).forEach((keyword, at) => {
+            consider(at === 0 ? "primaryKeyword" : "secondaryKeyword", keyword.text);
+        });
         if (best !== null) {
             hits.push(best);
         }

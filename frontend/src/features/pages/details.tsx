@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import { copy } from "../../copy/index.js";
 import { react } from "../../data/errors.js";
 import { useUpdatePage } from "../../data/hooks/pages.js";
-import type { Page } from "../../data/types.js";
+import type { Keyword, Page } from "../../data/types.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
+import { keywordList, sameKeywords } from "../../domain/keywords.js";
 import { pageStatuses, pageWpTypes } from "../../generated/vocab.js";
 import { pageStatusLabel } from "./labels.js";
 import type { SelectOption } from "../../ui/index.js";
-import { Banner, Button, Field, Input, Select, SyncProblemIcon, Textarea } from "../../ui/index.js";
+import { Banner, Button, Field, Input, KeywordInput, Select, SyncProblemIcon, Textarea } from "../../ui/index.js";
 import { ConflictNotice } from "./conflict-notice.js";
 
 const wpTypeOptions: readonly SelectOption<string>[] = pageWpTypes.map((value) => ({ value, label: value }));
@@ -88,9 +89,11 @@ export interface PageDetailsProps {
 export function PageDetails({ page, siteId, search }: PageDetailsProps): ReactElement {
     const update = useUpdatePage();
     const [draft, setDraft] = useState<Draft>(() => draftOf(page));
+    const [keywords, setKeywords] = useState<Keyword[]>(() => keywordList(page.keywords));
 
     useEffect(() => {
         setDraft(draftOf(page));
+        setKeywords(keywordList(page.keywords));
         update.reset();
     }, [page.id, page.updatedAt]);
 
@@ -99,8 +102,10 @@ export function PageDetails({ page, siteId, search }: PageDetailsProps): ReactEl
     };
 
     const original = draftOf(page);
+    const storedKeywords = keywordList(page.keywords);
     const keys = Object.keys(original) as (keyof Draft)[];
-    const dirty = keys.some((key) => original[key] !== draft[key]);
+    const keywordsChanged = !sameKeywords(storedKeywords, keywords);
+    const dirty = keywordsChanged || keys.some((key) => original[key] !== draft[key]);
 
     const save = (): void => {
         const request: Parameters<typeof update.mutate>[0] = { id: page.id };
@@ -108,6 +113,9 @@ export function PageDetails({ page, siteId, search }: PageDetailsProps): ReactEl
             if (original[key] !== draft[key]) {
                 request[key] = draft[key];
             }
+        }
+        if (keywordsChanged) {
+            request.keywords = keywords;
         }
         update.mutate(request);
     };
@@ -188,6 +196,24 @@ export function PageDetails({ page, siteId, search }: PageDetailsProps): ReactEl
                 )}
             </Field>
             <Field
+                label={copy.pages.detail.keywords}
+                hint={keywords.length > 0 ? copy.pages.detail.keywordsOwn : copy.pages.detail.keywordsInherited}
+                error={fieldErrorOf(update.error, "keywords")}
+            >
+                {(control) => (
+                    <KeywordInput
+                        id={control.id}
+                        aria-describedby={control["aria-describedby"]}
+                        invalid={control.invalid}
+                        values={keywords}
+                        removeLabel={copy.pages.detail.removeKeyword}
+                        phraseLabel={copy.pages.detail.keyword}
+                        volumeLabel={copy.pages.detail.volume}
+                        onChange={setKeywords}
+                    />
+                )}
+            </Field>
+            <Field
                 label={copy.pages.detail.metaTitle}
                 hint={copy.pages.detail.characters(draft.metaTitle.length)}
                 error={fieldErrorOf(update.error, "metaTitle")}
@@ -246,6 +272,7 @@ export function PageDetails({ page, siteId, search }: PageDetailsProps): ReactEl
                     disabled={!dirty}
                     onClick={() => {
                         setDraft(original);
+                        setKeywords(storedKeywords);
                         update.reset();
                     }}
                 >

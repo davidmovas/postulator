@@ -24,6 +24,7 @@ import type { Wire } from "./wire.js";
 export type ListFilter<T> = Omit<T, "cursor" | "limit" | "sort">;
 
 export type SortSpec = DtoModels.Sort;
+export type Keyword = Wire<DtoModels.Keyword>;
 
 export type Site = Wire<SitesModels.Site>;
 export type SiteDefaults = Wire<SitesModels.Defaults>;
