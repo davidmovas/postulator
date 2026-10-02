@@ -281,6 +281,11 @@ func TestRevertKeepsTheSEOMetaItHasNoCopyOf(t *testing.T) {
 
 func (s *revertStand) relinked(t *testing.T, pageID, neighborID, body string) {
 	t.Helper()
+	s.relinkedOver(t, pageID, neighborID, steps.NeighborBefore{Hash: wp.ContentHash(neighborBefore), HTML: neighborBefore}, body)
+}
+
+func (s *revertStand) relinkedOver(t *testing.T, pageID, neighborID string, before steps.NeighborBefore, body string) {
+	t.Helper()
 
 	wpID := s.wpIDs[neighborID]
 	client := syncClient(t, s.server)
@@ -297,8 +302,7 @@ func (s *revertStand) relinked(t *testing.T, pageID, neighborID, body string) {
 		Linked: 1,
 		Neighbors: []steps.NeighborResult{{
 			PageID: neighborID, Path: s.pages.items[neighborID].Path, WPID: wpID,
-			Outcome: steps.OutcomeLinked, Anchor: "espresso",
-			Before: steps.NeighborBefore{Hash: wp.ContentHash(neighborBefore), HTML: neighborBefore},
+			Outcome: steps.OutcomeLinked, Anchor: "espresso", Before: before,
 		}},
 	})
 	if err != nil {
@@ -361,6 +365,51 @@ const runBody = `<h1>Filter</h1><p>What the run wrote about filter coffee.</p>`
 
 func relinkedBody() string {
 	return neighborBefore + `<p>Try our <a href="/coffee/espresso/">espresso</a>.</p>`
+}
+
+func TestRevertTellsAnEmptyNeighborFromOneItKeptNoCopyOf(t *testing.T) {
+	t.Parallel()
+
+	sentence := `<p>Read about <a href="/coffee/espresso/">espresso</a>.</p>`
+	cases := []struct {
+		name   string
+		before steps.NeighborBefore
+		paused bool
+		body   string
+	}{
+		{
+			name:   "a neighbor that was empty is emptied again",
+			before: steps.NeighborBefore{Hash: wp.ContentHash(""), HTML: ""},
+			body:   "",
+		},
+		{
+			name:   "a neighbor with no record of what it held goes to a human",
+			before: steps.NeighborBefore{},
+			paused: true,
+			body:   sentence,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			stand := newRevertStand(t)
+			stand.updated(t, "page-filter", runBody)
+			stand.relinkedOver(t, "page-filter", "page-parent", tc.before, sentence)
+
+			reverted, result := stand.revert(t, "page-filter")
+			if paused := result.Next == run.TransitionPause; paused != tc.paused {
+				t.Fatalf("paused = %t (%s), want %t", paused, result.Message, tc.paused)
+			}
+			if tc.paused && reverted.Detail != steps.ReasonRevertNoBefore {
+				t.Fatalf("the revert handed back %q, want %q", reverted.Detail, steps.ReasonRevertNoBefore)
+			}
+			if got := stand.body(t, stand.wpIDs["page-parent"]); got != tc.body {
+				t.Fatalf("the neighbor holds %q, want %q", got, tc.body)
+			}
+		})
+	}
 }
 
 func TestRevertPutsBackWhatTheRunWroteToTheSite(t *testing.T) {

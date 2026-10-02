@@ -256,7 +256,7 @@ func undoNeighbor(ctx context.Context, deps Deps, sc *run.StepContext, result *R
 	if neighbor.Outcome != OutcomeLinked {
 		return "", true
 	}
-	if neighbor.Before.HTML == "" {
+	if neighbor.Before.Hash == "" {
 		return ReasonRevertNoBefore, false
 	}
 
