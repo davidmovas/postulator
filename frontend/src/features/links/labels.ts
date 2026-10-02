@@ -1,4 +1,5 @@
 import { copy } from "../../copy/index.js";
+import { isOneOf, linkBlockedReasons } from "../../generated/vocab.js";
 import type { IconComponent, Tone } from "../../ui/index.js";
 import { ArrowDownwardIcon, ArrowUpwardIcon, SyncAltIcon } from "../../ui/index.js";
 import type { Severity } from "./model/audit.js";
@@ -17,6 +18,10 @@ export function relationIcon(relation: string): IconComponent {
 
 export function relationLabel(relation: string): string {
     return copy.links.relations[relation] ?? relation;
+}
+
+export function blockedReasonLabel(reason: string): string {
+    return isOneOf(linkBlockedReasons, reason) ? copy.links.blockedReasons[reason] : reason;
 }
 
 export function classTone(kind: string): Tone {

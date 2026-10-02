@@ -23,7 +23,7 @@ import {
 } from "../../ui/index.js";
 import type { IconComponent, Tone } from "../../ui/index.js";
 import { pageStatusLabel, statusTone } from "../pages/labels.js";
-import { classLabel, classTone, relationIcon } from "./labels.js";
+import { blockedReasonLabel, classLabel, classTone, relationIcon } from "./labels.js";
 import { groups } from "./model/detail.js";
 
 interface RequiredRowProps {
@@ -98,8 +98,11 @@ function BlockedRow({ siteId, link }: BlockedRowProps): ReactElement {
     return (
         <li className="flex items-center gap-2 rounded-md px-1 py-1 text-xs hover:bg-inset">
             <Icon size={14} className="shrink-0 text-ink-faint" />
-            <span className="min-w-0 flex-1 truncate text-ink-soft">{link.targetEntityName}</span>
-            <LinkOffIcon size={12} className="shrink-0 text-danger" />
+            <span className="min-w-0 flex-1 truncate text-ink-soft" title={blockedReasonLabel(link.blockedReason)}>
+                {link.targetEntityName}
+                <span className="ml-1.5 text-2xs text-ink-faint">{blockedReasonLabel(link.blockedReason)}</span>
+            </span>
+            <LinkOffIcon size={12} className={cx("shrink-0", link.blockedReason === "no_page" ? "text-ink-faint" : "text-danger")} />
             <Link to={`/s/${siteId}/graph/${link.targetEntityId}`} className="shrink-0 text-2xs">
                 {copy.links.panel.givePage}
             </Link>

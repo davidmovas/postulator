@@ -41,7 +41,7 @@ func TestPlanLinksReportsWhatItCannotLink(t *testing.T) {
 			rules:    template.LinkRules{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5},
 			want: []content.BlockedTarget{{
 				EntityID: "orphan", Relation: content.RelationDown, Weight: 0.1, Depth: 1,
-				Reason: content.BlockedNoCanonicalPage,
+				Reason: content.BlockedNoPage,
 			}},
 		},
 		{
@@ -55,13 +55,13 @@ func TestPlanLinksReportsWhatItCannotLink(t *testing.T) {
 			}},
 		},
 		{
-			name:     "a parent without a page is a blocked required target",
+			name:     "a parent without any page is passed over and owed nothing",
 			fixture:  pagelessParent,
 			entityID: "child",
 			rules:    template.LinkRules{UpDepth: 1},
 			want: []content.BlockedTarget{{
-				EntityID: "parent", Relation: content.RelationUp, Required: true, Weight: 1, Depth: 1,
-				Reason: content.BlockedNoCanonicalPage,
+				EntityID: "parent", Relation: content.RelationUp, Weight: 1, Depth: 1,
+				Reason: content.BlockedNoPage,
 			}},
 		},
 		{

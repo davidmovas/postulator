@@ -20,7 +20,10 @@ const (
 
 type BlockedReason string
 
-const BlockedNoCanonicalPage BlockedReason = "no_canonical_page"
+const (
+	BlockedNoCanonicalPage BlockedReason = "no_canonical_page"
+	BlockedNoPage          BlockedReason = "no_page"
+)
 
 type LinkTarget struct {
 	EntityID string   `json:"entityId"`
@@ -151,28 +154,49 @@ func (p *planner) place(entity graph.Entity, relation Relation, required bool, w
 	}, true
 }
 
+func pageless(index pagemap.Index, entity graph.Entity) bool {
+	return entity.CanonicalPageID == nil && len(index.ByEntity(entity.ID)) == 0
+}
+
+func (p *planner) passOver(entity graph.Entity, relation Relation, weight float64, depth int) {
+	p.seen[entity.ID] = struct{}{}
+	p.blocked = append(p.blocked, BlockedTarget{
+		EntityID: entity.ID, Relation: relation, Weight: weight, Depth: depth, Reason: BlockedNoPage,
+	})
+}
+
 func (p *planner) up(entityID string, upDepth int) {
-	previous := 0
-	for depth := 1; depth <= upDepth; depth++ {
-		level := p.g.Parents(entityID, depth)
-		for i := previous; i < len(level); i++ {
-			if target, ok := p.place(level[i], RelationUp, true, 1, depth); ok {
-				p.targets = append(p.targets, target)
-			}
+	frontier := []string{entityID}
+	for depth := 1; depth <= upDepth && len(frontier) > 0; depth++ {
+		next := make([]string, 0)
+		for _, from := range frontier {
+			p.upFrom(from, depth, &next)
 		}
-		previous = len(level)
+		frontier = next
+	}
+}
+
+func (p *planner) upFrom(from string, depth int, next *[]string) {
+	parents := p.g.Parents(from, 1)
+	for i := range parents {
+		if _, dup := p.seen[parents[i].ID]; dup {
+			continue
+		}
+		if pageless(p.index, parents[i]) {
+			p.passOver(parents[i], RelationUp, 1, depth)
+			p.upFrom(parents[i].ID, depth, next)
+			continue
+		}
+		if target, ok := p.place(parents[i], RelationUp, true, 1, depth); ok {
+			p.targets = append(p.targets, target)
+		}
+		*next = append(*next, parents[i].ID)
 	}
 }
 
 func (p *planner) down(entityID string) {
-	children := p.g.Children(entityID)
-
-	out := make([]LinkTarget, 0, len(children))
-	for i := range children {
-		if target, ok := p.place(children[i], RelationDown, false, children[i].Score, 1); ok {
-			out = append(out, target)
-		}
-	}
+	out := make([]LinkTarget, 0)
+	p.downFrom(entityID, &out)
 
 	slices.SortStableFunc(out, func(a, b LinkTarget) int {
 		if a.Weight != b.Weight {
@@ -181,6 +205,23 @@ func (p *planner) down(entityID string) {
 		return strings.Compare(a.URL, b.URL)
 	})
 	p.targets = append(p.targets, out...)
+}
+
+func (p *planner) downFrom(from string, out *[]LinkTarget) {
+	children := p.g.Children(from)
+	for i := range children {
+		if _, dup := p.seen[children[i].ID]; dup {
+			continue
+		}
+		if pageless(p.index, children[i]) {
+			p.passOver(children[i], RelationDown, children[i].Score, 1)
+			p.downFrom(children[i].ID, out)
+			continue
+		}
+		if target, ok := p.place(children[i], RelationDown, false, children[i].Score, 1); ok {
+			*out = append(*out, target)
+		}
+	}
 }
 
 func (p *planner) siblings(entityID string, minWeight float64) {
@@ -192,7 +233,7 @@ func (p *planner) siblings(entityID string, minWeight float64) {
 	}
 }
 
-func MayLinkTo(g graph.Graph, entityID string) []graph.Entity {
+func MayLinkTo(g graph.Graph, index pagemap.Index, entityID string) []graph.Entity {
 	if _, known := g.Entity(entityID); !known {
 		return []graph.Entity{}
 	}
@@ -208,9 +249,16 @@ func MayLinkTo(g graph.Graph, entityID string) []graph.Entity {
 		return true
 	}
 
-	parents := g.Parents(entityID, 1)
-	for i := range parents {
-		keep(parents[i])
+	climb := []string{entityID}
+	for len(climb) > 0 {
+		from := climb[0]
+		climb = climb[1:]
+		parents := g.Parents(from, 1)
+		for i := range parents {
+			if keep(parents[i]) && pageless(index, parents[i]) {
+				climb = append(climb, parents[i].ID)
+			}
+		}
 	}
 	queue := []string{entityID}
 	for len(queue) > 0 {

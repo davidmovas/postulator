@@ -252,6 +252,81 @@ func TestPlanLinksSkipsWhatCannotBeLinked(t *testing.T) {
 	}
 }
 
+func passThroughFixture(t *testing.T, groupPages []pagemap.Page) dag {
+	t.Helper()
+
+	entities := []graph.Entity{
+		entity("root", "Peptides", 1, []string{"peptides"}, "page-root"),
+		entity("group", "BPC-157", 0.8, []string{"bpc 157"}, ""),
+		entity("leaf", "Liquid", 0.5, []string{"bpc 157 liquid"}, "page-leaf"),
+	}
+	g, err := graph.New(entities, []graph.Edge{parentEdge("e1", "group", "root"), parentEdge("e2", "leaf", "group")})
+	if err != nil {
+		t.Fatalf("graph.New: %v", err)
+	}
+	pages := append([]pagemap.Page{
+		page("page-root", "/peptides/", "root"), page("page-leaf", "/peptides/bpc-157/liquid/", "leaf"),
+	}, groupPages...)
+	return dag{g: g, index: pagemap.NewIndex(pages)}
+}
+
+func TestAParentWithNoPageIsPassedThrough(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		groupPages []pagemap.Page
+		subject    string
+		rules      template.LinkRules
+		targets    []string
+		blocked    content.BlockedReason
+		required   bool
+	}{
+		{
+			name:    "up past a group that has no page",
+			subject: "leaf", rules: template.LinkRules{UpDepth: 1},
+			targets: []string{"/peptides/"}, blocked: content.BlockedNoPage,
+		},
+		{
+			name:    "down past a group that has no page",
+			subject: "root", rules: template.LinkRules{DownLinks: true},
+			targets: []string{"/peptides/bpc-157/liquid/"}, blocked: content.BlockedNoPage,
+		},
+		{
+			name:       "a group with a page that is not canonical still blocks",
+			groupPages: []pagemap.Page{page("page-group", "/peptides/bpc-157/", "group")},
+			subject:    "leaf", rules: template.LinkRules{UpDepth: 1},
+			targets: []string{}, blocked: content.BlockedNoCanonicalPage, required: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			fixture := passThroughFixture(t, tc.groupPages)
+			plan := content.PlanLinks(fixture.g, fixture.index, content.Subject{EntityID: tc.subject}, policy(tc.rules))
+			if got := urls(plan.Context.Targets); !slices.Equal(got, tc.targets) {
+				t.Fatalf("targets = %v, want %v", got, tc.targets)
+			}
+			if len(plan.Blocked) != 1 || plan.Blocked[0].EntityID != "group" || plan.Blocked[0].Reason != tc.blocked ||
+				plan.Blocked[0].Required != tc.required {
+				t.Fatalf("blocked = %+v, want the group as %s, required %t", plan.Blocked, tc.blocked, tc.required)
+			}
+		})
+	}
+
+	fixture := passThroughFixture(t, nil)
+	reachable := content.MayLinkTo(fixture.g, fixture.index, "leaf")
+	ids := make([]string, 0, len(reachable))
+	for _, held := range reachable {
+		ids = append(ids, held.ID)
+	}
+	if !slices.Contains(ids, "root") || !slices.Contains(ids, "group") {
+		t.Fatalf("MayLinkTo(leaf) = %v, want the group and the page above it", ids)
+	}
+}
+
 func scoped(record graph.Entity, scope string) graph.Entity {
 	record.ScopeID = ref(scope)
 	return record
@@ -335,7 +410,7 @@ func TestMayLinkToNamesEveryEntityThatCanOweALink(t *testing.T) {
 		t.Run(tc.entity, func(t *testing.T) {
 			t.Parallel()
 
-			found := content.MayLinkTo(fixture.g, tc.entity)
+			found := content.MayLinkTo(fixture.g, fixture.index, tc.entity)
 			ids := make([]string, 0, len(found))
 			for i := range found {
 				ids = append(ids, found[i].ID)

@@ -63,6 +63,10 @@ func TestResolveContextPreflightNamesWhatTheGraphLacks(t *testing.T) {
 		ID: "e2", SiteID: "site", FromEntityID: "latte", ToEntityID: "parent",
 		Kind: graph.EdgeParent, Weight: 1, Source: graph.SourceUser, Status: graph.StatusApproved,
 	})
+	uncanonical := pageList{items: []pagemap.Page{
+		{ID: "page-parent", SiteID: "site", Path: "/coffee/", WPType: pagemap.WPPage, Status: pagemap.StatusPlanned, EntityID: pointer("parent")},
+		homeless,
+	}}
 
 	cases := []struct {
 		name     string
@@ -84,10 +88,21 @@ func TestResolveContextPreflightNamesWhatTheGraphLacks(t *testing.T) {
 			severity: content.SeverityError,
 		},
 		{
-			name: "a required parent without a page",
+			name: "a parent without any page is passed over",
 			deps: func(d steps.Deps) steps.Deps {
 				d.Entities = entityList{items: orphaned}
 				d.Edges = edgeList{items: orphanedEdges}
+				return d
+			},
+			targets: []pagemap.Page{homeless},
+			codes:   []string{},
+		},
+		{
+			name: "a required parent whose page is not its canonical one",
+			deps: func(d steps.Deps) steps.Deps {
+				d.Entities = entityList{items: orphaned}
+				d.Edges = edgeList{items: orphanedEdges}
+				d.Pages = uncanonical
 				return d
 			},
 			targets:  []pagemap.Page{homeless},
@@ -95,10 +110,11 @@ func TestResolveContextPreflightNamesWhatTheGraphLacks(t *testing.T) {
 			severity: content.SeverityError,
 		},
 		{
-			name: "a required parent without a page when validate allows errors",
+			name: "a required parent whose page is not its canonical one when validate allows errors",
 			deps: func(d steps.Deps) steps.Deps {
 				d.Entities = entityList{items: orphaned}
 				d.Edges = edgeList{items: orphanedEdges}
+				d.Pages = uncanonical
 				return d
 			},
 			recipe: []template.StepSpec{

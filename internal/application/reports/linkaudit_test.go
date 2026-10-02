@@ -168,7 +168,7 @@ func TestLinkAuditPageAgreesWithTheSiteAudit(t *testing.T) {
 	}
 	beans := reports.RequiredLink{
 		Relation: "down", TargetEntityID: f.entities["Beans"].ID, TargetEntityName: "Beans",
-		AnchorsAllowed: []string{}, Weight: 0.9, Depth: 1, BlockedReason: "no_canonical_page",
+		AnchorsAllowed: []string{}, Weight: 0.9, Depth: 1, BlockedReason: "no_page",
 		State: string(reports.LinkBlocked),
 	}
 	if !reflect.DeepEqual(blocked[2], beans) {

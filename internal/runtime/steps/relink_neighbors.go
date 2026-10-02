@@ -202,7 +202,7 @@ func candidatesOf(lc content.LinkContext, around neighborWork, entity graph.Enti
 		seen[page.ID] = struct{}{}
 		out = append(out, candidate{page: page, planned: true})
 	}
-	others := content.MayLinkTo(around.graph, entity.ID)
+	others := content.MayLinkTo(around.graph, around.index, entity.ID)
 	for i := range others {
 		if others[i].CanonicalPageID == nil {
 			continue

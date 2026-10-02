@@ -46,7 +46,7 @@ export type LinkClass = (typeof linkClasses)[number];
 
 export const offGraphLinkClasses: readonly LinkClass[] = ["self", "external", "unknown_internal"];
 
-export const linkBlockedReasons = ["no_canonical_page"] as const;
+export const linkBlockedReasons = ["no_canonical_page", "no_page"] as const;
 export type LinkBlockedReason = (typeof linkBlockedReasons)[number];
 
 export const linkAuditSkipReasons = ["unmapped", "no_template"] as const;

@@ -120,6 +120,7 @@ func TestResolveContextSaysWhatTheGraphAsksForAndNoPageCarries(t *testing.T) {
 		},
 	}}
 	deps.Pages = pageList{items: []pagemap.Page{
+		{ID: "page-parent", SiteID: "site", Path: "/coffee/", WPType: pagemap.WPPage, Status: pagemap.StatusPlanned, EntityID: pointer("parent")},
 		{ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", WPType: pagemap.WPPage, Status: pagemap.StatusPlanned},
 	}}
 
@@ -133,7 +134,7 @@ func TestResolveContextSaysWhatTheGraphAsksForAndNoPageCarries(t *testing.T) {
 		t.Fatalf("decode the link context: %v", err)
 	}
 	if len(lc.Targets) != 0 {
-		t.Fatalf("targets = %+v, want none: the parent is on no page", lc.Targets)
+		t.Fatalf("targets = %+v, want none: the parent's page is not its canonical one", lc.Targets)
 	}
 	if !strings.Contains(result.Message, "holding back 1") || !strings.Contains(result.Message, "1 of them required") {
 		t.Fatalf("message = %q, want the required link nobody can carry named", result.Message)
