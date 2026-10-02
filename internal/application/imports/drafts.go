@@ -3,12 +3,19 @@ package imports
 import (
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 )
 
 func key(name string) string {
 	return strings.ToLower(strings.TrimSpace(name))
+}
+
+func slugOf(name string) string {
+	return strings.Join(strings.FieldsFunc(strings.ToLower(name), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	}), "-")
 }
 
 func union(into, more []string) []string {
@@ -37,16 +44,6 @@ func fill(current, next string) string {
 	return strings.TrimSpace(next)
 }
 
-type entityDraft struct {
-	name     string
-	kind     string
-	keywords keyword.List
-	anchors  []string
-	parent   string
-	related  []string
-	row      int
-}
-
 type pageDraft struct {
 	path      string
 	title     string
@@ -57,31 +54,24 @@ type pageDraft struct {
 	pageKind  string
 	entity    string
 	keywords  keyword.List
+	own       ownership
+	rows      []int
+	unit      int
 	generated bool
 	row       int
 }
 
+func (p *pageDraft) technical() bool {
+	return p.own == ownNo
+}
+
 type drafts struct {
-	entities map[string]*entityDraft
-	pages    map[string]*pageDraft
-	order    []string
-	paths    []string
+	pages map[string]*pageDraft
+	paths []string
 }
 
 func newDrafts() *drafts {
-	return &drafts{entities: make(map[string]*entityDraft), pages: make(map[string]*pageDraft)}
-}
-
-func (d *drafts) entity(name string, row int) *entityDraft {
-	at := key(name)
-	current, known := d.entities[at]
-	if known {
-		return current
-	}
-	current = &entityDraft{name: strings.TrimSpace(name), row: row}
-	d.entities[at] = current
-	d.order = append(d.order, at)
-	return current
+	return &drafts{pages: make(map[string]*pageDraft)}
 }
 
 func (d *drafts) page(path string, row int) (draft *pageDraft, known bool) {
@@ -89,7 +79,7 @@ func (d *drafts) page(path string, row int) (draft *pageDraft, known bool) {
 	if known {
 		return current, true
 	}
-	current = &pageDraft{path: path, row: row}
+	current = &pageDraft{path: path, row: row, unit: -1}
 	d.pages[path] = current
 	d.paths = append(d.paths, path)
 	return current, false
@@ -101,21 +91,16 @@ func (d *drafts) sortedPaths() []string {
 	return out
 }
 
-func (e *entityDraft) merge(other entityDraft) {
-	e.kind = fill(e.kind, other.kind)
-	e.parent = fill(e.parent, other.parent)
-	e.keywords = e.keywords.Merge(other.keywords)
-	e.anchors = union(e.anchors, other.anchors)
-	e.related = union(e.related, other.related)
-}
-
-func (p *pageDraft) merge(other pageDraft) {
-	p.title = fill(p.title, other.title)
-	p.h1 = fill(p.h1, other.h1)
-	p.metaTitle = fill(p.metaTitle, other.metaTitle)
-	p.metaDesc = fill(p.metaDesc, other.metaDesc)
-	p.wpType = fill(p.wpType, other.wpType)
-	p.pageKind = fill(p.pageKind, other.pageKind)
-	p.entity = fill(p.entity, other.entity)
-	p.keywords = p.keywords.Merge(other.keywords)
+func (p *pageDraft) merge(row *rowDraft, at int) {
+	p.title = fill(p.title, row.title)
+	p.h1 = fill(p.h1, row.h1)
+	p.metaTitle = fill(p.metaTitle, row.metaTitle)
+	p.metaDesc = fill(p.metaDesc, row.metaDesc)
+	p.wpType = fill(p.wpType, row.wpType)
+	p.pageKind = fill(p.pageKind, row.pageKind)
+	p.keywords = p.keywords.Merge(row.keywords)
+	if p.own == ownUnset {
+		p.own = row.own
+	}
+	p.rows = append(p.rows, at)
 }

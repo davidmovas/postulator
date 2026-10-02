@@ -218,6 +218,11 @@ export const importFindingCodes = [
     "unknown_wp_type",
     "root_page_skipped",
     "bad_volume",
+    "unknown_own_entity",
+    "technical_parent",
+    "group_without_page",
+    "ambiguous_parent",
+    "ambiguous_entity",
 ] as const;
 export type ImportFindingCode = (typeof importFindingCodes)[number];
 
@@ -227,6 +232,8 @@ export const blockingImportFindingCodes: readonly ImportFindingCode[] = [
     "unknown_related",
     "self_edge",
     "cycle",
+    "ambiguous_parent",
+    "ambiguous_entity",
 ];
 
 export const importActions = ["create", "update", "skip"] as const;

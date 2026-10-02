@@ -35,10 +35,15 @@ const (
 	CodeUnknownWPType     FindingCode = "unknown_wp_type"
 	CodeRootPageSkipped   FindingCode = "root_page_skipped"
 	CodeBadVolume         FindingCode = "bad_volume"
+	CodeUnknownOwnEntity  FindingCode = "unknown_own_entity"
+	CodeTechnicalParent   FindingCode = "technical_parent"
+	CodeGroupWithoutPage  FindingCode = "group_without_page"
+	CodeAmbiguousParent   FindingCode = "ambiguous_parent"
+	CodeAmbiguousEntity   FindingCode = "ambiguous_entity"
 )
 
 var blockingFindingCodes = []FindingCode{
-	CodeBadPath, CodeUnknownParent, CodeUnknownRelated, CodeSelfEdge, CodeCycle,
+	CodeBadPath, CodeUnknownParent, CodeUnknownRelated, CodeSelfEdge, CodeCycle, CodeAmbiguousParent, CodeAmbiguousEntity,
 }
 
 func (c FindingCode) Blocking() bool {
@@ -96,10 +101,17 @@ type PreviewPage struct {
 
 type PreviewEntity struct {
 	Name     string        `json:"name"`
+	Parent   string        `json:"parent,omitempty"`
 	Kind     string        `json:"kind"`
 	Keywords []dto.Keyword `json:"keywords"`
 	Anchors  []string      `json:"anchors"`
 	Action   string        `json:"action"`
+}
+
+type PreviewGroup struct {
+	Path []string `json:"path"`
+	Page string   `json:"page,omitempty"`
+	Rows int      `json:"rows"`
 }
 
 type PreviewEdge struct {
@@ -119,6 +131,7 @@ type Conflict struct {
 type PreviewReport struct {
 	Pages           []PreviewPage   `json:"pages"`
 	Entities        []PreviewEntity `json:"entities"`
+	Groups          []PreviewGroup  `json:"groups"`
 	Edges           []PreviewEdge   `json:"edges"`
 	Warnings        []Finding       `json:"warnings"`
 	Errors          []Finding       `json:"errors"`
@@ -196,6 +209,9 @@ func (r *PreviewReport) settle() {
 	if r.Entities == nil {
 		r.Entities = []PreviewEntity{}
 	}
+	if r.Groups == nil {
+		r.Groups = []PreviewGroup{}
+	}
 	if r.Edges == nil {
 		r.Edges = []PreviewEdge{}
 	}
@@ -210,9 +226,10 @@ func (r *PreviewReport) settle() {
 	}
 }
 
-func entityView(e graph.Entity, action Action) PreviewEntity {
+func entityView(e graph.Entity, parent string, action Action) PreviewEntity {
 	return PreviewEntity{
 		Name:     e.Name,
+		Parent:   parent,
 		Kind:     string(e.Kind),
 		Keywords: application.KeywordViews(e.Keywords),
 		Anchors:  anchorTexts(e.Anchors),

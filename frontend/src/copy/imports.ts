@@ -176,6 +176,11 @@ export const imports = {
         unknown_wp_type: "The WordPress type is not one Postulator knows",
         root_page_skipped: "The root of the site already exists on WordPress, so the import leaves it alone",
         bad_volume: "A search volume in the keywords cannot be read, so that keyword was kept without one",
+        unknown_own_entity: "The entity column says neither yes nor no, so the row was read as an entity",
+        technical_parent: "A page that is not an entity sits above pages of the sheet, so they wait until it is published",
+        group_without_page: "A group has no page of its own; it stays an entity and the links pass over it",
+        ambiguous_parent: "Several entities carry the parent's name, so the row has to say which one it means",
+        ambiguous_entity: "Several entities carry this name, so the row needs a parent or a group to say which one",
     },
     actions: {
         create: "new",

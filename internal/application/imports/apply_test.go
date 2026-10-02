@@ -152,11 +152,19 @@ func TestApplyMergesRepeatedPathsAndFillsTheGaps(t *testing.T) {
 	if got.Counts.PagesCreated != 2 {
 		t.Fatalf("pages created = %d, want the merged page plus one intermediate", got.Counts.PagesCreated)
 	}
-	if got.Counts.EntitiesCreated != 1 {
-		t.Fatalf("entities created = %d", got.Counts.EntitiesCreated)
+	if got.Counts.EntitiesCreated != 2 {
+		t.Fatalf("entities created = %d, want the named one and the intermediate's", got.Counts.EntitiesCreated)
 	}
-	if entities := h.entities(t); !slices.Equal(entities[0].Keywords.Texts(), []string{"hosting", "servers"}) {
-		t.Fatalf("keywords = %v, want both rows", entities[0].Keywords.Texts())
+	byName := make(map[string]graph.Entity)
+	for _, stored := range h.entities(t) {
+		byName[stored.Name] = stored
+	}
+	hosting, shop := byName["Hosting"], byName["Shop"]
+	if !slices.Equal(hosting.Keywords.Texts(), []string{"hosting", "servers"}) {
+		t.Fatalf("keywords = %v, want both rows", hosting.Keywords.Texts())
+	}
+	if shop.ID == "" || hosting.ScopeID == nil || *hosting.ScopeID != shop.ID {
+		t.Fatalf("Hosting sits under %v, want the intermediate Shop", hosting.ScopeID)
 	}
 }
 
@@ -409,8 +417,17 @@ func TestApplyKeepsTheKeywordsOfARowOnItsPage(t *testing.T) {
 	if road := pathOf()["/shoes/road/"]; len(road.Keywords) != 0 {
 		t.Fatalf("a row without keywords gave its page some: %+v", road)
 	}
-	if len(h.entities(t)) != 0 {
-		t.Fatal("a row that names no entity created one")
+	stored := h.entities(t)
+	names := make([]string, 0, len(stored))
+	for _, held := range stored {
+		names = append(names, held.Name)
+		if held.Name == "Trail shoes" && !held.Keywords.Equal(trail.Keywords) {
+			t.Fatalf("the entity of the row lost its keywords: %+v", held.Keywords)
+		}
+	}
+	slices.Sort(names)
+	if !slices.Equal(names, []string{"Road shoes", "Shoes", "Trail shoes"}) {
+		t.Fatalf("entities = %v, want one per row and one for the intermediate", names)
 	}
 
 	again := "path,title,primary keyword,keywords\n/shoes/trail/,Trail shoes,,\"trail shoes (3000), trail boots\"\n"
@@ -424,6 +441,9 @@ func TestApplyKeepsTheKeywordsOfARowOnItsPage(t *testing.T) {
 	h.apply(t, h.file(t, "blank.csv", blank), mapping)
 	if kept := pathOf()["/shoes/trail/"]; !kept.Keywords.Equal(trail.Keywords) {
 		t.Fatalf("an empty keywords cell changed the page: %v, want %v", kept.Keywords.Texts(), trail.Keywords.Texts())
+	}
+	if got := len(h.entities(t)); got != 3 {
+		t.Fatalf("entities after the imports that name none = %d, want the page's own entity reused", got)
 	}
 }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Entity } from "../data/types.js";
-import { entityLabels } from "./entities.js";
+import { entityLabels, pathOf } from "./entities.js";
 
 function entity(id: string, name: string, scopeEntityId: string | null = null): Entity {
     return {
@@ -20,6 +20,17 @@ function entity(id: string, name: string, scopeEntityId: string | null = null): 
         updatedAt: null,
     };
 }
+
+describe("pathOf", () => {
+    it.each<[string[], string]>([
+        [["BPC-157", "Liquid"], "BPC-157 › Liquid"],
+        [["", "Liquid"], "Liquid"],
+        [["Peptides"], "Peptides"],
+        [[], ""],
+    ])("joins %j as %s", (names, want) => {
+        expect(pathOf(names)).toBe(want);
+    });
+});
 
 describe("entityLabels", () => {
     it.each<[string, Entity[], Record<string, string>]>([

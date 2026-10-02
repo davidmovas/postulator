@@ -115,7 +115,7 @@ func TestTheDerivedGroupingsReadTheirGoPredicates(t *testing.T) {
 		"purgeableArtifactKinds":       {"draft", "body_html", "images"},
 		"toolRisksNeedingConfirmation": {"write", "dangerous"},
 		"blockingImportFindingCodes": {
-			"bad_path", "unknown_parent", "unknown_related", "self_edge", "cycle",
+			"bad_path", "unknown_parent", "unknown_related", "self_edge", "cycle", "ambiguous_parent", "ambiguous_entity",
 		},
 		"offGraphLinkClasses":        {"self", "external", "unknown_internal"},
 		"runKindsWithTheirOwnRecipe": {"relink", "sync", "repair", "revert"},

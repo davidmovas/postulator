@@ -244,6 +244,8 @@ func TestTheClientSamplesStillImport(t *testing.T) {
 			name:     "sitemap-import-example.csv",
 			detected: []importmap.Field{importmap.FieldPath, importmap.FieldTitle, importmap.FieldKeywords},
 			pages:    10,
+			entities: 18,
+			edges:    12,
 		},
 		{
 			name: "sitemap-import-example.xlsx",

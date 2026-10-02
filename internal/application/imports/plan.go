@@ -10,7 +10,6 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
-	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -110,19 +109,6 @@ func edgeKey(e graph.Edge) string {
 	return string(e.Kind) + "|" + e.FromEntityID + "|" + e.ToEntityID
 }
 
-func rowKeywords(binding importmap.Binding, row []string, at importmap.Origin, p *plan) keyword.List {
-	items := make([]keyword.Keyword, 0)
-	for _, field := range []importmap.Field{importmap.FieldPrimaryKeyword, importmap.FieldKeywords} {
-		list, unreadable := keyword.Parse(binding.Text(row, field))
-		for _, fragment := range unreadable {
-			p.noteAt(at, string(field), CodeBadVolume,
-				"the search volume of "+fragment+" cannot be read, so the keyword was kept without one")
-		}
-		items = append(items, list...)
-	}
-	return keyword.New(items)
-}
-
 func sameEntity(a, b graph.Entity) bool {
 	return a.Kind == b.Kind && a.Keywords.Equal(b.Keywords) &&
 		slices.Equal(anchorTexts(a.Anchors), anchorTexts(b.Anchors))
@@ -151,7 +137,7 @@ type siteState struct {
 	entities []graph.Entity
 	edges    []graph.Edge
 	pages    []pagemap.Page
-	byName   map[string]graph.Entity
+	byName   map[string][]graph.Entity
 	byPath   map[string]pagemap.Page
 	edgeKeys map[string]struct{}
 }
@@ -171,12 +157,12 @@ func (s *Service) state(ctx context.Context, siteID string) (siteState, error) {
 	}
 	state := siteState{
 		siteID: siteID, entities: entities, edges: edges, pages: pages,
-		byName:   make(map[string]graph.Entity, len(entities)),
+		byName:   make(map[string][]graph.Entity, len(entities)),
 		byPath:   make(map[string]pagemap.Page, len(pages)),
 		edgeKeys: make(map[string]struct{}, len(edges)),
 	}
 	for i := range entities {
-		state.byName[key(entities[i].Name)] = entities[i]
+		state.byName[key(entities[i].Name)] = append(state.byName[key(entities[i].Name)], entities[i])
 	}
 	for i := range pages {
 		state.byPath[pages[i].Path] = pages[i]
@@ -206,64 +192,6 @@ func (s *Service) templateFor(ctx context.Context, siteID, pageKind string) (*st
 	return global, nil
 }
 
-func read(binding importmap.Binding, table importmap.Table, p *plan) *drafts {
-	sheet := newDrafts()
-	walk := binding.Walk()
-	for i := range table.Rows {
-		row, at := table.Rows[i], table.Origin(i)
-		number := at.Row
-		path := walk.Path(row)
-		if binding.Blank(row) && path == "" {
-			p.report.Skipped++
-			continue
-		}
-
-		name := binding.Text(row, importmap.FieldEntity)
-		if name == "" && path == "" {
-			p.noteAt(at, "", CodeNoTarget, "the row names neither a path nor an entity")
-			p.report.Skipped++
-			continue
-		}
-
-		keywords := rowKeywords(binding, row, at, p)
-		if name != "" {
-			sheet.entity(name, number).merge(entityDraft{
-				kind:     binding.Text(row, importmap.FieldEntityKind),
-				keywords: keywords,
-				anchors:  binding.List(row, importmap.FieldAnchors),
-				parent:   binding.Text(row, importmap.FieldParentEntity),
-				related:  binding.List(row, importmap.FieldRelated),
-			})
-		}
-		if path == "" {
-			continue
-		}
-
-		normalized, err := pagemap.NormalizePath(path)
-		if err != nil {
-			p.noteAt(at, string(importmap.FieldPath), CodeBadPath, "the path cannot be read: "+path)
-			continue
-		}
-
-		draft, known := sheet.page(normalized, number)
-		if known {
-			p.noteAt(at, string(importmap.FieldPath), CodeDuplicatePath,
-				"the path repeats an earlier row and was merged: "+normalized)
-		}
-		draft.merge(pageDraft{
-			title:     binding.Text(row, importmap.FieldTitle),
-			h1:        binding.Text(row, importmap.FieldH1),
-			metaTitle: binding.Text(row, importmap.FieldMetaTitle),
-			metaDesc:  binding.Text(row, importmap.FieldMetaDescription),
-			wpType:    binding.Text(row, importmap.FieldWPType),
-			pageKind:  binding.Text(row, importmap.FieldPageKind),
-			entity:    name,
-			keywords:  keywords,
-		})
-	}
-	return sheet
-}
-
 func fillGaps(sheet *drafts, state siteState, p *plan) {
 	for _, path := range sheet.sortedPaths() {
 		for parent := pagemap.ParentPath(path); parent != "" && parent != pagemap.RootPath; parent = pagemap.ParentPath(parent) {
@@ -281,130 +209,148 @@ func fillGaps(sheet *drafts, state siteState, p *plan) {
 	}
 }
 
-func resolveEntities(sheet *drafts, state siteState, now time.Time, p *plan) (map[string]graph.Entity, error) {
-	resolved := make(map[string]graph.Entity, len(sheet.order))
-	for _, at := range sheet.order {
-		draft := sheet.entities[at]
-
-		kind, known := kindOf(draft.kind)
+func (b *builder) planEntities(now time.Time) (map[string]graph.Entity, error) {
+	resolved := make(map[string]graph.Entity, len(b.units))
+	for _, at := range b.roots() {
+		u := &b.units[at]
+		kind, known := kindOf(u.kind)
 		if !known {
-			p.note(draft.row, string(importmap.FieldEntityKind), CodeUnknownEntityKind,
-				"the entity kind is not recognized and was read as a topic: "+draft.kind)
+			b.p.noteAt(u.at, string(importmap.FieldEntityKind), CodeUnknownEntityKind,
+				"the entity kind is not recognized and was read as a topic: "+u.kind)
 		}
 
-		current, found := state.byName[at]
-		if !found {
+		parent := b.parentName(u)
+		if u.matched == "" {
 			if kind == "" {
 				kind = graph.KindTopic
+				if u.group >= 0 {
+					kind = graph.KindCategory
+				}
+			}
+			var scope *string
+			if parentID := b.parentID(u); parentID != "" && parentID != u.id {
+				scope = &parentID
 			}
 			entity, err := graph.NewEntity(graph.Entity{
-				ID: id.New(), SiteID: state.siteID, Name: draft.name, Kind: kind,
-				Keywords: draft.keywords, Anchors: anchorsOf(draft.anchors),
+				ID: u.id, SiteID: b.state.siteID, Name: u.name, Kind: kind, ScopeID: scope,
+				Keywords: u.keywords, Anchors: anchorsOf(u.anchors),
 				Source: graph.SourceImport, CreatedAt: now, UpdatedAt: now,
 			})
 			if err != nil {
 				return nil, err
 			}
-			resolved[at] = entity
-			p.entities = append(p.entities, plannedEntity{entity: entity, created: true})
-			p.report.Entities = append(p.report.Entities, entityView(entity, ActionCreate))
+			resolved[entity.ID] = entity
+			b.p.entities = append(b.p.entities, plannedEntity{entity: entity, created: true})
+			b.p.report.Entities = append(b.p.report.Entities, entityView(entity, parent, ActionCreate))
 			continue
 		}
 
+		current := b.byID[u.matched]
 		next := current
 		if kind != "" {
 			next.Kind = kind
 		}
-		next.Keywords = next.Keywords.Merge(draft.keywords)
-		next.Anchors = anchorsOf(union(anchorTexts(next.Anchors), draft.anchors))
+		next.Keywords = next.Keywords.Merge(u.keywords)
+		next.Anchors = anchorsOf(union(anchorTexts(next.Anchors), u.anchors))
 		next.UpdatedAt = now
 		entity, err := graph.NewEntity(next)
 		if err != nil {
 			return nil, err
 		}
-		resolved[at] = entity
-
+		resolved[entity.ID] = entity
 		if sameEntity(entity, current) {
-			p.report.Entities = append(p.report.Entities, entityView(entity, ActionSkip))
+			b.p.report.Entities = append(b.p.report.Entities, entityView(entity, parent, ActionSkip))
 			continue
 		}
-		p.entities = append(p.entities, plannedEntity{entity: entity, created: false})
-		p.report.Entities = append(p.report.Entities, entityView(entity, ActionUpdate))
+		b.p.entities = append(b.p.entities, plannedEntity{entity: entity, created: false})
+		b.p.report.Entities = append(b.p.report.Entities, entityView(entity, parent, ActionUpdate))
 	}
 	return resolved, nil
 }
 
-func resolveEdges(sheet *drafts, state siteState, resolved map[string]graph.Entity, now time.Time, p *plan) {
-	lookup := func(name string) (graph.Entity, bool) {
-		if entity, ok := resolved[key(name)]; ok {
-			return entity, true
+func (b *builder) nameOf(entityID string) string {
+	for at := range b.units {
+		if b.units[at].alias < 0 && b.units[at].id == entityID {
+			return b.units[at].name
 		}
-		entity, ok := state.byName[key(name)]
-		return entity, ok
 	}
+	return b.byID[entityID].Name
+}
 
-	seen := maps.Clone(state.edgeKeys)
+func (b *builder) parentName(u *unit) string {
+	if parentID := b.parentID(u); parentID != "" {
+		return b.nameOf(parentID)
+	}
+	return ""
+}
 
-	add := func(from, to graph.Entity, kind graph.EdgeKind) {
+func (b *builder) planEdges(now time.Time) {
+	seen := maps.Clone(b.state.edgeKeys)
+
+	add := func(fromID, toID string, kind graph.EdgeKind) {
 		edge, err := graph.NewEdge(graph.Edge{
-			ID: id.New(), SiteID: state.siteID, FromEntityID: from.ID, ToEntityID: to.ID,
+			ID: id.New(), SiteID: b.state.siteID, FromEntityID: fromID, ToEntityID: toID,
 			Kind: kind, Weight: 1, Source: graph.SourceImport, Status: graph.StatusApproved, CreatedAt: now,
 		})
 		if err != nil {
 			return
 		}
-		view := PreviewEdge{From: from.Name, To: to.Name, Kind: string(kind), Action: string(ActionCreate)}
+		view := PreviewEdge{From: b.nameOf(fromID), To: b.nameOf(toID), Kind: string(kind), Action: string(ActionCreate)}
 		if _, known := seen[edgeKey(edge)]; known {
 			view.Action = string(ActionSkip)
-			p.report.Edges = append(p.report.Edges, view)
+			b.p.report.Edges = append(b.p.report.Edges, view)
 			return
 		}
 		seen[edgeKey(edge)] = struct{}{}
-		p.edges = append(p.edges, edge)
-		p.report.Edges = append(p.report.Edges, view)
+		b.p.edges = append(b.p.edges, edge)
+		b.p.report.Edges = append(b.p.report.Edges, view)
 	}
 
-	for _, at := range sheet.order {
-		draft := sheet.entities[at]
-		from := resolved[at]
-
-		if draft.parent != "" {
-			switch to, ok := lookup(draft.parent); {
-			case !ok:
-				p.note(draft.row, string(importmap.FieldParentEntity), CodeUnknownParent,
-					"the parent entity is not in the file and not on the site: "+draft.parent)
-			case to.ID == from.ID:
-				p.note(draft.row, string(importmap.FieldParentEntity), CodeSelfEdge,
-					"the entity names itself as its parent: "+draft.name)
-			default:
-				add(from, to, graph.EdgeParent)
-			}
+	for _, at := range b.roots() {
+		u := &b.units[at]
+		parentID := b.parentID(u)
+		switch {
+		case parentID == "":
+		case parentID == u.id:
+			b.p.noteAt(u.parent.at, string(importmap.FieldParentEntity), CodeSelfEdge,
+				"the entity names itself as its parent: "+u.name)
+		case u.parent.weak && u.matched != "" && b.parents[u.matched] > 0:
+		default:
+			add(u.id, parentID, graph.EdgeParent)
 		}
 
-		for _, name := range draft.related {
-			switch to, ok := lookup(name); {
-			case !ok:
-				p.note(draft.row, string(importmap.FieldRelated), CodeUnknownRelated,
+		for _, name := range u.related {
+			ref, code := b.resolve(name, u.context)
+			switch code {
+			case CodeUnknownParent:
+				b.p.noteAt(u.at, string(importmap.FieldRelated), CodeUnknownRelated,
 					"the related entity is not in the file and not on the site: "+name)
-			case to.ID == from.ID:
-				p.note(draft.row, string(importmap.FieldRelated), CodeSelfEdge,
-					"the entity names itself as related: "+draft.name)
-			default:
-				add(from, to, graph.EdgeRelated)
+				continue
+			case CodeAmbiguousParent:
+				b.p.noteAt(u.at, string(importmap.FieldRelated), CodeAmbiguousEntity,
+					"more than one entity is named "+name+"; name a related entity that only one carries")
+				continue
 			}
+			relatedID := ref.site
+			if ref.kind == refUnit {
+				relatedID = b.entityID(ref.unit)
+			}
+			if relatedID == u.id {
+				b.p.noteAt(u.at, string(importmap.FieldRelated), CodeSelfEdge, "the entity names itself as related: "+u.name)
+				continue
+			}
+			add(u.id, relatedID, graph.EdgeRelated)
 		}
 	}
 }
 
 func checkAcyclic(state siteState, resolved map[string]graph.Entity, p *plan) error {
 	entities := make([]graph.Entity, 0, len(state.entities)+len(resolved))
-	taken := make(map[string]struct{}, len(resolved))
 	for _, at := range slices.Sorted(maps.Keys(resolved)) {
 		entities = append(entities, resolved[at])
-		taken[resolved[at].ID] = struct{}{}
 	}
 	for i := range state.entities {
-		if _, replaced := taken[state.entities[i].ID]; !replaced {
+		if _, replaced := resolved[state.entities[i].ID]; !replaced {
 			entities = append(entities, state.entities[i])
 		}
 	}
@@ -423,10 +369,11 @@ func checkAcyclic(state siteState, resolved map[string]graph.Entity, p *plan) er
 	return nil
 }
 
-func (s *Service) resolvePages(ctx context.Context, sheet *drafts, state siteState, resolved map[string]graph.Entity, now time.Time, p *plan) error {
+func (s *Service) resolvePages(ctx context.Context, b *builder, now time.Time) error {
+	p := b.p
 	templates := make(map[string]*string)
-	for _, path := range sheet.sortedPaths() {
-		draft := sheet.pages[path]
+	for _, path := range b.sheet.sortedPaths() {
+		draft := b.sheet.pages[path]
 
 		wpType := pagemap.WPType(strings.ToLower(draft.wpType))
 		if draft.wpType != "" && !wpType.Valid() {
@@ -437,7 +384,7 @@ func (s *Service) resolvePages(ctx context.Context, sheet *drafts, state siteSta
 
 		templateID, ok := templates[key(draft.pageKind)]
 		if !ok && draft.pageKind != "" {
-			found, err := s.templateFor(ctx, state.siteID, draft.pageKind)
+			found, err := s.templateFor(ctx, b.state.siteID, draft.pageKind)
 			if err != nil {
 				return err
 			}
@@ -450,12 +397,12 @@ func (s *Service) resolvePages(ctx context.Context, sheet *drafts, state siteSta
 		}
 
 		var entityID *string
-		if draft.entity != "" {
-			entity := resolved[key(draft.entity)]
-			entityID = &entity.ID
+		if owner, owned := b.pageUnit(path); owned {
+			entityID = &b.units[owner].id
+			draft.entity = b.units[owner].name
 		}
 
-		current, exists := state.byPath[path]
+		current, exists := b.state.byPath[path]
 		if !exists && path == pagemap.RootPath {
 			p.note(draft.row, string(importmap.FieldPath), CodeRootPageSkipped,
 				"the root of the site already exists on WordPress, so the import does not plan it; sync the site first to map it")
@@ -463,7 +410,7 @@ func (s *Service) resolvePages(ctx context.Context, sheet *drafts, state siteSta
 		}
 		if !exists {
 			page, err := pagemap.NewPage(pagemap.Page{
-				ID: id.New(), SiteID: state.siteID, Path: path, WPType: wpTypeOr(wpType),
+				ID: id.New(), SiteID: b.state.siteID, Path: path, WPType: wpTypeOr(wpType),
 				Title: fill(draft.title, titleFrom(path)), H1: draft.h1, MetaTitle: draft.metaTitle,
 				MetaDescription: draft.metaDesc, Keywords: draft.keywords,
 				Status: pagemap.StatusPlanned, EntityID: entityID,
@@ -492,19 +439,48 @@ func (s *Service) resolvePages(ctx context.Context, sheet *drafts, state siteSta
 		if entityID != nil {
 			next.EntityID = entityID
 		}
-		next.UpdatedAt = now
-		page, err := pagemap.NewPage(next)
-		if err != nil {
+		if err := planUpdate(p, current, next, draft, now); err != nil {
 			return err
 		}
-
-		if samePage(page, current) {
-			p.report.Pages = append(p.report.Pages, pageView(page, draft, ActionSkip))
-			continue
-		}
-		p.pages = append(p.pages, plannedPage{page: page, created: false})
-		p.report.Pages = append(p.report.Pages, pageView(page, draft, ActionUpdate))
 	}
+
+	for _, path := range slices.Sorted(maps.Keys(b.siteOwned())) {
+		owner := b.siteOwned()[path]
+		current := b.state.byPath[path]
+		next := current
+		next.EntityID = &b.units[owner].id
+		if err := planUpdate(p, current, next, &pageDraft{path: path, entity: b.units[owner].name}, now); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (b *builder) siteOwned() map[string]int {
+	out := make(map[string]int)
+	for path, at := range b.assigned {
+		out[path] = b.root(at)
+	}
+	for path, node := range b.adopted {
+		if _, planned := b.sheet.pages[path]; !planned {
+			out[path] = b.root(b.groups.nodes[node].unit)
+		}
+	}
+	return out
+}
+
+func planUpdate(p *plan, current, next pagemap.Page, draft *pageDraft, now time.Time) error {
+	next.UpdatedAt = now
+	page, err := pagemap.NewPage(next)
+	if err != nil {
+		return err
+	}
+	if samePage(page, current) {
+		p.report.Pages = append(p.report.Pages, pageView(page, draft, ActionSkip))
+		return nil
+	}
+	p.pages = append(p.pages, plannedPage{page: page, created: false})
+	p.report.Pages = append(p.report.Pages, pageView(page, draft, ActionUpdate))
 	return nil
 }
 
@@ -520,10 +496,6 @@ func checkCannibalization(state siteState, resolved map[string]graph.Entity, p *
 	if err != nil {
 		return err
 	}
-	byID := make(map[string]graph.Entity, len(resolved))
-	for _, at := range slices.Sorted(maps.Keys(resolved)) {
-		byID[resolved[at].ID] = resolved[at]
-	}
 
 	index := pagemap.NewIndex(state.pages)
 	for i := range p.pages {
@@ -533,7 +505,7 @@ func checkCannibalization(state siteState, resolved map[string]graph.Entity, p *
 		}
 		var entity graph.Entity
 		if planned.page.EntityID != nil {
-			entity = byID[*planned.page.EntityID]
+			entity = resolved[*planned.page.EntityID]
 		}
 		for _, evidence := range pagemap.Cannibalization(planned.page, entity, index, g).Evidence {
 			p.report.Cannibalization = append(p.report.Cannibalization, conflictView(evidence))
@@ -566,7 +538,7 @@ func linkParents(state siteState, p *plan) {
 	}
 }
 
-func markCanonical(state siteState, resolved map[string]graph.Entity, p *plan) {
+func finalPages(state siteState, p *plan) map[string]pagemap.Page {
 	final := make(map[string]pagemap.Page, len(state.pages)+len(p.pages))
 	for i := range state.pages {
 		final[state.pages[i].ID] = state.pages[i]
@@ -574,7 +546,11 @@ func markCanonical(state siteState, resolved map[string]graph.Entity, p *plan) {
 	for i := range p.pages {
 		final[p.pages[i].page.ID] = p.pages[i].page
 	}
+	return final
+}
 
+func markCanonical(state siteState, resolved map[string]graph.Entity, p *plan) {
+	final := finalPages(state, p)
 	owners := make(map[string][]string, len(resolved))
 	for _, at := range slices.Sorted(maps.Keys(final)) {
 		if page := final[at]; page.EntityID != nil {
@@ -591,6 +567,35 @@ func markCanonical(state siteState, resolved map[string]graph.Entity, p *plan) {
 	}
 }
 
+func (b *builder) reportGroups() {
+	owned := make(map[string]string)
+	final := finalPages(b.state, b.p)
+	for pageID := range final {
+		entityID, path := final[pageID].EntityID, final[pageID].Path
+		if entityID == nil {
+			continue
+		}
+		if held, seen := owned[*entityID]; !seen || path < held {
+			owned[*entityID] = path
+		}
+	}
+
+	for at := range b.groups.nodes {
+		node := &b.groups.nodes[at]
+		entityID := b.entityID(node.unit)
+		view := PreviewGroup{Path: b.groups.chain(at), Page: node.page, Rows: len(node.under)}
+		if view.Page == "" {
+			view.Page = owned[entityID]
+		}
+		b.p.report.Groups = append(b.p.report.Groups, view)
+		if view.Page == "" {
+			b.p.noteAt(b.units[node.unit].at, "", CodeGroupWithoutPage,
+				"the group "+strings.Join(view.Path, " › ")+" has no page of its own in the sheet or on the site; "+
+					"it is kept as an entity, and the links of the pages under it pass over it")
+		}
+	}
+}
+
 func (s *Service) plan(ctx context.Context, siteID string, table importmap.Table, mapping importmap.Mapping) (plan, error) {
 	binding, err := mapping.Bind(table.Headers)
 	if err != nil {
@@ -604,18 +609,21 @@ func (s *Service) plan(ctx context.Context, siteID string, table importmap.Table
 
 	now := s.now()
 	p := plan{siteID: siteID, rows: len(table.Rows)}
-	sheet := read(binding, table, &p)
+	rows := readRows(binding, table, &p)
+	sheet := pagesOf(rows, &p)
 	fillGaps(sheet, state, &p)
 
-	resolved, err := resolveEntities(sheet, state, now, &p)
+	b := newBuilder(state, &p, rows, sheet)
+	b.build()
+	resolved, err := b.planEntities(now)
 	if err != nil {
 		return plan{}, err
 	}
-	resolveEdges(sheet, state, resolved, now, &p)
+	b.planEdges(now)
 	if err := checkAcyclic(state, resolved, &p); err != nil {
 		return plan{}, err
 	}
-	if err := s.resolvePages(ctx, sheet, state, resolved, now, &p); err != nil {
+	if err := s.resolvePages(ctx, b, now); err != nil {
 		return plan{}, err
 	}
 	if err := checkCannibalization(state, resolved, &p); err != nil {
@@ -623,6 +631,7 @@ func (s *Service) plan(ctx context.Context, siteID string, table importmap.Table
 	}
 	linkParents(state, &p)
 	markCanonical(state, resolved, &p)
+	b.reportGroups()
 	p.report.settle()
 	return p, nil
 }

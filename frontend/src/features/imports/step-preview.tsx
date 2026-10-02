@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 
 import { copy } from "../../copy/index.js";
 import type { PreviewReport } from "../../data/types.js";
+import { pathOf } from "../../domain/entities.js";
 import { keywordsLine } from "../../domain/keywords.js";
 import { importActions } from "../../generated/vocab.js";
 import {
@@ -132,7 +133,9 @@ export function StepPreview({ report, onBack, onApply }: StepPreviewProps): Reac
                         : sheet === "entities"
                           ? entities.map((entity, at) => (
                                 <TableRow key={`${entity.name}-${at}`}>
-                                    <TableCell title={entity.name}>{entity.name}</TableCell>
+                                    <TableCell title={pathOf([entity.parent ?? "", entity.name])}>
+                                        {pathOf([entity.parent ?? "", entity.name])}
+                                    </TableCell>
                                     <TableCell muted={true}>{entityKindLabel(entity.kind)}</TableCell>
                                     <TableCell mono={true} muted={true} title={keywordsLine(entity.keywords)}>
                                         {keywordsLine(entity.keywords)}
