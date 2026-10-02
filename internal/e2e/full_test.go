@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/application/events"
@@ -304,7 +305,8 @@ func awaitRun(t *testing.T, service *runs.Service, runID string) {
 		reason string
 		done   bool
 	)
-	waitFor(t, "run "+runID+" to finish", func() bool {
+	deadline := time.Now().Add(pollTimeout)
+	for !done && time.Now().Before(deadline) {
 		listed, err := service.ListEvents(t.Context(), runs.ListEventsRequest{
 			RunID: runID, SinceSeq: seq, Limit: 200,
 		})
@@ -321,11 +323,45 @@ func awaitRun(t *testing.T, service *runs.Service, runID string) {
 				done, reason = true, event.Type+" "+string(event.Payload)
 			}
 		}
-		return done
-	})
+		if !done {
+			time.Sleep(pollInterval)
+		}
+	}
+	if !done {
+		t.Fatalf("timed out waiting for run %s to finish%s", runID, itemStates(t, service, runID))
+	}
 	if reason != "" {
 		t.Fatalf("the run ended with %s%s", reason, itemFailures(t, service, runID))
 	}
+}
+
+func itemStates(t *testing.T, service *runs.Service, runID string) string {
+	t.Helper()
+
+	listed, err := service.ListItems(t.Context(), runs.ListItemsRequest{
+		RunID: runID, ListRequest: dto.ListRequest{Limit: 50},
+	})
+	if err != nil {
+		return "; the items could not be listed: " + err.Error()
+	}
+
+	out := strings.Builder{}
+	for i := range listed.Items {
+		item := listed.Items[i]
+		out.WriteString("\n  item " + strconv.Itoa(item.Seq) + " " + item.TargetID + ": " + item.Status + " at " + item.CurrentStep +
+			", attempt " + strconv.Itoa(item.Attempts))
+		for _, said := range [][2]string{
+			{"blocked by", item.BlockedBy}, {"paused for", item.PauseReason}, {"error", item.Error}, {"note", item.Note},
+		} {
+			if said[1] != "" {
+				out.WriteString("; " + said[0] + " " + said[1])
+			}
+		}
+		if item.WaitingFor != nil {
+			out.WriteString("; waiting for " + item.WaitingFor.Path)
+		}
+	}
+	return out.String()
 }
 
 func itemFailures(t *testing.T, service *runs.Service, runID string) string {
