@@ -1,3 +1,4 @@
+import type { ImportOptions } from "../../data/types.js";
 import { importFields } from "../../generated/vocab.js";
 import type { ImportField } from "../../generated/vocab.js";
 
@@ -54,6 +55,10 @@ export function usable(
 
 export function freeHeaders(headers: readonly string[], columns: ColumnMap | null, elsewhere: readonly string[]): string[] {
     return unmappedHeaders(headers, columns).filter((header) => !elsewhere.includes(header));
+}
+
+export function withDetected(options: ImportOptions, detected: ImportOptions): ImportOptions {
+    return { ...options, levelColumns: [...(detected.levelColumns ?? [])], noteColumns: [...(detected.noteColumns ?? [])] };
 }
 
 export function toggled(chosen: readonly string[], header: string, headers: readonly string[]): string[] {

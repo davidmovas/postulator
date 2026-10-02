@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
     cannibalizationReasons,
     importActions,
+    importColumnUses,
     importFields,
     importFindingCodes,
 } from "../../generated/vocab.js";
@@ -10,6 +11,7 @@ import {
     actionLabel,
     actionTone,
     blocking,
+    columnUseLabel,
     fieldChoices,
     fieldLabel,
     findingLabel,
@@ -19,6 +21,7 @@ import {
 
 const vocabularies: readonly [string, readonly string[], (value: string) => string][] = [
     ["import field", importFields, fieldLabel],
+    ["column use", importColumnUses.filter((use) => use !== "field"), (use) => columnUseLabel({ header: "", use })],
     ["finding code", importFindingCodes, findingLabel],
     ["import action", importActions, actionLabel],
     ["cannibalisation reason", cannibalizationReasons, reasonLabel],
@@ -56,6 +59,17 @@ describe("blocking findings", () => {
         ["something_new", false],
     ])("reads %s as blocking %s", (code, want) => {
         expect(blocking(code)).toBe(want);
+    });
+});
+
+describe("what a column became", () => {
+    it.each([
+        [{ header: "URL", use: "field", field: "path" }, "Page path"],
+        [{ header: "Category", use: "level" }, "Group"],
+        [{ header: "Notes", use: "note" }, "Note for the writer"],
+        [{ header: "Entity?", use: "ignored" }, "Ignored"],
+    ])("words %j as %s", (column, want) => {
+        expect(columnUseLabel(column)).toBe(want);
     });
 });
 

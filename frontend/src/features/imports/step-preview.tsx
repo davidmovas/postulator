@@ -19,7 +19,7 @@ import {
     toneClasses,
 } from "../../ui/index.js";
 import { kindLabel as entityKindLabel } from "../graph/labels.js";
-import { actionLabel, actionTone, edgeKindLabel } from "./labels.js";
+import { actionLabel, actionTone, columnUseLabel, edgeKindLabel } from "./labels.js";
 
 type Sheet = "pages" | "entities" | "edges";
 
@@ -85,6 +85,27 @@ export function StepPreview({ report, onBack, onApply }: StepPreviewProps): Reac
                     )}
                 </div>
             </div>
+            {(report.columns ?? []).length === 0 ? null : (
+                <section
+                    aria-label={copy.imports.preview.columns}
+                    className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-hairline px-3 py-2"
+                >
+                    <span className="text-2xs text-ink-faint">{copy.imports.preview.columns}</span>
+                    {(report.columns ?? []).map((column, at) => (
+                        <span
+                            key={`${column.header}-${String(at)}`}
+                            className={cx(
+                                "flex h-5 items-center gap-1 rounded-sm bg-inset px-1.5 text-2xs",
+                                column.use === "ignored" ? "text-ink-faint" : "text-ink-soft",
+                            )}
+                        >
+                            <span className="font-mono">{column.header === "" ? "—" : column.header}</span>
+                            <span aria-hidden={true}>→</span>
+                            {columnUseLabel(column)}
+                        </span>
+                    ))}
+                </section>
+            )}
             <div className="min-h-0 flex-1 overflow-auto">
                 <DenseTable columns={grids[sheet]} label={copy.imports.preview.title}>
                     <TableHead>

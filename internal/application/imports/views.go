@@ -108,6 +108,20 @@ type PreviewEntity struct {
 	Action   string        `json:"action"`
 }
 
+type PreviewColumn struct {
+	Header string `json:"header"`
+	Use    string `json:"use"`
+	Field  string `json:"field,omitempty"`
+}
+
+func columnViews(uses []importmap.ColumnUse) []PreviewColumn {
+	out := make([]PreviewColumn, 0, len(uses))
+	for _, use := range uses {
+		out = append(out, PreviewColumn{Header: use.Header, Use: string(use.Use), Field: string(use.Field)})
+	}
+	return out
+}
+
 type PreviewGroup struct {
 	Path []string `json:"path"`
 	Page string   `json:"page,omitempty"`
@@ -129,6 +143,7 @@ type Conflict struct {
 }
 
 type PreviewReport struct {
+	Columns         []PreviewColumn `json:"columns"`
 	Pages           []PreviewPage   `json:"pages"`
 	Entities        []PreviewEntity `json:"entities"`
 	Groups          []PreviewGroup  `json:"groups"`
@@ -203,6 +218,9 @@ func conflictView(evidence pagemap.Evidence) Conflict {
 }
 
 func (r *PreviewReport) settle() {
+	if r.Columns == nil {
+		r.Columns = []PreviewColumn{}
+	}
 	if r.Pages == nil {
 		r.Pages = []PreviewPage{}
 	}

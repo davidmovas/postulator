@@ -5,6 +5,7 @@ import {
     edgeKinds,
     exportFormats,
     importActions,
+    importColumnUses,
     importFields,
     importFindingCodes,
     isOneOf,
@@ -14,6 +15,19 @@ import type { Tone } from "../../ui/index.js";
 
 export function fieldLabel(field: string): string {
     return isOneOf(importFields, field) ? copy.imports.fields[field] : field;
+}
+
+export interface ColumnFate {
+    header: string;
+    use: string;
+    field?: string;
+}
+
+export function columnUseLabel(column: ColumnFate): string {
+    if (column.use === "field") {
+        return fieldLabel(column.field ?? "");
+    }
+    return isOneOf(importColumnUses, column.use) ? copy.imports.columnUses[column.use] : column.use;
 }
 
 export function findingLabel(code: string): string {

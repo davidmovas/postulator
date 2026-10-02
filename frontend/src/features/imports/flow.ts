@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useApplySheet, useInspectSheet, usePreviewSheet } from "../../data/hooks/imports.js";
 import type { ImportMapping, ImportOptions, ImportSheet } from "../../data/types.js";
 import type { ColumnMap } from "./columns.js";
+import { withDetected } from "./columns.js";
 import { forget, readRecent, remember, writeRecent } from "./recent.js";
 import type { RecentFile } from "./recent.js";
 
@@ -73,6 +74,16 @@ export function useImportFlow(siteId: string, path: string, previewing: boolean)
         }
         inspectMutate({ siteId, path, sheets: options.sheets ?? [], noHeader: options.noHeader === true });
     }, [siteId, path, reading, options.sheets, options.noHeader, inspectMutate, applyReset]);
+
+    const adopted = useRef<unknown>(null);
+    useEffect(() => {
+        const answered = inspect.data;
+        if (answered === undefined || adopted.current === answered) {
+            return;
+        }
+        adopted.current = answered;
+        setOptions((held) => withDetected(held, answered.detected.options));
+    }, [inspect.data]);
 
     const detected = inspect.data?.detected.columns ?? null;
 

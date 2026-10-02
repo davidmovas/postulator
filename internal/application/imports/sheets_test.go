@@ -368,6 +368,27 @@ func TestARowsGroupSaysWhichParentItMeans(t *testing.T) {
 	t.Fatal("Drops was not created")
 }
 
+func TestThePreviewSaysWhatEachColumnBecame(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	path := h.file(t, "variations.csv", "Parent Product Entity,URL,Detected Form / Variation,Entity?,Reason,Entity ID\n"+
+		"BPC-157,/bpc-157/liquid/,Liquid,NO,A form the shop sells,E-17\n")
+	report := h.preview(t, path, h.detected(t, path))
+
+	want := []imports.PreviewColumn{
+		{Header: "Parent Product Entity", Use: "field", Field: "parent_entity"},
+		{Header: "URL", Use: "field", Field: "path"},
+		{Header: "Detected Form / Variation", Use: "note"},
+		{Header: "Entity?", Use: "ignored"},
+		{Header: "Reason", Use: "note"},
+		{Header: "Entity ID", Use: "ignored"},
+	}
+	if !slices.Equal(report.Columns, want) {
+		t.Fatalf("columns =\n%+v\nwant\n%+v", report.Columns, want)
+	}
+}
+
 func notesAt(t *testing.T, h harness, path string) []pagemap.Note {
 	t.Helper()
 

@@ -610,6 +610,7 @@ func (s *Service) plan(ctx context.Context, siteID string, table importmap.Table
 
 	now := s.now()
 	p := plan{siteID: siteID, rows: len(table.Rows)}
+	p.report.Columns = columnViews(mapping.Uses(table.Headers))
 	rows := readRows(binding, table, &p)
 	sheet := pagesOf(rows, &p)
 	fillGaps(sheet, state, &p)

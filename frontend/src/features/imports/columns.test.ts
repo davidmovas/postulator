@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { importFields } from "../../generated/vocab.js";
-import { assign, freeHeaders, mappedFields, takenFrom, targetOf, toggled, unmappedHeaders, usable } from "./columns.js";
+import { assign, freeHeaders, mappedFields, takenFrom, targetOf, toggled, unmappedHeaders, usable, withDetected } from "./columns.js";
 
 const detected = { path: "URL", title: "Title", keywords: "Keywords" };
 
@@ -66,6 +66,21 @@ describe("what the mapping covers", () => {
 
     it("offers as a group or a note only a column no field reads and the other list does not hold", () => {
         expect(freeHeaders(["URL", "Category", "Notes", "", "Title"], detected, ["Notes"])).toEqual(["Category"]);
+    });
+
+    it("takes the groups and notes the detector found and leaves the rest of the options alone", () => {
+        expect(
+            withDetected(
+                { pathPrefixStrip: "https://shop.example", levelColumns: ["Old"], sheets: ["Sheet1"] },
+                { levelColumns: ["Category", "Subcategory"], noteColumns: ["Notes"], anchorSeparator: "|" },
+            ),
+        ).toEqual({
+            pathPrefixStrip: "https://shop.example",
+            sheets: ["Sheet1"],
+            levelColumns: ["Category", "Subcategory"],
+            noteColumns: ["Notes"],
+        });
+        expect(withDetected({ levelColumns: ["Old"] }, {})).toEqual({ levelColumns: [], noteColumns: [] });
     });
 
     it("toggles a column in or out and keeps the order of the sheet", () => {

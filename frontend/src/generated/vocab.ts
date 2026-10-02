@@ -203,6 +203,9 @@ export const importFields = [
 ] as const;
 export type ImportField = (typeof importFields)[number];
 
+export const importColumnUses = ["field", "level", "note", "indent", "ignored"] as const;
+export type ImportColumnUse = (typeof importColumnUses)[number];
+
 export const importFindingCodes = [
     "bad_path",
     "no_target",

@@ -125,6 +125,7 @@ func catalog() []vocabulary {
 		},
 		{export: "toolCallStatuses", tsType: "ToolCallStatus", pkg: "internal/domain/agent", typeName: "CallStatus"},
 		{export: "importFields", tsType: "ImportField", pkg: "internal/domain/importmap", typeName: "Field"},
+		{export: "importColumnUses", tsType: "ImportColumnUse", pkg: "internal/domain/importmap", typeName: "Use"},
 		{
 			export: "importFindingCodes", tsType: "ImportFindingCode", pkg: "internal/application/imports",
 			typeName: "FindingCode",

@@ -89,6 +89,7 @@ export const imports = {
     },
     preview: {
         title: "What the sheet will do",
+        columns: "Each column becomes",
         pages: "Pages",
         entities: "Entities",
         edges: "Relationships",
@@ -181,6 +182,13 @@ export const imports = {
         group_without_page: "A group has no page of its own; it stays an entity and the links pass over it",
         ambiguous_parent: "Several entities carry the parent's name, so the row has to say which one it means",
         ambiguous_entity: "Several entities carry this name, so the row needs a parent or a group to say which one",
+    },
+    columnUses: {
+        field: "A page field",
+        level: "Group",
+        note: "Note for the writer",
+        indent: "Hierarchy",
+        ignored: "Ignored",
     },
     actions: {
         create: "new",

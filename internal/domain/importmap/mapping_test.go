@@ -196,6 +196,31 @@ func TestBindRejectsALevelOrNoteColumnTheFileDoesNotCarry(t *testing.T) {
 	}
 }
 
+func TestUsesSaysWhatEveryColumnOfTheFileBecomes(t *testing.T) {
+	t.Parallel()
+
+	m := importmap.Mapping{
+		Columns: map[importmap.Field]string{importmap.FieldPath: "url", importmap.FieldTitle: "Title"},
+		Options: importmap.Options{
+			LevelColumns: []string{"Category"}, NoteColumns: []string{"Notes"}, IndentColumns: []string{"Outline"},
+		},
+	}
+	got := m.Uses([]string{"URL", "Category", "Title", "Notes", "Entity?", "", "Entity ID", "Outline"})
+	want := []importmap.ColumnUse{
+		{Header: "URL", Use: importmap.UseField, Field: importmap.FieldPath},
+		{Header: "Category", Use: importmap.UseLevel},
+		{Header: "Title", Use: importmap.UseField, Field: importmap.FieldTitle},
+		{Header: "Notes", Use: importmap.UseNote},
+		{Header: "Entity?", Use: importmap.UseIgnored},
+		{Header: "", Use: importmap.UseIgnored},
+		{Header: "Entity ID", Use: importmap.UseIgnored},
+		{Header: "Outline", Use: importmap.UseIndent},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("Uses =\n%+v\nwant\n%+v", got, want)
+	}
+}
+
 func TestBindFindsTheColumnsHoweverTheyAreWritten(t *testing.T) {
 	t.Parallel()
 
