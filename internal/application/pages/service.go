@@ -34,6 +34,10 @@ type entityStore interface {
 	SetCanonicalPage(ctx context.Context, id string, pageID *string, updatedAt time.Time) error
 }
 
+type edgeReader interface {
+	ListBySite(ctx context.Context, siteID string) ([]graph.Edge, error)
+}
+
 type siteReader interface {
 	Get(ctx context.Context, id string) (site.Site, error)
 }
@@ -46,6 +50,7 @@ type Service struct {
 	pages     pageStore
 	links     linkStore
 	entities  entityStore
+	edges     edgeReader
 	sites     siteReader
 	uow       unitOfWork
 	publisher application.Publisher
@@ -53,11 +58,11 @@ type Service struct {
 	preview   previewIssuer
 }
 
-func New(pages pageStore, links linkStore, entities entityStore, sites siteReader, uow unitOfWork,
+func New(pages pageStore, links linkStore, entities entityStore, edges edgeReader, sites siteReader, uow unitOfWork,
 	publisher application.Publisher, clk clock.Clock, preview previewIssuer) *Service {
 	return &Service{
-		pages: pages, links: links, entities: entities, sites: sites, uow: uow, publisher: publisher, clock: clk,
-		preview: preview,
+		pages: pages, links: links, entities: entities, edges: edges, sites: sites, uow: uow, publisher: publisher,
+		clock: clk, preview: preview,
 	}
 }
 

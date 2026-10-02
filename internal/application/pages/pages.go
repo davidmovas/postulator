@@ -310,10 +310,11 @@ func (s *Service) List(ctx context.Context, req ListRequest) (paging.List[Page],
 		}
 		q.Status = &status
 	}
-	if req.EntityID != "" {
-		entityID := req.EntityID
-		q.EntityID = &entityID
+	entityIDs, err := s.entityFilter(ctx, req)
+	if err != nil {
+		return paging.List[Page]{}, err
 	}
+	q.EntityIDs = entityIDs
 	key, desc, err := pageSort(req.Sort)
 	if err != nil {
 		return paging.List[Page]{}, err
@@ -325,6 +326,37 @@ func (s *Service) List(ctx context.Context, req ListRequest) (paging.List[Page],
 		return paging.List[Page]{}, err
 	}
 	return application.MapList(list, view), nil
+}
+
+func (s *Service) entityFilter(ctx context.Context, req ListRequest) ([]string, error) {
+	switch {
+	case req.EntityID == "" && req.IncludeDescendants:
+		return nil, errors.New(errors.Invalid, "the pages under an entity need the entity").WithDetail("field", "entityId")
+	case req.EntityID == "":
+		return nil, nil
+	case !req.IncludeDescendants:
+		return []string{req.EntityID}, nil
+	}
+
+	entities, err := s.entities.ListBySite(ctx, req.SiteID)
+	if err != nil {
+		return nil, err
+	}
+	edges, err := s.edges.ListBySite(ctx, req.SiteID)
+	if err != nil {
+		return nil, err
+	}
+	g, err := graph.New(entities, edges)
+	if err != nil {
+		return nil, err
+	}
+	below := g.Descendants(req.EntityID)
+	out := make([]string, 0, len(below)+1)
+	out = append(out, req.EntityID)
+	for i := range below {
+		out = append(out, below[i].ID)
+	}
+	return out, nil
 }
 
 func (s *Service) MapToEntity(ctx context.Context, req MapToEntityRequest) (MapToEntityResponse, error) {

@@ -49,6 +49,29 @@ func diamond(t *testing.T, extra ...graph.Edge) graph.Graph {
 	return g
 }
 
+func TestDescendantsAreEveryEntityBelowOnce(t *testing.T) {
+	t.Parallel()
+
+	g := diamond(t)
+	cases := []struct {
+		id   string
+		want []string
+	}{
+		{id: entA, want: []string{"bravo", "Charlie", "delta"}},
+		{id: entB, want: []string{"delta"}},
+		{id: entD, want: []string{}},
+		{id: entE, want: []string{}},
+		{id: "missing", want: []string{}},
+	}
+	for _, tc := range cases {
+		got := names(g.Descendants(tc.id))
+		slices.SortFunc(got, func(a, b string) int { return strings.Compare(strings.ToLower(a), strings.ToLower(b)) })
+		if !slices.Equal(got, tc.want) {
+			t.Errorf("Descendants(%s) = %v, want %v", tc.id, got, tc.want)
+		}
+	}
+}
+
 func TestParentsIsBreadthFirstAndDeduplicated(t *testing.T) {
 	t.Parallel()
 

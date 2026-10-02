@@ -79,6 +79,7 @@ export const pages = {
         anyStatus: "Any status",
         entity: "Entity",
         anyEntity: "Any entity",
+        descendants: "And every entity under it",
         unmapped: "No entity attached",
         noEntities: "This site has no entities yet.",
     },

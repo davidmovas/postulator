@@ -148,6 +148,25 @@ func (g Graph) Children(id string) []Entity {
 	return g.collect(g.children[id])
 }
 
+func (g Graph) Descendants(id string) []Entity {
+	seen := map[string]struct{}{id: {}}
+	out := make([]Entity, 0)
+	queue := []string{id}
+	for len(queue) > 0 {
+		from := queue[0]
+		queue = queue[1:]
+		for _, child := range g.children[from] {
+			if _, dup := seen[child]; dup {
+				continue
+			}
+			seen[child] = struct{}{}
+			out = append(out, g.entities[child])
+			queue = append(queue, child)
+		}
+	}
+	return out
+}
+
 func (g Graph) Related(id string, minWeight float64) []Neighbor {
 	out := make([]Neighbor, 0, len(g.related[id]))
 	for _, n := range g.related[id] {

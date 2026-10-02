@@ -8,6 +8,7 @@ export interface PagesQuery {
     view: PagesView;
     status: string;
     entityId: string;
+    descendants: boolean;
     unmapped: boolean;
     pathPrefix: string;
     sort: PageSort | null;
@@ -17,6 +18,7 @@ export const defaultQuery: PagesQuery = {
     view: "table",
     status: "",
     entityId: "",
+    descendants: false,
     unmapped: false,
     pathPrefix: "",
     sort: null,
@@ -48,6 +50,7 @@ export function readQuery(params: URLSearchParams): PagesQuery {
         view: params.get("view") === "tree" ? "tree" : "table",
         status: isOneOf(pageStatuses, status) ? status : "",
         entityId: params.get("entity") ?? "",
+        descendants: params.get("under") === "1",
         unmapped: params.get("unmapped") === "1",
         pathPrefix: params.get("prefix") ?? "",
         sort: parseSort(params.get("sort")),
@@ -64,6 +67,9 @@ export function writeQuery(query: PagesQuery): URLSearchParams {
     }
     if (query.entityId !== "") {
         params.set("entity", query.entityId);
+    }
+    if (query.descendants) {
+        params.set("under", "1");
     }
     if (query.unmapped) {
         params.set("unmapped", "1");
@@ -90,6 +96,9 @@ export function filterOf(siteId: string, query: PagesQuery): PageFilter {
     }
     if (query.entityId !== "") {
         filter.entityId = query.entityId;
+        if (query.descendants) {
+            filter.includeDescendants = true;
+        }
     }
     if (query.unmapped) {
         filter.unmapped = true;

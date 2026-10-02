@@ -33,12 +33,13 @@ describe("parseSort", () => {
 describe("readQuery", () => {
     it("reads every filter the list endpoint supports", () => {
         const query = readQuery(
-            new URLSearchParams("view=tree&status=published&entity=e1&unmapped=1&prefix=/shop/&sort=path:desc"),
+            new URLSearchParams("view=tree&status=published&entity=e1&under=1&unmapped=1&prefix=/shop/&sort=path:desc"),
         );
         expect(query).toStrictEqual({
             view: "tree",
             status: "published",
             entityId: "e1",
+            descendants: true,
             unmapped: true,
             pathPrefix: "/shop/",
             sort: { field: "path", desc: true },
@@ -61,6 +62,7 @@ describe("writeQuery", () => {
             view: "tree" as const,
             status: "archived",
             entityId: "e9",
+            descendants: true,
             unmapped: true,
             pathPrefix: "/a/",
             sort: { field: "createdAt" as const, desc: false },
@@ -83,6 +85,15 @@ describe("filterOf", () => {
         expect(
             filterOf("site", { ...defaultQuery, status: "planned", entityId: "e1", unmapped: true, pathPrefix: "/x/" }),
         ).toStrictEqual({ siteId: "site", status: "planned", entityId: "e1", unmapped: true, pathPrefix: "/x/" });
+    });
+
+    it("asks for the pages under an entity only when an entity is chosen", () => {
+        expect(filterOf("site", { ...defaultQuery, entityId: "e1", descendants: true })).toStrictEqual({
+            siteId: "site",
+            entityId: "e1",
+            includeDescendants: true,
+        });
+        expect(filterOf("site", { ...defaultQuery, descendants: true })).toStrictEqual({ siteId: "site" });
     });
 });
 

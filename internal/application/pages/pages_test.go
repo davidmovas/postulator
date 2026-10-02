@@ -19,6 +19,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
 type harness struct {
@@ -44,7 +45,7 @@ func newPreviewHarness(t *testing.T, issuer *recordingIssuer) harness {
 	clk := clock.NewFake(time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC))
 	return harness{
 		service: pages.New(sqlite.NewPageRepo(store), sqlite.NewPageLinkRepo(store), sqlite.NewEntityRepo(store),
-			sqlite.NewSiteRepo(store), store, recorder, clk, issuer),
+			sqlite.NewEdgeRepo(store), sqlite.NewSiteRepo(store), store, recorder, clk, issuer),
 		store:    store,
 		recorder: recorder,
 		clock:    clk,
@@ -558,6 +559,61 @@ func keywordTexts(keywords []dto.Keyword) []string {
 		out = append(out, item.Text)
 	}
 	return out
+}
+
+func TestListKeepsThePagesOfAnEntityAndEverythingUnderIt(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	peptides, bpc, liquid, other := h.entity(t, "Peptides"), h.entity(t, "BPC-157"), h.entity(t, "Liquid"), h.entity(t, "Other")
+	edges := sqlite.NewEdgeRepo(h.store)
+	for _, pair := range [][2]string{{bpc.ID, peptides.ID}, {liquid.ID, bpc.ID}} {
+		if err := edges.Insert(t.Context(), graph.Edge{
+			ID: id.New(), SiteID: h.siteID, FromEntityID: pair[0], ToEntityID: pair[1], Kind: graph.EdgeParent, Weight: 1,
+			Source: graph.SourceUser, Status: graph.StatusApproved, CreatedAt: sqlitetest.Stamp,
+		}); err != nil {
+			t.Fatalf("insert the edge: %v", err)
+		}
+	}
+	h.page(t, "/peptides/", &peptides.ID)
+	h.page(t, "/peptides/bpc-157/", &bpc.ID)
+	h.page(t, "/peptides/bpc-157/liquid/", &liquid.ID)
+	h.page(t, "/other/", &other.ID)
+
+	cases := []struct {
+		name   string
+		entity string
+		under  bool
+		want   []string
+	}{
+		{name: "the entity alone", entity: peptides.ID, want: []string{"/peptides/"}},
+		{name: "the entity and everything under it", entity: peptides.ID, under: true,
+			want: []string{"/peptides/", "/peptides/bpc-157/", "/peptides/bpc-157/liquid/"}},
+		{name: "a leaf and nothing more", entity: liquid.ID, under: true, want: []string{"/peptides/bpc-157/liquid/"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			listed, err := h.service.List(t.Context(), pages.ListRequest{
+				SiteID: h.siteID, EntityID: tc.entity, IncludeDescendants: tc.under,
+				ListRequest: dto.ListRequest{Limit: 20, Sort: &dto.Sort{Field: "path"}},
+			})
+			if err != nil {
+				t.Fatalf("List: %v", err)
+			}
+			got := make([]string, 0, len(listed.Items))
+			for _, item := range listed.Items {
+				got = append(got, item.Path)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Fatalf("paths = %v, want %v", got, tc.want)
+			}
+		})
+	}
+
+	_, err := h.service.List(t.Context(), pages.ListRequest{SiteID: h.siteID, IncludeDescendants: true})
+	if !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("List without an entity = %v, want it refused", err)
+	}
 }
 
 func TestAPageShowsTheNotesItCarries(t *testing.T) {

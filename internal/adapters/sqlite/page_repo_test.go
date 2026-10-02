@@ -182,9 +182,13 @@ func TestPageRepoListAndFilters(t *testing.T) {
 	if got := pagePaths(byStatus.Items); !reflect.DeepEqual(got, []string{"/shop/", "/shop/bags/", "/shop/shoes/"}) {
 		t.Errorf("planned = %v", got)
 	}
-	byEntity, err := repo.List(t.Context(), pagemap.Query{SiteID: owner.ID, EntityID: &entity.ID, Sort: pagemap.SortPath}, paging.Request{Limit: 10})
+	byEntity, err := repo.List(t.Context(), pagemap.Query{SiteID: owner.ID, EntityIDs: []string{entity.ID}, Sort: pagemap.SortPath}, paging.Request{Limit: 10})
 	if err != nil || len(byEntity.Items) != 1 || byEntity.Items[0].Path != "/shop/shoes/" {
 		t.Errorf("by entity = %+v, %v", byEntity.Items, err)
+	}
+	none, err := repo.List(t.Context(), pagemap.Query{SiteID: owner.ID, EntityIDs: []string{}, Sort: pagemap.SortPath}, paging.Request{Limit: 10})
+	if err != nil || len(none.Items) != 0 {
+		t.Errorf("an empty entity list = %+v, %v, want no page", none.Items, err)
 	}
 	unmapped, err := repo.List(t.Context(), pagemap.Query{SiteID: owner.ID, Unmapped: true, Sort: pagemap.SortPath}, paging.Request{Limit: 10})
 	if err != nil || len(unmapped.Items) != 4 {

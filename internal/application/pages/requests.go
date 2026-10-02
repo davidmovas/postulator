@@ -57,11 +57,12 @@ type GetResponse struct {
 
 type ListRequest struct {
 	dto.ListRequest
-	SiteID     string `json:"siteId"`
-	Status     string `json:"status,omitempty" enum:"planned,exists,published,archived" description:"Keep only pages in this state"`
-	EntityID   string `json:"entityId,omitempty" description:"Keep only pages mapped to this entity"`
-	Unmapped   bool   `json:"unmapped,omitempty" description:"Keep only pages that carry no entity"`
-	PathPrefix string `json:"pathPrefix,omitempty" description:"Keep only pages whose path starts with this text"`
+	SiteID             string `json:"siteId"`
+	Status             string `json:"status,omitempty" enum:"planned,exists,published,archived" description:"Keep only pages in this state"`
+	EntityID           string `json:"entityId,omitempty" description:"Keep only pages mapped to this entity"`
+	IncludeDescendants bool   `json:"includeDescendants,omitempty" description:"With entityId, also keep the pages of every entity under it"`
+	Unmapped           bool   `json:"unmapped,omitempty" description:"Keep only pages that carry no entity"`
+	PathPrefix         string `json:"pathPrefix,omitempty" description:"Keep only pages whose path starts with this text"`
 }
 
 type MapToEntityRequest struct {

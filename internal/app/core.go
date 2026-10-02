@@ -328,7 +328,7 @@ func (c *Core) build(ctx context.Context, key []byte) (kit, error) {
 		Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Pages: pageRepo, Work: itemRepo,
 		Profiles: modelProfiles, LLM: client, UnitOfWork: store, Publisher: relay, Clock: now,
 	})
-	pagesService := pages.New(pageRepo, linkRepo, entityRepo, siteRepo, store, relay, now, previewIssuer{clients: wordpress})
+	pagesService := pages.New(pageRepo, linkRepo, entityRepo, edgeRepo, siteRepo, store, relay, now, previewIssuer{clients: wordpress})
 	importsService := imports.New(imports.Deps{
 		Tables:     importer.New(),
 		Entities:   entityRepo,
