@@ -106,7 +106,7 @@ export function SearchBox({ index, onPick, focusKey }: SearchBoxProps): ReactEle
                                     }}
                                 >
                                     <Icon size={14} className={toneClasses[kindTone(held?.kind ?? "")].ink} />
-                                    <span className="flex-1 truncate">{held?.name ?? hit.id}</span>
+                                    <span className="flex-1 truncate">{index.labels.get(hit.id) ?? held?.name ?? hit.id}</span>
                                     <span className="text-2xs text-ink-faint">{copy.graph.search.field[hit.field]}</span>
                                 </li>
                             );

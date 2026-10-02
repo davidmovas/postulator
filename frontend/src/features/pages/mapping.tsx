@@ -51,7 +51,7 @@ export function PageMapping({ page, siteId, index, search }: PageMappingProps): 
 
     const options: SelectOption<string>[] = [
         { value: noEntity, label: copy.pages.detail.noEntityOption },
-        ...index.entities.map((held) => ({ value: held.id, label: held.name })),
+        ...index.entities.map((held) => ({ value: held.id, label: index.labels.get(held.id) ?? held.name })),
     ];
 
     const changed = choice !== (page.entityId ?? noEntity);

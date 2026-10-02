@@ -3,6 +3,7 @@ import { useEffect, useMemo } from "react";
 import { flatten } from "../../data/call.js";
 import { useEntities } from "../../data/hooks/graph.js";
 import type { Entity } from "../../data/types.js";
+import { entityLabels } from "../../domain/entities.js";
 
 const entityPageSize = 500;
 const maxEntityPages = 4;
@@ -10,6 +11,7 @@ const maxEntityPages = 4;
 export interface EntityIndex {
     entities: readonly Entity[];
     byId: ReadonlyMap<string, Entity>;
+    labels: ReadonlyMap<string, string>;
     complete: boolean;
     loading: boolean;
 }
@@ -33,6 +35,7 @@ export function useEntityIndex(siteId: string): EntityIndex {
         }
         return index;
     }, [entities]);
+    const labels = useMemo(() => entityLabels(entities), [entities]);
 
-    return { entities, byId, complete: !hasNextPage, loading: isPending };
+    return { entities, byId, labels, complete: !hasNextPage, loading: isPending };
 }

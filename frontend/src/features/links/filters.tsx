@@ -52,7 +52,7 @@ export interface LinkFiltersProps {
 export function LinkFilters({ query, counts, statusCounts, index, onChange }: LinkFiltersProps): ReactElement {
     const entityOptions: SelectOption<string>[] = [
         { value: anyEntity, label: copy.links.filters.anyEntity },
-        ...(index?.entities ?? []).map((entity) => ({ value: entity.id, label: entity.name })),
+        ...(index?.entities ?? []).map((entity) => ({ value: entity.id, label: index?.labels.get(entity.id) ?? entity.name })),
     ];
 
     return (

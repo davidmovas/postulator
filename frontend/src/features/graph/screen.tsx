@@ -105,7 +105,7 @@ export function GraphScreen(): ReactElement {
     }, [index]);
     const fold: FoldState = useMemo(() => session.fold ?? defaultFold(index), [session.fold, index]);
     const entityIndex: EntityIndex = useMemo(
-        () => ({ entities: index.entities, byId: index.byId, complete: true, loading: graph.isPending }),
+        () => ({ entities: index.entities, byId: index.byId, labels: index.labels, complete: true, loading: graph.isPending }),
         [index, graph.isPending],
     );
 

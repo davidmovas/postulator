@@ -81,7 +81,7 @@ export function PlanPageDialog({
 
     const entityOptions: SelectOption<string>[] = [
         { value: noEntity, label: copy.pages.create.noEntity },
-        ...index.entities.map((entity) => ({ value: entity.id, label: entity.name })),
+        ...index.entities.map((entity) => ({ value: entity.id, label: index.labels.get(entity.id) ?? entity.name })),
     ];
 
     const submit = (): void => {

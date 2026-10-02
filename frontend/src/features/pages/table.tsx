@@ -219,7 +219,7 @@ export function PageTable({
                             page={page}
                             selected={page.id === selectedId}
                             entityName={
-                                page.entityId === null ? null : (index.byId.get(page.entityId)?.name ?? null)
+                                page.entityId === null ? null : (index.labels.get(page.entityId) ?? null)
                             }
                             onSelect={onSelect}
                             onOpen={onOpen}

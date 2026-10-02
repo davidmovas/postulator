@@ -121,7 +121,7 @@ export function PageTree({ view, index, selectedId, onSelect, onOpen, onCreate }
                             entityName={
                                 row.page.entityId === null
                                     ? null
-                                    : (index.byId.get(row.page.entityId)?.name ?? null)
+                                    : (index.labels.get(row.page.entityId) ?? null)
                             }
                             onToggle={view.toggle}
                             onSelect={onSelect}

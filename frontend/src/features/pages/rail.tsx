@@ -53,7 +53,7 @@ export function PageRail({ siteId, query, index, disabled, onChange }: PageRailP
 
     const entityOptions: SelectOption<string>[] = [
         { value: anyEntity, label: copy.pages.filters.anyEntity },
-        ...index.entities.map((entity) => ({ value: entity.id, label: entity.name })),
+        ...index.entities.map((entity) => ({ value: entity.id, label: index.labels.get(entity.id) ?? entity.name })),
     ];
 
     return (
