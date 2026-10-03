@@ -336,6 +336,74 @@ func TestAStreamedReplyIsServedAsServerSentEvents(t *testing.T) {
 	}
 }
 
+type hooks struct {
+	seen []string
+	mu   sync.Mutex
+}
+
+func (h *hooks) mark(name string) func() {
+	return func() {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		h.seen = append(h.seen, name)
+	}
+}
+
+func (h *hooks) marked() []string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return append([]string(nil), h.seen...)
+}
+
+func TestAReplySaysWhenItIsReached(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		reply func(h *hooks) openaitest.Reply
+		want  []string
+		event string
+	}{
+		{
+			name:  "a json reply runs its arrival hook before it answers",
+			reply: func(h *hooks) openaitest.Reply { return openaitest.Text("hi").Reply().OnArrival(h.mark("arrived")) },
+			want:  []string{"arrived"},
+		},
+		{
+			name: "a stream runs its arrival hook, then each event's hook before that event",
+			reply: func(h *hooks) openaitest.Reply {
+				return openaitest.Stream(
+					openaitest.Event{Name: "response.created", Data: `{"type":"response.created"}`, Before: h.mark("created")},
+					openaitest.Event{Name: "response.completed", Data: `{"type":"response.completed"}`, Before: h.mark("completed")},
+				).OnArrival(h.mark("arrived"))
+			},
+			want:  []string{"arrived", "created", "completed"},
+			event: "response.completed",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			seen := &hooks{}
+			server := openaitest.New(t)
+			server.Enqueue(tc.reply(seen))
+
+			got := post(t, server, "/responses", openaitest.DefaultKey, minimalBody)
+			if got.Status != http.StatusOK {
+				t.Fatalf("status = %d, want 200", got.Status)
+			}
+			if marked := seen.marked(); strings.Join(marked, ",") != strings.Join(tc.want, ",") {
+				t.Errorf("hooks ran %v, want %v", marked, tc.want)
+			}
+			if tc.event != "" && !strings.Contains(got.Body, tc.event) {
+				t.Errorf("the stream lost %s after its hook: %s", tc.event, got.Body)
+			}
+		})
+	}
+}
+
 func TestAPausedStreamStopsWhenTheCallerLeaves(t *testing.T) {
 	t.Parallel()
 

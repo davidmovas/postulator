@@ -21,6 +21,14 @@ func WithFlexPatience(patience time.Duration) Option {
 	return func(c *Client) { c.patience = max(patience, 0) }
 }
 
+type alarm interface {
+	Stop() bool
+}
+
+func afterPatience(after time.Duration, ring func()) alarm {
+	return time.AfterFunc(after, ring)
+}
+
 func (e exchange) flex() bool {
 	return e.body.ServiceTier == tierFlex
 }
@@ -33,23 +41,23 @@ func (e exchange) onDefault() exchange {
 type attempt struct {
 	ctx    context.Context
 	cancel context.CancelCauseFunc
-	timer  *time.Timer
+	alarm  alarm
 }
 
 func (c *Client) begin(call context.Context, ex exchange) attempt {
 	ctx, cancel := context.WithCancelCause(call)
 	started := attempt{ctx: ctx, cancel: cancel}
 	if ex.flex() && c.patience > 0 {
-		started.timer = time.AfterFunc(c.patience, func() { cancel(errImpatient) })
+		started.alarm = c.arm(c.patience, func() { cancel(errImpatient) })
 	}
 	return started
 }
 
 func (a attempt) settle() bool {
-	if a.timer == nil {
+	if a.alarm == nil {
 		return false
 	}
-	return !a.timer.Stop() && stderrors.Is(context.Cause(a.ctx), errImpatient)
+	return !a.alarm.Stop() && stderrors.Is(context.Cause(a.ctx), errImpatient)
 }
 
 func (a attempt) release() {

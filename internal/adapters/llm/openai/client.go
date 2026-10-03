@@ -70,6 +70,7 @@ type Client struct {
 	models   modelReader
 	http     *http.Client
 	clock    clock.Clock
+	arm      func(after time.Duration, ring func()) alarm
 	baseURL  string
 	timeout  time.Duration
 	patience time.Duration
@@ -81,6 +82,7 @@ func New(secrets secretReader, models modelReader, opts ...Option) *Client {
 		models:  models,
 		http:    &http.Client{},
 		clock:   clock.System{},
+		arm:     afterPatience,
 		baseURL: DefaultBaseURL,
 		timeout: DefaultTimeout,
 	}

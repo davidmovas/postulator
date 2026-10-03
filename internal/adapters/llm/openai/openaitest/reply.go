@@ -17,17 +17,19 @@ const (
 )
 
 type Event struct {
-	Name  string
-	Data  string
-	Pause time.Duration
+	Before func()
+	Name   string
+	Data   string
+	Pause  time.Duration
 }
 
 type Reply struct {
-	Header http.Header
-	Body   string
-	Events []Event
-	Delay  time.Duration
-	Status int
+	Header  http.Header
+	Arrived func()
+	Body    string
+	Events  []Event
+	Delay   time.Duration
+	Status  int
 }
 
 type Fault struct {
@@ -90,6 +92,11 @@ func (r Reply) After(delay time.Duration) Reply {
 	return r
 }
 
+func (r Reply) OnArrival(hook func()) Reply {
+	r.Arrived = hook
+	return r
+}
+
 func (r Reply) WithHeader(key, value string) Reply {
 	header := http.Header{}
 	if r.Header != nil {
@@ -117,6 +124,9 @@ func nullable(value string) any {
 }
 
 func (r Reply) serve(w http.ResponseWriter, req *http.Request) {
+	if r.Arrived != nil {
+		r.Arrived()
+	}
 	if !wait(req.Context(), r.Delay) {
 		return
 	}
@@ -143,6 +153,9 @@ func (r Reply) serve(w http.ResponseWriter, req *http.Request) {
 func (r Reply) stream(w http.ResponseWriter, req *http.Request) {
 	controller := http.NewResponseController(w)
 	for _, event := range r.Events {
+		if event.Before != nil {
+			event.Before()
+		}
 		if !wait(req.Context(), event.Pause) {
 			return
 		}

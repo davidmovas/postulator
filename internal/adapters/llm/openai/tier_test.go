@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -53,17 +54,120 @@ func sameTiers(got []any, want ...string) bool {
 	return true
 }
 
+const (
+	held           = time.Minute
+	patienceAsked  = 8 * time.Minute
+	alarmPending   = "pending"
+	alarmStopped   = "stopped"
+	alarmRungState = "rung"
+)
+
+type patience struct {
+	alarms []*fakeAlarm
+	mu     sync.Mutex
+}
+
+type fakeAlarm struct {
+	owner *patience
+	ring  func()
+	state string
+	after time.Duration
+}
+
+func (p *patience) arm(after time.Duration, ring func()) openai.Alarm {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	armed := &fakeAlarm{owner: p, ring: ring, state: alarmPending, after: after}
+	p.alarms = append(p.alarms, armed)
+	return armed
+}
+
+func (a *fakeAlarm) Stop() bool {
+	a.owner.mu.Lock()
+	defer a.owner.mu.Unlock()
+
+	if a.state != alarmPending {
+		return false
+	}
+	a.state = alarmStopped
+	return true
+}
+
+func (p *patience) ringAll() {
+	p.mu.Lock()
+	due := make([]func(), 0, len(p.alarms))
+	for _, armed := range p.alarms {
+		if armed.state == alarmPending {
+			armed.state = alarmRungState
+			due = append(due, armed.ring)
+		}
+	}
+	p.mu.Unlock()
+
+	for _, ring := range due {
+		ring()
+	}
+}
+
+func (p *patience) armed() []time.Duration {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	out := make([]time.Duration, 0, len(p.alarms))
+	for _, armed := range p.alarms {
+		out = append(out, armed.after)
+	}
+	return out
+}
+
+func (p *patience) rung() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	count := 0
+	for _, armed := range p.alarms {
+		if armed.state == alarmRungState {
+			count++
+		}
+	}
+	return count
+}
+
+func patientClient(server *openaitest.Server, after time.Duration, alarms *patience, opts ...openai.Option) *openai.Client {
+	return newClient(server, append([]openai.Option{openai.WithFlexPatience(after), openai.WithAlarm(alarms.arm)}, opts...)...)
+}
+
+func stalled(reply openaitest.Reply, alarms *patience) openaitest.Reply {
+	return reply.After(held).OnArrival(alarms.ringAll)
+}
+
+func sameDurations(got []time.Duration, want ...time.Duration) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func TestAFlexCompletionFallsBackToTheDefaultTierOnce(t *testing.T) {
 	t.Parallel()
 
 	served := openaitest.Answer{Text: "on default", Usage: openaitest.Usage{Input: 100, Output: 20}}.Reply()
+	late := &patience{}
 	cases := []struct {
 		name     string
+		alarms   *patience
 		replies  []openaitest.Reply
 		patience time.Duration
 		want     errors.Code
 		text     string
 		tiers    []string
+		armed    []time.Duration
 	}{
 		{
 			name:    "flex had no capacity",
@@ -72,15 +176,16 @@ func TestAFlexCompletionFallsBackToTheDefaultTierOnce(t *testing.T) {
 		},
 		{
 			name:     "flex did not answer within the patience",
-			replies:  []openaitest.Reply{openaitest.Text("too late").Reply().After(5 * time.Second), served},
-			patience: 100 * time.Millisecond,
-			text:     "on default", tiers: []string{"flex", "default"},
+			alarms:   late,
+			replies:  []openaitest.Reply{stalled(openaitest.Text("too late").Reply(), late), served},
+			patience: patienceAsked,
+			text:     "on default", tiers: []string{"flex", "default"}, armed: []time.Duration{patienceAsked},
 		},
 		{
 			name:     "flex answered in time",
-			replies:  []openaitest.Reply{openaitest.Answer{Text: "on flex", Tier: "flex"}.Reply().After(20 * time.Millisecond)},
-			patience: 2 * time.Second,
-			text:     "on flex", tiers: []string{"flex"},
+			replies:  []openaitest.Reply{openaitest.Answer{Text: "on flex", Tier: "flex"}.Reply()},
+			patience: patienceAsked,
+			text:     "on flex", tiers: []string{"flex"}, armed: []time.Duration{patienceAsked},
 		},
 		{
 			name:    "flex without patience waits",
@@ -120,8 +225,12 @@ func TestAFlexCompletionFallsBackToTheDefaultTierOnce(t *testing.T) {
 
 			server := openaitest.New(t)
 			server.Enqueue(tc.replies...)
+			alarms := tc.alarms
+			if alarms == nil {
+				alarms = &patience{}
+			}
 
-			resp, err := newClient(server, openai.WithFlexPatience(tc.patience)).Complete(t.Context(), onFlex("hello"))
+			resp, err := patientClient(server, tc.patience, alarms).Complete(t.Context(), onFlex("hello"))
 			if tc.want != "" {
 				if !errors.IsCode(err, tc.want) {
 					t.Fatalf("Complete = %v (%s), want %s", err, errors.CodeOf(err), tc.want)
@@ -134,6 +243,9 @@ func TestAFlexCompletionFallsBackToTheDefaultTierOnce(t *testing.T) {
 			}
 			if got := tiers(t, server); !sameTiers(got, tc.tiers...) {
 				t.Errorf("tiers sent = %v, want %v", got, tc.tiers)
+			}
+			if got := alarms.armed(); !sameDurations(got, tc.armed...) {
+				t.Errorf("patience armed = %v, want %v: only a flex attempt with a patience waits on one", got, tc.armed)
 			}
 		})
 	}
@@ -174,30 +286,29 @@ func TestPatienceIsOnlyForFlex(t *testing.T) {
 	t.Parallel()
 
 	server := openaitest.New(t)
-	server.Enqueue(openaitest.Text("slow but default").Reply().After(250 * time.Millisecond))
+	server.Enqueue(openaitest.Text("slow but default").Reply().After(50 * time.Millisecond))
 
-	resp, err := newClient(server, openai.WithFlexPatience(50*time.Millisecond)).Complete(t.Context(), write("hello"))
+	alarms := &patience{}
+	resp, err := patientClient(server, patienceAsked, alarms).Complete(t.Context(), write("hello"))
 	if err != nil {
 		t.Fatalf("Complete: %v", err)
 	}
 	if resp.Text != "slow but default" || len(server.Requests()) != 1 {
 		t.Errorf("text = %q after %d requests, want the one default answer", resp.Text, len(server.Requests()))
 	}
+	if armed := alarms.armed(); len(armed) != 0 {
+		t.Errorf("a default call armed the patience %v", armed)
+	}
 }
 
 func TestACallerWhoLeavesDuringFlexIsNotResent(t *testing.T) {
 	t.Parallel()
 
-	server := openaitest.New(t)
-	server.Enqueue(openaitest.Text("late").Reply().After(5*time.Second), openaitest.Text("never").Reply())
-
 	ctx, cancel := context.WithCancel(t.Context())
-	go func() {
-		time.Sleep(50 * time.Millisecond)
-		cancel()
-	}()
+	server := openaitest.New(t)
+	server.Enqueue(openaitest.Text("late").Reply().After(held).OnArrival(cancel), openaitest.Text("never").Reply())
 
-	_, err := newClient(server, openai.WithFlexPatience(time.Second)).Complete(ctx, onFlex("hello"))
+	_, err := patientClient(server, patienceAsked, &patience{}).Complete(ctx, onFlex("hello"))
 	if !errors.IsCode(err, errors.Cancelled) {
 		t.Fatalf("Complete = %v (%s), want %s", err, errors.CodeOf(err), errors.Cancelled)
 	}
@@ -224,27 +335,31 @@ func TestAClientTimeoutDuringFlexIsNotResent(t *testing.T) {
 func TestAFlexStreamFallsBackBeforeItHasSpoken(t *testing.T) {
 	t.Parallel()
 
-	stalled := openaitest.Text("too late").Stream()
-	stalled.Events[2].Pause = 5 * time.Second
-
 	served := openaitest.Answer{Text: "on default", Chunks: []string{"on", " default"}}.Stream()
+	unanswered, silent := &patience{}, &patience{}
+	admitted := openaitest.Text("too late").Stream()
+	admitted.Events[2].Before = silent.ringAll
+	admitted.Events[2].Pause = held
+
 	cases := []struct {
 		name     string
+		alarms   *patience
 		replies  []openaitest.Reply
 		patience time.Duration
 		tiers    []string
+		rung     int
 	}{
 		{name: "no capacity over http", replies: []openaitest.Reply{openaitest.FlexCapacity(), served}, tiers: []string{"flex", "default"}},
 		{name: "no capacity inside the stream", replies: []openaitest.Reply{openaitest.StreamFailure(openaitest.Capacity()), served}, tiers: []string{"flex", "default"}},
 		{
-			name:    "no answer within the patience",
-			replies: []openaitest.Reply{openaitest.Text("too late").Stream().After(5 * time.Second), served}, patience: 100 * time.Millisecond,
-			tiers: []string{"flex", "default"},
+			name: "no answer within the patience", alarms: unanswered, patience: patienceAsked,
+			replies: []openaitest.Reply{stalled(openaitest.Text("too late").Stream(), unanswered), served},
+			tiers:   []string{"flex", "default"}, rung: 1,
 		},
 		{
-			name:    "admitted but silent past the patience",
-			replies: []openaitest.Reply{stalled, served}, patience: 100 * time.Millisecond,
-			tiers: []string{"flex", "default"},
+			name: "admitted but silent past the patience", alarms: silent, patience: patienceAsked,
+			replies: []openaitest.Reply{admitted, served},
+			tiers:   []string{"flex", "default"}, rung: 1,
 		},
 	}
 
@@ -254,8 +369,12 @@ func TestAFlexStreamFallsBackBeforeItHasSpoken(t *testing.T) {
 
 			server := openaitest.New(t)
 			server.Enqueue(tc.replies...)
+			alarms := tc.alarms
+			if alarms == nil {
+				alarms = &patience{}
+			}
 
-			deltas, err := newClient(server, openai.WithFlexPatience(tc.patience)).Stream(t.Context(), onFlex("hello"))
+			deltas, err := patientClient(server, tc.patience, alarms).Stream(t.Context(), onFlex("hello"))
 			if err != nil {
 				t.Fatalf("Stream: %v", err)
 			}
@@ -266,6 +385,9 @@ func TestAFlexStreamFallsBackBeforeItHasSpoken(t *testing.T) {
 			if sent := tiers(t, server); !sameTiers(sent, tc.tiers...) {
 				t.Errorf("tiers sent = %v, want %v", sent, tc.tiers)
 			}
+			if rung := alarms.rung(); rung != tc.rung {
+				t.Errorf("the patience rang %d times, want %d", rung, tc.rung)
+			}
 		})
 	}
 }
@@ -273,26 +395,37 @@ func TestAFlexStreamFallsBackBeforeItHasSpoken(t *testing.T) {
 func TestAFlexStreamThatHasSpokenIsNotCutByThePatience(t *testing.T) {
 	t.Parallel()
 
+	gate := make(chan struct{})
+	release := sync.OnceFunc(func() { close(gate) })
 	slow := openaitest.Answer{Text: "first second", Chunks: []string{"first", " second"}, Tier: "flex"}.Stream()
 	for i := range slow.Events {
-		if slow.Events[i].Name == "response.output_text.done" {
-			slow.Events[i].Pause = 300 * time.Millisecond
+		if slow.Events[i].Name == "response.output_text.delta" {
+			slow.Events[i].Before = func() { <-gate }
+			break
 		}
 	}
 
 	server := openaitest.New(t)
+	t.Cleanup(release)
 	server.Enqueue(slow)
 
-	deltas, err := newClient(server, openai.WithFlexPatience(100*time.Millisecond)).Stream(t.Context(), onFlex("hello"))
+	alarms := &patience{}
+	deltas, err := patientClient(server, patienceAsked, alarms).Stream(t.Context(), onFlex("hello"))
 	if err != nil {
 		t.Fatalf("Stream: %v", err)
 	}
+	alarms.ringAll()
+	release()
+
 	got := listen(t, deltas)
 	if got.err != nil || got.text() != "first second" || got.done == nil || got.done.Tier != llm.TierFlex {
 		t.Errorf("stream = %+v (final %+v), want the whole flex answer", got, got.done)
 	}
 	if len(server.Requests()) != 1 {
 		t.Errorf("the server saw %d requests, want one", len(server.Requests()))
+	}
+	if armed := alarms.armed(); !sameDurations(armed, patienceAsked) || alarms.rung() != 0 {
+		t.Errorf("patience armed %v and rang %d times, want one stopped before it could ring", armed, alarms.rung())
 	}
 }
 
