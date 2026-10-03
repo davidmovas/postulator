@@ -20,6 +20,7 @@ export interface StepFileProps {
     path: string;
     rows: number | null;
     columns: number | null;
+    sheets: number;
     busy: boolean;
     recent: readonly RecentFile[];
     onChoose: () => void;
@@ -32,6 +33,7 @@ export function StepFile({
     path,
     rows,
     columns,
+    sheets,
     busy,
     recent,
     onChoose,
@@ -87,6 +89,8 @@ export function StepFile({
                                 </>
                             ) : rows === null ? (
                                 copy.imports.file.gone
+                            ) : sheets > 1 ? (
+                                `${copy.imports.file.sheets(sheets)} · ${copy.imports.file.rows(rows)}`
                             ) : (
                                 `${copy.imports.file.rows(rows)} · ${copy.imports.file.columns(columns ?? 0)}`
                             )}

@@ -8,7 +8,7 @@ function read(search: string) {
 
 describe("readQuery", () => {
     it("lands on the file step with nothing chosen", () => {
-        expect(read("")).toEqual({ tab: "import", step: "file", path: "", mappingId: "" });
+        expect(read("")).toEqual({ tab: "import", step: "file", path: "" });
     });
 
     it("keeps the step a reload was on when the file came with it", () => {
@@ -16,7 +16,6 @@ describe("readQuery", () => {
             tab: "import",
             step: "preview",
             path: "C:\\sheets\\mugs.csv",
-            mappingId: "",
         });
     });
 
@@ -29,31 +28,30 @@ describe("readQuery", () => {
             tab: "import",
             step: "file",
             path: "x",
-            mappingId: "",
         });
     });
 
-    it("carries the saved mapping it was opened with", () => {
-        expect(read("path=x&mapping=m-1").mappingId).toBe("m-1");
+    it("opens an older address that named a saved mapping on its file and step", () => {
+        expect(read("step=columns&path=x&mapping=m-1")).toEqual({ tab: "import", step: "columns", path: "x" });
     });
 });
 
 describe("writeQuery", () => {
     it("writes nothing for the opening state", () => {
-        expect(writeQuery({ tab: "import", step: "file", path: "", mappingId: "" }).toString()).toBe("");
+        expect(writeQuery({ tab: "import", step: "file", path: "" }).toString()).toBe("");
     });
 
     it("round-trips a chosen file on a later step", () => {
-        const query = { tab: "import", step: "columns", path: "C:\\a b\\x.csv", mappingId: "m-1" } as const;
+        const query = { tab: "import", step: "columns", path: "C:\\a b\\x.csv" } as const;
         expect(readQuery(writeQuery(query))).toEqual(query);
     });
 
     it("drops a step that has no file", () => {
-        expect(writeQuery({ tab: "import", step: "preview", path: "", mappingId: "" }).toString()).toBe("");
+        expect(writeQuery({ tab: "import", step: "preview", path: "" }).toString()).toBe("");
     });
 
     it("keeps the export tab", () => {
-        expect(writeQuery({ tab: "export", step: "file", path: "", mappingId: "" }).toString()).toBe("tab=export");
+        expect(writeQuery({ tab: "export", step: "file", path: "" }).toString()).toBe("tab=export");
     });
 });
 

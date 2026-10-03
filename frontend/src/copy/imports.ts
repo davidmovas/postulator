@@ -1,3 +1,14 @@
+function listed(names: readonly string[]): string {
+    if (names.length < 2) {
+        return names.join("");
+    }
+    return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1] ?? ""}`;
+}
+
+function quoted(names: readonly string[]): string[] {
+    return names.map((name) => `“${name}”`);
+}
+
 export const imports = {
     dropped: {
         ask: (path: string) => `Inspect the sheet at ${path} and tell me what it would import into this site. `,
@@ -30,6 +41,7 @@ export const imports = {
         reading: "Reading the sheet",
         rows: (count: number) => (count === 1 ? "1 row" : `${count} rows`),
         columns: (count: number) => (count === 1 ? "1 column" : `${count} columns`),
+        sheets: (count: number) => (count === 1 ? "1 sheet" : `${count} sheets`),
         recent: "Recent files",
         forget: "Forget this file",
         gone: "The file could not be read. Choose it again.",
@@ -41,9 +53,6 @@ export const imports = {
         delete: "Delete mapping",
         deleted: "Mapping deleted",
         saved: "Mapping saved",
-        saveAs: "Save this mapping as",
-        namePlaceholder: "Sitemap export",
-        save: "Save mapping",
         updated: (when: string) => `saved ${when}`,
         fields: (count: number) => (count === 1 ? "1 field" : `${count} fields`),
     },
@@ -60,10 +69,20 @@ export const imports = {
             "Map a column to Path or to Entity, or tick the columns that carry the hierarchy or name the groups, before going on.",
         options: "Reading options",
         sheets: "Sheets",
-        sheetsHint: "Sheets that do not carry the same columns have to be imported one at a time.",
+        sheetsHint:
+            "Every sheet turned on here is imported in one go, in the order of the workbook, so a later sheet can name the entities of an earlier one. Each sheet keeps its own columns and options: open it with the tabs above the table.",
         sheetRows: (rows: number) => (rows === 1 ? "1 row" : `${rows} rows`),
         reading: (names: readonly string[]) =>
-            names.length === 0 ? "Reading nothing yet." : `Reading ${names.join(", ")}.`,
+            names.length === 0 ? "No sheet is turned on, so nothing will be imported." : `Importing ${listed(names)}.`,
+        sheetTabs: "Sheets to import",
+        settingsOf: (name: string) => `Settings of ${name}`,
+        noSheet: "Turn on at least one sheet on the right to import it.",
+        otherSheet: (name: string) =>
+            `The ${name} sheet has no column for Path or Entity yet. Map one in its tab, or turn that sheet off.`,
+        openSheet: (name: string) => `Open ${name}`,
+        saved: "Start from a saved mapping",
+        savedHint: "Picking one replaces the columns and options of this sheet with the ones it saved.",
+        savedPlaceholder: "Choose a saved mapping",
         noHeaderHelp: "Nothing matched automatically.",
         noHeaderHelpBody:
             "If this sheet carries no header row, turn on “The sheet has no header row”: the columns become A, B, C and every line is read as data. Then tick the columns whose position carries the hierarchy.",
@@ -75,7 +94,7 @@ export const imports = {
             "Tick the columns whose position carries the hierarchy, left to right. A row's path is its own cell prefixed by the columns to its left.",
         levels: "Group columns",
         levelsHint:
-            "Tick the columns that name the groups a row sits in, such as Root Entity, Category and Subcategory, outermost first. Rows that repeat the same names belong to the same group.",
+            "Tick the columns that name the groups a row sits in, outermost first; rows that repeat the same names belong to the same group. A Root Entity column makes hub entities. Category and Subcategory columns make entities that also become WordPress categories, created on the site when a page under them is published.",
         notes: "Notes for the writer",
         notesHint:
             "Tick the columns to keep on each page as notes, such as Notes or Intent Owner. The writer reads them as context and an export writes them back.",
@@ -134,9 +153,23 @@ export const imports = {
     },
     apply: {
         title: "Apply the sheet",
+        titleWorkbook: "Apply the workbook",
         start: "Apply",
+        reads: (names: readonly string[]) =>
+            names.length < 2 ? `Reads ${listed(names)}.` : `Reads ${listed(names)}, in the order of the workbook.`,
+        saveAs: "Save the columns and options for the next import as",
+        savePlaceholder: "Client workbook",
+        saveOne: "Optional. Leave it empty to apply without saving a mapping.",
+        saveEach: (names: readonly string[]) =>
+            `Optional. One mapping is saved for each sheet: ${quoted(names).join(", ")}.`,
         working: (rows: number) => `Writing ${rows} rows. Leave this screen open.`,
         done: "Applied",
+        applied: (names: readonly string[]) =>
+            names.length < 2 ? `Applied ${listed(names)}.` : `Applied ${listed(names)}, in the order of the workbook.`,
+        saved: (names: readonly string[]) =>
+            names.length === 1
+                ? `Saved the mapping ${quoted(names).join("")}.`
+                : `Saved ${names.length} mappings: ${quoted(names).join(", ")}.`,
         entitiesCreated: "Entities created",
         entitiesUpdated: "Entities updated",
         edgesCreated: "Relationships created",

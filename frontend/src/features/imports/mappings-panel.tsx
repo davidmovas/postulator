@@ -24,11 +24,11 @@ import { fieldLabel } from "./labels.js";
 
 export interface MappingsPanelProps {
     siteId: string;
-    activeId: string;
+    inUse: readonly string[];
     onUse: (mapping: ImportMapping) => void;
 }
 
-export function MappingsPanel({ siteId, activeId, onUse }: MappingsPanelProps): ReactElement {
+export function MappingsPanel({ siteId, inUse, onUse }: MappingsPanelProps): ReactElement {
     const mappings = useMappings(siteId === "" ? null : siteId);
     const remove = useDeleteMapping();
     const [doomed, setDoomed] = useState<ImportMapping | null>(null);
@@ -90,13 +90,13 @@ export function MappingsPanel({ siteId, activeId, onUse }: MappingsPanelProps): 
                                     </span>
                                     <Button
                                         size="sm"
-                                        variant={mapping.id === activeId ? "ghost" : "secondary"}
-                                        disabled={mapping.id === activeId}
+                                        variant={inUse.includes(mapping.id ?? "") ? "ghost" : "secondary"}
+                                        disabled={inUse.includes(mapping.id ?? "")}
                                         onClick={() => {
                                             onUse(mapping);
                                         }}
                                     >
-                                        {mapping.id === activeId
+                                        {inUse.includes(mapping.id ?? "")
                                             ? copy.imports.mappings.inUse
                                             : copy.imports.mappings.use}
                                     </Button>
