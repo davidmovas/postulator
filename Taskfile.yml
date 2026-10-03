@@ -178,6 +178,7 @@ tasks:
       WP_PORT: "8089"
       E2E_MODE: sandbox
       E2E_PLUGIN: '{{.E2E_PLUGIN | default "0"}}'
+      E2E_WOO: '{{.E2E_WOO | default "0"}}'
 
   sandbox:down:
     summary: Stops the WordPress sandbox and keeps its content

@@ -107,6 +107,7 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 	if len(applied.Report.Errors) != 0 {
 		t.Fatalf("the import reported %+v", applied.Report.Errors)
 	}
+	assertAProductIsRefusedWithoutThePlugin(t, core, siteID)
 
 	stored = pagesByPath(t, core.Pages, siteID)
 	targets := make([]string, 0, len(degradedTargets))
@@ -234,6 +235,35 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 
 	t.Logf("%d drafts under /menu/main-courses/, %d pages in the store, %d of %d edges realized",
 		len(drafts), len(after), overview.Edges.Realized, overview.Edges.Approved)
+}
+
+func assertAProductIsRefusedWithoutThePlugin(t *testing.T, core *app.Core, siteID string) {
+	t.Helper()
+
+	created, err := core.Pages.Create(t.Context(), pages.CreateRequest{
+		SiteID: siteID, Path: "/menu/gift-card/", WPType: string(pagemap.WPProduct), Title: "Gift card",
+	})
+	if err != nil {
+		t.Fatalf("plan a product row: %v", err)
+	}
+	estimated, err := core.Runs.Estimate(t.Context(), runs.StartRequest{
+		SiteID: siteID, PageIDs: []string{created.Page.ID}, TemplateID: productTemplate(t, core),
+		PublishMode: string(run.PublishLive), Recipe: recipe(),
+	})
+	if err != nil {
+		t.Fatalf("estimate a run over the product: %v", err)
+	}
+	refused := false
+	for _, finding := range estimated.Estimate.Blocking() {
+		refused = refused || finding.Code == steps.CodeProductNeedsPlugin
+	}
+	if !refused {
+		t.Fatalf("the estimate over a product without the plugin = %+v, want the %s refusal before anything is spent",
+			estimated.Estimate.Findings, steps.CodeProductNeedsPlugin)
+	}
+	if _, err = core.Pages.Delete(t.Context(), pages.DeleteRequest{ID: created.Page.ID}); err != nil {
+		t.Fatalf("drop the product row: %v", err)
+	}
 }
 
 func assertARevertWithoutThePluginPausesRatherThanFails(t *testing.T, core *app.Core, live *site,
