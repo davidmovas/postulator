@@ -47,6 +47,8 @@ function node(id: string, drift: boolean, children: PageTreeNode[] = []): PageTr
             notes: [],
             status: "published",
             entityId: null,
+            categories: [],
+            categoriesNeedPlugin: false,
             templateId: null,
             contentHash: "",
             observed: { link: "", slug: "", status: "", title: "", h1: "" },

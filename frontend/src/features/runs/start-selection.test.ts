@@ -22,6 +22,8 @@ function aPage(id: string, path: string, overrides: Partial<Page> = {}): Page {
         notes: [],
         status: "planned",
         entityId: `entity-${id}`,
+        categories: [],
+        categoriesNeedPlugin: false,
         templateId: null,
         contentHash: "",
         observed: { link: "", slug: "", status: "", title: "", h1: "" },

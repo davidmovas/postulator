@@ -22,6 +22,8 @@ function page(id: string, path: string): Page {
         notes: [],
         status: "planned",
         entityId: null,
+        categories: [],
+        categoriesNeedPlugin: false,
         templateId: null,
         contentHash: "",
         observed: { link: "", slug: "", status: "", title: "", h1: "" },
