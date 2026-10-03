@@ -35,6 +35,9 @@ func (i ModelInfo) Validate() error {
 	if i.CachedInputUSDPerM > i.InputUSDPerM {
 		return invalid("a cached input token must not cost more than a fresh one", "cachedInputUsdPerM")
 	}
+	if i.CacheWriteUSDPerM < 0 {
+		return invalid("a price must not be negative", "cacheWriteUsdPerM")
+	}
 	if err := i.validateFlex(); err != nil {
 		return err
 	}
@@ -57,6 +60,9 @@ func (i ModelInfo) validateFlex() error {
 	if i.FlexCachedInputUSDPerM < 0 {
 		return invalid("a price must not be negative", "flexCachedInputUsdPerM")
 	}
+	if i.FlexCacheWriteUSDPerM < 0 {
+		return invalid("a price must not be negative", "flexCacheWriteUsdPerM")
+	}
 	if i.FlexOutputUSDPerM < 0 {
 		return invalid("a price must not be negative", "flexOutputUsdPerM")
 	}
@@ -68,6 +74,9 @@ func (i ModelInfo) validateFlex() error {
 	}
 	if i.FlexOutputUSDPerM > 0 && i.FlexInputUSDPerM == 0 {
 		return invalid("a flex output price needs a flex input price beside it", "flexInputUsdPerM")
+	}
+	if i.FlexCacheWriteUSDPerM > 0 && i.FlexInputUSDPerM == 0 {
+		return invalid("a flex cache write price needs a flex input price beside it", "flexInputUsdPerM")
 	}
 	return nil
 }

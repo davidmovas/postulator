@@ -108,9 +108,11 @@ type ModelInfo struct {
 	MaxOutputTokens        int             `json:"maxOutputTokens"`
 	InputUSDPerM           float64         `json:"inputUsdPerM"`
 	CachedInputUSDPerM     float64         `json:"cachedInputUsdPerM,omitempty"`
+	CacheWriteUSDPerM      float64         `json:"cacheWriteUsdPerM,omitempty"`
 	OutputUSDPerM          float64         `json:"outputUsdPerM"`
 	FlexInputUSDPerM       float64         `json:"flexInputUsdPerM,omitempty"`
 	FlexCachedInputUSDPerM float64         `json:"flexCachedInputUsdPerM,omitempty"`
+	FlexCacheWriteUSDPerM  float64         `json:"flexCacheWriteUsdPerM,omitempty"`
 	FlexOutputUSDPerM      float64         `json:"flexOutputUsdPerM,omitempty"`
 	RPM                    int             `json:"rpm"`
 	TPM                    int             `json:"tpm"`
@@ -126,6 +128,7 @@ func (i ModelInfo) OffersFlex() bool {
 type Usage struct {
 	Input       int `json:"input"`
 	CachedInput int `json:"cachedInput"`
+	CacheWrite  int `json:"cacheWrite"`
 	Output      int `json:"output"`
 	Reasoning   int `json:"reasoning"`
 	Total       int `json:"total"`
@@ -135,6 +138,7 @@ func (u Usage) Add(other Usage) Usage {
 	return Usage{
 		Input:       u.Input + other.Input,
 		CachedInput: u.CachedInput + other.CachedInput,
+		CacheWrite:  u.CacheWrite + other.CacheWrite,
 		Output:      u.Output + other.Output,
 		Reasoning:   u.Reasoning + other.Reasoning,
 		Total:       u.Total + other.Total,
@@ -146,26 +150,40 @@ const tokensPerMillion = 1_000_000
 type prices struct {
 	input  float64
 	cached float64
+	write  float64
 	output float64
 }
 
 func pricesOf(info ModelInfo, tier ServiceTier) prices {
-	if tier == TierFlex && info.OffersFlex() {
-		return prices{input: info.FlexInputUSDPerM, cached: info.FlexCachedInputUSDPerM, output: info.FlexOutputUSDPerM}
+	chosen := prices{
+		input: info.InputUSDPerM, cached: info.CachedInputUSDPerM, write: info.CacheWriteUSDPerM,
+		output: info.OutputUSDPerM,
 	}
-	return prices{input: info.InputUSDPerM, cached: info.CachedInputUSDPerM, output: info.OutputUSDPerM}
+	if tier == TierFlex && info.OffersFlex() {
+		chosen = prices{
+			input: info.FlexInputUSDPerM, cached: info.FlexCachedInputUSDPerM, write: info.FlexCacheWriteUSDPerM,
+			output: info.FlexOutputUSDPerM,
+		}
+	}
+	if chosen.cached <= 0 {
+		chosen.cached = chosen.input
+	}
+	if chosen.write <= 0 {
+		chosen.write = chosen.input
+	}
+	return chosen
 }
 
 func Cost(usage Usage, info ModelInfo, tier ServiceTier) float64 {
 	rate := pricesOf(info, tier)
-	cachedRate := rate.cached
-	if cachedRate <= 0 {
-		cachedRate = rate.input
-	}
-	cached := min(max(usage.CachedInput, 0), usage.Input)
+	read := min(max(usage.CachedInput, 0), usage.Input)
+	written := min(max(usage.CacheWrite, 0), usage.Input-read)
+	fresh := usage.Input - read - written
 
-	fresh := float64(usage.Input-cached) / tokensPerMillion * rate.input
-	reused := float64(cached) / tokensPerMillion * cachedRate
-	output := float64(usage.Output) / tokensPerMillion * rate.output
-	return fresh + reused + output
+	return perMillion(fresh, rate.input) + perMillion(read, rate.cached) + perMillion(written, rate.write) +
+		perMillion(usage.Output, rate.output)
+}
+
+func perMillion(tokens int, usdPerMillion float64) float64 {
+	return float64(tokens) / tokensPerMillion * usdPerMillion
 }

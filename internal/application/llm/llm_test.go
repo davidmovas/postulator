@@ -272,7 +272,8 @@ func TestTheRequestEncoding(t *testing.T) {
 		{
 			name:  "a plain response",
 			value: llm.Response{Text: "hi", FinishReason: llm.FinishStop},
-			want:  `{"text":"hi","usage":{"input":0,"cachedInput":0,"output":0,"reasoning":0,"total":0},"finishReason":"stop"}`,
+			want: `{"text":"hi","usage":{"input":0,"cachedInput":0,"cacheWrite":0,"output":0,"reasoning":0,"total":0},` +
+				`"finishReason":"stop"}`,
 		},
 		{
 			name: "a response that calls tools on flex",
@@ -282,7 +283,8 @@ func TestTheRequestEncoding(t *testing.T) {
 				Calls:        []llm.ToolCall{{ID: "call_1", Name: "pages_list", Args: json.RawMessage(`{}`)}},
 				Tier:         domain.TierFlex,
 			},
-			want: `{"text":"","usage":{"input":1,"cachedInput":0,"output":2,"reasoning":1,"total":3},"finishReason":"stop",` +
+			want: `{"text":"","usage":{"input":1,"cachedInput":0,"cacheWrite":0,"output":2,"reasoning":1,"total":3},` +
+				`"finishReason":"stop",` +
 				`"calls":[{"id":"call_1","name":"pages_list","args":{}}],"tier":"flex"}`,
 		},
 		{

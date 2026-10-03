@@ -50,6 +50,28 @@ func TestModelInfoValidate(t *testing.T) {
 		{name: "a flex input price needs a flex output price", mutate: withFlex(1, 0.1, 0), wantErr: true},
 		{name: "a flex output price needs a flex input price", mutate: withFlex(0, 0, 6), wantErr: true},
 		{name: "a flex cached price needs a flex input price", mutate: withFlex(0, 0.1, 0), wantErr: true},
+		{name: "a cache write price may be declared", mutate: func(i *llm.ModelInfo) { i.CacheWriteUSDPerM = 2.5 }},
+		{name: "the cache write price is not negative", mutate: func(i *llm.ModelInfo) { i.CacheWriteUSDPerM = -1 }, wantErr: true},
+		{
+			name: "a flex cache write price may be declared",
+			mutate: func(i *llm.ModelInfo) {
+				withFlex(1, 0.1, 6)(i)
+				i.FlexCacheWriteUSDPerM = 1.25
+			},
+		},
+		{
+			name: "the flex cache write price is not negative",
+			mutate: func(i *llm.ModelInfo) {
+				withFlex(1, 0.1, 6)(i)
+				i.FlexCacheWriteUSDPerM = -1
+			},
+			wantErr: true,
+		},
+		{
+			name:    "a flex cache write price needs a flex input price",
+			mutate:  func(i *llm.ModelInfo) { i.FlexCacheWriteUSDPerM = 1.25 },
+			wantErr: true,
+		},
 	}
 
 	for _, tc := range cases {

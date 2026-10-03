@@ -84,6 +84,11 @@ func TestCost(t *testing.T) {
 		Ref: llm.ModelRef{Provider: "openai", Model: "gpt"}, InputUSDPerM: 3, CachedInputUSDPerM: 0.3, OutputUSDPerM: 15,
 		FlexInputUSDPerM: 1.5, FlexOutputUSDPerM: 7.5,
 	}
+	writing := llm.ModelInfo{
+		Ref: llm.ModelRef{Provider: "openai", Model: "gpt"}, InputUSDPerM: 3, CachedInputUSDPerM: 0.3,
+		CacheWriteUSDPerM: 3.75, OutputUSDPerM: 15,
+		FlexInputUSDPerM: 1.5, FlexCachedInputUSDPerM: 0.15, FlexCacheWriteUSDPerM: 1.875, FlexOutputUSDPerM: 7.5,
+	}
 
 	cases := []struct {
 		name  string
@@ -146,6 +151,38 @@ func TestCost(t *testing.T) {
 		{
 			name: "reasoning on flex is part of the flex output", info: flexible, tier: llm.TierFlex,
 			usage: llm.Usage{Output: 1_000_000, Reasoning: 900_000, Total: 1_000_000}, want: 7.5,
+		},
+		{
+			name: "a written input token costs the cache write rate", info: writing, tier: llm.TierDefault,
+			usage: llm.Usage{Input: 1_000_000, CacheWrite: 1_000_000, Total: 1_000_000}, want: 3.75,
+		},
+		{
+			name: "a prompt that is partly read, partly written and partly fresh is charged at three rates",
+			info: writing, tier: llm.TierDefault,
+			usage: llm.Usage{Input: 1_000_000, CachedInput: 500_000, CacheWrite: 250_000, Total: 1_000_000},
+			want:  0.75 + 0.15 + 0.9375,
+		},
+		{
+			name: "a model with no cache write price charges the input rate for a write", info: priced, tier: llm.TierDefault,
+			usage: llm.Usage{Input: 1_000_000, CacheWrite: 1_000_000, Total: 1_000_000}, want: 3,
+		},
+		{
+			name: "a written input token on flex costs the flex cache write rate", info: writing, tier: llm.TierFlex,
+			usage: llm.Usage{Input: 1_000_000, CacheWrite: 1_000_000, Total: 1_000_000}, want: 1.875,
+		},
+		{
+			name: "a flex row with no cache write price charges the flex input rate for a write", info: flexible,
+			tier: llm.TierFlex, usage: llm.Usage{Input: 1_000_000, CacheWrite: 1_000_000, Total: 1_000_000}, want: 1.5,
+		},
+		{
+			name: "more read and written tokens than input tokens cannot go negative", info: writing, tier: llm.TierDefault,
+			usage: llm.Usage{Input: 1_000_000, CachedInput: 800_000, CacheWrite: 600_000, Total: 1_000_000},
+			want:  0.24 + 0.75,
+		},
+		{
+			name: "written tokens are charged beside the output", info: writing, tier: llm.TierDefault,
+			usage: llm.Usage{Input: 1_000_000, CacheWrite: 400_000, Output: 100_000, Total: 1_100_000},
+			want:  1.8 + 1.5 + 1.5,
 		},
 	}
 
@@ -247,9 +284,9 @@ func TestAllowance(t *testing.T) {
 func TestUsageAdd(t *testing.T) {
 	t.Parallel()
 
-	sum := llm.Usage{Input: 10, Output: 5, CachedInput: 4, Reasoning: 3, Total: 15}.
-		Add(llm.Usage{Input: 1, Output: 2, CachedInput: 1, Reasoning: 2, Total: 3})
-	if sum != (llm.Usage{Input: 11, Output: 7, CachedInput: 5, Reasoning: 5, Total: 18}) {
+	sum := llm.Usage{Input: 10, Output: 5, CachedInput: 4, CacheWrite: 2, Reasoning: 3, Total: 15}.
+		Add(llm.Usage{Input: 1, Output: 2, CachedInput: 1, CacheWrite: 1, Reasoning: 2, Total: 3})
+	if sum != (llm.Usage{Input: 11, Output: 7, CachedInput: 5, CacheWrite: 3, Reasoning: 5, Total: 18}) {
 		t.Fatalf("Add = %+v", sum)
 	}
 }
@@ -264,17 +301,18 @@ func TestUsageAndPricesAreCamelCase(t *testing.T) {
 	}{
 		{
 			name:  "usage",
-			value: llm.Usage{Input: 10, CachedInput: 4, Output: 6, Reasoning: 2, Total: 16},
-			want:  `{"input":10,"cachedInput":4,"output":6,"reasoning":2,"total":16}`,
+			value: llm.Usage{Input: 10, CachedInput: 4, CacheWrite: 3, Output: 6, Reasoning: 2, Total: 16},
+			want:  `{"input":10,"cachedInput":4,"cacheWrite":3,"output":6,"reasoning":2,"total":16}`,
 		},
 		{
-			name: "flex prices",
+			name: "cache write and flex prices",
 			value: llm.ModelInfo{
-				InputUSDPerM: 3, OutputUSDPerM: 15,
-				FlexInputUSDPerM: 1.5, FlexCachedInputUSDPerM: 0.15, FlexOutputUSDPerM: 7.5,
+				InputUSDPerM: 3, CacheWriteUSDPerM: 3.75, OutputUSDPerM: 15,
+				FlexInputUSDPerM: 1.5, FlexCachedInputUSDPerM: 0.15, FlexCacheWriteUSDPerM: 1.875, FlexOutputUSDPerM: 7.5,
 			},
 			want: `{"ref":{"provider":"","model":""},"contextTokens":0,"maxOutputTokens":0,"inputUsdPerM":3,` +
-				`"outputUsdPerM":15,"flexInputUsdPerM":1.5,"flexCachedInputUsdPerM":0.15,"flexOutputUsdPerM":7.5,` +
+				`"cacheWriteUsdPerM":3.75,"outputUsdPerM":15,"flexInputUsdPerM":1.5,"flexCachedInputUsdPerM":0.15,` +
+				`"flexCacheWriteUsdPerM":1.875,"flexOutputUsdPerM":7.5,` +
 				`"rpm":0,"tpm":0,"supportsStructured":false,"supportsImages":false,"reasoning":false}`,
 		},
 		{
