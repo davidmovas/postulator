@@ -34,6 +34,7 @@ type canonical struct {
 type plan struct {
 	siteID    string
 	sheet     string
+	mapping   importmap.Mapping
 	report    PreviewReport
 	entities  []plannedEntity
 	edges     []graph.Edge
@@ -669,7 +670,7 @@ func (s *Service) plan(ctx context.Context, siteID string, table importmap.Table
 	}
 
 	now := s.now()
-	p := plan{siteID: siteID, sheet: sheetOf(table), rows: len(table.Rows)}
+	p := plan{siteID: siteID, sheet: sheetOf(table), mapping: mapping, rows: len(table.Rows)}
 	p.report.Columns = columnViews(mapping.Uses(table.Headers))
 	rows := readRows(binding, table, &p)
 	sheet := pagesOf(rows, &p)

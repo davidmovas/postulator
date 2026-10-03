@@ -23,7 +23,7 @@ func (s *Service) Inspect(ctx context.Context, req InspectRequest) (InspectRespo
 		return InspectResponse{}, err
 	}
 
-	table, err := s.table(ctx, req.Path, Options{Sheets: req.Sheets, NoHeader: req.NoHeader})
+	table, err := s.table(ctx, req.Path, importmap.Options{Sheets: req.Sheets, NoHeader: req.NoHeader})
 	if err != nil {
 		return InspectResponse{}, err
 	}
@@ -58,16 +58,16 @@ func (s *Service) Preview(ctx context.Context, req PreviewRequest) (PreviewRespo
 	return PreviewResponse{Report: computed.report}, nil
 }
 
-func (s *Service) compute(ctx context.Context, siteID, path string, mapping Mapping) (plan, error) {
+func (s *Service) compute(ctx context.Context, siteID, path string, view Mapping) (plan, error) {
 	if err := s.requireSite(ctx, siteID); err != nil {
 		return plan{}, err
 	}
 
-	table, err := s.table(ctx, path, mapping.Options)
+	mapping, table, err := s.read(ctx, siteID, path, view.domain())
 	if err != nil {
 		return plan{}, err
 	}
-	return s.plan(ctx, siteID, table, mapping.domain())
+	return s.plan(ctx, siteID, table, mapping)
 }
 
 func (s *Service) Apply(ctx context.Context, req ApplyRequest) (ApplyResponse, error) {
@@ -88,7 +88,7 @@ func (s *Service) Apply(ctx context.Context, req ApplyRequest) (ApplyResponse, e
 		}
 		counts = written
 		counts.Skipped = computed.report.Skipped
-		return s.remember(c, req)
+		return s.remember(c, req, computed.mapping)
 	})
 	if err != nil {
 		return ApplyResponse{}, err
@@ -169,19 +169,17 @@ func (s *Service) settleScopes(ctx context.Context, siteID string, now time.Time
 	return nil
 }
 
-func (s *Service) remember(ctx context.Context, req ApplyRequest) error {
+func (s *Service) remember(ctx context.Context, req ApplyRequest, used importmap.Mapping) error {
 	if req.Options.SaveMappingAs == "" {
 		return nil
 	}
-	saved := req.Mapping
-	saved.Name = req.Options.SaveMappingAs
-	saved.SiteID = req.SiteID
-	_, err := s.save(ctx, saved)
+	used.Name = req.Options.SaveMappingAs
+	used.SiteID = req.SiteID
+	_, err := s.save(ctx, used)
 	return err
 }
 
-func (s *Service) save(ctx context.Context, view Mapping) (importmap.Mapping, error) {
-	mapping := view.domain()
+func (s *Service) save(ctx context.Context, mapping importmap.Mapping) (importmap.Mapping, error) {
 	now := s.now()
 	mapping.CreatedAt, mapping.UpdatedAt = now, now
 
@@ -229,7 +227,7 @@ func (s *Service) SaveMapping(ctx context.Context, req SaveMappingRequest) (Save
 	if err := s.requireSite(ctx, req.Mapping.SiteID); err != nil {
 		return SaveMappingResponse{}, err
 	}
-	saved, err := s.save(ctx, req.Mapping)
+	saved, err := s.save(ctx, req.Mapping.domain())
 	if err != nil {
 		return SaveMappingResponse{}, err
 	}

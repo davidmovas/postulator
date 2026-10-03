@@ -8,9 +8,9 @@ type columnArgs struct {
 }
 
 type mappingArgs struct {
-	ID      string           `json:"id,omitempty" description:"The id of a saved mapping to reuse, left out for a mapping given here"`
+	ID      string           `json:"id,omitempty" description:"A saved mapping's id; with no columns an import uses it, taking only the row type and sheets given here"`
 	Name    string           `json:"name,omitempty" description:"What to call the mapping when it is saved"`
-	Columns []columnArgs     `json:"columns,omitempty" description:"Which spreadsheet column fills which page field; leave it out and the columns detected by imports_inspect are used"`
+	Columns []columnArgs     `json:"columns,omitempty" description:"Which spreadsheet column fills which page field; with none, an import detects them from the headers"`
 	Options *imports.Options `json:"options,omitempty" description:"How to read the cells: what to strip from a path and what separates a list; leave it out for the defaults"`
 }
 

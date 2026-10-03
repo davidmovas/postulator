@@ -98,7 +98,7 @@ func (s *Service) requireSite(ctx context.Context, siteID string) error {
 	return err
 }
 
-func (s *Service) table(ctx context.Context, path string, options Options) (importmap.Table, error) {
+func (s *Service) table(ctx context.Context, path string, options importmap.Options) (importmap.Table, error) {
 	return s.deps.Tables.Read(ctx, path, importmap.ReadOptions{
 		Sheets:  options.Sheets,
 		MaxRows: s.deps.MaxRows,
