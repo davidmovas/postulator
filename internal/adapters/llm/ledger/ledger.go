@@ -134,7 +134,7 @@ func (l *Ledger) cost(ctx context.Context, ref llm.ModelRef, usage llm.Usage) fl
 	if err != nil {
 		return 0
 	}
-	return llm.Cost(usage, info)
+	return llm.Cost(usage, info, llm.TierDefault)
 }
 
 func (l *Ledger) SumByRun(ctx context.Context, runID string) (llm.Spend, error) {

@@ -61,25 +61,73 @@ func (e ReasoningEffort) Valid() bool {
 	}
 }
 
+const (
+	allowanceLow    = 2048
+	allowanceMedium = 8192
+	allowanceHigh   = 24576
+	allowanceXHigh  = 49152
+)
+
+func Allowance(effort ReasoningEffort) int {
+	switch effort {
+	case EffortNone:
+		return 0
+	case EffortLow:
+		return allowanceLow
+	case EffortHigh:
+		return allowanceHigh
+	case EffortXHigh:
+		return allowanceXHigh
+	case EffortMedium:
+		return allowanceMedium
+	default:
+		return allowanceMedium
+	}
+}
+
+type ServiceTier string
+
+const (
+	TierDefault ServiceTier = "default"
+	TierFlex    ServiceTier = "flex"
+)
+
+func (t ServiceTier) Valid() bool {
+	switch t {
+	case TierDefault, TierFlex:
+		return true
+	default:
+		return false
+	}
+}
+
 type ModelInfo struct {
-	Ref                ModelRef        `json:"ref"`
-	ReasoningEffort    ReasoningEffort `json:"reasoningEffort,omitempty"`
-	ContextTokens      int             `json:"contextTokens"`
-	MaxOutputTokens    int             `json:"maxOutputTokens"`
-	InputUSDPerM       float64         `json:"inputUsdPerM"`
-	CachedInputUSDPerM float64         `json:"cachedInputUsdPerM,omitempty"`
-	OutputUSDPerM      float64         `json:"outputUsdPerM"`
-	RPM                int             `json:"rpm"`
-	TPM                int             `json:"tpm"`
-	SupportsStructured bool            `json:"supportsStructured"`
-	SupportsImages     bool            `json:"supportsImages"`
-	Reasoning          bool            `json:"reasoning"`
+	Ref                    ModelRef        `json:"ref"`
+	ReasoningEffort        ReasoningEffort `json:"reasoningEffort,omitempty"`
+	ContextTokens          int             `json:"contextTokens"`
+	MaxOutputTokens        int             `json:"maxOutputTokens"`
+	InputUSDPerM           float64         `json:"inputUsdPerM"`
+	CachedInputUSDPerM     float64         `json:"cachedInputUsdPerM,omitempty"`
+	OutputUSDPerM          float64         `json:"outputUsdPerM"`
+	FlexInputUSDPerM       float64         `json:"flexInputUsdPerM,omitempty"`
+	FlexCachedInputUSDPerM float64         `json:"flexCachedInputUsdPerM,omitempty"`
+	FlexOutputUSDPerM      float64         `json:"flexOutputUsdPerM,omitempty"`
+	RPM                    int             `json:"rpm"`
+	TPM                    int             `json:"tpm"`
+	SupportsStructured     bool            `json:"supportsStructured"`
+	SupportsImages         bool            `json:"supportsImages"`
+	Reasoning              bool            `json:"reasoning"`
+}
+
+func (i ModelInfo) OffersFlex() bool {
+	return i.FlexInputUSDPerM > 0
 }
 
 type Usage struct {
 	Input       int `json:"input"`
 	CachedInput int `json:"cachedInput"`
 	Output      int `json:"output"`
+	Reasoning   int `json:"reasoning"`
 	Total       int `json:"total"`
 }
 
@@ -88,21 +136,36 @@ func (u Usage) Add(other Usage) Usage {
 		Input:       u.Input + other.Input,
 		CachedInput: u.CachedInput + other.CachedInput,
 		Output:      u.Output + other.Output,
+		Reasoning:   u.Reasoning + other.Reasoning,
 		Total:       u.Total + other.Total,
 	}
 }
 
 const tokensPerMillion = 1_000_000
 
-func Cost(usage Usage, info ModelInfo) float64 {
-	cachedRate := info.CachedInputUSDPerM
+type prices struct {
+	input  float64
+	cached float64
+	output float64
+}
+
+func pricesOf(info ModelInfo, tier ServiceTier) prices {
+	if tier == TierFlex && info.OffersFlex() {
+		return prices{input: info.FlexInputUSDPerM, cached: info.FlexCachedInputUSDPerM, output: info.FlexOutputUSDPerM}
+	}
+	return prices{input: info.InputUSDPerM, cached: info.CachedInputUSDPerM, output: info.OutputUSDPerM}
+}
+
+func Cost(usage Usage, info ModelInfo, tier ServiceTier) float64 {
+	rate := pricesOf(info, tier)
+	cachedRate := rate.cached
 	if cachedRate <= 0 {
-		cachedRate = info.InputUSDPerM
+		cachedRate = rate.input
 	}
 	cached := min(max(usage.CachedInput, 0), usage.Input)
 
-	fresh := float64(usage.Input-cached) / tokensPerMillion * info.InputUSDPerM
+	fresh := float64(usage.Input-cached) / tokensPerMillion * rate.input
 	reused := float64(cached) / tokensPerMillion * cachedRate
-	output := float64(usage.Output) / tokensPerMillion * info.OutputUSDPerM
+	output := float64(usage.Output) / tokensPerMillion * rate.output
 	return fresh + reused + output
 }

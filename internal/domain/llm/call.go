@@ -26,6 +26,7 @@ type Call struct {
 	USD            float64
 	Latency        time.Duration
 	Status         CallStatus
+	Tier           ServiceTier
 }
 
 func (c Call) Validate() error {
@@ -37,6 +38,9 @@ func (c Call) Validate() error {
 	}
 	if !c.Status.Valid() {
 		return invalid("a call status must be ok or error", "status")
+	}
+	if c.Tier != "" && !c.Tier.Valid() {
+		return invalid("a call's service tier must be default or flex", "tier")
 	}
 	return nil
 }

@@ -43,31 +43,31 @@ func TestBudget(t *testing.T) {
 			name:  "a low effort carries the low allowance",
 			asked: 16,
 			info:  llm.ModelInfo{Reasoning: true, ReasoningEffort: llm.EffortLow, MaxOutputTokens: 128000},
-			want:  16 + allowanceLow,
+			want:  16 + llm.Allowance(llm.EffortLow),
 		},
 		{
 			name:  "a declared medium effort carries the medium allowance",
 			asked: 512,
 			info:  llm.ModelInfo{Reasoning: true, ReasoningEffort: llm.EffortMedium, MaxOutputTokens: 128000},
-			want:  512 + allowanceMedium,
+			want:  512 + llm.Allowance(llm.EffortMedium),
 		},
 		{
 			name:  "an undeclared effort is treated as the provider default",
 			asked: 512,
 			info:  llm.ModelInfo{Reasoning: true, MaxOutputTokens: 128000},
-			want:  512 + allowanceMedium,
+			want:  512 + llm.Allowance(llm.EffortMedium),
 		},
 		{
 			name:  "a high effort carries the high allowance",
 			asked: 1024,
 			info:  llm.ModelInfo{Reasoning: true, ReasoningEffort: llm.EffortHigh, MaxOutputTokens: 128000},
-			want:  1024 + allowanceHigh,
+			want:  1024 + llm.Allowance(llm.EffortHigh),
 		},
 		{
 			name:  "an xhigh effort carries the largest allowance",
 			asked: 1024,
 			info:  llm.ModelInfo{Reasoning: true, ReasoningEffort: llm.EffortXHigh, MaxOutputTokens: 128000},
-			want:  1024 + allowanceXHigh,
+			want:  1024 + llm.Allowance(llm.EffortXHigh),
 		},
 		{
 			name:  "the allowance never exceeds what the model can emit",
@@ -79,7 +79,7 @@ func TestBudget(t *testing.T) {
 			name:  "a model with no declared output ceiling is not clamped",
 			asked: 512,
 			info:  llm.ModelInfo{Reasoning: true, ReasoningEffort: llm.EffortLow},
-			want:  512 + allowanceLow,
+			want:  512 + llm.Allowance(llm.EffortLow),
 		},
 	}
 

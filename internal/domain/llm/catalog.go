@@ -35,6 +35,9 @@ func (i ModelInfo) Validate() error {
 	if i.CachedInputUSDPerM > i.InputUSDPerM {
 		return invalid("a cached input token must not cost more than a fresh one", "cachedInputUsdPerM")
 	}
+	if err := i.validateFlex(); err != nil {
+		return err
+	}
 	if i.RPM <= 0 {
 		return invalid("the request rate limit must be positive", "rpm")
 	}
@@ -43,6 +46,28 @@ func (i ModelInfo) Validate() error {
 	}
 	if i.ReasoningEffort != "" && !i.ReasoningEffort.Valid() {
 		return invalid("the reasoning effort must be none, low, medium, high or xhigh", "reasoningEffort")
+	}
+	return nil
+}
+
+func (i ModelInfo) validateFlex() error {
+	if i.FlexInputUSDPerM < 0 {
+		return invalid("a price must not be negative", "flexInputUsdPerM")
+	}
+	if i.FlexCachedInputUSDPerM < 0 {
+		return invalid("a price must not be negative", "flexCachedInputUsdPerM")
+	}
+	if i.FlexOutputUSDPerM < 0 {
+		return invalid("a price must not be negative", "flexOutputUsdPerM")
+	}
+	if i.FlexCachedInputUSDPerM > i.FlexInputUSDPerM {
+		return invalid("a cached input token must not cost more than a fresh one", "flexCachedInputUsdPerM")
+	}
+	if i.FlexInputUSDPerM > 0 && i.FlexOutputUSDPerM == 0 {
+		return invalid("a flex input price needs a flex output price beside it", "flexOutputUsdPerM")
+	}
+	if i.FlexOutputUSDPerM > 0 && i.FlexInputUSDPerM == 0 {
+		return invalid("a flex output price needs a flex input price beside it", "flexInputUsdPerM")
 	}
 	return nil
 }

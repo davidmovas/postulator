@@ -203,7 +203,7 @@ func (e *Engine) price(ctx context.Context, record run.Run, def run.StepDef, tar
 
 	usage := usageOf(outputOf(def, int(float64(targetWords(target.Spec, target.Page.WPType))*tokensPerWord)))
 	priced.tokens += usage.Total * calls
-	priced.usd += llm.Cost(usage, info) * float64(calls)
+	priced.usd += llm.Cost(usage, info, llm.TierDefault) * float64(calls)
 	return nil
 }
 

@@ -246,7 +246,7 @@ func (r *Runner) cost(ctx context.Context, ref domainllm.ModelRef, usage domainl
 	if err != nil {
 		return 0
 	}
-	return domainllm.Cost(usage, info)
+	return domainllm.Cost(usage, info, domainllm.TierDefault)
 }
 
 type readTheStream struct{}

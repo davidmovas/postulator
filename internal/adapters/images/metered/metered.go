@@ -88,5 +88,5 @@ func (m *Images) cost(ctx context.Context, usage llm.Usage) float64 {
 	if err != nil {
 		return 0
 	}
-	return llm.Cost(usage, info)
+	return llm.Cost(usage, info, llm.TierDefault)
 }
