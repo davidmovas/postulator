@@ -127,6 +127,32 @@ func TestMismatchesNamesBothValues(t *testing.T) {
 	}
 }
 
+func TestTheObservedPathIsTheAddressTheSiteAnswers(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		link string
+		want string
+	}{
+		{name: "a permalink", link: "https://shop.example.com/Coffee/Espresso", want: "/coffee/espresso/"},
+		{name: "a path", link: "/coffee/", want: "/coffee/"},
+		{name: "a path without its slash", link: "/coffee", want: "/coffee/"},
+		{name: "nothing observed", link: "", want: ""},
+		{name: "a link that is no path", link: "a b", want: "a b"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := (pagemap.Observed{Link: tc.link}).Path(); got != tc.want {
+				t.Errorf("Path() of %q = %q, want %q", tc.link, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestStatusFromWordPressCollapsesTheEditableStatuses(t *testing.T) {
 	t.Parallel()
 

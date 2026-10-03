@@ -55,6 +55,14 @@ func (i Index) PathParent(page Page) (parent Page, found bool) {
 	return parent, true
 }
 
+func (i Index) PathParentID(page Page) *string {
+	parent, found := i.PathParent(page)
+	if !found {
+		return nil
+	}
+	return &parent.ID
+}
+
 func (i Index) ByEntity(entityID string) []Page {
 	return slices.Clone(i.byEntity[entityID])
 }

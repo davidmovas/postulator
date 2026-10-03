@@ -47,13 +47,16 @@ func TestIndex(t *testing.T) {
 func TestAPageSitsUnderThePathAboveItAndAStoreItemNever(t *testing.T) {
 	t.Parallel()
 
+	root := page(pageA, "/", nil)
 	shop := page(pageB, "/shop/", nil)
-	index := pagemap.NewIndex([]pagemap.Page{page(pageA, "/", nil), shop})
+	index := pagemap.NewIndex([]pagemap.Page{root, shop})
 
 	product := page(pageC, "/shop/bags/", nil)
 	product.WPType = pagemap.WPProduct
 	category := page(pageD, "/shop/totes/", nil)
 	category.WPType = pagemap.WPProductCategory
+	post := page(pageC, "/shop/news/", nil)
+	post.WPType = pagemap.WPPost
 
 	cases := []struct {
 		name  string
@@ -61,8 +64,11 @@ func TestAPageSitsUnderThePathAboveItAndAStoreItemNever(t *testing.T) {
 		want  string
 	}{
 		{name: "a page under a page", child: page(pageC, "/shop/bags/", nil), want: pageB},
+		{name: "a post under a page", child: post, want: pageB},
+		{name: "a page written without its slash", child: page(pageC, "/Shop/Bags", nil), want: pageB},
 		{name: "a page whose parent path is not mapped", child: page(pageC, "/blog/news/", nil)},
 		{name: "the page above itself", child: shop, want: pageA},
+		{name: "the root", child: root},
 		{name: "a product", child: product},
 		{name: "a product category", child: category},
 	}
@@ -74,6 +80,10 @@ func TestAPageSitsUnderThePathAboveItAndAStoreItemNever(t *testing.T) {
 			parent, found := index.PathParent(tc.child)
 			if found != (tc.want != "") || parent.ID != tc.want {
 				t.Errorf("PathParent = %q (found %t), want %q", parent.ID, found, tc.want)
+			}
+			parentID := index.PathParentID(tc.child)
+			if (parentID != nil) != (tc.want != "") || (parentID != nil && *parentID != tc.want) {
+				t.Errorf("PathParentID = %v, want %q", parentID, tc.want)
 			}
 		})
 	}
