@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-const latestMigration = 38
+const latestMigration = 41
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -49,6 +49,9 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0036_model_catalog_tier_prices.sql",
 		"0037_drop_model_reasoning_effort.sql",
 		"0038_drop_removed_provider_profiles.sql",
+		"0039_categories.sql",
+		"0040_category_terms.sql",
+		"0041_page_category.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -93,7 +96,7 @@ func TestMigrationsRoundTrip(t *testing.T) {
 		t.Fatalf("down: %v", err)
 	}
 
-	for _, table := range []string{"app_meta", "settings", "secrets", "sites", "link_policies", "templates", "entities", "entity_anchors", "entity_terms", "edges", "pages", "page_links", "template_overrides", "model_catalog", "model_profiles", "llm_calls", "runs", "run_items", "artifacts", "step_execs", "run_events", "conversations", "messages", "conversation_histories", "pending_actions", "tool_calls", "schedules"} {
+	for _, table := range []string{"app_meta", "settings", "secrets", "sites", "link_policies", "templates", "entities", "entity_anchors", "entity_terms", "categories", "category_terms", "edges", "pages", "page_links", "template_overrides", "model_catalog", "model_profiles", "llm_calls", "runs", "run_items", "artifacts", "step_execs", "run_events", "conversations", "messages", "conversation_histories", "pending_actions", "tool_calls", "schedules"} {
 		var name string
 		scanErr := store.writer.QueryRowContext(t.Context(),
 			`SELECT name FROM sqlite_schema WHERE type = 'table' AND name = ?`, table).Scan(&name)
@@ -498,6 +501,268 @@ func TestEntityTermsSchema(t *testing.T) {
 	}
 	if got := count(`SELECT count(*) FROM entity_terms`); got != 0 {
 		t.Fatalf("entity_terms after a site delete = %d, want none", got)
+	}
+}
+
+func TestCategoriesSchema(t *testing.T) {
+	t.Parallel()
+
+	store := openStore(t, nil)
+	exec := func(query string, args ...any) error {
+		_, err := store.writer.ExecContext(t.Context(), query, args...)
+		return err
+	}
+	count := func(query string, args ...any) int {
+		t.Helper()
+		var n int
+		if err := store.reader.QueryRowContext(t.Context(), query, args...).Scan(&n); err != nil {
+			t.Fatalf("%s: %v", query, err)
+		}
+		return n
+	}
+	const at = "2026-10-04T09:00:00Z"
+	insert := func(id, siteID, name, key string, parentID any) error {
+		return exec(`INSERT INTO categories (id, site_id, name, name_key, parent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			id, siteID, name, key, parentID, at, at)
+	}
+
+	for _, siteID := range []string{"s1", "s2"} {
+		if err := exec(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES (?, 'Shop', 'https://shop', 'site:' || ? || ':wp_password', 'active', ?, ?)`, siteID, siteID, at, at); err != nil {
+			t.Fatalf("site %s: %v", siteID, err)
+		}
+	}
+
+	for _, step := range []struct {
+		why                   string
+		id, siteID, name, key string
+		parentID              any
+		ok                    bool
+	}{
+		{why: "a top-level category", id: "healing", siteID: "s1", name: "Healing", key: "healing", ok: true},
+		{why: "another top-level category", id: "recovery", siteID: "s1", name: "Recovery", key: "recovery", ok: true},
+		{why: "a category under another", id: "bpc", siteID: "s1", name: "BPC-157", key: "bpc-157", parentID: "healing", ok: true},
+		{why: "a level under the second", id: "bpc-liquid", siteID: "s1", name: "Liquid", key: "liquid", parentID: "bpc", ok: true},
+		{why: "the same key under another parent", id: "recovery-liquid", siteID: "s1", name: "Liquid", key: "liquid", parentID: "recovery", ok: true},
+		{why: "the same key at the top of another site", id: "elsewhere", siteID: "s2", name: "Healing", key: "healing", ok: true},
+		{why: "the same key twice at the top", id: "healing-2", siteID: "s1", name: "HEALING", key: "healing"},
+		{why: "the same key twice under one parent", id: "bpc-2", siteID: "s1", name: "bpc-157", key: "bpc-157", parentID: "healing"},
+		{why: "a category under itself", id: "self", siteID: "s1", name: "Self", key: "self", parentID: "self"},
+		{why: "a parent that does not exist", id: "orphan", siteID: "s1", name: "Orphan", key: "orphan", parentID: "missing"},
+		{why: "a site that does not exist", id: "stray", siteID: "s9", name: "Stray", key: "stray"},
+	} {
+		err := insert(step.id, step.siteID, step.name, step.key, step.parentID)
+		if step.ok && err != nil {
+			t.Fatalf("%s: %v", step.why, err)
+		}
+		if !step.ok && err == nil {
+			t.Fatalf("%s was accepted", step.why)
+		}
+	}
+	if err := exec(`INSERT INTO categories (id, site_id, name, name_key, created_at, updated_at) VALUES ('nulled', 's1', NULL, 'nulled', ?, ?)`, at, at); err == nil {
+		t.Fatal("a category without a name was accepted")
+	}
+	if err := exec(`INSERT INTO categories (id, site_id, name, name_key, created_at, updated_at) VALUES ('unkeyed', 's1', 'Unkeyed', NULL, ?, ?)`, at, at); err == nil {
+		t.Fatal("a category without a key was accepted")
+	}
+
+	for _, index := range []struct {
+		name   string
+		unique int
+	}{
+		{name: "categories_site_parent_key", unique: 1},
+		{name: "categories_site_parent", unique: 0},
+	} {
+		if got := count(`SELECT count(*) FROM pragma_index_list('categories') WHERE name = ? AND "unique" = ?`, index.name, index.unique); got != 1 {
+			t.Fatalf("the index %s (unique %d) is missing", index.name, index.unique)
+		}
+	}
+
+	if err := exec(`DELETE FROM categories WHERE id = 'healing'`); err != nil {
+		t.Fatalf("delete a parent: %v", err)
+	}
+	if got := count(`SELECT count(*) FROM categories WHERE site_id = 's1'`); got != 2 {
+		t.Fatalf("categories after a parent delete = %d, want the other branch's 2", got)
+	}
+	if err := exec(`DELETE FROM sites WHERE id = 's1'`); err != nil {
+		t.Fatalf("delete the site: %v", err)
+	}
+	if got := count(`SELECT count(*) FROM categories`); got != 1 {
+		t.Fatalf("categories after a site delete = %d, want the other site's 1", got)
+	}
+}
+
+func TestCategoryTermsSchema(t *testing.T) {
+	t.Parallel()
+
+	store := openStore(t, nil)
+	exec := func(query string, args ...any) error {
+		_, err := store.writer.ExecContext(t.Context(), query, args...)
+		return err
+	}
+	count := func(query string) int {
+		t.Helper()
+		var n int
+		if err := store.reader.QueryRowContext(t.Context(), query).Scan(&n); err != nil {
+			t.Fatalf("%s: %v", query, err)
+		}
+		return n
+	}
+	const at = "2026-10-04T09:00:00Z"
+	term := func(categoryID, siteID, taxonomy string, termID, parentTermID int) error {
+		return exec(`INSERT INTO category_terms (category_id, site_id, taxonomy, term_id, parent_term_id, name, run_id, seen_at) VALUES (?, ?, ?, ?, ?, 'Healing', '', ?)`,
+			categoryID, siteID, taxonomy, termID, parentTermID, at)
+	}
+
+	for _, setup := range []string{
+		`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`,
+		`INSERT INTO categories (id, site_id, name, name_key, created_at, updated_at) VALUES ('c1', 's1', 'Healing', 'healing', ?, ?)`,
+		`INSERT INTO categories (id, site_id, name, name_key, parent_id, created_at, updated_at) VALUES ('c2', 's1', 'BPC-157', 'bpc-157', 'c1', ?, ?)`,
+		`INSERT INTO categories (id, site_id, name, name_key, created_at, updated_at) VALUES ('c3', 's1', 'Recovery', 'recovery', ?, ?)`,
+	} {
+		if err := exec(setup, at, at); err != nil {
+			t.Fatalf("%s: %v", setup, err)
+		}
+	}
+
+	for _, step := range []struct {
+		why                       string
+		categoryID, siteID, taxon string
+		termID, parentTermID      int
+		ok                        bool
+	}{
+		{why: "a category term", categoryID: "c1", siteID: "s1", taxon: "category", termID: 5, ok: true},
+		{why: "the same category as a product category", categoryID: "c1", siteID: "s1", taxon: "product_cat", termID: 5, ok: true},
+		{why: "a term under another", categoryID: "c2", siteID: "s1", taxon: "category", termID: 6, parentTermID: 5, ok: true},
+		{why: "a term another category already maps to", categoryID: "c3", siteID: "s1", taxon: "category", termID: 5, ok: true},
+		{why: "a second term for one category in one taxonomy", categoryID: "c1", siteID: "s1", taxon: "category", termID: 7},
+		{why: "a taxonomy Postulator does not write", categoryID: "c3", siteID: "s1", taxon: "post_tag", termID: 7},
+		{why: "a term id of zero", categoryID: "c3", siteID: "s1", taxon: "product_cat", termID: 0},
+		{why: "a negative term id", categoryID: "c3", siteID: "s1", taxon: "product_cat", termID: -7},
+		{why: "a negative parent", categoryID: "c3", siteID: "s1", taxon: "product_cat", termID: 7, parentTermID: -1},
+		{why: "a category that does not exist", categoryID: "c9", siteID: "s1", taxon: "product_cat", termID: 7},
+		{why: "a site that does not exist", categoryID: "c3", siteID: "s9", taxon: "product_cat", termID: 7},
+	} {
+		err := term(step.categoryID, step.siteID, step.taxon, step.termID, step.parentTermID)
+		if step.ok && err != nil {
+			t.Fatalf("%s: %v", step.why, err)
+		}
+		if !step.ok && err == nil {
+			t.Fatalf("%s was accepted", step.why)
+		}
+	}
+
+	var parentTermID int
+	var runID string
+	if err := exec(`INSERT INTO category_terms (category_id, site_id, taxonomy, term_id, name, seen_at) VALUES ('c3', 's1', 'product_cat', 9, 'Recovery', ?)`, at); err != nil {
+		t.Fatalf("a term stored without a parent or a run: %v", err)
+	}
+	if err := store.reader.QueryRowContext(t.Context(), `SELECT parent_term_id, run_id FROM category_terms WHERE category_id = 'c3' AND taxonomy = 'product_cat'`).Scan(&parentTermID, &runID); err != nil {
+		t.Fatalf("read the defaults: %v", err)
+	}
+	if parentTermID != 0 || runID != "" {
+		t.Fatalf("defaults = parent %d, run %q; want no parent and no run", parentTermID, runID)
+	}
+
+	if got := count(`SELECT count(*) FROM sqlite_schema WHERE type = 'index' AND name = 'category_terms_site_taxonomy_term'`); got != 1 {
+		t.Fatalf("the lookup index by site, taxonomy and term is missing")
+	}
+
+	if err := exec(`DELETE FROM categories WHERE id = 'c1'`); err != nil {
+		t.Fatalf("delete a category: %v", err)
+	}
+	if got := count(`SELECT count(*) FROM category_terms`); got != 2 {
+		t.Fatalf("category_terms after a category delete = %d, want the other category's 2", got)
+	}
+	if err := exec(`DELETE FROM sites WHERE id = 's1'`); err != nil {
+		t.Fatalf("delete the site: %v", err)
+	}
+	if got := count(`SELECT count(*) FROM category_terms`); got != 0 {
+		t.Fatalf("category_terms after a site delete = %d, want none", got)
+	}
+}
+
+func TestPageCategoryColumn(t *testing.T) {
+	t.Parallel()
+
+	store := openStore(t, nil)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	if _, err = provider.DownTo(t.Context(), 40); err != nil {
+		t.Fatalf("down to 40: %v", err)
+	}
+	exec := func(query string, args ...any) error {
+		_, execErr := store.writer.ExecContext(t.Context(), query, args...)
+		return execErr
+	}
+	count := func(query string) int {
+		t.Helper()
+		var n int
+		if scanErr := store.writer.QueryRowContext(t.Context(), query).Scan(&n); scanErr != nil {
+			t.Fatalf("%s: %v", query, scanErr)
+		}
+		return n
+	}
+	const at = "2026-10-04T09:00:00Z"
+
+	for _, setup := range []string{
+		`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`,
+		`INSERT INTO pages (id, site_id, path, slug, wp_type, status, created_at, updated_at) VALUES ('pg1', 's1', '/healing/', 'healing', 'page', 'planned', ?, ?)`,
+		`INSERT INTO categories (id, site_id, name, name_key, created_at, updated_at) VALUES ('c1', 's1', 'Healing', 'healing', ?, ?)`,
+	} {
+		if err = exec(setup, at, at); err != nil {
+			t.Fatalf("%s: %v", setup, err)
+		}
+	}
+
+	if _, err = provider.UpTo(t.Context(), 41); err != nil {
+		t.Fatalf("up to 41: %v", err)
+	}
+	if got := count(`SELECT count(*) FROM pages WHERE id = 'pg1' AND category_id = ''`); got != 1 {
+		t.Fatal("a page stored before the column is not filed under no category")
+	}
+	if got := count(`SELECT count(*) FROM pragma_index_list('pages') WHERE name = 'pages_category'`); got != 1 {
+		t.Fatal("the index the category filter reads is missing")
+	}
+	if got := count(`SELECT count(*) FROM pragma_foreign_key_list('pages') WHERE "from" = 'category_id'`); got != 0 {
+		t.Fatal("category_id carries a foreign key, which SQLite's DROP COLUMN refuses")
+	}
+	for _, step := range []struct {
+		why   string
+		value any
+		ok    bool
+	}{
+		{why: "a page filed under a category", value: "c1", ok: true},
+		{why: "a page filed under no category", value: "", ok: true},
+		{why: "a page with no value at all", value: nil},
+	} {
+		err = exec(`UPDATE pages SET category_id = ? WHERE id = 'pg1'`, step.value)
+		if step.ok && err != nil {
+			t.Fatalf("%s: %v", step.why, err)
+		}
+		if !step.ok && err == nil {
+			t.Fatalf("%s was accepted", step.why)
+		}
+	}
+
+	if err = exec(`UPDATE pages SET category_id = 'c1' WHERE id = 'pg1'`); err != nil {
+		t.Fatalf("file the page: %v", err)
+	}
+	if _, err = provider.DownTo(t.Context(), 40); err != nil {
+		t.Fatalf("down to 40 with a page filed: %v", err)
+	}
+	if err = exec(`UPDATE pages SET category_id = ''`); err == nil {
+		t.Fatal("the column survived the down migration")
+	}
+	if got := count(`SELECT count(*) FROM pragma_index_list('pages') WHERE name = 'pages_category'`); got != 0 {
+		t.Fatal("the index survived the down migration")
+	}
+	if got := count(`SELECT count(*) FROM pages`); got != 1 {
+		t.Fatalf("the down migration left %d pages, want 1", got)
+	}
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up again: %v", err)
 	}
 }
 
