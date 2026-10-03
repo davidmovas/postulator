@@ -3,7 +3,6 @@ package fake
 import (
 	"context"
 	"encoding/json"
-	"regexp"
 	"strings"
 	"sync"
 
@@ -13,43 +12,14 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
-const (
-	ToolDirective  = "TOOL:"
-	FinalDirective = "FAKE:"
-	FailDirective  = "FAIL:"
-
-	callPrefix     = "fake-call-"
-	toolCallTokens = 8
-)
-
-var toolPattern = regexp.MustCompile(`TOOL:([A-Za-z0-9_.-]+)(\{.*\})`)
-
-type Turn struct {
-	Text string
-	Tool string
-	Args json.RawMessage
-}
-
-type Script func(prompt string) Turn
-
-type GollemOption func(*Gollem)
-
-func WithScript(script Script) GollemOption {
-	return func(g *Gollem) { g.script = script }
-}
-
 type Gollem struct {
 	script   Script
 	mu       sync.Mutex
 	sessions []*GollemSession
 }
 
-func NewGollem(options ...GollemOption) *Gollem {
-	client := &Gollem{}
-	for _, option := range options {
-		option(client)
-	}
-	return client
+func NewGollem(opts ...Option) *Gollem {
+	return &Gollem{script: settle(opts).script}
 }
 
 func (g *Gollem) New(_ context.Context, _ llm.ModelRef) (gollem.LLMClient, error) {
@@ -90,11 +60,6 @@ func (g *Gollem) Sessions() []*GollemSession {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	return append([]*GollemSession(nil), g.sessions...)
-}
-
-type scripted struct {
-	name string
-	args string
 }
 
 type GollemSession struct {
@@ -225,27 +190,9 @@ func (s *GollemSession) prime(text string) {
 	}
 	s.primed = true
 
-	for _, match := range toolPattern.FindAllStringSubmatch(text, -1) {
-		s.script = append(s.script, scripted{name: match[1], args: match[2]})
-	}
-	for line := range strings.SplitSeq(text, "\n") {
-		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, FinalDirective) {
-			s.answer = strings.TrimSpace(strings.TrimPrefix(trimmed, FinalDirective))
-		}
-	}
-	if len(s.script) > 0 || s.answer != "" || s.written == nil {
-		return
-	}
-
-	turn := s.written(text)
-	if turn.Tool != "" {
-		arguments := string(turn.Args)
-		if arguments == "" {
-			arguments = "{}"
-		}
-		s.script = append(s.script, scripted{name: turn.Tool, args: arguments})
-	}
-	s.answer = turn.Text
+	planned := planOf(text, s.written)
+	s.script = planned.calls
+	s.answer = planned.answer
 }
 
 func (s *GollemSession) emit(call scripted, characters int) *gollem.ContentResponse {

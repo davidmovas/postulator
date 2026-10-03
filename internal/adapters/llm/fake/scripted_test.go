@@ -111,6 +111,27 @@ func TestAScriptedTextOutranksItsOwnFunction(t *testing.T) {
 	}
 }
 
+func TestScriptedRepliesOverAClientThatChats(t *testing.T) {
+	t.Parallel()
+
+	client := fake.NewScriptedOver(
+		fake.New(fake.WithScript(func(string) fake.Turn { return fake.Turn{Text: "eleven entities"} })),
+		fake.Reply{Step: "generate_body", Text: `{"h1":"Steaks"}`},
+	)
+
+	drafted, err := client.Complete(t.Context(), scriptedRequest("generate_body"))
+	if err != nil || drafted.Text != `{"h1":"Steaks"}` {
+		t.Fatalf("the scripted step answered %+v, %v", drafted, err)
+	}
+
+	chat := scriptedRequest("chat")
+	chat.Tools = []port.Tool{{Name: "pages_tree"}}
+	answered, err := client.Complete(t.Context(), chat)
+	if err != nil || answered.Text != "eleven entities" {
+		t.Fatalf("the chat answered %+v, %v", answered, err)
+	}
+}
+
 func TestScriptedPicksTheReplyThatMatchesThePrompt(t *testing.T) {
 	t.Parallel()
 
