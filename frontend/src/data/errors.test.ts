@@ -4,6 +4,7 @@ import type { Code } from "../lib/errors.js";
 import { copy } from "../copy/index.js";
 import {
     browserSettingsPath,
+    errorMessageOf,
     failure,
     fieldErrorOf,
     formErrorOf,
@@ -138,7 +139,7 @@ describe("a site that cannot issue a preview", () => {
     });
 });
 
-describe("the messages a form shows", () => {
+describe("the messages a screen shows", () => {
     const cancelled = Object.assign(new Error("cancelled"), { name: "CancelError" });
     const cases: readonly {
         name: string;
@@ -146,17 +147,26 @@ describe("the messages a form shows", () => {
         field: string | null;
         form: string | null;
         validation: string | null;
+        message: string | null;
     }[] = [
-        { name: "nothing thrown", thrown: null, field: null, form: null, validation: null },
-        { name: "nothing yet", thrown: undefined, field: null, form: null, validation: null },
-        { name: "a cancelled call", thrown: cancelled, field: null, form: null, validation: null },
-        { name: "a locked store", thrown: rejection("LOCKED"), field: null, form: null, validation: null },
+        { name: "nothing thrown", thrown: null, field: null, form: null, validation: null, message: null },
+        { name: "nothing yet", thrown: undefined, field: null, form: null, validation: null, message: null },
+        { name: "a cancelled call", thrown: cancelled, field: null, form: null, validation: null, message: null },
+        {
+            name: "a locked store",
+            thrown: rejection("LOCKED"),
+            field: null,
+            form: null,
+            validation: null,
+            message: null,
+        },
         {
             name: "a refusal of the named field",
             thrown: rejection("INVALID", "the path must start with a slash", { details: { field: "path" } }),
             field: "the path must start with a slash",
             form: null,
             validation: null,
+            message: "the path must start with a slash",
         },
         {
             name: "a refusal of another field",
@@ -164,6 +174,7 @@ describe("the messages a form shows", () => {
             field: null,
             form: null,
             validation: null,
+            message: "the title is too long",
         },
         {
             name: "a refusal that names no field",
@@ -171,6 +182,7 @@ describe("the messages a form shows", () => {
             field: null,
             form: "the sheet has no usable rows",
             validation: "the sheet has no usable rows",
+            message: "the sheet has no usable rows",
         },
         {
             name: "a refusal with no words",
@@ -178,6 +190,7 @@ describe("the messages a form shows", () => {
             field: null,
             form: messages.INVALID,
             validation: messages.INVALID,
+            message: messages.INVALID,
         },
         {
             name: "a conflict",
@@ -185,6 +198,7 @@ describe("the messages a form shows", () => {
             field: null,
             form: messages.CONFLICT,
             validation: null,
+            message: messages.CONFLICT,
         },
         {
             name: "a failure outside the app",
@@ -192,6 +206,7 @@ describe("the messages a form shows", () => {
             field: null,
             form: messages.EXTERNAL,
             validation: null,
+            message: messages.EXTERNAL,
         },
         {
             name: "an internal failure",
@@ -199,6 +214,7 @@ describe("the messages a form shows", () => {
             field: null,
             form: messages.INTERNAL,
             validation: null,
+            message: messages.INTERNAL,
         },
     ];
 
@@ -207,6 +223,7 @@ describe("the messages a form shows", () => {
             expect(fieldErrorOf(held.thrown, "path")).toBe(held.field);
             expect(formErrorOf(held.thrown)).toBe(held.form);
             expect(validationErrorOf(held.thrown)).toBe(held.validation);
+            expect(errorMessageOf(held.thrown)).toBe(held.message);
         });
     }
 });

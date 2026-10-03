@@ -163,6 +163,14 @@ export function validationErrorOf(thrown: unknown): string | null {
     return reaction.kind === "form" ? reaction.message : null;
 }
 
+export function errorMessageOf(thrown: unknown): string | null {
+    if (thrown === null || thrown === undefined) {
+        return null;
+    }
+    const reaction = react(thrown);
+    return reaction.kind === "silent" || reaction.kind === "unlock" ? null : reaction.message;
+}
+
 export function keyErrorOf(thrown: unknown, key: string): string | null {
     if (thrown === null || thrown === undefined) {
         return null;

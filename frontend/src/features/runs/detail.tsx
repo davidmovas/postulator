@@ -13,9 +13,9 @@ import {
     SkeletonRows,
     StatusBadge,
     Toolbar,
+    useNow,
 } from "../../ui/index.js";
 import { itemView, runView, statsView } from "./authority.js";
-import { useNow } from "./clock.js";
 import { RunControls } from "./controls.js";
 import { RunEventFeed } from "./events.js";
 import { ItemStatusTabs, RunItemTable } from "./items.js";

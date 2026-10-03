@@ -8,6 +8,7 @@ export { Checkbox } from "./checkbox.js";
 export type { CheckboxProps } from "./checkbox.js";
 export { ChipInput } from "./chip-input.js";
 export type { ChipInputProps } from "./chip-input.js";
+export { useElapsed, useNow } from "./clock.js";
 export { cx } from "./cx.js";
 export type { ClassValue } from "./cx.js";
 export { Dialog } from "./dialog.js";

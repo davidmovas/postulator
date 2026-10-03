@@ -2,32 +2,14 @@ import type { ReactElement } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
-import { react } from "../../../data/errors.js";
+import { errorMessageOf } from "../../../data/errors.js";
 import { useProposeRelated } from "../../../data/hooks/graph.js";
-import { Dialog, Stars2Icon } from "../../../ui/index.js";
+import { Dialog, Stars2Icon, useElapsed } from "../../../ui/index.js";
 import type { GraphIndex } from "../model/index.js";
 
 interface Outcome {
     line: string;
     tokens: number;
-}
-
-function useElapsed(running: boolean): number {
-    const [seconds, setSeconds] = useState(0);
-    useEffect(() => {
-        if (!running) {
-            setSeconds(0);
-            return undefined;
-        }
-        const started = Date.now();
-        const timer = window.setInterval(() => {
-            setSeconds(Math.round((Date.now() - started) / 1000));
-        }, 1000);
-        return () => {
-            window.clearInterval(timer);
-        };
-    }, [running]);
-    return seconds;
 }
 
 interface RunningProps {
@@ -41,14 +23,6 @@ function Running({ seconds }: RunningProps): ReactElement {
             <span className="font-mono text-2xs text-ink-faint">{copy.graph.ai.elapsed(seconds)}</span>
         </p>
     );
-}
-
-function messageOf(thrown: unknown): string | null {
-    if (thrown === null || thrown === undefined) {
-        return null;
-    }
-    const reaction = react(thrown);
-    return reaction.kind === "silent" || reaction.kind === "unlock" ? null : reaction.message;
 }
 
 export interface ProposeRelatedDialogProps {
@@ -109,7 +83,7 @@ export function ProposeRelatedDialog({ open, onOpenChange, siteId, index, select
         onOpenChange(next);
     };
 
-    const error = messageOf(propose.error);
+    const error = errorMessageOf(propose.error);
 
     return (
         <Dialog

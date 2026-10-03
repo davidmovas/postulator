@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { copy } from "../../../copy/index.js";
 import { useAgentTurn } from "../../../data/agent/use-agent-turn.js";
 import { flatten } from "../../../data/call.js";
-import { react } from "../../../data/errors.js";
+import { errorMessageOf } from "../../../data/errors.js";
 import {
     useCancelTurn,
     useConfirmAction,
@@ -25,14 +25,6 @@ import { ConversationMeta } from "./meta.js";
 import { lastUserText, rows as transcriptRows } from "./model/transcript.js";
 import { Transcript } from "./transcript.js";
 import { TurnStatus } from "./turn-status.js";
-
-function messageOf(thrown: unknown): string | null {
-    if (thrown === null || thrown === undefined) {
-        return null;
-    }
-    const reaction = react(thrown);
-    return reaction.kind === "silent" || reaction.kind === "unlock" ? null : reaction.message;
-}
 
 interface ComposerBridge {
     prefillSeq: number;
@@ -61,7 +53,7 @@ function StartPane({ siteId, starting, startError, prefillSeq, takePrefill, onSt
                 disabled={starting}
                 placeholder={copy.agent.composer.firstPlaceholder}
                 error={
-                    messageOf(startError) ??
+                    errorMessageOf(startError) ??
                     (chat === null && profiles.data !== undefined ? copy.agent.composer.noModel : null)
                 }
                 status={null}
@@ -157,9 +149,9 @@ function LivePane({ conversation, prefillSeq, takePrefill, onOpenTools }: LivePa
                 }}
                 onOpenTools={onOpenTools}
             />
-            {transcript.error !== null && messageOf(transcript.error) !== null ? (
+            {transcript.error !== null && errorMessageOf(transcript.error) !== null ? (
                 <div className="px-3 pt-3">
-                    <Banner tone="danger" title={messageOf(transcript.error) ?? ""} />
+                    <Banner tone="danger" title={errorMessageOf(transcript.error) ?? ""} />
                 </div>
             ) : null}
             {transcript.isPending ? (
@@ -191,8 +183,8 @@ function LivePane({ conversation, prefillSeq, takePrefill, onOpenTools }: LivePa
                 disabled={send.isPending}
                 placeholder={copy.agent.composer.placeholder}
                 error={
-                    messageOf(send.error) ??
-                    messageOf(confirm.error) ??
+                    errorMessageOf(send.error) ??
+                    errorMessageOf(confirm.error) ??
                     (chat === null && profiles.data !== undefined ? copy.agent.composer.noModel : null)
                 }
                 status={<TurnStatus turn={turn} />}

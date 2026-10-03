@@ -19,8 +19,8 @@ import {
     PlayArrowIcon,
     Screen,
     SkeletonRows,
+    useNow,
 } from "../../ui/index.js";
-import { useNow } from "./clock.js";
 import { RunFilters } from "./filters.js";
 import { defaultQuery, filterOf, narrowed, readQuery, searchOf, writeQuery } from "./params.js";
 import type { RunsQuery } from "./params.js";
