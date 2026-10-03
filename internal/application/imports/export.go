@@ -142,6 +142,9 @@ func row(page *pagemap.Page, entity *graph.Entity, pageKind string, g graph.Grap
 	cells := make(map[importmap.Field]string, len(importmap.Fields()))
 	if page != nil {
 		cells[importmap.FieldPath] = page.Path
+		if page.PlannedPath != "" {
+			cells[importmap.FieldPath] = page.PlannedPath
+		}
 		cells[importmap.FieldTitle] = page.Title
 		cells[importmap.FieldH1] = page.H1
 		cells[importmap.FieldMetaTitle] = page.MetaTitle

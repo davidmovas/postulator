@@ -182,6 +182,10 @@ export const imports = {
         group_without_page: "A group has no page of its own; it stays an entity and the links pass over it",
         ambiguous_parent: "Several entities carry the parent's name, so the row has to say which one it means",
         ambiguous_entity: "Several entities carry this name, so the row needs a parent or a group to say which one",
+        product_not_in_store: "The store holds no product for this row yet; create it in WooCommerce and sync the site",
+        product_row_left: "An earlier row waited for this product and is left beside it; delete it on the Pages screen",
+        wp_type_kept: "The row is already on the site, so it keeps its WordPress type",
+        intermediate_level: "The level above the products stays an entity without a page",
     },
     columnUses: {
         field: "A page field",

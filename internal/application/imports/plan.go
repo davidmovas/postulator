@@ -126,20 +126,21 @@ func sameRef(a, b *string) bool {
 }
 
 func samePage(a, b pagemap.Page) bool {
-	return a.Title == b.Title && a.H1 == b.H1 && a.MetaTitle == b.MetaTitle &&
+	return a.Title == b.Title && a.H1 == b.H1 && a.MetaTitle == b.MetaTitle && a.PlannedPath == b.PlannedPath &&
 		a.MetaDescription == b.MetaDescription && a.WPType == b.WPType &&
 		a.Keywords.Equal(b.Keywords) && slices.Equal(a.Notes, b.Notes) &&
 		sameRef(a.EntityID, b.EntityID) && sameRef(a.TemplateID, b.TemplateID)
 }
 
 type siteState struct {
-	siteID   string
-	entities []graph.Entity
-	edges    []graph.Edge
-	pages    []pagemap.Page
-	byName   map[string][]graph.Entity
-	byPath   map[string]pagemap.Page
-	edgeKeys map[string]struct{}
+	siteID    string
+	entities  []graph.Entity
+	edges     []graph.Edge
+	pages     []pagemap.Page
+	byName    map[string][]graph.Entity
+	byPath    map[string]pagemap.Page
+	byPlanned map[string]pagemap.Page
+	edgeKeys  map[string]struct{}
 }
 
 func (s *Service) state(ctx context.Context, siteID string) (siteState, error) {
@@ -157,15 +158,19 @@ func (s *Service) state(ctx context.Context, siteID string) (siteState, error) {
 	}
 	state := siteState{
 		siteID: siteID, entities: entities, edges: edges, pages: pages,
-		byName:   make(map[string][]graph.Entity, len(entities)),
-		byPath:   make(map[string]pagemap.Page, len(pages)),
-		edgeKeys: make(map[string]struct{}, len(edges)),
+		byName:    make(map[string][]graph.Entity, len(entities)),
+		byPath:    make(map[string]pagemap.Page, len(pages)),
+		byPlanned: make(map[string]pagemap.Page),
+		edgeKeys:  make(map[string]struct{}, len(edges)),
 	}
 	for i := range entities {
 		state.byName[key(entities[i].Name)] = append(state.byName[key(entities[i].Name)], entities[i])
 	}
 	for i := range pages {
 		state.byPath[pages[i].Path] = pages[i]
+		if pages[i].PlannedPath != "" {
+			state.byPlanned[pages[i].PlannedPath] = pages[i]
+		}
 	}
 	for i := range edges {
 		state.edgeKeys[edgeKey(edges[i])] = struct{}{}
@@ -192,20 +197,37 @@ func (s *Service) templateFor(ctx context.Context, siteID, pageKind string) (*st
 	return global, nil
 }
 
-func fillGaps(sheet *drafts, state siteState, p *plan) {
+func fillGaps(sheet *drafts, state *siteState, p *plan) {
+	needsPage := make(map[string]bool)
+	order := make([]string, 0)
 	for _, path := range sheet.sortedPaths() {
+		product := state.productDraft(sheet.pages[path])
 		for parent := pagemap.ParentPath(path); parent != "" && parent != pagemap.RootPath; parent = pagemap.ParentPath(parent) {
 			if _, planned := sheet.pages[parent]; planned {
 				continue
 			}
-			if _, exists := state.byPath[parent]; exists {
+			if _, exists := state.held(parent); exists {
 				continue
 			}
-			draft, _ := sheet.page(parent, 0)
-			draft.generated = true
-			draft.title = titleFrom(parent)
-			p.note(0, string(importmap.FieldPath), CodeIntermediatePath, "the missing intermediate path was created: "+parent)
+			page, seen := needsPage[parent]
+			if !seen {
+				order = append(order, parent)
+			}
+			needsPage[parent] = page || !product
 		}
+	}
+
+	for _, parent := range order {
+		draft, _ := sheet.page(parent, 0)
+		draft.generated = true
+		draft.title = titleFrom(parent)
+		if !needsPage[parent] {
+			draft.entityOnly = true
+			p.note(0, string(importmap.FieldPath), CodeIntermediateLevel,
+				"the level above the products was kept as an entity without a page, because the store decides where a product sits: "+parent)
+			continue
+		}
+		p.note(0, string(importmap.FieldPath), CodeIntermediatePath, "the missing intermediate path was created: "+parent)
 	}
 }
 
@@ -374,6 +396,9 @@ func (s *Service) resolvePages(ctx context.Context, b *builder, now time.Time) e
 	templates := make(map[string]*string)
 	for _, path := range b.sheet.sortedPaths() {
 		draft := b.sheet.pages[path]
+		if draft.entityOnly {
+			continue
+		}
 
 		wpType := pagemap.WPType(strings.ToLower(draft.wpType))
 		if draft.wpType != "" && !wpType.Valid() {
@@ -402,16 +427,21 @@ func (s *Service) resolvePages(ctx context.Context, b *builder, now time.Time) e
 			draft.entity = b.units[owner].name
 		}
 
-		current, exists := b.state.byPath[path]
+		current, exists := b.state.held(path)
 		if !exists && path == pagemap.RootPath {
 			p.note(draft.row, string(importmap.FieldPath), CodeRootPageSkipped,
 				"the root of the site already exists on WordPress, so the import does not plan it; sync the site first to map it")
 			continue
 		}
 		if !exists {
+			created := wpTypeOr(fillType(wpType, draft.modeType))
+			title := fill(draft.title, titleFrom(path))
+			if created == pagemap.WPProduct {
+				title = strings.TrimSpace(draft.title)
+			}
 			page, err := pagemap.NewPage(pagemap.Page{
-				ID: id.New(), SiteID: b.state.siteID, Path: path, WPType: wpTypeOr(wpType),
-				Title: fill(draft.title, titleFrom(path)), H1: draft.h1, MetaTitle: draft.metaTitle,
+				ID: id.New(), SiteID: b.state.siteID, Path: path, WPType: created,
+				Title: title, H1: draft.h1, MetaTitle: draft.metaTitle,
 				MetaDescription: draft.metaDesc, Keywords: draft.keywords, Notes: draft.notes,
 				Status: pagemap.StatusPlanned, EntityID: entityID,
 				TemplateID: templateID, CreatedAt: now, UpdatedAt: now,
@@ -431,8 +461,16 @@ func (s *Service) resolvePages(ctx context.Context, b *builder, now time.Time) e
 		next.MetaDescription = fill(next.MetaDescription, draft.metaDesc)
 		next.Keywords = next.Keywords.Merge(draft.keywords)
 		next.Notes = pagemap.MergeNotes(next.Notes, draft.notes)
-		if wpType != "" {
+		switch {
+		case wpType == "" || wpType == current.WPType:
+		case current.WPID != nil:
+			p.note(draft.row, string(importmap.FieldWPType), CodeWPTypeKept,
+				path+" is a "+string(current.WPType)+" on the site, so it stays one; the sheet names it a "+string(wpType))
+		default:
 			next.WPType = wpType
+		}
+		if current.Path != path {
+			next.PlannedPath = path
 		}
 		if templateID != nil {
 			next.TemplateID = templateID
@@ -485,6 +523,13 @@ func planUpdate(p *plan, current, next pagemap.Page, draft *pageDraft, now time.
 	return nil
 }
 
+func fillType(cell, mode pagemap.WPType) pagemap.WPType {
+	if cell != "" {
+		return cell
+	}
+	return mode
+}
+
 func wpTypeOr(wpType pagemap.WPType) pagemap.WPType {
 	if wpType == "" {
 		return pagemap.WPPage
@@ -520,15 +565,19 @@ func checkCannibalization(state siteState, resolved map[string]graph.Entity, p *
 func linkParents(state siteState, p *plan) {
 	byPath := make(map[string]string, len(state.pages)+len(p.pages))
 	for i := range state.pages {
-		byPath[state.pages[i].Path] = state.pages[i].ID
+		if !state.pages[i].WPType.StoreAddressed() {
+			byPath[state.pages[i].Path] = state.pages[i].ID
+		}
 	}
 	for i := range p.pages {
-		byPath[p.pages[i].page.Path] = p.pages[i].page.ID
+		if !p.pages[i].page.WPType.StoreAddressed() {
+			byPath[p.pages[i].page.Path] = p.pages[i].page.ID
+		}
 	}
 
 	for i := range p.pages {
 		planned := &p.pages[i]
-		if planned.page.ParentPageID != nil {
+		if planned.page.ParentPageID != nil || planned.page.WPType.StoreAddressed() {
 			continue
 		}
 		parentID, found := byPath[pagemap.ParentPath(planned.page.Path)]
@@ -613,7 +662,9 @@ func (s *Service) plan(ctx context.Context, siteID string, table importmap.Table
 	p.report.Columns = columnViews(mapping.Uses(table.Headers))
 	rows := readRows(binding, table, &p)
 	sheet := pagesOf(rows, &p)
-	fillGaps(sheet, state, &p)
+	typeRows(sheet, rows, mapping.Options.RowType, &state)
+	matchProducts(sheet, &state, &p)
+	fillGaps(sheet, &state, &p)
 
 	b := newBuilder(state, &p, rows, sheet)
 	b.build()

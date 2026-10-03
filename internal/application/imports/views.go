@@ -40,6 +40,10 @@ const (
 	CodeGroupWithoutPage  FindingCode = "group_without_page"
 	CodeAmbiguousParent   FindingCode = "ambiguous_parent"
 	CodeAmbiguousEntity   FindingCode = "ambiguous_entity"
+	CodeProductNotInStore FindingCode = "product_not_in_store"
+	CodeProductRowLeft    FindingCode = "product_row_left"
+	CodeWPTypeKept        FindingCode = "wp_type_kept"
+	CodeIntermediateLevel FindingCode = "intermediate_level"
 )
 
 var blockingFindingCodes = []FindingCode{
@@ -51,14 +55,15 @@ func (c FindingCode) Blocking() bool {
 }
 
 type Options struct {
-	PathPrefixStrip string   `json:"pathPrefixStrip,omitempty" description:"Remove this prefix from every path in the sheet, such as a domain the export wrote in"`
-	AnchorSeparator string   `json:"anchorSeparator,omitempty" description:"What separates several anchors inside one cell, a comma by default"`
-	ListSeparator   string   `json:"listSeparator,omitempty" description:"What separates any other list inside one cell, a comma by default"`
-	Sheets          []string `json:"sheets,omitempty" description:"Which sheets of the workbook to read, exactly as inspect named them; leave it out for the first sheet alone"`
-	IndentColumns   []string `json:"indentColumns,omitempty" description:"Columns whose position carries the hierarchy, shallowest first; a row's path is built from the cells of its own column and of the columns to its left"`
-	LevelColumns    []string `json:"levelColumns,omitempty" description:"Group columns, outermost first, such as Category then Subcategory"`
-	NoteColumns     []string `json:"noteColumns,omitempty" description:"Columns kept on the page as notes for the writer"`
-	NoHeader        bool     `json:"noHeader,omitempty" description:"The sheet carries no header row, so every column is addressed by its spreadsheet letter and every row is data"`
+	PathPrefixStrip string            `json:"pathPrefixStrip,omitempty" description:"Remove this prefix from every path in the sheet, such as a domain the export wrote in"`
+	AnchorSeparator string            `json:"anchorSeparator,omitempty" description:"What separates several anchors inside one cell, a comma by default"`
+	ListSeparator   string            `json:"listSeparator,omitempty" description:"What separates any other list inside one cell, a comma by default"`
+	Sheets          []string          `json:"sheets,omitempty" description:"Which sheets of the workbook to read, exactly as inspect named them; leave it out for the first sheet alone"`
+	IndentColumns   []string          `json:"indentColumns,omitempty" description:"Columns whose position carries the hierarchy, shallowest first; a row's path is built from the cells of its own column and of the columns to its left"`
+	LevelColumns    []string          `json:"levelColumns,omitempty" description:"Group columns, outermost first, such as Category then Subcategory"`
+	NoteColumns     []string          `json:"noteColumns,omitempty" description:"Columns kept on the page as notes for the writer"`
+	RowType         importmap.RowType `json:"rowType,omitempty" enum:"pages,products,kind" description:"What a new row becomes, pages by default; a row with products under it stays a page and a wp_type cell wins"`
+	NoHeader        bool              `json:"noHeader,omitempty" description:"The sheet carries no header row, so every column is addressed by its spreadsheet letter and every row is data"`
 }
 
 type Sheet struct {
@@ -87,6 +92,9 @@ type Finding struct {
 
 type PreviewPage struct {
 	Path            string        `json:"path"`
+	PlannedPath     string        `json:"plannedPath,omitempty"`
+	StoreName       string        `json:"storeName,omitempty"`
+	MatchedBy       string        `json:"matchedBy,omitempty"`
 	Title           string        `json:"title"`
 	H1              string        `json:"h1,omitempty"`
 	MetaTitle       string        `json:"metaTitle,omitempty"`
@@ -256,8 +264,10 @@ func entityView(e graph.Entity, parent string, action Action) PreviewEntity {
 }
 
 func pageView(p pagemap.Page, draft *pageDraft, action Action) PreviewPage {
-	return PreviewPage{
+	view := PreviewPage{
 		Path:            p.Path,
+		PlannedPath:     p.PlannedPath,
+		MatchedBy:       string(draft.matchedBy),
 		Title:           p.Title,
 		H1:              p.H1,
 		MetaTitle:       p.MetaTitle,
@@ -269,4 +279,8 @@ func pageView(p pagemap.Page, draft *pageDraft, action Action) PreviewPage {
 		Action:          string(action),
 		Generated:       draft.generated,
 	}
+	if p.WPType == pagemap.WPProduct && p.WPID != nil {
+		view.StoreName = p.Observed.Title
+	}
+	return view
 }

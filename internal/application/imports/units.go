@@ -164,11 +164,11 @@ func (b *builder) addPageUnits() {
 		for _, at := range draft.rows {
 			explicit = fill(explicit, b.rows[at].name)
 		}
-		if _, onSite := b.state.byPath[path]; path == pagemap.RootPath && explicit == "" && !onSite {
+		if _, onSite := b.state.held(path); path == pagemap.RootPath && explicit == "" && !onSite {
 			continue
 		}
 		u := unit{name: fill(explicit, first.named()), at: first.at, context: b.contextOf(draft.rows), group: -1}
-		if existing, onSite := b.state.byPath[path]; onSite && explicit == "" && existing.EntityID != nil {
+		if existing, onSite := b.state.held(path); onSite && explicit == "" && existing.EntityID != nil {
 			if pinned, known := b.byID[*existing.EntityID]; known {
 				u.name, u.pinned = pinned.Name, pinned.ID
 			}
@@ -212,7 +212,7 @@ func (b *builder) urlParent(path string) parentRef {
 			}
 			continue
 		}
-		page, onSite := b.state.byPath[parent]
+		page, onSite := b.state.held(parent)
 		if !onSite {
 			continue
 		}
@@ -240,7 +240,7 @@ func (b *builder) warnTechnical(draft *pageDraft) {
 		return
 	}
 	b.warned[draft.path] = struct{}{}
-	if existing, onSite := b.state.byPath[draft.path]; onSite && existing.WPID != nil {
+	if existing, onSite := b.state.held(draft.path); onSite && existing.WPID != nil {
 		return
 	}
 	b.p.note(draft.row, string(importmap.FieldOwnEntity), CodeTechnicalParent,

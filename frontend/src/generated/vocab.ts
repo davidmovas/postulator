@@ -209,6 +209,9 @@ export type ImportField = (typeof importFields)[number];
 export const importColumnUses = ["field", "level", "note", "indent", "ignored"] as const;
 export type ImportColumnUse = (typeof importColumnUses)[number];
 
+export const importRowTypes = ["pages", "products", "kind"] as const;
+export type ImportRowType = (typeof importRowTypes)[number];
+
 export const importFindingCodes = [
     "bad_path",
     "no_target",
@@ -229,6 +232,10 @@ export const importFindingCodes = [
     "group_without_page",
     "ambiguous_parent",
     "ambiguous_entity",
+    "product_not_in_store",
+    "product_row_left",
+    "wp_type_kept",
+    "intermediate_level",
 ] as const;
 export type ImportFindingCode = (typeof importFindingCodes)[number];
 

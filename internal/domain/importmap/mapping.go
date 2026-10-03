@@ -23,7 +23,30 @@ type Options struct {
 	IndentColumns   []string `json:"indentColumns,omitempty"`
 	LevelColumns    []string `json:"levelColumns,omitempty"`
 	NoteColumns     []string `json:"noteColumns,omitempty"`
+	RowType         RowType  `json:"rowType,omitempty"`
 	NoHeader        bool     `json:"noHeader,omitempty"`
+}
+
+type RowType string
+
+const (
+	RowPages    RowType = "pages"
+	RowProducts RowType = "products"
+	RowKind     RowType = "kind"
+)
+
+func (r RowType) Valid() bool {
+	switch r {
+	case "", RowPages, RowProducts, RowKind:
+		return true
+	default:
+		return false
+	}
+}
+
+func unknownRowType(rowType RowType) error {
+	return invalid("the row type is not recognized; rows are pages, products or read by their kind", "rowType").
+		WithDetail("rowType", string(rowType))
 }
 
 func DefaultOptions() Options {
@@ -98,6 +121,8 @@ func NewMapping(m Mapping) (Mapping, error) {
 		return Mapping{}, invalid("mapping name must not be empty", "name")
 	case len(m.Columns) == 0 && len(m.Options.IndentColumns) == 0 && len(m.Options.LevelColumns) == 0:
 		return Mapping{}, invalid("mapping must map at least one column", "columns")
+	case !m.Options.RowType.Valid():
+		return Mapping{}, unknownRowType(m.Options.RowType)
 	}
 
 	columns := make(map[Field]string, len(m.Columns))
@@ -256,6 +281,9 @@ func (m Mapping) Bind(headers []string) (Binding, error) {
 		if !field.Valid() {
 			return Binding{}, invalid("import field is not recognized", "columns").WithDetail("importField", string(field))
 		}
+	}
+	if !m.Options.RowType.Valid() {
+		return Binding{}, unknownRowType(m.Options.RowType)
 	}
 
 	indent, err := bindAll(positions, m.Options.IndentColumns, "indentColumns", "the indent column is not in the file")

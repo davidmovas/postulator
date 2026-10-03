@@ -46,21 +46,32 @@ func fill(current, next string) string {
 }
 
 type pageDraft struct {
-	path      string
-	title     string
-	h1        string
-	metaTitle string
-	metaDesc  string
-	wpType    string
-	pageKind  string
-	entity    string
-	keywords  keyword.List
-	notes     []pagemap.Note
-	own       ownership
-	rows      []int
-	unit      int
-	generated bool
-	row       int
+	path       string
+	title      string
+	h1         string
+	metaTitle  string
+	metaDesc   string
+	wpType     string
+	pageKind   string
+	entity     string
+	keywords   keyword.List
+	notes      []pagemap.Note
+	own        ownership
+	modeType   pagemap.WPType
+	matchedBy  pagemap.MatchedBy
+	rows       []int
+	unit       int
+	generated  bool
+	entityOnly bool
+	row        int
+}
+
+func (p *pageDraft) cellType() pagemap.WPType {
+	wpType := pagemap.WPType(strings.ToLower(strings.TrimSpace(p.wpType)))
+	if !wpType.Valid() {
+		return ""
+	}
+	return wpType
 }
 
 func (p *pageDraft) technical() bool {

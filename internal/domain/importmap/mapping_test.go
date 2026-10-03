@@ -58,6 +58,7 @@ func TestNewMappingRejectsWhatCannotBeImported(t *testing.T) {
 		},
 		{name: "a blank level column", change: func(m *importmap.Mapping) { m.Options.LevelColumns = []string{"Category", " "} }},
 		{name: "a blank note column", change: func(m *importmap.Mapping) { m.Options.NoteColumns = []string{""} }},
+		{name: "an unknown row type", change: func(m *importmap.Mapping) { m.Options.RowType = "variants" }},
 		{
 			name:   "a level column that is also a field",
 			change: func(m *importmap.Mapping) { m.Options.LevelColumns = []string{"Title"} },
