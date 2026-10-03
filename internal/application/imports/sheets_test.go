@@ -1,6 +1,7 @@
 package imports_test
 
 import (
+	"maps"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -218,6 +219,116 @@ func TestLevelColumnsMakeAChainOfGroups(t *testing.T) {
 	}
 	if len(h.entities(t)) != 6 {
 		t.Fatalf("entities after a second import = %d", len(h.entities(t)))
+	}
+}
+
+type placed struct {
+	kind     graph.Kind
+	category bool
+}
+
+func (h harness) placements(t *testing.T) map[string]placed {
+	t.Helper()
+
+	stored := h.entities(t)
+	out := make(map[string]placed, len(stored))
+	for i := range stored {
+		out[stored[i].Name] = placed{kind: stored[i].Kind, category: stored[i].SiteCategory}
+	}
+	return out
+}
+
+func TestALevelSaysWhatAGroupBecomes(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		sheet string
+		want  map[string]placed
+	}{
+		{
+			name: "a root, its categories and their subcategories",
+			sheet: "Root Entity,Category,Subcategory,URL\nPeptides,,,/peptides/\nPeptides,BPC-157,,/peptides/bpc-157/\n" +
+				"Peptides,BPC-157,Liquid,/peptides/bpc-157/liquid/\n",
+			want: map[string]placed{
+				"Peptides": {kind: graph.KindHub}, "BPC-157": {kind: graph.KindCategory, category: true},
+				"Liquid": {kind: graph.KindCategory, category: true},
+			},
+		},
+		{
+			name:  "a root category is a category",
+			sheet: "Root Category,Category,URL\nPeptides,,/peptides/\nPeptides,BPC-157,/peptides/bpc-157/\n",
+			want: map[string]placed{
+				"Peptides": {kind: graph.KindCategory, category: true}, "BPC-157": {kind: graph.KindCategory, category: true},
+			},
+		},
+		{
+			name:  "a kind cell names the kind and leaves the flag to the level",
+			sheet: "Root,Category,URL,Entity Level\nPeptides,,/peptides/,Topic\nPeptides,BPC-157,/peptides/bpc-157/,Compound/Product\n",
+			want: map[string]placed{
+				"Peptides": {kind: graph.KindTopic}, "BPC-157": {kind: graph.KindProduct, category: true},
+			},
+		},
+		{
+			name:  "a page inside a group is no category of its own",
+			sheet: "Category,URL,H1\nPeptides,/peptides/,Peptides\nPeptides,/peptides/storage/,Storing peptides\n",
+			want: map[string]placed{
+				"Peptides": {kind: graph.KindCategory, category: true}, "Storing peptides": {kind: graph.KindTopic},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := newHarness(t)
+			path := h.file(t, "levels.csv", tc.sheet)
+			applied := h.apply(t, path, h.detected(t, path))
+			if len(applied.Report.Errors) != 0 {
+				t.Fatalf("errors = %+v", applied.Report.Errors)
+			}
+			for name, want := range tc.want {
+				if previewed, _ := entity(applied.Report, name); previewed.SiteCategory != want.category {
+					t.Errorf("the preview shows %s as %+v, want the category flag %t", name, previewed, want.category)
+				}
+			}
+			if got := h.placements(t); !maps.Equal(got, tc.want) {
+				t.Fatalf("entities = %+v, want %+v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestAnImportFlagsWhatItPlacesAtACategoryLevelAndNeverClearsIt(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	plain := h.file(t, "plain.csv", "URL,Entity\n/bpc-157/,BPC-157\n")
+	h.apply(t, plain, h.detected(t, plain))
+	if got := h.placements(t)["BPC-157"]; got != (placed{kind: graph.KindTopic}) {
+		t.Fatalf("BPC-157 = %+v, want a topic and no category", got)
+	}
+
+	grouped := h.file(t, "grouped.csv", "Category,URL\nBPC-157,/bpc-157/\n")
+	flagged := h.apply(t, grouped, h.detected(t, grouped))
+	if flagged.Counts.EntitiesUpdated != 1 || flagged.Counts.EntitiesCreated != 0 {
+		t.Fatalf("counts = %+v, want the flag written as one update", flagged.Counts)
+	}
+	if got := h.placements(t)["BPC-157"]; got != (placed{kind: graph.KindTopic, category: true}) {
+		t.Fatalf("BPC-157 = %+v, want its kind kept and the category flag set", got)
+	}
+
+	rooted := h.file(t, "rooted.csv", "Root Entity,URL\nBPC-157,/bpc-157/\n")
+	again := h.apply(t, rooted, h.detected(t, rooted))
+	if again.Counts.EntitiesUpdated != 0 || again.Counts.EntitiesCreated != 0 {
+		t.Fatalf("counts = %+v, want nothing written", again.Counts)
+	}
+	if got := h.placements(t)["BPC-157"]; !got.category {
+		t.Fatalf("BPC-157 = %+v, want the flag kept by a root level", got)
+	}
+	if repeated := h.apply(t, grouped, h.detected(t, grouped)); repeated.Counts != (imports.Counts{}) {
+		t.Fatalf("the grouped sheet imported again wrote %+v", repeated.Counts)
 	}
 }
 

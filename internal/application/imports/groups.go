@@ -7,12 +7,13 @@ import (
 )
 
 type groupNode struct {
-	name   string
-	parent int
-	unit   int
-	rows   []int
-	under  []int
-	page   string
+	name     string
+	parent   int
+	unit     int
+	rows     []int
+	under    []int
+	page     string
+	category bool
 }
 
 type groups struct {
@@ -26,15 +27,16 @@ func groupsOf(rows []rowDraft) *groups {
 	for i := range rows {
 		parent := -1
 		path := ""
-		for _, name := range rows[i].levels {
-			path += "\x00" + key(name)
+		for _, level := range rows[i].levels {
+			path += "\x00" + key(level.Name)
 			at, known := g.byKey[path]
 			if !known {
 				at = len(g.nodes)
-				g.nodes = append(g.nodes, groupNode{name: strings.TrimSpace(name), parent: parent, unit: -1})
+				g.nodes = append(g.nodes, groupNode{name: strings.TrimSpace(level.Name), parent: parent, unit: -1})
 				g.byKey[path] = at
 			}
 			g.nodes[at].under = append(g.nodes[at].under, i)
+			g.nodes[at].category = g.nodes[at].category || level.Category
 			parent = at
 		}
 		if parent >= 0 {

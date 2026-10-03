@@ -39,10 +39,22 @@ type unit struct {
 	parent   parentRef
 	context  int
 	group    int
+	category bool
 	pinned   string
 	alias    int
 	matched  string
 	id       string
+}
+
+func (u *unit) defaultKind() graph.Kind {
+	switch {
+	case u.group < 0:
+		return graph.KindTopic
+	case u.category:
+		return graph.KindCategory
+	default:
+		return graph.KindHub
+	}
 }
 
 type builder struct {
@@ -116,7 +128,7 @@ func (b *builder) absorbRow(at int, row *rowDraft) {
 func (b *builder) addGroupUnits() {
 	for at := range b.groups.nodes {
 		node := &b.groups.nodes[at]
-		u := unit{name: node.name, context: node.parent, group: at}
+		u := unit{name: node.name, context: node.parent, group: at, category: node.category}
 		if len(node.under) > 0 {
 			u.at = b.rows[node.under[0]].at
 		}
@@ -497,6 +509,7 @@ func (b *builder) absorb(into, from int) {
 	if target.group < 0 {
 		target.group = source.group
 	}
+	target.category = target.category || source.category
 	if target.context < 0 {
 		target.context = source.context
 	}

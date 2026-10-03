@@ -33,7 +33,7 @@ type rowDraft struct {
 	anchors   []string
 	related   []string
 	parent    string
-	levels    []string
+	levels    []importmap.Level
 }
 
 func (r *rowDraft) named() string {
@@ -60,16 +60,6 @@ func ownershipOf(raw string) (ownership, bool) {
 	default:
 		return ownUnset, false
 	}
-}
-
-func chainOf(levels []string) []string {
-	out := make([]string, 0, len(levels))
-	for _, level := range levels {
-		if level != "" {
-			out = append(out, level)
-		}
-	}
-	return out
 }
 
 func rowKeywords(binding importmap.Binding, row []string, at importmap.Origin, p *plan) keyword.List {
@@ -109,7 +99,7 @@ func readRows(binding importmap.Binding, table importmap.Table, p *plan) []rowDr
 			anchors:   binding.List(row, importmap.FieldAnchors),
 			related:   binding.List(row, importmap.FieldRelated),
 			parent:    binding.Text(row, importmap.FieldParentEntity),
-			levels:    chainOf(binding.Levels(row)),
+			levels:    binding.Levels(row),
 			notes:     binding.Notes(row),
 		}
 		if draft.name == "" && raw == "" && len(draft.levels) == 0 {

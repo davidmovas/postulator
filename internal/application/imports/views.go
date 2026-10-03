@@ -108,12 +108,13 @@ type PreviewPage struct {
 }
 
 type PreviewEntity struct {
-	Name     string        `json:"name"`
-	Parent   string        `json:"parent,omitempty"`
-	Kind     string        `json:"kind"`
-	Keywords []dto.Keyword `json:"keywords"`
-	Anchors  []string      `json:"anchors"`
-	Action   string        `json:"action"`
+	Name         string        `json:"name"`
+	Parent       string        `json:"parent,omitempty"`
+	Kind         string        `json:"kind"`
+	SiteCategory bool          `json:"siteCategory,omitempty"`
+	Keywords     []dto.Keyword `json:"keywords"`
+	Anchors      []string      `json:"anchors"`
+	Action       string        `json:"action"`
 }
 
 type PreviewColumn struct {
@@ -254,12 +255,13 @@ func (r *PreviewReport) settle() {
 
 func entityView(e graph.Entity, parent string, action Action) PreviewEntity {
 	return PreviewEntity{
-		Name:     e.Name,
-		Parent:   parent,
-		Kind:     string(e.Kind),
-		Keywords: application.KeywordViews(e.Keywords),
-		Anchors:  anchorTexts(e.Anchors),
-		Action:   string(action),
+		Name:         e.Name,
+		Parent:       parent,
+		Kind:         string(e.Kind),
+		SiteCategory: e.SiteCategory,
+		Keywords:     application.KeywordViews(e.Keywords),
+		Anchors:      anchorTexts(e.Anchors),
+		Action:       string(action),
 	}
 }
 

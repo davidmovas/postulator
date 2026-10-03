@@ -223,10 +223,20 @@ type noteColumn struct {
 	at    int
 }
 
+type levelColumn struct {
+	at       int
+	category bool
+}
+
+type Level struct {
+	Name     string
+	Category bool
+}
+
 type Binding struct {
 	index   map[Field]int
 	indent  []int
-	levels  []int
+	levels  []levelColumn
 	notes   []noteColumn
 	options Options
 }
@@ -290,9 +300,13 @@ func (m Mapping) Bind(headers []string) (Binding, error) {
 	if err != nil {
 		return Binding{}, err
 	}
-	levels, err := bindAll(positions, m.Options.LevelColumns, "levelColumns", "the level column is not in the file")
+	levelAt, err := bindAll(positions, m.Options.LevelColumns, "levelColumns", "the level column is not in the file")
 	if err != nil {
 		return Binding{}, err
+	}
+	levels := make([]levelColumn, 0, len(levelAt))
+	for i, at := range levelAt {
+		levels = append(levels, levelColumn{at: at, category: !rootLevel(m.Options.LevelColumns[i])})
 	}
 	noteAt, err := bindAll(positions, m.Options.NoteColumns, "noteColumns", "the note column is not in the file")
 	if err != nil {
@@ -332,10 +346,12 @@ func levelCell(row []string, at int) string {
 	return value
 }
 
-func (b Binding) Levels(row []string) []string {
-	out := make([]string, 0, len(b.levels))
-	for _, at := range b.levels {
-		out = append(out, levelCell(row, at))
+func (b Binding) Levels(row []string) []Level {
+	out := make([]Level, 0, len(b.levels))
+	for _, column := range b.levels {
+		if name := levelCell(row, column.at); name != "" {
+			out = append(out, Level{Name: name, Category: column.category})
+		}
 	}
 	return out
 }
@@ -383,10 +399,8 @@ func (b Binding) Blank(row []string) bool {
 			return false
 		}
 	}
-	for _, at := range b.levels {
-		if levelCell(row, at) != "" {
-			return false
-		}
+	if len(b.Levels(row)) > 0 {
+		return false
 	}
 	for _, column := range b.notes {
 		if cellAt(row, column.at) != "" {

@@ -35,20 +35,22 @@ var levelAliases = map[string]int{
 	"sub subcategory": 3,
 }
 
+var rootLevels = []string{"root entity", "root"}
+
 var noteAliases = []string{"notes", "note", "intent owner", "reason", "detected form variation"}
 
 var aliasIndex, compactIndex = buildIndexes()
 
-func buildIndexes() (spaced, compact map[string]Field) {
+func buildIndexes() (spaced, squeezed map[string]Field) {
 	spaced = make(map[string]Field)
-	compact = make(map[string]Field)
+	squeezed = make(map[string]Field)
 	for _, field := range fields {
 		for _, alias := range aliases[field] {
 			spaced[alias] = field
-			compact[strings.ReplaceAll(alias, " ", "")] = field
+			squeezed[compact(alias)] = field
 		}
 	}
-	return spaced, compact
+	return spaced, squeezed
 }
 
 func normalizeHeader(header string) string {
@@ -80,21 +82,30 @@ func Detect(header string) (Field, bool) {
 	if field, known := aliasIndex[normalized]; known {
 		return field, true
 	}
-	field, known := compactIndex[strings.ReplaceAll(normalized, " ", "")]
+	field, known := compactIndex[compact(normalized)]
 	return field, known
+}
+
+func compact(normalized string) string {
+	return strings.ReplaceAll(normalized, " ", "")
 }
 
 func levelOf(header string) (int, bool) {
 	if asked(header) {
 		return 0, false
 	}
-	normalized := normalizeHeader(header)
+	written := compact(normalizeHeader(header))
 	for alias, rank := range levelAliases {
-		if normalized == alias || strings.ReplaceAll(normalized, " ", "") == strings.ReplaceAll(alias, " ", "") {
+		if written == compact(alias) {
 			return rank, true
 		}
 	}
 	return 0, false
+}
+
+func rootLevel(header string) bool {
+	written := compact(normalizeHeader(header))
+	return slices.ContainsFunc(rootLevels, func(alias string) bool { return written == compact(alias) })
 }
 
 func noteOf(header string) bool {

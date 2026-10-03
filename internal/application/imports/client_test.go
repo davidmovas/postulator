@@ -71,6 +71,18 @@ func TestTheClientWorkbookImportsSheetBySheet(t *testing.T) {
 		bpc.Keywords[1].Volume == nil || *bpc.Keywords[1].Volume != 5400 {
 		t.Fatalf("the keywords of BPC-157 = %+v", bpc.Keywords)
 	}
+	for name, got := range h.placements(t) {
+		want := placed{kind: graph.KindCategory, category: true}
+		switch name {
+		case "Peptides":
+			want = placed{kind: graph.KindHub}
+		case "Storing peptides":
+			want = placed{kind: graph.KindTopic}
+		}
+		if got != want {
+			t.Errorf("after the group sheet %s = %+v, want %+v", name, got, want)
+		}
+	}
 
 	catalog := h.apply(t, path, h.sheet(t, path, "Catalog"))
 	clean(t, "Catalog", catalog)

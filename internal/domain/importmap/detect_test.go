@@ -174,6 +174,12 @@ func TestAutoDetectReadsTheClientSheets(t *testing.T) {
 			columns: map[importmap.Field]string{importmap.FieldPath: "URL"},
 			levels:  []string{"Root", "Category", "Subcategory"},
 		},
+		{
+			name:    "a root category is the outermost level",
+			headers: []string{"Sub Subcategory", "Category", "URL", "Root Category"},
+			columns: map[importmap.Field]string{importmap.FieldPath: "URL"},
+			levels:  []string{"Root Category", "Category", "Sub Subcategory"},
+		},
 	}
 
 	for _, tc := range cases {

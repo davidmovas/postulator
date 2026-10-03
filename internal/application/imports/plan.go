@@ -110,7 +110,7 @@ func edgeKey(e graph.Edge) string {
 }
 
 func sameEntity(a, b graph.Entity) bool {
-	return a.Kind == b.Kind && a.Keywords.Equal(b.Keywords) &&
+	return a.Kind == b.Kind && a.SiteCategory == b.SiteCategory && a.Keywords.Equal(b.Keywords) &&
 		slices.Equal(anchorTexts(a.Anchors), anchorTexts(b.Anchors))
 }
 
@@ -244,17 +244,14 @@ func (b *builder) planEntities(now time.Time) (map[string]graph.Entity, error) {
 		parent := b.parentName(u)
 		if u.matched == "" {
 			if kind == "" {
-				kind = graph.KindTopic
-				if u.group >= 0 {
-					kind = graph.KindCategory
-				}
+				kind = u.defaultKind()
 			}
 			var scope *string
 			if parentID := b.parentID(u); parentID != "" && parentID != u.id {
 				scope = &parentID
 			}
 			entity, err := graph.NewEntity(graph.Entity{
-				ID: u.id, SiteID: b.state.siteID, Name: u.name, Kind: kind, ScopeID: scope,
+				ID: u.id, SiteID: b.state.siteID, Name: u.name, Kind: kind, SiteCategory: u.category, ScopeID: scope,
 				Keywords: u.keywords, Anchors: anchorsOf(u.anchors),
 				Source: graph.SourceImport, CreatedAt: now, UpdatedAt: now,
 			})
@@ -272,6 +269,7 @@ func (b *builder) planEntities(now time.Time) (map[string]graph.Entity, error) {
 		if kind != "" {
 			next.Kind = kind
 		}
+		next.SiteCategory = next.SiteCategory || u.category
 		next.Keywords = next.Keywords.Merge(u.keywords)
 		next.Anchors = anchorsOf(union(anchorTexts(next.Anchors), u.anchors))
 		next.UpdatedAt = now

@@ -139,25 +139,33 @@ func TestBindReadsTheLevelsAndTheNotesOfARow(t *testing.T) {
 	cases := []struct {
 		name   string
 		row    []string
-		levels []string
+		levels []importmap.Level
 		notes  []pagemap.Note
 	}{
 		{
-			name:   "every level and note filled",
-			row:    []string{"Peptides", " BPC-157 ", "Liquid", "/bpc-157/liquid/", "Commercial", "Sold as a 10 ml vial"},
-			levels: []string{"Peptides", "BPC-157", "Liquid"},
-			notes:  []pagemap.Note{{Label: "Intent Owner", Text: "Commercial"}, {Label: "Notes", Text: "Sold as a 10 ml vial"}},
+			name: "every level and note filled",
+			row:  []string{"Peptides", " BPC-157 ", "Liquid", "/bpc-157/liquid/", "Commercial", "Sold as a 10 ml vial"},
+			levels: []importmap.Level{
+				{Name: "Peptides"}, {Name: "BPC-157", Category: true}, {Name: "Liquid", Category: true},
+			},
+			notes: []pagemap.Note{{Label: "Intent Owner", Text: "Commercial"}, {Label: "Notes", Text: "Sold as a 10 ml vial"}},
 		},
 		{
-			name:   "a placeholder is an empty level",
+			name:   "a placeholder is no level",
 			row:    []string{"Peptides", "BPC-157", "—", "/bpc-157/"},
-			levels: []string{"Peptides", "BPC-157", ""},
+			levels: []importmap.Level{{Name: "Peptides"}, {Name: "BPC-157", Category: true}},
+			notes:  []pagemap.Note{},
+		},
+		{
+			name:   "an empty level between two filled ones",
+			row:    []string{"Peptides", "", "Liquid", "/liquid/"},
+			levels: []importmap.Level{{Name: "Peptides"}, {Name: "Liquid", Category: true}},
 			notes:  []pagemap.Note{},
 		},
 		{
 			name:   "every placeholder the sheets carry",
 			row:    []string{"-", "N/A", "none", "/about/", " ", ""},
-			levels: []string{"", "", ""},
+			levels: []importmap.Level{},
 			notes:  []pagemap.Note{},
 		},
 	}
@@ -167,7 +175,7 @@ func TestBindReadsTheLevelsAndTheNotesOfARow(t *testing.T) {
 			t.Parallel()
 
 			if got := binding.Levels(tc.row); !slices.Equal(got, tc.levels) {
-				t.Errorf("Levels = %q, want %q", got, tc.levels)
+				t.Errorf("Levels = %+v, want %+v", got, tc.levels)
 			}
 			if got := binding.Notes(tc.row); !reflect.DeepEqual(got, tc.notes) {
 				t.Errorf("Notes = %+v, want %+v", got, tc.notes)
@@ -176,6 +184,46 @@ func TestBindReadsTheLevelsAndTheNotesOfARow(t *testing.T) {
 	}
 	if binding.Blank([]string{"Peptides", "", "", "", "", ""}) {
 		t.Fatal("a row that names only a level is reported blank")
+	}
+}
+
+func TestALevelIsACategoryUnlessItsColumnNamesTheRoot(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		header   string
+		category bool
+	}{
+		{header: "Root Entity", category: false},
+		{header: "root_entity", category: false},
+		{header: "Root", category: false},
+		{header: "Root Category", category: true},
+		{header: "Category", category: true},
+		{header: "Main Category", category: true},
+		{header: "Subcategory", category: true},
+		{header: "Sub Category", category: true},
+		{header: "Sub Subcategory", category: true},
+		{header: "Brand", category: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.header, func(t *testing.T) {
+			t.Parallel()
+
+			m := importmap.Mapping{
+				Columns: map[importmap.Field]string{importmap.FieldPath: "URL"},
+				Options: importmap.Options{LevelColumns: []string{tc.header}},
+			}
+			binding, err := m.Bind([]string{"URL", tc.header})
+			if err != nil {
+				t.Fatalf("Bind: %v", err)
+			}
+			got := binding.Levels([]string{"/a/", "Peptides"})
+			want := []importmap.Level{{Name: "Peptides", Category: tc.category}}
+			if !slices.Equal(got, want) {
+				t.Fatalf("Levels = %+v, want %+v", got, want)
+			}
+		})
 	}
 }
 
