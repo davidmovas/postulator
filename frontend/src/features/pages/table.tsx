@@ -4,6 +4,7 @@ import { useEffect, useMemo } from "react";
 import { copy } from "../../copy/index.js";
 import { flatten } from "../../data/call.js";
 import { usePages } from "../../data/hooks/pages.js";
+import { cycleSort } from "../../data/sorts.js";
 import type { Page } from "../../data/types.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
 import {
@@ -26,7 +27,7 @@ import {
 } from "../../ui/index.js";
 import type { EntityIndex } from "./entities.js";
 import { pageStatusLabel, statusTone } from "./labels.js";
-import { defaultQuery, filterOf, narrowed, nextSort } from "./params.js";
+import { defaultQuery, filterOf, narrowed } from "./params.js";
 import type { PagesQuery } from "./params.js";
 
 const columns = "minmax(96px,2.4fr) minmax(80px,2fr) 60px 84px minmax(80px,1.5fr) 36px 72px";
@@ -193,7 +194,7 @@ export function PageTable({
                     active={query.sort?.field === "path"}
                     direction={query.sort?.desc === true ? "desc" : "asc"}
                     onToggle={() => {
-                        onQueryChange({ ...query, sort: nextSort(query.sort, "path") });
+                        onQueryChange({ ...query, sort: cycleSort(query.sort, "path") });
                     }}
                 >
                     {copy.pages.columns.path}

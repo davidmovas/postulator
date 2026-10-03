@@ -1,4 +1,6 @@
-export const reportTabs = ["site", "runs", "pages"] as const;
+import { choiceParam, queryCodec, textParam } from "../../data/params.js";
+
+const reportTabs = ["site", "runs", "pages"] as const;
 
 export type ReportTab = (typeof reportTabs)[number];
 
@@ -9,39 +11,22 @@ export interface ReportsQuery {
     prefix: string;
 }
 
-export const defaultQuery: ReportsQuery = { tab: "site", runId: "", pageId: "", prefix: "" };
+const codec = queryCodec<ReportsQuery>({
+    tab: choiceParam("tab", reportTabs, "site"),
+    runId: textParam("run"),
+    prefix: textParam("prefix"),
+    pageId: textParam("page"),
+});
 
-function isTab(value: string): value is ReportTab {
-    return (reportTabs as readonly string[]).includes(value);
-}
-
-export function readQuery(params: URLSearchParams): ReportsQuery {
-    const tab = params.get("tab") ?? "";
-    return {
-        tab: isTab(tab) ? tab : "site",
-        runId: params.get("run") ?? "",
-        pageId: params.get("page") ?? "",
-        prefix: params.get("prefix") ?? "",
-    };
-}
+export const readQuery = codec.read;
 
 export function writeQuery(query: ReportsQuery): URLSearchParams {
-    const params = new URLSearchParams();
-    if (query.tab !== defaultQuery.tab) {
-        params.set("tab", query.tab);
-    }
-    if (query.tab === "runs" && query.runId !== "") {
-        params.set("run", query.runId);
-    }
-    if (query.tab === "pages") {
-        if (query.prefix !== "") {
-            params.set("prefix", query.prefix);
-        }
-        if (query.pageId !== "") {
-            params.set("page", query.pageId);
-        }
-    }
-    return params;
+    return codec.write({
+        tab: query.tab,
+        runId: query.tab === "runs" ? query.runId : "",
+        prefix: query.tab === "pages" ? query.prefix : "",
+        pageId: query.tab === "pages" ? query.pageId : "",
+    });
 }
 
 export function pathFilter(prefix: string): string {

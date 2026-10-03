@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { enabledOf, readQuery, wantsNew, writeQuery } from "./params.js";
+import { enabledOf, readQuery, writeQuery } from "./params.js";
 
 describe("readQuery", () => {
     it("shows everything by default", () => {
@@ -26,6 +26,11 @@ describe("writeQuery", () => {
         expect(readQuery(writeQuery(query))).toEqual(query);
     });
 
+    it("writes the filter before the selection", () => {
+        expect(writeQuery({ show: "on", id: "s-9" }).toString()).toBe("show=on&id=s-9");
+        expect(writeQuery({ show: "all", id: "s-9" }).toString()).toBe("id=s-9");
+    });
+
     it("drops the create flag rather than carrying it", () => {
         expect(writeQuery(readQuery(new URLSearchParams("action=new"))).toString()).toBe("");
     });
@@ -38,12 +43,5 @@ describe("enabledOf", () => {
         ["off", false],
     ] as const)("filters %s as %s", (show, want) => {
         expect(enabledOf(show)).toBe(want);
-    });
-});
-
-describe("wantsNew", () => {
-    it("opens the empty panel on the palette's query", () => {
-        expect(wantsNew(new URLSearchParams("action=new"))).toBe(true);
-        expect(wantsNew(new URLSearchParams(""))).toBe(false);
     });
 });

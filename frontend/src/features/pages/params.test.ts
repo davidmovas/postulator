@@ -1,34 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-    defaultQuery,
-    filterOf,
-    formatSort,
-    narrowed,
-    nextSort,
-    parseSort,
-    readQuery,
-    readTab,
-    searchOf,
-    wantsNew,
-    withTab,
-    writeQuery,
-} from "./params.js";
-
-describe("parseSort", () => {
-    it("accepts the two fields the backend declares", () => {
-        expect(parseSort("path:asc")).toStrictEqual({ field: "path", desc: false });
-        expect(parseSort("createdAt:desc")).toStrictEqual({ field: "createdAt", desc: true });
-    });
-
-    it("refuses a field the backend does not declare", () => {
-        expect(parseSort("status:asc")).toBeNull();
-        expect(parseSort("path:sideways")).toBeNull();
-        expect(parseSort("path")).toBeNull();
-        expect(parseSort("")).toBeNull();
-        expect(parseSort(null)).toBeNull();
-    });
-});
+import { defaultQuery, filterOf, narrowed, readQuery, readTab, searchOf, withTab, writeQuery } from "./params.js";
 
 describe("readQuery", () => {
     it("reads every filter the list endpoint supports", () => {
@@ -48,6 +20,14 @@ describe("readQuery", () => {
 
     it("drops a status that is not in the vocabulary", () => {
         expect(readQuery(new URLSearchParams("status=done")).status).toBe("");
+    });
+
+    it("drops a sort on a field the backend does not declare for pages", () => {
+        expect(readQuery(new URLSearchParams("sort=status:asc")).sort).toBeNull();
+        expect(readQuery(new URLSearchParams("sort=createdAt:desc")).sort).toStrictEqual({
+            field: "createdAt",
+            desc: true,
+        });
     });
 
     it("falls back to the table view", () => {
@@ -73,6 +53,21 @@ describe("writeQuery", () => {
     it("writes nothing for the default query", () => {
         expect(writeQuery(defaultQuery).toString()).toBe("");
         expect(searchOf(defaultQuery)).toBe("");
+    });
+
+    it("writes every filter under its own key, in the order the address has always had", () => {
+        const query = {
+            view: "tree" as const,
+            status: "published",
+            entityId: "e1",
+            descendants: true,
+            unmapped: true,
+            pathPrefix: "/shop/",
+            sort: { field: "path" as const, desc: true },
+        };
+        expect(searchOf(query)).toBe(
+            "?view=tree&status=published&entity=e1&under=1&unmapped=1&prefix=%2Fshop%2F&sort=path%3Adesc",
+        );
     });
 });
 
@@ -105,35 +100,7 @@ describe("narrowed", () => {
     });
 });
 
-describe("nextSort", () => {
-    it("cycles ascending, descending, then back to the backend default", () => {
-        expect(nextSort(null, "path")).toStrictEqual({ field: "path", desc: false });
-        expect(nextSort({ field: "path", desc: false }, "path")).toStrictEqual({ field: "path", desc: true });
-        expect(nextSort({ field: "path", desc: true }, "path")).toBeNull();
-    });
-
-    it("restarts ascending when the field changes", () => {
-        expect(nextSort({ field: "path", desc: true }, "createdAt")).toStrictEqual({
-            field: "createdAt",
-            desc: false,
-        });
-    });
-});
-
-describe("formatSort", () => {
-    it("renders the segment the query key uses", () => {
-        expect(formatSort({ field: "path", desc: true })).toBe("path:desc");
-        expect(formatSort(null)).toBe("");
-    });
-});
-
-describe("wantsNew", () => {
-    it("reads the create action the palette sends", () => {
-        expect(wantsNew(new URLSearchParams("action=new"))).toBe(true);
-        expect(wantsNew(new URLSearchParams("action=edit"))).toBe(false);
-        expect(wantsNew(new URLSearchParams())).toBe(false);
-    });
-
+describe("the create action", () => {
     it("is dropped by writeQuery, so a reload cannot reopen the form", () => {
         const query = readQuery(new URLSearchParams("action=new&status=planned"));
         expect(writeQuery(query).has("action")).toBe(false);

@@ -5,6 +5,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 import { copy } from "../../copy/index.js";
 import { useSiteOverview } from "../../data/hooks/reports.js";
 import { useSyncSite } from "../../data/hooks/sync.js";
+import { wantsNew } from "../../data/params.js";
 import {
     AccountTreeIcon,
     AddIcon,
@@ -18,7 +19,7 @@ import type { SegmentedOption } from "../../ui/index.js";
 import { PlanPageDialog } from "./create.js";
 import { PageDrawer } from "./drawer.js";
 import { useEntityIndex } from "./entities.js";
-import { readQuery, readTab, searchOf, wantsNew, withTab, writeQuery } from "./params.js";
+import { readQuery, readTab, searchOf, withTab, writeQuery } from "./params.js";
 import type { PageTab, PagesQuery, PagesView } from "./params.js";
 import { PageRail } from "./rail.js";
 import { PageSummary } from "./summary.js";

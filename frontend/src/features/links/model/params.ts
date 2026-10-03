@@ -1,4 +1,5 @@
-import { isOneOf, pageStatuses } from "../../../generated/vocab.js";
+import { choiceParam, queryCodec, textParam } from "../../../data/params.js";
+import { pageStatuses } from "../../../generated/vocab.js";
 
 export const shows = [
     "all",
@@ -14,7 +15,9 @@ export const shows = [
 
 export type Show = (typeof shows)[number];
 
-export type LinksSort = "severity" | "path";
+const linksSorts = ["severity", "path"] as const;
+
+export type LinksSort = (typeof linksSorts)[number];
 
 export interface LinksQuery {
     show: Show;
@@ -23,45 +26,21 @@ export interface LinksQuery {
     sort: LinksSort;
 }
 
-export const defaultQuery: LinksQuery = { show: "all", entity: "", status: "", sort: "severity" };
+const codec = queryCodec<LinksQuery>({
+    show: choiceParam("show", shows, "all"),
+    entity: textParam("entity"),
+    status: choiceParam("status", pageStatuses, ""),
+    sort: choiceParam("sort", linksSorts, "severity"),
+});
 
-export function isShow(value: string): value is Show {
-    return (shows as readonly string[]).includes(value);
-}
+export const defaultQuery: LinksQuery = codec.defaults;
 
-export function readQuery(params: URLSearchParams): LinksQuery {
-    const show = params.get("show") ?? "";
-    const status = params.get("status") ?? "";
-    return {
-        show: isShow(show) ? show : "all",
-        entity: params.get("entity") ?? "",
-        status: isOneOf(pageStatuses, status) ? status : "",
-        sort: params.get("sort") === "path" ? "path" : "severity",
-    };
-}
+export const readQuery = codec.read;
 
-export function writeQuery(query: LinksQuery): URLSearchParams {
-    const params = new URLSearchParams();
-    if (query.show !== defaultQuery.show) {
-        params.set("show", query.show);
-    }
-    if (query.entity !== "") {
-        params.set("entity", query.entity);
-    }
-    if (query.status !== "") {
-        params.set("status", query.status);
-    }
-    if (query.sort !== defaultQuery.sort) {
-        params.set("sort", query.sort);
-    }
-    return params;
-}
+export const writeQuery = codec.write;
 
-export function searchOf(query: LinksQuery): string {
-    const serialised = writeQuery(query).toString();
-    return serialised === "" ? "" : `?${serialised}`;
-}
+export const searchOf = codec.search;
 
 export function narrowed(query: LinksQuery): boolean {
-    return query.show !== "all" || query.entity !== "" || query.status !== "";
+    return codec.carries(query, ["show", "entity", "status"]);
 }

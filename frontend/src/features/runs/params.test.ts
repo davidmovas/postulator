@@ -4,32 +4,13 @@ import type { RunsQuery } from "./params.js";
 import {
     defaultQuery,
     filterOf,
-    formatSort,
     itemSearchOf,
     narrowed,
-    nextSort,
-    parseSort,
     readItemStatus,
     readQuery,
     searchOf,
-    wantsNew,
     writeQuery,
 } from "./params.js";
-
-describe("parseSort", () => {
-    it("accepts only the two fields the backend declares for runs", () => {
-        expect(parseSort("createdAt:asc")).toStrictEqual({ field: "createdAt", desc: false });
-        expect(parseSort("status:desc")).toStrictEqual({ field: "status", desc: true });
-    });
-
-    it("refuses a field runs do not declare", () => {
-        expect(parseSort("path:asc")).toBeNull();
-        expect(parseSort("name:asc")).toBeNull();
-        expect(parseSort("status:sideways")).toBeNull();
-        expect(parseSort("status")).toBeNull();
-        expect(parseSort(null)).toBeNull();
-    });
-});
 
 describe("readQuery", () => {
     it("reads the filters the list endpoint supports", () => {
@@ -46,6 +27,13 @@ describe("readQuery", () => {
     it("drops a kind outside the vocabulary", () => {
         expect(readQuery(new URLSearchParams("kind=rewrite")).kind).toBe("");
     });
+
+    it("accepts only the sort fields the backend declares for runs", () => {
+        expect(readQuery(new URLSearchParams("sort=createdAt:asc")).sort).toStrictEqual({ field: "createdAt", desc: false });
+        expect(readQuery(new URLSearchParams("sort=path:asc")).sort).toBeNull();
+        expect(readQuery(new URLSearchParams("sort=name:asc")).sort).toBeNull();
+        expect(readQuery(new URLSearchParams("sort=status")).sort).toBeNull();
+    });
 });
 
 describe("writeQuery", () => {
@@ -57,6 +45,11 @@ describe("writeQuery", () => {
     it("omits every default", () => {
         expect(writeQuery(defaultQuery).toString()).toBe("");
         expect(searchOf(defaultQuery)).toBe("");
+    });
+
+    it("writes every filter under its own key, in the order the address has always had", () => {
+        const query: RunsQuery = { status: "paused", kind: "audit", sort: { field: "createdAt", desc: true } };
+        expect(searchOf(query)).toBe("?status=paused&kind=audit&sort=createdAt%3Adesc");
     });
 });
 
@@ -82,29 +75,6 @@ describe("narrowed", () => {
     });
 });
 
-describe("nextSort", () => {
-    it("cycles ascending, descending, none", () => {
-        const first = nextSort(null, "status");
-        expect(first).toStrictEqual({ field: "status", desc: false });
-        const second = nextSort(first, "status");
-        expect(second).toStrictEqual({ field: "status", desc: true });
-        expect(nextSort(second, "status")).toBeNull();
-    });
-
-    it("restarts on another field", () => {
-        expect(nextSort({ field: "status", desc: true }, "createdAt")).toStrictEqual({
-            field: "createdAt",
-            desc: false,
-        });
-    });
-});
-
-describe("formatSort", () => {
-    it("answers an empty string for no sort", () => {
-        expect(formatSort(null)).toBe("");
-    });
-});
-
 describe("item status", () => {
     it("reads only a declared item status", () => {
         expect(readItemStatus(new URLSearchParams("item=waiting"))).toBe("waiting");
@@ -118,13 +88,7 @@ describe("item status", () => {
     });
 });
 
-describe("wantsNew", () => {
-    it("reads the start action the palette sends", () => {
-        expect(wantsNew(new URLSearchParams("action=new"))).toBe(true);
-        expect(wantsNew(new URLSearchParams("action=start"))).toBe(false);
-        expect(wantsNew(new URLSearchParams())).toBe(false);
-    });
-
+describe("the start action", () => {
     it("is dropped by writeQuery, so a reload cannot reopen the drawer", () => {
         const query = readQuery(new URLSearchParams("action=new&kind=generate"));
         expect(writeQuery(query).has("action")).toBe(false);

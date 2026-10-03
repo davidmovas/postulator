@@ -1,8 +1,11 @@
+import { choiceParam, flagParam, queryCodec, sortParam, textParam } from "../../data/params.js";
 import type { PageSort } from "../../data/sorts.js";
 import type { PageFilter } from "../../data/types.js";
-import { isOneOf, pageSortFields, pageStatuses } from "../../generated/vocab.js";
+import { pageSortFields, pageStatuses } from "../../generated/vocab.js";
 
-export type PagesView = "table" | "tree";
+const pagesViews = ["table", "tree"] as const;
+
+export type PagesView = (typeof pagesViews)[number];
 
 export interface PagesQuery {
     view: PagesView;
@@ -14,80 +17,23 @@ export interface PagesQuery {
     sort: PageSort | null;
 }
 
-export const defaultQuery: PagesQuery = {
-    view: "table",
-    status: "",
-    entityId: "",
-    descendants: false,
-    unmapped: false,
-    pathPrefix: "",
-    sort: null,
-};
+const codec = queryCodec<PagesQuery>({
+    view: choiceParam("view", pagesViews, "table"),
+    status: choiceParam("status", pageStatuses, ""),
+    entityId: textParam("entity"),
+    descendants: flagParam("under"),
+    unmapped: flagParam("unmapped"),
+    pathPrefix: textParam("prefix"),
+    sort: sortParam("sort", pageSortFields),
+});
 
-export function parseSort(raw: string | null): PageSort | null {
-    if (raw === null || raw === "") {
-        return null;
-    }
-    const separator = raw.lastIndexOf(":");
-    if (separator <= 0) {
-        return null;
-    }
-    const field = raw.slice(0, separator);
-    const direction = raw.slice(separator + 1);
-    if (!isOneOf(pageSortFields, field) || (direction !== "asc" && direction !== "desc")) {
-        return null;
-    }
-    return { field, desc: direction === "desc" };
-}
+export const defaultQuery: PagesQuery = codec.defaults;
 
-export function formatSort(sort: PageSort | null): string {
-    return sort === null ? "" : `${sort.field}:${sort.desc ? "desc" : "asc"}`;
-}
+export const readQuery = codec.read;
 
-export function readQuery(params: URLSearchParams): PagesQuery {
-    const status = params.get("status") ?? "";
-    return {
-        view: params.get("view") === "tree" ? "tree" : "table",
-        status: isOneOf(pageStatuses, status) ? status : "",
-        entityId: params.get("entity") ?? "",
-        descendants: params.get("under") === "1",
-        unmapped: params.get("unmapped") === "1",
-        pathPrefix: params.get("prefix") ?? "",
-        sort: parseSort(params.get("sort")),
-    };
-}
+export const writeQuery = codec.write;
 
-export function writeQuery(query: PagesQuery): URLSearchParams {
-    const params = new URLSearchParams();
-    if (query.view !== defaultQuery.view) {
-        params.set("view", query.view);
-    }
-    if (query.status !== "") {
-        params.set("status", query.status);
-    }
-    if (query.entityId !== "") {
-        params.set("entity", query.entityId);
-    }
-    if (query.descendants) {
-        params.set("under", "1");
-    }
-    if (query.unmapped) {
-        params.set("unmapped", "1");
-    }
-    if (query.pathPrefix !== "") {
-        params.set("prefix", query.pathPrefix);
-    }
-    const sort = formatSort(query.sort);
-    if (sort !== "") {
-        params.set("sort", sort);
-    }
-    return params;
-}
-
-export function searchOf(query: PagesQuery): string {
-    const serialised = writeQuery(query).toString();
-    return serialised === "" ? "" : `?${serialised}`;
-}
+export const searchOf = codec.search;
 
 export function filterOf(siteId: string, query: PagesQuery): PageFilter {
     const filter: PageFilter = { siteId };
@@ -110,41 +56,25 @@ export function filterOf(siteId: string, query: PagesQuery): PageFilter {
 }
 
 export function narrowed(query: PagesQuery): boolean {
-    return query.status !== "" || query.entityId !== "" || query.unmapped || query.pathPrefix !== "";
+    return codec.carries(query, ["status", "entityId", "unmapped", "pathPrefix"]);
 }
 
-export function nextSort(current: PageSort | null, field: PageSort["field"]): PageSort | null {
-    if (current === null || current.field !== field) {
-        return { field, desc: false };
-    }
-    return current.desc ? null : { field, desc: true };
-}
-
-export const pageTabs = ["details", "links", "mapping", "report", "preview"] as const;
+const pageTabs = ["details", "links", "mapping", "report", "preview"] as const;
 
 export type PageTab = (typeof pageTabs)[number];
 
-export const defaultTab: PageTab = "details";
-
-export const tabParam = "tab";
+const tabParam = choiceParam("tab", pageTabs, "details");
 
 export function readTab(params: URLSearchParams): PageTab {
-    const asked = params.get(tabParam) ?? "";
-    return (pageTabs as readonly string[]).includes(asked) ? (asked as PageTab) : defaultTab;
+    return tabParam.read(params.get(tabParam.key));
 }
 
 export function withTab(params: URLSearchParams, tab: PageTab): URLSearchParams {
     const next = new URLSearchParams(params);
-    next.delete(tabParam);
-    if (tab !== defaultTab) {
-        next.set(tabParam, tab);
+    next.delete(tabParam.key);
+    const written = tabParam.write(tab);
+    if (written !== "") {
+        next.set(tabParam.key, written);
     }
     return next;
-}
-
-export const actionParam = "action";
-export const actionNew = "new";
-
-export function wantsNew(params: URLSearchParams): boolean {
-    return params.get(actionParam) === actionNew;
 }

@@ -6,6 +6,8 @@ import { copy } from "../../copy/index.js";
 import { flatten } from "../../data/call.js";
 import { failure } from "../../data/errors.js";
 import { useRuns } from "../../data/hooks/runs.js";
+import { wantsNew } from "../../data/params.js";
+import { cycleSort } from "../../data/sorts.js";
 import { activeRunStatuses } from "../../generated/vocab.js";
 import {
     Banner,
@@ -20,7 +22,7 @@ import {
 } from "../../ui/index.js";
 import { useNow } from "./clock.js";
 import { RunFilters } from "./filters.js";
-import { defaultQuery, filterOf, narrowed, nextSort, readQuery, searchOf, wantsNew, writeQuery } from "./params.js";
+import { defaultQuery, filterOf, narrowed, readQuery, searchOf, writeQuery } from "./params.js";
 import type { RunsQuery } from "./params.js";
 import { RunTable } from "./run-table.js";
 import { StartRunDrawer } from "./start.js";
@@ -130,7 +132,7 @@ export function RunsScreen(): ReactElement {
                     selectedId={null}
                     scrollKey={`${siteId}:runs${search}`}
                     onSortChange={(field) => {
-                        change({ ...query, sort: nextSort(query.sort, field) });
+                        change({ ...query, sort: cycleSort(query.sort, field) });
                     }}
                     onOpen={(runId) => {
                         void navigate(`/s/${siteId}/runs/${runId}`);

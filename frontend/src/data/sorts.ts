@@ -1,6 +1,7 @@
 import type { Sort } from "../lib/paging.js";
 import {
     entitySortFields,
+    isOneOf,
     pageSortFields,
     runSortFields,
     siteSortFields,
@@ -22,9 +23,37 @@ export type EntitySort = SortOf<typeof entitySortFields>;
 
 export type NoSort = null;
 
-export function sortSegment(sort: Sort | null | undefined): string {
+export function parseSort<F extends string>(fields: readonly F[], raw: string | null): SortOf<readonly F[]> | null {
+    if (raw === null || raw === "") {
+        return null;
+    }
+    const separator = raw.lastIndexOf(":");
+    if (separator <= 0) {
+        return null;
+    }
+    const field = raw.slice(0, separator);
+    const direction = raw.slice(separator + 1);
+    if (!isOneOf(fields, field) || (direction !== "asc" && direction !== "desc")) {
+        return null;
+    }
+    return { field, desc: direction === "desc" };
+}
+
+export function formatSort(sort: Sort | null | undefined): string {
     if (sort === null || sort === undefined) {
-        return "default";
+        return "";
     }
     return `${sort.field}:${sort.desc ? "desc" : "asc"}`;
+}
+
+export function sortSegment(sort: Sort | null | undefined): string {
+    const formatted = formatSort(sort);
+    return formatted === "" ? "default" : formatted;
+}
+
+export function cycleSort<F extends string>(current: SortOf<readonly F[]> | null, field: F): SortOf<readonly F[]> | null {
+    if (current === null || current.field !== field) {
+        return { field, desc: false };
+    }
+    return current.desc ? null : { field, desc: true };
 }
