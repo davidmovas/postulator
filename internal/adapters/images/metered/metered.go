@@ -56,6 +56,7 @@ func (m *Images) Generate(ctx context.Context, prompt images.Prompt) (images.Ima
 		USD:       m.cost(ctx, image.Usage),
 		Latency:   time.Since(started),
 		Status:    llm.CallOK,
+		Tier:      llm.TierDefault,
 		CreatedAt: m.clock.Now().UTC().Truncate(time.Second),
 	}
 	if err != nil {
@@ -71,8 +72,16 @@ func (m *Images) Generate(ctx context.Context, prompt images.Prompt) (images.Ima
 	}
 	if call.Usage.Total > 0 {
 		if publishErr := m.events.Publish(events.LLMUsage, events.LLMUsagePayload{
-			RunID: call.RunID, ItemID: call.ItemID, Provider: m.ref.Provider, Model: m.ref.Model,
-			PromptTokens: call.Usage.Input, CompletionTokens: call.Usage.Output, USD: call.USD,
+			RunID:            call.RunID,
+			ItemID:           call.ItemID,
+			Provider:         m.ref.Provider,
+			Model:            m.ref.Model,
+			Tier:             string(call.Tier),
+			PromptTokens:     call.Usage.Input,
+			CompletionTokens: call.Usage.Output,
+			ReasoningTokens:  call.Usage.Reasoning,
+			CacheWriteTokens: call.Usage.CacheWrite,
+			USD:              call.USD,
 		}); publishErr != nil {
 			return images.Image{}, publishErr
 		}
@@ -84,7 +93,7 @@ func (m *Images) cost(ctx context.Context, usage llm.Usage) float64 {
 	if usage.Total == 0 {
 		return 0
 	}
-	info, err := m.catalog.Lookup(ctx, m.ref)
+	info, err := m.catalog.Lookup(context.WithoutCancel(ctx), m.ref)
 	if err != nil {
 		return 0
 	}
