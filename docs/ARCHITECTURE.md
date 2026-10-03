@@ -223,5 +223,12 @@ name is refused from the cached manifest before any request, so a site still on 
 Raw writes rely on that role's `unfiltered_html` rather than removing kses filters. With no
 SEO plugin the head is replaced, not appended, and every value is escaped on the way out.
 
+The post routes read their number through `get_post()`, so a product is written there like a
+page and a product category never is: a term id names whatever post shares its number, which is
+why the client names the item type on every call and refuses `product_cat` before the request.
+A product's other fields go through WooCommerce's `wc/v3` with the same application password, the
+store's fields before the description, because saving the short description makes WooCommerce
+save the whole post again.
+
 See `docs/CONTRACTS.md` for the wire shapes and `docs/superpowers/specs/` for the full
 design.

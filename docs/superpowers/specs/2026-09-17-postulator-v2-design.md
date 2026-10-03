@@ -15,7 +15,7 @@ The client (an SEO specialist, not a developer) has a network of WordPress sites
 
 | Topic | Decision |
 |---|---|
-| WP content types | Pages, posts, WooCommerce products and product categories |
+| WP content types | Pages, posts, WooCommerce products and product categories; the client creates products in WooCommerce and Postulator edits them where they stand, and a product category is read, never written |
 | Graph shape | Two structures: URL tree and Entity Graph. Graph is a DAG on `parent` edges, `related` edges undirected with weight |
 | Site state | Mixed: create, fill, rewrite, relink-only all needed |
 | SEO plugin | Unknown per site; ship our own companion plugin that detects Yoast/RankMath and writes meta |
@@ -112,7 +112,7 @@ Dependency rule (enforced by a test in `internal/app` using `go list -deps`): `d
 - `StepSpec{Name string, Enabled bool, Params map[string]any}`.
 - `Resolve(base TemplateSpec, siteOverride, pageOverride json.RawMessage) (TemplateSpec, error)` implements RFC 7396 merge patch over the JSON form of the spec (Phase 2): overrides are stored as merge-patch documents, arrays are replaced wholesale, `null` removes a key, and the resolved spec must pass `Validate`. `TemplateSpec` and its nested structs carry camelCase JSON tags because that JSON is their persisted form.
 - `LinkPolicy` is the `LinkRules` plus site-wide `ForbidExternal bool, ForbidSelf bool, AnchorStrategy(prefer_user|rotate)`.
-- Starter templates (Hub, Product, Guide, Comparison, Category) live in `domain/template/seed/*.json`, embedded, loaded by migration seeding in the application layer.
+- Starter templates (Hub, Product, Guide, Comparison, Category) live in `domain/template/seed/*.json`, embedded, loaded by migration seeding in the application layer. A spec's optional `product` block names what a product gets beside its description: a short description (`enabled`, `intent`, `targetWords`, `primaryKeyword`) and the attributes the writer fills where a product lacks them; the shipped Product template carries one.
 
 ### 5.5 Content (`domain/content`) — see section 6.
 
@@ -209,6 +209,7 @@ Shapes ported from Archond `internal/infra/jobs/pipeline/{pipeline,checkpoint,de
 ### 9.3 WordPress (`adapters/wp`)
 - `Client` per site: base URL, app-password Basic auth, proxy from settings, timeouts, retries on 429/5xx, no-redirect policy for diagnostics.
 - Core: `ListItems(type, since, cursor)`, `GetItem`, `CreateItem`, `UpdateItem` (POST), `UploadMedia`, `UpdateMedia`, `ListCategories`, `ListProductCategories`, `ListProducts`, `UpdateProduct`. Handles `X-WP-Total`, slug rewrite on create, tri-state parent (`nil` keep, `0` top, `id` set), `page number larger` end-of-list quirk.
+- Store: `GetProduct` and `UpdateProduct` read and write a product in WooCommerce's `wc/v3` with `context=edit`; an update carries only the short description, the attributes and the images, never the name, the description, the price, the status, the slug or the categories. A product's description is written through the plugin's raw route, which every plugin call names by its item type. `Commerce` says whether the store can be edited, and `Visit` reads a page of the site as a visitor sees it, without the application password.
 - Plugin namespace `/wp-json/postulator/v1`: `GET /manifest → {version, capabilities:[bulk,seo_meta,content_hash], seoPlugin: yoast|rankmath|none}`, `GET /content?since=&cursor=&types= → {items:[{id,type,slug,path,parent,status,modified,contentHash,title,h1,meta{title,description,canonical},links:[{href,anchor}]}], nextCursor}`, `PUT /seo-meta/{id} {title,description,canonical,ogTitle,ogDescription}`, `GET /content/{id}/raw`.
 - `Capabilities(site)` gates plugin features; without the plugin: sync via core REST per type, links parsed locally from rendered content, SEO meta read-only.
 - `wptest.Server`: httptest fake implementing the subset above with in-memory state, used by adapter tests and by runtime tests.

@@ -1805,3 +1805,114 @@ of the approved plan was taken out by the owner and handed to its own session.
   and declares its posts at the flat addresses WordPress gives posts.
 - The products stage is out of this branch: its plan, the owner's words and the research live in
   the handoff file the owner keeps, not in the repository.
+
+## 2026-10-03 — the products the client creates in WooCommerce, edited where they stand
+
+The client adds every product by hand in WooCommerce, with its name, price and stock, so
+Postulator creates none: it edits a product the way it edits a page. It writes the description with
+its links, the short description the store shows beside the price, the attributes the product
+lacks and the SEO meta. The owner's rules are those of 2026-10-02, plus one: a product's name,
+price, stock, SKU, status, slug and categories are never written. The plan that created products and
+gave them addresses through the plugin was dropped when the owner said so; the plugin stays 1.2.0
+and `wp-plugin/openapi.yaml` is unchanged.
+
+### What a run writes into a product
+
+- **The description is the body without its H1, written through the plugin's raw route** with
+  compare-and-swap. WooCommerce passes `description` through kses for every user, so its REST API
+  cannot write it as it was composed.
+- **The store's fields go first and the description last.** A changed short description makes
+  WooCommerce save the whole post again through `wp_update_post`, and `content_save_pre` runs kses
+  over `post_content` for a user without `unfiltered_html`. Written after that save, and against a
+  hash read again after it, the description stays what the run wrote. This **supersedes** the
+  Phase 3 line that `UpdateProduct` is the one write path into a shop: the description goes
+  through the raw route, and the short description, the attributes and the image through
+  `UpdateProduct`.
+- **Attributes are filled where the product lacks them.** The template names them; one is written
+  only when the product carries no attribute of that name, compared without case, or an empty one.
+  A global, a variation or a filled attribute is sent back untouched, because WooCommerce replaces
+  the whole list, and a variable product keeps its attributes as they are with `product_type_kept`.
+  The featured image is set only on a product with none.
+- **The name stays as the store has it.** The writer writes under the store's name, a file H1 that
+  differs is `product_name_differs`, and the primary keyword missing from the name is a warning,
+  because only the client can rename a product.
+- **A product is edited live.** It has no draft copy, so a draft run over a product is refused
+  before anything is spent, `product_edited_live`.
+- **The publish result keeps what the product held and what the run wrote**, as the store answered
+  it, so a revert can tell its own work from a human's.
+
+### Before anything is spent
+
+- A run over a product is refused when the site's store is not known to be editable
+  (`commerce_unknown`, `commerce_absent`, `commerce_forbidden`), when the plugin cannot write raw
+  content (`product_needs_plugin`), when the row has no product (`product_not_in_store`) and when it
+  is a draft run; a product category is refused, `product_category_unwritable`, because the plugin
+  does not write a term's description. A template with no product outputs over a product, and one
+  with them over a page, are warnings. A repair refuses both, `store_placed`.
+
+### The revert
+
+- **A product changed since the run is handed to a human**: a short description, an attribute the
+  run filled or a description that is no longer what the run wrote. Otherwise the store's fields
+  go first and the description last, against its own hash. Only the attributes the run filled are
+  taken back, and one a human removed since stays removed; only the image the run set is taken
+  off. The REST API has no compare-and-swap, so a human edit between the revert's read and its
+  write of the store's fields is the one race left, and the description keeps its own.
+- **A body counts as never copied only when no hash was kept**, so an empty description is put
+  back as empty, the rule a relink's neighbour already followed.
+- **A product or a product category is not deleted on the site** by `pages.Delete{onSite}`; the
+  client deletes it in WooCommerce.
+
+### Where a product sits
+
+- **The store decides a product's address.** The row's path is the store's, and the address the
+  sheet gave is kept beside it as `pages.planned_path`, migration 0032, which a second import reads
+  and the export writes. No product takes a parent from its path, and the level above a run of
+  products stays an entity without a page, `intermediate_level`.
+- **A site knows whether its store can be edited**, `sites.commerce`, migration 0031: absent when
+  WooCommerce answers no route, forbidden when the user may not edit products, ready otherwise. The
+  probe, the plugin check and the first batch of a sync set it, and a 401 or a 5xx keeps what was
+  known.
+- **A row is matched by its id and its type**, because post ids and term ids are two sequences, and
+  a path only within its family of types, `path_taken_on_site` otherwise.
+
+### The import
+
+- **A mapping says what a new row becomes**: pages by default, products, or read by the entity
+  kind. A row with product rows under it stays a page, a `wp_type` cell wins over the mode, and a
+  row with a WordPress id keeps its type, `wp_type_kept`.
+- **A product row finds the product the client created** by its address, then by the slug the URL
+  ends in, then by the one product whose name is the row's H1 or title. Ambiguous or not found, the
+  row waits with `product_not_in_store` and no invented title. A product the sync meets later claims
+  the row that waited for it through the same matcher, read from the row's side: only when the
+  product is the one the row itself would match, and only when no other row claims it.
+
+### What the screens and the read-back say
+
+- The site's detail says whether the store can be edited, the template editor has a Product group,
+  the import options say what the rows become and the preview names the product a row found, a
+  product's card shows both addresses, the store's name against the sheet's H1 and the outputs of
+  its last run, and the run panes show what a product was written with.
+- **`sync_back` opens a published product's page as a visitor would** and warns,
+  `product_description_hidden`, when the opening words of its description are not in the text a
+  visitor reads; it ignores the head, scripts and styles, where WooCommerce's structured data
+  repeats the description, and it compares words, so a theme's typographic quotes do not count. A
+  page builder, a cache and the store's coming-soon mode are the causes it names;
+  `product_page_unread` says the page could not be opened.
+
+### A correction
+
+- **Phase 3B says a term id is a 404 on the plugin's post routes; it is not.** `get_post()` reads
+  the number as a post id, so a term id that a post also carries answers that post. The client
+  names the item type on every plugin route, refuses a product category before the request, and
+  treats a raw read whose type differs from the one it asked for as `NotFound`.
+
+### Decided without asking
+
+- The tool schemas grew to 84,923 bytes with the row type, and the ceiling is 85,000.
+- A page report carries a draft's product outputs and nothing else of the draft, so the agent's
+  context is not filled with section HTML.
+- An import that finds a store's product for a row that waited under the sheet's address leaves
+  the waiting row and says `product_row_left`: an import deletes nothing.
+- The sandbox starts without WooCommerce unless `E2E_WOO=1`, and the UI harness stocks its fake
+  store with a product it runs the shipped Product template over.

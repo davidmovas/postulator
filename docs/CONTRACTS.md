@@ -56,7 +56,8 @@ still active, and a run that wrote nothing to the site.
 
 `ReportsService.JudgePage{pageId}` is synchronous: it pulls the live page, runs the shared
 judge rubric against it and answers with the report, one model call inside the request.
-`PageReport` and `RunReport` read what a run already recorded; `SiteOverview`,
+`PageReport` and `RunReport` read what a run already recorded, and a page report carries, as
+`product`, the short description and attributes of the newest draft and nothing else of it; `SiteOverview`,
 `LinkAudit{siteId}` and `LinkAuditPage{pageId}` read the graph and the page map. The audit
 plans every mapped page's link targets with the rules of the page's resolved template and the
 site's effective policy, exactly as `resolve_context` does, and answers one summary row per
@@ -205,7 +206,11 @@ enabled step that declares no ceiling and no model, `template_unresolved`, `enti
 and `RunsService.Start` refuses the run with `INVALID` and `details.findings` while they
 stand, and `recipe_differs`, `model_unknown`, `image_source_unavailable` and `plugin_missing`
 are warnings, as is `images_step_off`, raised per page whose template asks for images the run's
-recipe will not draw. `Budget` carries `maxUsd` and `maxTokens` and either one pauses the run with
+recipe will not draw. Over a product, `commerce_unknown`, `commerce_absent`, `commerce_forbidden`,
+`product_needs_plugin`, `product_not_in_store`, `product_edited_live` and
+`product_category_unwritable` are errors and `product_outputs_missing` and
+`product_outputs_ignored` warnings; a repair over a product or a product category is refused with
+`store_placed`. `Budget` carries `maxUsd` and `maxTokens` and either one pauses the run with
 `budget_exceeded`, and a negative one is refused.
 
 `StartRequest.templateId` assigns that template to the chosen pages: `Estimate` prices and
@@ -327,6 +332,26 @@ WordPress id answers `INVALID` with `details.field = wpId`, an archived one with
 status`. A site that cannot issue a link answers `INVALID` with `details.code` set to
 `plugin_missing` or, for a plugin older than 1.1.0, `plugin_outdated` with `details.capability`.
 
+## Products
+
+A product is a page row whose `wpType` is `product`, created by the client in WooCommerce and
+edited where it stands. `Site.commerce` is one of `siteCommerces` in `vocab.ts` (empty until the
+store is asked, then `absent`, `forbidden` or `ready`) and `CheckPluginResponse.commerce` answers
+the store as the check found it. `Page.plannedPath` is the address the sheet gave a product whose
+address the store decides, empty when the two agree. `ImportOptions.rowType` is one of
+`importRowTypes` (`pages`, `products`, `kind`), and a `PreviewPage` of a product carries
+`plannedPath`, `storeName` and `matchedBy` (`path`, `slug` or `name`); the import findings
+`product_not_in_store`, `product_row_left`, `wp_type_kept` and `intermediate_level` are warnings.
+
+A publish over a product writes the description through the plugin's raw route and the short
+description, the filled attributes and an image through WooCommerce's REST API, and its result
+carries `previousProduct {shortDescription, writtenShort, attributes, written, images, added,
+imageId, shortWritten, attributesSent}`, what the product held and what the run wrote, which the
+revert reads. A sync result may carry `product_description_hidden` or `product_page_unread`, both
+warnings. `PagesService.Delete{onSite: true}` refuses a product or a product category with
+`details.field = onSite`. The name, price, stock, SKU, status, slug and categories of a product
+are never written.
+
 ## The companion plugin's version
 
 The shipped plugin is **1.2.0** and advertises `bulk seo_meta seo_meta_read content_hash raw
@@ -381,9 +406,9 @@ A tool is `{Def{Name, Description, Risk(read|write|dangerous), Schema}, Authoriz
 every tool lives in its own file and `Binding{SiteID, ConversationID, RunID, Mode}` scopes
 every call. Ninety-three tools, `runs_revert` (`dangerous`), `graph_move_entity` (`write`),
 `graph_preview_from_pages` (`read`), `graph_propose_from_keywords` (`read`) and
-`graph_apply_proposals` (`write`) among them, measuring 78,971 bytes of schema — about 19,700
+`graph_apply_proposals` (`write`) among them, measuring 84,923 bytes of schema — about 21,200
 tokens resent on every round of every turn, which `TestTheToolSchemasFitTheirCeiling` holds
-against `schemaCeilingBytes` (79,000).
+against `schemaCeilingBytes` (85,000).
 
 The guard chain runs in this order and the order matters: `fence` wraps tool output as
 untrusted data so a result cannot inject instructions into the model, `audit` writes the

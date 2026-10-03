@@ -4,10 +4,30 @@ The handoff point between sessions. Read this first. The reasoning behind every 
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
-**Released:** `v2.3.0` on 2026-09-25 (2.2.0 and the 2026-09-25 work). **The 2026-10-02 work is on
-`dev`**, not yet released; what its gate did and did not run is under **The gate**.
+**Released:** `v2.3.0` on 2026-09-25 (2.2.0 and the 2026-09-25 work). **The 2026-10-02 and
+2026-10-03 work is on `dev`**, not yet released; what its gate did and did not run is under
+**The gate**.
 
 ## Where we are
+
+**2026-10-03** edits the products the client creates by hand in WooCommerce; the reasoning is
+under **2026-10-03** in `DECISIONS.md`.
+
+- **A product run writes** the description through the plugin's raw route, then the short
+  description, the attributes the product lacks and an image where it has none through
+  WooCommerce's REST API, and the SEO meta; the name, price, stock, SKU, status, slug and
+  categories are never written. A template declares the outputs in its `product` block.
+- **A product is refused before anything is spent** when the store is not editable, the plugin is
+  missing, the row has no product or the run is a draft; a revert hands back a product a human
+  changed since and otherwise puts back exactly what the run replaced.
+- **A sheet says its rows are products** (`rowType`), each row finds the client's product by its
+  address, its slug or its name and keeps the sheet's URL as `planned_path` (migration 0032), and a
+  product created after the import claims the row that waited for it on the next sync. A site
+  records whether its store can be edited (`sites.commerce`, migration 0031).
+- **`sync_back` warns when a published product's page does not show its description** to a
+  visitor, the sign of a page builder, a cache or coming-soon mode.
+- `internal/e2e/products_test.go` runs the whole loop against WooCommerce 11.1.2 on the docker
+  stack.
 
 **2026-10-02** makes the client's SEO workbooks import: the reasoning is under **2026-10-02** in
 `DECISIONS.md`, and `samples/client-sheets.xlsx` carries the four sheet shapes the client uses.
@@ -28,8 +48,6 @@ every ruling is in [`DECISIONS.md`](DECISIONS.md).
   a repeated import changes nothing.
 - **A group without a page is passed through by the link plan** (`no_page`, optional), and the
   page list filters by an entity and everything under it.
-- **WooCommerce products** were taken out of this work by the owner and are planned in their own
-  session; nothing about products is on `dev`.
 
 **Phases 0 through 13 are complete, and the production hardening of 2026-09-22 and 23 with
 them.** The application composes a Wails v3 window over an adiantum-encrypted SQLite store:
@@ -96,6 +114,17 @@ docker, and `TestAChildWaitsForItsParentAndGoesOnOnceTheParentIsRegenerated` now
 by exhausting the writer, because an incomplete draft is tried again instead of failing at validate.
 
 ## The gate
+
+**2026-10-03, on Windows, whole, over the 2026-10-02 and 2026-10-03 work.** `go test -race
+-count=1 -p 2 -covermode=atomic -coverprofile=coverage.out ./...` green; `go run ./cmd/covergate`
+**domain+application 87.22% of 8819** (gate 80%), **total 87.28% of 21287** (gate 70%);
+`golangci-lint run`, `task lint:e2e` and the comment check 0 issues, `gofmt -l .` silent; `task
+build` green and leaves no generated diff; `npm run typecheck` clean and **1238 vitest tests in 121
+files**; `task e2e:test` and `task e2e:full` green on 8088 with WooCommerce 11.1.2, the adapter
+suite and the product loop green again under `E2E_SEO=yoast`, and `task e2e:full:noplugin` green.
+`task ui:lint` failed once at 369 s on a test its output did not keep and passed on the two runs
+after it. Migrations end at **0032**; **93 tools**, 84,923 bytes of schema against the 85,000 the
+registry test allows.
 
 **2026-10-02, on Windows, partial.** Run: `gofmt -l .` silent, the comment check,
 `golangci-lint run` 0 issues, `go vet -tags uiharness` and `go vet -tags e2e` clean, `task ui:lint`
@@ -217,14 +246,15 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 
 ## Next steps
 
-1. **The rest of the 2026-10-02 gate, when the machine has the memory:** the full `go test -race
-   -count=1 -p 2 ./...` with the coverage profile and `go run ./cmd/covergate`, `task build`,
-   `task lint:e2e` and `task e2e:full`.
-2. **A sandbox walk with the client's sheets and a real provider:** import the four sheets of
-   `samples/client-sheets.xlsx` one after another, check the preview's columns, groups and
-   keyword order, then run one product form and read the writer's prompt (numbered keywords, the
-   notes block) and the page's link to its group's parent.
-3. **WooCommerce products**, in their own session, from the handoff the owner keeps.
+1. **A sandbox walk with the client's sheets and a real provider** (`task sandbox:up
+   E2E_PLUGIN=1 E2E_WOO=1`): import the four sheets of `samples/client-sheets.xlsx` one after
+   another and check the preview's columns, groups and keyword order; create two products by hand
+   in WooCommerce, sync, import the variation sheet in products mode and see each row find its
+   product; run them live and read the description, the short description, the filled
+   attributes, the untouched name and price, and the hub's link to the store's address; revert.
+2. **The client's own sites**: what a real model writes into the attributes, and whether a page
+   builder hides the description, which `product_description_hidden` will say.
+3. **A release** when the owner asks: the 2026-10-02 and 2026-10-03 work as one minor version.
 4. The residue above: the denied tool row's decision, the four narrow-width UI items, the ledger
    screen, `ProposeFromPages` and `Import.Apply` as runs, and `settings.changed` for a declared
    value.
