@@ -8,13 +8,15 @@ import type { Site } from "../../data/types.js";
 import {
     Banner,
     Button,
+    CategoryIcon,
     CloudUploadIcon,
     ExtensionIcon,
     ExtensionOffIcon,
+    LockIcon,
     Skeleton,
     SyncIcon,
 } from "../../ui/index.js";
-import { capabilityLabel, seoPluginLabel } from "./plugin.js";
+import { capabilityLabel, seoPluginLabel, storeBanner } from "./plugin.js";
 
 const packageFilename = "postulator-companion.zip";
 
@@ -79,34 +81,51 @@ export function PluginPanel({ site }: PluginPanelProps): ReactElement {
         return <Skeleton height={64} />;
     }
 
+    const store = storeBanner(state.data?.commerce ?? site.commerce, plugin.installed, site.username);
+    const storePanel =
+        store === null ? null : (
+            <Banner
+                tone={store.tone}
+                icon={store.tone === "ok" ? CategoryIcon : LockIcon}
+                title={store.title}
+                body={store.body}
+            />
+        );
+
     if (plugin.installed) {
         const listed = plugin.capabilities ?? [];
         const capabilities =
             listed.length === 0 ? copy.sites.plugin.noCapabilities : listed.map(capabilityLabel).join(", ");
         const seo = plugin.seoPlugin === "" ? copy.sites.plugin.noSeo : seoPluginLabel(plugin.seoPlugin);
         return (
-            <Banner
-                tone="ok"
-                icon={ExtensionIcon}
-                title={copy.sites.plugin.installed(plugin.version)}
-                body={`${copy.sites.plugin.capabilities}: ${capabilities} · ${copy.sites.plugin.seo}: ${seo}`}
-                actions={recheck}
-            />
+            <>
+                <Banner
+                    tone="ok"
+                    icon={ExtensionIcon}
+                    title={copy.sites.plugin.installed(plugin.version)}
+                    body={`${copy.sites.plugin.capabilities}: ${capabilities} · ${copy.sites.plugin.seo}: ${seo}`}
+                    actions={recheck}
+                />
+                {storePanel}
+            </>
         );
     }
 
     return (
-        <Banner
-            tone="warn"
-            icon={ExtensionOffIcon}
-            title={copy.sites.plugin.missingTitle(site.name)}
-            body={copy.sites.plugin.missingBody}
-            actions={
-                <>
-                    {recheck}
-                    {downloadButton}
-                </>
-            }
-        />
+        <>
+            <Banner
+                tone="warn"
+                icon={ExtensionOffIcon}
+                title={copy.sites.plugin.missingTitle(site.name)}
+                body={copy.sites.plugin.missingBody}
+                actions={
+                    <>
+                        {recheck}
+                        {downloadButton}
+                    </>
+                }
+            />
+            {storePanel}
+        </>
     );
 }
