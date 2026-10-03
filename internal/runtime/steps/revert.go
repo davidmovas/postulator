@@ -100,6 +100,7 @@ func Revert(deps Deps) run.StepDef {
 			if reason, undone := undoPage(ctx, deps, sc, &result, work); !undone {
 				return handBack(result, reason)
 			}
+			result.Findings = append(result.Findings, termsKept(page, published.Categories)...)
 			for i := range relinked.Neighbors {
 				if reason, undone := undoNeighbor(ctx, deps, sc, &result, work, relinked.Neighbors[i]); !undone {
 					return handBack(result, reason)
@@ -198,7 +199,13 @@ func putTheBodyBack(ctx context.Context, deps Deps, sc *run.StepContext, result 
 	if !ok {
 		return reason, false
 	}
-	return bodyRestored(ctx, deps, sc, result, work, hash, "the body the run replaced was written back")
+	if reason, ok = bodyRestored(ctx, deps, sc, result, work, hash, "the body the run replaced was written back"); !ok {
+		return reason, false
+	}
+	if reason, ok = putTheCategoriesBack(ctx, work); !ok {
+		result.Findings = append(result.Findings, categoriesKept(work.page, work.published.Categories, reason))
+	}
+	return "", true
 }
 
 func bodyToRestore(ctx context.Context, work revertWork) (wp.RawContent, string, bool) {
