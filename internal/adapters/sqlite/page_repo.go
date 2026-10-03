@@ -146,6 +146,9 @@ func (r *PageRepo) List(ctx context.Context, q pagemap.Query, page paging.Reques
 	if q.EntityIDs != nil {
 		builder = builder.Where(squirrel.Eq{"entity_id": q.EntityIDs})
 	}
+	if q.CategoryIDs != nil {
+		builder = builder.Where(squirrel.Eq{"category_id": q.CategoryIDs})
+	}
 	if q.Unmapped {
 		builder = builder.Where("entity_id IS NULL")
 	}

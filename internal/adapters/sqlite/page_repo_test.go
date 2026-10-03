@@ -234,6 +234,65 @@ func TestPageRepoListAndFilters(t *testing.T) {
 	}
 }
 
+func TestPageRepoListsThePagesFiledUnderTheGivenCategories(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	other := sqlitetest.Site(t, store, "blog")
+	repo := sqlite.NewPageRepo(store)
+	healing, liquid, company := id.New(), id.New(), id.New()
+
+	filed := []struct {
+		path       string
+		categoryID string
+	}{
+		{path: "/healing/", categoryID: healing},
+		{path: "/healing/liquid/", categoryID: liquid},
+		{path: "/healing/liquid-dosing/", categoryID: liquid},
+		{path: "/about/", categoryID: company},
+		{path: "/contact/", categoryID: ""},
+	}
+	for i := range filed {
+		record := fullPage(owner.ID, filed[i].path, sqlitetest.Stamp.Add(time.Duration(i)*time.Minute))
+		record.CategoryID = filed[i].categoryID
+		if err := repo.Insert(t.Context(), record); err != nil {
+			t.Fatalf("Insert %s: %v", filed[i].path, err)
+		}
+	}
+	elsewhere := fullPage(other.ID, "/healing/", sqlitetest.Stamp)
+	elsewhere.CategoryID = healing
+	if err := repo.Insert(t.Context(), elsewhere); err != nil {
+		t.Fatalf("Insert on the other site: %v", err)
+	}
+
+	cases := []struct {
+		name        string
+		categoryIDs []string
+		want        []string
+	}{
+		{name: "no category filter", want: []string{"/about/", "/contact/", "/healing/", "/healing/liquid-dosing/", "/healing/liquid/"}},
+		{name: "one category", categoryIDs: []string{liquid}, want: []string{"/healing/liquid-dosing/", "/healing/liquid/"}},
+		{name: "a category and the one below it", categoryIDs: []string{healing, liquid}, want: []string{"/healing/", "/healing/liquid-dosing/", "/healing/liquid/"}},
+		{name: "a category no page is filed under", categoryIDs: []string{id.New()}, want: []string{}},
+		{name: "an empty list", categoryIDs: []string{}, want: []string{}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			listed, err := repo.List(t.Context(), pagemap.Query{SiteID: owner.ID, CategoryIDs: tc.categoryIDs, Sort: pagemap.SortPath}, paging.Request{Limit: 10})
+			if err != nil {
+				t.Fatalf("List: %v", err)
+			}
+			if got := pagePaths(listed.Items); !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("List = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestPageFixture(t *testing.T) {
 	t.Parallel()
 
