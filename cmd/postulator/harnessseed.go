@@ -597,13 +597,6 @@ func seedConversation(ctx context.Context, core *app.Core, siteID string) error 
 }
 
 func exchange(ctx context.Context, core *app.Core, conversation, text string) error {
-	before, err := core.Agent.ListMessages(ctx, agent.ListMessagesRequest{
-		ConversationID: conversation, ListRequest: dto.ListRequest{Limit: 100},
-	})
-	if err != nil {
-		return err
-	}
-
 	if sendErr := waitFor(ctx, "the previous turn to end", func() (bool, error) {
 		_, sendErr := core.Agent.Send(ctx, agent.SendRequest{ConversationID: conversation, Text: text})
 		if errors.IsCode(sendErr, errors.Conflict) {
@@ -615,13 +608,11 @@ func exchange(ctx context.Context, core *app.Core, conversation, text string) er
 	}
 
 	return waitFor(ctx, "the agent to answer", func() (bool, error) {
-		listed, listErr := core.Agent.ListMessages(ctx, agent.ListMessagesRequest{
-			ConversationID: conversation, ListRequest: dto.ListRequest{Limit: 100},
-		})
-		if listErr != nil {
-			return false, listErr
+		status, statusErr := core.Agent.Status(ctx, agent.StatusRequest{ConversationID: conversation})
+		if statusErr != nil {
+			return false, statusErr
 		}
-		return len(listed.Items) >= len(before.Items)+2, nil
+		return !status.Running, nil
 	})
 }
 

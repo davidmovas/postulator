@@ -15,6 +15,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/llm/profiles"
 	"github.com/davidmovas/postulator/internal/adapters/llm/recordreplay"
 	"github.com/davidmovas/postulator/internal/adapters/llm/retry"
+	"github.com/davidmovas/postulator/internal/adapters/llm/tuning"
 	llmport "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/tools"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
@@ -30,7 +31,8 @@ type llmParts struct {
 	profiles   *profiles.Profiles
 	providers  AgentProvider
 	ledger     *ledger.Ledger
-	client     *retry.Client
+	tuning     *tuning.Policy
+	client     *tuning.Client
 	images     *metered.Images
 	imageModel *domainllm.ModelRef
 }
@@ -41,6 +43,7 @@ func (c *Core) buildLLM(stores repos) (llmParts, error) {
 		return llmParts{}, err
 	}
 
+	policy := tuning.NewPolicy(stores.values)
 	providers := c.agentProvider(stores, modelCatalog)
 	book := ledger.New(
 		recordreplay.New(c.provider(stores, providers, modelCatalog), recordreplay.Mode(stores.values),
@@ -54,7 +57,11 @@ func (c *Core) buildLLM(stores repos) (llmParts, error) {
 		profiles:  profiles.New(stores.profiles, stores.sites, modelCatalog, stores.now),
 		providers: providers,
 		ledger:    book,
-		client:    retry.New(limiter.New(book, modelCatalog), retry.Retries(stores.values), retry.DefaultBackoff),
+		tuning:    policy,
+		client: tuning.New(
+			retry.New(limiter.New(book, modelCatalog), retry.Retries(stores.values), retry.DefaultBackoff),
+			policy,
+		),
 		images: metered.New(
 			imageopenai.New(stores.secrets, imageModel, imageopenai.WithQuality(images.OpenAIQuality(stores.values))),
 			domainllm.ModelRef{Provider: imageopenai.Provider, Model: imageModel},
