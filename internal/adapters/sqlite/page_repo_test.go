@@ -22,7 +22,7 @@ func fullPage(siteID, path string, at time.Time) pagemap.Page {
 		Title: "Title", H1: "Heading", MetaTitle: "Meta", MetaDescription: "Description", Canonical: "https://shop.example.com" + path,
 		Keywords: keyword.New([]keyword.Keyword{{Text: "title keyword", Volume: new(5400)}, {Text: "one", Volume: new(0)}, {Text: "two"}}),
 		Notes:    []pagemap.Note{{Label: "Intent Owner", Text: "GEO Commercial"}, {Label: "Notes", Text: "the liquid form"}},
-		Status:   pagemap.StatusExists, ContentHash: "abc", WPModifiedAt: &modified, LastSyncedAt: &at, Drift: true, CreatedAt: at, UpdatedAt: at,
+		Status:   pagemap.StatusExists, CategoryID: id.New(), ContentHash: "abc", WPModifiedAt: &modified, LastSyncedAt: &at, Drift: true, CreatedAt: at, UpdatedAt: at,
 		Observed: pagemap.Observed{
 			Link: "https://shop.example.com" + path, Slug: pagemap.Slug(path), Status: "draft",
 			Title: "Title", H1: "Heading",
@@ -83,6 +83,7 @@ func TestPageRepoRoundTrip(t *testing.T) {
 	want.WPID = nil
 	want.LastSyncedAt = nil
 	want.Drift = false
+	want.CategoryID = id.New()
 	want.UpdatedAt = sqlitetest.Stamp.Add(time.Minute)
 	if err = repo.Update(t.Context(), want); err != nil {
 		t.Fatalf("Update: %v", err)
@@ -93,6 +94,14 @@ func TestPageRepoRoundTrip(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Get after update = %+v\nwant %+v", got, want)
+	}
+
+	want.CategoryID = ""
+	if err = repo.Update(t.Context(), want); err != nil {
+		t.Fatalf("Update to no category: %v", err)
+	}
+	if got, err = repo.Get(t.Context(), want.ID); err != nil || got.CategoryID != "" {
+		t.Errorf("a page taken out of its category = %q, %v; want no category", got.CategoryID, err)
 	}
 
 	if err = repo.Delete(t.Context(), parent.ID); err != nil {
@@ -123,6 +132,7 @@ func TestPageRepoListAndFilters(t *testing.T) {
 	repo := sqlite.NewPageRepo(store)
 
 	paths := []string{"/shop/", "/blog/", "/shop/shoes/", "/about/", "/shop/bags/"}
+	filed := make(map[string]string, len(paths))
 	for i, path := range paths {
 		record := fullPage(owner.ID, path, sqlitetest.Stamp.Add(time.Duration(i)*time.Minute))
 		if i%2 == 0 {
@@ -131,8 +141,20 @@ func TestPageRepoListAndFilters(t *testing.T) {
 		if path == "/shop/shoes/" {
 			record.EntityID = &entity.ID
 		}
+		if path == "/about/" {
+			record.CategoryID = ""
+		}
+		filed[record.ID] = record.CategoryID
 		if err := repo.Insert(t.Context(), record); err != nil {
 			t.Fatalf("Insert %s: %v", path, err)
+		}
+	}
+	requireFiled := func(what string, pages []pagemap.Page) {
+		t.Helper()
+		for i := range pages {
+			if want := filed[pages[i].ID]; pages[i].CategoryID != want {
+				t.Errorf("%s: %s category = %q, want %q", what, pages[i].Path, pages[i].CategoryID, want)
+			}
 		}
 	}
 	if err := repo.Insert(t.Context(), fullPage(other.ID, "/shop/", sqlitetest.Stamp)); err != nil {
@@ -146,6 +168,7 @@ func TestPageRepoListAndFilters(t *testing.T) {
 	if got := pagePaths(bySite); !reflect.DeepEqual(got, []string{"/about/", "/blog/", "/shop/", "/shop/bags/", "/shop/shoes/"}) {
 		t.Errorf("ListBySite = %v", got)
 	}
+	requireFiled("ListBySite", bySite)
 
 	byPath := pagemap.Query{SiteID: owner.ID, Sort: pagemap.SortPath}
 	first, err := repo.List(t.Context(), byPath, paging.Request{Limit: 2})
@@ -155,6 +178,7 @@ func TestPageRepoListAndFilters(t *testing.T) {
 	if got := pagePaths(first.Items); !reflect.DeepEqual(got, []string{"/about/", "/blog/"}) || !first.HasMore {
 		t.Fatalf("first page = %v", got)
 	}
+	requireFiled("List", first.Items)
 	second, err := repo.List(t.Context(), byPath, paging.Request{After: first.Next, Limit: 2})
 	if err != nil {
 		t.Fatalf("List after: %v", err)
@@ -162,6 +186,7 @@ func TestPageRepoListAndFilters(t *testing.T) {
 	if got := pagePaths(second.Items); !reflect.DeepEqual(got, []string{"/shop/", "/shop/bags/"}) {
 		t.Fatalf("second page = %v", got)
 	}
+	requireFiled("List after", second.Items)
 	back, err := repo.List(t.Context(), byPath, paging.Request{Before: second.Prev, Limit: 2})
 	if err != nil {
 		t.Fatalf("List before: %v", err)
@@ -183,6 +208,7 @@ func TestPageRepoListAndFilters(t *testing.T) {
 	if got := pagePaths(byStatus.Items); !reflect.DeepEqual(got, []string{"/shop/", "/shop/bags/", "/shop/shoes/"}) {
 		t.Errorf("planned = %v", got)
 	}
+	requireFiled("List by status", byStatus.Items)
 	byEntity, err := repo.List(t.Context(), pagemap.Query{SiteID: owner.ID, EntityIDs: []string{entity.ID}, Sort: pagemap.SortPath}, paging.Request{Limit: 10})
 	if err != nil || len(byEntity.Items) != 1 || byEntity.Items[0].Path != "/shop/shoes/" {
 		t.Errorf("by entity = %+v, %v", byEntity.Items, err)
