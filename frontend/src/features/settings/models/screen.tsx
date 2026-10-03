@@ -6,6 +6,7 @@ import { Button, TuneIcon } from "../../../ui/index.js";
 import { AdvancedCard } from "../advanced.js";
 import { useTabSettings } from "../schema.js";
 import { SettingPanel } from "../sections.js";
+import { RecentCalls } from "./calls.js";
 import { CatalogDrawer } from "./catalog.js";
 import { ProviderCards } from "./keys.js";
 import { RoleTable } from "./roles.js";
@@ -39,6 +40,7 @@ export function ModelSettingsScreen(): ReactElement {
                 </div>
             </div>
             <SpendPanel />
+            <RecentCalls />
             {catalogOpen ? (
                 <CatalogDrawer
                     onClose={() => {

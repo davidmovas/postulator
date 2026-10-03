@@ -397,6 +397,43 @@ export const settings = {
                 spent: "Spent",
                 note: "Counted in tokens. Cached is the part of the input read from the cache; reasoning is the part of the output the model spent thinking.",
             },
+            recent: {
+                title: "Recent calls",
+                when: "When",
+                what: "For",
+                model: "Model",
+                tier: "Tier",
+                tokens: "Tokens",
+                spent: "Spent",
+                loading: "Reading the latest calls",
+                empty: "No model has been called yet.",
+                failed: "Failed",
+                flow: (input: string, output: string) => `${input} in · ${output} out`,
+                inside: (cached: string, reasoning: string) =>
+                    `${cached} of the input came from the cache; ${reasoning} of the output was reasoning.`,
+                proposals: {
+                    propose_from_pages: "From pages",
+                    propose_from_keywords: "From keywords",
+                    propose_related: "Related entities",
+                },
+            },
+            failures: {
+                NOT_FOUND: "The provider has no such model. Choose another one for this job above.",
+                CONFLICT: "Something else changed first, so the answer was set aside.",
+                INVALID:
+                    "The provider refused the request as written: the prompt may not fit the model, or the answer ran out of room.",
+                UNAUTHORIZED:
+                    "The provider refused the key, or the key may not use this model. Set the key again under Provider keys.",
+                RATE_LIMITED: "The provider asked to slow down. Postulator waits and tries again on its own.",
+                BUDGET_EXCEEDED: "The run had reached its budget cap. Raise the cap to let it carry on.",
+                EXTERNAL: "The provider did not answer, or answered with an error of its own. Postulator tries again on its own.",
+                INTERNAL: "Something went wrong inside Postulator. The details are in errors.log.",
+                CANCELLED: "Stopped before the answer arrived, because the work was stopped or ran out of time.",
+                NEEDS_HUMAN:
+                    "The provider account is out of credit or over its spending limit. Add credit or raise the limit in the provider's billing settings, then try again.",
+                LOCKED: "Postulator was locked while the call was running.",
+            },
+            failedUnknown: "The call failed.",
         },
     },
     browser: {
