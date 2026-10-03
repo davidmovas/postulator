@@ -335,6 +335,42 @@ func TestRelinkSkipsWithoutThePlugin(t *testing.T) {
 	}
 }
 
+func TestRelinkLeavesAProductCategoryAndThePostThatSharesItsNumberAlone(t *testing.T) {
+	t.Parallel()
+
+	deps, server, _, wpID := relinkDeps(t, parentBody)
+	neighbors := relinkPages(wpID)
+	neighbors[0].WPType = pagemap.WPProductCategory
+	deps.Pages = pageList{items: neighbors}
+	server.ResetRequests()
+
+	relinked := runRelink(t, deps)
+	if len(relinked.Neighbors) != 1 || relinked.Neighbors[0].Outcome != steps.OutcomeSkipped {
+		t.Fatalf("relinked = %+v", relinked)
+	}
+	if relinked.Neighbors[0].Detail != steps.ReasonNeighborIsATerm {
+		t.Errorf("detail = %q, want %q", relinked.Neighbors[0].Detail, steps.ReasonNeighborIsATerm)
+	}
+	for _, request := range server.Requests() {
+		if strings.Contains(request.Path, "/raw") {
+			t.Errorf("the step asked %s %s of the post that shares the category's number", request.Method, request.Path)
+		}
+	}
+	if stored, _ := server.Lookup(wpID); stored.Content != parentBody {
+		t.Errorf("the page that shares the number holds %q", stored.Content)
+	}
+}
+
+func TestRelinkRecordsWhatKindOfItemItWrote(t *testing.T) {
+	t.Parallel()
+
+	deps, _, _, _ := relinkDeps(t, parentBody)
+	relinked := runRelink(t, deps)
+	if len(relinked.Neighbors) != 1 || relinked.Neighbors[0].Type != string(pagemap.WPPage) {
+		t.Fatalf("relinked = %+v, want the neighbor's type recorded for the revert", relinked)
+	}
+}
+
 func TestRelinkAsksWhatTheNeighborsOwnRulesAllow(t *testing.T) {
 	t.Parallel()
 

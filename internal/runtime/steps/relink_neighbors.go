@@ -41,6 +41,7 @@ type NeighborBefore struct {
 type NeighborResult struct {
 	PageID   string         `json:"pageId"`
 	Path     string         `json:"path"`
+	Type     string         `json:"type,omitempty"`
 	Outcome  string         `json:"outcome"`
 	Anchor   string         `json:"anchor"`
 	Sentence string         `json:"sentence,omitempty"`
@@ -305,7 +306,9 @@ func owedReason(lc content.LinkContext, page pagemap.Page) string {
 }
 
 func relinkOne(ctx context.Context, deps Deps, client *wp.Client, in neighborWork) (NeighborResult, error) {
-	outcome := NeighborResult{PageID: in.neighbor.ID, Path: in.neighbor.Path, WPID: *in.neighbor.WPID}
+	outcome := NeighborResult{
+		PageID: in.neighbor.ID, Path: in.neighbor.Path, Type: string(in.neighbor.WPType), WPID: *in.neighbor.WPID,
+	}
 
 	if in.neighbor.EntityID == nil {
 		return skip(outcome, ReasonNeighborUnmapped), nil
@@ -322,8 +325,11 @@ func relinkOne(ctx context.Context, deps Deps, client *wp.Client, in neighborWor
 	if !owed {
 		return skip(outcome, owedReason(lc, in.page)), nil
 	}
+	if in.neighbor.WPType == pagemap.WPProductCategory {
+		return skip(outcome, ReasonNeighborIsATerm), nil
+	}
 
-	raw, err := client.GetRaw(ctx, *in.neighbor.WPID)
+	raw, err := client.GetRaw(ctx, onSiteType(in.neighbor), *in.neighbor.WPID)
 	if err != nil {
 		switch {
 		case wp.IsPluginMissing(err):
@@ -354,7 +360,7 @@ func relinkOne(ctx context.Context, deps Deps, client *wp.Client, in neighborWor
 		return skip(outcome, ReasonNeighborUnreadable), nil
 	}
 
-	hash, err := client.PutRaw(ctx, *in.neighbor.WPID, updated, raw.ContentHash)
+	hash, err := client.PutRaw(ctx, onSiteType(in.neighbor), *in.neighbor.WPID, updated, raw.ContentHash)
 	if err != nil {
 		if errors.IsCode(err, errors.Conflict) {
 			outcome.Outcome = OutcomeConflict

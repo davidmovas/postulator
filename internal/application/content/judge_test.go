@@ -110,7 +110,7 @@ type rawStub struct {
 	err  error
 }
 
-func (r rawStub) RawContent(context.Context, string, int64) (string, error) {
+func (r rawStub) RawContent(context.Context, string, int64, string) (string, error) {
 	return r.body, r.err
 }
 

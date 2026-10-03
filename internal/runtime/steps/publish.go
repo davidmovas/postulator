@@ -104,7 +104,7 @@ func Publish(deps Deps) run.StepDef {
 				findings = append(findings, driftFinding(sc.Page))
 			}
 
-			replaced, err := bodyBeingReplaced(ctx, client, existing, found)
+			replaced, err := bodyBeingReplaced(ctx, client, itemType, existing, found)
 			if err != nil {
 				return run.Result{}, err
 			}
@@ -139,7 +139,7 @@ func Publish(deps Deps) run.StepDef {
 				SEOApplied: make([]string, 0), Skipped: make([]string, 0), Findings: findings,
 				Mismatches: mismatches,
 			}
-			seo, err := applySEO(ctx, client, sc, written.ID, found)
+			seo, err := applySEO(ctx, client, sc, itemType, written.ID, found)
 			if err != nil {
 				return run.Result{}, err
 			}
@@ -239,6 +239,10 @@ func itemTypeOf(page pagemap.Page) (wp.ItemType, error) {
 		return "", errors.New(errors.Invalid, "only pages and posts are written by the publish step").
 			WithDetail("wpType", string(page.WPType)).WithDetail("pageId", page.ID)
 	}
+}
+
+func onSiteType(page pagemap.Page) wp.ItemType {
+	return wp.ItemType(page.WPType)
 }
 
 func clientFor(ctx context.Context, deps Deps, siteID string) (*wp.Client, error) {
@@ -349,12 +353,12 @@ func bySlug(items []wp.Item, page pagemap.Page, parent int64) (wp.Item, bool, er
 	}
 }
 
-func bodyBeingReplaced(ctx context.Context, client *wp.Client, existing wp.Item, found bool) (wp.RawContent, error) {
+func bodyBeingReplaced(ctx context.Context, client *wp.Client, itemType wp.ItemType, existing wp.Item, found bool) (wp.RawContent, error) {
 	if !found {
 		return wp.RawContent{}, nil
 	}
 
-	raw, err := client.GetRaw(ctx, existing.ID)
+	raw, err := client.GetRaw(ctx, itemType, existing.ID)
 	switch {
 	case err == nil:
 		return raw, nil
@@ -409,7 +413,7 @@ type seoWrite struct {
 	findings []content.Finding
 }
 
-func applySEO(ctx context.Context, client *wp.Client, sc *run.StepContext, wpID int64, updating bool) (seoWrite, error) {
+func applySEO(ctx context.Context, client *wp.Client, sc *run.StepContext, itemType wp.ItemType, wpID int64, updating bool) (seoWrite, error) {
 	meta, found, err := decodeArtifact[Meta](sc, run.ArtifactMeta)
 	if err != nil {
 		return seoWrite{}, err
@@ -432,12 +436,12 @@ func applySEO(ctx context.Context, client *wp.Client, sc *run.StepContext, wpID 
 		return metaNotWritten(sc.Page, ReasonNoSEOWriter), nil
 	}
 
-	previous, err := metaBeingReplaced(ctx, client, capabilities, wpID, updating)
+	previous, err := metaBeingReplaced(ctx, client, capabilities, itemType, wpID, updating)
 	if err != nil {
 		return seoWrite{}, err
 	}
 
-	result, err := client.SetSEOMeta(ctx, wpID, wp.SEOMeta{
+	result, err := client.SetSEOMeta(ctx, itemType, wpID, wp.SEOMeta{
 		Title:         meta.Title,
 		Description:   meta.Description,
 		Canonical:     meta.Canonical,
@@ -459,12 +463,12 @@ func applySEO(ctx context.Context, client *wp.Client, sc *run.StepContext, wpID 
 }
 
 func metaBeingReplaced(ctx context.Context, client *wp.Client, capabilities wp.Capabilities,
-	wpID int64, updating bool) (*wp.SEOMeta, error) {
+	itemType wp.ItemType, wpID int64, updating bool) (*wp.SEOMeta, error) {
 	if !updating || !capabilities.Has(wp.CapabilitySEOMetaRead) {
 		return nil, nil
 	}
 
-	held, err := client.GetSEOMeta(ctx, wpID)
+	held, err := client.GetSEOMeta(ctx, itemType, wpID)
 	switch {
 	case err == nil:
 		return &held, nil

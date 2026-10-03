@@ -72,7 +72,7 @@ func SyncBack(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			body, source, err := readBack(ctx, client, published.WPID, item.Content)
+			body, source, err := readBack(ctx, client, itemType, published.WPID, item.Content)
 			if err != nil {
 				return run.Result{}, err
 			}
@@ -140,8 +140,8 @@ func planFindings(page pagemap.Page, mismatches []pagemap.Mismatch) []content.Fi
 	return out
 }
 
-func readBack(ctx context.Context, client *wp.Client, wpID int64, fallback string) (body, source string, err error) {
-	raw, err := client.GetRaw(ctx, wpID)
+func readBack(ctx context.Context, client *wp.Client, itemType wp.ItemType, wpID int64, fallback string) (body, source string, err error) {
+	raw, err := client.GetRaw(ctx, itemType, wpID)
 	if err == nil {
 		return raw.Content, "plugin", nil
 	}

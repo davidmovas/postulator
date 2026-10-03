@@ -44,7 +44,7 @@ func TestPreviewIssuerAsksTheSitesPlugin(t *testing.T) {
 	draft := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein", Status: "draft"})[0]
 	issuer := previewIssuer{clients: oneClient{client: clientOver(t, server), siteID: "s1"}}
 
-	issued, err := issuer.IssuePreview(t.Context(), "s1", draft.ID)
+	issued, err := issuer.IssuePreview(t.Context(), "s1", draft.ID, wptest.TypePage)
 	if err != nil {
 		t.Fatalf("IssuePreview: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestPreviewIssuerAsksTheSitesPlugin(t *testing.T) {
 		t.Errorf("issued = %+v, stored expiry %s", issued, stored.PreviewExpires)
 	}
 
-	if _, err = issuer.IssuePreview(t.Context(), "s2", draft.ID); !errors.IsCode(err, errors.NotFound) {
+	if _, err = issuer.IssuePreview(t.Context(), "s2", draft.ID, wptest.TypePage); !errors.IsCode(err, errors.NotFound) {
 		t.Errorf("IssuePreview on an unknown site = %v", err)
 	}
 }
@@ -65,7 +65,7 @@ func TestPreviewIssuerReportsAMissingPlugin(t *testing.T) {
 	draft := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein", Status: "draft"})[0]
 	issuer := previewIssuer{clients: oneClient{client: clientOver(t, server), siteID: "s1"}}
 
-	if _, err := issuer.IssuePreview(t.Context(), "s1", draft.ID); !wp.IsPluginMissing(err) {
+	if _, err := issuer.IssuePreview(t.Context(), "s1", draft.ID, wptest.TypePage); !wp.IsPluginMissing(err) {
 		t.Fatalf("IssuePreview without the plugin = %v, want plugin_missing", err)
 	}
 }

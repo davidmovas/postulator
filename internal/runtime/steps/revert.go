@@ -31,6 +31,8 @@ const (
 	ReasonRevertGone       = "the page is no longer on the site"
 	ReasonRevertNoNeighbor = "the neighbor is no longer on the site"
 	ReasonRevertNoBefore   = "the run kept no copy of the neighbor content it replaced"
+	ReasonRevertNoKind     = "nothing records whether the neighbor is a page, a post or a product, " +
+		"so the item that carries its number cannot be told apart from it"
 
 	ReasonRevertNoMeta = "the run kept no copy of the SEO meta it replaced, which needs a companion " +
 		"plugin that can read it"
@@ -189,7 +191,8 @@ func putTheBodyBack(ctx context.Context, deps Deps, sc *run.StepContext, result 
 		return ReasonRevertNoBody, false
 	}
 
-	raw, err := work.client.GetRaw(ctx, work.published.WPID)
+	itemType := onSiteType(work.page)
+	raw, err := work.client.GetRaw(ctx, itemType, work.published.WPID)
 	switch {
 	case wp.IsPluginMissing(err):
 		return ReasonRevertNoPlugin, false
@@ -206,7 +209,7 @@ func putTheBodyBack(ctx context.Context, deps Deps, sc *run.StepContext, result 
 	case raw.ContentHash != work.published.ContentHash:
 		return editedSince(work.published.ContentHash, raw.ContentHash), false
 	default:
-		written, putErr := work.client.PutRaw(ctx, work.published.WPID, work.published.PreviousContent, raw.ContentHash)
+		written, putErr := work.client.PutRaw(ctx, itemType, work.published.WPID, work.published.PreviousContent, raw.ContentHash)
 		if putErr != nil {
 			if errors.IsCode(putErr, errors.Conflict) {
 				return writtenUnderUs(raw.ContentHash), false
@@ -235,7 +238,7 @@ func putTheMetaBack(ctx context.Context, work revertWork) (string, bool) {
 		return ReasonRevertNoMeta, false
 	}
 
-	_, err := work.client.ReplaceSEOMeta(ctx, work.published.WPID, *work.published.PreviousMeta,
+	_, err := work.client.ReplaceSEOMeta(ctx, onSiteType(work.page), work.published.WPID, *work.published.PreviousMeta,
 		work.published.SEOApplied)
 	switch {
 	case err == nil:
@@ -260,7 +263,16 @@ func undoNeighbor(ctx context.Context, deps Deps, sc *run.StepContext, result *R
 		return ReasonRevertNoBefore, false
 	}
 
-	raw, err := work.client.GetRaw(ctx, neighbor.WPID)
+	stored, known := neighborPage(ctx, deps, sc, neighbor.PageID)
+	itemType := wp.ItemType(neighbor.Type)
+	if itemType == "" && known {
+		itemType = onSiteType(stored)
+	}
+	if itemType == "" {
+		return ReasonRevertNoKind, false
+	}
+
+	raw, err := work.client.GetRaw(ctx, itemType, neighbor.WPID)
 	switch {
 	case wp.IsPluginMissing(err):
 		return ReasonRevertNoPlugin, false
@@ -270,7 +282,6 @@ func undoNeighbor(ctx context.Context, deps Deps, sc *run.StepContext, result *R
 		return err.Error(), false
 	}
 
-	stored, known := neighborPage(ctx, deps, sc, neighbor.PageID)
 	hash := raw.ContentHash
 	switch {
 	case raw.ContentHash == neighbor.Before.Hash:
@@ -279,7 +290,7 @@ func undoNeighbor(ctx context.Context, deps Deps, sc *run.StepContext, result *R
 	case raw.ContentHash != stored.ContentHash:
 		return editedSince(stored.ContentHash, raw.ContentHash), false
 	default:
-		written, putErr := work.client.PutRaw(ctx, neighbor.WPID, neighbor.Before.HTML, raw.ContentHash)
+		written, putErr := work.client.PutRaw(ctx, itemType, neighbor.WPID, neighbor.Before.HTML, raw.ContentHash)
 		if putErr != nil {
 			if errors.IsCode(putErr, errors.Conflict) {
 				return writtenUnderUs(raw.ContentHash), false

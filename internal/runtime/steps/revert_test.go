@@ -191,19 +191,20 @@ func (s *revertStand) updatedOverMeta(t *testing.T, pageID, body string, previou
 	t.Helper()
 
 	wpID := s.wpIDs[pageID]
+	page := s.pages.items[pageID]
+	itemType := wp.ItemType(page.WPType)
 	client := syncClient(t, s.server)
-	if _, err := client.PutRaw(t.Context(), wpID, body, ""); err != nil {
+	if _, err := client.PutRaw(t.Context(), itemType, wpID, body, ""); err != nil {
 		t.Fatalf("write the run body to %s: %v", pageID, err)
 	}
 
-	page := s.pages.items[pageID]
 	page.ContentHash = wp.ContentHash(body)
 	s.pages.items[pageID] = page
 
 	applied := []string{"title"}
 	if previous != nil {
 		applied = []string{"title", "description"}
-		if _, err := client.SetSEOMeta(t.Context(), wpID, wp.SEOMeta{
+		if _, err := client.SetSEOMeta(t.Context(), itemType, wpID, wp.SEOMeta{
 			Title: "written by the run", Description: "written by the run",
 		}); err != nil {
 			t.Fatalf("write the run meta to %s: %v", pageID, err)
@@ -288,12 +289,12 @@ func (s *revertStand) relinkedOver(t *testing.T, pageID, neighborID string, befo
 	t.Helper()
 
 	wpID := s.wpIDs[neighborID]
+	neighbor := s.pages.items[neighborID]
 	client := syncClient(t, s.server)
-	if _, err := client.PutRaw(t.Context(), wpID, body, ""); err != nil {
+	if _, err := client.PutRaw(t.Context(), wp.ItemType(neighbor.WPType), wpID, body, ""); err != nil {
 		t.Fatalf("write the relinked body to %s: %v", neighborID, err)
 	}
 
-	neighbor := s.pages.items[neighborID]
 	neighbor.ContentHash = wp.ContentHash(body)
 	s.pages.items[neighborID] = neighbor
 
@@ -412,6 +413,24 @@ func TestRevertTellsAnEmptyNeighborFromOneItKeptNoCopyOf(t *testing.T) {
 	}
 }
 
+func TestRevertHandsBackANeighborItCannotTellTheKindOf(t *testing.T) {
+	t.Parallel()
+
+	sentence := `<p>Read about <a href="/coffee/espresso/">espresso</a>.</p>`
+	stand := newRevertStand(t)
+	stand.updated(t, "page-filter", runBody)
+	stand.relinked(t, "page-filter", "page-parent", sentence)
+	delete(stand.pages.items, "page-parent")
+
+	reverted, result := stand.revert(t, "page-filter")
+	if result.Next != run.TransitionPause || reverted.Detail != steps.ReasonRevertNoKind {
+		t.Fatalf("result = %+v, detail %q, want a hand-back with %q", result, reverted.Detail, steps.ReasonRevertNoKind)
+	}
+	if got := stand.body(t, stand.wpIDs["page-parent"]); got != sentence {
+		t.Fatalf("the neighbor holds %q, want it untouched", got)
+	}
+}
+
 func TestRevertPutsBackWhatTheRunWroteToTheSite(t *testing.T) {
 	t.Parallel()
 
@@ -462,7 +481,7 @@ func TestRevertPausesTheItemAHumanEditedSince(t *testing.T) {
 	stand.updated(t, "page-filter", runBody)
 
 	edited := runBody + `<p>And a sentence a human added afterwards.</p>`
-	if _, err := syncClient(t, stand.server).PutRaw(t.Context(), stand.wpIDs["page-filter"], edited, ""); err != nil {
+	if _, err := syncClient(t, stand.server).PutRaw(t.Context(), wp.TypePage, stand.wpIDs["page-filter"], edited, ""); err != nil {
 		t.Fatalf("edit the page on the site: %v", err)
 	}
 

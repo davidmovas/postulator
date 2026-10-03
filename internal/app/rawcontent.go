@@ -14,13 +14,13 @@ type rawContent struct {
 	clients siteClients
 }
 
-func (r rawContent) RawContent(ctx context.Context, siteID string, wpID int64) (string, error) {
+func (r rawContent) RawContent(ctx context.Context, siteID string, wpID int64, wpType string) (string, error) {
 	client, err := r.clients.Client(ctx, siteID)
 	if err != nil {
 		return "", err
 	}
 
-	raw, err := client.GetRaw(ctx, wpID)
+	raw, err := client.GetRaw(ctx, wp.ItemType(wpType), wpID)
 	if err != nil {
 		return "", err
 	}

@@ -29,8 +29,10 @@ const (
 	ReasonNeighborUnreadable = "the stored content of the neighbor could not be read as HTML"
 	ReasonNeighborUnmapped   = "the neighbor is not mapped to an entity, so it has no rules of its own"
 	ReasonNeighborNoTemplate = "the neighbor has no template, so nothing says what it may link to"
+	ReasonNeighborIsATerm    = "the neighbor is a product category, whose description the companion plugin does not write"
 
 	ReasonPageOffTheSite = "is not on the site, so there is nothing to relink; publish it first"
+	ReasonPageIsATerm    = "is a product category, whose description the companion plugin does not write"
 	ReasonPageGone       = "the page is no longer on the site"
 	ReasonPageUnreadable = "the stored content of the page could not be read as HTML"
 

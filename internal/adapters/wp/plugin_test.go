@@ -62,23 +62,23 @@ func TestEveryPluginMethodDegradesWhenThePluginIsAbsent(t *testing.T) {
 		{name: "capabilities", call: func() error { _, err := client.Capabilities(t.Context()); return err }},
 		{name: "content", call: func() error { _, err := client.ListContent(t.Context(), wp.ContentQuery{}); return err }},
 		{name: "seo meta", call: func() error {
-			_, err := client.SetSEOMeta(t.Context(), seeded[0].ID, wp.SEOMeta{Title: "x"})
+			_, err := client.SetSEOMeta(t.Context(), wp.TypePage, seeded[0].ID, wp.SEOMeta{Title: "x"})
 			return err
 		}},
 		{name: "seo meta read", call: func() error {
-			_, err := client.GetSEOMeta(t.Context(), seeded[0].ID)
+			_, err := client.GetSEOMeta(t.Context(), wp.TypePage, seeded[0].ID)
 			return err
 		}},
 		{name: "seo meta replace", call: func() error {
-			_, err := client.ReplaceSEOMeta(t.Context(), seeded[0].ID, wp.SEOMeta{}, []string{"title"})
+			_, err := client.ReplaceSEOMeta(t.Context(), wp.TypePage, seeded[0].ID, wp.SEOMeta{}, []string{"title"})
 			return err
 		}},
-		{name: "raw read", call: func() error { _, err := client.GetRaw(t.Context(), seeded[0].ID); return err }},
+		{name: "raw read", call: func() error { _, err := client.GetRaw(t.Context(), wp.TypePage, seeded[0].ID); return err }},
 		{name: "raw write", call: func() error {
-			_, err := client.PutRaw(t.Context(), seeded[0].ID, "x", "")
+			_, err := client.PutRaw(t.Context(), wp.TypePage, seeded[0].ID, "x", "")
 			return err
 		}},
-		{name: "preview", call: func() error { _, err := client.PreviewLink(t.Context(), seeded[0].ID); return err }},
+		{name: "preview", call: func() error { _, err := client.PreviewLink(t.Context(), wp.TypePage, seeded[0].ID); return err }},
 	}
 
 	for _, tc := range calls {
@@ -245,7 +245,7 @@ func TestSetSEOMetaReportsWhatWasWritten(t *testing.T) {
 	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein"})
 	client := newClient(t, server)
 
-	result, err := client.SetSEOMeta(t.Context(), seeded[0].ID, wp.SEOMeta{
+	result, err := client.SetSEOMeta(t.Context(), wp.TypePage, seeded[0].ID, wp.SEOMeta{
 		Title:       "Koffein",
 		Description: "about it",
 	})
@@ -264,7 +264,7 @@ func TestSetSEOMetaReportsWhatWasWritten(t *testing.T) {
 		t.Errorf("meta = %v", stored.Meta)
 	}
 
-	if _, err = client.SetSEOMeta(t.Context(), seeded[0].ID, wp.SEOMeta{}); !errors.IsCode(err, errors.Invalid) {
+	if _, err = client.SetSEOMeta(t.Context(), wp.TypePage, seeded[0].ID, wp.SEOMeta{}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("code = %q, want %q for an empty update", errors.CodeOf(err), errors.Invalid)
 	}
 }
@@ -276,7 +276,7 @@ func TestGetSEOMetaReadsTheFiveFieldsTheSiteHolds(t *testing.T) {
 	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein"})
 	client := newClient(t, server)
 
-	before, err := client.GetSEOMeta(t.Context(), seeded[0].ID)
+	before, err := client.GetSEOMeta(t.Context(), wp.TypePage, seeded[0].ID)
 	if err != nil {
 		t.Fatalf("GetSEOMeta: %v", err)
 	}
@@ -284,13 +284,13 @@ func TestGetSEOMetaReadsTheFiveFieldsTheSiteHolds(t *testing.T) {
 		t.Fatalf("a post with no meta reads as %+v", before)
 	}
 
-	if _, err = client.SetSEOMeta(t.Context(), seeded[0].ID, wp.SEOMeta{
+	if _, err = client.SetSEOMeta(t.Context(), wp.TypePage, seeded[0].ID, wp.SEOMeta{
 		Title: "Koffein", Description: "about it",
 	}); err != nil {
 		t.Fatalf("SetSEOMeta: %v", err)
 	}
 
-	after, err := client.GetSEOMeta(t.Context(), seeded[0].ID)
+	after, err := client.GetSEOMeta(t.Context(), wp.TypePage, seeded[0].ID)
 	if err != nil {
 		t.Fatalf("GetSEOMeta again: %v", err)
 	}
@@ -306,13 +306,13 @@ func TestReplaceSEOMetaPutsBackTheFieldsItIsGiven(t *testing.T) {
 	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein"})
 	client := newClient(t, server)
 
-	if _, err := client.SetSEOMeta(t.Context(), seeded[0].ID, wp.SEOMeta{
+	if _, err := client.SetSEOMeta(t.Context(), wp.TypePage, seeded[0].ID, wp.SEOMeta{
 		Title: "written by a run", Description: "written by a run", Canonical: "kept by a human",
 	}); err != nil {
 		t.Fatalf("SetSEOMeta: %v", err)
 	}
 
-	result, err := client.ReplaceSEOMeta(t.Context(), seeded[0].ID, wp.SEOMeta{Title: "what was there"},
+	result, err := client.ReplaceSEOMeta(t.Context(), wp.TypePage, seeded[0].ID, wp.SEOMeta{Title: "what was there"},
 		[]string{"title", "description"})
 	if err != nil {
 		t.Fatalf("ReplaceSEOMeta: %v", err)
@@ -321,7 +321,7 @@ func TestReplaceSEOMetaPutsBackTheFieldsItIsGiven(t *testing.T) {
 		t.Fatalf("applied = %v, want both named fields", result.Applied)
 	}
 
-	after, err := client.GetSEOMeta(t.Context(), seeded[0].ID)
+	after, err := client.GetSEOMeta(t.Context(), wp.TypePage, seeded[0].ID)
 	if err != nil {
 		t.Fatalf("GetSEOMeta: %v", err)
 	}
@@ -335,10 +335,10 @@ func TestReplaceSEOMetaPutsBackTheFieldsItIsGiven(t *testing.T) {
 		t.Errorf("canonical = %q, want a field nobody named left alone", after.Canonical)
 	}
 
-	if _, err = client.ReplaceSEOMeta(t.Context(), seeded[0].ID, wp.SEOMeta{}, []string{"shade"}); !errors.IsCode(err, errors.Invalid) {
+	if _, err = client.ReplaceSEOMeta(t.Context(), wp.TypePage, seeded[0].ID, wp.SEOMeta{}, []string{"shade"}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("a field the meta has no place for = %v, want invalid", err)
 	}
-	if _, err = client.ReplaceSEOMeta(t.Context(), seeded[0].ID, wp.SEOMeta{}, nil); !errors.IsCode(err, errors.Invalid) {
+	if _, err = client.ReplaceSEOMeta(t.Context(), wp.TypePage, seeded[0].ID, wp.SEOMeta{}, nil); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("a replacement of nothing = %v, want invalid", err)
 	}
 }
@@ -350,7 +350,7 @@ func TestGetSEOMetaRefusesAPluginWithoutTheCapability(t *testing.T) {
 	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein"})
 	client := newClient(t, server)
 
-	_, err := client.GetSEOMeta(t.Context(), seeded[0].ID)
+	_, err := client.GetSEOMeta(t.Context(), wp.TypePage, seeded[0].ID)
 	if !wp.IsPluginOutdated(err) {
 		t.Fatalf("GetSEOMeta on a 1.1.0 plugin = %v, want plugin_outdated", err)
 	}
@@ -369,7 +369,7 @@ func TestTheRawRoundTripIsGuardedByTheHash(t *testing.T) {
 	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein", Content: koffeinBody})
 	client := newClient(t, server)
 
-	raw, err := client.GetRaw(t.Context(), seeded[0].ID)
+	raw, err := client.GetRaw(t.Context(), wp.TypePage, seeded[0].ID)
 	if err != nil {
 		t.Fatalf("GetRaw: %v", err)
 	}
@@ -377,7 +377,7 @@ func TestTheRawRoundTripIsGuardedByTheHash(t *testing.T) {
 		t.Fatalf("raw = %+v", raw)
 	}
 
-	written, err := client.PutRaw(t.Context(), seeded[0].ID, "<p>Powder</p>", raw.ContentHash)
+	written, err := client.PutRaw(t.Context(), wp.TypePage, seeded[0].ID, "<p>Powder</p>", raw.ContentHash)
 	if err != nil {
 		t.Fatalf("PutRaw: %v", err)
 	}
@@ -385,7 +385,7 @@ func TestTheRawRoundTripIsGuardedByTheHash(t *testing.T) {
 		t.Errorf("hash = %q, want %q", written, powderHash)
 	}
 
-	_, err = client.PutRaw(t.Context(), seeded[0].ID, "<p>again</p>", raw.ContentHash)
+	_, err = client.PutRaw(t.Context(), wp.TypePage, seeded[0].ID, "<p>again</p>", raw.ContentHash)
 	if !errors.IsCode(err, errors.Conflict) {
 		t.Fatalf("code = %q, want %q", errors.CodeOf(err), errors.Conflict)
 	}
@@ -393,7 +393,7 @@ func TestTheRawRoundTripIsGuardedByTheHash(t *testing.T) {
 		t.Errorf("currentHash detail = %q, want %q", got, powderHash)
 	}
 
-	unconditional, err := client.PutRaw(t.Context(), seeded[0].ID, koffeinBody, "")
+	unconditional, err := client.PutRaw(t.Context(), wp.TypePage, seeded[0].ID, koffeinBody, "")
 	if err != nil {
 		t.Fatalf("PutRaw without a hash: %v", err)
 	}
@@ -408,30 +408,73 @@ func TestGetRawRefusesAHashThatDoesNotMatchTheContent(t *testing.T) {
 	server := wptest.New(t, wptest.WithBrokenContentHash())
 	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein", Content: koffeinBody})
 
-	_, err := newClient(t, server).GetRaw(t.Context(), seeded[0].ID)
+	_, err := newClient(t, server).GetRaw(t.Context(), wp.TypePage, seeded[0].ID)
 	if !errors.IsCode(err, errors.External) {
 		t.Errorf("code = %q, want %q", errors.CodeOf(err), errors.External)
 	}
 }
 
-func TestThePostOnlyRoutesReportATermAsMissing(t *testing.T) {
+func TestThePostRoutesRefuseAProductCategoryBeforeAnyRequest(t *testing.T) {
 	t.Parallel()
 
 	server := wptest.New(t)
+	post := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "About", Content: "<p>about</p>"})[0]
 	term := server.Seed(wptest.Item{Type: wptest.TypeProductCategory, Title: "Koffein"})[0]
+	if term.ID != post.ID {
+		t.Fatalf("the term is %d and the page %d; the case needs the two numbers to collide", term.ID, post.ID)
+	}
 	client := newClient(t, server)
+	server.ResetRequests()
 
-	if _, err := client.GetRaw(t.Context(), term.ID); !errors.IsCode(err, errors.NotFound) {
-		t.Errorf("raw read code = %q, want %q", errors.CodeOf(err), errors.NotFound)
+	category := wp.TypeProductCategory
+	calls := map[string]func() error{
+		"raw read": func() error {
+			_, err := client.GetRaw(t.Context(), category, term.ID)
+			return err
+		},
+		"raw write": func() error {
+			_, err := client.PutRaw(t.Context(), category, term.ID, "x", "")
+			return err
+		},
+		"seo meta read": func() error {
+			_, err := client.GetSEOMeta(t.Context(), category, term.ID)
+			return err
+		},
+		"seo meta write": func() error {
+			_, err := client.SetSEOMeta(t.Context(), category, term.ID, wp.SEOMeta{Title: "x"})
+			return err
+		},
+		"seo meta replace": func() error {
+			_, err := client.ReplaceSEOMeta(t.Context(), category, term.ID, wp.SEOMeta{}, []string{"title"})
+			return err
+		},
+		"preview": func() error {
+			_, err := client.PreviewLink(t.Context(), category, term.ID)
+			return err
+		},
 	}
-	if _, err := client.PutRaw(t.Context(), term.ID, "x", ""); !errors.IsCode(err, errors.NotFound) {
-		t.Errorf("raw write code = %q, want %q", errors.CodeOf(err), errors.NotFound)
+	for name, call := range calls {
+		if err := call(); !errors.IsCode(err, errors.Invalid) {
+			t.Errorf("%s code = %q, want %q", name, errors.CodeOf(err), errors.Invalid)
+		}
 	}
-	if _, err := client.SetSEOMeta(t.Context(), term.ID, wp.SEOMeta{Title: "x"}); !errors.IsCode(err, errors.NotFound) {
-		t.Errorf("seo meta code = %q, want %q", errors.CodeOf(err), errors.NotFound)
+	if requests := server.Requests(); len(requests) != 0 {
+		t.Errorf("%d requests reached the site; the refusal comes first", len(requests))
 	}
-	if _, err := client.PreviewLink(t.Context(), term.ID); !errors.IsCode(err, errors.NotFound) {
-		t.Errorf("preview code = %q, want %q", errors.CodeOf(err), errors.NotFound)
+	if stored, _ := server.Lookup(post.ID); stored.Content != "<p>about</p>" {
+		t.Errorf("the page that shares the number now holds %q", stored.Content)
+	}
+}
+
+func TestGetRawTakesAnItemOfAnotherTypeForMissing(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	post := server.Seed(wptest.Item{Type: wptest.TypePost, Title: "News", Content: "<p>news</p>"})[0]
+
+	_, err := newClient(t, server).GetRaw(t.Context(), wp.TypePage, post.ID)
+	if !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("code = %q, want %q for a post read as a page", errors.CodeOf(err), errors.NotFound)
 	}
 }
 
@@ -442,7 +485,7 @@ func TestPreviewLinkIssuesTheURLAndTheExpiry(t *testing.T) {
 	draft := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein", Status: "draft"})[0]
 	client := newClient(t, server)
 
-	link, err := client.PreviewLink(t.Context(), draft.ID)
+	link, err := client.PreviewLink(t.Context(), wp.TypePage, draft.ID)
 	if err != nil {
 		t.Fatalf("PreviewLink: %v", err)
 	}
@@ -472,7 +515,7 @@ func TestPreviewLinkRefusesAPluginWithoutTheCapability(t *testing.T) {
 	draft := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein", Status: "draft"})[0]
 	client := newClient(t, server)
 
-	_, err := client.PreviewLink(t.Context(), draft.ID)
+	_, err := client.PreviewLink(t.Context(), wp.TypePage, draft.ID)
 	if !errors.IsCode(err, errors.Invalid) || !wp.IsPluginOutdated(err) {
 		t.Fatalf("PreviewLink = %v, want a plugin_outdated refusal", err)
 	}
@@ -494,7 +537,7 @@ func TestPreviewLinkRefusesAnUnreadableExpiry(t *testing.T) {
 	draft := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein", Status: "draft"})[0]
 	client := newClient(t, server)
 
-	if _, err := client.PreviewLink(t.Context(), draft.ID); !errors.IsCode(err, errors.External) {
+	if _, err := client.PreviewLink(t.Context(), wp.TypePage, draft.ID); !errors.IsCode(err, errors.External) {
 		t.Fatalf("PreviewLink = %v, want an external failure", err)
 	}
 }

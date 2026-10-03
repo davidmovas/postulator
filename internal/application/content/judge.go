@@ -79,7 +79,7 @@ func (s *Service) Judge(ctx context.Context, req JudgeRequest) (JudgeResponse, e
 			WithDetail("pageId", pageID)
 	}
 
-	raw, err := s.deps.Raw.RawContent(ctx, page.SiteID, *page.WPID)
+	raw, err := s.deps.Raw.RawContent(ctx, page.SiteID, *page.WPID, string(page.WPType))
 	if err != nil {
 		return JudgeResponse{}, err
 	}

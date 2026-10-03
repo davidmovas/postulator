@@ -380,15 +380,15 @@ func assertPluginCallsAreRefusedAsInvalid(t *testing.T, core *app.Core, siteID s
 			return callErr
 		},
 		"seo meta": func() error {
-			_, callErr := client.SetSEOMeta(t.Context(), wpID, wp.SEOMeta{Title: "Our Menu"})
+			_, callErr := client.SetSEOMeta(t.Context(), wp.TypePage, wpID, wp.SEOMeta{Title: "Our Menu"})
 			return callErr
 		},
-		"raw read": func() error { _, callErr := client.GetRaw(t.Context(), wpID); return callErr },
+		"raw read": func() error { _, callErr := client.GetRaw(t.Context(), wp.TypePage, wpID); return callErr },
 		"raw write": func() error {
-			_, callErr := client.PutRaw(t.Context(), wpID, "<p>never written</p>", "")
+			_, callErr := client.PutRaw(t.Context(), wp.TypePage, wpID, "<p>never written</p>", "")
 			return callErr
 		},
-		"preview": func() error { _, callErr := client.PreviewLink(t.Context(), wpID); return callErr },
+		"preview": func() error { _, callErr := client.PreviewLink(t.Context(), wp.TypePage, wpID); return callErr },
 	}
 
 	for name, call := range calls {

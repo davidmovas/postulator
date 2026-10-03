@@ -27,8 +27,8 @@ type recordingIssuer struct {
 	trashed  []issued
 }
 
-func (r *recordingIssuer) IssuePreview(_ context.Context, siteID string, wpID int64) (pages.IssuedPreview, error) {
-	r.calls = append(r.calls, issued{siteID: siteID, wpID: wpID})
+func (r *recordingIssuer) IssuePreview(_ context.Context, siteID string, wpID int64, wpType string) (pages.IssuedPreview, error) {
+	r.calls = append(r.calls, issued{siteID: siteID, wpID: wpID, wpType: wpType})
 	return r.answer, r.err
 }
 
@@ -199,7 +199,7 @@ func TestPreviewLinkOfADraftIsIssuedByTheSite(t *testing.T) {
 	if answered.URL != issuer.answer.URL || answered.Kind != string(pages.PreviewIssued) || !answered.ExpiresAt.Std().Equal(expires) {
 		t.Errorf("answer = %+v", answered)
 	}
-	if len(issuer.calls) != 1 || issuer.calls[0] != (issued{siteID: h.siteID, wpID: 43}) {
+	if len(issuer.calls) != 1 || issuer.calls[0] != (issued{siteID: h.siteID, wpID: 43, wpType: string(pagemap.WPPage)}) {
 		t.Errorf("issuer calls = %+v", issuer.calls)
 	}
 	h.wantEvents(t)

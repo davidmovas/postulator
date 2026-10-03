@@ -58,6 +58,13 @@ func RelinkPage(deps Deps) run.StepDef {
 					Message: "the page " + sc.Page.Path + " " + ReasonPageOffTheSite,
 				}, nil
 			}
+			if sc.Page.WPType == pagemap.WPProductCategory {
+				return run.Result{
+					Next:    run.TransitionPause,
+					Reason:  run.PauseNeedsHuman,
+					Message: "the page " + sc.Page.Path + " " + ReasonPageIsATerm,
+				}, nil
+			}
 			client, err := clientFor(ctx, deps, sc.Run.SiteID)
 			if err != nil {
 				return run.Result{}, err
@@ -76,7 +83,7 @@ func RelinkPage(deps Deps) run.StepDef {
 				},
 			}
 
-			raw, err := client.GetRaw(ctx, *sc.Page.WPID)
+			raw, err := client.GetRaw(ctx, onSiteType(sc.Page), *sc.Page.WPID)
 			if err != nil {
 				switch {
 				case wp.IsPluginMissing(err):
@@ -112,7 +119,7 @@ func RelinkPage(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			hash, err := client.PutRaw(ctx, *sc.Page.WPID, linked, raw.ContentHash)
+			hash, err := client.PutRaw(ctx, onSiteType(sc.Page), *sc.Page.WPID, linked, raw.ContentHash)
 			if err != nil {
 				if errors.IsCode(err, errors.Conflict) {
 					return run.Result{

@@ -56,7 +56,7 @@ func (p chatProfiles) Resolve(context.Context, string, domainllm.Role, map[domai
 
 type stubPreview struct{}
 
-func (stubPreview) IssuePreview(context.Context, string, int64) (pages.IssuedPreview, error) {
+func (stubPreview) IssuePreview(context.Context, string, int64, string) (pages.IssuedPreview, error) {
 	return pages.IssuedPreview{}, errors.New(errors.Invalid, "no site in this test issues a preview").
 		WithDetail("code", "plugin_missing")
 }

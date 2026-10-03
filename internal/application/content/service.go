@@ -39,7 +39,7 @@ type profileResolver interface {
 }
 
 type rawReader interface {
-	RawContent(ctx context.Context, siteID string, wpID int64) (string, error)
+	RawContent(ctx context.Context, siteID string, wpID int64, wpType string) (string, error)
 }
 
 type Deps struct {
