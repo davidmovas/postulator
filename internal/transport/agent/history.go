@@ -65,13 +65,29 @@ func (m memory) save(ctx context.Context, items []llm.Message) error {
 		return nil
 	}
 
-	kept := trim(shorten(masked(items), m.cap), m.budget)
+	kept := trim(shorten(masked(replayable(items)), m.cap), m.budget)
 	body, err := json.Marshal(history{Format: historyFormat, Items: kept})
 	if err != nil {
 		return errors.Wrap(err, errors.Internal, "encode the conversation history")
 	}
 	return m.store.Save(context.WithoutCancel(ctx), m.conversationID, body, historyVersion,
 		m.clock.Now().UTC().Truncate(time.Second))
+}
+
+func replayable(items []llm.Message) []llm.Message {
+	out := make([]llm.Message, 0, len(items))
+	for _, item := range items {
+		if item.Search != nil {
+			continue
+		}
+		if item.Call != nil && item.Call.Namespace != "" {
+			call := *item.Call
+			call.Namespace = ""
+			item.Call = &call
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 func masked(items []llm.Message) []llm.Message {

@@ -94,6 +94,10 @@ export const settings = {
         "llm.tier.linker": tierLabels,
         "llm.tier.judge": tierLabels,
         "llm.tier.titler": tierLabels,
+        "agent.toolLoading": {
+            all: "All tools every round",
+            deferred: "Load tools on demand",
+        },
     },
     keys: {
         "agent.historyBudgetChars": {
@@ -111,6 +115,10 @@ export const settings = {
         "agent.maxToolResultBytes": {
             label: "Largest tool answer read",
             help: "A longer answer from a tool is cut before the agent reads it.",
+        },
+        "agent.toolLoading": {
+            label: "Tool loading",
+            help: "All tools every round is the default. Loading tools on demand sends fewer tokens per round; it stays experimental until it has been tested with your key.",
         },
         "agent.turnTimeout": {
             label: "Time limit for one answer",

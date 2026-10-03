@@ -38,12 +38,13 @@ type catalogReader interface {
 }
 
 type Deps struct {
-	Client   streamer
-	Registry *tools.Registry
-	History  historyStore
-	Catalog  catalogReader
-	Clock    clock.Clock
-	Logger   *zap.Logger
+	Client      streamer
+	Registry    *tools.Registry
+	History     historyStore
+	Catalog     catalogReader
+	Clock       clock.Clock
+	Logger      *zap.Logger
+	ToolLoading func() agentapp.ToolLoading
 }
 
 type Runner struct {
@@ -108,14 +109,23 @@ func (r *Runner) Run(ctx context.Context, spec agentapp.RunSpec) (agentapp.RunRe
 	}, nil
 }
 
-func (r *Runner) open(spec agentapp.RunSpec, instructions, situation string) *turn {
-	built := r.deps.Registry.Build(spec.Binding)
+func (r *Runner) offered(built []tools.Tool) []llm.Tool {
+	onDemand := r.deps.ToolLoading != nil && r.deps.ToolLoading() == agentapp.ToolsOnDemand
 	offered := make([]llm.Tool, 0, len(built))
 	for i := range built {
-		offered = append(offered, llm.Tool{
-			Name: built[i].Def.Name, Description: built[i].Def.Description, Schema: built[i].Def.Schema,
-		})
+		def := built[i].Def
+		tool := llm.Tool{Name: def.Name, Description: def.Description, Schema: def.Schema}
+		if group, deferred := tools.OnDemand(def.Name); onDemand && deferred {
+			tool.Deferred = &llm.ToolGroup{Name: group.Name, Description: group.Description}
+		}
+		offered = append(offered, tool)
 	}
+	return offered
+}
+
+func (r *Runner) open(spec agentapp.RunSpec, instructions, situation string) *turn {
+	built := r.deps.Registry.Build(spec.Binding)
+	offered := r.offered(built)
 
 	return &turn{
 		spec:    spec,

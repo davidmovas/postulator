@@ -107,16 +107,31 @@ func one(delta llm.Delta) []llm.Delta {
 	return []llm.Delta{delta}
 }
 
+func searchedFor(kind llm.SearchKind, payload string) llm.Delta {
+	return llm.Delta{Search: &llm.ToolSearch{Kind: kind, Execution: "server", Payload: json.RawMessage(payload)}}
+}
+
+func namespacedCall(id string) llm.Delta {
+	return llm.Delta{Call: &llm.ToolCall{ID: id, Name: "pages_count", Args: json.RawMessage(`{}`), Namespace: "pages"}}
+}
+
 func played(t *testing.T, client streamer, stream agentapp.Stream, limit int) (*turn, error) {
 	t.Helper()
+	return playedWith(t, client, stream, limit, func(*Deps) {})
+}
 
-	runner := New(Deps{
+func playedWith(t *testing.T, client streamer, stream agentapp.Stream, limit int, adjust func(*Deps)) (*turn, error) {
+	t.Helper()
+
+	deps := Deps{
 		Client:   client,
 		Registry: tools.New(tools.Deps{Clock: clock.NewFake(time.Date(2026, 10, 3, 9, 0, 0, 0, time.UTC))}),
 		Catalog:  pricedCatalog{},
 		Clock:    clock.NewFake(time.Date(2026, 10, 3, 9, 0, 0, 0, time.UTC)),
 		Logger:   zaptest.NewLogger(t),
-	})
+	}
+	adjust(&deps)
+	runner := New(deps)
 	current := runner.open(agentapp.RunSpec{
 		Binding:   tools.Binding{ConversationID: "c1", Mode: domainagent.ModeAutonomous},
 		Ref:       domainllm.ModelRef{Provider: "openai", Model: "gpt-5.6-terra"},
@@ -300,5 +315,99 @@ func TestEveryCallOfARoundIsAnsweredInOrder(t *testing.T) {
 	}
 	if !json.Valid(tail[2].Result.Output) {
 		t.Fatalf("a result is not JSON: %s", tail[2].Result.Output)
+	}
+}
+
+func TestATurnOffersItsToolsTheWayTheSettingLoadsThem(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		loading  func() agentapp.ToolLoading
+		deferred bool
+	}{
+		{name: "no setting sends every tool every round"},
+		{name: "every tool every round", loading: func() agentapp.ToolLoading { return agentapp.ToolsEveryRound }},
+		{name: "tools loaded on demand", loading: func() agentapp.ToolLoading { return agentapp.ToolsOnDemand }, deferred: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			client := &scriptedStream{rounds: [][]llm.Delta{round(text("hi"), one(done(10, 0, 2, "")))}}
+			if _, err := playedWith(t, client, nil, 2, func(d *Deps) { d.ToolLoading = tc.loading }); err != nil {
+				t.Fatalf("the turn failed: %v", err)
+			}
+
+			whole, grouped := 0, 0
+			for _, tool := range client.asked[0].Tools {
+				group, onDemand := tools.OnDemand(tool.Name)
+				switch {
+				case tool.Deferred == nil:
+					whole++
+					if tc.deferred && onDemand {
+						t.Errorf("%s was sent whole although it loads on demand", tool.Name)
+					}
+				case !tc.deferred:
+					t.Errorf("%s was deferred while every tool goes every round", tool.Name)
+				case tool.Deferred.Name != group.Name || tool.Deferred.Description != group.Description:
+					t.Errorf("%s was offered in %+v, want its group %+v", tool.Name, tool.Deferred, group)
+				default:
+					grouped++
+				}
+			}
+			if tc.deferred && (whole == 0 || grouped == 0) {
+				t.Errorf("a deferred turn sent %d tools whole and %d in groups, want both", whole, grouped)
+			}
+		})
+	}
+}
+
+func TestAToolSearchIsReplayedWithinItsTurnAndForgottenAfterIt(t *testing.T) {
+	t.Parallel()
+
+	client := &scriptedStream{rounds: [][]llm.Delta{
+		round(one(searchedFor(llm.SearchCall, `{"paths":["pages"]}`)), one(searchedFor(llm.SearchOutput, `[]`)),
+			one(namespacedCall("c1")), one(done(10, 0, 5, ""))),
+		round(text("done"), one(done(20, 0, 3, ""))),
+	}}
+	stored := &heldHistory{}
+
+	_, err := playedWith(t, client, nil, 4, func(d *Deps) {
+		d.History = stored
+		d.ToolLoading = func() agentapp.ToolLoading { return agentapp.ToolsOnDemand }
+	})
+	if err != nil {
+		t.Fatalf("the turn failed: %v", err)
+	}
+
+	second := client.asked[1].Messages
+	tail := second[len(second)-4:]
+	if tail[0].Search == nil || tail[0].Search.Kind != llm.SearchCall || tail[1].Search == nil || tail[1].Search.Kind != llm.SearchOutput {
+		t.Fatalf("the next round replayed %+v, want the search call and its output", tail)
+	}
+	if tail[2].Call == nil || tail[2].Call.Namespace != "pages" || tail[3].Result == nil || tail[3].Result.CallID != "c1" {
+		t.Fatalf("the next round replayed %+v, want the namespaced call and its result", tail[2:])
+	}
+
+	var held history
+	if err = json.Unmarshal(stored.body, &held); err != nil {
+		t.Fatalf("decode the stored history: %v", err)
+	}
+	called := false
+	for _, item := range held.Items {
+		if item.Search != nil {
+			t.Errorf("the stored history keeps a tool search: %+v", item.Search)
+		}
+		if item.Call != nil {
+			called = true
+			if item.Call.Namespace != "" {
+				t.Errorf("the stored call keeps the namespace %q the next turn may not load", item.Call.Namespace)
+			}
+		}
+	}
+	if !called {
+		t.Fatal("the stored history lost the call itself")
 	}
 }

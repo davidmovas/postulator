@@ -48,12 +48,14 @@ func (c *Core) buildAgent(stores repos, llm llmParts, writing authoring, service
 }
 
 func (c *Core) agentRunner(stores repos, llm llmParts, toolRegistry *tools.Registry) *agentrunner.Runner {
+	values := stores.values
 	return agentrunner.New(agentrunner.Deps{
-		Client:   llm.client,
-		Registry: toolRegistry,
-		History:  stores.history,
-		Catalog:  llm.catalog,
-		Clock:    stores.now,
-		Logger:   c.logger,
+		Client:      llm.client,
+		Registry:    toolRegistry,
+		History:     stores.history,
+		Catalog:     llm.catalog,
+		Clock:       stores.now,
+		Logger:      c.logger,
+		ToolLoading: func() agent.ToolLoading { return agent.ToolLoadingOf(values) },
 	})
 }

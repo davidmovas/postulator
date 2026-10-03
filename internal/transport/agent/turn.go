@@ -26,19 +26,29 @@ type turn struct {
 }
 
 type heard struct {
-	text  string
-	calls []llm.ToolCall
+	text    string
+	calls   []llm.ToolCall
+	carried []llm.Message
+}
+
+func (h *heard) carry(delta llm.Delta) {
+	if delta.Search != nil {
+		search := *delta.Search
+		h.carried = append(h.carried, llm.Message{Role: llm.RoleAssistant, Search: &search})
+	}
+	if delta.Call != nil {
+		call := *delta.Call
+		h.calls = append(h.calls, call)
+		h.carried = append(h.carried, llm.Message{Role: llm.RoleAssistant, Call: &call})
+	}
 }
 
 func (h heard) said() []llm.Message {
-	out := make([]llm.Message, 0, len(h.calls)+1)
+	out := make([]llm.Message, 0, len(h.carried)+1)
 	if h.text != "" {
 		out = append(out, llm.Message{Role: llm.RoleAssistant, Text: h.text})
 	}
-	for i := range h.calls {
-		out = append(out, llm.Message{Role: llm.RoleAssistant, Call: &h.calls[i]})
-	}
-	return out
+	return append(out, h.carried...)
 }
 
 func (t *turn) run(ctx context.Context) error {
@@ -102,9 +112,7 @@ func (t *turn) ask(ctx context.Context, round int, messages []llm.Message) (hear
 				muted = !t.show(ctx, delta.Text)
 			}
 		}
-		if delta.Call != nil {
-			answered.calls = append(answered.calls, *delta.Call)
-		}
+		answered.carry(delta)
 		if delta.Done {
 			ended := delta
 			done = &ended

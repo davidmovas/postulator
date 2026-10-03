@@ -228,6 +228,50 @@ func TestTheToolSchemasFitTheirCeiling(t *testing.T) {
 	}
 }
 
+type sentGroup struct {
+	Type        string `json:"type"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+func TestADeferredRoundSendsTheOrientingToolsWholeAndOnlyTheNamesOfTheGroups(t *testing.T) {
+	t.Parallel()
+
+	registry := newRegistry(&actionRecorder{}, &busRecorder{})
+	built := registry.Build(tools.Binding{SiteID: "site-1", Mode: agent.ModeAutonomous})
+
+	every, eager, whole := 0, 0, 0
+	named := map[string]bool{}
+	headers := []sentGroup{{Type: "tool_search"}}
+	for _, tool := range built {
+		size := schemaBytes(t, tool)
+		every += size
+		group, deferred := tools.OnDemand(tool.Def.Name)
+		if !deferred {
+			eager += size
+			whole++
+			continue
+		}
+		if !named[group.Name] {
+			named[group.Name] = true
+			headers = append(headers, sentGroup{Type: "namespace", Name: group.Name, Description: group.Description})
+		}
+	}
+	encoded, err := json.Marshal(headers)
+	if err != nil {
+		t.Fatalf("encode the group headers: %v", err)
+	}
+
+	payload := eager + len(encoded)
+	t.Logf("loading tools on demand sends %d tools whole and %d groups, %d bytes, about %d tokens, before any "+
+		"search; every tool at once is %d bytes", whole, len(named), payload, payload/charactersPerToken, every)
+
+	if whole == 0 || len(named) == 0 || payload >= every {
+		t.Fatalf("a deferred round sends %d tools whole in %d groups for %d bytes of %d, want fewer bytes than every tool",
+			whole, len(named), payload, every)
+	}
+}
+
 func TestAPreviewLinkIsApprovedBeforeItIsIssued(t *testing.T) {
 	t.Parallel()
 

@@ -38,6 +38,13 @@ describe("the placement of every declared setting", () => {
         expect(keys.at(-1)).toBe("llm.flexPatience");
     });
 
+    it("keeps the experimental tool loading among the advanced agent settings", () => {
+        const shaped = tabLayout("agent", declared);
+        const depth = shaped.advanced.find((section) => section.id === "agentDepth");
+        expect(depth?.keys).toContain("agent.toolLoading");
+        expect(shaped.plain.flatMap((section) => section.keys)).not.toContain("agent.toolLoading");
+    });
+
     it("names no key the copy does not declare", () => {
         for (const placement of placements) {
             expect(declared).toContain(placement.key);
