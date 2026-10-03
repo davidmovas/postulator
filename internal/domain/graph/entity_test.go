@@ -63,6 +63,22 @@ func TestNewEntityNormalises(t *testing.T) {
 	}
 }
 
+func TestNewEntityKeepsWhetherItIsASiteCategory(t *testing.T) {
+	t.Parallel()
+
+	for _, flagged := range []bool{true, false} {
+		entity := validEntity()
+		entity.SiteCategory = flagged
+		got, err := graph.NewEntity(entity)
+		if err != nil {
+			t.Fatalf("NewEntity: %v", err)
+		}
+		if got.SiteCategory != flagged {
+			t.Errorf("SiteCategory = %t, want %t", got.SiteCategory, flagged)
+		}
+	}
+}
+
 func TestNewEntityWithoutKeywordsCarriesAnEmptyList(t *testing.T) {
 	t.Parallel()
 

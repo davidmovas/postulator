@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -192,6 +193,29 @@ func TestEnums(t *testing.T) {
 	}
 	if !pagemap.SortCreatedAt.Valid() || !pagemap.SortPath.Valid() || pagemap.Sort("x").Valid() {
 		t.Error("sort validity is wrong")
+	}
+}
+
+func TestATypeKnowsTheTaxonomyItsCategoriesComeFrom(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		wpType   pagemap.WPType
+		taxonomy graph.Taxonomy
+		has      bool
+	}{
+		{wpType: pagemap.WPPage, taxonomy: graph.TaxonomyCategory, has: true},
+		{wpType: pagemap.WPPost, taxonomy: graph.TaxonomyCategory, has: true},
+		{wpType: pagemap.WPProduct, taxonomy: graph.TaxonomyProductCategory, has: true},
+		{wpType: pagemap.WPProductCategory},
+		{wpType: "attachment"},
+	}
+
+	for _, tc := range cases {
+		taxonomy, has := tc.wpType.Taxonomy()
+		if taxonomy != tc.taxonomy || has != tc.has {
+			t.Errorf("%q.Taxonomy() = %q, %t; want %q, %t", tc.wpType, taxonomy, has, tc.taxonomy, tc.has)
+		}
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -29,6 +30,17 @@ func (t WPType) Valid() bool {
 
 func (t WPType) Term() bool {
 	return t == WPProductCategory
+}
+
+func (t WPType) Taxonomy() (graph.Taxonomy, bool) {
+	switch t {
+	case WPPage, WPPost:
+		return graph.TaxonomyCategory, true
+	case WPProduct:
+		return graph.TaxonomyProductCategory, true
+	default:
+		return "", false
+	}
 }
 
 func (t WPType) SameFamily(other WPType) bool {

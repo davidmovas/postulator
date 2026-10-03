@@ -72,6 +72,7 @@ type Entity struct {
 	SiteID          string
 	Name            string
 	Kind            Kind
+	SiteCategory    bool
 	Intent          string
 	Keywords        keyword.List
 	Anchors         []Anchor
