@@ -103,7 +103,7 @@ func assertGolden(t *testing.T, name string, raw []byte) {
 		t.Fatalf("read the golden %s: %v", name, err)
 	}
 	want := strings.TrimSpace(strings.ReplaceAll(string(stored), "\r\n", "\n"))
-	if got := indented.String(); got != want {
+	if got := strings.TrimSpace(indented.String()); got != want {
 		t.Errorf("the request sent =\n%s\nwant (%s)\n%s", got, name, want)
 	}
 }
@@ -236,6 +236,25 @@ func TestTheKeyIsReadOnEveryCallAndSentAsABearer(t *testing.T) {
 	first := requests[0]
 	if first.Path != "/v1/responses" || first.Header.Get("Content-Type") != "application/json" {
 		t.Errorf("request = %s %v, want a JSON post to /v1/responses", first.Path, first.Header)
+	}
+}
+
+func TestMarkupTravelsAsItIsWritten(t *testing.T) {
+	t.Parallel()
+
+	server := openaitest.New(t)
+	server.Enqueue(openaitest.Text("ok").Reply())
+
+	req := write("<p>Koffein & Powder</p>")
+	req.System = "Answer in <h2> sections."
+	if _, err := newClient(server).Complete(t.Context(), req); err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+	raw := string(only(t, server).Raw)
+	for _, want := range []string{`"<p>Koffein & Powder</p>"`, `"Answer in <h2> sections."`} {
+		if !strings.Contains(raw, want) {
+			t.Errorf("the body %s does not carry %s unescaped", raw, want)
+		}
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/llm/openai/openaitest"
 	port "github.com/davidmovas/postulator/internal/application/llm"
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -162,6 +163,75 @@ func TestAnAnswerTheClientCannotUseIsAFailure(t *testing.T) {
 			}
 		})
 	}
+}
+
+func roundTrip[T any](t *testing.T, answer string, want T) {
+	t.Helper()
+
+	server := openaitest.New(t)
+	server.Enqueue(openaitest.Text(answer).Reply())
+
+	got, _, err := port.Structured[T](t.Context(), newClient(server), port.Request{
+		Ref:      ref("gpt-5.6-terra"),
+		Messages: []port.Message{{Role: port.RoleUser, Text: "answer"}},
+		Meta:     port.CallMeta{Step: "round_trip"},
+	})
+	if err != nil {
+		t.Fatalf("Structured: %v", err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("answer = %+v, want %+v", got, want)
+	}
+}
+
+type judgeShape struct {
+	Score       float64  `json:"score" description:"The overall quality of the page between 0 and 1"`
+	Issues      []string `json:"issues"`
+	Suggestions []string `json:"suggestions"`
+}
+
+type keywordShape struct {
+	Keyword           string   `json:"keyword"`
+	Kind              string   `json:"kind" enum:"hub,category,topic,product"`
+	SecondaryKeywords []string `json:"secondaryKeywords"`
+}
+
+type keywordsShape struct {
+	Entities []keywordShape `json:"entities"`
+}
+
+func TestEveryAnswerTheStepsAskForCrossesTheStrictContract(t *testing.T) {
+	t.Parallel()
+
+	t.Run("the writer's draft", func(t *testing.T) {
+		t.Parallel()
+		roundTrip(t, `{"title":"Koffein","h1":"Koffein Powder","sections":[{"slot":1,"heading":"Dose","html":"<p>3 g</p>"}],"summary":"Pure."}`,
+			content.DraftAnswer{Title: "Koffein", H1: "Koffein Powder", Summary: "Pure.",
+				Sections: []content.AnswerSection{{Slot: 1, Heading: "Dose", HTML: "<p>3 g</p>"}}})
+	})
+	t.Run("the writer's product", func(t *testing.T) {
+		t.Parallel()
+		roundTrip(t, `{"title":"Koffein","h1":"Koffein","sections":[],"summary":"s","shortDescription":"<p>short</p>",`+
+			`"specifications":[{"name":"Purity","value":"99%"}]}`,
+			content.ProductAnswer{
+				DraftAnswer:      content.DraftAnswer{Title: "Koffein", H1: "Koffein", Sections: []content.AnswerSection{}, Summary: "s"},
+				ShortDescription: "<p>short</p>",
+				Specifications:   []content.AnswerSpecification{{Name: "Purity", Value: "99%"}},
+			})
+	})
+	t.Run("the linker's repair", func(t *testing.T) {
+		t.Parallel()
+		roundTrip(t, `{"sentence":"Read about koffein powder."}`, content.RepairResponse{Sentence: "Read about koffein powder."})
+	})
+	t.Run("the judge's verdict", func(t *testing.T) {
+		t.Parallel()
+		roundTrip(t, `{"score":0.8,"issues":["thin"],"suggestions":[]}`, judgeShape{Score: 0.8, Issues: []string{"thin"}, Suggestions: []string{}})
+	})
+	t.Run("the keyword proposal", func(t *testing.T) {
+		t.Parallel()
+		roundTrip(t, `{"entities":[{"keyword":"koffein","kind":"topic","secondaryKeywords":["caffeine"]}]}`,
+			keywordsShape{Entities: []keywordShape{{Keyword: "koffein", Kind: "topic", SecondaryKeywords: []string{"caffeine"}}}})
+	})
 }
 
 type answerWithGaps struct {

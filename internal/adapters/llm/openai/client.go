@@ -178,12 +178,14 @@ func (c *Client) key(ctx context.Context) (string, error) {
 }
 
 func (c *Client) post(ctx context.Context, ex exchange) (*http.Response, error) {
-	payload, err := json.Marshal(ex.body)
-	if err != nil {
+	var payload bytes.Buffer
+	encoder := json.NewEncoder(&payload)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(ex.body); err != nil {
 		return nil, errors.Wrap(err, errors.Internal, "encode the model request")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+responsesPath, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+responsesPath, &payload)
 	if err != nil {
 		return nil, errors.New(errors.Invalid, "the model provider's address is not a valid URL").WithDetail("baseUrl", c.baseURL)
 	}
