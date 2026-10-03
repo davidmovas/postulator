@@ -34,14 +34,6 @@ const (
 	imageOutputTokens = 1056
 )
 
-type ImageProvider interface {
-	Generate(ctx context.Context, prompt images.Prompt) (images.Image, error)
-}
-
-type ImageSource interface {
-	Pick(ctx context.Context, query images.Query) ([]images.Image, error)
-}
-
 type PlacedImage struct {
 	Role string `json:"role"`
 	URL  string `json:"url"`

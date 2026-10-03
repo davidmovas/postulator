@@ -13,7 +13,14 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
-const NameRelinkPage = string(run.StepRelinkPage)
+const (
+	NameRelinkPage = string(run.StepRelinkPage)
+
+	ReasonPageOffTheSite = "is not on the site, so there is nothing to relink; publish it first"
+	ReasonPageIsATerm    = "is a product category, whose description the companion plugin does not write"
+	ReasonPageGone       = "the page is no longer on the site"
+	ReasonPageUnreadable = "the stored content of the page could not be read as HTML"
+)
 
 type PlacedLink struct {
 	PageID   string `json:"pageId"`

@@ -30,6 +30,17 @@ const (
 	CodeNeighborLinkMissing   = "neighbor_link_missing"
 	ClassNeedsHuman           = "needs_human"
 
+	ReasonNeighborGone       = "the neighbor is no longer on the site"
+	ReasonNeighborUnreadable = "the stored content of the neighbor could not be read as HTML"
+	ReasonNeighborUnmapped   = "the neighbor is not mapped to an entity, so it has no rules of its own"
+	ReasonNeighborNoTemplate = "the neighbor has no template, so nothing says what it may link to"
+	ReasonNeighborIsATerm    = "the neighbor is a product category, whose description the companion plugin does not write"
+
+	ReasonNeighborOwesNothing = "the rules of the neighbor do not ask it to link to this page"
+
+	ReasonNeighborOwesTheCanonicalPage = "the rules of the neighbor ask it to link to the canonical page " +
+		"of this entity, not to this page"
+
 	relinkTimeout = 5 * time.Minute
 )
 
