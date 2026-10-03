@@ -98,6 +98,7 @@ export type ModelCallFilter = ListFilter<CatalogModels.ListCallsRequest>;
 
 export type ImportSheet = Wire<ImportModels.Sheet>;
 export type ImportMapping = Wire<ImportModels.Mapping>;
+export type ImportSheetMapping = Wire<ImportModels.SheetMapping>;
 export type ImportOptions = Wire<ImportModels.Options>;
 export type ImportFinding = Wire<ImportModels.Finding>;
 export type ImportConflict = Wire<ImportModels.Conflict>;
@@ -105,6 +106,7 @@ export type ImportCounts = Wire<ImportModels.Counts>;
 export type PreviewReport = Wire<ImportModels.PreviewReport>;
 export type PreviewPage = Wire<ImportModels.PreviewPage>;
 export type PreviewEntity = Wire<ImportModels.PreviewEntity>;
+export type PreviewGroup = Wire<ImportModels.PreviewGroup>;
 export type PreviewEdge = Wire<ImportModels.PreviewEdge>;
 export type InspectResult = Wire<ImportModels.InspectResponse>;
 
