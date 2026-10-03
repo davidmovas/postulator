@@ -121,6 +121,7 @@ export const imports = {
         counted: (action: string, count: number) => `${count} ${action}`,
         blocked: "Fix the errors in the sheet before applying it.",
         row: (row: number) => `row ${row}`,
+        place: (sheet: string, row: number) => (row > 0 ? `${sheet} · row ${row}` : sheet),
         columnSheet: "Sheet",
         columnGroup: "Group",
         columnPage: "Page",

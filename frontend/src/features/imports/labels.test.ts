@@ -16,6 +16,7 @@ import {
     fieldChoices,
     fieldLabel,
     findingLabel,
+    findingPlace,
     noField,
     productNote,
     reasonLabel,
@@ -61,6 +62,25 @@ describe("every vocabulary reaches the screen as words", () => {
 
     it.each(vocabularies)("shows an unknown %s as it arrived", (_name, _values, label) => {
         expect(label("something_new")).toBe("something_new");
+    });
+});
+
+describe("where a finding sits", () => {
+    it.each([
+        { name: "a row of a named sheet", finding: { sheet: "Catalog", row: 4 }, want: "Catalog · row 4" },
+        { name: "a whole sheet", finding: { sheet: "Catalog", row: 0 }, want: "Catalog" },
+        { name: "a row of a csv", finding: { row: 7 }, want: "row 7" },
+        { name: "a csv row whose sheet arrived empty", finding: { sheet: "", row: 7 }, want: "row 7" },
+        { name: "the whole file", finding: { row: 0 }, want: null },
+    ])("reads $name", ({ finding, want }) => {
+        expect(findingPlace(finding)).toBe(want);
+    });
+
+    it("says what a name clash under one parent means", () => {
+        expect(findingLabel("scope_clash")).toBe(
+            "Two entities of one name would sit under the same parent; rename one or give it another parent",
+        );
+        expect(blocking("scope_clash")).toBe(true);
     });
 });
 

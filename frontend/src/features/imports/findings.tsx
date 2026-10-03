@@ -3,7 +3,7 @@ import type { ReactElement } from "react";
 import { copy } from "../../copy/index.js";
 import type { ImportConflict, ImportFinding } from "../../data/types.js";
 import { EmptyState, Panel, PanelHeader, StatusBadge, TaskAltIcon } from "../../ui/index.js";
-import { findingLabel, reasonLabel } from "./labels.js";
+import { findingLabel, findingPlace, reasonLabel } from "./labels.js";
 
 interface GroupProps {
     title: string;
@@ -24,24 +24,30 @@ function Group({ title, count, tone, findings }: GroupProps): ReactElement | nul
                 </StatusBadge>
             </PanelHeader>
             <ul className="flex flex-col">
-                {findings.map((finding, at) => (
-                    <li
-                        key={`${finding.row}-${finding.code}-${at}`}
-                        className="flex flex-col gap-0.5 border-b border-hairline px-3 py-2 last:border-b-0"
-                    >
-                        <div className="flex items-baseline gap-2">
-                            {finding.row > 0 ? (
-                                <span className="shrink-0 font-mono text-2xs text-ink-faint">
-                                    {copy.imports.preview.row(finding.row)}
-                                </span>
-                            ) : null}
-                            <span className="min-w-0 flex-1 text-xs text-ink">{findingLabel(finding.code)}</span>
-                        </div>
-                        {finding.message === "" ? null : (
-                            <p className="text-2xs text-ink-dim">{finding.message}</p>
-                        )}
-                    </li>
-                ))}
+                {findings.map((finding, at) => {
+                    const place = findingPlace(finding);
+                    return (
+                        <li
+                            key={`${finding.sheet ?? ""}-${finding.row}-${finding.code}-${at}`}
+                            className="flex flex-col gap-0.5 border-b border-hairline px-3 py-2 last:border-b-0"
+                        >
+                            <div className="flex items-baseline gap-2">
+                                {place === null ? null : (
+                                    <span
+                                        className="max-w-40 shrink-0 truncate font-mono text-2xs text-ink-faint"
+                                        title={place}
+                                    >
+                                        {place}
+                                    </span>
+                                )}
+                                <span className="min-w-0 flex-1 text-xs text-ink">{findingLabel(finding.code)}</span>
+                            </div>
+                            {finding.message === "" ? null : (
+                                <p className="text-2xs text-ink-dim">{finding.message}</p>
+                            )}
+                        </li>
+                    );
+                })}
             </ul>
         </Panel>
     );

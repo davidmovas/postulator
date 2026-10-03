@@ -35,6 +35,19 @@ export function findingLabel(code: string): string {
     return isOneOf(importFindingCodes, code) ? copy.imports.findings[code] : code;
 }
 
+interface FindingSpot {
+    sheet?: string;
+    row: number;
+}
+
+export function findingPlace(finding: FindingSpot): string | null {
+    const sheet = finding.sheet ?? "";
+    if (sheet !== "") {
+        return copy.imports.preview.place(sheet, finding.row);
+    }
+    return finding.row > 0 ? copy.imports.preview.row(finding.row) : null;
+}
+
 export function actionLabel(action: string): string {
     return isOneOf(importActions, action) ? copy.imports.actions[action] : action;
 }
