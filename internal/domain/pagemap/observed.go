@@ -35,16 +35,16 @@ func StatusFromWordPress(wordpress string) Status {
 
 func (p Page) Mismatches() []Mismatch {
 	found := make([]Mismatch, 0, 3)
+	if p.WPType.StoreAddressed() {
+		return p.statusMismatch(found)
+	}
 	if p.Observed.Link != "" {
 		found = differ(found, FieldPath, p.Path, observedPath(p.Observed.Link))
 	}
 	if p.Observed.Slug != "" {
 		found = differ(found, FieldSlug, p.Slug, p.Observed.Slug)
 	}
-	if p.Observed.Status != "" && p.asked() {
-		found = differ(found, FieldStatus,
-			string(p.Status), string(StatusFromWordPress(p.Observed.Status)))
-	}
+	found = p.statusMismatch(found)
 	if p.Title != "" && p.Observed.Title != "" {
 		found = differ(found, FieldTitle, p.Title, p.Observed.Title)
 	}
@@ -52,6 +52,13 @@ func (p Page) Mismatches() []Mismatch {
 		found = differ(found, FieldH1, p.H1, p.Observed.H1)
 	}
 	return found
+}
+
+func (p Page) statusMismatch(into []Mismatch) []Mismatch {
+	if p.Observed.Status == "" || !p.asked() {
+		return into
+	}
+	return differ(into, FieldStatus, string(p.Status), string(StatusFromWordPress(p.Observed.Status)))
 }
 
 func (p Page) asked() bool {

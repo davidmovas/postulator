@@ -31,6 +31,7 @@ type Page struct {
 	ID              string        `json:"id"`
 	SiteID          string        `json:"siteId"`
 	Path            string        `json:"path"`
+	PlannedPath     string        `json:"plannedPath"`
 	Slug            string        `json:"slug"`
 	ParentPageID    *string       `json:"parentPageId"`
 	WPType          string        `json:"wpType"`
@@ -90,6 +91,7 @@ func view(p pagemap.Page) Page {
 		ID:              p.ID,
 		SiteID:          p.SiteID,
 		Path:            p.Path,
+		PlannedPath:     p.PlannedPath,
 		Slug:            p.Slug,
 		ParentPageID:    p.ParentPageID,
 		WPType:          string(p.WPType),

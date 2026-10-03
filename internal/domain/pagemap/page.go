@@ -80,6 +80,7 @@ type Page struct {
 	ID              string
 	SiteID          string
 	Path            string
+	PlannedPath     string
 	Slug            string
 	ParentPageID    *string
 	WPType          WPType
@@ -148,6 +149,9 @@ func NewPage(p Page) (Page, error) {
 	}
 	p.Path = path
 	p.Slug = Slug(path)
+	if p.PlannedPath, err = plannedPath(p.PlannedPath, path); err != nil {
+		return Page{}, err
+	}
 	p.Title = strings.TrimSpace(p.Title)
 	p.H1 = strings.TrimSpace(p.H1)
 	p.MetaTitle = strings.TrimSpace(p.MetaTitle)
@@ -156,6 +160,20 @@ func NewPage(p Page) (Page, error) {
 	p.Keywords = keyword.New(p.Keywords)
 	p.Notes = NewNotes(p.Notes)
 	return p, nil
+}
+
+func plannedPath(raw, path string) (string, error) {
+	if strings.TrimSpace(raw) == "" {
+		return "", nil
+	}
+	planned, err := NormalizePath(raw)
+	if err != nil {
+		return "", err
+	}
+	if planned == path {
+		return "", nil
+	}
+	return planned, nil
 }
 
 func NewPageLink(l PageLink) (PageLink, error) {

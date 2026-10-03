@@ -53,6 +53,7 @@ func TestPageRepoRoundTrip(t *testing.T) {
 	want := fullPage(owner.ID, "/shop/shoes/", sqlitetest.Stamp)
 	want.ParentPageID = &parent.ID
 	want.EntityID = &entity.ID
+	want.PlannedPath = "/sneakers/running/"
 	if err := repo.Insert(t.Context(), want); err != nil {
 		t.Fatalf("Insert: %v", err)
 	}
