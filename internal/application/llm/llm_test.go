@@ -502,28 +502,28 @@ func TestStructured(t *testing.T) {
 			wantCalls: 1,
 		},
 		{
-			name: "repairs once and sums the usage",
+			name: "hands a malformed answer to the step's retry instead of asking again",
 			responses: []llm.Response{
 				{Text: "not json", Usage: domain.Usage{Input: 10, Output: 2, Total: 12}},
 				{Text: `{"heading":"Powder","html":"<p>y</p>"}`, Usage: domain.Usage{Input: 20, Output: 4, Total: 24}},
 			},
-			wantTitle: "Powder",
-			wantUsage: domain.Usage{Input: 30, Output: 6, Total: 36},
-			wantCalls: 2,
-		},
-		{
-			name: "gives up after the repair",
-			responses: []llm.Response{
-				{Text: "not json", Usage: domain.Usage{Input: 10, Output: 2, Total: 12}},
-				{Text: "still not json", Usage: domain.Usage{Input: 10, Output: 2, Total: 12}},
-			},
-			wantUsage: domain.Usage{Input: 20, Output: 4, Total: 24},
-			wantCalls: 2,
+			wantUsage: domain.Usage{Input: 10, Output: 2, Total: 12},
+			wantCalls: 1,
 			wantCode:  errors.External,
 			wantWhy:   llm.ReasonMalformedAnswer,
 		},
 		{
-			name: "does not repair an answer that stopped for length",
+			name: "refuses an answer of another shape",
+			responses: []llm.Response{
+				{Text: `{"heading":7}`, Usage: domain.Usage{Input: 10, Output: 2, Total: 12}},
+			},
+			wantUsage: domain.Usage{Input: 10, Output: 2, Total: 12},
+			wantCalls: 1,
+			wantCode:  errors.External,
+			wantWhy:   llm.ReasonMalformedAnswer,
+		},
+		{
+			name: "stops at an answer that stopped for length",
 			responses: []llm.Response{
 				{Text: `{"heading":"Koff`, Usage: domain.Usage{Input: 10, Output: 8, Total: 18}, FinishReason: llm.FinishLength},
 			},
@@ -579,20 +579,31 @@ func TestStructured(t *testing.T) {
 			if first.Schema == nil || first.Schema.Type != llm.SchemaObject {
 				t.Errorf("schema = %+v, want the derived object schema", first.Schema)
 			}
-			if !strings.HasPrefix(first.System, "you write pages") || !strings.Contains(first.System, "single JSON object") {
-				t.Errorf("system = %q, want the caller prompt plus the json instruction", first.System)
+			if first.System != "you write pages" {
+				t.Errorf("system = %q, want the caller's prompt as it was written; the strict schema says the shape", first.System)
 			}
-			if tc.wantCalls > 1 {
-				repaired := client.seen[1].Messages
-				if len(repaired) != 3 || repaired[1].Role != llm.RoleAssistant || repaired[1].Text != "not json" ||
-					!strings.Contains(repaired[2].Text, "could not be decoded") {
-					t.Errorf("repair messages = %+v, want the answer shown back with the decoder error", repaired)
-				}
-				if len(first.Messages) != 1 {
-					t.Errorf("first request messages = %+v, want the original single message", first.Messages)
-				}
+			if len(first.Messages) != 1 {
+				t.Errorf("request messages = %+v, want the caller's single message", first.Messages)
 			}
 		})
+	}
+}
+
+func TestAMalformedAnswerNamesItsModelAndWhyItFailed(t *testing.T) {
+	t.Parallel()
+
+	client := &scriptedClient{responses: []llm.Response{{Text: "Sure! Here is the section."}}}
+	_, _, err := llm.Structured[section](t.Context(), client, llm.Request{Ref: ref(), Messages: userMessage("go")})
+
+	var kernel *errors.Error
+	if !stderrors.As(err, &kernel) {
+		t.Fatalf("Structured error = %v, want a kernel error", err)
+	}
+	if kernel.Details["model"] != ref().String() || kernel.Details["reason"] != llm.ReasonMalformedAnswer {
+		t.Fatalf("the refusal carries %v", kernel.Details)
+	}
+	if !strings.Contains(err.Error(), "invalid character") {
+		t.Fatalf("the refusal does not keep the decoder's reason: %v", err)
 	}
 }
 
