@@ -146,6 +146,28 @@ func TestRelinkPagePlacesTheLinksTheGraphAsksThePageFor(t *testing.T) {
 	}
 }
 
+func TestRelinkPagePlacesTheLinksInAProductsDescription(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	product := server.Seed(wptest.Item{Type: wptest.TypeProduct, Title: "Espresso Machine", Content: espressoBody})[0]
+	pages := relinkPagePages(product.ID)
+	pages[1].WPType = pagemap.WPProduct
+	deps.Links = &linkRecorder{}
+	deps.Pages = pageList{items: pages}
+	sc := relinkPageContext(t, deps, product.ID)
+	sc.Page.WPType = pagemap.WPProduct
+
+	relinked, published, _ := runRelinkPage(t, deps, sc)
+	if relinked.Linked != 1 || published.WPID != product.ID || published.PreviousContent != espressoBody {
+		t.Fatalf("relinked = %+v, published = %+v", relinked, published)
+	}
+	if stored, _ := server.Lookup(product.ID); !strings.Contains(stored.Content, `<a href="/coffee/">coffee</a>`) ||
+		stored.Title != "Espresso Machine" {
+		t.Errorf("the product holds %+v", stored)
+	}
+}
+
 func parentOnTheSite(deps steps.Deps) steps.Deps {
 	listed, ok := deps.Pages.(pageList)
 	if !ok {

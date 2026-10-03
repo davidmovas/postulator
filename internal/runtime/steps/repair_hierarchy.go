@@ -11,14 +11,19 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
-const NameRepairHierarchy = string(run.StepRepairHierarchy)
+const (
+	NameRepairHierarchy = string(run.StepRepairHierarchy)
+
+	CodeStorePlaced = "store_placed"
+)
 
 func RepairHierarchy(deps Deps) run.StepDef {
 	return run.StepDef{
-		Name:     NameRepairHierarchy,
-		Produces: []run.ArtifactKind{run.ArtifactPublishResult},
-		Retry:    run.RetryPolicy{Max: 3},
-		Timeout:  publishTimeout,
+		Name:      NameRepairHierarchy,
+		Preflight: storePlacedPreflight,
+		Produces:  []run.ArtifactKind{run.ArtifactPublishResult},
+		Retry:     run.RetryPolicy{Max: 3},
+		Timeout:   publishTimeout,
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			itemType, err := itemTypeOf(sc.Page)
 			if err != nil {
@@ -75,6 +80,20 @@ func RepairHierarchy(deps Deps) run.StepDef {
 			}, nil
 		},
 	}
+}
+
+func storePlacedPreflight(_ context.Context, record run.Run, targets map[string]run.Target) ([]run.EstimateFinding, error) {
+	findings := make([]run.EstimateFinding, 0)
+	for _, targetID := range record.Targets {
+		page := targets[targetID].Page
+		if !page.WPType.StoreAddressed() {
+			continue
+		}
+		findings = append(findings, pageFinding(content.SeverityError, CodeStorePlaced, page,
+			page.Path+" is a "+string(page.WPType)+", which sits where its store puts it, so a repair has no parent "+
+				"to move it under; leave it out of the repair"))
+	}
+	return findings, nil
 }
 
 func placedAs(page pagemap.Page, parent int64, item wp.Item) []pagemap.Mismatch {

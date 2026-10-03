@@ -361,6 +361,31 @@ func TestRelinkLeavesAProductCategoryAndThePostThatSharesItsNumberAlone(t *testi
 	}
 }
 
+func TestRelinkWritesTheLinkIntoANeighborProductsDescription(t *testing.T) {
+	t.Parallel()
+
+	const description = `<p>We roast every espresso blend we sell.</p>`
+	deps, server := imageDeps(t)
+	product := server.Seed(wptest.Item{Type: wptest.TypeProduct, Title: "Coffee", Content: description, RegularPrice: "12"})[0]
+	neighbors := relinkPages(product.ID)
+	neighbors[0].WPType = pagemap.WPProduct
+	deps.Links = &linkRecorder{}
+	deps.Pages = pageList{items: neighbors}
+
+	relinked := runRelink(t, deps)
+	if len(relinked.Neighbors) != 1 || relinked.Neighbors[0].Outcome != steps.OutcomeLinked ||
+		relinked.Neighbors[0].Type != string(pagemap.WPProduct) {
+		t.Fatalf("relinked = %+v, want the product's description linked", relinked)
+	}
+	stored, _ := server.Lookup(product.ID)
+	if !strings.Contains(stored.Content, `<a href="/coffee/espresso/">espresso</a>`) {
+		t.Errorf("the product holds %q", stored.Content)
+	}
+	if stored.Title != "Coffee" || stored.RegularPrice != "12" || stored.Status != "publish" {
+		t.Errorf("the relink moved the store's own fields: %+v", stored)
+	}
+}
+
 func TestRelinkRecordsWhatKindOfItemItWrote(t *testing.T) {
 	t.Parallel()
 

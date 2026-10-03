@@ -50,7 +50,7 @@ func SyncBack(deps Deps) run.StepDef {
 					WithDetail("pageId", sc.Page.ID)
 			}
 
-			itemType, err := itemTypeOf(sc.Page)
+			itemType, err := readType(sc.Page)
 			if err != nil {
 				return run.Result{}, err
 			}
@@ -67,7 +67,7 @@ func SyncBack(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			item, err := client.GetItem(ctx, itemType, published.WPID)
+			item, err := readItem(ctx, client, itemType, published.WPID)
 			if err != nil {
 				return run.Result{}, err
 			}
@@ -140,10 +140,31 @@ func planFindings(page pagemap.Page, mismatches []pagemap.Mismatch) []content.Fi
 	return out
 }
 
+func readType(page pagemap.Page) (wp.ItemType, error) {
+	if page.WPType == pagemap.WPProduct {
+		return wp.TypeProduct, nil
+	}
+	return itemTypeOf(page)
+}
+
+func readItem(ctx context.Context, client *wp.Client, itemType wp.ItemType, wpID int64) (wp.Item, error) {
+	if itemType != wp.TypeProduct {
+		return client.GetItem(ctx, itemType, wpID)
+	}
+	product, err := client.GetProduct(ctx, wpID)
+	if err != nil {
+		return wp.Item{}, err
+	}
+	return product.Item(), nil
+}
+
 func readBack(ctx context.Context, client *wp.Client, itemType wp.ItemType, wpID int64, fallback string) (body, source string, err error) {
 	raw, err := client.GetRaw(ctx, itemType, wpID)
 	if err == nil {
 		return raw.Content, "plugin", nil
+	}
+	if wp.IsPluginMissing(err) && itemType == wp.TypeProduct {
+		return fallback, "store", nil
 	}
 	if wp.IsPluginMissing(err) {
 		return fallback, "core", nil

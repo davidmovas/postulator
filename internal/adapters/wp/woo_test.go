@@ -69,6 +69,13 @@ func TestGetProductReadsWhatTheStoreHolds(t *testing.T) {
 	if len(product.Images) != 1 || product.Images[0].ID != 41 {
 		t.Errorf("images = %+v", product.Images)
 	}
+
+	item := product.Item()
+	if item.ID != seeded.ID || item.Type != wp.TypeProduct || item.Title != "Powder" || item.Content != "<p>long</p>" ||
+		item.Excerpt != "<p>short</p>" || item.Slug != "powder" || item.Status != "publish" ||
+		item.Link != product.Permalink || !item.Modified.Equal(product.Modified) {
+		t.Errorf("the product as an item = %+v", item)
+	}
 }
 
 func TestGetProductTreatsTheTrashAndTheMissingAsNotFound(t *testing.T) {

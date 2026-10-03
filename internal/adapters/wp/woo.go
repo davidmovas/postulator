@@ -154,6 +154,13 @@ func (p productPayload) product() Product {
 	}
 }
 
+func (p Product) Item() Item {
+	return Item{
+		ID: p.ID, Type: TypeProduct, Title: p.Name, Content: p.Description, Excerpt: p.ShortDescription,
+		Slug: p.Slug, Status: p.Status, Link: p.Permalink, Modified: p.Modified,
+	}
+}
+
 func (c *Client) GetProduct(ctx context.Context, id int64) (Product, error) {
 	_, body, err := c.do(ctx, request{
 		method:    http.MethodGet,

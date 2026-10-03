@@ -3,8 +3,10 @@ package steps_test
 import (
 	"encoding/json"
 	"strconv"
+	"strings"
 	"testing"
 
+	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -198,6 +200,67 @@ func TestSyncBackFallsBackToCoreWithoutThePlugin(t *testing.T) {
 	}
 	if len(recorder.byPage["page-child"]) != 1 {
 		t.Fatalf("the recorded links are %+v", recorder.byPage)
+	}
+}
+
+func TestSyncBackReadsAProductFromTheStore(t *testing.T) {
+	t.Parallel()
+
+	const description = `<p>Part of our <a href="/coffee/">coffee</a> range.</p>`
+	cases := []struct {
+		name    string
+		options []wptest.Option
+		source  string
+	}{
+		{name: "through the plugin", source: "plugin"},
+		{name: "without the plugin", options: []wptest.Option{wptest.WithoutPlugin()}, source: "store"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps, server := imageDepsWith(t, tc.options...)
+			product := server.Seed(wptest.Item{
+				Type: wptest.TypeProduct, Title: "Espresso Machine", Slug: "espresso-machine", Content: description, Status: "publish",
+			})[0]
+			recorder := &linkRecorder{}
+			recorded := &pagemap.Page{}
+			deps.Links = recorder
+			deps.Pages = pageList{recorded: recorded, items: []pagemap.Page{
+				{
+					ID: "page-parent", SiteID: "site", Path: "/coffee/", Slug: "coffee", WPType: pagemap.WPPage,
+					Status: pagemap.StatusPublished, EntityID: pointer("parent"),
+				},
+				{
+					ID: "page-child", SiteID: "site", Path: "/product/espresso-machine/", Slug: "espresso-machine",
+					WPType: pagemap.WPProduct, Status: pagemap.StatusPublished, EntityID: pointer("child"), WPID: &product.ID,
+				},
+			}}
+			sc := syncBackContext(t, product.ID)
+			sc.Page.WPType = pagemap.WPProduct
+			sc.Page.Path = "/product/espresso-machine/"
+			sc.Page.Slug = "espresso-machine"
+			sc.Page.H1 = "Espresso"
+
+			synced := runSyncBack(t, deps, sc)
+			if synced.Source != tc.source || synced.WPID != product.ID || synced.Status != "publish" || synced.Links != 1 {
+				t.Fatalf("synced = %+v, want the product read from %s", synced, tc.source)
+			}
+			if synced.ContentHash != wp.ContentHash(description) {
+				t.Errorf("contentHash = %q, want the hash of the description", synced.ContentHash)
+			}
+			if len(synced.Mismatches) != 0 || len(synced.Findings) != 0 {
+				t.Errorf("a product the store names and places reports %+v / %+v", synced.Mismatches, synced.Findings)
+			}
+			if recorded.Observed.Title != "Espresso Machine" || recorded.Observed.Slug != "espresso-machine" ||
+				!strings.HasSuffix(recorded.Observed.Link, "/product/espresso-machine/") {
+				t.Errorf("the page observes %+v", recorded.Observed)
+			}
+			if links := recorder.byPage["page-child"]; len(links) != 1 || links[0].ToPageID == nil || *links[0].ToPageID != "page-parent" {
+				t.Errorf("the recorded links are %+v", links)
+			}
+		})
 	}
 }
 

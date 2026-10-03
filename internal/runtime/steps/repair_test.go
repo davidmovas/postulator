@@ -2,10 +2,12 @@ package steps_test
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -94,6 +96,54 @@ func TestRepairHierarchyWaitsForAParentThatIsNotThereYet(t *testing.T) {
 	}
 	if moved, ok := server.Lookup(flat[0].ID); !ok || moved.Parent != 0 {
 		t.Fatalf("the page is %+v, want it left alone", moved)
+	}
+}
+
+func TestRepairHierarchyPreflightRefusesWhatTheStorePlaces(t *testing.T) {
+	t.Parallel()
+
+	wpID := int64(12)
+	cases := []struct {
+		name string
+		page pagemap.Page
+		want []string
+	}{
+		{
+			name: "a page",
+			page: pagemap.Page{ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", WPType: pagemap.WPPage, WPID: &wpID},
+			want: []string{},
+		},
+		{
+			name: "a product",
+			page: pagemap.Page{ID: "page-product", SiteID: "site", Path: "/product/espresso-machine/", WPType: pagemap.WPProduct, WPID: &wpID},
+			want: []string{steps.CodeStorePlaced},
+		},
+		{
+			name: "a product category",
+			page: pagemap.Page{ID: "page-shelf", SiteID: "site", Path: "/product-category/machines/", WPType: pagemap.WPProductCategory, WPID: &wpID},
+			want: []string{steps.CodeStorePlaced},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			record, targets := preflightRun(run.RepairRecipe(), tc.page)
+			record.Kind = run.KindRepair
+			findings, err := steps.RepairHierarchy(unitDeps()).Preflight(t.Context(), record, targets)
+			if err != nil {
+				t.Fatalf("Preflight: %v", err)
+			}
+			if got := codesOf(findings); !slices.Equal(got, tc.want) {
+				t.Fatalf("findings = %+v, want %v", findings, tc.want)
+			}
+			for _, finding := range findings {
+				if finding.Severity != content.SeverityError || finding.Path != tc.page.Path {
+					t.Errorf("finding = %+v, want an error naming the page", finding)
+				}
+			}
+		})
 	}
 }
 
