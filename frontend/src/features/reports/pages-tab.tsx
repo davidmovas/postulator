@@ -20,7 +20,7 @@ import {
     TaskAltIcon,
 } from "../../ui/index.js";
 import { pageStatusLabel, pageStatusTone } from "../pages/labels.js";
-import { runStatusLabel } from "../runs/labels.js";
+import { runStatusLabel, runStatusTone } from "../runs/labels.js";
 import { PageReportCards } from "./page-cards.js";
 import { pathFilter } from "./params.js";
 
@@ -43,7 +43,6 @@ export function PagesTab({ siteId, prefix, pageId, onPrefix, onSelect }: PagesTa
     );
     const matches = useMemo(() => flatten(listed.data?.pages).slice(0, matchLimit), [listed.data]);
     const report = usePageReport(pageId === "" ? null : pageId);
-    const selected = matches.find((page) => page.id === pageId);
     const reported = report.error === null ? null : failure(report.error);
 
     return (
@@ -113,7 +112,7 @@ export function PagesTab({ siteId, prefix, pageId, onPrefix, onSelect }: PagesTa
                             <h2 className="min-w-0 truncate font-mono text-sm text-ink" title={report.data.path}>
                                 {report.data.path}
                             </h2>
-                            <StatusBadge tone={pageStatusTone(selected?.status ?? "")}>
+                            <StatusBadge tone={runStatusTone(report.data.status)}>
                                 {runStatusLabel(report.data.status)}
                             </StatusBadge>
                             <span
