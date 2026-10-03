@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import type { PagingModels, RunsModels, SitesModels } from "../lib/api.js";
+import type { CatalogModels, PagingModels, RunsModels, SitesModels } from "../lib/api.js";
 import type { Timestamp, Wire } from "./wire.js";
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
@@ -17,6 +17,12 @@ describe("Wire narrowing", () => {
     test("narrows a replayed event timestamp even though dto.Time generates as any", () => {
         const at: Equal<Wire<RunsModels.Event>["at"], Timestamp> = true;
         expect(at).toBe(true);
+    });
+
+    test("narrows the start of a spend report", () => {
+        const since: Equal<Wire<CatalogModels.SpendReportResponse>["since"], Timestamp> = true;
+        const createdAt: Equal<Wire<CatalogModels.Call>["createdAt"], Timestamp> = true;
+        expect([since, createdAt]).toEqual([true, true]);
     });
 
     test("leaves RawMessage opaque", () => {

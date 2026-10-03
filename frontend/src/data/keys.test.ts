@@ -61,6 +61,35 @@ describe("the conversation handle invalidates every message page", () => {
     });
 });
 
+describe("the spend keys", () => {
+    test("every range and every run report sits under the spend handle", () => {
+        expect(isPrefix(keys.models.spendAll(), keys.models.spendOver(7))).toBe(true);
+        expect(isPrefix(keys.models.spendAll(), keys.models.spendOfRun("r1"))).toBe(true);
+        expect(isPrefix(keys.models.spendRanges(), keys.models.spendOver(90))).toBe(true);
+    });
+
+    test("a run's report is not one of the ranges", () => {
+        expect(isPrefix(keys.models.spendRanges(), keys.models.spendOfRun("r1"))).toBe(false);
+    });
+
+    test("two ranges and two runs keep their own entries", () => {
+        expect(keys.models.spendOver(7)).not.toEqual(keys.models.spendOver(30));
+        expect(keys.models.spendOfRun("r1")).not.toEqual(keys.models.spendOfRun("r2"));
+    });
+
+    test("the call list keys its filter and its limit under one handle", () => {
+        expect(keys.models.calls({}, 25)).not.toEqual(keys.models.calls({}, 50));
+        expect(keys.models.calls({}, 25)).not.toEqual(keys.models.calls({ runId: "r1" }, 25));
+        expect(keys.models.calls({})).toEqual(keys.models.calls({}, defaultLimit));
+        expect(isPrefix(keys.models.callLists(), keys.models.calls({ runId: "r1" }, 25))).toBe(true);
+    });
+
+    test("spend is not under the usage handle, so a usage refresh leaves it alone", () => {
+        expect(isPrefix(keys.models.usageAll(), keys.models.spendOver(30))).toBe(false);
+        expect(isPrefix(keys.models.usageAll(), keys.models.calls({}, 25))).toBe(false);
+    });
+});
+
 describe("a preview link lives outside the page cache", () => {
     test("no page invalidation reaches a live preview link", () => {
         expect(isPrefix(keys.pages.root(), keys.previews.link("p1", "exists"))).toBe(false);

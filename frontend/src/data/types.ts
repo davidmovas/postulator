@@ -90,6 +90,11 @@ export type RoleProfile = Wire<CatalogModels.Profile>;
 export type TokenUsage = Wire<CatalogModels.Usage>;
 export type UsageSummary = Wire<CatalogModels.UsageSummaryResponse>;
 export type ProviderKey = Wire<CatalogModels.ProviderKey>;
+export type SpendReport = Wire<CatalogModels.SpendReportResponse>;
+export type SpendTotals = Wire<CatalogModels.SpendTotals>;
+export type SpendSlice = Wire<CatalogModels.SpendSlice>;
+export type ModelCall = Wire<CatalogModels.Call>;
+export type ModelCallFilter = ListFilter<CatalogModels.ListCallsRequest>;
 
 export type ImportSheet = Wire<ImportModels.Sheet>;
 export type ImportMapping = Wire<ImportModels.Mapping>;

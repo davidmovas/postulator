@@ -1,17 +1,20 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
     disableModel,
     getProfiles,
+    listCalls,
     listModels,
     setProfile,
+    spendReport,
     testProvider,
     upsertModel,
     usageSummary,
 } from "../endpoints/models.js";
 import type { UsageScope } from "../keys.js";
 import { keys } from "../keys.js";
-import { useUnlockedQuery } from "../query.js";
+import { useUnlockedInfinite, useUnlockedQuery } from "../query.js";
+import type { ModelCall, ModelCallFilter } from "../types.js";
 
 export function useModelCatalog() {
     return useUnlockedQuery({
@@ -31,6 +34,32 @@ export function useUsage(usageScope: UsageScope = {}) {
     return useUnlockedQuery({
         queryKey: keys.models.usage(usageScope),
         queryFn: ({ signal }) => usageSummary(usageScope, signal),
+    });
+}
+
+export function useSpendReport(days: number) {
+    return useUnlockedQuery({
+        queryKey: keys.models.spendOver(days),
+        queryFn: ({ signal }) => spendReport({ days }, signal),
+        placeholderData: keepPreviousData,
+    });
+}
+
+export function useRunSpend(runId: string | null) {
+    return useUnlockedQuery({
+        queryKey: keys.models.spendOfRun(runId ?? ""),
+        queryFn: ({ signal }) => spendReport({ runId: runId ?? "" }, signal),
+        enabled: runId !== null && runId !== "",
+    });
+}
+
+export function useModelCalls(filter: ModelCallFilter = {}, limit?: number) {
+    return useUnlockedInfinite<ModelCallFilter, ModelCall>({
+        queryKey: keys.models.calls(filter, limit),
+        fetch: listCalls,
+        filters: filter,
+        sort: null,
+        limit,
     });
 }
 

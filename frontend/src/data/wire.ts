@@ -14,7 +14,8 @@ type TimeField =
     | "observedAt"
     | "wpModifiedAt"
     | "lastSyncedAt"
-    | "nextRunAt";
+    | "nextRunAt"
+    | "since";
 
 export type Wire<T> =
     IsAny<T> extends true
