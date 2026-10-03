@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-const latestMigration = 37
+const latestMigration = 38
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -48,6 +48,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0035_llm_call_usage_detail.sql",
 		"0036_model_catalog_tier_prices.sql",
 		"0037_drop_model_reasoning_effort.sql",
+		"0038_drop_removed_provider_profiles.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -619,6 +620,70 @@ func TestTheCatalogRowCarriesNoReasoningEffort(t *testing.T) {
 	}
 	if slices.Contains(columns(), "reasoning_effort") {
 		t.Fatal("model_catalog carries reasoning_effort after the second up")
+	}
+}
+
+func TestAProfileOfARemovedProviderIsDropped(t *testing.T) {
+	t.Parallel()
+
+	store := openStore(t, nil)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	if _, err = provider.DownTo(t.Context(), 37); err != nil {
+		t.Fatalf("down to 37: %v", err)
+	}
+
+	const at = "2026-10-03T09:00:00Z"
+	for _, row := range [][3]string{
+		{"writer", "openai", "gpt-5.6-terra"},
+		{"judge", "retired", "old-model"},
+		{"chat", "elsewhere", "chat-model"},
+		{"editor", "OpenAI", "gpt-5.6-luna"},
+	} {
+		if _, execErr := store.writer.ExecContext(t.Context(),
+			`INSERT INTO model_profiles (role, provider, model, updated_at) VALUES (?, ?, ?, ?)`,
+			row[0], row[1], row[2], at); execErr != nil {
+			t.Fatalf("store the %s profile: %v", row[0], execErr)
+		}
+	}
+	kept := func() []string {
+		t.Helper()
+		rows, queryErr := store.writer.QueryContext(t.Context(), `SELECT role || ':' || provider FROM model_profiles ORDER BY role`)
+		if queryErr != nil {
+			t.Fatalf("read the profiles: %v", queryErr)
+		}
+		defer rows.Close()
+		var out []string
+		for rows.Next() {
+			var row string
+			if scanErr := rows.Scan(&row); scanErr != nil {
+				t.Fatalf("scan a profile: %v", scanErr)
+			}
+			out = append(out, row)
+		}
+		if rowsErr := rows.Err(); rowsErr != nil {
+			t.Fatalf("read the profiles: %v", rowsErr)
+		}
+		return out
+	}
+
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up: %v", err)
+	}
+	if got := kept(); !slices.Equal(got, []string{"writer:openai"}) {
+		t.Fatalf("profiles after the up = %v, want the OpenAI one alone", got)
+	}
+
+	if _, err = provider.DownTo(t.Context(), 37); err != nil {
+		t.Fatalf("the down of a removal must restore nothing and still succeed: %v", err)
+	}
+	if got := kept(); !slices.Equal(got, []string{"writer:openai"}) {
+		t.Fatalf("profiles after the down = %v, want them untouched", got)
+	}
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up again: %v", err)
 	}
 }
 

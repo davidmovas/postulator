@@ -28,11 +28,11 @@ func TestModelProfileRepo(t *testing.T) {
 	if err = repo.Set(ctx, llm.RoleWriter, writer, at); err != nil {
 		t.Fatalf("Set: %v", err)
 	}
-	if err = repo.Set(ctx, llm.RoleJudge, llm.ModelRef{Provider: "anthropic", Model: "claude-haiku-4-5"}, at); err != nil {
+	if err = repo.Set(ctx, llm.RoleJudge, llm.ModelRef{Provider: "openai", Model: "gpt-5.6-luna"}, at); err != nil {
 		t.Fatalf("Set judge: %v", err)
 	}
 
-	replacement := llm.ModelRef{Provider: "anthropic", Model: "claude-sonnet-5"}
+	replacement := llm.ModelRef{Provider: "openai", Model: "gpt-5.6-sol"}
 	if err = repo.Set(ctx, llm.RoleWriter, replacement, at.Add(time.Hour)); err != nil {
 		t.Fatalf("Set again: %v", err)
 	}
@@ -45,7 +45,7 @@ func TestModelProfileRepo(t *testing.T) {
 		t.Fatalf("profiles = %v, want the writer replaced", profiles)
 	}
 
-	if profiles[llm.RoleJudge].Model != "claude-haiku-4-5" {
+	if profiles[llm.RoleJudge].Model != "gpt-5.6-luna" {
 		t.Errorf("profiles = %v, want the judge kept", profiles)
 	}
 }
