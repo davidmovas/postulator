@@ -80,6 +80,7 @@ func newSyncHarness(t *testing.T, batch int, opts ...wptest.Option) *syncHarness
 		store: store, server: server, bus: bus, clock: fake,
 		pages: pageRepo, links: linkRepo, siteID: owner.ID, check: run.NewCheckpoint(),
 		deps: steps.Deps{
+			Entities: sqlite.NewEntityRepo(store), Terms: sqlite.NewTermRepo(store),
 			Pages: pageRepo, Links: linkRepo, Sites: siteRepo, SiteWriter: siteRepo,
 			WordPress: oneClient{client: syncClient(t, server)}, UnitOfWork: store, Publisher: bus,
 			Clock: fake, BatchSize: batch,
