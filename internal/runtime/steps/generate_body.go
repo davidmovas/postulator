@@ -39,7 +39,7 @@ func GenerateBody(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			policy, err := effectivePolicy(ctx, deps, sc)
+			policy, err := effectivePolicy(ctx, deps, sc.Run.SiteID, sc.Spec)
 			if err != nil {
 				return run.Result{}, err
 			}

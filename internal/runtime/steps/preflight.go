@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
-	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -21,20 +20,6 @@ const (
 	CodeImageSourceUnavailable = "image_source_unavailable"
 	CodePluginMissing          = "plugin_missing"
 )
-
-func effectivePolicyFor(ctx context.Context, deps Deps, siteID string, spec template.TemplateSpec) (template.LinkPolicy, error) {
-	resp, err := deps.Policies.GetEffectivePolicy(ctx, templates.GetEffectivePolicyRequest{SiteID: siteID})
-	if err != nil {
-		return template.LinkPolicy{}, err
-	}
-
-	return template.LinkPolicy{
-		Rules:          templates.EffectiveRules(resp.Policy.Rules, spec.LinkRules),
-		ForbidExternal: resp.Policy.ForbidExternal,
-		ForbidSelf:     resp.Policy.ForbidSelf,
-		AnchorStrategy: template.AnchorStrategy(resp.Policy.AnchorStrategy),
-	}, nil
-}
 
 func pageFinding(severity content.Severity, code string, page pagemap.Page, message string) run.EstimateFinding {
 	return run.EstimateFinding{Severity: severity, Code: code, Message: message, PageID: page.ID, Path: page.Path}
@@ -89,7 +74,7 @@ func graphPreflight(deps Deps) run.Preflight {
 				continue
 			}
 
-			policy, policyErr := effectivePolicyFor(ctx, deps, record.SiteID, target.Spec)
+			policy, policyErr := effectivePolicy(ctx, deps, record.SiteID, target.Spec)
 			if policyErr != nil {
 				return nil, policyErr
 			}

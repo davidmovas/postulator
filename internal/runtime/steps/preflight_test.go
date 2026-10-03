@@ -2,6 +2,8 @@ package steps_test
 
 import (
 	"context"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/images"
@@ -152,6 +154,63 @@ func TestResolveContextPreflightNamesWhatTheGraphLacks(t *testing.T) {
 				if finding.Severity != tc.severity || finding.PageID != tc.targets[0].ID || finding.Path != tc.targets[0].Path {
 					t.Fatalf("finding = %+v, want it graded %s and naming the page", finding, tc.severity)
 				}
+			}
+		})
+	}
+}
+
+func TestThePreflightOwesWhatTheStepWillResolve(t *testing.T) {
+	t.Parallel()
+
+	parentOnly := template.LinkRules{UpDepth: 1, MaxPerTarget: 1}
+	downOnly := template.LinkRules{DownLinks: true, MaxPerTarget: 1}
+
+	cases := []struct {
+		name     string
+		site     template.LinkRules
+		template template.LinkRules
+		owed     bool
+	}{
+		{name: "the template asks for the parent", template: parentOnly, owed: true},
+		{name: "a template without rules inherits the site's", site: parentOnly, owed: true},
+		{name: "the template's own rules win over the site's", site: parentOnly, template: downOnly},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			entities := unitEntities()
+			entities[0].CanonicalPageID = nil
+			deps := unitDeps()
+			deps.Entities = entityList{items: entities}
+			deps.Pages = pageList{items: []pagemap.Page{
+				{ID: "page-parent", SiteID: "site", Path: "/coffee/", WPType: pagemap.WPPage, Status: pagemap.StatusPlanned, EntityID: pointer("parent")},
+				{ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", WPType: pagemap.WPPage, Status: pagemap.StatusPlanned, EntityID: pointer("child")},
+			}}
+			deps.Policies = policyStub{rules: tc.site}
+
+			sc := unitContext(t, nil)
+			sc.Spec.LinkRules = tc.template
+			record, targets := preflightRun([]template.StepSpec{{Name: steps.NameResolveContext, Enabled: true}}, sc.Page)
+			target := targets[sc.Page.ID]
+			target.Spec.LinkRules = tc.template
+			targets[sc.Page.ID] = target
+
+			findings, err := steps.ResolveContext(deps).Preflight(t.Context(), record, targets)
+			if err != nil {
+				t.Fatalf("Preflight: %v", err)
+			}
+			result, err := steps.ResolveContext(deps).Run(t.Context(), sc)
+			if err != nil {
+				t.Fatalf("ResolveContext: %v", err)
+			}
+
+			preflightOwes := slices.Contains(codesOf(findings), steps.CodeRequiredTargetUnplaced)
+			stepOwes := strings.Contains(result.Message, "1 of them required")
+			if preflightOwes != tc.owed || stepOwes != tc.owed {
+				t.Fatalf("the preflight owes the parent %t and the step %t (%q), want both %t",
+					preflightOwes, stepOwes, result.Message, tc.owed)
 			}
 		})
 	}
