@@ -1,8 +1,11 @@
 package imports_test
 
 import (
+	"fmt"
 	"path/filepath"
+	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/application/imports"
@@ -136,5 +139,152 @@ func TestTheClientWorkbookImportsSheetBySheet(t *testing.T) {
 	again := h.apply(t, path, groups)
 	if again.Counts.EntitiesCreated != 0 || again.Counts.PagesCreated != 0 || again.Counts.EdgesCreated != 0 {
 		t.Fatalf("the group sheet imported again wrote %+v", again.Counts)
+	}
+}
+
+type siteLabels struct {
+	entities   []string
+	edges      []string
+	pages      []string
+	canonicals []string
+}
+
+func trail(byID map[string]graph.Entity, entityID string) string {
+	names := make([]string, 0, 4)
+	seen := make(map[string]struct{})
+	for at, held := byID[entityID]; held; at, held = byID[deref(at.ScopeID)] {
+		if _, again := seen[at.ID]; again {
+			break
+		}
+		seen[at.ID] = struct{}{}
+		names = append([]string{at.Name}, names...)
+	}
+	return strings.Join(names, " › ")
+}
+
+func deref(ref *string) string {
+	if ref == nil {
+		return ""
+	}
+	return *ref
+}
+
+func (h harness) labels(t *testing.T) siteLabels {
+	t.Helper()
+
+	entities, edges, pages := h.entities(t), h.edges(t), h.pages(t)
+	byID := make(map[string]graph.Entity, len(entities))
+	for i := range entities {
+		byID[entities[i].ID] = entities[i]
+	}
+	pathOf := make(map[string]string, len(pages))
+	for i := range pages {
+		pathOf[pages[i].ID] = pages[i].Path
+	}
+
+	var out siteLabels
+	for i := range entities {
+		held := &entities[i]
+		out.entities = append(out.entities, fmt.Sprintf("%s | %s | category %t | %s",
+			trail(byID, held.ID), held.Kind, held.SiteCategory, held.Keywords.Cell()))
+		if held.CanonicalPageID != nil {
+			out.canonicals = append(out.canonicals, trail(byID, held.ID)+" → "+pathOf[*held.CanonicalPageID])
+		}
+	}
+	for i := range edges {
+		out.edges = append(out.edges, fmt.Sprintf("%s → %s | %s | %s",
+			trail(byID, edges[i].FromEntityID), trail(byID, edges[i].ToEntityID), edges[i].Kind, edges[i].Status))
+	}
+	for i := range pages {
+		held := &pages[i]
+		out.pages = append(out.pages, fmt.Sprintf("%s | %s | %s | %s | %s | %s | %v | planned %s | under %s",
+			held.Path, held.WPType, trail(byID, deref(held.EntityID)), held.Title, held.H1, held.Keywords.Cell(),
+			held.Notes, held.PlannedPath, pathOf[deref(held.ParentPageID)]))
+	}
+	for _, list := range [][]string{out.entities, out.edges, out.pages, out.canonicals} {
+		slices.Sort(list)
+	}
+	return out
+}
+
+func TestTheClientWorkbookImportsAsOneWorkbook(t *testing.T) {
+	t.Parallel()
+
+	sheetBySheet, whole := newHarness(t), newHarness(t)
+	seen, err := whole.service.Inspect(t.Context(), imports.InspectRequest{SiteID: whole.siteID, Path: clientWorkbook})
+	if err != nil {
+		t.Fatalf("Inspect: %v", err)
+	}
+
+	sheets := make([]imports.SheetMapping, 0, len(seen.Sheets))
+	for _, listed := range seen.Sheets {
+		used := whole.sheet(t, clientWorkbook, listed.Name)
+		detected := listed.Detected
+		detected.Name = listed.Name
+		if !reflect.DeepEqual(detected, used) {
+			t.Fatalf("the %s sheet detects\n%+v\nwhere the sheet by sheet import uses\n%+v", listed.Name, detected, used)
+		}
+		sheets = append(sheets, imports.SheetMapping{Sheet: listed.Name, Mapping: listed.Detected})
+		clean(t, listed.Name, sheetBySheet.apply(t, clientWorkbook, sheetBySheet.sheet(t, clientWorkbook, listed.Name)))
+	}
+
+	applied, err := whole.service.Apply(t.Context(), imports.ApplyRequest{SiteID: whole.siteID, Path: clientWorkbook, Sheets: sheets})
+	if err != nil {
+		t.Fatalf("Apply the workbook: %v", err)
+	}
+	clean(t, "whole", applied)
+
+	want, got := sheetBySheet.labels(t), whole.labels(t)
+	if len(want.entities) != 8+7+1+2 || len(want.pages) == 0 || len(want.edges) == 0 {
+		t.Fatalf("the sheets imported one by one hold %d entities, %d pages and %d edges, want eighteen entities",
+			len(want.entities), len(want.pages), len(want.edges))
+	}
+	for _, compared := range []struct {
+		what      string
+		got, want []string
+	}{
+		{what: "entities", got: got.entities, want: want.entities},
+		{what: "edges", got: got.edges, want: want.edges},
+		{what: "pages", got: got.pages, want: want.pages},
+		{what: "canonical pages", got: got.canonicals, want: want.canonicals},
+	} {
+		if !slices.Equal(compared.got, compared.want) {
+			t.Errorf("the workbook's %s differ from the sheets imported one by one:\ngot\n%s\nwant\n%s",
+				compared.what, strings.Join(compared.got, "\n"), strings.Join(compared.want, "\n"))
+		}
+	}
+
+	for _, edge := range applied.Report.Edges {
+		if edge.From == "Capsules" && edge.To == "BPC-157" && (edge.Sheet != "Variations" || edge.Action != string(imports.ActionCreate)) {
+			t.Errorf("the capsules of BPC-157 = %+v, want the variation sheet's edge to the group planned before it", edge)
+		}
+	}
+	if !hasEdge(applied.Report, "Capsules", "BPC-157", string(graph.EdgeParent)) {
+		t.Errorf("edges = %+v, want the capsules of BPC-157 under it", applied.Report.Edges)
+	}
+	orphans := findings(applied.Report.Warnings, imports.CodeGroupWithoutPage)
+	if len(orphans) != 2 {
+		t.Errorf("groups without a page = %+v, want Blends and Recovery", orphans)
+	}
+	for _, finding := range slices.Concat(applied.Report.Warnings, applied.Report.Errors) {
+		if !slices.Contains(clientSheets, finding.Sheet) {
+			t.Errorf("the finding %+v names no sheet of the workbook", finding)
+		}
+	}
+	for _, orphan := range orphans {
+		if orphan.Sheet != "Catalog" {
+			t.Errorf("the group without a page %+v, want it on the catalog sheet", orphan)
+		}
+	}
+
+	again, err := whole.service.Apply(t.Context(), imports.ApplyRequest{SiteID: whole.siteID, Path: clientWorkbook, Sheets: sheets})
+	if err != nil {
+		t.Fatalf("Apply the workbook again: %v", err)
+	}
+	if again.Counts != (imports.Counts{Skipped: again.Counts.Skipped}) {
+		t.Fatalf("the workbook imported again wrote %+v", again.Counts)
+	}
+	if after := whole.labels(t); !reflect.DeepEqual(after, got) {
+		t.Fatal("the workbook imported again changed the site")
 	}
 }

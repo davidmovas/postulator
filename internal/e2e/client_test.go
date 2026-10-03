@@ -135,6 +135,10 @@ func assertEverySheetIsNamed(t *testing.T, core *app.Core, siteID string) {
 		if seen.Sheets[i].Rows == 0 {
 			t.Fatalf("the sheet %q reports no rows", seen.Sheets[i].Name)
 		}
+		if detected := seen.Sheets[i].Detected; !slices.Equal(detected.Options.Sheets, []string{seen.Sheets[i].Name}) ||
+			detected.Options.RowType == "" {
+			t.Fatalf("the sheet %q is detected as %+v, want its own mapping and row type", seen.Sheets[i].Name, detected)
+		}
 	}
 }
 
