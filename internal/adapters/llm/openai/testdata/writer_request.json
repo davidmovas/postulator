@@ -1,0 +1,79 @@
+{
+  "model": "gpt-5.6-terra",
+  "instructions": "You write pages.",
+  "input": [
+    {
+      "role": "user",
+      "content": "Write the page about caffeine."
+    }
+  ],
+  "store": false,
+  "max_output_tokens": 14192,
+  "reasoning": {
+    "effort": "medium"
+  },
+  "text": {
+    "format": {
+      "type": "json_schema",
+      "name": "generate_body",
+      "schema": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sections": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "heading": {
+                  "description": "The H2 heading",
+                  "type": "string"
+                },
+                "kind": {
+                  "enum": [
+                    "text",
+                    "list"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "heading",
+                "kind"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "title": {
+            "description": "The title of the page",
+            "type": "string"
+          },
+          "words": {
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "note",
+          "sections",
+          "title",
+          "words"
+        ],
+        "type": "object"
+      },
+      "strict": true
+    }
+  },
+  "service_tier": "flex",
+  "prompt_cache_options": {
+    "mode": "explicit"
+  }
+}

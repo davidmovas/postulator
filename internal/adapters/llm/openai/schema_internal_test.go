@@ -233,6 +233,15 @@ func TestANullForAnOptionalFieldDecodesToItsZeroValue(t *testing.T) {
 	}
 }
 
+func TestAnEmptyObjectIsStillClosed(t *testing.T) {
+	t.Parallel()
+
+	got := canonical(t, strictOf(schemaFor[struct{}](t)))
+	if want := canonicalText(t, `{"type":"object","properties":{},"required":[],"additionalProperties":false}`); got != want {
+		t.Errorf("strict schema = %s, want %s", got, want)
+	}
+}
+
 func TestAStructuredAnswerMustBeAnObject(t *testing.T) {
 	t.Parallel()
 
