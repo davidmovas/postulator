@@ -268,7 +268,7 @@ func (s *Service) ancestors(ctx context.Context, siteID string, targets []string
 
 func (s *Service) parentOf(ctx context.Context, child pagemap.Page) (pagemap.Page, bool, error) {
 	wanted := pagemap.ParentPath(child.Path)
-	if wanted == "" || wanted == "/" {
+	if wanted == "" || wanted == "/" || child.WPType.StoreAddressed() {
 		return pagemap.Page{}, false, nil
 	}
 

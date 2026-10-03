@@ -43,3 +43,38 @@ func TestIndex(t *testing.T) {
 		t.Errorf("Pages = %+v", pages)
 	}
 }
+
+func TestAPageSitsUnderThePathAboveItAndAStoreItemNever(t *testing.T) {
+	t.Parallel()
+
+	shop := page(pageB, "/shop/", nil)
+	index := pagemap.NewIndex([]pagemap.Page{page(pageA, "/", nil), shop})
+
+	product := page(pageC, "/shop/bags/", nil)
+	product.WPType = pagemap.WPProduct
+	category := page(pageD, "/shop/totes/", nil)
+	category.WPType = pagemap.WPProductCategory
+
+	cases := []struct {
+		name  string
+		child pagemap.Page
+		want  string
+	}{
+		{name: "a page under a page", child: page(pageC, "/shop/bags/", nil), want: pageB},
+		{name: "a page whose parent path is not mapped", child: page(pageC, "/blog/news/", nil)},
+		{name: "the page above itself", child: shop, want: pageA},
+		{name: "a product", child: product},
+		{name: "a product category", child: category},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			parent, found := index.PathParent(tc.child)
+			if found != (tc.want != "") || parent.ID != tc.want {
+				t.Errorf("PathParent = %q (found %t), want %q", parent.ID, found, tc.want)
+			}
+		})
+	}
+}

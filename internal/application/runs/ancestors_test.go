@@ -18,6 +18,7 @@ type chain struct {
 	path   string
 	id     string
 	parent string
+	wpType pagemap.WPType
 	wpID   *int64
 	mapped bool
 }
@@ -29,7 +30,7 @@ func (f *fixture) chain(links ...chain) {
 	}}
 	f.mapping.known = make(map[string]pagemap.Page, len(links))
 	for _, link := range links {
-		page := pagemap.Page{ID: link.id, Path: link.path, WPID: link.wpID}
+		page := pagemap.Page{ID: link.id, Path: link.path, WPType: link.wpType, WPID: link.wpID}
 		if link.parent != "" {
 			parent := link.parent
 			page.ParentPageID = &parent
@@ -76,6 +77,30 @@ func TestStartAddsTheAncestorsThatAreNotOnTheSite(t *testing.T) {
 	estimated, err := fixture.service.Estimate(t.Context(), runs.StartRequest{SiteID: fixture.siteID, PageIDs: []string{"max"}})
 	if err != nil || !slices.Equal(estimated.Added, want) {
 		t.Fatalf("Estimate = %+v, %v; want the same parents named before the run starts", estimated.Added, err)
+	}
+}
+
+func TestStartAddsNoAncestorToAProductTheStoreAddresses(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	fixture.chain(
+		chain{id: "bpc", path: "/bpc-157/", mapped: true},
+		chain{id: "liquid", path: "/product/bpc-157-liquid/", wpType: pagemap.WPProduct, wpID: onSite(), mapped: true},
+		chain{id: "capsules", path: "/bpc-157/capsules/", wpType: pagemap.WPProduct, mapped: true},
+	)
+
+	resp, err := fixture.service.Start(t.Context(), runs.StartRequest{
+		SiteID: fixture.siteID, PageIDs: []string{"liquid", "capsules"},
+	})
+	if err != nil {
+		t.Fatalf("Start: %v; a product has no parent in its path to sit under", err)
+	}
+	if len(resp.Added) != 0 {
+		t.Errorf("Added = %+v, want no ancestor for a product", resp.Added)
+	}
+	if got := fixture.engine.queued.Targets; !slices.Equal(got, []string{"liquid", "capsules"}) {
+		t.Errorf("the run targets %v, want the products alone", got)
 	}
 }
 

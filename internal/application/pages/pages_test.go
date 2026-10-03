@@ -98,6 +98,37 @@ func evidenceOf(t *testing.T, err error) []pages.Conflict {
 	return evidence
 }
 
+func TestAProductIsNeverPlacedUnderThePathAboveIt(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	product, err := h.service.Create(t.Context(), pages.CreateRequest{
+		SiteID: h.siteID, Path: "/shop/liquid/", Title: "Liquid", WPType: string(pagemap.WPProduct),
+	})
+	if err != nil {
+		t.Fatalf("Create the product: %v", err)
+	}
+	shop := h.page(t, "/shop/", nil)
+
+	stored, err := h.service.Get(t.Context(), pages.GetRequest{ID: product.Page.ID})
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if stored.Page.ParentPageID != nil {
+		t.Errorf("the product was adopted by %s; the store decides where a product lives", *stored.Page.ParentPageID)
+	}
+
+	later, err := h.service.Create(t.Context(), pages.CreateRequest{
+		SiteID: h.siteID, Path: "/shop/powder/", Title: "Powder", WPType: string(pagemap.WPProduct),
+	})
+	if err != nil {
+		t.Fatalf("Create the second product: %v", err)
+	}
+	if later.Page.ParentPageID != nil {
+		t.Errorf("a product created under %s got it as its parent", shop.Path)
+	}
+}
+
 func TestCreateResolvesTheParentAndAdoptsChildren(t *testing.T) {
 	t.Parallel()
 

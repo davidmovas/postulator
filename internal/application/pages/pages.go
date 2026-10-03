@@ -68,7 +68,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (CreateResponse
 		if verdictErr := s.verdict(c, page, index, entity); verdictErr != nil {
 			return verdictErr
 		}
-		if parent, found := index.ByPath(pagemap.ParentPath(page.Path)); found {
+		if parent, found := index.PathParent(page); found {
 			page.ParentPageID = &parent.ID
 		}
 		if insertErr := s.pages.Insert(c, page); insertErr != nil {
@@ -88,7 +88,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (CreateResponse
 func (s *Service) adopt(ctx context.Context, parent *pagemap.Page, siblings []pagemap.Page) error {
 	for i := range siblings {
 		child := siblings[i]
-		if child.ParentPageID != nil || pagemap.ParentPath(child.Path) != parent.Path {
+		if child.ParentPageID != nil || child.WPType.StoreAddressed() || pagemap.ParentPath(child.Path) != parent.Path {
 			continue
 		}
 		child.ParentPageID = &parent.ID
@@ -179,7 +179,7 @@ func (s *Service) Update(ctx context.Context, req UpdateRequest) (UpdateResponse
 				return verdictErr
 			}
 			next.ParentPageID = nil
-			if parent, found := index.ByPath(pagemap.ParentPath(next.Path)); found && parent.ID != next.ID {
+			if parent, found := index.PathParent(next); found {
 				next.ParentPageID = &parent.ID
 			}
 		}

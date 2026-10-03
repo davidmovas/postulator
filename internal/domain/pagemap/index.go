@@ -44,6 +44,17 @@ func (i Index) ByPath(path string) (page Page, found bool) {
 	return page, found
 }
 
+func (i Index) PathParent(page Page) (parent Page, found bool) {
+	if page.WPType.StoreAddressed() {
+		return Page{}, false
+	}
+	parent, found = i.ByPath(ParentPath(page.Path))
+	if !found || parent.ID == page.ID {
+		return Page{}, false
+	}
+	return parent, true
+}
+
 func (i Index) ByEntity(entityID string) []Page {
 	return slices.Clone(i.byEntity[entityID])
 }

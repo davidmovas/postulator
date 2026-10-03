@@ -765,7 +765,7 @@ func linkParents(ctx context.Context, deps Deps, siteID string) error {
 	for i := range pages {
 		page := pages[i]
 		var wanted *string
-		if parent, ok := index.ByPath(pagemap.ParentPath(page.Path)); ok && parent.ID != page.ID {
+		if parent, ok := index.PathParent(page); ok {
 			wanted = &parent.ID
 		}
 		if sameRef(page.ParentPageID, wanted) {
