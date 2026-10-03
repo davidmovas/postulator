@@ -207,16 +207,3 @@ func readBack(ctx context.Context, client *wp.Client, itemType wp.ItemType, wpID
 	}
 	return "", "", err
 }
-
-func persist(ctx context.Context, deps Deps, page pagemap.Page, links []pagemap.PageLink) error {
-	apply := func(c context.Context) error {
-		if err := deps.Pages.Update(c, page); err != nil {
-			return err
-		}
-		return deps.Links.ReplaceForPage(c, page.ID, links)
-	}
-	if deps.UnitOfWork == nil {
-		return apply(ctx)
-	}
-	return deps.UnitOfWork.Do(ctx, apply)
-}

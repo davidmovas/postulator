@@ -506,13 +506,8 @@ func reconcile(ctx context.Context, deps Deps, owner site.Site, batch []pulledIt
 		return nil
 	}
 
-	if deps.UnitOfWork == nil {
-		err = apply(ctx)
-	} else {
-		err = deps.UnitOfWork.Do(ctx, apply)
-	}
-	if err != nil {
-		return err
+	if applyErr := deps.inUnit(ctx, apply); applyErr != nil {
+		return applyErr
 	}
 	state.Findings = append(state.Findings, taken...)
 	return nil
@@ -719,18 +714,14 @@ func resolveLinks(ctx context.Context, deps Deps, siteID string) error {
 		return nil
 	}
 
-	apply := func(c context.Context) error {
+	return deps.inUnit(ctx, func(c context.Context) error {
 		for pageID, links := range pending {
 			if replaceErr := deps.Links.ReplaceForPage(c, pageID, links); replaceErr != nil {
 				return replaceErr
 			}
 		}
 		return nil
-	}
-	if deps.UnitOfWork == nil {
-		return apply(ctx)
-	}
-	return deps.UnitOfWork.Do(ctx, apply)
+	})
 }
 
 func resolveInto(links []pagemap.PageLink, index pagemap.Index) bool {
@@ -773,23 +764,9 @@ func archiveAbsent(ctx context.Context, deps Deps, siteID string, state *SiteSyn
 		return nil
 	}
 
-	apply := func(c context.Context) error {
-		for i := range stale {
-			if updateErr := deps.Pages.Update(c, stale[i]); updateErr != nil {
-				return updateErr
-			}
-		}
-		return nil
+	if updateErr := updateAll(ctx, deps, stale); updateErr != nil {
+		return updateErr
 	}
-	if deps.UnitOfWork != nil {
-		err = deps.UnitOfWork.Do(ctx, apply)
-	} else {
-		err = apply(ctx)
-	}
-	if err != nil {
-		return err
-	}
-
 	state.Archived += len(stale)
 	return nil
 }
@@ -820,18 +797,18 @@ func linkParents(ctx context.Context, deps Deps, siteID string) error {
 		return nil
 	}
 
-	apply := func(c context.Context) error {
-		for i := range moved {
-			if updateErr := deps.Pages.Update(c, moved[i]); updateErr != nil {
-				return updateErr
+	return updateAll(ctx, deps, moved)
+}
+
+func updateAll(ctx context.Context, deps Deps, pages []pagemap.Page) error {
+	return deps.inUnit(ctx, func(c context.Context) error {
+		for i := range pages {
+			if err := deps.Pages.Update(c, pages[i]); err != nil {
+				return err
 			}
 		}
 		return nil
-	}
-	if deps.UnitOfWork == nil {
-		return apply(ctx)
-	}
-	return deps.UnitOfWork.Do(ctx, apply)
+	})
 }
 
 func sameRef(current, wanted *string) bool {

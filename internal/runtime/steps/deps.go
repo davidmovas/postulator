@@ -113,3 +113,10 @@ func (d Deps) now() time.Time {
 	}
 	return d.Clock.Now().UTC().Truncate(time.Second)
 }
+
+func (d Deps) inUnit(ctx context.Context, apply func(context.Context) error) error {
+	if d.UnitOfWork == nil {
+		return apply(ctx)
+	}
+	return d.UnitOfWork.Do(ctx, apply)
+}

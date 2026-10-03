@@ -389,15 +389,7 @@ func readopt(ctx context.Context, deps Deps, sc *run.StepContext, page pagemap.P
 	if err != nil {
 		return errors.Wrap(err, errors.Internal, "read the body the revert wrote back")
 	}
-
-	now := deps.now()
-	next := page
-	next.ContentHash = hash
-	next.Drift = false
-	next.LastSyncedAt = &now
-	next.UpdatedAt = now
-	links := observedOn(page, pagemap.NewIndex(pages), pagemap.NewSite(owner.BaseURL), doc.Links(), now)
-	return persist(ctx, deps, next, links)
+	return adopt(ctx, deps, page, pagemap.NewIndex(pages), pagemap.NewSite(owner.BaseURL), doc, hash)
 }
 
 func metaKept(page pagemap.Page, applied []string, reason string) content.Finding {
