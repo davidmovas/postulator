@@ -18,6 +18,17 @@ func persist(ctx context.Context, deps Deps, page pagemap.Page, links []pagemap.
 	})
 }
 
+func updateAll(ctx context.Context, deps Deps, pages []pagemap.Page) error {
+	return deps.inUnit(ctx, func(c context.Context) error {
+		for i := range pages {
+			if err := deps.Pages.Update(c, pages[i]); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 func adopt(ctx context.Context, deps Deps, page pagemap.Page, index pagemap.Index, site pagemap.Site,
 	doc *content.Document, hash string) error {
 	now := deps.now()

@@ -526,6 +526,85 @@ func TestSyncSiteGivesAWaitingRowTheProductCreatedForIt(t *testing.T) {
 	}
 }
 
+func TestSyncSiteSettlesEveryParentFromThePathAboveIt(t *testing.T) {
+	t.Parallel()
+
+	row := func(siteID, path string, parent *string) pagemap.Page {
+		return pagemap.Page{
+			ID: id.New(), SiteID: siteID, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPPage,
+			Title: path, Status: pagemap.StatusPlanned, ParentPageID: parent,
+			CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+		}
+	}
+
+	cases := []struct {
+		name   string
+		seed   func(t *testing.T, h *syncHarness)
+		path   string
+		above  string
+		parent string
+	}{
+		{
+			name:   "a page under a page takes it",
+			seed:   seedSite,
+			path:   "/coffee/espresso/",
+			above:  "/coffee/",
+			parent: "/coffee/",
+		},
+		{
+			name: "a product under a page takes none",
+			seed: func(t *testing.T, h *syncHarness) {
+				t.Helper()
+				h.server.Seed(
+					wptest.Item{Type: wptest.TypePage, Title: "Product", Slug: "product", Content: "<p>the shop</p>"},
+					wptest.Item{Type: wptest.TypeProduct, Title: "Liquid", Slug: "liquid", Content: "<p>made by hand</p>", Status: "publish"},
+				)
+			},
+			path:  "/product/liquid/",
+			above: "/product/",
+		},
+		{
+			name: "a parent the path no longer names is let go",
+			seed: func(t *testing.T, h *syncHarness) {
+				t.Helper()
+				h.server.Seed(wptest.Item{Type: wptest.TypePage, Title: "About", Slug: "about", Content: "<p>about</p>"})
+				elsewhere := row(h.siteID, "/tea/", nil)
+				for _, planned := range []pagemap.Page{elsewhere, row(h.siteID, "/about/", &elsewhere.ID)} {
+					if err := h.pages.Insert(t.Context(), planned); err != nil {
+						t.Fatalf("insert %s: %v", planned.Path, err)
+					}
+				}
+			},
+			path: "/about/",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := newSyncHarness(t, 0)
+			tc.seed(t, h)
+			h.all(t)
+
+			child := h.byPath(t, tc.path)
+			if tc.above != "" {
+				h.byPath(t, tc.above)
+			}
+			if tc.parent == "" {
+				if child.ParentPageID != nil {
+					t.Fatalf("%s sits under %s, want no parent", tc.path, *child.ParentPageID)
+				}
+				return
+			}
+			parent := h.byPath(t, tc.parent)
+			if child.ParentPageID == nil || *child.ParentPageID != parent.ID {
+				t.Fatalf("%s sits under %v, want %s", tc.path, child.ParentPageID, parent.ID)
+			}
+		})
+	}
+}
+
 func TestSyncSiteAdoptsAPageItHasNeverSeen(t *testing.T) {
 	t.Parallel()
 
