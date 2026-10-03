@@ -18,6 +18,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/davidmovas/postulator/internal/adapters/wp"
 )
 
 type environment struct {
@@ -176,6 +178,16 @@ func newClient(t *testing.T) (*client, environment) {
 		pass: env.pass,
 		http: &http.Client{Timeout: 60 * time.Second},
 	}, env
+}
+
+func newAdapter(t *testing.T, env environment) *wp.Client {
+	t.Helper()
+
+	adapter, err := wp.New(wp.Config{BaseURL: env.baseURL, Username: env.user, AppPassword: env.pass}, wp.WithRateLimit(0))
+	if err != nil {
+		t.Fatalf("build the WordPress client for %s: %v", env.baseURL, err)
+	}
+	return adapter
 }
 
 var companionProbe struct {
