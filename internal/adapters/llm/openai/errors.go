@@ -91,7 +91,7 @@ func (r *refusal) effectiveStatus() int {
 
 func inferredStatus(fault wireFault) int {
 	switch {
-	case exhausted(fault), fault.Code == codeRateLimit, fault.Type == typeRateLimit:
+	case exhausted(fault), outOfCapacity(fault), fault.Code == codeRateLimit, fault.Type == typeRateLimit:
 		return http.StatusTooManyRequests
 	case fault.Code == codeModelNotFound:
 		return http.StatusNotFound

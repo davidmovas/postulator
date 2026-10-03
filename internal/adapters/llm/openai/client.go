@@ -66,12 +66,13 @@ func WithClock(clk clock.Clock) Option {
 }
 
 type Client struct {
-	secrets secretReader
-	models  modelReader
-	http    *http.Client
-	clock   clock.Clock
-	baseURL string
-	timeout time.Duration
+	secrets  secretReader
+	models   modelReader
+	http     *http.Client
+	clock    clock.Clock
+	baseURL  string
+	timeout  time.Duration
+	patience time.Duration
 }
 
 func New(secrets secretReader, models modelReader, opts ...Option) *Client {
@@ -108,7 +109,7 @@ func (c *Client) Complete(ctx context.Context, req port.Request) (port.Response,
 		return port.Response{}, err
 	}
 
-	resp, err := c.completeOnce(call, ex)
+	resp, err := c.complete(call, ex)
 	if err == nil {
 		return resp, nil
 	}

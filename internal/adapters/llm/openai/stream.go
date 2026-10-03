@@ -341,16 +341,6 @@ func (c *Client) Stream(ctx context.Context, req port.Request) (<-chan port.Delt
 	return out, nil
 }
 
-func (c *Client) open(call context.Context, ex exchange) (*liveStream, error) {
-	attempt, release := context.WithCancel(call)
-	live, err := c.openOnce(attempt, release, ex)
-	if err != nil {
-		release()
-		return nil, err
-	}
-	return live, nil
-}
-
 func (c *Client) openOnce(ctx context.Context, release context.CancelFunc, ex exchange) (*liveStream, error) {
 	resp, err := c.post(ctx, ex)
 	if err != nil {
