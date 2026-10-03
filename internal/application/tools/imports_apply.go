@@ -9,10 +9,10 @@ import (
 const importsApplyName = "imports_apply"
 
 type importsApplyArgs struct {
-	Path          string      `json:"path" description:"The absolute path of the .xlsx or .csv file on this machine"`
-	Mapping       mappingArgs `json:"mapping,omitempty" description:"How to read the sheet; leave it out to read the first sheet with the columns detected from its headers"`
-	Sheets        []sheetArgs `json:"sheets,omitempty" description:"Import these sheets together in workbook order, each with its own mapping"`
-	SaveMappingAs string      `json:"saveMappingAs,omitempty" description:"Keep the mapping under this name, each sheet's as name / sheet, so the next import can reuse it"`
+	Path          string      `json:"path" description:"Absolute path of the .xlsx or .csv file"`
+	Mapping       mappingArgs `json:"mapping,omitempty" description:"How to read the sheet; left out, the first sheet with detected columns"`
+	Sheets        []sheetArgs `json:"sheets,omitempty" description:"Sheets imported together in workbook order, each with its mapping"`
+	SaveMappingAs string      `json:"saveMappingAs,omitempty" description:"Save the mapping under this name, each sheet's as name / sheet"`
 }
 
 func importsApply(deps Deps) Tool {

@@ -9,21 +9,21 @@ import (
 )
 
 type modelProfileArgs struct {
-	Role     string `json:"role" enum:"writer,editor,linker,judge,chat,image,titler" description:"Which job this model takes while the page is written"`
-	Provider string `json:"provider" description:"The provider to use for that job, such as openai"`
-	Model    string `json:"model" description:"The model to use for that job"`
+	Role     string `json:"role" enum:"writer,editor,linker,judge,chat,image,titler" description:"The job the model does"`
+	Provider string `json:"provider" description:"Provider, such as openai"`
+	Model    string `json:"model" description:"Model name from models_list"`
 }
 
 type stepArgs struct {
-	Name        string `json:"name" enum:"resolve_context,generate_body,generate_meta,insert_links,repair_links,generate_images,validate,judge,publish,relink_neighbors,sync_back,report" description:"Which step of the run this is"`
-	Enabled     bool   `json:"enabled,omitempty" description:"Run this step; leave it out and the step stays in the recipe and is skipped"`
-	AllowErrors *bool  `json:"allowErrors,omitempty" description:"Only the validate step reads this: let the item go on although validation found faults"`
-	Iterations  *int   `json:"iterations,omitempty" minimum:"1" description:"Only the repair_links step reads this: how many passes it may make"`
+	Name        string `json:"name" enum:"resolve_context,generate_body,generate_meta,insert_links,repair_links,generate_images,validate,judge,publish,relink_neighbors,sync_back,report" description:"Step name"`
+	Enabled     bool   `json:"enabled,omitempty" description:"Run it; left out, the step is kept but skipped"`
+	AllowErrors *bool  `json:"allowErrors,omitempty" description:"validate only: go on despite faults"`
+	Iterations  *int   `json:"iterations,omitempty" minimum:"1" description:"repair_links only: passes allowed"`
 }
 
 type sectionKeywordRulesArgs struct {
-	Include          []string `json:"include,omitempty" description:"Phrases this section must use at least once; leave it out for none"`
-	PrimaryInHeading bool     `json:"primaryInHeading,omitempty" description:"The primary keyword must appear in this section's heading"`
+	Include          []string `json:"include,omitempty" description:"Phrases it must use"`
+	PrimaryInHeading bool     `json:"primaryInHeading,omitempty" description:"Primary keyword in the heading"`
 }
 
 func (a sectionKeywordRulesArgs) rules() template.SectionKeywordRules {
@@ -31,11 +31,11 @@ func (a sectionKeywordRulesArgs) rules() template.SectionKeywordRules {
 }
 
 type sectionArgs struct {
-	Heading      string                   `json:"heading" description:"The heading; {primaryKeyword}, {entityName}, {siteName} and {pageTitle} are filled in per page, other braces are refused"`
-	Intent       string                   `json:"intent,omitempty" description:"What the section has to cover, one short sentence to the writer"`
-	TargetWords  int                      `json:"targetWords,omitempty" minimum:"0" description:"About how many words the section should run to; leave it out to let the writer decide"`
-	Required     bool                     `json:"required,omitempty" description:"The page is not valid without this section"`
-	KeywordRules *sectionKeywordRulesArgs `json:"keywordRules,omitempty" description:"What this section has to say about the keywords; leave it out to ask nothing of it"`
+	Heading      string                   `json:"heading" description:"May use {primaryKeyword}, {entityName}, {siteName}, {pageTitle}; no other braces"`
+	Intent       string                   `json:"intent,omitempty" description:"What it covers, one sentence"`
+	TargetWords  int                      `json:"targetWords,omitempty" minimum:"0" description:"Approximate words"`
+	Required     bool                     `json:"required,omitempty" description:"Page invalid without it"`
+	KeywordRules *sectionKeywordRulesArgs `json:"keywordRules,omitempty" description:"Keyword rules for this section"`
 }
 
 func (a sectionArgs) section() template.Section {
@@ -61,8 +61,8 @@ func sectionsOf(listed []sectionArgs) []template.Section {
 }
 
 type lengthArgs struct {
-	Min int `json:"min,omitempty" minimum:"0" description:"The fewest words the whole page may run to; leave it out for no floor"`
-	Max int `json:"max,omitempty" minimum:"0" description:"The most words the whole page may run to; leave it out for no ceiling"`
+	Min int `json:"min,omitempty" minimum:"0" description:"Fewest words"`
+	Max int `json:"max,omitempty" minimum:"0" description:"Most words"`
 }
 
 func (a lengthArgs) length() template.Length {
@@ -70,11 +70,11 @@ func (a lengthArgs) length() template.Length {
 }
 
 type keywordRulesArgs struct {
-	PrimaryInTitle          bool    `json:"primaryInTitle,omitempty" description:"The primary keyword must appear in the title"`
-	PrimaryInH1             bool    `json:"primaryInH1,omitempty" description:"The primary keyword must appear in the first heading"`
-	PrimaryInFirstParagraph bool    `json:"primaryInFirstParagraph,omitempty" description:"The primary keyword must appear in the opening paragraph"`
-	MaxDensity              float64 `json:"maxDensity,omitempty" minimum:"0" maximum:"1" description:"The largest share of the words the primary keyword may take, between 0 and 1; leave it out for no ceiling"`
-	RequiredKeywords        *int    `json:"requiredKeywords,omitempty" minimum:"0" description:"How many of the page's keywords the body must use, the most searched first; leave it out for all"`
+	PrimaryInTitle          bool    `json:"primaryInTitle,omitempty" description:"Primary keyword in the title"`
+	PrimaryInH1             bool    `json:"primaryInH1,omitempty" description:"Primary keyword in the H1"`
+	PrimaryInFirstParagraph bool    `json:"primaryInFirstParagraph,omitempty" description:"Primary keyword in the first paragraph"`
+	MaxDensity              float64 `json:"maxDensity,omitempty" minimum:"0" maximum:"1" description:"Largest share of the words the primary keyword may take"`
+	RequiredKeywords        *int    `json:"requiredKeywords,omitempty" minimum:"0" description:"Keywords the body must use, most searched first; left out, all"`
 }
 
 func (a keywordRulesArgs) rules() template.KeywordRules {
@@ -88,13 +88,13 @@ func (a keywordRulesArgs) rules() template.KeywordRules {
 }
 
 type linkRulesArgs struct {
-	UpDepth                    int     `json:"upDepth,omitempty" minimum:"0" description:"How many levels up the tree a page links to, 1 for its parent alone; leave it out for none"`
-	DownLinks                  bool    `json:"downLinks,omitempty" description:"Link down to the children of the entity"`
-	SiblingMinWeight           float64 `json:"siblingMinWeight,omitempty" minimum:"0" maximum:"1" description:"The weight a related edge needs before a sibling link is placed, between 0 and 1; leave it out to place every sibling link"`
-	MaxLinks                   int     `json:"maxLinks,omitempty" minimum:"0" description:"The most internal links one page may carry; leave it out for no ceiling"`
-	MaxPerTarget               int     `json:"maxPerTarget,omitempty" minimum:"0" description:"The most links one page may point at a single target; leave it out for no ceiling"`
-	ParentLinkWithinParagraphs int     `json:"parentLinkWithinParagraphs,omitempty" minimum:"0" description:"The parent link must appear within this many paragraphs of the start; leave it out to let it sit anywhere"`
-	ChildrenSection            bool    `json:"childrenSection,omitempty" description:"Close the page with a section listing its children"`
+	UpDepth                    int     `json:"upDepth,omitempty" minimum:"0" description:"Levels up the tree to link, 1 for the parent only"`
+	DownLinks                  bool    `json:"downLinks,omitempty" description:"Link to the entity's children"`
+	SiblingMinWeight           float64 `json:"siblingMinWeight,omitempty" minimum:"0" maximum:"1" description:"Related-edge weight a sibling link needs; left out, every sibling"`
+	MaxLinks                   int     `json:"maxLinks,omitempty" minimum:"0" description:"Most internal links per page"`
+	MaxPerTarget               int     `json:"maxPerTarget,omitempty" minimum:"0" description:"Most links to one target"`
+	ParentLinkWithinParagraphs int     `json:"parentLinkWithinParagraphs,omitempty" minimum:"0" description:"Parent link within this many opening paragraphs"`
+	ChildrenSection            bool    `json:"childrenSection,omitempty" description:"End with a section listing the children"`
 }
 
 func (a linkRulesArgs) rules() template.LinkRules {
@@ -110,8 +110,8 @@ func (a linkRulesArgs) rules() template.LinkRules {
 }
 
 type metaRulesArgs struct {
-	TitlePattern   string `json:"titlePattern,omitempty" description:"How to build the SEO title, for example {primaryKeyword} | {siteName}; leave it out to use the page title"`
-	DescriptionMax int    `json:"descriptionMax,omitempty" minimum:"0" description:"The most characters the SEO description may run to; leave it out for no ceiling"`
+	TitlePattern   string `json:"titlePattern,omitempty" description:"SEO title such as {primaryKeyword} | {siteName}; left out, the page title"`
+	DescriptionMax int    `json:"descriptionMax,omitempty" minimum:"0" description:"Most SEO description characters"`
 }
 
 func (a metaRulesArgs) rules() template.MetaRules {
@@ -119,9 +119,9 @@ func (a metaRulesArgs) rules() template.MetaRules {
 }
 
 type imagesArgs struct {
-	Featured bool                 `json:"featured,omitempty" description:"The page carries a featured image"`
-	Inline   int                  `json:"inline,omitempty" minimum:"0" description:"How many images to place inside the body; leave it out for a page without images"`
-	Source   template.ImageSource `json:"source,omitempty" enum:"ai,wpmedia,local" description:"Where the images come from: drawn by a model, picked from the WordPress library, or read from a folder; required as soon as any image is asked for"`
+	Featured bool                 `json:"featured,omitempty" description:"Add a featured image"`
+	Inline   int                  `json:"inline,omitempty" minimum:"0" description:"Images in the body"`
+	Source   template.ImageSource `json:"source,omitempty" enum:"ai,wpmedia,local" description:"Drawn by ai, WordPress media or a local folder; required with any image"`
 }
 
 func (a imagesArgs) images() template.Images {
@@ -129,20 +129,20 @@ func (a imagesArgs) images() template.Images {
 }
 
 type productShortDescriptionArgs struct {
-	Enabled        bool   `json:"enabled,omitempty" description:"Write the product's short description, the text the store shows beside the price"`
-	Intent         string `json:"intent,omitempty" description:"What the short description has to say, one short sentence to the writer"`
-	TargetWords    int    `json:"targetWords,omitempty" minimum:"0" description:"About how many words it should run to; leave it out to let the writer decide"`
-	PrimaryKeyword bool   `json:"primaryKeyword,omitempty" description:"The primary keyword must appear in the short description"`
+	Enabled        bool   `json:"enabled,omitempty" description:"Write the short description"`
+	Intent         string `json:"intent,omitempty" description:"What it says, one sentence"`
+	TargetWords    int    `json:"targetWords,omitempty" minimum:"0" description:"Approximate words"`
+	PrimaryKeyword bool   `json:"primaryKeyword,omitempty" description:"Must contain the primary keyword"`
 }
 
 type productSpecificationArgs struct {
-	Name   string `json:"name" description:"The attribute the product shows, for example Form or Size"`
-	Intent string `json:"intent,omitempty" description:"Where its value comes from, one short sentence; a value the page data does not state is left out"`
+	Name   string `json:"name" description:"Attribute, such as Form or Size"`
+	Intent string `json:"intent,omitempty" description:"Where its value comes from; a value the data lacks is left out"`
 }
 
 type productArgs struct {
-	ShortDescription *productShortDescriptionArgs `json:"shortDescription,omitempty" description:"The short description the product shows beside its price; leave it out for none"`
-	Specifications   []productSpecificationArgs   `json:"specifications,omitempty" description:"The attributes the writer fills in where the product does not carry them yet; leave it out for none"`
+	ShortDescription *productShortDescriptionArgs `json:"shortDescription,omitempty" description:"Text shown beside the price"`
+	Specifications   []productSpecificationArgs   `json:"specifications,omitempty" description:"Attributes the writer fills where the product lacks them"`
 }
 
 func (a productArgs) product() *template.Product {
@@ -160,16 +160,16 @@ func (a productArgs) product() *template.Product {
 }
 
 type templateSpecArgs struct {
-	Sections      []sectionArgs      `json:"sections" description:"The sections the page is built from, in the order they appear; at least one is required"`
-	Tone          string             `json:"tone,omitempty" description:"How the page should read, one or two sentences to the writer"`
-	Length        *lengthArgs        `json:"length,omitempty" description:"How long the whole page may run to; leave it out for no length window"`
-	KeywordRules  *keywordRulesArgs  `json:"keywordRules,omitempty" description:"Where the primary keyword has to appear and how often it may; leave it out to ask nothing"`
-	LinkRules     *linkRulesArgs     `json:"linkRules,omitempty" description:"How many internal links the page carries and which of them it owes; leave it out to ask nothing"`
-	MetaRules     *metaRulesArgs     `json:"metaRules,omitempty" description:"How the SEO title and description are built; leave it out to take the page title"`
-	Images        *imagesArgs        `json:"images,omitempty" description:"Whether the page carries images and where they come from; leave it out for a page without images"`
-	Product       *productArgs       `json:"product,omitempty" description:"What a WooCommerce product gets beside its description; leave it out for a template that writes pages"`
-	ModelProfiles []modelProfileArgs `json:"modelProfiles,omitempty" description:"Which model does which job for this template; leave it out to take the site profiles"`
-	Recipe        []stepArgs         `json:"recipe,omitempty" description:"The steps a run takes for this template, in order; leave it out for the default recipe"`
+	Sections      []sectionArgs      `json:"sections" description:"Page sections in order, at least one"`
+	Tone          string             `json:"tone,omitempty" description:"How the page reads, one or two sentences"`
+	Length        *lengthArgs        `json:"length,omitempty" description:"Word count window"`
+	KeywordRules  *keywordRulesArgs  `json:"keywordRules,omitempty" description:"Primary keyword placement and density"`
+	LinkRules     *linkRulesArgs     `json:"linkRules,omitempty" description:"Internal links owed and allowed"`
+	MetaRules     *metaRulesArgs     `json:"metaRules,omitempty" description:"SEO title and description"`
+	Images        *imagesArgs        `json:"images,omitempty" description:"Images; left out, none"`
+	Product       *productArgs       `json:"product,omitempty" description:"WooCommerce product outputs; left out for pages"`
+	ModelProfiles []modelProfileArgs `json:"modelProfiles,omitempty" description:"Model per job; left out, the site profiles"`
+	Recipe        []stepArgs         `json:"recipe,omitempty" description:"Run steps in order; left out, the default"`
 }
 
 func (a templateSpecArgs) spec() template.TemplateSpec {
@@ -241,16 +241,16 @@ func paramsOf(step stepArgs) map[string]any {
 }
 
 type templatePatchArgs struct {
-	Sections      *[]sectionArgs     `json:"sections,omitempty" description:"The whole new list of sections, left out to keep the current one"`
-	Tone          *string            `json:"tone,omitempty" description:"The new tone, left out to keep the current one"`
-	Length        *lengthArgs        `json:"length,omitempty" description:"The new length window, left out to keep the current one"`
-	KeywordRules  *keywordRulesArgs  `json:"keywordRules,omitempty" description:"The new keyword rules, left out to keep the current ones"`
-	LinkRules     *linkRulesArgs     `json:"linkRules,omitempty" description:"The new link rules, left out to keep the current ones"`
-	MetaRules     *metaRulesArgs     `json:"metaRules,omitempty" description:"The new meta rules, left out to keep the current ones"`
-	Images        *imagesArgs        `json:"images,omitempty" description:"The new image settings, left out to keep the current ones"`
-	Product       *productArgs       `json:"product,omitempty" description:"The new product outputs, left out to keep the current ones"`
-	ModelProfiles []modelProfileArgs `json:"modelProfiles,omitempty" description:"The whole new set of model profiles, left out to keep the current ones"`
-	Recipe        []stepArgs         `json:"recipe,omitempty" description:"The whole new recipe in order, left out to keep the current one"`
+	Sections      *[]sectionArgs     `json:"sections,omitempty" description:"Whole new section list"`
+	Tone          *string            `json:"tone,omitempty" description:"New tone"`
+	Length        *lengthArgs        `json:"length,omitempty" description:"New word count window"`
+	KeywordRules  *keywordRulesArgs  `json:"keywordRules,omitempty" description:"New keyword rules"`
+	LinkRules     *linkRulesArgs     `json:"linkRules,omitempty" description:"New link rules"`
+	MetaRules     *metaRulesArgs     `json:"metaRules,omitempty" description:"New meta rules"`
+	Images        *imagesArgs        `json:"images,omitempty" description:"New image settings"`
+	Product       *productArgs       `json:"product,omitempty" description:"New product outputs"`
+	ModelProfiles []modelProfileArgs `json:"modelProfiles,omitempty" description:"Whole new model profile set"`
+	Recipe        []stepArgs         `json:"recipe,omitempty" description:"Whole new recipe in order"`
 }
 
 func (a templatePatchArgs) patch() (json.RawMessage, error) {

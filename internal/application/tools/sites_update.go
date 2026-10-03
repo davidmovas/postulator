@@ -9,15 +9,15 @@ import (
 const sitesUpdateName = "sites_update"
 
 type sitesUpdateArgs struct {
-	ID                  string  `json:"id" description:"The id of the site, exactly as sites_list returned it"`
-	Name                *string `json:"name,omitempty" description:"The new name, left out to keep the current one"`
-	BaseURL             *string `json:"baseUrl,omitempty" description:"The new address of the WordPress site, left out to keep the current one"`
-	Username            *string `json:"username,omitempty" description:"The new administrator login, left out to keep the current one"`
-	Password            *string `json:"password,omitempty" description:"The WordPress application password; it is stored encrypted and never read back"`
-	AllowInsecure       *bool   `json:"allowInsecure,omitempty" description:"Accept a certificate the machine does not trust, which only a local site should need"`
-	Status              *string `json:"status,omitempty" enum:"active,paused,error" description:"The new status, left out to keep the current one"`
-	DefaultTemplateID   *string `json:"defaultTemplateId,omitempty" description:"The template a page of this site falls back to, exactly as templates_list returned its id"`
-	DefaultLinkPolicyID *string `json:"defaultLinkPolicyId,omitempty" description:"The link policy this site falls back to, exactly as policies_list returned its id"`
+	ID                  string  `json:"id" description:"Site id from sites_list"`
+	Name                *string `json:"name,omitempty" description:"New name"`
+	BaseURL             *string `json:"baseUrl,omitempty" description:"New WordPress address"`
+	Username            *string `json:"username,omitempty" description:"New administrator login"`
+	Password            *string `json:"password,omitempty" description:"WordPress application password, stored encrypted, never read back"`
+	AllowInsecure       *bool   `json:"allowInsecure,omitempty" description:"Accept an untrusted certificate; only a local site needs it"`
+	Status              *string `json:"status,omitempty" enum:"active,paused,error" description:"New status"`
+	DefaultTemplateID   *string `json:"defaultTemplateId,omitempty" description:"Fallback template id from templates_list"`
+	DefaultLinkPolicyID *string `json:"defaultLinkPolicyId,omitempty" description:"Fallback link policy id from policies_list"`
 }
 
 func sitesUpdate(deps Deps) Tool {
