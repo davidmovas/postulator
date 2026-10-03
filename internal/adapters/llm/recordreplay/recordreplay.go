@@ -9,9 +9,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 
 	port "github.com/davidmovas/postulator/internal/application/llm"
-	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/settings"
 )
@@ -39,19 +39,20 @@ type fixture struct {
 }
 
 type Client struct {
-	next port.Client
-	mode string
-	dir  string
+	next   port.Client
+	redact func(args json.RawMessage) json.RawMessage
+	mode   string
+	dir    string
 }
 
-func New(next port.Client, mode, dir string) *Client {
+func New(next port.Client, mode, dir string, redact func(args json.RawMessage) json.RawMessage) *Client {
 	if mode == "" {
 		mode = ModeOff
 	}
 	if dir == "" {
 		dir = DefaultDir
 	}
-	return &Client{next: next, mode: mode, dir: dir}
+	return &Client{next: next, redact: redact, mode: mode, dir: dir}
 }
 
 func (c *Client) Complete(ctx context.Context, req port.Request) (port.Response, error) {
@@ -83,18 +84,26 @@ func (c *Client) Stream(ctx context.Context, req port.Request) (<-chan port.Delt
 		if err != nil {
 			return nil, err
 		}
-
-		usage := stored.Response.Usage
-		out := make(chan port.Delta, 2)
-		out <- port.Delta{Text: stored.Response.Text}
-		out <- port.Delta{Done: true, Usage: &usage}
-		close(out)
-		return out, nil
+		return replay(stored.Response), nil
 	case ModeRecord:
 		return c.recordStream(ctx, req)
 	default:
 		return c.next.Stream(ctx, req)
 	}
+}
+
+func replay(resp port.Response) <-chan port.Delta {
+	out := make(chan port.Delta, len(resp.Calls)+2)
+	if resp.Text != "" {
+		out <- port.Delta{Text: resp.Text}
+	}
+	for i := range resp.Calls {
+		out <- port.Delta{Call: &resp.Calls[i]}
+	}
+	usage := resp.Usage
+	out <- port.Delta{Done: true, Usage: &usage, Finish: resp.FinishReason, Tier: resp.Tier}
+	close(out)
+	return out
 }
 
 func (c *Client) recordStream(ctx context.Context, req port.Request) (<-chan port.Delta, error) {
@@ -108,17 +117,25 @@ func (c *Client) recordStream(ctx context.Context, req port.Request) (<-chan por
 		defer close(out)
 
 		var (
-			text    []byte
-			usage   llm.Usage
-			failure bool
+			heard    port.Response
+			text     []byte
+			finished bool
+			failure  bool
 		)
 		for delta := range deltas {
 			text = append(text, delta.Text...)
-			if delta.Usage != nil {
-				usage = *delta.Usage
+			if delta.Call != nil {
+				heard.Calls = append(heard.Calls, *delta.Call)
 			}
 			if delta.Err != nil {
 				failure = true
+			}
+			if delta.Done {
+				finished = true
+				heard.FinishReason, heard.Tier = delta.Finish, delta.Tier
+				if delta.Usage != nil {
+					heard.Usage = *delta.Usage
+				}
 			}
 			select {
 			case out <- delta:
@@ -126,12 +143,12 @@ func (c *Client) recordStream(ctx context.Context, req port.Request) (<-chan por
 				return
 			}
 		}
-		if failure {
+		if failure || !finished {
 			return
 		}
 
-		response := port.Response{Text: string(text), Usage: usage, FinishReason: port.FinishStop}
-		if saveErr := c.save(req, response); saveErr != nil {
+		heard.Text = string(text)
+		if saveErr := c.save(req, heard); saveErr != nil {
 			select {
 			case out <- port.Delta{Err: saveErr}:
 			case <-ctx.Done():
@@ -142,12 +159,14 @@ func (c *Client) recordStream(ctx context.Context, req port.Request) (<-chan por
 }
 
 func (c *Client) save(req port.Request, resp port.Response) error {
-	name, canonical, err := fixtureName(req)
+	masked := c.masked(req)
+	name, canonical, err := fixtureName(masked)
 	if err != nil {
 		return err
 	}
 
-	encoded, err := json.MarshalIndent(fixture{Request: req, Response: resp}, "", "  ")
+	resp.Calls = c.maskedCalls(resp.Calls)
+	encoded, err := json.MarshalIndent(fixture{Request: masked, Response: resp}, "", "  ")
 	if err != nil {
 		return errors.Wrap(err, errors.Internal, "encode the llm fixture")
 	}
@@ -161,7 +180,7 @@ func (c *Client) save(req port.Request, resp port.Response) error {
 }
 
 func (c *Client) load(req port.Request) (fixture, error) {
-	name, canonical, err := fixtureName(req)
+	name, canonical, err := fixtureName(c.masked(req))
 	if err != nil {
 		return fixture{}, err
 	}
@@ -182,6 +201,29 @@ func (c *Client) load(req port.Request) (fixture, error) {
 		return fixture{}, errors.New(errors.Internal, "decode the llm fixture").WithDetail("fixture", path).WithInternal(err)
 	}
 	return stored, nil
+}
+
+func (c *Client) masked(req port.Request) port.Request {
+	req.Messages = slices.Clone(req.Messages)
+	for i := range req.Messages {
+		if held := req.Messages[i].Call; held != nil {
+			call := *held
+			call.Args = c.redact(call.Args)
+			req.Messages[i].Call = &call
+		}
+	}
+	return req
+}
+
+func (c *Client) maskedCalls(calls []port.ToolCall) []port.ToolCall {
+	if len(calls) == 0 {
+		return calls
+	}
+	masked := slices.Clone(calls)
+	for i := range masked {
+		masked[i].Args = c.redact(masked[i].Args)
+	}
+	return masked
 }
 
 func fixtureName(req port.Request) (name, canonical string, err error) {

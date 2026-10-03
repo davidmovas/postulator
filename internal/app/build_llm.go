@@ -16,6 +16,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/llm/recordreplay"
 	"github.com/davidmovas/postulator/internal/adapters/llm/retry"
 	llmport "github.com/davidmovas/postulator/internal/application/llm"
+	"github.com/davidmovas/postulator/internal/application/tools"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 )
 
@@ -42,7 +43,8 @@ func (c *Core) buildLLM(stores repos) (llmParts, error) {
 
 	providers := c.agentProvider(stores, modelCatalog)
 	book := ledger.New(
-		recordreplay.New(c.provider(stores, providers, modelCatalog), recordreplay.Mode(stores.values), recordreplay.DefaultDir),
+		recordreplay.New(c.provider(stores, providers, modelCatalog), recordreplay.Mode(stores.values),
+			recordreplay.DefaultDir, tools.Redact),
 		stores.llmCalls, modelCatalog, c.Events, stores.now,
 	)
 	imageModel := images.OpenAIModel(stores.values)
