@@ -16,9 +16,11 @@ import (
 )
 
 const clientSheet = "Root Entity,Category,Subcategory,Recommended URL Layer,Title,H1,Keywords\n" +
+	"Peptides,,,/peptides/,Research peptides,Peptides,research peptides\n" +
 	"Peptides,BPC-157,,/peptides/bpc-157/,BPC-157 peptide,BPC-157,\"bpc 157 (12000), buy bpc 157 (5400)\"\n" +
 	"Peptides,BPC-157,Liquid,/peptides/bpc-157/liquid/,BPC-157 liquid,BPC-157 Liquid,bpc 157 liquid (900)\n" +
 	"Peptides,BPC-157,Powder,/peptides/bpc-157/powder/,BPC-157 powder,BPC-157 Powder,\n" +
+	"Peptides,TB-500,,/peptides/tb-500/,TB-500 peptide,TB-500,tb 500\n" +
 	"Peptides,TB-500,Liquid,/peptides/tb-500/liquid/,TB-500 liquid,TB-500 Liquid,tb 500 liquid\n"
 
 func (h harness) detected(t *testing.T, path string) imports.Mapping {
@@ -140,7 +142,7 @@ func TestTheUrlTreeGivesTheParentAFileDoesNotName(t *testing.T) {
 	}
 }
 
-func TestLevelColumnsMakeAChainOfGroups(t *testing.T) {
+func TestOnlyTheRootLevelMakesAGroupAndTheCategoriesPlaceTheRows(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
@@ -157,60 +159,45 @@ func TestLevelColumnsMakeAChainOfGroups(t *testing.T) {
 	owners := map[string]string{
 		"/peptides/":                "Peptides",
 		"/peptides/bpc-157/":        "BPC-157",
-		"/peptides/bpc-157/liquid/": "Liquid",
-		"/peptides/bpc-157/powder/": "Powder",
+		"/peptides/bpc-157/liquid/": "BPC-157 Liquid",
+		"/peptides/bpc-157/powder/": "BPC-157 Powder",
 		"/peptides/tb-500/":         "TB-500",
-		"/peptides/tb-500/liquid/":  "Liquid",
+		"/peptides/tb-500/liquid/":  "TB-500 Liquid",
 	}
 	for at, named := range owners {
 		if found, ok := page(report, at); !ok || found.Entity != named {
 			t.Fatalf("%s = %+v, want it owned by %s", at, found, named)
 		}
 	}
-	liquids := entitiesNamed(report, "Liquid")
-	parents := make([]string, 0, len(liquids))
-	for _, liquid := range liquids {
-		parents = append(parents, liquid.Parent)
-	}
-	slices.Sort(parents)
-	if !slices.Equal(parents, []string{"BPC-157", "TB-500"}) {
-		t.Fatalf("the Liquids sit under %v, want BPC-157 and TB-500", parents)
-	}
-	if len(report.Entities) != 6 {
-		t.Fatalf("entities = %+v, want six", report.Entities)
+	if len(report.Entities) != 6 || len(entitiesNamed(report, "Liquid")) != 0 {
+		t.Fatalf("entities = %+v, want the six rows and no entity of a category level", report.Entities)
 	}
 	for _, want := range [][2]string{
-		{"BPC-157", "Peptides"}, {"TB-500", "Peptides"}, {"Liquid", "BPC-157"}, {"Powder", "BPC-157"}, {"Liquid", "TB-500"},
+		{"BPC-157", "Peptides"}, {"TB-500", "Peptides"}, {"BPC-157 Liquid", "BPC-157"}, {"BPC-157 Powder", "BPC-157"},
+		{"TB-500 Liquid", "TB-500"},
 	} {
 		if !hasEdge(report, want[0], want[1], string(graph.EdgeParent)) {
 			t.Fatalf("edges = %+v, want %s under %s", report.Edges, want[0], want[1])
 		}
 	}
-	if len(findings(report.Warnings, imports.CodeGroupWithoutPage)) != 0 {
-		t.Fatalf("a group found no page: %+v", report.Warnings)
+	if len(report.Edges) != 5 {
+		t.Fatalf("edges = %+v, want five", report.Edges)
+	}
+	if groups := report.Groups; len(groups) != 1 || groups[0].Page != "/peptides/" || groups[0].Rows != 6 {
+		t.Fatalf("groups = %+v, want the root group alone on /peptides/", groups)
 	}
 
 	first := h.apply(t, path, mapping)
-	if first.Counts.EntitiesCreated != 6 || first.Counts.PagesCreated != 6 {
+	if first.Counts.EntitiesCreated != 6 || first.Counts.PagesCreated != 6 || first.Counts.EdgesCreated != 5 {
 		t.Fatalf("counts = %+v", first.Counts)
 	}
-	stored := h.entities(t)
-	byID := make(map[string]graph.Entity, len(stored))
-	for _, held := range stored {
-		byID[held.ID] = held
-	}
-	scoped := []string{}
-	for _, held := range stored {
-		if held.Name == "Liquid" && held.ScopeID != nil {
-			scoped = append(scoped, byID[*held.ScopeID].Name)
-		}
+	for _, held := range h.entities(t) {
 		if held.CanonicalPageID == nil {
 			t.Fatalf("%s has no canonical page", held.Name)
 		}
 	}
-	slices.Sort(scoped)
-	if !slices.Equal(scoped, []string{"BPC-157", "TB-500"}) {
-		t.Fatalf("the stored Liquids sit under %v", scoped)
+	if got := h.scopeOf(t, "TB-500 Liquid"); len(got) != 1 || got[0] != "Peptides › TB-500 › TB-500 Liquid" {
+		t.Fatalf("the stored TB-500 Liquid sits at %v", got)
 	}
 
 	again := h.apply(t, path, mapping)
@@ -222,59 +209,45 @@ func TestLevelColumnsMakeAChainOfGroups(t *testing.T) {
 	}
 }
 
-type placed struct {
-	kind     graph.Kind
-	category bool
-}
-
-func (h harness) placements(t *testing.T) map[string]placed {
+func (h harness) kinds(t *testing.T) map[string]graph.Kind {
 	t.Helper()
 
 	stored := h.entities(t)
-	out := make(map[string]placed, len(stored))
+	out := make(map[string]graph.Kind, len(stored))
 	for i := range stored {
-		out[stored[i].Name] = placed{kind: stored[i].Kind, category: stored[i].SiteCategory}
+		out[stored[i].Name] = stored[i].Kind
 	}
 	return out
 }
 
-func TestALevelSaysWhatAGroupBecomes(t *testing.T) {
+func TestOnlyTheRootLevelMakesAnEntityOfItsGroup(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
 		name  string
 		sheet string
-		want  map[string]placed
+		want  map[string]graph.Kind
 	}{
 		{
 			name: "a root, its categories and their subcategories",
-			sheet: "Root Entity,Category,Subcategory,URL\nPeptides,,,/peptides/\nPeptides,BPC-157,,/peptides/bpc-157/\n" +
-				"Peptides,BPC-157,Liquid,/peptides/bpc-157/liquid/\n",
-			want: map[string]placed{
-				"Peptides": {kind: graph.KindHub}, "BPC-157": {kind: graph.KindCategory, category: true},
-				"Liquid": {kind: graph.KindCategory, category: true},
-			},
+			sheet: "Root Entity,Category,Subcategory,URL,H1\nPeptides,,,/peptides/,Peptides\nPeptides,BPC-157,,/peptides/bpc-157/,BPC-157\n" +
+				"Peptides,BPC-157,Liquid,/peptides/bpc-157/liquid/,BPC-157 Liquid\n",
+			want: map[string]graph.Kind{"Peptides": graph.KindHub, "BPC-157": graph.KindTopic, "BPC-157 Liquid": graph.KindTopic},
 		},
 		{
-			name:  "a root category is a category",
-			sheet: "Root Category,Category,URL\nPeptides,,/peptides/\nPeptides,BPC-157,/peptides/bpc-157/\n",
-			want: map[string]placed{
-				"Peptides": {kind: graph.KindCategory, category: true}, "BPC-157": {kind: graph.KindCategory, category: true},
-			},
+			name:  "a root category is a category level",
+			sheet: "Root Category,Category,URL,H1\nPeptides,,/peptides/,Peptides\nPeptides,BPC-157,/peptides/bpc-157/,BPC-157\n",
+			want:  map[string]graph.Kind{"Peptides": graph.KindTopic, "BPC-157": graph.KindTopic},
 		},
 		{
-			name:  "a kind cell names the kind and leaves the flag to the level",
+			name:  "a kind cell names the kind",
 			sheet: "Root,Category,URL,Entity Level\nPeptides,,/peptides/,Topic\nPeptides,BPC-157,/peptides/bpc-157/,Compound/Product\n",
-			want: map[string]placed{
-				"Peptides": {kind: graph.KindTopic}, "BPC-157": {kind: graph.KindProduct, category: true},
-			},
+			want:  map[string]graph.Kind{"Peptides": graph.KindTopic, "Bpc 157": graph.KindProduct},
 		},
 		{
-			name:  "a page inside a group is no category of its own",
-			sheet: "Category,URL,H1\nPeptides,/peptides/,Peptides\nPeptides,/peptides/storage/,Storing peptides\n",
-			want: map[string]placed{
-				"Peptides": {kind: graph.KindCategory, category: true}, "Storing peptides": {kind: graph.KindTopic},
-			},
+			name:  "category levels alone make no entity",
+			sheet: "Category,Subcategory,URL,H1\nPeptides,Liquid,/a/,Alpha\nPeptides,Powder,/b/,Beta\n",
+			want:  map[string]graph.Kind{"Alpha": graph.KindTopic, "Beta": graph.KindTopic},
 		},
 	}
 
@@ -288,47 +261,28 @@ func TestALevelSaysWhatAGroupBecomes(t *testing.T) {
 			if len(applied.Report.Errors) != 0 {
 				t.Fatalf("errors = %+v", applied.Report.Errors)
 			}
-			for name, want := range tc.want {
-				if previewed, _ := entity(applied.Report, name); previewed.SiteCategory != want.category {
-					t.Errorf("the preview shows %s as %+v, want the category flag %t", name, previewed, want.category)
-				}
+			if orphaned := findings(applied.Report.Warnings, imports.CodeGroupWithoutPage); len(orphaned) != 0 {
+				t.Fatalf("groups without a page = %+v", orphaned)
 			}
-			if got := h.placements(t); !maps.Equal(got, tc.want) {
+			if got := h.kinds(t); !maps.Equal(got, tc.want) {
 				t.Fatalf("entities = %+v, want %+v", got, tc.want)
 			}
 		})
 	}
 }
 
-func TestAnImportFlagsWhatItPlacesAtACategoryLevelAndNeverClearsIt(t *testing.T) {
+func TestARowOfCategoriesAloneNamesNothing(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	plain := h.file(t, "plain.csv", "URL,Entity\n/bpc-157/,BPC-157\n")
-	h.apply(t, plain, h.detected(t, plain))
-	if got := h.placements(t)["BPC-157"]; got != (placed{kind: graph.KindTopic}) {
-		t.Fatalf("BPC-157 = %+v, want a topic and no category", got)
-	}
+	path := h.file(t, "levels.csv", "Category,Subcategory,URL,H1\nPeptides,BPC-157,,\nPeptides,,/peptides/,Peptides\n")
+	report := h.preview(t, path, h.detected(t, path))
 
-	grouped := h.file(t, "grouped.csv", "Category,URL\nBPC-157,/bpc-157/\n")
-	flagged := h.apply(t, grouped, h.detected(t, grouped))
-	if flagged.Counts.EntitiesUpdated != 1 || flagged.Counts.EntitiesCreated != 0 {
-		t.Fatalf("counts = %+v, want the flag written as one update", flagged.Counts)
+	if empty := findings(report.Warnings, imports.CodeNoTarget); len(empty) != 1 || empty[0].Row != 2 {
+		t.Fatalf("findings = %+v, want the row without a page, an entity or a root named", report.Warnings)
 	}
-	if got := h.placements(t)["BPC-157"]; got != (placed{kind: graph.KindTopic, category: true}) {
-		t.Fatalf("BPC-157 = %+v, want its kind kept and the category flag set", got)
-	}
-
-	rooted := h.file(t, "rooted.csv", "Root Entity,URL\nBPC-157,/bpc-157/\n")
-	again := h.apply(t, rooted, h.detected(t, rooted))
-	if again.Counts.EntitiesUpdated != 0 || again.Counts.EntitiesCreated != 0 {
-		t.Fatalf("counts = %+v, want nothing written", again.Counts)
-	}
-	if got := h.placements(t)["BPC-157"]; !got.category {
-		t.Fatalf("BPC-157 = %+v, want the flag kept by a root level", got)
-	}
-	if repeated := h.apply(t, grouped, h.detected(t, grouped)); repeated.Counts != (imports.Counts{}) {
-		t.Fatalf("the grouped sheet imported again wrote %+v", repeated.Counts)
+	if len(report.Entities) != 1 || report.Skipped != 1 {
+		t.Fatalf("entities = %+v and %d skipped, want the page's entity alone", report.Entities, report.Skipped)
 	}
 }
 
@@ -341,11 +295,11 @@ func TestAGroupTakesAPageOnlyOnEvidence(t *testing.T) {
 		page   string
 		orphan bool
 	}{
-		{name: "a row named as the group", sheet: "category,url,h1\nPeptides,/catalog/,Peptides\nPeptides,/catalog/bpc/,BPC\n", page: "/catalog/"},
-		{name: "a row whose slug is the group's", sheet: "category,url,h1\nPeptides,/peptides/,All our peptides\nPeptides,/peptides/bpc/,BPC\n", page: "/peptides/"},
-		{name: "a row above every other row of the group", sheet: "category,url,h1\nPeptides,/catalog/,Catalog\nPeptides,/catalog/bpc/,BPC\nPeptides,/catalog/tb/,TB\n", page: "/catalog/"},
-		{name: "an intermediate page whose slug is the group's", sheet: "category,url,h1\nPeptides,/peptides/bpc/,BPC\n", page: "/peptides/"},
-		{name: "nothing that says which page", sheet: "category,url,h1\nPeptides,/a/,Alpha\nPeptides,/b/,Beta\n", orphan: true},
+		{name: "a row named as the group", sheet: "root,url,h1\nPeptides,/catalog/,Peptides\nPeptides,/catalog/bpc/,BPC\n", page: "/catalog/"},
+		{name: "a row whose slug is the group's", sheet: "root,url,h1\nPeptides,/peptides/,All our peptides\nPeptides,/peptides/bpc/,BPC\n", page: "/peptides/"},
+		{name: "a row above every other row of the group", sheet: "root,url,h1\nPeptides,/catalog/,Catalog\nPeptides,/catalog/bpc/,BPC\nPeptides,/catalog/tb/,TB\n", page: "/catalog/"},
+		{name: "an intermediate page whose slug is the group's", sheet: "root,url,h1\nPeptides,/peptides/bpc/,BPC\n", page: "/peptides/"},
+		{name: "nothing that says which page", sheet: "root,url,h1\nPeptides,/a/,Alpha\nPeptides,/b/,Beta\n", orphan: true},
 	}
 
 	for _, tc := range cases {
@@ -403,20 +357,16 @@ func TestTheVariationSheetPutsEachFormUnderItsProduct(t *testing.T) {
 	if len(applied.Report.Errors) != 0 {
 		t.Fatalf("errors = %+v", applied.Report.Errors)
 	}
-	if applied.Counts.EntitiesCreated != 1 {
-		t.Fatalf("counts = %+v, want the capsules alone created", applied.Counts)
+	if applied.Counts.EntitiesCreated != 1 || applied.Counts.EdgesCreated != 1 {
+		t.Fatalf("counts = %+v, want the capsules alone created and put under BPC-157", applied.Counts)
 	}
-	byID := make(map[string]graph.Entity)
 	for _, held := range h.entities(t) {
-		byID[held.ID] = held
 		if held.Name == "Yes" || held.Name == "No" || held.Name == "NO" {
 			t.Fatalf("the Entity? column made an entity %q", held.Name)
 		}
 	}
-	for _, held := range byID {
-		if held.Name == "Capsules" && (held.ScopeID == nil || byID[*held.ScopeID].Name != "BPC-157") {
-			t.Fatalf("Capsules sits under %v, want BPC-157", held.ScopeID)
-		}
+	if got := h.scopeOf(t, "Capsules"); len(got) != 1 || got[0] != "Peptides › BPC-157 › Capsules" {
+		t.Fatalf("Capsules sits at %v, want under BPC-157", got)
 	}
 }
 
@@ -437,8 +387,8 @@ func TestAParentOrANameTwoEntitiesShareIsAnErrorNotAGuess(t *testing.T) {
 			t.Parallel()
 
 			h := newHarness(t)
-			client := h.file(t, "client.csv", clientSheet)
-			h.apply(t, client, h.detected(t, client))
+			liquids := h.file(t, "liquids.csv", twoLiquids)
+			h.apply(t, liquids, h.detected(t, liquids))
 
 			path := h.file(t, "ambiguous.csv", tc.sheet)
 			report := h.preview(t, path, h.detected(t, path))
@@ -453,30 +403,17 @@ func TestARowsGroupSaysWhichParentItMeans(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	client := h.file(t, "client.csv", clientSheet)
-	h.apply(t, client, h.detected(t, client))
+	liquids := h.file(t, "liquids.csv", twoLiquids)
+	h.apply(t, liquids, h.detected(t, liquids))
 
-	path := h.file(t, "drops.csv", "Category,URL,Entity,Parent\nTB-500,/peptides/tb-500/liquid/drops/,Drops,Liquid\n")
+	path := h.file(t, "drops.csv", "Root Entity,URL,Entity,Parent\nTB-500,/tb-500/liquid/drops/,Drops,Liquid\n")
 	applied := h.apply(t, path, h.detected(t, path))
 	if len(applied.Report.Errors) != 0 {
 		t.Fatalf("errors = %+v", applied.Report.Errors)
 	}
-
-	byID := make(map[string]graph.Entity)
-	for _, held := range h.entities(t) {
-		byID[held.ID] = held
+	if got := h.scopeOf(t, "Drops"); len(got) != 1 || got[0] != "TB-500 › Liquid › Drops" {
+		t.Fatalf("Drops sits at %v, want under the Liquid of TB-500", got)
 	}
-	for _, held := range byID {
-		if held.Name != "Drops" {
-			continue
-		}
-		parent := byID[*held.ScopeID]
-		if parent.Name != "Liquid" || byID[*parent.ScopeID].Name != "TB-500" {
-			t.Fatalf("Drops sits under %s, want the Liquid of TB-500", parent.Name)
-		}
-		return
-	}
-	t.Fatal("Drops was not created")
 }
 
 func TestThePreviewSaysWhatEachColumnBecame(t *testing.T) {

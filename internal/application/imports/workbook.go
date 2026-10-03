@@ -15,6 +15,7 @@ import (
 type sheetRead struct {
 	mapping importmap.Mapping
 	table   importmap.Table
+	binding importmap.Binding
 }
 
 type workbook struct {
@@ -84,9 +85,10 @@ func (s *Service) compute(ctx context.Context, req PreviewRequest) (workbook, er
 	}
 
 	now := s.now()
+	roots := rootsOf(reads, &state)
 	book := workbook{plans: make([]plan, 0, len(reads))}
 	for i := range reads {
-		planned, planErr := s.plan(ctx, state, reads[i].table, reads[i].mapping, now)
+		planned, planErr := s.plan(ctx, state, roots, &reads[i], now)
 		if planErr != nil {
 			return workbook{}, planErr
 		}
@@ -112,7 +114,11 @@ func (s *Service) reads(ctx context.Context, req PreviewRequest) ([]sheetRead, e
 		if err != nil {
 			return nil, err
 		}
-		return []sheetRead{{mapping: mapping, table: table}}, nil
+		read, err := bound(mapping, table)
+		if err != nil {
+			return nil, err
+		}
+		return []sheetRead{read}, nil
 	}
 	if given := req.Mapping.domain(); given.ID != "" || !unmapped(given) {
 		return nil, errors.New(errors.Invalid, "give one mapping for the file or one for each sheet, not both").
@@ -136,9 +142,21 @@ func (s *Service) reads(ctx context.Context, req PreviewRequest) ([]sheetRead, e
 			return nil, errors.New(errors.Invalid, "the sheets carry more rows together than the import.maxRows setting allows").
 				WithDetail("maxRows", s.deps.MaxRows).WithDetail("sheet", ordered[i].Sheet)
 		}
-		reads = append(reads, sheetRead{mapping: mapping, table: table})
+		read, bindErr := bound(mapping, table)
+		if bindErr != nil {
+			return nil, bindErr
+		}
+		reads = append(reads, read)
 	}
 	return reads, nil
+}
+
+func bound(mapping importmap.Mapping, table importmap.Table) (sheetRead, error) {
+	binding, err := mapping.Bind(table.Headers)
+	if err != nil {
+		return sheetRead{}, err
+	}
+	return sheetRead{mapping: mapping, table: table, binding: binding}, nil
 }
 
 func (s *Service) inWorkbookOrder(path string, asked []SheetMapping) ([]SheetMapping, error) {

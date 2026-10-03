@@ -100,17 +100,12 @@ func (p *plan) counts() Counts {
 	return tally
 }
 
-func (s *Service) plan(ctx context.Context, state siteState, table importmap.Table, mapping importmap.Mapping, now time.Time) (plan, error) {
-	binding, err := mapping.Bind(table.Headers)
-	if err != nil {
-		return plan{}, err
-	}
-
-	p := newPlan(state.siteID, mapping, table)
-	rows := readRows(binding, table, &p)
+func (s *Service) plan(ctx context.Context, state siteState, roots rootSet, read *sheetRead, now time.Time) (plan, error) {
+	p := newPlan(state.siteID, read.mapping, read.table)
+	rows := readRows(read.binding, read.table, roots, &p)
 	sheet := pagesOf(rows, &p)
 	state.byPlanned = maps.Clone(state.byPlanned)
-	typeRows(sheet, rows, mapping.Options.RowType, &state)
+	typeRows(sheet, rows, read.mapping.Options.RowType, &state)
 	matchProducts(sheet, &state, &p)
 	fillGaps(sheet, &state, &p)
 	templates, err := s.kindTemplates(ctx, state.siteID, sheet)

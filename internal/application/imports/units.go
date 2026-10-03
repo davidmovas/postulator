@@ -37,7 +37,8 @@ type unit struct {
 	parent   parentRef
 	context  int
 	group    int
-	category bool
+	chain    []string
+	dropped  []string
 	pinned   string
 	alias    int
 	matched  string
@@ -45,14 +46,10 @@ type unit struct {
 }
 
 func (u *unit) defaultKind() graph.Kind {
-	switch {
-	case u.group < 0:
+	if u.group < 0 {
 		return graph.KindTopic
-	case u.category:
-		return graph.KindCategory
-	default:
-		return graph.KindHub
 	}
+	return graph.KindHub
 }
 
 type builder struct {
@@ -97,6 +94,7 @@ func (b *builder) build() {
 	b.adopted = b.groups.adopt(b.rows, b.sheet, b.state)
 	b.addPageUnits()
 	b.addEntityRows()
+	b.place()
 	b.resolveParents()
 	b.match()
 	b.order = b.roots()
@@ -139,7 +137,7 @@ func (b *builder) absorbRows(draft *pageDraft) {
 func (b *builder) addGroupUnits() {
 	for at := range b.groups.nodes {
 		node := &b.groups.nodes[at]
-		u := unit{name: node.name, parent: b.groupParent(node.parent), context: node.parent, group: at, category: node.category}
+		u := unit{name: node.name, parent: b.groupParent(node.parent), context: node.parent, group: at}
 		if len(node.under) > 0 {
 			u.at = b.rows[node.under[0]].at
 		}
@@ -203,7 +201,10 @@ func (b *builder) addRowUnit(draft *pageDraft) {
 	}
 
 	first := &b.rows[draft.rows[0]]
-	u := unit{name: fill(explicit, first.named()), at: first.at, context: b.contextOf(draft.rows), group: -1}
+	u := unit{
+		name: fill(explicit, first.named()), at: first.at, context: b.contextOf(draft.rows), group: -1,
+		chain: draft.chain, dropped: draft.dropped,
+	}
 	if onSite && explicit == "" && existing.EntityID != nil {
 		if pinned, known := b.byID[*existing.EntityID]; known {
 			u.name, u.pinned = pinned.Name, pinned.ID
@@ -222,7 +223,7 @@ func (b *builder) addEntityRows() {
 		if row.path != "" || row.name == "" {
 			continue
 		}
-		u := unit{name: row.name, at: row.at, context: b.contextOf([]int{i}), group: -1}
+		u := unit{name: row.name, at: row.at, context: b.contextOf([]int{i}), group: -1, chain: row.chain, dropped: row.dropped}
 		u.parent = b.groupParent(u.context)
 		b.absorbRow(b.add(u), row)
 	}

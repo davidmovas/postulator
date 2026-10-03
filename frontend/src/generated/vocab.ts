@@ -243,6 +243,7 @@ export const importFindingCodes = [
     "wp_type_kept",
     "intermediate_level",
     "scope_clash",
+    "category_level_is_root",
 ] as const;
 export type ImportFindingCode = (typeof importFindingCodes)[number];
 

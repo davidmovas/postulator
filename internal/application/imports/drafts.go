@@ -22,6 +22,8 @@ type pageDraft struct {
 	entity     string
 	keywords   keyword.List
 	notes      []pagemap.Note
+	chain      []string
+	dropped    []string
 	own        ownership
 	modeType   pagemap.WPType
 	matchedBy  pagemap.MatchedBy
@@ -57,6 +59,12 @@ func (p *pageDraft) merge(row *rowDraft, at int) {
 	p.pageKind = fill(p.pageKind, row.pageKind)
 	p.keywords = p.keywords.Merge(row.keywords)
 	p.notes = pagemap.MergeNotes(p.notes, row.notes)
+	if len(p.chain) == 0 {
+		p.chain = row.chain
+	}
+	if len(p.dropped) == 0 {
+		p.dropped = row.dropped
+	}
 	if p.own == ownUnset {
 		p.own = row.own
 	}

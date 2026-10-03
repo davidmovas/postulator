@@ -31,7 +31,7 @@ func edgeKey(e graph.Edge) string {
 }
 
 func sameEntity(a, b graph.Entity) bool {
-	return a.Kind == b.Kind && a.SiteCategory == b.SiteCategory && a.Keywords.Equal(b.Keywords) &&
+	return a.Kind == b.Kind && a.Keywords.Equal(b.Keywords) &&
 		slices.Equal(anchorTexts(a.Anchors), anchorTexts(b.Anchors))
 }
 
@@ -66,7 +66,7 @@ func (b *builder) createEntity(u *unit, kind graph.Kind) error {
 		scope = &parentID
 	}
 	entity, err := graph.NewEntity(graph.Entity{
-		ID: u.id, SiteID: b.state.siteID, Name: u.name, Kind: cmp.Or(kind, u.defaultKind()), SiteCategory: u.category,
+		ID: u.id, SiteID: b.state.siteID, Name: u.name, Kind: cmp.Or(kind, u.defaultKind()),
 		ScopeID: scope, Keywords: u.keywords, Anchors: anchorsOf(u.anchors),
 		Source: graph.SourceImport, CreatedAt: b.now, UpdatedAt: b.now,
 	})
@@ -83,7 +83,6 @@ func (b *builder) updateEntity(u *unit, kind graph.Kind) error {
 	current := b.byID[u.matched]
 	next := current
 	next.Kind = cmp.Or(kind, current.Kind)
-	next.SiteCategory = current.SiteCategory || u.category
 	next.Keywords = current.Keywords.Merge(u.keywords)
 	next.Anchors = anchorsOf(union(anchorTexts(current.Anchors), u.anchors))
 	next.UpdatedAt = b.now

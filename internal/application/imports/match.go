@@ -269,7 +269,6 @@ func (b *builder) absorb(into, from int) {
 	if target.group < 0 {
 		target.group = source.group
 	}
-	target.category = target.category || source.category
 	if target.context < 0 {
 		target.context = source.context
 	}

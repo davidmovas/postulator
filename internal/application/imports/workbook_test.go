@@ -288,7 +288,7 @@ func TestAWorkbookApplySavesTheMappingOfEachSheet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
-	if applied.Counts.EntitiesCreated != 8+7 {
+	if applied.Counts.EntitiesCreated != 8+5 {
 		t.Fatalf("counts = %+v, want the groups and the catalog written together", applied.Counts)
 	}
 

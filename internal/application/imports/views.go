@@ -21,30 +21,31 @@ const (
 type FindingCode string
 
 const (
-	CodeBadPath           FindingCode = "bad_path"
-	CodeNoTarget          FindingCode = "no_target"
-	CodeDuplicatePath     FindingCode = "duplicate_path"
-	CodeIntermediatePath  FindingCode = "intermediate_path"
-	CodeUnknownParent     FindingCode = "unknown_parent"
-	CodeUnknownRelated    FindingCode = "unknown_related"
-	CodeSelfEdge          FindingCode = "self_edge"
-	CodeCycle             FindingCode = "cycle"
-	CodeCannibalization   FindingCode = "cannibalization"
-	CodeUnknownEntityKind FindingCode = "unknown_entity_kind"
-	CodeUnknownPageKind   FindingCode = "unknown_page_kind"
-	CodeUnknownWPType     FindingCode = "unknown_wp_type"
-	CodeRootPageSkipped   FindingCode = "root_page_skipped"
-	CodeBadVolume         FindingCode = "bad_volume"
-	CodeUnknownOwnEntity  FindingCode = "unknown_own_entity"
-	CodeTechnicalParent   FindingCode = "technical_parent"
-	CodeGroupWithoutPage  FindingCode = "group_without_page"
-	CodeAmbiguousParent   FindingCode = "ambiguous_parent"
-	CodeAmbiguousEntity   FindingCode = "ambiguous_entity"
-	CodeProductNotInStore FindingCode = "product_not_in_store"
-	CodeProductRowLeft    FindingCode = "product_row_left"
-	CodeWPTypeKept        FindingCode = "wp_type_kept"
-	CodeIntermediateLevel FindingCode = "intermediate_level"
-	CodeScopeClash        FindingCode = "scope_clash"
+	CodeBadPath             FindingCode = "bad_path"
+	CodeNoTarget            FindingCode = "no_target"
+	CodeDuplicatePath       FindingCode = "duplicate_path"
+	CodeIntermediatePath    FindingCode = "intermediate_path"
+	CodeUnknownParent       FindingCode = "unknown_parent"
+	CodeUnknownRelated      FindingCode = "unknown_related"
+	CodeSelfEdge            FindingCode = "self_edge"
+	CodeCycle               FindingCode = "cycle"
+	CodeCannibalization     FindingCode = "cannibalization"
+	CodeUnknownEntityKind   FindingCode = "unknown_entity_kind"
+	CodeUnknownPageKind     FindingCode = "unknown_page_kind"
+	CodeUnknownWPType       FindingCode = "unknown_wp_type"
+	CodeRootPageSkipped     FindingCode = "root_page_skipped"
+	CodeBadVolume           FindingCode = "bad_volume"
+	CodeUnknownOwnEntity    FindingCode = "unknown_own_entity"
+	CodeTechnicalParent     FindingCode = "technical_parent"
+	CodeGroupWithoutPage    FindingCode = "group_without_page"
+	CodeAmbiguousParent     FindingCode = "ambiguous_parent"
+	CodeAmbiguousEntity     FindingCode = "ambiguous_entity"
+	CodeProductNotInStore   FindingCode = "product_not_in_store"
+	CodeProductRowLeft      FindingCode = "product_row_left"
+	CodeWPTypeKept          FindingCode = "wp_type_kept"
+	CodeIntermediateLevel   FindingCode = "intermediate_level"
+	CodeScopeClash          FindingCode = "scope_clash"
+	CodeCategoryLevelIsRoot FindingCode = "category_level_is_root"
 )
 
 var blockingFindingCodes = []FindingCode{
@@ -112,14 +113,13 @@ type PreviewPage struct {
 }
 
 type PreviewEntity struct {
-	Sheet        string        `json:"sheet,omitempty"`
-	Name         string        `json:"name"`
-	Parent       string        `json:"parent,omitempty"`
-	Kind         string        `json:"kind"`
-	SiteCategory bool          `json:"siteCategory,omitempty"`
-	Keywords     []dto.Keyword `json:"keywords"`
-	Anchors      []string      `json:"anchors"`
-	Action       string        `json:"action"`
+	Sheet    string        `json:"sheet,omitempty"`
+	Name     string        `json:"name"`
+	Parent   string        `json:"parent,omitempty"`
+	Kind     string        `json:"kind"`
+	Keywords []dto.Keyword `json:"keywords"`
+	Anchors  []string      `json:"anchors"`
+	Action   string        `json:"action"`
 }
 
 type PreviewColumn struct {
@@ -259,14 +259,13 @@ func (r *PreviewReport) settle() {
 
 func entityView(sheet string, e graph.Entity, parent string, action Action) PreviewEntity {
 	return PreviewEntity{
-		Sheet:        sheet,
-		Name:         e.Name,
-		Parent:       parent,
-		Kind:         string(e.Kind),
-		SiteCategory: e.SiteCategory,
-		Keywords:     application.KeywordViews(e.Keywords),
-		Anchors:      anchorTexts(e.Anchors),
-		Action:       string(action),
+		Sheet:    sheet,
+		Name:     e.Name,
+		Parent:   parent,
+		Kind:     string(e.Kind),
+		Keywords: application.KeywordViews(e.Keywords),
+		Anchors:  anchorTexts(e.Anchors),
+		Action:   string(action),
 	}
 }
 

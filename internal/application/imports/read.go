@@ -34,6 +34,30 @@ type rowDraft struct {
 	related   []string
 	parent    string
 	levels    []importmap.Level
+	roots     []string
+	chain     []string
+	dropped   []string
+}
+
+func (r *rowDraft) sortLevels(roots rootSet) {
+	for _, level := range r.levels {
+		switch {
+		case !level.Category:
+			r.roots = append(r.roots, level.Name)
+		case roots.holds(level.Name):
+			r.dropped = append(r.dropped, level.Name)
+		default:
+			r.chain = append(r.chain, level.Name)
+		}
+	}
+}
+
+func (r *rowDraft) noteDropped(p *plan) {
+	for _, name := range r.dropped {
+		p.noteAt(r.at, "", CodeCategoryLevelIsRoot,
+			"the category "+name+" is the name of a root entity, so it is not made a category; "+
+				"the levels below it are filed under the level above it")
+	}
 }
 
 func (r *rowDraft) named() string {
@@ -75,12 +99,12 @@ func rowKeywords(binding importmap.Binding, row []string, at importmap.Origin, p
 	return keyword.New(items)
 }
 
-func readRows(binding importmap.Binding, table importmap.Table, p *plan) []rowDraft {
+func readRows(binding importmap.Binding, table importmap.Table, roots rootSet, p *plan) []rowDraft {
 	rows := make([]rowDraft, 0, len(table.Rows))
 	walk := binding.Walk()
 	for i := range table.Rows {
 		raw := walk.Path(table.Rows[i])
-		draft, kept := readRow(binding, table.Rows[i], raw, table.Origin(i), p)
+		draft, kept := readRow(binding, table.Rows[i], raw, table.Origin(i), roots, p)
 		if !kept {
 			p.report.Skipped++
 			continue
@@ -90,15 +114,17 @@ func readRows(binding importmap.Binding, table importmap.Table, p *plan) []rowDr
 	return rows
 }
 
-func readRow(binding importmap.Binding, row []string, raw string, at importmap.Origin, p *plan) (rowDraft, bool) {
+func readRow(binding importmap.Binding, row []string, raw string, at importmap.Origin, roots rootSet, p *plan) (rowDraft, bool) {
 	if binding.Blank(row) && raw == "" {
 		return rowDraft{}, false
 	}
 	draft := cellsOf(binding, row, at)
-	if draft.name == "" && raw == "" && len(draft.levels) == 0 {
+	draft.sortLevels(roots)
+	if draft.name == "" && raw == "" && len(draft.roots) == 0 {
 		p.noteAt(at, "", CodeNoTarget, "the row names neither a path, an entity nor a group")
 		return rowDraft{}, false
 	}
+	draft.noteDropped(p)
 	draft.own = rowOwnership(binding, row, at, p)
 	draft.keywords = rowKeywords(binding, row, at, p)
 	draft.path = rowPath(raw, at, p)
