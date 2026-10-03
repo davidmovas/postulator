@@ -4,6 +4,7 @@ export const settingsTabKeys = ["models", "runs", "agent", "browser", "security"
 export type SettingsTabKey = (typeof settingsTabKeys)[number];
 
 export type SectionId =
+    | "reasoning"
     | "modelCalls"
     | "endpoints"
     | "images"
@@ -46,6 +47,7 @@ export interface TabView {
 }
 
 const specs: readonly SectionSpec[] = [
+    { id: "reasoning", tab: "models", advanced: false },
     { id: "modelCalls", tab: "models", advanced: true },
     { id: "endpoints", tab: "models", advanced: true },
     { id: "images", tab: "models", advanced: true },
@@ -64,6 +66,17 @@ const specs: readonly SectionSpec[] = [
 ];
 
 export const placements: readonly Placement[] = [
+    { key: "llm.effort.writer", section: "reasoning" },
+    { key: "llm.tier.writer", section: "reasoning" },
+    { key: "llm.effort.editor", section: "reasoning" },
+    { key: "llm.tier.editor", section: "reasoning" },
+    { key: "llm.effort.linker", section: "reasoning" },
+    { key: "llm.tier.linker", section: "reasoning" },
+    { key: "llm.effort.judge", section: "reasoning" },
+    { key: "llm.tier.judge", section: "reasoning" },
+    { key: "llm.effort.titler", section: "reasoning" },
+    { key: "llm.tier.titler", section: "reasoning" },
+    { key: "llm.flexPatience", section: "reasoning" },
     { key: "llm.timeout", section: "modelCalls" },
     { key: "llm.retries", section: "modelCalls", unit: "times" },
     { key: "llm.recordReplayMode", section: "modelCalls" },

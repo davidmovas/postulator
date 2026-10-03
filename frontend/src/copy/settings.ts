@@ -1,3 +1,19 @@
+const effortLabels = {
+    none: "None",
+    low: "Low",
+    medium: "Medium",
+    high: "High",
+    xhigh: "Highest",
+};
+
+const tierLabels = {
+    standard: "Standard",
+    flex: "Flex, half price",
+};
+
+const flexHelp =
+    "Standard answers at once. Flex is half price but may take minutes longer, and a flex call that has not answered in time is sent again at the standard price.";
+
 export const settings = {
     title: "Settings",
     tabs: {
@@ -24,6 +40,7 @@ export const settings = {
         bytes: "bytes",
     },
     sections: {
+        reasoning: "Reasoning and speed",
         modelCalls: "Model calls",
         endpoints: "Endpoints",
         images: "Images",
@@ -67,6 +84,16 @@ export const settings = {
             high: "High",
             auto: "Let OpenAI choose",
         },
+        "llm.effort.writer": effortLabels,
+        "llm.effort.editor": effortLabels,
+        "llm.effort.linker": effortLabels,
+        "llm.effort.judge": effortLabels,
+        "llm.effort.titler": effortLabels,
+        "llm.tier.writer": tierLabels,
+        "llm.tier.editor": tierLabels,
+        "llm.tier.linker": tierLabels,
+        "llm.tier.judge": tierLabels,
+        "llm.tier.titler": tierLabels,
     },
     keys: {
         "agent.historyBudgetChars": {
@@ -113,6 +140,30 @@ export const settings = {
             label: "Anthropic endpoint",
             help: "An http or https address. Empty means Anthropic's own endpoint.",
         },
+        "llm.effort.editor": {
+            label: "Reasoning when editing",
+            help: "How long the model thinks before it writes a page's search title and description or proposes entities for the graph. Low is usually enough; more costs more.",
+        },
+        "llm.effort.judge": {
+            label: "Reasoning when judging quality",
+            help: "How long the model thinks before it scores a page. More reasoning judges more carefully and costs more.",
+        },
+        "llm.effort.linker": {
+            label: "Reasoning when placing links",
+            help: "How long the model thinks before it writes a sentence that carries a link. Low is usually enough; more costs more.",
+        },
+        "llm.effort.titler": {
+            label: "Reasoning when titling a chat",
+            help: "How long the model thinks before it names a conversation. None is enough for a short title.",
+        },
+        "llm.effort.writer": {
+            label: "Reasoning when writing the body",
+            help: "How long the model thinks before it writes a page. More reasoning writes more carefully and costs more, because thinking is paid for like written text. None writes straight away.",
+        },
+        "llm.flexPatience": {
+            label: "Longest wait for a flex answer",
+            help: "How long a flex call may go unanswered before it is sent again at the standard price. Takes effect after a restart.",
+        },
         "llm.gemini.location": {
             label: "Google Cloud region",
             help: "The Vertex AI region, for example europe-west4.",
@@ -136,6 +187,26 @@ export const settings = {
         "llm.retries": {
             label: "Retries after a failed call",
             help: "How many times a failed model call is tried again before the step fails.",
+        },
+        "llm.tier.editor": {
+            label: "Speed when editing",
+            help: flexHelp,
+        },
+        "llm.tier.judge": {
+            label: "Speed when judging quality",
+            help: flexHelp,
+        },
+        "llm.tier.linker": {
+            label: "Speed when placing links",
+            help: flexHelp,
+        },
+        "llm.tier.titler": {
+            label: "Speed when titling a chat",
+            help: flexHelp,
+        },
+        "llm.tier.writer": {
+            label: "Speed when writing the body",
+            help: "Flex is half price but may take minutes longer to write a page. A flex call that has not answered in time is sent again at the standard price.",
         },
         "llm.timeout": {
             label: "Time limit for one model call",
