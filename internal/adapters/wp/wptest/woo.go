@@ -1,6 +1,8 @@
 package wptest
 
 import (
+	"encoding/json"
+	"html"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -21,6 +23,58 @@ func (s *Server) routeWoo(mux *http.ServeMux) {
 	mux.HandleFunc("PUT "+wooNamespace+"/products/{id}", s.withCommerce(s.handleProductUpdate))
 	mux.HandleFunc("GET "+wooNamespace+"/products/categories", s.withCommerce(s.handleProductCategoryList))
 	mux.HandleFunc("GET "+wooNamespace+"/products/categories/{id}", s.withCommerce(s.handleProductCategoryGet))
+}
+
+func (s *Server) routeStorefront(mux *http.ServeMux) {
+	mux.HandleFunc("GET /product/{slug}/", s.handleProductPage)
+}
+
+func (s *Server) handleProductPage(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("slug")
+
+	s.mu.Lock()
+	var shown *Item
+	for _, id := range s.order {
+		stored := s.items[id]
+		if stored.Type == TypeProduct && stored.Slug == slug && stored.Status == "publish" {
+			shown = stored
+		}
+	}
+	builder, absent, down := s.builderLayout, s.noCommerce, s.storefrontOff
+	var name, description string
+	if shown != nil {
+		name, description = shown.Title, shown.Content
+	}
+	s.mu.Unlock()
+
+	if down {
+		http.Error(w, "the storefront is down", http.StatusServiceUnavailable)
+		return
+	}
+	if shown == nil || absent {
+		http.NotFound(w, r)
+		return
+	}
+
+	structured, err := json.Marshal(map[string]string{
+		"@type": "Product", "name": name, "description": tagPattern.ReplaceAllString(description, ""),
+	})
+	if err != nil {
+		s.t.Errorf("encode the structured data of %s: %v", slug, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	body := description
+	if builder {
+		body = `<div class="builder-layout"><button>Add to cart</button></div>`
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	page := "<!doctype html><html><head><title>" + html.EscapeString(name) + "</title>" +
+		`<script type="application/ld+json">` + string(structured) + "</script></head>" +
+		"<body><h1>" + html.EscapeString(name) + "</h1>" + body + "</body></html>"
+	if _, writeErr := w.Write([]byte(page)); writeErr != nil {
+		s.t.Logf("write the product page %s: %v", slug, writeErr)
+	}
 }
 
 func (s *Server) withCommerce(next http.HandlerFunc) http.HandlerFunc {

@@ -67,6 +67,8 @@ type Server struct {
 	noCommerce    bool
 	noProductEdit bool
 	filteredHTML  bool
+	builderLayout bool
+	storefrontOff bool
 	brokenHash    bool
 	brokenExpiry  bool
 	noNamespaces  bool
@@ -100,6 +102,14 @@ func WithoutProductEdit() Option {
 
 func WithFilteredHTML() Option {
 	return func(s *Server) { s.filteredHTML = true }
+}
+
+func WithBuilderLayout() Option {
+	return func(s *Server) { s.builderLayout = true }
+}
+
+func WithStorefrontDown() Option {
+	return func(s *Server) { s.storefrontOff = true }
 }
 
 func WithCapabilities(names ...string) Option {
@@ -172,7 +182,10 @@ func (s *Server) handler() http.Handler {
 	s.routeWoo(mux)
 	s.routePlugin(mux)
 
-	return s.record(s.redirectRoot(s.injectFaults(s.authenticate(mux))))
+	public := http.NewServeMux()
+	s.routeStorefront(public)
+	public.Handle("/", s.redirectRoot(s.injectFaults(s.authenticate(mux))))
+	return s.record(public)
 }
 
 func (s *Server) record(next http.Handler) http.Handler {

@@ -250,6 +250,15 @@ func TestTheProductLoopEditsWhatTheClientCreatedInTheStore(t *testing.T) {
 			t.Fatalf("the item for %s is %q: %s%s", items.Items[i].TargetID, items.Items[i].Status, items.Items[i].Error,
 				artifactDump(t, core.Runs, items.Items[i].ID, string(run.ArtifactValidationReport)))
 		}
+		final := finalReport(t, core.Runs, items.Items[i].ID)
+		if final.Sync == nil {
+			t.Fatalf("%s was never read back", final.Path)
+		}
+		for _, finding := range final.Sync.Findings {
+			if finding.Code == steps.CodeProductDescriptionHidden || finding.Code == steps.CodeProductPageUnread {
+				t.Errorf("%s says %s; the docker theme prints the description a visitor reads", final.Path, finding.Message)
+			}
+		}
 	}
 
 	for _, held := range []storeProduct{liquid, capsule} {

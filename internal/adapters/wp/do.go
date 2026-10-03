@@ -26,9 +26,12 @@ type request struct {
 	method       string
 	namespace    string
 	path         string
+	absolute     string
+	accept       string
 	contentType  string
 	body         []byte
 	keepRedirect bool
+	anonymous    bool
 }
 
 type attempt struct {
@@ -39,7 +42,10 @@ type attempt struct {
 }
 
 func (c *Client) do(ctx context.Context, req request) (*http.Response, []byte, error) {
-	target := c.resolve(req.namespace, req.path, req.query)
+	target := req.absolute
+	if target == "" {
+		target = c.resolve(req.namespace, req.path, req.query)
+	}
 	client := req.client
 	if client == nil {
 		client = c.http
@@ -96,8 +102,14 @@ func (c *Client) send(ctx context.Context, client *http.Client, req request, tar
 		return attempt{err: errors.New(errors.Invalid, "the WordPress request could not be built").WithInternal(err)}
 	}
 
-	httpReq.SetBasicAuth(c.username, c.password)
-	httpReq.Header.Set("Accept", "application/json")
+	if !req.anonymous {
+		httpReq.SetBasicAuth(c.username, c.password)
+	}
+	accept := req.accept
+	if accept == "" {
+		accept = contentTypeJSON
+	}
+	httpReq.Header.Set("Accept", accept)
 	httpReq.Header.Set("User-Agent", userAgent)
 	if req.contentType != "" {
 		httpReq.Header.Set("Content-Type", req.contentType)

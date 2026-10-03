@@ -1,8 +1,10 @@
 package wptest_test
 
 import (
+	"io"
 	"net/http"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
@@ -256,6 +258,57 @@ func TestSavingAProductPostFiltersTheDescriptionForAUserWithoutUnfilteredHTML(t 
 
 			if held, _ := server.Lookup(product.ID); held.Content != tc.want {
 				t.Errorf("description = %q, want %q", held.Content, tc.want)
+			}
+		})
+	}
+}
+
+func TestAVisitorSeesAProductPageAsTheThemeLaysItOut(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name        string
+		options     []wptest.Option
+		status      string
+		code        int
+		description bool
+	}{
+		{name: "a theme that prints the description", status: "publish", code: http.StatusOK, description: true},
+		{name: "a page builder that leaves it out", options: []wptest.Option{wptest.WithBuilderLayout()}, status: "publish", code: http.StatusOK},
+		{name: "a product that is not published", status: "draft", code: http.StatusNotFound},
+		{name: "a storefront that is down", options: []wptest.Option{wptest.WithStorefrontDown()}, status: "publish", code: http.StatusServiceUnavailable},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := wptest.New(t, tc.options...)
+			server.Seed(wptest.Item{Type: wptest.TypeProduct, Title: "Powder", Slug: "powder", Status: tc.status, Content: "<p>Made by hand.</p>"})
+
+			response, err := http.Get(server.URL() + "/product/powder/")
+			if err != nil {
+				t.Fatalf("GET: %v", err)
+			}
+			raw, err := io.ReadAll(response.Body)
+			if closeErr := response.Body.Close(); closeErr != nil {
+				t.Errorf("close: %v", closeErr)
+			}
+			if err != nil {
+				t.Fatalf("read: %v", err)
+			}
+			if response.StatusCode != tc.code {
+				t.Fatalf("status = %d, want %d", response.StatusCode, tc.code)
+			}
+			if tc.code != http.StatusOK {
+				return
+			}
+			page := string(raw)
+			if !strings.Contains(page, "<h1>Powder</h1>") || !strings.Contains(page, "application/ld+json") {
+				t.Errorf("the page = %s, want the name and the structured data", page)
+			}
+			if strings.Contains(page, "<p>Made by hand.</p>") != tc.description {
+				t.Errorf("the page = %s, want the description shown %t", page, tc.description)
 			}
 		})
 	}

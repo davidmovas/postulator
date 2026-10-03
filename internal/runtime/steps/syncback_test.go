@@ -2,6 +2,7 @@ package steps_test
 
 import (
 	"encoding/json"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -259,6 +260,54 @@ func TestSyncBackReadsAProductFromTheStore(t *testing.T) {
 			}
 			if links := recorder.byPage["page-child"]; len(links) != 1 || links[0].ToPageID == nil || *links[0].ToPageID != "page-parent" {
 				t.Errorf("the recorded links are %+v", links)
+			}
+		})
+	}
+}
+
+func TestSyncBackSaysWhenAVisitorCannotSeeAProductsDescription(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		options []wptest.Option
+		status  string
+		want    []string
+	}{
+		{name: "a theme that prints it", status: "publish", want: []string{}},
+		{name: "a page builder that leaves it out", options: []wptest.Option{wptest.WithBuilderLayout()}, status: "publish", want: []string{steps.CodeProductDescriptionHidden}},
+		{name: "a storefront that cannot be read", options: []wptest.Option{wptest.WithStorefrontDown()}, status: "publish", want: []string{steps.CodeProductPageUnread}},
+		{name: "a product no visitor can open yet", options: []wptest.Option{wptest.WithBuilderLayout()}, status: "draft", want: []string{}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps, server := imageDepsWith(t, tc.options...)
+			product := server.Seed(wptest.Item{
+				Type: wptest.TypeProduct, Title: "Espresso Machine", Slug: "espresso-machine", Status: tc.status,
+				Content: "<p>A single boiler machine that rewards a good grinder.</p>",
+			})[0]
+			deps.Links = &linkRecorder{}
+			deps.Pages = pageList{recorded: &pagemap.Page{}}
+			sc := syncBackContext(t, product.ID)
+			sc.Page.WPType = pagemap.WPProduct
+			sc.Page.Path = "/product/espresso-machine/"
+			sc.Page.Slug = "espresso-machine"
+
+			synced := runSyncBack(t, deps, sc)
+			codes := make([]string, 0, len(synced.Findings))
+			for i := range synced.Findings {
+				codes = append(codes, synced.Findings[i].Code)
+			}
+			if !slices.Equal(codes, tc.want) {
+				t.Fatalf("findings = %+v, want %v", synced.Findings, tc.want)
+			}
+			for i := range synced.Findings {
+				if synced.Findings[i].Severity != content.SeverityWarn {
+					t.Errorf("finding = %+v, want a warning", synced.Findings[i])
+				}
 			}
 		})
 	}
