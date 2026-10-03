@@ -4,6 +4,8 @@ export { Banner } from "./banner.js";
 export type { BannerProps } from "./banner.js";
 export { Button, IconButton } from "./button.js";
 export type { ButtonProps, ButtonSize, ButtonVariant, IconButtonProps } from "./button.js";
+export { CategoryTrail } from "./category-trail.js";
+export type { CategoryState, CategoryTrailItem, CategoryTrailProps } from "./category-trail.js";
 export { Checkbox } from "./checkbox.js";
 export type { CheckboxProps } from "./checkbox.js";
 export { ChipInput } from "./chip-input.js";
