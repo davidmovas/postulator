@@ -277,6 +277,8 @@ func TestPageReportReadsTheNewestItem(t *testing.T) {
 		run.ArtifactJudgeReport:      `{"score":0.8}`,
 		run.ArtifactPublishResult:    `{"wpId":7}`,
 		run.ArtifactRelinkResult:     `{"linked":1}`,
+		run.ArtifactDraft: `{"title":"Espresso","sections":[{"heading":"About","html":"<p>long</p>"}],` +
+			`"product":{"shortDescription":"<p>short</p>","specifications":[{"name":"Form","value":"Liquid"}]}}`,
 	})
 
 	report, err := f.service.PageReport(t.Context(), reports.PageReportRequest{
@@ -298,6 +300,37 @@ func TestPageReportReadsTheNewestItem(t *testing.T) {
 		if len(blob) == 0 {
 			t.Errorf("the %s artifact is missing", name)
 		}
+	}
+	if got := string(report.Product); got != `{"shortDescription":"<p>short</p>","specifications":[{"name":"Form","value":"Liquid"}]}` {
+		t.Errorf("product = %s, want the product outputs of the draft and nothing else", got)
+	}
+}
+
+func TestPageReportCarriesNoProductForADraftWithout(t *testing.T) {
+	t.Parallel()
+
+	for name, draft := range map[string]string{
+		"no draft":                "",
+		"a page's draft":          `{"title":"Espresso","sections":[]}`,
+		"a draft with no outputs": `{"title":"Espresso","product":null}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newFixture(t)
+			blobs := map[run.ArtifactKind]string{run.ArtifactPublishResult: `{"wpId":7}`}
+			if draft != "" {
+				blobs[run.ArtifactDraft] = draft
+			}
+			f.withRun(t, run.StatusCompleted, blobs)
+			report, err := f.service.PageReport(t.Context(), reports.PageReportRequest{PageID: f.pages["/coffee/espresso/"].ID})
+			if err != nil {
+				t.Fatalf("PageReport: %v", err)
+			}
+			if report.Product != nil {
+				t.Errorf("product = %s, want none", report.Product)
+			}
+		})
 	}
 }
 

@@ -48,7 +48,26 @@ func (s *Service) PageReport(ctx context.Context, req PageReportRequest) (PageRe
 	report.Judge = latest(artifacts, run.ArtifactJudgeReport)
 	report.Publish = latest(artifacts, run.ArtifactPublishResult)
 	report.Relink = latest(artifacts, run.ArtifactRelinkResult)
+	if report.Product, err = productOf(latest(artifacts, run.ArtifactDraft)); err != nil {
+		return PageReportResponse{}, err
+	}
 	return report, nil
+}
+
+func productOf(draft json.RawMessage) (json.RawMessage, error) {
+	if len(draft) == 0 {
+		return nil, nil
+	}
+	var held struct {
+		Product json.RawMessage `json:"product"`
+	}
+	if err := json.Unmarshal(draft, &held); err != nil {
+		return nil, errors.Wrap(err, errors.Internal, "the stored draft is not readable")
+	}
+	if len(held.Product) == 0 || string(held.Product) == "null" {
+		return nil, nil
+	}
+	return held.Product, nil
 }
 
 func (s *Service) RunReport(ctx context.Context, req RunReportRequest) (RunReportResponse, error) {

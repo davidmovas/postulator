@@ -60,6 +60,7 @@ type PageReportResponse struct {
 	Judge      json.RawMessage `json:"judge,omitempty"`
 	Publish    json.RawMessage `json:"publish,omitempty"`
 	Relink     json.RawMessage `json:"relink,omitempty"`
+	Product    json.RawMessage `json:"product,omitempty"`
 	PageID     string          `json:"pageId"`
 	Path       string          `json:"path"`
 	RunID      string          `json:"runId"`
