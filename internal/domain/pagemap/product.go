@@ -55,6 +55,40 @@ func MatchProduct(row ProductRow, pages []Page) ProductMatch {
 	return ProductMatch{}
 }
 
+func ClaimProduct(store Page, pages []Page) (Page, bool) {
+	candidates := make([]Page, 0, len(pages)+1)
+	for i := range pages {
+		if pages[i].PlannedPath == "" {
+			candidates = append(candidates, pages[i])
+		}
+	}
+	candidates = append(candidates, store)
+
+	var (
+		claimer Page
+		count   int
+	)
+	for i := range pages {
+		row := pages[i]
+		if row.WPType != WPProduct || row.WPID != nil {
+			continue
+		}
+		address := row.Path
+		if row.PlannedPath != "" {
+			address = row.PlannedPath
+		}
+		match := MatchProduct(ProductRow{Path: address, H1: row.H1, Title: row.Title}, candidates)
+		if match.Found && match.Page.WPID != nil && store.WPID != nil && *match.Page.WPID == *store.WPID {
+			claimer = row
+			count++
+		}
+	}
+	if count != 1 {
+		return Page{}, false
+	}
+	return claimer, true
+}
+
 func inTheStore(pages []Page) []Page {
 	held := make([]Page, 0, len(pages))
 	for i := range pages {

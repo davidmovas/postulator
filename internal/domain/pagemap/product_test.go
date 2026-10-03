@@ -66,6 +66,52 @@ func TestMatchProductFindsTheStoreProductAFileRowMeans(t *testing.T) {
 	}
 }
 
+func TestANewStoreProductClaimsTheRowThatWaitedForIt(t *testing.T) {
+	t.Parallel()
+
+	waiting := func(id, path, h1 string) pagemap.Page {
+		return pagemap.Page{ID: id, SiteID: "site", Path: path, WPType: pagemap.WPProduct, Status: pagemap.StatusPlanned, H1: h1}
+	}
+	pages := []pagemap.Page{
+		waiting("liquid-row", "/mak/mak-liquid/", "Mak Liquid"),
+		waiting("capsule-row", "/mak/capsule/", "Mak Capsule"),
+		waiting("gel-a", "/a/gel/", ""),
+		waiting("gel-b", "/b/gel/", ""),
+		waiting("powder-row", "/mak/powder/", "Powder"),
+		storeProduct("powder", 20, "/product/powder/", "powder", "Old Powder"),
+		{ID: "page", SiteID: "site", Path: "/mak/", WPType: pagemap.WPPage, H1: "Mak Liquid"},
+	}
+
+	cases := []struct {
+		name  string
+		store pagemap.Page
+		want  string
+	}{
+		{name: "the slug the row's URL ends in", store: storeProduct("", 31, "/product/mak-liquid/", "mak-liquid", "Liquid"), want: "liquid-row"},
+		{name: "the name the row's H1 gives", store: storeProduct("", 32, "/product/capsule-x/", "capsule-x", "Mak Capsule"), want: "capsule-row"},
+		{name: "a product two rows wait for", store: storeProduct("", 33, "/product/gel/", "gel", "Gel")},
+		{name: "a product a row would rather match elsewhere", store: storeProduct("", 34, "/product/powder-2/", "powder-2", "Powder")},
+		{name: "a product no row waits for", store: storeProduct("", 35, "/product/other/", "other", "Other")},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, claimed := pagemap.ClaimProduct(tc.store, pages)
+			if tc.want == "" {
+				if claimed {
+					t.Fatalf("claimed by %s, want no row", got.ID)
+				}
+				return
+			}
+			if !claimed || got.ID != tc.want {
+				t.Fatalf("claimed by %s (%t), want %s", got.ID, claimed, tc.want)
+			}
+		})
+	}
+}
+
 func TestOnlyTheShopsTypesAreAddressedByTheStore(t *testing.T) {
 	t.Parallel()
 

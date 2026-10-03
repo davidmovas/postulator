@@ -12,6 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
@@ -470,6 +471,58 @@ func TestSyncSiteMergesAPulledItemOnlyIntoARowOfItsFamily(t *testing.T) {
 	}
 	if state.Findings[0].Details["path"] != "/liquid/" {
 		t.Errorf("the finding = %+v", state.Findings[0])
+	}
+}
+
+func TestSyncSiteGivesAWaitingRowTheProductCreatedForIt(t *testing.T) {
+	t.Parallel()
+
+	h := newSyncHarness(t, 0)
+	product := h.server.Seed(wptest.Item{
+		Type: wptest.TypeProduct, Title: "Liquid", Slug: "mak-liquid", Content: "<p>made by hand</p>", Status: "publish",
+	})[0]
+	waiting := func(path, h1 string) pagemap.Page {
+		return pagemap.Page{
+			ID: id.New(), SiteID: h.siteID, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPProduct, H1: h1,
+			Keywords: keyword.Of("mak liquid"), Status: pagemap.StatusPlanned, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+		}
+	}
+	claimed, other := waiting("/mak/mak-liquid/", "Mak Liquid"), waiting("/mak/gel/", "Mak Gel")
+	for _, row := range []pagemap.Page{claimed, other} {
+		if err := h.pages.Insert(t.Context(), row); err != nil {
+			t.Fatalf("insert the waiting row: %v", err)
+		}
+	}
+
+	h.all(t)
+
+	stored, err := h.pages.Get(t.Context(), claimed.ID)
+	if err != nil {
+		t.Fatalf("read the waiting row: %v", err)
+	}
+	if stored.WPID == nil || *stored.WPID != product.ID || stored.Path != "/product/mak-liquid/" ||
+		stored.PlannedPath != "/mak/mak-liquid/" || stored.Status != pagemap.StatusPublished {
+		t.Fatalf("the waiting row reads %+v, want it on the store's product at the store's address", stored)
+	}
+	if stored.H1 != "Mak Liquid" || !stored.Keywords.Equal(claimed.Keywords) || stored.Observed.Title != "Liquid" {
+		t.Errorf("the claimed row lost its plan or the store's name: %+v", stored)
+	}
+	all, err := h.pages.ListBySite(t.Context(), h.siteID)
+	if err != nil {
+		t.Fatalf("list the pages: %v", err)
+	}
+	products := 0
+	for i := range all {
+		if all[i].WPType == pagemap.WPProduct && all[i].WPID != nil {
+			products++
+		}
+	}
+	if products != 1 {
+		t.Errorf("the map holds %d store products, want the one row that waited for it", products)
+	}
+	left, err := h.pages.Get(t.Context(), other.ID)
+	if err != nil || left.WPID != nil || left.Path != "/mak/gel/" {
+		t.Errorf("the row nothing answers reads %+v (%v), want it still waiting", left, err)
 	}
 }
 

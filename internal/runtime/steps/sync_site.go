@@ -3,7 +3,9 @@ package steps
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -457,13 +459,23 @@ func reconcile(ctx context.Context, deps Deps, owner site.Site, batch []pulledIt
 	taken := make([]content.Finding, 0)
 	apply := func(c context.Context) error {
 		taken = taken[:0]
+		waiting := waitingProducts(byPath)
 		for i := range batch {
 			current, known, foreign := match(batch[i], byWPID, byPath)
 			if foreign {
 				taken = append(taken, pathTaken(batch[i], current))
 				continue
 			}
+			if !known && batch[i].Type == pagemap.WPProduct && waiting > 0 {
+				current, known = pagemap.ClaimProduct(storeCandidate(batch[i]), slices.Collect(maps.Values(byPath)))
+				if known {
+					waiting--
+				}
+			}
 			next, drifted := merge(current, known, batch[i], owner.ID, now)
+			if known && current.Path != next.Path {
+				delete(byPath, current.Path)
+			}
 
 			if known {
 				if updateErr := deps.Pages.Update(c, next); updateErr != nil {
@@ -522,6 +534,24 @@ func match(item pulledItem, byWPID map[siteKey]pagemap.Page,
 	}
 }
 
+func waitingProducts(byPath map[string]pagemap.Page) int {
+	count := 0
+	for path := range byPath {
+		if byPath[path].WPType == pagemap.WPProduct && byPath[path].WPID == nil {
+			count++
+		}
+	}
+	return count
+}
+
+func storeCandidate(item pulledItem) pagemap.Page {
+	wpID := item.WPID
+	return pagemap.Page{
+		Path: item.Path, Slug: pagemap.Slug(item.Path), WPType: pagemap.WPProduct, WPID: &wpID,
+		Observed: pagemap.Observed{Slug: item.Slug, Title: item.Title},
+	}
+}
+
 func pathTaken(item pulledItem, row pagemap.Page) content.Finding {
 	found := wpTypeOrPage(item.Type)
 	return content.Finding{
@@ -556,6 +586,17 @@ func merge(current pagemap.Page, known bool, item pulledItem, siteID string,
 		next.Status = statusFor(item.Status)
 	}
 	next.WPType = wpTypeOrPage(item.Type)
+	if known && next.WPType.StoreAddressed() && next.Path != item.Path {
+		if current.WPID == nil && next.PlannedPath == "" {
+			next.PlannedPath = current.Path
+			next.Status = statusFor(item.Status)
+		}
+		next.Path = item.Path
+		next.Slug = pagemap.Slug(item.Path)
+	}
+	if next.PlannedPath == next.Path {
+		next.PlannedPath = ""
+	}
 	next.WPID = &item.WPID
 	next.Observed = pagemap.Observed{
 		Link: item.Path, Slug: item.Slug, Status: item.Status, Title: item.Title, H1: item.H1,
