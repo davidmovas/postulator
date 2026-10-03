@@ -551,4 +551,6 @@ func TestTheClientWorkbookFilesItsPagesUnderTheirCategories(t *testing.T) {
 	if carried := live.filed(t, "pages", second.Publish.WPID).Categories; !sameSet(carried, termIDsOf(again)) {
 		t.Errorf("%s carries %v, want the chain %v", siblingPath, carried, termIDsOf(again))
 	}
+	t.Logf("%s was filed under %v beside the client's %d and put back; %s reused %v and created %v",
+		filedPath, chain, picks.ID, siblingPath, termIDsOf(written), createdIDsOf(again))
 }

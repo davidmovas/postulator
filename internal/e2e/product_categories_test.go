@@ -167,4 +167,6 @@ func TestAProductKeepsTheClientsCategoryAndGainsOurs(t *testing.T) {
 			t.Errorf("after the revert the store holds %+v named %q, want the category kept", onSite, written.Terms[i].Name)
 		}
 	}
+	t.Logf("the vial gained %v beside the client's %d and kept only the client's after the revert",
+		termIDsOf(written), shelf.ID)
 }
