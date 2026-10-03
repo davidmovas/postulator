@@ -66,6 +66,7 @@ type Server struct {
 	noPlugin      bool
 	noCommerce    bool
 	noProductEdit bool
+	noTermEdit    bool
 	filteredHTML  bool
 	builderLayout bool
 	storefrontOff bool
@@ -98,6 +99,10 @@ func WithoutCommerce() Option {
 
 func WithoutProductEdit() Option {
 	return func(s *Server) { s.noProductEdit = true }
+}
+
+func WithoutTermEdit() Option {
+	return func(s *Server) { s.noTermEdit = true }
 }
 
 func WithFilteredHTML() Option {

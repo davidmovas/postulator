@@ -3,6 +3,7 @@ package wptest_test
 import (
 	"encoding/json"
 	"net/http"
+	"slices"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
@@ -261,9 +262,12 @@ func TestUpdateCanTouchEveryField(t *testing.T) {
 	t.Parallel()
 
 	server := wptest.New(t)
+	first := server.SeedCategory(wptest.Category{Name: "Koffein"})
+	second := server.SeedCategory(wptest.Category{Name: "Tee"})
 	seeded := server.Seed(wptest.Item{Type: wptest.TypePost, Title: "Powder"})[0]
 
-	body := []byte(`{"title":"Koffein","content":"<p>c</p>","excerpt":"e","template":"wide","menu_order":3,"featured_media":7,"categories":[1,2],"tags":[3],"meta":{"_postulator_title":"m"},"slug":"koffein-neu"}`)
+	body := []byte(`{"title":"Koffein","content":"<p>c</p>","excerpt":"e","template":"wide","menu_order":3,"featured_media":7,"categories":[` +
+		itoa(first.ID) + `,` + itoa(second.ID) + `],"tags":[3],"meta":{"_postulator_title":"m"},"slug":"koffein-neu"}`)
 	_, payload := call(t, server, http.MethodPost, "/wp-json/wp/v2/posts/"+itoa(seeded.ID), body, true)
 
 	var updated struct {
@@ -288,6 +292,79 @@ func TestUpdateCanTouchEveryField(t *testing.T) {
 	}
 	if string(updated.Meta) == "[]" {
 		t.Error("meta must be an object once a key is set")
+	}
+}
+
+func TestAPostKeepsTheCategoriesThatExistInTheOrderWordPressNamesThem(t *testing.T) {
+	t.Parallel()
+
+	origin := wptest.New(t)
+	tee := origin.SeedCategory(wptest.Category{Name: "Tee"})
+	koffein := origin.SeedCategory(wptest.Category{Name: "koffein"})
+	angebote := origin.SeedCategory(wptest.Category{Name: "Angebote"})
+
+	cases := []struct {
+		name   string
+		create string
+		update string
+		want   []int64
+	}{
+		{
+			name:   "a create names them by name",
+			create: `{"title":"Powder","categories":[` + itoa(tee.ID) + `,` + itoa(koffein.ID) + `,` + itoa(angebote.ID) + `]}`,
+			want:   []int64{angebote.ID, koffein.ID, tee.ID},
+		},
+		{
+			name:   "an unknown id is skipped",
+			create: `{"title":"Powder","categories":[999,` + itoa(tee.ID) + `,` + itoa(tee.ID) + `]}`,
+			want:   []int64{tee.ID},
+		},
+		{
+			name:   "an update replaces the whole list",
+			create: `{"title":"Powder","categories":[` + itoa(tee.ID) + `]}`,
+			update: `{"categories":[` + itoa(koffein.ID) + `]}`,
+			want:   []int64{koffein.ID},
+		},
+		{
+			name:   "an empty list clears them",
+			create: `{"title":"Powder","categories":[` + itoa(tee.ID) + `]}`,
+			update: `{"categories":[]}`,
+			want:   []int64{},
+		},
+		{
+			name:   "an absent list keeps them",
+			create: `{"title":"Powder","categories":[` + itoa(tee.ID) + `]}`,
+			update: `{"status":"draft"}`,
+			want:   []int64{tee.ID},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := wptest.New(t)
+			for _, category := range origin.Categories() {
+				if seeded := server.SeedCategory(category); seeded.ID != category.ID {
+					t.Fatalf("seeded %q as %d, want %d", category.Name, seeded.ID, category.ID)
+				}
+			}
+
+			_, payload := call(t, server, http.MethodPost, "/wp-json/wp/v2/posts", []byte(tc.create), true)
+			var post struct {
+				Categories []int64 `json:"categories"`
+				ID         int64   `json:"id"`
+			}
+			decode(t, payload, &post)
+			if tc.update != "" {
+				_, payload = call(t, server, http.MethodPost, "/wp-json/wp/v2/posts/"+itoa(post.ID), []byte(tc.update), true)
+				decode(t, payload, &post)
+			}
+
+			if post.Categories == nil || !slices.Equal(post.Categories, tc.want) {
+				t.Errorf("categories = %#v, want %v", post.Categories, tc.want)
+			}
+		})
 	}
 }
 

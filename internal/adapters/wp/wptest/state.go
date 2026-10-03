@@ -215,6 +215,9 @@ func (s *Server) add(item Item) Item {
 		base = slugify(item.Title)
 	}
 	item.Slug = s.uniqueSlug(base, item.Type, item.Parent, item.ID)
+	if term(item.Type) {
+		item.Title = storedTermName(item.Title)
+	}
 
 	if item.Modified.IsZero() {
 		item.Modified = s.tick()
@@ -261,8 +264,9 @@ func (s *Server) SeedCategory(category Category) Category {
 	s.nextTermID++
 	category.ID = s.nextTermID
 	if category.Slug == "" {
-		category.Slug = slugify(category.Name)
+		category.Slug = termSlug(category.Name)
 	}
+	category.Name = storedTermName(category.Name)
 
 	stored := category
 	s.categories[category.ID] = &stored

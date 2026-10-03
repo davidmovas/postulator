@@ -91,6 +91,124 @@ func TestClassifyCarriesTheWordPressCodeAndConflictHash(t *testing.T) {
 	}
 }
 
+func TestClassifyCarriesTheTermARefusalNames(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		status int
+		body   string
+		id     int64
+		exists bool
+	}{
+		{
+			name:   "core names the term it already has",
+			status: http.StatusBadRequest,
+			body:   `{"code":"term_exists","message":"A term with the name provided already exists with this parent.","data":{"status":400,"term_id":123}}`,
+			id:     123,
+			exists: true,
+		},
+		{
+			name:   "woocommerce names it as the resource",
+			status: http.StatusBadRequest,
+			body:   `{"code":"term_exists","message":"A term with the name provided already exists with this parent.","data":{"status":400,"resource_id":77}}`,
+			id:     77,
+			exists: true,
+		},
+		{
+			name:   "an id sent as text is still an id",
+			status: http.StatusBadRequest,
+			body:   `{"code":"term_exists","data":{"status":400,"term_id":"41"}}`,
+			id:     41,
+			exists: true,
+		},
+		{
+			name:   "a refusal without data names no term",
+			status: http.StatusBadRequest,
+			body:   `{"code":"term_exists","message":"A term with the name provided already exists with this parent."}`,
+		},
+		{
+			name:   "data that is not an object keeps the code",
+			status: http.StatusBadRequest,
+			body:   `{"code":"term_exists","message":"exists","data":"term 5"}`,
+		},
+		{
+			name:   "another refusal is not a duplicate",
+			status: http.StatusBadRequest,
+			body:   `{"code":"rest_term_invalid","message":"Parent term does not exist.","data":{"status":400,"term_id":9}}`,
+			id:     9,
+		},
+		{
+			name:   "a duplicate is only ever a refused request",
+			status: http.StatusInternalServerError,
+			body:   `{"code":"term_exists","data":{"status":500,"term_id":9}}`,
+			id:     9,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := classify(response(t, tc.status, nil), []byte(tc.body))
+			if detailString(err, "code") == "" {
+				t.Errorf("the WordPress code was lost from %s", tc.body)
+			}
+
+			value, carried := detailValue(err, "termId")
+			if tc.id == 0 && carried {
+				t.Errorf("termId detail = %v, want none", value)
+			}
+			if tc.id != 0 && value != tc.id {
+				t.Errorf("termId detail = %v, want %d", value, tc.id)
+			}
+
+			id, exists := TermExists(err)
+			if exists != tc.exists {
+				t.Fatalf("TermExists = %t, want %t", exists, tc.exists)
+			}
+			if exists && id != tc.id {
+				t.Errorf("TermExists id = %d, want %d", id, tc.id)
+			}
+		})
+	}
+}
+
+func TestForbiddenTellsAMissingPermissionFromABadPassword(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		status int
+		body   string
+		want   bool
+	}{
+		{name: "a user who may not create terms", status: http.StatusForbidden, body: `{"code":"rest_cannot_create"}`, want: true},
+		{name: "a user who may not edit products", status: http.StatusForbidden, body: `{"code":"woocommerce_rest_cannot_edit"}`, want: true},
+		{name: "a refused password", status: http.StatusUnauthorized, body: `{"code":"rest_not_logged_in"}`},
+		{name: "a refused request", status: http.StatusBadRequest, body: `{"code":"term_exists"}`},
+		{name: "a missing resource", status: http.StatusNotFound, body: `{"code":"rest_term_invalid"}`},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := classify(response(t, tc.status, nil), []byte(tc.body))
+			if got := Forbidden(err); got != tc.want {
+				t.Errorf("Forbidden = %t, want %t", got, tc.want)
+			}
+			if got := StoreForbidden(err); got != tc.want {
+				t.Errorf("StoreForbidden = %t, want %t", got, tc.want)
+			}
+		})
+	}
+
+	if Forbidden(errors.New(errors.Unauthorized, "no status")) {
+		t.Error("an unauthorized error without a status is not a refused permission")
+	}
+}
+
 func TestClassifyAttachesRetryInformation(t *testing.T) {
 	t.Parallel()
 

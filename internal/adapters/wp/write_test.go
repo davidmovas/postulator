@@ -1,6 +1,8 @@
 package wp_test
 
 import (
+	"encoding/json"
+	"net/http"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
@@ -137,6 +139,92 @@ func TestUpdateItemDistinguishesKeepingFromClearing(t *testing.T) {
 	}
 	if len(cleared.Categories) != 0 {
 		t.Errorf("categories = %v, want them cleared by an empty slice", cleared.Categories)
+	}
+}
+
+func TestTheCategoriesAreSentOnlyWhenTheWriteCarriesThem(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		categories []int64
+		sent       string
+	}{
+		{name: "nil leaves them out", categories: nil},
+		{name: "an empty list is sent as one", categories: []int64{}, sent: "[]"},
+		{name: "a list is sent as it is", categories: []int64{9, 7}, sent: "[9,7]"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := wptest.New(t)
+			client := newClient(t, server)
+
+			created, err := client.CreateItem(t.Context(), wp.TypePost, wp.CreateItem{Title: "Powder", Categories: tc.categories})
+			if err != nil {
+				t.Fatalf("CreateItem: %v", err)
+			}
+			if _, err = client.UpdateItem(t.Context(), wp.TypePost, created.ID, wp.UpdateItem{
+				Status: pointerTo("publish"), Categories: tc.categories,
+			}); err != nil {
+				t.Fatalf("UpdateItem: %v", err)
+			}
+
+			writes := 0
+			for _, recorded := range server.Requests() {
+				if recorded.Method != http.MethodPost {
+					continue
+				}
+				writes++
+				var body map[string]json.RawMessage
+				if err := json.Unmarshal(recorded.Body, &body); err != nil {
+					t.Fatalf("decode %s: %v", recorded.Body, err)
+				}
+				raw, present := body["categories"]
+				if present != (tc.sent != "") || string(raw) != tc.sent {
+					t.Errorf("%s sent categories %s (present %t), want %q", recorded.Path, raw, present, tc.sent)
+				}
+			}
+			if writes != 2 {
+				t.Errorf("recorded %d writes, want a create and an update", writes)
+			}
+		})
+	}
+}
+
+func TestAWrittenItemSaysWhetherItCarriesCategories(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	koffein := server.SeedCategory(wptest.Category{Name: "Koffein"})
+	client := newClient(t, server)
+
+	plain, err := client.CreateItem(t.Context(), wp.TypePost, wp.CreateItem{Title: "Plain"})
+	if err != nil {
+		t.Fatalf("CreateItem: %v", err)
+	}
+	if plain.Categories == nil || len(plain.Categories) != 0 {
+		t.Errorf("categories = %#v, want an empty list from a site that carries them", plain.Categories)
+	}
+
+	filed, err := client.CreateItem(t.Context(), wp.TypePost, wp.CreateItem{Title: "Filed", Categories: []int64{koffein.ID, 999}})
+	if err != nil {
+		t.Fatalf("CreateItem: %v", err)
+	}
+	if len(filed.Categories) != 1 || filed.Categories[0] != koffein.ID {
+		t.Errorf("categories = %v, want only the one that exists", filed.Categories)
+	}
+
+	read, err := client.ListItems(t.Context(), wp.TypePost, wp.ListQuery{Fields: []string{"title"}})
+	if err != nil {
+		t.Fatalf("ListItems: %v", err)
+	}
+	for _, item := range read.Items {
+		if item.Categories != nil {
+			t.Errorf("categories = %#v, want nil when the response leaves them out", item.Categories)
+		}
 	}
 }
 
