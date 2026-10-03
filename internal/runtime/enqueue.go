@@ -130,12 +130,7 @@ func ancestorsFirst(targets []string, pages map[string]pagemap.Page) []string {
 }
 
 func publishes(recipe []template.StepSpec) bool {
-	for i := range recipe {
-		if recipe[i].Name == string(run.StepPublish) {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(stepNames(recipe), string(run.StepPublish))
 }
 
 func blockerOf(page pagemap.Page, pages map[string]pagemap.Page, itemIDs map[string]string) string {

@@ -2,6 +2,7 @@ package runtime_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -12,7 +13,7 @@ import (
 	"github.com/davidmovas/postulator/internal/runtime"
 )
 
-func TestWaitingIsWokenOnDemand(t *testing.T) {
+func TestAWaitingStepIsWokenByTheSweepAndRunsAgain(t *testing.T) {
 	t.Parallel()
 
 	harness := newHarness(t, 1)
@@ -20,7 +21,7 @@ func TestWaitingIsWokenOnDemand(t *testing.T) {
 	sleeper := producing("generate_body", run.ArtifactBodyHTML, nil,
 		func(_ context.Context, sc *run.StepContext) (run.Result, error) {
 			if calls.hit(sc.Page.ID) == 1 {
-				return run.Result{Next: run.TransitionWait, WakeAt: time.Now().Add(time.Hour)}, nil
+				return run.Result{Next: run.TransitionWait}, nil
 			}
 			return run.Result{Artifacts: []run.Artifact{{Kind: run.ArtifactBodyHTML, Blob: []byte("<p>ok</p>")}}}, nil
 		})
@@ -30,35 +31,18 @@ func TestWaitingIsWokenOnDemand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Enqueue: %v", err)
 	}
-
-	var itemID string
-	waitFor(t, "the item to start waiting", func() bool {
-		items, listErr := harness.items.ByRun(t.Context(), queued.ID)
-		if listErr != nil || len(items) != 1 || items[0].Status != run.StatusWaiting {
-			return false
-		}
-		itemID = items[0].ID
-		return items[0].WakeAt != nil
-	})
-
-	if err = engine.Wake(t.Context(), itemID); err != nil {
-		t.Fatalf("Wake: %v", err)
-	}
 	harness.waitForRun(t, queued.ID, run.StatusCompleted)
 
 	if hits := calls.get(harness.pages[0]); hits != 2 {
 		t.Fatalf("the step ran %d times, want twice: a step that asked to wait is not replayed from its own record", hits)
 	}
+	itemID := onlyItem(t, harness, queued.ID)
+	if got, want := execsOf(t, harness, itemID), []string{"generate_body:1:started", "generate_body:2:done"}; !slices.Equal(got, want) {
+		t.Fatalf("the item recorded the execs %v, want %v", got, want)
+	}
 	stored, err := harness.blobs.ByItem(t.Context(), itemID)
 	if err != nil || len(stored) != 1 || stored[0].Kind != run.ArtifactBodyHTML {
 		t.Fatalf("artifacts after the wake = %+v, %v; want the body the second call wrote", stored, err)
-	}
-
-	if err = engine.Wake(t.Context(), itemID); !errors.IsCode(err, errors.Conflict) {
-		t.Fatalf("Wake of a finished item = %v", err)
-	}
-	if err = engine.Wake(t.Context(), "3f1a0a0c-0000-4000-8000-000000000000"); !errors.IsCode(err, errors.NotFound) {
-		t.Fatalf("Wake of an absent item = %v", err)
 	}
 }
 

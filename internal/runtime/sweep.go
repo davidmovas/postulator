@@ -10,10 +10,6 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
 
-func (e *Engine) Recover(ctx context.Context) error {
-	return e.sweep(ctx)
-}
-
 func (e *Engine) sweep(ctx context.Context) error {
 	if err := e.rearm(ctx); err != nil {
 		return err

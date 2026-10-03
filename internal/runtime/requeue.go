@@ -40,7 +40,7 @@ func (e *Engine) requeueStep(ctx context.Context, itemID string, amend func(*run
 		if putErr := e.putBack(c, item, next, now, "retried"); putErr != nil {
 			return putErr
 		}
-		if record.Status.Terminal() || record.Status == run.StatusPaused {
+		if atRest(record.Status) {
 			return e.reopen(c, box, record, now)
 		}
 		return nil
@@ -120,25 +120,4 @@ func (e *Engine) putBack(ctx context.Context, item, next run.Item, now time.Time
 	}
 	_, err = e.deps.Items.Persist(ctx, next, item.AdvanceSeq+1)
 	return err
-}
-
-func (e *Engine) Wake(ctx context.Context, itemID string) error {
-	item, err := e.deps.Items.Get(ctx, itemID)
-	if err != nil {
-		return err
-	}
-	if item.Status != run.StatusWaiting {
-		return errors.New(errors.Conflict, "only a waiting item can be woken").WithDetail("itemId", itemID)
-	}
-
-	woken, err := e.deps.Items.Requeue(ctx, itemID, item.AdvanceSeq, run.StatusWaiting, e.now())
-	if err != nil {
-		return err
-	}
-	if !woken {
-		return errors.New(errors.Conflict, "the item moved on before it could be woken").WithDetail("itemId", itemID)
-	}
-
-	e.nudge()
-	return nil
 }

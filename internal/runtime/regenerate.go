@@ -41,7 +41,7 @@ func (e *Engine) Regenerate(ctx context.Context, runID string, itemIDs []string)
 				return restartErr
 			}
 		}
-		if record.Status.Terminal() || record.Status == run.StatusPaused {
+		if atRest(record.Status) {
 			return e.reopen(c, box, record, now)
 		}
 		return nil

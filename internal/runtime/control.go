@@ -34,19 +34,10 @@ func (e *Engine) Pause(ctx context.Context, runID string, reason run.PauseReason
 			return nil
 		}
 
-		now := e.now()
-		if _, err = e.deps.Items.StopAll(c, runID, pausable, run.StatusPaused, reason, now); err != nil {
+		if _, err = e.deps.Items.StopAll(c, runID, pausable, run.StatusPaused, reason, e.now()); err != nil {
 			return err
 		}
-
-		record.Status = run.StatusPaused
-		record.PauseReason = reason
-		if updateErr := e.deps.Runs.Update(c, record); updateErr != nil {
-			return updateErr
-		}
-
-		box.add(c, runID, events.RunPaused, events.RunPausedPayload{RunID: runID, Reason: string(reason)})
-		return nil
+		return e.pauseRun(c, box, record, reason)
 	})
 }
 
@@ -101,6 +92,21 @@ func (e *Engine) Cancel(ctx context.Context, runID string) error {
 		box.add(c, runID, events.RunCancelled, events.RunCancelledPayload{RunID: runID})
 		return nil
 	})
+}
+
+func atRest(status run.Status) bool {
+	return status.Terminal() || status == run.StatusPaused
+}
+
+func (e *Engine) pauseRun(ctx context.Context, box *outbox, record run.Run, reason run.PauseReason) error {
+	record.Status = run.StatusPaused
+	record.PauseReason = reason
+	if err := e.deps.Runs.Update(ctx, record); err != nil {
+		return err
+	}
+
+	box.add(ctx, record.ID, events.RunPaused, events.RunPausedPayload{RunID: record.ID, Reason: string(reason)})
+	return nil
 }
 
 func (e *Engine) reopen(ctx context.Context, box *outbox, record run.Run, now time.Time) error {

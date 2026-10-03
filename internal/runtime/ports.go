@@ -15,7 +15,6 @@ type runStore interface {
 	Insert(ctx context.Context, record run.Run) error
 	Get(ctx context.Context, id string) (run.Run, error)
 	Update(ctx context.Context, record run.Run) error
-	Active(ctx context.Context) ([]run.Run, error)
 	PastDeadline(ctx context.Context, now time.Time, limit int) ([]run.Run, error)
 }
 

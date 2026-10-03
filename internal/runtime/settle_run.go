@@ -14,7 +14,7 @@ func (e *Engine) settleRun(ctx context.Context, box *outbox, record run.Run, now
 	if err != nil {
 		return err
 	}
-	if current.Status.Terminal() || current.Status == run.StatusPaused {
+	if atRest(current.Status) {
 		return nil
 	}
 
@@ -51,12 +51,7 @@ func statsOf(counts map[run.Status]int, spend llm.Spend) run.Stats {
 }
 
 func (e *Engine) pauseOverBudget(ctx context.Context, box *outbox, current run.Run, spend llm.Spend, now time.Time) error {
-	current.Status = run.StatusPaused
-	current.PauseReason = run.PauseBudgetExceeded
 	if _, err := e.deps.Items.StopAll(ctx, current.ID, pausable, run.StatusPaused, run.PauseBudgetExceeded, now); err != nil {
-		return err
-	}
-	if err := e.deps.Runs.Update(ctx, current); err != nil {
 		return err
 	}
 
@@ -64,10 +59,7 @@ func (e *Engine) pauseOverBudget(ctx context.Context, box *outbox, current run.R
 		RunID: current.ID, SpentUSD: spend.USD, BudgetUSD: current.Budget.MaxUSD,
 		SpentTokens: spend.Usage.Total, BudgetTokens: current.Budget.MaxTokens,
 	})
-	box.add(ctx, current.ID, events.RunPaused, events.RunPausedPayload{
-		RunID: current.ID, Reason: string(run.PauseBudgetExceeded),
-	})
-	return nil
+	return e.pauseRun(ctx, box, current, run.PauseBudgetExceeded)
 }
 
 func (e *Engine) pauseHeld(ctx context.Context, box *outbox, current run.Run) error {
@@ -75,15 +67,7 @@ func (e *Engine) pauseHeld(ctx context.Context, box *outbox, current run.Run) er
 	if err != nil {
 		return err
 	}
-
-	current.Status = run.StatusPaused
-	current.PauseReason = reason
-	if updateErr := e.deps.Runs.Update(ctx, current); updateErr != nil {
-		return updateErr
-	}
-
-	box.add(ctx, current.ID, events.RunPaused, events.RunPausedPayload{RunID: current.ID, Reason: string(reason)})
-	return nil
+	return e.pauseRun(ctx, box, current, reason)
 }
 
 func (e *Engine) heldFor(ctx context.Context, runID string) (run.PauseReason, error) {

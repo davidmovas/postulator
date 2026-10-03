@@ -74,7 +74,7 @@ func (e *Engine) claim(parent context.Context, itemID string) (*claim, error) {
 
 func claimable(record run.Run, item run.Item, now time.Time) bool {
 	switch {
-	case record.Status.Terminal(), record.Status == run.StatusPaused, !item.Status.Advanceable():
+	case atRest(record.Status), !item.Status.Advanceable():
 		return false
 	case item.Status == run.StatusWaiting && item.WakeAt != nil && now.Before(*item.WakeAt):
 		return false
