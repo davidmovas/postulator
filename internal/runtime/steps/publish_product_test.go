@@ -149,8 +149,12 @@ func TestPublishEditsAProductAndLeavesTheStoreItsOwn(t *testing.T) {
 	if snapshot == nil {
 		t.Fatal("the publish kept no snapshot of the product")
 	}
-	if snapshot.ShortDescription != "<p>old short</p>" || !snapshot.ShortWritten || !snapshot.AttributesSent || snapshot.ImageSet {
+	if snapshot.ShortDescription != "<p>old short</p>" || !snapshot.ShortWritten || !snapshot.AttributesSent || snapshot.ImageID != 0 {
 		t.Errorf("snapshot = %+v", snapshot)
+	}
+	if snapshot.WrittenShort != productShort || len(snapshot.Written) != 1 || snapshot.Written[0].Name != "form" ||
+		!slices.Equal(snapshot.Written[0].Options, []string{"Countertop"}) {
+		t.Errorf("the snapshot records it wrote %q and %+v", snapshot.WrittenShort, snapshot.Written)
 	}
 	if !slices.Equal(snapshot.Added, []string{"Form"}) {
 		t.Errorf("added = %v, want only the empty attribute the template filled", snapshot.Added)
@@ -382,8 +386,8 @@ func TestPublishSetsAProductImageOnlyWhereThereIsNone(t *testing.T) {
 			if !slices.Equal(stored.Images, tc.want) {
 				t.Errorf("images = %v, want %v", stored.Images, tc.want)
 			}
-			if published.PreviousProduct.ImageSet != tc.set || !slices.Equal(published.PreviousProduct.Images, tc.images) {
-				t.Errorf("snapshot = %+v, want imageSet %t over %v", published.PreviousProduct, tc.set, tc.images)
+			if (published.PreviousProduct.ImageID == 77) != tc.set || !slices.Equal(published.PreviousProduct.Images, tc.images) {
+				t.Errorf("snapshot = %+v, want the image set %t over %v", published.PreviousProduct, tc.set, tc.images)
 			}
 		})
 	}

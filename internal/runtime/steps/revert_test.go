@@ -317,6 +317,11 @@ func (s *revertStand) relinkedOver(t *testing.T, pageID, neighborID string, befo
 
 func (s *revertStand) revert(t *testing.T, pageID string) (steps.RevertResult, run.Result) {
 	t.Helper()
+	return runRevert(t, s.deps, pageID)
+}
+
+func runRevert(t *testing.T, deps steps.Deps, pageID string) (steps.RevertResult, run.Result) {
+	t.Helper()
 
 	parent := sourceRunID
 	sc := &run.StepContext{
@@ -327,7 +332,7 @@ func (s *revertStand) revert(t *testing.T, pageID string) (steps.RevertResult, r
 		Check:     run.NewCheckpoint(),
 	}
 
-	result, err := steps.Revert(s.deps).Run(t.Context(), sc)
+	result, err := steps.Revert(deps).Run(t.Context(), sc)
 	if err != nil {
 		t.Fatalf("Revert %s: %v", pageID, err)
 	}

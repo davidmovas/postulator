@@ -44,12 +44,31 @@ type SnapshotAttribute struct {
 
 type ProductSnapshot struct {
 	ShortDescription string              `json:"shortDescription"`
+	WrittenShort     string              `json:"writtenShort"`
 	Attributes       []SnapshotAttribute `json:"attributes"`
+	Written          []SnapshotAttribute `json:"written"`
 	Images           []int64             `json:"images"`
 	Added            []string            `json:"added"`
+	ImageID          int64               `json:"imageId"`
 	ShortWritten     bool                `json:"shortWritten"`
 	AttributesSent   bool                `json:"attributesSent"`
-	ImageSet         bool                `json:"imageSet"`
+}
+
+func (s *ProductSnapshot) wrote(written wp.Product) {
+	if s.ShortWritten {
+		s.WrittenShort = written.ShortDescription
+	}
+	for _, name := range s.Added {
+		if at := attributeNamed(written.Attributes, name); at >= 0 {
+			s.Written = append(s.Written, snapshotOf(written.Attributes[at:at+1])...)
+		}
+	}
+}
+
+func attributeNamed(attributes []wp.ProductAttribute, name string) int {
+	return slices.IndexFunc(attributes, func(attribute wp.ProductAttribute) bool {
+		return strings.EqualFold(strings.TrimSpace(attribute.Name), strings.TrimSpace(name))
+	})
 }
 
 func snapshotOf(attributes []wp.ProductAttribute) []SnapshotAttribute {
@@ -90,9 +109,7 @@ func mergedAttributes(held []wp.ProductAttribute, wanted []content.Specification
 	}
 	added = make([]string, 0, len(wanted))
 	for _, specification := range wanted {
-		at := slices.IndexFunc(merged, func(attribute wp.ProductAttribute) bool {
-			return strings.EqualFold(strings.TrimSpace(attribute.Name), specification.Name)
-		})
+		at := attributeNamed(merged, specification.Name)
 		switch {
 		case at < 0:
 			merged = append(merged, wp.ProductAttribute{
@@ -184,6 +201,7 @@ func publishProduct(ctx context.Context, deps Deps, sc *run.StepContext, body []
 				return refuseMismatch(sc, mismatches), nil
 			}
 		}
+		snapshot.wrote(written)
 		resaved, readErr := client.GetRaw(ctx, wp.TypeProduct, held.ID)
 		if readErr != nil {
 			return run.Result{}, readErr
@@ -239,7 +257,7 @@ func publishProduct(ctx context.Context, deps Deps, sc *run.StepContext, body []
 func productUpdate(held wp.Product, draft *content.ProductDraft, featured int64) (wp.UpdateProduct, ProductSnapshot, *content.Finding) {
 	snapshot := ProductSnapshot{
 		ShortDescription: held.ShortDescription, Attributes: snapshotOf(held.Attributes),
-		Images: imageIDs(held.Images), Added: make([]string, 0),
+		Written: make([]SnapshotAttribute, 0), Images: imageIDs(held.Images), Added: make([]string, 0),
 	}
 	var (
 		update wp.UpdateProduct
@@ -266,7 +284,7 @@ func productUpdate(held wp.Product, draft *content.ProductDraft, featured int64)
 	if featured != 0 && len(held.Images) == 0 {
 		images := []int64{featured}
 		update.Images = &images
-		snapshot.ImageSet = true
+		snapshot.ImageID = featured
 	}
 	return update, snapshot, typed
 }
@@ -290,9 +308,7 @@ func productKept(snapshot ProductSnapshot, draft *content.ProductDraft, written 
 				want = specification.Value
 			}
 		}
-		at := slices.IndexFunc(written.Attributes, func(attribute wp.ProductAttribute) bool {
-			return strings.EqualFold(strings.TrimSpace(attribute.Name), name)
-		})
+		at := attributeNamed(written.Attributes, name)
 		if at < 0 || !slices.Contains(written.Attributes[at].Options, want) {
 			found = append(found, pagemap.Mismatch{Field: FieldAttributes, Planned: name + ": " + want, Actual: "missing"})
 		}

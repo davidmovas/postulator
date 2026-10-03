@@ -250,6 +250,11 @@ func (s *Service) Delete(ctx context.Context, req DeleteRequest) (DeleteResponse
 		return DeleteResponse{}, err
 	}
 	if req.OnSite {
+		if current.WPType.StoreAddressed() {
+			return DeleteResponse{}, errors.New(errors.Invalid,
+				current.Path+" is a "+string(current.WPType)+" the store keeps; delete it in WooCommerce and sync the site").
+				WithDetail("field", "onSite").WithDetail("pageId", current.ID)
+		}
 		if current.WPID == nil {
 			return DeleteResponse{}, errors.New(errors.Invalid,
 				"the page is not on the site, so there is nothing to remove there").

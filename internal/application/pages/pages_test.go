@@ -520,6 +520,40 @@ func TestDeleteKeepsThePageWhenTheSiteRefuses(t *testing.T) {
 	}
 }
 
+func TestDeleteOnSiteLeavesWhatTheStoreKeepsToTheStore(t *testing.T) {
+	t.Parallel()
+
+	for _, wpType := range []pagemap.WPType{pagemap.WPProduct, pagemap.WPProductCategory} {
+		t.Run(string(wpType), func(t *testing.T) {
+			t.Parallel()
+
+			issuer := &recordingIssuer{}
+			h := newPreviewHarness(t, issuer)
+			placed := h.placed(t, "/product/espresso-machine/", pagemap.StatusPublished, 42)
+			repo := sqlite.NewPageRepo(h.store)
+			stored, err := repo.Get(t.Context(), placed.ID)
+			if err != nil {
+				t.Fatalf("Get: %v", err)
+			}
+			stored.WPType = wpType
+			if err = repo.Update(t.Context(), stored); err != nil {
+				t.Fatalf("Update: %v", err)
+			}
+
+			_, err = h.service.Delete(t.Context(), pages.DeleteRequest{ID: placed.ID, OnSite: true})
+			if !errors.IsCode(err, errors.Invalid) || fieldOf(err) != "onSite" || !strings.Contains(err.Error(), "WooCommerce") {
+				t.Fatalf("Delete = %v, want a refusal that sends the delete to WooCommerce", err)
+			}
+			if len(issuer.trashed) != 0 {
+				t.Errorf("the site was asked %+v", issuer.trashed)
+			}
+			if _, err = h.service.Get(t.Context(), pages.GetRequest{ID: placed.ID}); err != nil {
+				t.Errorf("the row was dropped although the delete was refused: %v", err)
+			}
+		})
+	}
+}
+
 func TestDeleteOnSiteNeedsAPageThatIsOnTheSite(t *testing.T) {
 	t.Parallel()
 
