@@ -53,7 +53,7 @@ func scripted(t *testing.T, runner agentapp.Runner, timeout func() time.Duration
 	owner := sqlitetest.Site(t, store, "shop")
 	bus := &applicationtest.Recorder{}
 
-	built := buildTuned(t, store, fake.NewGollem(), bus, func(deps *agentapp.Deps) {
+	built := buildTuned(t, store, fake.New(), bus, func(deps *agentapp.Deps) {
 		deps.Runner = runner
 		deps.TurnTimeout = timeout
 	})
@@ -420,7 +420,7 @@ func TestTheTurnReadsItsLimitsOnEveryTurn(t *testing.T) {
 	store := sqlitetest.Open(t)
 	owner := sqlitetest.Site(t, store, "shop")
 	bus := &applicationtest.Recorder{}
-	h := buildTuned(t, store, fake.NewGollem(), bus, func(deps *agentapp.Deps) {
+	h := buildTuned(t, store, fake.New(), bus, func(deps *agentapp.Deps) {
 		deps.Runner = recorded
 		deps.LoopLimit = func() int { return limit }
 		deps.HistoryBudget = func() int { return budget }

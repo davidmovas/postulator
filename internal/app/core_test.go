@@ -283,10 +283,11 @@ func TestOpenComposesTheAgentOverTheProviderSeam(t *testing.T) {
 
 	home := t.TempDir()
 	core, err := app.Open(t.Context(), app.Config{
-		DatabasePath:  filepath.Join(home, "postulator.db"),
-		KeyDir:        home,
-		Provider:      fake.New(),
-		AgentProvider: fake.NewGollem(fake.WithScript(func(string) fake.Turn { return fake.Turn{Text: "eleven entities carry no canonical page."} })),
+		DatabasePath: filepath.Join(home, "postulator.db"),
+		KeyDir:       home,
+		Provider: fake.New(fake.WithScript(func(string) fake.Turn {
+			return fake.Turn{Text: "eleven entities carry no canonical page."}
+		})),
 	}, zaptest.NewLogger(t))
 	if err != nil {
 		t.Fatalf("Open: %v", err)

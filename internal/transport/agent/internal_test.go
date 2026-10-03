@@ -5,87 +5,117 @@ import (
 	"encoding/json"
 	stderrors "errors"
 	"fmt"
-	"net/http"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/gollem-dev/gollem"
-	"github.com/sashabaranov/go-openai"
-
 	agentapp "github.com/davidmovas/postulator/internal/application/agent"
-	applicationllm "github.com/davidmovas/postulator/internal/application/llm"
+	"github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
-func message(t *testing.T, role gollem.MessageRole, text string) gollem.Message {
-	t.Helper()
-
-	content, err := gollem.NewTextContent(text)
-	if err != nil {
-		t.Fatalf("NewTextContent: %v", err)
-	}
-	return gollem.Message{Role: role, Contents: []gollem.MessageContent{content}}
+func said(role llm.Role, text string) llm.Message {
+	return llm.Message{Role: role, Text: text}
 }
 
-func toolResponse(t *testing.T, name string) gollem.Message {
-	t.Helper()
+func called(id, name, args string) llm.Message {
+	return llm.Message{Role: llm.RoleAssistant, Call: &llm.ToolCall{ID: id, Name: name, Args: json.RawMessage(args)}}
+}
 
-	content, err := gollem.NewToolResponseContent("call-1", name, map[string]any{"ok": true}, false)
-	if err != nil {
-		t.Fatalf("NewToolResponseContent: %v", err)
-	}
-	return gollem.Message{Role: gollem.RoleUser, Contents: []gollem.MessageContent{content}}
+func answered(id, output string) llm.Message {
+	return llm.Message{Role: llm.RoleTool, Result: &llm.ToolResult{CallID: id, Output: json.RawMessage(output)}}
 }
 
 func TestTrimKeepsTheNewestWholeTurns(t *testing.T) {
 	t.Parallel()
 
-	history := &gollem.History{
-		LLType:  gollem.LLMTypeOpenAI,
-		Version: gollem.HistoryVersion,
-		Messages: []gollem.Message{
-			message(t, gollem.RoleUser, strings.Repeat("a", 400)),
-			message(t, gollem.RoleAssistant, strings.Repeat("b", 400)),
-			message(t, gollem.RoleUser, "the newest question"),
-			toolResponse(t, "pages_tree"),
-			message(t, gollem.RoleAssistant, "the newest answer"),
-		},
+	items := []llm.Message{
+		said(llm.RoleDeveloper, "the site holds three pages"),
+		said(llm.RoleUser, strings.Repeat("a", 400)),
+		said(llm.RoleAssistant, strings.Repeat("b", 400)),
+		said(llm.RoleDeveloper, "the site holds four pages"),
+		said(llm.RoleUser, "the newest question"),
+		called("call-1", "pages_tree", `{}`),
+		answered("call-1", `{"ok":true}`),
+		said(llm.RoleAssistant, "the newest answer"),
 	}
 
-	if kept := trim(history, 100000); len(kept.Messages) != 5 {
-		t.Fatalf("a history inside its budget is kept whole: %d messages", len(kept.Messages))
+	cases := []struct {
+		name   string
+		budget int
+		want   int
+	}{
+		{name: "a history inside its budget is kept whole", budget: 100000, want: len(items)},
+		{name: "no budget keeps everything", budget: 0, want: len(items)},
+		{name: "an older turn over the budget is dropped whole", budget: 600, want: 5},
+		{name: "the newest turn is kept even over the budget", budget: 10, want: 5},
 	}
 
-	trimmed := trim(history, 300)
-	if len(trimmed.Messages) != 3 || trimmed.Messages[0].Role != gollem.RoleUser {
-		t.Fatalf("the trimmed history is %+v", trimmed.Messages)
-	}
-	if size(trimmed) >= size(history) {
-		t.Fatalf("the trimmed history is %d bytes of %d", size(trimmed), size(history))
-	}
-	if size(trim(history, 800)) > 800 {
-		t.Fatal("a turn that fits the budget is kept whole")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			kept := trim(items, tc.budget)
+			if len(kept) != tc.want {
+				t.Fatalf("trim kept %d messages, want %d", len(kept), tc.want)
+			}
+			if tc.want < len(items) && kept[0].Role != llm.RoleDeveloper {
+				t.Fatalf("the trimmed history starts with %+v, want a turn's developer message", kept[0])
+			}
+		})
 	}
 
 	if trim(nil, 10) != nil {
 		t.Error("trimming nothing answers nothing")
 	}
-	empty := &gollem.History{Version: gollem.HistoryVersion}
-	if kept := trim(empty, 10); len(kept.Messages) != 0 {
-		t.Error("trimming an empty history answers it unchanged")
+	if kept := trim([]llm.Message{said(llm.RoleAssistant, strings.Repeat("a", 500))}, 100); len(kept) != 0 {
+		t.Fatalf("a history over its budget that starts no turn is kept as %+v", kept)
 	}
 }
 
-const fenceBytes = 64
+func TestTrimNeverSeparatesACallFromItsResult(t *testing.T) {
+	t.Parallel()
+
+	items := []llm.Message{
+		said(llm.RoleDeveloper, "context one"),
+		said(llm.RoleUser, "first"),
+		called("call-1", "pages_tree", `{}`),
+		answered("call-1", `{"roots":["`+strings.Repeat("x", 300)+`"]}`),
+		said(llm.RoleAssistant, "one tree"),
+		said(llm.RoleDeveloper, "context two"),
+		said(llm.RoleUser, "second"),
+		called("call-2", "pages_tree", `{}`),
+		answered("call-2", `{"roots":[]}`),
+	}
+
+	for budget := 1; budget < 1200; budget += 7 {
+		kept := trim(items, budget)
+		calls, results := map[string]bool{}, map[string]bool{}
+		for _, item := range kept {
+			if item.Call != nil {
+				calls[item.Call.ID] = true
+			}
+			if item.Result != nil {
+				results[item.Result.CallID] = true
+			}
+		}
+		if fmt.Sprint(calls) != fmt.Sprint(results) {
+			t.Fatalf("a budget of %d kept the calls %v and the results %v", budget, calls, results)
+		}
+	}
+}
 
 type heldHistory struct {
 	body    []byte
 	version int
+	err     error
 }
 
 func (h *heldHistory) Load(context.Context, string) (body []byte, version int, err error) {
+	if h.err != nil {
+		return nil, 0, h.err
+	}
 	if h.body == nil {
 		return nil, 0, errors.New(errors.NotFound, "nothing stored yet")
 	}
@@ -98,7 +128,9 @@ func (h *heldHistory) Save(_ context.Context, _ string, body []byte, version int
 	return nil
 }
 
-func fatResponse(t *testing.T, name string, rows int) gollem.Message {
+const fenceBytes = 64
+
+func fatResult(t *testing.T, rows int) string {
 	t.Helper()
 
 	items := make([]any, 0, rows)
@@ -109,106 +141,149 @@ func fatResponse(t *testing.T, name string, rows int) gollem.Message {
 			"title": strings.Repeat("Espresso ", 8),
 		})
 	}
-
-	content, err := gollem.NewToolResponseContent("call-1", name,
-		agentapp.Fence(map[string]any{"items": items, "hasMore": true, "nextCursor": "c-42"}), false)
+	encoded, err := json.Marshal(agentapp.Fence(map[string]any{"items": items, "hasMore": true, "nextCursor": "c-42"}))
 	if err != nil {
-		t.Fatalf("NewToolResponseContent: %v", err)
+		t.Fatalf("encode the fixture: %v", err)
 	}
-	return gollem.Message{Role: gollem.RoleUser, Contents: []gollem.MessageContent{content}}
+	return string(encoded)
+}
+
+func remembering(store historyStore) memory {
+	return memory{
+		store: store, clock: clock.NewFake(time.Date(2026, 9, 22, 9, 0, 0, 0, time.UTC)), conversationID: "c1",
+		budget: agentapp.DefaultHistoryBudgetChars, cap: agentapp.DefaultHistoryToolResultBytes,
+	}
 }
 
 func TestAStoredToolResultReplaysShortenedAndStillDecodes(t *testing.T) {
 	t.Parallel()
 
-	fat := fatResponse(t, "pages_list", 128)
-	if measured := len(fat.Contents[0].Data); measured < agentapp.DefaultMaxToolResultBytes {
-		t.Fatalf("the fixture is %d bytes, want at least the in-turn ceiling", measured)
+	fat := fatResult(t, 128)
+	if len(fat) < agentapp.DefaultMaxToolResultBytes {
+		t.Fatalf("the fixture is %d bytes, want at least the in-turn ceiling", len(fat))
 	}
 
 	store := &heldHistory{}
-	held := bounded{
-		store: store, clock: clock.NewFake(time.Date(2026, 9, 22, 9, 0, 0, 0, time.UTC)),
-		budget: agentapp.DefaultHistoryBudgetChars,
-		cap:    agentapp.DefaultHistoryToolResultBytes,
+	held := remembering(store)
+	written := []llm.Message{
+		said(llm.RoleDeveloper, "the site holds 128 pages"),
+		said(llm.RoleUser, "list the espresso pages"),
+		called("call-1", "pages_list", `{}`),
+		answered("call-1", fat),
+		said(llm.RoleAssistant, "a hundred and twenty pages"),
+	}
+	if err := held.save(t.Context(), written); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	if store.version != historyVersion || !strings.Contains(string(store.body), `"format":"responses/1"`) {
+		t.Fatalf("the stored body is %s at version %d", store.body, store.version)
 	}
 
-	written := &gollem.History{
-		LLType:  gollem.LLMTypeOpenAI,
-		Version: gollem.HistoryVersion,
-		Messages: []gollem.Message{
-			message(t, gollem.RoleUser, "list the espresso pages"),
-			fat,
-			message(t, gollem.RoleAssistant, "a hundred and twenty pages"),
-		},
-	}
-	if err := held.Save(t.Context(), "c1", written); err != nil {
-		t.Fatalf("Save: %v", err)
-	}
-
-	replayed, err := held.Load(t.Context(), "c1")
+	replayed, err := held.load(t.Context())
 	if err != nil {
-		t.Fatalf("Load: %v", err)
+		t.Fatalf("load: %v", err)
 	}
-	if len(replayed.Messages) != 3 {
-		t.Fatalf("the replayed history holds %d messages", len(replayed.Messages))
-	}
-	if replayed.Messages[0].Contents[0].Type != gollem.MessageContentTypeText {
-		t.Fatal("a text message must be replayed untouched")
+	if len(replayed) != len(written) || replayed[1].Text != "list the espresso pages" {
+		t.Fatalf("the replayed history is %+v", replayed)
 	}
 
-	shortened := replayed.Messages[1].Contents[0]
-	if len(shortened.Data) >= len(fat.Contents[0].Data) {
-		t.Fatalf("the stored result is %d bytes of the original %d", len(shortened.Data), len(fat.Contents[0].Data))
+	shortened := replayed[3].Result
+	if shortened == nil || shortened.CallID != "call-1" {
+		t.Fatalf("the shortened result lost its call: %+v", replayed[3])
 	}
-	if len(shortened.Data) > agentapp.DefaultHistoryToolResultBytes+fenceBytes {
-		t.Fatalf("the stored result is %d bytes, over the history ceiling", len(shortened.Data))
+	if len(shortened.Output) >= len(fat) || len(shortened.Output) > agentapp.DefaultHistoryToolResultBytes+fenceBytes {
+		t.Fatalf("the stored result is %d bytes of the original %d", len(shortened.Output), len(fat))
 	}
 
-	answered, err := shortened.GetToolResponseContent()
-	if err != nil {
+	var document map[string]any
+	if err = json.Unmarshal(shortened.Output, &document); err != nil {
 		t.Fatalf("the shortened result no longer decodes: %v", err)
 	}
-	if answered.ToolCallID != "call-1" || answered.Name != "pages_list" {
-		t.Fatalf("the shortened result lost its call: %+v", answered)
+	if document[agentapp.UntrustedMarker] != true {
+		t.Fatalf("the shortened result lost its fence: %+v", document)
 	}
-	if answered.Response[agentapp.UntrustedMarker] != true {
-		t.Fatalf("the shortened result lost its fence: %+v", answered.Response)
-	}
-
-	inner, ok := answered.Response[agentapp.UntrustedData].(map[string]any)
+	inner, ok := document[agentapp.UntrustedData].(map[string]any)
 	if !ok || inner[agentapp.TruncatedKey] != true {
-		t.Fatalf("the shortened result does not say it was shortened: %+v", answered.Response)
+		t.Fatalf("the shortened result does not say it was shortened: %+v", document)
 	}
-	document, ok := inner[agentapp.ResultKey].(map[string]any)
-	if !ok || document["nextCursor"] != "c-42" || document["hasMore"] != true {
+	kept, ok := inner[agentapp.ResultKey].(map[string]any)
+	if !ok || kept["nextCursor"] != "c-42" || kept["hasMore"] != true {
 		t.Fatalf("the shortened result lost the fields that say how to ask for the rest: %+v", inner)
 	}
-	kept, ok := document["items"].([]any)
-	if !ok || len(kept) == 0 || len(kept) >= 128 {
-		t.Fatalf("the shortened result kept %d of 128 rows", len(kept))
+	if rows, listed := kept["items"].([]any); !listed || len(rows) == 0 || len(rows) >= 128 {
+		t.Fatalf("the shortened result kept %v of 128 rows", kept["items"])
 	}
 }
 
 func TestAResultThatFitsIsStoredUntouched(t *testing.T) {
 	t.Parallel()
 
-	small := toolResponse(t, "pages_tree")
-	history := &gollem.History{
-		LLType:   gollem.LLMTypeOpenAI,
-		Version:  gollem.HistoryVersion,
-		Messages: []gollem.Message{message(t, gollem.RoleUser, "hello"), small},
-	}
+	items := []llm.Message{said(llm.RoleUser, "hello"), answered("call-1", `{"ok":true}`), answered("call-2", `[1,2]`)}
 
-	kept := shorten(history, agentapp.DefaultHistoryToolResultBytes)
-	if string(kept.Messages[1].Contents[0].Data) != string(small.Contents[0].Data) {
-		t.Fatalf("a result inside the ceiling was rewritten: %s", kept.Messages[1].Contents[0].Data)
+	kept := shorten(items, agentapp.DefaultHistoryToolResultBytes)
+	if string(kept[1].Result.Output) != `{"ok":true}` || string(kept[2].Result.Output) != `[1,2]` {
+		t.Fatalf("a result inside the ceiling was rewritten: %+v", kept)
 	}
-	if shorten(nil, 100) != nil {
+	if len(shorten(nil, 100)) != 0 {
 		t.Error("shortening nothing answers nothing")
 	}
-	if shorten(history, 0) != history {
+	if got := shorten(items, 0); &got[0] != &items[0] {
 		t.Error("no ceiling shortens nothing")
+	}
+}
+
+func TestAnErrorResultIsShortenedWithoutAFence(t *testing.T) {
+	t.Parallel()
+
+	long := `{"error":"` + strings.Repeat("the site refused the write ", 200) + `"}`
+	kept := shorten([]llm.Message{answered("call-1", long)}, 600)
+
+	var document map[string]any
+	if err := json.Unmarshal(kept[0].Result.Output, &document); err != nil {
+		t.Fatalf("the shortened error no longer decodes: %v", err)
+	}
+	if document[agentapp.TruncatedKey] != true || document[agentapp.UntrustedMarker] != nil {
+		t.Fatalf("the shortened error reads %+v", document)
+	}
+}
+
+func TestAnyOtherHistoryLoadsEmpty(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		body string
+	}{
+		{name: "gollem's history", body: `{"version":3,"llType":"openai","messages":[{"role":"user","contents":[]}]}`},
+		{name: "a newer format", body: `{"format":"responses/2","items":[{"role":"user","text":"hi"}]}`},
+		{name: "a body that is not JSON", body: `{"format":`},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			loaded, err := remembering(&heldHistory{body: []byte(tc.body), version: 3}).load(t.Context())
+			if err != nil || len(loaded) != 0 {
+				t.Fatalf("load = %+v, %v; want an empty history", loaded, err)
+			}
+		})
+	}
+}
+
+func TestAMemoryWithoutAConversationKeepsNothing(t *testing.T) {
+	t.Parallel()
+
+	store := &heldHistory{}
+	held := remembering(store)
+	held.conversationID = ""
+	if err := held.save(t.Context(), []llm.Message{said(llm.RoleUser, "hello")}); err != nil || store.body != nil {
+		t.Fatalf("save = %v, stored %s", err, store.body)
+	}
+
+	failing := remembering(&heldHistory{err: errors.New(errors.Internal, "the disk is gone")})
+	if _, err := failing.load(t.Context()); !errors.IsCode(err, errors.Internal) {
+		t.Fatalf("load of a failing store = %v", err)
 	}
 }
 
@@ -241,35 +316,26 @@ func TestTheHistoryCeilingIsTheSettingTheTurnCarries(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			runner := New(Deps{}, Config{})
-			if got := runner.historyCeiling(tc.spec); got != tc.want {
+			if got := historyCeiling(tc.spec); got != tc.want {
 				t.Fatalf("historyCeiling = %d, want %d", got, tc.want)
 			}
 		})
 	}
-}
 
-func TestTrimDropsAHistoryThatStartsWithNoTurn(t *testing.T) {
-	t.Parallel()
-
-	history := &gollem.History{
-		LLType:   gollem.LLMTypeClaude,
-		Version:  gollem.HistoryVersion,
-		Messages: []gollem.Message{message(t, gollem.RoleAssistant, strings.Repeat("a", 500))},
-	}
-
-	trimmed := trim(history, 100)
-	if len(trimmed.Messages) != 0 || trimmed.LLType != gollem.LLMTypeClaude {
-		t.Fatalf("the trimmed history is %+v", trimmed)
+	if resultCeiling(agentapp.RunSpec{}) != agentapp.DefaultMaxToolResultBytes || resultCeiling(agentapp.RunSpec{MaxToolResult: 99}) != 99 {
+		t.Fatal("the result ceiling does not follow the turn")
 	}
 }
 
 func TestObjectOfWrapsWhatIsNotAnObject(t *testing.T) {
 	t.Parallel()
 
-	object, err := objectOf(map[string]any{"id": "p1"})
+	object, err := objectOf(map[string]any{"id": "p1", "wpId": int64(9007199254740993)})
 	if err != nil || object["id"] != "p1" {
 		t.Fatalf("objectOf = %v, %v", object, err)
+	}
+	if encoded := string(encode(object)); !strings.Contains(encoded, "9007199254740993") {
+		t.Fatalf("a wide id lost its digits: %s", encoded)
 	}
 
 	wrapped, err := objectOf([]string{"a", "b"})
@@ -286,86 +352,41 @@ func TestObjectOfWrapsWhatIsNotAnObject(t *testing.T) {
 	}
 }
 
-func TestParametersFollowTheSchema(t *testing.T) {
-	t.Parallel()
-
-	schema := &applicationllm.Schema{
-		Type:     applicationllm.SchemaObject,
-		Required: []string{"path"},
-		Properties: map[string]*applicationllm.Schema{
-			"path":  {Type: applicationllm.SchemaString, Description: "the path"},
-			"tags":  {Type: applicationllm.SchemaArray, Items: &applicationllm.Schema{Type: applicationllm.SchemaString}},
-			"loose": {Type: applicationllm.SchemaArray},
-			"nested": {
-				Type:     applicationllm.SchemaObject,
-				Required: []string{"id"},
-				Properties: map[string]*applicationllm.Schema{
-					"id":   {Type: applicationllm.SchemaString},
-					"hint": {Type: applicationllm.SchemaString},
-				},
-			},
-			"rows": {
-				Type: applicationllm.SchemaArray,
-				Items: &applicationllm.Schema{
-					Type:     applicationllm.SchemaObject,
-					Required: []string{"text"},
-					Properties: map[string]*applicationllm.Schema{
-						"text":   {Type: applicationllm.SchemaString},
-						"weight": {Type: applicationllm.SchemaNumber},
-					},
-				},
-			},
-		},
-	}
-
-	parameters := parametersOf(schema)
-	if !parameters["path"].Required || parameters["tags"].Required {
-		t.Fatalf("the required flags are %+v", parameters)
-	}
-	if parameters["tags"].Items == nil || parameters["loose"].Items == nil {
-		t.Fatal("an array parameter always carries an item type, because gollem refuses one without")
-	}
-	if parameters["nested"].Properties["id"] == nil || !parameters["nested"].Properties["id"].Required {
-		t.Fatalf("the nested parameter is %+v", parameters["nested"])
-	}
-	if parameters["nested"].Properties["hint"].Required {
-		t.Fatalf("a nested field its own schema leaves out was still required: %+v", parameters["nested"])
-	}
-	if parameters["rows"].Items == nil || !parameters["rows"].Items.Properties["text"].Required {
-		t.Fatalf("the item parameter is %+v", parameters["rows"].Items)
-	}
-	if parameters["rows"].Items.Properties["weight"].Required {
-		t.Fatalf("an optional field of a list item was still required: %+v", parameters["rows"].Items)
-	}
-	if len(parametersOf(nil)) != 0 {
-		t.Error("a tool with no schema takes no parameters")
-	}
-	if parameterOf(nil).Type != gollem.TypeString {
-		t.Error("a missing property schema falls back to a string")
-	}
-}
-
 func TestConvertNamesTheFailure(t *testing.T) {
 	t.Parallel()
 
-	if convert(nil) != nil {
+	stoppedCtx, stop := context.WithCancel(t.Context())
+	stop()
+
+	cases := []struct {
+		name string
+		ctx  context.Context
+		err  error
+		want errors.Code
+	}{
+		{name: "a coded error passes through", ctx: t.Context(), err: errors.New(errors.RateLimited, "slow down"), want: errors.RateLimited},
+		{name: "a cancelled context is a stopped turn", ctx: t.Context(), err: context.Canceled, want: errors.Cancelled},
+		{name: "a failure while the turn is stopping is a stopped turn", ctx: stoppedCtx, err: errors.New(errors.External, "gone"), want: errors.Cancelled},
+		{name: "an unknown failure is the provider's", ctx: t.Context(), err: stderrors.New("broken pipe"), want: errors.External},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := convert(tc.ctx, tc.err); !errors.IsCode(got, tc.want) {
+				t.Fatalf("convert = %v, want %s", got, tc.want)
+			}
+		})
+	}
+	if convert(t.Context(), nil) != nil {
 		t.Error("convert of nothing is nothing")
 	}
-	if err := convert(errors.New(errors.NotFound, "gone")); !errors.IsCode(err, errors.NotFound) {
-		t.Errorf("a coded error passes through: %v", err)
+	if got := unfinished(stoppedCtx); !errors.IsCode(got, errors.Cancelled) {
+		t.Errorf("a stream cut by a stopped turn = %v", got)
 	}
-	if err := convert(context.Canceled); !errors.IsCode(err, errors.Cancelled) {
-		t.Errorf("a cancelled turn = %v", err)
-	}
-	if err := convert(gollem.ErrLoopLimitExceeded); !errors.IsCode(err, errors.BudgetExceeded) {
-		t.Errorf("an exhausted loop = %v", err)
-	}
-	overflow := convert(fmt.Errorf("session: %w", gollem.ErrTokenSizeExceeded))
-	if !errors.IsCode(overflow, errors.Invalid) || !strings.Contains(overflow.Error(), "context window") {
-		t.Errorf("a turn that outgrew the context window = %v", overflow)
-	}
-	if err := convert(json.Unmarshal([]byte("x"), &struct{}{})); !errors.IsCode(err, errors.External) {
-		t.Errorf("an unknown model failure = %v", err)
+	if got := unfinished(t.Context()); !errors.IsCode(got, errors.External) {
+		t.Errorf("a stream that ended early = %v", got)
 	}
 }
 
@@ -383,59 +404,15 @@ func TestEncodeAnswersAnObjectForNothing(t *testing.T) {
 	}
 }
 
-func TestConvertSaysWhatTheProviderSaid(t *testing.T) {
+func TestEmptyArgumentsAreAnEmptyObject(t *testing.T) {
 	t.Parallel()
 
-	cases := []struct {
-		name    string
-		err     error
-		want    errors.Code
-		message string
-	}{
-		{
-			name:    "a key without access to the model",
-			err:     &openai.APIError{HTTPStatusCode: http.StatusForbidden, Message: "the project cannot reach this model"},
-			want:    errors.Unauthorized,
-			message: "the project cannot reach this model",
-		},
-		{
-			name:    "a model the provider does not have",
-			err:     &openai.APIError{HTTPStatusCode: http.StatusNotFound, Message: "unknown model"},
-			want:    errors.NotFound,
-			message: "unknown model",
-		},
-		{
-			name:    "a rejected request",
-			err:     &openai.APIError{HTTPStatusCode: http.StatusBadRequest, Message: "tools[7].function.parameters is invalid"},
-			want:    errors.Invalid,
-			message: "tools[7].function.parameters is invalid",
-		},
-		{
-			name: "a rate limited key",
-			err:  &openai.APIError{HTTPStatusCode: http.StatusTooManyRequests, Message: "slow down"},
-			want: errors.RateLimited,
-		},
+	for _, raw := range []string{"", "  ", "null"} {
+		if got := string(argumentsOf(json.RawMessage(raw))); got != "{}" {
+			t.Fatalf("argumentsOf(%q) = %s", raw, got)
+		}
 	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			got := convert(tc.err)
-			if !errors.IsCode(got, tc.want) {
-				t.Fatalf("convert = %v (%s), want %s", got, errors.CodeOf(got), tc.want)
-			}
-			if tc.message == "" {
-				return
-			}
-
-			var kernel *errors.Error
-			if !stderrors.As(got, &kernel) {
-				t.Fatalf("convert returned %T, want a kernel error", got)
-			}
-			if kernel.Details["providerMessage"] != tc.message {
-				t.Errorf("providerMessage = %v, want %q", kernel.Details["providerMessage"], tc.message)
-			}
-		})
+	if got := string(argumentsOf(json.RawMessage(`{"id":"p1"}`))); got != `{"id":"p1"}` {
+		t.Fatalf("argumentsOf kept %s", got)
 	}
 }

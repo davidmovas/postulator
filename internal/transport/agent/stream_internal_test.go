@@ -3,17 +3,25 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"testing"
+	"time"
 
-	"github.com/gollem-dev/gollem"
+	"go.uber.org/zap/zaptest"
 
 	agentapp "github.com/davidmovas/postulator/internal/application/agent"
+	"github.com/davidmovas/postulator/internal/application/llm"
+	"github.com/davidmovas/postulator/internal/application/tools"
+	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/kernel/clock"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 type quietStream struct {
 	deltas []string
 	rounds []agentapp.RoundUsage
+	waits  []agentapp.Wait
 }
 
 func (q *quietStream) Delta(_ context.Context, _ int64, text string) error {
@@ -26,7 +34,8 @@ func (q *quietStream) Spent(_ context.Context, round agentapp.RoundUsage) error 
 	return nil
 }
 
-func (q *quietStream) Waiting(context.Context, agentapp.Wait) error {
+func (q *quietStream) Waiting(_ context.Context, held agentapp.Wait) error {
+	q.waits = append(q.waits, held)
 	return nil
 }
 
@@ -38,134 +47,128 @@ func (q *quietStream) ToolFinished(context.Context, agentapp.ToolOutcome) error 
 	return nil
 }
 
-func text(pieces ...string) *gollem.ContentResponse {
-	return &gollem.ContentResponse{Texts: pieces}
+type scriptedStream struct {
+	rounds [][]llm.Delta
+	asked  []llm.Request
+	err    error
 }
 
-func spent(input, cached, output int) *gollem.ContentResponse {
-	return &gollem.ContentResponse{InputToken: input, CacheReadInputToken: cached, OutputToken: output}
+func (s *scriptedStream) Stream(_ context.Context, req llm.Request) (<-chan llm.Delta, error) {
+	s.asked = append(s.asked, req)
+	if s.err != nil {
+		return nil, s.err
+	}
+	round := s.rounds[0]
+	s.rounds = s.rounds[1:]
+
+	out := make(chan llm.Delta, len(round))
+	for _, delta := range round {
+		out <- delta
+	}
+	close(out)
+	return out, nil
 }
 
-func called(input, cached, output int) *gollem.ContentResponse {
-	chunk := spent(input, cached, output)
-	chunk.FunctionCalls = []*gollem.FunctionCall{{ID: "c1", Name: "graph_list_entities"}}
-	return chunk
+type pricedCatalog struct{}
+
+func (pricedCatalog) Lookup(context.Context, domainllm.ModelRef) (domainllm.ModelInfo, error) {
+	return domainllm.ModelInfo{
+		InputUSDPerM: 2, CachedInputUSDPerM: 0.2, OutputUSDPerM: 12,
+		FlexInputUSDPerM: 1, FlexCachedInputUSDPerM: 0.1, FlexOutputUSDPerM: 6,
+	}, nil
 }
 
-func watched(t *testing.T, rounds ...[]*gollem.ContentResponse) (
-	counted domainllm.Usage, said string, streamed []string) {
-	_, counted, said, streamed = billed(t, rounds...)
-	return counted, said, streamed
+func text(pieces ...string) []llm.Delta {
+	out := make([]llm.Delta, 0, len(pieces))
+	for _, piece := range pieces {
+		out = append(out, llm.Delta{Text: piece})
+	}
+	return out
 }
 
-func billed(t *testing.T, rounds ...[]*gollem.ContentResponse) (
-	recorded []round, counted domainllm.Usage, said string, streamed []string) {
+func call(id string) llm.Delta {
+	return llm.Delta{Call: &llm.ToolCall{ID: id, Name: "entities_count", Args: json.RawMessage(`{}`)}}
+}
+
+func done(input, cached, output int, tier domainllm.ServiceTier) llm.Delta {
+	used := domainllm.Usage{Input: input, CachedInput: cached, Output: output, Total: input + output}
+	return llm.Delta{Done: true, Usage: &used, Finish: llm.FinishStop, Tier: tier}
+}
+
+func round(parts ...[]llm.Delta) []llm.Delta {
+	var out []llm.Delta
+	for _, part := range parts {
+		out = append(out, part...)
+	}
+	return out
+}
+
+func one(delta llm.Delta) []llm.Delta {
+	return []llm.Delta{delta}
+}
+
+func played(t *testing.T, client streamer, stream agentapp.Stream, limit int) (*turn, error) {
 	t.Helper()
 
-	stream := &quietStream{}
-	usage := &tally{}
-	spoken := &answer{}
-	middleware := observe(stream, usage, spoken, func(error) {}, func(done round) {
-		recorded = append(recorded, done)
+	runner := New(Deps{
+		Client:   client,
+		Registry: tools.New(tools.Deps{Clock: clock.NewFake(time.Date(2026, 10, 3, 9, 0, 0, 0, time.UTC))}),
+		Catalog:  pricedCatalog{},
+		Clock:    clock.NewFake(time.Date(2026, 10, 3, 9, 0, 0, 0, time.UTC)),
+		Logger:   zaptest.NewLogger(t),
 	})
-
-	for _, chunks := range rounds {
-		handler := middleware(func(context.Context, *gollem.ContentRequest) (<-chan *gollem.ContentResponse, error) {
-			out := make(chan *gollem.ContentResponse, len(chunks))
-			for _, chunk := range chunks {
-				out <- chunk
-			}
-			close(out)
-			return out, nil
-		})
-
-		served, err := handler(t.Context(), &gollem.ContentRequest{})
-		if err != nil {
-			t.Fatalf("the middleware refused a round: %v", err)
-		}
-		for range served {
-		}
-	}
-	return recorded, usage.total(), spoken.String(), stream.deltas
+	current := runner.open(agentapp.RunSpec{
+		Binding:   tools.Binding{ConversationID: "c1", Mode: domainagent.ModeAutonomous},
+		Ref:       domainllm.ModelRef{Provider: "openai", Model: "gpt-5.6-terra"},
+		Input:     "how many entities?",
+		Stream:    stream,
+		LoopLimit: limit,
+	}, "the instructions", "the site")
+	return current, runner.execute(t.Context(), current)
 }
 
-func TestEveryRoundIsHandedToTheLedgerInOrder(t *testing.T) {
+func TestEveryRoundIsCountedOnceAndBilledAtTheTierItWasServed(t *testing.T) {
 	t.Parallel()
 
-	recorded, counted, _, _ := billed(t,
-		[]*gollem.ContentResponse{called(1200, 0, 40), spent(1200, 0, 40)},
-		[]*gollem.ContentResponse{called(1800, 1152, 30), spent(1800, 1152, 30)},
-		[]*gollem.ContentResponse{text("Twelve entities."), spent(2400, 2048, 12)},
-	)
+	client := &scriptedStream{rounds: [][]llm.Delta{
+		round(one(call("c1")), one(done(1200, 0, 40, domainllm.TierDefault))),
+		round(one(call("c2")), one(done(1800, 1152, 30, domainllm.TierFlex))),
+		round(text("Twelve ", "entities."), one(done(2400, 2048, 12, ""))),
+	}}
+	stream := &quietStream{}
 
-	if len(recorded) != 3 {
-		t.Fatalf("the ledger was handed %d rounds, want one per model call", len(recorded))
+	current, err := played(t, client, stream, 4)
+	if err != nil {
+		t.Fatalf("the turn failed: %v", err)
 	}
-	for index, done := range recorded {
-		if done.index != index+1 || done.failure != nil {
-			t.Fatalf("round %d reads %+v", index+1, done)
+
+	if len(stream.rounds) != 3 {
+		t.Fatalf("the window was told about %d rounds, want one per model call", len(stream.rounds))
+	}
+	for index, spent := range stream.rounds {
+		if spent.Round != index+1 || spent.Provider != "openai" || spent.Model != "gpt-5.6-terra" {
+			t.Fatalf("round %d reads %+v", index+1, spent)
 		}
 	}
-	if recorded[1].usage != (spend{input: 1800, cached: 1152, output: 30}) {
-		t.Fatalf("the second round spent %+v", recorded[1].usage)
+
+	want := []float64{
+		(1200*2 + 40*12) / 1e6,
+		(648*1 + 1152*0.1 + 30*6) / 1e6,
+		(352*2 + 2048*0.2 + 12*12) / 1e6,
+	}
+	total := 0.0
+	for index, spent := range stream.rounds {
+		if math.Abs(spent.USD-want[index]) > 1e-12 {
+			t.Fatalf("round %d cost %v, want %v", index+1, spent.USD, want[index])
+		}
+		total += want[index]
 	}
 
-	summed := spend{}
-	for _, done := range recorded {
-		summed.input += done.usage.input
-		summed.cached += done.usage.cached
-		summed.output += done.usage.output
+	if got := current.usage.total(); got.Input != 5400 || got.CachedInput != 3200 || got.Output != 82 {
+		t.Fatalf("the turn counted %+v", got)
 	}
-	if summed.input != counted.Input || summed.cached != counted.CachedInput || summed.output != counted.Output {
-		t.Fatalf("the rounds sum to %+v and the turn counted %+v", summed, counted)
-	}
-}
-
-func TestARoundIsCountedOnceHoweverOftenItReportsItsUsage(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name   string
-		rounds [][]*gollem.ContentResponse
-		want   domainllm.Usage
-	}{
-		{
-			name:   "a plain answer reports its usage in the trailing chunk",
-			rounds: [][]*gollem.ContentResponse{{text("Hi"), text(" there"), spent(1200, 0, 40)}},
-			want:   domainllm.Usage{Input: 1200, Output: 40, Total: 1240},
-		},
-		{
-			name: "a tool round reports the same totals twice, as the openai client does",
-			rounds: [][]*gollem.ContentResponse{
-				{called(1200, 1024, 40), spent(1200, 1024, 40)},
-			},
-			want: domainllm.Usage{Input: 1200, CachedInput: 1024, Output: 40, Total: 1240},
-		},
-		{
-			name: "every round of a turn is counted, each of them once",
-			rounds: [][]*gollem.ContentResponse{
-				{called(1200, 0, 40), spent(1200, 0, 40)},
-				{called(1800, 1152, 30), spent(1800, 1152, 30)},
-				{text("Twelve entities."), spent(2400, 2048, 12)},
-			},
-			want: domainllm.Usage{Input: 5400, CachedInput: 3200, Output: 82, Total: 5482},
-		},
-		{
-			name:   "a round that reports nothing costs nothing",
-			rounds: [][]*gollem.ContentResponse{{text("Hi")}},
-			want:   domainllm.Usage{},
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			got, _, _ := watched(t, tc.rounds...)
-			if got != tc.want {
-				t.Errorf("usage = %+v, want %+v", got, tc.want)
-			}
-		})
+	if current.usage.answered() != 3 || math.Abs(current.usage.spent()-total) > 1e-12 {
+		t.Fatalf("the turn counted %d calls costing %v", current.usage.answered(), current.usage.spent())
 	}
 }
 
@@ -174,34 +177,29 @@ func TestTheAnswerIsTheTextTheTurnStreamed(t *testing.T) {
 
 	cases := []struct {
 		name   string
-		rounds [][]*gollem.ContentResponse
+		rounds [][]llm.Delta
 		want   string
 	}{
 		{
 			name:   "the pieces of one round are joined with nothing",
-			rounds: [][]*gollem.ContentResponse{{text("От", "лич", "ная"), text(" идея", ".")}},
+			rounds: [][]llm.Delta{round(text("От", "лич", "ная", " идея", "."), one(done(10, 0, 5, "")))},
 			want:   "Отличная идея.",
 		},
 		{
 			name: "a round that only called a tool says nothing",
-			rounds: [][]*gollem.ContentResponse{
-				{called(10, 0, 5)},
-				{text("Twelve entities."), spent(20, 0, 3)},
+			rounds: [][]llm.Delta{
+				round(one(call("c1")), one(done(10, 0, 5, ""))),
+				round(text("Twelve entities."), one(done(20, 0, 3, ""))),
 			},
 			want: "Twelve entities.",
 		},
 		{
 			name: "two speaking rounds are separated by a blank line",
-			rounds: [][]*gollem.ContentResponse{
-				{text("Let me look."), called(10, 0, 5)},
-				{text("Twelve entities."), spent(20, 0, 3)},
+			rounds: [][]llm.Delta{
+				round(text("Let me look."), one(call("c1")), one(done(10, 0, 5, ""))),
+				round(text("Twelve entities."), one(done(20, 0, 3, ""))),
 			},
 			want: "Let me look.\n\nTwelve entities.",
-		},
-		{
-			name:   "a turn that never spoke answers nothing",
-			rounds: [][]*gollem.ContentResponse{{called(10, 0, 5)}},
-			want:   "",
 		},
 	}
 
@@ -209,31 +207,98 @@ func TestTheAnswerIsTheTextTheTurnStreamed(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, got, deltas := watched(t, tc.rounds...)
-			if got != tc.want {
+			stream := &quietStream{}
+			current, err := played(t, &scriptedStream{rounds: tc.rounds}, stream, 4)
+			if err != nil {
+				t.Fatalf("the turn failed: %v", err)
+			}
+			if got := current.spoken.String(); got != tc.want {
 				t.Errorf("answer = %q, want %q", got, tc.want)
 			}
-			if streamed := joinAll(deltas); streamed != flatten(tc.rounds) {
-				t.Errorf("the stream carried %q, want %q", streamed, flatten(tc.rounds))
+
+			streamed, sent := "", ""
+			for _, piece := range stream.deltas {
+				streamed += piece
+			}
+			for _, deltas := range tc.rounds {
+				for _, delta := range deltas {
+					sent += delta.Text
+				}
+			}
+			if streamed != sent {
+				t.Errorf("the stream carried %q, want %q", streamed, sent)
 			}
 		})
 	}
 }
 
-func joinAll(pieces []string) string {
-	out := ""
-	for _, piece := range pieces {
-		out += piece
+func TestARoundThatDidNotFinishFailsTheTurn(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		client *scriptedStream
+		want   errors.Code
+	}{
+		{
+			name:   "a refusal at admission keeps its code",
+			client: &scriptedStream{err: errors.New(errors.NeedsHuman, "the account is out of credit")},
+			want:   errors.NeedsHuman,
+		},
+		{
+			name: "a failure in the stream keeps its code",
+			client: &scriptedStream{rounds: [][]llm.Delta{
+				round(text("Half"), one(llm.Delta{Err: errors.New(errors.RateLimited, "slow down")})),
+			}},
+			want: errors.RateLimited,
+		},
+		{
+			name:   "a stream that ends without its end is the provider's fault",
+			client: &scriptedStream{rounds: [][]llm.Delta{text("Half an answer")}},
+			want:   errors.External,
+		},
+		{
+			name: "a turn that keeps calling tools runs out of budget",
+			client: &scriptedStream{rounds: [][]llm.Delta{
+				round(one(call("c1")), one(done(10, 0, 5, ""))),
+				round(one(call("c2")), one(done(10, 0, 5, ""))),
+			}},
+			want: errors.BudgetExceeded,
+		},
 	}
-	return out
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := played(t, tc.client, &quietStream{}, 2); !errors.IsCode(err, tc.want) {
+				t.Fatalf("the turn ended with %v, want %s", err, tc.want)
+			}
+		})
+	}
 }
 
-func flatten(rounds [][]*gollem.ContentResponse) string {
-	out := ""
-	for _, chunks := range rounds {
-		for _, chunk := range chunks {
-			out += joinAll(chunk.Texts)
-		}
+func TestEveryCallOfARoundIsAnsweredInOrder(t *testing.T) {
+	t.Parallel()
+
+	client := &scriptedStream{rounds: [][]llm.Delta{
+		round(one(call("c1")), one(call("c2")), one(done(10, 0, 5, ""))),
+		round(text("done"), one(done(20, 0, 3, ""))),
+	}}
+
+	if _, err := played(t, client, nil, 4); err != nil {
+		t.Fatalf("the turn failed: %v", err)
 	}
-	return out
+
+	second := client.asked[1].Messages
+	tail := second[len(second)-4:]
+	if tail[0].Call == nil || tail[0].Call.ID != "c1" || tail[1].Call == nil || tail[1].Call.ID != "c2" {
+		t.Fatalf("the calls were replayed as %+v", tail)
+	}
+	if tail[2].Result == nil || tail[2].Result.CallID != "c1" || tail[3].Result == nil || tail[3].Result.CallID != "c2" {
+		t.Fatalf("the results were sent as %+v", tail)
+	}
+	if !json.Valid(tail[2].Result.Output) {
+		t.Fatalf("a result is not JSON: %s", tail[2].Result.Output)
+	}
 }

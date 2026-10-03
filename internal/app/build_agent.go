@@ -3,7 +3,6 @@ package app
 import (
 	"time"
 
-	"github.com/davidmovas/postulator/internal/adapters/llm/retry"
 	"github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/tools"
 	agentrunner "github.com/davidmovas/postulator/internal/transport/agent"
@@ -50,16 +49,11 @@ func (c *Core) buildAgent(stores repos, llm llmParts, writing authoring, service
 
 func (c *Core) agentRunner(stores repos, llm llmParts, toolRegistry *tools.Registry) *agentrunner.Runner {
 	return agentrunner.New(agentrunner.Deps{
-		Factory:  llm.providers,
+		Client:   llm.client,
 		Registry: toolRegistry,
 		History:  stores.history,
-		Calls:    stores.llmCalls,
 		Catalog:  llm.catalog,
 		Clock:    stores.now,
 		Logger:   c.logger,
-	}, agentrunner.Config{
-		MaxToolResultBytes: agent.MaxToolResultBytes(stores.values),
-		Retries:            retry.Retries(stores.values),
-		Backoff:            retry.DefaultBackoff,
 	})
 }

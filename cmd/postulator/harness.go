@@ -60,8 +60,8 @@ type pacedProvider struct {
 	held    atomic.Bool
 }
 
-func newPacedProvider() *pacedProvider {
-	return &pacedProvider{inner: fake.NewScripted(harnessReplies()...)}
+func newPacedProvider(script *assistantScript) *pacedProvider {
+	return &pacedProvider{inner: fake.NewScriptedOver(fake.New(fake.WithScript(script.answer)), harnessReplies()...)}
 }
 
 func (p *pacedProvider) failOn(match string) {
@@ -121,12 +121,11 @@ func configure(cfg app.Config) (harness, error) {
 	site := wptest.New(&reporter{}, wptest.WithAddress(address()),
 		wptest.WithClock(time.Now), wptest.WithCredentials(harnessUser, harnessPassword))
 
-	provider := newPacedProvider()
 	script := &assistantScript{}
+	provider := newPacedProvider(script)
 	key := strings.TrimSpace(os.Getenv(keyVariable))
 	if key == "" {
 		cfg.Provider = provider
-		cfg.AgentProvider = fake.NewGollem(fake.WithScript(script.answer))
 	}
 	cfg.Environment = environment()
 

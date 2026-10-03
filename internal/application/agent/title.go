@@ -70,7 +70,10 @@ func (s *Service) suggestTitle(ctx context.Context, conversation domainagent.Con
 		System:    system,
 		Messages:  []llmport.Message{{Role: llmport.RoleUser, Text: user}},
 		MaxTokens: titleTokens,
-		Meta:      llmport.CallMeta{ConversationID: conversation.ID, Step: "title"},
+		Effort:    domainllm.EffortNone,
+		Meta: llmport.CallMeta{
+			ConversationID: conversation.ID, Step: domainllm.StepTitle, Role: domainllm.RoleTitler,
+		},
 	})
 	if err != nil {
 		return "", false

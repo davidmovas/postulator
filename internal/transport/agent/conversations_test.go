@@ -7,6 +7,7 @@ import (
 	agentapp "github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/events"
 	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
+	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
@@ -123,6 +124,15 @@ func TestTheFinishedTurnNamesTheConversation(t *testing.T) {
 	payload, ok := h.payload(events.AgentTitled).(events.AgentTitledPayload)
 	if !ok || payload.ConversationID != created.Conversation.ID || payload.Title != "Pages without an entity" {
 		t.Fatalf("agent.titled carried %+v", h.payload(events.AgentTitled))
+	}
+
+	asked := h.titler.lastAsked()
+	if asked.Meta.Step != domainllm.StepTitle || asked.Meta.Role != domainllm.RoleTitler ||
+		asked.Meta.ConversationID != created.Conversation.ID {
+		t.Fatalf("the title is booked as %+v", asked.Meta)
+	}
+	if asked.Effort != domainllm.EffortNone || len(asked.Tools) != 0 {
+		t.Fatalf("the title asks with effort %q and %d tools", asked.Effort, len(asked.Tools))
 	}
 }
 

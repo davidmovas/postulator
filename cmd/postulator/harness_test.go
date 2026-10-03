@@ -60,8 +60,8 @@ func seeded(t *testing.T) *app.Core {
 	if tuned.Seed == nil {
 		t.Fatal("an empty home must be seeded")
 	}
-	if tuned.Config.Provider == nil || tuned.Config.AgentProvider == nil {
-		t.Fatal("the harness must compose over both fakes")
+	if tuned.Config.Provider == nil {
+		t.Fatal("the harness must compose over the scripted provider")
 	}
 	if tuned.Config.DatabasePath != filepath.Join(home, "postulator.db") {
 		t.Fatalf("DatabasePath = %q, want it under %q", tuned.Config.DatabasePath, home)
