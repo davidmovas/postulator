@@ -134,6 +134,18 @@ describe("the run report's cost by step", () => {
         expect(within(meta).queryByText(said.failed(0))).toBeNull();
     });
 
+    it("says nothing of reasoning for a step that wrote no text", () => {
+        held.spend = spendOf([slice({ step: "generate_images", model: "gpt-image-2", calls: 2, input: 0, output: 0, usd: 0.08 })]);
+        show();
+        const [images] = steps();
+        if (images === undefined) {
+            throw new Error("a step expected");
+        }
+
+        expect(within(images).getByText(said.calls(2))).toBeDefined();
+        expect(within(images).queryByText(/reasoning/)).toBeNull();
+    });
+
     it("names the calls a run recorded without a step", () => {
         held.spend = spendOf([slice({ step: "", usd: 0.05 })]);
         show();

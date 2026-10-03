@@ -74,7 +74,7 @@ function Totals({ totals, days, busy }: TotalsProps): ReactElement {
             )}
         >
             <div className="flex min-w-0 flex-col justify-center gap-1 px-1">
-                <span className="font-mono text-3xl leading-none font-semibold tracking-tight text-ink">
+                <span className="font-mono text-2xl leading-none font-semibold tracking-tight text-ink">
                     {usd(totals.usd)}
                 </span>
                 <span className="text-xs text-ink-dim">{said.over(days)}</span>

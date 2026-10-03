@@ -28,7 +28,9 @@ function StepCost({ row }: { row: StepRow }): ReactElement {
             </div>
             <div className="flex flex-wrap items-center gap-x-2 text-2xs text-ink-dim">
                 <span>{said.calls(row.calls)}</span>
-                <span title={said.reasoningHint}>{said.reasoning(percent(row.reasoningShare))}</span>
+                {row.output > 0 ? (
+                    <span title={said.reasoningHint}>{said.reasoning(percent(row.reasoningShare))}</span>
+                ) : null}
                 {row.failed > 0 ? <span className="text-danger">{said.failed(row.failed)}</span> : null}
             </div>
         </li>
