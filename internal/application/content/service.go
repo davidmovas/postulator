@@ -74,5 +74,7 @@ type judgePrompt struct {
 	Body     string
 	Meta     Snippet
 	HasMeta  bool
+	Store    bool
+	Product  *contentdomain.ProductDraft
 	Targets  []contentdomain.LinkTarget
 }

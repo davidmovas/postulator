@@ -45,6 +45,7 @@ type Brief struct {
 	Sections       []BriefSection `json:"sections"`
 	Phrases        []BriefPhrase  `json:"phrases"`
 	Children       []string       `json:"children"`
+	Product        *BriefProduct  `json:"product,omitempty"`
 }
 
 func RequiredKeywords(keywords keyword.List, rules template.KeywordRules) keyword.List {
@@ -76,6 +77,14 @@ func NewBrief(spec template.TemplateSpec, rules template.LinkRules, page pagemap
 		Sections:       make([]BriefSection, 0, len(spec.Sections)),
 		Phrases:        make([]BriefPhrase, 0, len(lc.Targets)+1),
 		Children:       make([]string, 0),
+	}
+	if page.WPType == pagemap.WPProduct {
+		if name := StoreName(page); name != "" {
+			brief.H1 = name
+		}
+		if spec.Product != nil {
+			brief.Product = productBrief(*spec.Product)
+		}
 	}
 	brief.PlannedTitle = brief.Title != ""
 	brief.PlannedH1 = brief.H1 != ""

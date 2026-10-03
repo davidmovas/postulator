@@ -136,6 +136,13 @@ type Product struct {
 	Specifications   []ProductSpecification  `json:"specifications" description:"The attributes the writer fills in where the product does not carry them yet"`
 }
 
+func (p *Product) Words() int {
+	if p == nil || !p.ShortDescription.Enabled {
+		return 0
+	}
+	return max(p.ShortDescription.TargetWords, 0)
+}
+
 func (i Images) Wanted() int {
 	count := max(i.Inline, 0)
 	if i.Featured {

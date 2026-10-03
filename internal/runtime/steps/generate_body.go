@@ -15,10 +15,11 @@ import (
 const NameGenerateBody = string(run.StepGenerateBody)
 
 type bodyPrompt struct {
-	Page   pagemap.Page
-	Entity graph.Entity
-	Spec   template.TemplateSpec
-	Brief  content.Brief
+	Page    pagemap.Page
+	Entity  graph.Entity
+	Spec    template.TemplateSpec
+	Brief   content.Brief
+	Product bool
 }
 
 func GenerateBody(deps Deps) run.StepDef {
@@ -50,24 +51,19 @@ func GenerateBody(deps Deps) run.StepDef {
 
 			brief := content.NewBrief(sc.Spec, policy.Rules, sc.Page, entity, lc)
 			system, user, err := render(NameGenerateBody, bodyPrompt{
-				Page: sc.Page, Entity: entity, Spec: sc.Spec, Brief: brief,
+				Page: sc.Page, Entity: entity, Spec: sc.Spec, Brief: brief, Product: sc.Page.WPType == pagemap.WPProduct,
 			})
 			if err != nil {
 				return run.Result{}, err
 			}
 
-			answer, usage, err := port.Structured[content.DraftAnswer](ctx, deps.LLM, port.Request{
+			draft, doc, usage, err := write(ctx, deps, port.Request{
 				Ref:       ref,
 				System:    system,
 				Messages:  []port.Message{{Role: port.RoleUser, Text: user}},
-				MaxTokens: writerCeiling(sc.Spec, sc.Item.Attempts),
+				MaxTokens: writerCeiling(sc.Spec, sc.Page.WPType, sc.Item.Attempts),
 				Meta:      callMeta(sc, NameGenerateBody),
-			})
-			if err != nil {
-				return run.Result{}, err
-			}
-
-			draft, doc, err := content.Assemble(answer, brief)
+			}, brief)
 			if err != nil {
 				return run.Result{}, err
 			}
@@ -90,4 +86,23 @@ func GenerateBody(deps Deps) run.StepDef {
 			}, nil
 		},
 	}
+}
+
+func write(ctx context.Context, deps Deps, request port.Request,
+	brief content.Brief) (content.ContentDraft, *content.Document, domainllm.Usage, error) {
+	if brief.Product == nil {
+		answer, usage, err := port.Structured[content.DraftAnswer](ctx, deps.LLM, request)
+		if err != nil {
+			return content.ContentDraft{}, nil, usage, err
+		}
+		draft, doc, err := content.Assemble(answer, brief)
+		return draft, doc, usage, err
+	}
+
+	answer, usage, err := port.Structured[content.ProductAnswer](ctx, deps.LLM, request)
+	if err != nil {
+		return content.ContentDraft{}, nil, usage, err
+	}
+	draft, doc, err := content.AssembleProduct(answer, brief)
+	return draft, doc, usage, err
 }

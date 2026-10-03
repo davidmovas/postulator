@@ -8,6 +8,7 @@ import (
 	appcontent "github.com/davidmovas/postulator/internal/application/content"
 	port "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	contentdomain "github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
@@ -221,6 +222,54 @@ func TestJudgeAuditsTheLivePage(t *testing.T) {
 	}
 	if !strings.Contains(model.last.System, "RUBRIC") {
 		t.Error("the system prompt does not carry the rubric")
+	}
+}
+
+func TestJudgeAuditsAProductUnderTheNameTheStoreShows(t *testing.T) {
+	t.Parallel()
+
+	model := &llmStub{reply: `{"score":0.8,"issues":[],"suggestions":[]}`}
+	service := newService(model, func(deps *appcontent.Deps) {
+		listed := pages()
+		listed[1].WPType = pagemap.WPProduct
+		listed[1].Observed.Title = "Espresso &amp; Crema"
+		deps.Pages = pageStub{items: listed}
+		deps.Raw = rawStub{body: "<h2>About</h2><p>Espresso is a way to make coffee.</p>"}
+	})
+
+	if _, err := service.Judge(t.Context(), appcontent.JudgeRequest{PageID: "page-child"}); err != nil {
+		t.Fatalf("Judge: %v", err)
+	}
+	prompt := model.last.Messages[len(model.last.Messages)-1].Text
+	if !strings.Contains(prompt, "<h1>Espresso &amp; Crema</h1><h2>About</h2>") {
+		t.Errorf("the judge does not see the product's name as its h1:\n%s", prompt)
+	}
+	if !strings.Contains(model.last.System, "one WooCommerce product") {
+		t.Errorf("the judge is not told it grades a product:\n%s", model.last.System)
+	}
+}
+
+func TestAssessShowsTheJudgeTheProductOutputs(t *testing.T) {
+	t.Parallel()
+
+	model := &llmStub{reply: `{"score":0.8,"issues":[],"suggestions":[]}`}
+	page := pages()[1]
+	page.WPType = pagemap.WPProduct
+	_, err := newService(model, nil).Assess(t.Context(), appcontent.AssessRequest{
+		SiteID: "site", Page: page, Entity: entities()[1], Body: "<h1>Espresso</h1><p>Espresso.</p>",
+		Product: &contentdomain.ProductDraft{
+			ShortDescription: "<p>A strong shot.</p>",
+			Specifications:   []contentdomain.Specification{{Name: "Form", Value: "Beans"}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Assess: %v", err)
+	}
+	prompt := model.last.Messages[len(model.last.Messages)-1].Text
+	for _, want := range []string{"PRODUCT\n", "Short description: <p>A strong shot.</p>", "- Form: Beans"} {
+		if !strings.Contains(prompt, want) {
+			t.Errorf("the prompt lacks %q:\n%s", want, prompt)
+		}
 	}
 }
 

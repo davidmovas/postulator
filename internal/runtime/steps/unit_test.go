@@ -613,6 +613,59 @@ func TestInsertLinksAndValidateReadTheirArtifacts(t *testing.T) {
 	}
 }
 
+func TestValidateGradesAProductOnItsShortDescriptionNotOnItsName(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		short string
+		held  bool
+	}{
+		{name: "a short description with the keyword", short: "<p>An espresso machine.</p>"},
+		{name: "a short description without it", short: "<p>A machine.</p>", held: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps := unitDeps()
+			body := []byte(`<h1>Machine</h1><h2>About</h2><p>Espresso is a kind of <a href="/coffee/">coffee</a>.</p>`)
+			draft, err := json.Marshal(content.ContentDraft{
+				Title: "Machine", H1: "Machine",
+				Sections: []content.DraftSection{{Heading: "About", HTML: "<p>Espresso.</p>"}},
+				Product:  &content.ProductDraft{ShortDescription: tc.short},
+			})
+			if err != nil {
+				t.Fatalf("encode the draft: %v", err)
+			}
+			sc := productContext(t, deps)
+			sc.Artifacts[run.ArtifactBodyHTML] = run.Artifact{Kind: run.ArtifactBodyHTML, Blob: body}
+			sc.Artifacts[run.ArtifactDraft] = run.Artifact{Kind: run.ArtifactDraft, Blob: draft}
+			sc.Spec.KeywordRules.PrimaryInH1 = true
+
+			result, err := steps.Validate(deps).Run(t.Context(), sc)
+			if err != nil {
+				t.Fatalf("Validate: %v", err)
+			}
+			if held := result.Next == run.TransitionPause; held != tc.held {
+				t.Fatalf("held = %t (%s), want %t", held, result.Message, tc.held)
+			}
+
+			var decoded steps.ValidationReport
+			if err := json.Unmarshal(result.Artifacts[0].Blob, &decoded); err != nil {
+				t.Fatalf("decode the report: %v", err)
+			}
+			if hasFinding(decoded, content.CodePrimaryMissingInH1) || !hasFinding(decoded, content.CodePrimaryMissingInName) {
+				t.Errorf("findings = %+v, want the name named instead of an H1 error", decoded.Structure.Items)
+			}
+			if got := hasFinding(decoded, content.CodePrimaryMissingInShortDescription); got != tc.held {
+				t.Errorf("short description finding = %t, want %t", got, tc.held)
+			}
+		})
+	}
+}
+
 func TestValidateCarriesTheDraftAndRepairFindingsAndLetsThePlanWin(t *testing.T) {
 	t.Parallel()
 
@@ -1324,6 +1377,107 @@ func TestTheWriterPromptSaysWhenAPageHasNoKeywords(t *testing.T) {
 	}
 	if strings.Contains(recorder.last, "in the first paragraph of section 1") {
 		t.Fatalf("a page without keywords owes no lead phrase:\n%s", recorder.last)
+	}
+}
+
+const productDraftReply = `{"title":"Espresso guide","h1":"Espresso guide","sections":[` +
+	`{"heading":"About","html":"<p>Espresso is a way to make coffee, part of our drinks range.</p>"},` +
+	`{"heading":"Brewing","html":"<p>Use fresh water and a fine grind for a sweeter cup at home.</p>"}` +
+	`],"summary":"A short guide to espresso.",` +
+	`"shortDescription":"<p>An espresso machine for the home.</p>",` +
+	`"specifications":[{"name":"Form","value":"Countertop"},{"name":"Size","value":""}]}`
+
+func productContext(t *testing.T, deps steps.Deps) *run.StepContext {
+	t.Helper()
+
+	sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: linkContextBlob(t, deps)})
+	sc.Page.WPType = pagemap.WPProduct
+	sc.Page.Observed.Title = "Espresso Machine &amp; Grinder"
+	sc.Spec.Product = &template.Product{
+		ShortDescription: template.ProductShortDescription{Enabled: true, Intent: "Say what it is", TargetWords: 30, PrimaryKeyword: true},
+		Specifications: []template.ProductSpecification{
+			{Name: "Form", Intent: "The form the notes state"}, {Name: "Size", Intent: "The size the notes state"},
+		},
+	}
+	return sc
+}
+
+func TestTheWriterAnswersAProductUnderItsStoreName(t *testing.T) {
+	t.Parallel()
+
+	deps := unitDeps()
+	recorder := &promptRecorder{reply: productDraftReply}
+	deps.LLM = recorder
+	sc := productContext(t, deps)
+
+	result, err := steps.GenerateBody(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("GenerateBody: %v", err)
+	}
+	for _, want := range []string{
+		"writing body copy for a WooCommerce product",
+		"shortDescription and specifications",
+		"H1: Espresso Machine & Grinder (the product's name in the store",
+		"never state a price, a stock level or an SKU",
+		"Short description: write it in shortDescription as HTML paragraphs, about 30 words: Say what it is; it carries the primary keyword",
+		"- Form: The form the notes state\n",
+	} {
+		if !strings.Contains(recorder.last, want) {
+			t.Fatalf("the prompt lacks %q:\n%s", want, recorder.last)
+		}
+	}
+
+	var draft content.ContentDraft
+	if err := json.Unmarshal(result.Artifacts[0].Blob, &draft); err != nil {
+		t.Fatalf("decode the draft: %v", err)
+	}
+	if draft.H1 != "Espresso Machine & Grinder" || draft.Product == nil {
+		t.Fatalf("draft = %+v", draft)
+	}
+	if draft.Product.ShortDescription != "<p>An espresso machine for the home.</p>" ||
+		len(draft.Product.Specifications) != 1 || draft.Product.Specifications[0].Value != "Countertop" {
+		t.Errorf("product draft = %+v", draft.Product)
+	}
+}
+
+func TestTheWriterOfAPageIsAskedNothingAboutProducts(t *testing.T) {
+	t.Parallel()
+
+	deps := unitDeps()
+	recorder := &promptRecorder{reply: goodDraft}
+	deps.LLM = recorder
+	sc := productContext(t, deps)
+	sc.Page.WPType = pagemap.WPPage
+
+	result, err := steps.GenerateBody(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("GenerateBody: %v", err)
+	}
+	for _, gone := range []string{"WooCommerce", "PRODUCT\n", "shortDescription"} {
+		if strings.Contains(recorder.last, gone) {
+			t.Fatalf("a page's prompt carries %q:\n%s", gone, recorder.last)
+		}
+	}
+	var draft content.ContentDraft
+	if err := json.Unmarshal(result.Artifacts[0].Blob, &draft); err != nil || draft.Product != nil {
+		t.Fatalf("a page's draft = %+v, %v", draft.Product, err)
+	}
+}
+
+func TestTheWriterCeilingMakesRoomForAProductsShortDescription(t *testing.T) {
+	t.Parallel()
+
+	deps := unitDeps()
+	recorder := &ceilingRecorder{reply: productDraftReply}
+	deps.LLM = recorder
+
+	sc := productContext(t, deps)
+	sc.Spec.Sections = []template.Section{{Heading: "About", TargetWords: 1800, Required: true}, {Heading: "Brewing"}}
+	if _, err := steps.GenerateBody(deps).Run(t.Context(), sc); err != nil {
+		t.Fatalf("GenerateBody: %v", err)
+	}
+	if got, want := recorder.ceilings[len(recorder.ceilings)-1], (1800+30)*3+1024; got != want {
+		t.Errorf("ceiling = %d, want %d", got, want)
 	}
 }
 

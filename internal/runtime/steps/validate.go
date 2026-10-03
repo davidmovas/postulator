@@ -67,16 +67,24 @@ func Validate(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
+			keywords := pagemap.Keywords(sc.Page, entity)
 			report := ValidationReport{
 				PageID:     sc.Page.ID,
 				Compliance: content.Compliance(doc, lc, policy, sc.Page.ID),
-				Structure:  content.Structure(doc, pagemap.Keywords(sc.Page, entity), sc.Spec),
+				Structure:  content.Structure(doc, keywords, sc.Spec),
 				Links:      links,
 			}
 			report.Compliance.Items = append(report.Compliance.Items, content.Unpublished(doc, lc, live, sc.Page.ID)...)
 			report.Compliance.Score = content.ScoreOf(report.Compliance.Items)
 			if drafted {
 				report.Structure.Items = append(report.Structure.Items, draft.Findings...)
+			}
+			if drafted && draft.Product != nil && sc.Spec.Product != nil {
+				report.Structure.Items = append(report.Structure.Items,
+					content.ProductFindings(*draft.Product, *sc.Spec.Product, keywords.Main())...)
+			}
+			if sc.Page.WPType == pagemap.WPProduct {
+				report.Structure = content.ForStore(report.Structure)
 			}
 			report.Structure.Items = plannedH1Wins(append(report.Structure.Items, repairs...))
 			report.Structure.Score = content.ScoreOf(report.Structure.Items)

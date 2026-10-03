@@ -15,6 +15,7 @@ type AssessRequest struct {
 	Spec       template.TemplateSpec
 	Body       string
 	Snippet    Snippet
+	Product    *contentdomain.ProductDraft
 	Targets    []contentdomain.LinkTarget
 	Call       llm.CallMeta
 	HasSnippet bool

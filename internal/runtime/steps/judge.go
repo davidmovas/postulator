@@ -93,11 +93,15 @@ func judgement(ctx context.Context, deps Deps, sc *run.StepContext) (report Judg
 	if err != nil {
 		return JudgeReport{}, 0, err
 	}
+	draft, _, err := decodeArtifact[content.ContentDraft](sc, run.ArtifactDraft)
+	if err != nil {
+		return JudgeReport{}, 0, err
+	}
 
 	assessed, err := deps.Content.Assess(ctx, appcontent.AssessRequest{
 		SiteID: sc.Run.SiteID, Page: sc.Page, Entity: entity, Spec: sc.Spec, Body: body,
 		Snippet:    appcontent.Snippet{Title: snippet.Title, Description: snippet.Description},
-		HasSnippet: hasSnippet, Targets: targets, Call: callMeta(sc, NameJudge),
+		HasSnippet: hasSnippet, Product: draft.Product, Targets: targets, Call: callMeta(sc, NameJudge),
 	})
 	return assessed.Report, assessed.Tokens, err
 }

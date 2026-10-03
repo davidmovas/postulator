@@ -2,6 +2,7 @@ package content
 
 import (
 	"context"
+	"html"
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/application/llm"
@@ -42,6 +43,7 @@ func (s *Service) Assess(ctx context.Context, req AssessRequest) (AssessResponse
 	system, user, err := render(NameJudge, judgePrompt{
 		Page: req.Page, Entity: req.Entity, Keywords: pagemap.Keywords(req.Page, req.Entity), Spec: req.Spec, Body: req.Body,
 		Meta: req.Snippet, HasMeta: req.HasSnippet, Targets: req.Targets,
+		Store: req.Page.WPType == pagemap.WPProduct, Product: req.Product,
 	})
 	if err != nil {
 		return AssessResponse{}, err
@@ -82,6 +84,9 @@ func (s *Service) Judge(ctx context.Context, req JudgeRequest) (JudgeResponse, e
 	raw, err := s.deps.Raw.RawContent(ctx, page.SiteID, *page.WPID, string(page.WPType))
 	if err != nil {
 		return JudgeResponse{}, err
+	}
+	if page.WPType == pagemap.WPProduct {
+		raw = "<h1>" + html.EscapeString(contentdomain.StoreName(page)) + "</h1>" + raw
 	}
 	doc, err := contentdomain.Parse(raw)
 	if err != nil {

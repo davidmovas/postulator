@@ -201,7 +201,7 @@ func (e *Engine) price(ctx context.Context, record run.Run, def run.StepDef, tar
 		return nil
 	}
 
-	usage := usageOf(outputOf(def, int(float64(targetWords(target.Spec))*tokensPerWord)))
+	usage := usageOf(outputOf(def, int(float64(targetWords(target.Spec, target.Page.WPType))*tokensPerWord)))
 	priced.tokens += usage.Total * calls
 	priced.usd += llm.Cost(usage, info) * float64(calls)
 	return nil
@@ -264,7 +264,7 @@ func callsOf(def run.StepDef, spec template.TemplateSpec, params map[string]any)
 	return max(def.Price.Calls(spec, params), 0)
 }
 
-func targetWords(spec template.TemplateSpec) int {
+func targetWords(spec template.TemplateSpec, wpType pagemap.WPType) int {
 	words := 0
 	for i := range spec.Sections {
 		words += spec.Sections[i].TargetWords
@@ -274,6 +274,9 @@ func targetWords(spec template.TemplateSpec) int {
 	}
 	if words == 0 {
 		words = fallbackTargetWords
+	}
+	if wpType == pagemap.WPProduct {
+		words += spec.Product.Words()
 	}
 	return words
 }

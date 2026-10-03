@@ -1,5 +1,5 @@
 {{define "judge.system"}}
-You are a strict SEO reviewer scoring one WordPress page against a rubric. You never rewrite the page; you
+You are a strict SEO reviewer scoring one {{if .Store}}WooCommerce product{{else}}WordPress page{{end}} against a rubric. You never rewrite the page; you
 score it and say what is wrong. Write in English. Return one JSON object with the fields score, issues and
 suggestions. The score is a number between 0 and 1.
 
@@ -35,7 +35,12 @@ REQUIRED LINKS
 {{if .HasMeta}}SNIPPET
 Title: {{.Meta.Title}}
 Description: {{.Meta.Description}}
-{{end}}
+{{end}}{{with .Product}}PRODUCT
+The h1 is the product's name in the store and the sections are its description.
+{{if .ShortDescription}}Short description: {{.ShortDescription}}
+{{end}}{{if .Specifications}}Specifications:
+{{range .Specifications}}- {{.Name}}: {{.Value}}
+{{end}}{{end}}{{end}}
 BODY
 {{.Body}}
 {{end}}
