@@ -7,6 +7,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application/models"
 	"github.com/davidmovas/postulator/internal/kernel/middleware"
+	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
 type ModelsUseCase interface {
@@ -17,6 +18,8 @@ type ModelsUseCase interface {
 	SetProfile(ctx context.Context, req models.SetProfileRequest) (models.SetProfileResponse, error)
 	TestProvider(ctx context.Context, req models.TestProviderRequest) (models.TestProviderResponse, error)
 	UsageSummary(ctx context.Context, req models.UsageSummaryRequest) (models.UsageSummaryResponse, error)
+	SpendReport(ctx context.Context, req models.SpendReportRequest) (models.SpendReportResponse, error)
+	ListCalls(ctx context.Context, req models.ListCallsRequest) (paging.List[models.Call], error)
 }
 
 type ModelsService struct {
@@ -27,6 +30,8 @@ type ModelsService struct {
 	setProfile   middleware.Handler[models.SetProfileRequest, models.SetProfileResponse]
 	testProvider middleware.Handler[models.TestProviderRequest, models.TestProviderResponse]
 	usageSummary middleware.Handler[models.UsageSummaryRequest, models.UsageSummaryResponse]
+	spendReport  middleware.Handler[models.SpendReportRequest, models.SpendReportResponse]
+	listCalls    middleware.Handler[models.ListCallsRequest, paging.List[models.Call]]
 }
 
 func NewModelsService(logger *zap.Logger, useCase Source[ModelsUseCase]) *ModelsService {
@@ -38,6 +43,8 @@ func NewModelsService(logger *zap.Logger, useCase Source[ModelsUseCase]) *Models
 		setProfile:   Wrap(logger, "models.setProfile", call(useCase, ModelsUseCase.SetProfile)),
 		testProvider: Wrap(logger, "models.testProvider", call(useCase, ModelsUseCase.TestProvider)),
 		usageSummary: Wrap(logger, "models.usageSummary", call(useCase, ModelsUseCase.UsageSummary)),
+		spendReport:  Wrap(logger, "models.spendReport", call(useCase, ModelsUseCase.SpendReport)),
+		listCalls:    Wrap(logger, "models.listCalls", call(useCase, ModelsUseCase.ListCalls)),
 	}
 }
 
@@ -67,4 +74,12 @@ func (s *ModelsService) TestProvider(c context.Context, req models.TestProviderR
 
 func (s *ModelsService) UsageSummary(c context.Context, req models.UsageSummaryRequest) (models.UsageSummaryResponse, error) {
 	return s.usageSummary(c, req)
+}
+
+func (s *ModelsService) SpendReport(c context.Context, req models.SpendReportRequest) (models.SpendReportResponse, error) {
+	return s.spendReport(c, req)
+}
+
+func (s *ModelsService) ListCalls(c context.Context, req models.ListCallsRequest) (paging.List[models.Call], error) {
+	return s.listCalls(c, req)
 }

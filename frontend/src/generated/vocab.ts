@@ -170,6 +170,12 @@ export type ModelRole = (typeof modelRoles)[number];
 export const reasoningEfforts = ["none", "low", "medium", "high", "xhigh"] as const;
 export type ReasoningEffort = (typeof reasoningEfforts)[number];
 
+export const serviceTiers = ["default", "flex"] as const;
+export type ServiceTier = (typeof serviceTiers)[number];
+
+export const spendPurposes = ["run", "chat", "title", "probe", "graph", "audit", "other"] as const;
+export type SpendPurpose = (typeof spendPurposes)[number];
+
 export const conversationModes = ["confirm", "autonomous"] as const;
 export type ConversationMode = (typeof conversationModes)[number];
 

@@ -109,6 +109,8 @@ func catalog() []vocabulary {
 			export: "reasoningEfforts", tsType: "ReasoningEffort", pkg: "internal/domain/llm",
 			typeName: "ReasoningEffort",
 		},
+		{export: "serviceTiers", tsType: "ServiceTier", pkg: "internal/domain/llm", typeName: "ServiceTier"},
+		{export: "spendPurposes", tsType: "SpendPurpose", pkg: "internal/domain/llm", typeName: "Purpose"},
 		{export: "conversationModes", tsType: "ConversationMode", pkg: "internal/domain/agent", typeName: "Mode"},
 		{export: "messageRoles", tsType: "MessageRole", pkg: "internal/domain/agent", typeName: "Role"},
 		{
