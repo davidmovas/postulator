@@ -9,7 +9,7 @@ import { SettingPanel } from "../sections.js";
 import { CatalogDrawer } from "./catalog.js";
 import { ProviderCards } from "./keys.js";
 import { RoleTable } from "./roles.js";
-import { SpendTile } from "./spend.js";
+import { SpendPanel } from "./spend.js";
 
 export function ModelSettingsScreen(): ReactElement {
     const settings = useTabSettings("models");
@@ -27,7 +27,6 @@ export function ModelSettingsScreen(): ReactElement {
                     <AdvancedCard sections={settings.advanced} />
                 </div>
                 <div className="flex flex-col gap-4">
-                    <SpendTile />
                     <Button
                         variant="secondary"
                         icon={TuneIcon}
@@ -39,6 +38,7 @@ export function ModelSettingsScreen(): ReactElement {
                     </Button>
                 </div>
             </div>
+            <SpendPanel />
             {catalogOpen ? (
                 <CatalogDrawer
                     onClose={() => {
