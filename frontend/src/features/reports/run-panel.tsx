@@ -20,6 +20,7 @@ import {
 import { runKindLabel, runStatusLabel, runStatusTone } from "../runs/labels.js";
 import { flattenTree } from "./model/site.js";
 import { itemRows } from "./model/runs.js";
+import { RunCostPanel } from "./run-cost.js";
 
 export interface RunPanelProps {
     siteId: string;
@@ -108,6 +109,7 @@ export function RunReportPanel({ siteId, runId }: RunPanelProps): ReactElement {
                     </Link>
                 </div>
             </Panel>
+            <RunCostPanel runId={held.runId} />
             <Panel>
                 <PanelHeader title={copy.reports.runs.perPage} />
                 <ul className="flex flex-col">
