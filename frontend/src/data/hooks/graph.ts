@@ -7,7 +7,6 @@ import {
     applyProposals,
     approveEdge,
     createEntity,
-    deleteEdge,
     deleteEntity,
     getEntity,
     listEdges,
@@ -16,7 +15,6 @@ import {
     moveEntity,
     previewFromPages,
     proposeFromKeywords,
-    proposeFromPages,
     proposeRelated,
     recomputeScores,
     rejectEdge,
@@ -128,17 +126,6 @@ export function useMoveEntity() {
     });
 }
 
-export function useDeleteEdge() {
-    const client = useQueryClient();
-    return useMutation({
-        mutationFn: (request: Parameters<typeof deleteEdge>[0]) => deleteEdge(request),
-        onSuccess: () => {
-            void client.invalidateQueries({ queryKey: keys.graph.edgeLists() });
-            void client.invalidateQueries({ queryKey: keys.graph.fulls() });
-        },
-    });
-}
-
 function patchEdgeStatus(client: QueryClient, id: string, status: string): void {
     client.setQueriesData<EdgePages>({ queryKey: keys.graph.edgeLists() }, (held) => {
         if (held === undefined) {
@@ -217,10 +204,6 @@ function useGraphBatch<Request extends { siteId: string }, Answer>(
             void client.invalidateQueries({ queryKey: keys.reports.site(input.request.siteId) });
         },
     });
-}
-
-export function useProposeFromPages() {
-    return useGraphBatch((request: Parameters<typeof proposeFromPages>[0], signal?: AbortSignal) => proposeFromPages(request, signal));
 }
 
 export function useProposeRelated() {

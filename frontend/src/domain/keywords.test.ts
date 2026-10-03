@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { keywordList, keywordsLine, keywordTexts, mainKeyword, sameKeywords, volumeLabel } from "./keywords.js";
+import { keywordList, keywordsLine, mainKeyword, sameKeywords, volumeLabel } from "./keywords.js";
 
 describe("keywordList", () => {
     it("orders by volume and keeps the unmeasured in the order given", () => {
@@ -34,10 +34,9 @@ describe("keywordList", () => {
 describe("reading a list", () => {
     const list = [{ text: "bpc 157", volume: 12000 }, { text: "bpc-157" }];
 
-    it("names the main keyword and the phrases in order", () => {
+    it("names the main keyword", () => {
         expect(mainKeyword(list)).toBe("bpc 157");
         expect(mainKeyword([])).toBe("");
-        expect(keywordTexts(list)).toStrictEqual(["bpc 157", "bpc-157"]);
     });
 
     it("compares phrases, volumes and order", () => {

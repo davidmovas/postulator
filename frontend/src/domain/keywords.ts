@@ -49,10 +49,6 @@ export function mainKeyword(list: readonly Keyword[]): string {
     return list[0]?.text ?? "";
 }
 
-export function keywordTexts(list: readonly Keyword[]): string[] {
-    return list.map((item) => item.text);
-}
-
 export function sameKeywords(left: readonly Keyword[], right: readonly Keyword[]): boolean {
     return (
         left.length === right.length &&
