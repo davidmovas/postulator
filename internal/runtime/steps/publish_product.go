@@ -132,126 +132,138 @@ func filled(attribute wp.ProductAttribute) bool {
 func publishProduct(ctx context.Context, deps Deps, sc *run.StepContext, body []byte,
 	draft content.ContentDraft) (run.Result, error) {
 	if sc.Page.WPID == nil {
-		return run.Result{
-			Next: run.TransitionPause, Reason: run.PauseNeedsHuman,
-			Message: sc.Page.Path + " " + notInStore,
-		}, nil
+		return needsHuman(sc.Page.Path + " " + notInStore), nil
 	}
 	client, err := clientFor(ctx, deps, sc.Run.SiteID)
 	if err != nil {
 		return run.Result{}, err
 	}
-
 	held, err := client.GetProduct(ctx, *sc.Page.WPID)
 	if err != nil {
 		return refusedByStore(ctx, deps, sc, err)
 	}
-
-	findings := make([]content.Finding, 0, 2)
-	if sc.Page.Drift {
-		if sc.BoolParam(ParamRefuseDrift) {
-			return run.Result{
-				Next: run.TransitionPause, Reason: run.PauseNeedsHuman,
-				Message: "a human edited " + sc.Page.Path + " in the store since it was last written",
-			}, nil
-		}
-		findings = append(findings, driftFinding(sc.Page))
+	if refusesDrift(sc) {
+		return driftRefused(sc.Page, "in the store since it was last written"), nil
 	}
-
-	doc, err := content.Parse(string(body))
+	description, err := descriptionOf(body)
 	if err != nil {
 		return run.Result{}, err
 	}
-	description, err := doc.RenderWithoutHeadingOne()
-	if err != nil {
-		return run.Result{}, err
-	}
-
 	raw, err := client.GetRaw(ctx, wp.TypeProduct, held.ID)
 	switch {
 	case wp.IsPluginMissing(err):
-		return run.Result{
-			Next: run.TransitionPause, Reason: run.PauseNeedsHuman,
-			Message: sc.Page.Path + " is a product and the site has no companion plugin to write its description",
-		}, nil
+		return needsHuman(sc.Page.Path + " is a product and the site has no companion plugin to write its description"), nil
 	case err != nil:
 		return run.Result{}, err
 	}
-
 	featured, _, err := decodeArtifact[ImagesResult](sc, run.ArtifactImages)
 	if err != nil {
 		return run.Result{}, err
 	}
+
 	update, snapshot, typed := productUpdate(held, draft.Product, featured.FeaturedID)
-	if typed != nil {
-		findings = append(findings, *typed)
+	store := productWrite{deps: deps, sc: sc, client: client, held: held, draft: draft.Product}
+	saved, refused, err := store.saveFields(ctx, update, &snapshot, raw.ContentHash)
+	if err != nil {
+		return run.Result{}, err
 	}
-
-	written := held
-	expected := raw.ContentHash
-	if hasFields(update) {
-		if written, err = client.UpdateProduct(ctx, held.ID, update); err != nil {
-			return refusedByStore(ctx, deps, sc, err)
-		}
-		if mismatches := productKept(snapshot, draft.Product, written); len(mismatches) > 0 {
-			if written, err = client.UpdateProduct(ctx, held.ID, update); err != nil {
-				return refusedByStore(ctx, deps, sc, err)
-			}
-			if mismatches = productKept(snapshot, draft.Product, written); len(mismatches) > 0 {
-				return refuseMismatch(sc, mismatches), nil
-			}
-		}
-		snapshot.wrote(written)
-		resaved, readErr := client.GetRaw(ctx, wp.TypeProduct, held.ID)
-		if readErr != nil {
-			return run.Result{}, readErr
-		}
-		expected = resaved.ContentHash
+	if refused != nil {
+		return *refused, nil
 	}
-
-	hash, err := client.PutRaw(ctx, wp.TypeProduct, held.ID, description, expected)
+	hash, err := client.PutRaw(ctx, wp.TypeProduct, held.ID, description, saved.expected)
 	if err != nil {
 		if errors.IsCode(err, errors.Conflict) {
-			return run.Result{
-				Next: run.TransitionPause, Reason: run.PauseNeedsHuman,
-				Message: "the product " + sc.Page.Path + " changed in the store while its description was written: " +
-					"it held " + expected + " and now holds " + currentHashOf(err),
-			}, nil
+			return needsHuman("the product " + sc.Page.Path + " changed in the store while its description was written: " +
+				"it held " + saved.expected + " and now holds " + currentHashOf(err)), nil
 		}
 		return run.Result{}, err
 	}
 
-	if differs := nameDiffers(sc.Page, held); differs != nil {
-		findings = append(findings, *differs)
-	}
-
+	written := saved.written
 	result := PublishResult{
 		WPID: held.ID, URL: permalinkOf(wp.Item{Link: written.Permalink}), Status: written.Status, ContentHash: hash,
 		PreviousContent: raw.Content, PreviousContentHash: raw.ContentHash, PreviousProduct: &snapshot,
-		SEOApplied: make([]string, 0), Skipped: make([]string, 0), Findings: findings,
+		SEOApplied: make([]string, 0), Skipped: make([]string, 0), Findings: findingsOfProduct(sc.Page, held, typed),
 		Mismatches: make([]pagemap.Mismatch, 0),
 	}
 	seo, err := applySEO(ctx, client, sc, wp.TypeProduct, held.ID, true)
 	if err != nil {
 		return run.Result{}, err
 	}
-	result.SEOApplied = seo.applied
-	result.Skipped = seo.skipped
-	result.PreviousMeta = seo.previous
-	result.Findings = append(result.Findings, seo.findings...)
+	result.took(seo)
 
 	if recordErr := recordProduct(ctx, deps, sc, written, hash); recordErr != nil {
 		return run.Result{}, recordErr
 	}
+	return publishedAs(result, "updated the product "+sc.Page.Path+" as "+strconv.FormatInt(held.ID, 10))
+}
 
-	blob, err := encode(result, "publish result")
+func descriptionOf(body []byte) (string, error) {
+	doc, err := content.Parse(string(body))
 	if err != nil {
-		return run.Result{}, err
+		return "", err
 	}
-	return run.Result{
-		Artifacts: []run.Artifact{{Kind: run.ArtifactPublishResult, Blob: blob}},
-		Message:   "updated the product " + sc.Page.Path + " as " + strconv.FormatInt(held.ID, 10),
-	}, nil
+	return doc.RenderWithoutHeadingOne()
+}
+
+func findingsOfProduct(page pagemap.Page, held wp.Product, typed *content.Finding) []content.Finding {
+	findings := driftFindings(page)
+	if typed != nil {
+		findings = append(findings, *typed)
+	}
+	if differs := nameDiffers(page, held); differs != nil {
+		findings = append(findings, *differs)
+	}
+	return findings
+}
+
+type productWrite struct {
+	deps   Deps
+	sc     *run.StepContext
+	client *wp.Client
+	draft  *content.ProductDraft
+	held   wp.Product
+}
+
+type productSaved struct {
+	written  wp.Product
+	expected string
+}
+
+func (w productWrite) saveFields(ctx context.Context, update wp.UpdateProduct, snapshot *ProductSnapshot,
+	expected string) (productSaved, *run.Result, error) {
+	if !hasFields(update) {
+		return productSaved{written: w.held, expected: expected}, nil, nil
+	}
+
+	written, err := w.client.UpdateProduct(ctx, w.held.ID, update)
+	if err != nil {
+		return w.refusedBy(ctx, err)
+	}
+	if mismatches := productKept(*snapshot, w.draft, written); len(mismatches) > 0 {
+		if written, err = w.client.UpdateProduct(ctx, w.held.ID, update); err != nil {
+			return w.refusedBy(ctx, err)
+		}
+		if mismatches = productKept(*snapshot, w.draft, written); len(mismatches) > 0 {
+			refused := refuseMismatch(w.sc, mismatches)
+			return productSaved{}, &refused, nil
+		}
+	}
+	snapshot.wrote(written)
+
+	resaved, err := w.client.GetRaw(ctx, wp.TypeProduct, w.held.ID)
+	if err != nil {
+		return productSaved{}, nil, err
+	}
+	return productSaved{written: written, expected: resaved.ContentHash}, nil, nil
+}
+
+func (w productWrite) refusedBy(ctx context.Context, cause error) (productSaved, *run.Result, error) {
+	refused, err := refusedByStore(ctx, w.deps, w.sc, cause)
+	if err != nil {
+		return productSaved{}, nil, err
+	}
+	return productSaved{}, &refused, nil
 }
 
 func productUpdate(held wp.Product, draft *content.ProductDraft, featured int64) (wp.UpdateProduct, ProductSnapshot, *content.Finding) {
@@ -353,7 +365,7 @@ func refusedByStore(ctx context.Context, deps Deps, sc *run.StepContext, err err
 			return run.Result{}, keepErr
 		}
 	}
-	return run.Result{Next: run.TransitionPause, Reason: run.PauseNeedsHuman, Message: message}, nil
+	return needsHuman(message), nil
 }
 
 func keepCommerce(ctx context.Context, deps Deps, siteID string, commerce site.Commerce) error {

@@ -17,11 +17,7 @@ const (
 	NamePublish      = string(run.StepPublish)
 	ParamRefuseDrift = "refuseDrift"
 
-	CapabilitySEOMeta    = "seo_meta"
-	CodeSEOMetaSkipped   = "seo_meta_skipped"
 	CodePublishOverDrift = "publish_over_drift"
-
-	ReasonNoSEOWriter = "the companion plugin on this site cannot write SEO meta"
 
 	FieldParent = "parent"
 
@@ -65,107 +61,134 @@ func Publish(deps Deps) run.StepDef {
 			if sc.Page.WPType == pagemap.WPProduct {
 				return publishProduct(ctx, deps, sc, body.Blob, draft)
 			}
-			itemType, err := itemTypeOf(sc.Page)
-			if err != nil {
-				return run.Result{}, err
-			}
-			client, err := clientFor(ctx, deps, sc.Run.SiteID)
-			if err != nil {
-				return run.Result{}, err
-			}
-
-			parent := int64(0)
-			if hierarchical(sc.Page) {
-				placement, placeErr := parentOf(ctx, deps, sc.Page)
-				if placeErr != nil {
-					return run.Result{}, placeErr
-				}
-				if placement.pending {
-					return holdForParent(sc, placement), nil
-				}
-				parent = placement.wpID
-			}
-
-			featured, _, err := decodeArtifact[ImagesResult](sc, run.ArtifactImages)
-			if err != nil {
-				return run.Result{}, err
-			}
-
-			existing, found, err := locate(ctx, client, itemType, sc.Page, parent)
-			if err != nil {
-				return run.Result{}, err
-			}
-
-			findings := make([]content.Finding, 0, 1)
-			if sc.Page.Drift {
-				if sc.BoolParam(ParamRefuseDrift) {
-					return run.Result{
-						Next:    run.TransitionPause,
-						Reason:  run.PauseNeedsHuman,
-						Message: "a human edited " + sc.Page.Path + " on the site since it was last published",
-					}, nil
-				}
-				findings = append(findings, driftFinding(sc.Page))
-			}
-
-			replaced, err := bodyBeingReplaced(ctx, client, itemType, existing, found)
-			if err != nil {
-				return run.Result{}, err
-			}
-
-			rendered := string(body.Blob)
-			status := string(sc.Run.PublishMode)
-			asked := writeRequest{
-				existing: existing, found: found, title: draft.Title, content: rendered,
-				slug: sc.Page.Slug, status: status, parent: parent, featured: featured.FeaturedID,
-			}
-			written, err := upsert(ctx, client, itemType, asked)
-			if err != nil {
-				return run.Result{}, err
-			}
-
-			mismatches := compare(sc, asked, written)
-			if len(mismatches) > 0 {
-				asked.existing, asked.found = written, true
-				if written, err = upsert(ctx, client, itemType, asked); err != nil {
-					return run.Result{}, err
-				}
-				mismatches = compare(sc, asked, written)
-			}
-			if len(mismatches) > 0 {
-				return refuseMismatch(sc, mismatches), nil
-			}
-
-			result := PublishResult{
-				WPID: written.ID, URL: written.Link, Status: written.Status,
-				ContentHash: wp.ContentHash(rendered), Created: !found,
-				PreviousContent: replaced.Content, PreviousContentHash: replaced.ContentHash,
-				SEOApplied: make([]string, 0), Skipped: make([]string, 0), Findings: findings,
-				Mismatches: mismatches,
-			}
-			seo, err := applySEO(ctx, client, sc, itemType, written.ID, found)
-			if err != nil {
-				return run.Result{}, err
-			}
-			result.SEOApplied = seo.applied
-			result.Skipped = seo.skipped
-			result.PreviousMeta = seo.previous
-			result.Findings = append(result.Findings, seo.findings...)
-
-			if recordErr := record(ctx, deps, sc, written, result); recordErr != nil {
-				return run.Result{}, recordErr
-			}
-
-			blob, err := encode(result, "publish result")
-			if err != nil {
-				return run.Result{}, err
-			}
-			return run.Result{
-				Artifacts: []run.Artifact{{Kind: run.ArtifactPublishResult, Blob: blob}},
-				Message:   verb(found) + " " + sc.Page.Path + " as " + strconv.FormatInt(written.ID, 10),
-			}, nil
+			return publishItem(ctx, deps, sc, string(body.Blob), draft)
 		},
 	}
+}
+
+func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, rendered string,
+	draft content.ContentDraft) (run.Result, error) {
+	itemType, err := itemTypeOf(sc.Page)
+	if err != nil {
+		return run.Result{}, err
+	}
+	client, err := clientFor(ctx, deps, sc.Run.SiteID)
+	if err != nil {
+		return run.Result{}, err
+	}
+	placed, err := parentFor(ctx, deps, sc.Page)
+	if err != nil {
+		return run.Result{}, err
+	}
+	if placed.pending {
+		return holdForParent(sc, placed), nil
+	}
+	featured, _, err := decodeArtifact[ImagesResult](sc, run.ArtifactImages)
+	if err != nil {
+		return run.Result{}, err
+	}
+
+	existing, found, err := locate(ctx, client, itemType, sc.Page, placed.wpID)
+	if err != nil {
+		return run.Result{}, err
+	}
+	if refusesDrift(sc) {
+		return driftRefused(sc.Page, "on the site since it was last published"), nil
+	}
+	replaced, err := bodyBeingReplaced(ctx, client, itemType, existing, found)
+	if err != nil {
+		return run.Result{}, err
+	}
+
+	asked := itemRequest(sc, draft, rendered, placed.wpID, featured.FeaturedID)
+	asked.existing, asked.found = existing, found
+	written, mismatches, err := writeItem(ctx, client, itemType, sc, asked)
+	if err != nil {
+		return run.Result{}, err
+	}
+	if len(mismatches) > 0 {
+		return refuseMismatch(sc, mismatches), nil
+	}
+
+	result := PublishResult{
+		WPID: written.ID, URL: written.Link, Status: written.Status,
+		ContentHash: wp.ContentHash(rendered), Created: !found,
+		PreviousContent: replaced.Content, PreviousContentHash: replaced.ContentHash,
+		SEOApplied: make([]string, 0), Skipped: make([]string, 0), Findings: driftFindings(sc.Page),
+		Mismatches: mismatches,
+	}
+	seo, err := applySEO(ctx, client, sc, itemType, written.ID, found)
+	if err != nil {
+		return run.Result{}, err
+	}
+	result.took(seo)
+
+	if recordErr := record(ctx, deps, sc, written, result); recordErr != nil {
+		return run.Result{}, recordErr
+	}
+	return publishedAs(result, verb(found)+" "+sc.Page.Path+" as "+strconv.FormatInt(written.ID, 10))
+}
+
+type writeRequest struct {
+	existing wp.Item
+	title    string
+	content  string
+	slug     string
+	status   string
+	parent   int64
+	featured int64
+	found    bool
+}
+
+func itemRequest(sc *run.StepContext, draft content.ContentDraft, rendered string, parent, featured int64) writeRequest {
+	return writeRequest{
+		title: draft.Title, content: rendered, slug: sc.Page.Slug, status: string(sc.Run.PublishMode),
+		parent: parent, featured: featured,
+	}
+}
+
+func writeItem(ctx context.Context, client *wp.Client, itemType wp.ItemType, sc *run.StepContext,
+	asked writeRequest) (wp.Item, []pagemap.Mismatch, error) {
+	written, err := upsert(ctx, client, itemType, asked)
+	if err != nil {
+		return wp.Item{}, nil, err
+	}
+
+	mismatches := compare(sc, asked, written)
+	if len(mismatches) > 0 {
+		asked.existing, asked.found = written, true
+		if written, err = upsert(ctx, client, itemType, asked); err != nil {
+			return wp.Item{}, nil, err
+		}
+		mismatches = compare(sc, asked, written)
+	}
+	return written, mismatches, nil
+}
+
+func upsert(ctx context.Context, client *wp.Client, itemType wp.ItemType, req writeRequest) (wp.Item, error) {
+	if !req.found {
+		in := wp.CreateItem{
+			Title: req.title, Content: req.content, Slug: req.slug, Status: req.status,
+		}
+		if itemType == wp.TypePage {
+			in.Parent = &req.parent
+		}
+		if req.featured != 0 {
+			in.FeaturedMedia = &req.featured
+		}
+		return client.CreateItem(ctx, itemType, in)
+	}
+
+	in := wp.UpdateItem{
+		Title: &req.title, Content: &req.content, Slug: &req.slug, Status: &req.status,
+	}
+	if itemType == wp.TypePage {
+		in.Parent = &req.parent
+	}
+	if req.featured != 0 {
+		in.FeaturedMedia = &req.featured
+	}
+	return client.UpdateItem(ctx, itemType, req.existing.ID, in)
 }
 
 func compare(sc *run.StepContext, asked writeRequest, written wp.Item) []pagemap.Mismatch {
@@ -193,11 +216,23 @@ func refuseMismatch(sc *run.StepContext, mismatches []pagemap.Mismatch) run.Resu
 		said = append(said, mismatches[i].Field+" was asked for as "+mismatches[i].Planned+
 			" and the site answers "+mismatches[i].Actual)
 	}
-	return run.Result{
-		Next:    run.TransitionPause,
-		Reason:  run.PauseNeedsHuman,
-		Message: "the site did not take " + sc.Page.Path + " as it was asked for: " + strings.Join(said, "; "),
+	return needsHuman("the site did not take " + sc.Page.Path + " as it was asked for: " + strings.Join(said, "; "))
+}
+
+func refusesDrift(sc *run.StepContext) bool {
+	return sc.Page.Drift && sc.BoolParam(ParamRefuseDrift)
+}
+
+func driftRefused(page pagemap.Page, since string) run.Result {
+	return needsHuman("a human edited " + page.Path + " " + since)
+}
+
+func driftFindings(page pagemap.Page) []content.Finding {
+	findings := make([]content.Finding, 0, 2)
+	if page.Drift {
+		findings = append(findings, driftFinding(page))
 	}
+	return findings
 }
 
 func driftFinding(page pagemap.Page) content.Finding {
@@ -218,60 +253,6 @@ func verb(found bool) string {
 
 func hierarchical(page pagemap.Page) bool {
 	return page.WPType == pagemap.WPPage
-}
-
-type placement struct {
-	path    string
-	wpID    int64
-	pending bool
-}
-
-func parentOf(ctx context.Context, deps Deps, page pagemap.Page) (placement, error) {
-	wanted := pagemap.ParentPath(page.Path)
-	if wanted == "" || wanted == "/" {
-		return placement{}, nil
-	}
-
-	if page.ParentPageID == nil {
-		return placement{}, errors.New(errors.Invalid,
-			"the page map holds no page at "+wanted+", so "+page.Path+" has no parent to sit under").
-			WithDetail("pageId", page.ID).
-			WithDetail("path", page.Path).
-			WithDetail("parentPath", wanted)
-	}
-
-	parent, err := deps.Pages.Get(ctx, *page.ParentPageID)
-	if err != nil {
-		if errors.IsCode(err, errors.NotFound) {
-			return placement{}, errors.New(errors.Invalid,
-				"the page names a parent the page map does not hold").
-				WithDetail("pageId", page.ID).
-				WithDetail("path", page.Path).
-				WithDetail("parentPageId", *page.ParentPageID)
-		}
-		return placement{}, err
-	}
-	if parent.Path != wanted {
-		return placement{}, errors.New(errors.Invalid,
-			"the page is linked to "+parent.Path+" while its path asks for "+wanted).
-			WithDetail("pageId", page.ID).
-			WithDetail("path", page.Path).
-			WithDetail("parentPath", wanted).
-			WithDetail("linkedPath", parent.Path)
-	}
-	if parent.WPID == nil {
-		return placement{path: parent.Path, pending: true}, nil
-	}
-	return placement{path: parent.Path, wpID: *parent.WPID}, nil
-}
-
-func holdForParent(sc *run.StepContext, parent placement) run.Result {
-	return run.Result{
-		Next:   run.TransitionPause,
-		Reason: run.PauseAwaitingParent,
-		Message: sc.Page.Path + " waits for its parent " + parent.path +
-			", which is not on the site yet; it goes on by itself once " + parent.path + " is",
-	}
 }
 
 func locate(ctx context.Context, client *wp.Client, itemType wp.ItemType, page pagemap.Page, parent int64) (wp.Item, bool, error) {
@@ -336,149 +317,6 @@ func bodyBeingReplaced(ctx context.Context, client *wp.Client, itemType wp.ItemT
 	}
 }
 
-type writeRequest struct {
-	existing wp.Item
-	title    string
-	content  string
-	slug     string
-	status   string
-	parent   int64
-	featured int64
-	found    bool
-}
-
-func upsert(ctx context.Context, client *wp.Client, itemType wp.ItemType, req writeRequest) (wp.Item, error) {
-	if !req.found {
-		in := wp.CreateItem{
-			Title: req.title, Content: req.content, Slug: req.slug, Status: req.status,
-		}
-		if itemType == wp.TypePage {
-			in.Parent = &req.parent
-		}
-		if req.featured != 0 {
-			in.FeaturedMedia = &req.featured
-		}
-		return client.CreateItem(ctx, itemType, in)
-	}
-
-	in := wp.UpdateItem{
-		Title: &req.title, Content: &req.content, Slug: &req.slug, Status: &req.status,
-	}
-	if itemType == wp.TypePage {
-		in.Parent = &req.parent
-	}
-	if req.featured != 0 {
-		in.FeaturedMedia = &req.featured
-	}
-	return client.UpdateItem(ctx, itemType, req.existing.ID, in)
-}
-
-type seoWrite struct {
-	previous *wp.SEOMeta
-	applied  []string
-	skipped  []string
-	findings []content.Finding
-}
-
-func applySEO(ctx context.Context, client *wp.Client, sc *run.StepContext, itemType wp.ItemType, wpID int64, updating bool) (seoWrite, error) {
-	meta, found, err := decodeArtifact[Meta](sc, run.ArtifactMeta)
-	if err != nil {
-		return seoWrite{}, err
-	}
-	if !found {
-		if artifact, held := sc.Artifacts[run.ArtifactMeta]; held && artifact.Purged {
-			return metaPurged(sc.Page), nil
-		}
-		return noMetaGenerated(), nil
-	}
-
-	capabilities, err := client.Capabilities(ctx)
-	if err != nil {
-		if wp.IsPluginMissing(err) {
-			return metaNotWritten(sc.Page, ReasonNoPlugin), nil
-		}
-		return seoWrite{}, err
-	}
-	if !capabilities.Has(CapabilitySEOMeta) {
-		return metaNotWritten(sc.Page, ReasonNoSEOWriter), nil
-	}
-
-	previous, err := metaBeingReplaced(ctx, client, capabilities, itemType, wpID, updating)
-	if err != nil {
-		return seoWrite{}, err
-	}
-
-	result, err := client.SetSEOMeta(ctx, itemType, wpID, wp.SEOMeta{
-		Title:         meta.Title,
-		Description:   meta.Description,
-		Canonical:     meta.Canonical,
-		OGTitle:       meta.OGTitle,
-		OGDescription: meta.OGDescription,
-	})
-	if err != nil {
-		if wp.IsPluginMissing(err) {
-			return metaNotWritten(sc.Page, ReasonNoPlugin), nil
-		}
-		return seoWrite{}, err
-	}
-	return seoWrite{
-		previous: previous,
-		applied:  append(make([]string, 0, len(result.Applied)), result.Applied...),
-		skipped:  []string{},
-		findings: nil,
-	}, nil
-}
-
-func metaBeingReplaced(ctx context.Context, client *wp.Client, capabilities wp.Capabilities,
-	itemType wp.ItemType, wpID int64, updating bool) (*wp.SEOMeta, error) {
-	if !updating || !capabilities.Has(wp.CapabilitySEOMetaRead) {
-		return nil, nil
-	}
-
-	held, err := client.GetSEOMeta(ctx, itemType, wpID)
-	switch {
-	case err == nil:
-		return &held, nil
-	case wp.IsPluginMissing(err), wp.IsPluginOutdated(err), errors.IsCode(err, errors.NotFound):
-		return nil, nil
-	default:
-		return nil, err
-	}
-}
-
-func noMetaGenerated() seoWrite {
-	return seoWrite{applied: []string{}, skipped: []string{CodeSEOMetaSkipped}}
-}
-
-func metaPurged(page pagemap.Page) seoWrite {
-	return seoWrite{
-		applied: []string{},
-		skipped: []string{CodeSEOMetaSkipped},
-		findings: []content.Finding{{
-			Severity: content.SeverityWarn,
-			Code:     CodeArtifactPurged,
-			Message: "the meta of " + page.Path + " was dropped by retention before it could be written, " +
-				"so the search snippet on the site is whatever was there before",
-			Details: map[string]any{
-				"pageId": page.ID, "path": page.Path, "kind": string(run.ArtifactMeta),
-			},
-		}},
-	}
-}
-
-func metaNotWritten(page pagemap.Page, reason string) seoWrite {
-	return seoWrite{
-		applied: []string{},
-		skipped: []string{CodeSEOMetaSkipped},
-		findings: []content.Finding{{
-			Severity: content.SeverityWarn,
-			Code:     CodeSEOMetaSkipped,
-			Message:  "the SEO meta of " + page.Path + " was generated but not written: " + reason,
-			Details:  map[string]any{"pageId": page.ID, "path": page.Path, "reason": reason},
-		}},
-	}
-}
-
 func record(ctx context.Context, deps Deps, sc *run.StepContext, written wp.Item, result PublishResult) error {
 	now := deps.now()
 	next := sc.Page
@@ -501,4 +339,15 @@ func statusOf(mode run.PublishMode) pagemap.Status {
 		return pagemap.StatusPublished
 	}
 	return pagemap.StatusExists
+}
+
+func publishedAs(result PublishResult, message string) (run.Result, error) {
+	blob, err := encode(result, "publish result")
+	if err != nil {
+		return run.Result{}, err
+	}
+	return run.Result{
+		Artifacts: []run.Artifact{{Kind: run.ArtifactPublishResult, Blob: blob}},
+		Message:   message,
+	}, nil
 }

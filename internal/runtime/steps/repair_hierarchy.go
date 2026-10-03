@@ -68,16 +68,7 @@ func RepairHierarchy(deps Deps) run.StepDef {
 			if rememberErr := remember(ctx, deps, sc, moved); rememberErr != nil {
 				return run.Result{}, rememberErr
 			}
-
-			blob, err := encode(result, "publish result")
-			if err != nil {
-				return run.Result{}, err
-			}
-			return run.Result{
-				Artifacts: []run.Artifact{{Kind: run.ArtifactPublishResult, Blob: blob}},
-				Message: "moved " + sc.Page.Path + " under " +
-					strconv.FormatInt(placement.wpID, 10),
-			}, nil
+			return publishedAs(result, "moved "+sc.Page.Path+" under "+strconv.FormatInt(placement.wpID, 10))
 		},
 	}
 }

@@ -277,6 +277,58 @@ func TestPublishPausesAProductItCannotWrite(t *testing.T) {
 	}
 }
 
+func TestPublishWritesOverDriftAndSaysSoForAPageAndAProductAlike(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		setup func(*testing.T) (steps.Deps, *run.StepContext)
+		codes []string
+	}{
+		{
+			name: "a page",
+			setup: func(t *testing.T) (steps.Deps, *run.StepContext) {
+				t.Helper()
+				deps, _ := imageDeps(t)
+				return deps, publishContext(t)
+			},
+			codes: []string{steps.CodePublishOverDrift},
+		},
+		{
+			name: "a product the file names otherwise",
+			setup: func(t *testing.T) (steps.Deps, *run.StepContext) {
+				t.Helper()
+				h := newProductHarness(t, storeProduct())
+				sc := storeContext(t, h.held.ID)
+				sc.Page.H1 = "Espresso Maker"
+				return h.deps, sc
+			},
+			codes: []string{steps.CodePublishOverDrift, steps.CodeProductNameDiffers},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps, sc := tc.setup(t)
+			sc.Page.Drift = true
+
+			published := runPublish(t, deps, sc)
+			if published.WPID == 0 {
+				t.Fatalf("publish over drift = %+v, want the item written", published)
+			}
+			codes := make([]string, 0, len(published.Findings))
+			for i := range published.Findings {
+				codes = append(codes, published.Findings[i].Code)
+			}
+			if !slices.Equal(codes, tc.codes) {
+				t.Fatalf("findings = %v, want %v in that order", codes, tc.codes)
+			}
+		})
+	}
+}
+
 func TestPublishFillsOnlyTheAttributesAProductLacks(t *testing.T) {
 	t.Parallel()
 
