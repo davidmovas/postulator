@@ -1,7 +1,7 @@
 import { copy } from "../../copy/index.js";
 import type { Timestamp } from "../../data/wire.js";
 import { relativeTime } from "../../domain/format.js";
-import { kindLabel } from "../runs/labels.js";
+import { runKindLabel } from "../runs/labels.js";
 
 export interface RunRow {
     kind: string;
@@ -12,7 +12,7 @@ export interface RunRow {
 
 export function runRowLabel(run: RunRow, now: Date = new Date()): string {
     const when = run.startedAt === null || run.startedAt === "" ? run.createdAt : run.startedAt;
-    return copy.palette.run(kindLabel(run.kind), run.stats.items, relativeTime(when, now));
+    return copy.palette.run(runKindLabel(run.kind), run.stats.items, relativeTime(when, now));
 }
 
 export function pagePrefix(query: string): string {

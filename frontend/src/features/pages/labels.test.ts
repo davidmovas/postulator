@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { entityKinds, pageStatuses } from "../../generated/vocab.js";
-import { kindLabel } from "../graph/labels.js";
-import { pageStatusLabel } from "./labels.js";
+import { pageStatuses } from "../../generated/vocab.js";
+import { pageStatusLabel, pageStatusTone } from "./labels.js";
 
 describe("the page vocabulary in words", () => {
     it("names every page status without printing the stored value", () => {
@@ -18,10 +17,8 @@ describe("the page vocabulary in words", () => {
         expect(pageStatusLabel("teleported")).toBe("teleported");
     });
 
-    it("names every entity kind from one source", () => {
-        for (const kind of entityKinds) {
-            expect(kindLabel(kind)).not.toBe("");
-            expect(kindLabel(kind)).not.toBe(kind);
-        }
+    it("gives every page status a tone and an unknown one a muted tone", () => {
+        expect(pageStatuses.map((status) => pageStatusTone(status))).toStrictEqual(["info", "accent", "ok", "muted"]);
+        expect(pageStatusTone("teleported")).toBe("muted");
     });
 });

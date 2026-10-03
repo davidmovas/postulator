@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { actors, pageStatuses, publishModes } from "../../generated/vocab.js";
-import { actorLabel, pageStatusLabel, publishLabel, targetsSentence } from "./labels.js";
+import { actors, publishModes } from "../../generated/vocab.js";
+import { actorLabel, publishLabel, targetsSentence } from "./labels.js";
 
 const vocabularies: readonly [string, readonly string[], (value: string) => string][] = [
-    ["page status", pageStatuses, pageStatusLabel],
     ["publish mode", publishModes, publishLabel],
     ["actor", actors, actorLabel],
 ];

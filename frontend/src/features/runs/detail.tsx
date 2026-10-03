@@ -20,16 +20,16 @@ import { RunControls } from "./controls.js";
 import { RunEventFeed } from "./events.js";
 import { ItemStatusTabs, RunItemTable } from "./items.js";
 import {
-    kindLabel,
     pauseReasonShort,
     pauseReasonTone,
-    statusIcon,
-    statusLabel,
-    statusTone,
+    runKindLabel,
+    runStatusIcon,
+    runStatusLabel,
+    runStatusTone,
 } from "./labels.js";
 import { retryNotices, stepTimeline } from "./log-view.js";
 import { RunNotices } from "./notices.js";
-import { pathOf, usePageIndex } from "./page-index.js";
+import { targetPathOf, usePageIndex } from "./page-index.js";
 import { itemSearchOf, readItemStatus } from "./params.js";
 import { RunProgress } from "./progress.js";
 import { recipeSteps } from "./recipe.js";
@@ -72,7 +72,7 @@ export function RunDetailScreen(): ReactElement {
     const paths = useMemo(() => {
         const table = new Map<string, string>();
         for (const entry of items) {
-            table.set(entry.id, pathOf(index, entry.targetId));
+            table.set(entry.id, targetPathOf(index, entry.targetId));
         }
         return table;
     }, [items, index]);
@@ -105,11 +105,11 @@ export function RunDetailScreen(): ReactElement {
 
     return (
         <Screen
-            title={copy.runs.detail.header(kindLabel(run.kind))}
+            title={copy.runs.detail.header(runKindLabel(run.kind))}
             badge={
                 <span className="flex shrink-0 items-center gap-1.5">
-                    <StatusBadge tone={statusTone(run.status)} icon={statusIcon(run.status)}>
-                        {statusLabel(run.status)}
+                    <StatusBadge tone={runStatusTone(run.status)} icon={runStatusIcon(run.status)}>
+                        {runStatusLabel(run.status)}
                     </StatusBadge>
                     {view.paused && run.pauseReason !== "" ? (
                         <StatusBadge tone={pauseReasonTone(run.pauseReason)} dot={false}>
@@ -128,7 +128,7 @@ export function RunDetailScreen(): ReactElement {
                 />
             }
             toolbar={
-                <Toolbar label={copy.runs.detail.header(kindLabel(run.kind))}>
+                <Toolbar label={copy.runs.detail.header(runKindLabel(run.kind))}>
                     <Link
                         to={`/s/${siteId}/runs`}
                         className="flex shrink-0 items-center gap-0.5 text-2xs text-ink-faint hover:text-ink"
@@ -205,7 +205,7 @@ export function RunDetailScreen(): ReactElement {
                     steps={steps}
                     timeline={timeline}
                     retry={retries.get(itemId)}
-                    path={selected === undefined ? copy.runs.missingItem : pathOf(index, selected.targetId)}
+                    path={selected === undefined ? copy.runs.missingItem : targetPathOf(index, selected.targetId)}
                     now={now}
                     missing={selected === undefined && !listed.hasNextPage}
                     narrowed={status !== ""}

@@ -3,7 +3,7 @@ import type { ReactElement } from "react";
 import { copy } from "../../../copy/index.js";
 import type { Page } from "../../../data/types.js";
 import { AccountTreeIcon, Checkbox, ChevronRightIcon, cx, IconButton, StatusBadge } from "../../../ui/index.js";
-import { pageStatusLabel, statusTone as pageStatusTone } from "../labels.js";
+import { pageStatusLabel, pageStatusTone } from "../labels.js";
 import type { Tick } from "./model.js";
 
 const indentPx = 14;

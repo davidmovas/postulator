@@ -19,7 +19,7 @@ import {
     TableHead,
     TableRow,
 } from "../../ui/index.js";
-import { kindLabel, statusLabel, statusTone } from "../runs/labels.js";
+import { runKindLabel, runStatusLabel, runStatusTone } from "../runs/labels.js";
 import { finished } from "./model/runs.js";
 
 const grid = "minmax(11rem,1.4fr) minmax(6rem,1fr) 4rem 7rem 5rem";
@@ -104,8 +104,8 @@ export function RunsTab({ siteId, selectedId, onSelect }: RunsTabProps): ReactEl
                     >
                         <TableCell>
                             <span className="flex min-w-0 items-center gap-2">
-                                <StatusBadge tone={statusTone(run.status)}>{statusLabel(run.status)}</StatusBadge>
-                                <span className="truncate">{kindLabel(run.kind)}</span>
+                                <StatusBadge tone={runStatusTone(run.status)}>{runStatusLabel(run.status)}</StatusBadge>
+                                <span className="truncate">{runKindLabel(run.kind)}</span>
                             </span>
                         </TableCell>
                         <TableCell muted={true} title={absoluteTime(run.finishedAt ?? run.createdAt)}>

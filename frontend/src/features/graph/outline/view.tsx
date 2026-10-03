@@ -16,7 +16,7 @@ import {
     toneClasses,
     VirtualRows,
 } from "../../../ui/index.js";
-import { entityIcon, formatScore, kindTone, stateLabel, stateTone } from "../labels.js";
+import { entityIcon, formatScore, kindLabel, kindTone, stateLabel, stateTone } from "../labels.js";
 import type { VisibleRow } from "../model/fold.js";
 import { childLimit } from "../model/fold.js";
 import { nodeStateOf } from "../model/index.js";
@@ -133,7 +133,7 @@ export function OutlineView({ siteId, index, rows, selectedId, matched, onSelect
                         ) : null}
                     </span>
                 </TableCell>
-                <TableCell muted={true}>{entity?.kind ?? ""}</TableCell>
+                <TableCell muted={true}>{kindLabel(entity?.kind ?? "")}</TableCell>
                 <TableCell mono={true} align="right">
                     {entity === undefined ? "" : formatScore(entity.score)}
                 </TableCell>

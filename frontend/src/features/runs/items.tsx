@@ -20,10 +20,10 @@ import {
 import type { SegmentedOption } from "../../ui/index.js";
 import { itemViews } from "./authority.js";
 import { itemBadge, itemNote, queuedAfter } from "./hold.js";
-import { statusLabel } from "./labels.js";
+import { runStatusLabel } from "./labels.js";
 import type { RetryNotice } from "./log-view.js";
 import type { PageIndex } from "./page-index.js";
-import { pathOf } from "./page-index.js";
+import { targetPathOf } from "./page-index.js";
 import { StepCell } from "./step-cell.js";
 import { VirtualRows } from "../../ui/index.js";
 
@@ -37,7 +37,7 @@ export interface ItemStatusTabsProps {
 
 const itemStatusOptions: readonly SegmentedOption<string>[] = [
     { value: "", label: copy.runs.filters.anyItemStatus },
-    ...itemStatuses.map((status) => ({ value: status, label: statusLabel(status) })),
+    ...itemStatuses.map((status) => ({ value: status, label: runStatusLabel(status) })),
 ];
 
 export function ItemStatusTabs({ value, onChange }: ItemStatusTabsProps): ReactElement {
@@ -143,7 +143,7 @@ export function RunItemTable({
                             }}
                         >
                             <TableCell mono={true} title={item.targetId}>
-                                {pathOf(index, item.targetId)}
+                                {targetPathOf(index, item.targetId)}
                             </TableCell>
                             <TableCell>
                                 <StatusBadge tone={badge.tone} icon={badge.icon}>

@@ -5,7 +5,7 @@ import { iconViewBox } from "../../../ui/index.js";
 
 const paths = new Map<string, Path2D>();
 
-function pathOf(icon: IconComponent): Path2D {
+function iconPath(icon: IconComponent): Path2D {
     const held = paths.get(icon.path);
     if (held !== undefined) {
         return held;
@@ -38,7 +38,7 @@ export function drawIcon(context: CanvasRenderingContext2D, icon: IconComponent,
     const scale = size / iconViewBox;
     context.scale(scale, scale);
     context.fillStyle = color;
-    context.fill(pathOf(icon));
+    context.fill(iconPath(icon));
     context.restore();
 }
 

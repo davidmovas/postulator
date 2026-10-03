@@ -1,12 +1,22 @@
 import { copy } from "../../copy/index.js";
 import type { EntityKind } from "../../generated/vocab.js";
 import { entityKinds, isOneOf } from "../../generated/vocab.js";
-import type { Tone } from "../../ui/index.js";
-import { entityIcon } from "../pages/labels.js";
+import type { IconComponent, Tone } from "../../ui/index.js";
+import { CategoryIcon, HubIcon, Inventory2Icon, StarShineIcon, TopicIcon } from "../../ui/index.js";
 import type { NodeState } from "./model/index.js";
 import type { Lens } from "./model/lens.js";
 
-export { entityIcon };
+const entityIcons: Readonly<Record<EntityKind, IconComponent>> = {
+    hub: HubIcon,
+    product: Inventory2Icon,
+    topic: TopicIcon,
+    category: CategoryIcon,
+    custom: StarShineIcon,
+};
+
+export function entityIcon(kind: string): IconComponent {
+    return isOneOf(entityKinds, kind) ? entityIcons[kind] : StarShineIcon;
+}
 
 const kindTones: Readonly<Record<EntityKind, Tone>> = {
     hub: "accent",

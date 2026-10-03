@@ -74,12 +74,6 @@ export const schedules = {
         none: "No cadence set",
         nextIn: (words: string) => `next ${words}`,
     },
-    statuses: {
-        planned: "Planned",
-        exists: "Exists",
-        published: "Published",
-        archived: "Archived",
-    },
     publishModes: {
         draft: "Draft",
         publish: "Publish",

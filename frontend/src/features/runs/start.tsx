@@ -10,7 +10,7 @@ import type { AddedPage, Estimate } from "../../data/types.js";
 import { publishModes, runKinds, runKindsWithTheirOwnRecipe } from "../../generated/vocab.js";
 import type { SelectOption } from "../../ui/index.js";
 import { Button, CalculateIcon, Drawer, Field, PlayArrowIcon, Select } from "../../ui/index.js";
-import { kindLabel, publishModeLabel } from "./labels.js";
+import { publishModeLabel, runKindLabel } from "./labels.js";
 import { StartCaps, StartPrice } from "./start-price.js";
 import { TargetTree } from "./start-tree.js";
 import { kindGenerate, kindRevert } from "./statuses.js";
@@ -256,7 +256,7 @@ export function StartRunDrawer({
                                 id={control.id}
                                 aria-describedby={control["aria-describedby"]}
                                 value={kind}
-                                options={startableKinds.map((value) => ({ value, label: kindLabel(value) }))}
+                                options={startableKinds.map((value) => ({ value, label: runKindLabel(value) }))}
                                 onValueChange={(next) => {
                                     setKind(next);
                                     forget();

@@ -64,15 +64,15 @@ const statusIcons: Readonly<Record<RunStatus, IconComponent>> = {
     cancelled: CancelIcon,
 };
 
-export function statusTone(status: string): Tone {
+export function runStatusTone(status: string): Tone {
     return isOneOf(runStatuses, status) ? statusTones[status] : "muted";
 }
 
-export function statusIcon(status: string): IconComponent {
+export function runStatusIcon(status: string): IconComponent {
     return isOneOf(runStatuses, status) ? statusIcons[status] : PendingActionsIcon;
 }
 
-export function statusLabel(status: string): string {
+export function runStatusLabel(status: string): string {
     return isOneOf(runStatuses, status) ? copy.runs.status[status] : status;
 }
 
@@ -94,7 +94,7 @@ export function publishingLabel(mode: string): string {
     return isOneOf(publishModes, mode) ? publishingWords[mode] : mode;
 }
 
-export function kindLabel(kind: string): string {
+export function runKindLabel(kind: string): string {
     return isOneOf(runKinds, kind) ? copy.runs.kinds[kind] : kind;
 }
 

@@ -19,8 +19,7 @@ import {
 } from "../../ui/index.js";
 import { ConflictNotice } from "./conflict-notice.js";
 import type { EntityIndex } from "./entities.js";
-import { formatScore, kindLabel } from "../graph/labels.js";
-import { entityIcon } from "./labels.js";
+import { entityIcon, formatScore, kindLabel } from "../graph/labels.js";
 
 const noEntity = "none";
 
