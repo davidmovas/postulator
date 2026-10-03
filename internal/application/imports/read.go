@@ -137,7 +137,7 @@ func pagesOf(rows []rowDraft, p *plan) *drafts {
 		if row.path == "" {
 			continue
 		}
-		draft, known := sheet.page(row.path, row.at.Row)
+		draft, known := sheet.page(row.path, row.at)
 		if known {
 			p.noteAt(row.at, string(importmap.FieldPath), CodeDuplicatePath,
 				"the path repeats an earlier row and was merged: "+row.path)

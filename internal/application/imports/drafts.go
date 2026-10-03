@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
@@ -63,7 +64,7 @@ type pageDraft struct {
 	unit       int
 	generated  bool
 	entityOnly bool
-	row        int
+	at         importmap.Origin
 }
 
 func (p *pageDraft) cellType() pagemap.WPType {
@@ -87,12 +88,12 @@ func newDrafts() *drafts {
 	return &drafts{pages: make(map[string]*pageDraft)}
 }
 
-func (d *drafts) page(path string, row int) (draft *pageDraft, known bool) {
+func (d *drafts) page(path string, at importmap.Origin) (draft *pageDraft, known bool) {
 	current, known := d.pages[path]
 	if known {
 		return current, true
 	}
-	current = &pageDraft{path: path, row: row, unit: -1}
+	current = &pageDraft{path: path, at: at, unit: -1}
 	d.pages[path] = current
 	d.paths = append(d.paths, path)
 	return current, false

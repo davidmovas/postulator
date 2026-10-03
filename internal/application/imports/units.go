@@ -255,7 +255,7 @@ func (b *builder) warnTechnical(draft *pageDraft) {
 	if existing, onSite := b.state.held(draft.path); onSite && existing.WPID != nil {
 		return
 	}
-	b.p.note(draft.row, string(importmap.FieldOwnEntity), CodeTechnicalParent,
+	b.p.noteAt(draft.at, string(importmap.FieldOwnEntity), CodeTechnicalParent,
 		"the page "+draft.path+" is not an entity and is not on the site yet, so the pages under it cannot be "+
 			"written until it is published or given an entity")
 }

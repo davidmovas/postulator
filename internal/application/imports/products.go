@@ -122,16 +122,16 @@ func matchProducts(sheet *drafts, state *siteState, p *plan) {
 			state.byPlanned[draft.path] = match.Page
 			draft.matchedBy = match.By
 			if waiting, left := state.byPath[draft.path]; left && waiting.WPID == nil {
-				p.note(draft.row, string(importmap.FieldPath), CodeProductRowLeft,
+				p.noteAt(draft.at, string(importmap.FieldPath), CodeProductRowLeft,
 					"the row planned at "+draft.path+" waited for the product the store now holds at "+match.Page.Path+
 						"; the import writes to the store's product, so delete the waiting row on the Pages screen")
 			}
 		case match.Ambiguous:
-			p.note(draft.row, string(importmap.FieldPath), CodeProductNotInStore,
+			p.noteAt(draft.at, string(importmap.FieldPath), CodeProductNotInStore,
 				"more than one product in the store answers to "+draft.path+" by its "+string(match.By)+
 					"; give the row the product's own address or slug, or rename one of the products in WooCommerce")
 		default:
-			p.note(draft.row, string(importmap.FieldPath), CodeProductNotInStore,
+			p.noteAt(draft.at, string(importmap.FieldPath), CodeProductNotInStore,
 				draft.path+" names a product the store does not hold yet; create it in WooCommerce and sync the site, "+
 					"and the row finds it")
 		}

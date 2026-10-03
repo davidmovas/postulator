@@ -33,6 +33,7 @@ type canonical struct {
 
 type plan struct {
 	siteID    string
+	sheet     string
 	report    PreviewReport
 	entities  []plannedEntity
 	edges     []graph.Edge
@@ -41,8 +42,20 @@ type plan struct {
 	rows      int
 }
 
-func (p *plan) note(row int, field string, code FindingCode, message string) {
-	p.noteAt(importmap.Origin{Row: row}, field, code, message)
+func sheetOf(table importmap.Table) string {
+	sheet := ""
+	for i := range table.Rows {
+		at := table.Origin(i).Sheet
+		if i > 0 && at != sheet {
+			return ""
+		}
+		sheet = at
+	}
+	return sheet
+}
+
+func (p *plan) whole() importmap.Origin {
+	return importmap.Origin{Sheet: p.sheet}
 }
 
 func (p *plan) noteAt(at importmap.Origin, field string, code FindingCode, message string) {
@@ -218,16 +231,16 @@ func fillGaps(sheet *drafts, state *siteState, p *plan) {
 	}
 
 	for _, parent := range order {
-		draft, _ := sheet.page(parent, 0)
+		draft, _ := sheet.page(parent, p.whole())
 		draft.generated = true
 		draft.title = titleFrom(parent)
 		if !needsPage[parent] {
 			draft.entityOnly = true
-			p.note(0, string(importmap.FieldPath), CodeIntermediateLevel,
+			p.noteAt(draft.at, string(importmap.FieldPath), CodeIntermediateLevel,
 				"the level above the products was kept as an entity without a page, because the store decides where a product sits: "+parent)
 			continue
 		}
-		p.note(0, string(importmap.FieldPath), CodeIntermediatePath, "the missing intermediate path was created: "+parent)
+		p.noteAt(draft.at, string(importmap.FieldPath), CodeIntermediatePath, "the missing intermediate path was created: "+parent)
 	}
 }
 
@@ -384,7 +397,7 @@ func checkAcyclic(state siteState, resolved map[string]graph.Entity, p *plan) er
 		return err
 	}
 	if cycleErr := g.ValidateAcyclic(); cycleErr != nil {
-		p.note(0, string(importmap.FieldParentEntity), CodeCycle, cycleErr.Error())
+		p.noteAt(p.whole(), string(importmap.FieldParentEntity), CodeCycle, cycleErr.Error())
 	}
 	return nil
 }
@@ -400,7 +413,7 @@ func (s *Service) resolvePages(ctx context.Context, b *builder, now time.Time) e
 
 		wpType := pagemap.WPType(strings.ToLower(draft.wpType))
 		if draft.wpType != "" && !wpType.Valid() {
-			p.note(draft.row, string(importmap.FieldWPType), CodeUnknownWPType,
+			p.noteAt(draft.at, string(importmap.FieldWPType), CodeUnknownWPType,
 				"the wordpress type is not recognized and was read as a page: "+draft.wpType)
 			wpType = ""
 		}
@@ -412,7 +425,7 @@ func (s *Service) resolvePages(ctx context.Context, b *builder, now time.Time) e
 				return err
 			}
 			if found == nil {
-				p.note(draft.row, string(importmap.FieldPageKind), CodeUnknownPageKind,
+				p.noteAt(draft.at, string(importmap.FieldPageKind), CodeUnknownPageKind,
 					"no template carries this page kind: "+draft.pageKind)
 			}
 			templates[key(draft.pageKind)] = found
@@ -427,7 +440,7 @@ func (s *Service) resolvePages(ctx context.Context, b *builder, now time.Time) e
 
 		current, exists := b.state.held(path)
 		if !exists && path == pagemap.RootPath {
-			p.note(draft.row, string(importmap.FieldPath), CodeRootPageSkipped,
+			p.noteAt(draft.at, string(importmap.FieldPath), CodeRootPageSkipped,
 				"the root of the site already exists on WordPress, so the import does not plan it; sync the site first to map it")
 			continue
 		}
@@ -462,7 +475,7 @@ func (s *Service) resolvePages(ctx context.Context, b *builder, now time.Time) e
 		switch {
 		case wpType == "" || wpType == current.WPType:
 		case current.WPID != nil:
-			p.note(draft.row, string(importmap.FieldWPType), CodeWPTypeKept,
+			p.noteAt(draft.at, string(importmap.FieldWPType), CodeWPTypeKept,
 				path+" is a "+string(current.WPType)+" on the site, so it stays one; the sheet names it a "+string(wpType))
 		default:
 			next.WPType = wpType
@@ -553,7 +566,7 @@ func checkCannibalization(state siteState, resolved map[string]graph.Entity, p *
 		}
 		for _, evidence := range pagemap.Cannibalization(planned.page, entity, index, g).Evidence {
 			p.report.Cannibalization = append(p.report.Cannibalization, conflictView(evidence))
-			p.note(0, string(importmap.FieldPath), CodeCannibalization,
+			p.noteAt(p.whole(), string(importmap.FieldPath), CodeCannibalization,
 				"the page "+planned.page.Path+" overlaps "+evidence.Path+" ("+string(evidence.Reason)+")")
 		}
 	}
@@ -656,7 +669,7 @@ func (s *Service) plan(ctx context.Context, siteID string, table importmap.Table
 	}
 
 	now := s.now()
-	p := plan{siteID: siteID, rows: len(table.Rows)}
+	p := plan{siteID: siteID, sheet: sheetOf(table), rows: len(table.Rows)}
 	p.report.Columns = columnViews(mapping.Uses(table.Headers))
 	rows := readRows(binding, table, &p)
 	sheet := pagesOf(rows, &p)
