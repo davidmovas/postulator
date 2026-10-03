@@ -3,6 +3,7 @@ package wp_test
 import (
 	"encoding/json"
 	"net/http"
+	"slices"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
@@ -225,6 +226,48 @@ func TestAWrittenItemSaysWhetherItCarriesCategories(t *testing.T) {
 		if item.Categories != nil {
 			t.Errorf("categories = %#v, want nil when the response leaves them out", item.Categories)
 		}
+	}
+}
+
+func TestAPageTakesItsCategoriesOnlyWhereThePluginRegistersThem(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		options []wptest.Option
+		taken   bool
+	}{
+		{name: "beside the plugin", taken: true},
+		{name: "without the plugin", options: []wptest.Option{wptest.WithoutPlugin()}},
+		{name: "beside an older plugin", options: []wptest.Option{wptest.WithCapabilities("bulk", "seo_meta", "content_hash", "raw", "preview")}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := wptest.New(t, tc.options...)
+			koffein := server.SeedCategory(wptest.Category{Name: "Koffein"})
+			client := newClient(t, server)
+
+			created, err := client.CreateItem(t.Context(), wp.TypePage, wp.CreateItem{Title: "Powder", Categories: []int64{koffein.ID}})
+			if err != nil {
+				t.Fatalf("CreateItem: %v", err)
+			}
+			updated, err := client.UpdateItem(t.Context(), wp.TypePage, created.ID, wp.UpdateItem{Categories: []int64{koffein.ID}})
+			if err != nil {
+				t.Fatalf("UpdateItem: %v", err)
+			}
+
+			for name, item := range map[string]wp.Item{"created": created, "updated": updated} {
+				if tc.taken && !slices.Equal(item.Categories, []int64{koffein.ID}) {
+					t.Errorf("%s categories = %v, want [%d]", name, item.Categories, koffein.ID)
+				}
+				if !tc.taken && item.Categories != nil {
+					t.Errorf("%s categories = %#v, want nil from a site that does not carry them on pages", name, item.Categories)
+				}
+			}
+		})
 	}
 }
 

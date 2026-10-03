@@ -15,9 +15,11 @@ import (
 )
 
 const (
-	pluginNamespace     = "/wp-json/postulator/v1"
-	defaultContentLimit = 100
-	maxContentLimit     = 500
+	pluginNamespace          = "/wp-json/postulator/v1"
+	pluginVersion            = "1.3.0"
+	capabilityPageCategories = "page_categories"
+	defaultContentLimit      = 100
+	maxContentLimit          = 500
 )
 
 var seoFieldOrder = []string{"title", "description", "canonical", "ogTitle", "ogDescription"}
@@ -95,7 +97,7 @@ func (s *Server) handleManifest(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Unlock()
 
 	s.respond(w, http.StatusOK, map[string]any{
-		"version":      "1.2.0",
+		"version":      pluginVersion,
 		"capabilities": capabilities,
 		"seoPlugin":    plugin,
 		"wpVersion":    "6.9.1",

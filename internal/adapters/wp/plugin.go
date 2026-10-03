@@ -13,11 +13,12 @@ import (
 )
 
 const (
-	CodePluginMissing     = "plugin_missing"
-	CodePluginOutdated    = "plugin_outdated"
-	CapabilityPreview     = "preview"
-	CapabilitySEOMetaRead = "seo_meta_read"
-	CapabilityRaw         = "raw"
+	CodePluginMissing        = "plugin_missing"
+	CodePluginOutdated       = "plugin_outdated"
+	CapabilityPreview        = "preview"
+	CapabilitySEOMetaRead    = "seo_meta_read"
+	CapabilityRaw            = "raw"
+	CapabilityPageCategories = "page_categories"
 
 	FieldSEOTitle         = "title"
 	FieldSEODescription   = "description"

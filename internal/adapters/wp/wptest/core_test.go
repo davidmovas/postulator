@@ -368,6 +368,74 @@ func TestAPostKeepsTheCategoriesThatExistInTheOrderWordPressNamesThem(t *testing
 	}
 }
 
+func TestAPageCarriesCategoriesOnlyWhileThePluginRegistersThem(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		options  []wptest.Option
+		path     string
+		enable   bool
+		carries  bool
+		storedAs int
+	}{
+		{name: "a page beside the plugin", path: "/wp-json/wp/v2/pages", carries: true, storedAs: 1},
+		{name: "a page without the plugin", options: []wptest.Option{wptest.WithoutPlugin()}, path: "/wp-json/wp/v2/pages"},
+		{
+			name:    "a page beside a plugin that predates page categories",
+			options: []wptest.Option{wptest.WithCapabilities("bulk", "seo_meta", "content_hash", "raw", "preview")},
+			path:    "/wp-json/wp/v2/pages",
+		},
+		{
+			name:     "a page once the plugin is activated",
+			options:  []wptest.Option{wptest.WithoutPlugin()},
+			path:     "/wp-json/wp/v2/pages",
+			enable:   true,
+			carries:  true,
+			storedAs: 1,
+		},
+		{name: "a post without the plugin", options: []wptest.Option{wptest.WithoutPlugin()}, path: "/wp-json/wp/v2/posts", carries: true, storedAs: 1},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := wptest.New(t, tc.options...)
+			koffein := server.SeedCategory(wptest.Category{Name: "Koffein"})
+			if tc.enable {
+				server.EnablePlugin()
+			}
+
+			body := []byte(`{"title":"Powder","status":"publish","categories":[` + itoa(koffein.ID) + `]}`)
+			_, payload := call(t, server, http.MethodPost, tc.path, body, true)
+			var created map[string]json.RawMessage
+			decode(t, payload, &created)
+
+			raw, present := created["categories"]
+			if present != tc.carries {
+				t.Fatalf("categories present = %t, want %t: %s", present, tc.carries, payload)
+			}
+			if tc.carries && string(raw) != "["+itoa(koffein.ID)+"]" {
+				t.Errorf("categories = %s, want [%d]", raw, koffein.ID)
+			}
+
+			var id int64
+			decode(t, created["id"], &id)
+			_, payload = call(t, server, http.MethodPost, tc.path+"/"+itoa(id), []byte(`{"categories":[`+itoa(koffein.ID)+`]}`), true)
+			decode(t, payload, &created)
+			if _, present = created["categories"]; present != tc.carries {
+				t.Errorf("after an update categories present = %t, want %t", present, tc.carries)
+			}
+
+			stored, _ := server.Lookup(id)
+			if len(stored.Categories) != tc.storedAs {
+				t.Errorf("stored categories = %v, want %d", stored.Categories, tc.storedAs)
+			}
+		})
+	}
+}
+
 func TestTheCoreRoutesGuardTheirIdsAndBodies(t *testing.T) {
 	t.Parallel()
 
