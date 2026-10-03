@@ -46,6 +46,7 @@ export interface SpecDraft {
     featuredImage: boolean;
     inlineImages: number;
     imageSource: string;
+    product: JsonObject | null;
     profiles: ProfileDraft[];
     recipe: StepDraft[];
 }
@@ -178,6 +179,7 @@ export function draftFromJson(value: JsonValue): SpecDraft {
         featuredImage: flag(images, "featured"),
         inlineImages: count(images, "inline"),
         imageSource: text(images, "source"),
+        product: branch(root, "product"),
         profiles: profilesOf(branch(root, "modelProfiles")),
         recipe: recipeOf(series(root, "recipe")),
     };
@@ -212,7 +214,7 @@ export function specJsonOf(draft: SpecDraft): JsonObject {
     if (draft.requiredKeywords !== null) {
         keywordRules["requiredKeywords"] = draft.requiredKeywords;
     }
-    return {
+    const spec: JsonObject = {
         sections: draft.sections.map((section) => ({
             heading: section.heading,
             intent: section.intent,
@@ -237,6 +239,10 @@ export function specJsonOf(draft: SpecDraft): JsonObject {
         modelProfiles: profiles,
         recipe,
     };
+    if (draft.product !== null) {
+        spec["product"] = draft.product;
+    }
+    return spec;
 }
 
 export function specOf(draft: SpecDraft): TemplateSpec {

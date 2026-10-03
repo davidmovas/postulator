@@ -109,6 +109,16 @@ describe("template spec drafts", () => {
         expect(specJsonOf(draftFromJson(hub))).toStrictEqual(hub);
     });
 
+    it("carries a product block through untouched and writes none where the spec had none", () => {
+        const product: JsonObject = {
+            shortDescription: { enabled: true, intent: "Say what it is", targetWords: 40, primaryKeyword: true },
+            specifications: [{ name: "Form", intent: "As the notes say" }],
+        };
+        const withProduct = { ...hub, product };
+        expect(specJsonOf(draftFromJson(withProduct))).toStrictEqual(withProduct);
+        expect("product" in specJsonOf(draftFromJson(hub))).toBe(false);
+    });
+
     it("keeps the params a step carries when the step is switched off", () => {
         const draft = draftFromJson(hub);
         const recipe = draft.recipe.map((step) => (step.name === "publish" ? { ...step, enabled: false } : step));

@@ -128,6 +128,37 @@ func (a imagesArgs) images() template.Images {
 	return template.Images{Featured: a.Featured, Inline: a.Inline, Source: a.Source}
 }
 
+type productShortDescriptionArgs struct {
+	Enabled        bool   `json:"enabled,omitempty" description:"Write the product's short description, the text the store shows beside the price"`
+	Intent         string `json:"intent,omitempty" description:"What the short description has to say, one short sentence to the writer"`
+	TargetWords    int    `json:"targetWords,omitempty" minimum:"0" description:"About how many words it should run to; leave it out to let the writer decide"`
+	PrimaryKeyword bool   `json:"primaryKeyword,omitempty" description:"The primary keyword must appear in the short description"`
+}
+
+type productSpecificationArgs struct {
+	Name   string `json:"name" description:"The attribute the product shows, for example Form or Size"`
+	Intent string `json:"intent,omitempty" description:"Where its value comes from, one short sentence; a value the page data does not state is left out"`
+}
+
+type productArgs struct {
+	ShortDescription *productShortDescriptionArgs `json:"shortDescription,omitempty" description:"The short description the product shows beside its price; leave it out for none"`
+	Specifications   []productSpecificationArgs   `json:"specifications,omitempty" description:"The attributes the writer fills in where the product does not carry them yet; leave it out for none"`
+}
+
+func (a productArgs) product() *template.Product {
+	built := &template.Product{Specifications: make([]template.ProductSpecification, 0, len(a.Specifications))}
+	if a.ShortDescription != nil {
+		built.ShortDescription = template.ProductShortDescription{
+			Enabled: a.ShortDescription.Enabled, Intent: a.ShortDescription.Intent,
+			TargetWords: a.ShortDescription.TargetWords, PrimaryKeyword: a.ShortDescription.PrimaryKeyword,
+		}
+	}
+	for _, specification := range a.Specifications {
+		built.Specifications = append(built.Specifications, template.ProductSpecification(specification))
+	}
+	return built
+}
+
 type templateSpecArgs struct {
 	Sections      []sectionArgs      `json:"sections" description:"The sections the page is built from, in the order they appear; at least one is required"`
 	Tone          string             `json:"tone,omitempty" description:"How the page should read, one or two sentences to the writer"`
@@ -136,6 +167,7 @@ type templateSpecArgs struct {
 	LinkRules     *linkRulesArgs     `json:"linkRules,omitempty" description:"How many internal links the page carries and which of them it owes; leave it out to ask nothing"`
 	MetaRules     *metaRulesArgs     `json:"metaRules,omitempty" description:"How the SEO title and description are built; leave it out to take the page title"`
 	Images        *imagesArgs        `json:"images,omitempty" description:"Whether the page carries images and where they come from; leave it out for a page without images"`
+	Product       *productArgs       `json:"product,omitempty" description:"What a WooCommerce product gets beside its description; leave it out for a template that writes pages"`
 	ModelProfiles []modelProfileArgs `json:"modelProfiles,omitempty" description:"Which model does which job for this template; leave it out to take the site profiles"`
 	Recipe        []stepArgs         `json:"recipe,omitempty" description:"The steps a run takes for this template, in order; leave it out for the default recipe"`
 }
@@ -161,6 +193,9 @@ func (a templateSpecArgs) spec() template.TemplateSpec {
 	}
 	if a.Images != nil {
 		built.Images = a.Images.images()
+	}
+	if a.Product != nil {
+		built.Product = a.Product.product()
 	}
 	return built
 }
@@ -213,6 +248,7 @@ type templatePatchArgs struct {
 	LinkRules     *linkRulesArgs     `json:"linkRules,omitempty" description:"The new link rules, left out to keep the current ones"`
 	MetaRules     *metaRulesArgs     `json:"metaRules,omitempty" description:"The new meta rules, left out to keep the current ones"`
 	Images        *imagesArgs        `json:"images,omitempty" description:"The new image settings, left out to keep the current ones"`
+	Product       *productArgs       `json:"product,omitempty" description:"The new product outputs, left out to keep the current ones"`
 	ModelProfiles []modelProfileArgs `json:"modelProfiles,omitempty" description:"The whole new set of model profiles, left out to keep the current ones"`
 	Recipe        []stepArgs         `json:"recipe,omitempty" description:"The whole new recipe in order, left out to keep the current one"`
 }
@@ -239,6 +275,9 @@ func (a templatePatchArgs) patch() (json.RawMessage, error) {
 	}
 	if a.Images != nil {
 		written["images"] = a.Images.images()
+	}
+	if a.Product != nil {
+		written["product"] = a.Product.product()
 	}
 	if len(a.ModelProfiles) > 0 {
 		written["modelProfiles"] = profilesOf(a.ModelProfiles)

@@ -48,6 +48,18 @@ func validSpec() template.TemplateSpec {
 	}
 }
 
+func validProduct() *template.Product {
+	return &template.Product{
+		ShortDescription: template.ProductShortDescription{
+			Enabled: true, Intent: "Say what {entityName} is for", TargetWords: 40, PrimaryKeyword: true,
+		},
+		Specifications: []template.ProductSpecification{
+			{Name: "Form", Intent: "The form the name and the notes state"},
+			{Name: "Size", Intent: "The pack size the notes state"},
+		},
+	}
+}
+
 func TestAnUnknownPlaceholderIsRefusedByNameWithTheOnesThatWork(t *testing.T) {
 	t.Parallel()
 
@@ -96,6 +108,28 @@ func TestValidateSpec(t *testing.T) {
 		{name: "unknown image source", mutate: func(s *template.TemplateSpec) { s.Images.Source = "camera" }, field: "images.source"},
 		{name: "images without a source", mutate: func(s *template.TemplateSpec) { s.Images.Source = "" }, field: "images.source"},
 		{name: "no images no source is fine", mutate: func(s *template.TemplateSpec) { s.Images = template.Images{} }},
+		{name: "a product block", mutate: func(s *template.TemplateSpec) { s.Product = validProduct() }},
+		{name: "an empty product block", mutate: func(s *template.TemplateSpec) { s.Product = &template.Product{} }},
+		{name: "negative short description words", mutate: func(s *template.TemplateSpec) {
+			s.Product = validProduct()
+			s.Product.ShortDescription.TargetWords = -1
+		}, field: "product.shortDescription.targetWords"},
+		{name: "unknown short description placeholder", mutate: func(s *template.TemplateSpec) {
+			s.Product = validProduct()
+			s.Product.ShortDescription.Intent = "Sell the {price}"
+		}, field: "product.shortDescription.intent"},
+		{name: "blank specification name", mutate: func(s *template.TemplateSpec) {
+			s.Product = validProduct()
+			s.Product.Specifications[1].Name = "  "
+		}, field: "product.specifications[1].name"},
+		{name: "a specification named twice", mutate: func(s *template.TemplateSpec) {
+			s.Product = validProduct()
+			s.Product.Specifications[1].Name = "FORM"
+		}, field: "product.specifications[1].name"},
+		{name: "unknown specification placeholder", mutate: func(s *template.TemplateSpec) {
+			s.Product = validProduct()
+			s.Product.Specifications[0].Intent = "Read {notes}"
+		}, field: "product.specifications[0].intent"},
 		{name: "unknown role", mutate: func(s *template.TemplateSpec) {
 			s.ModelProfiles = map[llm.Role]llm.ModelRef{"painter": {Provider: "a", Model: "b"}}
 		}, field: "modelProfiles.painter"},

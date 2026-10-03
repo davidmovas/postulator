@@ -35,6 +35,7 @@ export function blankDraft(): SpecDraft {
         featuredImage: false,
         inlineImages: 0,
         imageSource: "wpmedia",
+        product: null,
         profiles: [],
         recipe: stepNames.map((name) => ({ name, enabled: name !== imageStep, declared: true, params: null })),
     };

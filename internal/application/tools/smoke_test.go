@@ -298,6 +298,40 @@ func TestATemplateToolSaysHowManyKeywordsThePageMustUse(t *testing.T) {
 	}
 }
 
+func TestATemplateToolDeclaresWhatAProductGets(t *testing.T) {
+	t.Parallel()
+
+	registry, binding, _ := wired(t)
+	binding.Mode = domainagent.ModeAutonomous
+
+	product := `,"product":{"shortDescription":{"enabled":true,"intent":"Say what it is","targetWords":40,` +
+		`"primaryKeyword":true},"specifications":[{"name":"Form","intent":"As the notes say"}]}}`
+	spec := strings.TrimSuffix(minimalSpec, "}") + product
+	out, err := registry.Call(t.Context(), binding, "templates_create",
+		json.RawMessage(`{"name":"Product outputs","pageKind":"product","spec":`+spec+`}`))
+	if err != nil {
+		t.Fatalf("templates_create: %v", err)
+	}
+	encoded, err := json.Marshal(out)
+	if err != nil {
+		t.Fatalf("encode the answer: %v", err)
+	}
+	for _, want := range []string{`"shortDescription":{"enabled":true`, `"targetWords":40`, `"name":"Form"`} {
+		if !strings.Contains(string(encoded), want) {
+			t.Errorf("the template lost %s: %s", want, encoded)
+		}
+	}
+
+	bare, err := registry.Call(t.Context(), binding, "templates_create",
+		json.RawMessage(`{"name":"No product outputs","pageKind":"guide","spec":`+minimalSpec+`}`))
+	if err != nil {
+		t.Fatalf("templates_create: %v", err)
+	}
+	if encoded, err = json.Marshal(bare); err != nil || strings.Contains(string(encoded), `"product":{`) {
+		t.Errorf("a template that says nothing of products carries a product block: %s", encoded)
+	}
+}
+
 func argumentsFor(name string) json.RawMessage {
 	switch name {
 	case "imports_inspect", "imports_preview":
