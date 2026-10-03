@@ -2,6 +2,7 @@ package steps
 
 import (
 	"context"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/images"
 	"github.com/davidmovas/postulator/internal/adapters/wp"
@@ -104,4 +105,11 @@ type Deps struct {
 	Publisher     application.Publisher
 	Clock         clock.Clock
 	BatchSize     int
+}
+
+func (d Deps) now() time.Time {
+	if d.Clock == nil {
+		return time.Time{}
+	}
+	return d.Clock.Now().UTC().Truncate(time.Second)
 }

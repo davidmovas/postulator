@@ -21,13 +21,13 @@ const (
 	CodeSEOMetaSkipped   = "seo_meta_skipped"
 	CodePublishOverDrift = "publish_over_drift"
 
+	ReasonNoSEOWriter = "the companion plugin on this site cannot write SEO meta"
+
 	FieldParent = "parent"
 
 	publishTimeout = 2 * time.Minute
 	lookupPerPage  = 100
 )
-
-var editableStatuses = []string{"publish", "future", "draft", "pending", "private"}
 
 type PublishResult struct {
 	PreviousMeta        *wp.SEOMeta        `json:"previousMeta,omitempty"`
@@ -187,19 +187,6 @@ func compare(sc *run.StepContext, asked writeRequest, written wp.Item) []pagemap
 	return found
 }
 
-func observedOf(item wp.Item) pagemap.Observed {
-	return pagemap.Observed{
-		Link: permalinkOf(item), Slug: item.Slug, Status: item.Status, Title: item.Title,
-	}
-}
-
-func permalinkOf(item wp.Item) string {
-	if strings.Contains(item.Link, "?") {
-		return ""
-	}
-	return item.Link
-}
-
 func refuseMismatch(sc *run.StepContext, mismatches []pagemap.Mismatch) run.Result {
 	said := make([]string, 0, len(mismatches))
 	for i := range mismatches {
@@ -231,30 +218,6 @@ func verb(found bool) string {
 
 func hierarchical(page pagemap.Page) bool {
 	return page.WPType == pagemap.WPPage
-}
-
-func itemTypeOf(page pagemap.Page) (wp.ItemType, error) {
-	switch page.WPType {
-	case pagemap.WPPage:
-		return wp.TypePage, nil
-	case pagemap.WPPost:
-		return wp.TypePost, nil
-	default:
-		return "", errors.New(errors.Invalid, "only pages, posts and products are written by the publish step").
-			WithDetail("wpType", string(page.WPType)).WithDetail("pageId", page.ID)
-	}
-}
-
-func onSiteType(page pagemap.Page) wp.ItemType {
-	return wp.ItemType(page.WPType)
-}
-
-func clientFor(ctx context.Context, deps Deps, siteID string) (*wp.Client, error) {
-	if deps.WordPress == nil {
-		return nil, errors.New(errors.Invalid, "no WordPress client is configured for this site").
-			WithDetail("siteId", siteID)
-	}
-	return deps.WordPress.Client(ctx, siteID)
 }
 
 type placement struct {
@@ -538,11 +501,4 @@ func statusOf(mode run.PublishMode) pagemap.Status {
 		return pagemap.StatusPublished
 	}
 	return pagemap.StatusExists
-}
-
-func (d Deps) now() time.Time {
-	if d.Clock == nil {
-		return time.Time{}
-	}
-	return d.Clock.Now().UTC().Truncate(time.Second)
 }

@@ -2,7 +2,6 @@ package steps
 
 import (
 	"context"
-	stderrors "errors"
 	"strconv"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
@@ -264,16 +263,4 @@ func settleRelinkPage(work pageRelink) (run.Result, error) {
 		},
 		Message: "placed " + strconv.Itoa(work.result.Linked) + " links on " + work.result.Path,
 	}, nil
-}
-
-func currentHashOf(err error) string {
-	var kernel *errors.Error
-	if !stderrors.As(err, &kernel) || kernel == nil {
-		return ""
-	}
-	value, ok := kernel.Details["currentHash"].(string)
-	if !ok {
-		return ""
-	}
-	return value
 }

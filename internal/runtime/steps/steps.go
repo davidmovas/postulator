@@ -9,11 +9,6 @@ import (
 )
 
 const (
-	ReasonNoPlugin    = "the site has no Postulator companion plugin"
-	ReasonNoSEOWriter = "the companion plugin on this site cannot write SEO meta"
-)
-
-const (
 	checkpointLinks = "links"
 
 	pureStepTimeout = 30 * time.Second
