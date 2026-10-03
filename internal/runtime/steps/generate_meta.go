@@ -80,25 +80,19 @@ func GenerateMeta(deps Deps) run.StepDef {
 
 			canonical := pagemap.NewSite(owner.BaseURL).URL(sc.Page.Path)
 			keywords := pagemap.Keywords(sc.Page, entity)
-			system, user, err := render(NameGenerateMeta, metaPrompt{
+			request, err := stepRequest(sc, NameGenerateMeta, ref, metaPrompt{
 				Page: sc.Page, Entity: entity, Keywords: keywords, Spec: sc.Spec, Draft: draft,
 				SiteName:  owner.Name,
 				Canonical: canonical,
 				Pattern: template.Expand(sc.Spec.MetaRules.TitlePattern, template.Vars{
 					PrimaryKeyword: keywords.Main(), EntityName: entity.Name, SiteName: owner.Name, PageTitle: sc.Page.Title,
 				}),
-			})
+			}, metaTokens)
 			if err != nil {
 				return run.Result{}, err
 			}
 
-			answer, usage, err := port.Structured[metaAnswer](ctx, deps.LLM, port.Request{
-				Ref:       ref,
-				System:    system,
-				Messages:  []port.Message{{Role: port.RoleUser, Text: user}},
-				MaxTokens: metaTokens,
-				Meta:      callMeta(sc, NameGenerateMeta),
-			})
+			answer, usage, err := port.Structured[metaAnswer](ctx, deps.LLM, request)
 			if err != nil {
 				return run.Result{}, err
 			}

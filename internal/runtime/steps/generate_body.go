@@ -50,20 +50,14 @@ func GenerateBody(deps Deps) run.StepDef {
 			}
 
 			brief := content.NewBrief(sc.Spec, policy.Rules, sc.Page, entity, lc)
-			system, user, err := render(NameGenerateBody, bodyPrompt{
+			request, err := stepRequest(sc, NameGenerateBody, ref, bodyPrompt{
 				Page: sc.Page, Entity: entity, Spec: sc.Spec, Brief: brief, Product: sc.Page.WPType == pagemap.WPProduct,
-			})
+			}, writerCeiling(sc.Spec, sc.Page.WPType, sc.Item.Attempts))
 			if err != nil {
 				return run.Result{}, err
 			}
 
-			draft, doc, usage, err := write(ctx, deps, port.Request{
-				Ref:       ref,
-				System:    system,
-				Messages:  []port.Message{{Role: port.RoleUser, Text: user}},
-				MaxTokens: writerCeiling(sc.Spec, sc.Page.WPType, sc.Item.Attempts),
-				Meta:      callMeta(sc, NameGenerateBody),
-			}, brief)
+			draft, doc, usage, err := write(ctx, deps, request, brief)
 			if err != nil {
 				return run.Result{}, err
 			}

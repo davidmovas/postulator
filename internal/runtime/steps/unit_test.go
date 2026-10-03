@@ -1239,6 +1239,89 @@ func TestTheModelStepsDeclareTheirOwnTimeouts(t *testing.T) {
 	}
 }
 
+type requestRecorder struct {
+	reply    string
+	requests []port.Request
+}
+
+func (r *requestRecorder) Complete(_ context.Context, req port.Request) (port.Response, error) {
+	r.requests = append(r.requests, req)
+	return port.Response{Text: r.reply, Usage: domainllm.Usage{Input: 1, Output: 2, Total: 3}}, nil
+}
+
+func (r *requestRecorder) Stream(context.Context, port.Request) (<-chan port.Delta, error) {
+	return nil, errors.New(errors.Internal, "the unit stub does not stream")
+}
+
+func TestEveryModelStepAsksUnderItsOwnNameAndCeiling(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		def     func(steps.Deps) run.StepDef
+		reply   string
+		context func(*testing.T, steps.Deps) *run.StepContext
+	}{
+		{
+			name: steps.NameGenerateBody, def: steps.GenerateBody, reply: goodDraft,
+			context: func(t *testing.T, deps steps.Deps) *run.StepContext {
+				t.Helper()
+				return unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: linkContextBlob(t, deps)})
+			},
+		},
+		{
+			name: steps.NameGenerateMeta, def: steps.GenerateMeta,
+			reply: `{"title":"Espresso | Shop","description":"Pull a shot.","canonical":"https://shop.example.com/coffee/espresso/"}`,
+			context: func(t *testing.T, _ steps.Deps) *run.StepContext {
+				t.Helper()
+				return unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactDraft: []byte(goodDraft)})
+			},
+		},
+		{
+			name: steps.NameRepairLinks, def: steps.RepairLinks, reply: `{"sentence":"A sentence with no anchor at all."}`,
+			context: func(t *testing.T, _ steps.Deps) *run.StepContext {
+				t.Helper()
+				return unitContext(t, map[run.ArtifactKind][]byte{
+					run.ArtifactLinkContext: owingContext(t),
+					run.ArtifactBodyHTML:    []byte("<h1>Espresso</h1><p>Our espresso starts with the coffee we roast.</p>"),
+				})
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps := unitDeps()
+			sc := tc.context(t, deps)
+			recorder := &requestRecorder{reply: tc.reply}
+			deps.LLM = recorder
+			def := tc.def(deps)
+
+			if _, err := def.Run(t.Context(), sc); err != nil {
+				t.Fatalf("%s: %v", tc.name, err)
+			}
+			if len(recorder.requests) == 0 {
+				t.Fatalf("%s asked the model nothing", tc.name)
+			}
+			for _, req := range recorder.requests {
+				if req.Meta.RunID != sc.Run.ID || req.Meta.ItemID != sc.Item.ID || req.Meta.Step != tc.name {
+					t.Fatalf("the call is booked as %+v, want run %s, item %s, step %s", req.Meta, sc.Run.ID, sc.Item.ID, tc.name)
+				}
+				if req.Ref.Model != "unit" || req.System == "" || len(req.Messages) != 1 ||
+					req.Messages[0].Role != port.RoleUser || req.Messages[0].Text == "" {
+					t.Fatalf("the request = %+v, want the resolved model, a system prompt and one user message", req)
+				}
+				ceiling := def.Price.OutputTokens
+				if (ceiling == 0 && req.MaxTokens <= 0) || (ceiling > 0 && req.MaxTokens != ceiling) {
+					t.Fatalf("the request asks for at most %d tokens, want the ceiling the step is priced at (%d)", req.MaxTokens, ceiling)
+				}
+			}
+		})
+	}
+}
+
 func TestMaxTokensFallsBackToTheTemplateLength(t *testing.T) {
 	t.Parallel()
 

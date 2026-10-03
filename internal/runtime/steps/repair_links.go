@@ -247,20 +247,14 @@ func (w sentenceWriter) write(ctx context.Context, doc *content.Document, owed o
 			return "", used, stoppedWhileWriting(err, owed)
 		}
 
-		system, user, renderErr := render(NameRepairLinks, repairPrompt{
+		request, renderErr := stepRequest(w.sc, NameRepairLinks, w.ref, repairPrompt{
 			Page: w.sc.Page, Entity: w.entity, Phrase: owed.text, Why: owed.why, Paragraph: contextParagraph(doc, owed.index),
-		})
+		}, repairTokens)
 		if renderErr != nil {
 			return "", used, renderErr
 		}
 
-		response, usage, callErr := port.Structured[content.RepairResponse](ctx, w.deps.LLM, port.Request{
-			Ref:       w.ref,
-			System:    system,
-			Messages:  []port.Message{{Role: port.RoleUser, Text: user}},
-			MaxTokens: repairTokens,
-			Meta:      callMeta(w.sc, NameRepairLinks),
-		})
+		response, usage, callErr := port.Structured[content.RepairResponse](ctx, w.deps.LLM, request)
 		used += usage.Total
 		if callErr != nil {
 			if ctxErr := ctx.Err(); ctxErr != nil {
