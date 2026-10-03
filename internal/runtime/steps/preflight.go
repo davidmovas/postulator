@@ -2,13 +2,16 @@ package steps
 
 import (
 	"context"
+	"slices"
 	"strconv"
 
+	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
+	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
 )
 
@@ -134,6 +137,94 @@ func imagesPreflight(deps Deps) run.Preflight {
 		}
 		return findings, nil
 	}
+}
+
+func preflights(checks ...run.Preflight) run.Preflight {
+	return func(ctx context.Context, record run.Run, targets map[string]run.Target) ([]run.EstimateFinding, error) {
+		found := make([]run.EstimateFinding, 0)
+		for _, check := range checks {
+			more, err := check(ctx, record, targets)
+			if err != nil {
+				return nil, err
+			}
+			found = append(found, more...)
+		}
+		return found, nil
+	}
+}
+
+func storePreflight(deps Deps) run.Preflight {
+	return func(ctx context.Context, record run.Run, targets map[string]run.Target) ([]run.EstimateFinding, error) {
+		findings := make([]run.EstimateFinding, 0)
+		var owner *site.Site
+		for _, targetID := range record.Targets {
+			target := targets[targetID]
+			page := target.Page
+			switch page.WPType {
+			case pagemap.WPProductCategory:
+				findings = append(findings, pageFinding(content.SeverityError, CodeProductCategoryUnwritable, page,
+					page.Path+" is a product category, whose description the companion plugin does not write; "+
+						"write it in WooCommerce"))
+				continue
+			case pagemap.WPProduct:
+			default:
+				if target.Spec.Product != nil {
+					findings = append(findings, pageFinding(content.SeverityWarn, CodeProductOutputsIgnored, page,
+						"the template of "+page.Path+" declares product outputs and "+page.Path+" is a "+
+							string(page.WPType)+", so they are not written"))
+				}
+				continue
+			}
+
+			if owner == nil {
+				held, err := deps.Sites.Get(ctx, record.SiteID)
+				if err != nil {
+					return nil, err
+				}
+				owner = &held
+			}
+			findings = append(findings, productFindings(*owner, record, target)...)
+		}
+		return findings, nil
+	}
+}
+
+func productFindings(owner site.Site, record run.Run, target run.Target) []run.EstimateFinding {
+	page := target.Page
+	found := make([]run.EstimateFinding, 0, 2)
+	switch owner.Commerce {
+	case site.CommerceUnknown:
+		found = append(found, pageFinding(content.SeverityError, CodeCommerceUnknown, page,
+			page.Path+" is a product, and "+owner.Name+" has not been checked for a store yet; "+
+				"open it on the Sites screen and press Recheck, or sync the site"))
+	case site.CommerceAbsent:
+		found = append(found, pageFinding(content.SeverityError, CodeCommerceAbsent, page,
+			page.Path+" is a product, and "+owner.Name+" answers no WooCommerce store, so there is nothing to write it to; "+
+				"activate WooCommerce and recheck the site, or change the row's type to page"))
+	case site.CommerceForbidden:
+		found = append(found, pageFinding(content.SeverityError, CodeCommerceForbidden, page,
+			page.Path+" is a product, and the WordPress user "+owner.Username+" may not edit products on "+owner.Name+
+				"; use the application password of an administrator or a shop manager and recheck the site"))
+	case site.CommerceReady:
+	}
+	if !owner.Plugin.Installed || !slices.Contains(owner.Plugin.Capabilities, wp.CapabilityRaw) {
+		found = append(found, pageFinding(content.SeverityError, CodeProductNeedsPlugin, page,
+			page.Path+" is a product, and its description is written through the Postulator companion plugin, "+
+				"which "+owner.Name+" does not carry; install the plugin and recheck the site"))
+	}
+	if page.WPID == nil {
+		found = append(found, pageFinding(content.SeverityError, CodeProductNotInStore, page, page.Path+" "+notInStore))
+	}
+	if record.PublishMode != run.PublishLive {
+		found = append(found, pageFinding(content.SeverityError, CodeProductEditedLive, page,
+			page.Path+" is a product, which has no draft copy, so its text goes live the moment it is written; "+
+				"start the run in live mode"))
+	}
+	if target.Spec.Product == nil {
+		found = append(found, pageFinding(content.SeverityWarn, CodeProductOutputsMissing, page,
+			"the template of "+page.Path+" declares no product outputs, so the product gets its description and nothing else"))
+	}
+	return found
 }
 
 func pluginPreflight(deps Deps, step, consequence string) run.Preflight {

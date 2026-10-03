@@ -30,6 +30,35 @@ func bodyOf(t *testing.T, doc *content.Document) string {
 	return body
 }
 
+func TestRenderWithoutHeadingOneDropsOnlyTheOpeningH1(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		body string
+		want string
+	}{
+		{name: "an opening h1", body: "<h1>Name</h1><h2>About</h2><p>Text.</p>", want: "<h2>About</h2><p>Text.</p>"},
+		{name: "no h1", body: "<h2>About</h2><p>Text.</p>", want: "<h2>About</h2><p>Text.</p>"},
+		{name: "an h1 further down", body: "<p>Lead.</p><h1>Late</h1>", want: "<p>Lead.</p><h1>Late</h1>"},
+		{name: "an empty body", body: "", want: ""},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := mustParse(t, tc.body).RenderWithoutHeadingOne()
+			if err != nil {
+				t.Fatalf("RenderWithoutHeadingOne: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("rendered %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestDocumentReadsItsShape(t *testing.T) {
 	t.Parallel()
 

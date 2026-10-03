@@ -17,6 +17,7 @@ const (
 	CodePluginOutdated    = "plugin_outdated"
 	CapabilityPreview     = "preview"
 	CapabilitySEOMetaRead = "seo_meta_read"
+	CapabilityRaw         = "raw"
 
 	FieldSEOTitle         = "title"
 	FieldSEODescription   = "description"

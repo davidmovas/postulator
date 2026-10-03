@@ -224,6 +224,43 @@ func TestSendingAttributesReplacesTheWholeList(t *testing.T) {
 	}
 }
 
+func TestSavingAProductPostFiltersTheDescriptionForAUserWithoutUnfilteredHTML(t *testing.T) {
+	t.Parallel()
+
+	const stored = "<p>one<br/>two</p>"
+	cases := []struct {
+		name    string
+		options []wptest.Option
+		body    string
+		want    string
+	}{
+		{name: "a short description saved by an administrator", body: `{"short_description":"<p>s</p>"}`, want: stored},
+		{
+			name: "a short description saved by a shop manager", options: []wptest.Option{wptest.WithFilteredHTML()},
+			body: `{"short_description":"<p>s</p>"}`, want: "<p>one<br />two</p>",
+		},
+		{
+			name: "attributes saved by a shop manager", options: []wptest.Option{wptest.WithFilteredHTML()},
+			body: `{"attributes":[{"name":"Form","options":["Liquid"]}]}`, want: stored,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := wptest.New(t, tc.options...)
+			product := server.Seed(wptest.Item{Type: wptest.TypeProduct, Title: "Powder", Content: stored})[0]
+
+			call(t, server, http.MethodPost, "/wp-json/wc/v3/products/"+itoa(product.ID), []byte(tc.body), true)
+
+			if held, _ := server.Lookup(product.ID); held.Content != tc.want {
+				t.Errorf("description = %q, want %q", held.Content, tc.want)
+			}
+		})
+	}
+}
+
 func TestTheNameIsFilteredOnTheWayIn(t *testing.T) {
 	t.Parallel()
 

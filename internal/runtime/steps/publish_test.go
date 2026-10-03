@@ -286,8 +286,8 @@ func TestPublishReportsWhatItCannotDo(t *testing.T) {
 			want: errors.Invalid,
 		},
 		{
-			name: "a product is not written here",
-			with: func(sc *run.StepContext) { sc.Page.WPType = pagemap.WPProduct },
+			name: "a product category is not written here",
+			with: func(sc *run.StepContext) { sc.Page.WPType = pagemap.WPProductCategory },
 			want: errors.Invalid,
 		},
 		{

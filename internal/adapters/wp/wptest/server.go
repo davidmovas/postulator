@@ -66,6 +66,7 @@ type Server struct {
 	noPlugin      bool
 	noCommerce    bool
 	noProductEdit bool
+	filteredHTML  bool
 	brokenHash    bool
 	brokenExpiry  bool
 	noNamespaces  bool
@@ -95,6 +96,10 @@ func WithoutCommerce() Option {
 
 func WithoutProductEdit() Option {
 	return func(s *Server) { s.noProductEdit = true }
+}
+
+func WithFilteredHTML() Option {
+	return func(s *Server) { s.filteredHTML = true }
 }
 
 func WithCapabilities(names ...string) Option {

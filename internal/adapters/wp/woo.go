@@ -214,9 +214,9 @@ func (c *Client) Commerce(ctx context.Context) (Commerce, error) {
 	})
 	switch {
 	case err == nil:
-	case detailString(err, "code") == "rest_no_route":
+	case StoreAbsent(err):
 		return CommerceAbsent, nil
-	case forbidden(err):
+	case StoreForbidden(err):
 		return CommerceForbidden, nil
 	default:
 		return "", err
@@ -258,7 +258,11 @@ func (c *Client) CommerceOr(ctx context.Context, known Commerce) (Commerce, erro
 	}
 }
 
-func forbidden(err error) bool {
+func StoreAbsent(err error) bool {
+	return errors.IsCode(err, errors.NotFound) && detailString(err, "code") == "rest_no_route"
+}
+
+func StoreForbidden(err error) bool {
 	status, ok := detailValue(err, "status")
-	return ok && status == http.StatusForbidden
+	return errors.IsCode(err, errors.Unauthorized) && ok && status == http.StatusForbidden
 }

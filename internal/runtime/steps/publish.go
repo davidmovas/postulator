@@ -31,6 +31,7 @@ var editableStatuses = []string{"publish", "future", "draft", "pending", "privat
 
 type PublishResult struct {
 	PreviousMeta        *wp.SEOMeta        `json:"previousMeta,omitempty"`
+	PreviousProduct     *ProductSnapshot   `json:"previousProduct,omitempty"`
 	URL                 string             `json:"url"`
 	Status              string             `json:"status"`
 	ContentHash         string             `json:"contentHash"`
@@ -47,7 +48,7 @@ type PublishResult struct {
 func Publish(deps Deps) run.StepDef {
 	return run.StepDef{
 		Name:      NamePublish,
-		Preflight: pluginPreflight(deps, NamePublish, "writes no SEO meta"),
+		Preflight: preflights(pluginPreflight(deps, NamePublish, "writes no SEO meta"), storePreflight(deps)),
 		Requires:  []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML},
 		Produces:  []run.ArtifactKind{run.ArtifactPublishResult},
 		Retry:     run.RetryPolicy{Max: 3},
@@ -60,6 +61,9 @@ func Publish(deps Deps) run.StepDef {
 			draft, err := draftOf(sc)
 			if err != nil {
 				return run.Result{}, err
+			}
+			if sc.Page.WPType == pagemap.WPProduct {
+				return publishProduct(ctx, deps, sc, body.Blob, draft)
 			}
 			itemType, err := itemTypeOf(sc.Page)
 			if err != nil {
@@ -236,7 +240,7 @@ func itemTypeOf(page pagemap.Page) (wp.ItemType, error) {
 	case pagemap.WPPost:
 		return wp.TypePost, nil
 	default:
-		return "", errors.New(errors.Invalid, "only pages and posts are written by the publish step").
+		return "", errors.New(errors.Invalid, "only pages, posts and products are written by the publish step").
 			WithDetail("wpType", string(page.WPType)).WithDetail("pageId", page.ID)
 	}
 }

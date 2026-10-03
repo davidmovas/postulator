@@ -132,6 +132,9 @@ func (s *Server) handleProductUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if s.filteredHTML && resavesPost(body) {
+		stored.Content = kses(stored.Content)
+	}
 	if value, present := body["name"].(string); present {
 		stored.Title = kses(value)
 	}
@@ -199,6 +202,15 @@ func rendered(value string, edit bool) string {
 		return value
 	}
 	return value + "\n"
+}
+
+func resavesPost(body map[string]any) bool {
+	for _, field := range []string{"name", "description", "short_description", "status", "slug"} {
+		if _, present := body[field]; present {
+			return true
+		}
+	}
+	return false
 }
 
 func kses(value string) string {
