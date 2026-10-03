@@ -45,7 +45,7 @@ type PublishResult struct {
 func Publish(deps Deps) run.StepDef {
 	return run.StepDef{
 		Name:      NamePublish,
-		Preflight: preflights(pluginPreflight(deps, NamePublish, "writes no SEO meta"), storePreflight(deps)),
+		Preflight: preflights(pluginPreflight(deps, NamePublish, "writes no SEO meta"), storePreflight(deps), categoryPreflight(deps)),
 		Requires:  []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML},
 		Produces:  []run.ArtifactKind{run.ArtifactPublishResult},
 		Retry:     run.RetryPolicy{Max: 3},

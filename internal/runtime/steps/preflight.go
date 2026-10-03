@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/domain/content"
@@ -210,6 +211,45 @@ func productFindings(owner site.Site, record run.Run, target run.Target) []run.E
 			"the template of "+page.Path+" declares no product outputs, so the product gets its description and nothing else"))
 	}
 	return found
+}
+
+func categoryPreflight(deps Deps) run.Preflight {
+	return func(ctx context.Context, record run.Run, targets map[string]run.Target) ([]run.EstimateFinding, error) {
+		findings := make([]run.EstimateFinding, 0)
+		pages := make([]pagemap.Page, 0, len(record.Targets))
+		for _, targetID := range record.Targets {
+			page := targets[targetID].Page
+			if page.WPType == pagemap.WPPage && page.EntityID != nil && *page.EntityID != "" {
+				pages = append(pages, page)
+			}
+		}
+		if len(pages) == 0 {
+			return findings, nil
+		}
+
+		owner, err := deps.Sites.Get(ctx, record.SiteID)
+		if err != nil {
+			return nil, err
+		}
+		if owner.Plugin.Installed && slices.Contains(owner.Plugin.Capabilities, wp.CapabilityPageCategories) {
+			return findings, nil
+		}
+		entities, err := deps.Entities.ListBySite(ctx, record.SiteID)
+		if err != nil {
+			return nil, err
+		}
+		for i := range pages {
+			chain := graph.CategoryChain(entities, *pages[i].EntityID)
+			if len(chain) == 0 {
+				continue
+			}
+			findings = append(findings, pageFinding(content.SeverityWarn, CodePageCategoriesNeedPlugin, pages[i],
+				pages[i].Path+" is filed under "+strings.Join(chainNames(chain), chainSeparator)+", and WordPress pages "+
+					"carry categories only through the Postulator companion plugin "+pageCategoriesPlugin+", which "+
+					owner.Name+" does not carry; update the plugin and sync the site, or the page goes up without them"))
+		}
+		return findings, nil
+	}
 }
 
 func pluginPreflight(deps Deps, step, consequence string) run.Preflight {

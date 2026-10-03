@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/images"
+	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
@@ -262,6 +263,76 @@ func TestGenerateImagesPreflightWarnsWhenTheSourceIsNotConfigured(t *testing.T) 
 			for _, finding := range findings {
 				if finding.Severity != content.SeverityWarn || finding.Path != page.Path {
 					t.Fatalf("finding = %+v, want a warning naming the page", finding)
+				}
+			}
+		})
+	}
+}
+
+func TestPublishPreflightWarnsOfAPageWhoseCategoriesNeedThePlugin(t *testing.T) {
+	t.Parallel()
+
+	page := pagemap.Page{ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", WPType: pagemap.WPPage, EntityID: pointer("child")}
+	post := page
+	post.WPType = pagemap.WPPost
+	unmapped := page
+	unmapped.EntityID = nil
+	plugin := func(names ...string) site.PluginState {
+		return site.PluginState{Installed: true, Version: "1.2.0", Capabilities: names}
+	}
+
+	cases := []struct {
+		name     string
+		page     pagemap.Page
+		plugin   site.PluginState
+		entities []graph.Entity
+		warned   bool
+	}{
+		{name: "a page under a plugin older than page categories", page: page, plugin: plugin(wp.CapabilityRaw), entities: filedEntities(), warned: true},
+		{name: "a page on a site without the plugin", page: page, plugin: site.PluginState{}, entities: filedEntities(), warned: true},
+		{name: "a page under a plugin that files pages", page: page, plugin: plugin(wp.CapabilityRaw, wp.CapabilityPageCategories), entities: filedEntities()},
+		{name: "a post", page: post, plugin: plugin(wp.CapabilityRaw), entities: filedEntities()},
+		{name: "a page with no categories", page: page, plugin: plugin(wp.CapabilityRaw), entities: unitEntities()},
+		{name: "a page mapped to no entity", page: unmapped, plugin: plugin(wp.CapabilityRaw), entities: filedEntities()},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			owner := storeSite()
+			owner.Plugin = tc.plugin
+			deps := unitDeps()
+			deps.Sites = siteStub{record: owner}
+			deps.Entities = entityList{items: tc.entities}
+			record, targets := preflightRun(run.GenerateRecipe(), tc.page)
+
+			findings, err := steps.Publish(deps).Preflight(t.Context(), record, targets)
+			if err != nil {
+				t.Fatalf("Preflight: %v", err)
+			}
+			warned := make([]run.EstimateFinding, 0)
+			for _, finding := range findings {
+				if finding.Code == steps.CodePageCategoriesNeedPlugin {
+					warned = append(warned, finding)
+				}
+			}
+			if !tc.warned {
+				if len(warned) != 0 {
+					t.Fatalf("findings = %+v, want no word of page categories", warned)
+				}
+				return
+			}
+			if len(warned) != 1 {
+				t.Fatalf("findings = %+v, want one %s", findings, steps.CodePageCategoriesNeedPlugin)
+			}
+			said := warned[0]
+			if said.Severity != content.SeverityWarn || said.PageID != page.ID || said.Path != page.Path {
+				t.Errorf("finding = %+v, want a warning naming the page", said)
+			}
+			for _, part := range []string{"Drinks › Coffee", "1.3.0", "sync"} {
+				if !strings.Contains(said.Message, part) {
+					t.Errorf("message = %q, want it to say %q", said.Message, part)
 				}
 			}
 		})
