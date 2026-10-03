@@ -86,6 +86,73 @@ func TestEveryEmbeddedModelPricesACacheRead(t *testing.T) {
 	}
 }
 
+func TestTheOpenAIModelsPriceTheFlexTierAndTheCacheWrite(t *testing.T) {
+	t.Parallel()
+
+	built, _ := newCatalog(t)
+	cases := []struct {
+		model  string
+		input  float64
+		write  float64
+		flexIn float64
+		cached float64
+		flexWr float64
+		flexOt float64
+	}{
+		{model: "gpt-5.6-sol", input: 4.00, write: 5.00, flexIn: 2.00, cached: 0.20, flexWr: 2.50, flexOt: 10.00},
+		{model: "gpt-5.6-terra", input: 2.00, write: 2.50, flexIn: 1.00, cached: 0.10, flexWr: 1.25, flexOt: 6.00},
+		{model: "gpt-5.6-luna", input: 0.20, write: 0.25, flexIn: 0.10, cached: 0.01, flexWr: 0.125, flexOt: 0.60},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.model, func(t *testing.T) {
+			t.Parallel()
+
+			info, err := built.Lookup(t.Context(), llm.ModelRef{Provider: "openai", Model: tc.model})
+			if err != nil {
+				t.Fatalf("Lookup: %v", err)
+			}
+			if !info.OffersFlex() {
+				t.Fatalf("%s offers no flex tier", tc.model)
+			}
+			if info.InputUSDPerM != tc.input || info.CacheWriteUSDPerM != tc.write {
+				t.Errorf("%s prices input %v and a cache write %v, want %v and %v",
+					tc.model, info.InputUSDPerM, info.CacheWriteUSDPerM, tc.input, tc.write)
+			}
+			if info.FlexInputUSDPerM != tc.flexIn || info.FlexCachedInputUSDPerM != tc.cached ||
+				info.FlexCacheWriteUSDPerM != tc.flexWr || info.FlexOutputUSDPerM != tc.flexOt {
+				t.Errorf("%s prices flex at %v / %v / %v / %v, want %v / %v / %v / %v", tc.model,
+					info.FlexInputUSDPerM, info.FlexCachedInputUSDPerM, info.FlexCacheWriteUSDPerM, info.FlexOutputUSDPerM,
+					tc.flexIn, tc.cached, tc.flexWr, tc.flexOt)
+			}
+			if info.FlexInputUSDPerM*2 != info.InputUSDPerM || info.FlexOutputUSDPerM*2 != info.OutputUSDPerM {
+				t.Errorf("%s does not price flex at half the standard tier", tc.model)
+			}
+		})
+	}
+}
+
+func TestEveryEmbeddedCacheWriteCostsAQuarterMoreThanAFreshToken(t *testing.T) {
+	t.Parallel()
+
+	built, _ := newCatalog(t)
+	models, err := built.List(t.Context())
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	for _, info := range models {
+		if info.CacheWriteUSDPerM == 0 {
+			continue
+		}
+		if want := info.InputUSDPerM * 1.25; info.CacheWriteUSDPerM != want {
+			t.Errorf("%s prices a cache write at %v, want %v", info.Ref, info.CacheWriteUSDPerM, want)
+		}
+		if info.OffersFlex() && info.FlexCacheWriteUSDPerM != info.FlexInputUSDPerM*1.25 {
+			t.Errorf("%s prices a flex cache write at %v, want %v", info.Ref, info.FlexCacheWriteUSDPerM, info.FlexInputUSDPerM*1.25)
+		}
+	}
+}
+
 func TestDefaults(t *testing.T) {
 	t.Parallel()
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"maps"
 	"slices"
 	"strings"
 
@@ -36,11 +37,12 @@ func New(store overrideStore) (*Catalog, error) {
 	}
 
 	base := make(map[string]llm.ModelInfo, len(parsed.Models))
-	for _, info := range parsed.Models {
+	for i := range parsed.Models {
+		info := &parsed.Models[i]
 		if err := info.Validate(); err != nil {
 			return nil, err
 		}
-		base[info.Ref.String()] = info
+		base[info.Ref.String()] = *info
 	}
 
 	for role, ref := range parsed.Defaults {
@@ -63,10 +65,7 @@ func (c *Catalog) resolved(ctx context.Context) (map[string]llm.ModelInfo, error
 		return nil, err
 	}
 
-	merged := make(map[string]llm.ModelInfo, len(c.base)+len(overrides))
-	for key, info := range c.base {
-		merged[key] = info
-	}
+	merged := maps.Clone(c.base)
 	for i := range overrides {
 		override := &overrides[i]
 		key := override.Info.Ref.String()
@@ -99,10 +98,7 @@ func (c *Catalog) List(ctx context.Context) ([]llm.ModelInfo, error) {
 		return nil, err
 	}
 
-	out := make([]llm.ModelInfo, 0, len(models))
-	for _, info := range models {
-		out = append(out, info)
-	}
+	out := slices.Collect(maps.Values(models))
 	slices.SortFunc(out, func(a, b llm.ModelInfo) int {
 		if provider := strings.Compare(a.Ref.Provider, b.Ref.Provider); provider != 0 {
 			return provider
