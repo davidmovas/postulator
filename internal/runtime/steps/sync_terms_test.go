@@ -2,12 +2,15 @@ package steps_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/run"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
@@ -123,6 +126,41 @@ func TestSyncSiteAsksForNoTermsWhenTheGraphFilesNothing(t *testing.T) {
 	}
 	if held := termsKeptBy(t, h); len(held) != 0 {
 		t.Errorf("the sync keeps %+v", held)
+	}
+}
+
+func TestSyncSiteNamesTheStoreItWasNotGiven(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		missing func(*steps.Deps)
+		says    string
+	}{
+		{name: "no term store", missing: func(deps *steps.Deps) { deps.Terms = nil }, says: "term store"},
+		{name: "no entity reader", missing: func(deps *steps.Deps) { deps.Entities = nil }, says: "entity reader"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := newSyncHarness(t, 0)
+			seedSite(t, h)
+			tc.missing(&h.deps)
+
+			sc := &run.StepContext{
+				Run:       run.Run{ID: "run", SiteID: h.siteID, Kind: run.KindSync},
+				Item:      run.Item{ID: "item", RunID: "run", SiteID: h.siteID, TargetID: h.siteID},
+				Params:    map[string]any{},
+				Artifacts: map[run.ArtifactKind]run.Artifact{},
+				Check:     run.NewCheckpoint(),
+			}
+			_, err := steps.SyncSite(h.deps).Run(t.Context(), sc)
+			if !errors.IsCode(err, errors.Internal) || !strings.Contains(err.Error(), tc.says) {
+				t.Fatalf("SyncSite = %v, want an error naming the missing %s", err, tc.says)
+			}
+		})
 	}
 }
 

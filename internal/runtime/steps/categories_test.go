@@ -171,12 +171,31 @@ func behind(t *testing.T, server *wptest.Server, handle func(http.ResponseWriter
 
 func failWith(t *testing.T, w http.ResponseWriter, status int) {
 	t.Helper()
+	refuseWith(t, w, status, "internal_server_error", "the relay failed the request")
+}
 
+func refuseWith(t *testing.T, w http.ResponseWriter, status int, code, message string) {
+	t.Helper()
+
+	body, err := json.Marshal(map[string]any{"code": code, "message": message, "data": map[string]any{"status": status}})
+	if err != nil {
+		t.Errorf("encode the relayed refusal: %v", err)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	if _, err := w.Write([]byte(`{"code":"internal_server_error","message":"the relay failed the request"}`)); err != nil {
+	if _, err = w.Write(body); err != nil {
 		t.Errorf("answer the relayed request: %v", err)
 	}
+}
+
+type failingTerms struct {
+	*termMemory
+	err error
+}
+
+func (f failingTerms) Upsert(context.Context, graph.Term) error {
+	return f.err
 }
 
 func withoutCategories(t *testing.T, r *http.Request) {
@@ -520,6 +539,106 @@ func TestPublishSaysSoWhenTheSiteDropsTheCategories(t *testing.T) {
 	}
 	if got := categoryFindings(published.Findings); !slices.Equal(got, []string{steps.CodeCategoriesNotTaken}) {
 		t.Errorf("findings = %v, want %s", got, steps.CodeCategoriesNotTaken)
+	}
+}
+
+func TestPublishWritesAPageWordPressWillNotFileAndSaysWhy(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		code    string
+		message string
+		status  int
+	}{
+		{name: "a name WordPress rejects", status: http.StatusBadRequest, code: "rest_invalid_param", message: "Invalid parameter(s): name"},
+		{name: "a name that sanitizes to nothing", status: http.StatusInternalServerError, code: "empty_term_name", message: "A name is required for this term."},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps, server := imageDeps(t)
+			terms := filed(&deps)
+			deps.WordPress = oneClient{client: behind(t, server, func(w http.ResponseWriter, r *http.Request, forward http.Handler) {
+				if r.Method == http.MethodPost && r.URL.Path == "/wp-json/wp/v2/categories" {
+					refuseWith(t, w, tc.status, tc.code, tc.message)
+					return
+				}
+				forward.ServeHTTP(w, r)
+			})}
+
+			published := runPublish(t, deps, publishContext(t))
+			if published.WPID == 0 || published.Categories != nil {
+				t.Fatalf("publish = %+v, want the page written without categories", published)
+			}
+			if got := categoryFindings(published.Findings); !slices.Equal(got, []string{steps.CodeCategoryRefused}) {
+				t.Fatalf("findings = %v, want %s", got, steps.CodeCategoryRefused)
+			}
+			for i := range published.Findings {
+				if published.Findings[i].Code == steps.CodeCategoryRefused && !strings.Contains(published.Findings[i].Message, tc.message) {
+					t.Errorf("the finding reads %q, want WordPress's own words %q", published.Findings[i].Message, tc.message)
+				}
+			}
+			if held, err := terms.ListBySite(t.Context(), "site"); err != nil || len(held) != 0 {
+				t.Errorf("the refused walk kept %+v (%v)", held, err)
+			}
+		})
+	}
+}
+
+func TestPublishNamesATermStoreItWasNotGiven(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		filed bool
+	}{
+		{name: "a page with categories", filed: true},
+		{name: "a page with none"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps, server := imageDeps(t)
+			if tc.filed {
+				filed(&deps)
+			}
+			deps.Terms = nil
+
+			_, err := steps.Publish(deps).Run(t.Context(), publishContext(t))
+			if !tc.filed {
+				if err != nil || len(server.Items()) != 1 {
+					t.Fatalf("Publish = %v over %+v, want a page that needs no term store written", err, server.Items())
+				}
+				return
+			}
+			if !errors.IsCode(err, errors.Internal) || !strings.Contains(err.Error(), "term store") {
+				t.Fatalf("Publish = %v, want an error naming the missing term store", err)
+			}
+			if len(server.Items()) != 0 || len(server.Categories()) != 0 {
+				t.Errorf("the site holds %+v and %+v, want nothing written", server.Items(), server.Categories())
+			}
+		})
+	}
+}
+
+func TestPublishStopsWhenItCannotKeepATerm(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	terms := filed(&deps)
+	deps.Terms = failingTerms{termMemory: terms, err: errors.New(errors.Invalid, "the term row was refused")}
+
+	_, err := steps.Publish(deps).Run(t.Context(), publishContext(t))
+	if !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("Publish = %v, want the store's refusal handed back rather than told as WordPress's", err)
+	}
+	if len(server.Items()) != 0 {
+		t.Errorf("the site holds %+v, want nothing written past a term the run could not keep", server.Items())
 	}
 }
 

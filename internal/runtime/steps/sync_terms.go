@@ -18,6 +18,9 @@ const (
 )
 
 func adoptTerms(ctx context.Context, deps Deps, client *wp.Client, siteID string, state *SiteSyncResult) error {
+	if err := deps.categoryStores(); err != nil {
+		return err
+	}
 	owner, err := deps.Sites.Get(ctx, siteID)
 	if err != nil {
 		return err

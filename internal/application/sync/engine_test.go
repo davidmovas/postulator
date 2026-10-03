@@ -97,6 +97,7 @@ func TestSyncSiteCompletesThroughTheEngine(t *testing.T) {
 
 	registry := run.NewRegistry()
 	if regErr := registry.Register(steps.SyncSite(steps.Deps{
+		Entities: sqlite.NewEntityRepo(store), Terms: sqlite.NewTermRepo(store),
 		Pages: pageRepo, Links: sqlite.NewPageLinkRepo(store), Sites: siteRepo, SiteWriter: siteRepo,
 		WordPress: oneClient{client: client}, UnitOfWork: store, Publisher: silentBus{},
 		Clock: clock.System{}, BatchSize: 1,

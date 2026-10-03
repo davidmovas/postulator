@@ -74,6 +74,9 @@ func ensureCategories(ctx context.Context, deps Deps, client *wp.Client, sc *run
 	if !carried || sc.Page.EntityID == nil || *sc.Page.EntityID == "" {
 		return categoryPlan{}, nil
 	}
+	if readerErr := deps.entityReader(); readerErr != nil {
+		return categoryPlan{}, readerErr
+	}
 	entities, err := deps.Entities.ListBySite(ctx, sc.Run.SiteID)
 	if err != nil {
 		return categoryPlan{}, err
@@ -93,12 +96,15 @@ func ensureCategories(ctx context.Context, deps Deps, client *wp.Client, sc *run
 		}
 	}
 
-	walk := termWalk{deps: deps, client: client, sc: sc, taxonomy: taxonomy}
-	terms, err := walk.resolve(ctx, chain)
-	if err != nil {
-		if refused, said := categoryRefusal(sc.Page, taxonomy, chain, err); said {
-			return categoryPlan{findings: []content.Finding{refused}}, nil
-		}
+	if storeErr := deps.termStore(); storeErr != nil {
+		return categoryPlan{}, storeErr
+	}
+	walk := termWalk{deps: deps, client: client, sc: sc, chain: chain, taxonomy: taxonomy}
+	terms, err := walk.resolve(ctx)
+	switch {
+	case walk.refused != nil:
+		return categoryPlan{findings: []content.Finding{*walk.refused}}, nil
+	case err != nil:
 		return categoryPlan{}, err
 	}
 	return planOf(taxonomy, terms, previous, creating), nil
@@ -120,25 +126,27 @@ type termWalk struct {
 	deps     Deps
 	client   *wp.Client
 	sc       *run.StepContext
+	refused  *content.Finding
 	stored   map[string]graph.Term
 	live     map[int64]wp.Term
+	chain    []graph.Entity
 	taxonomy graph.Taxonomy
 }
 
-func (w *termWalk) resolve(ctx context.Context, chain []graph.Entity) ([]AssignedTerm, error) {
+func (w *termWalk) resolve(ctx context.Context) ([]AssignedTerm, error) {
 	stored, err := storedTerms(ctx, w.deps, w.sc.Run.SiteID, w.taxonomy)
 	if err != nil {
 		return nil, err
 	}
 	w.stored = stored
-	if w.live, err = w.liveTerms(ctx, chain); err != nil {
+	if w.live, err = w.liveTerms(ctx); err != nil {
 		return nil, err
 	}
 
-	assigned := make([]AssignedTerm, 0, len(chain))
+	assigned := make([]AssignedTerm, 0, len(w.chain))
 	parent := int64(0)
-	for i := range chain {
-		level, levelErr := w.level(ctx, chain[i], parent)
+	for i := range w.chain {
+		level, levelErr := w.level(ctx, w.chain[i], parent)
 		if levelErr != nil {
 			return nil, levelErr
 		}
@@ -146,6 +154,13 @@ func (w *termWalk) resolve(ctx context.Context, chain []graph.Entity) ([]Assigne
 		parent = level.TermID
 	}
 	return assigned, nil
+}
+
+func (w *termWalk) answered(err error) error {
+	if refused, said := categoryRefusal(w.sc.Page, w.taxonomy, w.chain, err); said {
+		w.refused = &refused
+	}
+	return err
 }
 
 func storedTerms(ctx context.Context, deps Deps, siteID string, taxonomy graph.Taxonomy) (map[string]graph.Term, error) {
@@ -162,10 +177,10 @@ func storedTerms(ctx context.Context, deps Deps, siteID string, taxonomy graph.T
 	return stored, nil
 }
 
-func (w *termWalk) liveTerms(ctx context.Context, chain []graph.Entity) (map[int64]wp.Term, error) {
-	ids := make([]int64, 0, len(chain))
-	for i := range chain {
-		if held, known := w.stored[chain[i].ID]; known && !slices.Contains(ids, held.TermID) {
+func (w *termWalk) liveTerms(ctx context.Context) (map[int64]wp.Term, error) {
+	ids := make([]int64, 0, len(w.chain))
+	for i := range w.chain {
+		if held, known := w.stored[w.chain[i].ID]; known && !slices.Contains(ids, held.TermID) {
 			ids = append(ids, held.TermID)
 		}
 	}
@@ -176,7 +191,7 @@ func (w *termWalk) liveTerms(ctx context.Context, chain []graph.Entity) (map[int
 
 	listed, err := w.client.ListTerms(ctx, wp.Taxonomy(w.taxonomy), wp.TermQuery{Include: ids, Page: 1, PerPage: len(ids)})
 	if err != nil {
-		return nil, err
+		return nil, w.answered(err)
 	}
 	for _, term := range listed.Items {
 		live[term.ID] = term
@@ -195,7 +210,7 @@ func (w *termWalk) level(ctx context.Context, entity graph.Entity, parent int64)
 
 	term, created, err := w.client.EnsureTerm(ctx, wp.Taxonomy(w.taxonomy), entity.Name, parent)
 	if err != nil {
-		return AssignedTerm{}, err
+		return AssignedTerm{}, w.answered(err)
 	}
 	created = created || (known && held.TermID == term.ID && held.RunID == w.sc.Run.ID)
 	runID := ""

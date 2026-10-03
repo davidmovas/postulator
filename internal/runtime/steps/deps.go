@@ -17,6 +17,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 type entityReader interface {
@@ -119,6 +120,27 @@ func (d Deps) now() time.Time {
 		return time.Time{}
 	}
 	return d.Clock.Now().UTC().Truncate(time.Second)
+}
+
+func (d Deps) categoryStores() error {
+	if err := d.entityReader(); err != nil {
+		return err
+	}
+	return d.termStore()
+}
+
+func (d Deps) entityReader() error {
+	if d.Entities == nil {
+		return errors.New(errors.Internal, "the run steps were given no entity reader, so no category chain can be read")
+	}
+	return nil
+}
+
+func (d Deps) termStore() error {
+	if d.Terms == nil {
+		return errors.New(errors.Internal, "the run steps were given no term store, so no category can be kept")
+	}
+	return nil
 }
 
 func (d Deps) inUnit(ctx context.Context, apply func(context.Context) error) error {
