@@ -50,3 +50,7 @@ func Register(registry *run.Registry, deps Deps) error {
 func stopped(ctx context.Context) bool {
 	return stderrors.Is(ctx.Err(), context.Canceled)
 }
+
+func needsHuman(message string) run.Result {
+	return run.Result{Next: run.TransitionPause, Reason: run.PauseNeedsHuman, Message: message}
+}

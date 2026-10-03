@@ -117,12 +117,7 @@ func livePages(ctx context.Context, deps Deps, sc *run.StepContext) (map[string]
 	if err != nil {
 		return nil, err
 	}
-	live := make(map[string]bool, len(pages)+len(sc.Run.Targets))
-	for i := range pages {
-		if pages[i].WPID != nil {
-			live[pages[i].ID] = true
-		}
-	}
+	live := onTheSite(pages)
 	for _, target := range sc.Run.Targets {
 		live[target] = true
 	}

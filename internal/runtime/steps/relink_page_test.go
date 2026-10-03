@@ -359,6 +359,66 @@ func TestRelinkPageStandsDownWithoutThePlugin(t *testing.T) {
 	}
 }
 
+func TestBothRelinksStandDownOnABodyTheyCannotRead(t *testing.T) {
+	t.Parallel()
+
+	const elsewhere = 1000
+
+	cases := []struct {
+		name     string
+		opts     []wptest.Option
+		gone     bool
+		neighbor string
+		page     string
+	}{
+		{
+			name: "without the plugin", opts: []wptest.Option{wptest.WithoutPlugin()},
+			neighbor: steps.ReasonNoPlugin, page: steps.ReasonNoPlugin,
+		},
+		{
+			name: "gone from the site", gone: true,
+			neighbor: steps.ReasonNeighborGone, page: steps.ReasonPageGone,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name+", the neighbors", func(t *testing.T) {
+			t.Parallel()
+
+			deps, server, _, wpID := relinkDeps(t, parentBody, tc.opts...)
+			if tc.gone {
+				deps.Pages = pageList{items: relinkPages(wpID + elsewhere)}
+			}
+			relinked := runRelink(t, deps)
+			if relinked.Skipped != 1 || len(relinked.Neighbors) != 1 || relinked.Neighbors[0].Detail != tc.neighbor {
+				t.Fatalf("relinked = %+v, want the neighbor skipped for %q", relinked, tc.neighbor)
+			}
+			if stored, ok := server.Lookup(wpID); !ok || stored.Content != parentBody {
+				t.Fatalf("the neighbor was written although its body could not be read: %+v", stored)
+			}
+		})
+		t.Run(tc.name+", the page", func(t *testing.T) {
+			t.Parallel()
+
+			deps, server, _, wpID := relinkPageDeps(t, espressoBody, tc.opts...)
+			target := wpID
+			if tc.gone {
+				target += elsewhere
+			}
+			relinked, _, result := runRelinkPage(t, deps, relinkPageContext(t, deps, target))
+			if relinked.Skipped != 1 || len(relinked.Findings) != 1 || relinked.Findings[0].Details["reason"] != tc.page {
+				t.Fatalf("relinked = %+v, want the page stood down for %q", relinked, tc.page)
+			}
+			if result.Next == run.TransitionPause {
+				t.Fatalf("a body that cannot be read held the item: %s", result.Message)
+			}
+			if stored, ok := server.Lookup(wpID); !ok || stored.Content != espressoBody {
+				t.Fatalf("the page was written although its body could not be read: %+v", stored)
+			}
+		})
+	}
+}
+
 func TestRelinkPageHoldsAPageThatIsNotOnTheSite(t *testing.T) {
 	t.Parallel()
 
