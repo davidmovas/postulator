@@ -49,12 +49,11 @@ const (
 )
 
 type Config struct {
-	DatabasePath  string
-	KeyDir        string
-	Provider      llmport.Client
-	AgentProvider AgentProvider
-	Environment   func(name string) string
-	Open          func(cfg sqlite.Config) (*sqlite.Store, error)
+	DatabasePath string
+	KeyDir       string
+	Provider     llmport.Client
+	Environment  func(name string) string
+	Open         func(cfg sqlite.Config) (*sqlite.Store, error)
 }
 
 func (c Config) environment() func(string) string {

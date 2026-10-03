@@ -1,17 +1,13 @@
 package app
 
 import (
-	"context"
-
-	"github.com/gollem-dev/gollem"
-
 	"github.com/davidmovas/postulator/internal/adapters/images"
 	"github.com/davidmovas/postulator/internal/adapters/images/metered"
 	imageopenai "github.com/davidmovas/postulator/internal/adapters/images/openai"
 	"github.com/davidmovas/postulator/internal/adapters/llm/catalog"
-	"github.com/davidmovas/postulator/internal/adapters/llm/gollemclient"
 	"github.com/davidmovas/postulator/internal/adapters/llm/ledger"
 	"github.com/davidmovas/postulator/internal/adapters/llm/limiter"
+	"github.com/davidmovas/postulator/internal/adapters/llm/openai"
 	"github.com/davidmovas/postulator/internal/adapters/llm/profiles"
 	"github.com/davidmovas/postulator/internal/adapters/llm/recordreplay"
 	"github.com/davidmovas/postulator/internal/adapters/llm/retry"
@@ -21,15 +17,9 @@ import (
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 )
 
-type AgentProvider interface {
-	New(ctx context.Context, ref domainllm.ModelRef) (gollem.LLMClient, error)
-	NewForTools(ctx context.Context, ref domainllm.ModelRef) (gollem.LLMClient, error)
-}
-
 type llmParts struct {
 	catalog    *catalog.Catalog
 	profiles   *profiles.Profiles
-	providers  AgentProvider
 	ledger     *ledger.Ledger
 	tuning     *tuning.Policy
 	client     *tuning.Client
@@ -44,20 +34,18 @@ func (c *Core) buildLLM(stores repos) (llmParts, error) {
 	}
 
 	policy := tuning.NewPolicy(stores.values)
-	providers := c.agentProvider(stores, modelCatalog)
 	book := ledger.New(
-		recordreplay.New(c.provider(stores, providers, modelCatalog), recordreplay.Mode(stores.values),
+		recordreplay.New(c.provider(stores, modelCatalog, policy), recordreplay.Mode(stores.values),
 			recordreplay.DefaultDir, tools.Redact),
 		stores.llmCalls, modelCatalog, c.Events, stores.now,
 	)
 	imageModel := images.OpenAIModel(stores.values)
 
 	return llmParts{
-		catalog:   modelCatalog,
-		profiles:  profiles.New(stores.profiles, stores.sites, modelCatalog, stores.now),
-		providers: providers,
-		ledger:    book,
-		tuning:    policy,
+		catalog:  modelCatalog,
+		profiles: profiles.New(stores.profiles, stores.sites, modelCatalog, stores.now),
+		ledger:   book,
+		tuning:   policy,
 		client: tuning.New(
 			retry.New(limiter.New(book, modelCatalog), retry.Retries(stores.values), retry.DefaultBackoff),
 			policy,
@@ -71,16 +59,13 @@ func (c *Core) buildLLM(stores repos) (llmParts, error) {
 	}, nil
 }
 
-func (c *Core) agentProvider(stores repos, modelCatalog *catalog.Catalog) AgentProvider {
-	if c.cfg.AgentProvider != nil {
-		return c.cfg.AgentProvider
-	}
-	return gollemclient.NewFactory(stores.secrets, modelCatalog, stores.values)
-}
-
-func (c *Core) provider(stores repos, providers AgentProvider, modelCatalog *catalog.Catalog) llmport.Client {
+func (c *Core) provider(stores repos, modelCatalog *catalog.Catalog, policy *tuning.Policy) llmport.Client {
 	if c.cfg.Provider != nil {
 		return c.cfg.Provider
 	}
-	return gollemclient.New(providers, modelCatalog, gollemclient.Timeout(stores.values))
+	return openai.New(stores.secrets, modelCatalog,
+		openai.WithBaseURL(openai.BaseURL(stores.values)),
+		openai.WithTimeout(openai.Timeout(stores.values)),
+		openai.WithFlexPatience(policy.FlexPatience()),
+	)
 }

@@ -260,10 +260,9 @@ func gatedCore(t *testing.T) (*app.Core, *gatedProvider) {
 	home := t.TempDir()
 	provider := newGatedProvider()
 	core := openCore(t, app.Config{
-		DatabasePath:  filepath.Join(home, "postulator.db"),
-		KeyDir:        home,
-		Provider:      provider,
-		AgentProvider: fake.NewGollem(),
+		DatabasePath: filepath.Join(home, "postulator.db"),
+		KeyDir:       home,
+		Provider:     provider,
 	})
 	t.Cleanup(func() {
 		if closeErr := core.Close(); closeErr != nil {

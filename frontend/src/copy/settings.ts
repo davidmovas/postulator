@@ -136,10 +136,6 @@ export const settings = {
             label: "Largest spreadsheet accepted",
             help: "A spreadsheet with more rows than this is refused rather than half read.",
         },
-        "llm.anthropic.baseUrl": {
-            label: "Anthropic endpoint",
-            help: "An http or https address. Empty means Anthropic's own endpoint.",
-        },
         "llm.effort.editor": {
             label: "Reasoning when editing",
             help: "How long the model thinks before it writes a page's search title and description or proposes entities for the graph. Low is usually enough; more costs more.",
@@ -164,21 +160,9 @@ export const settings = {
             label: "Longest wait for a flex answer",
             help: "How long a flex call may go unanswered before it is sent again at the standard price. Takes effect after a restart.",
         },
-        "llm.gemini.location": {
-            label: "Google Cloud region",
-            help: "The Vertex AI region, for example europe-west4.",
-        },
-        "llm.gemini.projectId": {
-            label: "Google Cloud project",
-            help: "The project Vertex AI bills.",
-        },
-        "llm.geminiOpenai.baseUrl": {
-            label: "Gemini endpoint",
-            help: "An http or https address for the OpenAI-compatible Gemini surface.",
-        },
         "llm.openai.baseUrl": {
             label: "OpenAI endpoint",
-            help: "An http or https address. Empty means OpenAI's own endpoint.",
+            help: "An http or https address. Empty means OpenAI's own endpoint. Takes effect after a restart.",
         },
         "llm.recordReplayMode": {
             label: "Record and replay model calls",
@@ -210,7 +194,7 @@ export const settings = {
         },
         "llm.timeout": {
             label: "Time limit for one model call",
-            help: "A model call that takes longer than this is abandoned.",
+            help: "A model call that takes longer than this is abandoned. Takes effect after a restart.",
         },
         "runs.artifactRetentionDays": {
             label: "Keep drafts and images for",
