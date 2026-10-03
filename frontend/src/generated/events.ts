@@ -202,8 +202,11 @@ export interface LLMUsagePayload {
     itemId: string;
     provider: string;
     model: string;
+    tier: string;
     promptTokens: number;
     completionTokens: number;
+    reasoningTokens: number;
+    cacheWriteTokens: number;
     usd: number;
 }
 
