@@ -2,10 +2,10 @@ import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
+import { formErrorOf } from "../../../data/errors.js";
 import { useSetAnchors } from "../../../data/hooks/graph.js";
 import type { Anchor, Entity } from "../../../data/types.js";
 import { Button, CloseIcon, IconButton, Input, StatusBadge } from "../../../ui/index.js";
-import { formErrorOf } from "./fields.js";
 
 function same(left: readonly Anchor[], right: readonly Anchor[]): boolean {
     return (

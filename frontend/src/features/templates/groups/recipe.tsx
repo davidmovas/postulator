@@ -1,9 +1,10 @@
 import type { ReactElement } from "react";
 
 import { copy } from "../../../copy/index.js";
+import { fieldErrorOf } from "../../../data/errors.js";
 import type { JsonValue } from "../../../domain/merge-patch.js";
 import { Banner, cx, IconButton, RestartAltIcon, Switch, WarningIcon } from "../../../ui/index.js";
-import { fieldErrorOf, NumberInput } from "../controls.js";
+import { NumberInput } from "../controls.js";
 import { isKnownStep, stepLabel } from "../labels.js";
 import type { SpecDraft, StepDraft } from "../spec.js";
 

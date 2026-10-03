@@ -2,7 +2,7 @@ import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
-import { react } from "../../../data/errors.js";
+import { fieldErrorOf, formErrorOf } from "../../../data/errors.js";
 import { useUpdateEntity } from "../../../data/hooks/graph.js";
 import type { Entity, Keyword } from "../../../data/types.js";
 import { keywordList, sameKeywords } from "../../../domain/keywords.js";
@@ -30,22 +30,6 @@ function draftOf(entity: Entity): Draft {
         intent: entity.intent,
         keywords: keywordList(entity.keywords),
     };
-}
-
-export function fieldErrorOf(thrown: unknown, field: string): string | null {
-    if (thrown === null || thrown === undefined) {
-        return null;
-    }
-    const reaction = react(thrown);
-    return reaction.kind === "field" && reaction.field === field ? reaction.message : null;
-}
-
-export function formErrorOf(thrown: unknown): string | null {
-    if (thrown === null || thrown === undefined) {
-        return null;
-    }
-    const reaction = react(thrown);
-    return reaction.kind === "silent" || reaction.kind === "unlock" || reaction.kind === "field" ? null : reaction.message;
 }
 
 export interface EntityFieldsProps {

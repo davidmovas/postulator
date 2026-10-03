@@ -2,13 +2,13 @@ import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
+import { formErrorOf } from "../../../data/errors.js";
 import { useAddEdge } from "../../../data/hooks/graph.js";
 import { pushToast } from "../../../data/toasts.js";
 import { Banner, Button, Drawer, Field, Input, toneClasses, WarningIcon } from "../../../ui/index.js";
 import { entityIcon, kindTone } from "../labels.js";
 import { cycleOf } from "../model/cycle.js";
 import type { GraphIndex } from "../model/index.js";
-import { formErrorOf } from "../inspector/fields.js";
 
 type Choice = "parentOfFrom" | "parentOfTo" | "related";
 

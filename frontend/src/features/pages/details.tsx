@@ -2,7 +2,7 @@ import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
 
 import { copy } from "../../copy/index.js";
-import { react } from "../../data/errors.js";
+import { fieldErrorOf, validationErrorOf } from "../../data/errors.js";
 import { useUpdatePage } from "../../data/hooks/pages.js";
 import type { Keyword, Page } from "../../data/types.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
@@ -42,22 +42,6 @@ function draftOf(page: Page): Draft {
         wpType: page.wpType,
         status: page.status,
     };
-}
-
-function fieldErrorOf(thrown: unknown, field: string): string | null {
-    if (thrown === null || thrown === undefined) {
-        return null;
-    }
-    const reaction = react(thrown);
-    return reaction.kind === "field" && reaction.field === field ? reaction.message : null;
-}
-
-function formErrorOf(thrown: unknown): string | null {
-    if (thrown === null || thrown === undefined) {
-        return null;
-    }
-    const reaction = react(thrown);
-    return reaction.kind === "form" ? reaction.message : null;
 }
 
 function DriftNotice({ page }: { page: Page }): ReactElement {
@@ -278,8 +262,8 @@ export function PageDetails({ page, siteId, search }: PageDetailsProps): ReactEl
                     />
                 )}
             </Field>
-            {formErrorOf(update.error) === null ? null : (
-                <p className="text-xs text-danger">{formErrorOf(update.error)}</p>
+            {validationErrorOf(update.error) === null ? null : (
+                <p className="text-xs text-danger">{validationErrorOf(update.error)}</p>
             )}
             <ConflictNotice thrown={update.error} siteId={siteId} search={search} />
             <div className="flex justify-end gap-2">

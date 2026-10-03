@@ -2,11 +2,11 @@ import type { ReactElement } from "react";
 import { useMemo } from "react";
 
 import { copy } from "../../../copy/index.js";
+import { fieldErrorOf } from "../../../data/errors.js";
 import { useModelCatalog } from "../../../data/hooks/models.js";
 import type { SelectOption } from "../../../ui/index.js";
 import { Banner, cx, IconButton, RestartAltIcon, Select } from "../../../ui/index.js";
 import { pickableRoles } from "../../settings/model/profiles.js";
-import { fieldErrorOf } from "../controls.js";
 import { roleLabel } from "../labels.js";
 import type { ProfileDraft, SpecDraft } from "../spec.js";
 

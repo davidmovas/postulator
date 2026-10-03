@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 
 import { copy } from "../../../copy/index.js";
+import { fieldErrorOf } from "../../../data/errors.js";
 import {
     AddIcon,
     ArrowDownwardIcon,
@@ -17,7 +18,7 @@ import {
     Textarea,
     TopicIcon,
 } from "../../../ui/index.js";
-import { fieldErrorOf, NumberInput } from "../controls.js";
+import { NumberInput } from "../controls.js";
 import type { SectionDraft, SpecDraft } from "../spec.js";
 import { emptySection, moved } from "../spec.js";
 

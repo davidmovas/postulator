@@ -2,8 +2,8 @@ import type { ReactElement } from "react";
 import { useState } from "react";
 
 import { copy } from "../../copy/index.js";
+import { fieldErrorOf } from "../../data/errors.js";
 import { Dialog, Field, Input } from "../../ui/index.js";
-import { fieldErrorOf } from "./controls.js";
 
 export interface IdentityDialogProps {
     open: boolean;

@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
+import { fieldErrorOf, formErrorOf } from "../../../data/errors.js";
 import { useCreateEntity } from "../../../data/hooks/graph.js";
 import { pushToast } from "../../../data/toasts.js";
 import type { Keyword } from "../../../data/types.js";
@@ -10,7 +11,6 @@ import { Button, ChipInput, Drawer, Field, Input, KeywordInput, Select, Textarea
 import type { SelectOption } from "../../../ui/index.js";
 import { entityIcon, kindLabel, kindTone } from "../labels.js";
 import type { GraphIndex } from "../model/index.js";
-import { fieldErrorOf, formErrorOf } from "../inspector/fields.js";
 
 const kindOptions: readonly SelectOption<string>[] = entityKinds.map((value) => ({
     value,

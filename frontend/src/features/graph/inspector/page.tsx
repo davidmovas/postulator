@@ -4,12 +4,12 @@ import { Link } from "react-router";
 
 import { copy } from "../../../copy/index.js";
 import { flatten } from "../../../data/call.js";
+import { formErrorOf } from "../../../data/errors.js";
 import { useMapPageToEntity, usePage, usePages, useSetCanonicalPage } from "../../../data/hooks/pages.js";
 import type { Entity } from "../../../data/types.js";
 import { Banner, Button, Input, LinkOffIcon, Select, Skeleton, StatusBadge } from "../../../ui/index.js";
 import type { SelectOption } from "../../../ui/index.js";
 import { pageStatusLabel, statusTone } from "../../pages/labels.js";
-import { formErrorOf } from "./fields.js";
 
 const pickLimit = 100;
 const findLimit = 50;

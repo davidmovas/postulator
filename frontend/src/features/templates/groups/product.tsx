@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 
 import { copy } from "../../../copy/index.js";
+import { fieldErrorOf } from "../../../data/errors.js";
 import {
     AddIcon,
     Button,
@@ -14,7 +15,7 @@ import {
     Switch,
     Textarea,
 } from "../../../ui/index.js";
-import { fieldErrorOf, NumberInput } from "../controls.js";
+import { NumberInput } from "../controls.js";
 import type { ProductDraft, SpecDraft, SpecificationDraft } from "../spec.js";
 import { emptyProduct } from "../spec.js";
 

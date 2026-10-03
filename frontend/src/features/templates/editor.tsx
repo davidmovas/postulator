@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useBlocker, useNavigate, useParams, useSearchParams } from "react-router";
 
 import { copy } from "../../copy/index.js";
-import { failure } from "../../data/errors.js";
+import { failure, validationErrorOf } from "../../data/errors.js";
 import { usePage } from "../../data/hooks/pages.js";
 import { useSite, useUpdateSite } from "../../data/hooks/sites.js";
 import {
@@ -14,7 +14,6 @@ import {
 } from "../../data/hooks/templates.js";
 import { Banner, Button, Screen, SkeletonRows } from "../../ui/index.js";
 import { askAgent } from "../agent/index.js";
-import { formErrorOf } from "./controls.js";
 import { ConflictBar, EditorActions, EditorBadges, LayerChooser } from "./editor-actions.js";
 import { EditorDialogs } from "./editor-dialogs.js";
 import { useDraft, useLayerState } from "./editor-state.js";
@@ -150,7 +149,7 @@ export function TemplateEditorScreen(): ReactElement {
         );
     }
 
-    const formError = formErrorOf(thrown);
+    const formError = validationErrorOf(thrown);
 
     return (
         <Screen

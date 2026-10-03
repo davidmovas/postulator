@@ -5,12 +5,15 @@ import { copy } from "../copy/index.js";
 import {
     browserSettingsPath,
     failure,
+    fieldErrorOf,
+    formErrorOf,
     isTorClosedToLinks,
     messages,
     needsPlugin,
     pluginCodeOf,
     providerMessageOf,
     react,
+    validationErrorOf,
 } from "./errors.js";
 
 function rejection(code: Code, message = "", extra: Record<string, unknown> = {}): unknown {
@@ -133,6 +136,79 @@ describe("a site that cannot issue a preview", () => {
             "form",
         );
     });
+});
+
+describe("the messages a form shows", () => {
+    const cancelled = Object.assign(new Error("cancelled"), { name: "CancelError" });
+    const cases: readonly {
+        name: string;
+        thrown: unknown;
+        field: string | null;
+        form: string | null;
+        validation: string | null;
+    }[] = [
+        { name: "nothing thrown", thrown: null, field: null, form: null, validation: null },
+        { name: "nothing yet", thrown: undefined, field: null, form: null, validation: null },
+        { name: "a cancelled call", thrown: cancelled, field: null, form: null, validation: null },
+        { name: "a locked store", thrown: rejection("LOCKED"), field: null, form: null, validation: null },
+        {
+            name: "a refusal of the named field",
+            thrown: rejection("INVALID", "the path must start with a slash", { details: { field: "path" } }),
+            field: "the path must start with a slash",
+            form: null,
+            validation: null,
+        },
+        {
+            name: "a refusal of another field",
+            thrown: rejection("INVALID", "the title is too long", { details: { field: "title" } }),
+            field: null,
+            form: null,
+            validation: null,
+        },
+        {
+            name: "a refusal that names no field",
+            thrown: rejection("INVALID", "the sheet has no usable rows"),
+            field: null,
+            form: "the sheet has no usable rows",
+            validation: "the sheet has no usable rows",
+        },
+        {
+            name: "a refusal with no words",
+            thrown: rejection("INVALID"),
+            field: null,
+            form: messages.INVALID,
+            validation: messages.INVALID,
+        },
+        {
+            name: "a conflict",
+            thrown: rejection("CONFLICT"),
+            field: null,
+            form: messages.CONFLICT,
+            validation: null,
+        },
+        {
+            name: "a failure outside the app",
+            thrown: rejection("EXTERNAL"),
+            field: null,
+            form: messages.EXTERNAL,
+            validation: null,
+        },
+        {
+            name: "an internal failure",
+            thrown: rejection("INTERNAL", "panic"),
+            field: null,
+            form: messages.INTERNAL,
+            validation: null,
+        },
+    ];
+
+    for (const held of cases) {
+        test(held.name, () => {
+            expect(fieldErrorOf(held.thrown, "path")).toBe(held.field);
+            expect(formErrorOf(held.thrown)).toBe(held.form);
+            expect(validationErrorOf(held.thrown)).toBe(held.validation);
+        });
+    }
 });
 
 describe("providerMessageOf", () => {
