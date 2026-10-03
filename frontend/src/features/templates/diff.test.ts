@@ -108,7 +108,7 @@ describe("diffRows", () => {
             tone: "plain",
             featuredImage: true,
             imageSource: "ai",
-            profiles: [{ role: "judge", provider: "anthropic", model: "claude-opus-4.1" }],
+            profiles: [{ role: "judge", provider: "openai", model: "gpt-5.6-sol" }],
             recipe: below.recipe.map((step) => (step.name === "publish" ? { ...step, enabled: false } : step)),
             sections: [],
         };

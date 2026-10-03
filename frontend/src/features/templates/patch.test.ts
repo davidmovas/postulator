@@ -82,7 +82,7 @@ describe("patchBetween", () => {
     });
 
     it("removes a pinned role with null", () => {
-        const pinned = draftFromJson({ ...base, modelProfiles: { writer: { provider: "anthropic", model: "opus" } } });
+        const pinned = draftFromJson({ ...base, modelProfiles: { writer: { provider: "openai", model: "gpt-5" } } });
         expect(patchBetween(pinned, { ...pinned, profiles: [] })).toStrictEqual({ modelProfiles: { writer: null } });
     });
 

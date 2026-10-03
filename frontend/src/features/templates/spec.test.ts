@@ -179,8 +179,8 @@ describe("template spec drafts", () => {
             ...hub,
             modelProfiles: {
                 narrator: { provider: "openai", model: "gpt" },
-                editor: { provider: "anthropic", model: "sonnet" },
-                writer: { provider: "anthropic", model: "opus" },
+                editor: { provider: "openai", model: "gpt-5.6-luna" },
+                writer: { provider: "openai", model: "gpt-5.6-terra" },
             },
         });
         expect(draft.profiles.map((profile) => profile.role)).toStrictEqual(["writer", "editor", "narrator"]);

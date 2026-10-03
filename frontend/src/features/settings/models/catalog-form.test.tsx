@@ -136,7 +136,13 @@ describe("the model form", () => {
     });
 
     it("shows a model without flex with its flex prices empty", () => {
-        const plain = { ...terra(), flexInputUsdPerM: 0, flexCachedInputUsdPerM: 0, flexCacheWriteUsdPerM: 0, flexOutputUsdPerM: 0 };
+        const plain = {
+            ...terra(),
+            flexInputUsdPerM: 0,
+            flexCachedInputUsdPerM: 0,
+            flexCacheWriteUsdPerM: 0,
+            flexOutputUsdPerM: 0,
+        };
         render(<ModelForm editing={plain} onDone={() => undefined} />);
 
         for (const label of [said.field.flexInputUsdPerM, said.field.flexOutputUsdPerM]) {

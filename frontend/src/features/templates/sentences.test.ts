@@ -163,9 +163,9 @@ describe("sentencesOf", () => {
     });
 
     it("reads a pinned and an unpinned role", () => {
-        expect(sentencesOf(draft, { modelProfiles: { writer: { provider: "anthropic", model: "opus" } } })).toStrictEqual(
-            ["uses anthropic opus for the writer"],
-        );
+        expect(
+            sentencesOf(draft, { modelProfiles: { writer: { provider: "openai", model: "gpt-5.6-sol" } } }),
+        ).toStrictEqual(["uses openai gpt-5.6-sol for the writer"]);
         const pinned = draftFromJson({ ...base, modelProfiles: { judge: { provider: "openai", model: "mini" } } });
         expect(sentencesOf(pinned, { modelProfiles: { judge: null } })).toStrictEqual([
             "lets the judge fall back to the site model",

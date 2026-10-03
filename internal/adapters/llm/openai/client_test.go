@@ -302,7 +302,7 @@ func TestARequestTheClientCannotSendIsRefusedAtHome(t *testing.T) {
 		req  port.Request
 	}{
 		{name: "no messages", req: port.Request{Ref: ref("gpt-5.6-terra")}},
-		{name: "another provider", req: port.Request{Ref: llm.ModelRef{Provider: "anthropic", Model: "claude-opus-5"}, Messages: write("x").Messages}},
+		{name: "another provider", req: port.Request{Ref: llm.ModelRef{Provider: "retired", Model: "old-model"}, Messages: write("x").Messages}},
 		{name: "an array answer", req: func() port.Request {
 			req := write("x")
 			req.Schema = &port.Schema{Type: port.SchemaArray, Items: &port.Schema{Type: port.SchemaString}}
