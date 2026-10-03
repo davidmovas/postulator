@@ -3,6 +3,8 @@ package models_test
 import (
 	"context"
 	"encoding/json"
+	stderrors "errors"
+	"maps"
 	"reflect"
 	"slices"
 	"strings"
@@ -37,10 +39,7 @@ func newCatalog() *catalog {
 }
 
 func (c *catalog) List(context.Context) ([]llm.ModelInfo, error) {
-	out := make([]llm.ModelInfo, 0, len(c.models))
-	for _, info := range c.models {
-		out = append(out, info)
-	}
+	out := slices.Collect(maps.Values(c.models))
 	slices.SortFunc(out, func(a, b llm.ModelInfo) int { return int(a.InputUSDPerM - b.InputUSDPerM) })
 	return out, nil
 }
@@ -361,6 +360,128 @@ func TestUpsertModel(t *testing.T) {
 	}
 }
 
+func TestUpsertModelKeepsEveryPrice(t *testing.T) {
+	t.Parallel()
+
+	request := func(change func(req *models.UpsertModelRequest)) models.UpsertModelRequest {
+		req := models.UpsertModelRequest{
+			Provider: "openai", Model: "gpt-5.6-terra", ContextTokens: 1050000, MaxOutputTokens: 128000,
+			InputUSDPerM: 2, OutputUSDPerM: 12, RPM: 500, TPM: 500000,
+		}
+		change(&req)
+		return req
+	}
+
+	cases := []struct {
+		name string
+		req  models.UpsertModelRequest
+		want models.Prices
+	}{
+		{
+			name: "standard prices only",
+			req:  request(func(*models.UpsertModelRequest) {}),
+			want: models.Prices{InputUSDPerM: 2, OutputUSDPerM: 12},
+		},
+		{
+			name: "a cache read price",
+			req:  request(func(req *models.UpsertModelRequest) { req.CachedInputUSDPerM = 0.2 }),
+			want: models.Prices{InputUSDPerM: 2, CachedInputUSDPerM: 0.2, OutputUSDPerM: 12},
+		},
+		{
+			name: "a cache write price",
+			req:  request(func(req *models.UpsertModelRequest) { req.CacheWriteUSDPerM = 2.5 }),
+			want: models.Prices{InputUSDPerM: 2, CacheWriteUSDPerM: 2.5, OutputUSDPerM: 12},
+		},
+		{
+			name: "every standard and flex price",
+			req: request(func(req *models.UpsertModelRequest) {
+				req.CachedInputUSDPerM, req.CacheWriteUSDPerM = 0.2, 2.5
+				req.FlexInputUSDPerM, req.FlexCachedInputUSDPerM = 1, 0.1
+				req.FlexCacheWriteUSDPerM, req.FlexOutputUSDPerM = 1.25, 6
+			}),
+			want: models.Prices{
+				InputUSDPerM: 2, CachedInputUSDPerM: 0.2, CacheWriteUSDPerM: 2.5, OutputUSDPerM: 12,
+				FlexInputUSDPerM: 1, FlexCachedInputUSDPerM: 0.1, FlexCacheWriteUSDPerM: 1.25, FlexOutputUSDPerM: 6,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := newHarness(t, spend{})
+			resp, err := h.service.UpsertModel(t.Context(), tc.req)
+			if err != nil {
+				t.Fatalf("UpsertModel: %v", err)
+			}
+			if resp.Model.Prices != tc.want {
+				t.Errorf("saved view prices = %+v, want %+v", resp.Model.Prices, tc.want)
+			}
+
+			stored := h.catalog.overrides[0].Info
+			got := models.Prices{
+				InputUSDPerM: stored.InputUSDPerM, CachedInputUSDPerM: stored.CachedInputUSDPerM,
+				CacheWriteUSDPerM: stored.CacheWriteUSDPerM, OutputUSDPerM: stored.OutputUSDPerM,
+				FlexInputUSDPerM: stored.FlexInputUSDPerM, FlexCachedInputUSDPerM: stored.FlexCachedInputUSDPerM,
+				FlexCacheWriteUSDPerM: stored.FlexCacheWriteUSDPerM, FlexOutputUSDPerM: stored.FlexOutputUSDPerM,
+			}
+			if got != tc.want {
+				t.Errorf("stored prices = %+v, want %+v", got, tc.want)
+			}
+
+			listed, err := h.service.ListModels(t.Context(), models.ListModelsRequest{})
+			if err != nil {
+				t.Fatalf("ListModels: %v", err)
+			}
+			for _, model := range listed.Models {
+				if model.Model == "gpt-5.6-terra" && model.Prices != tc.want {
+					t.Errorf("listed prices = %+v, want %+v", model.Prices, tc.want)
+				}
+			}
+		})
+	}
+}
+
+func TestUpsertModelRefusesAPriceTheCatalogCannotCharge(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		field string
+		set   func(req *models.UpsertModelRequest)
+	}{
+		{name: "a negative cache write", field: "cacheWriteUsdPerM", set: func(req *models.UpsertModelRequest) { req.CacheWriteUSDPerM = -1 }},
+		{name: "a cached read dearer than a fresh one", field: "cachedInputUsdPerM", set: func(req *models.UpsertModelRequest) { req.CachedInputUSDPerM = 3 }},
+		{name: "a flex input with no flex output", field: "flexOutputUsdPerM", set: func(req *models.UpsertModelRequest) { req.FlexInputUSDPerM = 1 }},
+		{name: "a negative flex output", field: "flexOutputUsdPerM", set: func(req *models.UpsertModelRequest) { req.FlexOutputUSDPerM = -6 }},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			req := models.UpsertModelRequest{
+				Provider: "openai", Model: "gpt-5.6-terra", ContextTokens: 1050000, MaxOutputTokens: 128000,
+				InputUSDPerM: 2, OutputUSDPerM: 12, RPM: 500, TPM: 500000,
+			}
+			tc.set(&req)
+
+			h := newHarness(t, spend{})
+			_, err := h.service.UpsertModel(t.Context(), req)
+			if !errors.IsCode(err, errors.Invalid) {
+				t.Fatalf("UpsertModel error = %v, want %s", err, errors.Invalid)
+			}
+			if field := detail(err, "field"); field != tc.field {
+				t.Errorf("field = %q, want %q", field, tc.field)
+			}
+			if len(h.catalog.overrides) != 0 {
+				t.Errorf("overrides = %+v, want nothing stored", h.catalog.overrides)
+			}
+		})
+	}
+}
+
 func TestDisableModel(t *testing.T) {
 	t.Parallel()
 
@@ -562,4 +683,12 @@ func TestSetProviderKey(t *testing.T) {
 			}
 		})
 	}
+}
+
+func detail(err error, key string) any {
+	var kernel *errors.Error
+	if !stderrors.As(err, &kernel) || kernel == nil {
+		return nil
+	}
+	return kernel.Details[key]
 }

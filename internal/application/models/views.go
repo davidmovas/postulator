@@ -7,19 +7,29 @@ type ModelRef struct {
 	Model    string `json:"model"`
 }
 
+type Prices struct {
+	InputUSDPerM           float64 `json:"inputUsdPerM"`
+	CachedInputUSDPerM     float64 `json:"cachedInputUsdPerM"`
+	CacheWriteUSDPerM      float64 `json:"cacheWriteUsdPerM"`
+	OutputUSDPerM          float64 `json:"outputUsdPerM"`
+	FlexInputUSDPerM       float64 `json:"flexInputUsdPerM"`
+	FlexCachedInputUSDPerM float64 `json:"flexCachedInputUsdPerM"`
+	FlexCacheWriteUSDPerM  float64 `json:"flexCacheWriteUsdPerM"`
+	FlexOutputUSDPerM      float64 `json:"flexOutputUsdPerM"`
+}
+
 type Model struct {
-	Provider           string  `json:"provider"`
-	Model              string  `json:"model"`
-	ContextTokens      int     `json:"contextTokens"`
-	MaxOutputTokens    int     `json:"maxOutputTokens"`
-	InputUSDPerM       float64 `json:"inputUsdPerM"`
-	OutputUSDPerM      float64 `json:"outputUsdPerM"`
-	RPM                int     `json:"rpm"`
-	TPM                int     `json:"tpm"`
-	SupportsStructured bool    `json:"supportsStructured"`
-	SupportsImages     bool    `json:"supportsImages"`
-	Reasoning          bool    `json:"reasoning"`
-	ReasoningEffort    string  `json:"reasoningEffort"`
+	Provider        string `json:"provider"`
+	Model           string `json:"model"`
+	ContextTokens   int    `json:"contextTokens"`
+	MaxOutputTokens int    `json:"maxOutputTokens"`
+	Prices
+	RPM                int    `json:"rpm"`
+	TPM                int    `json:"tpm"`
+	SupportsStructured bool   `json:"supportsStructured"`
+	SupportsImages     bool   `json:"supportsImages"`
+	Reasoning          bool   `json:"reasoning"`
+	ReasoningEffort    string `json:"reasoningEffort"`
 }
 
 type Profile struct {
@@ -42,12 +52,20 @@ type ProviderKey struct {
 
 func modelView(info llm.ModelInfo) Model {
 	return Model{
-		Provider:           info.Ref.Provider,
-		Model:              info.Ref.Model,
-		ContextTokens:      info.ContextTokens,
-		MaxOutputTokens:    info.MaxOutputTokens,
-		InputUSDPerM:       info.InputUSDPerM,
-		OutputUSDPerM:      info.OutputUSDPerM,
+		Provider:        info.Ref.Provider,
+		Model:           info.Ref.Model,
+		ContextTokens:   info.ContextTokens,
+		MaxOutputTokens: info.MaxOutputTokens,
+		Prices: Prices{
+			InputUSDPerM:           info.InputUSDPerM,
+			CachedInputUSDPerM:     info.CachedInputUSDPerM,
+			CacheWriteUSDPerM:      info.CacheWriteUSDPerM,
+			OutputUSDPerM:          info.OutputUSDPerM,
+			FlexInputUSDPerM:       info.FlexInputUSDPerM,
+			FlexCachedInputUSDPerM: info.FlexCachedInputUSDPerM,
+			FlexCacheWriteUSDPerM:  info.FlexCacheWriteUSDPerM,
+			FlexOutputUSDPerM:      info.FlexOutputUSDPerM,
+		},
 		RPM:                info.RPM,
 		TPM:                info.TPM,
 		SupportsStructured: info.SupportsStructured,

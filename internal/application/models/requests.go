@@ -7,19 +7,24 @@ type ListModelsResponse struct {
 }
 
 type UpsertModelRequest struct {
-	Provider           string  `json:"provider" description:"The provider the model belongs to, such as openai, anthropic or gemini"`
-	Model              string  `json:"model" description:"The model name the provider answers to"`
-	ContextTokens      int     `json:"contextTokens" minimum:"1" description:"How many tokens the model reads in one call"`
-	MaxOutputTokens    int     `json:"maxOutputTokens" minimum:"1" description:"How many tokens the model may answer with, which must fit the context"`
-	InputUSDPerM       float64 `json:"inputUsdPerM,omitempty" minimum:"0" description:"Dollars per million input tokens; leave it out for a model that costs nothing to read"`
-	CachedInputUSDPerM float64 `json:"cachedInputUsdPerM,omitempty" minimum:"0" description:"Dollars per million input tokens served from the provider's prompt cache; leave it out and a cache read is charged at the full rate"`
-	OutputUSDPerM      float64 `json:"outputUsdPerM,omitempty" minimum:"0" description:"Dollars per million output tokens; leave it out for a model that costs nothing to answer"`
-	RPM                int     `json:"rpm" minimum:"1" description:"The requests per minute the account may make"`
-	TPM                int     `json:"tpm" minimum:"1" description:"The tokens per minute the account may use"`
-	SupportsStructured bool    `json:"supportsStructured,omitempty" description:"The model can answer against a JSON schema; leave it out for a model that cannot"`
-	SupportsImages     bool    `json:"supportsImages,omitempty" description:"The model can read images; leave it out for a model that cannot"`
-	Reasoning          bool    `json:"reasoning,omitempty" description:"The model thinks before it answers and bills those tokens as output; leave it out for a model that does not"`
-	ReasoningEffort    string  `json:"reasoningEffort,omitempty" enum:"none,low,medium,high,xhigh" description:"How long the model may think; leave it out to send no effort at all"`
+	Provider               string  `json:"provider" description:"The provider, such as openai"`
+	Model                  string  `json:"model" description:"The model name the provider answers to"`
+	ContextTokens          int     `json:"contextTokens" minimum:"1" description:"Tokens the model reads in one call"`
+	MaxOutputTokens        int     `json:"maxOutputTokens" minimum:"1" description:"Tokens it may answer with"`
+	InputUSDPerM           float64 `json:"inputUsdPerM,omitempty" minimum:"0" description:"USD per million input tokens"`
+	CachedInputUSDPerM     float64 `json:"cachedInputUsdPerM,omitempty" minimum:"0" description:"Cache read price; left out, the input price"`
+	CacheWriteUSDPerM      float64 `json:"cacheWriteUsdPerM,omitempty" minimum:"0" description:"Cache write price; left out, the input price"`
+	OutputUSDPerM          float64 `json:"outputUsdPerM,omitempty" minimum:"0" description:"USD per million output tokens"`
+	FlexInputUSDPerM       float64 `json:"flexInputUsdPerM,omitempty" minimum:"0" description:"Flex input price; left out, no flex"`
+	FlexCachedInputUSDPerM float64 `json:"flexCachedInputUsdPerM,omitempty" minimum:"0" description:"Flex cache read price"`
+	FlexCacheWriteUSDPerM  float64 `json:"flexCacheWriteUsdPerM,omitempty" minimum:"0" description:"Flex cache write price"`
+	FlexOutputUSDPerM      float64 `json:"flexOutputUsdPerM,omitempty" minimum:"0" description:"Flex output price"`
+	RPM                    int     `json:"rpm" minimum:"1" description:"Requests per minute the account may make"`
+	TPM                    int     `json:"tpm" minimum:"1" description:"Tokens per minute the account may use"`
+	SupportsStructured     bool    `json:"supportsStructured,omitempty" description:"It can answer against a JSON schema"`
+	SupportsImages         bool    `json:"supportsImages,omitempty" description:"It can read images"`
+	Reasoning              bool    `json:"reasoning,omitempty" description:"It bills its thinking as output"`
+	ReasoningEffort        string  `json:"reasoningEffort,omitempty" enum:"none,low,medium,high,xhigh" description:"How long it may think"`
 }
 
 type UpsertModelResponse struct {

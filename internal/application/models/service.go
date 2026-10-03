@@ -101,9 +101,9 @@ func (s *Service) ProviderKeys(ctx context.Context, _ ProviderKeysRequest) (Prov
 	}
 
 	named := make([]string, 0, len(known))
-	for _, info := range known {
-		if !slices.Contains(named, info.Ref.Provider) {
-			named = append(named, info.Ref.Provider)
+	for i := range known {
+		if provider := known[i].Ref.Provider; !slices.Contains(named, provider) {
+			named = append(named, provider)
 		}
 	}
 	slices.Sort(named)
@@ -161,25 +161,31 @@ func (s *Service) ListModels(ctx context.Context, _ ListModelsRequest) (ListMode
 	}
 
 	out := make([]Model, 0, len(known))
-	for _, info := range known {
-		out = append(out, modelView(info))
+	for i := range known {
+		out = append(out, modelView(known[i]))
 	}
 	return ListModelsResponse{Models: out}, nil
 }
 
 func (s *Service) UpsertModel(ctx context.Context, req UpsertModelRequest) (UpsertModelResponse, error) {
 	info := llm.ModelInfo{
-		Ref:                llm.ModelRef{Provider: strings.TrimSpace(req.Provider), Model: strings.TrimSpace(req.Model)},
-		ContextTokens:      req.ContextTokens,
-		MaxOutputTokens:    req.MaxOutputTokens,
-		InputUSDPerM:       req.InputUSDPerM,
-		OutputUSDPerM:      req.OutputUSDPerM,
-		RPM:                req.RPM,
-		TPM:                req.TPM,
-		SupportsStructured: req.SupportsStructured,
-		SupportsImages:     req.SupportsImages,
-		Reasoning:          req.Reasoning,
-		ReasoningEffort:    llm.ReasoningEffort(strings.TrimSpace(req.ReasoningEffort)),
+		Ref:                    llm.ModelRef{Provider: strings.TrimSpace(req.Provider), Model: strings.TrimSpace(req.Model)},
+		ContextTokens:          req.ContextTokens,
+		MaxOutputTokens:        req.MaxOutputTokens,
+		InputUSDPerM:           req.InputUSDPerM,
+		CachedInputUSDPerM:     req.CachedInputUSDPerM,
+		CacheWriteUSDPerM:      req.CacheWriteUSDPerM,
+		OutputUSDPerM:          req.OutputUSDPerM,
+		FlexInputUSDPerM:       req.FlexInputUSDPerM,
+		FlexCachedInputUSDPerM: req.FlexCachedInputUSDPerM,
+		FlexCacheWriteUSDPerM:  req.FlexCacheWriteUSDPerM,
+		FlexOutputUSDPerM:      req.FlexOutputUSDPerM,
+		RPM:                    req.RPM,
+		TPM:                    req.TPM,
+		SupportsStructured:     req.SupportsStructured,
+		SupportsImages:         req.SupportsImages,
+		Reasoning:              req.Reasoning,
+		ReasoningEffort:        llm.ReasoningEffort(strings.TrimSpace(req.ReasoningEffort)),
 	}
 	if err := info.Validate(); err != nil {
 		return UpsertModelResponse{}, err
