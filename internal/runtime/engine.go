@@ -27,6 +27,7 @@ type Deps struct {
 	Spend      spendReader
 	Catalog    modelCatalog
 	Profiles   profileResolver
+	Tuning     modelTuning
 	UnitOfWork unitOfWork
 	Publisher  publisher
 }

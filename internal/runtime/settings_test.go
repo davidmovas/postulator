@@ -91,6 +91,7 @@ func TestEnqueueTakesItsDeadlineFromTheSetting(t *testing.T) {
 		Keys:       &stubKeys{},
 		Catalog:    &stubCatalog{info: llm.ModelInfo{InputUSDPerM: 1, OutputUSDPerM: 2}},
 		Profiles:   &stubProfiles{ref: llm.ModelRef{Provider: "openai", Model: "test"}},
+		Tuning:     h.tuning,
 		UnitOfWork: h.store, Publisher: h.bus,
 	}, mustRegister(t, bodyStep(newCounter())),
 		runtime.Settings(storedValues(t, map[string]json.RawMessage{"runs.deadline": json.RawMessage(`"90m"`)})),

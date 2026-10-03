@@ -231,7 +231,7 @@ func (p *pipeline) start(t *testing.T) *runtime.Engine {
 		Runs: p.runs, Items: p.items, Artifacts: p.blobs, Execs: sqlite.NewStepExecRepo(p.store),
 		Events: sqlite.NewRunEventRepo(p.store), Pages: p.pages, Specs: specs,
 		Keys: stubKeys{}, Spend: sqlite.NewLLMCallRepo(p.store), Catalog: stubCatalog{}, Profiles: stubProfiles{},
-		UnitOfWork: p.store, Publisher: &recorder{},
+		Tuning: stubTuning{}, UnitOfWork: p.store, Publisher: &recorder{},
 	}, registry, runtime.Config{
 		Workers: 1, PerSite: 1, SweepInterval: 20 * time.Millisecond,
 		StepTimeout: 20 * time.Second, LeaseDuration: time.Second, RunDeadline: time.Hour,

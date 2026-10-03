@@ -96,6 +96,23 @@ func (p *stubProfiles) Resolve(context.Context, string, llm.Role, map[llm.Role]l
 	return p.ref, p.err
 }
 
+type stubTuning struct {
+	efforts map[llm.Role]llm.ReasoningEffort
+	tiers   map[llm.Role]llm.ServiceTier
+}
+
+func newStubTuning() *stubTuning {
+	return &stubTuning{efforts: map[llm.Role]llm.ReasoningEffort{}, tiers: map[llm.Role]llm.ServiceTier{}}
+}
+
+func (s *stubTuning) Effort(role llm.Role) llm.ReasoningEffort {
+	return s.efforts[role]
+}
+
+func (s *stubTuning) Tier(role llm.Role) llm.ServiceTier {
+	return s.tiers[role]
+}
+
 type record struct {
 	payload   any
 	runID     string
@@ -161,6 +178,7 @@ type harness struct {
 	keys        *stubKeys
 	catalog     *stubCatalog
 	profiles    *stubProfiles
+	tuning      *stubTuning
 	spend       *stubSpend
 	bus         *recorder
 	pages       []string
@@ -201,6 +219,7 @@ func newHarness(t *testing.T, targets int) *harness {
 		keys:     &stubKeys{},
 		catalog:  &stubCatalog{info: llm.ModelInfo{InputUSDPerM: 1, OutputUSDPerM: 2}},
 		profiles: &stubProfiles{ref: llm.ModelRef{Provider: "openai", Model: "test"}},
+		tuning:   newStubTuning(),
 		spend:    &stubSpend{},
 		bus:      &recorder{},
 		pages:    pages,
@@ -237,6 +256,7 @@ func (h *harness) idle(t *testing.T, registry *run.Registry) *runtime.Engine {
 		Spend:      h.spend,
 		Catalog:    h.catalog,
 		Profiles:   h.profiles,
+		Tuning:     h.tuning,
 		UnitOfWork: h.store,
 		Publisher:  h.bus,
 	}, registry, runtime.Config{

@@ -78,6 +78,11 @@ type profileResolver interface {
 	Resolve(ctx context.Context, siteID string, role llm.Role, templateProfiles map[llm.Role]llm.ModelRef) (llm.ModelRef, error)
 }
 
+type modelTuning interface {
+	Effort(role llm.Role) llm.ReasoningEffort
+	Tier(role llm.Role) llm.ServiceTier
+}
+
 type publisher interface {
 	PublishRun(runID string, seq int64, eventType events.Type, payload any) error
 }

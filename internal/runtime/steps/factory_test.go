@@ -62,6 +62,16 @@ func (stubKeys) Has(context.Context, string) (bool, error) {
 	return true, nil
 }
 
+type stubTuning struct{}
+
+func (stubTuning) Effort(domainllm.Role) domainllm.ReasoningEffort {
+	return domainllm.EffortNone
+}
+
+func (stubTuning) Tier(domainllm.Role) domainllm.ServiceTier {
+	return domainllm.TierDefault
+}
+
 type recorder struct {
 	types []events.Type
 	mu    sync.Mutex
@@ -269,7 +279,7 @@ func (f *factory) engine(t *testing.T) *runtime.Engine {
 	engine := runtime.New(runtime.Deps{
 		Runs: f.runs, Items: f.items, Artifacts: f.blobs, Execs: sqlite.NewStepExecRepo(f.store),
 		Events: f.log, Pages: sqlite.NewPageRepo(f.store), Specs: specs, Keys: stubKeys{},
-		Spend: sqlite.NewLLMCallRepo(f.store), Catalog: stubCatalog{}, Profiles: stubProfiles{},
+		Spend: sqlite.NewLLMCallRepo(f.store), Catalog: stubCatalog{}, Profiles: stubProfiles{}, Tuning: stubTuning{},
 		UnitOfWork: f.store, Publisher: f.bus,
 	}, registry, runtime.Config{
 		Workers: 1, PerSite: 1, SweepInterval: 20 * time.Millisecond,

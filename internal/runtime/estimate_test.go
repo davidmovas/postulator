@@ -2,6 +2,7 @@ package runtime_test
 
 import (
 	"context"
+	"math"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/application/events"
@@ -422,6 +423,107 @@ func TestEstimateRunsThePreflightOfEveryStepOnce(t *testing.T) {
 	}
 	if estimate.Findings[0].Path != "/page-a/" || estimate.Findings[1].Path != "/page-b/" {
 		t.Fatalf("findings = %+v, want them in the order of the targets", estimate.Findings)
+	}
+}
+
+func TestEstimatePricesTheWriterOnItsTierAndItsReasoning(t *testing.T) {
+	t.Parallel()
+
+	standard := llm.ModelInfo{InputUSDPerM: 2, CachedInputUSDPerM: 0.2, OutputUSDPerM: 12}
+	flexed := standard
+	flexed.FlexInputUSDPerM, flexed.FlexCachedInputUSDPerM, flexed.FlexOutputUSDPerM = 1, 0.1, 6
+	thinking := flexed
+	thinking.Reasoning = true
+
+	cases := []struct {
+		name      string
+		info      llm.ModelInfo
+		effort    llm.ReasoningEffort
+		tier      llm.ServiceTier
+		reasoning int
+		share     float64
+	}{
+		{name: "the standard tier", info: flexed, tier: llm.TierDefault, share: 1},
+		{name: "flex is half price", info: flexed, tier: llm.TierFlex, share: 0.5},
+		{name: "flex on a model that offers none is priced at the standard tier", info: standard, tier: llm.TierFlex, share: 1},
+		{name: "a model that does not reason is priced without reasoning", info: flexed, effort: llm.EffortHigh, share: 1},
+		{name: "no effort adds no reasoning", info: thinking, effort: llm.EffortNone, share: 1},
+		{name: "low effort reasons half its allowance", info: thinking, effort: llm.EffortLow, reasoning: 1024, share: 1},
+		{name: "medium effort reasons half its allowance", info: thinking, effort: llm.EffortMedium, reasoning: 4096, share: 1},
+		{name: "xhigh effort on flex", info: thinking, effort: llm.EffortXHigh, tier: llm.TierFlex, reasoning: 24576, share: 0.5},
+	}
+
+	baseline := func(t *testing.T) run.Estimate {
+		t.Helper()
+		harness := newHarness(t, 1)
+		harness.catalog.info = standard
+		engine := harness.engine(t, mustRegister(t, pricedStep("generate_body", llm.RoleWriter, run.Price{})))
+		estimate, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body")), nil)
+		if err != nil {
+			t.Fatalf("EstimateRun: %v", err)
+		}
+		return estimate
+	}(t)
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			harness := newHarness(t, 1)
+			harness.catalog.info = tc.info
+			harness.tuning.efforts[llm.RoleWriter] = tc.effort
+			harness.tuning.tiers[llm.RoleWriter] = tc.tier
+			engine := harness.engine(t, mustRegister(t, pricedStep("generate_body", llm.RoleWriter, run.Price{})))
+
+			estimate, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body")), nil)
+			if err != nil {
+				t.Fatalf("EstimateRun: %v", err)
+			}
+			if want := baseline.Tokens + tc.reasoning; estimate.Tokens != want {
+				t.Errorf("tokens = %d, want %d: the visible answer and %d of reasoning", estimate.Tokens, want, tc.reasoning)
+			}
+			want := tc.share * (baseline.USD + float64(tc.reasoning)/1_000_000*standard.OutputUSDPerM)
+			if math.Abs(estimate.USD-want) > 1e-12 {
+				t.Errorf("usd = %v, want %v", estimate.USD, want)
+			}
+			if len(estimate.Findings) != 0 {
+				t.Errorf("findings = %+v, want none", estimate.Findings)
+			}
+		})
+	}
+}
+
+func TestEstimatePricesEveryStepOnTheTierOfItsOwnRole(t *testing.T) {
+	t.Parallel()
+
+	flexed := llm.ModelInfo{InputUSDPerM: 2, OutputUSDPerM: 12, FlexInputUSDPerM: 1, FlexOutputUSDPerM: 6}
+	body := pricedStep("generate_body", llm.RoleWriter, run.Price{})
+	meta := pricedStep("generate_meta", llm.RoleEditor, run.Price{OutputTokens: 512})
+
+	estimate := func(t *testing.T, writerTier llm.ServiceTier, steps ...string) run.Estimate {
+		t.Helper()
+		harness := newHarness(t, 1)
+		harness.catalog.info = flexed
+		harness.tuning.tiers[llm.RoleWriter] = writerTier
+		harness.tuning.tiers[llm.RoleEditor] = llm.TierDefault
+		engine := harness.engine(t, mustRegister(t, body, meta))
+		priced, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf(steps...)), nil)
+		if err != nil {
+			t.Fatalf("EstimateRun: %v", err)
+		}
+		return priced
+	}
+
+	writer := estimate(t, llm.TierDefault, "generate_body")
+	editor := estimate(t, llm.TierDefault, "generate_meta")
+	both := estimate(t, llm.TierFlex, "generate_body", "generate_meta")
+
+	if want := writer.USD/2 + editor.USD; math.Abs(both.USD-want) > 1e-12 {
+		t.Fatalf("usd = %v, want the writer at flex (%v) and the editor at the standard tier (%v)",
+			both.USD, writer.USD/2, editor.USD)
+	}
+	if both.Tokens != writer.Tokens+editor.Tokens {
+		t.Fatalf("tokens = %d, want %d; a tier changes the price, not the tokens", both.Tokens, writer.Tokens+editor.Tokens)
 	}
 }
 

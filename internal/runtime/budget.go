@@ -20,6 +20,8 @@ const (
 	fallbackTargetWords = 800
 	inputShareOfOutput  = 0.5
 
+	reasoningShareOfAllowance = 0.5
+
 	CodeUnpricedStep       = "unpriced_step"
 	CodeTemplateUnresolved = "template_unresolved"
 	CodeRecipeDiffers      = "recipe_differs"
@@ -201,9 +203,12 @@ func (e *Engine) price(ctx context.Context, record run.Run, def run.StepDef, tar
 		return nil
 	}
 
-	usage := usageOf(outputOf(def, int(float64(targetWords(target.Spec, target.Page.WPType))*tokensPerWord)))
+	usage := usageOf(
+		outputOf(def, int(float64(targetWords(target.Spec, target.Page.WPType))*tokensPerWord)),
+		reasoningOf(info, e.deps.Tuning.Effort(def.Role)),
+	)
 	priced.tokens += usage.Total * calls
-	priced.usd += llm.Cost(usage, info, llm.TierDefault) * float64(calls)
+	priced.usd += llm.Cost(usage, info, e.deps.Tuning.Tier(def.Role)) * float64(calls)
 	return nil
 }
 
@@ -245,9 +250,16 @@ func stepNames(recipe []template.StepSpec) []string {
 	return out
 }
 
-func usageOf(output int) llm.Usage {
+func usageOf(output, reasoning int) llm.Usage {
 	input := promptOverhead + int(float64(output)*inputShareOfOutput)
-	return llm.Usage{Input: input, Output: output, Total: input + output}
+	return llm.Usage{Input: input, Output: output + reasoning, Reasoning: reasoning, Total: input + output + reasoning}
+}
+
+func reasoningOf(info llm.ModelInfo, effort llm.ReasoningEffort) int {
+	if !info.Reasoning {
+		return 0
+	}
+	return int(float64(llm.Allowance(effort)) * reasoningShareOfAllowance)
 }
 
 func outputOf(def run.StepDef, body int) int {
