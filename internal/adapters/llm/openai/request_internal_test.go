@@ -13,7 +13,6 @@ import (
 func terra() llm.ModelInfo {
 	return llm.ModelInfo{
 		Ref:             llm.ModelRef{Provider: "openai", Model: "gpt-5.6-terra"},
-		ReasoningEffort: llm.EffortMedium,
 		ContextTokens:   1_050_000,
 		MaxOutputTokens: 128_000,
 		InputUSDPerM:    2, CachedInputUSDPerM: 0.2, CacheWriteUSDPerM: 2.5, OutputUSDPerM: 12,
@@ -45,23 +44,19 @@ func asked(mutate func(*port.Request)) port.Request {
 func TestTheReasoningEffortIsAlwaysSentToAModelThatReasons(t *testing.T) {
 	t.Parallel()
 
-	minimalRow := terra()
-	minimalRow.ReasoningEffort = effortMinimal
-	silentRow := terra()
-	silentRow.ReasoningEffort = ""
-
 	cases := []struct {
 		name  string
 		req   port.Request
 		model catalogRow
 		want  string
 	}{
-		{name: "the effort the caller asked for", req: asked(func(r *port.Request) { r.Effort = llm.EffortLow }), model: listed(terra()), want: "low"},
-		{name: "the catalog's effort when none is asked", req: asked(nil), model: listed(terra()), want: "medium"},
+		{name: "the effort the caller asked for", req: asked(func(r *port.Request) { r.Effort = llm.EffortHigh }), model: listed(terra()), want: "high"},
+		{name: "a reasoning model asked for nothing thinks a little", req: asked(nil), model: listed(terra()), want: "low"},
 		{name: "none is sent, never left to the server's medium", req: asked(func(r *port.Request) { r.Effort = llm.EffortNone }), model: listed(terra()), want: "none"},
-		{name: "a catalog row that says minimal is sent low", req: asked(nil), model: listed(minimalRow), want: "low"},
-		{name: "a row without an effort is sent medium", req: asked(nil), model: listed(silentRow), want: "medium"},
+		{name: "medium is sent when it is asked", req: asked(func(r *port.Request) { r.Effort = llm.EffortMedium }), model: listed(terra()), want: "medium"},
+		{name: "an effort the provider does not take is sent low", req: asked(func(r *port.Request) { r.Effort = "minimal" }), model: listed(terra()), want: "low"},
 		{name: "a model that does not reason is sent no effort", req: asked(func(r *port.Request) { r.Effort = llm.EffortHigh }), model: listed(plainModel())},
+		{name: "a model that does not reason asked for nothing is sent no effort", req: asked(nil), model: listed(plainModel())},
 		{name: "an unlisted model keeps the asked effort", req: asked(func(r *port.Request) { r.Effort = llm.EffortHigh }), model: catalogRow{}, want: "high"},
 		{name: "an unlisted model asked for nothing is sent nothing", req: asked(nil), model: catalogRow{}},
 	}
@@ -88,7 +83,7 @@ func TestTheOutputCeilingMakesRoomForReasoning(t *testing.T) {
 	t.Parallel()
 
 	tight := terra()
-	tight.MaxOutputTokens = 9000
+	tight.MaxOutputTokens = 7000
 
 	cases := []struct {
 		name  string
@@ -97,10 +92,10 @@ func TestTheOutputCeilingMakesRoomForReasoning(t *testing.T) {
 		want  int
 	}{
 		{name: "no ceiling asked is no ceiling sent", req: asked(nil), model: listed(terra())},
-		{name: "the asked words plus the medium allowance", req: asked(func(r *port.Request) { r.MaxTokens = 6000 }), model: listed(terra()), want: 6000 + 8192},
-		{name: "the asked effort's allowance", req: asked(func(r *port.Request) { r.MaxTokens = 600; r.Effort = llm.EffortLow }), model: listed(terra()), want: 600 + 2048},
+		{name: "the asked words plus the low allowance when no effort is asked", req: asked(func(r *port.Request) { r.MaxTokens = 6000 }), model: listed(terra()), want: 6000 + 2048},
+		{name: "the asked effort's allowance", req: asked(func(r *port.Request) { r.MaxTokens = 6000; r.Effort = llm.EffortMedium }), model: listed(terra()), want: 6000 + 8192},
 		{name: "effort none adds nothing", req: asked(func(r *port.Request) { r.MaxTokens = 600; r.Effort = llm.EffortNone }), model: listed(terra()), want: 600},
-		{name: "clamped to what the model can write", req: asked(func(r *port.Request) { r.MaxTokens = 6000 }), model: listed(tight), want: 9000},
+		{name: "clamped to what the model can write", req: asked(func(r *port.Request) { r.MaxTokens = 6000 }), model: listed(tight), want: 7000},
 		{name: "never under the provider's floor", req: asked(func(r *port.Request) { r.MaxTokens = 4 }), model: listed(plainModel()), want: 16},
 		{name: "a model that does not reason gets what was asked", req: asked(func(r *port.Request) { r.MaxTokens = 256 }), model: listed(plainModel()), want: 256},
 		{name: "an unlisted model gets what was asked", req: asked(func(r *port.Request) { r.MaxTokens = 256 }), model: catalogRow{}, want: 256},

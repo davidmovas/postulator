@@ -604,7 +604,10 @@ func TestTestProvider(t *testing.T) {
 		t.Errorf("response = %+v, want the probe usage", resp)
 	}
 	if h.prober.seen.MaxTokens <= 1 || llm.PurposeOf(h.prober.seen.Meta.RunID, h.prober.seen.Meta.Step) != llm.PurposeProbe {
-		t.Errorf("probe request = %+v, want room for an answer a reasoning model can reach", h.prober.seen)
+		t.Errorf("probe request = %+v, want room for a short answer, booked as a probe", h.prober.seen)
+	}
+	if h.prober.seen.Effort != llm.EffortNone || h.prober.seen.MaxTokens > 64 {
+		t.Errorf("probe asked effort %q and %d tokens, want no reasoning and a few tokens", h.prober.seen.Effort, h.prober.seen.MaxTokens)
 	}
 
 	if _, err = h.service.TestProvider(t.Context(), models.TestProviderRequest{Provider: "openai", Model: "ghost"}); !errors.IsCode(err, errors.NotFound) {

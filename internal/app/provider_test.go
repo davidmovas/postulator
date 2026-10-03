@@ -328,35 +328,27 @@ func effortOf(asked map[string]any) (string, bool) {
 	return effort, ok
 }
 
-func TestTheRequestCarriesTheReasoningEffortTheCatalogNames(t *testing.T) {
+func TestTheProviderTestPaysForNoReasoning(t *testing.T) {
 	t.Parallel()
 
-	cases := []struct {
-		name  string
-		model string
-		want  string
-	}{
-		{name: "the cheap model asks for little", model: "gpt-5.6-luna", want: "low"},
-		{name: "the mid tier asks for more", model: "gpt-5.6-terra", want: "medium"},
-		{name: "the flagship asks for more", model: "gpt-5.6-sol", want: "medium"},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, model := range []string{"gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"} {
+		t.Run(model, func(t *testing.T) {
 			t.Parallel()
 
 			core, server := provided(t)
 			server.Enqueue(openaitest.Text("pong").Reply())
 			if _, err := core.Models.TestProvider(t.Context(), models.TestProviderRequest{
-				Provider: "openai", Model: tc.model,
+				Provider: "openai", Model: model,
 			}); err != nil {
 				t.Fatalf("TestProvider: %v", err)
 			}
 
 			asked := lastBody(t, server)
-			effort, carried := effortOf(asked)
-			if !carried || effort != tc.want {
-				t.Fatalf("reasoning.effort = %q (carried %v), want %q", effort, carried, tc.want)
+			if effort, carried := effortOf(asked); !carried || effort != "none" {
+				t.Fatalf("reasoning.effort = %q (carried %v), want none sent explicitly", effort, carried)
+			}
+			if ceiling, ok := asked["max_output_tokens"].(float64); !ok || ceiling > 64 {
+				t.Fatalf("max_output_tokens = %v, want a few tokens and no reasoning allowance", asked["max_output_tokens"])
 			}
 			if text, shaped := asked["text"].(map[string]any); shaped && text["verbosity"] != nil {
 				t.Fatalf("the request carries a verbosity nobody asked for: %v", text)
@@ -388,7 +380,7 @@ func TestAModelWithNoReasoningSendsNoEffort(t *testing.T) {
 	}
 }
 
-func TestAnInvalidReasoningEffortIsRefused(t *testing.T) {
+func TestAModelOfARemovedProviderIsRefused(t *testing.T) {
 	t.Parallel()
 
 	home := t.TempDir()
@@ -400,11 +392,11 @@ func TestAnInvalidReasoningEffortIsRefused(t *testing.T) {
 	})
 
 	_, err := core.Models.UpsertModel(t.Context(), models.UpsertModelRequest{
-		Provider: "openai", Model: "gpt-odd", ContextTokens: 200000, MaxOutputTokens: 64000,
-		InputUSDPerM: 1, OutputUSDPerM: 2, RPM: 60, TPM: 120000, ReasoningEffort: "minimal",
+		Provider: "retired", Model: "old-model", ContextTokens: 200000, MaxOutputTokens: 64000,
+		InputUSDPerM: 1, OutputUSDPerM: 2, RPM: 60, TPM: 120000,
 	})
 	if !errors.IsCode(err, errors.Invalid) {
-		t.Fatalf("UpsertModel with minimal = %v, want INVALID", err)
+		t.Fatalf("UpsertModel of a removed provider = %v, want INVALID", err)
 	}
 }
 

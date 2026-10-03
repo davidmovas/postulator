@@ -26,7 +26,6 @@ type UpsertModelRequest struct {
 	SupportsStructured     bool    `json:"supportsStructured,omitempty" description:"It can answer against a JSON schema"`
 	SupportsImages         bool    `json:"supportsImages,omitempty" description:"It can read images"`
 	Reasoning              bool    `json:"reasoning,omitempty" description:"It bills its thinking as output"`
-	ReasoningEffort        string  `json:"reasoningEffort,omitempty" enum:"none,low,medium,high,xhigh" description:"How long it may think"`
 }
 
 type UpsertModelResponse struct {

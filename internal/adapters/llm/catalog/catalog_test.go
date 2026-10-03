@@ -295,30 +295,25 @@ func TestLookupRejectsAnUnknownModel(t *testing.T) {
 	}
 }
 
-func TestTheReasoningEffortSurvivesAnOverride(t *testing.T) {
+func TestAnOverrideKeepsWhetherTheModelReasons(t *testing.T) {
 	t.Parallel()
 
-	_, repo := newCatalog(t)
-	ref := llm.ModelRef{Provider: "openai", Model: "gpt-5.6-luna"}
-	stored := override(ref, true, 1)
-	stored.Info.Reasoning = true
-	stored.Info.ReasoningEffort = llm.EffortHigh
+	for _, reasons := range []bool{true, false} {
+		built, repo := newCatalog(t)
+		ref := llm.ModelRef{Provider: "openai", Model: "gpt-5.6-luna"}
+		stored := override(ref, true, 1)
+		stored.Info.Reasoning = reasons
 
-	if err := repo.Upsert(t.Context(), stored); err != nil {
-		t.Fatalf("Upsert: %v", err)
-	}
+		if err := repo.Upsert(t.Context(), stored); err != nil {
+			t.Fatalf("Upsert: %v", err)
+		}
 
-	listed, err := repo.List(t.Context())
-	if err != nil {
-		t.Fatalf("List: %v", err)
-	}
-	if len(listed) != 1 {
-		t.Fatalf("listed %d overrides, want 1", len(listed))
-	}
-	if listed[0].Info.ReasoningEffort != llm.EffortHigh {
-		t.Errorf("reasoning effort = %q, want %q", listed[0].Info.ReasoningEffort, llm.EffortHigh)
-	}
-	if !listed[0].Info.Reasoning {
-		t.Error("the override forgot that the model reasons")
+		info, err := built.Lookup(t.Context(), ref)
+		if err != nil {
+			t.Fatalf("Lookup: %v", err)
+		}
+		if info.Reasoning != reasons {
+			t.Errorf("reasoning = %t, want the override's %t", info.Reasoning, reasons)
+		}
 	}
 }

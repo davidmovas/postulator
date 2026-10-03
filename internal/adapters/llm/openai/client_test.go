@@ -54,7 +54,7 @@ func ref(model string) llm.ModelRef {
 
 func terra() llm.ModelInfo {
 	return llm.ModelInfo{
-		Ref: ref("gpt-5.6-terra"), ReasoningEffort: llm.EffortMedium,
+		Ref:           ref("gpt-5.6-terra"),
 		ContextTokens: 1_050_000, MaxOutputTokens: 128_000,
 		InputUSDPerM: 2, CachedInputUSDPerM: 0.2, CacheWriteUSDPerM: 2.5, OutputUSDPerM: 12,
 		FlexInputUSDPerM: 1, FlexCachedInputUSDPerM: 0.1, FlexCacheWriteUSDPerM: 1.25, FlexOutputUSDPerM: 6,
@@ -64,7 +64,7 @@ func terra() llm.ModelInfo {
 
 func luna() llm.ModelInfo {
 	return llm.ModelInfo{
-		Ref: ref("gpt-5.6-luna"), ReasoningEffort: llm.EffortLow,
+		Ref:           ref("gpt-5.6-luna"),
 		ContextTokens: 1_050_000, MaxOutputTokens: 128_000,
 		InputUSDPerM: 0.2, CachedInputUSDPerM: 0.02, OutputUSDPerM: 1.2,
 		Reasoning: true,

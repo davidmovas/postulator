@@ -188,7 +188,6 @@ func (s *Service) UpsertModel(ctx context.Context, req UpsertModelRequest) (Upse
 		SupportsStructured:     req.SupportsStructured,
 		SupportsImages:         req.SupportsImages,
 		Reasoning:              req.Reasoning,
-		ReasoningEffort:        llm.ReasoningEffort(strings.TrimSpace(req.ReasoningEffort)),
 	}
 	if err := info.Validate(); err != nil {
 		return UpsertModelResponse{}, err
@@ -279,6 +278,7 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequest) (Te
 		Ref:       ref,
 		Messages:  []port.Message{{Role: port.RoleUser, Text: "ping"}},
 		MaxTokens: probeTokens,
+		Effort:    llm.EffortNone,
 		Meta:      port.CallMeta{Step: llm.StepProbe},
 	})
 	if err != nil {

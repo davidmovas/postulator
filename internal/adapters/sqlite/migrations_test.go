@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-const latestMigration = 36
+const latestMigration = 37
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -47,6 +47,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0034_entity_terms.sql",
 		"0035_llm_call_usage_detail.sql",
 		"0036_model_catalog_tier_prices.sql",
+		"0037_drop_model_reasoning_effort.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -552,6 +553,72 @@ func TestSpendColumns(t *testing.T) {
 		if !step.ok && err == nil {
 			t.Fatalf("%s = %v was accepted", step.column, step.price)
 		}
+	}
+}
+
+func TestTheCatalogRowCarriesNoReasoningEffort(t *testing.T) {
+	t.Parallel()
+
+	store := openStore(t, nil)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	columns := func() []string {
+		t.Helper()
+		rows, queryErr := store.writer.QueryContext(t.Context(), `SELECT name FROM pragma_table_info('model_catalog')`)
+		if queryErr != nil {
+			t.Fatalf("read the columns: %v", queryErr)
+		}
+		defer rows.Close()
+		var names []string
+		for rows.Next() {
+			var name string
+			if scanErr := rows.Scan(&name); scanErr != nil {
+				t.Fatalf("scan a column: %v", scanErr)
+			}
+			names = append(names, name)
+		}
+		if rowsErr := rows.Err(); rowsErr != nil {
+			t.Fatalf("read the columns: %v", rowsErr)
+		}
+		return names
+	}
+	const at = "2026-10-03T09:00:00Z"
+	insert := `INSERT INTO model_catalog (provider, model, context_tokens, max_output_tokens, input_usd_per_m, output_usd_per_m, rpm, tpm, supports_structured, supports_images, reasoning, enabled, created_at, updated_at) VALUES ('openai', 'gpt-5.6-terra', 1000, 100, 2, 12, 1, 1, 1, 0, 1, 1, ?, ?)`
+	if _, err = store.writer.ExecContext(t.Context(), insert, at, at); err != nil {
+		t.Fatalf("store a row: %v", err)
+	}
+
+	if slices.Contains(columns(), "reasoning_effort") {
+		t.Fatal("model_catalog still carries reasoning_effort")
+	}
+
+	if _, err = provider.DownTo(t.Context(), 36); err != nil {
+		t.Fatalf("down to 36: %v", err)
+	}
+	if !slices.Contains(columns(), "reasoning_effort") {
+		t.Fatal("the down migration did not bring reasoning_effort back")
+	}
+	var effort string
+	if err = store.writer.QueryRowContext(t.Context(), `SELECT reasoning_effort FROM model_catalog WHERE model = 'gpt-5.6-terra'`).Scan(&effort); err != nil || effort != "" {
+		t.Fatalf("the restored effort = %q, %v; want the empty default", effort, err)
+	}
+	for _, value := range []struct {
+		effort string
+		ok     bool
+	}{{effort: "medium", ok: true}, {effort: "xhigh", ok: true}, {effort: "minimal"}} {
+		_, updateErr := store.writer.ExecContext(t.Context(), `UPDATE model_catalog SET reasoning_effort = ?`, value.effort)
+		if value.ok != (updateErr == nil) {
+			t.Errorf("reasoning_effort = %q: %v, want accepted %t", value.effort, updateErr, value.ok)
+		}
+	}
+
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up again: %v", err)
+	}
+	if slices.Contains(columns(), "reasoning_effort") {
+		t.Fatal("model_catalog carries reasoning_effort after the second up")
 	}
 }
 

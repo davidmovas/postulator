@@ -27,12 +27,11 @@ type Model struct {
 	ContextTokens   int    `json:"contextTokens"`
 	MaxOutputTokens int    `json:"maxOutputTokens"`
 	Prices
-	RPM                int    `json:"rpm"`
-	TPM                int    `json:"tpm"`
-	SupportsStructured bool   `json:"supportsStructured"`
-	SupportsImages     bool   `json:"supportsImages"`
-	Reasoning          bool   `json:"reasoning"`
-	ReasoningEffort    string `json:"reasoningEffort"`
+	RPM                int  `json:"rpm"`
+	TPM                int  `json:"tpm"`
+	SupportsStructured bool `json:"supportsStructured"`
+	SupportsImages     bool `json:"supportsImages"`
+	Reasoning          bool `json:"reasoning"`
 }
 
 type Profile struct {
@@ -121,7 +120,6 @@ func modelView(info llm.ModelInfo) Model {
 		SupportsStructured: info.SupportsStructured,
 		SupportsImages:     info.SupportsImages,
 		Reasoning:          info.Reasoning,
-		ReasoningEffort:    string(info.ReasoningEffort),
 	}
 }
 

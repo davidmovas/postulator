@@ -16,7 +16,6 @@ func TestModelCatalogRepoKeepsEveryPrice(t *testing.T) {
 	base := llm.ModelInfo{
 		Ref: llm.ModelRef{Provider: "openai", Model: "gpt-5.6-terra"}, ContextTokens: 1050000, MaxOutputTokens: 128000,
 		InputUSDPerM: 2, OutputUSDPerM: 12, RPM: 500, TPM: 500000, SupportsStructured: true, Reasoning: true,
-		ReasoningEffort: llm.EffortMedium,
 	}
 	priced := func(change func(info *llm.ModelInfo)) llm.ModelInfo {
 		info := base

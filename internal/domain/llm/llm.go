@@ -108,23 +108,22 @@ func (t ServiceTier) Valid() bool {
 }
 
 type ModelInfo struct {
-	Ref                    ModelRef        `json:"ref"`
-	ReasoningEffort        ReasoningEffort `json:"reasoningEffort,omitempty"`
-	ContextTokens          int             `json:"contextTokens"`
-	MaxOutputTokens        int             `json:"maxOutputTokens"`
-	InputUSDPerM           float64         `json:"inputUsdPerM"`
-	CachedInputUSDPerM     float64         `json:"cachedInputUsdPerM,omitempty"`
-	CacheWriteUSDPerM      float64         `json:"cacheWriteUsdPerM,omitempty"`
-	OutputUSDPerM          float64         `json:"outputUsdPerM"`
-	FlexInputUSDPerM       float64         `json:"flexInputUsdPerM,omitempty"`
-	FlexCachedInputUSDPerM float64         `json:"flexCachedInputUsdPerM,omitempty"`
-	FlexCacheWriteUSDPerM  float64         `json:"flexCacheWriteUsdPerM,omitempty"`
-	FlexOutputUSDPerM      float64         `json:"flexOutputUsdPerM,omitempty"`
-	RPM                    int             `json:"rpm"`
-	TPM                    int             `json:"tpm"`
-	SupportsStructured     bool            `json:"supportsStructured"`
-	SupportsImages         bool            `json:"supportsImages"`
-	Reasoning              bool            `json:"reasoning"`
+	Ref                    ModelRef `json:"ref"`
+	ContextTokens          int      `json:"contextTokens"`
+	MaxOutputTokens        int      `json:"maxOutputTokens"`
+	InputUSDPerM           float64  `json:"inputUsdPerM"`
+	CachedInputUSDPerM     float64  `json:"cachedInputUsdPerM,omitempty"`
+	CacheWriteUSDPerM      float64  `json:"cacheWriteUsdPerM,omitempty"`
+	OutputUSDPerM          float64  `json:"outputUsdPerM"`
+	FlexInputUSDPerM       float64  `json:"flexInputUsdPerM,omitempty"`
+	FlexCachedInputUSDPerM float64  `json:"flexCachedInputUsdPerM,omitempty"`
+	FlexCacheWriteUSDPerM  float64  `json:"flexCacheWriteUsdPerM,omitempty"`
+	FlexOutputUSDPerM      float64  `json:"flexOutputUsdPerM,omitempty"`
+	RPM                    int      `json:"rpm"`
+	TPM                    int      `json:"tpm"`
+	SupportsStructured     bool     `json:"supportsStructured"`
+	SupportsImages         bool     `json:"supportsImages"`
+	Reasoning              bool     `json:"reasoning"`
 }
 
 func (i ModelInfo) OffersFlex() bool {

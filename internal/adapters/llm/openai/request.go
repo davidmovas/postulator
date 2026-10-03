@@ -17,7 +17,7 @@ const (
 	minOutputTokens = 16
 	maxCacheKey     = 64
 
-	effortMinimal llm.ReasoningEffort = "minimal"
+	effortWhenUnasked = llm.EffortLow
 )
 
 type wireRequest struct {
@@ -113,25 +113,12 @@ func effortFor(asked llm.ReasoningEffort, model catalogRow) (llm.ReasoningEffort
 	switch {
 	case model.known && !model.info.Reasoning:
 		return "", false
-	case model.known:
-		return settledEffort(asked, model.info.ReasoningEffort), true
 	case asked.Valid():
 		return asked, true
+	case model.known:
+		return effortWhenUnasked, true
 	default:
 		return "", false
-	}
-}
-
-func settledEffort(asked, catalog llm.ReasoningEffort) llm.ReasoningEffort {
-	switch {
-	case asked.Valid():
-		return asked
-	case catalog == effortMinimal:
-		return llm.EffortLow
-	case catalog.Valid():
-		return catalog
-	default:
-		return llm.EffortMedium
 	}
 }
 

@@ -35,7 +35,6 @@
         "provider": "openai",
         "model": "gpt-5.6-sol"
       },
-      "reasoningEffort": "medium",
       "contextTokens": 1050000,
       "maxOutputTokens": 128000,
       "inputUsdPerM": 4.0,
@@ -57,7 +56,6 @@
         "provider": "openai",
         "model": "gpt-5.6-terra"
       },
-      "reasoningEffort": "medium",
       "contextTokens": 1050000,
       "maxOutputTokens": 128000,
       "inputUsdPerM": 2.0,
@@ -79,7 +77,6 @@
         "provider": "openai",
         "model": "gpt-5.6-luna"
       },
-      "reasoningEffort": "low",
       "contextTokens": 1050000,
       "maxOutputTokens": 128000,
       "inputUsdPerM": 0.2,
