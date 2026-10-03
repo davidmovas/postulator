@@ -156,6 +156,24 @@ func (r *recorder) payloads(eventType events.Type) []any {
 	return out
 }
 
+func (r *recorder) deliveredThrough(runID string, last int64) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	seen := make(map[int64]bool, len(r.rows))
+	for _, row := range r.rows {
+		if row.runID == runID {
+			seen[row.seq] = true
+		}
+	}
+	for seq := int64(1); seq <= last; seq++ {
+		if !seen[seq] {
+			return false
+		}
+	}
+	return true
+}
+
 func (r *recorder) count(eventType events.Type) int {
 	total := 0
 	for _, seen := range r.types() {
@@ -286,6 +304,7 @@ func (h *harness) waitForRun(t *testing.T, runID string, want run.Status) run.Ru
 		if err == nil {
 			last = record
 			if record.Status == want {
+				h.waitForDelivery(t, runID)
 				return record
 			}
 		}
@@ -294,6 +313,15 @@ func (h *harness) waitForRun(t *testing.T, runID string, want run.Status) run.Ru
 	t.Fatalf("timed out waiting for run %s to reach %s; it is %s (%q, %q)",
 		runID, want, last.Status, last.PauseReason, last.Error)
 	return last
+}
+
+func (h *harness) waitForDelivery(t *testing.T, runID string) {
+	t.Helper()
+
+	waitFor(t, "every event the run recorded to be delivered live", func() bool {
+		stored, err := h.log.List(t.Context(), runID, 0, 1000)
+		return err == nil && len(stored) > 0 && h.bus.deliveredThrough(runID, stored[len(stored)-1].Seq)
+	})
 }
 
 func waitFor(t *testing.T, what string, done func() bool) {
