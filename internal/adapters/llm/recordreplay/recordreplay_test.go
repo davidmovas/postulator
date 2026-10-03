@@ -5,6 +5,7 @@ import (
 	stderrors "errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -80,7 +81,7 @@ func TestRecordThenReplay(t *testing.T) {
 	if err != nil {
 		t.Fatalf("replay Complete: %v", err)
 	}
-	if replayed != recorded {
+	if !reflect.DeepEqual(replayed, recorded) {
 		t.Errorf("replayed = %+v, want %+v", replayed, recorded)
 	}
 }

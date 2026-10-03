@@ -42,30 +42,166 @@ func userMessage(text string) []llm.Message {
 	return []llm.Message{{Role: llm.RoleUser, Text: text}}
 }
 
+func call(id, name, args string) llm.Message {
+	return llm.Message{Role: llm.RoleAssistant, Call: &llm.ToolCall{ID: id, Name: name, Args: json.RawMessage(args)}}
+}
+
+func result(callID, output string) llm.Message {
+	return llm.Message{Role: llm.RoleTool, Result: &llm.ToolResult{CallID: callID, Output: json.RawMessage(output)}}
+}
+
+func conversation(messages ...llm.Message) func(*llm.Request) {
+	return func(r *llm.Request) { r.Messages = messages }
+}
+
 func TestRequestValidate(t *testing.T) {
 	t.Parallel()
 
 	hot := 9.0
+	user := llm.Message{Role: llm.RoleUser, Text: "find the pages"}
+	developer := llm.Message{Role: llm.RoleDeveloper, Text: "the site is example.com"}
+	answer := llm.Message{Role: llm.RoleAssistant, Text: "here they are"}
+	listing := llm.Tool{Name: "pages_list", Description: "lists pages", Schema: &llm.Schema{Type: llm.SchemaObject}}
+
 	cases := []struct {
 		name    string
 		mutate  func(*llm.Request)
-		wantErr bool
+		wantErr string
 	}{
 		{name: "a plain request is valid"},
-		{name: "the provider is required", mutate: func(r *llm.Request) { r.Ref.Provider = "" }, wantErr: true},
-		{name: "the model is required", mutate: func(r *llm.Request) { r.Ref.Model = "" }, wantErr: true},
-		{name: "messages are required", mutate: func(r *llm.Request) { r.Messages = nil }, wantErr: true},
-		{name: "a role must be known", mutate: func(r *llm.Request) { r.Messages[0].Role = "system" }, wantErr: true},
-		{name: "a message must not be empty", mutate: func(r *llm.Request) { r.Messages[0].Text = "" }, wantErr: true},
+		{name: "the provider is required", mutate: func(r *llm.Request) { r.Ref.Provider = "" }, wantErr: "the model reference"},
+		{name: "the model is required", mutate: func(r *llm.Request) { r.Ref.Model = "" }, wantErr: "the model reference"},
+		{name: "messages are required", mutate: func(r *llm.Request) { r.Messages = nil }, wantErr: "at least one message"},
+		{name: "a role must be known", mutate: func(r *llm.Request) { r.Messages[0].Role = "system" }, wantErr: "a message role"},
+		{name: "a message must not be empty", mutate: func(r *llm.Request) { r.Messages[0].Text = "" }, wantErr: "must not be empty"},
 		{
 			name: "the last message comes from the user",
 			mutate: func(r *llm.Request) {
 				r.Messages = append(r.Messages, llm.Message{Role: llm.RoleAssistant, Text: "hi"})
 			},
-			wantErr: true,
+			wantErr: "the last message",
 		},
-		{name: "the ceiling is not negative", mutate: func(r *llm.Request) { r.MaxTokens = -1 }, wantErr: true},
-		{name: "the temperature is bounded", mutate: func(r *llm.Request) { r.Temperature = &hot }, wantErr: true},
+		{name: "the ceiling is not negative", mutate: func(r *llm.Request) { r.MaxTokens = -1 }, wantErr: "the token ceiling"},
+		{name: "the temperature is bounded", mutate: func(r *llm.Request) { r.Temperature = &hot }, wantErr: "the temperature"},
+		{name: "developer context may precede the user", mutate: conversation(developer, user)},
+		{name: "developer context may close the request", mutate: conversation(user, developer)},
+		{
+			name:   "a tool round ends on its result",
+			mutate: conversation(user, call("call_1", "pages_list", `{"siteId":"s"}`), result("call_1", `{"pages":[]}`)),
+		},
+		{
+			name: "two calls of one round are answered in turn",
+			mutate: conversation(user, call("call_1", "pages_list", `{}`), call("call_2", "pages_get", `{"id":"p"}`),
+				result("call_1", `{"pages":[]}`), result("call_2", `"gone"`)),
+		},
+		{
+			name: "the user speaks again after a finished round",
+			mutate: conversation(user, call("call_1", "pages_list", `{}`), result("call_1", `[]`), answer,
+				llm.Message{Role: llm.RoleUser, Text: "thanks, now publish"}),
+		},
+		{
+			name: "a message carries one thing",
+			mutate: conversation(llm.Message{
+				Role: llm.RoleAssistant, Text: "calling",
+				Call: &llm.ToolCall{ID: "call_1", Name: "pages_list", Args: json.RawMessage(`{}`)},
+			}, user),
+			wantErr: "only one of",
+		},
+		{
+			name: "a tool message carries its result and nothing else",
+			mutate: conversation(user, call("call_1", "pages_list", `{}`), llm.Message{
+				Role: llm.RoleTool, Text: "done",
+				Result: &llm.ToolResult{CallID: "call_1", Output: json.RawMessage(`[]`)},
+			}),
+			wantErr: "only one of",
+		},
+		{
+			name: "a tool call comes from the assistant",
+			mutate: conversation(llm.Message{
+				Role: llm.RoleUser, Call: &llm.ToolCall{ID: "call_1", Name: "pages_list", Args: json.RawMessage(`{}`)},
+			}, user),
+			wantErr: "a tool call must come from the assistant",
+		},
+		{
+			name: "a tool result travels in a tool message",
+			mutate: conversation(user, call("call_1", "pages_list", `{}`), llm.Message{
+				Role: llm.RoleUser, Result: &llm.ToolResult{CallID: "call_1", Output: json.RawMessage(`[]`)},
+			}),
+			wantErr: "a tool result must travel in a tool message",
+		},
+		{
+			name:    "a tool message carries a tool result",
+			mutate:  conversation(user, call("call_1", "pages_list", `{}`), llm.Message{Role: llm.RoleTool, Text: "[]"}),
+			wantErr: "a tool message must carry a tool result",
+		},
+		{
+			name:    "a tool call has an identifier",
+			mutate:  conversation(user, call("", "pages_list", `{}`), user),
+			wantErr: "a tool call needs an identifier",
+		},
+		{
+			name:    "a tool call names its tool",
+			mutate:  conversation(user, call("call_1", "", `{}`), user),
+			wantErr: "a tool call must name its tool",
+		},
+		{
+			name:    "a tool call's arguments are JSON",
+			mutate:  conversation(user, call("call_1", "pages_list", `{"siteId":`), user),
+			wantErr: "arguments must be JSON",
+		},
+		{
+			name:    "a tool call carries its arguments",
+			mutate:  conversation(user, call("call_1", "pages_list", ``), user),
+			wantErr: "arguments must be JSON",
+		},
+		{
+			name:    "a tool result names the call it answers",
+			mutate:  conversation(user, call("call_1", "pages_list", `{}`), result("", `[]`)),
+			wantErr: "a tool result must name the call it answers",
+		},
+		{
+			name:    "a tool result is JSON",
+			mutate:  conversation(user, call("call_1", "pages_list", `{}`), result("call_1", `not json`)),
+			wantErr: "a tool result must be JSON",
+		},
+		{
+			name:    "a tool result answers a call",
+			mutate:  conversation(user, result("call_9", `[]`)),
+			wantErr: "a call made before it",
+		},
+		{
+			name:    "a tool result follows its call",
+			mutate:  conversation(user, result("call_1", `[]`), call("call_1", "pages_list", `{}`), user),
+			wantErr: "a call made before it",
+		},
+		{
+			name:    "a request does not end on a tool call",
+			mutate:  conversation(user, call("call_1", "pages_list", `{}`)),
+			wantErr: "the last message",
+		},
+		{name: "a known effort is accepted", mutate: func(r *llm.Request) { r.Effort = domain.EffortLow }},
+		{name: "an effort must be known", mutate: func(r *llm.Request) { r.Effort = "extreme" }, wantErr: "the reasoning effort"},
+		{name: "the flex tier is accepted", mutate: func(r *llm.Request) { r.Tier = domain.TierFlex }},
+		{name: "a tier must be known", mutate: func(r *llm.Request) { r.Tier = "priority" }, wantErr: "the service tier"},
+		{name: "a cache key is free text", mutate: func(r *llm.Request) { r.CacheKey = "agent:v1" }},
+		{name: "tools may be offered", mutate: func(r *llm.Request) { r.Tools = []llm.Tool{listing, {Name: "pages_get"}} }},
+		{
+			name:    "a tool has a name",
+			mutate:  func(r *llm.Request) { r.Tools = []llm.Tool{listing, {Description: "nameless"}} },
+			wantErr: "a tool needs a name",
+		},
+		{
+			name:    "tool names are unique",
+			mutate:  func(r *llm.Request) { r.Tools = []llm.Tool{listing, listing} },
+			wantErr: "two tools share one name",
+		},
+		{
+			name: "a tool's parameters are an object",
+			mutate: func(r *llm.Request) {
+				r.Tools = []llm.Tool{{Name: "pages_list", Schema: &llm.Schema{Type: llm.SchemaString}}}
+			},
+			wantErr: "a tool's parameters must be an object",
+		},
 	}
 
 	for _, tc := range cases {
@@ -78,11 +214,99 @@ func TestRequestValidate(t *testing.T) {
 			}
 
 			err := req.Validate()
-			if tc.wantErr != (err != nil) {
-				t.Fatalf("Validate() = %v, want error %t", err, tc.wantErr)
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Fatalf("Validate() = %v, want no error", err)
+				}
+				return
 			}
-			if tc.wantErr && !errors.IsCode(err, errors.Invalid) {
-				t.Errorf("Validate() code = %s, want %s", errors.CodeOf(err), errors.Invalid)
+			if !errors.IsCode(err, errors.Invalid) {
+				t.Fatalf("Validate() = %v, want %s", err, errors.Invalid)
+			}
+			if _, message := errors.Describe(err); !strings.Contains(message, tc.wantErr) {
+				t.Errorf("Validate() message = %q, want it to say %q", message, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestTheRequestEncoding(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		value any
+		want  string
+	}{
+		{
+			name: "a request that uses none of the new fields keeps its recorded fixtures findable",
+			value: llm.Request{
+				Ref: ref(), System: "you write", Messages: userMessage("write"), MaxTokens: 128,
+				Meta: llm.CallMeta{RunID: "r"},
+			},
+			want: `{"ref":{"provider":"openai","model":"gpt-5.1"},"system":"you write",` +
+				`"messages":[{"role":"user","text":"write"}],` +
+				`"meta":{"runId":"r","itemId":"","step":"","conversationId":""},"maxTokens":128}`,
+		},
+		{
+			name: "the tool fields, the effort, the tier and the cache key are camelCase",
+			value: llm.Request{
+				Ref: ref(),
+				Messages: []llm.Message{
+					call("call_1", "pages_list", `{"siteId":"s"}`),
+					result("call_1", `{"pages":[]}`),
+				},
+				Meta:     llm.CallMeta{ConversationID: "c", Role: domain.RoleChat},
+				Tools:    []llm.Tool{{Name: "pages_list", Description: "lists pages", Schema: &llm.Schema{Type: llm.SchemaObject}}},
+				Effort:   domain.EffortLow,
+				Tier:     domain.TierFlex,
+				CacheKey: "agent",
+			},
+			want: `{"ref":{"provider":"openai","model":"gpt-5.1"},"system":"",` +
+				`"messages":[{"role":"assistant","text":"","call":{"id":"call_1","name":"pages_list","args":{"siteId":"s"}}},` +
+				`{"role":"tool","text":"","result":{"callId":"call_1","output":{"pages":[]}}}],` +
+				`"meta":{"runId":"","itemId":"","step":"","conversationId":"c","role":"chat"},"maxTokens":0,` +
+				`"tools":[{"name":"pages_list","description":"lists pages","schema":{"type":"object"}}],` +
+				`"effort":"low","tier":"flex","cacheKey":"agent"}`,
+		},
+		{
+			name:  "a plain response",
+			value: llm.Response{Text: "hi", FinishReason: llm.FinishStop},
+			want:  `{"text":"hi","usage":{"input":0,"cachedInput":0,"output":0,"reasoning":0,"total":0},"finishReason":"stop"}`,
+		},
+		{
+			name: "a response that calls tools on flex",
+			value: llm.Response{
+				Usage:        domain.Usage{Input: 1, Output: 2, Reasoning: 1, Total: 3},
+				FinishReason: llm.FinishStop,
+				Calls:        []llm.ToolCall{{ID: "call_1", Name: "pages_list", Args: json.RawMessage(`{}`)}},
+				Tier:         domain.TierFlex,
+			},
+			want: `{"text":"","usage":{"input":1,"cachedInput":0,"output":2,"reasoning":1,"total":3},"finishReason":"stop",` +
+				`"calls":[{"id":"call_1","name":"pages_list","args":{}}],"tier":"flex"}`,
+		},
+		{
+			name: "a delta that carries a call and the end of the answer",
+			value: llm.Delta{
+				Done:   true,
+				Call:   &llm.ToolCall{ID: "call_1", Name: "pages_list", Args: json.RawMessage(`{}`)},
+				Finish: llm.FinishStop,
+				Tier:   domain.TierDefault,
+			},
+			want: `{"text":"","done":true,"call":{"id":"call_1","name":"pages_list","args":{}},"finish":"stop","tier":"default"}`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			encoded, err := json.Marshal(tc.value)
+			if err != nil {
+				t.Fatalf("Marshal: %v", err)
+			}
+			if string(encoded) != tc.want {
+				t.Fatalf("Marshal =\n%s\nwant\n%s", encoded, tc.want)
 			}
 		})
 	}
