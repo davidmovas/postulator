@@ -15,6 +15,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/app"
+	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/reports"
@@ -240,8 +241,15 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 func assertAProductIsRefusedWithoutThePlugin(t *testing.T, core *app.Core, siteID string) {
 	t.Helper()
 
+	entity, err := core.Graph.CreateEntity(t.Context(), graph.CreateEntityRequest{
+		SiteID: siteID, Name: "Gift card", Kind: "product", Keywords: []dto.Keyword{{Text: "restaurant gift card"}},
+	})
+	if err != nil {
+		t.Fatalf("give the product row an entity: %v", err)
+	}
 	created, err := core.Pages.Create(t.Context(), pages.CreateRequest{
 		SiteID: siteID, Path: "/menu/gift-card/", WPType: string(pagemap.WPProduct), Title: "Gift card",
+		EntityID: &entity.Entity.ID,
 	})
 	if err != nil {
 		t.Fatalf("plan a product row: %v", err)
@@ -263,6 +271,9 @@ func assertAProductIsRefusedWithoutThePlugin(t *testing.T, core *app.Core, siteI
 	}
 	if _, err = core.Pages.Delete(t.Context(), pages.DeleteRequest{ID: created.Page.ID}); err != nil {
 		t.Fatalf("drop the product row: %v", err)
+	}
+	if _, err = core.Graph.DeleteEntity(t.Context(), graph.DeleteEntityRequest{ID: entity.Entity.ID}); err != nil {
+		t.Fatalf("drop the product row's entity: %v", err)
 	}
 }
 
