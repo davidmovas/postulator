@@ -9,11 +9,12 @@ import (
 	"github.com/davidmovas/postulator/internal/application/llm"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 const (
-	NameProposeFromKeywords = "propose_from_keywords"
+	NameProposeFromKeywords = domainllm.StepProposeFromKeywords
 	KeywordsPerCall         = 40
 )
 
@@ -90,7 +91,7 @@ func (s *Service) ProposeFromKeywords(ctx context.Context, req ProposeFromKeywor
 			System:    system,
 			Messages:  []llm.Message{{Role: llm.RoleUser, Text: user}},
 			MaxTokens: proposalTokens,
-			Meta:      llm.CallMeta{Step: NameProposeFromKeywords},
+			Meta:      proposalCall(NameProposeFromKeywords),
 		})
 		if callErr != nil {
 			return ProposeFromKeywordsResponse{}, callErr

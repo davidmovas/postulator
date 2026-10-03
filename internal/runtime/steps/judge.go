@@ -101,7 +101,7 @@ func judgement(ctx context.Context, deps Deps, sc *run.StepContext) (report Judg
 	assessed, err := deps.Content.Assess(ctx, appcontent.AssessRequest{
 		SiteID: sc.Run.SiteID, Page: sc.Page, Entity: entity, Spec: sc.Spec, Body: body,
 		Snippet:    appcontent.Snippet{Title: snippet.Title, Description: snippet.Description},
-		HasSnippet: hasSnippet, Product: draft.Product, Targets: targets, Call: callMeta(sc, NameJudge),
+		HasSnippet: hasSnippet, Product: draft.Product, Targets: targets, Call: callMeta(sc, NameJudge, domainllm.RoleJudge),
 	})
 	return assessed.Report, assessed.Tokens, err
 }

@@ -1278,6 +1278,13 @@ func TestEveryModelStepAsksUnderItsOwnNameAndCeiling(t *testing.T) {
 			},
 		},
 		{
+			name: steps.NameJudge, def: steps.Judge, reply: `{"score":0.9,"issues":[],"suggestions":[]}`,
+			context: func(t *testing.T, _ steps.Deps) *run.StepContext {
+				t.Helper()
+				return judgeContext(t)
+			},
+		},
+		{
 			name: steps.NameRepairLinks, def: steps.RepairLinks, reply: `{"sentence":"A sentence with no anchor at all."}`,
 			context: func(t *testing.T, _ steps.Deps) *run.StepContext {
 				t.Helper()
@@ -1297,6 +1304,7 @@ func TestEveryModelStepAsksUnderItsOwnNameAndCeiling(t *testing.T) {
 			sc := tc.context(t, deps)
 			recorder := &requestRecorder{reply: tc.reply}
 			deps.LLM = recorder
+			deps.Content = appcontent.New(appcontent.Deps{Profiles: deps.Profiles, LLM: recorder})
 			def := tc.def(deps)
 
 			if _, err := def.Run(t.Context(), sc); err != nil {
@@ -1308,6 +1316,9 @@ func TestEveryModelStepAsksUnderItsOwnNameAndCeiling(t *testing.T) {
 			for _, req := range recorder.requests {
 				if req.Meta.RunID != sc.Run.ID || req.Meta.ItemID != sc.Item.ID || req.Meta.Step != tc.name {
 					t.Fatalf("the call is booked as %+v, want run %s, item %s, step %s", req.Meta, sc.Run.ID, sc.Item.ID, tc.name)
+				}
+				if req.Meta.Role == "" || req.Meta.Role != def.Role {
+					t.Fatalf("the call is sent for the role %q, want the step's own %q", req.Meta.Role, def.Role)
 				}
 				if req.Ref.Model != "unit" || req.System == "" || len(req.Messages) != 1 ||
 					req.Messages[0].Role != port.RoleUser || req.Messages[0].Text == "" {

@@ -225,6 +225,51 @@ func TestJudgeAuditsTheLivePage(t *testing.T) {
 	}
 }
 
+func TestTheJudgeBooksEveryCallUnderItsStepAndRole(t *testing.T) {
+	t.Parallel()
+
+	inRun := port.CallMeta{RunID: "run", ItemID: "item", Step: appcontent.NameJudge}
+	cases := []struct {
+		name  string
+		judge func(*appcontent.Service) error
+		want  port.CallMeta
+	}{
+		{
+			name: "an audit on demand is booked as the judge's own step",
+			judge: func(service *appcontent.Service) error {
+				_, err := service.Judge(t.Context(), appcontent.JudgeRequest{PageID: "page-child"})
+				return err
+			},
+			want: port.CallMeta{Step: domainllm.StepJudge, Role: domainllm.RoleJudge},
+		},
+		{
+			name: "an assessment inside a run keeps the run's booking",
+			judge: func(service *appcontent.Service) error {
+				_, err := service.Assess(t.Context(), appcontent.AssessRequest{
+					SiteID: "site", Page: pages()[1], Entity: entities()[1], Body: "<h1>Espresso</h1><p>Espresso.</p>",
+					Call: inRun,
+				})
+				return err
+			},
+			want: port.CallMeta{RunID: "run", ItemID: "item", Step: appcontent.NameJudge, Role: domainllm.RoleJudge},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			model := &llmStub{reply: `{"score":0.8,"issues":[],"suggestions":[]}`}
+			if err := tc.judge(newService(model, nil)); err != nil {
+				t.Fatalf("the judge failed: %v", err)
+			}
+			if model.last.Meta != tc.want {
+				t.Fatalf("the call is booked as %+v, want %+v", model.last.Meta, tc.want)
+			}
+		})
+	}
+}
+
 func TestJudgeAuditsAProductUnderTheNameTheStoreShows(t *testing.T) {
 	t.Parallel()
 

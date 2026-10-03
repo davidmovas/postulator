@@ -19,12 +19,13 @@ import (
 )
 
 const (
-	NameProposeFromPages = "propose_from_pages"
-	NameProposeRelated   = "propose_related"
+	NameProposeFromPages = domainllm.StepProposeFromPages
+	NameProposeRelated   = domainllm.StepProposeRelated
 
 	PagesPerCall     = 40
 	proposalTokens   = 4096
 	relatedWeightMin = 0.05
+	proposalRole     = domainllm.RoleEditor
 )
 
 //go:embed prompts/*.tmpl
@@ -151,7 +152,7 @@ func (s *Service) previewFromPages(ctx context.Context, rawSiteID string, pageID
 			System:    system,
 			Messages:  []llm.Message{{Role: llm.RoleUser, Text: user}},
 			MaxTokens: proposalTokens,
-			Meta:      llm.CallMeta{Step: NameProposeFromPages},
+			Meta:      proposalCall(NameProposeFromPages),
 		})
 		if callErr != nil {
 			return PreviewFromPagesResponse{}, callErr
@@ -289,7 +290,7 @@ func (s *Service) ProposeRelated(ctx context.Context, req ProposeRelatedRequest)
 		System:    system,
 		Messages:  []llm.Message{{Role: llm.RoleUser, Text: user}},
 		MaxTokens: proposalTokens,
-		Meta:      llm.CallMeta{Step: NameProposeRelated},
+		Meta:      proposalCall(NameProposeRelated),
 	})
 	if err != nil {
 		return ProposeRelatedResponse{}, err
@@ -312,7 +313,11 @@ func (s *Service) model(ctx context.Context, siteID string) (domainllm.ModelRef,
 	if s.profiles == nil || s.llm == nil {
 		return domainllm.ModelRef{}, errors.New(errors.Invalid, "no model is wired for the graph proposals")
 	}
-	return s.profiles.Resolve(ctx, siteID, domainllm.RoleEditor, nil)
+	return s.profiles.Resolve(ctx, siteID, proposalRole, nil)
+}
+
+func proposalCall(step string) llm.CallMeta {
+	return llm.CallMeta{Step: step, Role: proposalRole}
 }
 
 type siteGraph struct {

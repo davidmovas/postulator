@@ -73,14 +73,14 @@ func GenerateMeta(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			ref, err := deps.Profiles.Resolve(ctx, sc.Run.SiteID, domainllm.RoleEditor, sc.Spec.ModelProfiles)
+			call, err := modelFor(ctx, deps, sc, NameGenerateMeta, domainllm.RoleEditor)
 			if err != nil {
 				return run.Result{}, err
 			}
 
 			canonical := pagemap.NewSite(owner.BaseURL).URL(sc.Page.Path)
 			keywords := pagemap.Keywords(sc.Page, entity)
-			request, err := stepRequest(sc, NameGenerateMeta, ref, metaPrompt{
+			request, err := stepRequest(sc, call, metaPrompt{
 				Page: sc.Page, Entity: entity, Keywords: keywords, Spec: sc.Spec, Draft: draft,
 				SiteName:  owner.Name,
 				Canonical: canonical,

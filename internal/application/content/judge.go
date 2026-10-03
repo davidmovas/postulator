@@ -49,12 +49,14 @@ func (s *Service) Assess(ctx context.Context, req AssessRequest) (AssessResponse
 		return AssessResponse{}, err
 	}
 
+	booked := req.Call
+	booked.Role = domainllm.RoleJudge
 	answer, usage, err := llm.Structured[judgeAnswer](ctx, s.deps.LLM, llm.Request{
 		Ref:       ref,
 		System:    system,
 		Messages:  []llm.Message{{Role: llm.RoleUser, Text: user}},
 		MaxTokens: JudgeTokens,
-		Meta:      req.Call,
+		Meta:      booked,
 	})
 	if err != nil {
 		return AssessResponse{Tokens: usage.Total}, err
@@ -112,6 +114,7 @@ func (s *Service) Judge(ctx context.Context, req JudgeRequest) (JudgeResponse, e
 		Snippet:    Snippet{Title: page.MetaTitle, Description: page.MetaDescription},
 		HasSnippet: page.MetaTitle != "" || page.MetaDescription != "",
 		Targets:    targets,
+		Call:       llm.CallMeta{Step: domainllm.StepJudge},
 	})
 	if err != nil {
 		return JudgeResponse{}, err

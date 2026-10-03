@@ -44,13 +44,13 @@ func GenerateBody(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			ref, err := deps.Profiles.Resolve(ctx, sc.Run.SiteID, domainllm.RoleWriter, sc.Spec.ModelProfiles)
+			call, err := modelFor(ctx, deps, sc, NameGenerateBody, domainllm.RoleWriter)
 			if err != nil {
 				return run.Result{}, err
 			}
 
 			brief := content.NewBrief(sc.Spec, policy.Rules, sc.Page, entity, lc)
-			request, err := stepRequest(sc, NameGenerateBody, ref, bodyPrompt{
+			request, err := stepRequest(sc, call, bodyPrompt{
 				Page: sc.Page, Entity: entity, Spec: sc.Spec, Brief: brief, Product: sc.Page.WPType == pagemap.WPProduct,
 			}, writerCeiling(sc.Spec, sc.Page.WPType, sc.Item.Attempts))
 			if err != nil {

@@ -437,6 +437,18 @@ func TestProposalsNameTheStepTheySpendOn(t *testing.T) {
 				return err
 			},
 		},
+		{
+			name:  "from the keywords",
+			reply: keywordProposal,
+			want:  appgraph.NameProposeFromKeywords,
+			run: func(t *testing.T, f proposeFixture) error {
+				t.Helper()
+				_, err := f.service.ProposeFromKeywords(t.Context(), appgraph.ProposeFromKeywordsRequest{
+					SiteID: f.siteID, Keywords: []string{"trail running shoes"},
+				})
+				return err
+			},
+		},
 	}
 
 	for _, tc := range cases {
@@ -451,9 +463,24 @@ func TestProposalsNameTheStepTheySpendOn(t *testing.T) {
 			if len(model.calls) == 0 {
 				t.Fatal("the model was never called")
 			}
-			if step := model.calls[0].Meta.Step; step != tc.want {
-				t.Errorf("step = %q, want %q; the ledger and the harness both key on it", step, tc.want)
+			for _, call := range model.calls {
+				if call.Meta.Step != tc.want {
+					t.Errorf("step = %q, want %q; the ledger and the harness both key on it", call.Meta.Step, tc.want)
+				}
+				if call.Meta.Role != domainllm.RoleEditor {
+					t.Errorf("role = %q, want the editor, whose effort and tier the call is sent on", call.Meta.Role)
+				}
 			}
 		})
+	}
+}
+
+func TestTheProposalStepsAreTheOnesTheSpendReportCountsAsGraphWork(t *testing.T) {
+	t.Parallel()
+
+	for _, step := range []string{appgraph.NameProposeFromPages, appgraph.NameProposeFromKeywords, appgraph.NameProposeRelated} {
+		if purpose := domainllm.PurposeOf("", step); purpose != domainllm.PurposeGraph {
+			t.Errorf("%s is counted as %q, want graph", step, purpose)
+		}
 	}
 }
