@@ -53,17 +53,57 @@ func TestEmbeddedCatalogIsUsable(t *testing.T) {
 		t.Fatal("the embedded catalog is empty")
 	}
 
-	providers := map[string]bool{}
 	for _, info := range models {
-		providers[info.Ref.Provider] = true
+		if info.Ref.Provider != llm.ProviderOpenAI {
+			t.Errorf("the embedded catalog carries %s, which is not an OpenAI model", info.Ref)
+		}
 		if err = info.Validate(); err != nil {
 			t.Errorf("%s: %v", info.Ref, err)
 		}
 	}
-	for _, want := range []string{"openai", "anthropic", "gemini"} {
-		if !providers[want] {
-			t.Errorf("the embedded catalog carries no %s model", want)
-		}
+}
+
+func TestAnOverrideOfARemovedProviderIsNeverOffered(t *testing.T) {
+	t.Parallel()
+
+	retired := llm.ModelRef{Provider: "retired", Model: "old-model"}
+	cases := []struct {
+		name    string
+		enabled bool
+	}{
+		{name: "a model added under a removed provider", enabled: true},
+		{name: "a model switched off under a removed provider", enabled: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			built, repo := newCatalog(t)
+			before, err := built.List(t.Context())
+			if err != nil {
+				t.Fatalf("List: %v", err)
+			}
+			if err = repo.Upsert(t.Context(), override(retired, tc.enabled, 3)); err != nil {
+				t.Fatalf("Upsert: %v", err)
+			}
+
+			after, err := built.List(t.Context())
+			if err != nil {
+				t.Fatalf("List: %v", err)
+			}
+			if len(after) != len(before) {
+				t.Errorf("models = %d, want the %d the catalog offered before", len(after), len(before))
+			}
+			for _, info := range after {
+				if info.Ref.Provider != llm.ProviderOpenAI {
+					t.Errorf("the catalog offers %s", info.Ref)
+				}
+			}
+			if _, err = built.Lookup(t.Context(), retired); !errors.IsCode(err, errors.NotFound) {
+				t.Errorf("Lookup of the removed provider's model = %v, want %s", err, errors.NotFound)
+			}
+		})
 	}
 }
 

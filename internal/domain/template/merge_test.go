@@ -78,7 +78,7 @@ func TestResolveLayersOverrides(t *testing.T) {
 
 	base := validSpec()
 	site := json.RawMessage(`{"linkRules":{"maxLinks":5},"tone":"warm"}`)
-	page := json.RawMessage(`{"sections":[{"heading":"Only","intent":"one","targetWords":100,"required":true,"keywordRules":{"include":["x"],"primaryInHeading":false}}],"images":{"inline":0},"modelProfiles":{"writer":null,"editor":{"provider":"anthropic","model":"m"}}}`)
+	page := json.RawMessage(`{"sections":[{"heading":"Only","intent":"one","targetWords":100,"required":true,"keywordRules":{"include":["x"],"primaryInHeading":false}}],"images":{"inline":0},"modelProfiles":{"writer":null,"editor":{"provider":"openai","model":"gpt-5.6-luna"}}}`)
 
 	resolved, err := template.Resolve(base, site, page)
 	if err != nil {
@@ -96,7 +96,7 @@ func TestResolveLayersOverrides(t *testing.T) {
 	if !resolved.Images.Featured || resolved.Images.Inline != 0 || resolved.Images.Source != template.ImagesAI {
 		t.Errorf("images = %+v, want inline patched and the rest kept", resolved.Images)
 	}
-	if _, writer := resolved.ModelProfiles["writer"]; writer || resolved.ModelProfiles["editor"].Provider != "anthropic" {
+	if _, writer := resolved.ModelProfiles["writer"]; writer || resolved.ModelProfiles["editor"].Model != "gpt-5.6-luna" {
 		t.Errorf("model profiles = %+v, want writer removed and editor added", resolved.ModelProfiles)
 	}
 	if len(resolved.Recipe) != 2 {

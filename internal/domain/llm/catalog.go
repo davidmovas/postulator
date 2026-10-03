@@ -17,6 +17,9 @@ func (i ModelInfo) Validate() error {
 	if !i.Ref.Valid() {
 		return invalid("a model entry must name a provider and a model", "ref")
 	}
+	if !i.Ref.Supported() {
+		return invalid("only OpenAI models can be added; Postulator no longer works with other providers", "provider")
+	}
 	if i.ContextTokens <= 0 {
 		return invalid("the context window must be positive", "contextTokens")
 	}

@@ -212,12 +212,21 @@ func TestProviderKeysReportsWhichProvidersAreConfiguredAndNeverTheKey(t *testing
 
 	h := newHarness(t, spend{})
 	if _, err := h.service.UpsertModel(t.Context(), models.UpsertModelRequest{
-		Provider: "anthropic", Model: "claude-sonnet-5", ContextTokens: 1000000, MaxOutputTokens: 128000,
-		InputUSDPerM: 2, OutputUSDPerM: 10, RPM: 60, TPM: 120000,
+		Provider: "openai", Model: "gpt-5.6-sol", ContextTokens: 1050000, MaxOutputTokens: 128000,
+		InputUSDPerM: 4, OutputUSDPerM: 20, RPM: 60, TPM: 120000,
 	}); err != nil {
 		t.Fatalf("UpsertModel: %v", err)
 	}
-	if _, err := h.service.SetProviderKey(t.Context(), models.SetProviderKeyRequest{
+
+	unset, err := h.service.ProviderKeys(t.Context(), models.ProviderKeysRequest{})
+	if err != nil {
+		t.Fatalf("ProviderKeys: %v", err)
+	}
+	if want := []models.ProviderKey{{Provider: "openai", Configured: false}}; !reflect.DeepEqual(unset.Providers, want) {
+		t.Fatalf("ProviderKeys before a key = %+v, want %+v", unset.Providers, want)
+	}
+
+	if _, err = h.service.SetProviderKey(t.Context(), models.SetProviderKeyRequest{
 		Provider: "openai", APIKey: "sk-secret",
 	}); err != nil {
 		t.Fatalf("SetProviderKey: %v", err)
@@ -227,12 +236,7 @@ func TestProviderKeysReportsWhichProvidersAreConfiguredAndNeverTheKey(t *testing
 	if err != nil {
 		t.Fatalf("ProviderKeys: %v", err)
 	}
-
-	want := []models.ProviderKey{
-		{Provider: "anthropic", Configured: false},
-		{Provider: "openai", Configured: true},
-	}
-	if !reflect.DeepEqual(answered.Providers, want) {
+	if want := []models.ProviderKey{{Provider: "openai", Configured: true}}; !reflect.DeepEqual(answered.Providers, want) {
 		t.Fatalf("ProviderKeys = %+v, want %+v", answered.Providers, want)
 	}
 
@@ -243,7 +247,7 @@ func TestProviderKeysReportsWhichProvidersAreConfiguredAndNeverTheKey(t *testing
 	if strings.Contains(string(encoded), "sk-secret") {
 		t.Fatalf("the response carries the key: %s", encoded)
 	}
-	if string(encoded) != `{"providers":[{"provider":"anthropic","configured":false},{"provider":"openai","configured":true}]}` {
+	if string(encoded) != `{"providers":[{"provider":"openai","configured":true}]}` {
 		t.Fatalf("response = %s", encoded)
 	}
 }
@@ -339,24 +343,35 @@ func TestUpsertModel(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name    string
-		req     models.UpsertModelRequest
-		wantErr bool
+		name      string
+		req       models.UpsertModelRequest
+		wantErr   bool
+		wantField string
 	}{
 		{
 			name: "a new model",
 			req: models.UpsertModelRequest{
-				Provider: " anthropic ", Model: " claude-sonnet-5 ",
+				Provider: " openai ", Model: " gpt-house-blend ",
 				ContextTokens: 1000000, MaxOutputTokens: 128000,
 				InputUSDPerM: 2, OutputUSDPerM: 10, RPM: 60, TPM: 120000,
 				SupportsStructured: true,
 			},
 		},
-		{name: "no reference", req: models.UpsertModelRequest{ContextTokens: 10, MaxOutputTokens: 5, RPM: 1, TPM: 1}, wantErr: true},
+		{name: "no reference", req: models.UpsertModelRequest{ContextTokens: 10, MaxOutputTokens: 5, RPM: 1, TPM: 1}, wantErr: true, wantField: "ref"},
 		{
-			name:    "no context window",
-			req:     models.UpsertModelRequest{Provider: "openai", Model: "x", MaxOutputTokens: 5, RPM: 1, TPM: 1},
-			wantErr: true,
+			name:      "no context window",
+			req:       models.UpsertModelRequest{Provider: "openai", Model: "x", MaxOutputTokens: 5, RPM: 1, TPM: 1},
+			wantErr:   true,
+			wantField: "contextTokens",
+		},
+		{
+			name: "a model of a provider Postulator no longer works with",
+			req: models.UpsertModelRequest{
+				Provider: "retired", Model: "old-model", ContextTokens: 1000000, MaxOutputTokens: 128000,
+				InputUSDPerM: 2, OutputUSDPerM: 10, RPM: 60, TPM: 120000,
+			},
+			wantErr:   true,
+			wantField: "provider",
 		},
 	}
 
@@ -370,12 +385,18 @@ func TestUpsertModel(t *testing.T) {
 				if !errors.IsCode(err, errors.Invalid) {
 					t.Fatalf("UpsertModel error = %v, want %s", err, errors.Invalid)
 				}
+				if field := detail(err, "field"); field != tc.wantField {
+					t.Errorf("field = %v, want %s", field, tc.wantField)
+				}
+				if len(h.catalog.overrides) != 0 {
+					t.Errorf("overrides = %+v, want nothing stored", h.catalog.overrides)
+				}
 				return
 			}
 			if err != nil {
 				t.Fatalf("UpsertModel: %v", err)
 			}
-			if resp.Model.Provider != "anthropic" || resp.Model.Model != "claude-sonnet-5" {
+			if resp.Model.Provider != "openai" || resp.Model.Model != "gpt-house-blend" {
 				t.Errorf("model = %+v, want the trimmed reference", resp.Model)
 			}
 			if len(h.catalog.overrides) != 1 || !h.catalog.overrides[0].Enabled {

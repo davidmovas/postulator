@@ -9,7 +9,7 @@ type ListModelsResponse struct {
 }
 
 type UpsertModelRequest struct {
-	Provider               string  `json:"provider" description:"The provider, such as openai"`
+	Provider               string  `json:"provider" description:"The provider, always openai"`
 	Model                  string  `json:"model" description:"The model name the provider answers to"`
 	ContextTokens          int     `json:"contextTokens" minimum:"1" description:"Tokens the model reads in one call"`
 	MaxOutputTokens        int     `json:"maxOutputTokens" minimum:"1" description:"Tokens it may answer with"`
@@ -34,7 +34,7 @@ type UpsertModelResponse struct {
 }
 
 type DisableModelRequest struct {
-	Provider string `json:"provider" description:"The provider of the model to switch off, such as openai"`
+	Provider string `json:"provider" description:"The provider of the model to switch off, openai"`
 	Model    string `json:"model" description:"The model name to switch off"`
 }
 
@@ -42,7 +42,7 @@ type DisableModelResponse struct{}
 
 type SetProfileRequest struct {
 	Role     string `json:"role" enum:"writer,editor,linker,judge,chat,image,titler" description:"Which job the model takes: writer drafts a page, editor rewrites, linker places links, judge grades, chat answers here, image draws, titler names a conversation"`
-	Provider string `json:"provider" description:"The provider to use for that job, such as openai"`
+	Provider string `json:"provider" description:"The provider to use for that job, openai"`
 	Model    string `json:"model" description:"The model to use for that job"`
 }
 
@@ -59,7 +59,7 @@ type GetProfilesResponse struct {
 }
 
 type SetProviderKeyRequest struct {
-	Provider string `json:"provider" description:"The provider the key belongs to, such as openai, anthropic or gemini"`
+	Provider string `json:"provider" description:"The provider the key belongs to, openai"`
 	APIKey   string `json:"apiKey" description:"The key itself, which is sealed on the machine and never read back"`
 }
 
@@ -82,7 +82,7 @@ type DeleteProviderKeyResponse struct {
 }
 
 type TestProviderRequest struct {
-	Provider string `json:"provider" description:"The provider to probe with one small call, such as openai"`
+	Provider string `json:"provider" description:"The provider to probe with one small call, openai"`
 	Model    string `json:"model,omitempty" description:"The model to probe with, left out to take the cheapest enabled one"`
 }
 

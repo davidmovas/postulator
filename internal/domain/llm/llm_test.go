@@ -33,14 +33,17 @@ func TestModelRef(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name  string
-		ref   llm.ModelRef
-		valid bool
-		text  string
+		name      string
+		ref       llm.ModelRef
+		valid     bool
+		supported bool
+		text      string
 	}{
-		{name: "complete", ref: llm.ModelRef{Provider: "openai", Model: "gpt"}, valid: true, text: "openai:gpt"},
+		{name: "complete", ref: llm.ModelRef{Provider: "openai", Model: "gpt"}, valid: true, supported: true, text: "openai:gpt"},
 		{name: "no provider", ref: llm.ModelRef{Model: "gpt"}, valid: false, text: ":gpt"},
 		{name: "no model", ref: llm.ModelRef{Provider: "openai"}, valid: false, text: "openai:"},
+		{name: "a provider that is no longer supported", ref: llm.ModelRef{Provider: "retired", Model: "old"}, valid: true, text: "retired:old"},
+		{name: "the provider is matched exactly", ref: llm.ModelRef{Provider: "OpenAI", Model: "gpt"}, valid: true, text: "OpenAI:gpt"},
 	}
 
 	for _, tc := range cases {
@@ -48,6 +51,9 @@ func TestModelRef(t *testing.T) {
 			t.Parallel()
 			if got := tc.ref.Valid(); got != tc.valid {
 				t.Errorf("Valid() = %v, want %v", got, tc.valid)
+			}
+			if got := tc.ref.Supported(); got != tc.supported {
+				t.Errorf("Supported() = %v, want %v", got, tc.supported)
 			}
 			if got := tc.ref.String(); got != tc.text {
 				t.Errorf("String() = %q, want %q", got, tc.text)

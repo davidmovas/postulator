@@ -22,13 +22,14 @@ const (
 
 	reasoningShareOfAllowance = 0.5
 
-	CodeUnpricedStep       = "unpriced_step"
-	CodeTemplateUnresolved = "template_unresolved"
-	CodeRecipeDiffers      = "recipe_differs"
-	CodeModelUnresolved    = "model_unresolved"
-	CodeModelUnknown       = "model_unknown"
-	CodeProviderKeyMissing = "provider_key_missing"
-	CodeImagesStepOff      = "images_step_off"
+	CodeUnpricedStep         = "unpriced_step"
+	CodeTemplateUnresolved   = "template_unresolved"
+	CodeRecipeDiffers        = "recipe_differs"
+	CodeModelUnresolved      = "model_unresolved"
+	CodeModelUnknown         = "model_unknown"
+	CodeModelProviderRemoved = "model_provider_removed"
+	CodeProviderKeyMissing   = "provider_key_missing"
+	CodeImagesStepOff        = "images_step_off"
 )
 
 type pricing struct {
@@ -231,6 +232,14 @@ func (e *Engine) modelOf(ctx context.Context, record run.Run, def run.StepDef, t
 			Message: "no model answers for the role " + string(def.Role) + ", which " + def.Name + " needs: " + err.Error(),
 		})
 		return llm.ModelRef{}, false, nil
+	}
+	if pinned := target.Spec.ModelProfiles[def.Role]; pinned.Valid() && !pinned.Supported() {
+		priced.add(run.EstimateFinding{
+			Severity: content.SeverityWarn, Code: CodeModelProviderRemoved, PageID: target.Page.ID, Path: target.Page.Path,
+			Message: "the template of " + pathOrID(target.Page, target.Page.ID) + " pins " + pinned.String() +
+				" for the role " + string(def.Role) + ", a provider Postulator no longer works with, so the role uses " +
+				ref.String() + " instead; choose an OpenAI model in the template",
+		})
 	}
 	return ref, true, nil
 }

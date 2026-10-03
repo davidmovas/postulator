@@ -68,6 +68,9 @@ func (c *Catalog) resolved(ctx context.Context) (map[string]llm.ModelInfo, error
 	merged := maps.Clone(c.base)
 	for i := range overrides {
 		override := &overrides[i]
+		if !override.Info.Ref.Supported() {
+			continue
+		}
 		key := override.Info.Ref.String()
 		if !override.Enabled {
 			delete(merged, key)

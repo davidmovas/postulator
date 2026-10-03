@@ -25,6 +25,8 @@ func (r Role) Valid() bool {
 	}
 }
 
+const ProviderOpenAI = "openai"
+
 type ModelRef struct {
 	Provider string `json:"provider"`
 	Model    string `json:"model"`
@@ -32,6 +34,10 @@ type ModelRef struct {
 
 func (r ModelRef) Valid() bool {
 	return r.Provider != "" && r.Model != ""
+}
+
+func (r ModelRef) Supported() bool {
+	return r.Provider == ProviderOpenAI && r.Model != ""
 }
 
 func (r ModelRef) String() string {

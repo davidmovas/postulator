@@ -1,6 +1,7 @@
 package llm_test
 
 import (
+	stderrors "errors"
 	"testing"
 	"time"
 
@@ -31,6 +32,7 @@ func TestModelInfoValidate(t *testing.T) {
 	}{
 		{name: "a catalog entry is valid"},
 		{name: "the reference is required", mutate: func(i *llm.ModelInfo) { i.Ref.Model = "" }, wantErr: true},
+		{name: "only an OpenAI model is accepted", mutate: func(i *llm.ModelInfo) { i.Ref.Provider = "retired" }, wantErr: true},
 		{name: "the context window is positive", mutate: func(i *llm.ModelInfo) { i.ContextTokens = 0 }, wantErr: true},
 		{name: "the output ceiling is positive", mutate: func(i *llm.ModelInfo) { i.MaxOutputTokens = 0 }, wantErr: true},
 		{name: "the output fits the context", mutate: func(i *llm.ModelInfo) { i.MaxOutputTokens = i.ContextTokens + 1 }, wantErr: true},
@@ -91,6 +93,24 @@ func TestModelInfoValidate(t *testing.T) {
 				t.Errorf("Validate() code = %s, want %s", errors.CodeOf(err), errors.Invalid)
 			}
 		})
+	}
+}
+
+func TestModelInfoValidateRefusesAnotherProviderOnItsField(t *testing.T) {
+	t.Parallel()
+
+	for _, provider := range []string{"retired", "OpenAI", " openai"} {
+		info := validInfo()
+		info.Ref.Provider = provider
+
+		err := info.Validate()
+		var kernel *errors.Error
+		if !stderrors.As(err, &kernel) || kernel.Code != errors.Invalid {
+			t.Fatalf("Validate() with %q = %v, want %s", provider, err, errors.Invalid)
+		}
+		if kernel.Details["field"] != "provider" {
+			t.Errorf("Validate() with %q names the field %v, want provider", provider, kernel.Details["field"])
+		}
 	}
 }
 

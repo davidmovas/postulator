@@ -136,6 +136,9 @@ func TestValidateSpec(t *testing.T) {
 		{name: "incomplete ref", mutate: func(s *template.TemplateSpec) {
 			s.ModelProfiles = map[llm.Role]llm.ModelRef{llm.RoleJudge: {Model: "b"}}
 		}, field: "modelProfiles.judge"},
+		{name: "a model of a removed provider stays saveable", mutate: func(s *template.TemplateSpec) {
+			s.ModelProfiles = map[llm.Role]llm.ModelRef{llm.RoleWriter: {Provider: "retired", Model: "old-model"}}
+		}},
 		{name: "blank step", mutate: func(s *template.TemplateSpec) { s.Recipe[1].Name = "" }, field: "recipe[1].name"},
 		{name: "repeated step", mutate: func(s *template.TemplateSpec) { s.Recipe[1].Name = "resolve_context" }, field: "recipe[1].name"},
 		{name: "empty recipe is allowed", mutate: func(s *template.TemplateSpec) { s.Recipe = nil }},

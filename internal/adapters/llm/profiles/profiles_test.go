@@ -28,15 +28,23 @@ func (d fixedDefaults) Default(role llm.Role) (llm.ModelRef, error) {
 func newProfiles(t *testing.T) (*profiles.Profiles, *sqlite.SiteRepo) {
 	t.Helper()
 
+	resolver, sites, _ := newProfilesWithStore(t)
+	return resolver, sites
+}
+
+func newProfilesWithStore(t *testing.T) (*profiles.Profiles, *sqlite.SiteRepo, *sqlite.ModelProfileRepo) {
+	t.Helper()
+
 	store := sqlitetest.Open(t)
 	sites := sqlite.NewSiteRepo(store)
+	stored := sqlite.NewModelProfileRepo(store)
 	resolver := profiles.New(
-		sqlite.NewModelProfileRepo(store),
+		stored,
 		sites,
 		fixedDefaults{llm.RoleWriter: {Provider: "openai", Model: "catalog"}},
 		clock.NewFake(time.Date(2026, 9, 18, 10, 0, 0, 0, time.UTC)),
 	)
-	return resolver, sites
+	return resolver, sites, stored
 }
 
 func seedSite(t *testing.T, repo *sqlite.SiteRepo, refs map[llm.Role]llm.ModelRef) string {
@@ -124,6 +132,72 @@ func TestResolvePrecedence(t *testing.T) {
 	}
 }
 
+func TestResolvePassesOverAModelOfARemovedProvider(t *testing.T) {
+	t.Parallel()
+
+	var (
+		retired    = llm.ModelRef{Provider: "retired", Model: "old-model"}
+		fromSite   = llm.ModelRef{Provider: "openai", Model: "site"}
+		fromGlobal = llm.ModelRef{Provider: "openai", Model: "global"}
+		catalog    = llm.ModelRef{Provider: "openai", Model: "catalog"}
+	)
+
+	cases := []struct {
+		name     string
+		template map[llm.Role]llm.ModelRef
+		siteRefs map[llm.Role]llm.ModelRef
+		global   llm.ModelRef
+		want     llm.ModelRef
+	}{
+		{
+			name:     "a template that pins one falls to the site",
+			template: map[llm.Role]llm.ModelRef{llm.RoleWriter: retired},
+			siteRefs: map[llm.Role]llm.ModelRef{llm.RoleWriter: fromSite},
+			global:   fromGlobal,
+			want:     fromSite,
+		},
+		{
+			name:     "a site that names one falls to the global profile",
+			siteRefs: map[llm.Role]llm.ModelRef{llm.RoleWriter: retired},
+			global:   fromGlobal,
+			want:     fromGlobal,
+		},
+		{
+			name:   "a global profile stored before the removal falls to the catalog default",
+			global: retired,
+			want:   catalog,
+		},
+		{
+			name:     "every level naming one leaves the catalog default",
+			template: map[llm.Role]llm.ModelRef{llm.RoleWriter: retired},
+			siteRefs: map[llm.Role]llm.ModelRef{llm.RoleWriter: retired},
+			global:   retired,
+			want:     catalog,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			resolver, sites, stored := newProfilesWithStore(t)
+			at := time.Date(2026, 9, 18, 9, 30, 0, 0, time.UTC)
+			if err := stored.Set(t.Context(), llm.RoleWriter, tc.global, at); err != nil {
+				t.Fatalf("store the global profile: %v", err)
+			}
+			siteID := seedSite(t, sites, tc.siteRefs)
+
+			got, err := resolver.Resolve(t.Context(), siteID, llm.RoleWriter, tc.template)
+			if err != nil {
+				t.Fatalf("Resolve: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("Resolve = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestResolveWithoutASite(t *testing.T) {
 	t.Parallel()
 
@@ -175,8 +249,11 @@ func TestSetGlobalProfile(t *testing.T) {
 	if err := resolver.Set(ctx, llm.RoleChat, llm.ModelRef{Provider: "openai"}); !errors.IsCode(err, errors.Invalid) {
 		t.Fatalf("Set incomplete reference error = %v, want %s", err, errors.Invalid)
 	}
+	if err := resolver.Set(ctx, llm.RoleChat, llm.ModelRef{Provider: "retired", Model: "old-model"}); !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("Set a removed provider error = %v, want %s", err, errors.Invalid)
+	}
 
-	chat := llm.ModelRef{Provider: "anthropic", Model: "claude-sonnet-5"}
+	chat := llm.ModelRef{Provider: "openai", Model: "gpt-5.6-sol"}
 	if err := resolver.Set(ctx, llm.RoleChat, chat); err != nil {
 		t.Fatalf("Set: %v", err)
 	}

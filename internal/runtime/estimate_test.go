@@ -3,6 +3,7 @@ package runtime_test
 import (
 	"context"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/application/events"
@@ -382,6 +383,72 @@ func TestEstimateReportsWhatWouldStopTheRunBeforeItStarts(t *testing.T) {
 			}
 			if blocking := len(estimate.Blocking()); (tc.severity == content.SeverityError) != (blocking == 1) {
 				t.Fatalf("Blocking = %d findings for a %s", blocking, tc.severity)
+			}
+		})
+	}
+}
+
+func TestEstimateWarnsAboutATemplateThatPinsARemovedProvider(t *testing.T) {
+	t.Parallel()
+
+	retired := llm.ModelRef{Provider: "retired", Model: "old-model"}
+	cases := []struct {
+		name    string
+		pinned  map[llm.Role]llm.ModelRef
+		warned  bool
+		mention []string
+	}{
+		{
+			name:    "the writer pinned to a removed provider",
+			pinned:  map[llm.Role]llm.ModelRef{llm.RoleWriter: retired},
+			warned:  true,
+			mention: []string{"/page-a/", "retired:old-model", "writer", "openai:test"},
+		},
+		{name: "a role the run does not call", pinned: map[llm.Role]llm.ModelRef{llm.RoleJudge: retired}},
+		{name: "the writer pinned to an OpenAI model", pinned: map[llm.Role]llm.ModelRef{llm.RoleWriter: {Provider: "openai", Model: "gpt-5.6-sol"}}},
+		{name: "nothing pinned"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			harness := newHarness(t, 1)
+			harness.specs.spec.ModelProfiles = tc.pinned
+			body := pricedStep("generate_body", llm.RoleWriter, run.Price{})
+			meta := pricedStep("generate_meta", llm.RoleWriter, run.Price{OutputTokens: 512})
+			engine := harness.engine(t, mustRegister(t, body, meta))
+
+			estimate, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body", "generate_meta")), nil)
+			if err != nil {
+				t.Fatalf("EstimateRun: %v", err)
+			}
+			if estimate.Tokens == 0 {
+				t.Error("the run is priced at nothing; it must be priced on the model the role falls back to")
+			}
+			if len(estimate.Blocking()) != 0 {
+				t.Errorf("blocking = %+v, want a template that pins a removed provider to stop nothing", estimate.Blocking())
+			}
+			if !tc.warned {
+				if len(estimate.Findings) != 0 {
+					t.Errorf("findings = %+v, want none", estimate.Findings)
+				}
+				return
+			}
+			if len(estimate.Findings) != 1 {
+				t.Fatalf("findings = %+v, want one warning for the page and the role", estimate.Findings)
+			}
+			finding := estimate.Findings[0]
+			if finding.Code != runtime.CodeModelProviderRemoved || finding.Severity != content.SeverityWarn {
+				t.Errorf("finding = %+v, want a %s warning", finding, runtime.CodeModelProviderRemoved)
+			}
+			if finding.PageID != harness.pages[0] || finding.Path != "/page-a/" {
+				t.Errorf("finding names %q at %q, want %s at /page-a/", finding.PageID, finding.Path, harness.pages[0])
+			}
+			for _, word := range tc.mention {
+				if !strings.Contains(finding.Message, word) {
+					t.Errorf("message %q does not name %s", finding.Message, word)
+				}
 			}
 		})
 	}
