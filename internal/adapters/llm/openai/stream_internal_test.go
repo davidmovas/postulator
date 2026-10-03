@@ -208,6 +208,34 @@ func TestACallIsDeliveredOnce(t *testing.T) {
 	}
 }
 
+func TestASearchItemIsDeliveredOnceWithOrWithoutItsID(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		item string
+	}{
+		{name: "an item the server named", item: `{"type":"tool_search_call","id":"tsc_1","execution":"server","arguments":{"paths":["pages"]}}`},
+		{name: "an item without an id", item: `{"type":"tool_search_output","execution":"server","tools":[]}`},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			state := newStreamState(tierDefault)
+			done := sseEvent{data: []byte(`{"type":"response.output_item.done","output_index":0,"item":` + tc.item + `}`)}
+			if first := state.read(done); len(first.deltas) != 1 || first.deltas[0].Search == nil {
+				t.Fatalf("first = %+v, want the search", first)
+			}
+			final := state.read(sseEvent{data: []byte(`{"type":"response.completed","response":{"status":"completed","output":[` + tc.item + `]}}`)})
+			if len(final.deltas) != 1 || !final.deltas[0].Done {
+				t.Errorf("final = %+v, want only the final delta", final)
+			}
+		})
+	}
+}
+
 func TestACallerWhoLeftIsSentNothing(t *testing.T) {
 	t.Parallel()
 

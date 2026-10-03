@@ -14,6 +14,8 @@ const (
 
 	cacheExplicit   = "explicit"
 	toolFunction    = "function"
+	toolNamespace   = "namespace"
+	toolSearch      = "tool_search"
 	minOutputTokens = 16
 	maxCacheKey     = 64
 
@@ -52,11 +54,13 @@ type wireFormat struct {
 }
 
 type wireTool struct {
-	Type        string         `json:"type"`
-	Name        string         `json:"name"`
-	Description string         `json:"description,omitempty"`
-	Parameters  map[string]any `json:"parameters"`
-	Strict      bool           `json:"strict"`
+	Type         string         `json:"type"`
+	Name         string         `json:"name,omitempty"`
+	Description  string         `json:"description,omitempty"`
+	Parameters   map[string]any `json:"parameters,omitempty"`
+	Strict       *bool          `json:"strict,omitempty"`
+	DeferLoading bool           `json:"defer_loading,omitempty"`
+	Tools        []wireTool     `json:"tools,omitempty"`
 }
 
 type wireCacheOptions struct {
@@ -157,15 +161,37 @@ func toolsOf(tools []port.Tool) []wireTool {
 		return nil
 	}
 
-	wired := make([]wireTool, 0, len(tools))
+	wired := make([]wireTool, 0, len(tools)+1)
+	namespaces := map[string]int{}
 	for _, tool := range tools {
-		wired = append(wired, wireTool{
-			Type:        toolFunction,
-			Name:        tool.Name,
-			Description: tool.Description,
-			Parameters:  parametersOf(tool.Schema),
-			Strict:      false,
-		})
+		function := functionOf(tool)
+		if tool.Deferred == nil {
+			wired = append(wired, function)
+			continue
+		}
+
+		at, opened := namespaces[tool.Deferred.Name]
+		if !opened {
+			at = len(wired)
+			namespaces[tool.Deferred.Name] = at
+			wired = append(wired, wireTool{Type: toolNamespace, Name: tool.Deferred.Name, Description: tool.Deferred.Description})
+		}
+		function.DeferLoading = true
+		wired[at].Tools = append(wired[at].Tools, function)
+	}
+	if len(namespaces) > 0 {
+		wired = append(wired, wireTool{Type: toolSearch})
 	}
 	return wired
+}
+
+func functionOf(tool port.Tool) wireTool {
+	strict := false
+	return wireTool{
+		Type:        toolFunction,
+		Name:        tool.Name,
+		Description: tool.Description,
+		Parameters:  parametersOf(tool.Schema),
+		Strict:      &strict,
+	}
 }

@@ -14,6 +14,9 @@ const (
 
 	reasonMaxOutput = "max_output_tokens"
 	tierDefault     = "default"
+	executionServer = "server"
+	emptyObject     = "{}"
+	emptyList       = "[]"
 )
 
 type Usage struct {
@@ -27,7 +30,14 @@ type Usage struct {
 type Call struct {
 	ID        string
 	Name      string
+	Namespace string
 	Arguments string
+}
+
+type Search struct {
+	CallID    string
+	Arguments string
+	Tools     string
 }
 
 type Answer struct {
@@ -36,6 +46,7 @@ type Answer struct {
 	Refusal    string
 	Incomplete string
 	Tier       string
+	Searches   []Search
 	Calls      []Call
 	Chunks     []string
 	Usage      Usage
@@ -174,24 +185,52 @@ func (a Answer) response() map[string]any {
 }
 
 func (a Answer) items() []map[string]any {
-	items := make([]map[string]any, 0, len(a.Calls)+2)
+	items := make([]map[string]any, 0, len(a.Calls)+2*len(a.Searches)+2)
 	if a.Usage.Reasoning > 0 {
 		items = append(items, map[string]any{"id": "rs_test", "type": "reasoning", "summary": []any{}})
+	}
+	for i, search := range a.Searches {
+		items = append(items, search.items(i)...)
 	}
 	if a.Text != "" || a.Refusal != "" {
 		items = append(items, a.message())
 	}
 	for i, call := range a.Calls {
-		items = append(items, map[string]any{
+		item := map[string]any{
 			"id":        "fc_test_" + strconv.Itoa(i),
 			"type":      "function_call",
 			"status":    statusCompleted,
 			"call_id":   call.ID,
 			"name":      call.Name,
 			"arguments": call.Arguments,
-		})
+		}
+		if call.Namespace != "" {
+			item["namespace"] = call.Namespace
+		}
+		items = append(items, item)
 	}
 	return items
+}
+
+func (s Search) items(index int) []map[string]any {
+	suffix := strconv.Itoa(index)
+	return []map[string]any{
+		{
+			"id": "tsc_test_" + suffix, "type": "tool_search_call", "status": statusCompleted,
+			"call_id": nullable(s.CallID), "execution": executionServer, "arguments": raw(s.Arguments, emptyObject),
+		},
+		{
+			"id": "tso_test_" + suffix, "type": "tool_search_output", "status": statusCompleted,
+			"call_id": nullable(s.CallID), "execution": executionServer, "tools": raw(s.Tools, emptyList),
+		},
+	}
+}
+
+func raw(value, fallback string) json.RawMessage {
+	if value == "" {
+		return json.RawMessage(fallback)
+	}
+	return json.RawMessage(value)
 }
 
 func (a Answer) message() map[string]any {

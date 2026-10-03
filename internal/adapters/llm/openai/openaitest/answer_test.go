@@ -155,6 +155,66 @@ func TestCallsAreServedOneItemEach(t *testing.T) {
 	}
 }
 
+func TestAToolSearchIsServedAsItsCallAndItsOutputBeforeTheNamespacedCall(t *testing.T) {
+	t.Parallel()
+
+	loaded := `[{"type":"namespace","name":"pages","description":"The page map.","tools":[]}]`
+	cases := []struct {
+		name      string
+		search    openaitest.Search
+		arguments any
+		tools     any
+		callID    any
+	}{
+		{
+			name:      "a search with its arguments and the tools it loaded",
+			search:    openaitest.Search{Arguments: `{"paths":["pages"]}`, Tools: loaded},
+			arguments: map[string]any{"paths": []any{"pages"}},
+			tools:     []any{map[string]any{"type": "namespace", "name": "pages", "description": "The page map.", "tools": []any{}}},
+		},
+		{
+			name:      "a search that names its call and loaded nothing",
+			search:    openaitest.Search{CallID: "ts_1"},
+			arguments: map[string]any{}, tools: []any{}, callID: "ts_1",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			body := decode(t, served(t, openaitest.Answer{
+				Searches: []openaitest.Search{tc.search},
+				Calls:    []openaitest.Call{{ID: "call_1", Namespace: "pages", Name: "pages_get", Arguments: `{"id":"p1"}`}},
+			}.Reply()).Body)
+
+			output, ok := field(t, body, "output").([]any)
+			if !ok || len(output) != 3 {
+				t.Fatalf("output = %v, want the search call, its output and the call", field(t, body, "output"))
+			}
+			for i, kind := range []string{"tool_search_call", "tool_search_output", "function_call"} {
+				if field(t, output, i, "type") != kind {
+					t.Errorf("output[%d] = %v, want a %s", i, output[i], kind)
+				}
+			}
+			for i := range 2 {
+				if field(t, output, i, "execution") != "server" || field(t, output, i, "call_id") != tc.callID {
+					t.Errorf("output[%d] = %v, want a server search with the call id %v", i, output[i], tc.callID)
+				}
+			}
+			if got := field(t, output, 0, "arguments"); !reflect.DeepEqual(got, tc.arguments) {
+				t.Errorf("arguments = %v, want %v", got, tc.arguments)
+			}
+			if got := field(t, output, 1, "tools"); !reflect.DeepEqual(got, tc.tools) {
+				t.Errorf("tools = %v, want %v", got, tc.tools)
+			}
+			if field(t, output, 2, "namespace") != "pages" {
+				t.Errorf("the call = %v, want it inside the pages namespace", output[2])
+			}
+		})
+	}
+}
+
 func eventTypes(t *testing.T, read []frame) []string {
 	t.Helper()
 

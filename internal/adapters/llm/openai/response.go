@@ -1,6 +1,7 @@
 package openai
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 
@@ -17,6 +18,8 @@ const (
 	partOutputText = "output_text"
 	partRefusal    = "refusal"
 	emptyArguments = "{}"
+	emptyTools     = "[]"
+	jsonNull       = "null"
 )
 
 type wireResponse struct {
@@ -33,11 +36,15 @@ type wireIncomplete struct {
 }
 
 type wireOutput struct {
-	Type      string        `json:"type"`
-	CallID    string        `json:"call_id"`
-	Name      string        `json:"name"`
-	Arguments string        `json:"arguments"`
-	Content   []wireContent `json:"content"`
+	Type      string          `json:"type"`
+	ID        string          `json:"id"`
+	CallID    string          `json:"call_id"`
+	Namespace string          `json:"namespace"`
+	Name      string          `json:"name"`
+	Arguments json.RawMessage `json:"arguments"`
+	Execution string          `json:"execution"`
+	Tools     json.RawMessage `json:"tools"`
+	Content   []wireContent   `json:"content"`
 }
 
 type wireContent struct {
@@ -75,6 +82,7 @@ func answerOf(decoded wireResponse, sentTier string) (port.Response, error) {
 		FinishReason: finishOf(decoded),
 		Calls:        calls,
 		Tier:         tierOf(decoded.ServiceTier, sentTier),
+		Searches:     searchesOf(decoded.Output),
 	}, nil
 }
 
@@ -88,11 +96,11 @@ func failedOf(decoded wireResponse) *refusal {
 
 func textOf(output []wireOutput) string {
 	var builder strings.Builder
-	for _, item := range output {
-		if item.Type != itemMessage {
+	for i := range output {
+		if output[i].Type != itemMessage {
 			continue
 		}
-		for _, part := range item.Content {
+		for _, part := range output[i].Content {
 			if part.Type == partOutputText {
 				builder.WriteString(part.Text)
 			}
@@ -102,8 +110,8 @@ func textOf(output []wireOutput) string {
 }
 
 func refused(output []wireOutput) bool {
-	for _, item := range output {
-		for _, part := range item.Content {
+	for i := range output {
+		for _, part := range output[i].Content {
 			if part.Type == partRefusal {
 				return true
 			}
@@ -114,11 +122,11 @@ func refused(output []wireOutput) bool {
 
 func callsOf(output []wireOutput) ([]port.ToolCall, error) {
 	var calls []port.ToolCall
-	for _, item := range output {
-		if item.Type != itemFunctionCall {
+	for i := range output {
+		if output[i].Type != itemFunctionCall {
 			continue
 		}
-		call, err := callOf(item)
+		call, err := callOf(output[i])
 		if err != nil {
 			return nil, err
 		}
@@ -128,15 +136,62 @@ func callsOf(output []wireOutput) ([]port.ToolCall, error) {
 }
 
 func callOf(item wireOutput) (port.ToolCall, error) {
-	args := item.Arguments
-	if strings.TrimSpace(args) == "" {
-		args = emptyArguments
-	}
-	if item.CallID == "" || item.Name == "" || !json.Valid([]byte(args)) {
+	args, readable := argumentsOf(item.Arguments)
+	if !readable || item.CallID == "" || item.Name == "" || !json.Valid([]byte(args)) {
 		return port.ToolCall{}, errors.New(errors.External, "the model asked for a tool in a shape it cannot be called with").
 			WithDetail("reason", port.ReasonMalformedAnswer).
 			WithDetail("tool", item.Name).
 			WithRetry(0)
 	}
-	return port.ToolCall{ID: item.CallID, Name: item.Name, Args: json.RawMessage(args)}, nil
+	return port.ToolCall{ID: item.CallID, Name: item.Name, Args: json.RawMessage(args), Namespace: item.Namespace}, nil
+}
+
+func argumentsOf(raw json.RawMessage) (string, bool) {
+	if absent(raw) {
+		return emptyArguments, true
+	}
+
+	var args string
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return "", false
+	}
+	if strings.TrimSpace(args) == "" {
+		return emptyArguments, true
+	}
+	return args, true
+}
+
+func absent(raw json.RawMessage) bool {
+	trimmed := bytes.TrimSpace(raw)
+	return len(trimmed) == 0 || bytes.Equal(trimmed, []byte(jsonNull))
+}
+
+func searchOf(item wireOutput) (port.ToolSearch, bool) {
+	search := port.ToolSearch{CallID: item.CallID, Execution: item.Execution}
+	switch item.Type {
+	case itemToolSearchCall:
+		search.Kind, search.Payload = port.SearchCall, payloadOf(item.Arguments, emptyArguments)
+	case itemToolSearchOutput:
+		search.Kind, search.Payload = port.SearchOutput, payloadOf(item.Tools, emptyTools)
+	default:
+		return port.ToolSearch{}, false
+	}
+	return search, true
+}
+
+func payloadOf(raw json.RawMessage, fallback string) json.RawMessage {
+	if absent(raw) {
+		return json.RawMessage(fallback)
+	}
+	return raw
+}
+
+func searchesOf(output []wireOutput) []port.ToolSearch {
+	var searches []port.ToolSearch
+	for i := range output {
+		if search, found := searchOf(output[i]); found {
+			searches = append(searches, search)
+		}
+	}
+	return searches
 }

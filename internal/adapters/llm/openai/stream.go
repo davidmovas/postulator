@@ -8,6 +8,7 @@ import (
 	stderrors "errors"
 	"io"
 	"net/http"
+	"strconv"
 
 	port "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -28,6 +29,8 @@ const (
 	eventIncomplete = "response.incomplete"
 	eventFailed     = "response.failed"
 	eventError      = "error"
+
+	searchPrefix = "search:"
 )
 
 var errEventTooLarge = stderrors.New("a server-sent event is larger than the client reads")
@@ -186,21 +189,49 @@ func (s *streamState) text(data []byte) outcome {
 
 func (s *streamState) item(data []byte) outcome {
 	var done struct {
-		Item wireOutput `json:"item"`
+		Item  wireOutput `json:"item"`
+		Index int        `json:"output_index"`
 	}
 	if err := json.Unmarshal(data, &done); err != nil {
 		return outcome{err: unreadableEvent(err), ended: true}
 	}
-	if done.Item.Type != itemFunctionCall || s.delivered[done.Item.CallID] {
-		return outcome{}
-	}
 
-	call, err := callOf(done.Item)
+	delta, err := s.carried(done.Index, done.Item)
 	if err != nil {
 		return outcome{err: err, ended: true}
 	}
+	if delta == nil {
+		return outcome{}
+	}
+	return outcome{deltas: []port.Delta{*delta}}
+}
+
+func (s *streamState) carried(index int, item wireOutput) (*port.Delta, error) {
+	if search, found := searchOf(item); found {
+		key := searchKey(index, item)
+		if s.delivered[key] {
+			return nil, nil
+		}
+		s.delivered[key] = true
+		return &port.Delta{Search: &search}, nil
+	}
+	if item.Type != itemFunctionCall || s.delivered[item.CallID] {
+		return nil, nil
+	}
+
+	call, err := callOf(item)
+	if err != nil {
+		return nil, err
+	}
 	s.delivered[call.ID] = true
-	return outcome{deltas: []port.Delta{{Call: &call}}}
+	return &port.Delta{Call: &call}, nil
+}
+
+func searchKey(index int, item wireOutput) string {
+	if item.ID != "" {
+		return searchPrefix + item.ID
+	}
+	return searchPrefix + "#" + strconv.Itoa(index)
 }
 
 func (s *streamState) finish(data []byte, kind string) outcome {
@@ -215,19 +246,17 @@ func (s *streamState) finish(data []byte, kind string) outcome {
 		answer.Status = statusIncomplete
 	}
 
-	calls, err := callsOf(answer.Output)
-	if err != nil {
-		return outcome{err: err, ended: true}
-	}
-
 	var deltas []port.Delta
 	if text := textOf(answer.Output); text != "" && !s.spoke {
 		deltas = append(deltas, port.Delta{Text: text})
 	}
-	for i := range calls {
-		if !s.delivered[calls[i].ID] {
-			s.delivered[calls[i].ID] = true
-			deltas = append(deltas, port.Delta{Call: &calls[i]})
+	for index := range answer.Output {
+		delta, err := s.carried(index, answer.Output[index])
+		if err != nil {
+			return outcome{err: err, ended: true}
+		}
+		if delta != nil {
+			deltas = append(deltas, *delta)
 		}
 	}
 	usage := usageOf(answer.Usage)

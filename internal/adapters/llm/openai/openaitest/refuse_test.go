@@ -113,6 +113,19 @@ func TestTheServerRefusesWhatTheProbeSawRefused(t *testing.T) {
 			status: http.StatusNotFound, param: "input",
 			message: "Item with id 'rs_123' not found. Items are not persisted when `store` is set to false.",
 		},
+		{
+			name:   "a deferred tool without tool search",
+			body:   `{"model":"gpt-5.6-terra","input":"hi","tools":[{"type":"function","name":"f","strict":false,"defer_loading":true,"parameters":{"type":"object"}}]}`,
+			status: http.StatusBadRequest, param: "tools.defer_loading",
+			message: "Invalid Value: 'tools.defer_loading'. Deferred tools require tools.tool_search.",
+		},
+		{
+			name: "a namespace of deferred tools without tool search",
+			body: `{"model":"gpt-5.6-terra","input":"hi","tools":[{"type":"namespace","name":"pages","description":"The page map.",` +
+				`"tools":[{"type":"function","name":"f","strict":false,"defer_loading":true,"parameters":{"type":"object"}}]}]}`,
+			status: http.StatusBadRequest, param: "tools.defer_loading",
+			message: "Deferred tools require tools.tool_search.",
+		},
 	}
 
 	for _, tc := range cases {
@@ -165,6 +178,30 @@ func TestTheServerAcceptsWhatTheProbeSawAccepted(t *testing.T) {
 		{
 			name: "a reasoning item with its encrypted content",
 			body: `{"model":"gpt-5.6-terra","input":[{"type":"reasoning","id":"rs_1","summary":[],"encrypted_content":"gAAA"},{"role":"user","content":"hi"}]}`,
+		},
+		{
+			name: "a namespace of deferred tools beside tool search",
+			body: `{"model":"gpt-5.6-terra","input":"hi","tools":[{"type":"function","name":"g","strict":false,"parameters":{"type":"object"}},` +
+				`{"type":"namespace","name":"pages","description":"The page map.",` +
+				`"tools":[{"type":"function","name":"f","strict":false,"defer_loading":true,"parameters":{"type":"object"}}]},{"type":"tool_search"}]}`,
+		},
+		{
+			name: "a top level deferred tool beside tool search",
+			body: `{"model":"gpt-5.6-terra","input":"hi","tools":[{"type":"tool_search"},` +
+				`{"type":"function","name":"f","strict":false,"defer_loading":true,"parameters":{"type":"object"}}]}`,
+		},
+		{
+			name: "a namespace whose tools are all loaded at once",
+			body: `{"model":"gpt-5.6-terra","input":"hi","tools":[{"type":"namespace","name":"pages","description":"The page map.",` +
+				`"tools":[{"type":"function","name":"f","strict":false,"parameters":{"type":"object"}}]}]}`,
+		},
+		{
+			name: "a replayed tool search before the namespaced call it loaded",
+			body: `{"model":"gpt-5.6-terra","input":[{"role":"user","content":"hi"},` +
+				`{"type":"tool_search_call","execution":"server","arguments":{"paths":["pages"]}},` +
+				`{"type":"tool_search_output","execution":"server","tools":[]},` +
+				`{"type":"function_call","call_id":"call_1","namespace":"pages","name":"f","arguments":"{}"},` +
+				`{"type":"function_call_output","call_id":"call_1","output":"{}"}],"tools":[{"type":"tool_search"}]}`,
 		},
 	}
 

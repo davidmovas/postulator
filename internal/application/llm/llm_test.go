@@ -54,6 +54,21 @@ func conversation(messages ...llm.Message) func(*llm.Request) {
 	return func(r *llm.Request) { r.Messages = messages }
 }
 
+func searched(kind llm.SearchKind, payload string) llm.Message {
+	return llm.Message{Role: llm.RoleAssistant, Search: &llm.ToolSearch{Kind: kind, Execution: "server", Payload: json.RawMessage(payload)}}
+}
+
+func namespaced(id, namespace, name string) llm.Message {
+	return llm.Message{Role: llm.RoleAssistant, Call: &llm.ToolCall{ID: id, Name: name, Args: json.RawMessage(`{}`), Namespace: namespace}}
+}
+
+func deferred(name, group, description string) llm.Tool {
+	return llm.Tool{
+		Name: name, Description: "reads", Schema: &llm.Schema{Type: llm.SchemaObject},
+		Deferred: &llm.ToolGroup{Name: group, Description: description},
+	}
+}
+
 func TestRequestValidate(t *testing.T) {
 	t.Parallel()
 
@@ -202,6 +217,57 @@ func TestRequestValidate(t *testing.T) {
 			},
 			wantErr: "a tool's parameters must be an object",
 		},
+		{
+			name: "deferred tools sit beside the tools sent whole",
+			mutate: func(r *llm.Request) {
+				r.Tools = []llm.Tool{listing, deferred("pages_get", "pages", "the page map"), deferred("pages_tree", "pages", "the page map")}
+			},
+		},
+		{
+			name:    "a deferred tool's group has a name",
+			mutate:  func(r *llm.Request) { r.Tools = []llm.Tool{deferred("pages_get", "", "the page map")} },
+			wantErr: "a group with a name and a description",
+		},
+		{
+			name:    "a deferred tool's group says what it holds",
+			mutate:  func(r *llm.Request) { r.Tools = []llm.Tool{deferred("pages_get", "pages", "")} },
+			wantErr: "a group with a name and a description",
+		},
+		{
+			name: "a group is described one way",
+			mutate: func(r *llm.Request) {
+				r.Tools = []llm.Tool{deferred("pages_get", "pages", "the page map"), deferred("pages_tree", "pages", "the tree")}
+			},
+			wantErr: "a tool group is described two ways",
+		},
+		{
+			name: "a tool search is replayed before the namespaced call it loaded",
+			mutate: conversation(user, searched(llm.SearchCall, `{"paths":["pages"]}`), searched(llm.SearchOutput, `[]`),
+				namespaced("call_1", "pages", "pages_get"), result("call_1", `{}`)),
+		},
+		{
+			name:    "a tool search comes from the assistant",
+			mutate:  conversation(llm.Message{Role: llm.RoleUser, Search: &llm.ToolSearch{Kind: llm.SearchCall, Payload: json.RawMessage(`{}`)}}, user),
+			wantErr: "a tool search must come from the assistant",
+		},
+		{
+			name:    "a tool search is a call or its output",
+			mutate:  conversation(user, searched("lookup", `{}`), user),
+			wantErr: "a tool search is a call or its output",
+		},
+		{
+			name:    "a tool search carries JSON",
+			mutate:  conversation(user, searched(llm.SearchOutput, `[`), user),
+			wantErr: "a tool search must carry JSON",
+		},
+		{
+			name: "a tool search is a message of its own",
+			mutate: conversation(llm.Message{
+				Role: llm.RoleAssistant, Text: "searching",
+				Search: &llm.ToolSearch{Kind: llm.SearchCall, Payload: json.RawMessage(`{}`)},
+			}, user),
+			wantErr: "only one of",
+		},
 	}
 
 	for _, tc := range cases {
@@ -296,6 +362,35 @@ func TestTheRequestEncoding(t *testing.T) {
 				Tier:   domain.TierDefault,
 			},
 			want: `{"text":"","done":true,"call":{"id":"call_1","name":"pages_list","args":{}},"finish":"stop","tier":"default"}`,
+		},
+		{
+			name: "a deferred tool names its group and a replayed round carries the search and the namespace",
+			value: llm.Request{
+				Ref: ref(),
+				Messages: []llm.Message{
+					searched(llm.SearchCall, `{"paths":["pages"]}`),
+					searched(llm.SearchOutput, `[]`),
+					namespaced("call_1", "pages", "pages_get"),
+				},
+				Tools: []llm.Tool{deferred("pages_get", "pages", "the page map")},
+			},
+			want: `{"ref":{"provider":"openai","model":"gpt-5.1"},"system":"",` +
+				`"messages":[{"role":"assistant","text":"","search":{"kind":"call","execution":"server","payload":{"paths":["pages"]}}},` +
+				`{"role":"assistant","text":"","search":{"kind":"output","execution":"server","payload":[]}},` +
+				`{"role":"assistant","text":"","call":{"id":"call_1","name":"pages_get","args":{},"namespace":"pages"}}],` +
+				`"meta":{"runId":"","itemId":"","step":"","conversationId":""},"maxTokens":0,` +
+				`"tools":[{"name":"pages_get","description":"reads","schema":{"type":"object"},` +
+				`"deferred":{"name":"pages","description":"the page map"}}]}`,
+		},
+		{
+			name: "a response and a delta carry the tool search the model ran",
+			value: []any{
+				llm.Response{Searches: []llm.ToolSearch{{Kind: llm.SearchOutput, CallID: "ts_1", Payload: json.RawMessage(`[]`)}}},
+				llm.Delta{Search: &llm.ToolSearch{Kind: llm.SearchCall, Payload: json.RawMessage(`{}`)}},
+			},
+			want: `[{"text":"","usage":{"input":0,"cachedInput":0,"cacheWrite":0,"output":0,"reasoning":0,"total":0},` +
+				`"finishReason":"","searches":[{"kind":"output","callId":"ts_1","payload":[]}]},` +
+				`{"text":"","done":false,"search":{"kind":"call","payload":{}}}]`,
 		},
 	}
 

@@ -1,0 +1,153 @@
+{
+  "model": "gpt-5.6-terra",
+  "instructions": "You are the assistant.",
+  "input": [
+    {
+      "role": "developer",
+      "content": "Site: Example."
+    },
+    {
+      "role": "user",
+      "content": "Read the page p1."
+    },
+    {
+      "type": "tool_search_call",
+      "arguments": {
+        "paths": [
+          "pages"
+        ]
+      },
+      "execution": "server"
+    },
+    {
+      "type": "tool_search_output",
+      "tools": [
+        {
+          "type": "namespace",
+          "name": "pages",
+          "description": "The page map.",
+          "tools": [
+            {
+              "type": "function",
+              "name": "pages_get",
+              "description": "Reads a page.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              },
+              "strict": false,
+              "defer_loading": true
+            }
+          ]
+        }
+      ],
+      "execution": "server"
+    },
+    {
+      "type": "function_call",
+      "call_id": "call_1",
+      "namespace": "pages",
+      "name": "pages_get",
+      "arguments": "{\"id\":\"p1\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_1",
+      "output": "{\"status\":\"draft\"}"
+    }
+  ],
+  "store": false,
+  "max_output_tokens": 2048,
+  "reasoning": {
+    "effort": "none"
+  },
+  "tools": [
+    {
+      "type": "function",
+      "name": "pages_list",
+      "description": "Lists pages.",
+      "parameters": {
+        "properties": {},
+        "type": "object"
+      },
+      "strict": false
+    },
+    {
+      "type": "namespace",
+      "name": "pages",
+      "description": "The page map.",
+      "tools": [
+        {
+          "type": "function",
+          "name": "pages_get",
+          "description": "Reads a page.",
+          "parameters": {
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          },
+          "strict": false,
+          "defer_loading": true
+        },
+        {
+          "type": "function",
+          "name": "pages_tree",
+          "description": "Reads the tree.",
+          "parameters": {
+            "properties": {},
+            "type": "object"
+          },
+          "strict": false,
+          "defer_loading": true
+        }
+      ]
+    },
+    {
+      "type": "namespace",
+      "name": "runs",
+      "description": "Runs and their items.",
+      "tools": [
+        {
+          "type": "function",
+          "name": "runs_get",
+          "description": "Reads a run.",
+          "parameters": {
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          },
+          "strict": false,
+          "defer_loading": true
+        }
+      ]
+    },
+    {
+      "type": "tool_search"
+    }
+  ],
+  "service_tier": "default",
+  "prompt_cache_key": "chat:conv-1",
+  "stream": true,
+  "stream_options": {
+    "include_obfuscation": false
+  }
+}

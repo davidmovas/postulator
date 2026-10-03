@@ -17,12 +17,14 @@ import (
 )
 
 type heard struct {
-	err    error
-	done   *port.Delta
-	texts  []string
-	calls  []port.ToolCall
-	after  int
-	closed bool
+	err      error
+	done     *port.Delta
+	texts    []string
+	calls    []port.ToolCall
+	searches []port.ToolSearch
+	order    []string
+	after    int
+	closed   bool
 }
 
 func (h heard) text() string {
@@ -52,6 +54,10 @@ func listen(t *testing.T, deltas <-chan port.Delta) heard {
 				got.done = &final
 			case delta.Call != nil:
 				got.calls = append(got.calls, *delta.Call)
+				got.order = append(got.order, "call "+delta.Call.ID)
+			case delta.Search != nil:
+				got.searches = append(got.searches, *delta.Search)
+				got.order = append(got.order, "search "+string(delta.Search.Kind))
 			default:
 				got.texts = append(got.texts, delta.Text)
 			}

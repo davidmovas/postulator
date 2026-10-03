@@ -12,6 +12,8 @@ const (
 	maxCacheKey     = 64
 	defaultEffort   = "medium"
 	effortNone      = "none"
+	toolSearch      = "tool_search"
+	toolNamespace   = "namespace"
 )
 
 var (
@@ -23,7 +25,10 @@ var (
 type check func(body map[string]any) (Reply, bool)
 
 func refuse(body map[string]any) (Reply, bool) {
-	for _, run := range []check{refuseModel, refuseEffort, refuseSampling, refuseTier, refuseCeiling, refuseCacheKey, refuseFormat, refuseTools, refuseInput} {
+	for _, run := range []check{
+		refuseModel, refuseEffort, refuseSampling, refuseTier, refuseCeiling, refuseCacheKey, refuseFormat,
+		refuseDeferred, refuseTools, refuseInput,
+	} {
 		if reply, refused := run(body); refused {
 			return reply, true
 		}
@@ -143,6 +148,38 @@ func refuseFormat(body map[string]any) (Reply, bool) {
 	}
 	return badRequest("text.format.schema", "invalid_json_schema",
 		"Invalid schema for response_format '"+named(format, "name")+"': "+problem), true
+}
+
+func refuseDeferred(body map[string]any) (Reply, bool) {
+	deferred, searchable := false, false
+	for _, each := range listAt(body, "tools") {
+		tool, isObject := each.(map[string]any)
+		if !isObject {
+			continue
+		}
+		switch tool["type"] {
+		case toolSearch:
+			searchable = true
+		case toolNamespace:
+			deferred = deferred || anyDeferred(listAt(tool, "tools"))
+		default:
+			deferred = deferred || tool["defer_loading"] == true
+		}
+	}
+	if !deferred || searchable {
+		return Reply{}, false
+	}
+	return badRequest("tools.defer_loading", "",
+		"Invalid Value: 'tools.defer_loading'. Deferred tools require tools.tool_search."), true
+}
+
+func anyDeferred(tools []any) bool {
+	for _, each := range tools {
+		if tool, isObject := each.(map[string]any); isObject && tool["defer_loading"] == true {
+			return true
+		}
+	}
+	return false
 }
 
 func refuseTools(body map[string]any) (Reply, bool) {

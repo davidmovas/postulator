@@ -27,9 +27,10 @@ func (r Role) Valid() bool {
 }
 
 type ToolCall struct {
-	ID   string          `json:"id"`
-	Name string          `json:"name"`
-	Args json.RawMessage `json:"args"`
+	ID        string          `json:"id"`
+	Name      string          `json:"name"`
+	Args      json.RawMessage `json:"args"`
+	Namespace string          `json:"namespace,omitempty"`
 }
 
 type ToolResult struct {
@@ -37,17 +38,42 @@ type ToolResult struct {
 	Output json.RawMessage `json:"output"`
 }
 
+type SearchKind string
+
+const (
+	SearchCall   SearchKind = "call"
+	SearchOutput SearchKind = "output"
+)
+
+func (k SearchKind) Valid() bool {
+	return k == SearchCall || k == SearchOutput
+}
+
+type ToolSearch struct {
+	Kind      SearchKind      `json:"kind"`
+	CallID    string          `json:"callId,omitempty"`
+	Execution string          `json:"execution,omitempty"`
+	Payload   json.RawMessage `json:"payload"`
+}
+
 type Message struct {
 	Role   Role        `json:"role"`
 	Text   string      `json:"text"`
 	Call   *ToolCall   `json:"call,omitempty"`
 	Result *ToolResult `json:"result,omitempty"`
+	Search *ToolSearch `json:"search,omitempty"`
+}
+
+type ToolGroup struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 type Tool struct {
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	Schema      *Schema `json:"schema,omitempty"`
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	Schema      *Schema    `json:"schema,omitempty"`
+	Deferred    *ToolGroup `json:"deferred,omitempty"`
 }
 
 type CallMeta struct {
@@ -120,10 +146,13 @@ func (m Message) check(called map[string]struct{}) *errors.Error {
 		return errors.New(errors.Invalid, "a message must not be empty")
 	}
 	if carried > 1 {
-		return errors.New(errors.Invalid, "a message carries only one of text, a tool call or a tool result")
+		return errors.New(errors.Invalid, "a message carries only one of text, a tool call, a tool search or a tool result")
 	}
 	if m.Call != nil && m.Role != RoleAssistant {
 		return errors.New(errors.Invalid, "a tool call must come from the assistant")
+	}
+	if m.Search != nil && m.Role != RoleAssistant {
+		return errors.New(errors.Invalid, "a tool search must come from the assistant")
 	}
 	if m.Result != nil && m.Role != RoleTool {
 		return errors.New(errors.Invalid, "a tool result must travel in a tool message")
@@ -131,13 +160,16 @@ func (m Message) check(called map[string]struct{}) *errors.Error {
 	if m.Role == RoleTool && m.Result == nil {
 		return errors.New(errors.Invalid, "a tool message must carry a tool result")
 	}
-	if m.Call != nil {
+	switch {
+	case m.Call != nil:
 		return m.Call.check()
-	}
-	if m.Result != nil {
+	case m.Result != nil:
 		return m.Result.check(called)
+	case m.Search != nil:
+		return m.Search.check()
+	default:
+		return nil
 	}
-	return nil
 }
 
 func (m Message) carried() int {
@@ -151,7 +183,20 @@ func (m Message) carried() int {
 	if m.Result != nil {
 		carried++
 	}
+	if m.Search != nil {
+		carried++
+	}
 	return carried
+}
+
+func (s ToolSearch) check() *errors.Error {
+	if !s.Kind.Valid() {
+		return errors.New(errors.Invalid, "a tool search is a call or its output").WithDetail("kind", string(s.Kind))
+	}
+	if !json.Valid(s.Payload) {
+		return errors.New(errors.Invalid, "a tool search must carry JSON").WithDetail("kind", string(s.Kind))
+	}
+	return nil
 }
 
 func (c ToolCall) check() *errors.Error {
@@ -182,6 +227,7 @@ func (r ToolResult) check(called map[string]struct{}) *errors.Error {
 
 func checkTools(tools []Tool) error {
 	named := make(map[string]struct{}, len(tools))
+	described := map[string]string{}
 	for i, tool := range tools {
 		if tool.Name == "" {
 			return errors.New(errors.Invalid, "a tool needs a name").WithDetail("index", i)
@@ -193,7 +239,23 @@ func checkTools(tools []Tool) error {
 		if tool.Schema != nil && tool.Schema.Type != SchemaObject {
 			return errors.New(errors.Invalid, "a tool's parameters must be an object").WithDetail("tool", tool.Name)
 		}
+		if tool.Deferred != nil {
+			if problem := tool.Deferred.check(described); problem != nil {
+				return problem.WithDetail("tool", tool.Name)
+			}
+		}
 	}
+	return nil
+}
+
+func (g ToolGroup) check(described map[string]string) *errors.Error {
+	if g.Name == "" || g.Description == "" {
+		return errors.New(errors.Invalid, "a deferred tool needs a group with a name and a description")
+	}
+	if held, seen := described[g.Name]; seen && held != g.Description {
+		return errors.New(errors.Invalid, "a tool group is described two ways").WithDetail("group", g.Name)
+	}
+	described[g.Name] = g.Description
 	return nil
 }
 
@@ -211,6 +273,7 @@ type Response struct {
 	FinishReason FinishReason       `json:"finishReason"`
 	Calls        []ToolCall         `json:"calls,omitempty"`
 	Tier         domain.ServiceTier `json:"tier,omitempty"`
+	Searches     []ToolSearch       `json:"searches,omitempty"`
 }
 
 type Delta struct {
@@ -221,6 +284,7 @@ type Delta struct {
 	Call   *ToolCall          `json:"call,omitempty"`
 	Finish FinishReason       `json:"finish,omitempty"`
 	Tier   domain.ServiceTier `json:"tier,omitempty"`
+	Search *ToolSearch        `json:"search,omitempty"`
 }
 
 type Client interface {

@@ -136,6 +136,11 @@ func TestAnAnswerTheClientCannotUseIsAFailure(t *testing.T) {
 			want: errors.External, reason: port.ReasonMalformedAnswer,
 		},
 		{
+			name: "a call whose arguments are an object rather than its json text",
+			body: `{"status":"completed","output":[{"type":"function_call","call_id":"call_1","name":"pages_get","arguments":{"id":"p1"}}]}`,
+			want: errors.External, reason: port.ReasonMalformedAnswer,
+		},
+		{
 			name: "a failed answer",
 			body: `{"status":"failed","error":{"code":"server_error","message":"The server had an error."},"output":[]}`,
 			want: errors.External,
