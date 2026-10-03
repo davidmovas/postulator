@@ -286,6 +286,114 @@ func TestOverrides(t *testing.T) {
 	}
 }
 
+func TestAnOverrideTakesTheBasePriceForEveryPriceItLeftAtZero(t *testing.T) {
+	t.Parallel()
+
+	terra := llm.ModelRef{Provider: "openai", Model: "gpt-5.6-terra"}
+	base := llm.ModelInfo{
+		InputUSDPerM: 2, CachedInputUSDPerM: 0.2, CacheWriteUSDPerM: 2.5, OutputUSDPerM: 12,
+		FlexInputUSDPerM: 1, FlexCachedInputUSDPerM: 0.1, FlexCacheWriteUSDPerM: 1.25, FlexOutputUSDPerM: 6,
+	}
+	prices := func(info llm.ModelInfo) llm.ModelInfo {
+		return llm.ModelInfo{
+			InputUSDPerM: info.InputUSDPerM, CachedInputUSDPerM: info.CachedInputUSDPerM,
+			CacheWriteUSDPerM: info.CacheWriteUSDPerM, OutputUSDPerM: info.OutputUSDPerM,
+			FlexInputUSDPerM: info.FlexInputUSDPerM, FlexCachedInputUSDPerM: info.FlexCachedInputUSDPerM,
+			FlexCacheWriteUSDPerM: info.FlexCacheWriteUSDPerM, FlexOutputUSDPerM: info.FlexOutputUSDPerM,
+		}
+	}
+
+	cases := []struct {
+		name  string
+		ref   llm.ModelRef
+		saved llm.ModelInfo
+		want  llm.ModelInfo
+	}{
+		{
+			name:  "a row saved before the flex and cache write prices existed",
+			ref:   terra,
+			saved: llm.ModelInfo{InputUSDPerM: 2, CachedInputUSDPerM: 0.2, OutputUSDPerM: 12},
+			want:  base,
+		},
+		{
+			name:  "a row saved without its cached price",
+			ref:   terra,
+			saved: llm.ModelInfo{InputUSDPerM: 2, OutputUSDPerM: 12},
+			want:  base,
+		},
+		{
+			name:  "a row with no price at all",
+			ref:   terra,
+			saved: llm.ModelInfo{},
+			want:  base,
+		},
+		{
+			name: "prices the row sets are its own",
+			ref:  terra,
+			saved: llm.ModelInfo{
+				InputUSDPerM: 3, CachedInputUSDPerM: 0.3, CacheWriteUSDPerM: 3.75, OutputUSDPerM: 15,
+				FlexInputUSDPerM: 1.5, FlexCachedInputUSDPerM: 0.15, FlexCacheWriteUSDPerM: 1.875, FlexOutputUSDPerM: 7.5,
+			},
+			want: llm.ModelInfo{
+				InputUSDPerM: 3, CachedInputUSDPerM: 0.3, CacheWriteUSDPerM: 3.75, OutputUSDPerM: 15,
+				FlexInputUSDPerM: 1.5, FlexCachedInputUSDPerM: 0.15, FlexCacheWriteUSDPerM: 1.875, FlexOutputUSDPerM: 7.5,
+			},
+		},
+		{
+			name:  "only the prices left at zero are filled",
+			ref:   terra,
+			saved: llm.ModelInfo{InputUSDPerM: 2.5, OutputUSDPerM: 14, FlexInputUSDPerM: 1.25, FlexOutputUSDPerM: 7},
+			want: llm.ModelInfo{
+				InputUSDPerM: 2.5, CachedInputUSDPerM: 0.2, CacheWriteUSDPerM: 2.5, OutputUSDPerM: 14,
+				FlexInputUSDPerM: 1.25, FlexCachedInputUSDPerM: 0.1, FlexCacheWriteUSDPerM: 1.25, FlexOutputUSDPerM: 7,
+			},
+		},
+		{
+			name:  "a model the embedded catalog does not carry keeps its zeros",
+			ref:   llm.ModelRef{Provider: "openai", Model: "gpt-house-blend"},
+			saved: llm.ModelInfo{InputUSDPerM: 2, OutputUSDPerM: 12},
+			want:  llm.ModelInfo{InputUSDPerM: 2, OutputUSDPerM: 12},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			built, repo := newCatalog(t)
+			stored := override(tc.ref, true, 0)
+			stored.Info.InputUSDPerM, stored.Info.CachedInputUSDPerM = tc.saved.InputUSDPerM, tc.saved.CachedInputUSDPerM
+			stored.Info.CacheWriteUSDPerM, stored.Info.OutputUSDPerM = tc.saved.CacheWriteUSDPerM, tc.saved.OutputUSDPerM
+			stored.Info.FlexInputUSDPerM, stored.Info.FlexCachedInputUSDPerM = tc.saved.FlexInputUSDPerM, tc.saved.FlexCachedInputUSDPerM
+			stored.Info.FlexCacheWriteUSDPerM, stored.Info.FlexOutputUSDPerM = tc.saved.FlexCacheWriteUSDPerM, tc.saved.FlexOutputUSDPerM
+			if err := repo.Upsert(t.Context(), stored); err != nil {
+				t.Fatalf("Upsert: %v", err)
+			}
+
+			info, err := built.Lookup(t.Context(), tc.ref)
+			if err != nil {
+				t.Fatalf("Lookup: %v", err)
+			}
+			if got := prices(info); got != tc.want {
+				t.Errorf("prices = %+v, want %+v", got, tc.want)
+			}
+			if info.MaxOutputTokens != stored.Info.MaxOutputTokens || info.RPM != stored.Info.RPM {
+				t.Errorf("info = %+v, want the override's limits kept", info)
+			}
+
+			listed, err := built.List(t.Context())
+			if err != nil {
+				t.Fatalf("List: %v", err)
+			}
+			for _, model := range listed {
+				if model.Ref == tc.ref && prices(model) != tc.want {
+					t.Errorf("listed prices = %+v, want %+v", prices(model), tc.want)
+				}
+			}
+		})
+	}
+}
+
 func TestLookupRejectsAnUnknownModel(t *testing.T) {
 	t.Parallel()
 

@@ -76,9 +76,30 @@ func (c *Catalog) resolved(ctx context.Context) (map[string]llm.ModelInfo, error
 			delete(merged, key)
 			continue
 		}
-		merged[key] = override.Info
+		merged[key] = withBasePrices(override.Info, c.base[key])
 	}
 	return merged, nil
+}
+
+func withBasePrices(info, base llm.ModelInfo) llm.ModelInfo {
+	for _, price := range []struct {
+		own  *float64
+		base float64
+	}{
+		{own: &info.InputUSDPerM, base: base.InputUSDPerM},
+		{own: &info.CachedInputUSDPerM, base: base.CachedInputUSDPerM},
+		{own: &info.CacheWriteUSDPerM, base: base.CacheWriteUSDPerM},
+		{own: &info.OutputUSDPerM, base: base.OutputUSDPerM},
+		{own: &info.FlexInputUSDPerM, base: base.FlexInputUSDPerM},
+		{own: &info.FlexCachedInputUSDPerM, base: base.FlexCachedInputUSDPerM},
+		{own: &info.FlexCacheWriteUSDPerM, base: base.FlexCacheWriteUSDPerM},
+		{own: &info.FlexOutputUSDPerM, base: base.FlexOutputUSDPerM},
+	} {
+		if *price.own == 0 && price.base > 0 {
+			*price.own = price.base
+		}
+	}
+	return info
 }
 
 func (c *Catalog) Lookup(ctx context.Context, ref llm.ModelRef) (llm.ModelInfo, error) {
