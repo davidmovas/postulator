@@ -23,7 +23,7 @@ type siteStore interface {
 }
 
 type pluginProbe interface {
-	Probe(ctx context.Context, record site.Site) (site.PluginState, error)
+	Probe(ctx context.Context, record site.Site) (site.Extensions, error)
 }
 
 type packager interface {
@@ -93,21 +93,22 @@ func (s *Service) CheckPlugin(ctx context.Context, req CheckPluginRequest) (Chec
 		return CheckPluginResponse{}, err
 	}
 
-	state, err := s.probe.Probe(ctx, record)
+	found, err := s.probe.Probe(ctx, record)
 	if err != nil {
 		return CheckPluginResponse{}, err
 	}
-	if state.Capabilities == nil {
-		state.Capabilities = []string{}
+	if found.Plugin.Capabilities == nil {
+		found.Plugin.Capabilities = []string{}
 	}
 
 	next := record
-	next.Plugin = state
+	next.Plugin = found.Plugin
+	next.Commerce = found.Commerce
 	next.UpdatedAt = s.now()
 	if updateErr := s.sites.Update(ctx, next); updateErr != nil {
 		return CheckPluginResponse{}, updateErr
 	}
-	return CheckPluginResponse{Plugin: pluginView(state)}, nil
+	return CheckPluginResponse{Plugin: pluginView(found.Plugin), Commerce: string(found.Commerce)}, nil
 }
 
 func (s *Service) PluginPackage(_ context.Context, _ PluginPackageRequest) (PluginPackageResponse, error) {

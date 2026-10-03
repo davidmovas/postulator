@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-const latestMigration = 30
+const latestMigration = 31
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -41,6 +41,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0028_run_item_blocked_by.sql",
 		"0029_keyword_lists.sql",
 		"0030_entity_scope.sql",
+		"0031_site_commerce.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)

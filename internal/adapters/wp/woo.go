@@ -246,6 +246,18 @@ func (c *Client) Commerce(ctx context.Context) (Commerce, error) {
 	return CommerceReady, nil
 }
 
+func (c *Client) CommerceOr(ctx context.Context, known Commerce) (Commerce, error) {
+	found, err := c.Commerce(ctx)
+	switch {
+	case err == nil:
+		return found, nil
+	case errors.IsCode(err, errors.External), errors.IsCode(err, errors.Unauthorized):
+		return known, nil
+	default:
+		return "", err
+	}
+}
+
 func forbidden(err error) bool {
 	status, ok := detailValue(err, "status")
 	return ok && status == http.StatusForbidden

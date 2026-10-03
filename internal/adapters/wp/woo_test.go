@@ -2,6 +2,7 @@ package wp_test
 
 import (
 	"encoding/json"
+	"net/http"
 	"slices"
 	"testing"
 
@@ -221,6 +222,43 @@ func TestCommerceSaysWhatTheStoreAllows(t *testing.T) {
 			}
 			if err != nil {
 				t.Fatalf("Commerce: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("commerce = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestCommerceOrKeepsWhatWasKnownWhenTheStoreCannotBeAsked(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		prepare func(server *wptest.Server)
+		name    string
+		options []wptest.Option
+		want    wp.Commerce
+	}{
+		{name: "the store answers", want: wp.CommerceAbsent, options: []wptest.Option{wptest.WithoutCommerce()}},
+		{
+			name:    "the store is down",
+			prepare: func(server *wptest.Server) { server.FailNext(http.StatusServiceUnavailable, 10) },
+			want:    wp.CommerceReady,
+		},
+		{name: "the password is refused", options: []wptest.Option{wptest.WithCredentials("someone", "else")}, want: wp.CommerceReady},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := wptest.New(t, tc.options...)
+			if tc.prepare != nil {
+				tc.prepare(server)
+			}
+			got, err := newClient(t, server).CommerceOr(t.Context(), wp.CommerceReady)
+			if err != nil {
+				t.Fatalf("CommerceOr: %v", err)
 			}
 			if got != tc.want {
 				t.Errorf("commerce = %q, want %q", got, tc.want)

@@ -277,6 +277,48 @@ func TestSyncSiteAdoptsTheManifest(t *testing.T) {
 	}
 }
 
+func TestSyncSiteAsksTheStoreOnceAndRecordsWhatItFound(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		opts []wptest.Option
+		want site.Commerce
+	}{
+		{name: "a store the user may edit", want: site.CommerceReady},
+		{name: "no store", opts: []wptest.Option{wptest.WithoutCommerce()}, want: site.CommerceAbsent},
+		{name: "a user without product rights", opts: []wptest.Option{wptest.WithoutProductEdit()}, want: site.CommerceForbidden},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := newSyncHarness(t, 1, tc.opts...)
+			seedSite(t, h)
+			h.all(t)
+
+			owner, err := sqlite.NewSiteRepo(h.store).Get(t.Context(), h.siteID)
+			if err != nil {
+				t.Fatalf("read the site: %v", err)
+			}
+			if owner.Commerce != tc.want {
+				t.Errorf("commerce = %q, want %q", owner.Commerce, tc.want)
+			}
+
+			asked := 0
+			for _, request := range h.server.Requests() {
+				if request.Path == "/wp-json/wp/v2/users/me" || request.Path == "/wp-json/wc/v3/products" {
+					asked++
+				}
+			}
+			if asked > 2 {
+				t.Errorf("the store was asked %d times over a sync of several batches, want it asked once", asked)
+			}
+		})
+	}
+}
+
 func TestSyncSiteFlagsDriftOnlyOverOurOwnHashAndArchivesWhatIsGone(t *testing.T) {
 	t.Parallel()
 

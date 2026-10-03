@@ -4,6 +4,9 @@ export type SiteStatus = (typeof siteStatuses)[number];
 export const siteReaches = ["ok", "upgradeRequired", "unauthorized", "unreachable"] as const;
 export type SiteReach = (typeof siteReaches)[number];
 
+export const siteCommerces = ["", "absent", "forbidden", "ready"] as const;
+export type SiteCommerce = (typeof siteCommerces)[number];
+
 export const pageStatuses = ["planned", "exists", "published", "archived"] as const;
 export type PageStatus = (typeof pageStatuses)[number];
 

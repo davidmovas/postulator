@@ -37,8 +37,8 @@ import (
 
 type stubProbe struct{}
 
-func (stubProbe) Probe(context.Context, site.Site) (site.PluginState, error) {
-	return site.PluginState{Capabilities: []string{}}, nil
+func (stubProbe) Probe(context.Context, site.Site) (site.Extensions, error) {
+	return site.Extensions{Plugin: site.PluginState{Capabilities: []string{}}}, nil
 }
 
 func (stubProbe) TestConnection(context.Context, site.Candidate) (site.Reachability, error) {

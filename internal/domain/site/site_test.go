@@ -95,6 +95,9 @@ func TestSiteValidate(t *testing.T) {
 		{name: "blank name", mutate: func(s *site.Site) { s.Name = "  " }, field: "name"},
 		{name: "http without allow", mutate: func(s *site.Site) { s.BaseURL = "http://shop.example.com" }, field: "baseUrl"},
 		{name: "unknown status", mutate: func(s *site.Site) { s.Status = "sleeping" }, field: "status"},
+		{name: "a store never checked", mutate: func(s *site.Site) { s.Commerce = site.CommerceUnknown }},
+		{name: "a ready store", mutate: func(s *site.Site) { s.Commerce = site.CommerceReady }},
+		{name: "unknown store state", mutate: func(s *site.Site) { s.Commerce = "open" }, field: "commerce"},
 		{name: "foreign secret ref", mutate: func(s *site.Site) { s.SecretRef = "site:other:wp_password" }, field: "secretRef"},
 		{name: "unknown role", mutate: func(s *site.Site) {
 			s.Defaults.ModelProfiles = map[llm.Role]llm.ModelRef{"painter": {Provider: "a", Model: "b"}}
@@ -138,6 +141,14 @@ func TestStatusAndSort(t *testing.T) {
 	}
 	if site.Status("x").Valid() {
 		t.Error("unknown status must be invalid")
+	}
+	for _, commerce := range []site.Commerce{site.CommerceUnknown, site.CommerceAbsent, site.CommerceForbidden, site.CommerceReady} {
+		if !commerce.Valid() {
+			t.Errorf("%q must be valid", commerce)
+		}
+	}
+	if site.Commerce("open").Valid() {
+		t.Error("an unknown store state must be invalid")
 	}
 	if !site.SortCreatedAt.Valid() || !site.SortName.Valid() || site.Sort("age").Valid() {
 		t.Error("sort validity is wrong")

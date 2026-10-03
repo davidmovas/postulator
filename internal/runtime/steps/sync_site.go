@@ -97,7 +97,7 @@ func SyncSite(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			bulk, err := adoptManifest(ctx, deps, client, owner)
+			bulk, err := adoptExtensions(ctx, deps, client, owner, state.Batches == 0)
 			if err != nil {
 				return run.Result{}, err
 			}
@@ -175,32 +175,40 @@ func batchSize(deps Deps) int {
 	return deps.BatchSize
 }
 
-func adoptManifest(ctx context.Context, deps Deps, client *wp.Client, owner site.Site) (bool, error) {
+func adoptExtensions(ctx context.Context, deps Deps, client *wp.Client, owner site.Site, withStore bool) (bool, error) {
+	plugin := site.PluginState{Capabilities: []string{}}
+	bulk := false
 	capabilities, err := client.Capabilities(ctx)
-	if err != nil {
-		if !wp.IsPluginMissing(err) {
-			return false, err
+	switch {
+	case err == nil:
+		bulk = capabilities.Has(CapabilityBulk)
+		plugin = site.PluginState{
+			Installed:    true,
+			Version:      capabilities.Version,
+			Capabilities: capabilities.Names,
+			SEOPlugin:    capabilities.SEOPlugin,
 		}
-		return false, adoptPlugin(ctx, deps, owner, site.PluginState{Capabilities: []string{}})
+	case !wp.IsPluginMissing(err):
+		return false, err
 	}
 
-	return capabilities.Has(CapabilityBulk), adoptPlugin(ctx, deps, owner, site.PluginState{
-		Installed:    true,
-		Version:      capabilities.Version,
-		Capabilities: capabilities.Names,
-		SEOPlugin:    capabilities.SEOPlugin,
-	})
-}
-
-func adoptPlugin(ctx context.Context, deps Deps, owner site.Site, state site.PluginState) error {
-	if deps.SiteWriter == nil || samePlugin(owner.Plugin, state) {
-		return nil
+	commerce := owner.Commerce
+	if withStore {
+		found, storeErr := client.CommerceOr(ctx, wp.Commerce(owner.Commerce))
+		if storeErr != nil {
+			return false, storeErr
+		}
+		commerce = site.Commerce(found)
 	}
 
+	if deps.SiteWriter == nil || (samePlugin(owner.Plugin, plugin) && commerce == owner.Commerce) {
+		return bulk, nil
+	}
 	next := owner
-	next.Plugin = state
+	next.Plugin = plugin
+	next.Commerce = commerce
 	next.UpdatedAt = deps.now()
-	return deps.SiteWriter.Update(ctx, next)
+	return bulk, deps.SiteWriter.Update(ctx, next)
 }
 
 func samePlugin(current, next site.PluginState) bool {

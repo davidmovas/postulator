@@ -27,6 +27,7 @@ type Site struct {
 	Status        string   `json:"status"`
 	AllowInsecure bool     `json:"allowInsecure"`
 	Plugin        Plugin   `json:"plugin"`
+	Commerce      string   `json:"commerce"`
 	Defaults      Defaults `json:"defaults"`
 	CreatedAt     dto.Time `json:"createdAt"`
 	UpdatedAt     dto.Time `json:"updatedAt"`
@@ -71,6 +72,7 @@ func view(s site.Site) Site {
 		Status:        string(s.Status),
 		AllowInsecure: s.AllowInsecure,
 		Plugin:        Plugin{Installed: s.Plugin.Installed, Version: s.Plugin.Version, Capabilities: capabilities, SEOPlugin: s.Plugin.SEOPlugin},
+		Commerce:      string(s.Commerce),
 		Defaults:      Defaults{TemplateID: s.Defaults.TemplateID, LinkPolicyID: s.Defaults.LinkPolicyID, ModelProfiles: profiles},
 		CreatedAt:     dto.NewTime(s.CreatedAt),
 		UpdatedAt:     dto.NewTime(s.UpdatedAt),
