@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { entityKinds } from "../../generated/vocab.js";
 import { StarShineIcon } from "../../ui/index.js";
-import { entityIcon, formatScore, kindLabel, scored } from "./labels.js";
+import { entityIcon, formatScore, entityKindLabel, scored } from "./labels.js";
 
 describe("formatScore", () => {
     it("shows a computed score to two places", () => {
@@ -29,14 +29,14 @@ describe("scored", () => {
 describe("the entity kinds in words and icons", () => {
     it("names every entity kind from one source", () => {
         for (const kind of entityKinds) {
-            expect(kindLabel(kind)).not.toBe("");
-            expect(kindLabel(kind)).not.toBe(kind);
+            expect(entityKindLabel(kind)).not.toBe("");
+            expect(entityKindLabel(kind)).not.toBe(kind);
         }
     });
 
     it("shows a kind it has never heard of as it arrived", () => {
-        expect(kindLabel("galaxy")).toBe("galaxy");
-        expect(kindLabel("")).toBe("");
+        expect(entityKindLabel("galaxy")).toBe("galaxy");
+        expect(entityKindLabel("")).toBe("");
     });
 
     it("draws every entity kind with its own icon", () => {

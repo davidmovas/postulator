@@ -50,7 +50,7 @@ export function lensHint(lens: Lens): string {
     return copy.graph.lens.hint[lens];
 }
 
-export function kindLabel(kind: string): string {
+export function entityKindLabel(kind: string): string {
     return isOneOf(entityKinds, kind) ? copy.graph.kinds[kind] : kind;
 }
 

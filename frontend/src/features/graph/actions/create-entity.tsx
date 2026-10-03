@@ -9,12 +9,12 @@ import type { Keyword } from "../../../data/types.js";
 import { entityKinds } from "../../../generated/vocab.js";
 import { Button, ChipInput, Drawer, Field, Input, KeywordInput, Select, Textarea, toneClasses } from "../../../ui/index.js";
 import type { SelectOption } from "../../../ui/index.js";
-import { entityIcon, kindLabel, kindTone } from "../labels.js";
+import { entityIcon, entityKindLabel, kindTone } from "../labels.js";
 import type { GraphIndex } from "../model/index.js";
 
 const kindOptions: readonly SelectOption<string>[] = entityKinds.map((value) => ({
     value,
-    label: kindLabel(value),
+    label: entityKindLabel(value),
 }));
 
 export interface CreateEntityDrawerProps {

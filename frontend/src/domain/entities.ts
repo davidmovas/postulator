@@ -2,7 +2,7 @@ import type { Entity } from "../data/types.js";
 
 const separator = " › ";
 
-export function pathOf(names: readonly string[]): string {
+export function trailOf(names: readonly string[]): string {
     return names.filter((name) => name !== "").join(separator);
 }
 

@@ -9,7 +9,7 @@ import { relativeTime } from "../../../domain/format.js";
 import { Button, CloseIcon, cx, DeleteIcon, IconButton, SectionLabel, SmartToyIcon, toneClasses } from "../../../ui/index.js";
 import { askAgent } from "../../agent/index.js";
 import { severityOf } from "../../links/model/audit.js";
-import { entityIcon, formatScore, kindLabel, kindTone } from "../labels.js";
+import { entityIcon, formatScore, entityKindLabel, kindTone } from "../labels.js";
 import type { GraphIndex } from "../model/index.js";
 import type { Lens } from "../model/lens.js";
 import { AnchorsEditor } from "./anchors.js";
@@ -135,7 +135,7 @@ export function Inspector({
                 <div className="min-w-0 flex-1">
                     <h2 className="truncate text-base font-semibold text-ink">{entity.name}</h2>
                     <p className="flex items-center gap-2 text-2xs text-ink-dim">
-                        <span>{kindLabel(entity.kind)}</span>
+                        <span>{entityKindLabel(entity.kind)}</span>
                         <span className="font-mono">{formatScore(entity.score)}</span>
                         <span>{copy.graph.inspector.rank(rank, index.counts.total)}</span>
                     </p>

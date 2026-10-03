@@ -4,7 +4,7 @@ import type { Point } from "../../canvas/viewport.js";
 import { copy } from "../../copy/index.js";
 import { StatusBadge, toneClasses } from "../../ui/index.js";
 import type { Tone } from "../../ui/index.js";
-import { entityIcon, formatScore, kindLabel, kindTone } from "./labels.js";
+import { entityIcon, formatScore, entityKindLabel, kindTone } from "./labels.js";
 import type { GraphIndex } from "./model/index.js";
 
 const cardWidth = 224;
@@ -67,7 +67,7 @@ export function NodeCard({ index, hovered, hostWidth }: NodeCardProps): ReactEle
                 <span className="min-w-0 flex-1 truncate text-xs font-semibold text-ink">{entity.name}</span>
             </div>
             <div className="flex items-center gap-2 text-2xs text-ink-dim">
-                <span>{kindLabel(entity.kind)}</span>
+                <span>{entityKindLabel(entity.kind)}</span>
                 <span className="font-mono">{formatScore(entity.score)}</span>
             </div>
             {flags.length === 0 ? null : (

@@ -8,12 +8,12 @@ import type { Entity, Keyword } from "../../../data/types.js";
 import { keywordList, sameKeywords } from "../../../domain/keywords.js";
 import { entityKinds } from "../../../generated/vocab.js";
 import { Button, Field, Input, KeywordInput, Select, Textarea } from "../../../ui/index.js";
-import { kindLabel } from "../labels.js";
+import { entityKindLabel } from "../labels.js";
 import type { SelectOption } from "../../../ui/index.js";
 
 const kindOptions: readonly SelectOption<string>[] = entityKinds.map((value) => ({
     value,
-    label: kindLabel(value),
+    label: entityKindLabel(value),
 }));
 
 interface Draft {
