@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-const latestMigration = 34
+const latestMigration = 36
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -45,6 +45,8 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0032_page_planned_path.sql",
 		"0033_entity_site_category.sql",
 		"0034_entity_terms.sql",
+		"0035_llm_call_usage_detail.sql",
+		"0036_model_catalog_tier_prices.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -494,6 +496,62 @@ func TestEntityTermsSchema(t *testing.T) {
 	}
 	if got := count(`SELECT count(*) FROM entity_terms`); got != 0 {
 		t.Fatalf("entity_terms after a site delete = %d, want none", got)
+	}
+}
+
+func TestSpendColumns(t *testing.T) {
+	t.Parallel()
+
+	store := openStore(t, nil)
+	exec := func(query string, args ...any) error {
+		_, err := store.writer.ExecContext(t.Context(), query, args...)
+		return err
+	}
+	const at = "2026-10-03T09:00:00Z"
+
+	if err := exec(`INSERT INTO llm_calls (id, run_id, item_id, step, conversation_id, provider, model, input_tokens, output_tokens, usd, latency_ms, status, error_code, created_at) VALUES ('c1', '', '', 'chat', 'conv', 'openai', 'gpt-5.6-terra', 10, 5, 0.1, 30, 'ok', '', ?)`, at); err != nil {
+		t.Fatalf("a call written before the detail columns: %v", err)
+	}
+	var reasoning, written int
+	var tier string
+	if err := store.reader.QueryRowContext(t.Context(), `SELECT reasoning_tokens, cache_write_tokens, service_tier FROM llm_calls WHERE id = 'c1'`).Scan(&reasoning, &written, &tier); err != nil {
+		t.Fatalf("read the detail columns: %v", err)
+	}
+	if reasoning != 0 || written != 0 || tier != "" {
+		t.Fatalf("defaults = %d reasoning, %d written, tier %q; want zeros and no tier", reasoning, written, tier)
+	}
+	var index string
+	if err := store.reader.QueryRowContext(t.Context(), `SELECT name FROM sqlite_schema WHERE type = 'index' AND name = 'llm_calls_created'`).Scan(&index); err != nil {
+		t.Fatalf("the index the spend window reads is missing: %v", err)
+	}
+
+	model := `INSERT INTO model_catalog (provider, model, context_tokens, max_output_tokens, input_usd_per_m, output_usd_per_m, rpm, tpm, supports_structured, supports_images, reasoning, enabled, created_at, updated_at) VALUES ('openai', ?, 1000, 100, 2, 12, 1, 1, 1, 0, 1, 1, ?, ?)`
+	for _, step := range []struct {
+		model, column string
+		price         float64
+		ok            bool
+	}{
+		{model: "a", column: "cache_write_usd_per_m", price: 2.5, ok: true},
+		{model: "b", column: "flex_input_usd_per_m", price: 1, ok: true},
+		{model: "c", column: "flex_cached_input_usd_per_m", price: 0.1, ok: true},
+		{model: "d", column: "flex_cache_write_usd_per_m", price: 1.25, ok: true},
+		{model: "e", column: "flex_output_usd_per_m", price: 6, ok: true},
+		{model: "f", column: "cache_write_usd_per_m", price: -1},
+		{model: "g", column: "flex_input_usd_per_m", price: -1},
+		{model: "h", column: "flex_cached_input_usd_per_m", price: -0.1},
+		{model: "i", column: "flex_cache_write_usd_per_m", price: -1},
+		{model: "j", column: "flex_output_usd_per_m", price: -6},
+	} {
+		if err := exec(model, step.model, at, at); err != nil {
+			t.Fatalf("model %s: %v", step.model, err)
+		}
+		err := exec(`UPDATE model_catalog SET `+step.column+` = ? WHERE model = ?`, step.price, step.model)
+		if step.ok && err != nil {
+			t.Fatalf("%s = %v: %v", step.column, step.price, err)
+		}
+		if !step.ok && err == nil {
+			t.Fatalf("%s = %v was accepted", step.column, step.price)
+		}
 	}
 }
 
