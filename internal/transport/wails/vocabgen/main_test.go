@@ -116,6 +116,7 @@ func TestTheDerivedGroupingsReadTheirGoPredicates(t *testing.T) {
 		"toolRisksNeedingConfirmation": {"write", "dangerous"},
 		"blockingImportFindingCodes": {
 			"bad_path", "unknown_parent", "unknown_related", "self_edge", "cycle", "ambiguous_parent", "ambiguous_entity",
+			"scope_clash",
 		},
 		"offGraphLinkClasses":        {"self", "external", "unknown_internal"},
 		"runKindsWithTheirOwnRecipe": {"relink", "sync", "repair", "revert"},

@@ -44,10 +44,12 @@ const (
 	CodeProductRowLeft    FindingCode = "product_row_left"
 	CodeWPTypeKept        FindingCode = "wp_type_kept"
 	CodeIntermediateLevel FindingCode = "intermediate_level"
+	CodeScopeClash        FindingCode = "scope_clash"
 )
 
 var blockingFindingCodes = []FindingCode{
 	CodeBadPath, CodeUnknownParent, CodeUnknownRelated, CodeSelfEdge, CodeCycle, CodeAmbiguousParent, CodeAmbiguousEntity,
+	CodeScopeClash,
 }
 
 func (c FindingCode) Blocking() bool {
@@ -67,9 +69,10 @@ type Options struct {
 }
 
 type Sheet struct {
-	Name    string   `json:"name"`
-	Headers []string `json:"headers"`
-	Rows    int      `json:"rows"`
+	Name     string   `json:"name"`
+	Headers  []string `json:"headers"`
+	Rows     int      `json:"rows"`
+	Detected Mapping  `json:"detected"`
 }
 
 type Mapping struct {
@@ -91,6 +94,7 @@ type Finding struct {
 }
 
 type PreviewPage struct {
+	Sheet           string        `json:"sheet,omitempty"`
 	Path            string        `json:"path"`
 	PlannedPath     string        `json:"plannedPath,omitempty"`
 	StoreName       string        `json:"storeName,omitempty"`
@@ -108,6 +112,7 @@ type PreviewPage struct {
 }
 
 type PreviewEntity struct {
+	Sheet        string        `json:"sheet,omitempty"`
 	Name         string        `json:"name"`
 	Parent       string        `json:"parent,omitempty"`
 	Kind         string        `json:"kind"`
@@ -118,26 +123,29 @@ type PreviewEntity struct {
 }
 
 type PreviewColumn struct {
+	Sheet  string `json:"sheet,omitempty"`
 	Header string `json:"header"`
 	Use    string `json:"use"`
 	Field  string `json:"field,omitempty"`
 }
 
-func columnViews(uses []importmap.ColumnUse) []PreviewColumn {
+func columnViews(sheet string, uses []importmap.ColumnUse) []PreviewColumn {
 	out := make([]PreviewColumn, 0, len(uses))
 	for _, use := range uses {
-		out = append(out, PreviewColumn{Header: use.Header, Use: string(use.Use), Field: string(use.Field)})
+		out = append(out, PreviewColumn{Sheet: sheet, Header: use.Header, Use: string(use.Use), Field: string(use.Field)})
 	}
 	return out
 }
 
 type PreviewGroup struct {
-	Path []string `json:"path"`
-	Page string   `json:"page,omitempty"`
-	Rows int      `json:"rows"`
+	Sheet string   `json:"sheet,omitempty"`
+	Path  []string `json:"path"`
+	Page  string   `json:"page,omitempty"`
+	Rows  int      `json:"rows"`
 }
 
 type PreviewEdge struct {
+	Sheet  string `json:"sheet,omitempty"`
 	From   string `json:"from"`
 	To     string `json:"to"`
 	Kind   string `json:"kind"`
@@ -188,16 +196,12 @@ func mappingView(m importmap.Mapping) Mapping {
 	}
 }
 
-func sheetViews(list []importmap.SheetInfo) []Sheet {
-	out := make([]Sheet, 0, len(list))
-	for i := range list {
-		headers := list[i].Headers
-		if headers == nil {
-			headers = []string{}
-		}
-		out = append(out, Sheet{Name: list[i].Name, Headers: headers, Rows: list[i].Rows})
+func sheetView(info importmap.SheetInfo, detected importmap.Mapping) Sheet {
+	headers := info.Headers
+	if headers == nil {
+		headers = []string{}
 	}
-	return out
+	return Sheet{Name: info.Name, Headers: headers, Rows: info.Rows, Detected: mappingView(detected)}
 }
 
 func mappingViews(list []importmap.Mapping) []Mapping {
@@ -253,8 +257,9 @@ func (r *PreviewReport) settle() {
 	}
 }
 
-func entityView(e graph.Entity, parent string, action Action) PreviewEntity {
+func entityView(sheet string, e graph.Entity, parent string, action Action) PreviewEntity {
 	return PreviewEntity{
+		Sheet:        sheet,
 		Name:         e.Name,
 		Parent:       parent,
 		Kind:         string(e.Kind),
@@ -265,8 +270,9 @@ func entityView(e graph.Entity, parent string, action Action) PreviewEntity {
 	}
 }
 
-func pageView(p pagemap.Page, draft *pageDraft, action Action) PreviewPage {
+func pageView(sheet string, p pagemap.Page, draft *pageDraft, action Action) PreviewPage {
 	view := PreviewPage{
+		Sheet:           sheet,
 		Path:            p.Path,
 		PlannedPath:     p.PlannedPath,
 		MatchedBy:       string(draft.matchedBy),

@@ -8,17 +8,6 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
 
-func (s *siteState) held(path string) (pagemap.Page, bool) {
-	if page, ok := s.byPath[path]; ok && page.WPID != nil {
-		return page, true
-	}
-	if page, ok := s.byPlanned[path]; ok {
-		return page, true
-	}
-	page, ok := s.byPath[path]
-	return page, ok
-}
-
 func (s *siteState) productDraft(draft *pageDraft) bool {
 	current, held := s.held(draft.path)
 	switch {

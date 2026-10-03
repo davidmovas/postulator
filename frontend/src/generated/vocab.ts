@@ -236,6 +236,7 @@ export const importFindingCodes = [
     "product_row_left",
     "wp_type_kept",
     "intermediate_level",
+    "scope_clash",
 ] as const;
 export type ImportFindingCode = (typeof importFindingCodes)[number];
 
@@ -247,6 +248,7 @@ export const blockingImportFindingCodes: readonly ImportFindingCode[] = [
     "cycle",
     "ambiguous_parent",
     "ambiguous_entity",
+    "scope_clash",
 ];
 
 export const importActions = ["create", "update", "skip"] as const;

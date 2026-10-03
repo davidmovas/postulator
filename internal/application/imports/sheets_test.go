@@ -35,9 +35,9 @@ func (h harness) detected(t *testing.T, path string) imports.Mapping {
 
 func entitiesNamed(report imports.PreviewReport, name string) []imports.PreviewEntity {
 	out := make([]imports.PreviewEntity, 0)
-	for _, held := range report.Entities {
-		if held.Name == name {
-			out = append(out, held)
+	for i := range report.Entities {
+		if report.Entities[i].Name == name {
+			out = append(out, report.Entities[i])
 		}
 	}
 	return out

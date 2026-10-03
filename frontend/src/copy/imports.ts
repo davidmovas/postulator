@@ -205,6 +205,7 @@ export const imports = {
         product_row_left: "An earlier row waited for this product and is left beside it; delete it on the Pages screen",
         wp_type_kept: "The row is already on the site, so it keeps its WordPress type",
         intermediate_level: "The level above the products stays an entity without a page",
+        scope_clash: "Two entities of one name would sit under the same parent; rename one or give it another parent",
     },
     columnUses: {
         field: "A page field",

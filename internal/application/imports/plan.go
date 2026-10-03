@@ -34,6 +34,7 @@ type canonical struct {
 type plan struct {
 	siteID    string
 	sheet     string
+	read      []string
 	mapping   importmap.Mapping
 	report    PreviewReport
 	entities  []plannedEntity
@@ -43,20 +44,28 @@ type plan struct {
 	rows      int
 }
 
-func sheetOf(table importmap.Table) string {
-	sheet := ""
-	for i := range table.Rows {
-		at := table.Origin(i).Sheet
-		if i > 0 && at != sheet {
-			return ""
-		}
-		sheet = at
+func sheetsRead(mapping importmap.Mapping, table importmap.Table) []string {
+	if len(mapping.Options.Sheets) > 0 {
+		return slices.Clone(mapping.Options.Sheets)
 	}
-	return sheet
+	out := make([]string, 0, 1)
+	for i := range table.Rows {
+		if at := table.Origin(i).Sheet; at != "" && !slices.Contains(out, at) {
+			out = append(out, at)
+		}
+	}
+	return out
 }
 
 func (p *plan) whole() importmap.Origin {
 	return importmap.Origin{Sheet: p.sheet}
+}
+
+func (p *plan) sheetAt(at importmap.Origin) string {
+	if at.Sheet != "" {
+		return at.Sheet
+	}
+	return p.sheet
 }
 
 func (p *plan) noteAt(at importmap.Origin, field string, code FindingCode, message string) {
@@ -86,10 +95,6 @@ func (p *plan) counts() Counts {
 		tally.PagesUpdated++
 	}
 	return tally
-}
-
-func (p *plan) broken() bool {
-	return len(p.report.Errors) > 0
 }
 
 func titleFrom(path string) string {
@@ -144,52 +149,6 @@ func samePage(a, b pagemap.Page) bool {
 		a.MetaDescription == b.MetaDescription && a.WPType == b.WPType &&
 		a.Keywords.Equal(b.Keywords) && slices.Equal(a.Notes, b.Notes) &&
 		sameRef(a.EntityID, b.EntityID) && sameRef(a.TemplateID, b.TemplateID)
-}
-
-type siteState struct {
-	siteID    string
-	entities  []graph.Entity
-	edges     []graph.Edge
-	pages     []pagemap.Page
-	byName    map[string][]graph.Entity
-	byPath    map[string]pagemap.Page
-	byPlanned map[string]pagemap.Page
-	edgeKeys  map[string]struct{}
-}
-
-func (s *Service) state(ctx context.Context, siteID string) (siteState, error) {
-	entities, err := s.deps.Entities.ListBySite(ctx, siteID)
-	if err != nil {
-		return siteState{}, err
-	}
-	edges, err := s.deps.Edges.ListBySite(ctx, siteID)
-	if err != nil {
-		return siteState{}, err
-	}
-	pages, err := s.deps.Pages.ListBySite(ctx, siteID)
-	if err != nil {
-		return siteState{}, err
-	}
-	state := siteState{
-		siteID: siteID, entities: entities, edges: edges, pages: pages,
-		byName:    make(map[string][]graph.Entity, len(entities)),
-		byPath:    make(map[string]pagemap.Page, len(pages)),
-		byPlanned: make(map[string]pagemap.Page),
-		edgeKeys:  make(map[string]struct{}, len(edges)),
-	}
-	for i := range entities {
-		state.byName[key(entities[i].Name)] = append(state.byName[key(entities[i].Name)], entities[i])
-	}
-	for i := range pages {
-		state.byPath[pages[i].Path] = pages[i]
-		if pages[i].PlannedPath != "" {
-			state.byPlanned[pages[i].PlannedPath] = pages[i]
-		}
-	}
-	for i := range edges {
-		state.edgeKeys[edgeKey(edges[i])] = struct{}{}
-	}
-	return state, nil
 }
 
 func (s *Service) templateFor(ctx context.Context, siteID, pageKind string) (*string, error) {
@@ -274,7 +233,7 @@ func (b *builder) planEntities(now time.Time) (map[string]graph.Entity, error) {
 			}
 			resolved[entity.ID] = entity
 			b.p.entities = append(b.p.entities, plannedEntity{entity: entity, created: true})
-			b.p.report.Entities = append(b.p.report.Entities, entityView(entity, parent, ActionCreate))
+			b.p.report.Entities = append(b.p.report.Entities, entityView(b.p.sheetAt(u.at), entity, parent, ActionCreate))
 			continue
 		}
 
@@ -293,11 +252,11 @@ func (b *builder) planEntities(now time.Time) (map[string]graph.Entity, error) {
 		}
 		resolved[entity.ID] = entity
 		if sameEntity(entity, current) {
-			b.p.report.Entities = append(b.p.report.Entities, entityView(entity, parent, ActionSkip))
+			b.p.report.Entities = append(b.p.report.Entities, entityView(b.p.sheetAt(u.at), entity, parent, ActionSkip))
 			continue
 		}
 		b.p.entities = append(b.p.entities, plannedEntity{entity: entity, created: false})
-		b.p.report.Entities = append(b.p.report.Entities, entityView(entity, parent, ActionUpdate))
+		b.p.report.Entities = append(b.p.report.Entities, entityView(b.p.sheetAt(u.at), entity, parent, ActionUpdate))
 	}
 	return resolved, nil
 }
@@ -321,15 +280,17 @@ func (b *builder) parentName(u *unit) string {
 func (b *builder) planEdges(now time.Time) {
 	seen := maps.Clone(b.state.edgeKeys)
 
-	add := func(fromID, toID string, kind graph.EdgeKind) {
+	add := func(from *unit, toID string, kind graph.EdgeKind) {
 		edge, err := graph.NewEdge(graph.Edge{
-			ID: id.New(), SiteID: b.state.siteID, FromEntityID: fromID, ToEntityID: toID,
+			ID: id.New(), SiteID: b.state.siteID, FromEntityID: from.id, ToEntityID: toID,
 			Kind: kind, Weight: 1, Source: graph.SourceImport, Status: graph.StatusApproved, CreatedAt: now,
 		})
 		if err != nil {
 			return
 		}
-		view := PreviewEdge{From: b.nameOf(fromID), To: b.nameOf(toID), Kind: string(kind), Action: string(ActionCreate)}
+		view := PreviewEdge{
+			Sheet: b.p.sheetAt(from.at), From: b.nameOf(from.id), To: b.nameOf(toID), Kind: string(kind), Action: string(ActionCreate),
+		}
 		if _, known := seen[edgeKey(edge)]; known {
 			view.Action = string(ActionSkip)
 			b.p.report.Edges = append(b.p.report.Edges, view)
@@ -350,7 +311,7 @@ func (b *builder) planEdges(now time.Time) {
 				"the entity names itself as its parent: "+u.name)
 		case u.parent.weak && u.matched != "" && b.parents[u.matched] > 0:
 		default:
-			add(u.id, parentID, graph.EdgeParent)
+			add(u, parentID, graph.EdgeParent)
 		}
 
 		for _, name := range u.related {
@@ -373,7 +334,7 @@ func (b *builder) planEdges(now time.Time) {
 				b.p.noteAt(u.at, string(importmap.FieldRelated), CodeSelfEdge, "the entity names itself as related: "+u.name)
 				continue
 			}
-			add(u.id, relatedID, graph.EdgeRelated)
+			add(u, relatedID, graph.EdgeRelated)
 		}
 	}
 }
@@ -462,7 +423,7 @@ func (s *Service) resolvePages(ctx context.Context, b *builder, now time.Time) e
 				return err
 			}
 			p.pages = append(p.pages, plannedPage{page: page, created: true})
-			p.report.Pages = append(p.report.Pages, pageView(page, draft, ActionCreate))
+			p.report.Pages = append(p.report.Pages, pageView(p.sheetAt(draft.at), page, draft, ActionCreate))
 			continue
 		}
 
@@ -527,11 +488,11 @@ func planUpdate(p *plan, current, next pagemap.Page, draft *pageDraft, now time.
 		return err
 	}
 	if samePage(page, current) {
-		p.report.Pages = append(p.report.Pages, pageView(page, draft, ActionSkip))
+		p.report.Pages = append(p.report.Pages, pageView(p.sheetAt(draft.at), page, draft, ActionSkip))
 		return nil
 	}
 	p.pages = append(p.pages, plannedPage{page: page, created: false})
-	p.report.Pages = append(p.report.Pages, pageView(page, draft, ActionUpdate))
+	p.report.Pages = append(p.report.Pages, pageView(p.sheetAt(draft.at), page, draft, ActionUpdate))
 	return nil
 }
 
@@ -645,7 +606,9 @@ func (b *builder) reportGroups() {
 	for at := range b.groups.nodes {
 		node := &b.groups.nodes[at]
 		entityID := b.entityID(node.unit)
-		view := PreviewGroup{Path: b.groups.chain(at), Page: node.page, Rows: len(node.under)}
+		view := PreviewGroup{
+			Sheet: b.p.sheetAt(b.units[node.unit].at), Path: b.groups.chain(at), Page: node.page, Rows: len(node.under),
+		}
 		if view.Page == "" {
 			view.Page = owned[entityID]
 		}
@@ -658,20 +621,18 @@ func (b *builder) reportGroups() {
 	}
 }
 
-func (s *Service) plan(ctx context.Context, siteID string, table importmap.Table, mapping importmap.Mapping) (plan, error) {
+func (s *Service) plan(ctx context.Context, state siteState, table importmap.Table, mapping importmap.Mapping, now time.Time) (plan, error) {
 	binding, err := mapping.Bind(table.Headers)
 	if err != nil {
 		return plan{}, err
 	}
 
-	state, err := s.state(ctx, siteID)
-	if err != nil {
-		return plan{}, err
+	state.byPlanned = maps.Clone(state.byPlanned)
+	p := plan{siteID: state.siteID, read: sheetsRead(mapping, table), mapping: mapping, rows: len(table.Rows)}
+	if len(p.read) == 1 {
+		p.sheet = p.read[0]
 	}
-
-	now := s.now()
-	p := plan{siteID: siteID, sheet: sheetOf(table), mapping: mapping, rows: len(table.Rows)}
-	p.report.Columns = columnViews(mapping.Uses(table.Headers))
+	p.report.Columns = columnViews(p.sheet, mapping.Uses(table.Headers))
 	rows := readRows(binding, table, &p)
 	sheet := pagesOf(rows, &p)
 	typeRows(sheet, rows, mapping.Options.RowType, &state)
