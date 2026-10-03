@@ -112,6 +112,59 @@ func TestEntityRepoRoundTrip(t *testing.T) {
 	}
 }
 
+func TestEntityRepoKeepsWhetherAnEntityIsASiteCategory(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	repo := sqlite.NewEntityRepo(store)
+
+	cases := []struct {
+		name    string
+		flagged bool
+	}{
+		{name: "Healing", flagged: true},
+		{name: "Liquid", flagged: false},
+	}
+	for _, tc := range cases {
+		record := fullEntity(owner.ID, tc.name, sqlitetest.Stamp)
+		record.SiteCategory = tc.flagged
+		if err := repo.Insert(t.Context(), record); err != nil {
+			t.Fatalf("Insert %s: %v", tc.name, err)
+		}
+
+		got, err := repo.Get(t.Context(), record.ID)
+		if err != nil || got.SiteCategory != tc.flagged {
+			t.Fatalf("Get %s = %t, %v; want %t", tc.name, got.SiteCategory, err, tc.flagged)
+		}
+		listed, err := repo.List(t.Context(), graph.EntityQuery{SiteID: owner.ID, NamePrefix: tc.name, Sort: graph.EntitySortName}, paging.Request{Limit: 10})
+		if err != nil || len(listed.Items) != 1 || listed.Items[0].SiteCategory != tc.flagged {
+			t.Fatalf("List %s = %+v, %v; want the flag %t", tc.name, listed.Items, err, tc.flagged)
+		}
+
+		record.SiteCategory = !tc.flagged
+		record.UpdatedAt = sqlitetest.Stamp.Add(time.Minute)
+		if err = repo.Update(t.Context(), record); err != nil {
+			t.Fatalf("Update %s: %v", tc.name, err)
+		}
+		if got, err = repo.Get(t.Context(), record.ID); err != nil || !reflect.DeepEqual(got, record) {
+			t.Fatalf("Get %s after the flag turned = %+v, %v\nwant %+v", tc.name, got, err, record)
+		}
+	}
+
+	bySite, err := repo.ListBySite(t.Context(), owner.ID)
+	if err != nil {
+		t.Fatalf("ListBySite: %v", err)
+	}
+	flags := make(map[string]bool, len(bySite))
+	for i := range bySite {
+		flags[bySite[i].Name] = bySite[i].SiteCategory
+	}
+	if want := map[string]bool{"Healing": false, "Liquid": true}; !reflect.DeepEqual(flags, want) {
+		t.Fatalf("ListBySite flags = %v, want %v", flags, want)
+	}
+}
+
 func TestEntityRepoKeepsANameUniqueUnderItsParent(t *testing.T) {
 	t.Parallel()
 
