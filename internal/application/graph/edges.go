@@ -11,10 +11,10 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
-func entityViews(entities []graphdomain.Entity) []Entity {
+func entityViews(entities []graphdomain.Entity, filed application.CategoryIndex) []Entity {
 	out := make([]Entity, 0, len(entities))
 	for i := range entities {
-		out = append(out, entityView(entities[i]))
+		out = append(out, entityView(entities[i], filed))
 	}
 	return out
 }
@@ -73,8 +73,13 @@ func (s *Service) LoadGraph(ctx context.Context, req LoadGraphRequest) (LoadGrap
 	if err != nil {
 		return LoadGraphResponse{}, err
 	}
+	entities := g.Entities()
+	filed, err := s.categoryIndex(ctx, req.SiteID, entities)
+	if err != nil {
+		return LoadGraphResponse{}, err
+	}
 	return LoadGraphResponse{
-		Entities: entityViews(g.Entities()), Edges: edgeViews(g.Edges()), Pages: states,
+		Entities: entityViews(entities, filed), Edges: edgeViews(g.Edges()), Pages: states,
 	}, nil
 }
 

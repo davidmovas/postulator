@@ -42,6 +42,10 @@ type siteReader interface {
 	Get(ctx context.Context, id string) (site.Site, error)
 }
 
+type termReader interface {
+	ListBySite(ctx context.Context, siteID string) ([]graphdomain.Term, error)
+}
+
 type pageStore interface {
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.Page, error)
 	Update(ctx context.Context, p pagemap.Page) error
@@ -63,6 +67,7 @@ type Deps struct {
 	Entities   entityStore
 	Edges      edgeStore
 	Sites      siteReader
+	Terms      termReader
 	Pages      pageStore
 	Work       workReader
 	Profiles   profileResolver
@@ -76,6 +81,7 @@ type Service struct {
 	entities  entityStore
 	edges     edgeStore
 	sites     siteReader
+	terms     termReader
 	pages     pageStore
 	work      workReader
 	profiles  profileResolver
@@ -87,8 +93,8 @@ type Service struct {
 
 func New(deps Deps) *Service {
 	return &Service{
-		entities: deps.Entities, edges: deps.Edges, sites: deps.Sites, pages: deps.Pages, work: deps.Work,
-		profiles: deps.Profiles, llm: deps.LLM, uow: deps.UnitOfWork, publisher: deps.Publisher,
+		entities: deps.Entities, edges: deps.Edges, sites: deps.Sites, terms: deps.Terms, pages: deps.Pages,
+		work: deps.Work, profiles: deps.Profiles, llm: deps.LLM, uow: deps.UnitOfWork, publisher: deps.Publisher,
 		clock: deps.Clock,
 	}
 }

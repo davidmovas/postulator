@@ -96,7 +96,11 @@ func (s *Service) CreateEntities(ctx context.Context, req CreateEntitiesRequest)
 	if publishErr := s.changed(req.SiteID); publishErr != nil {
 		return CreateEntitiesResponse{}, publishErr
 	}
-	return CreateEntitiesResponse{Entities: entityViews(built), Edges: edgeViews(edges)}, nil
+	views, err := s.viewsOf(ctx, req.SiteID, built)
+	if err != nil {
+		return CreateEntitiesResponse{}, err
+	}
+	return CreateEntitiesResponse{Entities: views, Edges: edgeViews(edges)}, nil
 }
 
 func namedIn(existing, built []graphdomain.Entity) map[string][]string {

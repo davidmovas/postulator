@@ -38,11 +38,12 @@ type CreateEntitiesResponse struct {
 }
 
 type UpdateEntityRequest struct {
-	ID       string         `json:"id" description:"The id of the entity, exactly as a read tool returned it"`
-	Name     *string        `json:"name,omitempty" description:"The new name, left out to keep the current one"`
-	Kind     *string        `json:"kind,omitempty" enum:"hub,product,topic,category,custom" description:"The new kind, left out to keep the current one"`
-	Intent   *string        `json:"intent,omitempty" description:"The new reader intent, left out to keep the current one"`
-	Keywords *[]dto.Keyword `json:"keywords,omitempty" description:"The whole new keyword list, left out to keep the current one"`
+	ID           string         `json:"id" description:"The id of the entity, exactly as a read tool returned it"`
+	Name         *string        `json:"name,omitempty" description:"The new name, left out to keep the current one"`
+	Kind         *string        `json:"kind,omitempty" enum:"hub,product,topic,category,custom" description:"The new kind, left out to keep the current one"`
+	Intent       *string        `json:"intent,omitempty" description:"The new reader intent, left out to keep the current one"`
+	Keywords     *[]dto.Keyword `json:"keywords,omitempty" description:"The whole new keyword list, left out to keep the current one"`
+	SiteCategory *bool          `json:"siteCategory,omitempty" description:"True files the entity's pages, and the pages under it, in a WordPress category of its name, created on the site when such a page is published; false stops it"`
 }
 
 type UpdateEntityResponse struct {

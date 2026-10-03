@@ -16,19 +16,21 @@ type Anchor struct {
 }
 
 type Entity struct {
-	ID              string        `json:"id"`
-	SiteID          string        `json:"siteId"`
-	Name            string        `json:"name"`
-	Kind            string        `json:"kind"`
-	Intent          string        `json:"intent"`
-	Keywords        []dto.Keyword `json:"keywords"`
-	Anchors         []Anchor      `json:"anchors"`
-	ScopeEntityID   *string       `json:"scopeEntityId"`
-	CanonicalPageID *string       `json:"canonicalPageId"`
-	Score           float64       `json:"score"`
-	Source          string        `json:"source"`
-	CreatedAt       dto.Time      `json:"createdAt"`
-	UpdatedAt       dto.Time      `json:"updatedAt"`
+	ID              string         `json:"id"`
+	SiteID          string         `json:"siteId"`
+	Name            string         `json:"name"`
+	Kind            string         `json:"kind"`
+	SiteCategory    bool           `json:"siteCategory"`
+	Intent          string         `json:"intent"`
+	Keywords        []dto.Keyword  `json:"keywords"`
+	Anchors         []Anchor       `json:"anchors"`
+	ScopeEntityID   *string        `json:"scopeEntityId"`
+	Categories      []dto.Category `json:"categories"`
+	CanonicalPageID *string        `json:"canonicalPageId"`
+	Score           float64        `json:"score"`
+	Source          string         `json:"source"`
+	CreatedAt       dto.Time       `json:"createdAt"`
+	UpdatedAt       dto.Time       `json:"updatedAt"`
 }
 
 type Edge struct {
@@ -53,7 +55,7 @@ type EntityPage struct {
 	Mismatch bool   `json:"mismatch"`
 }
 
-func entityView(e graphdomain.Entity) Entity {
+func entityView(e graphdomain.Entity, filed application.CategoryIndex) Entity {
 	anchors := make([]Anchor, 0, len(e.Anchors))
 	for _, anchor := range e.Anchors {
 		anchors = append(anchors, Anchor{Text: anchor.Text, Source: string(anchor.Source), Weight: anchor.Weight})
@@ -63,10 +65,12 @@ func entityView(e graphdomain.Entity) Entity {
 		SiteID:          e.SiteID,
 		Name:            e.Name,
 		Kind:            string(e.Kind),
+		SiteCategory:    e.SiteCategory,
 		Intent:          e.Intent,
 		Keywords:        application.KeywordViews(e.Keywords),
 		Anchors:         anchors,
 		ScopeEntityID:   e.ScopeID,
+		Categories:      filed.Of(e.ID, graphdomain.TaxonomyCategory),
 		CanonicalPageID: e.CanonicalPageID,
 		Score:           e.Score,
 		Source:          string(e.Source),

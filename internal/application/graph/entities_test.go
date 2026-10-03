@@ -35,7 +35,7 @@ func newHarness(t *testing.T) harness {
 	return harness{
 		service: graph.New(graph.Deps{
 			Entities: sqlite.NewEntityRepo(store), Edges: sqlite.NewEdgeRepo(store),
-			Sites: sqlite.NewSiteRepo(store), Pages: sqlite.NewPageRepo(store),
+			Sites: sqlite.NewSiteRepo(store), Pages: sqlite.NewPageRepo(store), Terms: sqlite.NewTermRepo(store),
 			UnitOfWork: store, Publisher: recorder, Clock: clk,
 		}),
 		store:    store,

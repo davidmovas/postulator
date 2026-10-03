@@ -11,7 +11,7 @@ const graphUpdateEntityName = "graph_update_entity"
 func graphUpdateEntity(deps Deps) Tool {
 	return NewTool(Def{
 		Name:        graphUpdateEntityName,
-		Description: "Rename an entity or change its kind, intent or keywords.",
+		Description: "Rename an entity, change its kind, intent or keywords, or make it a WordPress category.",
 		Risk:        RiskWrite,
 	}, func(ctx context.Context, _ Binding, in graph.UpdateEntityRequest) (graph.UpdateEntityResponse, error) {
 		return deps.Graph.UpdateEntity(ctx, in)
