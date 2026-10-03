@@ -1,6 +1,7 @@
 package imports
 
 import (
+	"cmp"
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -14,6 +15,14 @@ type groupNode struct {
 	under    []int
 	page     string
 	category bool
+}
+
+func (n *groupNode) namedBy(row *rowDraft) bool {
+	return key(row.named()) == key(n.name)
+}
+
+func (n *groupNode) sluggedBy(row *rowDraft) bool {
+	return strings.EqualFold(pagemap.Slug(row.path), slugOf(n.name))
 }
 
 type groups struct {
@@ -93,7 +102,21 @@ func (g *groups) adopt(rows []rowDraft, sheet *drafts, state siteState) map[stri
 }
 
 func (g *groups) ownRow(node *groupNode, rows []rowDraft, sheet *drafts, adopted map[string]int) (string, bool) {
-	eligible := make([]int, 0, len(node.rows))
+	eligible := g.eligible(node, rows, sheet, adopted)
+	for _, evidence := range []func(*rowDraft) bool{node.namedBy, node.sluggedBy} {
+		switch paths := distinctPaths(rows, picked(eligible, rows, evidence)); len(paths) {
+		case 0:
+		case 1:
+			return paths[0], true
+		default:
+			return "", false
+		}
+	}
+	return aboveTheRest(distinctPaths(rows, eligible), distinctPaths(rows, node.rows))
+}
+
+func (g *groups) eligible(node *groupNode, rows []rowDraft, sheet *drafts, adopted map[string]int) []int {
+	out := make([]int, 0, len(node.rows))
 	for _, at := range node.rows {
 		row := &rows[at]
 		if row.path == "" || sheet.pages[row.path].technical() {
@@ -102,49 +125,42 @@ func (g *groups) ownRow(node *groupNode, rows []rowDraft, sheet *drafts, adopted
 		if _, taken := adopted[row.path]; taken {
 			continue
 		}
-		if row.name != "" && key(row.name) != key(node.name) {
-			continue
+		if row.name == "" || key(row.name) == key(node.name) {
+			out = append(out, at)
 		}
-		eligible = append(eligible, at)
 	}
+	return out
+}
 
-	named := make([]int, 0)
-	slugged := make([]int, 0)
-	for _, at := range eligible {
-		if key(rows[at].named()) == key(node.name) {
-			named = append(named, at)
-		}
-		if strings.EqualFold(pagemap.Slug(rows[at].path), slugOf(node.name)) {
-			slugged = append(slugged, at)
+func picked(candidates []int, rows []rowDraft, evidence func(*rowDraft) bool) []int {
+	out := make([]int, 0, len(candidates))
+	for _, at := range candidates {
+		if evidence(&rows[at]) {
+			out = append(out, at)
 		}
 	}
-	for _, picked := range [][]int{named, slugged} {
-		switch paths := distinctPaths(rows, picked); len(paths) {
-		case 0:
-		case 1:
-			return paths[0], true
-		default:
-			return "", false
-		}
-	}
+	return out
+}
 
-	all := distinctPaths(rows, node.rows)
+func aboveTheRest(candidates, all []string) (string, bool) {
 	if len(all) < 2 {
 		return "", false
 	}
-	for _, candidate := range distinctPaths(rows, eligible) {
-		above := true
-		for _, other := range all {
-			if other != candidate && !ancestorOf(candidate, other) {
-				above = false
-				break
-			}
-		}
-		if above {
+	for _, candidate := range candidates {
+		if aboveAll(candidate, all) {
 			return candidate, true
 		}
 	}
 	return "", false
+}
+
+func aboveAll(candidate string, paths []string) bool {
+	for _, other := range paths {
+		if other != candidate && !ancestorOf(candidate, other) {
+			return false
+		}
+	}
+	return true
 }
 
 func (g *groups) freePage(node *groupNode, rows []rowDraft, sheet *drafts, state siteState, adopted map[string]int) (string, bool) {
@@ -152,11 +168,10 @@ func (g *groups) freePage(node *groupNode, rows []rowDraft, sheet *drafts, state
 	if len(under) == 0 {
 		return "", false
 	}
-	slug := slugOf(node.name)
 
 	candidates := make([]string, 0)
 	consider := func(path string) {
-		if _, taken := adopted[path]; taken || !strings.EqualFold(pagemap.Slug(path), slug) {
+		if _, taken := adopted[path]; taken || !strings.EqualFold(pagemap.Slug(path), slugOf(node.name)) {
 			return
 		}
 		for _, below := range under {
@@ -172,10 +187,7 @@ func (g *groups) freePage(node *groupNode, rows []rowDraft, sheet *drafts, state
 		}
 	}
 	for path := range state.byPath {
-		if _, planned := sheet.pages[path]; planned {
-			continue
-		}
-		if state.byPath[path].EntityID == nil {
+		if _, planned := sheet.pages[path]; !planned && state.byPath[path].EntityID == nil {
 			consider(path)
 		}
 	}
@@ -195,4 +207,36 @@ func (g *groups) freeRows(draft *pageDraft, rows []rowDraft) bool {
 		}
 	}
 	return true
+}
+
+func (b *builder) groupPages() map[string]string {
+	owned := make(map[string]string)
+	for i := range b.final {
+		entityID, path := b.final[i].EntityID, b.final[i].Path
+		if entityID == nil {
+			continue
+		}
+		if held, seen := owned[*entityID]; !seen || path < held {
+			owned[*entityID] = path
+		}
+	}
+	return owned
+}
+
+func (b *builder) reportGroups() {
+	owned := b.groupPages()
+	for at := range b.groups.nodes {
+		node := &b.groups.nodes[at]
+		origin := b.units[node.unit].at
+		view := PreviewGroup{
+			Sheet: b.p.sheetAt(origin), Path: b.groups.chain(at), Page: cmp.Or(node.page, owned[b.entityID(node.unit)]),
+			Rows: len(node.under),
+		}
+		b.p.report.Groups = append(b.p.report.Groups, view)
+		if view.Page == "" {
+			b.p.noteAt(origin, "", CodeGroupWithoutPage,
+				"the group "+strings.Join(view.Path, " › ")+" has no page of its own in the sheet or on the site; "+
+					"it is kept as an entity, and the links of the pages under it pass over it")
+		}
+	}
 }

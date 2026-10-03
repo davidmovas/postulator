@@ -254,7 +254,7 @@ func indexHeaders(headers []string) headerIndex {
 				index.exact[trimmed] = i
 			}
 		}
-		if key := normalizeHeader(header); key != "" {
+		if key := Words(header); key != "" {
 			if _, taken := index.normalized[key]; !taken {
 				index.normalized[key] = i
 			}
@@ -267,7 +267,7 @@ func (h headerIndex) find(column string) (int, bool) {
 	if at, found := h.exact[strings.TrimSpace(column)]; found {
 		return at, true
 	}
-	at, found := h.normalized[normalizeHeader(column)]
+	at, found := h.normalized[Words(column)]
 	return at, found
 }
 
@@ -300,23 +300,39 @@ func (m Mapping) Bind(headers []string) (Binding, error) {
 	if err != nil {
 		return Binding{}, err
 	}
-	levelAt, err := bindAll(positions, m.Options.LevelColumns, "levelColumns", "the level column is not in the file")
+	levels, err := bindLevels(positions, m.Options.LevelColumns)
 	if err != nil {
 		return Binding{}, err
 	}
-	levels := make([]levelColumn, 0, len(levelAt))
-	for i, at := range levelAt {
-		levels = append(levels, levelColumn{at: at, category: !rootLevel(m.Options.LevelColumns[i])})
-	}
-	noteAt, err := bindAll(positions, m.Options.NoteColumns, "noteColumns", "the note column is not in the file")
+	notes, err := bindNotes(positions, m.Options.NoteColumns)
 	if err != nil {
 		return Binding{}, err
-	}
-	notes := make([]noteColumn, 0, len(noteAt))
-	for i, at := range noteAt {
-		notes = append(notes, noteColumn{label: strings.TrimSpace(m.Options.NoteColumns[i]), at: at})
 	}
 	return Binding{index: index, indent: indent, levels: levels, notes: notes, options: m.Options.OrDefault()}, nil
+}
+
+func bindLevels(positions headerIndex, columns []string) ([]levelColumn, error) {
+	found, err := bindAll(positions, columns, "levelColumns", "the level column is not in the file")
+	if err != nil {
+		return nil, err
+	}
+	levels := make([]levelColumn, 0, len(found))
+	for i, at := range found {
+		levels = append(levels, levelColumn{at: at, category: !rootLevel(columns[i])})
+	}
+	return levels, nil
+}
+
+func bindNotes(positions headerIndex, columns []string) ([]noteColumn, error) {
+	found, err := bindAll(positions, columns, "noteColumns", "the note column is not in the file")
+	if err != nil {
+		return nil, err
+	}
+	notes := make([]noteColumn, 0, len(found))
+	for i, at := range found {
+		notes = append(notes, noteColumn{label: strings.TrimSpace(columns[i]), at: at})
+	}
+	return notes, nil
 }
 
 func bindAll(positions headerIndex, columns []string, field, missing string) ([]int, error) {

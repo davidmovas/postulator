@@ -53,21 +53,10 @@ func buildIndexes() (spaced, squeezed map[string]Field) {
 	return spaced, squeezed
 }
 
-func normalizeHeader(header string) string {
-	var out strings.Builder
-	gap := false
-	for _, r := range strings.ToLower(header) {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			if gap && out.Len() > 0 {
-				out.WriteByte(' ')
-			}
-			gap = false
-			out.WriteRune(r)
-			continue
-		}
-		gap = true
-	}
-	return out.String()
+func Words(text string) string {
+	return strings.Join(strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	}), " ")
 }
 
 func asked(header string) bool {
@@ -75,7 +64,7 @@ func asked(header string) bool {
 }
 
 func Detect(header string) (Field, bool) {
-	normalized := normalizeHeader(header)
+	normalized := Words(header)
 	if normalized == "" || asked(header) {
 		return "", false
 	}
@@ -94,7 +83,7 @@ func levelOf(header string) (int, bool) {
 	if asked(header) {
 		return 0, false
 	}
-	written := compact(normalizeHeader(header))
+	written := compact(Words(header))
 	for alias, rank := range levelAliases {
 		if written == compact(alias) {
 			return rank, true
@@ -104,12 +93,12 @@ func levelOf(header string) (int, bool) {
 }
 
 func rootLevel(header string) bool {
-	written := compact(normalizeHeader(header))
+	written := compact(Words(header))
 	return slices.ContainsFunc(rootLevels, func(alias string) bool { return written == compact(alias) })
 }
 
 func noteOf(header string) bool {
-	return !asked(header) && slices.Contains(noteAliases, normalizeHeader(header))
+	return !asked(header) && slices.Contains(noteAliases, Words(header))
 }
 
 func AutoDetect(headers []string) Mapping {

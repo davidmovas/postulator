@@ -20,15 +20,10 @@ func (s *Service) Inspect(ctx context.Context, req InspectRequest) (InspectRespo
 	if err != nil {
 		return InspectResponse{}, err
 	}
-
 	read := make(map[string]importmap.Table, len(sheets))
-	views := make([]Sheet, 0, len(sheets))
-	for _, info := range sheets {
-		detected, detectErr := s.detectSheet(ctx, req, &state, info, read)
-		if detectErr != nil {
-			return InspectResponse{}, detectErr
-		}
-		views = append(views, sheetView(info, detected))
+	views, err := s.sheetViews(ctx, req, &state, sheets, read)
+	if err != nil {
+		return InspectResponse{}, err
 	}
 
 	table, err := s.sample(ctx, req, sheets, read)
@@ -65,6 +60,20 @@ func sheetsNamed(name string) []string {
 		return nil
 	}
 	return []string{name}
+}
+
+func (s *Service) sheetViews(
+	ctx context.Context, req InspectRequest, state *siteState, sheets []importmap.SheetInfo, read map[string]importmap.Table,
+) ([]Sheet, error) {
+	views := make([]Sheet, 0, len(sheets))
+	for _, info := range sheets {
+		detected, err := s.detectSheet(ctx, req, state, info, read)
+		if err != nil {
+			return nil, err
+		}
+		views = append(views, sheetView(info, detected))
+	}
+	return views, nil
 }
 
 func (s *Service) detectSheet(

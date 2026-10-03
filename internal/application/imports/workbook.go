@@ -8,6 +8,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -170,48 +171,45 @@ func (s *Service) inWorkbookOrder(path string, asked []SheetMapping) ([]SheetMap
 	return ordered, nil
 }
 
-func (s siteState) after(p *plan, now time.Time) (siteState, error) {
-	entities := slices.Clone(s.entities)
-	entityAt := make(map[string]int, len(entities)+len(p.entities))
-	for i := range entities {
-		entityAt[entities[i].ID] = i
+func fold[T any](held, planned []T, idOf func(*T) string) (folded []T, at map[string]int) {
+	folded = slices.Clone(held)
+	at = make(map[string]int, len(folded)+len(planned))
+	for i := range folded {
+		at[idOf(&folded[i])] = i
 	}
-	for i := range p.entities {
-		planned := p.entities[i].entity
-		if at, held := entityAt[planned.ID]; held {
-			entities[at] = planned
+	for i := range planned {
+		if found, replaced := at[idOf(&planned[i])]; replaced {
+			folded[found] = planned[i]
 			continue
 		}
-		entityAt[planned.ID] = len(entities)
-		entities = append(entities, planned)
+		at[idOf(&planned[i])] = len(folded)
+		folded = append(folded, planned[i])
 	}
+	return folded, at
+}
+
+func (s siteState) after(p *plan, now time.Time) (siteState, error) {
+	planned := make([]graph.Entity, 0, len(p.entities))
+	for i := range p.entities {
+		planned = append(planned, p.entities[i].entity)
+	}
+	entities, entityAt := fold(s.entities, planned, func(e *graph.Entity) string { return e.ID })
 	for _, owned := range p.canonical {
 		at := entityAt[owned.entityID]
-		entities[at].CanonicalPageID = &owned.pageID
-		entities[at].UpdatedAt = now
+		entities[at].CanonicalPageID, entities[at].UpdatedAt = &owned.pageID, now
 	}
 
-	pages := slices.Clone(s.pages)
-	pageAt := make(map[string]int, len(pages)+len(p.pages))
-	for i := range pages {
-		pageAt[pages[i].ID] = i
-	}
+	written := make([]pagemap.Page, 0, len(p.pages))
 	for i := range p.pages {
-		planned := p.pages[i].page
-		if at, held := pageAt[planned.ID]; held {
-			pages[at] = planned
-			continue
-		}
-		pageAt[planned.ID] = len(pages)
-		pages = append(pages, planned)
+		written = append(written, p.pages[i].page)
 	}
+	pages, _ := fold(s.pages, written, func(page *pagemap.Page) string { return page.ID })
 
 	edges := slices.Concat(s.edges, p.edges)
 	moved, err := graph.Settle(entities, edges)
 	for i := range moved {
 		at := entityAt[moved[i].ID]
-		entities[at].ScopeID = moved[i].ScopeID
-		entities[at].UpdatedAt = now
+		entities[at].ScopeID, entities[at].UpdatedAt = moved[i].ScopeID, now
 	}
 	sortStored(entities, edges, pages)
 	return newSiteState(s.siteID, entities, edges, pages), err

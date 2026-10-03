@@ -200,6 +200,24 @@ func TestAutoDetectReadsTheClientSheets(t *testing.T) {
 	}
 }
 
+func TestWordsReadsACellAsItsLowercaseWords(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]string{
+		"Compound/Product":           "compound product",
+		"  Root_Entity ":             "root entity",
+		"Detected Form / Variation":  "detected form variation",
+		"BPC-157":                    "bpc 157",
+		"--":                         "",
+		"Sub   Subcategory (levels)": "sub subcategory levels",
+	}
+	for text, want := range cases {
+		if got := importmap.Words(text); got != want {
+			t.Errorf("Words(%q) = %q, want %q", text, got, want)
+		}
+	}
+}
+
 func TestFieldsAreTheCanonicalColumnOrder(t *testing.T) {
 	t.Parallel()
 

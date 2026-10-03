@@ -111,7 +111,7 @@ func newCollector(opts ReadOptions, sheet string) *collector {
 func (c *collector) add(row []string) error {
 	c.line++
 	trimmed := trimRow(row)
-	if blank(trimmed) {
+	if len(trimmed) == 0 {
 		return nil
 	}
 	if !c.headed && !c.letters {
@@ -163,22 +163,17 @@ func openFailed(cause error, path string) error {
 	return errors.Wrap(cause, errors.Invalid, "read the import file")
 }
 
+func bare(text string) string {
+	return strings.TrimSpace(strings.TrimPrefix(text, "\ufeff"))
+}
+
 func trimRow(row []string) []string {
 	out := make([]string, len(row))
 	for i, cell := range row {
-		out[i] = strings.TrimSpace(strings.TrimPrefix(cell, "\ufeff"))
+		out[i] = bare(cell)
 	}
 	for len(out) > 0 && out[len(out)-1] == "" {
 		out = out[:len(out)-1]
 	}
 	return out
-}
-
-func blank(row []string) bool {
-	for _, cell := range row {
-		if strings.TrimSpace(strings.TrimPrefix(cell, "\ufeff")) != "" {
-			return false
-		}
-	}
-	return true
 }

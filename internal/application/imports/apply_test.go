@@ -350,6 +350,26 @@ func TestApplyLinksEveryCreatedPageToItsParentPath(t *testing.T) {
 	}
 }
 
+func TestAStoreItemIsNeverThePageParentOfARow(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	product := h.storeProduct(t, "mak-liquid", "Mak Liquid", 501)
+	h.apply(t, h.file(t, "guide.csv", "path,title\n"+product.Path+"guide/,Guide\n/menu/,Menu\n/menu/mains/,Mains\n"),
+		h.mapping(map[string]string{"path": "path", "title": "title"}))
+
+	byPath := make(map[string]pagemap.Page)
+	for _, stored := range h.pages(t) {
+		byPath[stored.Path] = stored
+	}
+	if guide := byPath[product.Path+"guide/"]; guide.ParentPageID != nil {
+		t.Fatalf("the guide under the product's address sits under %s, want no parent", *guide.ParentPageID)
+	}
+	if mains := byPath["/menu/mains/"]; mains.ParentPageID == nil || *mains.ParentPageID != byPath["/menu/"].ID {
+		t.Fatalf("/menu/mains/ sits under %v, want /menu/", mains.ParentPageID)
+	}
+}
+
 func TestApplyPutsAnEntityUnderTheParentItsRowNames(t *testing.T) {
 	t.Parallel()
 

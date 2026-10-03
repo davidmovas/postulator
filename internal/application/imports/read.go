@@ -79,70 +79,69 @@ func readRows(binding importmap.Binding, table importmap.Table, p *plan) []rowDr
 	rows := make([]rowDraft, 0, len(table.Rows))
 	walk := binding.Walk()
 	for i := range table.Rows {
-		row, at := table.Rows[i], table.Origin(i)
-		raw := walk.Path(row)
-		if binding.Blank(row) && raw == "" {
+		raw := walk.Path(table.Rows[i])
+		draft, kept := readRow(binding, table.Rows[i], raw, table.Origin(i), p)
+		if !kept {
 			p.report.Skipped++
 			continue
-		}
-
-		draft := rowDraft{
-			at:        at,
-			title:     binding.Text(row, importmap.FieldTitle),
-			h1:        binding.Text(row, importmap.FieldH1),
-			metaTitle: binding.Text(row, importmap.FieldMetaTitle),
-			metaDesc:  binding.Text(row, importmap.FieldMetaDescription),
-			wpType:    binding.Text(row, importmap.FieldWPType),
-			pageKind:  binding.Text(row, importmap.FieldPageKind),
-			name:      binding.Text(row, importmap.FieldEntity),
-			kind:      binding.Text(row, importmap.FieldEntityKind),
-			anchors:   binding.List(row, importmap.FieldAnchors),
-			related:   binding.List(row, importmap.FieldRelated),
-			parent:    binding.Text(row, importmap.FieldParentEntity),
-			levels:    binding.Levels(row),
-			notes:     binding.Notes(row),
-		}
-		if draft.name == "" && raw == "" && len(draft.levels) == 0 {
-			p.noteAt(at, "", CodeNoTarget, "the row names neither a path, an entity nor a group")
-			p.report.Skipped++
-			continue
-		}
-
-		flag := binding.Text(row, importmap.FieldOwnEntity)
-		own, known := ownershipOf(flag)
-		if !known {
-			p.noteAt(at, string(importmap.FieldOwnEntity), CodeUnknownOwnEntity,
-				"the row says neither yes nor no about being an entity, so it was read as one: "+flag)
-		}
-		draft.own = own
-		draft.keywords = rowKeywords(binding, row, at, p)
-
-		if raw != "" {
-			normalized, err := pagemap.NormalizePath(raw)
-			if err != nil {
-				p.noteAt(at, string(importmap.FieldPath), CodeBadPath, "the path cannot be read: "+raw)
-			} else {
-				draft.path = normalized
-			}
 		}
 		rows = append(rows, draft)
 	}
 	return rows
 }
 
-func pagesOf(rows []rowDraft, p *plan) *drafts {
-	sheet := newDrafts()
-	for i := range rows {
-		row := &rows[i]
-		if row.path == "" {
-			continue
-		}
-		draft, known := sheet.page(row.path, row.at)
-		if known {
-			p.noteAt(row.at, string(importmap.FieldPath), CodeDuplicatePath,
-				"the path repeats an earlier row and was merged: "+row.path)
-		}
-		draft.merge(row, i)
+func readRow(binding importmap.Binding, row []string, raw string, at importmap.Origin, p *plan) (rowDraft, bool) {
+	if binding.Blank(row) && raw == "" {
+		return rowDraft{}, false
 	}
-	return sheet
+	draft := cellsOf(binding, row, at)
+	if draft.name == "" && raw == "" && len(draft.levels) == 0 {
+		p.noteAt(at, "", CodeNoTarget, "the row names neither a path, an entity nor a group")
+		return rowDraft{}, false
+	}
+	draft.own = rowOwnership(binding, row, at, p)
+	draft.keywords = rowKeywords(binding, row, at, p)
+	draft.path = rowPath(raw, at, p)
+	return draft, true
+}
+
+func cellsOf(binding importmap.Binding, row []string, at importmap.Origin) rowDraft {
+	return rowDraft{
+		at:        at,
+		title:     binding.Text(row, importmap.FieldTitle),
+		h1:        binding.Text(row, importmap.FieldH1),
+		metaTitle: binding.Text(row, importmap.FieldMetaTitle),
+		metaDesc:  binding.Text(row, importmap.FieldMetaDescription),
+		wpType:    binding.Text(row, importmap.FieldWPType),
+		pageKind:  binding.Text(row, importmap.FieldPageKind),
+		name:      binding.Text(row, importmap.FieldEntity),
+		kind:      binding.Text(row, importmap.FieldEntityKind),
+		anchors:   binding.List(row, importmap.FieldAnchors),
+		related:   binding.List(row, importmap.FieldRelated),
+		parent:    binding.Text(row, importmap.FieldParentEntity),
+		levels:    binding.Levels(row),
+		notes:     binding.Notes(row),
+	}
+}
+
+func rowOwnership(binding importmap.Binding, row []string, at importmap.Origin, p *plan) ownership {
+	flag := binding.Text(row, importmap.FieldOwnEntity)
+	own, known := ownershipOf(flag)
+	if !known {
+		p.noteAt(at, string(importmap.FieldOwnEntity), CodeUnknownOwnEntity,
+			"the row says neither yes nor no about being an entity, so it was read as one: "+flag)
+	}
+	return own
+}
+
+func rowPath(raw string, at importmap.Origin, p *plan) string {
+	if raw == "" {
+		return ""
+	}
+	normalized, err := pagemap.NormalizePath(raw)
+	if err != nil {
+		p.noteAt(at, string(importmap.FieldPath), CodeBadPath, "the path cannot be read: "+raw)
+		return ""
+	}
+	return normalized
 }

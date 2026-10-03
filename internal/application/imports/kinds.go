@@ -1,10 +1,8 @@
 package imports
 
 import (
-	"strings"
-	"unicode"
-
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/importmap"
 )
 
 var kindSynonyms = map[string]graph.Kind{
@@ -22,14 +20,8 @@ var kindSynonyms = map[string]graph.Kind{
 	"pillar":              graph.KindHub,
 }
 
-func kindWords(raw string) string {
-	return strings.Join(strings.FieldsFunc(strings.ToLower(raw), func(r rune) bool {
-		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
-	}), " ")
-}
-
 func kindOf(raw string) (graph.Kind, bool) {
-	words := kindWords(raw)
+	words := importmap.Words(raw)
 	if words == "" {
 		return "", true
 	}
