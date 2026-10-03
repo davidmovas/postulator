@@ -64,6 +64,7 @@ func (c *Core) stepDeps(stores repos, llm llmParts, writing authoring) steps.Dep
 			template.ImagesWPMedia: wpmedia.New(writing.wordpress),
 			template.ImagesLocal:   localfile.New(images.LocalDir(stores.values)),
 		},
+		Terms:      stores.terms,
 		UnitOfWork: stores.store,
 		Publisher:  c.Events,
 		Clock:      stores.now,
