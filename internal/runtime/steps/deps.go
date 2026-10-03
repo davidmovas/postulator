@@ -10,6 +10,7 @@ import (
 	appcontent "github.com/davidmovas/postulator/internal/application/content"
 	"github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -32,6 +33,16 @@ type termStore interface {
 	ListBySite(ctx context.Context, siteID string) ([]graph.Term, error)
 	Upsert(ctx context.Context, t graph.Term) error
 	Delete(ctx context.Context, entityID string, taxonomy graph.Taxonomy) error
+}
+
+type categoryReader interface {
+	ListBySite(ctx context.Context, siteID string) ([]category.Category, error)
+}
+
+type categoryTermStore interface {
+	ListBySite(ctx context.Context, siteID string) ([]category.Term, error)
+	Upsert(ctx context.Context, t category.Term) error
+	Delete(ctx context.Context, categoryID string, taxonomy category.Taxonomy) error
 }
 
 type pageStore interface {
@@ -95,6 +106,8 @@ type Deps struct {
 	Entities      entityReader
 	Edges         edgeReader
 	Terms         termStore
+	Categories    categoryReader
+	CategoryTerms categoryTermStore
 	Pages         pageStore
 	Links         linkStore
 	Items         itemReader
@@ -139,6 +152,20 @@ func (d Deps) entityReader() error {
 func (d Deps) termStore() error {
 	if d.Terms == nil {
 		return errors.New(errors.Internal, "the run steps were given no term store, so no category can be kept")
+	}
+	return nil
+}
+
+func (d Deps) categoryReader() error {
+	if d.Categories == nil {
+		return errors.New(errors.Internal, "the run steps were given no category reader, so no category chain can be read")
+	}
+	return nil
+}
+
+func (d Deps) categoryTermStore() error {
+	if d.CategoryTerms == nil {
+		return errors.New(errors.Internal, "the run steps were given no category term store, so no category can be kept")
 	}
 	return nil
 }

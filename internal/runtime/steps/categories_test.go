@@ -19,90 +19,102 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
+	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/content"
-	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/kernel/id"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
 
+const (
+	categoryDrinks = "cat-drinks"
+	categoryCoffee = "cat-coffee"
+)
+
+type categoryList struct {
+	err   error
+	items []category.Category
+}
+
+func (c categoryList) ListBySite(context.Context, string) ([]category.Category, error) {
+	return c.items, c.err
+}
+
 type termMemory struct {
-	held map[string]graph.Term
+	held map[string]category.Term
 	mu   sync.Mutex
 }
 
 func newTermMemory() *termMemory {
-	return &termMemory{held: make(map[string]graph.Term)}
+	return &termMemory{held: make(map[string]category.Term)}
 }
 
-func termKey(entityID string, taxonomy graph.Taxonomy) string {
-	return entityID + "/" + string(taxonomy)
+func termKey(categoryID string, taxonomy category.Taxonomy) string {
+	return categoryID + "/" + string(taxonomy)
 }
 
-func (m *termMemory) ListBySite(_ context.Context, siteID string) ([]graph.Term, error) {
+func (m *termMemory) ListBySite(_ context.Context, siteID string) ([]category.Term, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	out := make([]graph.Term, 0, len(m.held))
+	out := make([]category.Term, 0, len(m.held))
 	for key := range m.held {
 		if m.held[key].SiteID == siteID {
 			out = append(out, m.held[key])
 		}
 	}
-	slices.SortFunc(out, func(left, right graph.Term) int {
+	slices.SortFunc(out, func(left, right category.Term) int {
 		return cmp.Or(
 			strings.Compare(string(left.Taxonomy), string(right.Taxonomy)),
 			cmp.Compare(left.TermID, right.TermID),
-			strings.Compare(left.EntityID, right.EntityID),
+			strings.Compare(left.CategoryID, right.CategoryID),
 		)
 	})
 	return out, nil
 }
 
-func (m *termMemory) Upsert(_ context.Context, t graph.Term) error {
+func (m *termMemory) Upsert(_ context.Context, t category.Term) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.held[termKey(t.EntityID, t.Taxonomy)] = t
+	m.held[termKey(t.CategoryID, t.Taxonomy)] = t
 	return nil
 }
 
-func (m *termMemory) Delete(_ context.Context, entityID string, taxonomy graph.Taxonomy) error {
+func (m *termMemory) Delete(_ context.Context, categoryID string, taxonomy category.Taxonomy) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	key := termKey(entityID, taxonomy)
+	key := termKey(categoryID, taxonomy)
 	if _, held := m.held[key]; !held {
-		return errors.New(errors.NotFound, "the entity has no term in this taxonomy")
+		return errors.New(errors.NotFound, "the category has no term in this taxonomy")
 	}
 	delete(m.held, key)
 	return nil
 }
 
-func (m *termMemory) of(entityID string, taxonomy graph.Taxonomy) (graph.Term, bool) {
+func (m *termMemory) of(categoryID string, taxonomy category.Taxonomy) (category.Term, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	held, found := m.held[termKey(entityID, taxonomy)]
+	held, found := m.held[termKey(categoryID, taxonomy)]
 	return held, found
 }
 
-func filedEntities() []graph.Entity {
-	entities := unitEntities()
-	entities[0].SiteCategory = true
-	entities[0].ScopeID = pointer("drinks")
-	entities[1].ScopeID = pointer("parent")
-	return append([]graph.Entity{{
-		ID: "drinks", SiteID: "site", Name: "Drinks", Kind: graph.KindCategory, SiteCategory: true,
-		Source: graph.SourceImport,
-	}}, entities...)
+func filedCategories() []category.Category {
+	return []category.Category{
+		{ID: categoryCoffee, SiteID: "site", Name: "Coffee", Key: category.Key("Coffee"), ParentID: categoryDrinks},
+		{ID: categoryDrinks, SiteID: "site", Name: "Drinks", Key: category.Key("Drinks")},
+	}
 }
 
 func filed(deps *steps.Deps) *termMemory {
 	terms := newTermMemory()
-	deps.Entities = entityList{items: filedEntities()}
-	deps.Terms = terms
+	deps.Categories = categoryList{items: filedCategories()}
+	deps.CategoryTerms = terms
 	return terms
 }
 
@@ -194,7 +206,7 @@ type failingTerms struct {
 	err error
 }
 
-func (f failingTerms) Upsert(context.Context, graph.Term) error {
+func (f failingTerms) Upsert(context.Context, category.Term) error {
 	return f.err
 }
 
@@ -216,28 +228,33 @@ func withoutCategories(t *testing.T, r *http.Request) {
 	r.ContentLength = int64(len(encoded))
 }
 
+func storedCategory(t *testing.T, store *sqlite.Store, siteID, name, parentID string) category.Category {
+	t.Helper()
+
+	record, err := category.New(category.Category{
+		ID: id.New(), SiteID: siteID, Name: name, ParentID: parentID, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+	})
+	if err != nil {
+		t.Fatalf("the category %s: %v", name, err)
+	}
+	if err = sqlite.NewCategoryRepo(store).Insert(t.Context(), record); err != nil {
+		t.Fatalf("insert the category %s: %v", name, err)
+	}
+	return record
+}
+
 func fileThePipeline(t *testing.T, p *pipeline) {
 	t.Helper()
 
-	repo := sqlite.NewEntityRepo(p.store)
-	held, err := repo.ListBySite(t.Context(), p.siteID)
+	drinks := storedCategory(t, p.store, p.siteID, "Drinks", "")
+	coffee := storedCategory(t, p.store, p.siteID, "Coffee", drinks.ID)
+	espresso, err := p.pages.Get(t.Context(), p.pageID)
 	if err != nil {
-		t.Fatalf("list the entities: %v", err)
+		t.Fatalf("read the page: %v", err)
 	}
-	byName := make(map[string]graph.Entity, len(held))
-	for i := range held {
-		byName[held[i].Name] = held[i]
-	}
-
-	drinks, coffee, espresso := byName["Drinks"], byName["Coffee"], byName["Espresso"]
-	drinks.SiteCategory = true
-	coffee.SiteCategory, coffee.ScopeID = true, &drinks.ID
-	espresso.ScopeID = &coffee.ID
-	filedOnes := []graph.Entity{drinks, coffee, espresso}
-	for i := range filedOnes {
-		if err = repo.Update(t.Context(), filedOnes[i]); err != nil {
-			t.Fatalf("file %s: %v", filedOnes[i].Name, err)
-		}
+	espresso.CategoryID = coffee.ID
+	if err = p.pages.Update(t.Context(), espresso); err != nil {
+		t.Fatalf("file the page under %s: %v", coffee.Name, err)
 	}
 }
 
@@ -261,7 +278,7 @@ func TestAGenerateRunFilesThePageUnderItsCategoriesOnce(t *testing.T) {
 		t.Fatalf("the draft carries %v", page.Categories)
 	}
 
-	stored, err := sqlite.NewTermRepo(p.store).ListBySite(t.Context(), p.siteID)
+	stored, err := sqlite.NewCategoryTermRepo(p.store).ListBySite(t.Context(), p.siteID)
 	if err != nil {
 		t.Fatalf("list the terms: %v", err)
 	}
@@ -301,13 +318,13 @@ func TestPublishFilesAPageUnderItsWholeCategoryChainOnce(t *testing.T) {
 	if written == nil {
 		t.Fatalf("the publish result says nothing of the categories: %+v", first)
 	}
-	if written.Taxonomy != graph.TaxonomyCategory || !written.Taken || !slices.Equal(written.Added, chain) ||
+	if written.Taxonomy != category.TaxonomyCategory || !written.Taken || !slices.Equal(written.Added, chain) ||
 		written.Previous == nil || len(written.Previous) != 0 {
 		t.Errorf("categories = %+v, want the chain %v added to nothing and taken", written, chain)
 	}
 	want := []steps.AssignedTerm{
-		{EntityID: "drinks", Name: "Drinks", TermID: drinks.ID, Created: true},
-		{EntityID: "parent", Name: "Coffee", TermID: coffee.ID, ParentID: drinks.ID, Created: true},
+		{CategoryID: categoryDrinks, Name: "Drinks", TermID: drinks.ID, Created: true},
+		{CategoryID: categoryCoffee, Name: "Coffee", TermID: coffee.ID, ParentID: drinks.ID, Created: true},
 	}
 	if !reflect.DeepEqual(written.Terms, want) {
 		t.Errorf("terms = %+v, want %+v", written.Terms, want)
@@ -316,10 +333,10 @@ func TestPublishFilesAPageUnderItsWholeCategoryChainOnce(t *testing.T) {
 		t.Errorf("the page is filed under %v, want %v", stored.Categories, chain)
 	}
 	for _, level := range want {
-		kept, found := terms.of(level.EntityID, graph.TaxonomyCategory)
+		kept, found := terms.of(level.CategoryID, category.TaxonomyCategory)
 		if !found || kept.TermID != level.TermID || kept.ParentTermID != level.ParentID || kept.RunID != "run" ||
 			kept.SiteID != "site" || kept.Name != level.Name || kept.SeenAt.IsZero() {
-			t.Errorf("the term of %s is kept as %+v (%t), want %d under %d by the run", level.EntityID, kept, found,
+			t.Errorf("the term of %s is kept as %+v (%t), want %d under %d by the run", level.CategoryID, kept, found,
 				level.TermID, level.ParentID)
 		}
 	}
@@ -351,8 +368,93 @@ func TestPublishFilesAPageUnderItsWholeCategoryChainOnce(t *testing.T) {
 			t.Errorf("the second publish sent the categories the page already carries: %s", request.Body)
 		}
 	}
-	if kept, _ := terms.of("drinks", graph.TaxonomyCategory); kept.RunID != "run" {
+	if kept, _ := terms.of(categoryDrinks, category.TaxonomyCategory); kept.RunID != "run" {
 		t.Errorf("the second publish took the term over: %+v", kept)
+	}
+}
+
+func TestPublishFilesAPageByItsCategoryWhateverItsEntity(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		entityID   *string
+		categoryID string
+		filed      bool
+	}{
+		{name: "a page with no entity under a category", categoryID: categoryCoffee, filed: true},
+		{name: "a page whose entity is gone under a category", entityID: pointer("deleted"), categoryID: categoryCoffee, filed: true},
+		{name: "a page with an entity and no category", entityID: pointer("child")},
+		{name: "a page under a category the site no longer holds", entityID: pointer("child"), categoryID: "cat-gone"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps, server := imageDeps(t)
+			terms := filed(&deps)
+			sc := publishContext(t)
+			sc.Page.EntityID = tc.entityID
+			sc.Page.CategoryID = tc.categoryID
+
+			published := runPublish(t, deps, sc)
+			stored, _ := server.Lookup(published.WPID)
+			if !tc.filed {
+				held, err := terms.ListBySite(t.Context(), "site")
+				if err != nil {
+					t.Fatalf("list the terms: %v", err)
+				}
+				if published.Categories != nil || len(stored.Categories) != 0 || len(server.Categories()) != 0 || len(held) != 0 {
+					t.Fatalf("categories = %+v, the page carries %v among %+v and %+v is kept; want nothing filed",
+						published.Categories, stored.Categories, server.Categories(), held)
+				}
+				return
+			}
+			drinks := siteCategory(t, server, "Drinks", 0)
+			coffee := siteCategory(t, server, "Coffee", drinks.ID)
+			if published.Categories == nil || !published.Categories.Taken ||
+				!sameSet(stored.Categories, []int64{drinks.ID, coffee.ID}) {
+				t.Fatalf("categories = %+v and the page carries %v, want Drinks and Coffee", published.Categories, stored.Categories)
+			}
+			if kept, found := terms.of(categoryCoffee, category.TaxonomyCategory); !found || kept.TermID != coffee.ID {
+				t.Errorf("the term of Coffee is kept as %+v (%t), want %d", kept, found, coffee.ID)
+			}
+		})
+	}
+}
+
+func TestThePublishResultNamesTheCategoryOfEachTerm(t *testing.T) {
+	t.Parallel()
+
+	deps, _ := imageDeps(t)
+	filed(&deps)
+	result, err := steps.Publish(deps).Run(t.Context(), publishContext(t))
+	if err != nil || len(result.Artifacts) != 1 {
+		t.Fatalf("Publish = %+v, %v", result, err)
+	}
+
+	var shape struct {
+		Categories struct {
+			Terms []map[string]any `json:"terms"`
+		} `json:"categories"`
+	}
+	if err = json.Unmarshal(result.Artifacts[0].Blob, &shape); err != nil {
+		t.Fatalf("decode the publish result: %v", err)
+	}
+	if len(shape.Categories.Terms) != 2 {
+		t.Fatalf("terms = %+v, want two", shape.Categories.Terms)
+	}
+	for i, want := range []string{categoryDrinks, categoryCoffee} {
+		term := shape.Categories.Terms[i]
+		keys := make([]string, 0, len(term))
+		for key := range term {
+			keys = append(keys, key)
+		}
+		slices.Sort(keys)
+		if !slices.Equal(keys, []string{"categoryId", "created", "name", "parentId", "termId"}) || term["categoryId"] != want {
+			t.Errorf("term %d = %+v, want the fields of a term filed for the category %s", i, term, want)
+		}
 	}
 }
 
@@ -588,15 +690,23 @@ func TestPublishWritesAPageWordPressWillNotFileAndSaysWhy(t *testing.T) {
 	}
 }
 
-func TestPublishNamesATermStoreItWasNotGiven(t *testing.T) {
+func TestPublishNamesAStoreItWasNotGiven(t *testing.T) {
 	t.Parallel()
 
+	noTerms := func(deps *steps.Deps) { deps.CategoryTerms = nil }
+	noCategories := func(deps *steps.Deps) { deps.Categories = nil }
 	cases := []struct {
-		name  string
-		filed bool
+		name       string
+		missing    func(*steps.Deps)
+		says       string
+		categoryID string
+		filed      bool
 	}{
-		{name: "a page with categories", filed: true},
-		{name: "a page with none"},
+		{name: "no term store for a page with categories", missing: noTerms, categoryID: categoryCoffee, filed: true, says: "term store"},
+		{name: "no term store for a page under a category the site lacks", missing: noTerms, categoryID: categoryCoffee},
+		{name: "no term store for a page with no category", missing: noTerms, filed: true},
+		{name: "no category reader for a page with a category", missing: noCategories, categoryID: categoryCoffee, filed: true, says: "category reader"},
+		{name: "no category reader for a page with no category", missing: noCategories, filed: true},
 	}
 
 	for _, tc := range cases {
@@ -607,17 +717,19 @@ func TestPublishNamesATermStoreItWasNotGiven(t *testing.T) {
 			if tc.filed {
 				filed(&deps)
 			}
-			deps.Terms = nil
+			tc.missing(&deps)
+			sc := publishContext(t)
+			sc.Page.CategoryID = tc.categoryID
 
-			_, err := steps.Publish(deps).Run(t.Context(), publishContext(t))
-			if !tc.filed {
+			_, err := steps.Publish(deps).Run(t.Context(), sc)
+			if tc.says == "" {
 				if err != nil || len(server.Items()) != 1 {
-					t.Fatalf("Publish = %v over %+v, want a page that needs no term store written", err, server.Items())
+					t.Fatalf("Publish = %v over %+v, want a page that needs no such store written", err, server.Items())
 				}
 				return
 			}
-			if !errors.IsCode(err, errors.Internal) || !strings.Contains(err.Error(), "term store") {
-				t.Fatalf("Publish = %v, want an error naming the missing term store", err)
+			if !errors.IsCode(err, errors.Internal) || !strings.Contains(err.Error(), tc.says) {
+				t.Fatalf("Publish = %v, want an error naming the missing %s", err, tc.says)
 			}
 			if len(server.Items()) != 0 || len(server.Categories()) != 0 {
 				t.Errorf("the site holds %+v and %+v, want nothing written", server.Items(), server.Categories())
@@ -631,7 +743,7 @@ func TestPublishStopsWhenItCannotKeepATerm(t *testing.T) {
 
 	deps, server := imageDeps(t)
 	terms := filed(&deps)
-	deps.Terms = failingTerms{termMemory: terms, err: errors.New(errors.Invalid, "the term row was refused")}
+	deps.CategoryTerms = failingTerms{termMemory: terms, err: errors.New(errors.Invalid, "the term row was refused")}
 
 	_, err := steps.Publish(deps).Run(t.Context(), publishContext(t))
 	if !errors.IsCode(err, errors.Invalid) {

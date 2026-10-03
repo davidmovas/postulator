@@ -8,6 +8,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/images"
 	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
@@ -15,6 +16,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
 
@@ -272,28 +274,37 @@ func TestGenerateImagesPreflightWarnsWhenTheSourceIsNotConfigured(t *testing.T) 
 func TestPublishPreflightWarnsOfAPageWhoseCategoriesNeedThePlugin(t *testing.T) {
 	t.Parallel()
 
-	page := pagemap.Page{ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", WPType: pagemap.WPPage, EntityID: pointer("child")}
+	page := pagemap.Page{
+		ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", WPType: pagemap.WPPage, EntityID: pointer("child"),
+		CategoryID: categoryCoffee,
+	}
 	post := page
 	post.WPType = pagemap.WPPost
 	unmapped := page
 	unmapped.EntityID = nil
+	unfiled := page
+	unfiled.CategoryID = ""
+	stray := page
+	stray.CategoryID = "cat-gone"
 	plugin := func(names ...string) site.PluginState {
 		return site.PluginState{Installed: true, Version: "1.2.0", Capabilities: names}
 	}
 
 	cases := []struct {
-		name     string
-		page     pagemap.Page
-		plugin   site.PluginState
-		entities []graph.Entity
-		warned   bool
+		name       string
+		page       pagemap.Page
+		plugin     site.PluginState
+		categories []category.Category
+		warned     bool
 	}{
-		{name: "a page under a plugin older than page categories", page: page, plugin: plugin(wp.CapabilityRaw), entities: filedEntities(), warned: true},
-		{name: "a page on a site without the plugin", page: page, plugin: site.PluginState{}, entities: filedEntities(), warned: true},
-		{name: "a page under a plugin that files pages", page: page, plugin: plugin(wp.CapabilityRaw, wp.CapabilityPageCategories), entities: filedEntities()},
-		{name: "a post", page: post, plugin: plugin(wp.CapabilityRaw), entities: filedEntities()},
-		{name: "a page with no categories", page: page, plugin: plugin(wp.CapabilityRaw), entities: unitEntities()},
-		{name: "a page mapped to no entity", page: unmapped, plugin: plugin(wp.CapabilityRaw), entities: filedEntities()},
+		{name: "a page under a plugin older than page categories", page: page, plugin: plugin(wp.CapabilityRaw), categories: filedCategories(), warned: true},
+		{name: "a page on a site without the plugin", page: page, plugin: site.PluginState{}, categories: filedCategories(), warned: true},
+		{name: "a page mapped to no entity", page: unmapped, plugin: plugin(wp.CapabilityRaw), categories: filedCategories(), warned: true},
+		{name: "a page under a plugin that files pages", page: page, plugin: plugin(wp.CapabilityRaw, wp.CapabilityPageCategories), categories: filedCategories()},
+		{name: "a post", page: post, plugin: plugin(wp.CapabilityRaw), categories: filedCategories()},
+		{name: "a page with no category", page: unfiled, plugin: plugin(wp.CapabilityRaw), categories: filedCategories()},
+		{name: "a page under a category the site no longer holds", page: stray, plugin: plugin(wp.CapabilityRaw), categories: filedCategories()},
+		{name: "a site with no categories", page: page, plugin: plugin(wp.CapabilityRaw)},
 	}
 
 	for _, tc := range cases {
@@ -304,7 +315,7 @@ func TestPublishPreflightWarnsOfAPageWhoseCategoriesNeedThePlugin(t *testing.T) 
 			owner.Plugin = tc.plugin
 			deps := unitDeps()
 			deps.Sites = siteStub{record: owner}
-			deps.Entities = entityList{items: tc.entities}
+			deps.Categories = categoryList{items: tc.categories}
 			record, targets := preflightRun(run.GenerateRecipe(), tc.page)
 
 			findings, err := steps.Publish(deps).Preflight(t.Context(), record, targets)
@@ -334,6 +345,46 @@ func TestPublishPreflightWarnsOfAPageWhoseCategoriesNeedThePlugin(t *testing.T) 
 				if !strings.Contains(said.Message, part) {
 					t.Errorf("message = %q, want it to say %q", said.Message, part)
 				}
+			}
+		})
+	}
+}
+
+func TestPublishPreflightNamesACategoryReaderItWasNotGiven(t *testing.T) {
+	t.Parallel()
+
+	page := pagemap.Page{ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", WPType: pagemap.WPPage}
+	cases := []struct {
+		name       string
+		categoryID string
+		refused    bool
+	}{
+		{name: "a page under a category", categoryID: categoryCoffee, refused: true},
+		{name: "a page under none", categoryID: ""},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			owner := storeSite()
+			owner.Plugin = site.PluginState{}
+			deps := unitDeps()
+			deps.Sites = siteStub{record: owner}
+			deps.Categories = nil
+			filedPage := page
+			filedPage.CategoryID = tc.categoryID
+			record, targets := preflightRun(run.GenerateRecipe(), filedPage)
+
+			_, err := steps.Publish(deps).Preflight(t.Context(), record, targets)
+			if !tc.refused {
+				if err != nil {
+					t.Fatalf("Preflight = %v, want a page under no category estimated without a category reader", err)
+				}
+				return
+			}
+			if !errors.IsCode(err, errors.Internal) || !strings.Contains(err.Error(), "category reader") {
+				t.Fatalf("Preflight = %v, want an error naming the missing category reader", err)
 			}
 		})
 	}

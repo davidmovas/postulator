@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/content"
-	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -25,19 +25,19 @@ const (
 )
 
 type AssignedTerm struct {
-	EntityID string `json:"entityId"`
-	Name     string `json:"name"`
-	TermID   int64  `json:"termId"`
-	ParentID int64  `json:"parentId"`
-	Created  bool   `json:"created"`
+	CategoryID string `json:"categoryId"`
+	Name       string `json:"name"`
+	TermID     int64  `json:"termId"`
+	ParentID   int64  `json:"parentId"`
+	Created    bool   `json:"created"`
 }
 
 type CategoryWrite struct {
-	Taxonomy graph.Taxonomy `json:"taxonomy"`
-	Terms    []AssignedTerm `json:"terms"`
-	Previous []int64        `json:"previous"`
-	Added    []int64        `json:"added"`
-	Taken    bool           `json:"taken"`
+	Taxonomy category.Taxonomy `json:"taxonomy"`
+	Terms    []AssignedTerm    `json:"terms"`
+	Previous []int64           `json:"previous"`
+	Added    []int64           `json:"added"`
+	Taken    bool              `json:"taken"`
 }
 
 func (w *CategoryWrite) termIDs() []int64 {
@@ -71,19 +71,12 @@ func (p *categoryPlan) took(page pagemap.Page, carried []int64) {
 func ensureCategories(ctx context.Context, deps Deps, client *wp.Client, sc *run.StepContext,
 	previous []int64, creating bool) (categoryPlan, error) {
 	taxonomy, carried := sc.Page.WPType.Taxonomy()
-	if !carried || sc.Page.EntityID == nil || *sc.Page.EntityID == "" {
+	if !carried || sc.Page.CategoryID == "" {
 		return categoryPlan{}, nil
 	}
-	if readerErr := deps.entityReader(); readerErr != nil {
-		return categoryPlan{}, readerErr
-	}
-	entities, err := deps.Entities.ListBySite(ctx, sc.Run.SiteID)
-	if err != nil {
+	chain, err := chainOf(ctx, deps, sc.Run.SiteID, sc.Page.CategoryID)
+	if err != nil || len(chain) == 0 {
 		return categoryPlan{}, err
-	}
-	chain := graph.CategoryChain(entities, *sc.Page.EntityID)
-	if len(chain) == 0 {
-		return categoryPlan{}, nil
 	}
 
 	if sc.Page.WPType == pagemap.WPPage {
@@ -96,7 +89,7 @@ func ensureCategories(ctx context.Context, deps Deps, client *wp.Client, sc *run
 		}
 	}
 
-	if storeErr := deps.termStore(); storeErr != nil {
+	if storeErr := deps.categoryTermStore(); storeErr != nil {
 		return categoryPlan{}, storeErr
 	}
 	walk := termWalk{deps: deps, client: client, sc: sc, chain: chain, taxonomy: taxonomy}
@@ -108,6 +101,17 @@ func ensureCategories(ctx context.Context, deps Deps, client *wp.Client, sc *run
 		return categoryPlan{}, err
 	}
 	return planOf(taxonomy, terms, previous, creating), nil
+}
+
+func chainOf(ctx context.Context, deps Deps, siteID, categoryID string) ([]category.Category, error) {
+	if err := deps.categoryReader(); err != nil {
+		return nil, err
+	}
+	categories, err := deps.Categories.ListBySite(ctx, siteID)
+	if err != nil {
+		return nil, err
+	}
+	return category.Chain(categories, categoryID), nil
 }
 
 func pagesCarryCategories(ctx context.Context, client *wp.Client) (bool, error) {
@@ -127,10 +131,10 @@ type termWalk struct {
 	client   *wp.Client
 	sc       *run.StepContext
 	refused  *content.Finding
-	stored   map[string]graph.Term
+	stored   map[string]category.Term
 	live     map[int64]wp.Term
-	chain    []graph.Entity
-	taxonomy graph.Taxonomy
+	chain    []category.Category
+	taxonomy category.Taxonomy
 }
 
 func (w *termWalk) resolve(ctx context.Context) ([]AssignedTerm, error) {
@@ -163,15 +167,15 @@ func (w *termWalk) answered(err error) error {
 	return err
 }
 
-func storedTerms(ctx context.Context, deps Deps, siteID string, taxonomy graph.Taxonomy) (map[string]graph.Term, error) {
-	listed, err := deps.Terms.ListBySite(ctx, siteID)
+func storedTerms(ctx context.Context, deps Deps, siteID string, taxonomy category.Taxonomy) (map[string]category.Term, error) {
+	listed, err := deps.CategoryTerms.ListBySite(ctx, siteID)
 	if err != nil {
 		return nil, err
 	}
-	stored := make(map[string]graph.Term, len(listed))
+	stored := make(map[string]category.Term, len(listed))
 	for i := range listed {
 		if listed[i].Taxonomy == taxonomy {
-			stored[listed[i].EntityID] = listed[i]
+			stored[listed[i].CategoryID] = listed[i]
 		}
 	}
 	return stored, nil
@@ -199,16 +203,16 @@ func (w *termWalk) liveTerms(ctx context.Context) (map[int64]wp.Term, error) {
 	return live, nil
 }
 
-func (w *termWalk) level(ctx context.Context, entity graph.Entity, parent int64) (AssignedTerm, error) {
-	held, known := w.stored[entity.ID]
+func (w *termWalk) level(ctx context.Context, filed category.Category, parent int64) (AssignedTerm, error) {
+	held, known := w.stored[filed.ID]
 	if term, alive := w.live[held.TermID]; known && alive && term.Parent == parent {
-		if err := w.keep(ctx, entity.ID, term, held.RunID); err != nil {
+		if err := w.keep(ctx, filed.ID, term, held.RunID); err != nil {
 			return AssignedTerm{}, err
 		}
-		return assignedOf(entity.ID, term, held.RunID == w.sc.Run.ID), nil
+		return assignedOf(filed.ID, term, held.RunID == w.sc.Run.ID), nil
 	}
 
-	term, created, err := w.client.EnsureTerm(ctx, wp.Taxonomy(w.taxonomy), entity.Name, parent)
+	term, created, err := w.client.EnsureTerm(ctx, wp.Taxonomy(w.taxonomy), filed.Name, parent)
 	if err != nil {
 		return AssignedTerm{}, w.answered(err)
 	}
@@ -217,28 +221,28 @@ func (w *termWalk) level(ctx context.Context, entity graph.Entity, parent int64)
 	if created {
 		runID = w.sc.Run.ID
 	}
-	if keepErr := w.keep(ctx, entity.ID, term, runID); keepErr != nil {
+	if keepErr := w.keep(ctx, filed.ID, term, runID); keepErr != nil {
 		return AssignedTerm{}, keepErr
 	}
-	return assignedOf(entity.ID, term, created), nil
+	return assignedOf(filed.ID, term, created), nil
 }
 
-func (w *termWalk) keep(ctx context.Context, entityID string, term wp.Term, runID string) error {
-	record, err := graph.NewTerm(graph.Term{
-		EntityID: entityID, SiteID: w.sc.Run.SiteID, Taxonomy: w.taxonomy, TermID: term.ID,
+func (w *termWalk) keep(ctx context.Context, categoryID string, term wp.Term, runID string) error {
+	record, err := category.NewTerm(category.Term{
+		CategoryID: categoryID, SiteID: w.sc.Run.SiteID, Taxonomy: w.taxonomy, TermID: term.ID,
 		ParentTermID: term.Parent, Name: term.Name, RunID: runID, SeenAt: w.deps.now(),
 	})
 	if err != nil {
 		return err
 	}
-	return w.deps.Terms.Upsert(ctx, record)
+	return w.deps.CategoryTerms.Upsert(ctx, record)
 }
 
-func assignedOf(entityID string, term wp.Term, created bool) AssignedTerm {
-	return AssignedTerm{EntityID: entityID, Name: term.Name, TermID: term.ID, ParentID: term.Parent, Created: created}
+func assignedOf(categoryID string, term wp.Term, created bool) AssignedTerm {
+	return AssignedTerm{CategoryID: categoryID, Name: term.Name, TermID: term.ID, ParentID: term.Parent, Created: created}
 }
 
-func planOf(taxonomy graph.Taxonomy, terms []AssignedTerm, previous []int64, creating bool) categoryPlan {
+func planOf(taxonomy category.Taxonomy, terms []AssignedTerm, previous []int64, creating bool) categoryPlan {
 	held := append(make([]int64, 0, len(previous)), previous...)
 	write := &CategoryWrite{Taxonomy: taxonomy, Terms: terms, Previous: held}
 	chain := write.termIDs()
@@ -273,7 +277,7 @@ func containsAll(carried, wanted []int64) bool {
 	return true
 }
 
-func chainNames(chain []graph.Entity) []string {
+func chainNames(chain []category.Category) []string {
 	names := make([]string, 0, len(chain))
 	for i := range chain {
 		names = append(names, chain[i].Name)
@@ -289,11 +293,11 @@ func termNames(terms []AssignedTerm) []string {
 	return names
 }
 
-func categoryDetails(page pagemap.Page, taxonomy graph.Taxonomy, names []string) map[string]any {
+func categoryDetails(page pagemap.Page, taxonomy category.Taxonomy, names []string) map[string]any {
 	return map[string]any{"pageId": page.ID, "path": page.Path, "taxonomy": string(taxonomy), "categories": names}
 }
 
-func pageNeedsPlugin(page pagemap.Page, chain []graph.Entity) content.Finding {
+func pageNeedsPlugin(page pagemap.Page, chain []category.Category) content.Finding {
 	names := chainNames(chain)
 	return content.Finding{
 		Severity: content.SeverityWarn,
@@ -301,11 +305,11 @@ func pageNeedsPlugin(page pagemap.Page, chain []graph.Entity) content.Finding {
 		Message: page.Path + " went up without its categories " + strings.Join(names, chainSeparator) +
 			": WordPress pages carry categories only through the Postulator companion plugin " + pageCategoriesPlugin +
 			" or later; update the plugin, sync the site and publish the page again",
-		Details: categoryDetails(page, graph.TaxonomyCategory, names),
+		Details: categoryDetails(page, category.TaxonomyCategory, names),
 	}
 }
 
-func categoryRefusal(page pagemap.Page, taxonomy graph.Taxonomy, chain []graph.Entity, err error) (content.Finding, bool) {
+func categoryRefusal(page pagemap.Page, taxonomy category.Taxonomy, chain []category.Category, err error) (content.Finding, bool) {
 	names := chainNames(chain)
 	details := categoryDetails(page, taxonomy, names)
 	switch {
@@ -334,8 +338,8 @@ func categoryRefusal(page pagemap.Page, taxonomy graph.Taxonomy, chain []graph.E
 	}
 }
 
-func termCapability(taxonomy graph.Taxonomy) string {
-	if taxonomy == graph.TaxonomyProductCategory {
+func termCapability(taxonomy category.Taxonomy) string {
+	if taxonomy == category.TaxonomyProductCategory {
 		return "manage_product_terms"
 	}
 	return "manage_categories"

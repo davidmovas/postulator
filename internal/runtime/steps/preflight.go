@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -219,7 +220,7 @@ func categoryPreflight(deps Deps) run.Preflight {
 		pages := make([]pagemap.Page, 0, len(record.Targets))
 		for _, targetID := range record.Targets {
 			page := targets[targetID].Page
-			if page.WPType == pagemap.WPPage && page.EntityID != nil && *page.EntityID != "" {
+			if page.WPType == pagemap.WPPage && page.CategoryID != "" {
 				pages = append(pages, page)
 			}
 		}
@@ -234,12 +235,15 @@ func categoryPreflight(deps Deps) run.Preflight {
 		if owner.Plugin.Installed && slices.Contains(owner.Plugin.Capabilities, wp.CapabilityPageCategories) {
 			return findings, nil
 		}
-		entities, err := deps.Entities.ListBySite(ctx, record.SiteID)
+		if readerErr := deps.categoryReader(); readerErr != nil {
+			return nil, readerErr
+		}
+		categories, err := deps.Categories.ListBySite(ctx, record.SiteID)
 		if err != nil {
 			return nil, err
 		}
 		for i := range pages {
-			chain := graph.CategoryChain(entities, *pages[i].EntityID)
+			chain := category.Chain(categories, pages[i].CategoryID)
 			if len(chain) == 0 {
 				continue
 			}

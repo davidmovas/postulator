@@ -11,8 +11,8 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/content"
-	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
@@ -624,7 +624,7 @@ func TestPublishAddsOurProductCategoriesBesideTheClients(t *testing.T) {
 	}
 
 	written := published.Categories
-	if written == nil || written.Taxonomy != graph.TaxonomyProductCategory || !written.Taken ||
+	if written == nil || written.Taxonomy != category.TaxonomyProductCategory || !written.Taken ||
 		!slices.Equal(written.Previous, assigned) || !slices.Equal(written.Added, []int64{drinks.ID, coffee.ID}) {
 		t.Fatalf("categories = %+v, want Drinks and Coffee added beside %v", written, assigned)
 	}

@@ -1,9 +1,11 @@
 package steps_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -18,18 +20,59 @@ var itemRoute = regexp.MustCompile(`^/wp-json/wp/v2/(pages|posts)/\d+$`)
 
 func publishedForRevert(t *testing.T, deps steps.Deps, sc *run.StepContext) (steps.Deps, steps.PublishResult) {
 	t.Helper()
+	return publishedAs(t, deps, sc, func(published steps.PublishResult) any { return published })
+}
+
+func publishedAs(t *testing.T, deps steps.Deps, sc *run.StepContext, stored func(steps.PublishResult) any) (steps.Deps, steps.PublishResult) {
+	t.Helper()
 
 	recorded := &pagemap.Page{}
 	deps.Pages = pageList{recorded: recorded}
 	published := runPublish(t, deps, sc)
 
 	source := newSourceRecord()
-	source.record(t, recorded.ID, map[run.ArtifactKind]any{run.ArtifactPublishResult: published})
+	source.record(t, recorded.ID, map[run.ArtifactKind]any{run.ArtifactPublishResult: stored(published)})
 	deps.Pages = newPageMap(*recorded)
 	deps.Links = &linkRecorder{}
 	deps.Items = source
 	deps.Artifacts = source
 	return deps, published
+}
+
+func filedByEntity(t *testing.T, published steps.PublishResult) json.RawMessage {
+	t.Helper()
+
+	encoded, err := json.Marshal(published)
+	if err != nil {
+		t.Fatalf("encode the publish result: %v", err)
+	}
+	var shape map[string]any
+	if err = json.Unmarshal(encoded, &shape); err != nil {
+		t.Fatalf("decode the publish result: %v", err)
+	}
+	written, ok := shape["categories"].(map[string]any)
+	if !ok {
+		t.Fatalf("the publish result carries no categories: %s", encoded)
+	}
+	terms, ok := written["terms"].([]any)
+	if !ok || len(terms) == 0 {
+		t.Fatalf("the publish result files under no terms: %s", encoded)
+	}
+	for i := range terms {
+		level, isObject := terms[i].(map[string]any)
+		if !isObject {
+			t.Fatalf("term %d is %T", i, terms[i])
+		}
+		delete(level, "categoryId")
+		level["entityId"] = "entity-" + strconv.Itoa(i)
+	}
+	if encoded, err = json.Marshal(shape); err != nil {
+		t.Fatalf("encode the earlier shape: %v", err)
+	}
+	if !strings.Contains(string(encoded), `"entityId"`) || strings.Contains(string(encoded), `"categoryId"`) {
+		t.Fatalf("the earlier shape reads %s", encoded)
+	}
+	return encoded
 }
 
 func filedItem(t *testing.T, server *wptest.Server, wpType string) (item wptest.Item, own int64) {
@@ -98,6 +141,34 @@ func TestRevertTakesBackOnlyTheCategoriesTheRunAdded(t *testing.T) {
 				t.Errorf("the site holds %+v, want the categories the run created kept", server.Categories())
 			}
 		})
+	}
+}
+
+func TestRevertTakesBackTheCategoriesOfAPublishFiledByEntity(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	filed(&deps)
+	item, own := filedItem(t, server, wptest.TypePost)
+	sc := publishContext(t)
+	sc.Page.WPType = pagemap.WPPost
+	deps, published := publishedAs(t, deps, sc, func(published steps.PublishResult) any {
+		return filedByEntity(t, published)
+	})
+	if published.Categories == nil || len(published.Categories.Added) != 2 {
+		t.Fatalf("categories = %+v, want two added", published.Categories)
+	}
+
+	reverted, result := runRevert(t, deps, "page-child")
+	if result.Next == run.TransitionPause || reverted.Outcome != steps.OutcomeRestored {
+		t.Fatalf("the revert answered %+v / %s", reverted, result.Message)
+	}
+	if failed, found := findingOf(reverted, steps.CodeRevertCategoriesKept); found {
+		t.Fatalf("the revert kept the categories: %+v", failed)
+	}
+	termsKeptSays(t, reverted, "Drinks", "Coffee")
+	if stored, _ := server.Lookup(item.ID); !slices.Equal(stored.Categories, []int64{own}) {
+		t.Errorf("the post carries %v, want only its own %d", stored.Categories, own)
 	}
 }
 

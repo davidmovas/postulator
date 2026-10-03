@@ -47,6 +47,8 @@ func (c *Core) stepDeps(stores repos, llm llmParts, writing authoring) steps.Dep
 	return steps.Deps{
 		Entities:      stores.entities,
 		Edges:         stores.edges,
+		Categories:    stores.categories,
+		CategoryTerms: stores.categoryTerms,
 		Pages:         stores.pages,
 		Links:         stores.links,
 		Items:         stores.items,
