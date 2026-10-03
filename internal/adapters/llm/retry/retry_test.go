@@ -164,6 +164,85 @@ func TestBackoffGrowsAndIsBounded(t *testing.T) {
 	}
 }
 
+func TestEveryWaitIsToldToTheObserverOnTheContext(t *testing.T) {
+	t.Parallel()
+
+	rateLimited := errors.New(errors.RateLimited, "slow down").WithRetry(3 * time.Millisecond)
+	external := errors.New(errors.External, "gateway")
+
+	cases := []struct {
+		name     string
+		failures []error
+		want     []retry.Wait
+		wantErr  errors.Code
+	}{
+		{name: "a first success waits for nothing"},
+		{
+			name:     "a rate limit is waited out for as long as the provider asked",
+			failures: []error{rateLimited},
+			want:     []retry.Wait{{Attempt: 1, Delay: 3 * time.Millisecond}},
+		},
+		{
+			name:     "an upstream failure backs off and then backs off further",
+			failures: []error{external, external},
+			want:     []retry.Wait{{Attempt: 1, Delay: time.Millisecond}, {Attempt: 2, Delay: 2 * time.Millisecond}},
+		},
+		{
+			name:     "a refusal that is not retried is never waited for",
+			failures: []error{errors.New(errors.Invalid, "no")},
+			wantErr:  errors.Invalid,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			for _, mode := range []string{"complete", "stream"} {
+				var told []retry.Wait
+				ctx := retry.Observing(t.Context(), func(held retry.Wait) { told = append(told, held) })
+				client := retry.New(&flaky{failures: tc.failures}, 3, time.Millisecond)
+
+				var err error
+				if mode == "complete" {
+					_, err = client.Complete(ctx, request())
+				} else {
+					_, err = client.Stream(ctx, request())
+				}
+				if errors.CodeOf(err) != tc.wantErr {
+					t.Fatalf("%s error = %v, want %q", mode, err, tc.wantErr)
+				}
+
+				if len(told) != len(tc.want) {
+					t.Fatalf("%s: the observer was told %+v, want %d waits", mode, told, len(tc.want))
+				}
+				for i, wanted := range tc.want {
+					if told[i].Attempt != wanted.Attempt || told[i].Delay != wanted.Delay {
+						t.Fatalf("%s: wait %d reads %+v, want %+v", mode, i+1, told[i], wanted)
+					}
+					if told[i].Cause == nil || errors.CodeOf(told[i].Cause) != errors.CodeOf(tc.failures[i]) {
+						t.Fatalf("%s: wait %d names the cause %v, want %v", mode, i+1, told[i].Cause, tc.failures[i])
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestAContextWithoutAnObserverStillRetries(t *testing.T) {
+	t.Parallel()
+
+	inner := &flaky{failures: []error{errors.New(errors.External, "gateway")}}
+	client := retry.New(inner, 1, time.Millisecond)
+
+	if _, err := client.Complete(retry.Observing(t.Context(), nil), request()); err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+	if inner.calls != 2 {
+		t.Fatalf("calls = %d, want 2", inner.calls)
+	}
+}
+
 func TestRetriesSetting(t *testing.T) {
 	t.Parallel()
 
