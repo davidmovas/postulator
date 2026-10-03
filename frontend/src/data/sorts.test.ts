@@ -59,7 +59,8 @@ describe("cycleSort", () => {
     });
 
     it("restarts ascending when the field changes", () => {
-        expect(cycleSort({ field: "path", desc: true }, "createdAt")).toStrictEqual({ field: "createdAt", desc: false });
-        expect(cycleSort({ field: "path", desc: false }, "createdAt")).toStrictEqual({ field: "createdAt", desc: false });
+        const restarted = { field: "createdAt", desc: false };
+        expect(cycleSort({ field: "path", desc: true }, "createdAt")).toStrictEqual(restarted);
+        expect(cycleSort({ field: "path", desc: false }, "createdAt")).toStrictEqual(restarted);
     });
 });

@@ -178,7 +178,8 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, source: init
         onOpenChange(next);
     };
 
-    const error = errorMessageOf(previewPages.error) ?? errorMessageOf(previewKeywords.error) ?? errorMessageOf(apply.error);
+    const error =
+        errorMessageOf(previewPages.error) ?? errorMessageOf(previewKeywords.error) ?? errorMessageOf(apply.error);
     const ready = source === "pages" ? selected.size : lines.length;
     const edges = outcome?.edges?.length ?? 0;
 

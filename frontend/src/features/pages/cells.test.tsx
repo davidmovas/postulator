@@ -20,8 +20,9 @@ describe("PageTableRow", () => {
     it("names the page it shows and selects or opens it", () => {
         const onSelect = vi.fn();
         const onOpen = vi.fn();
+        const page = aPage("p1", "/mugs/", { status: "published" });
         inTable(
-            <PageTableRow page={aPage("p1", "/mugs/", { status: "published" })} selected={true} onSelect={onSelect} onOpen={onOpen}>
+            <PageTableRow page={page} selected={true} onSelect={onSelect} onOpen={onOpen}>
                 <TableCell>/mugs/</TableCell>
             </PageTableRow>,
         );

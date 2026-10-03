@@ -29,7 +29,10 @@ describe("readQuery", () => {
     });
 
     it("accepts only the sort fields the backend declares for runs", () => {
-        expect(readQuery(new URLSearchParams("sort=createdAt:asc")).sort).toStrictEqual({ field: "createdAt", desc: false });
+        expect(readQuery(new URLSearchParams("sort=createdAt:asc")).sort).toStrictEqual({
+            field: "createdAt",
+            desc: false,
+        });
         expect(readQuery(new URLSearchParams("sort=path:asc")).sort).toBeNull();
         expect(readQuery(new URLSearchParams("sort=name:asc")).sort).toBeNull();
         expect(readQuery(new URLSearchParams("sort=status")).sort).toBeNull();

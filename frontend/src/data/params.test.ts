@@ -131,7 +131,8 @@ describe("queryCodec", () => {
 
     it("says whether a query carries any of the named fields", () => {
         expect(codec.carries(codec.defaults, ["view", "search", "kinds", "open", "sort"])).toBe(false);
-        expect(codec.carries({ ...codec.defaults, sort: { field: "path", desc: false } }, ["search", "kinds"])).toBe(false);
+        const sorted: SampleQuery = { ...codec.defaults, sort: { field: "path", desc: false } };
+        expect(codec.carries(sorted, ["search", "kinds"])).toBe(false);
         expect(codec.carries({ ...codec.defaults, open: true }, ["search", "open"])).toBe(true);
         expect(codec.carries({ ...codec.defaults, kinds: ["hub"] }, ["kinds"])).toBe(true);
         expect(codec.carries(full, [])).toBe(false);

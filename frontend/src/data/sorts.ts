@@ -51,7 +51,10 @@ export function sortSegment(sort: Sort | null | undefined): string {
     return formatted === "" ? "default" : formatted;
 }
 
-export function cycleSort<F extends string>(current: SortOf<readonly F[]> | null, field: F): SortOf<readonly F[]> | null {
+export function cycleSort<F extends string>(
+    current: SortOf<readonly F[]> | null,
+    field: F,
+): SortOf<readonly F[]> | null {
     if (current === null || current.field !== field) {
         return { field, desc: false };
     }
