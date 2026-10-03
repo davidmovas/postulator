@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { nameDiffers, plainText, productOutputsOf } from "./product.js";
+import { nameDiffers, productOutputsOf } from "./product.js";
 
 describe("the product outputs a run last wrote", () => {
     it("reads the short description and the attributes", () => {
@@ -18,10 +18,6 @@ describe("the product outputs a run last wrote", () => {
     it.each([null, undefined, "text", [], { specifications: "none" }])("reads nothing out of %j", (raw) => {
         const read = productOutputsOf(raw);
         expect(read === null || (read.shortDescription === "" && read.specifications.length === 0)).toBe(true);
-    });
-
-    it("turns HTML into the words a reader sees", () => {
-        expect(plainText("<p>One</p><p>Two&nbsp;&lt;three&gt;</p>")).toBe("One Two <three>");
     });
 });
 

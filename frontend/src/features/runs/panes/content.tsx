@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 
 import { copy } from "../../../copy/index.js";
+import { plainText } from "../../../domain/text.js";
 import { HtmlPreview, SectionLabel } from "../../../ui/index.js";
 import { draftView, imagesView, metaView } from "../artifacts.js";
 import { FindingList } from "../findings.js";
@@ -35,6 +36,26 @@ export function DraftPane({ payload }: PayloadPaneProps): ReactElement {
                     </li>
                 ))}
             </ul>
+            {view.product === null ? null : (
+                <>
+                    {view.product.shortDescription === "" ? null : (
+                        <>
+                            <SectionLabel className="px-3">{copy.runs.review.draft.short}</SectionLabel>
+                            <p className="px-3 text-xs text-ink-soft">{plainText(view.product.shortDescription)}</p>
+                        </>
+                    )}
+                    {view.product.specifications.length === 0 ? null : (
+                        <>
+                            <SectionLabel className="px-3">{copy.runs.review.draft.specifications}</SectionLabel>
+                            <Rows
+                                entries={view.product.specifications.map(
+                                    (row) => [row.name, row.value === "" ? copy.runs.review.draft.unstated : row.value] as const,
+                                )}
+                            />
+                        </>
+                    )}
+                </>
+            )}
         </div>
     );
 }

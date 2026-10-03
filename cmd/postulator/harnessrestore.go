@@ -14,6 +14,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/sites"
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
@@ -91,9 +92,13 @@ func placeOnSite(ctx context.Context, core *app.Core, site *wptest.Server, siteI
 			continue
 		}
 
+		body, bodyErr := restoredContent(page, bodies[page.ID])
+		if bodyErr != nil {
+			return bodyErr
+		}
 		item := wptest.Item{
 			Type: page.WPType, Title: page.Title, H1: page.H1, Slug: slugOf(page.Path),
-			Content: bodies[page.ID], Status: wpStatus(page.Status), Modified: time.Now().UTC(),
+			Content: body, Status: wpStatus(page.Status), Modified: time.Now().UTC(),
 			Parent: wpByPath[parentOf(page.Path)],
 		}
 		if page.WPID != nil {
@@ -102,6 +107,17 @@ func placeOnSite(ctx context.Context, core *app.Core, site *wptest.Server, siteI
 		wpByPath[page.Path] = site.Restore(item)[0].ID
 	}
 	return nil
+}
+
+func restoredContent(page *pages.Page, body string) (string, error) {
+	if page.WPType != wptest.TypeProduct || body == "" {
+		return body, nil
+	}
+	doc, err := content.Parse(body)
+	if err != nil {
+		return "", err
+	}
+	return doc.RenderWithoutHeadingOne()
 }
 
 func depthOf(path string) int {

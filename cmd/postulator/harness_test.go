@@ -17,6 +17,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/schedules"
 	"github.com/davidmovas/postulator/internal/application/sites"
@@ -98,11 +99,11 @@ func TestTheHarnessSeedsASiteWorthLookingAt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadGraph: %v", err)
 	}
-	if len(loaded.Entities) != 43 {
-		t.Errorf("entities = %d, want 43", len(loaded.Entities))
+	if len(loaded.Entities) != 44 {
+		t.Errorf("entities = %d, want 44", len(loaded.Entities))
 	}
-	if len(loaded.Edges) != 47 {
-		t.Errorf("edges = %d, want 47", len(loaded.Edges))
+	if len(loaded.Edges) != 48 {
+		t.Errorf("edges = %d, want 48", len(loaded.Edges))
 	}
 
 	proposed := 0
@@ -146,11 +147,11 @@ func TestTheHarnessSeedsMappedAndUnmappedPages(t *testing.T) {
 		cursor = string(page.Next)
 	}
 
-	if total != 64 {
-		t.Errorf("pages = %d, want 64", total)
+	if total != 65 {
+		t.Errorf("pages = %d, want 65", total)
 	}
-	if mapped != 46 {
-		t.Errorf("mapped pages = %d, want 46", mapped)
+	if mapped != 47 {
+		t.Errorf("mapped pages = %d, want 47", mapped)
 	}
 }
 
@@ -392,8 +393,8 @@ func TestASeededHomeIsNotSeededTwice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadGraph: %v", err)
 	}
-	if len(loaded.Entities) != 43 {
-		t.Fatalf("entities after the restart = %d, want the forty-three that were seeded", len(loaded.Entities))
+	if len(loaded.Entities) != 44 {
+		t.Fatalf("entities after the restart = %d, want the forty-four that were seeded", len(loaded.Entities))
 	}
 }
 
@@ -586,6 +587,51 @@ func TestTheSeededConfirmationNamesARealPage(t *testing.T) {
 	}
 	if page.Page.Path != "/espresso-machines/under-500/" {
 		t.Fatalf("the pending action names %s, want the under-500 page", page.Page.Path)
+	}
+}
+
+func TestTheHarnessSeedsAProductTheStoreLetsARunEdit(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+	if listed.Items[0].Commerce != "ready" {
+		t.Errorf("the seeded site's store reads %q, want ready", listed.Items[0].Commerce)
+	}
+
+	mapped, err := allPages(t.Context(), core, listed.Items[0].ID)
+	if err != nil {
+		t.Fatalf("list the pages: %v", err)
+	}
+	productID := ""
+	for i := range mapped {
+		if mapped[i].Path == productPath && mapped[i].WPType == "product" && mapped[i].EntityID != nil {
+			productID = mapped[i].ID
+		}
+	}
+	if productID == "" {
+		t.Fatalf("no mapped product at %s", productPath)
+	}
+
+	report, err := core.Reports.PageReport(t.Context(), reports.PageReportRequest{PageID: productID})
+	if err != nil {
+		t.Fatalf("PageReport: %v", err)
+	}
+	if report.Status != string(run.StatusCompleted) || len(report.Product) == 0 {
+		t.Fatalf("the product's last run is %q with outputs %s, want a completed run that wrote them", report.Status, report.Product)
+	}
+	var published struct {
+		PreviousProduct *struct {
+			Added []string `json:"added"`
+		} `json:"previousProduct"`
+	}
+	if err = json.Unmarshal(report.Publish, &published); err != nil || published.PreviousProduct == nil {
+		t.Fatalf("the publish result %s keeps no snapshot of the product (%v)", report.Publish, err)
+	}
+	if len(published.PreviousProduct.Added) != 1 || published.PreviousProduct.Added[0] != "Form" {
+		t.Errorf("the run filled %v, want the one empty attribute the template names", published.PreviousProduct.Added)
 	}
 }
 

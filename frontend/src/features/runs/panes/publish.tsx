@@ -41,6 +41,14 @@ export function PublishPane({ payload }: PayloadPaneProps): ReactElement {
     if (view.skipped.length > 0) {
         entries.push([copy.runs.review.publish.skipped, view.skipped.join(", ")]);
     }
+    if (view.product !== null) {
+        const said = copy.runs.review.publish;
+        entries.push(
+            [said.productShort, view.product.shortWritten ? said.productShortWritten : said.productShortKept],
+            [said.productAdded, view.product.added.length === 0 ? said.productAddedNone : view.product.added.join(", ")],
+            [said.productImage, view.product.imageSet ? said.productImageSet : said.productImageKept],
+        );
+    }
     return (
         <div className="flex flex-col gap-2 pb-3" title={copy.runs.review.noDiff}>
             <Rows entries={entries} />
