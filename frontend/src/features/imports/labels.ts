@@ -8,6 +8,7 @@ import {
     importColumnUses,
     importFields,
     importFindingCodes,
+    importRowTypes,
     isOneOf,
 } from "../../generated/vocab.js";
 import type { ImportField } from "../../generated/vocab.js";
@@ -48,6 +49,31 @@ export function edgeKindLabel(kind: string): string {
 
 export function exportFormatLabel(format: string): string {
     return isOneOf(exportFormats, format) ? copy.imports.export.formats[format] : format;
+}
+
+export function rowTypeLabel(rowType: string): string {
+    return isOneOf(importRowTypes, rowType) ? copy.imports.rowTypes[rowType] : rowType;
+}
+
+export interface ProductRow {
+    wpType: string;
+    plannedPath?: string;
+    storeName?: string;
+    matchedBy?: string;
+}
+
+const matchedBy = copy.imports.preview.matchedBy as Readonly<Record<string, string>>;
+
+export function productNote(page: ProductRow): string | null {
+    if (page.wpType !== "product") {
+        return null;
+    }
+    const name = page.storeName ?? "";
+    if (name === "") {
+        return copy.imports.preview.waitingProduct;
+    }
+    const by = matchedBy[page.matchedBy ?? ""] ?? matchedBy["path"] ?? "";
+    return copy.imports.preview.storeProduct(name, by, page.plannedPath ?? "");
 }
 
 export function blocking(code: string): boolean {

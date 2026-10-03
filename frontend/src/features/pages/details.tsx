@@ -12,6 +12,7 @@ import { pageStatusLabel } from "./labels.js";
 import type { SelectOption } from "../../ui/index.js";
 import { Banner, Button, Field, Input, KeywordInput, Select, SyncProblemIcon, Textarea } from "../../ui/index.js";
 import { ConflictNotice } from "./conflict-notice.js";
+import { ProductPanel } from "./product-panel.js";
 
 const wpTypeOptions: readonly SelectOption<string>[] = pageWpTypes.map((value) => ({ value, label: value }));
 const statusOptions: readonly SelectOption<string>[] = pageStatuses.map((value) => ({
@@ -123,6 +124,7 @@ export function PageDetails({ page, siteId, search }: PageDetailsProps): ReactEl
     return (
         <div className="flex flex-col gap-3 p-3">
             {page.drift ? <DriftNotice page={page} /> : null}
+            {page.wpType === "product" ? <ProductPanel page={page} /> : null}
             <Field
                 label={copy.pages.detail.path}
                 tooltip={copy.pages.detail.pathHint}

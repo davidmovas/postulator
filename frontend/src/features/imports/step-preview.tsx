@@ -19,7 +19,7 @@ import {
     toneClasses,
 } from "../../ui/index.js";
 import { kindLabel as entityKindLabel } from "../graph/labels.js";
-import { actionLabel, actionTone, columnUseLabel, edgeKindLabel } from "./labels.js";
+import { actionLabel, actionTone, columnUseLabel, edgeKindLabel, productNote } from "./labels.js";
 
 type Sheet = "pages" | "entities" | "edges";
 
@@ -139,7 +139,12 @@ export function StepPreview({ report, onBack, onApply }: StepPreviewProps): Reac
                                   <TableCell mono={true} title={page.path}>
                                       {page.path}
                                   </TableCell>
-                                  <TableCell title={page.title}>{page.title}</TableCell>
+                                  <TableCell
+                                      muted={productNote(page) !== null}
+                                      title={productNote(page) ?? page.title}
+                                  >
+                                      {productNote(page) ?? page.title}
+                                  </TableCell>
                                   <TableCell muted={true} title={keywordsLine(page.keywords)}>
                                       {keywordsLine(page.keywords)}
                                   </TableCell>

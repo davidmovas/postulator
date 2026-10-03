@@ -5,8 +5,11 @@ import { copy } from "../../copy/index.js";
 import { fieldErrorOf, formErrorOf } from "../../data/errors.js";
 import { useSaveMapping } from "../../data/hooks/imports.js";
 import type { ImportMapping, ImportOptions, ImportSheet } from "../../data/types.js";
-import { Banner, Button, Field, Input, Panel, PanelHeader, Switch } from "../../ui/index.js";
+import type { ImportRowType } from "../../generated/vocab.js";
+import { importRowTypes, isOneOf } from "../../generated/vocab.js";
+import { Banner, Button, Field, Input, Panel, PanelHeader, Segmented, Switch } from "../../ui/index.js";
 import { freeHeaders, toggled, usable } from "./columns.js";
+import { rowTypeLabel } from "./labels.js";
 
 function letterOf(at: number): string {
     let name = "";
@@ -16,6 +19,15 @@ function letterOf(at: number): string {
         index = Math.floor(index / 26) - 1;
     }
     return name;
+}
+
+function rowTypeOf(options: ImportOptions): ImportRowType {
+    const held: string = options.rowType ?? "";
+    return isOneOf(importRowTypes, held) ? held : "pages";
+}
+
+function wireRowType(value: ImportRowType): ImportOptions["rowType"] {
+    return value as ImportOptions["rowType"];
 }
 
 type SeparatorKey = "anchorSeparator" | "listSeparator";
@@ -168,6 +180,23 @@ export function OptionsPanel({
                             </li>
                         ))}
                     </ul>
+                </div>
+            </Panel>
+            <Panel>
+                <PanelHeader title={copy.imports.rowType.title} />
+                <div className="flex flex-col gap-2 p-3">
+                    <Segmented
+                        label={copy.imports.rowType.title}
+                        value={rowTypeOf(options)}
+                        options={importRowTypes.map((value) => ({ value, label: rowTypeLabel(value) }))}
+                        onValueChange={(value) => {
+                            onOptions({ ...options, rowType: wireRowType(value) });
+                        }}
+                    />
+                    <p className="text-2xs text-ink-faint">{copy.imports.rowType.hint}</p>
+                    {rowTypeOf(options) === "pages" ? null : (
+                        <p className="text-2xs text-ink-faint">{copy.imports.rowType.products}</p>
+                    )}
                 </div>
             </Panel>
             <ColumnChecklist

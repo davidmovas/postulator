@@ -112,6 +112,25 @@ export const imports = {
         columnTo: "To",
         columnRelation: "Relation",
         columnReason: "Reason",
+        waitingProduct: "A product the store does not hold yet",
+        storeProduct: (name: string, by: string, planned: string) =>
+            planned === "" ? `The store's ${name}, found by ${by}` : `The store's ${name}, found by ${by}, from ${planned}`,
+        matchedBy: {
+            path: "its address",
+            slug: "its slug",
+            name: "its name",
+        } as Readonly<Record<string, string>>,
+    },
+    rowTypes: {
+        pages: "Pages",
+        products: "Products",
+        kind: "By entity kind",
+    },
+    rowType: {
+        title: "Rows become",
+        hint: "What a new row of the sheet becomes. A row with product rows under it stays a page, a wp_type column wins over this choice, and a row already on the site keeps its type.",
+        products:
+            "A product row is matched to the product you created in WooCommerce by its address, its slug, then its name; Postulator never creates a product.",
     },
     apply: {
         title: "Apply the sheet",

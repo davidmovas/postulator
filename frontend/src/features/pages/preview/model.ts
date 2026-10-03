@@ -58,9 +58,13 @@ export function frameScale(available: number, width: number): number {
 }
 
 export function editorPreviewUrl(baseUrl: string, wpType: string, wpId: number | null): string | null {
-    if (wpId === null || baseUrl === "") {
+    if (wpId === null || baseUrl === "" || wpType === "product_cat") {
         return null;
     }
+    const root = baseUrl.replace(/\/+$/, "");
+    if (wpType === "product") {
+        return `${root}/?post_type=product&p=${wpId}&preview=true`;
+    }
     const key = wpType === "page" ? "page_id" : "p";
-    return `${baseUrl.replace(/\/+$/, "")}/?${key}=${wpId}&preview=true`;
+    return `${root}/?${key}=${wpId}&preview=true`;
 }
