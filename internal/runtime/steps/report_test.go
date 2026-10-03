@@ -125,6 +125,28 @@ func TestReportNoticesWhatThePageLacks(t *testing.T) {
 			want: "1 of 3 images placed",
 		},
 		{
+			name: "a page that went up without its categories",
+			artifacts: map[run.ArtifactKind][]byte{
+				run.ArtifactPublishResult: []byte(`{"wpId":7,"findings":[{"severity":"warn",` +
+					`"code":"categories_forbidden","message":"may not create them"}]}`),
+			},
+			want: "its categories are not on the site",
+		},
+		{
+			name: "a page whose categories the site did not keep",
+			artifacts: map[run.ArtifactKind][]byte{
+				run.ArtifactPublishResult: []byte(`{"wpId":7,"categories":{"taxonomy":"category","taken":false},` +
+					`"findings":[{"severity":"warn","code":"categories_not_taken","message":"not kept"}]}`),
+			},
+			want: "its categories are not on the site",
+		},
+		{
+			name: "a page filed under its categories",
+			artifacts: map[run.ArtifactKind][]byte{
+				run.ArtifactPublishResult: []byte(`{"wpId":7,"categories":{"taxonomy":"category","taken":true},"findings":[]}`),
+			},
+		},
+		{
 			name: "all of it",
 			artifacts: map[run.ArtifactKind][]byte{
 				run.ArtifactValidationReport: validation(missing+","+unpublished, ""),

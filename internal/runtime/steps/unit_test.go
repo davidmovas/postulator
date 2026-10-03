@@ -207,6 +207,7 @@ func unitDeps() steps.Deps {
 	return steps.Deps{
 		Entities: entityList{items: unitEntities()},
 		Edges:    edgeList{items: unitEdges()},
+		Terms:    newTermMemory(),
 		Pages: pageList{items: []pagemap.Page{
 			{ID: "page-parent", SiteID: "site", Path: "/coffee/", WPType: pagemap.WPPage, Status: pagemap.StatusPublished},
 			{ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", WPType: pagemap.WPPage, Status: pagemap.StatusPlanned},

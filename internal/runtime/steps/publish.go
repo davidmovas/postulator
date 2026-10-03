@@ -28,6 +28,7 @@ const (
 type PublishResult struct {
 	PreviousMeta        *wp.SEOMeta        `json:"previousMeta,omitempty"`
 	PreviousProduct     *ProductSnapshot   `json:"previousProduct,omitempty"`
+	Categories          *CategoryWrite     `json:"categories,omitempty"`
 	URL                 string             `json:"url"`
 	Status              string             `json:"status"`
 	ContentHash         string             `json:"contentHash"`
@@ -99,8 +100,12 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, rendered s
 	if err != nil {
 		return run.Result{}, err
 	}
+	categories, err := ensureCategories(ctx, deps, client, sc, existing.Categories, !found)
+	if err != nil {
+		return run.Result{}, err
+	}
 
-	asked := itemRequest(sc, draft, rendered, placed.wpID, featured.FeaturedID)
+	asked := itemRequest(sc, draft, rendered, placed.wpID, featured.FeaturedID, categories.send)
 	asked.existing, asked.found = existing, found
 	written, mismatches, err := writeItem(ctx, client, itemType, sc, asked)
 	if err != nil {
@@ -109,13 +114,14 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, rendered s
 	if len(mismatches) > 0 {
 		return refuseMismatch(sc, mismatches), nil
 	}
+	categories.took(sc.Page, written.Categories)
 
 	result := PublishResult{
-		WPID: written.ID, URL: written.Link, Status: written.Status,
+		Categories: categories.write, WPID: written.ID, URL: written.Link, Status: written.Status,
 		ContentHash: wp.ContentHash(rendered), Created: !found,
 		PreviousContent: replaced.Content, PreviousContentHash: replaced.ContentHash,
-		SEOApplied: make([]string, 0), Skipped: make([]string, 0), Findings: driftFindings(sc.Page),
-		Mismatches: mismatches,
+		SEOApplied: make([]string, 0), Skipped: make([]string, 0),
+		Findings: append(driftFindings(sc.Page), categories.findings...), Mismatches: mismatches,
 	}
 	seo, err := applySEO(ctx, client, sc, itemType, written.ID, found)
 	if err != nil {
@@ -130,20 +136,22 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, rendered s
 }
 
 type writeRequest struct {
-	existing wp.Item
-	title    string
-	content  string
-	slug     string
-	status   string
-	parent   int64
-	featured int64
-	found    bool
+	existing   wp.Item
+	title      string
+	content    string
+	slug       string
+	status     string
+	categories []int64
+	parent     int64
+	featured   int64
+	found      bool
 }
 
-func itemRequest(sc *run.StepContext, draft content.ContentDraft, rendered string, parent, featured int64) writeRequest {
+func itemRequest(sc *run.StepContext, draft content.ContentDraft, rendered string, parent, featured int64,
+	categories []int64) writeRequest {
 	return writeRequest{
 		title: draft.Title, content: rendered, slug: sc.Page.Slug, status: string(sc.Run.PublishMode),
-		parent: parent, featured: featured,
+		categories: categories, parent: parent, featured: featured,
 	}
 }
 
@@ -168,7 +176,7 @@ func writeItem(ctx context.Context, client *wp.Client, itemType wp.ItemType, sc 
 func upsert(ctx context.Context, client *wp.Client, itemType wp.ItemType, req writeRequest) (wp.Item, error) {
 	if !req.found {
 		in := wp.CreateItem{
-			Title: req.title, Content: req.content, Slug: req.slug, Status: req.status,
+			Title: req.title, Content: req.content, Slug: req.slug, Status: req.status, Categories: req.categories,
 		}
 		if itemType == wp.TypePage {
 			in.Parent = &req.parent
@@ -180,7 +188,7 @@ func upsert(ctx context.Context, client *wp.Client, itemType wp.ItemType, req wr
 	}
 
 	in := wp.UpdateItem{
-		Title: &req.title, Content: &req.content, Slug: &req.slug, Status: &req.status,
+		Title: &req.title, Content: &req.content, Slug: &req.slug, Status: &req.status, Categories: req.categories,
 	}
 	if itemType == wp.TypePage {
 		in.Parent = &req.parent

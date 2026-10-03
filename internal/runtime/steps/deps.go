@@ -27,6 +27,12 @@ type edgeReader interface {
 	ListBySite(ctx context.Context, siteID string) ([]graph.Edge, error)
 }
 
+type termStore interface {
+	ListBySite(ctx context.Context, siteID string) ([]graph.Term, error)
+	Upsert(ctx context.Context, t graph.Term) error
+	Delete(ctx context.Context, entityID string, taxonomy graph.Taxonomy) error
+}
+
 type pageStore interface {
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.Page, error)
 	Get(ctx context.Context, id string) (pagemap.Page, error)
@@ -87,6 +93,7 @@ type ImageSource interface {
 type Deps struct {
 	Entities      entityReader
 	Edges         edgeReader
+	Terms         termStore
 	Pages         pageStore
 	Links         linkStore
 	Items         itemReader
