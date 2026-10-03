@@ -18,6 +18,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
 type catalog struct {
@@ -90,11 +91,34 @@ func (p *profiles) Resolve(_ context.Context, siteID string, role llm.Role, _ ma
 	return ref, nil
 }
 
+type heardSpend struct {
+	aggregate llm.SpendQuery
+	calls     llm.CallQuery
+	page      paging.Request
+}
+
 type spend struct {
 	run          llm.Spend
 	conversation llm.Spend
 	everything   llm.Spend
 	err          error
+	slices       []llm.SpendSlice
+	listed       paging.List[llm.Call]
+	heard        *heardSpend
+}
+
+func (s spend) Aggregate(_ context.Context, q llm.SpendQuery) ([]llm.SpendSlice, error) {
+	if s.heard != nil {
+		s.heard.aggregate = q
+	}
+	return s.slices, s.err
+}
+
+func (s spend) List(_ context.Context, q llm.CallQuery, page paging.Request) (paging.List[llm.Call], error) {
+	if s.heard != nil {
+		s.heard.calls, s.heard.page = q, page
+	}
+	return s.listed, s.err
 }
 
 func (s spend) SumByRun(context.Context, string) (llm.Spend, error) {
@@ -163,6 +187,8 @@ type harness struct {
 	events   *applicationtest.Recorder
 }
 
+var harnessNow = time.Date(2026, 9, 18, 10, 0, 0, 0, time.UTC)
+
 func newHarness(t *testing.T, book spend) harness {
 	t.Helper()
 
@@ -172,8 +198,7 @@ func newHarness(t *testing.T, book spend) harness {
 	keys := &vault{stored: map[string]string{}}
 	recorder := &applicationtest.Recorder{}
 	return harness{
-		service: models.New(known, known, people, book, keys, probe, recorder,
-			clock.NewFake(time.Date(2026, 9, 18, 10, 0, 0, 0, time.UTC))),
+		service:  models.New(known, known, people, book, keys, probe, recorder, clock.NewFake(harnessNow)),
 		catalog:  known,
 		profiles: people,
 		prober:   probe,
@@ -557,7 +582,7 @@ func TestTestProvider(t *testing.T) {
 	if resp.Model.Model != "gpt-5.6-luna" || resp.Usage.Total != 2 {
 		t.Errorf("response = %+v, want the probe usage", resp)
 	}
-	if h.prober.seen.MaxTokens <= 1 || h.prober.seen.Meta.Step != "test_provider" {
+	if h.prober.seen.MaxTokens <= 1 || llm.PurposeOf(h.prober.seen.Meta.RunID, h.prober.seen.Meta.Step) != llm.PurposeProbe {
 		t.Errorf("probe request = %+v, want room for an answer a reasoning model can reach", h.prober.seen)
 	}
 

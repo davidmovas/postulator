@@ -12,6 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
 const probeTokens = 16
@@ -35,6 +36,8 @@ type spendReader interface {
 	SumByRun(ctx context.Context, runID string) (llm.Spend, error)
 	SumByConversation(ctx context.Context, conversationID string) (llm.Spend, error)
 	SumAll(ctx context.Context) (llm.Spend, error)
+	Aggregate(ctx context.Context, q llm.SpendQuery) ([]llm.SpendSlice, error)
+	List(ctx context.Context, q llm.CallQuery, page paging.Request) (paging.List[llm.Call], error)
 }
 
 type prober interface {
@@ -276,7 +279,7 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequest) (Te
 		Ref:       ref,
 		Messages:  []port.Message{{Role: port.RoleUser, Text: "ping"}},
 		MaxTokens: probeTokens,
-		Meta:      port.CallMeta{Step: "test_provider"},
+		Meta:      port.CallMeta{Step: llm.StepProbe},
 	})
 	if err != nil {
 		return TestProviderResponse{}, err

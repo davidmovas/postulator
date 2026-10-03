@@ -1,5 +1,7 @@
 package models
 
+import "github.com/davidmovas/postulator/internal/kernel/dto"
+
 type ListModelsRequest struct{}
 
 type ListModelsResponse struct {
@@ -99,4 +101,23 @@ type UsageSummaryResponse struct {
 	Usage Usage   `json:"usage"`
 	USD   float64 `json:"usd"`
 	Calls int     `json:"calls"`
+}
+
+type SpendReportRequest struct {
+	Days  int    `json:"days,omitempty" minimum:"0" maximum:"366" description:"How many days back to count, 1 to 366; leave it out for 30. A run is counted whole"`
+	RunID string `json:"runId,omitempty" description:"Count only this run, step by step; leave it out for every call in the range"`
+}
+
+type SpendReportResponse struct {
+	Since  dto.Time     `json:"since"`
+	Days   int          `json:"days"`
+	RunID  string       `json:"runId"`
+	Totals SpendTotals  `json:"totals"`
+	Slices []SpendSlice `json:"slices"`
+}
+
+type ListCallsRequest struct {
+	dto.ListRequest
+	RunID          string `json:"runId,omitempty" description:"Keep only this run's calls"`
+	ConversationID string `json:"conversationId,omitempty" description:"Keep only this conversation's calls"`
 }
