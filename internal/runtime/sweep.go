@@ -2,12 +2,17 @@ package runtime
 
 import (
 	"context"
+	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
+
+func (e *Engine) Recover(ctx context.Context) error {
+	return e.sweep(ctx)
+}
 
 func (e *Engine) sweep(ctx context.Context) error {
 	if err := e.rearm(ctx); err != nil {
@@ -88,12 +93,7 @@ func (e *Engine) unblock(ctx context.Context) error {
 			if record.Status != run.StatusPaused {
 				return nil
 			}
-			e.revive(&record, now)
-			if updateErr := e.deps.Runs.Update(c, record); updateErr != nil {
-				return updateErr
-			}
-			box.add(c, record.ID, events.RunResumed, events.RunResumedPayload{RunID: record.ID})
-			return nil
+			return e.reopen(c, box, record, now)
 		})
 		if releaseErr != nil {
 			e.logger.Warn("releasing a run item whose parent reached the site failed; the next sweep will try again",
@@ -235,4 +235,12 @@ func (e *Engine) purge(ctx context.Context) error {
 		)
 	}
 	return nil
+}
+
+func (e *Engine) retention() time.Duration {
+	return time.Duration(e.cfg.RetentionDays) * 24 * time.Hour
+}
+
+func (e *Engine) eventRetention() time.Duration {
+	return time.Duration(e.cfg.EventRetentionDays) * 24 * time.Hour
 }

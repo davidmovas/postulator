@@ -149,14 +149,6 @@ func (e *Engine) expire(ctx context.Context, box *outbox, record run.Run, now ti
 	return nil
 }
 
-func (e *Engine) revive(record *run.Run, now time.Time) {
-	record.Status = run.StatusRunning
-	record.PauseReason = ""
-	record.Error = ""
-	record.FinishedAt = nil
-	record.DeadlineAt = now.Add(e.cfg.RunDeadline)
-}
-
 func overBudget(record run.Run, spend llm.Spend) bool {
 	overMoney := record.Budget.MaxUSD > 0 && spend.USD > record.Budget.MaxUSD
 	overTokens := record.Budget.MaxTokens > 0 && spend.Usage.Total > record.Budget.MaxTokens
