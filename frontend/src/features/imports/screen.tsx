@@ -228,7 +228,7 @@ export function ImportScreen(): ReactElement {
                     onBack={() => {
                         goto("columns");
                     }}
-                    onApply={() => {
+                    onNext={() => {
                         goto("apply");
                     }}
                 />
