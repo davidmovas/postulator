@@ -2,6 +2,7 @@ package pages
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/application"
@@ -68,13 +69,11 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (CreateResponse
 		if verdictErr := s.verdict(c, page, index, entity); verdictErr != nil {
 			return verdictErr
 		}
-		if parent, found := index.PathParent(page); found {
-			page.ParentPageID = &parent.ID
-		}
+		page.ParentPageID = index.PathParentID(page)
 		if insertErr := s.pages.Insert(c, page); insertErr != nil {
 			return insertErr
 		}
-		return s.adopt(c, &page, siblings)
+		return s.adopt(c, page, siblings)
 	})
 	if doErr != nil {
 		return CreateResponse{}, doErr
@@ -85,13 +84,18 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (CreateResponse
 	return CreateResponse{Page: view(page)}, nil
 }
 
-func (s *Service) adopt(ctx context.Context, parent *pagemap.Page, siblings []pagemap.Page) error {
+func (s *Service) adopt(ctx context.Context, parent pagemap.Page, siblings []pagemap.Page) error {
+	index := pagemap.NewIndex(append(slices.Clip(siblings), parent))
 	for i := range siblings {
 		child := siblings[i]
-		if child.ParentPageID != nil || child.WPType.StoreAddressed() || pagemap.ParentPath(child.Path) != parent.Path {
+		if child.ParentPageID != nil {
 			continue
 		}
-		child.ParentPageID = &parent.ID
+		wanted := index.PathParentID(child)
+		if wanted == nil || *wanted != parent.ID {
+			continue
+		}
+		child.ParentPageID = wanted
 		child.UpdatedAt = parent.UpdatedAt
 		if err := s.pages.Update(ctx, child); err != nil {
 			return err
@@ -178,10 +182,7 @@ func (s *Service) Update(ctx context.Context, req UpdateRequest) (UpdateResponse
 			if verdictErr := s.verdict(c, next, index, graph.Entity{}); verdictErr != nil {
 				return verdictErr
 			}
-			next.ParentPageID = nil
-			if parent, found := index.PathParent(next); found {
-				next.ParentPageID = &parent.ID
-			}
+			next.ParentPageID = index.PathParentID(next)
 		}
 
 		if updateErr := s.pages.Update(c, next); updateErr != nil {

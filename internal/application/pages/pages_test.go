@@ -181,6 +181,65 @@ func TestCreateResolvesTheParentAndAdoptsChildren(t *testing.T) {
 	}
 }
 
+func TestANewPageAdoptsOnlyTheOrphansRightUnderIt(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	h.page(t, "/shop/shoes/", nil)
+	h.page(t, "/shop/bags/red/", nil)
+	h.page(t, "/elsewhere/news/", nil)
+	if _, err := h.service.Create(t.Context(), pages.CreateRequest{
+		SiteID: h.siteID, Path: "/shop/liquid/", Title: "Liquid", WPType: string(pagemap.WPProduct),
+	}); err != nil {
+		t.Fatalf("Create the product: %v", err)
+	}
+	blog := h.page(t, "/blog/", nil)
+	kept := pagemap.Page{
+		ID: id.New(), SiteID: h.siteID, Path: "/shop/kept/", Slug: "kept", WPType: pagemap.WPPage,
+		Status: pagemap.StatusPlanned, ParentPageID: &blog.ID,
+		CreatedAt: h.clock.Now(), UpdatedAt: h.clock.Now(),
+	}
+	if err := sqlite.NewPageRepo(h.store).Insert(t.Context(), kept); err != nil {
+		t.Fatalf("insert a page that already sits under another: %v", err)
+	}
+
+	shop := h.page(t, "/shop/", nil)
+
+	cases := []struct {
+		name   string
+		path   string
+		parent string
+	}{
+		{name: "an orphan right under it", path: "/shop/shoes/", parent: shop.ID},
+		{name: "an orphan two levels down", path: "/shop/bags/red/"},
+		{name: "an orphan elsewhere", path: "/elsewhere/news/"},
+		{name: "a product right under it", path: "/shop/liquid/"},
+		{name: "a page that already sits under another", path: "/shop/kept/", parent: blog.ID},
+	}
+
+	listed, err := sqlite.NewPageRepo(h.store).ListBySite(t.Context(), h.siteID)
+	if err != nil {
+		t.Fatalf("list the pages: %v", err)
+	}
+	index := pagemap.NewIndex(listed)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			stored, found := index.ByPath(tc.path)
+			if !found {
+				t.Fatalf("no page at %s", tc.path)
+			}
+			if tc.parent == "" && stored.ParentPageID != nil {
+				t.Fatalf("%s sits under %s, want no parent", tc.path, *stored.ParentPageID)
+			}
+			if tc.parent != "" && (stored.ParentPageID == nil || *stored.ParentPageID != tc.parent) {
+				t.Fatalf("%s sits under %v, want %s", tc.path, stored.ParentPageID, tc.parent)
+			}
+		})
+	}
+}
+
 func TestCreateRefusesCannibalization(t *testing.T) {
 	t.Parallel()
 
