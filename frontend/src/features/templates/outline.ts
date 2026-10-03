@@ -3,10 +3,11 @@ import type { JsonObject } from "../../domain/merge-patch.js";
 import type { SpecPath } from "./patch.js";
 import { paths, touches } from "./patch.js";
 
-export type GroupKey = "sections" | "rules" | "models" | "recipe" | "overrides" | "policies";
+export type GroupKey = "sections" | "product" | "rules" | "models" | "recipe" | "overrides" | "policies";
 
 export const groupKeys: readonly GroupKey[] = [
     "sections",
+    "product",
     "rules",
     "models",
     "recipe",
@@ -25,6 +26,7 @@ const ruleRoots: readonly SpecPath[] = [
 
 const watched: Readonly<Record<GroupKey, readonly SpecPath[]>> = {
     sections: [paths.sections],
+    product: [paths.product],
     rules: ruleRoots,
     models: [paths.profiles],
     recipe: [paths.recipe],
@@ -34,6 +36,7 @@ const watched: Readonly<Record<GroupKey, readonly SpecPath[]>> = {
 
 export const groupTitles: Readonly<Record<GroupKey, string>> = {
     sections: copy.templates.sections.title,
+    product: copy.templates.product.title,
     rules: copy.templates.editor.groups.rules,
     models: copy.templates.models.title,
     recipe: copy.templates.recipe.title,

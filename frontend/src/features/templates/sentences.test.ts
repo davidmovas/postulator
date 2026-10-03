@@ -43,6 +43,24 @@ describe("sentencesOf", () => {
         expect(sentencesOf(draft, null)).toStrictEqual([]);
     });
 
+    it("says what a layer does to the product outputs", () => {
+        expect(
+            sentencesOf(draft, {
+                product: {
+                    shortDescription: { enabled: true, intent: "", targetWords: 40, primaryKeyword: false },
+                    specifications: [{ name: "Form", intent: "" }, { name: "Size", intent: "" }],
+                },
+            }),
+        ).toStrictEqual(["writes a short description of about 40 words and fills Form and Size"]);
+        expect(
+            sentencesOf(draft, {
+                product: { shortDescription: { enabled: false }, specifications: [] },
+            }),
+        ).toStrictEqual(["writes no product outputs beyond the description"]);
+        const outputs = draftFromJson({ ...base, product: { specifications: [{ name: "Form" }] } });
+        expect(sentencesOf(outputs, { product: null })).toStrictEqual(["drops the product outputs"]);
+    });
+
     it("says the site shortened the page", () => {
         expect(sentencesOf(draft, { length: { min: 600, max: 900 } })).toStrictEqual([
             "shortens the page to 600–900 words",

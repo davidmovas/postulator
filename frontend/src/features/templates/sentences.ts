@@ -168,6 +168,22 @@ function paramSentences(base: SpecDraft, after: SpecDraft): string[] {
     return out;
 }
 
+function productSentences(after: SpecDraft): string[] {
+    const product = after.product;
+    if (product === null) {
+        return [said.productNone];
+    }
+    const parts: string[] = [];
+    if (product.shortEnabled) {
+        parts.push(product.shortWords > 0 ? said.productShortWords(product.shortWords) : said.productShort);
+    }
+    const names = product.specifications.map((row) => (row.name === "" ? copy.templates.product.unnamed : row.name));
+    if (names.length > 0) {
+        parts.push(said.productFills(joined(names)));
+    }
+    return parts.length === 0 ? [said.productNothing] : [parts.join(" and ")];
+}
+
 function sectionSentences(after: SpecDraft): string[] {
     if (after.sections.length === 0) {
         return [said.sectionsNone];
@@ -204,6 +220,8 @@ export function sentencesOf(base: SpecDraft, patch: JsonObject | null): string[]
             out.push(...profileSentences(after, held));
         } else if (key === "recipe") {
             out.push(...recipeSentences(base, after));
+        } else if (key === "product") {
+            out.push(...productSentences(after));
         } else {
             out.push(said.other(key));
         }

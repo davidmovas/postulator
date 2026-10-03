@@ -29,6 +29,7 @@ export const paths = {
     featuredImage: ["images", "featured"],
     inlineImages: ["images", "inline"],
     imageSource: ["images", "source"],
+    product: ["product"],
     profiles: ["modelProfiles"],
     recipe: ["recipe"],
 } as const;

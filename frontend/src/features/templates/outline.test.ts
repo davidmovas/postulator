@@ -27,6 +27,11 @@ describe("changedGroups", () => {
         },
         { name: "a recipe marks the recipe", patch: { recipe: [] }, want: ["recipe", "overrides"] },
         {
+            name: "a product output marks the product",
+            patch: { product: { shortDescription: { targetWords: 60 } } },
+            want: ["product", "overrides"],
+        },
+        {
             name: "several groups at once",
             patch: { sections: [], images: { inline: 2 }, recipe: [] },
             want: ["sections", "rules", "recipe", "overrides"],

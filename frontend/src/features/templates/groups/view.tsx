@@ -7,6 +7,7 @@ import type { SpecDraft } from "../spec.js";
 import { ModelsGroup } from "./models.js";
 import { OverridesGroup } from "./overrides.js";
 import { PoliciesGroup } from "./policies.js";
+import { ProductGroup } from "./product.js";
 import { RecipeGroup } from "./recipe.js";
 import { RulesGroup } from "./rules.js";
 import { SectionsGroup } from "./sections.js";
@@ -37,6 +38,8 @@ export function GroupView({
     switch (group) {
         case "sections":
             return <SectionsGroup draft={draft} below={below} error={error} onChange={onChange} />;
+        case "product":
+            return <ProductGroup draft={draft} below={below} error={error} onChange={onChange} />;
         case "rules":
             return <RulesGroup draft={draft} below={below} error={error} onChange={onChange} />;
         case "models":

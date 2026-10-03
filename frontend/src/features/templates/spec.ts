@@ -24,6 +24,19 @@ export interface StepDraft {
     params: JsonObject | null;
 }
 
+export interface SpecificationDraft {
+    name: string;
+    intent: string;
+}
+
+export interface ProductDraft {
+    shortEnabled: boolean;
+    shortIntent: string;
+    shortWords: number;
+    shortKeyword: boolean;
+    specifications: SpecificationDraft[];
+}
+
 export interface SpecDraft {
     sections: SectionDraft[];
     tone: string;
@@ -46,7 +59,7 @@ export interface SpecDraft {
     featuredImage: boolean;
     inlineImages: number;
     imageSource: string;
-    product: JsonObject | null;
+    product: ProductDraft | null;
     profiles: ProfileDraft[];
     recipe: StepDraft[];
 }
@@ -111,6 +124,38 @@ function sectionOf(value: JsonValue): SectionDraft {
         include: words(rules, "include"),
         primaryInHeading: flag(rules, "primaryInHeading"),
     };
+}
+
+function productOf(held: JsonObject | null): ProductDraft | null {
+    if (held === null) {
+        return null;
+    }
+    const short = branch(held, "shortDescription");
+    return {
+        shortEnabled: flag(short, "enabled"),
+        shortIntent: text(short, "intent"),
+        shortWords: count(short, "targetWords"),
+        shortKeyword: flag(short, "primaryKeyword"),
+        specifications: series(held, "specifications")
+            .filter(isJsonObject)
+            .map((row) => ({ name: text(row, "name"), intent: text(row, "intent") })),
+    };
+}
+
+function productJson(product: ProductDraft): JsonObject {
+    return {
+        shortDescription: {
+            enabled: product.shortEnabled,
+            intent: product.shortIntent,
+            targetWords: product.shortWords,
+            primaryKeyword: product.shortKeyword,
+        },
+        specifications: product.specifications.map((row) => ({ name: row.name, intent: row.intent })),
+    };
+}
+
+export function emptyProduct(): ProductDraft {
+    return { shortEnabled: true, shortIntent: "", shortWords: 0, shortKeyword: false, specifications: [] };
 }
 
 function profilesOf(held: JsonObject | null): ProfileDraft[] {
@@ -179,7 +224,7 @@ export function draftFromJson(value: JsonValue): SpecDraft {
         featuredImage: flag(images, "featured"),
         inlineImages: count(images, "inline"),
         imageSource: text(images, "source"),
-        product: branch(root, "product"),
+        product: productOf(branch(root, "product")),
         profiles: profilesOf(branch(root, "modelProfiles")),
         recipe: recipeOf(series(root, "recipe")),
     };
@@ -240,7 +285,7 @@ export function specJsonOf(draft: SpecDraft): JsonObject {
         recipe,
     };
     if (draft.product !== null) {
-        spec["product"] = draft.product;
+        spec["product"] = productJson(draft.product);
     }
     return spec;
 }

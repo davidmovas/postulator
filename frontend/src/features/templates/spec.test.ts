@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { JsonObject } from "../../domain/merge-patch.js";
 import { stepNames } from "../../generated/vocab.js";
 import type { SpecDraft } from "./spec.js";
-import { draftFromJson, imageStep, moved, readyForImages, specJsonOf } from "./spec.js";
+import { draftFromJson, emptyProduct, imageStep, moved, readyForImages, specJsonOf } from "./spec.js";
 
 const hub: JsonObject = {
     sections: [
@@ -109,14 +109,36 @@ describe("template spec drafts", () => {
         expect(specJsonOf(draftFromJson(hub))).toStrictEqual(hub);
     });
 
-    it("carries a product block through untouched and writes none where the spec had none", () => {
+    it("reads the product outputs, rebuilds them, and writes none where the spec had none", () => {
         const product: JsonObject = {
             shortDescription: { enabled: true, intent: "Say what it is", targetWords: 40, primaryKeyword: true },
             specifications: [{ name: "Form", intent: "As the notes say" }],
         };
         const withProduct = { ...hub, product };
-        expect(specJsonOf(draftFromJson(withProduct))).toStrictEqual(withProduct);
+        const draft = draftFromJson(withProduct);
+        expect(draft.product).toStrictEqual({
+            shortEnabled: true,
+            shortIntent: "Say what it is",
+            shortWords: 40,
+            shortKeyword: true,
+            specifications: [{ name: "Form", intent: "As the notes say" }],
+        });
+        expect(specJsonOf(draft)).toStrictEqual(withProduct);
+        expect(draftFromJson(hub).product).toBeNull();
         expect("product" in specJsonOf(draftFromJson(hub))).toBe(false);
+    });
+
+    it("reads a product block that says only part of itself", () => {
+        const draft = draftFromJson({ ...hub, product: { specifications: [{ name: "Size" }, "not a row"] } });
+        expect(draft.product).toStrictEqual({
+            shortEnabled: false,
+            shortIntent: "",
+            shortWords: 0,
+            shortKeyword: false,
+            specifications: [{ name: "Size", intent: "" }],
+        });
+        expect(emptyProduct().shortEnabled).toBe(true);
+        expect(emptyProduct().specifications).toStrictEqual([]);
     });
 
     it("keeps the params a step carries when the step is switched off", () => {
