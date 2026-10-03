@@ -22,7 +22,7 @@ import {
     toneClasses,
 } from "../../ui/index.js";
 import type { IconComponent, Tone } from "../../ui/index.js";
-import { pageStatusLabel, pageStatusTone } from "../pages/labels.js";
+import { PageStatusBadge } from "../pages/badges.js";
 import { blockedReasonLabel, classLabel, classTone, relationIcon } from "./labels.js";
 import { groups } from "./model/detail.js";
 
@@ -174,7 +174,7 @@ export function AuditPanel({ siteId, row, onClose, onRelink }: AuditPanelProps):
                         {row.path}
                     </Link>
                     <p className="flex flex-wrap items-center gap-2 text-2xs text-ink-dim">
-                        <StatusBadge tone={pageStatusTone(row.status)}>{pageStatusLabel(row.status)}</StatusBadge>
+                        <PageStatusBadge status={row.status} />
                         {row.entityName === "" ? null : (
                             <Link to={`/s/${siteId}/graph/${row.entityId}`} className="truncate">
                                 {row.entityName}

@@ -19,7 +19,7 @@ import {
     StatusBadge,
     TaskAltIcon,
 } from "../../ui/index.js";
-import { pageStatusLabel, pageStatusTone } from "../pages/labels.js";
+import { PageStatusBadge } from "../pages/badges.js";
 import { runStatusLabel, runStatusTone } from "../runs/labels.js";
 import { PageReportCards } from "./page-cards.js";
 import { pathFilter } from "./params.js";
@@ -86,9 +86,7 @@ export function PagesTab({ siteId, prefix, pageId, onPrefix, onSelect }: PagesTa
                                     <span className="min-w-0 flex-1 truncate font-mono text-xs text-ink">
                                         {page.path}
                                     </span>
-                                    <StatusBadge tone={pageStatusTone(page.status)} dot={false}>
-                                        {pageStatusLabel(page.status)}
-                                    </StatusBadge>
+                                    <PageStatusBadge status={page.status} dot={false} />
                                 </button>
                             </li>
                         ))}

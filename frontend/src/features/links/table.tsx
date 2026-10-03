@@ -17,7 +17,7 @@ import {
     toneClasses,
     VirtualRows,
 } from "../../ui/index.js";
-import { pageStatusLabel, pageStatusTone } from "../pages/labels.js";
+import { PageStatusBadge } from "../pages/badges.js";
 import { severityTone } from "./labels.js";
 import { severityOf } from "./model/audit.js";
 
@@ -137,7 +137,7 @@ export function AuditTable({ siteId, rows, selectedId, narrowed, onOpen, onReset
                     )}
                 </TableCell>
                 <TableCell>
-                    <StatusBadge tone={pageStatusTone(held.status)}>{pageStatusLabel(held.status)}</StatusBadge>
+                    <PageStatusBadge status={held.status} />
                 </TableCell>
             </TableRow>
         );

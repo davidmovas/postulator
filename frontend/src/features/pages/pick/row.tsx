@@ -2,8 +2,8 @@ import type { ReactElement } from "react";
 
 import { copy } from "../../../copy/index.js";
 import type { Page } from "../../../data/types.js";
-import { AccountTreeIcon, Checkbox, ChevronRightIcon, cx, IconButton, StatusBadge } from "../../../ui/index.js";
-import { pageStatusLabel, pageStatusTone } from "../labels.js";
+import { AccountTreeIcon, Checkbox, ChevronRightIcon, cx, IconButton } from "../../../ui/index.js";
+import { PageStatusBadge } from "../badges.js";
 import type { Tick } from "./model.js";
 
 const indentPx = 14;
@@ -67,9 +67,7 @@ export function PageRow({
             />
             <span className="min-w-0 flex-1 truncate text-xs text-ink-faint">{page.title}</span>
             {note === null ? null : <span className="shrink-0 text-2xs text-accent">{note}</span>}
-            <StatusBadge tone={pageStatusTone(page.status)} dot={false}>
-                {pageStatusLabel(page.status)}
-            </StatusBadge>
+            <PageStatusBadge status={page.status} dot={false} />
             {childCount > 0 ? (
                 <IconButton
                     size="sm"

@@ -9,7 +9,7 @@ import { useMapPageToEntity, usePage, usePages, useSetCanonicalPage } from "../.
 import type { Entity } from "../../../data/types.js";
 import { Banner, Button, Input, LinkOffIcon, Select, Skeleton, StatusBadge } from "../../../ui/index.js";
 import type { SelectOption } from "../../../ui/index.js";
-import { pageStatusLabel, pageStatusTone } from "../../pages/labels.js";
+import { PageStatusBadge } from "../../pages/badges.js";
 
 const pickLimit = 100;
 const findLimit = 50;
@@ -33,7 +33,7 @@ function CurrentPage({ siteId, pageId }: { siteId: string; pageId: string }): Re
             </Link>
             {held === undefined ? null : (
                 <span className="flex items-center gap-2">
-                    <StatusBadge tone={pageStatusTone(held.status)}>{pageStatusLabel(held.status)}</StatusBadge>
+                    <PageStatusBadge status={held.status} />
                     {held.drift ? (
                         <StatusBadge tone="warn" dot={false}>
                             {copy.graph.pageForm.drift}

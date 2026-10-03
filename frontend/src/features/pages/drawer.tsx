@@ -13,16 +13,14 @@ import {
     Drawer,
     SkeletonRows,
     SmartToyIcon,
-    StatusBadge,
-    SyncProblemIcon,
     TabPanel,
     Tabs,
 } from "../../ui/index.js";
 import { askAgent } from "../agent/index.js";
+import { PageStatusBadges } from "./badges.js";
 import type { PageTab } from "./params.js";
 import { PageDetails } from "./details.js";
 import type { EntityIndex } from "./entities.js";
-import { pageStatusLabel, pageStatusTone } from "./labels.js";
 import { PageLinks } from "./links.js";
 import { PageMapping } from "./mapping.js";
 import { PreviewTab } from "./preview/tab.js";
@@ -79,12 +77,7 @@ export function PageDrawer({
             header={
                 page === undefined ? null : (
                     <div className="flex shrink-0 items-center gap-1.5">
-                        <StatusBadge tone={pageStatusTone(page.status)}>{pageStatusLabel(page.status)}</StatusBadge>
-                        {page.drift ? (
-                            <StatusBadge tone="warn" icon={SyncProblemIcon}>
-                                {copy.pages.drift.badge}
-                            </StatusBadge>
-                        ) : null}
+                        <PageStatusBadges page={page} />
                     </div>
                 )
             }
