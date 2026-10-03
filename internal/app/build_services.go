@@ -56,8 +56,10 @@ func (c *Core) buildAuthoring(stores repos, llm llmParts) authoring {
 
 func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, running runtimeParts) useCases {
 	values := stores.values
-	pagesService := pages.New(stores.pages, stores.links, stores.entities, stores.edges, stores.sites, stores.store,
-		c.Events, stores.now, previewIssuer{clients: writing.wordpress})
+	pagesService := pages.New(pages.Deps{
+		Pages: stores.pages, Links: stores.links, Entities: stores.entities, Edges: stores.edges, Sites: stores.sites,
+		UnitOfWork: stores.store, Publisher: c.Events, Clock: stores.now, Preview: previewIssuer{clients: writing.wordpress},
+	})
 	runsService := runs.New(running.engine, stores.runs, stores.items, stores.artifacts, stores.runEvents,
 		writing.templates, stores.pages, running.steps, pagesService)
 

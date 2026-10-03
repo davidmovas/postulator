@@ -166,8 +166,11 @@ func buildWired(t *testing.T, store *sqlite.Store, model *fake.Client, wired wir
 	templateService := templates.New(sqlite.NewTemplateRepo(store), sqlite.NewLinkPolicyRepo(store),
 		pageRepo, sqlite.NewEntityRepo(store), siteRepo, store, bus, now)
 	registered := tools.New(tools.Deps{
-		Sites:     sites.New(siteRepo, nil, store, nil, bus, now),
-		Pages:     pages.New(pageRepo, linkRepo, entityRepo, edgeRepo, siteRepo, store, bus, now, stubPreview{}),
+		Sites: sites.New(siteRepo, nil, store, nil, bus, now),
+		Pages: pages.New(pages.Deps{
+			Pages: pageRepo, Links: linkRepo, Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo,
+			UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
+		}),
 		Templates: templateService,
 		Reports: reports.New(reports.Deps{
 			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,

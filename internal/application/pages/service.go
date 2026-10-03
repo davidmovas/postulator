@@ -38,6 +38,10 @@ type edgeReader interface {
 	ListBySite(ctx context.Context, siteID string) ([]graph.Edge, error)
 }
 
+type termReader interface {
+	ListBySite(ctx context.Context, siteID string) ([]graph.Term, error)
+}
+
 type siteReader interface {
 	Get(ctx context.Context, id string) (site.Site, error)
 }
@@ -46,11 +50,25 @@ type unitOfWork interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
 }
 
+type Deps struct {
+	Pages      pageStore
+	Links      linkStore
+	Entities   entityStore
+	Edges      edgeReader
+	Terms      termReader
+	Sites      siteReader
+	UnitOfWork unitOfWork
+	Publisher  application.Publisher
+	Clock      clock.Clock
+	Preview    previewIssuer
+}
+
 type Service struct {
 	pages     pageStore
 	links     linkStore
 	entities  entityStore
 	edges     edgeReader
+	terms     termReader
 	sites     siteReader
 	uow       unitOfWork
 	publisher application.Publisher
@@ -58,11 +76,10 @@ type Service struct {
 	preview   previewIssuer
 }
 
-func New(pages pageStore, links linkStore, entities entityStore, edges edgeReader, sites siteReader, uow unitOfWork,
-	publisher application.Publisher, clk clock.Clock, preview previewIssuer) *Service {
+func New(deps Deps) *Service {
 	return &Service{
-		pages: pages, links: links, entities: entities, edges: edges, sites: sites, uow: uow, publisher: publisher,
-		clock: clk, preview: preview,
+		pages: deps.Pages, links: deps.Links, entities: deps.Entities, edges: deps.Edges, terms: deps.Terms,
+		sites: deps.Sites, uow: deps.UnitOfWork, publisher: deps.Publisher, clock: deps.Clock, preview: deps.Preview,
 	}
 }
 

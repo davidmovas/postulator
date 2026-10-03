@@ -81,7 +81,11 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (CreateResponse
 	if publishErr := s.changed(page.SiteID); publishErr != nil {
 		return CreateResponse{}, publishErr
 	}
-	return CreateResponse{Page: view(page)}, nil
+	created, err := s.viewOf(ctx, page)
+	if err != nil {
+		return CreateResponse{}, err
+	}
+	return CreateResponse{Page: created}, nil
 }
 
 func (s *Service) adopt(ctx context.Context, parent pagemap.Page, siblings []pagemap.Page) error {
@@ -197,7 +201,11 @@ func (s *Service) Update(ctx context.Context, req UpdateRequest) (UpdateResponse
 	if publishErr := s.changed(updated.SiteID); publishErr != nil {
 		return UpdateResponse{}, publishErr
 	}
-	return UpdateResponse{Page: view(updated)}, nil
+	answer, err := s.viewOf(ctx, updated)
+	if err != nil {
+		return UpdateResponse{}, err
+	}
+	return UpdateResponse{Page: answer}, nil
 }
 
 func (s *Service) AssignTemplate(ctx context.Context, req AssignTemplateRequest) (AssignTemplateResponse, error) {
@@ -290,7 +298,11 @@ func (s *Service) Get(ctx context.Context, req GetRequest) (GetResponse, error) 
 	if err != nil {
 		return GetResponse{}, err
 	}
-	return GetResponse{Page: view(page), Links: linkViews(links)}, nil
+	answer, err := s.viewOf(ctx, page)
+	if err != nil {
+		return GetResponse{}, err
+	}
+	return GetResponse{Page: answer, Links: linkViews(links)}, nil
 }
 
 func pageSort(sort *dto.Sort) (key pagemap.Sort, desc bool, err error) {
@@ -331,7 +343,11 @@ func (s *Service) List(ctx context.Context, req ListRequest) (paging.List[Page],
 	if err != nil {
 		return paging.List[Page]{}, err
 	}
-	return application.MapList(list, view), nil
+	filed, err := s.filingOf(ctx, req.SiteID, list.Items...)
+	if err != nil {
+		return paging.List[Page]{}, err
+	}
+	return application.MapList(list, func(p pagemap.Page) Page { return view(p, filed) }), nil
 }
 
 func (s *Service) entityFilter(ctx context.Context, req ListRequest) ([]string, error) {
@@ -397,7 +413,11 @@ func (s *Service) MapToEntity(ctx context.Context, req MapToEntityRequest) (MapT
 	if publishErr := s.changed(updated.SiteID); publishErr != nil {
 		return MapToEntityResponse{}, publishErr
 	}
-	return MapToEntityResponse{Page: view(updated)}, nil
+	answer, err := s.viewOf(ctx, updated)
+	if err != nil {
+		return MapToEntityResponse{}, err
+	}
+	return MapToEntityResponse{Page: answer}, nil
 }
 
 func (s *Service) Unmap(ctx context.Context, req UnmapRequest) (UnmapResponse, error) {
@@ -449,7 +469,11 @@ func (s *Service) Unmap(ctx context.Context, req UnmapRequest) (UnmapResponse, e
 			return UnmapResponse{}, publishErr
 		}
 	}
-	return UnmapResponse{Page: view(updated)}, nil
+	answer, err := s.viewOf(ctx, updated)
+	if err != nil {
+		return UnmapResponse{}, err
+	}
+	return UnmapResponse{Page: answer}, nil
 }
 
 func (s *Service) SetCanonical(ctx context.Context, req SetCanonicalRequest) (SetCanonicalResponse, error) {
@@ -493,7 +517,11 @@ func (s *Service) SetCanonical(ctx context.Context, req SetCanonicalRequest) (Se
 	if publishErr := s.changed(updated.SiteID); publishErr != nil {
 		return SetCanonicalResponse{}, publishErr
 	}
-	return SetCanonicalResponse{Page: view(updated)}, nil
+	answer, err := s.viewOf(ctx, updated)
+	if err != nil {
+		return SetCanonicalResponse{}, err
+	}
+	return SetCanonicalResponse{Page: answer}, nil
 }
 
 func (s *Service) Tree(ctx context.Context, req TreeRequest) (TreeResponse, error) {
@@ -507,5 +535,9 @@ func (s *Service) Tree(ctx context.Context, req TreeRequest) (TreeResponse, erro
 	if err != nil {
 		return TreeResponse{}, err
 	}
-	return TreeResponse{Roots: nodeViews(pagemap.BuildTree(all))}, nil
+	filed, err := s.filingOf(ctx, req.SiteID, all...)
+	if err != nil {
+		return TreeResponse{}, err
+	}
+	return TreeResponse{Roots: nodeViews(pagemap.BuildTree(all), filed)}, nil
 }

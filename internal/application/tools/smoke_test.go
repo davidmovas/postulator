@@ -146,7 +146,10 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		Sites: siteRepo, Specs: templateService, Policies: templateService,
 	})
 
-	pagesService := pages.New(pageRepo, linkRepo, entityRepo, edgeRepo, siteRepo, store, bus, now, stubPreview{})
+	pagesService := pages.New(pages.Deps{
+		Pages: pageRepo, Links: linkRepo, Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo,
+		UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
+	})
 	return tools.New(tools.Deps{
 		Sites: sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, stubProbe{}, bus, now),
 		Graph: graph.New(graph.Deps{

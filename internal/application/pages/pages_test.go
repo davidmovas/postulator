@@ -44,8 +44,11 @@ func newPreviewHarness(t *testing.T, issuer *recordingIssuer) harness {
 	recorder := &applicationtest.Recorder{}
 	clk := clock.NewFake(time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC))
 	return harness{
-		service: pages.New(sqlite.NewPageRepo(store), sqlite.NewPageLinkRepo(store), sqlite.NewEntityRepo(store),
-			sqlite.NewEdgeRepo(store), sqlite.NewSiteRepo(store), store, recorder, clk, issuer),
+		service: pages.New(pages.Deps{
+			Pages: sqlite.NewPageRepo(store), Links: sqlite.NewPageLinkRepo(store), Entities: sqlite.NewEntityRepo(store),
+			Edges: sqlite.NewEdgeRepo(store), Terms: sqlite.NewTermRepo(store), Sites: sqlite.NewSiteRepo(store),
+			UnitOfWork: store, Publisher: recorder, Clock: clk, Preview: issuer,
+		}),
 		store:    store,
 		recorder: recorder,
 		clock:    clk,
