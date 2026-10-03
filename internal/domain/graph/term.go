@@ -4,23 +4,16 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/davidmovas/postulator/internal/domain/category"
 )
 
-type Taxonomy string
+type Taxonomy = category.Taxonomy
 
 const (
-	TaxonomyCategory        Taxonomy = "category"
-	TaxonomyProductCategory Taxonomy = "product_cat"
+	TaxonomyCategory        = category.TaxonomyCategory
+	TaxonomyProductCategory = category.TaxonomyProductCategory
 )
-
-func (t Taxonomy) Valid() bool {
-	switch t {
-	case TaxonomyCategory, TaxonomyProductCategory:
-		return true
-	default:
-		return false
-	}
-}
 
 type Term struct {
 	EntityID     string

@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
 type WPType string
@@ -106,6 +107,7 @@ type Page struct {
 	Notes           []Note
 	Status          Status
 	EntityID        *string
+	CategoryID      string
 	TemplateID      *string
 	ContentHash     string
 	Observed        Observed
@@ -151,6 +153,8 @@ func NewPage(p Page) (Page, error) {
 		return Page{}, invalid("page cannot be its own parent", "parentPageId")
 	case emptyRef(p.EntityID):
 		return Page{}, invalid("entity id must not be empty when set", "entityId")
+	case p.CategoryID != "" && !id.Valid(p.CategoryID):
+		return Page{}, invalid("category id must be an id when set", "categoryId")
 	case emptyRef(p.TemplateID):
 		return Page{}, invalid("template id must not be empty when set", "templateId")
 	}
