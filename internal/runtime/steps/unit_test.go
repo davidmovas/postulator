@@ -1211,7 +1211,7 @@ func TestWriterCeilingGrowsWithTheTemplateAndTheAttempt(t *testing.T) {
 		{name: "a long template asks for three tokens a word and a thousand more", spec: long, attempts: 0, want: 1800*3 + 1024},
 		{name: "a short template still gets room to answer", spec: short, attempts: 0, want: 4096},
 		{name: "the second attempt doubles the room", spec: long, attempts: 1, want: (1800*3 + 1024) * 2},
-		{name: "the room stops doubling after three attempts", spec: long, attempts: 7, want: (1800*3 + 1024) * 8},
+		{name: "the room doubles once and no more", spec: long, attempts: 7, want: (1800*3 + 1024) * 2},
 	} {
 		sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: blob})
 		sc.Spec = tc.spec

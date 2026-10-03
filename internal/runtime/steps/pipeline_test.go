@@ -425,6 +425,43 @@ func (p *pipeline) runKind(t *testing.T, kind run.Kind) run.Item {
 	return run.Item{}
 }
 
+func TestAWriterOutOfRoomTwicePausesThePageForAPerson(t *testing.T) {
+	t.Parallel()
+
+	p := newPipeline(t)
+	p.llm = fake.NewScripted(fake.Reply{Step: steps.NameGenerateBody, Text: guideDraft + "\n" + fake.LengthDirective})
+	p.start(t)
+
+	queued, err := p.engine.Enqueue(t.Context(), run.Run{
+		ID: id.New(), SiteID: p.siteID, Kind: run.KindGenerate, Targets: []string{p.pageID},
+		Recipe: p.recipe, TemplateID: "guide", TemplateVersion: 1, PublishMode: run.PublishDraft,
+	})
+	if err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+
+	var paused run.Item
+	deadline := time.Now().Add(pollTimeout)
+	for time.Now().Before(deadline) && paused.ID == "" {
+		items, listErr := p.items.ByRun(t.Context(), queued.ID)
+		if listErr == nil && len(items) == 1 && (items[0].Status == run.StatusPaused || items[0].Status.Terminal()) {
+			paused = items[0]
+		}
+		time.Sleep(pollInterval)
+	}
+
+	if paused.Status != run.StatusPaused || paused.PauseReason != run.PauseNeedsHuman ||
+		paused.CurrentStep != steps.NameGenerateBody {
+		t.Fatalf("the item is %+v, want it paused for a person at the writer", paused)
+	}
+	if !strings.Contains(paused.Note, steps.ReasonWriterOutOfRoom) {
+		t.Fatalf("the note reads %q, want what to change", paused.Note)
+	}
+	if calls := p.llm.CallsTo(steps.NameGenerateBody); calls != 2 {
+		t.Fatalf("the writer was paid for %d answers, want two", calls)
+	}
+}
+
 func TestEveryKindRecipeIsRunnableByTheRealRegistry(t *testing.T) {
 	t.Parallel()
 

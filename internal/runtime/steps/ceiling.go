@@ -10,7 +10,7 @@ const (
 	tokenHeadroom     = 1024
 	leastWriterTokens = 4096
 	fallbackWords     = 800
-	ceilingDoublings  = 3
+	ceilingDoublings  = 1
 )
 
 func plannedWords(spec template.TemplateSpec, wpType pagemap.WPType) int {
@@ -33,4 +33,8 @@ func plannedWords(spec template.TemplateSpec, wpType pagemap.WPType) int {
 func writerCeiling(spec template.TemplateSpec, wpType pagemap.WPType, attempts int) int {
 	ceiling := max(leastWriterTokens, plannedWords(spec, wpType)*tokensPerWord+tokenHeadroom)
 	return ceiling << min(max(attempts, 0), ceilingDoublings)
+}
+
+func atFullRoom(attempts int) bool {
+	return attempts >= ceilingDoublings
 }

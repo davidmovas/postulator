@@ -2,6 +2,7 @@ package steps
 
 import (
 	"context"
+	stderrors "errors"
 
 	port "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/domain/content"
@@ -10,9 +11,15 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
-const NameGenerateBody = string(run.StepGenerateBody)
+const (
+	NameGenerateBody = string(run.StepGenerateBody)
+
+	ReasonWriterOutOfRoom = "the model ran out of room before it finished, even with twice the room it is first given; " +
+		"lower the word counts of the template or choose a model that writes longer answers, then retry the step"
+)
 
 type bodyPrompt struct {
 	Page    pagemap.Page
@@ -58,6 +65,9 @@ func GenerateBody(deps Deps) run.StepDef {
 			}
 
 			draft, doc, usage, err := write(ctx, deps, request, brief)
+			if truncated(err) && atFullRoom(sc.Item.Attempts) {
+				return outOfRoom(sc, usage), nil
+			}
 			if err != nil {
 				return run.Result{}, err
 			}
@@ -80,6 +90,21 @@ func GenerateBody(deps Deps) run.StepDef {
 			}, nil
 		},
 	}
+}
+
+func truncated(err error) bool {
+	var kernel *errors.Error
+	if !stderrors.As(err, &kernel) || kernel == nil || kernel.Code != errors.External {
+		return false
+	}
+	reason, ok := kernel.Details["reason"].(string)
+	return ok && reason == port.ReasonOutputTruncated
+}
+
+func outOfRoom(sc *run.StepContext, usage domainllm.Usage) run.Result {
+	paused := needsHuman("the body of " + sc.Page.Path + " is unfinished: " + ReasonWriterOutOfRoom)
+	paused.Tokens = usage.Total
+	return paused
 }
 
 func write(ctx context.Context, deps Deps, request port.Request,
