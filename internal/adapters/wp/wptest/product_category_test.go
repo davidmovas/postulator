@@ -48,6 +48,7 @@ func TestAProductCategoryIsCreatedOnceUnderItsParent(t *testing.T) {
 		{name: "the same name at the top level", body: `{"name":"KOFFEIN"}`, status: http.StatusBadRequest, code: "term_exists", id: koffein.ID},
 		{name: "a parent that does not exist", body: `{"name":"Tee","parent":999}`, status: http.StatusNotFound, code: "woocommerce_rest_term_invalid"},
 		{name: "no name", body: `{}`, status: http.StatusBadRequest, code: "rest_missing_callback_param"},
+		{name: "an empty name", body: `{"name":"  "}`, status: http.StatusBadRequest, code: "empty_term_name"},
 	}
 
 	for _, tc := range cases {

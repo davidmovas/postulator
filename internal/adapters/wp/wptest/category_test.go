@@ -221,6 +221,7 @@ func TestACategoryIsRefusedWhatWordPressRefuses(t *testing.T) {
 	}{
 		{name: "a parent that does not exist", body: `{"name":"Pulver","parent":999}`, status: http.StatusBadRequest, code: "rest_term_invalid"},
 		{name: "no name", body: `{"parent":0}`, status: http.StatusBadRequest, code: "rest_missing_callback_param"},
+		{name: "a name that sanitizes to nothing", body: `{"name":" <b></b> "}`, status: http.StatusInternalServerError, code: "empty_term_name"},
 		{name: "a broken body", body: `not json`, status: http.StatusBadRequest, code: "rest_invalid_json"},
 		{
 			name:    "a user who may not manage categories",
