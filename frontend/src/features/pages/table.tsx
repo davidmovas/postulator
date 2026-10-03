@@ -21,12 +21,12 @@ import {
     VirtualRows,
 } from "../../ui/index.js";
 import { PageStatusBadge } from "./badges.js";
-import { DriftCell, EntityCell, PageTableRow, SyncedCell } from "./cells.js";
+import { CategoryCell, DriftCell, EntityCell, PageTableRow, SyncedCell } from "./cells.js";
 import type { EntityIndex } from "./entities.js";
 import { defaultQuery, filterOf, narrowed } from "./params.js";
 import type { PagesQuery } from "./params.js";
 
-const columns = "minmax(96px,2.4fr) minmax(80px,2fr) 60px 84px minmax(80px,1.5fr) 36px 72px";
+const columns = "minmax(96px,2.4fr) minmax(80px,2fr) 60px 84px minmax(80px,1.5fr) minmax(80px,1.5fr) 36px 72px";
 const rowHeight = 28;
 const pageSize = 200;
 
@@ -52,6 +52,7 @@ function PageRow({ page, selected, entityName, onSelect, onOpen }: PageRowProps)
                 <PageStatusBadge status={page.status} />
             </TableCell>
             <EntityCell entityId={page.entityId} entityName={entityName} />
+            <CategoryCell page={page} />
             <DriftCell drift={page.drift} />
             <SyncedCell at={page.lastSyncedAt} />
         </PageTableRow>
@@ -162,6 +163,7 @@ export function PageTable({
                 <div>{copy.pages.columns.wpType}</div>
                 <div>{copy.pages.columns.status}</div>
                 <div>{copy.pages.columns.entity}</div>
+                <div>{copy.pages.columns.categories}</div>
                 <div>{copy.pages.columns.drift}</div>
                 <div>{copy.pages.columns.synced}</div>
             </TableHead>

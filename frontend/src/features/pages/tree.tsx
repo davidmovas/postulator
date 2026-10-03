@@ -84,6 +84,7 @@ export function PageTree({ view, index, selectedId, onSelect, onOpen, onCreate }
                 <div>{copy.pages.columns.path}</div>
                 <div>{copy.pages.columns.status}</div>
                 <div>{copy.pages.columns.entity}</div>
+                <div>{copy.pages.columns.categories}</div>
                 <div>{copy.pages.columns.drift}</div>
                 <div>{copy.pages.columns.synced}</div>
             </TableHead>

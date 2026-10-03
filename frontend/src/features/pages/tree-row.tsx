@@ -3,10 +3,10 @@ import type { ReactElement } from "react";
 import { copy } from "../../copy/index.js";
 import { ChevronRightIcon, cx, DescriptionIcon, TableCell } from "../../ui/index.js";
 import { PageStatusBadge } from "./badges.js";
-import { DriftCell, EntityCell, PageTableRow, SyncedCell } from "./cells.js";
+import { CategoryCell, DriftCell, EntityCell, PageTableRow, SyncedCell } from "./cells.js";
 import type { TreeRow } from "./tree-model.js";
 
-export const treeColumns = "minmax(200px,3fr) 92px minmax(96px,1.5fr) 44px 84px";
+export const treeColumns = "minmax(200px,3fr) 92px minmax(96px,1.5fr) minmax(96px,1.5fr) 44px 84px";
 export const indentStep = 14;
 
 export interface PageTreeRowProps {
@@ -68,6 +68,7 @@ export function PageTreeRow({
                 <PageStatusBadge status={page.status} />
             </TableCell>
             <EntityCell entityId={page.entityId} entityName={entityName} />
+            <CategoryCell page={page} />
             <DriftCell drift={page.drift} />
             <SyncedCell at={page.lastSyncedAt} />
         </PageTableRow>

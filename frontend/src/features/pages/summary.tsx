@@ -8,9 +8,11 @@ import { usePage } from "../../data/hooks/pages.js";
 import { usePageReport } from "../../data/hooks/reports.js";
 import { useSite } from "../../data/hooks/sites.js";
 import { isBrowsable, openExternal } from "../../data/host.js";
+import { pageCategoryItems } from "../../domain/categories.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
 import {
     Button,
+    CategoryTrail,
     ChevronRightIcon,
     EditNoteIcon,
     IconButton,
@@ -22,6 +24,7 @@ import {
     StatusBadge,
     TaskAltIcon,
     VerifiedIcon,
+    WarningIcon,
 } from "../../ui/index.js";
 import { entityIcon } from "../graph/labels.js";
 import { DriftBadge, PageStatusBadge } from "./badges.js";
@@ -84,6 +87,7 @@ export function PageSummary({ pageId, siteId, search, onOpen }: PageSummaryProps
     const reachable = isBrowsable(url) && page.wpId !== null && page.status !== "archived";
     const Icon = entityIcon(entity.data?.entity.kind ?? "");
     const canonical = entity.data?.entity.canonicalPageId === page.id;
+    const filed = pageCategoryItems(page);
 
     return (
         <div className="flex h-full min-h-0 flex-col">
@@ -153,6 +157,25 @@ export function PageSummary({ pageId, siteId, search, onOpen }: PageSummaryProps
                             ) : null}
                         </div>
                     )}
+                </div>
+
+                <div className="flex flex-col gap-1.5" data-page-categories={true}>
+                    <SectionLabel>{copy.pages.summary.categories}</SectionLabel>
+                    {filed.length === 0 ? (
+                        <p className="text-xs text-ink-dim">
+                            {page.entityId === null
+                                ? copy.pages.summary.noCategories
+                                : copy.pages.summary.noCategoriesHint}
+                        </p>
+                    ) : (
+                        <CategoryTrail items={filed} label={copy.categories.trail} />
+                    )}
+                    {page.categoriesNeedPlugin ? (
+                        <p data-categories-need-plugin={true} className="flex items-start gap-1.5 text-xs text-warn">
+                            <WarningIcon size={14} className="mt-px shrink-0" />
+                            <span>{copy.pages.summary.categoriesNeedPlugin}</span>
+                        </p>
+                    ) : null}
                 </div>
 
                 <div className="flex flex-col gap-1.5">
