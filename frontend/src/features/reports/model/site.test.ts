@@ -8,6 +8,7 @@ function page(overrides: Partial<Page> = {}): Page {
         id: "p-1",
         siteId: "site-1",
         path: "/a/",
+        plannedPath: "",
         slug: "a",
         parentPageId: null,
         wpType: "page",

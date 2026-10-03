@@ -8,6 +8,7 @@ function page(id: string, path: string): Page {
         id,
         siteId: "site",
         path,
+        plannedPath: "",
         slug: id,
         parentPageId: null,
         wpType: "page",

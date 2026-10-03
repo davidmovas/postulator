@@ -33,6 +33,7 @@ function node(id: string, drift: boolean, children: PageTreeNode[] = []): PageTr
             id,
             siteId: "s1",
             path: `/${id}/`,
+            plannedPath: "",
             slug: id,
             parentPageId: null,
             wpType: "page",
