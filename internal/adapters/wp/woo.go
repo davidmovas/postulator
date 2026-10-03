@@ -3,15 +3,35 @@ package wp
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
-type ProductCategoryRef struct {
-	Name string
-	Slug string
-	ID   int64
+type Commerce string
+
+const (
+	CommerceAbsent    Commerce = "absent"
+	CommerceForbidden Commerce = "forbidden"
+	CommerceReady     Commerce = "ready"
+)
+
+var productEditCapabilities = []string{"edit_products", "edit_published_products", "edit_others_products"}
+
+type ProductAttribute struct {
+	Name      string
+	Options   []string
+	ID        int64
+	Position  int
+	Visible   bool
+	Variation bool
+}
+
+type ProductImage struct {
+	Src string
+	Alt string
+	ID  int64
 }
 
 type Product struct {
@@ -19,64 +39,104 @@ type Product struct {
 	Name             string
 	Slug             string
 	Permalink        string
+	Type             string
 	Status           string
 	Description      string
 	ShortDescription string
-	Categories       []ProductCategoryRef
+	Attributes       []ProductAttribute
+	Images           []ProductImage
 	ID               int64
-	MenuOrder        int
 }
-
-type ProductCategory struct {
-	Name        string
-	Slug        string
-	Description string
-	ID          int64
-	Parent      int64
-	Count       int
-}
-
-type (
-	ProductPage         = Page[Product]
-	ProductCategoryPage = Page[ProductCategory]
-)
 
 type UpdateProduct struct {
-	Description      *string
 	ShortDescription *string
-	Slug             *string
-	Status           *string
-	Categories       []int64
+	Attributes       *[]ProductAttribute
+	Images           *[]int64
 }
 
 func (in UpdateProduct) payload() map[string]any {
-	attributes := make(map[string]any)
-	if in.Description != nil {
-		attributes["description"] = *in.Description
-	}
+	fields := make(map[string]any)
 	if in.ShortDescription != nil {
-		attributes["short_description"] = *in.ShortDescription
+		fields["short_description"] = *in.ShortDescription
 	}
-	if in.Slug != nil {
-		attributes["slug"] = *in.Slug
-	}
-	if in.Status != nil {
-		attributes["status"] = *in.Status
-	}
-	if in.Categories != nil {
-		refs := make([]map[string]any, 0, len(in.Categories))
-		for _, id := range in.Categories {
-			refs = append(refs, map[string]any{"id": id})
+	if in.Attributes != nil {
+		attributes := make([]map[string]any, 0, len(*in.Attributes))
+		for _, attribute := range *in.Attributes {
+			entry := map[string]any{
+				"position":  attribute.Position,
+				"visible":   attribute.Visible,
+				"variation": attribute.Variation,
+				"options":   append([]string{}, attribute.Options...),
+			}
+			if attribute.ID != 0 {
+				entry["id"] = attribute.ID
+			}
+			if attribute.Name != "" {
+				entry["name"] = attribute.Name
+			}
+			attributes = append(attributes, entry)
 		}
-		attributes["categories"] = refs
+		fields["attributes"] = attributes
 	}
-	return attributes
+	if in.Images != nil {
+		images := make([]map[string]any, 0, len(*in.Images))
+		for _, id := range *in.Images {
+			images = append(images, map[string]any{"id": id})
+		}
+		fields["images"] = images
+	}
+	return fields
+}
+
+type productAttributePayload struct {
+	Name      string   `json:"name"`
+	Options   []string `json:"options"`
+	ID        int64    `json:"id"`
+	Position  int      `json:"position"`
+	Visible   bool     `json:"visible"`
+	Variation bool     `json:"variation"`
+}
+
+type productImagePayload struct {
+	Src string `json:"src"`
+	Alt string `json:"alt"`
+	ID  int64  `json:"id"`
+}
+
+type productPayload struct {
+	Name             string                    `json:"name"`
+	Slug             string                    `json:"slug"`
+	Permalink        string                    `json:"permalink"`
+	Type             string                    `json:"type"`
+	Status           string                    `json:"status"`
+	Description      string                    `json:"description"`
+	ShortDescription string                    `json:"short_description"`
+	DateModifiedGMT  string                    `json:"date_modified_gmt"`
+	Attributes       []productAttributePayload `json:"attributes"`
+	Images           []productImagePayload     `json:"images"`
+	ID               int64                     `json:"id"`
 }
 
 func (p productPayload) product() Product {
-	categories := make([]ProductCategoryRef, 0, len(p.Categories))
-	for _, ref := range p.Categories {
-		categories = append(categories, ProductCategoryRef(ref))
+	attributes := make([]ProductAttribute, 0, len(p.Attributes))
+	for _, attribute := range p.Attributes {
+		options := attribute.Options
+		if options == nil {
+			options = []string{}
+		}
+		attributes = append(attributes, ProductAttribute{
+			ID:        attribute.ID,
+			Name:      attribute.Name,
+			Options:   options,
+			Position:  attribute.Position,
+			Visible:   attribute.Visible,
+			Variation: attribute.Variation,
+		})
+	}
+
+	images := make([]ProductImage, 0, len(p.Images))
+	for _, image := range p.Images {
+		images = append(images, ProductImage(image))
 	}
 
 	return Product{
@@ -84,40 +144,14 @@ func (p productPayload) product() Product {
 		Name:             p.Name,
 		Slug:             p.Slug,
 		Permalink:        p.Permalink,
+		Type:             p.Type,
 		Status:           p.Status,
 		Description:      p.Description,
 		ShortDescription: p.ShortDescription,
-		Categories:       categories,
-		MenuOrder:        p.MenuOrder,
+		Attributes:       attributes,
+		Images:           images,
 		Modified:         parseWPTime(p.DateModifiedGMT),
 	}
-}
-
-func (p productCategoryPayload) productCategory() ProductCategory {
-	return ProductCategory(p)
-}
-
-func (c *Client) ListProducts(ctx context.Context, query ListQuery) (ProductPage, error) {
-	resp, body, err := c.do(ctx, request{
-		method:    http.MethodGet,
-		namespace: wooNamespace,
-		path:      "/products",
-		query:     query.values(TypeProduct),
-	})
-	if err != nil {
-		return ProductPage{}, err
-	}
-
-	var payload []productPayload
-	if err := decodeJSON(body, &payload); err != nil {
-		return ProductPage{}, err
-	}
-
-	products := make([]Product, 0, len(payload))
-	for index := range payload {
-		products = append(products, payload[index].product())
-	}
-	return newPage(resp, query.pageNumber(), products), nil
 }
 
 func (c *Client) GetProduct(ctx context.Context, id int64) (Product, error) {
@@ -125,6 +159,7 @@ func (c *Client) GetProduct(ctx context.Context, id int64) (Product, error) {
 		method:    http.MethodGet,
 		namespace: wooNamespace,
 		path:      resourcePath("/products", id),
+		query:     url.Values{"context": {"edit"}},
 	})
 	if err != nil {
 		return Product{}, err
@@ -134,16 +169,19 @@ func (c *Client) GetProduct(ctx context.Context, id int64) (Product, error) {
 	if err := decodeJSON(body, &payload); err != nil {
 		return Product{}, err
 	}
+	if payload.Status == "trash" {
+		return Product{}, errors.New(errors.NotFound, "the product is in the shop's trash").WithDetail("id", id)
+	}
 	return payload.product(), nil
 }
 
 func (c *Client) UpdateProduct(ctx context.Context, id int64, in UpdateProduct) (Product, error) {
-	attributes := in.payload()
-	if len(attributes) == 0 {
+	fields := in.payload()
+	if len(fields) == 0 {
 		return Product{}, errors.New(errors.Invalid, "the product update carries no fields")
 	}
 
-	body, err := encodeJSON(attributes)
+	body, err := encodeJSON(fields)
 	if err != nil {
 		return Product{}, err
 	}
@@ -152,6 +190,7 @@ func (c *Client) UpdateProduct(ctx context.Context, id int64, in UpdateProduct) 
 		method:      http.MethodPost,
 		namespace:   wooNamespace,
 		path:        resourcePath("/products", id),
+		query:       url.Values{"context": {"edit"}},
 		body:        body,
 		contentType: contentTypeJSON,
 	})
@@ -166,25 +205,48 @@ func (c *Client) UpdateProduct(ctx context.Context, id int64, in UpdateProduct) 
 	return payload.product(), nil
 }
 
-func (c *Client) ListProductCategories(ctx context.Context, query ListQuery) (ProductCategoryPage, error) {
-	resp, body, err := c.do(ctx, request{
+func (c *Client) Commerce(ctx context.Context) (Commerce, error) {
+	_, _, err := c.do(ctx, request{
 		method:    http.MethodGet,
 		namespace: wooNamespace,
-		path:      "/products/categories",
-		query:     query.values(TypeProductCategory),
+		path:      "/products",
+		query:     url.Values{"per_page": {"1"}, "_fields": {"id"}},
+	})
+	switch {
+	case err == nil:
+	case detailString(err, "code") == "rest_no_route":
+		return CommerceAbsent, nil
+	case forbidden(err):
+		return CommerceForbidden, nil
+	default:
+		return "", err
+	}
+
+	_, body, err := c.do(ctx, request{
+		method:    http.MethodGet,
+		namespace: coreNamespace,
+		path:      "/users/me",
+		query:     url.Values{"context": {"edit"}, "_fields": {"capabilities"}},
 	})
 	if err != nil {
-		return ProductCategoryPage{}, err
+		return "", err
 	}
 
-	var payload []productCategoryPayload
-	if err := decodeJSON(body, &payload); err != nil {
-		return ProductCategoryPage{}, err
+	var me struct {
+		Capabilities map[string]bool `json:"capabilities"`
 	}
+	if err := decodeJSON(body, &me); err != nil {
+		return "", err
+	}
+	for _, capability := range productEditCapabilities {
+		if !me.Capabilities[capability] {
+			return CommerceForbidden, nil
+		}
+	}
+	return CommerceReady, nil
+}
 
-	categories := make([]ProductCategory, 0, len(payload))
-	for index := range payload {
-		categories = append(categories, payload[index].productCategory())
-	}
-	return newPage(resp, query.pageNumber(), categories), nil
+func forbidden(err error) bool {
+	status, ok := detailValue(err, "status")
+	return ok && status == http.StatusForbidden
 }

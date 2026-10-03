@@ -2,45 +2,100 @@ package wptest_test
 
 import (
 	"net/http"
+	"slices"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 )
+
+type productBody struct {
+	ID               int64  `json:"id"`
+	Name             string `json:"name"`
+	Slug             string `json:"slug"`
+	Permalink        string `json:"permalink"`
+	Type             string `json:"type"`
+	Status           string `json:"status"`
+	Description      string `json:"description"`
+	ShortDescription string `json:"short_description"`
+	RegularPrice     string `json:"regular_price"`
+	SKU              string `json:"sku"`
+	DateModifiedGMT  string `json:"date_modified_gmt"`
+	Attributes       []struct {
+		ID        int64    `json:"id"`
+		Name      string   `json:"name"`
+		Options   []string `json:"options"`
+		Position  int      `json:"position"`
+		Visible   bool     `json:"visible"`
+		Variation bool     `json:"variation"`
+	} `json:"attributes"`
+	Images []struct {
+		ID int64 `json:"id"`
+	} `json:"images"`
+	Categories []struct {
+		ID   int64  `json:"id"`
+		Slug string `json:"slug"`
+	} `json:"categories"`
+}
 
 func TestProductsUseTheWooCommerceFieldNames(t *testing.T) {
 	t.Parallel()
 
 	server := wptest.New(t)
 	seeded := server.Seed(wptest.Item{
-		Type:    wptest.TypeProduct,
-		Title:   "Koffein Powder",
-		Content: "<p>long</p>",
-		Excerpt: "short",
-		Status:  "publish",
+		Type:         wptest.TypeProduct,
+		Title:        "Koffein Powder",
+		Content:      "<p>long</p>",
+		Excerpt:      "short",
+		Status:       "publish",
+		RegularPrice: "9.90",
+		SKU:          "kp-1",
 	})
 
-	response, payload := call(t, server, http.MethodGet, "/wp-json/wc/v3/products/"+itoa(seeded[0].ID), nil, true)
-	if response.StatusCode != http.StatusOK {
-		t.Fatalf("status = %d, want 200", response.StatusCode)
+	cases := []struct {
+		name        string
+		query       string
+		description string
+		short       string
+	}{
+		{name: "the edit context answers what is stored", query: "?context=edit", description: "<p>long</p>", short: "short"},
+		{name: "the view context answers the rendering", query: "", description: "<p>long</p>\n", short: "short\n"},
 	}
 
-	var product struct {
-		ID               int64  `json:"id"`
-		Name             string `json:"name"`
-		Slug             string `json:"slug"`
-		Permalink        string `json:"permalink"`
-		Status           string `json:"status"`
-		Description      string `json:"description"`
-		ShortDescription string `json:"short_description"`
-		DateModifiedGMT  string `json:"date_modified_gmt"`
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			response, payload := call(t, server, http.MethodGet, "/wp-json/wc/v3/products/"+itoa(seeded[0].ID)+tc.query, nil, true)
+			if response.StatusCode != http.StatusOK {
+				t.Fatalf("status = %d, want 200", response.StatusCode)
+			}
+
+			var product productBody
+			decode(t, payload, &product)
+			if product.Name != "Koffein Powder" || product.Description != tc.description || product.ShortDescription != tc.short {
+				t.Errorf("product = %+v", product)
+			}
+			if product.Type != "simple" || product.RegularPrice != "9.90" || product.SKU != "kp-1" {
+				t.Errorf("product = %+v", product)
+			}
+			if product.Permalink != server.URL()+"/product/koffein-powder/" || product.DateModifiedGMT == "" {
+				t.Errorf("product = %+v", product)
+			}
+		})
 	}
+}
+
+func TestADraftProductHasNoPrettyAddress(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	seeded := server.Seed(wptest.Item{Type: wptest.TypeProduct, Title: "Draft", Status: "draft"})[0]
+
+	_, payload := call(t, server, http.MethodGet, "/wp-json/wc/v3/products/"+itoa(seeded.ID), nil, true)
+	var product productBody
 	decode(t, payload, &product)
-
-	if product.Name != "Koffein Powder" || product.Description != "<p>long</p>" || product.ShortDescription != "short" {
-		t.Errorf("product = %+v", product)
-	}
-	if product.Permalink == "" || product.DateModifiedGMT == "" || product.Slug != "koffein-powder" {
-		t.Errorf("product = %+v", product)
+	if want := server.URL() + "/?post_type=product&p=" + itoa(seeded.ID); product.Permalink != want {
+		t.Errorf("permalink = %q, want %q", product.Permalink, want)
 	}
 }
 
@@ -68,25 +123,45 @@ func TestProductsPageWithoutTheCoreEndOfListError(t *testing.T) {
 	}
 }
 
-func TestAProductStatusFilterTakesOneValue(t *testing.T) {
+func TestAProductListLeavesTheTrashOutUnlessAsked(t *testing.T) {
 	t.Parallel()
 
 	server := wptest.New(t)
 	server.Seed(
 		wptest.Item{Type: wptest.TypeProduct, Title: "Live", Status: "publish"},
 		wptest.Item{Type: wptest.TypeProduct, Title: "Draft", Status: "draft"},
+		wptest.Item{Type: wptest.TypeProduct, Title: "Gone", Status: "trash"},
 	)
 
-	response, _ := call(t, server, http.MethodGet, "/wp-json/wc/v3/products?status=publish,draft", nil, true)
-	if response.StatusCode != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400 for a comma list", response.StatusCode)
+	cases := []struct {
+		name   string
+		query  string
+		status int
+		count  int
+	}{
+		{name: "any status but the trash", query: "", status: http.StatusOK, count: 2},
+		{name: "one status", query: "?status=draft", status: http.StatusOK, count: 1},
+		{name: "the trash when asked", query: "?status=trash", status: http.StatusOK, count: 1},
+		{name: "a comma list", query: "?status=publish,draft", status: http.StatusBadRequest},
 	}
 
-	_, payload := call(t, server, http.MethodGet, "/wp-json/wc/v3/products?status=draft", nil, true)
-	var drafts []map[string]any
-	decode(t, payload, &drafts)
-	if len(drafts) != 1 {
-		t.Errorf("got %d drafts, want 1", len(drafts))
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			response, payload := call(t, server, http.MethodGet, "/wp-json/wc/v3/products"+tc.query, nil, true)
+			if response.StatusCode != tc.status {
+				t.Fatalf("status = %d, want %d", response.StatusCode, tc.status)
+			}
+			if tc.status != http.StatusOK {
+				return
+			}
+			var items []map[string]any
+			decode(t, payload, &items)
+			if len(items) != tc.count {
+				t.Errorf("got %d products, want %d", len(items), tc.count)
+			}
+		})
 	}
 }
 
@@ -95,27 +170,73 @@ func TestUpdatingAProductWritesTheWooCommerceFields(t *testing.T) {
 
 	server := wptest.New(t)
 	category := server.Seed(wptest.Item{Type: wptest.TypeProductCategory, Title: "Koffein"})[0]
-	product := server.Seed(wptest.Item{Type: wptest.TypeProduct, Title: "Powder"})[0]
+	product := server.Seed(wptest.Item{Type: wptest.TypeProduct, Title: "Powder", RegularPrice: "9.90"})[0]
 
-	body := []byte(`{"description":"<p>new</p>","short_description":"brief","status":"draft","categories":[{"id":` + itoa(category.ID) + `}]}`)
+	body := []byte(`{"short_description":"<p>brief<br/>line</p><script>x()</script>","status":"draft",` +
+		`"categories":[{"id":` + itoa(category.ID) + `}],"images":[{"id":41}],` +
+		`"attributes":[{"id":7,"name":"Color","options":["<b>Blue</b>"],"visible":true},` +
+		`{"name":"Form","options":["Liquid"],"position":1,"visible":true},{"options":["nameless"]}]}`)
 	_, payload := call(t, server, http.MethodPost, "/wp-json/wc/v3/products/"+itoa(product.ID), body, true)
 
-	var updated struct {
-		Description      string `json:"description"`
-		ShortDescription string `json:"short_description"`
-		Status           string `json:"status"`
-		Categories       []struct {
-			ID   int64  `json:"id"`
-			Slug string `json:"slug"`
-		} `json:"categories"`
-	}
+	var updated productBody
 	decode(t, payload, &updated)
 
-	if updated.Description != "<p>new</p>" || updated.ShortDescription != "brief" || updated.Status != "draft" {
+	if updated.ShortDescription != "<p>brief<br />line</p>" || updated.Status != "draft" || updated.RegularPrice != "9.90" {
 		t.Errorf("updated = %+v", updated)
 	}
 	if len(updated.Categories) != 1 || updated.Categories[0].ID != category.ID || updated.Categories[0].Slug != "koffein" {
 		t.Errorf("categories = %+v", updated.Categories)
+	}
+	if len(updated.Images) != 1 || updated.Images[0].ID != 41 {
+		t.Errorf("images = %+v", updated.Images)
+	}
+	if len(updated.Attributes) != 2 {
+		t.Fatalf("attributes = %+v; an entry with neither id nor name is skipped", updated.Attributes)
+	}
+	if color := updated.Attributes[0]; color.ID != 7 || !slices.Equal(color.Options, []string{"Blue"}) || !color.Visible {
+		t.Errorf("color = %+v; option values lose their tags", color)
+	}
+	if form := updated.Attributes[1]; form.ID != 0 || form.Name != "Form" || form.Position != 1 {
+		t.Errorf("form = %+v", form)
+	}
+}
+
+func TestSendingAttributesReplacesTheWholeList(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	product := server.Seed(wptest.Item{
+		Type:  wptest.TypeProduct,
+		Title: "Powder",
+		Attributes: []wptest.Attribute{
+			{Name: "Origin", Options: []string{"Client"}, Visible: true},
+			{Name: "Form", Options: []string{"Powder"}, Visible: true},
+		},
+	})[0]
+
+	_, payload := call(t, server, http.MethodPost, "/wp-json/wc/v3/products/"+itoa(product.ID),
+		[]byte(`{"attributes":[{"name":"Form","options":["Liquid"],"visible":true}]}`), true)
+
+	var updated productBody
+	decode(t, payload, &updated)
+	if len(updated.Attributes) != 1 || updated.Attributes[0].Name != "Form" {
+		t.Errorf("attributes = %+v; the list the store keeps is the one it was sent", updated.Attributes)
+	}
+}
+
+func TestTheNameIsFilteredOnTheWayIn(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	product := server.Seed(wptest.Item{Type: wptest.TypeProduct, Title: "Powder"})[0]
+
+	_, payload := call(t, server, http.MethodPut, "/wp-json/wc/v3/products/"+itoa(product.ID),
+		[]byte(`{"name":"Salt & Pepper"}`), true)
+
+	var updated productBody
+	decode(t, payload, &updated)
+	if updated.Name != "Salt &amp; Pepper" {
+		t.Errorf("name = %q, want the bare ampersand turned into an entity", updated.Name)
 	}
 }
 
@@ -203,5 +324,82 @@ func TestUpdatingAProductRenamesAndReslugsIt(t *testing.T) {
 	decode(t, payload, &updated)
 	if updated.Name != "Koffein Powder" || updated.Slug != "koffein-powder" {
 		t.Errorf("updated = %+v", updated)
+	}
+}
+
+func TestASiteWithoutAStoreHasNoStoreRoutes(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t, wptest.WithoutCommerce())
+	seeded := server.Seed(wptest.Item{Type: wptest.TypeProduct, Title: "Powder"})[0]
+
+	for _, path := range []string{"/wp-json/wc/v3/products", "/wp-json/wc/v3/products/" + itoa(seeded.ID)} {
+		response, payload := call(t, server, http.MethodGet, path, nil, true)
+		var failure struct {
+			Code string `json:"code"`
+		}
+		decode(t, payload, &failure)
+		if response.StatusCode != http.StatusNotFound || failure.Code != "rest_no_route" {
+			t.Errorf("%s: status %d, code %q", path, response.StatusCode, failure.Code)
+		}
+	}
+
+	_, payload := call(t, server, http.MethodGet, "/wp-json", nil, true)
+	var root struct {
+		Namespaces []string `json:"namespaces"`
+	}
+	decode(t, payload, &root)
+	if slices.Contains(root.Namespaces, "wc/v3") {
+		t.Errorf("namespaces = %v, want no wc/v3", root.Namespaces)
+	}
+}
+
+func TestAUserWithoutProductRightsReadsButCannotEdit(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		options []wptest.Option
+		status  int
+		allowed bool
+	}{
+		{name: "an administrator", status: http.StatusOK, allowed: true},
+		{name: "an editor without product rights", options: []wptest.Option{wptest.WithoutProductEdit()}, status: http.StatusForbidden},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := wptest.New(t, tc.options...)
+			seeded := server.Seed(wptest.Item{Type: wptest.TypeProduct, Title: "Powder"})[0]
+
+			got, _ := call(t, server, http.MethodPost, "/wp-json/wc/v3/products/"+itoa(seeded.ID), []byte(`{"short_description":"x"}`), true)
+			if got.StatusCode != tc.status {
+				t.Errorf("update status = %d, want %d", got.StatusCode, tc.status)
+			}
+
+			_, payload := call(t, server, http.MethodGet, "/wp-json/wp/v2/users/me?context=edit", nil, true)
+			var me struct {
+				Capabilities map[string]bool `json:"capabilities"`
+			}
+			decode(t, payload, &me)
+			if me.Capabilities["edit_products"] != tc.allowed || !me.Capabilities["edit_pages"] {
+				t.Errorf("capabilities = %v", me.Capabilities)
+			}
+		})
+	}
+}
+
+func TestTheCurrentUserShowsItsCapabilitiesOnlyInTheEditContext(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	_, payload := call(t, server, http.MethodGet, "/wp-json/wp/v2/users/me", nil, true)
+
+	var me map[string]any
+	decode(t, payload, &me)
+	if _, present := me["capabilities"]; present {
+		t.Errorf("me = %v; the view context carries no capabilities", me)
 	}
 }

@@ -324,7 +324,7 @@ func TestTheRawRoutesRoundTripAndGuardTheHash(t *testing.T) {
 	}
 }
 
-func TestThePostOnlyRoutesRefuseATerm(t *testing.T) {
+func TestThePostRoutesAnswerATermIDThatNamesNoPostWithANotFound(t *testing.T) {
 	t.Parallel()
 
 	server := wptest.New(t)
@@ -361,19 +361,42 @@ func TestThePostOnlyRoutesRefuseATerm(t *testing.T) {
 	}
 }
 
+func TestThePostRoutesAnswerTheirPostForATermIDThatNamesOneToo(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	post := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "About", Content: "<p>about</p>"})[0]
+	term := server.Seed(wptest.Item{Type: wptest.TypeProductCategory, Title: "Koffein", Content: "the hub"})[0]
+	if term.ID != post.ID {
+		t.Fatalf("the term is %d and the page %d; terms and posts keep their own sequences", term.ID, post.ID)
+	}
+
+	_, payload := call(t, server, http.MethodGet, "/wp-json/postulator/v1/content/"+itoa(term.ID)+"/raw", nil, true)
+	var raw struct {
+		Type    string `json:"type"`
+		Content string `json:"content"`
+	}
+	decode(t, payload, &raw)
+	if raw.Type != wptest.TypePage || raw.Content != "<p>about</p>" {
+		t.Errorf("raw = %+v; WordPress resolves the number as a post, as the real plugin does", raw)
+	}
+}
+
 func TestATermStillAppearsInTheContentListing(t *testing.T) {
 	t.Parallel()
 
 	server := wptest.New(t)
-	server.Seed(wptest.Item{Type: wptest.TypeProductCategory, Title: "Koffein", Content: "the hub"})
+	server.Seed(wptest.Item{Type: wptest.TypeProductCategory, Title: "Koffein", Content: "<h1>Hub</h1><p>the <a href=\"/x/\">hub</a></p>"})
 
 	_, payload := call(t, server, http.MethodGet, "/wp-json/postulator/v1/content?types=product_cat", nil, true)
 
 	var page struct {
 		Items []struct {
-			Type     string `json:"type"`
-			Modified string `json:"modified"`
-			Path     string `json:"path"`
+			Type     string           `json:"type"`
+			Modified string           `json:"modified"`
+			Path     string           `json:"path"`
+			H1       string           `json:"h1"`
+			Links    []map[string]any `json:"links"`
 		} `json:"items"`
 	}
 	decode(t, payload, &page)
@@ -381,11 +404,55 @@ func TestATermStillAppearsInTheContentListing(t *testing.T) {
 	if len(page.Items) != 1 {
 		t.Fatalf("got %d items, want 1", len(page.Items))
 	}
-	if page.Items[0].Type != wptest.TypeProductCategory || page.Items[0].Modified == "" {
-		t.Errorf("item = %+v; a term carries the modification date the plugin maintains", page.Items[0])
+	item := page.Items[0]
+	if item.Type != wptest.TypeProductCategory || item.Modified == "" {
+		t.Errorf("item = %+v; a term carries the modification date the plugin maintains", item)
 	}
-	if page.Items[0].Path != "/koffein/" {
-		t.Errorf("path = %q", page.Items[0].Path)
+	if item.Path != "/product-category/koffein/" {
+		t.Errorf("path = %q, want WooCommerce's category base", item.Path)
+	}
+	if item.H1 != "" || len(item.Links) != 0 {
+		t.Errorf("h1 = %q, links = %v; the plugin reports neither for a term", item.H1, item.Links)
+	}
+}
+
+func TestTheContentListingWalksThePostsAndThenTheTerms(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	server.Seed(
+		wptest.Item{Type: wptest.TypePage, Title: "One"},
+		wptest.Item{Type: wptest.TypeProduct, Title: "Two"},
+		wptest.Item{Type: wptest.TypeProductCategory, Title: "Three"},
+		wptest.Item{Type: wptest.TypeProductCategory, Title: "Four"},
+	)
+
+	seen := make([]string, 0, 4)
+	cursor := ""
+	for range 10 {
+		path := "/wp-json/postulator/v1/content?limit=1"
+		if cursor != "" {
+			path += "&cursor=" + url.QueryEscape(cursor)
+		}
+		_, payload := call(t, server, http.MethodGet, path, nil, true)
+		var page struct {
+			Items []struct {
+				Title string `json:"title"`
+			} `json:"items"`
+			NextCursor *string `json:"nextCursor"`
+		}
+		decode(t, payload, &page)
+		for _, item := range page.Items {
+			seen = append(seen, item.Title)
+		}
+		if page.NextCursor == nil {
+			break
+		}
+		cursor = *page.NextCursor
+	}
+
+	if want := []string{"One", "Two", "Three", "Four"}; !slices.Equal(seen, want) {
+		t.Errorf("walked %v, want %v", seen, want)
 	}
 }
 

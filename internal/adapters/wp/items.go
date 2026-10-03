@@ -20,7 +20,7 @@ func (c *Client) ListItems(ctx context.Context, itemType ItemType, query ListQue
 		method:    http.MethodGet,
 		namespace: namespace,
 		path:      path,
-		query:     query.values(itemType),
+		query:     query.values(),
 	})
 	if err != nil {
 		if endOfList(err) {
@@ -42,16 +42,11 @@ func (c *Client) GetItem(ctx context.Context, itemType ItemType, id int64) (Item
 		return Item{}, err
 	}
 
-	query := url.Values{}
-	if itemType.core() {
-		query.Set("context", "edit")
-	}
-
 	_, body, err := c.do(ctx, request{
 		method:    http.MethodGet,
 		namespace: namespace,
 		path:      resourcePath(path, id),
-		query:     query,
+		query:     url.Values{"context": {"edit"}},
 	})
 	if err != nil {
 		return Item{}, err

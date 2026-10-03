@@ -20,6 +20,15 @@ const (
 
 var startInstant = time.Date(2026, time.September, 18, 10, 0, 0, 0, time.UTC)
 
+type Attribute struct {
+	Name      string
+	Options   []string
+	ID        int64
+	Position  int
+	Visible   bool
+	Variation bool
+}
+
 type Item struct {
 	Modified       time.Time
 	PreviewExpires time.Time
@@ -33,8 +42,13 @@ type Item struct {
 	Slug           string
 	Status         string
 	Template       string
+	ProductType    string
+	RegularPrice   string
+	SKU            string
 	Categories     []int64
 	Tags           []int64
+	Attributes     []Attribute
+	Images         []int64
 	ID             int64
 	Parent         int64
 	MenuOrder      int
@@ -90,6 +104,17 @@ func hierarchical(itemType string) bool {
 	return itemType == TypePage || itemType == TypeProductCategory
 }
 
+func term(itemType string) bool {
+	return itemType == TypeProductCategory
+}
+
+func (s *Server) storeOf(itemType string) (store map[int64]*Item, order []int64) {
+	if term(itemType) {
+		return s.terms, s.termOrder
+	}
+	return s.items, s.order
+}
+
 func (s *Server) instant() time.Time {
 	if s.now != nil {
 		return s.now().UTC().Truncate(time.Second)
@@ -120,8 +145,9 @@ func (s *Server) uniqueSlug(base, itemType string, parent, exclude int64) string
 }
 
 func (s *Server) slugTaken(slug, itemType string, parent, exclude int64) bool {
-	for _, id := range s.order {
-		stored := s.items[id]
+	store, order := s.storeOf(itemType)
+	for _, id := range order {
+		stored := store[id]
 		if stored.ID == exclude || stored.Type != itemType || stored.Slug != slug {
 			continue
 		}
@@ -133,10 +159,21 @@ func (s *Server) slugTaken(slug, itemType string, parent, exclude int64) bool {
 }
 
 func (s *Server) itemPath(stored *Item) string {
+	switch stored.Type {
+	case TypeProduct:
+		return "/product/" + stored.Slug + "/"
+	case TypeProductCategory:
+		return "/product-category" + s.chain(stored, s.terms)
+	default:
+		return s.chain(stored, s.items)
+	}
+}
+
+func (s *Server) chain(stored *Item, store map[int64]*Item) string {
 	segments := []string{stored.Slug}
 	parent := stored.Parent
 	for depth := 0; parent != 0 && depth < maxPathDepth; depth++ {
-		ancestor, ok := s.items[parent]
+		ancestor, ok := store[parent]
 		if !ok {
 			break
 		}
@@ -147,11 +184,11 @@ func (s *Server) itemPath(stored *Item) string {
 }
 
 func (s *Server) add(item Item) Item {
-	if !hierarchical(item.Type) {
-		item.Parent = 0
-	}
 	if item.Type == "" {
 		item.Type = TypePage
+	}
+	if !hierarchical(item.Type) {
+		item.Parent = 0
 	}
 	if item.Status == "" {
 		item.Status = "publish"
@@ -159,12 +196,19 @@ func (s *Server) add(item Item) Item {
 	if item.Meta == nil {
 		item.Meta = make(map[string]string)
 	}
-
-	if item.ID <= 0 {
-		s.nextID++
-		item.ID = s.nextID
+	if item.Type == TypeProduct && item.ProductType == "" {
+		item.ProductType = "simple"
 	}
-	s.nextID = max(s.nextID, item.ID)
+
+	sequence := &s.nextID
+	if term(item.Type) {
+		sequence = &s.nextTermID
+	}
+	if item.ID <= 0 {
+		*sequence++
+		item.ID = *sequence
+	}
+	*sequence = max(*sequence, item.ID)
 
 	base := item.Slug
 	if base == "" {
@@ -177,6 +221,11 @@ func (s *Server) add(item Item) Item {
 	}
 
 	stored := item
+	if term(item.Type) {
+		s.terms[item.ID] = &stored
+		s.termOrder = append(s.termOrder, item.ID)
+		return stored
+	}
 	s.items[item.ID] = &stored
 	s.order = append(s.order, item.ID)
 	return stored
@@ -209,8 +258,8 @@ func (s *Server) SeedCategory(category Category) Category {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.nextID++
-	category.ID = s.nextID
+	s.nextTermID++
+	category.ID = s.nextTermID
 	if category.Slug == "" {
 		category.Slug = slugify(category.Name)
 	}
@@ -284,13 +333,27 @@ func (s *Server) Lookup(id int64) (Item, bool) {
 	return *stored, true
 }
 
+func (s *Server) LookupTerm(id int64) (Item, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	stored, ok := s.terms[id]
+	if !ok {
+		return Item{}, false
+	}
+	return *stored, true
+}
+
 func (s *Server) Items() []Item {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	items := make([]Item, 0, len(s.order))
+	items := make([]Item, 0, len(s.order)+len(s.termOrder))
 	for _, id := range s.order {
 		items = append(items, *s.items[id])
+	}
+	for _, id := range s.termOrder {
+		items = append(items, *s.terms[id])
 	}
 	return items
 }

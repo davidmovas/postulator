@@ -33,10 +33,9 @@ func (t ItemType) route() (namespace, path string, err error) {
 		return coreNamespace, "/pages", nil
 	case TypePost:
 		return coreNamespace, "/posts", nil
-	case TypeProduct:
-		return wooNamespace, "/products", nil
-	case TypeProductCategory:
-		return wooNamespace, "/products/categories", nil
+	case TypeProduct, TypeProductCategory:
+		return "", "", errors.New(errors.Invalid, "a shop's products and categories are read through the store methods").
+			WithDetail("type", string(t))
 	default:
 		return "", "", errors.New(errors.Invalid, "unknown WordPress content type").WithDetail("type", string(t))
 	}
@@ -110,28 +109,22 @@ func (q ListQuery) perPageSize() int {
 	return perPageSize(q.PerPage)
 }
 
-func (q ListQuery) values(itemType ItemType) url.Values {
+func (q ListQuery) values() url.Values {
 	query := url.Values{}
-	if itemType.core() {
-		query.Set("context", "edit")
-	}
+	query.Set("context", "edit")
 	query.Set("page", strconv.Itoa(q.pageNumber()))
 	query.Set("per_page", strconv.Itoa(q.perPageSize()))
 	query.Set("orderby", "id")
 	query.Set("order", "asc")
 
-	if q.ModifiedAfter != nil && itemType != TypeProductCategory {
+	if q.ModifiedAfter != nil {
 		query.Set("modified_after", q.ModifiedAfter.UTC().Format(wpTimeLayout))
 	}
 	if q.Slug != "" {
 		query.Set("slug", q.Slug)
 	}
 	if len(q.Status) > 0 {
-		if itemType.core() {
-			query.Set("status", strings.Join(q.Status, ","))
-		} else {
-			query.Set("status", q.Status[0])
-		}
+		query.Set("status", strings.Join(q.Status, ","))
 	}
 	if len(q.Fields) > 0 {
 		query.Set("_fields", strings.Join(withID(q.Fields), ","))
@@ -224,66 +217,6 @@ func (p itemPayload) item(fallback ItemType) Item {
 	}
 }
 
-type productCategoryRef struct {
-	Name string `json:"name"`
-	Slug string `json:"slug"`
-	ID   int64  `json:"id"`
-}
-
-type productPayload struct {
-	Name             string               `json:"name"`
-	Slug             string               `json:"slug"`
-	Permalink        string               `json:"permalink"`
-	Status           string               `json:"status"`
-	Description      string               `json:"description"`
-	ShortDescription string               `json:"short_description"`
-	DateModifiedGMT  string               `json:"date_modified_gmt"`
-	Categories       []productCategoryRef `json:"categories"`
-	ID               int64                `json:"id"`
-	MenuOrder        int                  `json:"menu_order"`
-}
-
-func (p productPayload) item() Item {
-	categories := make([]int64, 0, len(p.Categories))
-	for _, ref := range p.Categories {
-		categories = append(categories, ref.ID)
-	}
-
-	return Item{
-		ID:         p.ID,
-		Type:       TypeProduct,
-		Title:      p.Name,
-		Content:    p.Description,
-		Excerpt:    p.ShortDescription,
-		Slug:       p.Slug,
-		Status:     p.Status,
-		Link:       p.Permalink,
-		Categories: categories,
-		MenuOrder:  p.MenuOrder,
-		Modified:   parseWPTime(p.DateModifiedGMT),
-	}
-}
-
-type productCategoryPayload struct {
-	Name        string `json:"name"`
-	Slug        string `json:"slug"`
-	Description string `json:"description"`
-	ID          int64  `json:"id"`
-	Parent      int64  `json:"parent"`
-	Count       int    `json:"count"`
-}
-
-func (p productCategoryPayload) item() Item {
-	return Item{
-		ID:      p.ID,
-		Type:    TypeProductCategory,
-		Title:   p.Name,
-		Content: p.Description,
-		Slug:    p.Slug,
-		Parent:  p.Parent,
-	}
-}
-
 func parseWPTime(value string) time.Time {
 	if value == "" {
 		return time.Time{}
@@ -298,65 +231,23 @@ func parseWPTime(value string) time.Time {
 }
 
 func decodeItems(itemType ItemType, body []byte) ([]Item, error) {
-	switch itemType {
-	case TypePage, TypePost:
-		var payload []itemPayload
-		if err := decodeJSON(body, &payload); err != nil {
-			return nil, err
-		}
-		items := make([]Item, 0, len(payload))
-		for index := range payload {
-			items = append(items, payload[index].item(itemType))
-		}
-		return items, nil
-	case TypeProduct:
-		var payload []productPayload
-		if err := decodeJSON(body, &payload); err != nil {
-			return nil, err
-		}
-		items := make([]Item, 0, len(payload))
-		for index := range payload {
-			items = append(items, payload[index].item())
-		}
-		return items, nil
-	case TypeProductCategory:
-		var payload []productCategoryPayload
-		if err := decodeJSON(body, &payload); err != nil {
-			return nil, err
-		}
-		items := make([]Item, 0, len(payload))
-		for index := range payload {
-			items = append(items, payload[index].item())
-		}
-		return items, nil
-	default:
-		return nil, errors.New(errors.Invalid, "unknown WordPress content type").WithDetail("type", string(itemType))
+	var payload []itemPayload
+	if err := decodeJSON(body, &payload); err != nil {
+		return nil, err
 	}
+	items := make([]Item, 0, len(payload))
+	for index := range payload {
+		items = append(items, payload[index].item(itemType))
+	}
+	return items, nil
 }
 
 func decodeItem(itemType ItemType, body []byte) (Item, error) {
-	switch itemType {
-	case TypePage, TypePost:
-		var payload itemPayload
-		if err := decodeJSON(body, &payload); err != nil {
-			return Item{}, err
-		}
-		return payload.item(itemType), nil
-	case TypeProduct:
-		var payload productPayload
-		if err := decodeJSON(body, &payload); err != nil {
-			return Item{}, err
-		}
-		return payload.item(), nil
-	case TypeProductCategory:
-		var payload productCategoryPayload
-		if err := decodeJSON(body, &payload); err != nil {
-			return Item{}, err
-		}
-		return payload.item(), nil
-	default:
-		return Item{}, errors.New(errors.Invalid, "unknown WordPress content type").WithDetail("type", string(itemType))
+	var payload itemPayload
+	if err := decodeJSON(body, &payload); err != nil {
+		return Item{}, err
 	}
+	return payload.item(itemType), nil
 }
 
 type CreateItem struct {

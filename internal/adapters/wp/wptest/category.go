@@ -93,9 +93,9 @@ func (s *Server) handleCategoryCreate(w http.ResponseWriter, r *http.Request) {
 		base = slugify(name)
 	}
 
-	s.nextID++
+	s.nextTermID++
 	stored := &Category{
-		ID:          s.nextID,
+		ID:          s.nextTermID,
 		Name:        name,
 		Slug:        s.uniqueCategorySlug(base),
 		Description: stringField(body, "description"),

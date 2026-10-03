@@ -42,9 +42,11 @@ type Server struct {
 	t             TB
 	http          *httptest.Server
 	items         map[int64]*Item
+	terms         map[int64]*Item
 	categories    map[int64]*Category
 	uploads       map[int64]*upload
 	order         []int64
+	termOrder     []int64
 	categoryOrder []int64
 	uploadOrder   []int64
 	requests      []Request
@@ -59,8 +61,11 @@ type Server struct {
 	pendingEdit   *edit
 	capabilities  []string
 	nextID        int64
+	nextTermID    int64
 	previewSeq    int64
 	noPlugin      bool
+	noCommerce    bool
+	noProductEdit bool
 	brokenHash    bool
 	brokenExpiry  bool
 	noNamespaces  bool
@@ -82,6 +87,14 @@ func WithSEOPlugin(name string) Option {
 
 func WithoutPlugin() Option {
 	return func(s *Server) { s.noPlugin = true }
+}
+
+func WithoutCommerce() Option {
+	return func(s *Server) { s.noCommerce = true }
+}
+
+func WithoutProductEdit() Option {
+	return func(s *Server) { s.noProductEdit = true }
 }
 
 func WithCapabilities(names ...string) Option {
@@ -110,6 +123,7 @@ func New(t TB, opts ...Option) *Server {
 	server := &Server{
 		t:            t,
 		items:        make(map[int64]*Item),
+		terms:        make(map[int64]*Item),
 		categories:   make(map[int64]*Category),
 		uploads:      make(map[int64]*upload),
 		clock:        startInstant.Add(-time.Second),
@@ -214,7 +228,10 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 
 func (s *Server) handleRoot(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Lock()
-	namespaces := []string{"oembed/1.0", "wp/v2", "wc/v3"}
+	namespaces := []string{"oembed/1.0", "wp/v2"}
+	if !s.noCommerce {
+		namespaces = append(namespaces, "wc/v3")
+	}
 	if !s.noPlugin {
 		namespaces = append(namespaces, pluginNamespaceName)
 	}
