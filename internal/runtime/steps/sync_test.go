@@ -372,6 +372,65 @@ func TestSyncSiteKeepsThePlanAndRecordsWhatTheSiteHolds(t *testing.T) {
 	}
 }
 
+func TestSyncSiteKeepsATermAndAPostThatShareANumberApart(t *testing.T) {
+	t.Parallel()
+
+	h := newSyncHarness(t, 0)
+	page := h.server.Seed(wptest.Item{Type: wptest.TypePage, Title: "About", Slug: "about", Content: "<p>about</p>"})[0]
+	term := h.server.Seed(wptest.Item{Type: wptest.TypeProductCategory, Title: "Koffein", Slug: "koffein"})[0]
+	if page.ID != term.ID {
+		t.Fatalf("the page is %d and the term %d; the case needs the numbers to collide", page.ID, term.ID)
+	}
+
+	for pass := range 2 {
+		h.restart(t)
+		h.all(t)
+
+		about := h.byPath(t, "/about/")
+		category := h.byPath(t, "/product-category/koffein/")
+		if about.ID == category.ID {
+			t.Fatalf("pass %d merged the page and the category into one row", pass)
+		}
+		if about.WPType != pagemap.WPPage || about.WPID == nil || *about.WPID != page.ID {
+			t.Errorf("pass %d: the page row = %+v", pass, about)
+		}
+		if category.WPType != pagemap.WPProductCategory || category.WPID == nil || *category.WPID != term.ID {
+			t.Errorf("pass %d: the category row = %+v", pass, category)
+		}
+	}
+}
+
+func TestSyncSiteMergesAPulledItemOnlyIntoARowOfItsFamily(t *testing.T) {
+	t.Parallel()
+
+	h := newSyncHarness(t, 0)
+	h.server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Liquid", Slug: "liquid", Content: "<p>a page</p>"})
+
+	planned := pagemap.Page{
+		ID: id.New(), SiteID: h.siteID, Path: "/liquid/", Slug: "liquid", WPType: pagemap.WPProduct,
+		Title: "BPC-157 Liquid", Status: pagemap.StatusPlanned, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+	}
+	if err := h.pages.Insert(t.Context(), planned); err != nil {
+		t.Fatalf("insert the planned product: %v", err)
+	}
+
+	state := h.all(t)
+
+	stored, err := h.pages.Get(t.Context(), planned.ID)
+	if err != nil {
+		t.Fatalf("read the planned product: %v", err)
+	}
+	if stored.WPType != pagemap.WPProduct || stored.WPID != nil || stored.Title != planned.Title {
+		t.Fatalf("the planned product became %+v; a page on the site is not the product the file plans", stored)
+	}
+	if len(state.Findings) != 1 || state.Findings[0].Code != steps.CodePathTakenOnSite {
+		t.Fatalf("findings = %+v, want one %q", state.Findings, steps.CodePathTakenOnSite)
+	}
+	if state.Findings[0].Details["path"] != "/liquid/" {
+		t.Errorf("the finding = %+v", state.Findings[0])
+	}
+}
+
 func TestSyncSiteAdoptsAPageItHasNeverSeen(t *testing.T) {
 	t.Parallel()
 

@@ -27,6 +27,21 @@ func (t WPType) Valid() bool {
 	}
 }
 
+func (t WPType) Term() bool {
+	return t == WPProductCategory
+}
+
+func (t WPType) SameFamily(other WPType) bool {
+	if t == other {
+		return true
+	}
+	return t.core() && other.core()
+}
+
+func (t WPType) core() bool {
+	return t == WPPage || t == WPPost
+}
+
 type Status string
 
 const (

@@ -194,3 +194,38 @@ func TestEnums(t *testing.T) {
 		t.Error("sort validity is wrong")
 	}
 }
+
+func TestATypeKnowsItsNumberSequenceAndItsFamily(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		left   pagemap.WPType
+		right  pagemap.WPType
+		term   bool
+		family bool
+	}{
+		{left: pagemap.WPPage, right: pagemap.WPPage, family: true},
+		{left: pagemap.WPPage, right: pagemap.WPPost, family: true},
+		{left: pagemap.WPPost, right: pagemap.WPProduct},
+		{left: pagemap.WPProduct, right: pagemap.WPProduct, family: true},
+		{left: pagemap.WPProduct, right: pagemap.WPProductCategory},
+		{left: pagemap.WPProductCategory, right: pagemap.WPProductCategory, term: true, family: true},
+		{left: pagemap.WPProductCategory, right: pagemap.WPPage, term: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(string(tc.left)+" and "+string(tc.right), func(t *testing.T) {
+			t.Parallel()
+
+			if got := tc.left.Term(); got != tc.term {
+				t.Errorf("%s.Term() = %t, want %t", tc.left, got, tc.term)
+			}
+			if got := tc.left.SameFamily(tc.right); got != tc.family {
+				t.Errorf("%s.SameFamily(%s) = %t, want %t", tc.left, tc.right, got, tc.family)
+			}
+			if got := tc.right.SameFamily(tc.left); got != tc.family {
+				t.Errorf("the family is not symmetric for %s and %s", tc.left, tc.right)
+			}
+		})
+	}
+}

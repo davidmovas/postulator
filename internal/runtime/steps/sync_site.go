@@ -26,6 +26,8 @@ const (
 	SourcePlugin = "plugin"
 	SourceCore   = "core"
 
+	CodePathTakenOnSite = "path_taken_on_site"
+
 	checkpointSync = "sync"
 
 	syncStepTimeout = 10 * time.Minute
@@ -34,16 +36,26 @@ const (
 var coreTypes = []wp.ItemType{wp.TypePage, wp.TypePost}
 
 type SiteSyncResult struct {
-	StartedAt time.Time `json:"startedAt"`
-	Source    string    `json:"source"`
-	Cursor    string    `json:"cursor"`
-	Batches   int       `json:"batches"`
-	Pulled    int       `json:"pulled"`
-	Created   int       `json:"created"`
-	Updated   int       `json:"updated"`
-	Drifted   int       `json:"drifted"`
-	Archived  int       `json:"archived"`
-	Done      bool      `json:"done"`
+	StartedAt time.Time         `json:"startedAt"`
+	Source    string            `json:"source"`
+	Cursor    string            `json:"cursor"`
+	Findings  []content.Finding `json:"findings,omitempty"`
+	Batches   int               `json:"batches"`
+	Pulled    int               `json:"pulled"`
+	Created   int               `json:"created"`
+	Updated   int               `json:"updated"`
+	Drifted   int               `json:"drifted"`
+	Archived  int               `json:"archived"`
+	Done      bool              `json:"done"`
+}
+
+type siteKey struct {
+	wpID int64
+	term bool
+}
+
+func keyOf(wpType pagemap.WPType, wpID int64) siteKey {
+	return siteKey{wpID: wpID, term: wpType.Term()}
 }
 
 type coreCursor struct {
@@ -340,14 +352,14 @@ func queryPermalink(link string) bool {
 	return parsed.RawQuery != ""
 }
 
-func resolveDraftPaths(batch []pulledItem, byWPID map[int64]pagemap.Page) []pulledItem {
-	known := make(map[int64]string, len(byWPID)+len(batch))
-	for wpID := range byWPID {
-		known[wpID] = byWPID[wpID].Path
+func resolveDraftPaths(batch []pulledItem, byWPID map[siteKey]pagemap.Page) []pulledItem {
+	known := make(map[siteKey]string, len(byWPID)+len(batch))
+	for key := range byWPID {
+		known[key] = byWPID[key].Path
 	}
 	for i := range batch {
 		if batch[i].Path != "" {
-			known[batch[i].WPID] = batch[i].Path
+			known[keyOf(batch[i].Type, batch[i].WPID)] = batch[i].Path
 		}
 	}
 
@@ -365,14 +377,14 @@ func resolveDraftPaths(batch []pulledItem, byWPID map[int64]pagemap.Page) []pull
 	return out
 }
 
-func draftPath(item pulledItem, known map[int64]string) (string, bool) {
+func draftPath(item pulledItem, known map[siteKey]string) (string, bool) {
 	if item.Slug == "" {
 		return "", false
 	}
 
 	base := "/"
 	if item.ParentWPID != 0 {
-		parent, ok := known[item.ParentWPID]
+		parent, ok := known[keyOf(item.Type, item.ParentWPID)]
 		if !ok {
 			return "", false
 		}
@@ -420,11 +432,11 @@ func reconcile(ctx context.Context, deps Deps, owner site.Site, batch []pulledIt
 	}
 
 	byPath := make(map[string]pagemap.Page, len(pages))
-	byWPID := make(map[int64]pagemap.Page, len(pages))
+	byWPID := make(map[siteKey]pagemap.Page, len(pages))
 	for i := range pages {
 		byPath[pages[i].Path] = pages[i]
 		if pages[i].WPID != nil {
-			byWPID[*pages[i].WPID] = pages[i]
+			byWPID[keyOf(pages[i].WPType, *pages[i].WPID)] = pages[i]
 		}
 	}
 
@@ -434,9 +446,15 @@ func reconcile(ctx context.Context, deps Deps, owner site.Site, batch []pulledIt
 	}
 
 	now := deps.now()
+	taken := make([]content.Finding, 0)
 	apply := func(c context.Context) error {
+		taken = taken[:0]
 		for i := range batch {
-			current, known := match(batch[i], byWPID, byPath)
+			current, known, foreign := match(batch[i], byWPID, byPath)
+			if foreign {
+				taken = append(taken, pathTaken(batch[i], current))
+				continue
+			}
 			next, drifted := merge(current, known, batch[i], owner.ID, now)
 
 			if known {
@@ -454,7 +472,7 @@ func reconcile(ctx context.Context, deps Deps, owner site.Site, batch []pulledIt
 				state.Drifted++
 			}
 			byPath[next.Path] = next
-			byWPID[*next.WPID] = next
+			byWPID[keyOf(next.WPType, *next.WPID)] = next
 
 			ours, listErr := generatedTargets(c, deps, next.ID, known)
 			if listErr != nil {
@@ -469,19 +487,45 @@ func reconcile(ctx context.Context, deps Deps, owner site.Site, batch []pulledIt
 	}
 
 	if deps.UnitOfWork == nil {
-		return apply(ctx)
+		err = apply(ctx)
+	} else {
+		err = deps.UnitOfWork.Do(ctx, apply)
 	}
-	return deps.UnitOfWork.Do(ctx, apply)
+	if err != nil {
+		return err
+	}
+	state.Findings = append(state.Findings, taken...)
+	return nil
 }
 
-func match(item pulledItem, byWPID map[int64]pagemap.Page, byPath map[string]pagemap.Page) (pagemap.Page, bool) {
-	if page, ok := byWPID[item.WPID]; ok {
-		return page, true
+func match(item pulledItem, byWPID map[siteKey]pagemap.Page,
+	byPath map[string]pagemap.Page) (page pagemap.Page, known, foreign bool) {
+	if numbered, ok := byWPID[keyOf(item.Type, item.WPID)]; ok {
+		return numbered, true, false
 	}
-	if page, ok := byPath[item.Path]; ok {
-		return page, true
+	page, ok := byPath[item.Path]
+	switch {
+	case !ok:
+		return pagemap.Page{}, false, false
+	case !page.WPType.SameFamily(wpTypeOrPage(item.Type)):
+		return page, false, true
+	default:
+		return page, true, false
 	}
-	return pagemap.Page{}, false
+}
+
+func pathTaken(item pulledItem, row pagemap.Page) content.Finding {
+	found := wpTypeOrPage(item.Type)
+	return content.Finding{
+		Severity: content.SeverityWarn,
+		Code:     CodePathTakenOnSite,
+		Message: "the site holds a " + string(found) + " at " + item.Path + " and the page map plans a " +
+			string(row.WPType) + " there, so the two were kept apart; change the row's type or its path",
+		Details: map[string]any{
+			"pageId": row.ID, "path": item.Path, "planned": string(row.WPType),
+			"found": string(found), "wpId": item.WPID,
+		},
+	}
 }
 
 func merge(current pagemap.Page, known bool, item pulledItem, siteID string,
