@@ -29,12 +29,6 @@ type edgeReader interface {
 	ListBySite(ctx context.Context, siteID string) ([]graph.Edge, error)
 }
 
-type termStore interface {
-	ListBySite(ctx context.Context, siteID string) ([]graph.Term, error)
-	Upsert(ctx context.Context, t graph.Term) error
-	Delete(ctx context.Context, entityID string, taxonomy graph.Taxonomy) error
-}
-
 type categoryReader interface {
 	ListBySite(ctx context.Context, siteID string) ([]category.Category, error)
 }
@@ -105,7 +99,6 @@ type ImageSource interface {
 type Deps struct {
 	Entities      entityReader
 	Edges         edgeReader
-	Terms         termStore
 	Categories    categoryReader
 	CategoryTerms categoryTermStore
 	Pages         pageStore
@@ -136,24 +129,10 @@ func (d Deps) now() time.Time {
 }
 
 func (d Deps) categoryStores() error {
-	if err := d.entityReader(); err != nil {
+	if err := d.categoryReader(); err != nil {
 		return err
 	}
-	return d.termStore()
-}
-
-func (d Deps) entityReader() error {
-	if d.Entities == nil {
-		return errors.New(errors.Internal, "the run steps were given no entity reader, so no category chain can be read")
-	}
-	return nil
-}
-
-func (d Deps) termStore() error {
-	if d.Terms == nil {
-		return errors.New(errors.Internal, "the run steps were given no term store, so no category can be kept")
-	}
-	return nil
+	return d.categoryTermStore()
 }
 
 func (d Deps) categoryReader() error {

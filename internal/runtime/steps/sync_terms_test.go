@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -15,12 +16,12 @@ import (
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
 
-func seedCategoryEntity(t *testing.T, h *syncHarness, name string, scope *string, flagged bool) graph.Entity {
+func seedEntityNamed(t *testing.T, h *syncHarness, name string) graph.Entity {
 	t.Helper()
 
 	record := graph.Entity{
-		ID: id.New(), SiteID: h.siteID, Name: name, Kind: graph.KindCategory, SiteCategory: flagged, ScopeID: scope,
-		Source: graph.SourceImport, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+		ID: id.New(), SiteID: h.siteID, Name: name, Kind: graph.KindHub, Source: graph.SourceImport,
+		CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 	}
 	if err := sqlite.NewEntityRepo(h.store).Insert(t.Context(), record); err != nil {
 		t.Fatalf("insert the entity %s: %v", name, err)
@@ -28,26 +29,26 @@ func seedCategoryEntity(t *testing.T, h *syncHarness, name string, scope *string
 	return record
 }
 
-func keepTerm(t *testing.T, h *syncHarness, held graph.Term) {
+func keepTerm(t *testing.T, h *syncHarness, held category.Term) {
 	t.Helper()
 
 	held.SiteID = h.siteID
 	held.SeenAt = sqlitetest.Stamp
-	if err := sqlite.NewTermRepo(h.store).Upsert(t.Context(), held); err != nil {
-		t.Fatalf("keep the term of %s: %v", held.EntityID, err)
+	if err := sqlite.NewCategoryTermRepo(h.store).Upsert(t.Context(), held); err != nil {
+		t.Fatalf("keep the term of %s: %v", held.CategoryID, err)
 	}
 }
 
-func termsKeptBy(t *testing.T, h *syncHarness) map[string]graph.Term {
+func termsKeptBy(t *testing.T, h *syncHarness) map[string]category.Term {
 	t.Helper()
 
-	listed, err := sqlite.NewTermRepo(h.store).ListBySite(t.Context(), h.siteID)
+	listed, err := sqlite.NewCategoryTermRepo(h.store).ListBySite(t.Context(), h.siteID)
 	if err != nil {
 		t.Fatalf("list the terms: %v", err)
 	}
-	held := make(map[string]graph.Term, len(listed))
+	held := make(map[string]category.Term, len(listed))
 	for i := range listed {
-		held[termKey(listed[i].EntityID, listed[i].Taxonomy)] = listed[i]
+		held[termKey(listed[i].CategoryID, listed[i].Taxonomy)] = listed[i]
 	}
 	return held
 }
@@ -60,15 +61,18 @@ func TestSyncSiteMatchesTheCategoriesAlreadyOnTheSite(t *testing.T) {
 	drinks := h.server.SeedCategory(wptest.Category{Name: "Drinks"})
 	coffee := h.server.SeedCategory(wptest.Category{Name: "coffee & more", Parent: drinks.ID})
 	h.server.SeedCategory(wptest.Category{Name: "Coffee & More"})
+	h.server.SeedCategory(wptest.Category{Name: "Ristretto"})
+	h.server.SeedCategory(wptest.Category{Name: "Espresso", Parent: drinks.ID})
 	shelf := h.server.Seed(wptest.Item{Type: wptest.TypeProductCategory, Title: "Drinks"})[0]
 
-	root := seedCategoryEntity(t, h, "Drinks", nil, true)
-	sub := seedCategoryEntity(t, h, "Coffee & More", &root.ID, true)
-	tea := seedCategoryEntity(t, h, "Tea", &root.ID, true)
-	juice := seedCategoryEntity(t, h, "Juice", nil, true)
-	seedCategoryEntity(t, h, "Espresso", &sub.ID, false)
-	keepTerm(t, h, graph.Term{EntityID: root.ID, Taxonomy: graph.TaxonomyCategory, TermID: drinks.ID, Name: "Drinks", RunID: "earlier-run"})
-	keepTerm(t, h, graph.Term{EntityID: juice.ID, Taxonomy: graph.TaxonomyCategory, TermID: 999, Name: "Juice", RunID: "earlier-run"})
+	root := storedCategory(t, h.store, h.siteID, "Drinks", "")
+	sub := storedCategory(t, h.store, h.siteID, "Coffee  &  More", root.ID)
+	tea := storedCategory(t, h.store, h.siteID, "Tea", root.ID)
+	juice := storedCategory(t, h.store, h.siteID, "Juice", "")
+	lost := storedCategory(t, h.store, h.siteID, "Ristretto", tea.ID)
+	seedEntityNamed(t, h, "Espresso")
+	keepTerm(t, h, category.Term{CategoryID: root.ID, Taxonomy: category.TaxonomyCategory, TermID: drinks.ID, Name: "Drinks", RunID: "earlier-run"})
+	keepTerm(t, h, category.Term{CategoryID: juice.ID, Taxonomy: category.TaxonomyCategory, TermID: 999, Name: "Juice", RunID: "earlier-run"})
 
 	state := h.all(t)
 	if len(state.Findings) != 0 {
@@ -77,23 +81,24 @@ func TestSyncSiteMatchesTheCategoriesAlreadyOnTheSite(t *testing.T) {
 
 	held := termsKeptBy(t, h)
 	cases := []struct {
-		name     string
-		entityID string
-		taxonomy graph.Taxonomy
-		termID   int64
-		parent   int64
-		runID    string
+		name       string
+		categoryID string
+		taxonomy   category.Taxonomy
+		termID     int64
+		parent     int64
+		runID      string
 	}{
-		{name: "a root kept from an earlier run", entityID: root.ID, taxonomy: graph.TaxonomyCategory, termID: drinks.ID, runID: "earlier-run"},
-		{name: "a subcategory matched under its parent", entityID: sub.ID, taxonomy: graph.TaxonomyCategory, termID: coffee.ID, parent: drinks.ID},
-		{name: "a root matched among the store's categories", entityID: root.ID, taxonomy: graph.TaxonomyProductCategory, termID: shelf.ID},
-		{name: "a category the site lacks", entityID: tea.ID, taxonomy: graph.TaxonomyCategory},
-		{name: "a category whose term was deleted", entityID: juice.ID, taxonomy: graph.TaxonomyCategory},
-		{name: "a subcategory the store lacks", entityID: sub.ID, taxonomy: graph.TaxonomyProductCategory},
+		{name: "a root kept from an earlier run", categoryID: root.ID, taxonomy: category.TaxonomyCategory, termID: drinks.ID, runID: "earlier-run"},
+		{name: "a subcategory matched by its key under its parent", categoryID: sub.ID, taxonomy: category.TaxonomyCategory, termID: coffee.ID, parent: drinks.ID},
+		{name: "a root matched among the store's categories", categoryID: root.ID, taxonomy: category.TaxonomyProductCategory, termID: shelf.ID},
+		{name: "a category the site lacks", categoryID: tea.ID, taxonomy: category.TaxonomyCategory},
+		{name: "a category under one the site lacks", categoryID: lost.ID, taxonomy: category.TaxonomyCategory},
+		{name: "a category whose term was deleted", categoryID: juice.ID, taxonomy: category.TaxonomyCategory},
+		{name: "a subcategory the store lacks", categoryID: sub.ID, taxonomy: category.TaxonomyProductCategory},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			kept, found := held[termKey(tc.entityID, tc.taxonomy)]
+			kept, found := held[termKey(tc.categoryID, tc.taxonomy)]
 			if tc.termID == 0 {
 				if found {
 					t.Fatalf("the sync keeps %+v, want no term", kept)
@@ -110,18 +115,18 @@ func TestSyncSiteMatchesTheCategoriesAlreadyOnTheSite(t *testing.T) {
 	}
 }
 
-func TestSyncSiteAsksForNoTermsWhenTheGraphFilesNothing(t *testing.T) {
+func TestSyncSiteAsksForNoTermsWhenTheSiteHasNoCategories(t *testing.T) {
 	t.Parallel()
 
 	h := newSyncHarness(t, 0)
 	seedSite(t, h)
 	h.server.SeedCategory(wptest.Category{Name: "Drinks"})
-	seedCategoryEntity(t, h, "Drinks", nil, false)
+	seedEntityNamed(t, h, "Drinks")
 
 	h.all(t)
 	for _, request := range h.server.Requests() {
 		if request.Path == "/wp-json/wp/v2/categories" || request.Path == "/wp-json/wc/v3/products/categories" {
-			t.Errorf("the sync asked %s %s of a graph that files nothing", request.Method, request.Path)
+			t.Errorf("the sync asked %s %s of a site with no categories", request.Method, request.Path)
 		}
 	}
 	if held := termsKeptBy(t, h); len(held) != 0 {
@@ -137,8 +142,8 @@ func TestSyncSiteNamesTheStoreItWasNotGiven(t *testing.T) {
 		missing func(*steps.Deps)
 		says    string
 	}{
-		{name: "no term store", missing: func(deps *steps.Deps) { deps.Terms = nil }, says: "term store"},
-		{name: "no entity reader", missing: func(deps *steps.Deps) { deps.Entities = nil }, says: "entity reader"},
+		{name: "no category term store", missing: func(deps *steps.Deps) { deps.CategoryTerms = nil }, says: "term store"},
+		{name: "no category reader", missing: func(deps *steps.Deps) { deps.Categories = nil }, says: "category reader"},
 	}
 
 	for _, tc := range cases {
@@ -170,7 +175,7 @@ func TestSyncSiteSaysWhichCategoriesTheSiteWouldNotList(t *testing.T) {
 	h := newSyncHarness(t, 0)
 	seedSite(t, h)
 	drinks := h.server.SeedCategory(wptest.Category{Name: "Drinks"})
-	root := seedCategoryEntity(t, h, "Drinks", nil, true)
+	root := storedCategory(t, h.store, h.siteID, "Drinks", "")
 	h.deps.WordPress = oneClient{client: behind(t, h.server, func(w http.ResponseWriter, r *http.Request, forward http.Handler) {
 		if r.URL.Path == "/wp-json/wc/v3/products/categories" {
 			failWith(t, w, http.StatusForbidden)
@@ -184,7 +189,7 @@ func TestSyncSiteSaysWhichCategoriesTheSiteWouldNotList(t *testing.T) {
 		t.Fatalf("findings = %+v, want one %s", state.Findings, steps.CodeCategoriesUnread)
 	}
 	held := termsKeptBy(t, h)
-	if kept, found := held[termKey(root.ID, graph.TaxonomyCategory)]; !found || kept.TermID != drinks.ID {
+	if kept, found := held[termKey(root.ID, category.TaxonomyCategory)]; !found || kept.TermID != drinks.ID {
 		t.Errorf("the sync keeps %+v, want the post categories matched whatever the store refused", held)
 	}
 }

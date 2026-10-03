@@ -267,7 +267,6 @@ func (f *factory) engine(t *testing.T) *runtime.Engine {
 	if err := steps.Register(registry, steps.Deps{
 		Entities:      sqlite.NewEntityRepo(f.store),
 		Edges:         sqlite.NewEdgeRepo(f.store),
-		Terms:         sqlite.NewTermRepo(f.store),
 		Categories:    sqlite.NewCategoryRepo(f.store),
 		CategoryTerms: sqlite.NewCategoryTermRepo(f.store),
 		Pages:         sqlite.NewPageRepo(f.store),
