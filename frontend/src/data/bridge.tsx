@@ -49,15 +49,27 @@ function siteOfRun(client: QueryClient, runId: string): string | null {
     return typeof siteId === "string" && siteId !== "" ? siteId : null;
 }
 
+function filingMoved(client: QueryClient, siteId: string): void {
+    invalidateBySite(client, keys.pages.lists(), siteId);
+    invalidateBySite(client, keys.graph.entityLists(), siteId);
+    invalidateAll(
+        client,
+        keys.pages.categories(siteId),
+        keys.pages.details(),
+        keys.pages.tree(siteId),
+        keys.graph.entityAll(),
+        keys.graph.full(siteId),
+    );
+}
+
 function fanOutSite(client: QueryClient, siteId: string | null): void {
     if (siteId === null) {
         invalidateAll(client, keys.pages.root(), keys.graph.root(), keys.reports.root());
         return;
     }
-    invalidateBySite(client, keys.pages.lists(), siteId);
-    invalidateBySite(client, keys.graph.entityLists(), siteId);
+    filingMoved(client, siteId);
     invalidateBySite(client, keys.graph.edgeLists(), siteId);
-    invalidateAll(client, keys.pages.tree(siteId), keys.graph.full(siteId), keys.reports.site(siteId));
+    invalidateAll(client, keys.reports.site(siteId));
 }
 
 function runLifecycle(client: QueryClient, envelope: Envelope<EventType>, ...extra: readonly (readonly unknown[])[]): void {
@@ -187,23 +199,16 @@ function handlersFor(client: QueryClient): Handlers {
         "graph.changed": (envelope) => {
             const siteId = envelope.payload.siteId;
             coalesce(`graph:${siteId}`, () => {
-                invalidateBySite(client, keys.graph.entityLists(), siteId);
+                filingMoved(client, siteId);
                 invalidateBySite(client, keys.graph.edgeLists(), siteId);
-                invalidateBySite(client, keys.pages.lists(), siteId);
-                invalidateAll(client, keys.graph.entityAll(), keys.graph.full(siteId), keys.reports.site(siteId));
+                invalidateAll(client, keys.reports.site(siteId));
             });
         },
         "pages.changed": (envelope) => {
             const siteId = envelope.payload.siteId;
             coalesce(`pages:${siteId}`, () => {
-                invalidateBySite(client, keys.pages.lists(), siteId);
-                invalidateAll(
-                    client,
-                    keys.pages.details(),
-                    keys.pages.tree(siteId),
-                    keys.reports.site(siteId),
-                    keys.graph.entityAll(),
-                );
+                filingMoved(client, siteId);
+                invalidateAll(client, keys.reports.site(siteId));
             });
         },
         "templates.changed": () => {
@@ -215,6 +220,7 @@ function handlersFor(client: QueryClient): Handlers {
             const siteId = envelope.payload.siteId;
             coalesce(`sites:${siteId}`, () => {
                 invalidateAll(client, keys.sites.root(), keys.sync.plugin(siteId), keys.reports.site(siteId));
+                filingMoved(client, siteId);
             });
         },
         "settings.changed": () => {
