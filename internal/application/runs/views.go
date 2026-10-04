@@ -2,7 +2,6 @@ package runs
 
 import (
 	"encoding/json"
-	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -96,13 +95,6 @@ type ArtifactSummary struct {
 	CreatedAt dto.Time `json:"createdAt"`
 }
 
-func timeOf(at *time.Time) dto.Time {
-	if at == nil {
-		return dto.Time{}
-	}
-	return dto.NewTime(*at)
-}
-
 func runView(record run.Run) Run {
 	return Run{
 		ID:              record.ID,
@@ -122,8 +114,8 @@ func runView(record run.Run) Run {
 		Error:           record.Error,
 		DeadlineAt:      dto.NewTime(record.DeadlineAt),
 		CreatedAt:       dto.NewTime(record.CreatedAt),
-		StartedAt:       timeOf(record.StartedAt),
-		FinishedAt:      timeOf(record.FinishedAt),
+		StartedAt:       dto.TimeOf(record.StartedAt),
+		FinishedAt:      dto.TimeOf(record.FinishedAt),
 	}
 }
 
@@ -144,10 +136,10 @@ func itemView(item run.Item, blocked run.RetryBlockedReason, awaited *AwaitedPar
 		WaitingFor:         awaited,
 		Retryable:          blocked == "",
 		RetryBlockedReason: string(blocked),
-		WakeAt:             timeOf(item.WakeAt),
+		WakeAt:             dto.TimeOf(item.WakeAt),
 		CreatedAt:          dto.NewTime(item.CreatedAt),
 		UpdatedAt:          dto.NewTime(item.UpdatedAt),
-		FinishedAt:         timeOf(item.FinishedAt),
+		FinishedAt:         dto.TimeOf(item.FinishedAt),
 	}
 }
 
@@ -171,7 +163,7 @@ func artifactSummaryView(artifact run.Artifact) ArtifactSummary {
 		Size:      artifact.Size,
 		Hash:      artifact.Hash,
 		Purged:    artifact.Purged,
-		ExpiresAt: timeOf(artifact.ExpiresAt),
+		ExpiresAt: dto.TimeOf(artifact.ExpiresAt),
 		CreatedAt: dto.NewTime(artifact.CreatedAt),
 	}
 }
@@ -187,7 +179,7 @@ func artifactView(artifact run.Artifact) Artifact {
 		Size:      artifact.Size,
 		Hash:      artifact.Hash,
 		Purged:    artifact.Purged,
-		ExpiresAt: timeOf(artifact.ExpiresAt),
+		ExpiresAt: dto.TimeOf(artifact.ExpiresAt),
 		CreatedAt: dto.NewTime(artifact.CreatedAt),
 	}
 }

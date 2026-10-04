@@ -18,6 +18,13 @@ func NewTime(t time.Time) Time {
 	return Time(t.UTC().Truncate(time.Second))
 }
 
+func TimeOf(at *time.Time) Time {
+	if at == nil {
+		return Time{}
+	}
+	return NewTime(*at)
+}
+
 func (t Time) Std() time.Time {
 	return time.Time(t)
 }

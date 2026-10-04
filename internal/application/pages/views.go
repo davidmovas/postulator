@@ -1,8 +1,6 @@
 package pages
 
 import (
-	"time"
-
 	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
@@ -94,13 +92,6 @@ type Conflict struct {
 	EntityID string `json:"entityId,omitempty"`
 }
 
-func optionalTime(t *time.Time) dto.Time {
-	if t == nil {
-		return dto.Time{}
-	}
-	return dto.NewTime(*t)
-}
-
 func view(p pagemap.Page, filed filing) Page {
 	categories, needPlugin := filed.of(p)
 	return Page{
@@ -130,8 +121,8 @@ func view(p pagemap.Page, filed filing) Page {
 			Title: p.Observed.Title, H1: p.Observed.H1,
 		},
 		Mismatches:   mismatchViews(p),
-		WPModifiedAt: optionalTime(p.WPModifiedAt),
-		LastSyncedAt: optionalTime(p.LastSyncedAt),
+		WPModifiedAt: dto.TimeOf(p.WPModifiedAt),
+		LastSyncedAt: dto.TimeOf(p.LastSyncedAt),
 		Drift:        p.Drift,
 		CreatedAt:    dto.NewTime(p.CreatedAt),
 		UpdatedAt:    dto.NewTime(p.UpdatedAt),

@@ -10,6 +10,34 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
+func TestAnInstantThatMayBeMissingIsNullWhenItIs(t *testing.T) {
+	t.Parallel()
+
+	at := time.Date(2026, 9, 17, 11, 30, 0, 500_000_000, time.FixedZone("CET", 3600))
+	cases := []struct {
+		name string
+		in   *time.Time
+		want string
+	}{
+		{name: "missing", in: nil, want: `null`},
+		{name: "zero", in: &time.Time{}, want: `null`},
+		{name: "present", in: &at, want: `"2026-09-17T10:30:00Z"`},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := json.Marshal(dto.TimeOf(tc.in))
+			if err != nil {
+				t.Fatalf("Marshal() error: %v", err)
+			}
+			if string(got) != tc.want {
+				t.Fatalf("TimeOf(%v) = %s, want %s", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestTimeMarshal(t *testing.T) {
 	t.Parallel()
 
