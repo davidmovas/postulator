@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-const latestMigration = 43
+const latestMigration = 44
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -55,6 +55,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0041_page_category.sql",
 		"0042_drop_entity_terms.sql",
 		"0043_drop_entity_site_category.sql",
+		"0044_drop_categories.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -545,7 +546,7 @@ func TestSiteCategoryIsDroppedAndADownBringsItBackAsMigration33MadeIt(t *testing
 func TestCategoriesSchema(t *testing.T) {
 	t.Parallel()
 
-	store := openStore(t, nil)
+	store := storeAt(t, 43)
 	exec := func(query string, args ...any) error {
 		_, err := store.writer.ExecContext(t.Context(), query, args...)
 		return err
@@ -632,7 +633,7 @@ func TestCategoriesSchema(t *testing.T) {
 func TestCategoryTermsSchema(t *testing.T) {
 	t.Parallel()
 
-	store := openStore(t, nil)
+	store := storeAt(t, 43)
 	exec := func(query string, args ...any) error {
 		_, err := store.writer.ExecContext(t.Context(), query, args...)
 		return err
@@ -754,8 +755,8 @@ func TestPageCategoryColumn(t *testing.T) {
 		}
 	}
 
-	if _, err = provider.UpTo(t.Context(), 41); err != nil {
-		t.Fatalf("up to 41: %v", err)
+	if _, err = provider.UpTo(t.Context(), 43); err != nil {
+		t.Fatalf("up to 43: %v", err)
 	}
 	if got := count(`SELECT count(*) FROM pages WHERE id = 'pg1' AND category_id = ''`); got != 1 {
 		t.Fatal("a page stored before the column is not filed under no category")
@@ -801,6 +802,94 @@ func TestPageCategoryColumn(t *testing.T) {
 	}
 	if _, err = provider.Up(t.Context()); err != nil {
 		t.Fatalf("up again: %v", err)
+	}
+}
+
+func TestCategoriesAreDroppedAndADownBringsThemBackAsMigrations39To41MadeThem(t *testing.T) {
+	t.Parallel()
+
+	made := storeAt(t, 43)
+	tables := []string{"categories", "category_terms", "pages"}
+	want := make(map[string][]string, len(tables))
+	for _, table := range tables {
+		want[table] = schemaOf(t, made, table)
+	}
+	if len(want["categories"]) != 3 {
+		t.Fatalf("migration 39 made %v, want the table and its two indexes", want["categories"])
+	}
+	if len(want["category_terms"]) != 2 {
+		t.Fatalf("migration 40 made %v, want the table and its index", want["category_terms"])
+	}
+	wantColumn := columnOf(t, made, "pages", "category_id")
+	if wantColumn == "" {
+		t.Fatal("migration 41 made no category_id column")
+	}
+
+	store := openStore(t, nil)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	exec := func(query string, args ...any) {
+		t.Helper()
+		if _, execErr := store.writer.ExecContext(t.Context(), query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	count := func(query string) int {
+		t.Helper()
+		var n int
+		if scanErr := store.writer.QueryRowContext(t.Context(), query).Scan(&n); scanErr != nil {
+			t.Fatalf("%s: %v", query, scanErr)
+		}
+		return n
+	}
+	requireDropped := func(when string) {
+		t.Helper()
+		for _, table := range []string{"categories", "category_terms"} {
+			if got := schemaOf(t, store, table); len(got) != 0 {
+				t.Fatalf("%s survived %s: %v", table, when, got)
+			}
+		}
+		if got := columnOf(t, store, "pages", "category_id"); got != "" {
+			t.Fatalf("pages still carries category_id (%s) after %s", got, when)
+		}
+		if got := count(`SELECT count(*) FROM sqlite_schema WHERE type = 'index' AND name = 'pages_category'`); got != 0 {
+			t.Fatalf("the index pages_category survived %s", when)
+		}
+	}
+	const at = "2026-10-04T09:00:00Z"
+
+	requireDropped("the up migration")
+	exec(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at)
+	exec(`INSERT INTO pages (id, site_id, path, slug, wp_type, status, created_at, updated_at) VALUES ('pg1', 's1', '/healing/', 'healing', 'page', 'planned', ?, ?)`, at, at)
+
+	if _, err = provider.DownTo(t.Context(), 43); err != nil {
+		t.Fatalf("down to 43: %v", err)
+	}
+	for _, table := range tables {
+		if got := schemaOf(t, store, table); !slices.Equal(got, want[table]) {
+			t.Fatalf("the down migration made %s as\n%s\nwant it as migrations 39 to 41 made it\n%s", table, strings.Join(got, "\n"), strings.Join(want[table], "\n"))
+		}
+	}
+	if got := columnOf(t, store, "pages", "category_id"); got != wantColumn {
+		t.Fatalf("the down migration made category_id %q, want %q as migration 41 made it", got, wantColumn)
+	}
+	if got := count(`SELECT count(*) FROM pages WHERE id = 'pg1' AND category_id = ''`); got != 1 {
+		t.Fatal("a page stored before the down is not left filed under no category")
+	}
+	exec(`INSERT INTO categories (id, site_id, name, name_key, created_at, updated_at) VALUES ('c1', 's1', 'Healing', 'healing', ?, ?)`, at, at)
+	exec(`INSERT INTO categories (id, site_id, name, name_key, parent_id, created_at, updated_at) VALUES ('c2', 's1', 'BPC-157', 'bpc-157', 'c1', ?, ?)`, at, at)
+	exec(`INSERT INTO category_terms (category_id, site_id, taxonomy, term_id, name, seen_at) VALUES ('c2', 's1', 'category', 5, 'BPC-157', ?)`, at)
+	exec(`INSERT INTO pages (id, site_id, path, slug, wp_type, status, category_id, created_at, updated_at) VALUES ('pg2', 's1', '/healing/bpc-157/', 'bpc-157', 'page', 'planned', 'c2', ?, ?)`, at, at)
+	exec(`UPDATE pages SET category_id = 'c1' WHERE id = 'pg1'`)
+
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up again with a filed page, a category tree and a term stored: %v", err)
+	}
+	requireDropped("the second up")
+	if got := count(`SELECT count(*) FROM pages WHERE id IN ('pg1', 'pg2')`); got != 2 {
+		t.Fatalf("dropping the categories left %d of the two filed pages", got)
 	}
 }
 
