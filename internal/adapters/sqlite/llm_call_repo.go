@@ -166,20 +166,7 @@ func (r *LLMCallRepo) List(ctx context.Context, q llm.CallQuery, page paging.Req
 		builder = builder.Where(squirrel.Eq{"conversation_id": q.ConversationID})
 	}
 
-	keyset := callKeyset(q)
-	keyed, err := keyset.Apply(builder, page)
-	if err != nil {
-		return paging.List[llm.Call]{}, err
-	}
-	query, args, err := buildQuery(keyed, "llm calls")
-	if err != nil {
-		return paging.List[llm.Call]{}, err
-	}
-	rows, err := selectAll(ctx, r.store.execFrom(ctx), query, args, scanCall, "list the llm calls")
-	if err != nil {
-		return paging.List[llm.Call]{}, err
-	}
-	return keyset.Cut(rows, page)
+	return selectKeyed(ctx, r.store.execFrom(ctx), builder, callKeyset(q), page, scanCall, "llm calls")
 }
 
 func scanCall(rows *sql.Rows) (llm.Call, error) {

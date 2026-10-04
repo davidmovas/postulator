@@ -118,20 +118,7 @@ func (r *SiteRepo) List(ctx context.Context, q site.Query, page paging.Request) 
 		builder = builder.Where(squirrel.Eq{"status": string(*q.Status)})
 	}
 
-	keyset := siteKeyset(q)
-	keyed, err := keyset.Apply(builder, page)
-	if err != nil {
-		return paging.List[site.Site]{}, err
-	}
-	query, args, err := buildQuery(keyed, "sites")
-	if err != nil {
-		return paging.List[site.Site]{}, err
-	}
-	rows, err := selectAll(ctx, r.store.execFrom(ctx), query, args, scanSite, "list the sites")
-	if err != nil {
-		return paging.List[site.Site]{}, err
-	}
-	return keyset.Cut(rows, page)
+	return selectKeyed(ctx, r.store.execFrom(ctx), builder, siteKeyset(q), page, scanSite, "sites")
 }
 
 func scanSite(rows *sql.Rows) (site.Site, error) {

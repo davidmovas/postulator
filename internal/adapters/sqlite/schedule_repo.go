@@ -100,20 +100,7 @@ func (r *ScheduleRepo) List(ctx context.Context, q schedule.Query, page paging.R
 		builder = builder.Where(squirrel.Eq{"enabled": boolInt(*q.Enabled)})
 	}
 
-	keyset := scheduleKeyset(q.Desc)
-	keyed, err := keyset.Apply(builder, page)
-	if err != nil {
-		return paging.List[schedule.Schedule]{}, err
-	}
-	query, args, err := buildQuery(keyed, "schedules")
-	if err != nil {
-		return paging.List[schedule.Schedule]{}, err
-	}
-	rows, err := selectAll(ctx, r.store.execFrom(ctx), query, args, scanSchedule, "list the schedules")
-	if err != nil {
-		return paging.List[schedule.Schedule]{}, err
-	}
-	return keyset.Cut(rows, page)
+	return selectKeyed(ctx, r.store.execFrom(ctx), builder, scheduleKeyset(q.Desc), page, scanSchedule, "schedules")
 }
 
 func scheduleKeyset(desc bool) paging.Keyset[schedule.Schedule] {

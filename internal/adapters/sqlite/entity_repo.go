@@ -185,23 +185,14 @@ func (r *EntityRepo) List(ctx context.Context, q graph.EntityQuery, page paging.
 		builder = builder.Where(`name LIKE ? ESCAPE '\'`, escapeLike(q.NamePrefix)+"%")
 	}
 
-	keyset := entityKeyset(q)
-	keyed, err := keyset.Apply(builder, page)
+	list, err := selectKeyed(ctx, r.store.execFrom(ctx), builder, entityKeyset(q), page, scanEntity, "entities")
 	if err != nil {
 		return paging.List[graph.Entity]{}, err
 	}
-	query, args, err := buildQuery(keyed, "entities")
-	if err != nil {
-		return paging.List[graph.Entity]{}, err
-	}
-	entities, err := selectAll(ctx, r.store.execFrom(ctx), query, args, scanEntity, "list the entities")
-	if err != nil {
-		return paging.List[graph.Entity]{}, err
-	}
-	if attachErr := r.attachAnchorsByID(ctx, entities); attachErr != nil {
+	if attachErr := r.attachAnchorsByID(ctx, list.Items); attachErr != nil {
 		return paging.List[graph.Entity]{}, attachErr
 	}
-	return keyset.Cut(entities, page)
+	return list, nil
 }
 
 func (r *EntityRepo) attachAnchorsByID(ctx context.Context, entities []graph.Entity) error {

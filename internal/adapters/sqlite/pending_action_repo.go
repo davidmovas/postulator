@@ -67,20 +67,7 @@ func (r *PendingActionRepo) List(ctx context.Context, q agent.ActionQuery, page 
 		builder = builder.Where(squirrel.Eq{"status": string(*q.Status)})
 	}
 
-	keyset := pendingActionKeyset(q.Desc)
-	keyed, err := keyset.Apply(builder, page)
-	if err != nil {
-		return paging.List[agent.PendingAction]{}, err
-	}
-	query, args, err := buildQuery(keyed, "pending actions")
-	if err != nil {
-		return paging.List[agent.PendingAction]{}, err
-	}
-	rows, err := selectAll(ctx, r.store.execFrom(ctx), query, args, scanPendingAction, "list the pending actions")
-	if err != nil {
-		return paging.List[agent.PendingAction]{}, err
-	}
-	return keyset.Cut(rows, page)
+	return selectKeyed(ctx, r.store.execFrom(ctx), builder, pendingActionKeyset(q.Desc), page, scanPendingAction, "pending actions")
 }
 
 func pendingActionKeyset(desc bool) paging.Keyset[agent.PendingAction] {

@@ -111,20 +111,7 @@ func (r *RunRepo) List(ctx context.Context, q run.Query, page paging.Request) (p
 		builder = builder.Where(squirrel.Eq{"kind": string(*q.Kind)})
 	}
 
-	keyset := runKeyset(q)
-	keyed, err := keyset.Apply(builder, page)
-	if err != nil {
-		return paging.List[run.Run]{}, err
-	}
-	query, args, err := buildQuery(keyed, "runs")
-	if err != nil {
-		return paging.List[run.Run]{}, err
-	}
-	rows, err := selectAll(ctx, r.store.execFrom(ctx), query, args, scanRun, "list the runs")
-	if err != nil {
-		return paging.List[run.Run]{}, err
-	}
-	return keyset.Cut(rows, page)
+	return selectKeyed(ctx, r.store.execFrom(ctx), builder, runKeyset(q), page, scanRun, "runs")
 }
 
 func scanRun(rows *sql.Rows) (run.Run, error) {

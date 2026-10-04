@@ -75,13 +75,6 @@ const (
 
 var errNotClaimed = errors.New(errors.Conflict, "the run item moved on before it could be claimed")
 
-func nullText(value string) any {
-	if value == "" {
-		return nil
-	}
-	return value
-}
-
 type RunItemRepo struct {
 	store *Store
 }
@@ -237,20 +230,7 @@ func (r *RunItemRepo) List(ctx context.Context, q run.ItemQuery, page paging.Req
 		builder = builder.Where(squirrel.Eq{"status": string(*q.Status)})
 	}
 
-	keyset := itemKeyset(q)
-	keyed, err := keyset.Apply(builder, page)
-	if err != nil {
-		return paging.List[run.Item]{}, err
-	}
-	query, args, err := buildQuery(keyed, "run items")
-	if err != nil {
-		return paging.List[run.Item]{}, err
-	}
-	rows, err := selectAll(ctx, r.store.execFrom(ctx), query, args, scanItem, "list the run items")
-	if err != nil {
-		return paging.List[run.Item]{}, err
-	}
-	return keyset.Cut(rows, page)
+	return selectKeyed(ctx, r.store.execFrom(ctx), builder, itemKeyset(q), page, scanItem, "run items")
 }
 
 func itemKeyset(q run.ItemQuery) paging.Keyset[run.Item] {

@@ -3,7 +3,6 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/Masterminds/squirrel"
 
@@ -36,39 +35,6 @@ func pageNotFound(id string) *errors.Error {
 
 func pageConflict(path string) *errors.Error {
 	return errors.New(errors.Conflict, "a page with this path already exists in the site").WithDetail("path", path)
-}
-
-func nullTime(t *time.Time) any {
-	if t == nil {
-		return nil
-	}
-	return formatTime(*t)
-}
-
-func parseNullTime(raw sql.NullString) (*time.Time, error) {
-	if !raw.Valid {
-		return nil, nil
-	}
-	parsed, err := parseTime(raw.String)
-	if err != nil {
-		return nil, err
-	}
-	return &parsed, nil
-}
-
-func nullInt(v *int64) any {
-	if v == nil {
-		return nil
-	}
-	return *v
-}
-
-func optInt(raw sql.NullInt64) *int64 {
-	if !raw.Valid {
-		return nil
-	}
-	value := raw.Int64
-	return &value
 }
 
 func encodePlan(p pagemap.Page) (keywords, notes string, err error) {
@@ -156,20 +122,7 @@ func (r *PageRepo) List(ctx context.Context, q pagemap.Query, page paging.Reques
 		builder = builder.Where(`path LIKE ? ESCAPE '\'`, escapeLike(q.PathPrefix)+"%")
 	}
 
-	keyset := pageKeyset(q)
-	keyed, err := keyset.Apply(builder, page)
-	if err != nil {
-		return paging.List[pagemap.Page]{}, err
-	}
-	query, args, err := buildQuery(keyed, "pages")
-	if err != nil {
-		return paging.List[pagemap.Page]{}, err
-	}
-	rows, err := selectAll(ctx, r.store.execFrom(ctx), query, args, scanPage, "list the pages")
-	if err != nil {
-		return paging.List[pagemap.Page]{}, err
-	}
-	return keyset.Cut(rows, page)
+	return selectKeyed(ctx, r.store.execFrom(ctx), builder, pageKeyset(q), page, scanPage, "pages")
 }
 
 func scanPage(rows *sql.Rows) (pagemap.Page, error) {
