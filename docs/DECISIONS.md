@@ -2328,7 +2328,7 @@ tests written before each move.
   enum, float and bool sort keys, `ctx.WithRunID` and `WithConversationID` with the audit log
   fields that read them, `errors.Stack` and `Frame` with the stack every error captured,
   `middleware.Timeout`, the two `"openai"` provider constants beside `llm.ProviderOpenAI`,
-  `RunRepo.Active`, `MessageRepo.LatestSeq` and
+  `RunRepo.Active`, `Graph.Roots`, `MessageRepo.LatestSeq` and
   `ByConversation`, `CategoryRepo.Get`, `Store.Path`, `pagemap.Unmapped`, `InternalPath` and
   `Index.Len`, and exports one file used are unexported. In the frontend: three hooks with no
   caller and their endpoint wrappers, `runPhase`, `actionStatusTone`, `keywordTexts`, a second run
@@ -2340,7 +2340,9 @@ tests written before each move.
   `dto.PageSize` for a list's limit in place of `ListRequest.Normalize`, and `graph.Distinct`,
   which keeps a list of texts once as the store tells them apart, in place of a
   `CleanKeywords` that cleaned no keyword. The four `anchorsOf` say what each builds
-  (`requestedAnchors`, `sheetAnchors`, `targetAnchors`, `placedAnchors`).
+  (`requestedAnchors`, `sheetAnchors`, `targetAnchors`, `placedAnchors`). Thirteen repository
+  `List` methods repeated the keyset, the query, the select and the cut; `selectKeyed` does it once
+  and each keeps only its filters, and the nullable-column helpers live together in `rows.go`.
 - **A run or an item that waited before its first step still starts.** A run paused before it
   started and then resumed came back running, so its first claim never set `StartedAt` nor
   announced `run.started`, and the window showed a finished run with no start; an item held behind

@@ -95,7 +95,7 @@ Dependency rule (enforced by a test in `internal/app` using `go list -deps`): `d
 ### 5.2 Entity Graph (`domain/graph`)
 - `Entity{ID, SiteID, Name, Kind(hub|product|topic|category|custom), Intent, Keywords keyword.List, Anchors []Anchor, ScopeID *string, CanonicalPageID *string, Score float64, Source(import|user|ai), CreatedAt, UpdatedAt}`; `Anchor{Text, Source(user|ai), Weight}`. `keyword.List` is `[]{Text, Volume *int}` sorted by volume; the name is unique under `ScopeID`, the parent it was named under. *(Amended 2026-10-02.)*
 - `Edge{ID, SiteID, FromEntityID, ToEntityID, Kind(parent|related), Weight float64, Source(import|user|ai), Status(approved|proposed|rejected), CreatedAt}`. `parent` is directed child→parent; `related` is stored with `FromEntityID < ToEntityID`.
-- `Graph` value type built from entities+edges with pure methods: `Parents(id, depth)`, `Children(id)`, `Related(id, minWeight)`, `Roots()`, `ValidateAcyclic() error`, `Score()` (PageRank-like over approved edges, damping 0.85, 30 iterations).
+- `Graph` value type built from entities+edges with pure methods: `Parents(id, depth)`, `Children(id)`, `Related(id, minWeight)`, `ValidateAcyclic() error`, `Score()` (PageRank-like over approved edges, damping 0.85, 30 iterations). *(Amended 2026-10-04: `Roots()`, which only tests read, is gone.)*
 - Invariants: no self edges, no cycles on parent edges, edge endpoints in the same site.
 
 ### 5.3 Page Map (`domain/pagemap`)
