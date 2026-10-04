@@ -31,7 +31,7 @@ the same day on his word. The reasoning is under the four sections of those date
   override left at zero takes the built-in price.
 - **The agent runs on the same chain as the runs**, with a ledger row per attempt and its own
   `responses/1` history: a conversation from before keeps its transcript and the model forgets
-  it. Its tool schemas went from 85,991 to 63,304 bytes a round; loading tools on demand
+  it. Its tool schemas went from 85,991 to 63,183 bytes a round; loading tools on demand
   (`agent.toolLoading: deferred`, 6,506 bytes a round) is built and off until a funded key has
   tried it.
 - **WordPress categories were built and removed the same day.** Records of their own
@@ -166,6 +166,18 @@ by exhausting the writer, because an incomplete draft is tried again instead of 
 
 ## The gate
 
+**2026-10-04, on Windows, whole, after the categories came out, at `2b74b4a`.** `gofmt -l .`
+silent, the comment check, `golangci-lint run` and `task lint:e2e` 0 issues, `go vet -tags e2e`
+and `-tags uiharness` clean; `go test -race -count=1 -p 2 -covermode=atomic` green over every
+package in the same five groups, the profiles merged into `coverage.out`; `go run
+./cmd/covergate` **domain+application 87.87% of 9166** (gate 80%), **total 88.40% of 21989**
+(gate 70%); `task build` green and `task vocab` and `task events` leave no diff; `npm run
+typecheck` clean and **1509 vitest tests in 143 files**; `task ui:lint` green (376 s); on a fresh
+8088 stack with WooCommerce on, `task e2e:test`, `task e2e:full` and `task e2e:full:noplugin`
+green. Migrations end at **0044**; **93 tools**, 63,183 bytes of schema against the 63,200 the
+registry test allows; **124 bound methods**; the plugin is **1.2.0**. Not run: a live OpenAI call
+with a funded key, and the `E2E_SEO=yoast` pass.
+
 **2026-10-04, on Windows, whole, over the 2026-10-03 and 04 work at `dad410e`.** `gofmt -l .`
 silent, the comment check, `golangci-lint run` and `task lint:e2e` 0 issues; `go test -race
 -count=1 -p 2 -covermode=atomic` green over every package, run in five groups (kernel+domain,
@@ -259,7 +271,7 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 | 12 | Master password, backup, retention, e2e, release | done, reviewed |
 | 13 | The product frontend on one screen contract | done |
 | — | Hardening 2026-09-22/23: links, agent reliability, reversibility, agent cost, relink and repair as kinds, the content steps, the client scenario | done, gate green per wave |
-| — | 2026-10-03/04: OpenAI only on our own client, the spend in view, the whole workbook, the refactor; WordPress categories built and removed | done; the closing gate after the removal is pending |
+| — | 2026-10-03/04: OpenAI only on our own client, the spend in view, the whole workbook, the refactor; WordPress categories built and removed | done, gate green after the removal |
 
 ## Known gaps
 
@@ -335,24 +347,21 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 
 ## Next steps
 
-1. **The closing gate after the categories came out**: the whole Go suite and its coverage, both
-   lints, `task build`, the vitest suite, `task ui:lint` and the three docker suites on 8088, over
-   migration 0044 and plugin 1.2.0.
-2. **The pre-release smoke with a funded OpenAI key**: one generate run with the writer on flex
+1. **The pre-release smoke with a funded OpenAI key**: one generate run with the writer on flex
    (the tier served and the reasoning shown in the ledger), one agent turn with tools (cached
    tokens from its second round), and the spend panel naming both by purpose and model; then the
    probe's open tests and the seven checks under **Known gaps**, and only then a decision on
    `agent.toolLoading`.
-3. **A sandbox walk with the client's sheets and a real provider** (`task sandbox:up
+2. **A sandbox walk with the client's sheets and a real provider** (`task sandbox:up
    E2E_PLUGIN=1 E2E_WOO=1`, after `task sandbox:reset` if it still carries plugin 1.3.0 and its
    terms): import `samples/client-sheets.xlsx` as one workbook and check each sheet's tab, the
    Groups segment, that Category and Subcategory read ignored, and the Groups sheet's deeper rows
    under their URL parent inside Peptides; sync; run a page under TB-500 › Liquid; create a product
    by hand in WooCommerce under a category of the client's own, import the variation sheet in
    products mode, run it and see its categories untouched; revert both.
-4. **The client's own sites**: what a real model writes into the attributes, and whether a page
+3. **The client's own sites**: what a real model writes into the attributes, and whether a page
    builder hides the description, which `product_description_hidden` will say.
-5. **A release** when the owner asks: the 2026-10-02, 2026-10-03 and 2026-10-03/04 work as one
+4. **A release** when the owner asks: the 2026-10-02, 2026-10-03 and 2026-10-03/04 work as one
    minor version.
-6. The residue above: the denied tool row's decision, the four narrow-width UI items,
+5. The residue above: the denied tool row's decision, the four narrow-width UI items,
    `ProposeFromPages` and `Import.Apply` as runs, and `settings.changed` for a declared value.

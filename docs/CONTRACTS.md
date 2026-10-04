@@ -469,9 +469,9 @@ A tool is `{Def{Name, Description, Risk(read|write|dangerous), Schema}, Authoriz
 every tool lives in its own file and `Binding{SiteID, ConversationID, RunID, Mode}` scopes
 every call. Ninety-three tools, `runs_revert` (`dangerous`), `graph_move_entity` (`write`),
 `graph_preview_from_pages` (`read`), `graph_propose_from_keywords` (`read`) and
-`graph_apply_proposals` (`write`) among them, measuring 63,304 bytes of schema — about 15,800
+`graph_apply_proposals` (`write`) among them, measuring 63,183 bytes of schema — about 15,800
 tokens resent on every round of every turn, which `TestTheToolSchemasFitTheirCeiling` holds
-against `schemaCeilingBytes` (63,400) and logs with the eight widest. A description names what a
+against `schemaCeilingBytes` (63,200) and logs with the eight widest. A description names what a
 field takes, its default, its limits and the tool an id comes from, and no more; the chat
 instructions say once that an id is used as a read tool returned it and that a field left out
 keeps its value. `imports_preview` and `imports_apply` take `sheets: [{sheet, mappingId?,
