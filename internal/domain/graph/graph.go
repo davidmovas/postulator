@@ -184,16 +184,6 @@ func (g Graph) Related(id string, minWeight float64) []Neighbor {
 	return out
 }
 
-func (g Graph) Roots() []Entity {
-	out := make([]Entity, 0, len(g.ordered))
-	for i := range g.ordered {
-		if len(g.parents[g.ordered[i].ID]) == 0 {
-			out = append(out, g.ordered[i])
-		}
-	}
-	return out
-}
-
 func (g Graph) trail(cycle []string) string {
 	named := make([]string, 0, len(cycle))
 	for _, entityID := range cycle {

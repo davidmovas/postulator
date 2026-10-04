@@ -110,7 +110,7 @@ func TestParentsShortcutMovesTheAncestorToTheNearestLevel(t *testing.T) {
 	}
 }
 
-func TestChildrenRootsAndRelated(t *testing.T) {
+func TestChildrenAndRelated(t *testing.T) {
 	t.Parallel()
 
 	g := diamond(t, related("r1", entB, entC, 0.9, graph.StatusApproved), related("r2", entB, entE, 0.2, graph.StatusApproved), related("r3", entA, entB, 0.95, graph.StatusProposed))
@@ -120,9 +120,6 @@ func TestChildrenRootsAndRelated(t *testing.T) {
 	}
 	if got := names(g.Children(entD)); len(got) != 0 {
 		t.Errorf("Children(D) = %v, want none", got)
-	}
-	if got := names(g.Roots()); !slices.Equal(got, []string{"Alpha", "Echo"}) {
-		t.Errorf("Roots = %v", got)
 	}
 
 	neighbors := g.Related(entB, 0)
@@ -241,7 +238,7 @@ func TestEmptyGraph(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	if len(g.Entities()) != 0 || len(g.Roots()) != 0 || g.ValidateAcyclic() != nil {
+	if len(g.Entities()) != 0 || len(g.Edges()) != 0 || g.ValidateAcyclic() != nil {
 		t.Error("an empty graph is valid and has nothing in it")
 	}
 }

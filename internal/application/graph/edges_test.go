@@ -209,8 +209,8 @@ func TestLoadGraphAndRecomputeScores(t *testing.T) {
 		t.Fatalf("LoadGraph = %+v, %v", loaded, err)
 	}
 	domainGraph, err := h.service.Load(t.Context(), h.siteID)
-	if err != nil || len(domainGraph.Roots()) != 1 {
-		t.Errorf("Load = %d roots, %v", len(domainGraph.Roots()), err)
+	if err != nil || len(domainGraph.Descendants(hub.ID)) != 2 || len(domainGraph.Parents(hub.ID, 1)) != 0 {
+		t.Errorf("Load = %d entities under the hub, %v", len(domainGraph.Descendants(hub.ID)), err)
 	}
 	if _, err = h.service.LoadGraph(t.Context(), graph.LoadGraphRequest{SiteID: "missing"}); !errors.IsCode(err, errors.NotFound) {
 		t.Errorf("unknown site code = %q, want NOT_FOUND", errors.CodeOf(err))
