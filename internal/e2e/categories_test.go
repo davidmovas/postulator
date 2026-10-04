@@ -4,6 +4,7 @@ package e2e_test
 
 import (
 	"html"
+	"maps"
 	"net/http"
 	"net/url"
 	"slices"
@@ -251,27 +252,100 @@ func entitiesOf(t *testing.T, core *app.Core, siteID string) map[string]graph.En
 	}
 }
 
-func categoryChainOf(t *testing.T, core *app.Core, siteID, entityID string) []string {
-	t.Helper()
-
-	filed := entitiesOf(t, core, siteID)[entityID].Categories
-	chain := make([]string, 0, len(filed))
-	for i := range filed {
-		chain = append(chain, filed[i].Name)
+func namesOf(chain []dto.Category) []string {
+	names := make([]string, 0, len(chain))
+	for i := range chain {
+		names = append(names, chain[i].Name)
 	}
-	return chain
+	return names
 }
 
-func rootNamed(t *testing.T, core *app.Core, siteID, name string) (graph.Entity, bool) {
-	t.Helper()
+func recordIDsOf(chain []dto.Category) []string {
+	ids := make([]string, 0, len(chain))
+	for i := range chain {
+		ids = append(ids, chain[i].ID)
+	}
+	return ids
+}
 
-	byID := entitiesOf(t, core, siteID)
-	for id := range byID {
-		if byID[id].Name == name && byID[id].ScopeEntityID == nil {
-			return byID[id], true
+func shownTermIDsOf(chain []dto.Category) []int64 {
+	ids := make([]int64, 0, len(chain))
+	for i := range chain {
+		if chain[i].TermID != nil {
+			ids = append(ids, *chain[i].TermID)
 		}
 	}
-	return graph.Entity{}, false
+	return ids
+}
+
+func shelfOf(t *testing.T, core *app.Core, siteID string) []pages.CategoryNode {
+	t.Helper()
+
+	listed, err := core.Pages.ListCategories(t.Context(), pages.ListCategoriesRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("list the categories: %v", err)
+	}
+	return listed.Categories
+}
+
+func trailsOf(nodes []pages.CategoryNode) map[string]string {
+	byID := make(map[string]pages.CategoryNode, len(nodes))
+	for _, node := range nodes {
+		byID[node.ID] = node
+	}
+	trails := make(map[string]string, len(nodes))
+	for _, node := range nodes {
+		trail := node.Name
+		for at, walked := node.ParentID, 0; at != nil && walked < len(nodes); walked++ {
+			parent := byID[*at]
+			trail = parent.Name + " › " + trail
+			at = parent.ParentID
+		}
+		trails[node.ID] = trail
+	}
+	return trails
+}
+
+func assertTheWorkbookShelf(t *testing.T, core *app.Core, siteID string, applied imports.ApplyResponse) {
+	t.Helper()
+
+	dropped := make([]string, 0, 6)
+	for _, finding := range applied.Report.Warnings {
+		if finding.Code == string(imports.CodeCategoryLevelIsRoot) {
+			dropped = append(dropped, finding.Sheet)
+		}
+	}
+	if !slices.Contains(dropped, "Catalog") || !slices.Contains(dropped, "Entities") {
+		t.Errorf("the workbook reported %s on the sheets %v, want the Catalog and Entities sheets, whose Category column "+
+			"names the Root Entity %q", imports.CodeCategoryLevelIsRoot, dropped, workbookRoot)
+	}
+
+	shelf := shelfOf(t, core, siteID)
+	trails := slices.Sorted(maps.Values(trailsOf(shelf)))
+	for _, node := range shelf {
+		if strings.EqualFold(node.Name, workbookRoot) {
+			t.Errorf("the import made the category %+v among %v, though %q is the Root Entity of the Groups sheet",
+				node, trails, workbookRoot)
+		}
+	}
+	for _, want := range []string{"TB-500", "TB-500 › Liquid", "TB-500 › Capsules"} {
+		if !slices.Contains(trails, want) {
+			t.Fatalf("the site's categories are %v, want %q among them", trails, want)
+		}
+	}
+}
+
+func assertTheEntityShowsItsPageCategories(t *testing.T, core *app.Core, siteID string, page pages.Page) {
+	t.Helper()
+
+	if page.EntityID == nil {
+		t.Errorf("the import left %s without an entity", page.Path)
+		return
+	}
+	shown := entitiesOf(t, core, siteID)[*page.EntityID].Categories
+	if !slices.Equal(recordIDsOf(shown), recordIDsOf(page.Categories)) {
+		t.Errorf("the entity of %s shows the categories %v, want its page's %v", page.Path, namesOf(shown), namesOf(page.Categories))
+	}
 }
 
 func importTheClientWorkbook(t *testing.T, core *app.Core, siteID string) imports.ApplyResponse {
@@ -310,6 +384,7 @@ func importTheClientWorkbook(t *testing.T, core *app.Core, siteID string) import
 			t.Fatalf("the workbook import wrote %+v and no entity %q of the %s sheet", applied.Counts, witness, sheet)
 		}
 	}
+	assertTheWorkbookShelf(t, core, siteID, applied)
 	return applied
 }
 
@@ -358,7 +433,7 @@ func publishAlone(t *testing.T, core *app.Core, siteID string, page pages.Page) 
 }
 
 func assertTheChainIsOnTheSite(t *testing.T, live *site, taxonomy wp.Taxonomy, path string, written *steps.CategoryWrite,
-	chain []string) {
+	chain []dto.Category) {
 	t.Helper()
 
 	if string(written.Taxonomy) != string(taxonomy) || !written.Taken {
@@ -366,11 +441,14 @@ func assertTheChainIsOnTheSite(t *testing.T, live *site, taxonomy wp.Taxonomy, p
 			written.Taken, taxonomy)
 	}
 	names := make([]string, 0, len(written.Terms))
+	records := make([]string, 0, len(written.Terms))
 	for i := range written.Terms {
 		names = append(names, written.Terms[i].Name)
+		records = append(records, written.Terms[i].CategoryID)
 	}
-	if !slices.Equal(names, chain) {
-		t.Fatalf("%s was filed under %v, want the chain %v its entity sits in", path, names, chain)
+	if !slices.Equal(names, namesOf(chain)) || !slices.Equal(records, recordIDsOf(chain)) {
+		t.Fatalf("%s was filed under %v (records %v), want the chain %v (records %v) the page is filed under", path, names,
+			records, namesOf(chain), recordIDsOf(chain))
 	}
 
 	parent := int64(0)
@@ -386,6 +464,16 @@ func assertTheChainIsOnTheSite(t *testing.T, live *site, taxonomy wp.Taxonomy, p
 	}
 }
 
+func assertThePageShowsItsTerms(t *testing.T, core *app.Core, siteID, path string, written *steps.CategoryWrite) {
+	t.Helper()
+
+	shown := pagesByPath(t, core.Pages, siteID)[path].Categories
+	if !slices.Equal(shownTermIDsOf(shown), termIDsOf(written)) || len(shown) != len(written.Terms) {
+		t.Errorf("%s shows the categories %+v, want each with the term %v the run filed it under", path, shown,
+			termIDsOf(written))
+	}
+}
+
 func assertNoCategoryIsNamedAfterTheRoot(t *testing.T, core *app.Core, live *site, siteID string) {
 	t.Helper()
 
@@ -393,11 +481,9 @@ func assertNoCategoryIsNamedAfterTheRoot(t *testing.T, core *app.Core, live *sit
 	if len(made) == 0 {
 		return
 	}
-	root, found := rootNamed(t, core, siteID, workbookRoot)
 	t.Errorf("the site carries the categories %+v named after %q, the Root Entity of the Groups sheet; only the Category "+
-		"and Subcategory columns make WordPress categories, yet the whole-workbook import left the root as %q filed "+
-		"under %+v (found %t), since the Catalog and Entities sheets name it in their Category column",
-		made, workbookRoot, root.Kind, root.Categories, found)
+		"and Subcategory columns make WordPress categories, and the import filed its pages under %v",
+		made, workbookRoot, slices.Sorted(maps.Values(trailsOf(shelfOf(t, core, siteID)))))
 }
 
 func assertTheArchiveListsThePageAndAPost(t *testing.T, core *app.Core, live *site, siteID string, term steps.AssignedTerm,
@@ -489,13 +575,18 @@ func TestTheClientWorkbookFilesItsPagesUnderTheirCategories(t *testing.T) {
 
 	stored := pagesByPath(t, core.Pages, siteID)
 	filed := stored[filedPath]
-	if filed.WPID == nil || *filed.WPID != liquidID || filed.EntityID == nil {
-		t.Fatalf("the import left %s as %+v, want the synced page %d with its entity", filedPath, filed, liquidID)
+	if filed.WPID == nil || *filed.WPID != liquidID {
+		t.Fatalf("the import left %s as %+v, want the synced page %d", filedPath, filed, liquidID)
 	}
-	chain := categoryChainOf(t, core, siteID, *filed.EntityID)
-	if len(chain) < 2 || !slices.Equal(chain[len(chain)-2:], []string{"TB-500", "Liquid"}) {
-		t.Fatalf("%s sits in the chain %v, want it to end in the Category and Subcategory the Groups sheet names", filedPath, chain)
+	chain := filed.Categories
+	if !slices.Equal(namesOf(chain), []string{"TB-500", "Liquid"}) || filed.CategoriesNeedPlugin {
+		t.Fatalf("%s is filed under %v (needs the plugin %t), want the Category and Subcategory the Groups sheet names, "+
+			"which the plugin lets a page carry", filedPath, namesOf(chain), filed.CategoriesNeedPlugin)
 	}
+	if held := shownTermIDsOf(chain); len(held) != 0 {
+		t.Fatalf("%s shows the terms %v before any run filed it", filedPath, held)
+	}
+	assertTheEntityShowsItsPageCategories(t, core, siteID, filed)
 
 	firstRun, first := publishAlone(t, core, siteID, filed)
 	written := first.Publish.Categories
@@ -503,6 +594,7 @@ func TestTheClientWorkbookFilesItsPagesUnderTheirCategories(t *testing.T) {
 		t.Fatalf("the run created %s, which was on the site already", filedPath)
 	}
 	assertTheChainIsOnTheSite(t, live, wp.TaxonomyCategory, filedPath, written, chain)
+	assertThePageShowsItsTerms(t, core, siteID, filedPath, written)
 	if created := createdIDsOf(written); !sameSet(created, termIDsOf(written)) {
 		t.Errorf("the first publish says it created %v of %v, want every level of the chain", created, termIDsOf(written))
 	}
@@ -518,14 +610,20 @@ func TestTheClientWorkbookFilesItsPagesUnderTheirCategories(t *testing.T) {
 
 	revertPutsTheClientsCategoriesBack(t, core, live, firstRun, liquidID, before, picks.ID, written)
 
-	sibling := stored[siblingPath]
-	if sibling.ID == "" || sibling.WPID != nil || sibling.EntityID == nil {
-		t.Fatalf("the import left %s as %+v, want a planned page with its entity", siblingPath, sibling)
+	sibling := pagesByPath(t, core.Pages, siteID)[siblingPath]
+	if sibling.ID == "" || sibling.WPID != nil {
+		t.Fatalf("the import left %s as %+v, want a planned page", siblingPath, sibling)
 	}
-	siblingChain := categoryChainOf(t, core, siteID, *sibling.EntityID)
+	siblingChain := sibling.Categories
+	if !slices.Equal(namesOf(siblingChain), []string{"TB-500", "Capsules"}) ||
+		!slices.Equal(shownTermIDsOf(siblingChain), termIDsOf(written)[:1]) {
+		t.Fatalf("%s is filed under %+v, want TB-500, already on the site as %d, and Capsules, not yet", siblingPath,
+			siblingChain, written.Terms[0].TermID)
+	}
 	_, second := publishAlone(t, core, siteID, sibling)
 	again := second.Publish.Categories
 	assertTheChainIsOnTheSite(t, live, wp.TaxonomyCategory, siblingPath, again, siblingChain)
+	assertThePageShowsItsTerms(t, core, siteID, siblingPath, again)
 
 	reused := make(map[string]int64, len(written.Terms))
 	for i := range written.Terms {
@@ -543,6 +641,6 @@ func TestTheClientWorkbookFilesItsPagesUnderTheirCategories(t *testing.T) {
 	if carried := live.filed(t, "pages", second.Publish.WPID).Categories; !sameSet(carried, termIDsOf(again)) {
 		t.Errorf("%s carries %v, want the chain %v", siblingPath, carried, termIDsOf(again))
 	}
-	t.Logf("%s was filed under %v beside the client's %d and put back; %s reused %v and created %v",
-		filedPath, chain, picks.ID, siblingPath, termIDsOf(written), createdIDsOf(again))
+	t.Logf("%s was filed under %v as %v beside the client's %d and put back; %s reused %v and created %v",
+		filedPath, namesOf(chain), termIDsOf(written), picks.ID, siblingPath, termIDsOf(written)[:1], createdIDsOf(again))
 }

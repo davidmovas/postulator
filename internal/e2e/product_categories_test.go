@@ -3,6 +3,7 @@
 package e2e_test
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -94,12 +95,16 @@ func TestAProductKeepsTheClientsCategoryAndGainsOurs(t *testing.T) {
 	}
 
 	page := pagesByPath(t, core.Pages, siteID)[vialPath]
-	if page.WPType != string(pagemap.WPProduct) || page.WPID == nil || *page.WPID != int64(vial.ID) || page.EntityID == nil {
-		t.Fatalf("the import left %s as %+v, want the client's product %d with an entity", vialPath, page, vial.ID)
+	if page.WPType != string(pagemap.WPProduct) || page.WPID == nil || *page.WPID != int64(vial.ID) {
+		t.Fatalf("the import left %s as %+v, want the client's product %d", vialPath, page, vial.ID)
 	}
-	chain := categoryChainOf(t, core, siteID, *page.EntityID)
-	if !slices.Equal(chain, []string{vials, small}) {
-		t.Fatalf("the product sits in the chain %v, want %v", chain, []string{vials, small})
+	chain := page.Categories
+	if !slices.Equal(namesOf(chain), []string{vials, small}) || len(shownTermIDsOf(chain)) != 0 || page.CategoriesNeedPlugin {
+		t.Fatalf("the product is filed under %+v (needs the plugin %t), want %v, neither in the store yet", chain,
+			page.CategoriesNeedPlugin, []string{vials, small})
+	}
+	if trails := slices.Collect(maps.Values(trailsOf(shelfOf(t, core, siteID)))); !slices.Contains(trails, vials+" › "+small) {
+		t.Fatalf("the site's categories are %v, want %s under %s", trails, small, vials)
 	}
 
 	started, err := core.Runs.Start(t.Context(), runs.StartRequest{
@@ -125,6 +130,7 @@ func TestAProductKeepsTheClientsCategoryAndGainsOurs(t *testing.T) {
 	written := final.Publish.Categories
 
 	assertTheChainIsOnTheSite(t, live, wp.TaxonomyProductCategory, vialPath, written, chain)
+	assertThePageShowsItsTerms(t, core, siteID, vialPath, written)
 	if created := createdIDsOf(written); !sameSet(created, termIDsOf(written)) {
 		t.Errorf("the product run says it created %v of %v, want both levels", created, termIDsOf(written))
 	}

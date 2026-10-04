@@ -3,13 +3,15 @@
 package e2e_test
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/app"
-	"github.com/davidmovas/postulator/internal/application/graph"
+	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/domain/content"
@@ -24,43 +26,32 @@ const (
 	filedPostTopic = "tb 500 dosing notes"
 )
 
-func entityNamed(t *testing.T, core *app.Core, siteID, name string) graph.Entity {
+func importFiledPost(t *testing.T, core *app.Core, siteID string) pages.Page {
 	t.Helper()
 
-	byID := entitiesOf(t, core, siteID)
-	found := make([]graph.Entity, 0, 1)
-	for id := range byID {
-		if byID[id].Name == name {
-			found = append(found, byID[id])
-		}
+	sheet := filepath.Join(t.TempDir(), "posts.csv")
+	rows := "Category,Path,Title,H1,Keywords,Post Type\n" +
+		"TB-500," + filedPostPath + ",TB-500 dosing notes,TB-500 dosing notes," + filedPostTopic + "," + string(pagemap.WPPost) + "\n"
+	if err := os.WriteFile(sheet, []byte(rows), 0o600); err != nil {
+		t.Fatalf("write the sheet: %v", err)
 	}
-	if len(found) != 1 {
-		t.Fatalf("the graph holds %d entities named %q, want one", len(found), name)
-	}
-	return found[0]
-}
-
-func plantFiledPost(t *testing.T, core *app.Core, siteID, templateID string) pages.Page {
-	t.Helper()
-
-	under := entityNamed(t, core, siteID, "TB-500")
-	created, err := core.Graph.CreateEntity(t.Context(), graph.CreateEntityRequest{
-		SiteID: siteID, Name: "TB-500 Dosing Notes", Kind: "topic", Keywords: []dto.Keyword{{Text: filedPostTopic}},
-		ParentID: under.ID,
-	})
+	seen, err := core.Imports.Inspect(t.Context(), imports.InspectRequest{SiteID: siteID, Path: sheet})
 	if err != nil {
-		t.Fatalf("create the post's entity under TB-500: %v", err)
+		t.Fatalf("inspect the sheet: %v", err)
+	}
+	applied, err := core.Imports.Apply(t.Context(), imports.ApplyRequest{SiteID: siteID, Path: sheet, Mapping: seen.Detected})
+	if err != nil || len(applied.Report.Errors) != 0 {
+		t.Fatalf("apply the sheet: %v %+v", err, applied.Report.Errors)
+	}
+	if applied.Counts.CategoriesCreated != 0 {
+		t.Errorf("the sheet created %d categories, want TB-500 matched to the one the workbook made", applied.Counts.CategoriesCreated)
 	}
 
-	entityID := created.Entity.ID
-	planted, err := core.Pages.Create(t.Context(), pages.CreateRequest{
-		SiteID: siteID, Path: filedPostPath, WPType: string(pagemap.WPPost), Title: "TB-500 dosing notes",
-		EntityID: &entityID, TemplateID: &templateID,
-	})
-	if err != nil {
-		t.Fatalf("plan the post %s: %v", filedPostPath, err)
+	post := pagesByPath(t, core.Pages, siteID)[filedPostPath]
+	if post.ID == "" || post.WPType != string(pagemap.WPPost) || post.WPID != nil {
+		t.Fatalf("the import left %s as %+v, want a planned post", filedPostPath, post)
 	}
-	return planted.Page
+	return post
 }
 
 func TestTheWholeLoopDegradesWithoutThePluginAndFilesOnlyItsPosts(t *testing.T) {
@@ -80,16 +71,22 @@ func TestTheWholeLoopDegradesWithoutThePluginAndFilesOnlyItsPosts(t *testing.T) 
 	importTheClientWorkbook(t, core, siteID)
 
 	liquid := pagesByPath(t, core.Pages, siteID)[filedPath]
-	if liquid.ID == "" || liquid.WPID != nil || liquid.EntityID == nil {
-		t.Fatalf("the import left %s as %+v, want a planned page with its entity", filedPath, liquid)
+	if liquid.ID == "" || liquid.WPID != nil {
+		t.Fatalf("the import left %s as %+v, want a planned page", filedPath, liquid)
 	}
-	pageChain := categoryChainOf(t, core, siteID, *liquid.EntityID)
+	pageChain := liquid.Categories
+	if !slices.Equal(namesOf(pageChain), []string{"TB-500", "Liquid"}) || !liquid.CategoriesNeedPlugin {
+		t.Fatalf("%s is filed under %v (needs the plugin %t), want TB-500 and Liquid, which a page carries only with "+
+			"the plugin", filedPath, namesOf(pageChain), liquid.CategoriesNeedPlugin)
+	}
+	post := importFiledPost(t, core, siteID)
+	postChain := post.Categories
+	if !slices.Equal(namesOf(postChain), []string{"TB-500"}) || !slices.Equal(recordIDsOf(postChain), recordIDsOf(pageChain[:1])) ||
+		post.CategoriesNeedPlugin {
+		t.Fatalf("the post is filed under %+v (needs the plugin %t), want the TB-500 record %s, which a post carries "+
+			"without the plugin", postChain, post.CategoriesNeedPlugin, pageChain[0].ID)
+	}
 	categoryTemplate := templateOfKind(t, core, categoryKind)
-	post := plantFiledPost(t, core, siteID, categoryTemplate)
-	postChain := categoryChainOf(t, core, siteID, *post.EntityID)
-	if len(pageChain) == 0 || len(postChain) == 0 || postChain[len(postChain)-1] != "TB-500" {
-		t.Fatalf("the page sits in %v and the post in %v, want both filed, the post under TB-500", pageChain, postChain)
-	}
 
 	request := runs.StartRequest{
 		SiteID: siteID, PageIDs: []string{liquid.ID, post.ID}, TemplateID: categoryTemplate,
@@ -148,6 +145,7 @@ func TestTheWholeLoopDegradesWithoutThePluginAndFilesOnlyItsPosts(t *testing.T) 
 		t.Fatalf("the post %s went up without its categories: %+v", filedPostPath, filed.Findings)
 	}
 	assertTheChainIsOnTheSite(t, live, wp.TaxonomyCategory, filedPostPath, filed.Categories, postChain)
+	assertThePageShowsItsTerms(t, core, siteID, filedPostPath, filed.Categories)
 	if carried := live.filed(t, "posts", filed.WPID).Categories; !sameSet(carried, termIDsOf(filed.Categories)) {
 		t.Errorf("the post %s carries %v, want the chain %v", filedPostPath, carried, termIDsOf(filed.Categories))
 	}
@@ -156,5 +154,5 @@ func TestTheWholeLoopDegradesWithoutThePluginAndFilesOnlyItsPosts(t *testing.T) 
 			steps.CodePageCategoriesNeedPlugin)
 	}
 	t.Logf("%s went up without its chain %v and said %s; the post %s was filed under %v",
-		filedPath, pageChain, steps.CodePageCategoriesNeedPlugin, filedPostPath, termIDsOf(filed.Categories))
+		filedPath, namesOf(pageChain), steps.CodePageCategoriesNeedPlugin, filedPostPath, termIDsOf(filed.Categories))
 }
