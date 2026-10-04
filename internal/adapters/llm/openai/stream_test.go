@@ -467,12 +467,15 @@ func TestAStreamThatOutlivesTheClientsTimeoutFails(t *testing.T) {
 	server.Enqueue(answer)
 
 	deltas, err := newClient(server, openai.WithTimeout(300*time.Millisecond)).Stream(t.Context(), chat("hello"))
-	if err != nil {
-		t.Fatalf("Stream: %v", err)
+	if err == nil {
+		got := listen(t, deltas)
+		if got.done != nil {
+			t.Fatalf("stream = %+v, want it cut by the timeout before it finished", got)
+		}
+		err = got.err
 	}
-	got := listen(t, deltas)
-	if !errors.IsCode(got.err, errors.External) || kernelOf(t, got.err).Retry == nil {
-		t.Fatalf("stream = %+v, want a retryable external failure", got)
+	if !errors.IsCode(err, errors.External) || kernelOf(t, err).Retry == nil {
+		t.Fatalf("the stream ended with %v, want a retryable external failure whether it had opened or not", err)
 	}
 }
 

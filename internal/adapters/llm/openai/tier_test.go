@@ -317,17 +317,45 @@ func TestACallerWhoLeavesDuringFlexIsNotResent(t *testing.T) {
 	}
 }
 
+type silentProvider struct {
+	tiers []any
+	mu    sync.Mutex
+}
+
+func (s *silentProvider) RoundTrip(req *http.Request) (*http.Response, error) {
+	var body map[string]any
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	s.tiers = append(s.tiers, body["service_tier"])
+	s.mu.Unlock()
+
+	<-req.Context().Done()
+	return nil, req.Context().Err()
+}
+
+func (s *silentProvider) sent() []any {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]any(nil), s.tiers...)
+}
+
 func TestAClientTimeoutDuringFlexIsNotResent(t *testing.T) {
 	t.Parallel()
 
-	server := openaitest.New(t)
-	server.Enqueue(openaitest.Text("late").Reply().After(5*time.Second), openaitest.Text("never").Reply())
+	silent := &silentProvider{}
+	client := openai.New(keys(), models(),
+		openai.WithBaseURL("http://provider.invalid/v1"),
+		openai.WithHTTPClient(&http.Client{Transport: silent}),
+		openai.WithTimeout(60*time.Millisecond),
+		openai.WithFlexPatience(patienceAsked), openai.WithAlarm((&patience{}).arm))
 
-	_, err := newClient(server, openai.WithTimeout(60*time.Millisecond), openai.WithFlexPatience(time.Second)).Complete(t.Context(), onFlex("hello"))
+	_, err := client.Complete(t.Context(), onFlex("hello"))
 	if !errors.IsCode(err, errors.External) {
 		t.Fatalf("Complete = %v (%s), want %s", err, errors.CodeOf(err), errors.External)
 	}
-	if got := tiers(t, server); !sameTiers(got, "flex") {
+	if got := silent.sent(); !sameTiers(got, "flex") {
 		t.Errorf("tiers sent = %v, want only the flex attempt", got)
 	}
 }
