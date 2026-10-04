@@ -2128,6 +2128,9 @@ lose the model's memory of them; the writer on flex with a fallback, every role'
 
 ## 2026-10-04 — WordPress categories, their own records, and the whole workbook in one import
 
+*Superseded the same day by "no categories: the client's Category columns are WooCommerce's" at
+the end of this file, all but the whole workbook; kept as history.*
+
 The client writes Category and Subcategory in his sheets, and none of it reached the site,
 although categories are a second way through it for his visitors; and a workbook imported one sheet
 at a time, in an order that mattered. The owner's decisions of 2026-10-03: only the Category,
@@ -2370,3 +2373,84 @@ tests written before each move.
   compares whole anchors, so an entity is skipped only when its anchors are equal in text, source
   and weight.
 - The canvas under the graph map was left as it is, by the owner's choice.
+
+## 2026-10-04 — no categories: the client's Category columns are WooCommerce's
+
+The client saw the categories built that day and said that the Category, Subcategory and Sub
+Subcategory columns of his sheets are WooCommerce's product categories, which he keeps himself in
+the store. The owner removed categories from the whole application the same day, the Go and the
+screens, as if they had never been added, and kept every other change of the same commits: the
+OpenAI-only client, the spend panel, the whole workbook in one import, the rewrite and `graph.Key`.
+None of it had been released.
+
+### The owner's answers
+
+- **The Category columns are ignored.** Category, Subcategory, Sub Subcategory and every other
+  level column make no category and no entity group; only a `Root Entity` or `Root` column makes a
+  group. That holds wherever a level column comes from: the headers a sheet is detected by, a saved
+  mapping and the agent. `Mapping.Bind` and `Uses` keep only the root level columns and report every
+  other one, `Root Category` and `Brand` among them, as `ignored`; a mapping maps something only
+  through its root level columns, so one that names only Category and Subcategory is refused; the
+  wizard offers as group columns only the root headers detected for the sheet. The option keeps its
+  name, `levelColumns`, because it is stored JSON and part of a tool's schema, and no stored mapping
+  is migrated.
+- **No product category is written again.** A product's name, price, stock, SKU, status, slug and
+  categories are never sent, the 2026-10-03 rule, and a product revert touches no category.
+- **A URL parent wins inside the row's Root group.** A row's entity takes its parent from its
+  parent cell; else from its URL parent, when that parent lies inside the row's own Root group; else
+  from the Root group; else from the URL tree. With Root Peptides, `/peptides/bpc-157/liquid/` puts
+  Liquid under BPC-157, not under Peptides. A URL parent lies inside the group when it, or a row
+  above it reached through URL parents alone, belongs to the group; a page already on the site does
+  when an entity above it carries the group's name by `graph.Key`. A URL parent that is the group's
+  own page gives the group, as before, and one in another Root group gives the row's own group. The
+  URL parent is kept as weakly as the URL tree, so a matched entity that has a parent keeps it. A
+  parent cell is resolved by the same test, so one that names a namesake deeper in the group is
+  found instead of being `ambiguous_parent`.
+
+### Decided without asking
+
+- **A forward migration undoes the records.** 0044 drops the index `pages_category`, then
+  `pages.category_id`, then `category_terms` with its index and `categories` with its two; its down
+  recreates them with the exact text and index names of 0039–0041, the column last. 0039–0043 are
+  not edited, as 0042 and 0043 undid the flag model's 0033 and 0034 without editing them. Nothing is
+  converted: a development database loses its category records and its filings, which were never
+  released.
+- **The companion plugin returns to 1.2.0**, byte for byte its content at `v2.3.0`: 1.3.0 and its
+  `page_categories` was the only plugin change since, and it never shipped. `wp-plugin/openapi.yaml`
+  is the 1.2.0 contract again.
+- **`wp/category.go` is not restored**: its `ListCategories` and `CreateCategory` had no production
+  caller even before the category work. The terms client, `wp.SameTermName` and the term id a
+  refusal named go with the rest of the adapter's category code.
+- **What the range added for categories and other code now uses stays**: `wp.Forbidden`, which
+  three other callers read; `pages.Deps`, without its two category fields; the run screens' revert
+  and sync findings lists, which show every finding, `revert_meta_kept` among them; the workbook's
+  per-sheet `after` fold, which keeps the scopes, and `scope_clash`.
+- **Not this feature, and kept**: the graph's entity kind `category` and its synonyms, the Category
+  template, a product category page (`product_cat` as a page type, `product_category_unwritable`)
+  and every guard that refuses to write one.
+- **What an earlier run left is harmless.** A run artifact written with `publish_result.categories`
+  decodes with the field ignored, and its revert touches no category. A site whose stored
+  capabilities still name `page_categories` keeps the word until its next sync, and nothing reads
+  it.
+
+### What it supersedes
+
+- **The whole 2026-10-04 categories section** as it bears on categories: the category records and
+  `category.Key`, the category chains and the root rule of the import, the parent taken from the
+  deepest category level, the export's category columns and `category_chain_cut`, the filing on
+  publish, the product categories, the revert's terms, the sync's adoption,
+  `page_categories_need_plugin`, `publish_result.categories`, the plugin 1.3.0 and what the screens
+  and the services said of categories, `PagesService.ListCategories` among them. Its whole workbook
+  stands, less the categories it named: the `after` fold keeps the scopes, and the workbook as one
+  import equals its sheets one by one with no category or filing left to compare. Its line that
+  only a root level makes a group stands, with every other level column ignored where it was a
+  category level, and its undoing of the flag model by 0042 and 0043 is the precedent 0044 follows.
+- **The 2026-10-04 line that a product gains our product categories beside the client's**, which
+  had superseded the 2026-10-03 rule: the 2026-10-03 rule holds again.
+- **The 2026-10-02 line that the level columns build a tree of groups**: only the Root levels do,
+  as they had since 2026-10-04, and the others are ignored.
+- **The parent precedence** of 2026-10-02, "the parent cell, else the row's deepest group, else the
+  URL tree", and its 2026-10-04 form through the deepest category level: the precedence is the one
+  above.
+- **The third of the rewrite's three keys**: `category.Key` goes with the records; `graph.Key` and
+  a keyword's own lowercase remain.
