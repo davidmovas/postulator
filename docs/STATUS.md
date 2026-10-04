@@ -39,8 +39,10 @@ the same day on his word. The reasoning is under the four sections of those date
   model as a flag on an entity that 0042 and 0043 undid) filed pages, posts and products under the
   chain of a sheet's Category columns. The client then said those columns are WooCommerce's, which
   he keeps himself, and the owner took categories out of the whole application: migration 0044
-  drops the three, no WordPress or WooCommerce category is read or written, the import ignores
-  every level column but Root Entity and Root, and a URL parent wins inside the row's Root group.
+  drops the three, nothing is filed under a WordPress or WooCommerce category and none is written,
+  the import ignores every level column but Root Entity and Root, and a URL parent wins inside the
+  row's Root group. The Catalog's products, which no Root names, sit under its Shop page by the URL
+  tree.
 - **The companion plugin stays 1.2.0**: the 1.3.0 that filed pages under categories never shipped,
   and the plugin's sources are those of `v2.3.0` again.
 - **A workbook imports in one go**: one preview and one apply over the chosen sheets in the

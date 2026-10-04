@@ -83,9 +83,10 @@ with the page each took (`page`, empty for none) and the rows under it; each ent
 brackets; `levelColumns` and `noteColumns` are mapping options, and `own_entity` is a field. Only
 a level column headed `Root Entity` or `Root` is a level, and it makes entity groups; the
 detection names no other. Any other column a saved mapping or the agent puts in `levelColumns`,
-Category, `Root Category` and `Brand` among them, is `ignored` and makes nothing, so a mapping
-whose level columns are all of that kind and that names no path, entity or indent column is
-`INVALID` with `details.field = columns`. A row's entity takes its parent from its parent cell,
+Category, `Root Category` and `Brand` among them, stays stored, is `ignored` and makes nothing. A
+mapping maps something only through a field, an indent column or a root column: one that names
+none of them is detected from its sheet's headers on a preview and refused `INVALID` with
+`details.field = columns` when saved. A row's entity takes its parent from its parent cell,
 else from its URL parent when that parent lies inside the row's own root group, else from the
 group, else from the URL tree. Findings `ambiguous_parent`, `ambiguous_entity` and `scope_clash`
 block an apply like an unknown parent; `bad_volume`, `technical_parent`, `group_without_page` and
@@ -93,11 +94,11 @@ block an apply like an unknown parent; `bad_volume`, `technical_parent`, `group_
 
 A whole workbook is one request: `PreviewRequest` and `ApplyRequest` take `sheets: [{sheet,
 mapping}]` in place of the one-sheet `mapping`, which stays; `sheets` beside a `mapping` that names
-columns, levels, indents or an id is `INVALID` with `details.field = sheets`, and so is an unknown
+columns, root levels, indents or an id is `INVALID` with `details.field = sheets`, and so is an unknown
 sheet or one named twice. The sheets are planned in the workbook's order whatever order the
 request gives, share the `import.maxRows` budget and are written in one transaction;
 `saveMappingAs` keeps one mapping per sheet as `"<name> / <sheet>"`. A mapping with an `id` and no columns loads that saved mapping of the
-same site, and one with no columns, levels or indents is detected from its sheet's headers.
+same site, and one with no columns, root levels or indents is detected from its sheet's headers.
 `InspectResponse.sheets[i].detected` is each sheet's own detected mapping, with `options.rowType`
 `pages` or `products`. Every report item and finding carries its `sheet`, and `summary.sheets`
 lists the sheets read.
