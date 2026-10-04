@@ -181,7 +181,7 @@ func (s *Service) previewFromPages(ctx context.Context, rawSiteID string, pageID
 				Anchors:          graphdomain.CleanKeywords(proposed.Anchors),
 				Parent:           strings.TrimSpace(proposed.ParentPath),
 				Related:          graphdomain.CleanKeywords(proposed.RelatedPaths),
-				ExistingEntityID: state.byName[fold(name)],
+				ExistingEntityID: state.byName[graphdomain.Key(name)],
 			})
 		}
 	}
@@ -356,7 +356,7 @@ func (s *Service) snapshot(ctx context.Context, siteID string) (siteGraph, error
 		byName: make(map[string]string, len(entities)), byPath: make(map[string]string, len(pages)),
 	}
 	for i := range entities {
-		state.byName[fold(state.labels[entities[i].ID])] = entities[i].ID
+		state.byName[graphdomain.Key(state.labels[entities[i].ID])] = entities[i].ID
 	}
 	for i := range pages {
 		if pages[i].EntityID != nil {
@@ -405,8 +405,8 @@ func (s *Service) applyRelated(ctx context.Context, siteID string, proposal rela
 	now := s.now()
 	return s.uow.Do(ctx, func(c context.Context) error {
 		for _, proposed := range proposal.Edges {
-			from, knownFrom := state.byName[fold(proposed.From)]
-			to, knownTo := state.byName[fold(proposed.To)]
+			from, knownFrom := state.byName[graphdomain.Key(proposed.From)]
+			to, knownTo := state.byName[graphdomain.Key(proposed.To)]
 			if !knownFrom || !knownTo || from == to {
 				out.Skipped++
 				continue
@@ -498,8 +498,4 @@ func parentReason(path, parentPath string) string {
 
 func relatedReason(path, relatedPath string) string {
 	return path + " and " + relatedPath + " are sibling pages of one subject"
-}
-
-func fold(name string) string {
-	return strings.ToLower(strings.TrimSpace(name))
 }

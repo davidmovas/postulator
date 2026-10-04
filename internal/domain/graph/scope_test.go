@@ -143,6 +143,12 @@ func TestScopeClashesAreTwoNamesUnderOneParent(t *testing.T) {
 			entities: []graph.Entity{named(entA, "Shoes", nil), named(entB, "shoes", nil)},
 			clashes:  [][]string{{entA, entB}},
 		},
+		{
+			name: "names the store tells apart under one parent",
+			entities: []graph.Entity{
+				named(entA, "Coffee", nil), named(entC, "Café", new(entA)), named(entD, "CAFÉ", new(entA)),
+			},
+		},
 	}
 
 	for _, tc := range cases {

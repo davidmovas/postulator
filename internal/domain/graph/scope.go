@@ -56,15 +56,11 @@ func scopeKey(scope *string) string {
 	return *scope
 }
 
-func nameKey(name string) string {
-	return strings.ToLower(strings.TrimSpace(name))
-}
-
 func ScopeClashes(entities []Entity) []Clash {
 	held := make(map[string]int, len(entities))
 	clashes := make([]Clash, 0)
 	for i := range entities {
-		key := scopeKey(entities[i].ScopeID) + "\x00" + nameKey(entities[i].Name)
+		key := scopeKey(entities[i].ScopeID) + "\x00" + Key(entities[i].Name)
 		at, seen := held[key]
 		if !seen {
 			held[key] = -1 - i
@@ -120,7 +116,7 @@ func Labels(entities []Entity) map[string]string {
 	uses := make(map[string]int, len(entities))
 	for i := range entities {
 		byID[entities[i].ID] = entities[i]
-		uses[nameKey(entities[i].Name)]++
+		uses[Key(entities[i].Name)]++
 	}
 
 	labels := make(map[string]string, len(entities))
@@ -131,7 +127,7 @@ func Labels(entities []Entity) map[string]string {
 }
 
 func labelOf(entity Entity, byID map[string]Entity, uses map[string]int, climbed map[string]struct{}) string {
-	if entity.ScopeID == nil || uses[nameKey(entity.Name)] < 2 {
+	if entity.ScopeID == nil || uses[Key(entity.Name)] < 2 {
 		return entity.Name
 	}
 	parent, found := byID[*entity.ScopeID]
@@ -139,7 +135,7 @@ func labelOf(entity Entity, byID map[string]Entity, uses map[string]int, climbed
 		return entity.Name
 	}
 	climbed[entity.ID] = struct{}{}
-	if uses[nameKey(parent.Name)] < 2 {
+	if uses[Key(parent.Name)] < 2 {
 		return parent.Name + " " + entity.Name
 	}
 	return labelOf(parent, byID, uses, climbed) + " " + entity.Name

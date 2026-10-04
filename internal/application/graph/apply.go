@@ -96,7 +96,7 @@ func (s *Service) adopt(ctx context.Context, siteID string, proposed *ProposedEn
 		}
 	}
 
-	entityID, exists := state.byName[fold(name)]
+	entityID, exists := state.byName[graphdomain.Key(name)]
 	if !exists {
 		keywords, keywordsErr := application.KeywordList(proposed.Keywords, "keywords")
 		if keywordsErr != nil {
@@ -123,7 +123,7 @@ func (s *Service) adopt(ctx context.Context, siteID string, proposed *ProposedEn
 		}
 		state.entities = append(state.entities, entity)
 		state.labels[entity.ID] = name
-		state.byName[fold(name)] = entity.ID
+		state.byName[graphdomain.Key(name)] = entity.ID
 		entityID = entity.ID
 	}
 	if !hasPage {
@@ -191,7 +191,7 @@ func (s *Service) connect(ctx context.Context, siteID string, proposals []Propos
 	out *ApplyProposalsResponse, now time.Time) error {
 	for i := range proposals {
 		proposed := &proposals[i]
-		from, known := state.byName[fold(proposed.Name)]
+		from, known := state.byName[graphdomain.Key(proposed.Name)]
 		if !known {
 			continue
 		}
@@ -231,7 +231,7 @@ func resolveRef(state *siteGraph, raw string) (string, bool) {
 	if entityID, ok := state.byPath[ref]; ok {
 		return entityID, true
 	}
-	entityID, ok := state.byName[fold(ref)]
+	entityID, ok := state.byName[graphdomain.Key(ref)]
 	return entityID, ok
 }
 

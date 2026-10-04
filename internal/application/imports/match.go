@@ -19,7 +19,7 @@ func (b *builder) identity(at int, visiting map[int]bool) string {
 	}
 	visiting[root] = true
 	defer delete(visiting, root)
-	return b.parentKey(&b.units[root], visiting) + "/" + key(b.units[root].name)
+	return b.parentKey(&b.units[root], visiting) + "/" + graph.Key(b.units[root].name)
 }
 
 func (b *builder) parentKey(u *unit, visiting map[int]bool) string {
@@ -33,7 +33,7 @@ func (b *builder) parentKey(u *unit, visiting map[int]bool) string {
 		}
 		return "{" + parent + "}"
 	case refName:
-		return "?" + key(u.parent.name)
+		return "?" + graph.Key(u.parent.name)
 	case refNone:
 	}
 	return ""
@@ -47,11 +47,11 @@ func (b *builder) resolve(name string, context int) (parentRef, FindingCode) {
 }
 
 func (b *builder) inFile(name string, context int) (parentRef, FindingCode, bool) {
-	want := key(name)
+	want := graph.Key(name)
 	seen := make(map[string]struct{})
 	named := make([]int, 0)
 	for at := range b.units {
-		if key(b.units[at].name) != want {
+		if graph.Key(b.units[at].name) != want {
 			continue
 		}
 		identity := b.identity(at, map[int]bool{})
@@ -80,7 +80,7 @@ func (b *builder) inFile(name string, context int) (parentRef, FindingCode, bool
 }
 
 func (b *builder) onSite(name string, context int) (parentRef, FindingCode) {
-	sites := b.state.byName[key(name)]
+	sites := b.state.byName[graph.Key(name)]
 	switch {
 	case len(sites) == 0:
 		return parentRef{}, CodeUnknownParent
@@ -90,10 +90,10 @@ func (b *builder) onSite(name string, context int) (parentRef, FindingCode) {
 		return parentRef{}, CodeAmbiguousParent
 	}
 
-	group := key(b.groups.nodes[context].name)
+	group := graph.Key(b.groups.nodes[context].name)
 	inGroup := make([]string, 0, len(sites))
 	for i := range sites {
-		if scope := sites[i].ScopeID; scope != nil && key(b.byID[*scope].Name) == group {
+		if scope := sites[i].ScopeID; scope != nil && graph.Key(b.byID[*scope].Name) == group {
 			inGroup = append(inGroup, sites[i].ID)
 		}
 	}
@@ -186,13 +186,13 @@ func (b *builder) sameAsWeakParent(at int) bool {
 	switch u.parent.kind {
 	case refUnit:
 		parent := b.root(u.parent.unit)
-		if parent == at || key(b.units[parent].name) != key(u.name) {
+		if parent == at || graph.Key(b.units[parent].name) != graph.Key(u.name) {
 			return false
 		}
 		b.absorb(parent, at)
 		return true
 	case refSite:
-		if key(b.byID[u.parent.site].Name) != key(u.name) {
+		if graph.Key(b.byID[u.parent.site].Name) != graph.Key(u.name) {
 			return false
 		}
 		if into, taken := b.claimed[u.parent.site]; taken {
@@ -211,7 +211,7 @@ func (u *unit) placed() bool {
 }
 
 func (b *builder) find(u *unit) string {
-	candidates := b.state.byName[key(u.name)]
+	candidates := b.state.byName[graph.Key(u.name)]
 	if found := b.underItsParent(u, candidates); found != "" {
 		return found
 	}

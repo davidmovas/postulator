@@ -35,7 +35,7 @@ func newSiteState(
 		edgeKeys:  make(map[string]struct{}, len(edges)),
 	}
 	for i := range entities {
-		state.byName[key(entities[i].Name)] = append(state.byName[key(entities[i].Name)], entities[i])
+		state.byName[graph.Key(entities[i].Name)] = append(state.byName[graph.Key(entities[i].Name)], entities[i])
 	}
 	for i := range pages {
 		state.byPath[pages[i].Path] = pages[i]

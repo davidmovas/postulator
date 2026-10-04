@@ -91,7 +91,7 @@ func New(entities []Entity, edges []Edge) (Graph, error) {
 }
 
 func byName(a, b Entity) int {
-	if c := strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)); c != 0 {
+	if c := strings.Compare(Key(a.Name), Key(b.Name)); c != 0 {
 		return c
 	}
 	return strings.Compare(a.ID, b.ID)

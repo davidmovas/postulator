@@ -193,3 +193,30 @@ func TestABatchPutsTheSameNameUnderTwoParents(t *testing.T) {
 		})
 	}
 }
+
+func TestABatchRefusesOnlyTheNamesTheStoreRefuses(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	created, err := h.service.CreateEntities(t.Context(), graph.CreateEntitiesRequest{
+		SiteID: h.siteID,
+		Entities: []graph.EntityInput{
+			{Name: "Coffee", Kind: "product"},
+			{Name: "Café", Kind: "topic", ParentName: "coffee"},
+			{Name: "CAFÉ", Kind: "topic", ParentName: "COFFEE"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateEntities of two names the store tells apart: %v", err)
+	}
+	if len(created.Entities) != 3 || len(created.Edges) != 2 {
+		t.Fatalf("the batch wrote %d entities and %d edges, want 3 and 2", len(created.Entities), len(created.Edges))
+	}
+
+	_, err = h.service.CreateEntities(t.Context(), graph.CreateEntitiesRequest{
+		SiteID: h.siteID, Entities: []graph.EntityInput{{Name: "café", Kind: "topic", ParentName: "Coffee"}},
+	})
+	if !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("a name the store holds under the parent = %v, want an invalid batch", err)
+	}
+}

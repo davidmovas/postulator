@@ -129,11 +129,10 @@ func CleanKeywords(raw []string) []string {
 		if trimmed == "" {
 			continue
 		}
-		key := strings.ToLower(trimmed)
-		if _, dup := seen[key]; dup {
+		if _, dup := seen[Key(trimmed)]; dup {
 			continue
 		}
-		seen[key] = struct{}{}
+		seen[Key(trimmed)] = struct{}{}
 		out = append(out, trimmed)
 	}
 	return out
@@ -153,11 +152,10 @@ func newAnchors(anchors []Anchor) ([]Anchor, error) {
 		case anchor.Weight < 0 || anchor.Weight > 1:
 			return nil, invalid("anchor weight must be between 0 and 1", field+".weight")
 		}
-		key := strings.ToLower(anchor.Text)
-		if _, dup := seen[key]; dup {
+		if _, dup := seen[Key(anchor.Text)]; dup {
 			return nil, invalid("anchor text is repeated", field+".text")
 		}
-		seen[key] = struct{}{}
+		seen[Key(anchor.Text)] = struct{}{}
 		out = append(out, anchor)
 	}
 	return out, nil

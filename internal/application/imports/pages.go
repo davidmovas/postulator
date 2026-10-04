@@ -46,7 +46,7 @@ func (s *Service) kindTemplates(ctx context.Context, siteID string, sheet *draft
 	found := &kindTemplates{byKind: make(map[string]*string), noted: make(map[string]struct{})}
 	for _, path := range sheet.sortedPaths() {
 		draft := sheet.pages[path]
-		kind := key(draft.pageKind)
+		kind := draft.kind()
 		if _, looked := found.byKind[kind]; draft.entityOnly || kind == "" || looked {
 			continue
 		}
@@ -79,7 +79,7 @@ func (s *Service) templateFor(ctx context.Context, siteID, pageKind string) (*st
 }
 
 func (k *kindTemplates) of(draft *pageDraft, p *plan) *string {
-	kind := key(draft.pageKind)
+	kind := draft.kind()
 	found := k.byKind[kind]
 	if _, noted := k.noted[kind]; kind == "" || found != nil || noted {
 		return found

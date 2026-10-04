@@ -33,6 +33,10 @@ type pageDraft struct {
 	at         importmap.Origin
 }
 
+func (p *pageDraft) kind() string {
+	return strings.ToLower(strings.TrimSpace(p.pageKind))
+}
+
 func (p *pageDraft) cellType() pagemap.WPType {
 	wpType := pagemap.WPType(strings.ToLower(strings.TrimSpace(p.wpType)))
 	if !wpType.Valid() {

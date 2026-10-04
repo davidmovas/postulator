@@ -50,11 +50,6 @@ func (s *Service) ProposeFromKeywords(ctx context.Context, req ProposeFromKeywor
 		return ProposeFromKeywordsResponse{}, errors.New(errors.Invalid, "a proposal from keywords needs at least one keyword").
 			WithDetail("field", "keywords")
 	}
-	asked := make(map[string]keyword.Keyword, len(given))
-	for _, item := range given {
-		asked[fold(item.Text)] = item
-	}
-
 	owner, err := s.sites.Get(ctx, siteID)
 	if err != nil {
 		return ProposeFromKeywordsResponse{}, err
@@ -100,7 +95,7 @@ func (s *Service) ProposeFromKeywords(ctx context.Context, req ProposeFromKeywor
 
 		for i := range proposal.Entities {
 			proposed := &proposal.Entities[i]
-			answered, known := asked[fold(proposed.Keyword)]
+			answered, known := given.Find(proposed.Keyword)
 			name := strings.TrimSpace(proposed.Name)
 			if name == "" || !known {
 				response.Skipped++
@@ -114,23 +109,23 @@ func (s *Service) ProposeFromKeywords(ctx context.Context, req ProposeFromKeywor
 				Name:             name,
 				Kind:             string(kindOf(proposed.Kind)),
 				Intent:           strings.TrimSpace(proposed.Intent),
-				Keywords:         application.KeywordViews(answeredKeywords(answered, proposed.SecondaryKeywords, asked)),
+				Keywords:         application.KeywordViews(answeredKeywords(answered, proposed.SecondaryKeywords, given)),
 				Anchors:          graphdomain.CleanKeywords(proposed.Anchors),
 				Parent:           parentName,
 				Related:          graphdomain.CleanKeywords(proposed.RelatedNames),
-				ExistingEntityID: state.byName[fold(name)],
+				ExistingEntityID: state.byName[graphdomain.Key(name)],
 			})
 		}
 	}
 	return response, nil
 }
 
-func answeredKeywords(answered keyword.Keyword, others []string, asked map[string]keyword.Keyword) keyword.List {
+func answeredKeywords(answered keyword.Keyword, others []string, given keyword.List) keyword.List {
 	listed := make([]keyword.Keyword, 0, len(others)+1)
 	listed = append(listed, answered)
 	for _, other := range others {
-		if given, known := asked[fold(other)]; known {
-			listed = append(listed, given)
+		if asked, known := given.Find(other); known {
+			listed = append(listed, asked)
 			continue
 		}
 		listed = append(listed, keyword.Keyword{Text: other})

@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"strings"
 
+	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
 
@@ -17,7 +18,7 @@ type groupNode struct {
 }
 
 func (n *groupNode) namedBy(row *rowDraft) bool {
-	return key(row.named()) == key(n.name)
+	return graph.Key(row.named()) == graph.Key(n.name)
 }
 
 func (n *groupNode) sluggedBy(row *rowDraft) bool {
@@ -36,7 +37,7 @@ func groupsOf(rows []rowDraft) *groups {
 		parent := -1
 		path := ""
 		for _, name := range rows[i].roots {
-			path += "\x00" + key(name)
+			path += "\x00" + graph.Key(name)
 			at, known := g.byKey[path]
 			if !known {
 				at = len(g.nodes)
@@ -123,7 +124,7 @@ func (g *groups) eligible(node *groupNode, rows []rowDraft, sheet *drafts, adopt
 		if _, taken := adopted[row.path]; taken {
 			continue
 		}
-		if row.name == "" || key(row.name) == key(node.name) {
+		if row.name == "" || graph.Key(row.name) == graph.Key(node.name) {
 			out = append(out, at)
 		}
 	}

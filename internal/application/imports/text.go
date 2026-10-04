@@ -4,13 +4,10 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
-
-func key(name string) string {
-	return strings.ToLower(strings.TrimSpace(name))
-}
 
 func slugOf(name string) string {
 	return strings.ReplaceAll(importmap.Words(name), " ", "-")
@@ -35,10 +32,10 @@ func union(into, more []string) []string {
 			if trimmed == "" {
 				continue
 			}
-			if _, dup := seen[key(trimmed)]; dup {
+			if _, dup := seen[graph.Key(trimmed)]; dup {
 				continue
 			}
-			seen[key(trimmed)] = struct{}{}
+			seen[graph.Key(trimmed)] = struct{}{}
 			out = append(out, trimmed)
 		}
 	}

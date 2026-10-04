@@ -184,6 +184,41 @@ func TestTextsAreTheKeywordsInOrder(t *testing.T) {
 	}
 }
 
+func TestFindNamesAKeywordTheWayTheListHoldsIt(t *testing.T) {
+	t.Parallel()
+
+	list := keyword.New([]keyword.Keyword{{Text: "BPC 157", Volume: new(12000)}, {Text: "Café Crème"}})
+	cases := []struct {
+		name   string
+		text   string
+		want   string
+		volume int
+		found  bool
+	}{
+		{name: "as written", text: "BPC 157", want: "BPC 157", volume: 12000, found: true},
+		{name: "in another case with spaces around it", text: "  bpc 157 ", want: "BPC 157", volume: 12000, found: true},
+		{name: "an accented capital", text: "CAFÉ CRÈME", want: "Café Crème", volume: unknown, found: true},
+		{name: "another phrase", text: "bpc-157"},
+		{name: "nothing", text: " "},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, found := list.Find(tc.text)
+			switch {
+			case found != tc.found:
+				t.Fatalf("Find(%q) found %t, want %t", tc.text, found, tc.found)
+			case !found && got != (keyword.Keyword{}):
+				t.Fatalf("Find(%q) = %+v, want nothing", tc.text, got)
+			case found:
+				assertList(t, keyword.List{got}, []want{{text: tc.want, volume: tc.volume}})
+			}
+		})
+	}
+}
+
 func TestRestIsEveryKeywordAfterTheMainOne(t *testing.T) {
 	t.Parallel()
 

@@ -83,6 +83,16 @@ func (l List) Texts() []string {
 	return texts
 }
 
+func (l List) Find(text string) (Keyword, bool) {
+	wanted := fold(strings.TrimSpace(text))
+	for _, item := range l {
+		if fold(item.Text) == wanted {
+			return item, true
+		}
+	}
+	return Keyword{}, false
+}
+
 func (l List) Rest() []string {
 	if len(l) < 2 {
 		return []string{}

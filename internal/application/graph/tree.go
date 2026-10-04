@@ -106,10 +106,10 @@ func (s *Service) CreateEntities(ctx context.Context, req CreateEntitiesRequest)
 func namedIn(existing, built []graphdomain.Entity) map[string][]string {
 	known := make(map[string][]string, len(existing)+len(built))
 	for i := range existing {
-		known[folded(existing[i].Name)] = append(known[folded(existing[i].Name)], existing[i].ID)
+		known[graphdomain.Key(existing[i].Name)] = append(known[graphdomain.Key(existing[i].Name)], existing[i].ID)
 	}
 	for i := range built {
-		known[folded(built[i].Name)] = append(known[folded(built[i].Name)], built[i].ID)
+		known[graphdomain.Key(built[i].Name)] = append(known[graphdomain.Key(built[i].Name)], built[i].ID)
 	}
 	return known
 }
@@ -169,10 +169,10 @@ func (s *Service) parentEdges(req CreateEntitiesRequest, built, existing []graph
 		}
 
 		field := "entities[" + strconv.Itoa(i) + "].parentName"
-		candidates := slices.DeleteFunc(slices.Clone(known[folded(parent)]), func(id string) bool { return id == built[i].ID })
+		candidates := slices.DeleteFunc(slices.Clone(known[graphdomain.Key(parent)]), func(id string) bool { return id == built[i].ID })
 		switch len(candidates) {
 		case 0:
-			if slices.Contains(known[folded(parent)], built[i].ID) {
+			if slices.Contains(known[graphdomain.Key(parent)], built[i].ID) {
 				return nil, invalidField("an entity cannot be its own parent", field)
 			}
 			return nil, invalidField("no entity of this batch or of the site is named "+parent, field)
@@ -219,10 +219,6 @@ func (s *Service) acyclic(ctx context.Context, siteID string) error {
 		return err
 	}
 	return g.ValidateAcyclic()
-}
-
-func folded(name string) string {
-	return strings.ToLower(strings.TrimSpace(name))
 }
 
 func invalidField(message, field string) error {
