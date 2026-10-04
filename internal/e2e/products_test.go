@@ -33,10 +33,6 @@ type storeAttribute struct {
 	ID      int      `json:"id"`
 }
 
-type storeCategory struct {
-	ID int64 `json:"id"`
-}
-
 type storeProduct struct {
 	Name             string           `json:"name"`
 	Slug             string           `json:"slug"`
@@ -47,16 +43,7 @@ type storeProduct struct {
 	ShortDescription string           `json:"short_description"`
 	Permalink        string           `json:"permalink"`
 	Attributes       []storeAttribute `json:"attributes"`
-	Categories       []storeCategory  `json:"categories"`
 	ID               int              `json:"id"`
-}
-
-func (p storeProduct) categoryIDs() []int64 {
-	ids := make([]int64, 0, len(p.Categories))
-	for _, category := range p.Categories {
-		ids = append(ids, category.ID)
-	}
-	return ids
 }
 
 const (
@@ -84,24 +71,15 @@ func requireStore(t *testing.T, live *site) {
 	}
 }
 
-func (s *site) createProduct(t *testing.T, name, slug string, categories ...int64) storeProduct {
+func (s *site) createProduct(t *testing.T, name, slug string) storeProduct {
 	t.Helper()
 
-	body := map[string]any{
+	var created storeProduct
+	s.call(t, http.MethodPost, "/wp-json/wc/v3/products", map[string]any{
 		"name": name, "slug": slug, "type": "simple", "status": "publish", "regular_price": "19.90", "sku": slug,
 		"description": clientDescription, "short_description": clientShort,
 		"attributes": []map[string]any{{"name": "Origin", "options": []string{"Client"}, "visible": true}},
-	}
-	if len(categories) > 0 {
-		filed := make([]storeCategory, 0, len(categories))
-		for _, id := range categories {
-			filed = append(filed, storeCategory{ID: id})
-		}
-		body["categories"] = filed
-	}
-
-	var created storeProduct
-	s.call(t, http.MethodPost, "/wp-json/wc/v3/products", body, http.StatusCreated, &created)
+	}, http.StatusCreated, &created)
 	s.removeLater(t, "/wp-json/wc/v3/products/"+strconv.Itoa(created.ID)+"?force=true")
 	return s.product(t, created.ID)
 }
@@ -155,11 +133,6 @@ func productAnswer(keyword string) string {
 
 func productTemplate(t *testing.T, core *app.Core) string {
 	t.Helper()
-	return templateOfKind(t, core, "product")
-}
-
-func templateOfKind(t *testing.T, core *app.Core, kind string) string {
-	t.Helper()
 
 	listed, err := core.Templates.ListTemplates(t.Context(), templates.ListTemplatesRequest{
 		Scope: "global", ListRequest: dto.ListRequest{Limit: 20},
@@ -168,11 +141,11 @@ func templateOfKind(t *testing.T, core *app.Core, kind string) string {
 		t.Fatalf("list the templates: %v", err)
 	}
 	for i := range listed.Items {
-		if listed.Items[i].PageKind == kind {
+		if listed.Items[i].PageKind == "product" {
 			return listed.Items[i].ID
 		}
 	}
-	t.Fatalf("the shipped %s template is missing", kind)
+	t.Fatal("the shipped product template is missing")
 	return ""
 }
 

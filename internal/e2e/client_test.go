@@ -266,21 +266,11 @@ func assertEveryPlantedFaultIsReported(t *testing.T, core *app.Core, siteID stri
 	}
 }
 
-func trashedByTheClientLoop() []string {
-	slugs := make([]string, 0, len(cancelTargets)+1)
-	for _, path := range append(slices.Clone(cancelTargets), deleteTarget) {
-		slugs = append(slugs, pagemap.Slug(path))
-	}
-	return slugs
-}
-
 func TestTheClientLoopFromTheSamples(t *testing.T) {
 	live := newSite(t)
 	requirePlugin(t, live.env, true)
 	live.clearUnder(t, clientPrefixes...)
-	live.dropTrashed(t, "pages", trashedByTheClientLoop()...)
 	defer func() {
-		live.dropTrashed(t, "pages", trashedByTheClientLoop()...)
 		if !t.Failed() {
 			live.clearUnder(t, clientPrefixes...)
 		}
