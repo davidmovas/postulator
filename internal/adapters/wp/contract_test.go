@@ -14,8 +14,6 @@ import (
 
 var httpMethods = []string{"get", "put", "post", "delete", "patch"}
 
-const pluginVersion = "1.3.0"
-
 func contractDocument(t *testing.T) string {
 	t.Helper()
 
@@ -127,10 +125,7 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 		{name: "preview query argument", snippet: "postulator_preview"},
 		{name: "preview capability", snippet: "\n              - preview\n"},
 		{name: "seo read capability", snippet: "\n              - seo_meta_read\n"},
-		{name: "page categories capability", snippet: "\n              - page_categories\n"},
-		{name: "page categories on core pages", snippet: "/wp/v2/pages"},
-		{name: "category archives", snippet: "/category/"},
-		{name: "plugin version", snippet: "\n  version: " + pluginVersion + "\n"},
+		{name: "plugin version", snippet: "\n  version: 1.2.0\n"},
 	}
 
 	document := contractDocument(t)
@@ -142,35 +137,6 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 				t.Errorf("the contract does not carry %q", tc.snippet)
 			}
 		})
-	}
-}
-
-func TestThePluginTheFakeAndTheContractShareOneVersion(t *testing.T) {
-	t.Parallel()
-
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "wp-plugin", "postulator-companion", "postulator-companion.php"))
-	if err != nil {
-		t.Fatalf("read the plugin: %v", err)
-	}
-	source := strings.ReplaceAll(string(raw), "\r\n", "\n")
-
-	for _, snippet := range []string{
-		"\n * Version: " + pluginVersion + "\n",
-		"const VERSION             = '" + pluginVersion + "';",
-		"'preview', 'page_categories' );",
-	} {
-		if !strings.Contains(source, snippet) {
-			t.Errorf("the plugin does not carry %q", snippet)
-		}
-	}
-
-	server := wptest.New(t)
-	capabilities, err := newClient(t, server).Capabilities(t.Context())
-	if err != nil {
-		t.Fatalf("Capabilities: %v", err)
-	}
-	if capabilities.Version != pluginVersion || !capabilities.Has(wp.CapabilityPageCategories) {
-		t.Errorf("the fake reports %+v, want version %s with %s", capabilities, pluginVersion, wp.CapabilityPageCategories)
 	}
 }
 

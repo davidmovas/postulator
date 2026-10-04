@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Postulator companion plugin
-  version: 1.3.0
+  version: 1.2.0
   summary: The REST namespace the Postulator companion plugin adds to a WordPress site.
   description: >-
     Every route lives under the WordPress REST namespace postulator/v1 and is
@@ -9,18 +9,7 @@ info:
     The plugin requires the edit_posts capability on every route. A site that
     does not have the plugin installed answers every route with the WordPress
     404 body {"code":"rest_no_route"}, which is how a client detects its
-    absence and degrades to core REST. From version 1.3.0 the plugin also
-    registers the core category taxonomy for pages, on init after core has
-    registered it, so /wp/v2/pages accepts a categories list of term ids on a
-    create or an update, replaces the page's whole set with it and returns it
-    on every read, exactly as /wp/v2/posts does; without the plugin core
-    ignores the field on a page and leaves it out of the response. The
-    categories themselves are read and created through core's
-    /wp/v2/categories. A category archive at /category/{slug}/ then lists the
-    pages filed under the category beside its posts, because the plugin adds
-    page to the post types of the main query of a category archive outside
-    wp-admin, keeping every post type that query already names. Version 1.3.0
-    advertises this as the capability page_categories and adds no route.
+    absence and degrades to core REST.
 servers:
   - url: https://{site}/wp-json/postulator/v1
     variables:
@@ -349,12 +338,10 @@ components:
         capabilities:
           type: array
           description: >-
-            For version 1.3.0 this is exactly bulk, seo_meta, seo_meta_read,
-            content_hash, raw, preview and page_categories, in that order. A
-            1.2.0 plugin lists the same list without page_categories, and its
-            site keeps no categories on a page; a 1.1.0 plugin lists neither
-            that nor seo_meta_read and serves no read of the SEO meta; a 1.0.0
-            plugin lists none of those nor preview.
+            For version 1.2.0 this is exactly bulk, seo_meta, seo_meta_read,
+            content_hash, raw and preview, in that order. A 1.1.0 plugin lists
+            the same list without seo_meta_read and serves no read of the SEO
+            meta; a 1.0.0 plugin lists neither that nor preview.
           items:
             type: string
             enum:
@@ -364,7 +351,6 @@ components:
               - content_hash
               - raw
               - preview
-              - page_categories
         seoPlugin:
           type: string
           enum:
