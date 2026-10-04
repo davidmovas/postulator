@@ -7,7 +7,7 @@ import type { ImportRowType } from "../../generated/vocab.js";
 import { importRowTypes, isOneOf } from "../../generated/vocab.js";
 import { Field, Input, Panel, PanelHeader, SectionLabel, Segmented, Select, Switch } from "../../ui/index.js";
 import { freeHeaders, toggled } from "./columns.js";
-import { rowTypeLabel } from "./labels.js";
+import { isRootLevel, rowTypeLabel } from "./labels.js";
 import type { SheetSettings } from "./workbook.js";
 
 function letterOf(at: number): string {
@@ -41,10 +41,15 @@ interface ColumnChecklistProps {
     hint: string;
     choices: readonly string[];
     chosen: readonly string[];
+    noteOf?: (header: string) => string;
     onToggle: (header: string) => void;
 }
 
-function ColumnChecklist({ title, hint, choices, chosen, onToggle }: ColumnChecklistProps): ReactElement {
+function levelNote(header: string): string {
+    return isRootLevel(header) ? copy.imports.columns.levelRoot : copy.imports.columns.levelCategory;
+}
+
+function ColumnChecklist({ title, hint, choices, chosen, noteOf, onToggle }: ColumnChecklistProps): ReactElement {
     return (
         <Panel>
             <PanelHeader title={title} />
@@ -54,18 +59,29 @@ function ColumnChecklist({ title, hint, choices, chosen, onToggle }: ColumnCheck
                     <p className="text-2xs text-ink-dim">{copy.imports.columns.noFreeColumns}</p>
                 ) : (
                     <ul className="flex flex-col">
-                        {choices.map((header) => (
-                            <li key={header} className="flex h-7 items-center">
-                                <Switch
-                                    className="w-full"
-                                    label={header}
-                                    checked={chosen.includes(header)}
-                                    onChange={() => {
-                                        onToggle(header);
-                                    }}
-                                />
-                            </li>
-                        ))}
+                        {choices.map((header) => {
+                            const on = chosen.includes(header);
+                            return (
+                                <li key={header} className="flex h-7 items-center gap-2">
+                                    <Switch
+                                        className="min-w-0 flex-1"
+                                        label={header}
+                                        checked={on}
+                                        onChange={() => {
+                                            onToggle(header);
+                                        }}
+                                    />
+                                    {noteOf === undefined ? null : (
+                                        <span
+                                            data-column-note={on ? true : undefined}
+                                            className="w-20 shrink-0 truncate text-right text-2xs text-ink-faint"
+                                        >
+                                            {on ? noteOf(header) : ""}
+                                        </span>
+                                    )}
+                                </li>
+                            );
+                        })}
                     </ul>
                 )}
             </div>
@@ -234,6 +250,7 @@ export function OptionsPanel({
                         hint={copy.imports.columns.levelsHint}
                         choices={freeHeaders(headers, columns, notes)}
                         chosen={levels}
+                        noteOf={levelNote}
                         onToggle={(header) => {
                             onOptions({ ...options, levelColumns: toggled(levels, header, headers) });
                         }}

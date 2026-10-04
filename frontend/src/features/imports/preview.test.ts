@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { PreviewReport } from "../../data/types.js";
-import { columnsBySheet, sheetsIn } from "./preview.js";
+import { categoryPathKey } from "../../domain/categories.js";
+import { columnsBySheet, createdPaths, sheetsIn } from "./preview.js";
 
 function report(part: Partial<PreviewReport>): PreviewReport {
     return {
@@ -44,8 +45,38 @@ describe("the sheets a preview read", () => {
             },
             want: ["Catalog", "Forms", "Peptides"],
         },
+        {
+            name: "a sheet that only files categories, and no sheet for the categories an apply removes",
+            part: {
+                categories: [
+                    { sheet: "Catalog", path: ["Peptides"], action: "create", rows: 2 },
+                    { path: ["Old"], action: "delete", rows: 0 },
+                ],
+            },
+            want: ["Catalog"],
+        },
     ])("lists $name", ({ part, want }) => {
         expect(sheetsIn(report(part))).toEqual(want);
+    });
+});
+
+describe("the categories an import creates", () => {
+    it("keys each created category by its whole path and leaves the found and removed ones out", () => {
+        const created = createdPaths(
+            report({
+                categories: [
+                    { sheet: "Catalog", path: ["Peptides"], action: "match", rows: 5 },
+                    { sheet: "Catalog", path: ["Peptides", "Healing"], action: "create", rows: 3 },
+                    { sheet: "Forms", path: ["Peptides", "Healing"], action: "match", rows: 1 },
+                    { path: ["Old"], action: "delete", rows: 0 },
+                ],
+            }),
+        );
+        expect([...created]).toStrictEqual([categoryPathKey(["Peptides", "Healing"])]);
+    });
+
+    it("creates nothing from a preview that files no page", () => {
+        expect(createdPaths(report({})).size).toBe(0);
     });
 });
 

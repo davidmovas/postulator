@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { copy } from "../copy/index.js";
 import type { Category } from "./categories.js";
-import { chainItems, filedItems, pageCategoryItems } from "./categories.js";
+import { categoryPathKey, chainItems, filedItems, pageCategoryItems, plannedItems } from "./categories.js";
 
 const peptides: Category = { id: "peptides", name: "Peptides", termId: 12 };
 const healing: Category = { id: "healing", name: "Healing" };
@@ -59,6 +59,29 @@ describe("chainItems", () => {
 
     it.each([[null], [undefined], [[]]])("maps an entity with no filed page to nothing (%j)", (chain) => {
         expect(chainItems(chain)).toStrictEqual([]);
+    });
+});
+
+describe("plannedItems", () => {
+    const created = new Set([categoryPathKey(["Peptides", "Healing"]), categoryPathKey(["Peptides", "Healing", "Liquid"])]);
+
+    it("draws the levels an import creates apart from the ones it finds", () => {
+        expect(plannedItems(["Peptides", "Healing", "Liquid"], created).map((item) => [item.name, item.state, item.hint])).toStrictEqual([
+            ["Peptides", "known", copy.categories.known],
+            ["Healing", "becomes", copy.categories.becomesHint],
+            ["Liquid", "becomes", copy.categories.becomesHint],
+        ]);
+    });
+
+    it("keys every level by its whole path, so one name under two parents stays two chips", () => {
+        expect(plannedItems(["Tools", "Healing"], created).map((item) => [item.key, item.state])).toStrictEqual([
+            [categoryPathKey(["Tools"]), "known"],
+            [categoryPathKey(["Tools", "Healing"]), "known"],
+        ]);
+    });
+
+    it("maps a page filed under nothing to nothing", () => {
+        expect(plannedItems([], created)).toStrictEqual([]);
     });
 });
 

@@ -92,9 +92,11 @@ export const imports = {
         unnamed: (letter: string) => `Column ${letter}`,
         indentHint:
             "Tick the columns whose position carries the hierarchy, left to right. A row's path is its own cell prefixed by the columns to its left.",
-        levels: "Group columns",
+        levels: "Root and category columns",
         levelsHint:
-            "Tick the columns that name the groups a row sits in, outermost first; rows that repeat the same names belong to the same group. A Root Entity column makes hub entities. Category and Subcategory columns make entities that also become WordPress categories, created on the site when a page under them is published.",
+            "Tick the columns that say where a row sits, outermost first. A Root Entity or Root column groups the row's entity under a hub. Every other column ticked here, such as Category and Subcategory, files the row's page under a WordPress category of that name, created on the site when a page under it is published; a category makes no entity.",
+        levelRoot: "root group",
+        levelCategory: "category level",
         notes: "Notes for the writer",
         notesHint:
             "Tick the columns to keep on each page as notes, such as Notes or Intent Owner. The writer reads them as context and an export writes them back.",
@@ -110,9 +112,15 @@ export const imports = {
         title: "What the sheet will do",
         columns: "Each column becomes",
         pages: "Pages",
+        categories: "Categories",
         entities: "Entities",
         groups: "Groups",
         edges: "Relationships",
+        categoriesHint:
+            "The categories the sheet files its pages under. A new one reaches WordPress when a page under it is published; a removed one has no page left under it and was never on WordPress.",
+        noCategories: "The sheet files no page under a category. Tick its Category and Subcategory columns to file them.",
+        columnCategory: "Category",
+        columnCategories: "Categories",
         rows: "Rows",
         conflicts: "Competing pages",
         warnings: "Warnings",
@@ -182,6 +190,8 @@ export const imports = {
         edgesCreated: "Relationships created",
         pagesCreated: "Pages created",
         pagesUpdated: "Pages updated",
+        categoriesCreated: "Categories created",
+        categoriesDeleted: "Categories removed",
         skipped: "Rows skipped",
         openGraph: "Open the graph",
         openPages: "Open the pages",
@@ -202,6 +212,7 @@ export const imports = {
         working: "Writing the sheet",
         done: (pages: number, entities: number) => `${pages} pages and ${entities} entities written to`,
         noDestination: "Choose a destination file first",
+        warnings: "What the sheet could not carry",
     },
     fields: {
         none: "Not imported",
@@ -253,15 +264,21 @@ export const imports = {
     },
     columnUses: {
         field: "A page field",
-        level: "Group",
+        level: "WordPress category level",
         note: "Note for the writer",
         indent: "Hierarchy",
         ignored: "Ignored",
     },
+    rootLevel: "Root group",
     actions: {
         create: "new",
         update: "updated",
         skip: "skipped",
+    },
+    categoryActions: {
+        create: "new",
+        match: "existing",
+        delete: "removed",
     },
     edgeKinds: {
         parent: "Parent",

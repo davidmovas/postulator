@@ -11,6 +11,7 @@ import { Banner, Button, CheckCircleIcon, CloudUploadIcon, Field, Input, Select 
 import type { SelectOption } from "../../ui/index.js";
 import type { ExportFormat } from "../../generated/vocab.js";
 import { exportFormats } from "../../generated/vocab.js";
+import { FindingGroup } from "./findings.js";
 import { exportFormatLabel } from "./labels.js";
 import { fileName } from "./recent.js";
 
@@ -37,6 +38,7 @@ export function ExportTab({ siteId }: ExportTabProps): ReactElement {
     const [path, setPath] = useState("");
     const [format, setFormat] = useState<ExportFormat>(exportFormats[0]);
     const written = exporting.data ?? null;
+    const warnings = written?.warnings ?? [];
     const failure = exporting.error === null ? null : react(exporting.error);
 
     const choose = (): void => {
@@ -132,6 +134,16 @@ export function ExportTab({ siteId }: ExportTabProps): ReactElement {
                     </Link>
                 )}
             </div>
+            {warnings.length === 0 ? null : (
+                <div data-export-warnings={true} className="max-w-160">
+                    <FindingGroup
+                        title={copy.imports.export.warnings}
+                        count={warnings.length}
+                        tone="warn"
+                        findings={warnings}
+                    />
+                </div>
+            )}
         </div>
     );
 }

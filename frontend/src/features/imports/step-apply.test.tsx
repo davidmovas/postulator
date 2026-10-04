@@ -22,8 +22,8 @@ const counts: ImportCounts = {
     edgesCreated: 3,
     pagesCreated: 5,
     pagesUpdated: 0,
-    categoriesCreated: 0,
-    categoriesDeleted: 0,
+    categoriesCreated: 6,
+    categoriesDeleted: 2,
     skipped: 0,
 };
 
@@ -89,6 +89,12 @@ describe("applying a workbook", () => {
         expect(screen.getByText("Applied Catalog and Compounds, in the order of the workbook.")).toBeDefined();
         expect(screen.getByText("Saved 2 mappings: “Client / Catalog”, “Client / Compounds”.")).toBeDefined();
         expect(screen.getByText(copy.imports.apply.pagesCreated)).toBeDefined();
+    });
+
+    it("counts the categories the apply created and the ones it removed", () => {
+        show({ counts, applied: { ...single, options: {} } });
+        expect(screen.getByText(copy.imports.apply.categoriesCreated).previousElementSibling?.textContent).toBe("6");
+        expect(screen.getByText(copy.imports.apply.categoriesDeleted).previousElementSibling?.textContent).toBe("2");
     });
 
     it("says nothing was saved when no name was given", () => {

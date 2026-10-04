@@ -5,13 +5,14 @@ import {
     edgeKinds,
     exportFormats,
     importActions,
+    importCategoryActions,
     importColumnUses,
     importFields,
     importFindingCodes,
     importRowTypes,
     isOneOf,
 } from "../../generated/vocab.js";
-import type { ImportField } from "../../generated/vocab.js";
+import type { ImportCategoryAction, ImportField } from "../../generated/vocab.js";
 import type { Tone } from "../../ui/index.js";
 
 export function fieldLabel(field: string): string {
@@ -24,11 +25,38 @@ export interface ColumnFate {
     field?: string;
 }
 
+const rootHeaders: readonly string[] = ["rootentity", "root"];
+
+export function isRootLevel(header: string): boolean {
+    return rootHeaders.includes(header.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ""));
+}
+
+export function levelUseLabel(header: string): string {
+    return isRootLevel(header) ? copy.imports.rootLevel : copy.imports.columnUses.level;
+}
+
 export function columnUseLabel(column: ColumnFate): string {
     if (column.use === "field") {
         return fieldLabel(column.field ?? "");
     }
+    if (column.use === "level") {
+        return levelUseLabel(column.header);
+    }
     return isOneOf(importColumnUses, column.use) ? copy.imports.columnUses[column.use] : column.use;
+}
+
+export function categoryActionLabel(action: string): string {
+    return isOneOf(importCategoryActions, action) ? copy.imports.categoryActions[action] : action;
+}
+
+const categoryActionTones: Readonly<Record<ImportCategoryAction, Tone>> = {
+    create: "ok",
+    match: "muted",
+    delete: "warn",
+};
+
+export function categoryActionTone(action: string): Tone {
+    return isOneOf(importCategoryActions, action) ? categoryActionTones[action] : "muted";
 }
 
 export function findingLabel(code: string): string {

@@ -4,7 +4,7 @@ import { cx } from "./cx.js";
 import { CategoryIcon } from "./icons/index.js";
 import { toneClasses } from "./tone.js";
 
-export type CategoryState = "onSite" | "onPublish" | "needsPlugin" | "becomes";
+export type CategoryState = "onSite" | "onPublish" | "needsPlugin" | "becomes" | "known";
 
 export interface CategoryTrailItem {
     key: string;
@@ -27,6 +27,7 @@ const stateClasses: Readonly<Record<CategoryState, string>> = {
     onPublish: "border-dashed border-edge text-ink-dim",
     needsPlugin: cx(toneClasses.warn.soft, toneClasses.warn.border, toneClasses.warn.ink),
     becomes: cx("border-dashed", toneClasses.info.border, toneClasses.info.ink),
+    known: "border-hairline text-ink-soft",
 };
 
 function wholeTrail(items: readonly CategoryTrailItem[]): string {

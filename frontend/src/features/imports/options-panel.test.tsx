@@ -80,12 +80,26 @@ describe("the options of a workbook import", () => {
         expect(screen.queryByText(copy.imports.columns.levels)).toBeNull();
     });
 
-    it("explains that a Category column becomes a WordPress category and a Root Entity column a hub", () => {
+    it("explains that a Category column files pages under a WordPress category and a Root Entity column groups entities", () => {
         show();
         const hint = screen.getByText(copy.imports.columns.levelsHint).textContent ?? "";
-        expect(hint).toContain("Root Entity column makes hub entities");
-        expect(hint).toContain("WordPress categories");
-        expect(hint).toContain("when a page under them is published");
+        expect(hint).toContain("A Root Entity or Root column groups the row's entity under a hub");
+        expect(hint).toContain("files the row's page under a WordPress category");
+        expect(hint).toContain("when a page under it is published");
+        expect(hint).toContain("a category makes no entity");
+    });
+
+    it("says beside each ticked level whether it groups entities or files pages under a category", () => {
+        show({
+            settings: {
+                columns: { path: "URL" },
+                options: { levelColumns: ["Root Entity", "Category"], noteColumns: [] },
+                mappingId: "",
+            },
+            headers: ["URL", "Root Entity", "Category", "Subcategory"],
+        });
+        const notes = [...document.querySelectorAll<HTMLElement>("[data-column-note]")].map((note) => note.textContent);
+        expect(notes).toStrictEqual([copy.imports.columns.levelRoot, copy.imports.columns.levelCategory]);
     });
 
     it("edits the groups and the header row of the open sheet", () => {

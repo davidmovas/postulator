@@ -38,6 +38,7 @@ describe("CategoryTrail", () => {
         ["onPublish", "border-dashed", "Created on WordPress when a page under it is published"],
         ["needsPlugin", toneClasses.warn.ink, "Pages carry categories only with the companion plugin 1.3.0"],
         ["becomes", "border-dashed", "Becomes a WordPress category"],
+        ["known", "border-hairline", "A category Postulator already holds"],
     ])("draws a %s chip apart and says what it means on hover", (state, mark, hint) => {
         render(<CategoryTrail items={[{ key: "one", name: "Peptides", state, hint }]} label="WordPress categories" />);
 

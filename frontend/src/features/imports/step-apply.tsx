@@ -160,6 +160,8 @@ export function StepApply({
                 <Tile label={copy.imports.apply.entitiesCreated} value={counts.entitiesCreated} strong={true} />
                 <Tile label={copy.imports.apply.entitiesUpdated} value={counts.entitiesUpdated} />
                 <Tile label={copy.imports.apply.edgesCreated} value={counts.edgesCreated} />
+                <Tile label={copy.imports.apply.categoriesCreated} value={counts.categoriesCreated} strong={true} />
+                <Tile label={copy.imports.apply.categoriesDeleted} value={counts.categoriesDeleted} />
                 <Tile label={copy.imports.apply.skipped} value={counts.skipped} />
             </div>
             <div className="flex flex-wrap gap-2">

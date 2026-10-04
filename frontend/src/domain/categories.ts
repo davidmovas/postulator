@@ -39,6 +39,19 @@ export function pageCategoryItems(page: Pick<Page, "categories" | "categoriesNee
     }));
 }
 
+export function categoryPathKey(path: readonly string[]): string {
+    return path.join("\u001f");
+}
+
+export function plannedItems(path: readonly string[], created: ReadonlySet<string>): readonly CategoryTrailItem[] {
+    return path.map((name, at): CategoryTrailItem => {
+        const key = categoryPathKey(path.slice(0, at + 1));
+        return created.has(key)
+            ? { key, name, state: "becomes", hint: copy.categories.becomesHint }
+            : { key, name, state: "known", hint: copy.categories.known };
+    });
+}
+
 export function filedItems(terms: readonly FiledTerm[]): readonly CategoryTrailItem[] {
     return terms.map((term) => ({
         key: String(term.termId),
