@@ -242,7 +242,7 @@ recipe will not draw. Over a product, `commerce_unknown`, `commerce_absent`, `co
 `product_needs_plugin`, `product_not_in_store`, `product_edited_live` and
 `product_category_unwritable` are errors and `product_outputs_missing` and
 `product_outputs_ignored` warnings; a repair over a product or a product category is refused with
-`store_placed`. `model_provider_removed` warns of a template that pins a model of a provider
+`store_placed`, and one over a post, which WordPress keeps flat, with `post_unnested`. `model_provider_removed` warns of a template that pins a model of a provider
 Postulator no longer works with and names the model the role uses instead, and
 `page_categories_need_plugin` of a WordPress page filed under a category on a site whose plugin
 lacks `page_categories`. Each step is priced at its role's service tier and, on a model that

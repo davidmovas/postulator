@@ -244,7 +244,9 @@ the record behind it. Sections are moved verbatim from STATUS as each phase ends
   percent-decode, collapse duplicate slashes, force exactly one leading and one trailing
   slash, lowercase the whole path, and make no exception for a file extension.
   `wp.NormalizePath` and `wp.InternalPath` are now one-line calls into
-  `internal/domain/pagemap`.
+  `internal/domain/pagemap`. *(Superseded 2026-10-04: both wrappers had no caller and are gone,
+  and `pagemap.InternalPath` with them; `pagemap.NormalizePath` and `pagemap.Site.Resolve` are
+  the one answer.)*
 
 ## Decisions taken in Phase 3B
 
@@ -2100,8 +2102,10 @@ lose the model's memory of them; the writer on flex with a fallback, every role'
 - **The tool schemas say what a field takes in fewer words.** Restated types and boilerplate went
   from the tool and argument descriptions, which keep their limits, defaults and the tool each id
   comes from; the chat instructions say once that an id is used as a read tool returned it and that
-  a field left out keeps its value. 85,991 bytes became 63,304, a quarter less, about 15,800 tokens
-  a round, and the ceiling follows to 63,400. The ceiling test names the widest schemas.
+  a field left out of a change keeps its current value. Two cuts, the tool descriptions first
+  (85,991 bytes to 76,479) and then the request structs' field descriptions (76,347, after the
+  category fields, to 63,304), leave 26.4% less than before, about 15,800 tokens a round, and the
+  ceiling follows to 63,400. The ceiling test names the widest schemas.
 - **Loading tools on demand waits behind `agent.toolLoading`, `all` by default.** `deferred` sends
   ten orienting reads whole (`sites_list`, `sites_get`, `reports_site_overview`,
   `graph_list_entities`, `pages_list`, `pages_get`, `pages_tree`, `runs_list`, `runs_get`,
@@ -2321,8 +2325,10 @@ tests written before each move.
   item now.
 - **What nothing called is gone.** In Go: `wp.SEOFields`, the `wp` path wrappers `pagemap` owns,
   `wp.StoreForbidden`, `Brief.RequiredHeadings` and `PhraseTexts`, `dbx.Ok` and `Err`, the UUID,
-  enum, float and bool sort keys, `ctx.WithRunID` and `WithConversationID`, `errors.Stack` with the
-  stack every error captured, `middleware.Timeout`, `RunRepo.Active`, `MessageRepo.LatestSeq` and
+  enum, float and bool sort keys, `ctx.WithRunID` and `WithConversationID` with the audit log
+  fields that read them, `errors.Stack` and `Frame` with the stack every error captured,
+  `middleware.Timeout`, the two `"openai"` provider constants beside `llm.ProviderOpenAI`,
+  `RunRepo.Active`, `MessageRepo.LatestSeq` and
   `ByConversation`, `CategoryRepo.Get`, `Store.Path`, `pagemap.Unmapped`, `InternalPath` and
   `Index.Len`, and exports one file used are unexported. In the frontend: three hooks with no
   caller and their endpoint wrappers, `runPhase`, `actionStatusTone`, `keywordTexts`, a second run
@@ -2330,5 +2336,18 @@ tests written before each move.
   `Stack` is nil-receiver safe. The errors the agent could hand to nobody go to `Deps.Dropped`,
   which the composition root logs.
 - **One key per rule**: `graph.Key` for an entity's name and anchors, `category.Key` for a
-  category's, `keyword.List.Find` for a keyword, `dto.TimeOf` for an instant that may be missing.
+  category's, `keyword.List.Find` for a keyword, `dto.TimeOf` for an instant that may be missing,
+  `dto.PageSize` for a list's limit in place of `ListRequest.Normalize`, and `graph.Distinct`,
+  which keeps a list of texts once as the store tells them apart, in place of a
+  `CleanKeywords` that cleaned no keyword. The four `anchorsOf` say what each builds
+  (`requestedAnchors`, `sheetAnchors`, `targetAnchors`, `placedAnchors`).
+- **A run or an item that waited before its first step still starts.** A run paused before it
+  started and then resumed came back running, so its first claim never set `StartedAt` nor
+  announced `run.started`, and the window showed a finished run with no start; an item held behind
+  its parent before its first claim never announced `item.started`. A run now starts on its first
+  real claim whatever its status, and an item when it reaches its first step with nothing recorded.
+- **A repair leaves a post where its permalink puts it.** `repair_hierarchy` sent a post the parent
+  its path implied, WordPress kept the post flat, and the item paused on a mismatch nobody could
+  resolve. The preflight refuses a post with `post_unnested`, beside `store_placed`, and the step
+  refuses one before it writes.
 - The canvas under the graph map was left as it is, by the owner's choice.
