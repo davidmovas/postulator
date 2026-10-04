@@ -84,7 +84,7 @@ func (b *builder) updateEntity(u *unit, kind graph.Kind) error {
 	next := current
 	next.Kind = cmp.Or(kind, current.Kind)
 	next.Keywords = current.Keywords.Merge(u.keywords)
-	next.Anchors = sheetAnchors(union(anchorTexts(current.Anchors), u.anchors))
+	next.Anchors = sheetAnchors(graph.Distinct(anchorTexts(current.Anchors), u.anchors))
 	next.UpdatedAt = b.now
 	entity, err := graph.NewEntity(next)
 	if err != nil {

@@ -121,23 +121,6 @@ func NewEntity(e Entity) (Entity, error) {
 	return e, nil
 }
 
-func CleanKeywords(raw []string) []string {
-	out := make([]string, 0, len(raw))
-	seen := make(map[string]struct{}, len(raw))
-	for _, keyword := range raw {
-		trimmed := strings.TrimSpace(keyword)
-		if trimmed == "" {
-			continue
-		}
-		if _, dup := seen[Key(trimmed)]; dup {
-			continue
-		}
-		seen[Key(trimmed)] = struct{}{}
-		out = append(out, trimmed)
-	}
-	return out
-}
-
 func newAnchors(anchors []Anchor) ([]Anchor, error) {
 	out := make([]Anchor, 0, len(anchors))
 	seen := make(map[string]struct{}, len(anchors))

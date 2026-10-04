@@ -264,8 +264,8 @@ func (b *builder) absorb(into, from int) {
 	target := &b.units[into]
 	target.kind = fill(target.kind, source.kind)
 	target.keywords = target.keywords.Merge(source.keywords)
-	target.anchors = union(target.anchors, source.anchors)
-	target.related = union(target.related, source.related)
+	target.anchors = graph.Distinct(target.anchors, source.anchors)
+	target.related = graph.Distinct(target.related, source.related)
 	if target.group < 0 {
 		target.group = source.group
 	}

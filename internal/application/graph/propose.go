@@ -178,9 +178,9 @@ func (s *Service) previewFromPages(ctx context.Context, rawSiteID string, pageID
 				Kind:             string(kindOf(proposed.Kind)),
 				Intent:           strings.TrimSpace(proposed.Intent),
 				Keywords:         proposedKeywords(page.Keywords, proposed.PrimaryKeyword, proposed.SecondaryKeywords),
-				Anchors:          graphdomain.CleanKeywords(proposed.Anchors),
+				Anchors:          graphdomain.Distinct(proposed.Anchors),
 				Parent:           strings.TrimSpace(proposed.ParentPath),
-				Related:          graphdomain.CleanKeywords(proposed.RelatedPaths),
+				Related:          graphdomain.Distinct(proposed.RelatedPaths),
 				ExistingEntityID: state.byName[graphdomain.Key(name)],
 			})
 		}

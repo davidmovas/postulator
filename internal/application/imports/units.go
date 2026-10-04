@@ -120,8 +120,8 @@ func (b *builder) absorbRow(at int, row *rowDraft) {
 	u := &b.units[at]
 	u.kind = fill(u.kind, row.kind)
 	u.keywords = u.keywords.Merge(row.keywords)
-	u.anchors = union(u.anchors, row.anchors)
-	u.related = union(u.related, row.related)
+	u.anchors = graph.Distinct(u.anchors, row.anchors)
+	u.related = graph.Distinct(u.related, row.related)
 	if u.at.Row == 0 {
 		u.at = row.at
 	}

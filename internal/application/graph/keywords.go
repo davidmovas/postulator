@@ -110,9 +110,9 @@ func (s *Service) ProposeFromKeywords(ctx context.Context, req ProposeFromKeywor
 				Kind:             string(kindOf(proposed.Kind)),
 				Intent:           strings.TrimSpace(proposed.Intent),
 				Keywords:         application.KeywordViews(answeredKeywords(answered, proposed.SecondaryKeywords, given)),
-				Anchors:          graphdomain.CleanKeywords(proposed.Anchors),
+				Anchors:          graphdomain.Distinct(proposed.Anchors),
 				Parent:           parentName,
-				Related:          graphdomain.CleanKeywords(proposed.RelatedNames),
+				Related:          graphdomain.Distinct(proposed.RelatedNames),
 				ExistingEntityID: state.byName[graphdomain.Key(name)],
 			})
 		}

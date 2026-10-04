@@ -4,7 +4,6 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
@@ -21,25 +20,6 @@ func titleFrom(path string) string {
 		words[i] = string(runes)
 	}
 	return strings.Join(words, " ")
-}
-
-func union(into, more []string) []string {
-	seen := make(map[string]struct{}, len(into)+len(more))
-	out := make([]string, 0, len(into)+len(more))
-	for _, values := range [][]string{into, more} {
-		for _, value := range values {
-			trimmed := strings.TrimSpace(value)
-			if trimmed == "" {
-				continue
-			}
-			if _, dup := seen[graph.Key(trimmed)]; dup {
-				continue
-			}
-			seen[graph.Key(trimmed)] = struct{}{}
-			out = append(out, trimmed)
-		}
-	}
-	return out
 }
 
 func fill(current, next string) string {
