@@ -39,8 +39,6 @@ type repos struct {
 	messages      *sqlite.MessageRepo
 	toolCalls     *sqlite.ToolCallRepo
 	history       *sqlite.ConversationHistoryRepo
-	categories    *sqlite.CategoryRepo
-	categoryTerms *sqlite.CategoryTermRepo
 }
 
 func (c *Core) openStore(key []byte) (*sqlite.Store, error) {
@@ -90,7 +88,5 @@ func openRepos(ctx context.Context, store *sqlite.Store, key []byte) (repos, err
 		messages:      sqlite.NewMessageRepo(store),
 		toolCalls:     sqlite.NewToolCallRepo(store),
 		history:       sqlite.NewConversationHistoryRepo(store),
-		categories:    sqlite.NewCategoryRepo(store),
-		categoryTerms: sqlite.NewCategoryTermRepo(store),
 	}, nil
 }

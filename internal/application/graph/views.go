@@ -16,20 +16,19 @@ type Anchor struct {
 }
 
 type Entity struct {
-	ID              string         `json:"id"`
-	SiteID          string         `json:"siteId"`
-	Name            string         `json:"name"`
-	Kind            string         `json:"kind"`
-	Intent          string         `json:"intent"`
-	Keywords        []dto.Keyword  `json:"keywords"`
-	Anchors         []Anchor       `json:"anchors"`
-	ScopeEntityID   *string        `json:"scopeEntityId"`
-	Categories      []dto.Category `json:"categories"`
-	CanonicalPageID *string        `json:"canonicalPageId"`
-	Score           float64        `json:"score"`
-	Source          string         `json:"source"`
-	CreatedAt       dto.Time       `json:"createdAt"`
-	UpdatedAt       dto.Time       `json:"updatedAt"`
+	ID              string        `json:"id"`
+	SiteID          string        `json:"siteId"`
+	Name            string        `json:"name"`
+	Kind            string        `json:"kind"`
+	Intent          string        `json:"intent"`
+	Keywords        []dto.Keyword `json:"keywords"`
+	Anchors         []Anchor      `json:"anchors"`
+	ScopeEntityID   *string       `json:"scopeEntityId"`
+	CanonicalPageID *string       `json:"canonicalPageId"`
+	Score           float64       `json:"score"`
+	Source          string        `json:"source"`
+	CreatedAt       dto.Time      `json:"createdAt"`
+	UpdatedAt       dto.Time      `json:"updatedAt"`
 }
 
 type Edge struct {
@@ -54,7 +53,7 @@ type EntityPage struct {
 	Mismatch bool   `json:"mismatch"`
 }
 
-func entityView(e graphdomain.Entity, filed filing) Entity {
+func entityView(e graphdomain.Entity) Entity {
 	anchors := make([]Anchor, 0, len(e.Anchors))
 	for _, anchor := range e.Anchors {
 		anchors = append(anchors, Anchor{Text: anchor.Text, Source: string(anchor.Source), Weight: anchor.Weight})
@@ -68,7 +67,6 @@ func entityView(e graphdomain.Entity, filed filing) Entity {
 		Keywords:        application.KeywordViews(e.Keywords),
 		Anchors:         anchors,
 		ScopeEntityID:   e.ScopeID,
-		Categories:      filed.of(e),
 		CanonicalPageID: e.CanonicalPageID,
 		Score:           e.Score,
 		Source:          string(e.Source),

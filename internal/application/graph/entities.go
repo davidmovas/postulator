@@ -85,11 +85,7 @@ func (s *Service) CreateEntity(ctx context.Context, req CreateEntityRequest) (Cr
 	if publishErr := s.changed(entity.SiteID); publishErr != nil {
 		return CreateEntityResponse{}, publishErr
 	}
-	view, err := s.viewOf(ctx, entity)
-	if err != nil {
-		return CreateEntityResponse{}, err
-	}
-	return CreateEntityResponse{Entity: view}, nil
+	return CreateEntityResponse{Entity: entityView(entity)}, nil
 }
 
 func (s *Service) UpdateEntity(ctx context.Context, req UpdateEntityRequest) (UpdateEntityResponse, error) {
@@ -118,11 +114,7 @@ func (s *Service) UpdateEntity(ctx context.Context, req UpdateEntityRequest) (Up
 	if err != nil {
 		return UpdateEntityResponse{}, err
 	}
-	view, err := s.viewOf(ctx, updated)
-	if err != nil {
-		return UpdateEntityResponse{}, err
-	}
-	return UpdateEntityResponse{Entity: view}, nil
+	return UpdateEntityResponse{Entity: entityView(updated)}, nil
 }
 
 func (s *Service) SetAnchors(ctx context.Context, req SetAnchorsRequest) (SetAnchorsResponse, error) {
@@ -132,11 +124,7 @@ func (s *Service) SetAnchors(ctx context.Context, req SetAnchorsRequest) (SetAnc
 	if err != nil {
 		return SetAnchorsResponse{}, err
 	}
-	view, err := s.viewOf(ctx, updated)
-	if err != nil {
-		return SetAnchorsResponse{}, err
-	}
-	return SetAnchorsResponse{Entity: view}, nil
+	return SetAnchorsResponse{Entity: entityView(updated)}, nil
 }
 
 func (s *Service) rewriteEntity(ctx context.Context, entityID string, change func(*graphdomain.Entity)) (graphdomain.Entity, error) {
@@ -198,11 +186,7 @@ func (s *Service) GetEntity(ctx context.Context, req GetEntityRequest) (GetEntit
 	if err != nil {
 		return GetEntityResponse{}, err
 	}
-	view, err := s.viewOf(ctx, entity)
-	if err != nil {
-		return GetEntityResponse{}, err
-	}
-	return GetEntityResponse{Entity: view}, nil
+	return GetEntityResponse{Entity: entityView(entity)}, nil
 }
 
 func (s *Service) ListEntities(ctx context.Context, req ListEntitiesRequest) (paging.List[Entity], error) {
@@ -227,9 +211,5 @@ func (s *Service) ListEntities(ctx context.Context, req ListEntitiesRequest) (pa
 	if err != nil {
 		return paging.List[Entity]{}, err
 	}
-	filed, err := s.filingOf(ctx, req.SiteID, list.Items)
-	if err != nil {
-		return paging.List[Entity]{}, err
-	}
-	return application.MapList(list, func(e graphdomain.Entity) Entity { return entityView(e, filed) }), nil
+	return application.MapList(list, entityView), nil
 }

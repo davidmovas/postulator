@@ -10,13 +10,6 @@ import (
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
 
-type seedCategory struct {
-	Name   string
-	Parent string
-	Paths  []string
-	OnSite bool
-}
-
 type callOwner int
 
 const (
@@ -177,17 +170,6 @@ func seedLoosePages() []seedPage {
 		{Path: "/shipping-and-returns/", Title: "Shipping and returns", Status: statusPublished},
 		{Path: "/privacy-policy/", Title: "Privacy policy", Status: statusPublished},
 		{Path: "/terms/", Title: "Terms of sale", Status: statusPublished},
-	}
-}
-
-func seedCategoryTree() []seedCategory {
-	return []seedCategory{
-		{Name: "Espresso gear", OnSite: true},
-		{Name: "Machines", Parent: "Espresso gear", Paths: []string{"/espresso-machines/under-500/", "/espresso-machines/semi-automatic/", "/espresso-machines/dual-boiler/"}},
-		{Name: "Grinders", Parent: "Espresso gear", Paths: []string{"/grinders/hand/", "/grinders/electric/", failingPath}},
-		{Name: "Accessories", Parent: "Espresso gear", Paths: []string{"/accessories/tampers/", "/accessories/scales/", revertedPath}},
-		{Name: "Brewing guides", Paths: []string{"/brewing/tamping/", "/brewing/channeling/", "/brewing/dialing-in/"}},
-		{Name: "Milk drinks", Parent: "Brewing guides", Paths: []string{"/milk-drinks/latte-art/", "/milk-drinks/cappuccino/", "/milk-drinks/cortado/"}},
 	}
 }
 

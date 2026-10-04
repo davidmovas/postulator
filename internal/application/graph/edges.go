@@ -5,17 +5,16 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
-	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
-func entityViews(entities []graphdomain.Entity, filed filing) []Entity {
+func entityViews(entities []graphdomain.Entity) []Entity {
 	out := make([]Entity, 0, len(entities))
 	for i := range entities {
-		out = append(out, entityView(entities[i], filed))
+		out = append(out, entityView(entities[i]))
 	}
 	return out
 }
@@ -70,25 +69,20 @@ func (s *Service) LoadGraph(ctx context.Context, req LoadGraphRequest) (LoadGrap
 	if err != nil {
 		return LoadGraphResponse{}, err
 	}
-	pages, err := s.pages.ListBySite(ctx, req.SiteID)
+	states, err := s.pageStates(ctx, req.SiteID)
 	if err != nil {
 		return LoadGraphResponse{}, err
 	}
-	states, err := s.pageStates(ctx, req.SiteID, pages)
-	if err != nil {
-		return LoadGraphResponse{}, err
-	}
-	tree, err := s.categoryTree(ctx, req.SiteID)
-	if err != nil {
-		return LoadGraphResponse{}, err
-	}
-	entities := g.Entities()
 	return LoadGraphResponse{
-		Entities: entityViews(entities, newFiling(tree, entities, pages)), Edges: edgeViews(g.Edges()), Pages: states,
+		Entities: entityViews(g.Entities()), Edges: edgeViews(g.Edges()), Pages: states,
 	}, nil
 }
 
-func (s *Service) pageStates(ctx context.Context, siteID string, pages []pagemap.Page) ([]EntityPage, error) {
+func (s *Service) pageStates(ctx context.Context, siteID string) ([]EntityPage, error) {
+	pages, err := s.pages.ListBySite(ctx, siteID)
+	if err != nil {
+		return nil, err
+	}
 	working, err := s.inFlight(ctx, siteID)
 	if err != nil {
 		return nil, err

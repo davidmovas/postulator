@@ -46,8 +46,7 @@ func newPreviewHarness(t *testing.T, issuer *recordingIssuer) harness {
 	return harness{
 		service: pages.New(pages.Deps{
 			Pages: sqlite.NewPageRepo(store), Links: sqlite.NewPageLinkRepo(store), Entities: sqlite.NewEntityRepo(store),
-			Edges: sqlite.NewEdgeRepo(store), Categories: sqlite.NewCategoryRepo(store),
-			CategoryTerms: sqlite.NewCategoryTermRepo(store), Sites: sqlite.NewSiteRepo(store),
+			Edges: sqlite.NewEdgeRepo(store), Sites: sqlite.NewSiteRepo(store),
 			UnitOfWork: store, Publisher: recorder, Clock: clk, Preview: issuer,
 		}),
 		store:    store,

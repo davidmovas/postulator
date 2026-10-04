@@ -37,10 +37,6 @@ func (f pagesFake) Tree(context.Context, pages.TreeRequest) (pages.TreeResponse,
 	return answer[pages.TreeResponse](f.mode)
 }
 
-func (f pagesFake) ListCategories(context.Context, pages.ListCategoriesRequest) (pages.ListCategoriesResponse, error) {
-	return answer[pages.ListCategoriesResponse](f.mode)
-}
-
 func (f pagesFake) MapToEntity(context.Context, pages.MapToEntityRequest) (pages.MapToEntityResponse, error) {
 	return answer[pages.MapToEntityResponse](f.mode)
 }
@@ -65,8 +61,7 @@ func TestPagesServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
 	assertMethodNames(t, wails.NewPagesService(zap.NewNop(), ready[wails.PagesUseCase](pagesFake{})), []string{
-		"Create", "Delete", "Get", "List", "ListCategories", "MapToEntity", "PreviewLink", "ReplaceLinks", "SetCanonical", "Tree",
-		"Unmap", "Update",
+		"Create", "Delete", "Get", "List", "MapToEntity", "PreviewLink", "ReplaceLinks", "SetCanonical", "Tree", "Unmap", "Update",
 	})
 	assertEveryMethodConverts(t, wails.NewPagesService(zap.NewNop(), ready[wails.PagesUseCase](pagesFake{mode: missing})), missingBody)
 	assertEveryMethodConverts(t, wails.NewPagesService(zap.NewNop(), ready[wails.PagesUseCase](pagesFake{mode: panicking})), panicBody)

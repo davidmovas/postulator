@@ -1005,59 +1005,6 @@ func TestASyncKeepsThePagesTheSiteStillHolds(t *testing.T) {
 	}
 }
 
-func TestTheHarnessFilesPagesUnderACategoryTree(t *testing.T) {
-	core := seeded(t)
-
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
-	if err != nil {
-		t.Fatalf("List sites: %v", err)
-	}
-	siteID := listed.Items[0].ID
-
-	tree, err := core.Pages.ListCategories(t.Context(), pages.ListCategoriesRequest{SiteID: siteID})
-	if err != nil {
-		t.Fatalf("ListCategories: %v", err)
-	}
-	byName := make(map[string]pages.CategoryNode, len(tree.Categories))
-	for index := range tree.Categories {
-		byName[tree.Categories[index].Name] = tree.Categories[index]
-	}
-	declared := seedCategoryTree()
-	if len(byName) != len(declared) {
-		t.Fatalf("categories = %d, want the %d the seed declares", len(byName), len(declared))
-	}
-
-	gear, grinders := byName["Espresso gear"], byName["Grinders"]
-	if gear.TermIDs.Category == nil {
-		t.Error("Espresso gear holds no term, so no node of the rail reads as on the site")
-	}
-	if grinders.TermIDs.Category != nil {
-		t.Errorf("Grinders holds term %d, but no run published a page under it", *grinders.TermIDs.Category)
-	}
-	if grinders.ParentID == nil || *grinders.ParentID != gear.ID {
-		t.Errorf("Grinders hangs under %v, want Espresso gear %s", grinders.ParentID, gear.ID)
-	}
-	if gear.Pages != 9 {
-		t.Errorf("Espresso gear counts %d pages, want the nine filed under its three subcategories", gear.Pages)
-	}
-
-	filtered, err := core.Pages.List(t.Context(), pages.ListRequest{
-		SiteID: siteID, CategoryID: gear.ID, ListRequest: dto.ListRequest{Limit: 50},
-	})
-	if err != nil {
-		t.Fatalf("List the pages of a branch: %v", err)
-	}
-	if len(filtered.Items) != gear.Pages {
-		t.Errorf("the branch lists %d pages, want %d", len(filtered.Items), gear.Pages)
-	}
-	for index := range filtered.Items {
-		chain := filtered.Items[index].Categories
-		if len(chain) != 2 || chain[0].Name != "Espresso gear" {
-			t.Errorf("%s is filed under %v, want a chain under Espresso gear", filtered.Items[index].Path, chain)
-		}
-	}
-}
-
 func TestTheHarnessRecordsSpendWorthReading(t *testing.T) {
 	core := seeded(t)
 

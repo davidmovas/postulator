@@ -58,8 +58,8 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 	values := stores.values
 	pagesService := pages.New(pages.Deps{
 		Pages: stores.pages, Links: stores.links, Entities: stores.entities, Edges: stores.edges,
-		Categories: stores.categories, CategoryTerms: stores.categoryTerms, Sites: stores.sites, UnitOfWork: stores.store,
-		Publisher: c.Events, Clock: stores.now, Preview: previewIssuer{clients: writing.wordpress},
+		Sites: stores.sites, UnitOfWork: stores.store, Publisher: c.Events, Clock: stores.now,
+		Preview: previewIssuer{clients: writing.wordpress},
 	})
 	runsService := runs.New(running.engine, stores.runs, stores.items, stores.artifacts, stores.runEvents,
 		writing.templates, stores.pages, running.steps, pagesService)
@@ -67,9 +67,9 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 	return useCases{
 		sites: sites.New(stores.sites, stores.secrets, stores.store, writing.wordpress, c.Events, stores.now),
 		graph: graph.New(graph.Deps{
-			Entities: stores.entities, Edges: stores.edges, Sites: stores.sites, Categories: stores.categories,
-			CategoryTerms: stores.categoryTerms, Pages: stores.pages, Work: stores.items, Profiles: llm.profiles,
-			LLM: llm.client, UnitOfWork: stores.store, Publisher: c.Events, Clock: stores.now,
+			Entities: stores.entities, Edges: stores.edges, Sites: stores.sites, Pages: stores.pages,
+			Work: stores.items, Profiles: llm.profiles, LLM: llm.client, UnitOfWork: stores.store,
+			Publisher: c.Events, Clock: stores.now,
 		}),
 		pages: pagesService,
 		imports: imports.New(imports.Deps{

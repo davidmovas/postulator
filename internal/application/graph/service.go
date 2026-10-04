@@ -7,7 +7,6 @@ import (
 	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/llm"
-	"github.com/davidmovas/postulator/internal/domain/category"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -43,14 +42,6 @@ type siteReader interface {
 	Get(ctx context.Context, id string) (site.Site, error)
 }
 
-type categoryReader interface {
-	ListBySite(ctx context.Context, siteID string) ([]category.Category, error)
-}
-
-type categoryTermReader interface {
-	ListBySite(ctx context.Context, siteID string) ([]category.Term, error)
-}
-
 type pageStore interface {
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.Page, error)
 	Update(ctx context.Context, p pagemap.Page) error
@@ -69,40 +60,36 @@ type unitOfWork interface {
 }
 
 type Deps struct {
-	Entities      entityStore
-	Edges         edgeStore
-	Sites         siteReader
-	Categories    categoryReader
-	CategoryTerms categoryTermReader
-	Pages         pageStore
-	Work          workReader
-	Profiles      profileResolver
-	LLM           llm.Client
-	UnitOfWork    unitOfWork
-	Publisher     application.Publisher
-	Clock         clock.Clock
+	Entities   entityStore
+	Edges      edgeStore
+	Sites      siteReader
+	Pages      pageStore
+	Work       workReader
+	Profiles   profileResolver
+	LLM        llm.Client
+	UnitOfWork unitOfWork
+	Publisher  application.Publisher
+	Clock      clock.Clock
 }
 
 type Service struct {
-	entities      entityStore
-	edges         edgeStore
-	sites         siteReader
-	categories    categoryReader
-	categoryTerms categoryTermReader
-	pages         pageStore
-	work          workReader
-	profiles      profileResolver
-	llm           llm.Client
-	uow           unitOfWork
-	publisher     application.Publisher
-	clock         clock.Clock
+	entities  entityStore
+	edges     edgeStore
+	sites     siteReader
+	pages     pageStore
+	work      workReader
+	profiles  profileResolver
+	llm       llm.Client
+	uow       unitOfWork
+	publisher application.Publisher
+	clock     clock.Clock
 }
 
 func New(deps Deps) *Service {
 	return &Service{
-		entities: deps.Entities, edges: deps.Edges, sites: deps.Sites, categories: deps.Categories,
-		categoryTerms: deps.CategoryTerms, pages: deps.Pages, work: deps.Work, profiles: deps.Profiles, llm: deps.LLM,
-		uow: deps.UnitOfWork, publisher: deps.Publisher, clock: deps.Clock,
+		entities: deps.Entities, edges: deps.Edges, sites: deps.Sites, pages: deps.Pages, work: deps.Work,
+		profiles: deps.Profiles, llm: deps.LLM, uow: deps.UnitOfWork, publisher: deps.Publisher,
+		clock: deps.Clock,
 	}
 }
 

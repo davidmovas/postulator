@@ -47,7 +47,6 @@ func (s *Service) ApplyProposals(ctx context.Context, req ApplyProposalsRequest)
 	}
 
 	response := ApplyProposalsResponse{Entities: []Entity{}, Edges: []Edge{}}
-	known := len(state.entities)
 	now := s.now()
 	err = s.uow.Do(ctx, func(c context.Context) error {
 		for i := range req.Entities {
@@ -64,12 +63,8 @@ func (s *Service) ApplyProposals(ctx context.Context, req ApplyProposalsRequest)
 		return ApplyProposalsResponse{}, err
 	}
 
-	minted := state.entities[known:]
-	if len(minted) == 0 && len(response.Edges) == 0 && response.Mapped == 0 {
+	if len(response.Entities) == 0 && len(response.Edges) == 0 && response.Mapped == 0 {
 		return response, nil
-	}
-	if response.Entities, err = s.viewsOf(ctx, siteID, minted); err != nil {
-		return ApplyProposalsResponse{}, err
 	}
 	if changedErr := s.changed(siteID); changedErr != nil {
 		return ApplyProposalsResponse{}, changedErr
@@ -125,6 +120,7 @@ func (s *Service) adopt(ctx context.Context, siteID string, proposed *ProposedEn
 		state.labels[entity.ID] = name
 		state.byName[graphdomain.Key(name)] = entity.ID
 		entityID = entity.ID
+		out.Entities = append(out.Entities, entityView(entity))
 	}
 	if !hasPage {
 		if exists {

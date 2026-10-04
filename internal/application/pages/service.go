@@ -6,7 +6,6 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/events"
-	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/site"
@@ -39,14 +38,6 @@ type edgeReader interface {
 	ListBySite(ctx context.Context, siteID string) ([]graph.Edge, error)
 }
 
-type categoryReader interface {
-	ListBySite(ctx context.Context, siteID string) ([]category.Category, error)
-}
-
-type categoryTermReader interface {
-	ListBySite(ctx context.Context, siteID string) ([]category.Term, error)
-}
-
 type siteReader interface {
 	Get(ctx context.Context, id string) (site.Site, error)
 }
@@ -56,38 +47,33 @@ type unitOfWork interface {
 }
 
 type Deps struct {
-	Pages         pageStore
-	Links         linkStore
-	Entities      entityStore
-	Edges         edgeReader
-	Categories    categoryReader
-	CategoryTerms categoryTermReader
-	Sites         siteReader
-	UnitOfWork    unitOfWork
-	Publisher     application.Publisher
-	Clock         clock.Clock
-	Preview       previewIssuer
+	Pages      pageStore
+	Links      linkStore
+	Entities   entityStore
+	Edges      edgeReader
+	Sites      siteReader
+	UnitOfWork unitOfWork
+	Publisher  application.Publisher
+	Clock      clock.Clock
+	Preview    previewIssuer
 }
 
 type Service struct {
-	pages         pageStore
-	links         linkStore
-	entities      entityStore
-	edges         edgeReader
-	categories    categoryReader
-	categoryTerms categoryTermReader
-	sites         siteReader
-	uow           unitOfWork
-	publisher     application.Publisher
-	clock         clock.Clock
-	preview       previewIssuer
+	pages     pageStore
+	links     linkStore
+	entities  entityStore
+	edges     edgeReader
+	sites     siteReader
+	uow       unitOfWork
+	publisher application.Publisher
+	clock     clock.Clock
+	preview   previewIssuer
 }
 
 func New(deps Deps) *Service {
 	return &Service{
-		pages: deps.Pages, links: deps.Links, entities: deps.Entities, edges: deps.Edges, categories: deps.Categories,
-		categoryTerms: deps.CategoryTerms, sites: deps.Sites, uow: deps.UnitOfWork, publisher: deps.Publisher,
-		clock: deps.Clock, preview: deps.Preview,
+		pages: deps.Pages, links: deps.Links, entities: deps.Entities, edges: deps.Edges, sites: deps.Sites,
+		uow: deps.UnitOfWork, publisher: deps.Publisher, clock: deps.Clock, preview: deps.Preview,
 	}
 }
 

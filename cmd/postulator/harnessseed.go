@@ -23,7 +23,6 @@ import (
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/application/templates"
-	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -358,9 +357,6 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 	if err != nil {
 		return err
 	}
-	if fileErr := fileThePages(ctx, core, site, siteID, pagesByPath); fileErr != nil {
-		return fileErr
-	}
 	script.naming(pagesByPath["/espresso-machines/under-500/"])
 	script.onSite(siteID)
 
@@ -400,70 +396,6 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 		return conversationErr
 	}
 	return seedSpend(ctx, core, siteID)
-}
-
-func fileThePages(ctx context.Context, core *app.Core, site *wptest.Server, siteID string, byPath map[string]string) error {
-	records := sqlite.NewCategoryRepo(core.Store)
-	terms := sqlite.NewCategoryTermRepo(core.Store)
-	mapped := sqlite.NewPageRepo(core.Store)
-	now := time.Now().UTC()
-
-	site.SeedCategory(wptest.Category{Name: "Uncategorized"})
-	tree := seedCategoryTree()
-	byName := make(map[string]string, len(tree))
-	for _, declared := range tree {
-		made, newErr := category.New(category.Category{
-			ID: id.New(), SiteID: siteID, Name: declared.Name, ParentID: byName[declared.Parent],
-			CreatedAt: now, UpdatedAt: now,
-		})
-		if newErr != nil {
-			return newErr
-		}
-		if insertErr := records.Insert(ctx, made); insertErr != nil {
-			return insertErr
-		}
-		byName[declared.Name] = made.ID
-
-		if declared.OnSite {
-			if termErr := holdTheTerm(ctx, terms, site, made, now); termErr != nil {
-				return termErr
-			}
-		}
-		for _, path := range declared.Paths {
-			if fileErr := fileUnder(ctx, mapped, byPath, path, made.ID, now); fileErr != nil {
-				return fileErr
-			}
-		}
-	}
-	return nil
-}
-
-func holdTheTerm(ctx context.Context, terms *sqlite.CategoryTermRepo, site *wptest.Server, made category.Category,
-	now time.Time) error {
-	onSite := site.SeedCategory(wptest.Category{Name: made.Name})
-	held, err := category.NewTerm(category.Term{
-		CategoryID: made.ID, SiteID: made.SiteID, Taxonomy: category.TaxonomyCategory, TermID: onSite.ID,
-		Name: onSite.Name, SeenAt: now,
-	})
-	if err != nil {
-		return err
-	}
-	return terms.Upsert(ctx, held)
-}
-
-func fileUnder(ctx context.Context, mapped *sqlite.PageRepo, byPath map[string]string, path, categoryID string,
-	now time.Time) error {
-	pageID, known := byPath[path]
-	if !known {
-		return errors.New(errors.NotFound, "the harness seeded no page at "+path)
-	}
-	page, err := mapped.Get(ctx, pageID)
-	if err != nil {
-		return err
-	}
-	page.CategoryID = categoryID
-	page.UpdatedAt = now
-	return mapped.Update(ctx, page)
 }
 
 func seedSpend(ctx context.Context, core *app.Core, siteID string) error {
