@@ -77,7 +77,7 @@ func entityView(e graphdomain.Entity, filed filing) Entity {
 	}
 }
 
-func anchorsOf(ctx context.Context, anchors []Anchor) []graphdomain.Anchor {
+func requestedAnchors(ctx context.Context, anchors []Anchor) []graphdomain.Anchor {
 	fallback := anchorSourceOfActor(ctx)
 
 	out := make([]graphdomain.Anchor, 0, len(anchors))

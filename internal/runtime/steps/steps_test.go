@@ -64,7 +64,7 @@ func TestAPlannedPageIsWrittenAndLinkedIntoItsGraph(t *testing.T) {
 	if len(doc.Links()) != 2 {
 		t.Fatalf("the body carries %d links", len(doc.Links()))
 	}
-	if anchors := anchorsOf(doc); anchors[0] != "coffee" || anchors[1] != "drinks" {
+	if anchors := placedAnchors(doc); anchors[0] != "coffee" || anchors[1] != "drinks" {
 		t.Fatalf("anchors = %v", anchors)
 	}
 
@@ -86,7 +86,7 @@ func TestAPlannedPageIsWrittenAndLinkedIntoItsGraph(t *testing.T) {
 	assertEventOrder(t, f, runID)
 }
 
-func anchorsOf(doc *content.Document) []string {
+func placedAnchors(doc *content.Document) []string {
 	links := doc.Links()
 
 	out := make([]string, 0, len(links))

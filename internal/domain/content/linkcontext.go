@@ -110,7 +110,7 @@ func PlanLinks(g graph.Graph, index pagemap.Index, subject Subject, policy templ
 		plan.Context.PageURL = page.Path
 	case subject.PageID != "" && mapped && page.ID != subject.PageID:
 		walk.targets = append(walk.targets, LinkTarget{
-			EntityID: self.ID, PageID: page.ID, URL: page.Path, Anchors: anchorsOf(self, g.Label(self.ID)),
+			EntityID: self.ID, PageID: page.ID, URL: page.Path, Anchors: targetAnchors(self, g.Label(self.ID)),
 			Relation: RelationUp, Weight: 1,
 		})
 	}
@@ -149,7 +149,7 @@ func (p *planner) place(entity graph.Entity, relation Relation, required bool, w
 		return LinkTarget{}, false
 	}
 	return LinkTarget{
-		EntityID: entity.ID, PageID: page.ID, URL: page.Path, Anchors: anchorsOf(entity, p.g.Label(entity.ID)),
+		EntityID: entity.ID, PageID: page.ID, URL: page.Path, Anchors: targetAnchors(entity, p.g.Label(entity.ID)),
 		Relation: relation, Required: required, Weight: weight, Depth: depth,
 	}, true
 }
@@ -285,7 +285,7 @@ func canonical(index pagemap.Index, entity graph.Entity) (pagemap.Page, bool) {
 	return index.ByID(*entity.CanonicalPageID)
 }
 
-func anchorsOf(entity graph.Entity, label string) []string {
+func targetAnchors(entity graph.Entity, label string) []string {
 	out := make([]string, 0, len(entity.Anchors)+1)
 	for _, anchor := range entity.Anchors {
 		if text := strings.TrimSpace(anchor.Text); text != "" {

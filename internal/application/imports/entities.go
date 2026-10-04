@@ -10,7 +10,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-func anchorsOf(texts []string) []graph.Anchor {
+func sheetAnchors(texts []string) []graph.Anchor {
 	out := make([]graph.Anchor, 0, len(texts))
 	for _, text := range texts {
 		out = append(out, graph.Anchor{Text: text, Source: graph.AnchorUser, Weight: 1})
@@ -67,7 +67,7 @@ func (b *builder) createEntity(u *unit, kind graph.Kind) error {
 	}
 	entity, err := graph.NewEntity(graph.Entity{
 		ID: u.id, SiteID: b.state.siteID, Name: u.name, Kind: cmp.Or(kind, u.defaultKind()),
-		ScopeID: scope, Keywords: u.keywords, Anchors: anchorsOf(u.anchors),
+		ScopeID: scope, Keywords: u.keywords, Anchors: sheetAnchors(u.anchors),
 		Source: graph.SourceImport, CreatedAt: b.now, UpdatedAt: b.now,
 	})
 	if err != nil {
@@ -84,7 +84,7 @@ func (b *builder) updateEntity(u *unit, kind graph.Kind) error {
 	next := current
 	next.Kind = cmp.Or(kind, current.Kind)
 	next.Keywords = current.Keywords.Merge(u.keywords)
-	next.Anchors = anchorsOf(union(anchorTexts(current.Anchors), u.anchors))
+	next.Anchors = sheetAnchors(union(anchorTexts(current.Anchors), u.anchors))
 	next.UpdatedAt = b.now
 	entity, err := graph.NewEntity(next)
 	if err != nil {

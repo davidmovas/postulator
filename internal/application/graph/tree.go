@@ -50,7 +50,7 @@ func (s *Service) CreateEntities(ctx context.Context, req CreateEntitiesRequest)
 			Kind:      graphdomain.Kind(req.Entities[i].Kind),
 			Intent:    req.Entities[i].Intent,
 			Keywords:  keywords,
-			Anchors:   anchorsOf(ctx, req.Entities[i].Anchors),
+			Anchors:   requestedAnchors(ctx, req.Entities[i].Anchors),
 			Source:    source,
 			CreatedAt: now,
 			UpdatedAt: now,
