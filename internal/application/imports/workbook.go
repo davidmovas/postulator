@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -20,6 +21,7 @@ type sheetRead struct {
 
 type workbook struct {
 	plans  []plan
+	unused []category.Category
 	report PreviewReport
 }
 
@@ -30,6 +32,7 @@ func (w *workbook) add(p *plan) {
 	r.Pages = append(r.Pages, more.Pages...)
 	r.Entities = append(r.Entities, more.Entities...)
 	r.Groups = append(r.Groups, more.Groups...)
+	r.Categories = append(r.Categories, more.Categories...)
 	r.Edges = append(r.Edges, more.Edges...)
 	r.Warnings = append(r.Warnings, more.Warnings...)
 	r.Errors = append(r.Errors, more.Errors...)
@@ -50,9 +53,26 @@ func (w *workbook) counts() Counts {
 		total.EdgesCreated += each.EdgesCreated
 		total.PagesCreated += each.PagesCreated
 		total.PagesUpdated += each.PagesUpdated
+		total.CategoriesCreated += each.CategoriesCreated
 		total.Skipped += each.Skipped
 	}
+	total.CategoriesDeleted = len(w.unused)
 	return total
+}
+
+func (s *Service) sweep(ctx context.Context, book *workbook, state *siteState) error {
+	terms, err := s.deps.CategoryTerms.ListBySite(ctx, state.siteID)
+	if err != nil {
+		return err
+	}
+	book.unused = unused(state.categories, state.pages, terms)
+	held := newShelf(state.categories)
+	for i := range book.unused {
+		book.report.Categories = append(book.report.Categories, PreviewCategory{
+			Path: held.trail(book.unused[i].ID), Action: string(CategoryDelete),
+		})
+	}
+	return nil
 }
 
 func (w *workbook) sheets() []string {
@@ -103,6 +123,9 @@ func (s *Service) compute(ctx context.Context, req PreviewRequest) (workbook, er
 		}
 		state = next
 		book.add(&planned)
+	}
+	if err := s.sweep(ctx, &book, &state); err != nil {
+		return workbook{}, err
 	}
 	book.report.settle()
 	return book, nil
@@ -230,5 +253,5 @@ func (s siteState) after(p *plan, now time.Time) (siteState, error) {
 		entities[at].ScopeID, entities[at].UpdatedAt = moved[i].ScopeID, now
 	}
 	sortStored(entities, edges, pages)
-	return newSiteState(s.siteID, entities, edges, pages), err
+	return newSiteState(s.siteID, entities, edges, pages, slices.Concat(s.categories, p.categories)), err
 }

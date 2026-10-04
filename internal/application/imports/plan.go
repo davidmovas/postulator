@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -27,16 +28,17 @@ type canonical struct {
 }
 
 type plan struct {
-	siteID    string
-	sheet     string
-	read      []string
-	mapping   importmap.Mapping
-	report    PreviewReport
-	entities  []plannedEntity
-	edges     []graph.Edge
-	pages     []plannedPage
-	canonical []canonical
-	rows      int
+	siteID     string
+	sheet      string
+	read       []string
+	mapping    importmap.Mapping
+	report     PreviewReport
+	categories []category.Category
+	entities   []plannedEntity
+	edges      []graph.Edge
+	pages      []plannedPage
+	canonical  []canonical
+	rows       int
 }
 
 func newPlan(siteID string, mapping importmap.Mapping, table importmap.Table) plan {
@@ -82,7 +84,7 @@ func (p *plan) noteAt(at importmap.Origin, field string, code FindingCode, messa
 }
 
 func (p *plan) counts() Counts {
-	tally := Counts{Skipped: p.report.Skipped, EdgesCreated: len(p.edges)}
+	tally := Counts{Skipped: p.report.Skipped, EdgesCreated: len(p.edges), CategoriesCreated: len(p.categories)}
 	for i := range p.entities {
 		if p.entities[i].created {
 			tally.EntitiesCreated++
@@ -141,5 +143,6 @@ func (b *builder) run(templates *kindTemplates) error {
 	b.linkParents()
 	b.markCanonical()
 	b.reportGroups()
+	b.reportCategories()
 	return nil
 }

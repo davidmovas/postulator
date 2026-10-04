@@ -3,6 +3,7 @@ package imports
 import (
 	"strings"
 
+	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -44,6 +45,7 @@ func (r *rowDraft) sortLevels(roots rootSet) {
 		switch {
 		case !level.Category:
 			r.roots = append(r.roots, level.Name)
+		case category.Key(level.Name) == "":
 		case roots.holds(level.Name):
 			r.dropped = append(r.dropped, level.Name)
 		default:

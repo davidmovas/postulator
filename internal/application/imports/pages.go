@@ -27,8 +27,14 @@ func sameRef(a, b *string) bool {
 func samePage(a, b pagemap.Page) bool {
 	return a.Title == b.Title && a.H1 == b.H1 && a.MetaTitle == b.MetaTitle && a.PlannedPath == b.PlannedPath &&
 		a.MetaDescription == b.MetaDescription && a.WPType == b.WPType &&
-		a.Keywords.Equal(b.Keywords) && slices.Equal(a.Notes, b.Notes) &&
+		a.Keywords.Equal(b.Keywords) && slices.Equal(a.Notes, b.Notes) && a.CategoryID == b.CategoryID &&
 		sameRef(a.EntityID, b.EntityID) && sameRef(a.TemplateID, b.TemplateID)
+}
+
+type pageRefs struct {
+	templateID *string
+	entityID   *string
+	categoryID string
 }
 
 type kindTemplates struct {
@@ -99,20 +105,23 @@ func (b *builder) planPage(draft *pageDraft, templates *kindTemplates) error {
 		b.p.noteAt(draft.at, string(importmap.FieldWPType), CodeUnknownWPType,
 			"the wordpress type is not recognized and was read as a page: "+draft.wpType)
 	}
-	templateID := templates.of(draft, b.p)
-	entityID := b.ownerOf(draft)
+	refs := pageRefs{templateID: templates.of(draft, b.p), entityID: b.ownerOf(draft)}
 
 	current, exists := b.state.held(draft.path)
-	switch {
-	case exists:
-		return b.updatePage(current, draft, templateID, entityID)
-	case draft.path == pagemap.RootPath:
+	if !exists && draft.path == pagemap.RootPath {
 		b.p.noteAt(draft.at, string(importmap.FieldPath), CodeRootPageSkipped,
 			"the root of the site already exists on WordPress, so the import does not plan it; sync the site first to map it")
 		return nil
-	default:
-		return b.createPage(draft, templateID, entityID)
 	}
+	categoryID, err := b.file(draft)
+	if err != nil {
+		return err
+	}
+	refs.categoryID = categoryID
+	if exists {
+		return b.updatePage(current, draft, refs)
+	}
+	return b.createPage(draft, refs)
 }
 
 func (b *builder) ownerOf(draft *pageDraft) *string {
@@ -124,7 +133,7 @@ func (b *builder) ownerOf(draft *pageDraft) *string {
 	return &b.units[owner].id
 }
 
-func (b *builder) createPage(draft *pageDraft, templateID, entityID *string) error {
+func (b *builder) createPage(draft *pageDraft, refs pageRefs) error {
 	wpType := draft.createdType()
 	title := fill(draft.title, titleFrom(draft.path))
 	if wpType == pagemap.WPProduct {
@@ -133,18 +142,19 @@ func (b *builder) createPage(draft *pageDraft, templateID, entityID *string) err
 	page, err := pagemap.NewPage(pagemap.Page{
 		ID: id.New(), SiteID: b.state.siteID, Path: draft.path, WPType: wpType,
 		Title: title, H1: draft.h1, MetaTitle: draft.metaTitle, MetaDescription: draft.metaDesc,
-		Keywords: draft.keywords, Notes: draft.notes, Status: pagemap.StatusPlanned, EntityID: entityID,
-		TemplateID: templateID, CreatedAt: b.now, UpdatedAt: b.now,
+		Keywords: draft.keywords, Notes: draft.notes, Status: pagemap.StatusPlanned, EntityID: refs.entityID,
+		CategoryID: refs.categoryID, TemplateID: refs.templateID, CreatedAt: b.now, UpdatedAt: b.now,
 	})
 	if err != nil {
 		return err
 	}
 	b.p.pages = append(b.p.pages, plannedPage{page: page, created: true})
-	b.p.report.Pages = append(b.p.report.Pages, pageView(b.p.sheetAt(draft.at), page, draft, ActionCreate))
+	b.p.report.Pages = append(b.p.report.Pages,
+		pageView(b.p.sheetAt(draft.at), page, draft, b.shelf.trail(page.CategoryID), ActionCreate))
 	return nil
 }
 
-func (b *builder) updatePage(current pagemap.Page, draft *pageDraft, templateID, entityID *string) error {
+func (b *builder) updatePage(current pagemap.Page, draft *pageDraft, refs pageRefs) error {
 	next := current
 	next.Title = fill(current.Title, draft.title)
 	next.H1 = fill(current.H1, draft.h1)
@@ -156,11 +166,14 @@ func (b *builder) updatePage(current pagemap.Page, draft *pageDraft, templateID,
 	if current.Path != draft.path {
 		next.PlannedPath = draft.path
 	}
-	if templateID != nil {
-		next.TemplateID = templateID
+	if refs.templateID != nil {
+		next.TemplateID = refs.templateID
 	}
-	if entityID != nil {
-		next.EntityID = entityID
+	if refs.entityID != nil {
+		next.EntityID = refs.entityID
+	}
+	if refs.categoryID != "" {
+		next.CategoryID = refs.categoryID
 	}
 	return b.planUpdate(current, next, draft)
 }
@@ -190,7 +203,7 @@ func (b *builder) planUpdate(current, next pagemap.Page, draft *pageDraft) error
 		action = ActionUpdate
 		b.p.pages = append(b.p.pages, plannedPage{page: page, created: false})
 	}
-	b.p.report.Pages = append(b.p.report.Pages, pageView(b.p.sheetAt(draft.at), page, draft, action))
+	b.p.report.Pages = append(b.p.report.Pages, pageView(b.p.sheetAt(draft.at), page, draft, b.shelf.trail(page.CategoryID), action))
 	return nil
 }
 

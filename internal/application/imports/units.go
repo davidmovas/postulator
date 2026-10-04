@@ -70,6 +70,8 @@ type builder struct {
 	names    map[string]string
 	resolved map[string]graph.Entity
 	final    []pagemap.Page
+	shelf    *shelf
+	filings  map[string]*filing
 }
 
 func newBuilder(state siteState, p *plan, rows []rowDraft, sheet *drafts, now time.Time) *builder {
@@ -77,6 +79,7 @@ func newBuilder(state siteState, p *plan, rows []rowDraft, sheet *drafts, now ti
 		state: state, p: p, now: now, rows: rows, sheet: sheet, groups: groupsOf(rows),
 		assigned: make(map[string]int), warned: make(map[string]struct{}), claimed: make(map[string]int),
 		parents: make(map[string]int), byID: make(map[string]graph.Entity, len(state.entities)),
+		shelf: newShelf(state.categories), filings: make(map[string]*filing),
 	}
 	for i := range state.entities {
 		b.byID[state.entities[i].ID] = state.entities[i]

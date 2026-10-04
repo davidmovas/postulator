@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
@@ -262,6 +263,9 @@ func TestEveryItemOfAWorkbookPreviewNamesItsSheet(t *testing.T) {
 	}
 	for _, group := range report.Groups {
 		named("a group", group.Sheet)
+	}
+	for _, listed := range report.Categories {
+		named("the category "+strings.Join(listed.Path, " › "), listed.Sheet)
 	}
 	for _, edge := range report.Edges {
 		named("the edge from "+edge.From, edge.Sheet)

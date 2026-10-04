@@ -141,6 +141,10 @@ func catalog() []vocabulary {
 			},
 		},
 		{export: "importActions", tsType: "ImportAction", pkg: "internal/application/imports", typeName: "Action"},
+		{
+			export: "importCategoryActions", tsType: "ImportCategoryAction", pkg: "internal/application/imports",
+			typeName: "CategoryAction",
+		},
 		{export: "exportFormats", tsType: "ExportFormat", pkg: "internal/domain/importmap", typeName: "Format"},
 		{export: "settingTypes", tsType: "SettingType", pkg: "internal/kernel/settings", typeName: "Type"},
 		{export: "settingGroups", tsType: "SettingGroup", pkg: "internal/kernel/settings", typeName: "Group"},

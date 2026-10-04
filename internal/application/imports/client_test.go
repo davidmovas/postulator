@@ -98,6 +98,13 @@ func TestTheClientWorkbookImportsSheetBySheet(t *testing.T) {
 			t.Errorf("after the group sheet %s is a %s, want a %s", name, got, want)
 		}
 	}
+	groupShelf := []string{"BPC-157", "BPC-157 › Liquid", "BPC-157 › Powder", "TB-500", "TB-500 › Capsules", "TB-500 › Liquid"}
+	if got := h.shelf(t); !slices.Equal(got, groupShelf) || first.Counts.CategoriesCreated != len(groupShelf) {
+		t.Fatalf("after the group sheet the categories are %v (%+v), want %v", got, first.Counts, groupShelf)
+	}
+	if got := previewed(first.Report); !slices.Contains(got, "BPC-157 | create | 3") || !slices.Contains(got, "TB-500 › Liquid | create | 1") {
+		t.Fatalf("the group sheet lists the categories %v", got)
+	}
 
 	catalog := h.apply(t, path, h.sheet(t, path, "Catalog"))
 	clean(t, "Catalog", catalog)
@@ -119,6 +126,21 @@ func TestTheClientWorkbookImportsSheetBySheet(t *testing.T) {
 	if got := h.scopeOf(t, "BPC-157 10 mg vial"); !slices.Equal(got, []string{"Peptides › BPC-157 › BPC-157 10 mg vial"}) {
 		t.Fatalf("the 10 mg vial sits at %v, want under the BPC-157 entity", got)
 	}
+	wantListed := []string{"BPC-157 | match | 2", "Blends | create | 1", "Blends › Recovery | create | 1", "TB-500 | match | 1"}
+	if got := previewed(catalog.Report); !slices.Equal(got, wantListed) {
+		t.Fatalf("the catalog lists the categories %v, want %v", got, wantListed)
+	}
+	if got := h.shelf(t); !slices.Equal(got, slices.Concat(groupShelf[:3], []string{"Blends", "Blends › Recovery"}, groupShelf[3:])) {
+		t.Fatalf("after the catalog the categories are %v, want no Peptides among them", got)
+	}
+	for at, want := range map[string]string{
+		"/shop/bpc-157-10mg/": "BPC-157", "/shop/tb-500-5mg/": "TB-500", "/shop/recovery-blend/": "Blends › Recovery",
+		"/shop/": "", "/peptides/": "", "/peptides/storage/": "", "/peptides/tb-500/capsules/": "TB-500 › Capsules",
+	} {
+		if got := h.filed(t)[at]; got != want {
+			t.Errorf("%s is filed under %q, want %q", at, got, want)
+		}
+	}
 
 	wide := h.apply(t, path, h.sheet(t, path, "Entities"))
 	clean(t, "Entities", wide)
@@ -126,6 +148,9 @@ func TestTheClientWorkbookImportsSheetBySheet(t *testing.T) {
 		t.Fatalf("the wide sheet wrote %+v, want Canada alone created", wide.Counts)
 	}
 	rootLevelsDropped(t, wide.Report, "Entities", 2, 3, 4)
+	if got := previewed(wide.Report); wide.Counts.CategoriesCreated != 0 || !slices.Equal(got, []string{"BPC-157 | match | 1"}) {
+		t.Fatalf("the wide sheet lists the categories %v (%+v), want BPC-157 matched alone", got, wide.Counts)
+	}
 	if canada, found := entity(wide.Report, "Peptides in Canada"); !found || canada.Kind != string(graph.KindCustom) ||
 		canada.Parent != "Peptides" {
 		t.Fatalf("Canada = %+v, want a geographic entity under Peptides", canada)
@@ -159,7 +184,8 @@ func TestTheClientWorkbookImportsSheetBySheet(t *testing.T) {
 	}
 
 	again := h.apply(t, path, groups)
-	if again.Counts.EntitiesCreated != 0 || again.Counts.PagesCreated != 0 || again.Counts.EdgesCreated != 0 {
+	if again.Counts.EntitiesCreated != 0 || again.Counts.PagesCreated != 0 || again.Counts.EdgesCreated != 0 ||
+		again.Counts.CategoriesCreated != 0 || again.Counts.CategoriesDeleted != 0 {
 		t.Fatalf("the group sheet imported again wrote %+v", again.Counts)
 	}
 }
@@ -169,6 +195,7 @@ type siteLabels struct {
 	edges      []string
 	pages      []string
 	canonicals []string
+	categories []string
 }
 
 func trail(byID map[string]graph.Entity, entityID string) string {
@@ -204,7 +231,8 @@ func (h harness) labels(t *testing.T) siteLabels {
 		pathOf[pages[i].ID] = pages[i].Path
 	}
 
-	var out siteLabels
+	filed := h.filed(t)
+	out := siteLabels{categories: h.shelf(t)}
 	for i := range entities {
 		held := &entities[i]
 		out.entities = append(out.entities, fmt.Sprintf("%s | %s | %s", trail(byID, held.ID), held.Kind, held.Keywords.Cell()))
@@ -218,9 +246,9 @@ func (h harness) labels(t *testing.T) siteLabels {
 	}
 	for i := range pages {
 		held := &pages[i]
-		out.pages = append(out.pages, fmt.Sprintf("%s | %s | %s | %s | %s | %s | %v | planned %s | under %s",
+		out.pages = append(out.pages, fmt.Sprintf("%s | %s | %s | %s | %s | %s | %v | planned %s | under %s | filed %s",
 			held.Path, held.WPType, trail(byID, deref(held.EntityID)), held.Title, held.H1, held.Keywords.Cell(),
-			held.Notes, held.PlannedPath, pathOf[deref(held.ParentPageID)]))
+			held.Notes, held.PlannedPath, pathOf[deref(held.ParentPageID)], filed[held.Path]))
 	}
 	for _, list := range [][]string{out.entities, out.edges, out.pages, out.canonicals} {
 		slices.Sort(list)
@@ -268,6 +296,7 @@ func TestTheClientWorkbookImportsAsOneWorkbook(t *testing.T) {
 		{what: "edges", got: got.edges, want: want.edges},
 		{what: "pages", got: got.pages, want: want.pages},
 		{what: "canonical pages", got: got.canonicals, want: want.canonicals},
+		{what: "categories", got: got.categories, want: want.categories},
 	} {
 		if !slices.Equal(compared.got, compared.want) {
 			t.Errorf("the workbook's %s differ from the sheets imported one by one:\ngot\n%s\nwant\n%s",
@@ -294,6 +323,17 @@ func TestTheClientWorkbookImportsAsOneWorkbook(t *testing.T) {
 	if dropped := findings(applied.Report.Warnings, imports.CodeCategoryLevelIsRoot); len(dropped) != 6 {
 		t.Errorf("dropped levels = %+v, want Peptides on three rows of the catalog and three of the entity sheet", dropped)
 	}
+	if len(want.categories) != 8 || slices.ContainsFunc(want.categories, func(held string) bool { return strings.Contains(held, "Peptides") }) {
+		t.Errorf("categories = %v, want eight and no Peptides", want.categories)
+	}
+	if applied.Counts.CategoriesCreated != 8 || applied.Counts.CategoriesDeleted != 0 {
+		t.Errorf("counts = %+v, want the eight categories created once", applied.Counts)
+	}
+	for _, listed := range applied.Report.Categories {
+		if listed.Action == string(imports.CategoryCreate) && listed.Sheet != "Groups" && listed.Sheet != "Catalog" {
+			t.Errorf("the category %+v was created by a sheet that matches it", listed)
+		}
+	}
 
 	again, err := whole.service.Apply(t.Context(), imports.ApplyRequest{SiteID: whole.siteID, Path: clientWorkbook, Sheets: sheets})
 	if err != nil {
@@ -315,7 +355,16 @@ func TestTheCatalogAloneMakesPeptidesACategoryOnlyWhereNoRootIsKnown(t *testing.
 	if dropped := findings(report.Warnings, imports.CodeCategoryLevelIsRoot); len(dropped) != 0 {
 		t.Fatalf("the catalog on an empty site dropped %+v, want Peptides kept: nothing says it is a root", dropped)
 	}
+	if got := previewed(report); !slices.Contains(got, "Peptides | create | 3") || !slices.Contains(got, "Peptides › BPC-157 | create | 2") {
+		t.Fatalf("the catalog on an empty site lists %v, want Peptides made a category", got)
+	}
 
 	together := newHarness(t)
-	rootLevelsDropped(t, together.workbookPreview(t, clientWorkbook, "Catalog", "Groups"), "Catalog", 2, 3, 4)
+	report = together.workbookPreview(t, clientWorkbook, "Catalog", "Groups")
+	rootLevelsDropped(t, report, "Catalog", 2, 3, 4)
+	for _, listed := range previewed(report) {
+		if strings.Contains(listed, "Peptides") {
+			t.Fatalf("the catalog beside the group sheet lists %v, want no Peptides category", previewed(report))
+		}
+	}
 }

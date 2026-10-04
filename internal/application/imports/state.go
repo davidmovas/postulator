@@ -6,25 +6,29 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
 
 type siteState struct {
-	siteID    string
-	entities  []graph.Entity
-	edges     []graph.Edge
-	pages     []pagemap.Page
-	byName    map[string][]graph.Entity
-	byPath    map[string]pagemap.Page
-	byPlanned map[string]pagemap.Page
-	edgeKeys  map[string]struct{}
+	siteID     string
+	entities   []graph.Entity
+	edges      []graph.Edge
+	pages      []pagemap.Page
+	categories []category.Category
+	byName     map[string][]graph.Entity
+	byPath     map[string]pagemap.Page
+	byPlanned  map[string]pagemap.Page
+	edgeKeys   map[string]struct{}
 }
 
-func newSiteState(siteID string, entities []graph.Entity, edges []graph.Edge, pages []pagemap.Page) siteState {
+func newSiteState(
+	siteID string, entities []graph.Entity, edges []graph.Edge, pages []pagemap.Page, categories []category.Category,
+) siteState {
 	state := siteState{
-		siteID: siteID, entities: entities, edges: edges, pages: pages,
+		siteID: siteID, entities: entities, edges: edges, pages: pages, categories: categories,
 		byName:    make(map[string][]graph.Entity, len(entities)),
 		byPath:    make(map[string]pagemap.Page, len(pages)),
 		byPlanned: make(map[string]pagemap.Page),
@@ -58,7 +62,11 @@ func (s *Service) state(ctx context.Context, siteID string) (siteState, error) {
 	if err != nil {
 		return siteState{}, err
 	}
-	return newSiteState(siteID, entities, edges, pages), nil
+	categories, err := s.deps.Categories.ListBySite(ctx, siteID)
+	if err != nil {
+		return siteState{}, err
+	}
+	return newSiteState(siteID, entities, edges, pages, categories), nil
 }
 
 func sortStored(entities []graph.Entity, edges []graph.Edge, pages []pagemap.Page) {

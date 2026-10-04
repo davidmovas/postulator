@@ -18,6 +18,14 @@ const (
 	ActionSkip   Action = "skip"
 )
 
+type CategoryAction string
+
+const (
+	CategoryCreate CategoryAction = "create"
+	CategoryMatch  CategoryAction = "match"
+	CategoryDelete CategoryAction = "delete"
+)
+
 type FindingCode string
 
 const (
@@ -108,8 +116,16 @@ type PreviewPage struct {
 	WPType          string        `json:"wpType"`
 	PageKind        string        `json:"pageKind,omitempty"`
 	Entity          string        `json:"entity,omitempty"`
+	Categories      []string      `json:"categories"`
 	Action          string        `json:"action"`
 	Generated       bool          `json:"generated,omitempty"`
+}
+
+type PreviewCategory struct {
+	Sheet  string   `json:"sheet,omitempty"`
+	Path   []string `json:"path"`
+	Action string   `json:"action"`
+	Rows   int      `json:"rows"`
 }
 
 type PreviewEntity struct {
@@ -160,24 +176,27 @@ type Conflict struct {
 }
 
 type PreviewReport struct {
-	Columns         []PreviewColumn `json:"columns"`
-	Pages           []PreviewPage   `json:"pages"`
-	Entities        []PreviewEntity `json:"entities"`
-	Groups          []PreviewGroup  `json:"groups"`
-	Edges           []PreviewEdge   `json:"edges"`
-	Warnings        []Finding       `json:"warnings"`
-	Errors          []Finding       `json:"errors"`
-	Cannibalization []Conflict      `json:"cannibalization"`
-	Skipped         int             `json:"skipped"`
+	Columns         []PreviewColumn   `json:"columns"`
+	Pages           []PreviewPage     `json:"pages"`
+	Entities        []PreviewEntity   `json:"entities"`
+	Groups          []PreviewGroup    `json:"groups"`
+	Categories      []PreviewCategory `json:"categories"`
+	Edges           []PreviewEdge     `json:"edges"`
+	Warnings        []Finding         `json:"warnings"`
+	Errors          []Finding         `json:"errors"`
+	Cannibalization []Conflict        `json:"cannibalization"`
+	Skipped         int               `json:"skipped"`
 }
 
 type Counts struct {
-	EntitiesCreated int `json:"entitiesCreated"`
-	EntitiesUpdated int `json:"entitiesUpdated"`
-	EdgesCreated    int `json:"edgesCreated"`
-	PagesCreated    int `json:"pagesCreated"`
-	PagesUpdated    int `json:"pagesUpdated"`
-	Skipped         int `json:"skipped"`
+	EntitiesCreated   int `json:"entitiesCreated"`
+	EntitiesUpdated   int `json:"entitiesUpdated"`
+	EdgesCreated      int `json:"edgesCreated"`
+	PagesCreated      int `json:"pagesCreated"`
+	PagesUpdated      int `json:"pagesUpdated"`
+	CategoriesCreated int `json:"categoriesCreated"`
+	CategoriesDeleted int `json:"categoriesDeleted"`
+	Skipped           int `json:"skipped"`
 }
 
 func mappingView(m importmap.Mapping) Mapping {
@@ -243,6 +262,9 @@ func (r *PreviewReport) settle() {
 	if r.Groups == nil {
 		r.Groups = []PreviewGroup{}
 	}
+	if r.Categories == nil {
+		r.Categories = []PreviewCategory{}
+	}
 	if r.Edges == nil {
 		r.Edges = []PreviewEdge{}
 	}
@@ -269,8 +291,9 @@ func entityView(sheet string, e graph.Entity, parent string, action Action) Prev
 	}
 }
 
-func pageView(sheet string, p pagemap.Page, draft *pageDraft, action Action) PreviewPage {
+func pageView(sheet string, p pagemap.Page, draft *pageDraft, categories []string, action Action) PreviewPage {
 	view := PreviewPage{
+		Categories:      categories,
 		Sheet:           sheet,
 		Path:            p.Path,
 		PlannedPath:     p.PlannedPath,
