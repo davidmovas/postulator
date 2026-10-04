@@ -10,7 +10,7 @@ code path.
 ```
 cmd/postulator        Wails bootstrap only
 internal/kernel       errors, paging, id, clock, log, ctx, dto, settings, middleware
-internal/domain       pure logic: site graph category pagemap keyword importmap template content run schedule settings llm
+internal/domain       pure logic: site graph pagemap keyword importmap template content run schedule settings llm
 internal/application  use cases, UnitOfWork, tool registry, event registry
 internal/adapters     sqlite, wp, llm (openai, tuning, retry, limiter, ledger, recordreplay, catalog, profiles, fake), images, secrets, importer
 internal/runtime      the run engine and its step catalog
@@ -80,13 +80,6 @@ mapping of a sheet's headers, its level and note columns, and what each column b
 `run`, `schedule`, `settings`, and the `llm` model catalog types with the service tiers, the
 reasoning allowance per effort, `Cost` and the purpose rules the spend report groups by.
 
-`category` is a WordPress category kept as a record of its own, never as an entity: a site, a
-name, a parent, the `Key` the name folds to by WordPress's own rule for comparing term names, and
-the `Term` it is in `category` or `product_cat` once the site has it. A page names the one leaf it
-is filed under; `Chain` reads the path above it, root first. The graph and the categories are two
-structures on purpose: an import makes entity groups from the root level columns and categories
-from the other level columns, and nothing files a page by its entity.
-
 The heart of it is `content`: `PlanLinks` turns a graph, a page index and a
 `content.Subject{Site, PageID, PagePath, EntityID}` into the set of links that page owes,
 `InsertLinks` places them with a decision recorded per candidate, and `Compliance` grades
@@ -131,16 +124,6 @@ plugin's `seo_meta_read`; every neighbour a relink rewrote has its `before.html`
 A human edit since the run, a missing record, a page already gone or a site without the
 plugin holds that one item with both facts named, and every other item still goes back. Media
 stays.
-
-`publish` files a page under its category in the same write as its body, with no step of its
-own: it reads the chain of the page's category record, reuses each stored term that still sits
-under the wanted parent, ensures the rest in WordPress and keeps every term against its category,
-then sends the chain on a create and the union with what the item carries on an update. A product
-gets its chain's product categories added to the client's in its `wc/v3` save. What the run added
-is kept in the publish result, and a revert takes back that and nothing else, leaving the terms
-it created on the site. A category never stops a page: a refusal, a missing permission or a site
-whose plugin cannot file pages is a warning. At the end of a sync the category records are matched
-to the terms already on the site, root first, by their key under the parent already matched.
 
 `advance(itemID)` claims an
 item in one SQLite transaction by compare-and-swap, runs its current step under a
@@ -235,18 +218,12 @@ again from what it read.
 
 ## WordPress companion plugin
 
-`wp-plugin/postulator-companion` **1.3.0** (PHP ≥ 8.1, WP ≥ 6.4, no dependencies) serves
+`wp-plugin/postulator-companion` **1.2.0** (PHP ≥ 8.1, WP ≥ 6.4, no dependencies) serves
 `/wp-json/postulator/v1` and advertises `bulk seo_meta seo_meta_read content_hash raw
-preview page_categories`; every permission callback requires `edit_posts`, and the password must
-belong to an **administrator**, so **multisite is unsupported in v2.0**. A capability the manifest
-does not name is refused from the cached manifest before any request, so a site still on 1.1.0
-answers `plugin_outdated` for the SEO read rather than a 404.
-
-`page_categories` (since 1.3.0) adds no route: `includes/categories.php` registers the core
-category taxonomy for pages on `init`, so `/wp/v2/pages` takes and returns `categories`, and adds
-pages to the post types of a category archive's main query outside wp-admin, keeping the types
-the query already names. Categories themselves are written through core's
-`/wp/v2/categories` and WooCommerce's `/wc/v3/products/categories`.
+preview`; every permission callback requires `edit_posts`, and the password must belong to an
+**administrator**, so **multisite is unsupported in v2.0**. A capability the manifest does not
+name is refused from the cached manifest before any request, so a site still on 1.1.0 answers
+`plugin_outdated` for the SEO read rather than a 404.
 
 | Route | Purpose |
 |---|---|
@@ -273,7 +250,7 @@ page and a product category never is: a term id names whatever post shares its n
 why the client names the item type on every call and refuses `product_cat` before the request.
 A product's other fields go through WooCommerce's `wc/v3` with the same application password, the
 store's fields before the description, because saving the short description makes WooCommerce
-save the whole post again; the product categories the run adds travel in that same save.
+save the whole post again.
 
 See `docs/CONTRACTS.md` for the wire shapes and `docs/superpowers/specs/` for the full
 design.
