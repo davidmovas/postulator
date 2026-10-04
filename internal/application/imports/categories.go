@@ -56,7 +56,7 @@ type filing struct {
 
 func (b *builder) file(draft *pageDraft) (string, error) {
 	parentID := ""
-	for _, name := range draft.chain {
+	for _, name := range draft.categories.chain() {
 		at, held := b.shelf.find(parentID, name)
 		if !held {
 			made, err := category.New(category.Category{

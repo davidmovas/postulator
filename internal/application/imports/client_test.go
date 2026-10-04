@@ -347,24 +347,61 @@ func TestTheClientWorkbookImportsAsOneWorkbook(t *testing.T) {
 	}
 }
 
-func TestTheCatalogAloneMakesPeptidesACategoryOnlyWhereNoRootIsKnown(t *testing.T) {
+func TestTheCatalogMakesPeptidesACategoryOnlyWhereNoEntityAtTheTopOfTheGraphIsNamedSo(t *testing.T) {
 	t.Parallel()
 
-	alone := newHarness(t)
-	report := alone.workbookPreview(t, clientWorkbook, "Catalog")
-	if dropped := findings(report.Warnings, imports.CodeCategoryLevelIsRoot); len(dropped) != 0 {
-		t.Fatalf("the catalog on an empty site dropped %+v, want Peptides kept: nothing says it is a root", dropped)
-	}
-	if got := previewed(report); !slices.Contains(got, "Peptides | create | 3") || !slices.Contains(got, "Peptides › BPC-157 | create | 2") {
-		t.Fatalf("the catalog on an empty site lists %v, want Peptides made a category", got)
+	cases := []struct {
+		name     string
+		before   []string
+		beside   []string
+		kind     graph.Kind
+		dropped  []int
+		peptides []string
+	}{
+		{
+			name:     "an empty site",
+			peptides: []string{"Peptides | create | 3", "Peptides › BPC-157 | create | 2", "Peptides › TB-500 | create | 1"},
+		},
+		{
+			name:    "the group sheet in the same import",
+			beside:  []string{"Groups"},
+			dropped: []int{2, 3, 4},
+		},
+		{
+			name:    "the group sheet imported before",
+			before:  []string{"Groups"},
+			kind:    graph.KindHub,
+			dropped: []int{2, 3, 4},
+		},
+		{
+			name:    "the entity sheet imported after the group sheet, which makes Peptides an entity of kind category",
+			before:  []string{"Groups", "Entities"},
+			kind:    graph.KindCategory,
+			dropped: []int{2, 3, 4},
+		},
 	}
 
-	together := newHarness(t)
-	report = together.workbookPreview(t, clientWorkbook, "Catalog", "Groups")
-	rootLevelsDropped(t, report, "Catalog", 2, 3, 4)
-	for _, listed := range previewed(report) {
-		if strings.Contains(listed, "Peptides") {
-			t.Fatalf("the catalog beside the group sheet lists %v, want no Peptides category", previewed(report))
-		}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := newHarness(t)
+			for _, sheet := range tc.before {
+				clean(t, sheet, h.apply(t, clientWorkbook, h.sheet(t, clientWorkbook, sheet)))
+			}
+			if got := h.kinds(t)["Peptides"]; got != tc.kind {
+				t.Fatalf("before the catalog Peptides is %q, want %q", got, tc.kind)
+			}
+
+			report := h.workbookPreview(t, clientWorkbook, slices.Concat([]string{"Catalog"}, tc.beside)...)
+			if len(report.Errors) != 0 {
+				t.Fatalf("errors = %+v", report.Errors)
+			}
+			rootLevelsDropped(t, report, "Catalog", tc.dropped...)
+			listed := slices.DeleteFunc(previewed(report), func(held string) bool { return !strings.Contains(held, "Peptides") })
+			if !slices.Equal(listed, tc.peptides) {
+				t.Fatalf("the catalog lists the Peptides categories %v, want %v", listed, tc.peptides)
+			}
+		})
 	}
 }

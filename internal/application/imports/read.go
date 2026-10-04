@@ -18,26 +18,50 @@ const (
 )
 
 type rowDraft struct {
-	at        importmap.Origin
-	path      string
-	title     string
-	h1        string
-	metaTitle string
-	metaDesc  string
-	wpType    string
-	pageKind  string
-	keywords  keyword.List
-	notes     []pagemap.Note
-	name      string
-	own       ownership
-	kind      string
-	anchors   []string
-	related   []string
-	parent    string
-	levels    []importmap.Level
-	roots     []string
-	chain     []string
-	dropped   []string
+	at         importmap.Origin
+	path       string
+	title      string
+	h1         string
+	metaTitle  string
+	metaDesc   string
+	wpType     string
+	pageKind   string
+	keywords   keyword.List
+	notes      []pagemap.Note
+	name       string
+	own        ownership
+	kind       string
+	anchors    []string
+	related    []string
+	parent     string
+	levels     []importmap.Level
+	roots      []string
+	categories categoryLevels
+}
+
+type categoryLevel struct {
+	name string
+	root bool
+}
+
+type categoryLevels []categoryLevel
+
+func (l categoryLevels) named(root bool) []string {
+	out := make([]string, 0, len(l))
+	for _, level := range l {
+		if level.root == root {
+			out = append(out, level.name)
+		}
+	}
+	return out
+}
+
+func (l categoryLevels) chain() []string {
+	return l.named(false)
+}
+
+func (l categoryLevels) dropped() []string {
+	return l.named(true)
 }
 
 func (r *rowDraft) sortLevels(roots rootSet) {
@@ -46,16 +70,14 @@ func (r *rowDraft) sortLevels(roots rootSet) {
 		case !level.Category:
 			r.roots = append(r.roots, level.Name)
 		case category.Key(level.Name) == "":
-		case roots.holds(level.Name):
-			r.dropped = append(r.dropped, level.Name)
 		default:
-			r.chain = append(r.chain, level.Name)
+			r.categories = append(r.categories, categoryLevel{name: level.Name, root: roots.holds(level.Name)})
 		}
 	}
 }
 
 func (r *rowDraft) noteDropped(p *plan) {
-	for _, name := range r.dropped {
+	for _, name := range r.categories.dropped() {
 		p.noteAt(r.at, "", CodeCategoryLevelIsRoot,
 			"the category "+name+" is the name of a root entity, so it is not made a category; "+
 				"the levels below it are filed under the level above it")

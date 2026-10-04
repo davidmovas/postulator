@@ -28,21 +28,20 @@ type parentRef struct {
 }
 
 type unit struct {
-	name     string
-	kind     string
-	keywords keyword.List
-	anchors  []string
-	related  []string
-	at       importmap.Origin
-	parent   parentRef
-	context  int
-	group    int
-	chain    []string
-	dropped  []string
-	pinned   string
-	alias    int
-	matched  string
-	id       string
+	name       string
+	kind       string
+	keywords   keyword.List
+	anchors    []string
+	related    []string
+	at         importmap.Origin
+	parent     parentRef
+	context    int
+	group      int
+	categories categoryLevels
+	pinned     string
+	alias      int
+	matched    string
+	id         string
 }
 
 func (u *unit) defaultKind() graph.Kind {
@@ -206,7 +205,7 @@ func (b *builder) addRowUnit(draft *pageDraft) {
 	first := &b.rows[draft.rows[0]]
 	u := unit{
 		name: fill(explicit, first.named()), at: first.at, context: b.contextOf(draft.rows), group: -1,
-		chain: draft.chain, dropped: draft.dropped,
+		categories: draft.categories,
 	}
 	if onSite && explicit == "" && existing.EntityID != nil {
 		if pinned, known := b.byID[*existing.EntityID]; known {
@@ -226,7 +225,7 @@ func (b *builder) addEntityRows() {
 		if row.path != "" || row.name == "" {
 			continue
 		}
-		u := unit{name: row.name, at: row.at, context: b.contextOf([]int{i}), group: -1, chain: row.chain, dropped: row.dropped}
+		u := unit{name: row.name, at: row.at, context: b.contextOf([]int{i}), group: -1, categories: row.categories}
 		u.parent = b.groupParent(u.context)
 		b.absorbRow(b.add(u), row)
 	}

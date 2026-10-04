@@ -2,7 +2,6 @@ package imports
 
 import (
 	"github.com/davidmovas/postulator/internal/domain/category"
-	"github.com/davidmovas/postulator/internal/domain/graph"
 )
 
 type rootSet map[string]struct{}
@@ -21,7 +20,7 @@ func (r rootSet) holds(name string) bool {
 func rootsOf(reads []sheetRead, state *siteState) rootSet {
 	roots := make(rootSet)
 	for i := range state.entities {
-		if held := &state.entities[i]; held.Kind == graph.KindHub && held.ScopeID == nil {
+		if held := &state.entities[i]; held.ScopeID == nil {
 			roots.add(held.Name)
 		}
 	}

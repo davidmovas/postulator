@@ -54,15 +54,16 @@ func (b *builder) place() {
 func (b *builder) underCategory(at int, known *namesakes) (parentRef, bool) {
 	u := &b.units[at]
 	own := category.Key(u.name)
-	for level := len(u.chain) - 1; level >= 0; level-- {
-		if category.Key(u.chain[level]) == own {
+	for level := len(u.categories) - 1; level >= 0; level-- {
+		held := u.categories[level]
+		if held.root || category.Key(held.name) == own {
 			continue
 		}
 		above := ""
 		if level > 0 {
-			above = u.chain[level-1]
+			above = u.categories[level-1].name
 		}
-		if ref, found := b.namedLike(u.chain[level], at, known, above, false); found {
+		if ref, found := b.namedLike(held.name, at, known, above, false); found {
 			return ref, true
 		}
 	}
@@ -72,11 +73,12 @@ func (b *builder) underCategory(at int, known *namesakes) (parentRef, bool) {
 func (b *builder) underDroppedRoot(at int, known *namesakes) (parentRef, bool) {
 	u := &b.units[at]
 	own := category.Key(u.name)
-	for level := len(u.dropped) - 1; level >= 0; level-- {
-		if category.Key(u.dropped[level]) == own {
+	for level := len(u.categories) - 1; level >= 0; level-- {
+		held := u.categories[level]
+		if !held.root || category.Key(held.name) == own {
 			continue
 		}
-		if ref, found := b.namedLike(u.dropped[level], at, known, "", true); found {
+		if ref, found := b.namedLike(held.name, at, known, "", true); found {
 			return ref, true
 		}
 	}

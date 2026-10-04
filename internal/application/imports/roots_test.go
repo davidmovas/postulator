@@ -33,13 +33,25 @@ func TestARootNameIsNeverACategoryLevel(t *testing.T) {
 			dropped: []int{3},
 		},
 		{
+			name:    "a topic the site holds at the top of its graph",
+			before:  "url,h1\n/peptides/,Peptides\n",
+			sheet:   "category,url,h1\nPeptides,/shop/x/,X\n",
+			dropped: []int{2},
+		},
+		{
+			name:    "an entity of kind category the site holds at the top of its graph",
+			before:  "url,entity,entity kind\n/peptides/,Peptides,category\n",
+			sheet:   "category,subcategory,url,h1\nPeptides,Blends,/shop/blend/,Blend\n",
+			dropped: []int{2},
+		},
+		{
 			name:   "a hub that sits under another entity",
 			before: "url,entity,entity kind,parent\n/a/,A,,\n/a/peptides/,Peptides,hub,A\n",
 			sheet:  "category,url,h1\nPeptides,/shop/x/,X\n",
 		},
 		{
-			name:   "an entity of another kind without a parent",
-			before: "url,h1\n/peptides/,Peptides\n",
+			name:   "an entity of kind category that sits under another entity",
+			before: "url,entity,entity kind,parent\n/a/,A,,\n/a/peptides/,Peptides,category,A\n",
 			sheet:  "category,url,h1\nPeptides,/shop/x/,X\n",
 		},
 	}

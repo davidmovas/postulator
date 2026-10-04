@@ -8,6 +8,9 @@ import (
 
 const twoLiquids = "url,entity,parent\n/bpc-157/,BPC-157,\n/bpc-157/liquid/,Liquid,BPC-157\n/tb-500/,TB-500,\n/tb-500/liquid/,Liquid,TB-500\n"
 
+const twoLiquidsUnderARoot = "url,entity,parent\n/peptides/,Peptides,\n/peptides/bpc-157/,BPC-157,Peptides\n" +
+	"/peptides/bpc-157/liquid/,Liquid,BPC-157\n/peptides/tb-500/,TB-500,Peptides\n/peptides/tb-500/liquid/,Liquid,TB-500\n"
+
 func (h harness) scopeOf(t *testing.T, name string) []string {
 	t.Helper()
 
@@ -85,8 +88,20 @@ func TestARowHangsUnderTheEntityItsCategoriesName(t *testing.T) {
 		},
 		{
 			name:   "the level above tells two entities of one name apart",
+			before: twoLiquidsUnderARoot,
+			sheet:  "category,subcategory,url,h1\nTB-500,Liquid,/drops/,Drops\n",
+			entity: "Drops", scope: "Peptides › TB-500 › Liquid › Drops",
+		},
+		{
+			name:   "a level above that names a root and is no category still tells two entities of one name apart",
 			before: twoLiquids,
 			sheet:  "category,subcategory,url,h1\nTB-500,Liquid,/drops/,Drops\n",
+			entity: "Drops", scope: "TB-500 › Liquid › Drops",
+		},
+		{
+			name:   "the level right above a category tells its namesakes apart, though it names a root",
+			before: twoLiquids,
+			sheet:  "category,subcategory,sub subcategory,url,h1\nBlends,TB-500,Liquid,/drops/,Drops\n",
 			entity: "Drops", scope: "TB-500 › Liquid › Drops",
 		},
 		{

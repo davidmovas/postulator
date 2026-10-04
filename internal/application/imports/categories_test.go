@@ -103,6 +103,13 @@ func TestAChainFilesThePageUnderItsLastCategory(t *testing.T) {
 			filed:   map[string]string{"/peptides/": "", "/x/": "Blends › Recovery"},
 			preview: []string{"Blends | create | 1", "Blends › Recovery | create | 1"},
 		},
+		{
+			name:    "a repeated path is filed by the first of its rows whose levels are not all roots",
+			sheet:   "Root Entity,Category,Subcategory,URL\nPeptides,,,/peptides/\n,Peptides,,/x/\n,Blends,Recovery,/x/\n,Liquid,,/x/\n",
+			shelf:   []string{"Blends", "Blends › Recovery"},
+			filed:   map[string]string{"/peptides/": "", "/x/": "Blends › Recovery"},
+			preview: []string{"Blends | create | 3", "Blends › Recovery | create | 3"},
+		},
 	}
 
 	for _, tc := range cases {
