@@ -385,6 +385,98 @@ func TestExportWritesTheFormatItIsAsked(t *testing.T) {
 	}
 }
 
+func TestExportWritesEachPageCategoriesAndAnImportFilesThemAgain(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		sheet   string
+		levels  []string
+		headers []string
+		cut     []string
+		filed   map[string]string
+	}{
+		{
+			name:    "as deep as the deepest chain",
+			sheet:   "url,h1,category,subcategory\n/bpc-157/liquid/,BPC-157 Liquid,BPC-157,Liquid\n/tb-500/,TB-500,TB-500,\n/about/,About,,\n",
+			levels:  []string{"category", "subcategory"},
+			headers: []string{"Category", "Subcategory"},
+			filed:   map[string]string{"/bpc-157/liquid/": "BPC-157 › Liquid", "/tb-500/": "TB-500", "/about/": ""},
+		},
+		{
+			name:    "no category column when no page has a category",
+			sheet:   "url,h1\n/about/,About\n",
+			filed:   map[string]string{"/about/": ""},
+			headers: []string{},
+		},
+		{
+			name:    "a chain deeper than the detector reads is cut at three and said so",
+			sheet:   "url,h1,one,two,three,four\n/vial/,Vial,Peptides,BPC-157,Liquid,10 ml\n",
+			levels:  []string{"one", "two", "three", "four"},
+			headers: []string{"Category", "Subcategory", "Sub Subcategory"},
+			cut:     []string{"/vial/"},
+			filed:   map[string]string{"/vial/": "Peptides › BPC-157 › Liquid"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			source := newHarness(t)
+			mapping := source.mapping(map[string]string{string(importmap.FieldPath): "url", string(importmap.FieldH1): "h1"})
+			mapping.Options.LevelColumns = tc.levels
+			source.apply(t, source.file(t, "sheet.csv", tc.sheet), mapping)
+
+			exported := filepath.Join(source.dir, "export.xlsx")
+			got, err := source.service.Export(t.Context(), imports.ExportRequest{SiteID: source.siteID, Path: exported})
+			if err != nil {
+				t.Fatalf("Export: %v", err)
+			}
+			cut := make([]string, 0, len(got.Warnings))
+			for _, warning := range got.Warnings {
+				if warning.Code != string(imports.CodeCategoryChainCut) || warning.Row < 2 {
+					t.Errorf("warning %+v, want a cut chain on a row of the file", warning)
+				}
+				for at := range tc.filed {
+					if strings.Contains(warning.Message, at) {
+						cut = append(cut, at)
+					}
+				}
+			}
+			if got.Warnings == nil || !slices.Equal(cut, tc.cut) {
+				t.Fatalf("warnings = %+v, want the chains of %v cut", got.Warnings, tc.cut)
+			}
+
+			table, err := importer.Read(t.Context(), exported, importer.ReadOptions{})
+			if err != nil {
+				t.Fatalf("Read the export: %v", err)
+			}
+			written := slices.DeleteFunc(slices.Clone(table.Headers), func(header string) bool {
+				return !slices.Contains(importmap.CategoryHeaders(), header)
+			})
+			if !slices.Equal(written, tc.headers) {
+				t.Fatalf("the export writes the category columns %v, want %v", written, tc.headers)
+			}
+
+			target := newHarness(t)
+			detected := target.detected(t, exported)
+			if !slices.Equal(detected.Options.LevelColumns, tc.headers) && len(tc.headers) > 0 {
+				t.Fatalf("the export's levels read back as %v", detected.Options.LevelColumns)
+			}
+			if applied := target.apply(t, exported, detected); len(applied.Report.Errors) != 0 {
+				t.Fatalf("errors = %+v", applied.Report.Errors)
+			}
+			filed := target.filed(t)
+			for at, want := range tc.filed {
+				if filed[at] != want {
+					t.Errorf("after the round trip %s is filed under %q, want %q", at, filed[at], want)
+				}
+			}
+		})
+	}
+}
+
 func TestExportRefusesAFormatItDoesNotWrite(t *testing.T) {
 	t.Parallel()
 

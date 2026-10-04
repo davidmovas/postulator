@@ -218,6 +218,34 @@ func TestWordsReadsACellAsItsLowercaseWords(t *testing.T) {
 	}
 }
 
+func TestTheCategoryHeadersReadBackAsCategoryLevels(t *testing.T) {
+	t.Parallel()
+
+	headers := importmap.CategoryHeaders()
+	if !slices.Equal(headers, []string{"Category", "Subcategory", "Sub Subcategory"}) {
+		t.Fatalf("CategoryHeaders() = %v", headers)
+	}
+	headers[0] = "Brand"
+	if importmap.CategoryHeaders()[0] != "Category" {
+		t.Fatal("a caller changed the headers the detector knows")
+	}
+
+	written := append([]string{"path"}, importmap.CategoryHeaders()...)
+	mapping := importmap.AutoDetect(written)
+	if !slices.Equal(mapping.Options.LevelColumns, importmap.CategoryHeaders()) {
+		t.Fatalf("levels = %v, want the three category headers in their order", mapping.Options.LevelColumns)
+	}
+	binding, err := mapping.Bind(written)
+	if err != nil {
+		t.Fatalf("Bind: %v", err)
+	}
+	got := binding.Levels([]string{"/a/", "BPC-157", "Liquid", "10 ml"})
+	want := []importmap.Level{{Name: "BPC-157", Category: true}, {Name: "Liquid", Category: true}, {Name: "10 ml", Category: true}}
+	if !slices.Equal(got, want) {
+		t.Fatalf("Levels = %+v, want %+v", got, want)
+	}
+}
+
 func TestFieldsAreTheCanonicalColumnOrder(t *testing.T) {
 	t.Parallel()
 

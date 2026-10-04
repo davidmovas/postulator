@@ -244,6 +244,7 @@ export const importFindingCodes = [
     "intermediate_level",
     "scope_clash",
     "category_level_is_root",
+    "category_chain_cut",
 ] as const;
 export type ImportFindingCode = (typeof importFindingCodes)[number];
 

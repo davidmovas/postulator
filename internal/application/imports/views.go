@@ -54,6 +54,7 @@ const (
 	CodeIntermediateLevel   FindingCode = "intermediate_level"
 	CodeScopeClash          FindingCode = "scope_clash"
 	CodeCategoryLevelIsRoot FindingCode = "category_level_is_root"
+	CodeCategoryChainCut    FindingCode = "category_chain_cut"
 )
 
 var blockingFindingCodes = []FindingCode{

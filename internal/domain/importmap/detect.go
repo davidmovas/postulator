@@ -37,6 +37,12 @@ var levelAliases = map[string]int{
 
 var rootLevels = []string{"root entity", "root"}
 
+var categoryHeaders = []string{"Category", "Subcategory", "Sub Subcategory"}
+
+func CategoryHeaders() []string {
+	return slices.Clone(categoryHeaders)
+}
+
 var noteAliases = []string{"notes", "note", "intent owner", "reason", "detected form variation"}
 
 var aliasIndex, compactIndex = buildIndexes()
