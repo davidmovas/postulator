@@ -2387,10 +2387,12 @@ None of it had been released.
 
 - **The Category columns are ignored.** Category, Subcategory, Sub Subcategory and every other
   level column make no category and no entity group; only a `Root Entity` or `Root` column makes a
-  group. That holds wherever a level column comes from: the headers a sheet is detected by, a saved
-  mapping and the agent. `Mapping.Bind` and `Uses` keep only the root level columns and report every
-  other one, `Root Category` and `Brand` among them, as `ignored`; a mapping maps something only
-  through its root level columns, so one that names only Category and Subcategory is refused; the
+  group. That holds wherever a level column comes from: the detection proposes only the root
+  headers, and a saved mapping or the agent that names Category keeps it stored and reads it
+  ignored. `Mapping.Bind` and `Uses` keep only the root level columns and report every other one,
+  `Root Category` and `Brand` among them, as `ignored`; a mapping maps something only through a
+  field, an indent column or a root column (`Mapping.Unmapped`), so one that names only Category
+  and Subcategory is refused when saved and detected from the sheet's headers when previewed; the
   wizard offers as group columns only the root headers detected for the sheet. The option keeps its
   name, `levelColumns`, because it is stored JSON and part of a tool's schema, and no stored mapping
   is migrated.
@@ -2399,13 +2401,21 @@ None of it had been released.
 - **A URL parent wins inside the row's Root group.** A row's entity takes its parent from its
   parent cell; else from its URL parent, when that parent lies inside the row's own Root group; else
   from the Root group; else from the URL tree. With Root Peptides, `/peptides/bpc-157/liquid/` puts
-  Liquid under BPC-157, not under Peptides. A URL parent lies inside the group when it, or a row
-  above it reached through URL parents alone, belongs to the group; a page already on the site does
-  when an entity above it carries the group's name by `graph.Key`. A URL parent that is the group's
-  own page gives the group, as before, and one in another Root group gives the row's own group. The
-  URL parent is kept as weakly as the URL tree, so a matched entity that has a parent keeps it. A
-  parent cell is resolved by the same test, so one that names a namesake deeper in the group is
-  found instead of being `ambiguous_parent`.
+  Liquid under BPC-157, not under Peptides. One predicate, `inGroup`, says whether a parent lies
+  inside the group: a planned unit does when it, or a unit above it, is the group or one of its
+  rows, the walk ending at a parent a cell names; an entity on the site does when it, or an entity
+  it is named under, carries the group's name by `graph.Key`, and a planned unit whose parent is on
+  the site walks on there. A URL parent that is the group's own page gives the group, as before,
+  and one in another Root group gives the row's own group. The URL parent is kept as weakly as the
+  URL tree, so a matched entity that has a parent keeps it. A parent cell is resolved by the same
+  predicate, so one that names a namesake deeper in the group is found instead of being
+  `ambiguous_parent`.
+- **What it does to the client workbook.** The Groups sheet keeps its eight entities and seven
+  edges, because every URL parent in it lies inside Peptides, so BPC-157's Liquid and Powder stay
+  under BPC-157 and TB-500's Liquid and Capsules under TB-500. The Catalog, which names no root, puts
+  its four products under the generated Shop by the URL tree, where its Category column had put
+  three of them under BPC-157 and TB-500. The workbook as one import still makes sixteen entities,
+  equal to its sheets one by one.
 
 ### Decided without asking
 
