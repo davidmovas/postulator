@@ -20,8 +20,6 @@ vi.mock("../lib/events.js", () => ({
 const { EventBridge, usageCoalesceMs } = await import("./bridge.js");
 const { keys } = await import("./keys.js");
 
-const settleMs = 250;
-
 const seeded = {
     lastWeek: keys.models.spendOver(7),
     lastMonth: keys.models.spendOver(30),
@@ -162,76 +160,5 @@ describe("the spend panel follows the ledger", () => {
         vi.advanceTimersByTime(usageCoalesceMs);
 
         expect(stale(client)).toEqual(["lastWeek", "lastMonth", "calls"]);
-    });
-});
-
-const filing = {
-    tree: keys.pages.categories("s1"),
-    otherTree: keys.pages.categories("s2"),
-    pageDetail: keys.pages.detail("p1"),
-    pageTree: keys.pages.tree("s1"),
-    pageList: keys.pages.list({ siteId: "s1" }, null, 200),
-    otherPageList: keys.pages.list({ siteId: "s2" }, null, 200),
-    entity: keys.graph.entity("e1"),
-    entityList: keys.graph.entities({ siteId: "s1" }, null, 50),
-    graph: keys.graph.full("s1"),
-    otherGraph: keys.graph.full("s2"),
-} as const;
-
-type Filed = keyof typeof filing;
-
-const followsSiteOne: Filed[] = ["tree", "pageDetail", "pageTree", "pageList", "entity", "entityList", "graph"];
-
-function bridgedFiling(): QueryClient {
-    const client = bridged();
-    for (const key of Object.values(filing)) {
-        client.setQueryData(key, { held: true });
-    }
-    client.setQueryData(keys.runs.detail("r1"), { run: { id: "r1", siteId: "s1" } });
-    return client;
-}
-
-function staleFiling(client: QueryClient): Filed[] {
-    return (Object.keys(filing) as Filed[]).filter((name) => client.getQueryState(filing[name])?.isInvalidated === true);
-}
-
-describe("the category tree and every label of a page's categories follow the site", () => {
-    it.each<[string, () => void]>([
-        ["the pages change", () => {
-            fire("pages.changed", { siteId: "s1" });
-        }],
-        ["the graph changes", () => {
-            fire("graph.changed", { siteId: "s1" });
-        }],
-        ["a sync stores the site's terms", () => {
-            fire("sites.changed", { siteId: "s1" });
-        }],
-        ["a run that published pages completes", () => {
-            fire("run.completed", { runId: "r1", succeeded: 3, failed: 0 }, "r1");
-        }],
-    ])("refreshes the tree, the pages and the entities of that site when %s", (_, happen) => {
-        const client = bridgedFiling();
-
-        happen();
-        vi.advanceTimersByTime(settleMs);
-
-        expect(staleFiling(client)).toEqual(followsSiteOne);
-    });
-
-    it("refreshes every site's tree after a run whose site it never saw", () => {
-        const client = bridgedFiling();
-
-        fire("run.completed", { runId: "r9", succeeded: 1, failed: 0 }, "r9");
-
-        expect(staleFiling(client)).toEqual(Object.keys(filing));
-    });
-
-    it("waits for a burst of page changes to settle", () => {
-        const client = bridgedFiling();
-
-        fire("pages.changed", { siteId: "s1" });
-        vi.advanceTimersByTime(settleMs - 1);
-
-        expect(staleFiling(client)).toEqual([]);
     });
 });

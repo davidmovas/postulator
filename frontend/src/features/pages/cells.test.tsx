@@ -6,7 +6,7 @@ import { copy } from "../../copy/index.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
 import { aPage } from "../../testing/pages.js";
 import { DenseTable, TableCell } from "../../ui/index.js";
-import { CategoryCell, DriftCell, EntityCell, PageTableRow, SyncedCell } from "./cells.js";
+import { DriftCell, EntityCell, PageTableRow, SyncedCell } from "./cells.js";
 
 function inTable(node: ReactNode) {
     return render(
@@ -69,37 +69,6 @@ describe("EntityCell", () => {
             </DenseTable>,
         );
         expect(screen.getByRole("cell").textContent).toBe(copy.pages.mapped);
-    });
-});
-
-describe("CategoryCell", () => {
-    const filed = [
-        { id: "peptides", name: "Peptides", termId: 12 },
-        { id: "healing", name: "Healing" },
-    ];
-
-    it("shows the categories that file the page on one line, the whole trail on hover", () => {
-        inTable(<CategoryCell page={{ categories: filed, categoriesNeedPlugin: false }} />);
-        const trail = screen.getByRole("list", { name: copy.categories.trail });
-        expect(trail.className).toContain("flex-nowrap");
-        expect(trail.getAttribute("title")).toContain("Peptides › Healing");
-        expect(trail.getAttribute("title")).toContain(copy.categories.onSite(12));
-        expect(trail.getAttribute("title")).toContain(copy.categories.onPublish);
-        const states = [...trail.querySelectorAll("li")].map((item) => item.dataset["categoryState"]);
-        expect(states).toStrictEqual(["onSite", "onPublish"]);
-    });
-
-    it("warns on every chip when the site's plugin cannot file pages", () => {
-        inTable(<CategoryCell page={{ categories: filed, categoriesNeedPlugin: true }} />);
-        const trail = screen.getByRole("list", { name: copy.categories.trail });
-        const states = [...trail.querySelectorAll("li")].map((item) => item.dataset["categoryState"]);
-        expect(states).toStrictEqual(["needsPlugin", "needsPlugin"]);
-        expect(trail.getAttribute("title")).toContain(copy.categories.needsPlugin);
-    });
-
-    it.each([[[]], [null]])("stays empty for a page no category files (%j)", (categories) => {
-        inTable(<CategoryCell page={{ categories, categoriesNeedPlugin: false }} />);
-        expect(screen.getByRole("cell").childElementCount).toBe(0);
     });
 });
 

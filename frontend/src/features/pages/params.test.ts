@@ -5,9 +5,7 @@ import { defaultQuery, filterOf, narrowed, readQuery, readTab, searchOf, withTab
 describe("readQuery", () => {
     it("reads every filter the list endpoint supports", () => {
         const query = readQuery(
-            new URLSearchParams(
-                "view=tree&status=published&entity=e1&under=1&unmapped=1&prefix=/shop/&category=c7&sort=path:desc",
-            ),
+            new URLSearchParams("view=tree&status=published&entity=e1&under=1&unmapped=1&prefix=/shop/&sort=path:desc"),
         );
         expect(query).toStrictEqual({
             view: "tree",
@@ -16,7 +14,6 @@ describe("readQuery", () => {
             descendants: true,
             unmapped: true,
             pathPrefix: "/shop/",
-            categoryId: "c7",
             sort: { field: "path", desc: true },
         });
     });
@@ -48,7 +45,6 @@ describe("writeQuery", () => {
             descendants: true,
             unmapped: true,
             pathPrefix: "/a/",
-            categoryId: "c2",
             sort: { field: "createdAt" as const, desc: false },
         };
         expect(readQuery(writeQuery(query))).toStrictEqual(query);
@@ -67,14 +63,10 @@ describe("writeQuery", () => {
             descendants: true,
             unmapped: true,
             pathPrefix: "/shop/",
-            categoryId: "",
             sort: { field: "path" as const, desc: true },
         };
         expect(searchOf(query)).toBe(
             "?view=tree&status=published&entity=e1&under=1&unmapped=1&prefix=%2Fshop%2F&sort=path%3Adesc",
-        );
-        expect(searchOf({ ...query, categoryId: "c7" })).toBe(
-            "?view=tree&status=published&entity=e1&under=1&unmapped=1&prefix=%2Fshop%2F&category=c7&sort=path%3Adesc",
         );
     });
 });
@@ -86,22 +78,8 @@ describe("filterOf", () => {
 
     it("carries the filters that are set", () => {
         expect(
-            filterOf("site", {
-                ...defaultQuery,
-                status: "planned",
-                entityId: "e1",
-                unmapped: true,
-                pathPrefix: "/x/",
-                categoryId: "c7",
-            }),
-        ).toStrictEqual({
-            siteId: "site",
-            status: "planned",
-            entityId: "e1",
-            unmapped: true,
-            pathPrefix: "/x/",
-            categoryId: "c7",
-        });
+            filterOf("site", { ...defaultQuery, status: "planned", entityId: "e1", unmapped: true, pathPrefix: "/x/" }),
+        ).toStrictEqual({ siteId: "site", status: "planned", entityId: "e1", unmapped: true, pathPrefix: "/x/" });
     });
 
     it("asks for the pages under an entity only when an entity is chosen", () => {
@@ -112,21 +90,12 @@ describe("filterOf", () => {
         });
         expect(filterOf("site", { ...defaultQuery, descendants: true })).toStrictEqual({ siteId: "site" });
     });
-
-    it("asks for the pages of a category branch beside the other filters", () => {
-        expect(filterOf("site", { ...defaultQuery, status: "published", categoryId: "c7" })).toStrictEqual({
-            siteId: "site",
-            status: "published",
-            categoryId: "c7",
-        });
-    });
 });
 
 describe("narrowed", () => {
     it("is false only for the untouched query", () => {
         expect(narrowed(defaultQuery)).toBe(false);
         expect(narrowed({ ...defaultQuery, unmapped: true })).toBe(true);
-        expect(narrowed({ ...defaultQuery, categoryId: "c7" })).toBe(true);
         expect(narrowed({ ...defaultQuery, view: "tree" })).toBe(false);
     });
 });

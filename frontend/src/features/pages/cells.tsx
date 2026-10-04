@@ -2,9 +2,8 @@ import type { ReactElement, ReactNode } from "react";
 
 import { copy } from "../../copy/index.js";
 import type { Page } from "../../data/types.js";
-import { pageCategoryItems } from "../../domain/categories.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
-import { CategoryTrail, LinkOffIcon, SyncProblemIcon, TableCell, TableRow } from "../../ui/index.js";
+import { LinkOffIcon, SyncProblemIcon, TableCell, TableRow } from "../../ui/index.js";
 
 export interface PageTableRowProps {
     page: Pick<Page, "id" | "status">;
@@ -57,18 +56,6 @@ export function EntityCell({ entityId, entityName }: EntityCellProps): ReactElem
             ) : (
                 (entityName ?? copy.pages.mapped)
             )}
-        </TableCell>
-    );
-}
-
-export interface CategoryCellProps {
-    page: Pick<Page, "categories" | "categoriesNeedPlugin">;
-}
-
-export function CategoryCell({ page }: CategoryCellProps): ReactElement {
-    return (
-        <TableCell>
-            <CategoryTrail items={pageCategoryItems(page)} label={copy.categories.trail} compact={true} />
         </TableCell>
     );
 }

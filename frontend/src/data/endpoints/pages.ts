@@ -8,7 +8,6 @@ export const deletePage = one(Pages.Delete);
 export const getPage = one(Pages.Get);
 export const listPages = listed<Parameters<typeof Pages.List>[0], Page>(Pages.List);
 export const pageTree = one(Pages.Tree);
-export const listCategories = one(Pages.ListCategories);
 export const mapPageToEntity = one(Pages.MapToEntity);
 export const unmapPage = one(Pages.Unmap);
 export const setCanonicalPage = one(Pages.SetCanonical);
