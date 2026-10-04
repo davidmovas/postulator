@@ -30,7 +30,7 @@ the composition root binds the two.
 | `HealthService` | `Ping` |
 | `SitesService` | `Create Update Delete Get List TestConnection` |
 | `GraphService` | `LoadGraph CreateEntity UpdateEntity DeleteEntity GetEntity ListEntities SetAnchors AddEdge ApproveEdge RejectEdge DeleteEdge ListEdges RecomputeScores ProposeFromPages PreviewFromPages ProposeFromKeywords ApplyProposals ProposeRelated MoveEntity` |
-| `PagesService` | `Create Update Delete Get List Tree ListCategories MapToEntity Unmap SetCanonical ReplaceLinks PreviewLink` |
+| `PagesService` | `Create Update Delete Get List Tree MapToEntity Unmap SetCanonical ReplaceLinks PreviewLink` |
 | `TemplatesService` | `CreateTemplate UpdateTemplate DeleteTemplate GetTemplate ListTemplates SetOverride DeleteOverride ResolveForPage CreatePolicy UpdatePolicy DeletePolicy GetPolicy ListPolicies GetEffectivePolicy` |
 | `RunsService` | `Start Estimate Get List ListItems ListEvents GetArtifact ListArtifacts Pause Resume Cancel RetryStep Regenerate RevertRun` |
 | `SyncService` | `SyncSite CheckPlugin SavePluginPackage` |
@@ -43,7 +43,7 @@ the composition root binds the two.
 | `BrowserService` | `Open Locate` |
 | `SettingsService` | `Schema Get Set SetProviderKey ProviderKeys DeleteProviderKey LockState Lock Unlock SetMasterPassword ExportBackup ImportBackup` |
 
-A hundred and twenty-five methods. Where a use case answers with bytes the service writes them
+A hundred and twenty-four methods. Where a use case answers with bytes the service writes them
 to the path the request names and returns it, because the webview has no filesystem;
 `SyncService.SavePluginPackage{path}` is the only such method.
 
@@ -80,12 +80,16 @@ sheet in order, what it became (`use` from `importColumnUses`: `field` with the 
 `level`, `note`, `indent` or `ignored`); `groups` list the chains the root level columns name,
 with the page each took (`page`, empty for none) and the rows under it; each entity carries its
 `parent`. A keyword cell reads `text (volume), text`, separated by `, ; |` or a line break outside
-brackets; `levelColumns` and `noteColumns` are mapping options, and `own_entity` is a field. A
-level column headed `Root Entity` or `Root` makes entity groups; every other level column gives
-the row a chain of WordPress categories. Findings `ambiguous_parent`, `ambiguous_entity` and
-`scope_clash` block an apply like an unknown parent; `bad_volume`, `technical_parent`,
-`group_without_page`, `unknown_own_entity` and `category_level_is_root` (a category level that
-carries a root's name, left out of the chain) are warnings.
+brackets; `levelColumns` and `noteColumns` are mapping options, and `own_entity` is a field. Only
+a level column headed `Root Entity` or `Root` is a level, and it makes entity groups; the
+detection names no other. Any other column a saved mapping or the agent puts in `levelColumns`,
+Category, `Root Category` and `Brand` among them, is `ignored` and makes nothing, so a mapping
+whose level columns are all of that kind and that names no path, entity or indent column is
+`INVALID` with `details.field = columns`. A row's entity takes its parent from its parent cell,
+else from its URL parent when that parent lies inside the row's own root group, else from the
+group, else from the URL tree. Findings `ambiguous_parent`, `ambiguous_entity` and `scope_clash`
+block an apply like an unknown parent; `bad_volume`, `technical_parent`, `group_without_page` and
+`unknown_own_entity` are warnings.
 
 A whole workbook is one request: `PreviewRequest` and `ApplyRequest` take `sheets: [{sheet,
 mapping}]` in place of the one-sheet `mapping`, which stays; `sheets` beside a `mapping` that names
@@ -95,30 +99,12 @@ request gives, share the `import.maxRows` budget and are written in one transact
 `saveMappingAs` keeps one mapping per sheet as `"<name> / <sheet>"`. A mapping with an `id` and no columns loads that saved mapping of the
 same site, and one with no columns, levels or indents is detected from its sheet's headers.
 `InspectResponse.sheets[i].detected` is each sheet's own detected mapping, with `options.rowType`
-`pages` or `products`. Every report item and finding carries its `sheet`, `summary.sheets` lists
-the sheets read, `categories` lists `{sheet?, path[], action, rows}` with `action` from
-`importCategoryActions` (`create`, `match`, `delete`; a delete carries no sheet and comes last,
-deepest first), every `PreviewPage` carries its chain as `categories`, and the counts carry
-`categoriesCreated` and `categoriesDeleted`. `ExportResponse.warnings` is always present and may
-carry `category_chain_cut`, a chain deeper than the three columns an import reads back.
+`pages` or `products`. Every report item and finding carries its `sheet`, and `summary.sheets`
+lists the sheets read.
 
 `PagesService.List` takes `includeDescendants` with an `entityId` and keeps the pages of that
-entity and of every entity under it; it refuses the flag alone. It also takes `categoryId`, which
-always keeps the pages filed under that category or any category below it, with no flag; an
-unknown id keeps none. A page carries `notes`, each `{label, text}`, from the note columns of an
-import.
-
-A page carries `categories`, the chain of the category record it is filed under, root first, each
-`dto.Category{id, name, termId?}` where `termId` is left out until the site has the term: in the
-`category` taxonomy for a page or a post, in `product_cat` for a product, and empty for a product
-category. `categoriesNeedPlugin` is true for a WordPress page with a chain on a site whose plugin
-is missing or does not advertise `page_categories`. Both are computed wherever a page view is built, the tree's nodes
-included. An entity carries `categories`, the chain of its canonical page, else of its only page,
-and empty when it has several and no canonical one; `UpdateEntity` takes no category flag.
-`PagesService.ListCategories{siteId}` answers `{categories: [{id, name, parentId, pages,
-termIds: {category?, productCategory?}}]}`, every category of the site level by level, `pages`
-counting the whole branch. It is unpaged like `Tree`: the categories of a site are created only by
-imports.
+entity and of every entity under it; it refuses the flag alone. A page carries `notes`, each
+`{label, text}`, from the note columns of an import.
 
 Every method but `HealthService.Ping` and the four lock methods of `SettingsService`
 answers `LOCKED` while a master password is set and the application has not been unlocked,
@@ -242,10 +228,9 @@ recipe will not draw. Over a product, `commerce_unknown`, `commerce_absent`, `co
 `product_needs_plugin`, `product_not_in_store`, `product_edited_live` and
 `product_category_unwritable` are errors and `product_outputs_missing` and
 `product_outputs_ignored` warnings; a repair over a product or a product category is refused with
-`store_placed`, and one over a post, which WordPress keeps flat, with `post_unnested`. `model_provider_removed` warns of a template that pins a model of a provider
-Postulator no longer works with and names the model the role uses instead, and
-`page_categories_need_plugin` of a WordPress page filed under a category on a site whose plugin
-lacks `page_categories`. Each step is priced at its role's service tier and, on a model that
+`store_placed`, and one over a post, which WordPress keeps flat, with `post_unnested`.
+`model_provider_removed` warns of a template that pins a model of a provider Postulator no longer
+works with and names the model the role uses instead. Each step is priced at its role's service tier and, on a model that
 reasons, with half the allowance of the role's effort added to its output. `Budget` carries
 `maxUsd` and `maxTokens` and either one pauses the run with `budget_exceeded`, and a negative one
 is refused.
@@ -293,17 +278,8 @@ nothing. Warning findings added on 2026-09-25: `target_not_published` (`targetPa
 (`sentence`, `targetPageId`), `neighbor_link_missing` (`reason`, `targetPageId`), and
 `target_missing` from `relink_page` when the page's budget is spent.
 
-`publish_result.categories` is `{taxonomy, terms[{categoryId, name, termId, parentId, created}],
-previous, added, taken}`, root first, and is left out when the page is filed under nothing:
-`previous` is what the item carried before the write (`[]` on a create), `added` what the run put
-on it and all a revert takes off, `taken` whether the written item carries what was sent. A revert
-reads only `taxonomy`, `added` and the created terms, so a result that named an `entityId` still
-reverts. Warning findings of 2026-10-04: `page_categories_need_plugin`, `categories_forbidden`,
-`category_refused` (in WordPress's words) and `categories_not_taken` from `publish`,
-`revert_categories_kept` from `revert`, and `categories_unread` from `sync_site`; `revert_terms_kept`
-is an info finding naming the terms the run created and left on the site. A writer that runs out
-of room twice holds the page `needs_human` with a note that says to lower the template's word
-counts or choose another model.
+A writer that runs out of room twice holds the page `needs_human` with a note that says to lower
+the template's word counts or choose another model.
 
 ## Events
 
@@ -401,9 +377,8 @@ carries `previousProduct {shortDescription, writtenShort, attributes, written, i
 imageId, shortWritten, attributesSent}`, what the product held and what the run wrote, which the
 revert reads. A sync result may carry `product_description_hidden` or `product_page_unread`, both
 warnings. `PagesService.Delete{onSite: true}` refuses a product or a product category with
-`details.field = onSite`. The name, price, stock, SKU, status and slug of a product are never
-written; its categories gain the `product_cat` terms of its chain in the same `wc/v3` save, sent
-as the whole union because WooCommerce replaces the list, and the client's are never taken off.
+`details.field = onSite`. The name, price, stock, SKU, status, slug and categories of a product
+are never written.
 
 ## Models and spend
 
@@ -431,14 +406,11 @@ model, tier, tokens (`input cachedInput cacheWrite output reasoning total`), `us
 
 ## The companion plugin's version
 
-The shipped plugin is **1.3.0** and advertises `bulk seo_meta seo_meta_read content_hash raw
-preview page_categories`. A capability the manifest does not name is refused from the cached
-manifest, before any request: `GET /seo-meta/{id}` needs `seo_meta_read`, so a site still running
-1.1.0 answers `plugin_outdated` with `details.capability` and a revert keeps its
-`revert_meta_kept` warning instead of restoring the search snippet. `page_categories` is what lets
-`/wp/v2/pages` take and return `categories` and a category archive list pages; a site on 1.2.0
-files its posts and products and puts its pages up uncategorised with
-`page_categories_need_plugin`. Everything else works against 1.1.0 unchanged.
+The shipped plugin is **1.2.0** and advertises `bulk seo_meta seo_meta_read content_hash raw
+preview`. A capability the manifest does not name is refused from the cached manifest, before
+any request: `GET /seo-meta/{id}` needs `seo_meta_read`, so a site still running 1.1.0 answers
+`plugin_outdated` with `details.capability` and a revert keeps its `revert_meta_kept` warning
+instead of restoring the search snippet. Everything else works against 1.1.0 unchanged.
 
 ## Agent chat
 
@@ -502,7 +474,7 @@ against `schemaCeilingBytes` (63,400) and logs with the eight widest. A descript
 field takes, its default, its limits and the tool an id comes from, and no more; the chat
 instructions say once that an id is used as a read tool returned it and that a field left out
 keeps its value. `imports_preview` and `imports_apply` take `sheets: [{sheet, mappingId?,
-rowType?}]`, and `pages_list` takes `categoryId`.
+rowType?}]`.
 
 With `agent.toolLoading` set to `deferred`, a round sends ten orienting reads whole (`sites_list
 sites_get reports_site_overview graph_list_entities pages_list pages_get pages_tree runs_list
