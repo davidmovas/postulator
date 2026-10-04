@@ -77,6 +77,13 @@ describe("CategoryTrail", () => {
         expect(screen.getByText("Healing").className).toContain("truncate");
     });
 
+    it("lets the categories above the leaf give up their room first on one line", () => {
+        render(<CategoryTrail items={[peptides, healing]} label="WordPress categories" compact={true} />);
+
+        expect(chipOf("Peptides").className).toContain("shrink-[3]");
+        expect(chipOf("Healing").className).not.toContain("shrink-[3]");
+    });
+
     it("wraps a full trail and leaves the tooltips to each chip", () => {
         render(<CategoryTrail items={[peptides, healing]} label="WordPress categories" />);
 

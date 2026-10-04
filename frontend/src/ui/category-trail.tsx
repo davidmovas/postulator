@@ -56,7 +56,7 @@ export function CategoryTrail({ items, label, compact = false, className }: Cate
                     key={item.key}
                     data-category-state={item.state}
                     title={compact ? undefined : item.hint}
-                    className="flex min-w-0 items-center gap-1"
+                    className={cx("flex min-w-0 items-center gap-1", compact && at < items.length - 1 && "shrink-[3]")}
                 >
                     {at === 0 ? null : (
                         <span aria-hidden={true} className="shrink-0 text-ink-faint">

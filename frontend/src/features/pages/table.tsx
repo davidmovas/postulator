@@ -26,7 +26,7 @@ import type { EntityIndex } from "./entities.js";
 import { defaultQuery, filterOf, narrowed } from "./params.js";
 import type { PagesQuery } from "./params.js";
 
-const columns = "minmax(96px,2.4fr) minmax(80px,2fr) 60px 84px minmax(80px,1.5fr) minmax(80px,1.5fr) 36px 72px";
+const columns = "minmax(96px,2.2fr) minmax(80px,1.7fr) 60px 84px minmax(80px,1.4fr) minmax(80px,2fr) 36px 72px";
 const rowHeight = 28;
 const pageSize = 200;
 

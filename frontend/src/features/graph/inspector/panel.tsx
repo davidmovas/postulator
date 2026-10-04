@@ -142,40 +142,42 @@ export function Inspector({
 
     return (
         <section aria-label={copy.graph.inspector.title} className="flex h-full min-h-0 flex-col bg-panel">
-            <header className="flex items-start gap-2 border-b border-hairline p-3">
-                <Icon size={20} className={`mt-0.5 shrink-0 ${toneClasses[kindTone(entity.kind)].ink}`} />
-                <div className="min-w-0 flex-1">
-                    <h2 className="truncate text-base font-semibold text-ink">{entity.name}</h2>
-                    <p className="flex items-center gap-2 text-2xs text-ink-dim">
-                        <span>{entityKindLabel(entity.kind)}</span>
-                        <span className="font-mono">{formatScore(entity.score)}</span>
-                        <span>{copy.graph.inspector.rank(rank, index.counts.total)}</span>
-                    </p>
-                    {filed.length === 0 ? null : (
-                        <div data-entity-categories={true} className="mt-1.5 flex flex-col gap-1">
-                            <span className="text-2xs text-ink-faint">{copy.graph.inspector.filedUnder}</span>
-                            <CategoryTrail items={filed} label={copy.categories.trail} />
-                        </div>
-                    )}
+            <header className="flex flex-col gap-1.5 border-b border-hairline p-3">
+                <div className="flex items-start gap-2">
+                    <Icon size={20} className={`mt-0.5 shrink-0 ${toneClasses[kindTone(entity.kind)].ink}`} />
+                    <div className="min-w-0 flex-1">
+                        <h2 className="truncate text-base font-semibold text-ink">{entity.name}</h2>
+                        <p className="flex items-center gap-2 text-2xs text-ink-dim">
+                            <span>{entityKindLabel(entity.kind)}</span>
+                            <span className="font-mono">{formatScore(entity.score)}</span>
+                            <span>{copy.graph.inspector.rank(rank, index.counts.total)}</span>
+                        </p>
+                    </div>
+                    <IconButton
+                        icon={SmartToyIcon}
+                        label={copy.agent.askAbout}
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                            askAgent(copy.agent.ask.entity(entity.name, entity.id));
+                        }}
+                    />
+                    <IconButton
+                        icon={CloseIcon}
+                        label={copy.graph.inspector.close}
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                            onSelect(null);
+                        }}
+                    />
                 </div>
-                <IconButton
-                    icon={SmartToyIcon}
-                    label={copy.agent.askAbout}
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                        askAgent(copy.agent.ask.entity(entity.name, entity.id));
-                    }}
-                />
-                <IconButton
-                    icon={CloseIcon}
-                    label={copy.graph.inspector.close}
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                        onSelect(null);
-                    }}
-                />
+                {filed.length === 0 ? null : (
+                    <div data-entity-categories={true} className="flex flex-col gap-1 pl-7">
+                        <span className="text-2xs text-ink-faint">{copy.graph.inspector.filedUnder}</span>
+                        <CategoryTrail items={filed} label={copy.categories.trail} />
+                    </div>
+                )}
             </header>
 
             <div className="flex flex-col gap-4 p-3">
