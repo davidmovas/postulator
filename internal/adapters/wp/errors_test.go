@@ -198,9 +198,6 @@ func TestForbiddenTellsAMissingPermissionFromABadPassword(t *testing.T) {
 			if got := Forbidden(err); got != tc.want {
 				t.Errorf("Forbidden = %t, want %t", got, tc.want)
 			}
-			if got := StoreForbidden(err); got != tc.want {
-				t.Errorf("StoreForbidden = %t, want %t", got, tc.want)
-			}
 		})
 	}
 

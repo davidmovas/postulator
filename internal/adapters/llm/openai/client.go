@@ -17,7 +17,6 @@ import (
 )
 
 const (
-	Provider       = "openai"
 	DefaultBaseURL = "https://api.openai.com/v1"
 	DefaultTimeout = 2 * time.Minute
 
@@ -139,7 +138,7 @@ func (c *Client) completeOnce(ctx context.Context, ex exchange) (port.Response, 
 }
 
 func (c *Client) prepare(ctx context.Context, req port.Request, stream bool) (exchange, error) {
-	if req.Ref.Provider != Provider {
+	if req.Ref.Provider != llm.ProviderOpenAI {
 		return exchange{}, errors.New(errors.Invalid, "this provider is not supported").WithDetail("provider", req.Ref.Provider)
 	}
 
@@ -166,15 +165,17 @@ func (c *Client) row(ctx context.Context, ref llm.ModelRef) catalogRow {
 }
 
 func (c *Client) key(ctx context.Context) (string, error) {
-	key, err := c.secrets.Get(ctx, llm.SecretRef(Provider))
+	key, err := c.secrets.Get(ctx, llm.SecretRef(llm.ProviderOpenAI))
 	if err != nil {
 		if errors.IsCode(err, errors.NotFound) {
-			return "", errors.New(errors.Unauthorized, "no api key is stored for this provider").WithDetail("provider", Provider)
+			return "", errors.New(errors.Unauthorized, "no api key is stored for this provider").
+				WithDetail("provider", llm.ProviderOpenAI)
 		}
 		return "", err
 	}
 	if key = strings.TrimSpace(key); key == "" {
-		return "", errors.New(errors.Unauthorized, "the stored api key for this provider is empty").WithDetail("provider", Provider)
+		return "", errors.New(errors.Unauthorized, "the stored api key for this provider is empty").
+			WithDetail("provider", llm.ProviderOpenAI)
 	}
 	return key, nil
 }

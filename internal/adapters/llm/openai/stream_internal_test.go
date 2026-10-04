@@ -185,7 +185,7 @@ func TestAFlatErrorIsNotMistakenForItsEventType(t *testing.T) {
 	if refused == nil || refused.fault.Type != "" || refused.effectiveStatus() != http.StatusTooManyRequests {
 		t.Fatalf("refusal = %#v, want a rate limit without a borrowed type", refused)
 	}
-	if delay := refused.kernel(llm.ModelRef{Provider: Provider, Model: "m"}, time.Now()); !errors.IsCode(delay, errors.RateLimited) {
+	if delay := refused.kernel(llm.ModelRef{Provider: llm.ProviderOpenAI, Model: "m"}, time.Now()); !errors.IsCode(delay, errors.RateLimited) {
 		t.Errorf("kernel = %v, want %s", delay, errors.RateLimited)
 	}
 }

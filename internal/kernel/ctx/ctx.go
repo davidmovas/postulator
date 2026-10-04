@@ -16,29 +16,7 @@ func (a Actor) String() string {
 
 type key uint8
 
-const (
-	runIDKey key = iota
-	conversationIDKey
-	actorKey
-)
-
-func WithRunID(parent context.Context, runID string) context.Context {
-	return context.WithValue(parent, runIDKey, runID)
-}
-
-func RunID(c context.Context) (string, bool) {
-	value, ok := c.Value(runIDKey).(string)
-	return value, ok
-}
-
-func WithConversationID(parent context.Context, conversationID string) context.Context {
-	return context.WithValue(parent, conversationIDKey, conversationID)
-}
-
-func ConversationID(c context.Context) (string, bool) {
-	value, ok := c.Value(conversationIDKey).(string)
-	return value, ok
-}
+const actorKey key = iota
 
 func WithActor(parent context.Context, actor Actor) context.Context {
 	return context.WithValue(parent, actorKey, actor)

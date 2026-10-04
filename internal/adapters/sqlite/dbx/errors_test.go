@@ -43,8 +43,8 @@ func TestClassify(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := Classify(tc.err); got != tc.want {
-				t.Errorf("Classify(%v) = %q, want %q", tc.err, got, tc.want)
+			if got := classify(tc.err); got != tc.want {
+				t.Errorf("classify(%v) = %q, want %q", tc.err, got, tc.want)
 			}
 		})
 	}
@@ -82,8 +82,8 @@ func TestConvert(t *testing.T) {
 	if !stderrors.As(busy, &kernel) {
 		t.Fatalf("Convert must produce a kernel error, got %v", busy)
 	}
-	if kernel.Retry == nil || kernel.Retry.After != BusyRetryAfter {
-		t.Errorf("Retry = %+v, want an After of %v", kernel.Retry, BusyRetryAfter)
+	if kernel.Retry == nil || kernel.Retry.After != busyRetryAfter {
+		t.Errorf("Retry = %+v, want an After of %v", kernel.Retry, busyRetryAfter)
 	}
 }
 
@@ -96,10 +96,10 @@ func TestPredicates(t *testing.T) {
 	if IsNotFound(io.EOF) {
 		t.Error("IsNotFound must reject a foreign error")
 	}
-	if !IsConflict(sqlite3.CONSTRAINT_PRIMARYKEY) || !IsConflict(errors.New(errors.Conflict, "taken")) {
-		t.Error("IsConflict must accept the driver error and the kernel error")
+	if !isConflict(sqlite3.CONSTRAINT_PRIMARYKEY) || !isConflict(errors.New(errors.Conflict, "taken")) {
+		t.Error("isConflict must accept the driver error and the kernel error")
 	}
-	if IsConflict(io.EOF) {
-		t.Error("IsConflict must reject a foreign error")
+	if isConflict(io.EOF) {
+		t.Error("isConflict must reject a foreign error")
 	}
 }

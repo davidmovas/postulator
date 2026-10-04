@@ -55,7 +55,7 @@ func storeReason(err error) string {
 	switch {
 	case wp.StoreAbsent(err):
 		return ReasonRevertNoStore
-	case wp.StoreForbidden(err):
+	case wp.Forbidden(err):
 		return ReasonRevertStoreRefused
 	case errors.IsCode(err, errors.NotFound):
 		return ReasonRevertGone

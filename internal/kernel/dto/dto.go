@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	DefaultLimit = 50
-	MaxLimit     = 500
+	defaultLimit = 50
+	maxLimit     = 500
 )
 
 type Time time.Time
@@ -71,12 +71,13 @@ type ListRequest struct {
 	Sort   *Sort  `json:"sort,omitempty" description:"Row order"`
 }
 
-func (r ListRequest) Normalize() ListRequest {
+func PageSize(requested int) int {
 	switch {
-	case r.Limit <= 0:
-		r.Limit = DefaultLimit
-	case r.Limit > MaxLimit:
-		r.Limit = MaxLimit
+	case requested <= 0:
+		return defaultLimit
+	case requested > maxLimit:
+		return maxLimit
+	default:
+		return requested
 	}
-	return r
 }

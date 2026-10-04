@@ -49,7 +49,7 @@ func (c catalog) Lookup(_ context.Context, ref llm.ModelRef) (llm.ModelInfo, err
 }
 
 func ref(model string) llm.ModelRef {
-	return llm.ModelRef{Provider: openai.Provider, Model: model}
+	return llm.ModelRef{Provider: llm.ProviderOpenAI, Model: model}
 }
 
 func terra() llm.ModelInfo {
@@ -80,7 +80,7 @@ func models() catalog {
 }
 
 func keys() vault {
-	return vault{llm.SecretRef(openai.Provider): openaitest.DefaultKey}
+	return vault{llm.SecretRef(llm.ProviderOpenAI): openaitest.DefaultKey}
 }
 
 func newClient(server *openaitest.Server, opts ...openai.Option) *openai.Client {
@@ -224,7 +224,7 @@ func TestTheKeyIsReadOnEveryCallAndSentAsABearer(t *testing.T) {
 	if _, err := client.Complete(t.Context(), write("one")); err != nil {
 		t.Fatalf("Complete: %v", err)
 	}
-	stored[llm.SecretRef(openai.Provider)] = "rotated-key"
+	stored[llm.SecretRef(llm.ProviderOpenAI)] = "rotated-key"
 	if _, err := client.Complete(t.Context(), write("two")); !errors.IsCode(err, errors.Unauthorized) {
 		t.Fatalf("Complete with a rotated key = %v, want the server's refusal of it", err)
 	}
@@ -269,7 +269,7 @@ func TestACallWithoutAUsableKeyNeverLeaves(t *testing.T) {
 		want errors.Code
 	}{
 		{name: "no key stored", secrets: vault{}, want: errors.Unauthorized},
-		{name: "an empty key", secrets: vault{llm.SecretRef(openai.Provider): ""}, want: errors.Unauthorized},
+		{name: "an empty key", secrets: vault{llm.SecretRef(llm.ProviderOpenAI): ""}, want: errors.Unauthorized},
 		{name: "a vault that cannot answer", secrets: brokenVault{}, want: errors.Locked},
 	}
 
@@ -284,7 +284,7 @@ func TestACallWithoutAUsableKeyNeverLeaves(t *testing.T) {
 			if !errors.IsCode(err, tc.want) {
 				t.Fatalf("Complete = %v (%s), want %s", err, errors.CodeOf(err), tc.want)
 			}
-			if tc.want == errors.Unauthorized && kernelOf(t, err).Details["provider"] != openai.Provider {
+			if tc.want == errors.Unauthorized && kernelOf(t, err).Details["provider"] != llm.ProviderOpenAI {
 				t.Errorf("details = %v, want the provider named", kernelOf(t, err).Details)
 			}
 			if len(server.Requests()) != 0 {

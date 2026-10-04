@@ -74,7 +74,7 @@ func (e *Engine) EstimateRun(ctx context.Context, record run.Run, assigned map[s
 		}
 	}
 
-	priced.targets = e.pricedTargets(record, targets)
+	priced.targets = pricedTargets(record, targets)
 	for t := range priced.targets {
 		for i := range defs {
 			if priceErr := e.price(ctx, record, defs[i], &priced.targets[t], priced); priceErr != nil {
@@ -151,7 +151,7 @@ func writesWithoutImages(recipe []template.StepSpec) bool {
 	return slices.Contains(names, string(run.StepGenerateBody)) && !slices.Contains(names, string(run.StepGenerateImages))
 }
 
-func (e *Engine) pricedTargets(record run.Run, targets map[string]run.Target) []run.Target {
+func pricedTargets(record run.Run, targets map[string]run.Target) []run.Target {
 	if !record.Kind.PageScoped() {
 		return []run.Target{{}}
 	}

@@ -140,21 +140,3 @@ func whyOwed(target LinkTarget) string {
 		return "the page links to " + target.URL + " with it"
 	}
 }
-
-func (b Brief) RequiredHeadings() []string {
-	out := make([]string, 0, len(b.Sections))
-	for i := range b.Sections {
-		if b.Sections[i].Required {
-			out = append(out, b.Sections[i].Heading)
-		}
-	}
-	return out
-}
-
-func (b Brief) PhraseTexts() []string {
-	out := make([]string, 0, len(b.Phrases))
-	for i := range b.Phrases {
-		out = append(out, b.Phrases[i].Text)
-	}
-	return out
-}

@@ -11,8 +11,8 @@ import (
 
 const (
 	ResultKey    = "result"
-	DroppedKey   = "droppedItems"
-	ShortenedKey = "shortenedText"
+	droppedKey   = "droppedItems"
+	shortenedKey = "shortenedText"
 
 	minTextBytes = 160
 	cutMarker    = "…"
@@ -69,10 +69,10 @@ func Cap(result map[string]any, limit int) (map[string]any, bool) {
 func report(document any, total int, dropped map[string]int, shortened int) map[string]any {
 	out := map[string]any{TruncatedKey: true, TotalBytesKey: total, ResultKey: document}
 	if len(dropped) > 0 {
-		out[DroppedKey] = dropped
+		out[droppedKey] = dropped
 	}
 	if shortened > 0 {
-		out[ShortenedKey] = shortened
+		out[shortenedKey] = shortened
 	}
 	return out
 }
@@ -88,11 +88,11 @@ func measured(value any) int {
 func preview(encoded string, total, limit int) map[string]any {
 	room := min(max(limit/2, MinPreviewBytes), len(encoded))
 	return map[string]any{
-		TruncatedKey: true, TotalBytesKey: total, PreviewKey: CutAtRune(encoded, room),
+		TruncatedKey: true, TotalBytesKey: total, PreviewKey: cutAtRune(encoded, room),
 	}
 }
 
-func CutAtRune(text string, limit int) string {
+func cutAtRune(text string, limit int) string {
 	if len(text) <= limit {
 		return text
 	}
@@ -207,6 +207,6 @@ func cut(document any) bool {
 	}
 
 	held := found[longest]
-	held.set(strings.TrimRight(CutAtRune(held.text, len(held.text)/2), " ") + cutMarker)
+	held.set(strings.TrimRight(cutAtRune(held.text, len(held.text)/2), " ") + cutMarker)
 	return true
 }

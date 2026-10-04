@@ -246,7 +246,7 @@ func (c *Client) Commerce(ctx context.Context) (Commerce, error) {
 	case err == nil:
 	case StoreAbsent(err):
 		return CommerceAbsent, nil
-	case StoreForbidden(err):
+	case Forbidden(err):
 		return CommerceForbidden, nil
 	default:
 		return "", err
@@ -290,8 +290,4 @@ func (c *Client) CommerceOr(ctx context.Context, known Commerce) (Commerce, erro
 
 func StoreAbsent(err error) bool {
 	return errors.IsCode(err, errors.NotFound) && detailString(err, "code") == "rest_no_route"
-}
-
-func StoreForbidden(err error) bool {
-	return Forbidden(err)
 }

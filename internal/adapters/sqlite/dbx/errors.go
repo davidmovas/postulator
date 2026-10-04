@@ -11,9 +11,9 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
-const BusyRetryAfter = 250 * time.Millisecond
+const busyRetryAfter = 250 * time.Millisecond
 
-func Classify(err error) errors.Code {
+func classify(err error) errors.Code {
 	switch {
 	case err == nil:
 		return ""
@@ -40,19 +40,19 @@ func Convert(err error, message string) error {
 		return err
 	}
 
-	code := Classify(err)
+	code := classify(err)
 	if code == errors.External {
-		return errors.New(code, message).WithInternal(err).WithRetry(BusyRetryAfter)
+		return errors.New(code, message).WithInternal(err).WithRetry(busyRetryAfter)
 	}
 	return errors.Wrap(err, code, message)
 }
 
 func IsNotFound(err error) bool {
-	return errors.IsCode(err, errors.NotFound) || Classify(err) == errors.NotFound
+	return errors.IsCode(err, errors.NotFound) || classify(err) == errors.NotFound
 }
 
-func IsConflict(err error) bool {
-	return errors.IsCode(err, errors.Conflict) || Classify(err) == errors.Conflict
+func isConflict(err error) bool {
+	return errors.IsCode(err, errors.Conflict) || classify(err) == errors.Conflict
 }
 
 func isKernel(err error) bool {

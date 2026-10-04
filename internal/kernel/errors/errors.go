@@ -3,26 +3,14 @@ package errors
 import (
 	stderrors "errors"
 	"maps"
-	"runtime"
 	"strings"
 	"time"
 )
 
-const (
-	maxStackDepth   = 32
-	stackSkipFrames = 3
-
-	internalMessage = "unexpected internal error"
-)
+const internalMessage = "unexpected internal error"
 
 type RetryInfo struct {
 	After time.Duration
-}
-
-type Frame struct {
-	Function string
-	File     string
-	Line     int
 }
 
 type Error struct {
@@ -31,30 +19,17 @@ type Error struct {
 	Retry    *RetryInfo
 	Code     Code
 	Message  string
-	stack    []uintptr
 }
 
 func New(code Code, message string) *Error {
-	return newError(code, message, nil)
+	return &Error{Code: code, Message: message}
 }
 
 func Wrap(err error, code Code, message string) error {
 	if err == nil {
 		return nil
 	}
-	return newError(code, message, err)
-}
-
-func newError(code Code, message string, internal error) *Error {
-	var pcs [maxStackDepth]uintptr
-	n := runtime.Callers(stackSkipFrames, pcs[:])
-
-	return &Error{
-		Code:     code,
-		Message:  message,
-		internal: internal,
-		stack:    pcs[:n],
-	}
+	return &Error{Code: code, Message: message, internal: err}
 }
 
 func (e *Error) Error() string {
@@ -143,21 +118,4 @@ func IsCode(err error, code Code) bool {
 		return false
 	}
 	return CodeOf(err) == code
-}
-
-func Stack(err error) []Frame {
-	var kernel *Error
-	if !stderrors.As(err, &kernel) || kernel == nil || len(kernel.stack) == 0 {
-		return nil
-	}
-
-	frames := runtime.CallersFrames(kernel.stack)
-	out := make([]Frame, 0, len(kernel.stack))
-	for {
-		frame, more := frames.Next()
-		out = append(out, Frame{Function: frame.Function, File: frame.File, Line: frame.Line})
-		if !more {
-			return out
-		}
-	}
 }

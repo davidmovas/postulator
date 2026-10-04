@@ -13,28 +13,22 @@ import (
 )
 
 const (
-	CodePluginMissing        = "plugin_missing"
-	CodePluginOutdated       = "plugin_outdated"
+	codePluginMissing        = "plugin_missing"
+	codePluginOutdated       = "plugin_outdated"
 	CapabilityPreview        = "preview"
 	CapabilitySEOMetaRead    = "seo_meta_read"
 	CapabilityRaw            = "raw"
 	CapabilityPageCategories = "page_categories"
 
-	FieldSEOTitle         = "title"
-	FieldSEODescription   = "description"
-	FieldSEOCanonical     = "canonical"
-	FieldSEOOGTitle       = "ogTitle"
-	FieldSEOOGDescription = "ogDescription"
+	fieldSEOTitle         = "title"
+	fieldSEODescription   = "description"
+	fieldSEOCanonical     = "canonical"
+	fieldSEOOGTitle       = "ogTitle"
+	fieldSEOOGDescription = "ogDescription"
 
 	defaultContentLimit = 100
 	maxContentLimit     = 500
 )
-
-func SEOFields() []string {
-	return []string{
-		FieldSEOTitle, FieldSEODescription, FieldSEOCanonical, FieldSEOOGTitle, FieldSEOOGDescription,
-	}
-}
 
 type PreviewLink struct {
 	ExpiresAt time.Time
@@ -232,15 +226,15 @@ type seoStatePayload struct {
 
 func (m SEOMeta) field(name string) (string, bool) {
 	switch name {
-	case FieldSEOTitle:
+	case fieldSEOTitle:
 		return m.Title, true
-	case FieldSEODescription:
+	case fieldSEODescription:
 		return m.Description, true
-	case FieldSEOCanonical:
+	case fieldSEOCanonical:
 		return m.Canonical, true
-	case FieldSEOOGTitle:
+	case fieldSEOOGTitle:
 		return m.OGTitle, true
-	case FieldSEOOGDescription:
+	case fieldSEOOGDescription:
 		return m.OGDescription, true
 	default:
 		return "", false
@@ -249,21 +243,21 @@ func (m SEOMeta) field(name string) (string, bool) {
 
 func pluginMissing() error {
 	return errors.New(errors.Invalid, "the Postulator companion plugin is not installed on this site").
-		WithDetail("code", CodePluginMissing)
+		WithDetail("code", codePluginMissing)
 }
 
 func IsPluginMissing(err error) bool {
-	return errors.IsCode(err, errors.Invalid) && detailString(err, "code") == CodePluginMissing
+	return errors.IsCode(err, errors.Invalid) && detailString(err, "code") == codePluginMissing
 }
 
 func pluginOutdated(capability string) error {
 	return errors.New(errors.Invalid, "the Postulator companion plugin on this site is too old for this; update it").
-		WithDetail("code", CodePluginOutdated).
+		WithDetail("code", codePluginOutdated).
 		WithDetail("capability", capability)
 }
 
 func IsPluginOutdated(err error) bool {
-	return errors.IsCode(err, errors.Invalid) && detailString(err, "code") == CodePluginOutdated
+	return errors.IsCode(err, errors.Invalid) && detailString(err, "code") == codePluginOutdated
 }
 
 func (c *Client) Manifest(ctx context.Context) (Manifest, error) {

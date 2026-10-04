@@ -180,15 +180,7 @@ func (s *Service) ListEvents(ctx context.Context, req ListEventsRequest) (ListEv
 		return ListEventsResponse{}, invalid("the sequence to read from must not be negative", "sinceSeq")
 	}
 
-	limit := req.Limit
-	switch {
-	case limit <= 0:
-		limit = dto.DefaultLimit
-	case limit > dto.MaxLimit:
-		limit = dto.MaxLimit
-	}
-
-	stored, err := s.events.List(ctx, runID, req.SinceSeq, limit)
+	stored, err := s.events.List(ctx, runID, req.SinceSeq, dto.PageSize(req.Limit))
 	if err != nil {
 		return ListEventsResponse{}, err
 	}

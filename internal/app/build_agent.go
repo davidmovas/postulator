@@ -3,6 +3,8 @@ package app
 import (
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/tools"
 	agentrunner "github.com/davidmovas/postulator/internal/transport/agent"
@@ -43,6 +45,9 @@ func (c *Core) buildAgent(stores repos, llm llmParts, writing authoring, service
 			HistoryBudget:     func() int { return agent.HistoryBudgetChars(values) },
 			MaxToolResult:     func() int { return agent.MaxToolResultBytes(values) },
 			HistoryToolResult: func() int { return agent.HistoryToolResultBytes(values) },
+			Dropped: func(err error) {
+				c.logger.Warn("the agent dropped a failure no caller was waiting for", zap.Error(err))
+			},
 		}),
 	}
 }

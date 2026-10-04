@@ -52,10 +52,10 @@ func (c *Core) buildLLM(stores repos) (llmParts, error) {
 		),
 		images: metered.New(
 			imageopenai.New(stores.secrets, imageModel, imageopenai.WithQuality(images.OpenAIQuality(stores.values))),
-			domainllm.ModelRef{Provider: imageopenai.Provider, Model: imageModel},
+			domainllm.ModelRef{Provider: domainllm.ProviderOpenAI, Model: imageModel},
 			stores.llmCalls, modelCatalog, c.Events, stores.now,
 		),
-		imageModel: &domainllm.ModelRef{Provider: imageopenai.Provider, Model: imageModel},
+		imageModel: &domainllm.ModelRef{Provider: domainllm.ProviderOpenAI, Model: imageModel},
 	}, nil
 }
 

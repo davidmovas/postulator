@@ -3,7 +3,7 @@ package paging
 import "encoding/json"
 
 const (
-	DefaultLimit = 50
+	defaultLimit = 50
 	MaxLimit     = 500
 )
 
@@ -36,7 +36,7 @@ type Request struct {
 func (r Request) Normalize() Request {
 	switch {
 	case r.Limit <= 0:
-		r.Limit = DefaultLimit
+		r.Limit = defaultLimit
 	case r.Limit > MaxLimit:
 		r.Limit = MaxLimit
 	}

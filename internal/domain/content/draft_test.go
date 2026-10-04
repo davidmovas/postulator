@@ -14,6 +14,24 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
+func phraseTexts(brief content.Brief) []string {
+	out := make([]string, 0, len(brief.Phrases))
+	for i := range brief.Phrases {
+		out = append(out, brief.Phrases[i].Text)
+	}
+	return out
+}
+
+func requiredHeadings(brief content.Brief) []string {
+	out := make([]string, 0, len(brief.Sections))
+	for i := range brief.Sections {
+		if brief.Sections[i].Required {
+			out = append(out, brief.Sections[i].Heading)
+		}
+	}
+	return out
+}
+
 func guideBrief(page pagemap.Page) content.Brief {
 	spec := template.TemplateSpec{
 		Sections: []template.Section{
@@ -62,7 +80,7 @@ func TestNewBriefTakesThePlanFirstAndListsWhatThePageOwes(t *testing.T) {
 	if len(brief.Sections) != 3 || brief.Sections[0].Slot != 1 || brief.Sections[2].Slot != 3 || !brief.Sections[0].PrimaryInHeading {
 		t.Fatalf("sections = %+v", brief.Sections)
 	}
-	if got := brief.PhraseTexts(); len(got) != 3 || got[0] != "espresso" || got[1] != "coffee" || got[2] != "filter coffee" {
+	if got := phraseTexts(brief); len(got) != 3 || got[0] != "espresso" || got[1] != "coffee" || got[2] != "filter coffee" {
 		t.Fatalf("phrases = %v, want the lead keyword, the parent anchor and the sibling anchor", got)
 	}
 	if !brief.Phrases[0].Lead || brief.Phrases[1].Lead || brief.Phrases[2].Lead {
@@ -71,7 +89,7 @@ func TestNewBriefTakesThePlanFirstAndListsWhatThePageOwes(t *testing.T) {
 	if brief.Phrases[0].Within != 0 || brief.Phrases[1].Within != 2 || brief.Phrases[2].Within != 0 {
 		t.Fatalf("phrases = %+v, want the parent anchor within the first two paragraphs and the others unbounded", brief.Phrases)
 	}
-	if got := brief.RequiredHeadings(); len(got) != 2 || got[1] != "Brewing" {
+	if got := requiredHeadings(brief); len(got) != 2 || got[1] != "Brewing" {
 		t.Fatalf("required headings = %v", got)
 	}
 
@@ -106,7 +124,7 @@ func TestNewBriefListsTheKeywordsOfThePageMostImportantFirst(t *testing.T) {
 	if second.Rank != 2 || second.Text != "liquid bpc" || second.Volume != nil || !second.Required {
 		t.Fatalf("second keyword = %+v", second)
 	}
-	if got := own.PhraseTexts(); len(got) != 1 || got[0] != "bpc 157 liquid" || !own.Phrases[0].Lead {
+	if got := phraseTexts(own); len(got) != 1 || got[0] != "bpc 157 liquid" || !own.Phrases[0].Lead {
 		t.Fatalf("phrases = %+v, want the page's main keyword to open the page", own.Phrases)
 	}
 
@@ -194,7 +212,7 @@ func TestNewBriefOwesEveryLinkTheBudgetAllows(t *testing.T) {
 			t.Parallel()
 
 			brief := content.NewBrief(template.TemplateSpec{}, tc.rules, pagemap.Page{}, entity, lc)
-			if got := brief.PhraseTexts(); !slices.Equal(got, tc.phrases) {
+			if got := phraseTexts(brief); !slices.Equal(got, tc.phrases) {
 				t.Fatalf("phrases = %v, want %v", got, tc.phrases)
 			}
 			if !slices.Equal(brief.Children, tc.children) {

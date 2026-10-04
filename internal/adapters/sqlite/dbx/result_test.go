@@ -14,14 +14,9 @@ import (
 func TestResultUnwrap(t *testing.T) {
 	t.Parallel()
 
-	value, err := Ok("secret").Unwrap()
+	value, err := From("secret", nil).Unwrap()
 	if value != "secret" || err != nil {
-		t.Fatalf("Ok = %q, %v", value, err)
-	}
-
-	value, err = Err[string](io.EOF).Unwrap()
-	if value != "" || !stderrors.Is(err, io.EOF) {
-		t.Fatalf("Err = %q, %v", value, err)
+		t.Fatalf("From a value = %q, %v", value, err)
 	}
 
 	value, err = From("row", sql.ErrNoRows).Unwrap()
@@ -78,7 +73,7 @@ func TestResultReplacements(t *testing.T) {
 func TestResultWrapErr(t *testing.T) {
 	t.Parallel()
 
-	_, err := Ok(1).WrapErr(wrap).Unwrap()
+	_, err := From(1, nil).WrapErr(wrap).Unwrap()
 	if err != nil {
 		t.Fatalf("WrapErr on a value must not produce an error, got %v", err)
 	}

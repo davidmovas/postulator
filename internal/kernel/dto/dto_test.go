@@ -101,25 +101,26 @@ func TestTimeRoundTrip(t *testing.T) {
 	}
 }
 
-func TestListRequestNormalize(t *testing.T) {
+func TestPageSize(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
 		name string
-		in   dto.ListRequest
+		in   int
 		want int
 	}{
-		{name: "zero falls back to the default", in: dto.ListRequest{}, want: dto.DefaultLimit},
-		{name: "negative falls back to the default", in: dto.ListRequest{Limit: -1}, want: dto.DefaultLimit},
-		{name: "within range is kept", in: dto.ListRequest{Limit: 10}, want: 10},
-		{name: "above the maximum is clamped", in: dto.ListRequest{Limit: 10_000}, want: dto.MaxLimit},
+		{name: "zero falls back to the default", in: 0, want: 50},
+		{name: "negative falls back to the default", in: -1, want: 50},
+		{name: "within range is kept", in: 10, want: 10},
+		{name: "the maximum is kept", in: 500, want: 500},
+		{name: "above the maximum is clamped", in: 10_000, want: 500},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			if got := tc.in.Normalize().Limit; got != tc.want {
-				t.Fatalf("Normalize().Limit = %d, want %d", got, tc.want)
+			if got := dto.PageSize(tc.in); got != tc.want {
+				t.Fatalf("PageSize(%d) = %d, want %d", tc.in, got, tc.want)
 			}
 		})
 	}
@@ -128,11 +129,11 @@ func TestListRequestNormalize(t *testing.T) {
 func TestListRequestLimitsMatchPaging(t *testing.T) {
 	t.Parallel()
 
-	if dto.DefaultLimit != paging.DefaultLimit {
-		t.Fatalf("dto.DefaultLimit = %d, paging.DefaultLimit = %d", dto.DefaultLimit, paging.DefaultLimit)
+	if got, want := dto.PageSize(0), (paging.Request{}).Normalize().Limit; got != want {
+		t.Fatalf("dto.PageSize(0) = %d, paging's default = %d", got, want)
 	}
-	if dto.MaxLimit != paging.MaxLimit {
-		t.Fatalf("dto.MaxLimit = %d, paging.MaxLimit = %d", dto.MaxLimit, paging.MaxLimit)
+	if got := dto.PageSize(paging.MaxLimit + 1); got != paging.MaxLimit {
+		t.Fatalf("dto.PageSize(%d) = %d, paging.MaxLimit = %d", paging.MaxLimit+1, got, paging.MaxLimit)
 	}
 }
 

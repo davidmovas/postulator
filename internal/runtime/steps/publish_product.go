@@ -363,7 +363,7 @@ func refusedByStore(ctx context.Context, deps Deps, sc *run.StepContext, err err
 	case wp.StoreAbsent(err):
 		commerce = site.CommerceAbsent
 		message = "the site answers no WooCommerce store, so the product " + sc.Page.Path + " cannot be written"
-	case wp.StoreForbidden(err):
+	case wp.Forbidden(err):
 		commerce = site.CommerceForbidden
 		message = "the WordPress user may not edit products, so the product " + sc.Page.Path + " cannot be written"
 	case errors.IsCode(err, errors.NotFound):

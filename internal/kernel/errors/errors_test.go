@@ -162,11 +162,6 @@ func TestNilReceiverIsSafe(t *testing.T) {
 				t.Fatal("IsCode() must classify a nil kernel error as Internal")
 			}
 		}},
-		{name: "Stack", check: func(t *testing.T) {
-			if got := errors.Stack(empty); got != nil {
-				t.Fatalf("Stack() = %v, want nil", got)
-			}
-		}},
 		{name: "errors.Is", check: func(t *testing.T) {
 			if stderrors.Is(empty, io.EOF) {
 				t.Fatal("errors.Is() on a nil receiver must be false")
@@ -241,25 +236,6 @@ func TestWithInternalClones(t *testing.T) {
 	}
 	if !stderrors.Is(derived, io.EOF) {
 		t.Fatal("clone must carry the internal cause")
-	}
-}
-
-func TestStack(t *testing.T) {
-	t.Parallel()
-
-	frames := errors.Stack(errors.New(errors.Internal, "boom"))
-	if len(frames) == 0 {
-		t.Fatal("Stack() must not be empty")
-	}
-	if frames[0].Function == "" || frames[0].File == "" || frames[0].Line == 0 {
-		t.Fatalf("first frame is incomplete: %+v", frames[0])
-	}
-
-	if got := errors.Stack(io.EOF); got != nil {
-		t.Fatalf("Stack(foreign) = %v, want nil", got)
-	}
-	if got := errors.Stack(nil); got != nil {
-		t.Fatalf("Stack(nil) = %v, want nil", got)
 	}
 }
 
