@@ -5,19 +5,8 @@ import { Link } from "react-router";
 
 import { copy } from "../../../copy/index.js";
 import type { PageAudit } from "../../../data/types.js";
-import { chainItems } from "../../../domain/categories.js";
 import { relativeTime } from "../../../domain/format.js";
-import {
-    Button,
-    CategoryTrail,
-    CloseIcon,
-    cx,
-    DeleteIcon,
-    IconButton,
-    SectionLabel,
-    SmartToyIcon,
-    toneClasses,
-} from "../../../ui/index.js";
+import { Button, CloseIcon, cx, DeleteIcon, IconButton, SectionLabel, SmartToyIcon, toneClasses } from "../../../ui/index.js";
 import { askAgent } from "../../agent/index.js";
 import { severityOf } from "../../links/model/audit.js";
 import { entityIcon, formatScore, entityKindLabel, kindTone } from "../labels.js";
@@ -138,46 +127,37 @@ export function Inspector({
     }
 
     const Icon = entityIcon(entity.kind);
-    const filed = chainItems(entity.categories);
 
     return (
         <section aria-label={copy.graph.inspector.title} className="flex h-full min-h-0 flex-col bg-panel">
-            <header className="flex flex-col gap-1.5 border-b border-hairline p-3">
-                <div className="flex items-start gap-2">
-                    <Icon size={20} className={`mt-0.5 shrink-0 ${toneClasses[kindTone(entity.kind)].ink}`} />
-                    <div className="min-w-0 flex-1">
-                        <h2 className="truncate text-base font-semibold text-ink">{entity.name}</h2>
-                        <p className="flex items-center gap-2 text-2xs text-ink-dim">
-                            <span>{entityKindLabel(entity.kind)}</span>
-                            <span className="font-mono">{formatScore(entity.score)}</span>
-                            <span>{copy.graph.inspector.rank(rank, index.counts.total)}</span>
-                        </p>
-                    </div>
-                    <IconButton
-                        icon={SmartToyIcon}
-                        label={copy.agent.askAbout}
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                            askAgent(copy.agent.ask.entity(entity.name, entity.id));
-                        }}
-                    />
-                    <IconButton
-                        icon={CloseIcon}
-                        label={copy.graph.inspector.close}
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                            onSelect(null);
-                        }}
-                    />
+            <header className="flex items-start gap-2 border-b border-hairline p-3">
+                <Icon size={20} className={`mt-0.5 shrink-0 ${toneClasses[kindTone(entity.kind)].ink}`} />
+                <div className="min-w-0 flex-1">
+                    <h2 className="truncate text-base font-semibold text-ink">{entity.name}</h2>
+                    <p className="flex items-center gap-2 text-2xs text-ink-dim">
+                        <span>{entityKindLabel(entity.kind)}</span>
+                        <span className="font-mono">{formatScore(entity.score)}</span>
+                        <span>{copy.graph.inspector.rank(rank, index.counts.total)}</span>
+                    </p>
                 </div>
-                {filed.length === 0 ? null : (
-                    <div data-entity-categories={true} className="flex flex-col gap-1 pl-7">
-                        <span className="text-2xs text-ink-faint">{copy.graph.inspector.filedUnder}</span>
-                        <CategoryTrail items={filed} label={copy.categories.trail} />
-                    </div>
-                )}
+                <IconButton
+                    icon={SmartToyIcon}
+                    label={copy.agent.askAbout}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                        askAgent(copy.agent.ask.entity(entity.name, entity.id));
+                    }}
+                />
+                <IconButton
+                    icon={CloseIcon}
+                    label={copy.graph.inspector.close}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                        onSelect(null);
+                    }}
+                />
             </header>
 
             <div className="flex flex-col gap-4 p-3">

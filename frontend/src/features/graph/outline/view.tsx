@@ -1,11 +1,9 @@
 import type { KeyboardEvent, ReactElement } from "react";
 
 import { copy } from "../../../copy/index.js";
-import { chainItems } from "../../../domain/categories.js";
 import {
     Button,
     CallSplitIcon,
-    CategoryTrail,
     ChevronRightIcon,
     CountBadge,
     cx,
@@ -26,7 +24,7 @@ import type { GraphIndex } from "../model/index.js";
 import { move } from "../model/navigation.js";
 import type { NavKey } from "../model/navigation.js";
 
-const columns = "minmax(200px, 2.6fr) 88px 64px 128px minmax(120px, 2fr) minmax(104px, 1fr)";
+const columns = "minmax(200px, 3fr) 88px 64px 128px minmax(104px, 1fr)";
 const rowHeight = 28;
 const indentStep = 14;
 
@@ -78,7 +76,7 @@ export function OutlineView({ siteId, index, rows, selectedId, matched, onSelect
         if (held.kind === "more") {
             return (
                 <TableRow key={held.id} className="text-ink-dim">
-                    <TableCell className="col-span-6">
+                    <TableCell className="col-span-5">
                         <span className="flex items-center gap-2" style={{ paddingLeft: held.depth * indentStep }}>
                             <Button
                                 size="sm"
@@ -151,9 +149,6 @@ export function OutlineView({ siteId, index, rows, selectedId, matched, onSelect
                     )}
                 </TableCell>
                 <TableCell>
-                    <CategoryTrail items={chainItems(entity?.categories)} label={copy.categories.trail} compact={true} />
-                </TableCell>
-                <TableCell>
                     <span className="flex items-center justify-end gap-1">
                         {(flags?.proposed ?? 0) > 0 ? <CountBadge tone="info" count={flags?.proposed ?? 0} /> : null}
                         {flags?.orphan ? (
@@ -176,7 +171,6 @@ export function OutlineView({ siteId, index, rows, selectedId, matched, onSelect
                     <TableCell>{copy.graph.outline.columns.kind}</TableCell>
                     <TableCell align="right">{copy.graph.outline.columns.score}</TableCell>
                     <TableCell>{copy.graph.outline.columns.page}</TableCell>
-                    <TableCell>{copy.graph.outline.columns.categories}</TableCell>
                     <TableCell align="right">{copy.graph.outline.columns.attention}</TableCell>
                 </TableHead>
                 <VirtualRows count={rows.length} rowHeight={rowHeight} row={row} scrollKey={`${siteId}:graph-outline`} />
