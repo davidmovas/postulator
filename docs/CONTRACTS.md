@@ -112,7 +112,7 @@ A page carries `categories`, the chain of the category record it is filed under,
 `dto.Category{id, name, termId?}` where `termId` is left out until the site has the term: in the
 `category` taxonomy for a page or a post, in `product_cat` for a product, and empty for a product
 category. `categoriesNeedPlugin` is true for a WordPress page with a chain on a site whose plugin
-lacks `page_categories`. Both are computed wherever a page view is built, the tree's nodes
+is missing or does not advertise `page_categories`. Both are computed wherever a page view is built, the tree's nodes
 included. An entity carries `categories`, the chain of its canonical page, else of its only page,
 and empty when it has several and no canonical one; `UpdateEntity` takes no category flag.
 `PagesService.ListCategories{siteId}` answers `{categories: [{id, name, parentId, pages,

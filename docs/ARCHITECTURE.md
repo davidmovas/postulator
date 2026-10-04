@@ -84,8 +84,8 @@ reasoning allowance per effort, `Cost` and the purpose rules the spend report gr
 name, a parent, the `Key` the name folds to by WordPress's own rule for comparing term names, and
 the `Term` it is in `category` or `product_cat` once the site has it. A page names the one leaf it
 is filed under; `Chain` reads the path above it, root first. The graph and the categories are two
-structures on purpose: the import fills one from the root level columns and the other from the
-category level columns, and nothing files a page by its entity.
+structures on purpose: an import makes entity groups from the root level columns and categories
+from the other level columns, and nothing files a page by its entity.
 
 The heart of it is `content`: `PlanLinks` turns a graph, a page index and a
 `content.Subject{Site, PageID, PagePath, EntityID}` into the set of links that page owes,
