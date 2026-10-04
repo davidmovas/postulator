@@ -16,14 +16,18 @@ import (
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/graph"
+	"github.com/davidmovas/postulator/internal/application/models"
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/schedules"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/sync"
+	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/runtime/steps"
 	"github.com/davidmovas/postulator/internal/transport/wails"
 )
 
@@ -998,6 +1002,133 @@ func TestASyncKeepsThePagesTheSiteStillHolds(t *testing.T) {
 	}
 	if len(after) != len(before) {
 		t.Errorf("the map went from %d to %d pages", len(before), len(after))
+	}
+}
+
+func TestTheHarnessFilesPagesUnderACategoryTree(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+	siteID := listed.Items[0].ID
+
+	tree, err := core.Pages.ListCategories(t.Context(), pages.ListCategoriesRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("ListCategories: %v", err)
+	}
+	byName := make(map[string]pages.CategoryNode, len(tree.Categories))
+	for index := range tree.Categories {
+		byName[tree.Categories[index].Name] = tree.Categories[index]
+	}
+	declared := seedCategoryTree()
+	if len(byName) != len(declared) {
+		t.Fatalf("categories = %d, want the %d the seed declares", len(byName), len(declared))
+	}
+
+	gear, grinders := byName["Espresso gear"], byName["Grinders"]
+	if gear.TermIDs.Category == nil {
+		t.Error("Espresso gear holds no term, so no node of the rail reads as on the site")
+	}
+	if grinders.TermIDs.Category != nil {
+		t.Errorf("Grinders holds term %d, but no run published a page under it", *grinders.TermIDs.Category)
+	}
+	if grinders.ParentID == nil || *grinders.ParentID != gear.ID {
+		t.Errorf("Grinders hangs under %v, want Espresso gear %s", grinders.ParentID, gear.ID)
+	}
+	if gear.Pages != 9 {
+		t.Errorf("Espresso gear counts %d pages, want the nine filed under its three subcategories", gear.Pages)
+	}
+
+	filtered, err := core.Pages.List(t.Context(), pages.ListRequest{
+		SiteID: siteID, CategoryID: gear.ID, ListRequest: dto.ListRequest{Limit: 50},
+	})
+	if err != nil {
+		t.Fatalf("List the pages of a branch: %v", err)
+	}
+	if len(filtered.Items) != gear.Pages {
+		t.Errorf("the branch lists %d pages, want %d", len(filtered.Items), gear.Pages)
+	}
+	for index := range filtered.Items {
+		chain := filtered.Items[index].Categories
+		if len(chain) != 2 || chain[0].Name != "Espresso gear" {
+			t.Errorf("%s is filed under %v, want a chain under Espresso gear", filtered.Items[index].Path, chain)
+		}
+	}
+}
+
+func TestTheHarnessRecordsSpendWorthReading(t *testing.T) {
+	core := seeded(t)
+
+	month, err := core.Models.SpendReport(t.Context(), models.SpendReportRequest{Days: 30})
+	if err != nil {
+		t.Fatalf("SpendReport: %v", err)
+	}
+	purposes := make(map[string]bool, len(month.Slices))
+	for index := range month.Slices {
+		purposes[month.Slices[index].Purpose] = true
+	}
+	for _, want := range []llm.Purpose{
+		llm.PurposeRun, llm.PurposeChat, llm.PurposeTitle, llm.PurposeGraph, llm.PurposeAudit, llm.PurposeProbe,
+	} {
+		if !purposes[string(want)] {
+			t.Errorf("the month's spend has no %s slice; it has %v", want, purposes)
+		}
+	}
+	if month.Totals.FlexShare <= 0 || month.Totals.ReasoningShare <= 0 || month.Totals.CachedShare <= 0 {
+		t.Errorf("the month's shares are flex %.2f, reasoning %.2f, cached %.2f; want every one above zero",
+			month.Totals.FlexShare, month.Totals.ReasoningShare, month.Totals.CachedShare)
+	}
+
+	week, err := core.Models.SpendReport(t.Context(), models.SpendReportRequest{Days: 7})
+	if err != nil {
+		t.Fatalf("SpendReport: %v", err)
+	}
+	if week.Totals.USD >= month.Totals.USD {
+		t.Errorf("the week spent %.4f and the month %.4f; want older writer calls the week leaves out",
+			week.Totals.USD, month.Totals.USD)
+	}
+
+	calls, err := core.Models.ListCalls(t.Context(), models.ListCallsRequest{ListRequest: dto.ListRequest{Limit: 100}})
+	if err != nil {
+		t.Fatalf("ListCalls: %v", err)
+	}
+	if len(calls.Items) <= 25 {
+		t.Errorf("recent calls = %d, want more than one page of 25", len(calls.Items))
+	}
+	failed := make(map[string]bool)
+	for index := range calls.Items {
+		if calls.Items[index].Status == string(llm.CallError) {
+			failed[calls.Items[index].ErrorCode] = true
+		}
+	}
+	for _, want := range []errors.Code{errors.NeedsHuman, errors.RateLimited, errors.Unauthorized} {
+		if !failed[string(want)] {
+			t.Errorf("no recent call failed with %s; the failures are %v", want, failed)
+		}
+	}
+
+	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+	finished, err := finishedRunItems(t.Context(), core, listed.Items[0].ID)
+	if err != nil {
+		t.Fatalf("find the finished run: %v", err)
+	}
+	byStep, err := core.Models.SpendReport(t.Context(), models.SpendReportRequest{RunID: finished.runID})
+	if err != nil {
+		t.Fatalf("SpendReport of the run: %v", err)
+	}
+	stepped := make(map[string]bool, len(byStep.Slices))
+	for index := range byStep.Slices {
+		stepped[byStep.Slices[index].Step] = true
+	}
+	for _, want := range []string{steps.NameGenerateBody, steps.NameGenerateMeta, steps.NameJudge, steps.NameRepairLinks} {
+		if !stepped[want] {
+			t.Errorf("the finished run spent nothing on %s; its steps are %v", want, stepped)
+		}
 	}
 }
 

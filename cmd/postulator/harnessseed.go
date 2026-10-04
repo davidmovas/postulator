@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
+	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/application/agent"
@@ -22,10 +23,13 @@ import (
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/category"
+	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/kernel/id"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
 
@@ -269,12 +273,12 @@ type assistantScript struct {
 	site atomic.Pointer[string]
 }
 
-func (a *assistantScript) naming(id string) {
-	a.page.Store(&id)
+func (a *assistantScript) naming(pageID string) {
+	a.page.Store(&pageID)
 }
 
-func (a *assistantScript) onSite(id string) {
-	a.site.Store(&id)
+func (a *assistantScript) onSite(siteID string) {
+	a.site.Store(&siteID)
 }
 
 func (a *assistantScript) pageID() string {
@@ -354,6 +358,9 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 	if err != nil {
 		return err
 	}
+	if fileErr := fileThePages(ctx, core, site, siteID, pagesByPath); fileErr != nil {
+		return fileErr
+	}
 	script.naming(pagesByPath["/espresso-machines/under-500/"])
 	script.onSite(siteID)
 
@@ -389,7 +396,177 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 	if scheduleErr := seedSchedule(ctx, core, siteID, guide); scheduleErr != nil {
 		return scheduleErr
 	}
-	return seedConversation(ctx, core, siteID)
+	if conversationErr := seedConversation(ctx, core, siteID); conversationErr != nil {
+		return conversationErr
+	}
+	return seedSpend(ctx, core, siteID)
+}
+
+func fileThePages(ctx context.Context, core *app.Core, site *wptest.Server, siteID string, byPath map[string]string) error {
+	records := sqlite.NewCategoryRepo(core.Store)
+	terms := sqlite.NewCategoryTermRepo(core.Store)
+	mapped := sqlite.NewPageRepo(core.Store)
+	now := time.Now().UTC()
+
+	site.SeedCategory(wptest.Category{Name: "Uncategorized"})
+	tree := seedCategoryTree()
+	byName := make(map[string]string, len(tree))
+	for _, declared := range tree {
+		made, newErr := category.New(category.Category{
+			ID: id.New(), SiteID: siteID, Name: declared.Name, ParentID: byName[declared.Parent],
+			CreatedAt: now, UpdatedAt: now,
+		})
+		if newErr != nil {
+			return newErr
+		}
+		if insertErr := records.Insert(ctx, made); insertErr != nil {
+			return insertErr
+		}
+		byName[declared.Name] = made.ID
+
+		if declared.OnSite {
+			if termErr := holdTheTerm(ctx, terms, site, made, now); termErr != nil {
+				return termErr
+			}
+		}
+		for _, path := range declared.Paths {
+			if fileErr := fileUnder(ctx, mapped, byPath, path, made.ID, now); fileErr != nil {
+				return fileErr
+			}
+		}
+	}
+	return nil
+}
+
+func holdTheTerm(ctx context.Context, terms *sqlite.CategoryTermRepo, site *wptest.Server, made category.Category,
+	now time.Time) error {
+	onSite := site.SeedCategory(wptest.Category{Name: made.Name})
+	held, err := category.NewTerm(category.Term{
+		CategoryID: made.ID, SiteID: made.SiteID, Taxonomy: category.TaxonomyCategory, TermID: onSite.ID,
+		Name: onSite.Name, SeenAt: now,
+	})
+	if err != nil {
+		return err
+	}
+	return terms.Upsert(ctx, held)
+}
+
+func fileUnder(ctx context.Context, mapped *sqlite.PageRepo, byPath map[string]string, path, categoryID string,
+	now time.Time) error {
+	pageID, known := byPath[path]
+	if !known {
+		return errors.New(errors.NotFound, "the harness seeded no page at "+path)
+	}
+	page, err := mapped.Get(ctx, pageID)
+	if err != nil {
+		return err
+	}
+	page.CategoryID = categoryID
+	page.UpdatedAt = now
+	return mapped.Update(ctx, page)
+}
+
+func seedSpend(ctx context.Context, core *app.Core, siteID string) error {
+	finished, err := finishedRunItems(ctx, core, siteID)
+	if err != nil {
+		return err
+	}
+	conversation, err := onlyConversation(ctx, core, siteID)
+	if err != nil {
+		return err
+	}
+
+	pastRuns := make(map[int]string)
+	pastItems := make(map[[2]int]string)
+	ledger := sqlite.NewLLMCallRepo(core.Store)
+	now := time.Now().UTC()
+
+	history := seedSpendHistory()
+	for index := range history {
+		declared := &history[index]
+		call := llm.Call{
+			ID: id.New(), CreatedAt: now.Add(-declared.Ago), Step: declared.Step,
+			Ref:   llm.ModelRef{Provider: "openai", Model: declared.Model},
+			Usage: declared.Usage, Latency: declared.Latency, Tier: declared.Tier, Status: llm.CallOK,
+		}
+		switch declared.Owner {
+		case ownedByConversation:
+			call.ConversationID = conversation
+		case ownedByFinishedRun:
+			call.RunID, call.ItemID = finished.runID, finished.items[declared.Item]
+		case ownedByPastRun:
+			call.RunID = mintedOnce(pastRuns, declared.Run)
+			call.ItemID = mintedOnce(pastItems, [2]int{declared.Run, declared.Item})
+		case ownedByNobody:
+		}
+		if declared.Failed != "" {
+			call.Status, call.ErrorCode = llm.CallError, string(declared.Failed)
+		}
+		info, lookupErr := core.Catalog.Lookup(ctx, call.Ref)
+		if lookupErr != nil {
+			return lookupErr
+		}
+		call.USD = llm.Cost(call.Usage, info, call.Tier)
+		if insertErr := ledger.Insert(ctx, call); insertErr != nil {
+			return insertErr
+		}
+	}
+	return nil
+}
+
+func mintedOnce[K comparable](minted map[K]string, key K) string {
+	if held, known := minted[key]; known {
+		return held
+	}
+	made := id.New()
+	minted[key] = made
+	return made
+}
+
+type finishedRun struct {
+	runID string
+	items []string
+}
+
+func finishedRunItems(ctx context.Context, core *app.Core, siteID string) (finishedRun, error) {
+	listed, err := core.Runs.List(ctx, runs.ListRequest{SiteID: siteID, ListRequest: dto.ListRequest{Limit: 20}})
+	if err != nil {
+		return finishedRun{}, err
+	}
+	for index := range listed.Items {
+		held := listed.Items[index]
+		if held.Status != string(run.StatusCompleted) || held.Kind != string(run.KindGenerate) ||
+			held.Stats.Items != len(completedRun) {
+			continue
+		}
+		items, itemsErr := core.Runs.ListItems(ctx, runs.ListItemsRequest{
+			RunID: held.ID, ListRequest: dto.ListRequest{Limit: 20},
+		})
+		if itemsErr != nil {
+			return finishedRun{}, itemsErr
+		}
+		out := finishedRun{runID: held.ID, items: make([]string, 0, len(items.Items))}
+		for item := range items.Items {
+			out.items = append(out.items, items.Items[item].ID)
+		}
+		if len(out.items) == len(completedRun) {
+			return out, nil
+		}
+	}
+	return finishedRun{}, errors.New(errors.NotFound, "the harness finished no run over "+strings.Join(completedRun, ", "))
+}
+
+func onlyConversation(ctx context.Context, core *app.Core, siteID string) (string, error) {
+	listed, err := core.Agent.ListConversations(ctx, agent.ListConversationsRequest{
+		SiteID: siteID, ListRequest: dto.ListRequest{Limit: 10},
+	})
+	if err != nil {
+		return "", err
+	}
+	if len(listed.Items) == 0 {
+		return "", errors.New(errors.NotFound, "the harness seeded no conversation")
+	}
+	return listed.Items[0].ID, nil
 }
 
 func keyTheProviders(ctx context.Context, core *app.Core) error {
@@ -714,11 +891,11 @@ func seedRevertRun(ctx context.Context, core *app.Core, siteID, guide string, by
 func startRun(ctx context.Context, core *app.Core, siteID, guide string, byPath map[string]string, paths []string) (string, error) {
 	targets := make([]string, 0, len(paths))
 	for _, path := range paths {
-		id, known := byPath[path]
+		pageID, known := byPath[path]
 		if !known {
 			return "", errors.New(errors.NotFound, "the harness seeded no page at "+path)
 		}
-		targets = append(targets, id)
+		targets = append(targets, pageID)
 	}
 
 	started, err := core.Runs.Start(ctx, runs.StartRequest{

@@ -2,6 +2,50 @@
 
 package main
 
+import (
+	"time"
+
+	"github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/runtime/steps"
+)
+
+type seedCategory struct {
+	Name   string
+	Parent string
+	Paths  []string
+	OnSite bool
+}
+
+type callOwner int
+
+const (
+	ownedByNobody callOwner = iota
+	ownedByConversation
+	ownedByFinishedRun
+	ownedByPastRun
+)
+
+type seedCall struct {
+	Ago     time.Duration
+	Owner   callOwner
+	Run     int
+	Item    int
+	Step    string
+	Model   string
+	Tier    llm.ServiceTier
+	Usage   llm.Usage
+	Latency time.Duration
+	Failed  errors.Code
+}
+
+const (
+	writerModel = "gpt-5.6-terra"
+	editorModel = "gpt-5.6-luna"
+
+	day = 24 * time.Hour
+)
+
 type seedEntity struct {
 	Name    string
 	Kind    string
@@ -134,4 +178,73 @@ func seedLoosePages() []seedPage {
 		{Path: "/privacy-policy/", Title: "Privacy policy", Status: statusPublished},
 		{Path: "/terms/", Title: "Terms of sale", Status: statusPublished},
 	}
+}
+
+func seedCategoryTree() []seedCategory {
+	return []seedCategory{
+		{Name: "Espresso gear", OnSite: true},
+		{Name: "Machines", Parent: "Espresso gear", Paths: []string{"/espresso-machines/under-500/", "/espresso-machines/semi-automatic/", "/espresso-machines/dual-boiler/"}},
+		{Name: "Grinders", Parent: "Espresso gear", Paths: []string{"/grinders/hand/", "/grinders/electric/", failingPath}},
+		{Name: "Accessories", Parent: "Espresso gear", Paths: []string{"/accessories/tampers/", "/accessories/scales/", revertedPath}},
+		{Name: "Brewing guides", Paths: []string{"/brewing/tamping/", "/brewing/channeling/", "/brewing/dialing-in/"}},
+		{Name: "Milk drinks", Parent: "Brewing guides", Paths: []string{"/milk-drinks/latte-art/", "/milk-drinks/cappuccino/", "/milk-drinks/cortado/"}},
+	}
+}
+
+func spent(input, cached, output, reasoning int) llm.Usage {
+	return llm.Usage{Input: input, CachedInput: cached, Output: output, Reasoning: reasoning, Total: input + output}
+}
+
+func pastRunCalls(run int, ago time.Duration, body, meta [2]llm.Usage) []seedCall {
+	out := make([]seedCall, 0, 4)
+	for item := range 2 {
+		at := ago - time.Duration(item)*4*time.Minute
+		out = append(out,
+			seedCall{Ago: at, Owner: ownedByPastRun, Run: run, Item: item, Step: steps.NameGenerateBody, Model: writerModel, Tier: llm.TierFlex, Usage: body[item], Latency: 94 * time.Second},
+			seedCall{Ago: at - 2*time.Minute, Owner: ownedByPastRun, Run: run, Item: item, Step: steps.NameGenerateMeta, Model: editorModel, Tier: llm.TierDefault, Usage: meta[item], Latency: 3800 * time.Millisecond},
+		)
+	}
+	return out
+}
+
+func finishedRunCalls() []seedCall {
+	out := make([]seedCall, 0, 13)
+	bodies := [4]llm.Usage{spent(12400, 8100, 5600, 2400), spent(11900, 8100, 5200, 2100), spent(10300, 8100, 4800, 1900), spent(11200, 8100, 5100, 2300)}
+	for item := range 4 {
+		at := 9*time.Minute - time.Duration(item)*90*time.Second
+		out = append(out,
+			seedCall{Ago: at, Owner: ownedByFinishedRun, Item: item, Step: steps.NameGenerateBody, Model: writerModel, Tier: llm.TierFlex, Usage: bodies[item], Latency: 88 * time.Second},
+			seedCall{Ago: at - 40*time.Second, Owner: ownedByFinishedRun, Item: item, Step: steps.NameGenerateMeta, Model: editorModel, Tier: llm.TierDefault, Usage: spent(2300, 0, 280, 110), Latency: 3600 * time.Millisecond},
+			seedCall{Ago: at - 70*time.Second, Owner: ownedByFinishedRun, Item: item, Step: steps.NameJudge, Model: editorModel, Tier: llm.TierDefault, Usage: spent(6100, 1900, 460, 240), Latency: 5200 * time.Millisecond},
+		)
+	}
+	return append(out, seedCall{
+		Ago: 6 * time.Minute, Owner: ownedByFinishedRun, Item: 1, Step: steps.NameRepairLinks, Model: editorModel,
+		Tier: llm.TierDefault, Usage: spent(3400, 0, 190, 80), Latency: 2900 * time.Millisecond,
+	})
+}
+
+func seedSpendHistory() []seedCall {
+	out := make([]seedCall, 0, 40)
+	out = append(out, pastRunCalls(0, 27*day, [2]llm.Usage{spent(11800, 0, 6900, 3100), spent(12100, 7400, 5300, 2200)}, [2]llm.Usage{spent(2100, 0, 260, 120), spent(2200, 0, 240, 90)})...)
+	out = append(out, pastRunCalls(1, 18*day, [2]llm.Usage{spent(12600, 7400, 5800, 2600), spent(11400, 7400, 4900, 2000)}, [2]llm.Usage{spent(2000, 0, 250, 100), spent(2150, 0, 270, 130)})...)
+	out = append(out, seedCall{
+		Ago: 18*day + 2*time.Minute, Owner: ownedByPastRun, Run: 1, Item: 0, Step: steps.NameGenerateBody, Model: writerModel,
+		Tier: llm.TierFlex, Latency: 1200 * time.Millisecond, Failed: errors.RateLimited,
+	})
+	out = append(out, pastRunCalls(2, 9*day, [2]llm.Usage{spent(10900, 7400, 4700, 1800), spent(13200, 7400, 6400, 3000)}, [2]llm.Usage{spent(1900, 0, 230, 80), spent(2050, 0, 255, 110)})...)
+	out = append(out, pastRunCalls(3, 4*day, [2]llm.Usage{spent(12000, 8100, 5500, 2400), spent(11600, 8100, 5000, 2100)}, [2]llm.Usage{spent(2250, 0, 265, 120), spent(2100, 0, 240, 100)})...)
+	out = append(out, finishedRunCalls()...)
+	return append(out,
+		seedCall{Ago: 25*day + 5*time.Minute, Step: llm.StepProbe, Model: editorModel, Tier: llm.TierDefault, Latency: 600 * time.Millisecond, Failed: errors.Unauthorized},
+		seedCall{Ago: 25 * day, Step: llm.StepProbe, Model: editorModel, Tier: llm.TierDefault, Usage: spent(14, 0, 6, 0), Latency: 900 * time.Millisecond},
+		seedCall{Ago: 6*day + time.Minute, Owner: ownedByConversation, Step: llm.StepTitle, Model: editorModel, Tier: llm.TierDefault, Usage: spent(420, 0, 14, 0), Latency: 1100 * time.Millisecond},
+		seedCall{Ago: 6 * day, Owner: ownedByConversation, Step: llm.StepChat, Model: writerModel, Tier: llm.TierDefault, Usage: spent(24800, 0, 610, 180), Latency: 7200 * time.Millisecond},
+		seedCall{Ago: 3*day + 2*time.Hour, Step: llm.StepProposeFromPages, Model: editorModel, Tier: llm.TierDefault, Usage: spent(6400, 0, 2900, 900), Latency: 21 * time.Second},
+		seedCall{Ago: 2 * day, Owner: ownedByConversation, Step: llm.StepChat, Model: writerModel, Tier: llm.TierDefault, Usage: spent(26300, 23900, 660, 220), Latency: 6100 * time.Millisecond},
+		seedCall{Ago: 2*day - 3*time.Hour, Step: llm.StepJudge, Model: editorModel, Tier: llm.TierDefault, Usage: spent(5200, 0, 420, 190), Latency: 4800 * time.Millisecond},
+		seedCall{Ago: day, Owner: ownedByConversation, Step: llm.StepChat, Model: writerModel, Tier: llm.TierDefault, Usage: spent(27100, 24600, 540, 160), Latency: 5400 * time.Millisecond},
+		seedCall{Ago: 5 * time.Hour, Owner: ownedByConversation, Step: llm.StepChat, Model: writerModel, Tier: llm.TierDefault, Latency: 800 * time.Millisecond, Failed: errors.NeedsHuman},
+		seedCall{Ago: 3 * time.Hour, Owner: ownedByConversation, Step: llm.StepChat, Model: writerModel, Tier: llm.TierDefault, Usage: spent(28400, 25800, 720, 240), Latency: 6800 * time.Millisecond},
+	)
 }
