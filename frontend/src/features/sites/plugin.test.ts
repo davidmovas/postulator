@@ -4,12 +4,16 @@ import { capabilityLabel, seoPluginLabel, storeBanner } from "./plugin.js";
 
 describe("what the companion plugin reports, in words", () => {
     it("names every capability the plugin manifest can carry", () => {
-        for (const capability of ["bulk", "seo_meta", "content_hash", "raw", "preview"]) {
+        for (const capability of ["bulk", "seo_meta", "content_hash", "raw", "preview", "page_categories"]) {
             const label = capabilityLabel(capability);
             expect(label).not.toBe("");
             expect(label).not.toContain("_");
             expect(label).not.toBe(capability);
         }
+    });
+
+    it("names the capability that lets pages carry categories", () => {
+        expect(capabilityLabel("page_categories")).toBe("categories on pages");
     });
 
     it("shows a capability it has never heard of without its underscores", () => {
@@ -37,6 +41,12 @@ describe("what the store lets Postulator do", () => {
 
     it("says what a ready store never has touched", () => {
         expect(storeBanner("ready", true, "editor")?.body).toMatch(/price/);
+    });
+
+    it("says a run keeps the store's categories and only adds the sheet's", () => {
+        const body = storeBanner("ready", true, "editor")?.body ?? "";
+        expect(body).toContain("the categories the store gave them stay");
+        expect(body).toContain("only adds the ones their sheet files them under");
     });
 
     it("names the user a store refuses", () => {

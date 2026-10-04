@@ -12,9 +12,11 @@ import {
 } from "../../generated/vocab.js";
 import {
     artifactLabel,
+    findingHeadline,
     pauseReasonShort,
     pauseReasonText,
     retryBlockedText,
+    revertOutcomeLabel,
     runKindLabel,
     runStatusLabel,
     stepLabel,
@@ -54,5 +56,34 @@ describe("a value this build does not know", () => {
         expect(runKindLabel("teleport")).toBe("teleport");
         expect(runStatusLabel("melted")).toBe("melted");
         expect(artifactLabel("recipe_card")).toBe("recipe_card");
+        expect(revertOutcomeLabel("vanished")).toBe("vanished");
+    });
+});
+
+describe("the category findings of a run", () => {
+    it.each([
+        "page_categories_need_plugin",
+        "categories_forbidden",
+        "category_refused",
+        "categories_not_taken",
+        "revert_terms_kept",
+        "revert_categories_kept",
+        "categories_unread",
+    ])("names %s in plain words", (code) => {
+        spoken(findingHeadline(code) ?? "");
+    });
+
+    it("tells a person what to do when pages cannot carry categories", () => {
+        expect(findingHeadline("page_categories_need_plugin")).toBe(
+            "Categories on pages need the companion plugin 1.3.0 — update it and sync",
+        );
+    });
+
+    it("leaves a finding it has no words for to its own message", () => {
+        expect(findingHeadline("seo_meta_skipped")).toBeNull();
+    });
+
+    it.each(["trashed", "restored", "needs_human"])("says what a revert outcome %s means", (outcome) => {
+        spoken(revertOutcomeLabel(outcome));
     });
 });

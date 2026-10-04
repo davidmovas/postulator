@@ -13,6 +13,7 @@ import {
     owedTargets,
     publishView,
     relinkView,
+    revertView,
     syncView,
     validationView,
     weigh,
@@ -236,6 +237,57 @@ describe("publishView", () => {
         expect(view?.product).toStrictEqual({ shortWritten: true, added: ["Form"], imageSet: true });
         expect(publishView({ wpId: 9 })?.product).toBeNull();
     });
+
+    it.each([
+        ["a result written with category records", "categoryId"],
+        ["a result written before categories were records", "entityId"],
+    ])("reads the categories of %s by their term ids", (_, owner) => {
+        const view = publishView({
+            wpId: 9,
+            categories: {
+                taxonomy: "category",
+                terms: [
+                    { [owner]: "c1", name: "Peptides", termId: 12, parentId: 0, created: false },
+                    { [owner]: "c2", name: "Healing", termId: 31, parentId: 12, created: true },
+                    { [owner]: "c3", name: "Broken", termId: 0, parentId: 0, created: true },
+                ],
+                previous: [5, 12, "x"],
+                added: [31],
+                taken: true,
+            },
+        });
+        expect(view?.categories).toStrictEqual({
+            taxonomy: "category",
+            terms: [
+                { name: "Peptides", termId: 12, created: false },
+                { name: "Healing", termId: 31, created: true },
+            ],
+            previous: [5, 12],
+            added: [31],
+            taken: true,
+        });
+    });
+
+    it("reads no categories from a page the run filed under none", () => {
+        expect(publishView({ wpId: 9 })?.categories).toBeNull();
+    });
+});
+
+describe("revertView", () => {
+    it("reads what the revert did to the page and its neighbours, and its findings", () => {
+        const view = revertView({
+            pageId: "p1",
+            path: "/a/",
+            outcome: "restored",
+            detail: "the content the run replaced was written back",
+            neighbors: [{ pageId: "p2", path: "/b/", outcome: "restored", detail: "unlinked", wpId: 3 }, 4],
+            findings: [{ severity: "info", code: "revert_terms_kept", message: "kept" }],
+        });
+        expect(view?.outcome).toBe("restored");
+        expect(view?.neighbours).toStrictEqual([{ pageId: "p2", path: "/b/", outcome: "restored", detail: "unlinked" }]);
+        expect(view?.findings.map((finding) => finding.code)).toStrictEqual(["revert_terms_kept"]);
+        expect(revertView("nope")).toBeNull();
+    });
 });
 
 describe("the remaining artifact shapes", () => {
@@ -297,6 +349,11 @@ describe("the remaining artifact shapes", () => {
 
     it("reads a sync result", () => {
         expect(syncView({ url: "u", status: "publish", links: 7 })?.links).toBe(7);
+        expect(
+            syncView({ findings: [{ severity: "warn", code: "categories_unread", message: "no list" }] })?.findings.map(
+                (finding) => finding.code,
+            ),
+        ).toStrictEqual(["categories_unread"]);
     });
 
     it("reads a final report", () => {

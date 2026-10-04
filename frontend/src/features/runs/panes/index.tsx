@@ -18,13 +18,14 @@ import {
     artifactMeta,
     artifactPublishResult,
     artifactRelinkResult,
+    artifactRevertResult,
     artifactSyncResult,
     artifactValidationReport,
 } from "../statuses.js";
 import { BodyPane, DraftPane, ImagesPane, MetaPane } from "./content.js";
 import { JudgePane } from "./judge.js";
 import { LinkContextPane, ValidationPane } from "./links.js";
-import { FinalPane, PublishPane, RelinkPane, SyncPane } from "./publish.js";
+import { FinalPane, PublishPane, RelinkPane, RevertPane, SyncPane } from "./publish.js";
 import { Unreadable } from "./shared.js";
 
 interface PayloadProps {
@@ -56,6 +57,8 @@ function Payload({ itemId, kind, pageId, payload }: PayloadProps): ReactElement 
             return <SyncPane payload={payload} />;
         case artifactFinalReport:
             return <FinalPane payload={payload} />;
+        case artifactRevertResult:
+            return <RevertPane payload={payload} />;
         default:
             return <Unreadable />;
     }
