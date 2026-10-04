@@ -2,6 +2,7 @@ package pages_test
 
 import (
 	"encoding/json"
+	"slices"
 	"strconv"
 	"testing"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
@@ -436,6 +438,133 @@ func TestEveryWriteAnswersWithTheCategoriesOfThePageItWrote(t *testing.T) {
 
 			s := newShelf(t)
 			wantFiled(t, tc.write(t, s), tc.want(s))
+		})
+	}
+}
+
+func TestTheCategoryTreeCountsThePagesUnderEveryCategory(t *testing.T) {
+	t.Parallel()
+
+	s := newShelf(t)
+	node := func(record category.Category, pagesUnder int, termIDs string) string {
+		parent := "null"
+		if record.ParentID != "" {
+			parent = `"` + record.ParentID + `"`
+		}
+		return `{"id":"` + record.ID + `","name":"` + record.Name + `","parentId":` + parent +
+			`,"pages":` + strconv.Itoa(pagesUnder) + `,"termIds":` + termIDs + `}`
+	}
+
+	cases := []struct {
+		name    string
+		service *pages.Service
+		want    string
+	}{
+		{
+			name: "parents first, each with the pages of its whole branch and the terms the site has", service: s.service,
+			want: `{"categories":[` + node(s.company, 0, `{}`) + `,` + node(s.peptides, 5, `{"category":5,"productCategory":31}`) + `,` +
+				node(s.bpc, 4, `{"productCategory":32}`) + `,` + node(s.liquid, 2, `{}`) + `]}`,
+		},
+		{
+			name: "a service that reads no terms", service: s.serviceWith(true, false),
+			want: `{"categories":[` + node(s.company, 0, `{}`) + `,` + node(s.peptides, 5, `{}`) + `,` +
+				node(s.bpc, 4, `{}`) + `,` + node(s.liquid, 2, `{}`) + `]}`,
+		},
+		{name: "a service that reads no categories", service: s.serviceWith(false, true), want: `{"categories":[]}`},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := tc.service.ListCategories(t.Context(), pages.ListCategoriesRequest{SiteID: s.siteID})
+			if err != nil {
+				t.Fatalf("ListCategories: %v", err)
+			}
+			if encoded(t, got) != tc.want {
+				t.Fatalf("ListCategories = %s\nwant %s", encoded(t, got), tc.want)
+			}
+		})
+	}
+}
+
+func TestTheCategoryTreeOfASiteWithoutCategoriesIsEmpty(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	h.page(t, "/about/", nil)
+	got, err := h.service.ListCategories(t.Context(), pages.ListCategoriesRequest{SiteID: h.siteID})
+	if err != nil {
+		t.Fatalf("ListCategories: %v", err)
+	}
+	if encoded(t, got) != `{"categories":[]}` {
+		t.Fatalf("ListCategories = %s, want no category", encoded(t, got))
+	}
+
+	refused := []struct {
+		name   string
+		siteID string
+		code   errors.Code
+	}{
+		{name: "no site", code: errors.Invalid},
+		{name: "a site that does not exist", siteID: id.New(), code: errors.NotFound},
+	}
+	for _, tc := range refused {
+		if _, err = h.service.ListCategories(t.Context(), pages.ListCategoriesRequest{SiteID: tc.siteID}); !errors.IsCode(err, tc.code) {
+			t.Errorf("%s: code = %q, want %q", tc.name, errors.CodeOf(err), tc.code)
+		}
+	}
+}
+
+func TestThePageListFiltersByACategoryAndEveryCategoryBelowIt(t *testing.T) {
+	t.Parallel()
+
+	s := newShelf(t)
+
+	cases := []struct {
+		name    string
+		service *pages.Service
+		request pages.ListRequest
+		want    []string
+	}{
+		{
+			name: "a root", service: s.service, request: pages.ListRequest{CategoryID: s.peptides.ID},
+			want: []string{peptidesPath, liquidPath, powderPath, capsulesPath, shelfPath},
+		},
+		{
+			name: "a category in the middle", service: s.service, request: pages.ListRequest{CategoryID: s.bpc.ID},
+			want: []string{liquidPath, powderPath, capsulesPath, shelfPath},
+		},
+		{name: "a leaf", service: s.service, request: pages.ListRequest{CategoryID: s.liquid.ID}, want: []string{liquidPath, capsulesPath}},
+		{name: "a category no page is filed under", service: s.service, request: pages.ListRequest{CategoryID: s.company.ID}, want: []string{}},
+		{name: "a category the site does not have", service: s.service, request: pages.ListRequest{CategoryID: id.New()}, want: []string{}},
+		{
+			name: "with another filter", service: s.service,
+			request: pages.ListRequest{CategoryID: s.peptides.ID, EntityID: s.liquidEntity.ID}, want: []string{liquidPath},
+		},
+		{
+			name: "a service that reads no categories keeps the category itself", service: s.serviceWith(false, false),
+			request: pages.ListRequest{CategoryID: s.bpc.ID}, want: []string{powderPath, shelfPath},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			tc.request.SiteID = s.siteID
+			listed, err := tc.service.List(t.Context(), tc.request)
+			if err != nil {
+				t.Fatalf("List: %v", err)
+			}
+			got := make([]string, 0, len(listed.Items))
+			for i := range listed.Items {
+				got = append(got, listed.Items[i].Path)
+			}
+			slices.Sort(got)
+			if want := slices.Sorted(slices.Values(tc.want)); !slices.Equal(got, want) {
+				t.Fatalf("List = %v, want %v", got, want)
+			}
 		})
 	}
 }

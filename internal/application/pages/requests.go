@@ -63,6 +63,15 @@ type ListRequest struct {
 	IncludeDescendants bool   `json:"includeDescendants,omitempty" description:"With entityId, also keep the pages of every entity under it"`
 	Unmapped           bool   `json:"unmapped,omitempty" description:"Keep only pages that carry no entity"`
 	PathPrefix         string `json:"pathPrefix,omitempty" description:"Keep only pages whose path starts with this text"`
+	CategoryID         string `json:"categoryId,omitempty" description:"Keep only pages filed under this category or a category below it"`
+}
+
+type ListCategoriesRequest struct {
+	SiteID string `json:"siteId"`
+}
+
+type ListCategoriesResponse struct {
+	Categories []CategoryNode `json:"categories"`
 }
 
 type MapToEntityRequest struct {

@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/davidmovas/postulator/internal/application"
+	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
@@ -54,4 +55,64 @@ func (s *Service) viewOf(ctx context.Context, p pagemap.Page) (Page, error) {
 		return Page{}, err
 	}
 	return view(p, filed), nil
+}
+
+func (s *Service) categoryFilter(ctx context.Context, req ListRequest) ([]string, error) {
+	if req.CategoryID == "" {
+		return nil, nil
+	}
+	tree, err := application.LoadCategoryTree(ctx, req.SiteID, s.categories, nil)
+	if err != nil {
+		return nil, err
+	}
+	return tree.Subtree(req.CategoryID), nil
+}
+
+func (s *Service) ListCategories(ctx context.Context, req ListCategoriesRequest) (ListCategoriesResponse, error) {
+	if err := requireSite(req.SiteID); err != nil {
+		return ListCategoriesResponse{}, err
+	}
+	if _, err := s.sites.Get(ctx, req.SiteID); err != nil {
+		return ListCategoriesResponse{}, err
+	}
+	tree, err := application.LoadCategoryTree(ctx, req.SiteID, s.categories, s.categoryTerms)
+	if err != nil {
+		return ListCategoriesResponse{}, err
+	}
+	if tree.Empty() {
+		return ListCategoriesResponse{Categories: []CategoryNode{}}, nil
+	}
+	all, err := s.pages.ListBySite(ctx, req.SiteID)
+	if err != nil {
+		return ListCategoriesResponse{}, err
+	}
+	filed := make(map[string]int, len(all))
+	for i := range all {
+		if all[i].CategoryID != "" {
+			filed[all[i].CategoryID]++
+		}
+	}
+	return ListCategoriesResponse{Categories: categoryNodes(tree, filed)}, nil
+}
+
+func categoryNodes(tree application.CategoryTree, filed map[string]int) []CategoryNode {
+	listed := tree.Categories()
+	nodes := make([]CategoryNode, 0, len(listed))
+	for i := range listed {
+		node := CategoryNode{ID: listed[i].ID, Name: listed[i].Name}
+		if parentID := listed[i].ParentID; parentID != "" {
+			node.ParentID = &parentID
+		}
+		for _, below := range tree.Subtree(listed[i].ID) {
+			node.Pages += filed[below]
+		}
+		if termID, held := tree.TermID(listed[i].ID, category.TaxonomyCategory); held {
+			node.TermIDs.Category = &termID
+		}
+		if termID, held := tree.TermID(listed[i].ID, category.TaxonomyProductCategory); held {
+			node.TermIDs.ProductCategory = &termID
+		}
+		nodes = append(nodes, node)
+	}
+	return nodes
 }

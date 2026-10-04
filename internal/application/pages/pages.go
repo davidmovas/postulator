@@ -333,6 +333,9 @@ func (s *Service) List(ctx context.Context, req ListRequest) (paging.List[Page],
 		return paging.List[Page]{}, err
 	}
 	q.EntityIDs = entityIDs
+	if q.CategoryIDs, err = s.categoryFilter(ctx, req); err != nil {
+		return paging.List[Page]{}, err
+	}
 	key, desc, err := pageSort(req.Sort)
 	if err != nil {
 		return paging.List[Page]{}, err

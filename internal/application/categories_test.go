@@ -183,6 +183,28 @@ func TestCategoryTreeHandsOutTermIDsOfItsOwn(t *testing.T) {
 	}
 }
 
+func TestCategoryTreeListsItsCategoriesInTheOrderItWasGiven(t *testing.T) {
+	t.Parallel()
+
+	given := treeCategories()
+	tree := application.NewCategoryTree(given, nil)
+	given[0].Name = "Renamed by the caller"
+
+	listed := tree.Categories()
+	if len(listed) != len(treeCategories()) || !slices.Equal(listed, treeCategories()) {
+		t.Fatalf("Categories = %+v, want %+v", listed, treeCategories())
+	}
+	listed[1].Name = "Renamed by a reader"
+	if again := tree.Categories(); !slices.Equal(again, treeCategories()) {
+		t.Fatalf("writing to one answer changed the next: %+v", again)
+	}
+
+	var empty application.CategoryTree
+	if got := empty.Categories(); len(got) != 0 {
+		t.Fatalf("an empty tree listed %+v", got)
+	}
+}
+
 type categoryShelf struct {
 	listed []category.Category
 	err    error

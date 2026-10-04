@@ -17,6 +17,7 @@ type PagesUseCase interface {
 	Get(ctx context.Context, req pages.GetRequest) (pages.GetResponse, error)
 	List(ctx context.Context, req pages.ListRequest) (paging.List[pages.Page], error)
 	Tree(ctx context.Context, req pages.TreeRequest) (pages.TreeResponse, error)
+	ListCategories(ctx context.Context, req pages.ListCategoriesRequest) (pages.ListCategoriesResponse, error)
 	MapToEntity(ctx context.Context, req pages.MapToEntityRequest) (pages.MapToEntityResponse, error)
 	Unmap(ctx context.Context, req pages.UnmapRequest) (pages.UnmapResponse, error)
 	SetCanonical(ctx context.Context, req pages.SetCanonicalRequest) (pages.SetCanonicalResponse, error)
@@ -25,32 +26,34 @@ type PagesUseCase interface {
 }
 
 type PagesService struct {
-	create       middleware.Handler[pages.CreateRequest, pages.CreateResponse]
-	update       middleware.Handler[pages.UpdateRequest, pages.UpdateResponse]
-	remove       middleware.Handler[pages.DeleteRequest, pages.DeleteResponse]
-	get          middleware.Handler[pages.GetRequest, pages.GetResponse]
-	list         middleware.Handler[pages.ListRequest, paging.List[pages.Page]]
-	tree         middleware.Handler[pages.TreeRequest, pages.TreeResponse]
-	mapToEntity  middleware.Handler[pages.MapToEntityRequest, pages.MapToEntityResponse]
-	unmap        middleware.Handler[pages.UnmapRequest, pages.UnmapResponse]
-	setCanonical middleware.Handler[pages.SetCanonicalRequest, pages.SetCanonicalResponse]
-	replaceLinks middleware.Handler[pages.ReplaceLinksRequest, pages.ReplaceLinksResponse]
-	previewLink  middleware.Handler[pages.PreviewLinkRequest, pages.PreviewLinkResponse]
+	create         middleware.Handler[pages.CreateRequest, pages.CreateResponse]
+	update         middleware.Handler[pages.UpdateRequest, pages.UpdateResponse]
+	remove         middleware.Handler[pages.DeleteRequest, pages.DeleteResponse]
+	get            middleware.Handler[pages.GetRequest, pages.GetResponse]
+	list           middleware.Handler[pages.ListRequest, paging.List[pages.Page]]
+	tree           middleware.Handler[pages.TreeRequest, pages.TreeResponse]
+	listCategories middleware.Handler[pages.ListCategoriesRequest, pages.ListCategoriesResponse]
+	mapToEntity    middleware.Handler[pages.MapToEntityRequest, pages.MapToEntityResponse]
+	unmap          middleware.Handler[pages.UnmapRequest, pages.UnmapResponse]
+	setCanonical   middleware.Handler[pages.SetCanonicalRequest, pages.SetCanonicalResponse]
+	replaceLinks   middleware.Handler[pages.ReplaceLinksRequest, pages.ReplaceLinksResponse]
+	previewLink    middleware.Handler[pages.PreviewLinkRequest, pages.PreviewLinkResponse]
 }
 
 func NewPagesService(logger *zap.Logger, useCase Source[PagesUseCase]) *PagesService {
 	return &PagesService{
-		create:       Wrap(logger, "pages.create", call(useCase, PagesUseCase.Create)),
-		update:       Wrap(logger, "pages.update", call(useCase, PagesUseCase.Update)),
-		remove:       Wrap(logger, "pages.delete", call(useCase, PagesUseCase.Delete)),
-		get:          Wrap(logger, "pages.get", call(useCase, PagesUseCase.Get)),
-		list:         Wrap(logger, "pages.list", call(useCase, PagesUseCase.List)),
-		tree:         Wrap(logger, "pages.tree", call(useCase, PagesUseCase.Tree)),
-		mapToEntity:  Wrap(logger, "pages.mapToEntity", call(useCase, PagesUseCase.MapToEntity)),
-		unmap:        Wrap(logger, "pages.unmap", call(useCase, PagesUseCase.Unmap)),
-		setCanonical: Wrap(logger, "pages.setCanonical", call(useCase, PagesUseCase.SetCanonical)),
-		replaceLinks: Wrap(logger, "pages.replaceLinks", call(useCase, PagesUseCase.ReplaceLinks)),
-		previewLink:  Wrap(logger, "pages.previewLink", call(useCase, PagesUseCase.PreviewLink)),
+		create:         Wrap(logger, "pages.create", call(useCase, PagesUseCase.Create)),
+		update:         Wrap(logger, "pages.update", call(useCase, PagesUseCase.Update)),
+		remove:         Wrap(logger, "pages.delete", call(useCase, PagesUseCase.Delete)),
+		get:            Wrap(logger, "pages.get", call(useCase, PagesUseCase.Get)),
+		list:           Wrap(logger, "pages.list", call(useCase, PagesUseCase.List)),
+		tree:           Wrap(logger, "pages.tree", call(useCase, PagesUseCase.Tree)),
+		listCategories: Wrap(logger, "pages.listCategories", call(useCase, PagesUseCase.ListCategories)),
+		mapToEntity:    Wrap(logger, "pages.mapToEntity", call(useCase, PagesUseCase.MapToEntity)),
+		unmap:          Wrap(logger, "pages.unmap", call(useCase, PagesUseCase.Unmap)),
+		setCanonical:   Wrap(logger, "pages.setCanonical", call(useCase, PagesUseCase.SetCanonical)),
+		replaceLinks:   Wrap(logger, "pages.replaceLinks", call(useCase, PagesUseCase.ReplaceLinks)),
+		previewLink:    Wrap(logger, "pages.previewLink", call(useCase, PagesUseCase.PreviewLink)),
 	}
 }
 
@@ -76,6 +79,10 @@ func (s *PagesService) List(c context.Context, req pages.ListRequest) (paging.Li
 
 func (s *PagesService) Tree(c context.Context, req pages.TreeRequest) (pages.TreeResponse, error) {
 	return s.tree(c, req)
+}
+
+func (s *PagesService) ListCategories(c context.Context, req pages.ListCategoriesRequest) (pages.ListCategoriesResponse, error) {
+	return s.listCategories(c, req)
 }
 
 func (s *PagesService) MapToEntity(c context.Context, req pages.MapToEntityRequest) (pages.MapToEntityResponse, error) {

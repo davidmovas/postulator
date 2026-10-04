@@ -74,6 +74,19 @@ type TreeNode struct {
 	Children []TreeNode `json:"children"`
 }
 
+type CategoryTermIDs struct {
+	Category        *int64 `json:"category,omitempty"`
+	ProductCategory *int64 `json:"productCategory,omitempty"`
+}
+
+type CategoryNode struct {
+	ID       string          `json:"id"`
+	Name     string          `json:"name"`
+	ParentID *string         `json:"parentId"`
+	Pages    int             `json:"pages"`
+	TermIDs  CategoryTermIDs `json:"termIds"`
+}
+
 type Conflict struct {
 	PageID   string `json:"pageId"`
 	Path     string `json:"path"`

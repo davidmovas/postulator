@@ -95,6 +95,14 @@ func TestTheGraphAndThePagesNameTheCategoryAPageIsFiledUnder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get the post: %v", err)
 	}
+	listed, err := core.Pages.List(t.Context(), pages.ListRequest{SiteID: siteID, CategoryID: peptides.ID})
+	if err != nil {
+		t.Fatalf("List under Peptides: %v", err)
+	}
+	tree, err := core.Pages.ListCategories(t.Context(), pages.ListCategoriesRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("ListCategories: %v", err)
+	}
 
 	chain := `[{"id":"` + peptides.ID + `","name":"Peptides","termId":14},{"id":"` + healing.ID + `","name":"Healing"}]`
 	cases := []struct {
@@ -104,10 +112,19 @@ func TestTheGraphAndThePagesNameTheCategoryAPageIsFiledUnder(t *testing.T) {
 	}{
 		{name: "the entity", got: entity.Entity.Categories, want: chain},
 		{name: "the post", got: read.Page.Categories, want: chain},
+		{name: "the pages under the root category", got: len(listed.Items), want: "1"},
+		{
+			name: "the category tree", got: tree,
+			want: `{"categories":[{"id":"` + peptides.ID + `","name":"Peptides","parentId":null,"pages":1,"termIds":{"category":14}},` +
+				`{"id":"` + healing.ID + `","name":"Healing","parentId":"` + peptides.ID + `","pages":1,"termIds":{}}]}`,
+		},
 	}
 	for _, tc := range cases {
 		if got := encodedJSON(t, tc.got); got != tc.want {
 			t.Errorf("%s = %s, want %s", tc.name, got, tc.want)
 		}
+	}
+	if len(listed.Items) == 1 && listed.Items[0].ID != post.Page.ID {
+		t.Errorf("the page under the root category is %s, want the post", listed.Items[0].Path)
 	}
 }

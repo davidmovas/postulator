@@ -69,6 +69,10 @@ func (x CategoryTree) Empty() bool {
 	return len(x.listed) == 0
 }
 
+func (x CategoryTree) Categories() []category.Category {
+	return slices.Clone(x.listed)
+}
+
 func (x CategoryTree) Chain(leafID string, taxonomy category.Taxonomy) []dto.Category {
 	chain := x.chains[leafID]
 	out := make([]dto.Category, 0, len(chain))
