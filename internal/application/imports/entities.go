@@ -10,9 +10,17 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-func sheetAnchors(texts []string) []graph.Anchor {
-	out := make([]graph.Anchor, 0, len(texts))
+func unionAnchors(carried []graph.Anchor, texts []string) []graph.Anchor {
+	out := slices.Clone(carried)
+	held := make(map[string]struct{}, len(carried)+len(texts))
+	for i := range carried {
+		held[graph.Key(carried[i].Text)] = struct{}{}
+	}
 	for _, text := range texts {
+		if _, known := held[graph.Key(text)]; known {
+			continue
+		}
+		held[graph.Key(text)] = struct{}{}
 		out = append(out, graph.Anchor{Text: text, Source: graph.AnchorUser, Weight: 1})
 	}
 	return out
@@ -31,8 +39,7 @@ func edgeKey(e graph.Edge) string {
 }
 
 func sameEntity(a, b graph.Entity) bool {
-	return a.Kind == b.Kind && a.Keywords.Equal(b.Keywords) &&
-		slices.Equal(anchorTexts(a.Anchors), anchorTexts(b.Anchors))
+	return a.Kind == b.Kind && a.Keywords.Equal(b.Keywords) && slices.Equal(a.Anchors, b.Anchors)
 }
 
 func (b *builder) planEntities() error {
@@ -67,7 +74,7 @@ func (b *builder) createEntity(u *unit, kind graph.Kind) error {
 	}
 	entity, err := graph.NewEntity(graph.Entity{
 		ID: u.id, SiteID: b.state.siteID, Name: u.name, Kind: cmp.Or(kind, u.defaultKind()),
-		ScopeID: scope, Keywords: u.keywords, Anchors: sheetAnchors(u.anchors),
+		ScopeID: scope, Keywords: u.keywords, Anchors: unionAnchors(nil, u.anchors),
 		Source: graph.SourceImport, CreatedAt: b.now, UpdatedAt: b.now,
 	})
 	if err != nil {
@@ -84,7 +91,7 @@ func (b *builder) updateEntity(u *unit, kind graph.Kind) error {
 	next := current
 	next.Kind = cmp.Or(kind, current.Kind)
 	next.Keywords = current.Keywords.Merge(u.keywords)
-	next.Anchors = sheetAnchors(graph.Distinct(anchorTexts(current.Anchors), u.anchors))
+	next.Anchors = unionAnchors(current.Anchors, u.anchors)
 	next.UpdatedAt = b.now
 	entity, err := graph.NewEntity(next)
 	if err != nil {
