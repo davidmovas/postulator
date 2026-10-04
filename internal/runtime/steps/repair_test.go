@@ -81,6 +81,36 @@ func TestRepairHierarchyMovesAFlatPageWithoutRewritingIt(t *testing.T) {
 	}
 }
 
+func TestRepairHierarchyLeavesAPostWhereItsPermalinkPutsIt(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	parent := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Coffee", Slug: "coffee", Status: "publish"})
+	parentWP := parent[0].ID
+	post := server.Seed(wptest.Item{
+		Type: wptest.TypePost, Title: "Espresso", Slug: "espresso", Status: "publish", Content: flatBody,
+	})
+
+	stored := &pagemap.Page{}
+	deps.Pages = pageList{recorded: stored, items: []pagemap.Page{{
+		ID: "page-parent", SiteID: "site", Path: "/coffee/", Slug: "coffee", WPType: pagemap.WPPage,
+		Status: pagemap.StatusPublished, WPID: &parentWP,
+	}}}
+	sc := repairContext(t, post[0].ID)
+	sc.Page.WPType = pagemap.WPPost
+
+	result, err := steps.RepairHierarchy(deps).Run(t.Context(), sc)
+	if !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("a repair of a post = %+v, %v; want it refused as invalid", result, err)
+	}
+	if kept, ok := server.Lookup(post[0].ID); !ok || kept.Parent != 0 || kept.Content != flatBody {
+		t.Fatalf("the post is %+v, want it left as it was", kept)
+	}
+	if stored.ID != "" {
+		t.Fatalf("the page map recorded %+v for a post the repair never moved", stored)
+	}
+}
+
 func TestRepairHierarchyWaitsForAParentThatIsNotThereYet(t *testing.T) {
 	t.Parallel()
 
@@ -99,7 +129,7 @@ func TestRepairHierarchyWaitsForAParentThatIsNotThereYet(t *testing.T) {
 	}
 }
 
-func TestRepairHierarchyPreflightRefusesWhatTheStorePlaces(t *testing.T) {
+func TestRepairHierarchyPreflightRefusesWhatNoParentHolds(t *testing.T) {
 	t.Parallel()
 
 	wpID := int64(12)
@@ -112,6 +142,11 @@ func TestRepairHierarchyPreflightRefusesWhatTheStorePlaces(t *testing.T) {
 			name: "a page",
 			page: pagemap.Page{ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", WPType: pagemap.WPPage, WPID: &wpID},
 			want: []string{},
+		},
+		{
+			name: "a post",
+			page: pagemap.Page{ID: "page-post", SiteID: "site", Path: "/coffee/espresso-at-home/", WPType: pagemap.WPPost, WPID: &wpID},
+			want: []string{steps.CodePostUnnested},
 		},
 		{
 			name: "a product",
