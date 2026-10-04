@@ -153,7 +153,7 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request, itemType s
 		Parent:        intField(body, "parent"),
 		MenuOrder:     int(intField(body, "menu_order")),
 		FeaturedMedia: intField(body, "featured_media"),
-		Categories:    s.sentCategories(itemType, body),
+		Categories:    intListField(body, "categories"),
 		Tags:          intListField(body, "tags"),
 		Meta:          metaField(body),
 	})
@@ -184,9 +184,6 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request, itemType s
 	}
 
 	applyUpdate(stored, body)
-	if categories := s.sentCategories(stored.Type, body); categories != nil {
-		stored.Categories = categories
-	}
 	if slug := stringField(body, "slug"); slug != "" {
 		stored.Slug = s.uniqueSlug(slug, stored.Type, stored.Parent, stored.ID)
 	}
@@ -195,13 +192,6 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request, itemType s
 	s.mu.Unlock()
 
 	s.respond(w, http.StatusOK, payload)
-}
-
-func (s *Server) sentCategories(itemType string, body map[string]any) []int64 {
-	if _, sent := body["categories"]; !sent || !s.carriesCategories(itemType) {
-		return nil
-	}
-	return s.assignedTerms(taxonomyCategory, intListField(body, "categories"))
 }
 
 func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request, itemType string) {
@@ -278,17 +268,7 @@ func (s *Server) itemPayload(stored *Item) map[string]any {
 	if !hierarchical(stored.Type) {
 		delete(payload, "parent")
 	}
-	if !s.carriesCategories(stored.Type) {
-		delete(payload, "categories")
-	}
 	return payload
-}
-
-func (s *Server) carriesCategories(itemType string) bool {
-	if itemType != TypePage {
-		return true
-	}
-	return !s.noPlugin && slices.Contains(s.capabilities, capabilityPageCategories)
 }
 
 func (s *Server) itemFields(stored *Item) map[string]any {
@@ -359,6 +339,9 @@ func applyUpdate(stored *Item, body map[string]any) {
 	}
 	if value, ok := body["featured_media"].(float64); ok {
 		stored.FeaturedMedia = int64(value)
+	}
+	if _, ok := body["categories"]; ok {
+		stored.Categories = intListField(body, "categories")
 	}
 	if _, ok := body["tags"]; ok {
 		stored.Tags = intListField(body, "tags")

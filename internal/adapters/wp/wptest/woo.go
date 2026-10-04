@@ -21,7 +21,8 @@ func (s *Server) routeWoo(mux *http.ServeMux) {
 	mux.HandleFunc("GET "+wooNamespace+"/products/{id}", s.withCommerce(s.handleProductGet))
 	mux.HandleFunc("POST "+wooNamespace+"/products/{id}", s.withCommerce(s.handleProductUpdate))
 	mux.HandleFunc("PUT "+wooNamespace+"/products/{id}", s.withCommerce(s.handleProductUpdate))
-	s.routeProductCategories(mux)
+	mux.HandleFunc("GET "+wooNamespace+"/products/categories", s.withCommerce(s.handleProductCategoryList))
+	mux.HandleFunc("GET "+wooNamespace+"/products/categories/{id}", s.withCommerce(s.handleProductCategoryGet))
 }
 
 func (s *Server) routeStorefront(mux *http.ServeMux) {
@@ -91,6 +92,14 @@ func (s *Server) withCommerce(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func (s *Server) handleProductList(w http.ResponseWriter, r *http.Request) {
+	s.handleWooList(w, r, TypeProduct, s.productPayload)
+}
+
+func (s *Server) handleProductCategoryList(w http.ResponseWriter, r *http.Request) {
+	s.handleWooList(w, r, TypeProductCategory, s.productCategoryPayload)
+}
+
+func (s *Server) handleWooList(w http.ResponseWriter, r *http.Request, itemType string, render func(*Item, bool) map[string]any) {
 	query := r.URL.Query()
 	page, perPage, bad := listWindow(query)
 	if bad != "" {
@@ -104,7 +113,7 @@ func (s *Server) handleProductList(w http.ResponseWriter, r *http.Request) {
 	edit := query.Get("context") == "edit"
 
 	s.mu.Lock()
-	matched := s.filter(TypeProduct, query)
+	matched := s.filter(itemType, query)
 	total := len(matched)
 	totalPages := (total + perPage - 1) / perPage
 
@@ -112,7 +121,7 @@ func (s *Server) handleProductList(w http.ResponseWriter, r *http.Request) {
 	end := min(start+perPage, total)
 	payload := make([]map[string]any, 0, end-start)
 	for _, stored := range matched[start:end] {
-		payload = append(payload, narrowFields(s.productPayload(stored, edit), query.Get("_fields")))
+		payload = append(payload, narrowFields(render(stored, edit), query.Get("_fields")))
 	}
 	s.mu.Unlock()
 
@@ -123,6 +132,10 @@ func (s *Server) handleProductList(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleProductGet(w http.ResponseWriter, r *http.Request) {
 	s.handleWooGet(w, r, TypeProduct, s.productPayload)
+}
+
+func (s *Server) handleProductCategoryGet(w http.ResponseWriter, r *http.Request) {
+	s.handleWooGet(w, r, TypeProductCategory, s.productCategoryPayload)
 }
 
 func (s *Server) handleWooGet(w http.ResponseWriter, r *http.Request, itemType string, render func(*Item, bool) map[string]any) {
@@ -192,7 +205,7 @@ func (s *Server) handleProductUpdate(w http.ResponseWriter, r *http.Request) {
 		stored.Slug = s.uniqueSlug(slug, stored.Type, stored.Parent, stored.ID)
 	}
 	if _, present := body["categories"]; present {
-		stored.Categories = s.assignedTerms(TypeProductCategory, objectIDList(body, "categories"))
+		stored.Categories = objectIDList(body, "categories")
 	}
 	if _, present := body["attributes"]; present {
 		stored.Attributes = attributesField(body)
@@ -224,6 +237,17 @@ func (s *Server) productPayload(stored *Item, edit bool) map[string]any {
 		"categories":        s.categoryRefs(stored.Categories),
 		"attributes":        attributePayload(stored.Attributes),
 		"images":            s.imagePayload(stored.Images),
+	}
+}
+
+func (s *Server) productCategoryPayload(stored *Item, _ bool) map[string]any {
+	return map[string]any{
+		"id":          stored.ID,
+		"name":        stored.Title,
+		"slug":        stored.Slug,
+		"parent":      stored.Parent,
+		"description": stored.Content,
+		"count":       s.countProducts(stored.ID),
 	}
 }
 
@@ -326,6 +350,35 @@ func (s *Server) imagePayload(ids []int64) []map[string]any {
 		payload = append(payload, image)
 	}
 	return payload
+}
+
+func (s *Server) categoryRefs(ids []int64) []map[string]any {
+	refs := make([]map[string]any, 0, len(ids))
+	for _, id := range ids {
+		stored, ok := s.terms[id]
+		if !ok {
+			continue
+		}
+		refs = append(refs, map[string]any{"id": stored.ID, "name": stored.Title, "slug": stored.Slug})
+	}
+	return refs
+}
+
+func (s *Server) countProducts(categoryID int64) int {
+	count := 0
+	for _, id := range s.order {
+		stored := s.items[id]
+		if stored.Type != TypeProduct {
+			continue
+		}
+		for _, assigned := range stored.Categories {
+			if assigned == categoryID {
+				count++
+				break
+			}
+		}
+	}
+	return count
 }
 
 func objectIDList(body map[string]any, key string) []int64 {

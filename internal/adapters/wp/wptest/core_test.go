@@ -3,7 +3,6 @@ package wptest_test
 import (
 	"encoding/json"
 	"net/http"
-	"slices"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
@@ -262,12 +261,9 @@ func TestUpdateCanTouchEveryField(t *testing.T) {
 	t.Parallel()
 
 	server := wptest.New(t)
-	first := server.SeedCategory(wptest.Category{Name: "Koffein"})
-	second := server.SeedCategory(wptest.Category{Name: "Tee"})
 	seeded := server.Seed(wptest.Item{Type: wptest.TypePost, Title: "Powder"})[0]
 
-	body := []byte(`{"title":"Koffein","content":"<p>c</p>","excerpt":"e","template":"wide","menu_order":3,"featured_media":7,"categories":[` +
-		itoa(first.ID) + `,` + itoa(second.ID) + `],"tags":[3],"meta":{"_postulator_title":"m"},"slug":"koffein-neu"}`)
+	body := []byte(`{"title":"Koffein","content":"<p>c</p>","excerpt":"e","template":"wide","menu_order":3,"featured_media":7,"categories":[1,2],"tags":[3],"meta":{"_postulator_title":"m"},"slug":"koffein-neu"}`)
 	_, payload := call(t, server, http.MethodPost, "/wp-json/wp/v2/posts/"+itoa(seeded.ID), body, true)
 
 	var updated struct {
@@ -292,147 +288,6 @@ func TestUpdateCanTouchEveryField(t *testing.T) {
 	}
 	if string(updated.Meta) == "[]" {
 		t.Error("meta must be an object once a key is set")
-	}
-}
-
-func TestAPostKeepsTheCategoriesThatExistInTheOrderWordPressNamesThem(t *testing.T) {
-	t.Parallel()
-
-	origin := wptest.New(t)
-	tee := origin.SeedCategory(wptest.Category{Name: "Tee"})
-	koffein := origin.SeedCategory(wptest.Category{Name: "koffein"})
-	angebote := origin.SeedCategory(wptest.Category{Name: "Angebote"})
-
-	cases := []struct {
-		name   string
-		create string
-		update string
-		want   []int64
-	}{
-		{
-			name:   "a create names them by name",
-			create: `{"title":"Powder","categories":[` + itoa(tee.ID) + `,` + itoa(koffein.ID) + `,` + itoa(angebote.ID) + `]}`,
-			want:   []int64{angebote.ID, koffein.ID, tee.ID},
-		},
-		{
-			name:   "an unknown id is skipped",
-			create: `{"title":"Powder","categories":[999,` + itoa(tee.ID) + `,` + itoa(tee.ID) + `]}`,
-			want:   []int64{tee.ID},
-		},
-		{
-			name:   "an update replaces the whole list",
-			create: `{"title":"Powder","categories":[` + itoa(tee.ID) + `]}`,
-			update: `{"categories":[` + itoa(koffein.ID) + `]}`,
-			want:   []int64{koffein.ID},
-		},
-		{
-			name:   "an empty list clears them",
-			create: `{"title":"Powder","categories":[` + itoa(tee.ID) + `]}`,
-			update: `{"categories":[]}`,
-			want:   []int64{},
-		},
-		{
-			name:   "an absent list keeps them",
-			create: `{"title":"Powder","categories":[` + itoa(tee.ID) + `]}`,
-			update: `{"status":"draft"}`,
-			want:   []int64{tee.ID},
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			server := wptest.New(t)
-			for _, category := range origin.Categories() {
-				if seeded := server.SeedCategory(category); seeded.ID != category.ID {
-					t.Fatalf("seeded %q as %d, want %d", category.Name, seeded.ID, category.ID)
-				}
-			}
-
-			_, payload := call(t, server, http.MethodPost, "/wp-json/wp/v2/posts", []byte(tc.create), true)
-			var post struct {
-				Categories []int64 `json:"categories"`
-				ID         int64   `json:"id"`
-			}
-			decode(t, payload, &post)
-			if tc.update != "" {
-				_, payload = call(t, server, http.MethodPost, "/wp-json/wp/v2/posts/"+itoa(post.ID), []byte(tc.update), true)
-				decode(t, payload, &post)
-			}
-
-			if post.Categories == nil || !slices.Equal(post.Categories, tc.want) {
-				t.Errorf("categories = %#v, want %v", post.Categories, tc.want)
-			}
-		})
-	}
-}
-
-func TestAPageCarriesCategoriesOnlyWhileThePluginRegistersThem(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name     string
-		options  []wptest.Option
-		path     string
-		enable   bool
-		carries  bool
-		storedAs int
-	}{
-		{name: "a page beside the plugin", path: "/wp-json/wp/v2/pages", carries: true, storedAs: 1},
-		{name: "a page without the plugin", options: []wptest.Option{wptest.WithoutPlugin()}, path: "/wp-json/wp/v2/pages"},
-		{
-			name:    "a page beside a plugin that predates page categories",
-			options: []wptest.Option{wptest.WithCapabilities("bulk", "seo_meta", "content_hash", "raw", "preview")},
-			path:    "/wp-json/wp/v2/pages",
-		},
-		{
-			name:     "a page once the plugin is activated",
-			options:  []wptest.Option{wptest.WithoutPlugin()},
-			path:     "/wp-json/wp/v2/pages",
-			enable:   true,
-			carries:  true,
-			storedAs: 1,
-		},
-		{name: "a post without the plugin", options: []wptest.Option{wptest.WithoutPlugin()}, path: "/wp-json/wp/v2/posts", carries: true, storedAs: 1},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			server := wptest.New(t, tc.options...)
-			koffein := server.SeedCategory(wptest.Category{Name: "Koffein"})
-			if tc.enable {
-				server.EnablePlugin()
-			}
-
-			body := []byte(`{"title":"Powder","status":"publish","categories":[` + itoa(koffein.ID) + `]}`)
-			_, payload := call(t, server, http.MethodPost, tc.path, body, true)
-			var created map[string]json.RawMessage
-			decode(t, payload, &created)
-
-			raw, present := created["categories"]
-			if present != tc.carries {
-				t.Fatalf("categories present = %t, want %t: %s", present, tc.carries, payload)
-			}
-			if tc.carries && string(raw) != "["+itoa(koffein.ID)+"]" {
-				t.Errorf("categories = %s, want [%d]", raw, koffein.ID)
-			}
-
-			var id int64
-			decode(t, created["id"], &id)
-			_, payload = call(t, server, http.MethodPost, tc.path+"/"+itoa(id), []byte(`{"categories":[`+itoa(koffein.ID)+`]}`), true)
-			decode(t, payload, &created)
-			if _, present = created["categories"]; present != tc.carries {
-				t.Errorf("after an update categories present = %t, want %t", present, tc.carries)
-			}
-
-			stored, _ := server.Lookup(id)
-			if len(stored.Categories) != tc.storedAs {
-				t.Errorf("stored categories = %v, want %d", stored.Categories, tc.storedAs)
-			}
-		})
 	}
 }
 

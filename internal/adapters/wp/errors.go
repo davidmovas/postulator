@@ -13,15 +13,9 @@ import (
 )
 
 type wpError struct {
-	Code        string          `json:"code"`
-	Message     string          `json:"message"`
-	CurrentHash string          `json:"currentHash"`
-	Data        json.RawMessage `json:"data"`
-}
-
-type wpErrorData struct {
-	TermID     json.Number `json:"term_id"`
-	ResourceID json.Number `json:"resource_id"`
+	Code        string `json:"code"`
+	Message     string `json:"message"`
+	CurrentHash string `json:"currentHash"`
 }
 
 func decodeError(body []byte) wpError {
@@ -30,19 +24,6 @@ func decodeError(body []byte) wpError {
 		return wpError{}
 	}
 	return failure
-}
-
-func (e wpError) termID() int64 {
-	var data wpErrorData
-	if len(e.Data) == 0 || json.Unmarshal(e.Data, &data) != nil {
-		return 0
-	}
-	for _, candidate := range []json.Number{data.TermID, data.ResourceID} {
-		if id, err := candidate.Int64(); err == nil && id > 0 {
-			return id
-		}
-	}
-	return 0
 }
 
 func classify(resp *http.Response, body []byte) error {
@@ -57,9 +38,6 @@ func classify(resp *http.Response, body []byte) error {
 	}
 	if failure.Message != "" {
 		base = base.WithDetail("wpMessage", failure.Message)
-	}
-	if id := failure.termID(); id > 0 {
-		base = base.WithDetail("termId", id)
 	}
 
 	switch {

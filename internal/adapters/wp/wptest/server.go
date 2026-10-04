@@ -66,7 +66,6 @@ type Server struct {
 	noPlugin      bool
 	noCommerce    bool
 	noProductEdit bool
-	noTermEdit    bool
 	filteredHTML  bool
 	builderLayout bool
 	storefrontOff bool
@@ -99,10 +98,6 @@ func WithoutCommerce() Option {
 
 func WithoutProductEdit() Option {
 	return func(s *Server) { s.noProductEdit = true }
-}
-
-func WithoutTermEdit() Option {
-	return func(s *Server) { s.noTermEdit = true }
 }
 
 func WithFilteredHTML() Option {
@@ -150,7 +145,7 @@ func New(t TB, opts ...Option) *Server {
 		user:         DefaultUser,
 		password:     DefaultPassword,
 		seoPlugin:    "yoast",
-		capabilities: []string{"bulk", "seo_meta", "seo_meta_read", "content_hash", "raw", "preview", capabilityPageCategories},
+		capabilities: []string{"bulk", "seo_meta", "seo_meta_read", "content_hash", "raw", "preview"},
 	}
 	for _, opt := range opts {
 		opt(server)

@@ -45,7 +45,6 @@ type Product struct {
 	ShortDescription string
 	Attributes       []ProductAttribute
 	Images           []ProductImage
-	Categories       []int64
 	ID               int64
 }
 
@@ -53,7 +52,6 @@ type UpdateProduct struct {
 	ShortDescription *string
 	Attributes       *[]ProductAttribute
 	Images           *[]int64
-	Categories       *[]int64
 }
 
 func (in UpdateProduct) payload() map[string]any {
@@ -81,20 +79,13 @@ func (in UpdateProduct) payload() map[string]any {
 		fields["attributes"] = attributes
 	}
 	if in.Images != nil {
-		fields["images"] = idRefs(*in.Images)
-	}
-	if in.Categories != nil {
-		fields["categories"] = idRefs(*in.Categories)
+		images := make([]map[string]any, 0, len(*in.Images))
+		for _, id := range *in.Images {
+			images = append(images, map[string]any{"id": id})
+		}
+		fields["images"] = images
 	}
 	return fields
-}
-
-func idRefs(ids []int64) []map[string]any {
-	refs := make([]map[string]any, 0, len(ids))
-	for _, id := range ids {
-		refs = append(refs, map[string]any{"id": id})
-	}
-	return refs
 }
 
 type productAttributePayload struct {
@@ -112,10 +103,6 @@ type productImagePayload struct {
 	ID  int64  `json:"id"`
 }
 
-type productCategoryPayload struct {
-	ID int64 `json:"id"`
-}
-
 type productPayload struct {
 	Name             string                    `json:"name"`
 	Slug             string                    `json:"slug"`
@@ -127,7 +114,6 @@ type productPayload struct {
 	DateModifiedGMT  string                    `json:"date_modified_gmt"`
 	Attributes       []productAttributePayload `json:"attributes"`
 	Images           []productImagePayload     `json:"images"`
-	Categories       []productCategoryPayload  `json:"categories"`
 	ID               int64                     `json:"id"`
 }
 
@@ -153,14 +139,6 @@ func (p productPayload) product() Product {
 		images = append(images, ProductImage(image))
 	}
 
-	var categories []int64
-	if p.Categories != nil {
-		categories = make([]int64, 0, len(p.Categories))
-		for _, category := range p.Categories {
-			categories = append(categories, category.ID)
-		}
-	}
-
 	return Product{
 		ID:               p.ID,
 		Name:             p.Name,
@@ -172,7 +150,6 @@ func (p productPayload) product() Product {
 		ShortDescription: p.ShortDescription,
 		Attributes:       attributes,
 		Images:           images,
-		Categories:       categories,
 		Modified:         parseWPTime(p.DateModifiedGMT),
 	}
 }
@@ -180,7 +157,7 @@ func (p productPayload) product() Product {
 func (p Product) Item() Item {
 	return Item{
 		ID: p.ID, Type: TypeProduct, Title: p.Name, Content: p.Description, Excerpt: p.ShortDescription,
-		Slug: p.Slug, Status: p.Status, Link: p.Permalink, Modified: p.Modified, Categories: p.Categories,
+		Slug: p.Slug, Status: p.Status, Link: p.Permalink, Modified: p.Modified,
 	}
 }
 

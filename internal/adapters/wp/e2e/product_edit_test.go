@@ -9,8 +9,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/davidmovas/postulator/internal/adapters/wp"
 )
 
 type storeAttribute struct {
@@ -34,17 +32,6 @@ type storeProduct struct {
 	RegularPrice     string           `json:"regular_price"`
 	SKU              string           `json:"sku"`
 	Attributes       []storeAttribute `json:"attributes"`
-	Categories       []struct {
-		ID int `json:"id"`
-	} `json:"categories"`
-}
-
-func (p storeProduct) categoryIDs() []int64 {
-	ids := make([]int64, 0, len(p.Categories))
-	for _, category := range p.Categories {
-		ids = append(ids, int64(category.ID))
-	}
-	return ids
 }
 
 func storeProductPath(id int) string {
@@ -142,9 +129,6 @@ func TestAnApplicationPasswordEditsAProductThroughTheStoreAPI(t *testing.T) {
 
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano()%1_000_000_000)
 	colorID := createGlobalAttribute(t, c, "Color "+suffix, "pc"+suffix, "Blue")
-	var clientCategory storedTerm
-	c.expect(t, http.MethodPost, productCategoriesRoute, map[string]any{"name": "Client Shelf " + suffix}, http.StatusCreated, &clientCategory)
-	forgetTerm(t, c, wp.TaxonomyProductCategory, int64(clientCategory.ID))
 	created := createStoreProduct(t, c, map[string]any{
 		"name":              "Spike & Co " + suffix,
 		"slug":              "postulator-spike-" + suffix,
@@ -158,7 +142,6 @@ func TestAnApplicationPasswordEditsAProductThroughTheStoreAPI(t *testing.T) {
 			{"id": colorID, "options": []string{"Blue"}, "visible": true, "variation": false, "position": 0},
 			{"name": "Origin", "options": []string{"Client"}, "visible": true, "variation": false, "position": 1},
 		},
-		"categories": []map[string]any{{"id": clientCategory.ID}},
 	})
 	before := readStoreProduct(t, c, created.ID)
 	if before.Type != "simple" {
@@ -247,47 +230,6 @@ func TestAnApplicationPasswordEditsAProductThroughTheStoreAPI(t *testing.T) {
 		if !strings.Contains(page, "Rewritten with a") {
 			t.Errorf("the product page at %s does not show the description", after.Permalink)
 		}
-	})
-
-	t.Run("our category joins the client's and leaves alone on a revert", func(t *testing.T) {
-		adapter := newAdapter(t, env)
-		client := int64(clientCategory.ID)
-		ours, made := ensureTerm(t, c, adapter, wp.TaxonomyProductCategory, "Postulator Shelf "+suffix, 0)
-		if !made {
-			t.Fatalf("the category %+v already existed", ours)
-		}
-
-		product, err := adapter.GetProduct(t.Context(), int64(created.ID))
-		if err != nil {
-			t.Fatalf("GetProduct: %v", err)
-		}
-		if !slices.Equal(product.Categories, []int64{client}) {
-			t.Fatalf("the product starts with %v, want the client's %d", product.Categories, client)
-		}
-
-		union := append(slices.Clone(product.Categories), ours.ID)
-		joined, err := adapter.UpdateProduct(t.Context(), int64(created.ID), wp.UpdateProduct{Categories: &union})
-		if err != nil {
-			t.Fatalf("UpdateProduct: %v", err)
-		}
-		if !sameIDs(joined.Categories, []int64{client, ours.ID}) {
-			t.Errorf("after the union the product carries %v, want %d and %d", joined.Categories, client, ours.ID)
-		}
-		after := readStoreProduct(t, c, created.ID)
-		requireUntouched(t, "the category write", before, after)
-		if !sameIDs(after.categoryIDs(), []int64{client, ours.ID}) {
-			t.Errorf("the store reads %v after the union", after.categoryIDs())
-		}
-
-		previous := slices.DeleteFunc(slices.Clone(joined.Categories), func(id int64) bool { return id == ours.ID })
-		reverted, err := adapter.UpdateProduct(t.Context(), int64(created.ID), wp.UpdateProduct{Categories: &previous})
-		if err != nil {
-			t.Fatalf("UpdateProduct: %v", err)
-		}
-		if !slices.Equal(reverted.Categories, []int64{client}) {
-			t.Errorf("after the revert the product carries %v, want only the client's %d", reverted.Categories, client)
-		}
-		requireUntouched(t, "the category revert", before, readStoreProduct(t, c, created.ID))
 	})
 
 	t.Run("the plugin writes the product's SEO meta", func(t *testing.T) {

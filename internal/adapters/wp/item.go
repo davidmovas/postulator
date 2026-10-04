@@ -291,7 +291,7 @@ func (in CreateItem) payload() map[string]any {
 	if in.Template != "" {
 		payload["template"] = in.Template
 	}
-	if in.Categories != nil {
+	if len(in.Categories) > 0 {
 		payload["categories"] = in.Categories
 	}
 	if len(in.Tags) > 0 {

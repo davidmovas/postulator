@@ -29,7 +29,7 @@ func TestCapabilitiesAreFetchedOnceAndCached(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Capabilities: %v", err)
 	}
-	if first.SEOPlugin != "rankmath" || first.Version != "1.3.0" || first.Site != server.URL() {
+	if first.SEOPlugin != "rankmath" || first.Version != "1.2.0" || first.Site != server.URL() {
 		t.Errorf("capabilities = %+v", first)
 	}
 	if !first.Has("raw") || !first.Has("seo_meta") || !first.Has(wp.CapabilityPreview) || first.Has("telepathy") {
@@ -37,9 +37,6 @@ func TestCapabilitiesAreFetchedOnceAndCached(t *testing.T) {
 	}
 	if !first.Has(wp.CapabilitySEOMetaRead) {
 		t.Errorf("names = %v, want the read of the SEO meta", first.Names)
-	}
-	if !first.Has(wp.CapabilityPageCategories) || wp.CapabilityPageCategories != "page_categories" {
-		t.Errorf("names = %v, want pages to carry categories", first.Names)
 	}
 
 	if _, err = client.Capabilities(t.Context()); err != nil {
