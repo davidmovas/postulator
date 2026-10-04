@@ -35,7 +35,7 @@ const catalog = sheet(
     ["Root Entity", "Category", "URL", "Title"],
     mapping(
         { path: "URL", title: "Title" },
-        { sheets: ["Catalog"], rowType: "pages" as ImportOptions["rowType"], levelColumns: ["Root Entity", "Category"] },
+        { sheets: ["Catalog"], rowType: "pages" as ImportOptions["rowType"], levelColumns: ["Root Entity"] },
     ),
 );
 const peptides = sheet(
@@ -62,7 +62,7 @@ describe("opening a workbook", () => {
         const opened = book();
         expect(settingsOf(opened, "Catalog")).toEqual({
             columns: { path: "URL", title: "Title" },
-            options: { sheets: ["Catalog"], rowType: "pages", levelColumns: ["Root Entity", "Category"] },
+            options: { sheets: ["Catalog"], rowType: "pages", levelColumns: ["Root Entity"] },
             mappingId: "",
         });
         expect(settingsOf(opened, "Forms").options.noteColumns).toEqual(["Notes"]);
@@ -208,6 +208,19 @@ describe("a saved mapping", () => {
         const held = adoptSaved(book(), saved);
         expect(inUse(held)).toEqual(["m-1"]);
         expect(inUse(chooseSheet(held, "Peptides", false))).toEqual([]);
+    });
+
+    it("keeps of its group columns only the root headers detected on the sheet", () => {
+        const grouped = mapping({ path: "URL" }, { levelColumns: ["Root Entity", "Category"] }, "m-2");
+        const held = adoptSavedOn(book(), grouped, "Catalog");
+        expect(settingsOf(held, "Catalog").options.levelColumns).toEqual(["Root Entity"]);
+    });
+
+    it("maps nothing when a category column was all it grouped by", () => {
+        const grouped = mapping({}, { levelColumns: ["Category"] }, "m-3");
+        const held = adoptSavedOn(book(), grouped, "Catalog");
+        expect(settingsOf(held, "Catalog").options.levelColumns).toEqual([]);
+        expect(columnsNotice(held).kind).toBe("needsTarget");
     });
 });
 

@@ -123,13 +123,22 @@ export function headerless(book: Workbook, on: boolean): Workbook {
     });
 }
 
+function rootsOnly(options: ImportOptions, roots: readonly string[]): ImportOptions {
+    const levels = options.levelColumns;
+    if (levels === undefined || levels === null) {
+        return options;
+    }
+    return { ...options, levelColumns: levels.filter((column) => roots.includes(column)) };
+}
+
 export function adoptSavedOn(book: Workbook, saved: ImportMapping, name: string): Workbook {
-    if (sheetOf(book, name) === undefined) {
+    const sheet = sheetOf(book, name);
+    if (sheet === undefined) {
         return book;
     }
     return withSettings(book, name, {
         columns: filled(saved.columns),
-        options: { ...saved.options, sheets: named(name) },
+        options: rootsOnly({ ...saved.options, sheets: named(name) }, sheet.detected.options.levelColumns ?? []),
         mappingId: saved.id ?? "",
     });
 }
