@@ -511,7 +511,21 @@ func seedSpend(ctx context.Context, core *app.Core, siteID string) error {
 			return insertErr
 		}
 	}
-	return nil
+	return settleTheSpend(ctx, core, ledger, finished.runID)
+}
+
+func settleTheSpend(ctx context.Context, core *app.Core, ledger *sqlite.LLMCallRepo, runID string) error {
+	spend, err := ledger.SumByRun(ctx, runID)
+	if err != nil {
+		return err
+	}
+	recorded := sqlite.NewRunRepo(core.Store)
+	held, err := recorded.Get(ctx, runID)
+	if err != nil {
+		return err
+	}
+	held.Stats.Tokens, held.Stats.USD = spend.Usage.Total, spend.USD
+	return recorded.Update(ctx, held)
 }
 
 func mintedOnce[K comparable](minted map[K]string, key K) string {
