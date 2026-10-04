@@ -17,12 +17,11 @@ func (s Sort) Valid() bool {
 }
 
 type Query struct {
-	SiteID      string
-	Status      *Status
-	EntityIDs   []string
-	CategoryIDs []string
-	Unmapped    bool
-	PathPrefix  string
-	Sort        Sort
-	Desc        bool
+	SiteID     string
+	Status     *Status
+	EntityIDs  []string
+	Unmapped   bool
+	PathPrefix string
+	Sort       Sort
+	Desc       bool
 }

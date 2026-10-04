@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -20,7 +19,6 @@ const (
 	pageD = "dddddddd-4444-4ddd-8ddd-dddddddddddd"
 	entA  = "1a1a1a1a-1a1a-4a1a-8a1a-1a1a1a1a1a1a"
 	entB  = "2b2b2b2b-2b2b-4b2b-8b2b-2b2b2b2b2b2b"
-	catA  = "3c3c3c3c-3c3c-4c3c-8c3c-3c3c3c3c3c3c"
 )
 
 var stamp = time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC)
@@ -87,34 +85,6 @@ func TestNewPageWithoutKeywordsOrNotesCarriesEmptyLists(t *testing.T) {
 	}
 }
 
-func TestNewPageCarriesItsCategory(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name     string
-		category string
-	}{
-		{name: "a page filed under no category", category: ""},
-		{name: "a page filed under a category", category: catA},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			p := page(pageA, "/a/", nil)
-			p.CategoryID = tc.category
-			got, err := pagemap.NewPage(p)
-			if err != nil {
-				t.Fatalf("NewPage: %v", err)
-			}
-			if got.CategoryID != tc.category {
-				t.Fatalf("CategoryID = %q, want %q", got.CategoryID, tc.category)
-			}
-		})
-	}
-}
-
 func TestNewPageRejects(t *testing.T) {
 	t.Parallel()
 
@@ -131,9 +101,6 @@ func TestNewPageRejects(t *testing.T) {
 		{name: "own parent", mutate: func(p *pagemap.Page) { p.ParentPageID = new(p.ID) }, field: "parentPageId"},
 		{name: "empty entity", mutate: func(p *pagemap.Page) { p.EntityID = new("") }, field: "entityId"},
 		{name: "empty template", mutate: func(p *pagemap.Page) { p.TemplateID = new("") }, field: "templateId"},
-		{name: "a category that is not an id", mutate: func(p *pagemap.Page) { p.CategoryID = "healing" }, field: "categoryId"},
-		{name: "a blank category", mutate: func(p *pagemap.Page) { p.CategoryID = " " }, field: "categoryId"},
-		{name: "a category id with padding", mutate: func(p *pagemap.Page) { p.CategoryID = " " + catA }, field: "categoryId"},
 	}
 
 	for _, tc := range cases {
@@ -217,29 +184,6 @@ func TestEnums(t *testing.T) {
 	}
 	if !pagemap.SortCreatedAt.Valid() || !pagemap.SortPath.Valid() || pagemap.Sort("x").Valid() {
 		t.Error("sort validity is wrong")
-	}
-}
-
-func TestATypeKnowsTheTaxonomyItsCategoriesComeFrom(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		wpType   pagemap.WPType
-		taxonomy category.Taxonomy
-		has      bool
-	}{
-		{wpType: pagemap.WPPage, taxonomy: category.TaxonomyCategory, has: true},
-		{wpType: pagemap.WPPost, taxonomy: category.TaxonomyCategory, has: true},
-		{wpType: pagemap.WPProduct, taxonomy: category.TaxonomyProductCategory, has: true},
-		{wpType: pagemap.WPProductCategory},
-		{wpType: "attachment"},
-	}
-
-	for _, tc := range cases {
-		taxonomy, has := tc.wpType.Taxonomy()
-		if taxonomy != tc.taxonomy || has != tc.has {
-			t.Errorf("%q.Taxonomy() = %q, %t; want %q, %t", tc.wpType, taxonomy, has, tc.taxonomy, tc.has)
-		}
 	}
 }
 
