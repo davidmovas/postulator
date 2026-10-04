@@ -27,9 +27,6 @@ func putTheProductBack(ctx context.Context, deps Deps, sc *run.StepContext, resu
 	if reason != "" {
 		return reason, false
 	}
-	if kept, changed := categoriesTakenBack(held.Categories, work.published.Categories); changed {
-		update.Categories = &kept
-	}
 	raw, reason, ok := bodyToRestore(ctx, work)
 	if !ok {
 		return reason, false

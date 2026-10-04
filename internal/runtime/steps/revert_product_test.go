@@ -24,11 +24,7 @@ func publishAndRecord(t *testing.T, item wptest.Item, opts ...wptest.Option) pub
 	h := newProductHarness(t, item, opts...)
 	sc := storeContext(t, h.held.ID)
 	sc.Artifacts[run.ArtifactImages] = run.Artifact{Kind: run.ArtifactImages, Blob: []byte(`{"featuredId":77}`)}
-	return recordedProduct(t, h, runPublish(t, h.deps, sc))
-}
-
-func recordedProduct(t *testing.T, h productHarness, published steps.PublishResult) publishedProduct {
-	t.Helper()
+	published := runPublish(t, h.deps, sc)
 
 	page := *h.recorded
 	pages := newPageMap(page)
