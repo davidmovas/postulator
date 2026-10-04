@@ -9,10 +9,10 @@ import (
 const templatesSetOverrideName = "templates_set_override"
 
 type templatesSetOverrideArgs struct {
-	TemplateID string            `json:"templateId" description:"Template id from templates_list"`
-	Scope      string            `json:"scope" enum:"site,page" description:"Every page of a site, or one page"`
-	TargetID   string            `json:"targetId" description:"Site id or page id, as the scope says"`
-	Patch      templatePatchArgs `json:"patch" description:"Only the specification fields that change"`
+	TemplateID string            `json:"templateId" description:"Template id"`
+	Scope      string            `json:"scope" enum:"site,page" description:"Whole site or one page"`
+	TargetID   string            `json:"targetId" description:"Site or page id, per scope"`
+	Patch      templatePatchArgs `json:"patch" description:"Spec fields to change"`
 }
 
 func templatesSetOverride(deps Deps) Tool {

@@ -67,15 +67,15 @@ func (c FindingCode) Blocking() bool {
 }
 
 type Options struct {
-	PathPrefixStrip string            `json:"pathPrefixStrip,omitempty" description:"Remove this prefix from every path in the sheet, such as a domain the export wrote in"`
-	AnchorSeparator string            `json:"anchorSeparator,omitempty" description:"What separates several anchors inside one cell, a comma by default"`
-	ListSeparator   string            `json:"listSeparator,omitempty" description:"What separates any other list inside one cell, a comma by default"`
-	Sheets          []string          `json:"sheets,omitempty" description:"Which sheets of the workbook to read, exactly as inspect named them; leave it out for the first sheet alone"`
-	IndentColumns   []string          `json:"indentColumns,omitempty" description:"Columns whose position carries the hierarchy, shallowest first; a row's path is built from the cells of its own column and of the columns to its left"`
-	LevelColumns    []string          `json:"levelColumns,omitempty" description:"Outermost first; a Root groups entities, the rest are categories"`
-	NoteColumns     []string          `json:"noteColumns,omitempty" description:"Columns kept on the page as notes for the writer"`
-	RowType         importmap.RowType `json:"rowType,omitempty" enum:"pages,products,kind" description:"What a new row becomes, pages by default; a row with products under it stays a page and a wp_type cell wins"`
-	NoHeader        bool              `json:"noHeader,omitempty" description:"The sheet carries no header row, so every column is addressed by its spreadsheet letter and every row is data"`
+	PathPrefixStrip string            `json:"pathPrefixStrip,omitempty" description:"Prefix to strip from every path, such as a domain"`
+	AnchorSeparator string            `json:"anchorSeparator,omitempty" description:"Anchor separator in a cell; default comma"`
+	ListSeparator   string            `json:"listSeparator,omitempty" description:"Other list separator in a cell; default comma"`
+	Sheets          []string          `json:"sheets,omitempty" description:"Sheet names to read; default the first"`
+	IndentColumns   []string          `json:"indentColumns,omitempty" description:"Columns whose position nests the path, shallowest first"`
+	LevelColumns    []string          `json:"levelColumns,omitempty" description:"Outermost first; Root groups entities, the rest are categories"`
+	NoteColumns     []string          `json:"noteColumns,omitempty" description:"Columns kept as notes for the writer"`
+	RowType         importmap.RowType `json:"rowType,omitempty" enum:"pages,products,kind" description:"Default pages; a parent of products stays a page, a wp_type cell wins"`
+	NoHeader        bool              `json:"noHeader,omitempty" description:"No header row: columns go by letter, every row is data"`
 }
 
 type Sheet struct {

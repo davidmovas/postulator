@@ -10,11 +10,11 @@ import (
 const templatesCreateName = "templates_create"
 
 type templatesCreateArgs struct {
-	Scope    string           `json:"scope,omitempty" enum:"global,site" description:"Every site or one; left out, global"`
-	SiteID   *string          `json:"siteId,omitempty" description:"Required when the scope is site"`
-	Name     string           `json:"name" description:"Two to four words"`
-	PageKind string           `json:"pageKind" enum:"hub,category,guide,comparison,product" description:"Kind of page it writes"`
-	Spec     templateSpecArgs `json:"spec" description:"The full specification"`
+	Scope    string           `json:"scope,omitempty" enum:"global,site" description:"Default global"`
+	SiteID   *string          `json:"siteId,omitempty" description:"Required for site scope"`
+	Name     string           `json:"name" description:"Name, 2-4 words"`
+	PageKind string           `json:"pageKind" enum:"hub,category,guide,comparison,product" description:"Page kind it writes"`
+	Spec     templateSpecArgs `json:"spec" description:"Full specification"`
 }
 
 func templatesCreate(deps Deps) Tool {

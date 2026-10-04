@@ -9,15 +9,15 @@ import (
 const sitesUpdateName = "sites_update"
 
 type sitesUpdateArgs struct {
-	ID                  string  `json:"id" description:"Site id from sites_list"`
+	ID                  string  `json:"id" description:"Site id"`
 	Name                *string `json:"name,omitempty" description:"New name"`
-	BaseURL             *string `json:"baseUrl,omitempty" description:"New WordPress address"`
+	BaseURL             *string `json:"baseUrl,omitempty" description:"New site URL"`
 	Username            *string `json:"username,omitempty" description:"New administrator login"`
-	Password            *string `json:"password,omitempty" description:"WordPress application password, stored encrypted, never read back"`
-	AllowInsecure       *bool   `json:"allowInsecure,omitempty" description:"Accept an untrusted certificate; only a local site needs it"`
+	Password            *string `json:"password,omitempty" description:"New application password; sealed, never read back"`
+	AllowInsecure       *bool   `json:"allowInsecure,omitempty" description:"Accept an untrusted certificate, local sites only"`
 	Status              *string `json:"status,omitempty" enum:"active,paused,error" description:"New status"`
-	DefaultTemplateID   *string `json:"defaultTemplateId,omitempty" description:"Fallback template id from templates_list"`
-	DefaultLinkPolicyID *string `json:"defaultLinkPolicyId,omitempty" description:"Fallback link policy id from policies_list"`
+	DefaultTemplateID   *string `json:"defaultTemplateId,omitempty" description:"Fallback template id"`
+	DefaultLinkPolicyID *string `json:"defaultLinkPolicyId,omitempty" description:"Fallback link policy id"`
 }
 
 func sitesUpdate(deps Deps) Tool {

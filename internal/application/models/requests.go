@@ -9,23 +9,23 @@ type ListModelsResponse struct {
 }
 
 type UpsertModelRequest struct {
-	Provider               string  `json:"provider" description:"The provider, always openai"`
-	Model                  string  `json:"model" description:"The model name the provider answers to"`
-	ContextTokens          int     `json:"contextTokens" minimum:"1" description:"Tokens the model reads in one call"`
-	MaxOutputTokens        int     `json:"maxOutputTokens" minimum:"1" description:"Tokens it may answer with"`
-	InputUSDPerM           float64 `json:"inputUsdPerM,omitempty" minimum:"0" description:"USD per million input tokens"`
-	CachedInputUSDPerM     float64 `json:"cachedInputUsdPerM,omitempty" minimum:"0" description:"Cache read price; left out, the input price"`
-	CacheWriteUSDPerM      float64 `json:"cacheWriteUsdPerM,omitempty" minimum:"0" description:"Cache write price; left out, the input price"`
-	OutputUSDPerM          float64 `json:"outputUsdPerM,omitempty" minimum:"0" description:"USD per million output tokens"`
-	FlexInputUSDPerM       float64 `json:"flexInputUsdPerM,omitempty" minimum:"0" description:"Flex input price; left out, no flex"`
-	FlexCachedInputUSDPerM float64 `json:"flexCachedInputUsdPerM,omitempty" minimum:"0" description:"Flex cache read price"`
-	FlexCacheWriteUSDPerM  float64 `json:"flexCacheWriteUsdPerM,omitempty" minimum:"0" description:"Flex cache write price"`
-	FlexOutputUSDPerM      float64 `json:"flexOutputUsdPerM,omitempty" minimum:"0" description:"Flex output price"`
-	RPM                    int     `json:"rpm" minimum:"1" description:"Requests per minute the account may make"`
-	TPM                    int     `json:"tpm" minimum:"1" description:"Tokens per minute the account may use"`
-	SupportsStructured     bool    `json:"supportsStructured,omitempty" description:"It can answer against a JSON schema"`
-	SupportsImages         bool    `json:"supportsImages,omitempty" description:"It can read images"`
-	Reasoning              bool    `json:"reasoning,omitempty" description:"It bills its thinking as output"`
+	Provider               string  `json:"provider" description:"Always openai"`
+	Model                  string  `json:"model" description:"Provider's model name"`
+	ContextTokens          int     `json:"contextTokens" minimum:"1" description:"Context window in tokens"`
+	MaxOutputTokens        int     `json:"maxOutputTokens" minimum:"1" description:"Max output tokens"`
+	InputUSDPerM           float64 `json:"inputUsdPerM,omitempty" minimum:"0" description:"USD per 1M input tokens"`
+	CachedInputUSDPerM     float64 `json:"cachedInputUsdPerM,omitempty" minimum:"0" description:"Cache read USD/1M; default input"`
+	CacheWriteUSDPerM      float64 `json:"cacheWriteUsdPerM,omitempty" minimum:"0" description:"Cache write USD/1M; default input"`
+	OutputUSDPerM          float64 `json:"outputUsdPerM,omitempty" minimum:"0" description:"USD per 1M output tokens"`
+	FlexInputUSDPerM       float64 `json:"flexInputUsdPerM,omitempty" minimum:"0" description:"Flex input USD/1M; omit for no flex"`
+	FlexCachedInputUSDPerM float64 `json:"flexCachedInputUsdPerM,omitempty" minimum:"0" description:"Flex cache read USD/1M"`
+	FlexCacheWriteUSDPerM  float64 `json:"flexCacheWriteUsdPerM,omitempty" minimum:"0" description:"Flex cache write USD/1M"`
+	FlexOutputUSDPerM      float64 `json:"flexOutputUsdPerM,omitempty" minimum:"0" description:"Flex output USD/1M"`
+	RPM                    int     `json:"rpm" minimum:"1" description:"Requests per minute allowed"`
+	TPM                    int     `json:"tpm" minimum:"1" description:"Tokens per minute allowed"`
+	SupportsStructured     bool    `json:"supportsStructured,omitempty" description:"Answers to a JSON schema"`
+	SupportsImages         bool    `json:"supportsImages,omitempty" description:"Reads images"`
+	Reasoning              bool    `json:"reasoning,omitempty" description:"Bills thinking as output"`
 }
 
 type UpsertModelResponse struct {
@@ -33,16 +33,16 @@ type UpsertModelResponse struct {
 }
 
 type DisableModelRequest struct {
-	Provider string `json:"provider" description:"The provider of the model to switch off, openai"`
-	Model    string `json:"model" description:"The model name to switch off"`
+	Provider string `json:"provider" description:"Provider, openai"`
+	Model    string `json:"model" description:"Model to disable"`
 }
 
 type DisableModelResponse struct{}
 
 type SetProfileRequest struct {
-	Role     string `json:"role" enum:"writer,editor,linker,judge,chat,image,titler" description:"Which job the model takes: writer drafts a page, editor rewrites, linker places links, judge grades, chat answers here, image draws, titler names a conversation"`
-	Provider string `json:"provider" description:"The provider to use for that job, openai"`
-	Model    string `json:"model" description:"The model to use for that job"`
+	Role     string `json:"role" enum:"writer,editor,linker,judge,chat,image,titler" description:"writer drafts, editor rewrites, linker links, judge grades, chat answers here, image draws, titler names chats"`
+	Provider string `json:"provider" description:"Provider, openai"`
+	Model    string `json:"model" description:"Model name"`
 }
 
 type SetProfileResponse struct {
@@ -58,8 +58,8 @@ type GetProfilesResponse struct {
 }
 
 type SetProviderKeyRequest struct {
-	Provider string `json:"provider" description:"The provider the key belongs to, openai"`
-	APIKey   string `json:"apiKey" description:"The key itself, which is sealed on the machine and never read back"`
+	Provider string `json:"provider" description:"Provider, openai"`
+	APIKey   string `json:"apiKey" description:"The key; sealed, never read back"`
 }
 
 type SetProviderKeyResponse struct {
@@ -81,8 +81,8 @@ type DeleteProviderKeyResponse struct {
 }
 
 type TestProviderRequest struct {
-	Provider string `json:"provider" description:"The provider to probe with one small call, openai"`
-	Model    string `json:"model,omitempty" description:"The model to probe with, left out to take the cheapest enabled one"`
+	Provider string `json:"provider" description:"Provider to probe, openai"`
+	Model    string `json:"model,omitempty" description:"Model to probe; default the cheapest enabled"`
 }
 
 type TestProviderResponse struct {
@@ -92,8 +92,8 @@ type TestProviderResponse struct {
 }
 
 type UsageSummaryRequest struct {
-	RunID          string `json:"runId,omitempty" description:"Count only what this run spent; leave it out for everything"`
-	ConversationID string `json:"conversationId,omitempty" description:"Count only what this conversation spent; leave it out for everything"`
+	RunID          string `json:"runId,omitempty" description:"Only this run's spend"`
+	ConversationID string `json:"conversationId,omitempty" description:"Only this conversation's spend"`
 }
 
 type UsageSummaryResponse struct {

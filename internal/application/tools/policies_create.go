@@ -9,13 +9,13 @@ import (
 const policiesCreateName = "policies_create"
 
 type policiesCreateArgs struct {
-	Scope          string         `json:"scope,omitempty" enum:"global,site" description:"Every site or one; left out, global"`
-	SiteID         *string        `json:"siteId,omitempty" description:"Required when the scope is site"`
-	Name           string         `json:"name" description:"Two to four words"`
+	Scope          string         `json:"scope,omitempty" enum:"global,site" description:"Default global"`
+	SiteID         *string        `json:"siteId,omitempty" description:"Required for site scope"`
+	Name           string         `json:"name" description:"Name, 2-4 words"`
 	Rules          *linkRulesArgs `json:"rules,omitempty" description:"Internal links owed and allowed"`
-	ForbidExternal bool           `json:"forbidExternal,omitempty" description:"Refuse links that leave the site"`
-	ForbidSelf     bool           `json:"forbidSelf,omitempty" description:"Refuse a link to the page itself"`
-	AnchorStrategy string         `json:"anchorStrategy,omitempty" enum:"prefer_user,rotate" description:"Keep to human anchors (the default) or rotate through all"`
+	ForbidExternal bool           `json:"forbidExternal,omitempty" description:"Refuse external links"`
+	ForbidSelf     bool           `json:"forbidSelf,omitempty" description:"Refuse self links"`
+	AnchorStrategy string         `json:"anchorStrategy,omitempty" enum:"prefer_user,rotate" description:"Default prefer_user, human anchors first"`
 }
 
 func (a policiesCreateArgs) request() templates.CreatePolicyRequest {

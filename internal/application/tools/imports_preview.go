@@ -10,8 +10,8 @@ const importsPreviewName = "imports_preview"
 
 type importsPreviewArgs struct {
 	Path    string      `json:"path" description:"Absolute path of the .xlsx or .csv file"`
-	Mapping mappingArgs `json:"mapping,omitempty" description:"How to read the sheet; left out, the first sheet with detected columns"`
-	Sheets  []sheetArgs `json:"sheets,omitempty" description:"Sheets imported together in workbook order, each with its mapping"`
+	Mapping mappingArgs `json:"mapping,omitempty" description:"Sheet mapping; default the first sheet, detected"`
+	Sheets  []sheetArgs `json:"sheets,omitempty" description:"Several sheets in workbook order, each mapped"`
 }
 
 func importsPreview(deps Deps) Tool {

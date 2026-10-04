@@ -1,6 +1,6 @@
 package dto
 
 type Keyword struct {
-	Text   string `json:"text" description:"The phrase"`
-	Volume *int   `json:"volume,omitempty" minimum:"0" description:"Monthly searches, left out when unknown"`
+	Text   string `json:"text" description:"Phrase"`
+	Volume *int   `json:"volume,omitempty" minimum:"0" description:"Monthly searches, if known"`
 }

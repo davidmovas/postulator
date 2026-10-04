@@ -10,9 +10,9 @@ import (
 )
 
 type Anchor struct {
-	Text   string  `json:"text" description:"The link text another page points here with"`
-	Source string  `json:"source,omitempty" enum:"user,ai" description:"Who wrote the anchor; leave it out and an anchor you propose is recorded as ai"`
-	Weight float64 `json:"weight,omitempty" minimum:"0" maximum:"1" description:"How strongly to prefer this anchor over the others, between 0 and 1; leave it out for no preference"`
+	Text   string  `json:"text" description:"Link text"`
+	Source string  `json:"source,omitempty" enum:"user,ai" description:"Who wrote it; default ai"`
+	Weight float64 `json:"weight,omitempty" minimum:"0" maximum:"1" description:"Preference over the others; omit for none"`
 }
 
 type Entity struct {

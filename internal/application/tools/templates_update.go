@@ -10,7 +10,7 @@ import (
 const templatesUpdateName = "templates_update"
 
 type templatesUpdateArgs struct {
-	ID       string            `json:"id" description:"Template id from templates_list"`
+	ID       string            `json:"id" description:"Template id"`
 	Name     *string           `json:"name,omitempty" description:"New name"`
 	PageKind *string           `json:"pageKind,omitempty" enum:"hub,category,guide,comparison,product" description:"New page kind"`
 	Spec     *templateSpecArgs `json:"spec,omitempty" description:"Full replacement specification"`
