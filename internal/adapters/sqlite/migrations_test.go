@@ -2,13 +2,14 @@ package sqlite
 
 import (
 	"database/sql"
+	stderrors "errors"
 	"io/fs"
 	"slices"
 	"strings"
 	"testing"
 )
 
-const latestMigration = 41
+const latestMigration = 43
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -52,6 +53,8 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0039_categories.sql",
 		"0040_category_terms.sql",
 		"0041_page_category.sql",
+		"0042_drop_entity_terms.sql",
+		"0043_drop_entity_site_category.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -345,16 +348,128 @@ func TestEntityScopeMigrationTakesTheParentAnEntityHas(t *testing.T) {
 	}
 }
 
-func TestSiteCategoryMigrationFlagsNoEntity(t *testing.T) {
-	t.Parallel()
+func schemaOf(t *testing.T, store *Store, table string) []string {
+	t.Helper()
+
+	rows, err := store.writer.QueryContext(t.Context(),
+		`SELECT type || ' ' || name || ': ' || sql FROM sqlite_schema WHERE tbl_name = ? AND sql IS NOT NULL ORDER BY type DESC, name`, table)
+	if err != nil {
+		t.Fatalf("read the schema of %s: %v", table, err)
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var entry string
+		if scanErr := rows.Scan(&entry); scanErr != nil {
+			t.Fatalf("scan the schema of %s: %v", table, scanErr)
+		}
+		out = append(out, entry)
+	}
+	if rowsErr := rows.Err(); rowsErr != nil {
+		t.Fatalf("read the schema of %s: %v", table, rowsErr)
+	}
+	return out
+}
+
+func columnOf(t *testing.T, store *Store, table, column string) string {
+	t.Helper()
+
+	var described string
+	err := store.writer.QueryRowContext(t.Context(),
+		`SELECT type || ' notnull=' || "notnull" || ' default=' || coalesce(dflt_value, 'NULL') || ' pk=' || pk FROM pragma_table_xinfo(?) WHERE name = ?`,
+		table, column).Scan(&described)
+	if stderrors.Is(err, sql.ErrNoRows) {
+		return ""
+	}
+	if err != nil {
+		t.Fatalf("read the column %s.%s: %v", table, column, err)
+	}
+	return described
+}
+
+func storeAt(t *testing.T, version int64) *Store {
+	t.Helper()
 
 	store := openStore(t, nil)
 	provider, err := store.provider()
 	if err != nil {
 		t.Fatalf("provider: %v", err)
 	}
-	if _, err = provider.DownTo(t.Context(), 32); err != nil {
-		t.Fatalf("down to 32: %v", err)
+	if _, err = provider.DownTo(t.Context(), version); err != nil {
+		t.Fatalf("down to %d: %v", version, err)
+	}
+	return store
+}
+
+func TestEntityTermsAreDroppedAndADownBringsThemBackAsMigration34MadeThem(t *testing.T) {
+	t.Parallel()
+
+	want := schemaOf(t, storeAt(t, 34), "entity_terms")
+	if len(want) != 2 {
+		t.Fatalf("migration 34 made %v, want the table and its index", want)
+	}
+
+	store := openStore(t, nil)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	exec := func(query string, args ...any) {
+		t.Helper()
+		if _, execErr := store.writer.ExecContext(t.Context(), query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	count := func(query string) int {
+		t.Helper()
+		var n int
+		if scanErr := store.writer.QueryRowContext(t.Context(), query).Scan(&n); scanErr != nil {
+			t.Fatalf("%s: %v", query, scanErr)
+		}
+		return n
+	}
+	const at = "2026-10-04T09:00:00Z"
+
+	if got := schemaOf(t, store, "entity_terms"); len(got) != 0 {
+		t.Fatalf("entity_terms survived the up migration: %v", got)
+	}
+
+	exec(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at)
+	exec(`INSERT INTO entities (id, site_id, name, kind, source, created_at, updated_at) VALUES ('e1', 's1', 'Healing', 'topic', 'import', ?, ?)`, at, at)
+
+	if _, err = provider.DownTo(t.Context(), 41); err != nil {
+		t.Fatalf("down to 41: %v", err)
+	}
+	if got := schemaOf(t, store, "entity_terms"); !slices.Equal(got, want) {
+		t.Fatalf("the down migration made\n%s\nwant it as migration 34 made it\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	exec(`INSERT INTO entity_terms (entity_id, site_id, taxonomy, term_id, name, seen_at) VALUES ('e1', 's1', 'category', 5, 'Healing', ?)`, at)
+
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up again with a term stored: %v", err)
+	}
+	if got := schemaOf(t, store, "entity_terms"); len(got) != 0 {
+		t.Fatalf("entity_terms survived the second up: %v", got)
+	}
+	if got := count(`SELECT count(*) FROM entities WHERE id = 'e1'`); got != 1 {
+		t.Fatalf("dropping the terms left %d of the one entity", got)
+	}
+}
+
+func TestSiteCategoryIsDroppedAndADownBringsItBackAsMigration33MadeIt(t *testing.T) {
+	t.Parallel()
+
+	made := storeAt(t, 33)
+	want := columnOf(t, made, "entities", "site_category")
+	if want == "" {
+		t.Fatal("migration 33 made no site_category column")
+	}
+	wantSchema := schemaOf(t, made, "entities")
+
+	store := openStore(t, nil)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
 	}
 	exec := func(query string, args ...any) error {
 		_, execErr := store.writer.ExecContext(t.Context(), query, args...)
@@ -368,30 +483,31 @@ func TestSiteCategoryMigrationFlagsNoEntity(t *testing.T) {
 		}
 		return n
 	}
-	const at = "2026-10-03T09:00:00Z"
+	const at = "2026-10-04T09:00:00Z"
 
-	if err = exec(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at); err != nil {
-		t.Fatalf("site: %v", err)
+	if got := columnOf(t, store, "entities", "site_category"); got != "" {
+		t.Fatalf("entities still carries site_category (%s) after the up migration", got)
 	}
-	for _, row := range []struct {
-		id, name, kind string
-		scope          any
-	}{
-		{id: "root", name: "Peptides", kind: "category"},
-		{id: "category", name: "Healing", kind: "category", scope: "root"},
-		{id: "topic", name: "BPC-157", kind: "topic", scope: "category"},
+	for _, setup := range []string{
+		`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`,
+		`INSERT INTO entities (id, site_id, name, kind, source, created_at, updated_at) VALUES ('e1', 's1', 'Healing', 'topic', 'import', ?, ?)`,
 	} {
-		if err = exec(`INSERT INTO entities (id, site_id, name, kind, scope_entity_id, source, created_at, updated_at) VALUES (?, 's1', ?, ?, ?, 'import', ?, ?)`,
-			row.id, row.name, row.kind, row.scope, at, at); err != nil {
-			t.Fatalf("entity %s: %v", row.id, err)
+		if err = exec(setup, at, at); err != nil {
+			t.Fatalf("%s: %v", setup, err)
 		}
 	}
 
-	if _, err = provider.UpTo(t.Context(), 33); err != nil {
-		t.Fatalf("up to 33: %v", err)
+	if _, err = provider.DownTo(t.Context(), 42); err != nil {
+		t.Fatalf("down to 42: %v", err)
 	}
-	if got := count(`SELECT count(*) FROM entities WHERE site_category <> 0`); got != 0 {
-		t.Fatalf("the migration made %d entities site categories, want none", got)
+	if got := columnOf(t, store, "entities", "site_category"); got != want {
+		t.Fatalf("the down migration made site_category %q, want %q as migration 33 made it", got, want)
+	}
+	if got := schemaOf(t, store, "entities"); !slices.Equal(got, wantSchema) {
+		t.Fatalf("the down migration left entities as\n%s\nwant it as migration 33 made it\n%s", strings.Join(got, "\n"), strings.Join(wantSchema, "\n"))
+	}
+	if got := count(`SELECT count(*) FROM entities WHERE id = 'e1' AND site_category = 0`); got != 1 {
+		t.Fatal("an entity stored before the down is not left unflagged")
 	}
 	for _, step := range []struct {
 		why   string
@@ -401,9 +517,9 @@ func TestSiteCategoryMigrationFlagsNoEntity(t *testing.T) {
 		{why: "a flagged entity", value: 1, ok: true},
 		{why: "an entity no longer flagged", value: 0, ok: true},
 		{why: "a flag that is neither", value: 2},
-		{why: "a negative flag", value: -1},
+		{why: "no flag at all", value: nil},
 	} {
-		err = exec(`UPDATE entities SET site_category = ? WHERE id = 'category'`, step.value)
+		err = exec(`UPDATE entities SET site_category = ? WHERE id = 'e1'`, step.value)
 		if step.ok && err != nil {
 			t.Fatalf("%s: %v", step.why, err)
 		}
@@ -412,95 +528,17 @@ func TestSiteCategoryMigrationFlagsNoEntity(t *testing.T) {
 		}
 	}
 
-	if err = exec(`UPDATE entities SET site_category = 1 WHERE id = 'category'`); err != nil {
-		t.Fatalf("flag: %v", err)
-	}
-	if _, err = provider.DownTo(t.Context(), 32); err != nil {
-		t.Fatalf("down to 32 with a flagged entity: %v", err)
-	}
-	if got := count(`SELECT count(*) FROM entities`); got != 3 {
-		t.Fatalf("the down migration left %d entities, want 3", got)
-	}
-	if err = exec(`UPDATE entities SET site_category = 1`); err == nil {
-		t.Fatal("the column survived the down migration")
+	if err = exec(`UPDATE entities SET site_category = 1 WHERE id = 'e1'`); err != nil {
+		t.Fatalf("flag the entity: %v", err)
 	}
 	if _, err = provider.Up(t.Context()); err != nil {
-		t.Fatalf("up again: %v", err)
+		t.Fatalf("up again with a flagged entity: %v", err)
 	}
-}
-
-func TestEntityTermsSchema(t *testing.T) {
-	t.Parallel()
-
-	store := openStore(t, nil)
-	exec := func(query string, args ...any) error {
-		_, err := store.writer.ExecContext(t.Context(), query, args...)
-		return err
+	if got := columnOf(t, store, "entities", "site_category"); got != "" {
+		t.Fatalf("entities carries site_category (%s) after the second up", got)
 	}
-	count := func(query string) int {
-		t.Helper()
-		var n int
-		if err := store.reader.QueryRowContext(t.Context(), query).Scan(&n); err != nil {
-			t.Fatalf("%s: %v", query, err)
-		}
-		return n
-	}
-	const at = "2026-10-03T09:00:00Z"
-	term := func(entityID, siteID, taxonomy string, termID, parentTermID int) error {
-		return exec(`INSERT INTO entity_terms (entity_id, site_id, taxonomy, term_id, parent_term_id, name, run_id, seen_at) VALUES (?, ?, ?, ?, ?, 'Healing', '', ?)`,
-			entityID, siteID, taxonomy, termID, parentTermID, at)
-	}
-
-	for _, setup := range []string{
-		`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`,
-		`INSERT INTO entities (id, site_id, name, kind, source, created_at, updated_at) VALUES ('e1', 's1', 'Healing', 'category', 'import', ?, ?)`,
-		`INSERT INTO entities (id, site_id, name, kind, source, created_at, updated_at) VALUES ('e2', 's1', 'Recovery', 'category', 'import', ?, ?)`,
-	} {
-		if err := exec(setup, at, at); err != nil {
-			t.Fatalf("%s: %v", setup, err)
-		}
-	}
-
-	for _, step := range []struct {
-		why                     string
-		entityID, siteID, taxon string
-		termID, parentTermID    int
-		ok                      bool
-	}{
-		{why: "a category term", entityID: "e1", siteID: "s1", taxon: "category", termID: 5, ok: true},
-		{why: "the same entity as a product category", entityID: "e1", siteID: "s1", taxon: "product_cat", termID: 5, parentTermID: 2, ok: true},
-		{why: "a term another entity already maps to", entityID: "e2", siteID: "s1", taxon: "category", termID: 5, ok: true},
-		{why: "a second term for one entity in one taxonomy", entityID: "e1", siteID: "s1", taxon: "category", termID: 6},
-		{why: "a taxonomy Postulator does not write", entityID: "e2", siteID: "s1", taxon: "post_tag", termID: 7},
-		{why: "a term id of zero", entityID: "e2", siteID: "s1", taxon: "product_cat", termID: 0},
-		{why: "a negative parent", entityID: "e2", siteID: "s1", taxon: "product_cat", termID: 7, parentTermID: -1},
-		{why: "an entity that does not exist", entityID: "e9", siteID: "s1", taxon: "product_cat", termID: 7},
-		{why: "a site that does not exist", entityID: "e2", siteID: "s9", taxon: "product_cat", termID: 7},
-	} {
-		err := term(step.entityID, step.siteID, step.taxon, step.termID, step.parentTermID)
-		if step.ok && err != nil {
-			t.Fatalf("%s: %v", step.why, err)
-		}
-		if !step.ok && err == nil {
-			t.Fatalf("%s was accepted", step.why)
-		}
-	}
-
-	if got := count(`SELECT count(*) FROM sqlite_schema WHERE type = 'index' AND name = 'entity_terms_site_taxonomy_term'`); got != 1 {
-		t.Fatalf("the lookup index by site, taxonomy and term is missing")
-	}
-
-	if err := exec(`DELETE FROM entities WHERE id = 'e2'`); err != nil {
-		t.Fatalf("delete an entity: %v", err)
-	}
-	if got := count(`SELECT count(*) FROM entity_terms`); got != 2 {
-		t.Fatalf("entity_terms after an entity delete = %d, want the other entity's 2", got)
-	}
-	if err := exec(`DELETE FROM sites WHERE id = 's1'`); err != nil {
-		t.Fatalf("delete the site: %v", err)
-	}
-	if got := count(`SELECT count(*) FROM entity_terms`); got != 0 {
-		t.Fatalf("entity_terms after a site delete = %d, want none", got)
+	if got := count(`SELECT count(*) FROM entities`); got != 1 {
+		t.Fatalf("dropping the column left %d entities, want 1", got)
 	}
 }
 
