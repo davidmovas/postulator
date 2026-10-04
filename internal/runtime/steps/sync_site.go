@@ -74,7 +74,7 @@ func SyncSite(deps Deps) run.StepDef {
 			}
 			state.advance(len(batch), next)
 			if state.Done {
-				if finishErr := finishSync(ctx, deps, client, owner.ID, &state); finishErr != nil {
+				if finishErr := finishSync(ctx, deps, owner.ID, &state); finishErr != nil {
 					return run.Result{}, finishErr
 				}
 			}
@@ -111,7 +111,7 @@ func (s *SiteSyncResult) advance(pulled int, next string) {
 	s.Done = next == ""
 }
 
-func finishSync(ctx context.Context, deps Deps, client *wp.Client, siteID string, state *SiteSyncResult) error {
+func finishSync(ctx context.Context, deps Deps, siteID string, state *SiteSyncResult) error {
 	if err := archiveAbsent(ctx, deps, siteID, state); err != nil {
 		return err
 	}
@@ -119,9 +119,6 @@ func finishSync(ctx context.Context, deps Deps, client *wp.Client, siteID string
 		return err
 	}
 	if err := resolveLinks(ctx, deps, siteID); err != nil {
-		return err
-	}
-	if err := adoptTerms(ctx, deps, client, siteID, state); err != nil {
 		return err
 	}
 	return announcePages(deps, siteID)
