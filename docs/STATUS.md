@@ -10,9 +10,10 @@ run is under **The gate**.
 
 ## Where we are
 
-**2026-10-03 and 04** answers the client's two complaints, $10 of OpenAI spend that bought little
-and the Category and Subcategory of his sheets never reaching the site, and reads again the code
-that had been rewritten many times. The reasoning is under the three sections of those dates in
+**2026-10-03 and 04** answers the client's $10 of OpenAI spend that bought little, imports a
+whole workbook at once, and reads again the code that had been rewritten many times; the
+WordPress categories built that day for the Category and Subcategory of his sheets were removed
+the same day on his word. The reasoning is under the four sections of those dates in
 `DECISIONS.md`.
 
 - **OpenAI only, through our own Responses API client** (`internal/adapters/llm/openai`, faked
@@ -33,17 +34,15 @@ that had been rewritten many times. The reasoning is under the three sections of
   it. Its tool schemas went from 85,991 to 63,304 bytes a round; loading tools on demand
   (`agent.toolLoading: deferred`, 6,506 bytes a round) is built and off until a funded key has
   tried it.
-- **WordPress categories are records of their own** (`categories`, `category_terms`,
-  `pages.category_id`, migrations 0039 to 0041; the first model, a flag on an entity, was undone
-  by 0042 and 0043). The Category and Subcategory columns of a sheet become categories and file
-  each page under its chain; Root Entity columns make entity groups, and a root's name is never a
-  category. Publish files a page or a post under the whole chain, a product gains our product
-  categories beside the client's, a revert takes back only what the run added, and a sync adopts
-  the terms the site already has. The Pages rail filters by a branch of the category tree, and the
-  pages, the entities, the runs and the import preview name the categories.
-- **The companion plugin is 1.3.0**: it files pages under categories and lists them on category
-  archives (`page_categories`). Without it posts and products are still filed and a page says it
-  needs the plugin.
+- **WordPress categories were built and removed the same day.** Records of their own
+  (`categories`, `category_terms`, `pages.category_id`, migrations 0039 to 0041, after a first
+  model as a flag on an entity that 0042 and 0043 undid) filed pages, posts and products under the
+  chain of a sheet's Category columns. The client then said those columns are WooCommerce's, which
+  he keeps himself, and the owner took categories out of the whole application: migration 0044
+  drops the three, no WordPress or WooCommerce category is read or written, the import ignores
+  every level column but Root Entity and Root, and a URL parent wins inside the row's Root group.
+- **The companion plugin stays 1.2.0**: the 1.3.0 that filed pages under categories never shipped,
+  and the plugin's sources are those of `v2.3.0` again.
 - **A workbook imports in one go**: one preview and one apply over the chosen sheets in the
   workbook's order, a tab per sheet, every finding naming its sheet, a scope clash caught in the
   preview, and a saved mapping or the sheet's own headers resolved before use, which is what makes
@@ -62,9 +61,8 @@ under **2026-10-03** in `DECISIONS.md`.
 
 - **A product run writes** the description through the plugin's raw route, then the short
   description, the attributes the product lacks and an image where it has none through
-  WooCommerce's REST API, and the SEO meta; the name, price, stock, SKU, status and slug are never
-  written, and since 2026-10-04 its categories only gain the product categories of its chain. A
-  template declares the outputs in its `product` block.
+  WooCommerce's REST API, and the SEO meta; the name, price, stock, SKU, status, slug and
+  categories are never written. A template declares the outputs in its `product` block.
 - **A product is refused before anything is spent** when the store is not editable, the plugin is
   missing, the row has no product or the run is a draft; a revert hands back a product a human
   changed since and otherwise puts back exactly what the run replaced.
@@ -89,8 +87,9 @@ under **2026-10-03** in `DECISIONS.md`.
   model and the anchors, and shown as a path on the screens.
 - **The import reads the client's headers**: level columns (`Root Entity | Category |
   Subcategory`) make groups that take a page only on evidence (since 2026-10-04 only a root level
-  does, and the others are WordPress categories), every row with a page gets an
-  entity, a parent comes from the parent cell, the group or the URL tree, `Entity?` and other
+  does; the others are ignored), every row with a page gets an entity, a parent comes from the
+  parent cell, the group or the URL tree (since 2026-10-04 a URL parent inside the row's group
+  first), `Entity?` and other
   questions stay ignored, `own_entity: no` makes a technical page, the entity level reads as the
   kind, note columns travel with the page to the writer and back out, and the preview says what
   each column became. Matching is by parent and name, an ambiguous name is a blocking finding, and
@@ -158,8 +157,7 @@ under **2026-09-25** in `DECISIONS.md`.
   written yet** instead of missing everything and being an orphan, and what waits for a page to
   be written or published is counted apart from what is missing.
 
-`relink`, `repair`, `sync` and `revert` own their recipes. The companion plugin was then
-**1.2.0**; it is **1.3.0** since 2026-10-04.
+`relink`, `repair`, `sync` and `revert` own their recipes. The companion plugin is **1.2.0**.
 `TestTheClientLoopFromTheSamples` drives the whole loop from the client's own workbooks against
 docker, and `TestAChildWaitsForItsParentAndGoesOnOnceTheParentIsRegenerated` now stops the parent
 by exhausting the writer, because an incomplete draft is tried again instead of failing at validate.
@@ -259,7 +257,7 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 | 12 | Master password, backup, retention, e2e, release | done, reviewed |
 | 13 | The product frontend on one screen contract | done |
 | — | Hardening 2026-09-22/23: links, agent reliability, reversibility, agent cost, relink and repair as kinds, the content steps, the client scenario | done, gate green per wave |
-| — | 2026-10-03/04: OpenAI only on our own client, the spend in view, WordPress categories, the whole workbook, the refactor | done; the closing gate is pending |
+| — | 2026-10-03/04: OpenAI only on our own client, the spend in view, the whole workbook, the refactor; WordPress categories built and removed | done; the closing gate after the removal is pending |
 
 ## Known gaps
 
@@ -296,20 +294,9 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
   ledger.
 - **A flex attempt abandoned for its patience returns no usage**, so partial work OpenAI may bill
   for it is not metered, and a capacity refusal is assumed unbilled.
-- **A page is filed only by a sheet.** A page planned by hand or by the agent carries no category
-  until a sheet's Category column names its chain; nothing files a page by hand.
-- **One edge of the root rule stays open**: the site's half of the root set is read as the site was
-  before the import, so a request that relabels a top-level hub as a topic and uses its name as a
-  category level drops that level on its first import and makes the category on the second.
-- **The UI harness's fake site loses its categories on a restart**, because `harnessrestore.go`
-  does not put them back; the stored term ids stay until a sync drops them.
-  `frontend/scripts/routes.json` has no route for the category filter yet.
 - **`relink_page` reads the site record only after it wrote the page**: if that read fails, the
   site holds the relinked body while the map keeps the old hash, and the next sync reports the
   run's own write as drift.
-- **For the owner to decide in the UI:** the rail's category chip reads `#12` or `new` with a
-  legend, the full sentence in its tooltip, because the rail is 212 px wide; a trail in a narrow
-  page table shrinks to its leaf; the graph inspector keeps its own drift badge.
 - **What a revert cannot put back:** media a run uploaded, because a delete needs `force=true`
   and sweeping media a human may have reused is worse; and, against plugin 1.1.0, the SEO meta,
   because the read is refused from the manifest and `revert_meta_kept` names it instead.
@@ -326,10 +313,8 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
   docker stack is never run in CI** — `windows-latest` cannot run Linux containers — so every
   suite is run by hand before a tag.
 - **Without the companion plugin** the SEO meta is skipped with a warning, the neighbour relink
-  stands down, no draft can be previewed, a page goes up without its categories and a revert of
-  an updated page pauses; the loop still generates, publishes and reads back. **Plugin 1.3.0
-  changes the client's site**: its category archives, feeds and category sitemaps list pages, and
-  the page editor gains a Categories box.
+  stands down, no draft can be previewed and a revert of an updated page pauses; the loop still
+  generates, publishes and reads back.
 - **Application events published before the window exists are dropped**, by design, and
   backward paging exists in every repository but not at the use-case boundary.
   **`settings.changed`** is published by `models.SetProviderKey` and `DeleteProviderKey` only,
@@ -348,26 +333,24 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 
 ## Next steps
 
-1. **The closing gate over the head of this work**, everything listed as not yet run under **The
-   gate**, and the docker suites again over the commits after `2cd8f18`.
+1. **The closing gate after the categories came out**: the whole Go suite and its coverage, both
+   lints, `task build`, the vitest suite, `task ui:lint` and the three docker suites on 8088, over
+   migration 0044 and plugin 1.2.0.
 2. **The pre-release smoke with a funded OpenAI key**: one generate run with the writer on flex
    (the tier served and the reasoning shown in the ledger), one agent turn with tools (cached
    tokens from its second round), and the spend panel naming both by purpose and model; then the
    probe's open tests and the seven checks under **Known gaps**, and only then a decision on
    `agent.toolLoading`.
 3. **A sandbox walk with the client's sheets and a real provider** (`task sandbox:up
-   E2E_PLUGIN=1 E2E_WOO=1`): import `samples/client-sheets.xlsx` as one workbook and check each
-   sheet's tab, the Groups and Categories segments and that no category is named Peptides; sync;
-   run a page under TB-500 › Liquid and see it filed on the site and listed on the category
-   archive; create a product by hand in WooCommerce under a category of the client's own, import
-   the variation sheet in products mode, run it and see it keep the client's category and gain
-   ours; revert both.
-4. **The client's own sites**: plugin 1.3.0 lists pages on his category archives, feeds and
-   sitemaps, which he should hear before he updates it; what a real model writes into the
-   attributes, and whether a page builder hides the description, which
-   `product_description_hidden` will say.
+   E2E_PLUGIN=1 E2E_WOO=1`, after `task sandbox:reset` if it still carries plugin 1.3.0 and its
+   terms): import `samples/client-sheets.xlsx` as one workbook and check each sheet's tab, the
+   Groups segment, that Category and Subcategory read ignored, and the Groups sheet's deeper rows
+   under their URL parent inside Peptides; sync; run a page under TB-500 › Liquid; create a product
+   by hand in WooCommerce under a category of the client's own, import the variation sheet in
+   products mode, run it and see its categories untouched; revert both.
+4. **The client's own sites**: what a real model writes into the attributes, and whether a page
+   builder hides the description, which `product_description_hidden` will say.
 5. **A release** when the owner asks: the 2026-10-02, 2026-10-03 and 2026-10-03/04 work as one
    minor version.
-6. The residue above: the denied tool row's decision, the four narrow-width UI items, the UI
-   questions on the category trail, `ProposeFromPages` and `Import.Apply` as runs, and
-   `settings.changed` for a declared value.
+6. The residue above: the denied tool row's decision, the four narrow-width UI items,
+   `ProposeFromPages` and `Import.Apply` as runs, and `settings.changed` for a declared value.
