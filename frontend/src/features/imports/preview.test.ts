@@ -9,6 +9,7 @@ function report(part: Partial<PreviewReport>): PreviewReport {
         pages: null,
         entities: null,
         groups: null,
+        categories: null,
         edges: null,
         warnings: null,
         errors: null,
@@ -23,7 +24,9 @@ describe("the sheets a preview read", () => {
         { name: "nothing read", part: {}, want: [] },
         {
             name: "a csv, whose rows name no sheet",
-            part: { pages: [{ path: "/a/", title: "A", keywords: null, wpType: "page", action: "create" }] },
+            part: {
+                pages: [{ path: "/a/", title: "A", keywords: null, wpType: "page", categories: null, action: "create" }],
+            },
             want: [],
         },
         {
@@ -31,8 +34,8 @@ describe("the sheets a preview read", () => {
             part: {
                 columns: [{ sheet: "Catalog", header: "URL", use: "field", field: "path" }],
                 pages: [
-                    { sheet: "Catalog", path: "/a/", title: "A", keywords: null, wpType: "page", action: "create" },
-                    { sheet: "Forms", path: "/a/b/", title: "B", keywords: null, wpType: "page", action: "create" },
+                    { sheet: "Catalog", path: "/a/", title: "A", keywords: null, wpType: "page", categories: [], action: "create" },
+                    { sheet: "Forms", path: "/a/b/", title: "B", keywords: null, wpType: "page", categories: [], action: "create" },
                 ],
                 entities: [
                     { sheet: "Peptides", name: "BPC-157", kind: "product", keywords: null, anchors: null, action: "create" },

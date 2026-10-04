@@ -127,8 +127,6 @@ export const imports = {
         columnPage: "Page",
         columnRows: "Rows",
         noPage: "no page",
-        siteCategory: "WordPress category",
-        siteCategoryHint: "Becomes a WordPress category, created on the site when a page under it is published.",
         columnPath: "Page path",
         columnTitle: "Title",
         columnEntity: "Entity",
@@ -248,6 +246,10 @@ export const imports = {
         wp_type_kept: "The row is already on the site, so it keeps its WordPress type",
         intermediate_level: "The level above the products stays an entity without a page",
         scope_clash: "Two entities of one name would sit under the same parent; rename one or give it another parent",
+        category_level_is_root:
+            "A category cell carries the name of a root group, so it is not made a category and the levels below it move up one",
+        category_chain_cut:
+            "A page sits under more than three categories, and the sheet keeps only the first three, as many as an import reads back",
     },
     columnUses: {
         field: "A page field",

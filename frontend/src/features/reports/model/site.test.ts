@@ -43,7 +43,6 @@ function entity(overrides: Partial<Entity> = {}): Entity {
         siteId: "site-1",
         name: "Alpha",
         kind: "topic",
-        siteCategory: false,
         intent: "",
         keywords: null,
         anchors: null,

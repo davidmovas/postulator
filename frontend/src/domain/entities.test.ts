@@ -9,7 +9,6 @@ function entity(id: string, name: string, scopeEntityId: string | null = null): 
         siteId: "site",
         name,
         kind: "topic",
-        siteCategory: false,
         intent: "",
         keywords: [],
         anchors: [],

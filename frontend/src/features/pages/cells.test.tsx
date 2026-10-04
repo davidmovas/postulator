@@ -74,8 +74,8 @@ describe("EntityCell", () => {
 
 describe("CategoryCell", () => {
     const filed = [
-        { entityId: "peptides", name: "Peptides", termId: 12 },
-        { entityId: "healing", name: "Healing" },
+        { id: "peptides", name: "Peptides", termId: 12 },
+        { id: "healing", name: "Healing" },
     ];
 
     it("shows the categories that file the page on one line, the whole trail on hover", () => {

@@ -19,7 +19,6 @@ import {
     toneClasses,
 } from "../../ui/index.js";
 import { entityKindLabel } from "../graph/labels.js";
-import { CategoryMark } from "./category-mark.js";
 import { actionLabel, actionTone, columnUseLabel, edgeKindLabel, productNote } from "./labels.js";
 import type { PreviewColumn } from "./preview.js";
 import { columnsBySheet, sheetsIn } from "./preview.js";
@@ -243,10 +242,7 @@ export function StepPreview({ report, onBack, onNext }: StepPreviewProps): React
                                 <TableRow key={`${entity.sheet ?? ""}-${entity.name}-${at}`}>
                                     <SheetCell shown={shown} sheet={entity.sheet} />
                                     <TableCell title={trailOf([entity.parent ?? "", entity.name])}>
-                                        <span className="flex min-w-0 items-center gap-1.5">
-                                            <span className="truncate">{trailOf([entity.parent ?? "", entity.name])}</span>
-                                            {entity.siteCategory === true ? <CategoryMark /> : null}
-                                        </span>
+                                        {trailOf([entity.parent ?? "", entity.name])}
                                     </TableCell>
                                     <TableCell muted={true}>{entityKindLabel(entity.kind)}</TableCell>
                                     <TableCell mono={true} muted={true} title={keywordsLine(entity.keywords)}>

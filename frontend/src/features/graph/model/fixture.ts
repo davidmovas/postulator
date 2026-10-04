@@ -18,7 +18,6 @@ export function entity(seed: EntitySeed): Entity {
         siteId: "site",
         name: seed.name,
         kind: seed.kind ?? "topic",
-        siteCategory: false,
         intent: "",
         keywords: [seed.primaryKeyword ?? seed.name.toLowerCase(), ...(seed.secondaryKeywords ?? [])].map((text) => ({ text })),
         anchors: [{ text: seed.name, source: "user", weight: 1 }],

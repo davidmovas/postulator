@@ -58,8 +58,8 @@ const { PageSummary } = await import("./summary.js");
 const { PageDrawer } = await import("./drawer.js");
 
 const filed = [
-    { entityId: "peptides", name: "Peptides", termId: 12 },
-    { entityId: "healing", name: "Healing" },
+    { id: "peptides", name: "Peptides", termId: 12 },
+    { id: "healing", name: "Healing" },
 ];
 
 const index: EntityIndex = { entities: [], byId: new Map(), labels: new Map(), complete: true, loading: false };

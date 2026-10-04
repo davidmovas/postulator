@@ -18,7 +18,15 @@ const workbook: PreviewReport = {
         { sheet: "Compounds", header: "Entity", use: "field", field: "entity" },
     ],
     pages: [
-        { sheet: "Catalog", path: "/peptides/", title: "Peptides", keywords: null, wpType: "page", action: "create" },
+        {
+            sheet: "Catalog",
+            path: "/peptides/",
+            title: "Peptides",
+            keywords: null,
+            wpType: "page",
+            categories: [],
+            action: "create",
+        },
         {
             sheet: "Compounds",
             path: "/peptides/bpc-157/",
@@ -26,11 +34,12 @@ const workbook: PreviewReport = {
             keywords: null,
             wpType: "page",
             entity: "BPC-157",
+            categories: [],
             action: "update",
         },
     ],
     entities: [
-        entity({ sheet: "Catalog", name: "Peptides", kind: "category", siteCategory: true }),
+        entity({ sheet: "Catalog", name: "Peptides", kind: "category" }),
         entity({ sheet: "Catalog", name: "Research", kind: "hub" }),
         entity({ sheet: "Compounds", name: "BPC-157", parent: "Peptides", kind: "product" }),
     ],
@@ -38,6 +47,7 @@ const workbook: PreviewReport = {
         { sheet: "Catalog", path: ["Peptides", "BPC-157"], page: "/peptides/bpc-157/", rows: 3 },
         { sheet: "Catalog", path: ["Research"], rows: 1 },
     ],
+    categories: [],
     edges: [{ sheet: "Compounds", from: "BPC-157", to: "Peptides", kind: "parent", action: "create" }],
     warnings: null,
     errors: null,
@@ -106,14 +116,6 @@ describe("the preview of a workbook", () => {
     it("counts the groups on their segment", () => {
         show(workbook);
         expect(screen.getByRole("radio", { name: `${copy.imports.preview.groups} 2` })).toBeDefined();
-    });
-
-    it("marks only the entities that become WordPress categories", () => {
-        show(workbook);
-        open(copy.imports.preview.entities);
-        expect(within(rowFor("Peptides")).getByText(copy.imports.preview.siteCategory)).toBeDefined();
-        expect(within(rowFor("Research")).queryByText(copy.imports.preview.siteCategory)).toBeNull();
-        expect(within(rowFor("Peptides › BPC-157")).queryByText(copy.imports.preview.siteCategory)).toBeNull();
     });
 
     it("goes on to the apply step", () => {
