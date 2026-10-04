@@ -16,10 +16,6 @@ type Observed struct {
 	H1     string
 }
 
-func (o Observed) Empty() bool {
-	return o == Observed{}
-}
-
 func (o Observed) Path() string {
 	path, err := NormalizePath(o.Link)
 	if err != nil {
