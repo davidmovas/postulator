@@ -51,7 +51,11 @@ that had been rewritten many times. The reasoning is under the three sections of
 - **The refactor**: the composition root builds by area, the steps live by concern, the run engine
   reads by life cycle (`Engine.Wake` and `Recover` are gone), the import is a pipeline of named
   stages, the frontend shares its helpers, and the exports nothing called are deleted. The reports
-  Pages tab no longer colours a failed item green.
+  Pages tab no longer colours a failed item green; a re-import no longer rewrites a matched
+  entity's anchors as the user's at weight 1, losing the agent's and every weight, but keeps them
+  and adds only the sheet's new ones; a run resumed before it started now starts; a repair refuses
+  a post, which WordPress keeps flat. An entity's name and anchors compare by `graph.Key`, the
+  store's own `NOCASE`.
 
 **2026-10-03** edits the products the client creates by hand in WooCommerce; the reasoning is
 under **2026-10-03** in `DECISIONS.md`.

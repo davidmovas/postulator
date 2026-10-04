@@ -2328,15 +2328,25 @@ tests written before each move.
   enum, float and bool sort keys, `ctx.WithRunID` and `WithConversationID` with the audit log
   fields that read them, `errors.Stack` and `Frame` with the stack every error captured,
   `middleware.Timeout`, the two `"openai"` provider constants beside `llm.ProviderOpenAI`,
-  `RunRepo.Active`, `Graph.Roots`, `MessageRepo.LatestSeq` and
-  `ByConversation`, `CategoryRepo.Get`, `Store.Path`, `pagemap.Unmapped`, `InternalPath` and
-  `Index.Len`, and exports one file used are unexported. In the frontend: three hooks with no
+  `RunRepo.Active`, `Graph.Roots`, `MessageRepo.LatestSeq` and `ByConversation`,
+  `CategoryRepo.Get`, `ScanUpdatedAt`, `Store.Path`, `sqlitetest.OpenEncrypted`,
+  `pagemap.Unmapped`, `InternalPath`, `Index.Len` and `Observed.Empty`, with `Index.PathParent`
+  folded into `PathParentID`, and exports one file used, `graph.NewAnchors` and `graph.Scopes`
+  among them, are unexported. In the frontend: three hooks with no
   caller and their endpoint wrappers, `runPhase`, `actionStatusTone`, `keywordTexts`, a second run
   status tone and a second copy of the page status words. This **supersedes** the Phase 0 note that
   `Stack` is nil-receiver safe. The errors the agent could hand to nobody go to `Deps.Dropped`,
   which the composition root logs.
-- **One key per rule**: `graph.Key` for an entity's name and anchors, `category.Key` for a
-  category's, `keyword.List.Find` for a keyword, `dto.TimeOf` for an instant that may be missing,
+- **Three keys, each the rule of whoever refuses a duplicate.** `graph.Key` trims and lowers
+  ASCII letters only, which is what SQLite's `NOCASE` does to `entities.name` and
+  `entity_anchors.text`; `TestTheGraphKeyRefusesWhatTheStoreRefuses` inserts each pair into a real
+  store and shows the store refuses exactly the pairs the key folds together, so Café and CAFÉ under
+  one parent are two entities in Go as they always were in the database. It replaces the name key,
+  the anchor check and the name sort of `graph`, the fold of `application/graph` and the import's
+  key, which lowered every letter and so merged in Go what the store keeps apart. A keyword is one by
+  its own Unicode lowercase, found in its list by `keyword.List.Find`; a category by
+  `category.Key`, WordPress's term-name rule, stored as `name_key`.
+- **One helper per job**: `dto.TimeOf` for an instant that may be missing,
   `dto.PageSize` for a list's limit in place of `ListRequest.Normalize`, and `graph.Distinct`,
   which keeps a list of texts once as the store tells them apart, in place of a
   `CleanKeywords` that cleaned no keyword. The four `anchorsOf` say what each builds
@@ -2352,4 +2362,11 @@ tests written before each move.
   its path implied, WordPress kept the post flat, and the item paused on a mismatch nobody could
   resolve. The preflight refuses a post with `post_unnested`, beside `store_placed`, and the step
   refuses one before it writes.
+- **A matched entity keeps the anchors it carries.** An import rewrote every anchor of a matched
+  entity as a user anchor of weight 1 whenever anything about it changed, so a re-import that added
+  a keyword turned the agent's anchors into the user's and reset every weight. The sheet's anchors
+  are unioned with the carried ones: those the entity holds stay exactly as they are, one
+  `graph.Key` finds in none of them is added as a user anchor of weight 1, and `sameEntity`
+  compares whole anchors, so an entity is skipped only when its anchors are equal in text, source
+  and weight.
 - The canvas under the graph map was left as it is, by the owner's choice.
