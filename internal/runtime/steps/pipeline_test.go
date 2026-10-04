@@ -210,8 +210,6 @@ func (p *pipeline) start(t *testing.T) *runtime.Engine {
 	if err := steps.Register(registry, steps.Deps{
 		Entities:      sqlite.NewEntityRepo(p.store),
 		Edges:         sqlite.NewEdgeRepo(p.store),
-		Categories:    sqlite.NewCategoryRepo(p.store),
-		CategoryTerms: sqlite.NewCategoryTermRepo(p.store),
 		Pages:         p.pages,
 		Links:         p.links,
 		Sites:         sqlite.NewSiteRepo(p.store),

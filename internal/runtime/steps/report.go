@@ -192,21 +192,7 @@ func noticeOf(report FinalReport) string {
 		parts = append(parts, strconv.Itoa(len(report.Images.Images))+" of "+strconv.Itoa(report.Images.Wanted)+
 			" images placed")
 	}
-	if categoriesMissed(report.Findings) {
-		parts = append(parts, "its categories are not on the site")
-	}
 	return strings.Join(parts, "; ")
-}
-
-func categoriesMissed(findings []content.Finding) bool {
-	for _, code := range []string{
-		CodeCategoriesForbidden, CodeCategoryRefused, CodeCategoriesNotTaken, CodePageCategoriesNeedPlugin,
-	} {
-		if countCode(findings, code) > 0 {
-			return true
-		}
-	}
-	return false
 }
 
 func countCode(findings []content.Finding, code string) int {

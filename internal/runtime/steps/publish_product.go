@@ -160,12 +160,8 @@ func publishProduct(ctx context.Context, deps Deps, sc *run.StepContext, body []
 	if err != nil {
 		return run.Result{}, err
 	}
-	categories, err := ensureCategories(ctx, deps, client, sc, held.Categories, false)
-	if err != nil {
-		return run.Result{}, err
-	}
 
-	update, snapshot, typed := productUpdate(held, draft.Product, featured.FeaturedID, categories.send)
+	update, snapshot, typed := productUpdate(held, draft.Product, featured.FeaturedID)
 	store := productWrite{deps: deps, sc: sc, client: client, held: held, draft: draft.Product}
 	saved, refused, err := store.saveFields(ctx, update, &snapshot, raw.ContentHash)
 	if err != nil {
@@ -184,12 +180,10 @@ func publishProduct(ctx context.Context, deps Deps, sc *run.StepContext, body []
 	}
 
 	written := saved.written
-	categories.took(sc.Page, written.Categories)
 	result := PublishResult{
 		WPID: held.ID, URL: permalinkOf(wp.Item{Link: written.Permalink}), Status: written.Status, ContentHash: hash,
 		PreviousContent: raw.Content, PreviousContentHash: raw.ContentHash, PreviousProduct: &snapshot,
-		Categories: categories.write, SEOApplied: make([]string, 0), Skipped: make([]string, 0),
-		Findings:   append(findingsOfProduct(sc.Page, held, typed), categories.findings...),
+		SEOApplied: make([]string, 0), Skipped: make([]string, 0), Findings: findingsOfProduct(sc.Page, held, typed),
 		Mismatches: make([]pagemap.Mismatch, 0),
 	}
 	seo, err := applySEO(ctx, client, sc, wp.TypeProduct, held.ID, true)
@@ -272,8 +266,7 @@ func (w productWrite) refusedBy(ctx context.Context, cause error) (productSaved,
 	return productSaved{}, &refused, nil
 }
 
-func productUpdate(held wp.Product, draft *content.ProductDraft, featured int64,
-	categories []int64) (wp.UpdateProduct, ProductSnapshot, *content.Finding) {
+func productUpdate(held wp.Product, draft *content.ProductDraft, featured int64) (wp.UpdateProduct, ProductSnapshot, *content.Finding) {
 	snapshot := ProductSnapshot{
 		ShortDescription: held.ShortDescription, Attributes: snapshotOf(held.Attributes),
 		Written: make([]SnapshotAttribute, 0), Images: imageIDs(held.Images), Added: make([]string, 0),
@@ -305,16 +298,11 @@ func productUpdate(held wp.Product, draft *content.ProductDraft, featured int64,
 		update.Images = &images
 		snapshot.ImageID = featured
 	}
-	if categories != nil {
-		filed := slices.Clone(categories)
-		update.Categories = &filed
-	}
 	return update, snapshot, typed
 }
 
 func hasFields(update wp.UpdateProduct) bool {
-	return update.ShortDescription != nil || update.Attributes != nil || update.Images != nil ||
-		update.Categories != nil
+	return update.ShortDescription != nil || update.Attributes != nil || update.Images != nil
 }
 
 func productKept(snapshot ProductSnapshot, draft *content.ProductDraft, written wp.Product) []pagemap.Mismatch {

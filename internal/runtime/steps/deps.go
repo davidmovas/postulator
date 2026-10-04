@@ -10,7 +10,6 @@ import (
 	appcontent "github.com/davidmovas/postulator/internal/application/content"
 	"github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/templates"
-	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -18,7 +17,6 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
-	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 type entityReader interface {
@@ -27,16 +25,6 @@ type entityReader interface {
 
 type edgeReader interface {
 	ListBySite(ctx context.Context, siteID string) ([]graph.Edge, error)
-}
-
-type categoryReader interface {
-	ListBySite(ctx context.Context, siteID string) ([]category.Category, error)
-}
-
-type categoryTermStore interface {
-	ListBySite(ctx context.Context, siteID string) ([]category.Term, error)
-	Upsert(ctx context.Context, t category.Term) error
-	Delete(ctx context.Context, categoryID string, taxonomy category.Taxonomy) error
 }
 
 type pageStore interface {
@@ -99,8 +87,6 @@ type ImageSource interface {
 type Deps struct {
 	Entities      entityReader
 	Edges         edgeReader
-	Categories    categoryReader
-	CategoryTerms categoryTermStore
 	Pages         pageStore
 	Links         linkStore
 	Items         itemReader
@@ -126,27 +112,6 @@ func (d Deps) now() time.Time {
 		return time.Time{}
 	}
 	return d.Clock.Now().UTC().Truncate(time.Second)
-}
-
-func (d Deps) categoryStores() error {
-	if err := d.categoryReader(); err != nil {
-		return err
-	}
-	return d.categoryTermStore()
-}
-
-func (d Deps) categoryReader() error {
-	if d.Categories == nil {
-		return errors.New(errors.Internal, "the run steps were given no category reader, so no category chain can be read")
-	}
-	return nil
-}
-
-func (d Deps) categoryTermStore() error {
-	if d.CategoryTerms == nil {
-		return errors.New(errors.Internal, "the run steps were given no category term store, so no category can be kept")
-	}
-	return nil
 }
 
 func (d Deps) inUnit(ctx context.Context, apply func(context.Context) error) error {

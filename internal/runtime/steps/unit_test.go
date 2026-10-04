@@ -205,10 +205,8 @@ func unitEdges() []graph.Edge {
 
 func unitDeps() steps.Deps {
 	return steps.Deps{
-		Entities:      entityList{items: unitEntities()},
-		Edges:         edgeList{items: unitEdges()},
-		Categories:    categoryList{},
-		CategoryTerms: newTermMemory(),
+		Entities: entityList{items: unitEntities()},
+		Edges:    edgeList{items: unitEdges()},
 		Pages: pageList{items: []pagemap.Page{
 			{ID: "page-parent", SiteID: "site", Path: "/coffee/", WPType: pagemap.WPPage, Status: pagemap.StatusPublished},
 			{ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", WPType: pagemap.WPPage, Status: pagemap.StatusPlanned},
@@ -238,7 +236,7 @@ func unitContext(t *testing.T, artifacts map[run.ArtifactKind][]byte) *run.StepC
 		Item: run.Item{ID: "item", RunID: "run", SiteID: "site", TargetID: "page-child"},
 		Page: pagemap.Page{
 			ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", Title: "Espresso",
-			WPType: pagemap.WPPage, Status: pagemap.StatusPlanned, EntityID: pointer("child"), CategoryID: categoryCoffee,
+			WPType: pagemap.WPPage, Status: pagemap.StatusPlanned, EntityID: pointer("child"),
 		},
 		Spec:      spec(),
 		Params:    map[string]any{},

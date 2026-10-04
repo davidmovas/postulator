@@ -265,15 +265,13 @@ func (f *factory) engine(t *testing.T) *runtime.Engine {
 
 	registry := run.NewRegistry()
 	if err := steps.Register(registry, steps.Deps{
-		Entities:      sqlite.NewEntityRepo(f.store),
-		Edges:         sqlite.NewEdgeRepo(f.store),
-		Categories:    sqlite.NewCategoryRepo(f.store),
-		CategoryTerms: sqlite.NewCategoryTermRepo(f.store),
-		Pages:         sqlite.NewPageRepo(f.store),
-		Sites:         sqlite.NewSiteRepo(f.store),
-		Policies:      specs,
-		Profiles:      stubProfiles{},
-		LLM:           f.llm,
+		Entities: sqlite.NewEntityRepo(f.store),
+		Edges:    sqlite.NewEdgeRepo(f.store),
+		Pages:    sqlite.NewPageRepo(f.store),
+		Sites:    sqlite.NewSiteRepo(f.store),
+		Policies: specs,
+		Profiles: stubProfiles{},
+		LLM:      f.llm,
 	}); err != nil {
 		t.Fatalf("register the steps: %v", err)
 	}

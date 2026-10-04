@@ -11,7 +11,6 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
-	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
@@ -578,110 +577,22 @@ func orNone(codes []string) []string {
 	return codes
 }
 
-func productCategories(server *wptest.Server) []wptest.Item {
-	held := server.Items()
-	out := make([]wptest.Item, 0, len(held))
-	for i := range held {
-		if held[i].Type == wptest.TypeProductCategory {
-			out = append(out, held[i])
-		}
-	}
-	return out
-}
-
-func fileProduct(t *testing.T, h productHarness, names ...string) []int64 {
-	t.Helper()
-
-	assigned := make([]int64, 0, len(names))
-	parent := int64(0)
-	for _, name := range names {
-		shelf := h.server.Seed(wptest.Item{Type: wptest.TypeProductCategory, Title: name, Parent: parent})[0]
-		assigned = append(assigned, shelf.ID)
-		parent = shelf.ID
-	}
-	if _, err := syncClient(t, h.server).UpdateProduct(t.Context(), h.held.ID, wp.UpdateProduct{Categories: &assigned}); err != nil {
-		t.Fatalf("file the product under %v: %v", names, err)
-	}
-	return assigned
-}
-
-func TestPublishAddsOurProductCategoriesBesideTheClients(t *testing.T) {
+func TestPublishNeverWritesAProductsCategories(t *testing.T) {
 	t.Parallel()
 
 	h := newProductHarness(t, storeProduct())
-	filed(&h.deps)
-	assigned := fileProduct(t, h, "Machines")
 
 	published := runPublish(t, h.deps, storeContext(t, h.held.ID))
-	shelves := productCategories(h.server)
-	if len(shelves) != 3 || len(h.server.Categories()) != 0 {
-		t.Fatalf("the store holds the product categories %+v and the posts %+v, want ours beside Machines",
-			shelves, h.server.Categories())
-	}
-	drinks, coffee := shelves[1], shelves[2]
-	if drinks.Title != "Drinks" || drinks.Parent != 0 || coffee.Title != "Coffee" || coffee.Parent != drinks.ID {
-		t.Fatalf("the store holds %+v, want Drinks with Coffee under it", shelves)
-	}
-
-	written := published.Categories
-	if written == nil || written.Taxonomy != category.TaxonomyProductCategory || !written.Taken ||
-		!slices.Equal(written.Previous, assigned) || !slices.Equal(written.Added, []int64{drinks.ID, coffee.ID}) {
-		t.Fatalf("categories = %+v, want Drinks and Coffee added beside %v", written, assigned)
-	}
-	stored, _ := h.server.Lookup(h.held.ID)
-	if !sameSet(stored.Categories, append(slices.Clone(assigned), drinks.ID, coffee.ID)) {
-		t.Errorf("the product carries %v, want Machines, Drinks and Coffee", stored.Categories)
-	}
-	if stored.Content != productDescription || stored.Excerpt != productShort {
-		t.Errorf("the product holds %q / %q, want the run's description written after its fields", stored.Content, stored.Excerpt)
-	}
-}
-
-func TestPublishLeavesAProductsCategoriesAloneWhenItCarriesTheChain(t *testing.T) {
-	t.Parallel()
-
-	h := newProductHarness(t, storeProduct())
-	filed(&h.deps)
-	fileProduct(t, h, "Drinks", "Coffee")
-	h.server.ResetRequests()
-
-	published := runPublish(t, h.deps, storeContext(t, h.held.ID))
-	written := published.Categories
-	if written == nil || !written.Taken || len(written.Added) != 0 || len(productCategories(h.server)) != 2 {
-		t.Fatalf("categories = %+v over %+v, want nothing added", written, productCategories(h.server))
-	}
-	for i := range written.Terms {
-		if written.Terms[i].Created {
-			t.Errorf("term %+v reports created over a store that held it", written.Terms[i])
-		}
+	if published.WPID != h.held.ID {
+		t.Fatalf("publish = %+v, want an update of the product", published)
 	}
 	for _, request := range h.server.Requests() {
 		if request.Method != http.MethodGet && strings.HasPrefix(request.Path, "/wp-json/wc/v3/products") &&
 			bytes.Contains(request.Body, []byte(`"categories"`)) {
-			t.Errorf("the publish resent the categories the product carries: %s %s", request.Path, request.Body)
+			t.Errorf("the publish wrote the product's categories: %s %s %s", request.Method, request.Path, request.Body)
 		}
 	}
-}
-
-func TestPublishFilesAProductOnlyWhereTheStoreLetsIt(t *testing.T) {
-	t.Parallel()
-
-	h := newProductHarness(t, storeProduct(), wptest.WithoutTermEdit())
-	filed(&h.deps)
-	assigned := fileProduct(t, h, "Machines")
-
-	published := runPublish(t, h.deps, storeContext(t, h.held.ID))
-	if got := categoryFindings(published.Findings); !slices.Equal(got, []string{steps.CodeCategoriesForbidden}) {
-		t.Fatalf("findings = %v, want %s", got, steps.CodeCategoriesForbidden)
-	}
-	if published.Categories != nil {
-		t.Errorf("categories = %+v, want none written", published.Categories)
-	}
-	stored, _ := h.server.Lookup(h.held.ID)
-	if !slices.Equal(stored.Categories, assigned) || len(productCategories(h.server)) != 1 {
-		t.Errorf("the product carries %v among %+v, want the client's alone", stored.Categories, productCategories(h.server))
-	}
-	if stored.Content != productDescription || stored.Excerpt != productShort {
-		t.Errorf("the product holds %q / %q, want it written without its categories", stored.Content, stored.Excerpt)
+	if stored, _ := h.server.Lookup(h.held.ID); len(stored.Categories) != 0 {
+		t.Errorf("the product carries %v, want the store's categories untouched", stored.Categories)
 	}
 }

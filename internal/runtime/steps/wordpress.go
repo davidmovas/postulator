@@ -52,15 +52,11 @@ func permalinkOf(item wp.Item) string {
 }
 
 func currentHashOf(err error) string {
-	return detailOf(err, "currentHash")
-}
-
-func detailOf(err error, key string) string {
 	var kernel *errors.Error
 	if !stderrors.As(err, &kernel) || kernel == nil {
 		return ""
 	}
-	value, ok := kernel.Details[key].(string)
+	value, ok := kernel.Details["currentHash"].(string)
 	if !ok {
 		return ""
 	}
