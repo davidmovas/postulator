@@ -5,7 +5,6 @@ import { cx, ErrorIcon, InfoIcon, WarningIcon, toneClasses } from "../../ui/inde
 import type { IconComponent, Tone } from "../../ui/index.js";
 import type { Finding, Severity } from "./artifacts.js";
 import { severityError, severityWarn, weigh } from "./artifacts.js";
-import { findingHeadline } from "./labels.js";
 
 const severityTones: Readonly<Record<Severity, Tone>> = {
     error: "danger",
@@ -34,20 +33,14 @@ export function FindingList({ findings, empty }: FindingListProps): ReactElement
             {ranked.map((finding, position) => {
                 const Icon = severityIcons[finding.severity];
                 const tone = toneClasses[severityTones[finding.severity]];
-                const headline = findingHeadline(finding.code);
                 return (
                     <li
                         key={`${finding.code}:${String(position)}`}
-                        data-finding-code={finding.code}
                         className="flex gap-2 border-b border-inset px-3 py-2 last:border-b-0"
                     >
                         <Icon size={14} className={cx("mt-0.5 shrink-0", tone.ink)} />
                         <div className="flex min-w-0 flex-col gap-0.5">
-                            {headline === null ? (
-                                <span className="font-mono text-2xs text-ink-faint">{finding.code}</span>
-                            ) : (
-                                <span className="text-xs font-medium text-ink">{headline}</span>
-                            )}
+                            <span className="font-mono text-2xs text-ink-faint">{finding.code}</span>
                             <span className="text-xs text-ink-soft">{finding.message}</span>
                         </div>
                     </li>

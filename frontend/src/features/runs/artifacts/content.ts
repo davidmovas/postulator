@@ -24,20 +24,6 @@ export interface ProductEditView {
     imageSet: boolean;
 }
 
-export interface FiledTermView {
-    name: string;
-    termId: number;
-    created: boolean;
-}
-
-export interface CategoryWriteView {
-    taxonomy: string;
-    terms: readonly FiledTermView[];
-    previous: readonly number[];
-    added: readonly number[];
-    taken: boolean;
-}
-
 export interface PublishView {
     url: string;
     status: string;
@@ -48,7 +34,6 @@ export interface PublishView {
     skipped: readonly string[];
     findings: readonly Finding[];
     product: ProductEditView | null;
-    categories: CategoryWriteView | null;
 }
 
 function productEditOf(held: unknown): ProductEditView | null {
@@ -57,37 +42,6 @@ function productEditOf(held: unknown): ProductEditView | null {
     }
     const image = numberAt(held, "imageId");
     return { shortWritten: boolAt(held, "shortWritten"), added: stringsAt(held, "added"), imageSet: image !== null && image !== 0 };
-}
-
-function termIdsAt(held: unknown, key: string): readonly number[] {
-    const out: number[] = [];
-    for (const entry of listAt(held, key)) {
-        if (typeof entry === "number" && Number.isInteger(entry) && entry > 0) {
-            out.push(entry);
-        }
-    }
-    return out;
-}
-
-function categoryWriteOf(held: unknown): CategoryWriteView | null {
-    if (record(held) === null) {
-        return null;
-    }
-    const terms: FiledTermView[] = [];
-    for (const entry of listAt(held, "terms")) {
-        const termId = numberAt(entry, "termId");
-        if (termId === null || termId <= 0) {
-            continue;
-        }
-        terms.push({ name: stringAt(entry, "name"), termId, created: boolAt(entry, "created") });
-    }
-    return {
-        taxonomy: stringAt(held, "taxonomy"),
-        terms,
-        previous: termIdsAt(held, "previous"),
-        added: termIdsAt(held, "added"),
-        taken: boolAt(held, "taken"),
-    };
 }
 
 export function publishView(held: unknown): PublishView | null {
@@ -105,7 +59,6 @@ export function publishView(held: unknown): PublishView | null {
         skipped: stringsAt(held, "skipped"),
         findings: findingsAt(held, "findings"),
         product: productEditOf(root["previousProduct"]),
-        categories: categoryWriteOf(root["categories"]),
     };
 }
 

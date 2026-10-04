@@ -5,7 +5,6 @@ import type { AddedPage, Estimate } from "../../data/types.js";
 import { tokens as formatTokens, usd as formatUsd } from "../../domain/format.js";
 import type { Tone } from "../../ui/index.js";
 import { Banner, Field, Input, SectionLabel } from "../../ui/index.js";
-import { findingHeadline } from "./labels.js";
 
 const findingTones: Readonly<Record<string, Tone>> = { error: "danger", warn: "warn", info: "info" };
 
@@ -104,17 +103,13 @@ export function StartPrice({ estimate, added, over, refusal }: StartPriceProps):
                 />
             )}
 
-            {(estimate?.findings ?? []).map((finding) => {
-                const headline = findingHeadline(finding.code);
-                return (
-                    <Banner
-                        key={`${finding.code}:${finding.pageId ?? ""}:${finding.message}`}
-                        tone={findingTone(finding.severity)}
-                        title={headline ?? findingTitle(finding)}
-                        body={headline === null ? undefined : findingTitle(finding)}
-                    />
-                );
-            })}
+            {(estimate?.findings ?? []).map((finding) => (
+                <Banner
+                    key={`${finding.code}:${finding.pageId ?? ""}:${finding.message}`}
+                    tone={findingTone(finding.severity)}
+                    title={findingTitle(finding)}
+                />
+            ))}
 
             {over ? <Banner tone="warn" title={copy.runs.start.overCap} /> : null}
             {refusal === null ? null : <Banner tone="danger" title={refusal} />}

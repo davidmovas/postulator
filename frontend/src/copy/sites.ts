@@ -60,8 +60,7 @@ export const sites = {
         title: "Companion plugin",
         installed: (version: string) => (version === "" ? "Installed" : `Installed, version ${version}`),
         missingTitle: (name: string) => `The companion plugin is not installed on ${name}`,
-        missingBody:
-            "Products stay invisible to a sync, SEO meta is read-only, neighbour links are never repaired and pages go up without their categories.",
+        missingBody: "Products stay invisible to a sync, SEO meta is read-only and neighbour links are never repaired.",
         recheck: "Check again",
         download: "Save the plugin zip",
         saved: (path: string) => `Companion plugin written to ${path}`,
@@ -72,7 +71,6 @@ export const sites = {
             content_hash: "change detection",
             raw: "raw content",
             preview: "draft previews",
-            page_categories: "categories on pages",
         } as Readonly<Record<string, string>>,
         seo: "SEO plugin",
         seoNames: {
@@ -85,7 +83,7 @@ export const sites = {
     store: {
         readyTitle: "The WooCommerce store can be edited",
         readyBody:
-            "Products you create in WooCommerce get their description, short description, missing attributes and SEO meta written here. Their name, price, stock, SKU, status and slug are never touched, and the categories the store gave them stay: a run only adds the ones their sheet files them under.",
+            "Products you create in WooCommerce get their description, short description, missing attributes and SEO meta written here. Their name, price, stock, SKU, status, slug and categories are never touched.",
         needsPlugin:
             "Product descriptions are written through the companion plugin, so products are refused until it is installed.",
         forbiddenTitle: "The store refuses to let this user edit products",

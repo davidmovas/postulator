@@ -126,10 +126,6 @@ export function isKnownRetryBlock(reason: string): reason is RetryBlockedReason 
     return isOneOf(retryBlockedReasons, reason);
 }
 
-export function findingHeadline(code: string): string | null {
-    return copy.runs.findingTitles[code] ?? null;
-}
-
 export function revertOutcomeLabel(outcome: string): string {
     return copy.runs.review.revert.outcomes[outcome] ?? outcome;
 }
