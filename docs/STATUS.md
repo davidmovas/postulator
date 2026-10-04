@@ -166,17 +166,18 @@ by exhausting the writer, because an incomplete draft is tried again instead of 
 
 ## The gate
 
-**2026-10-03 and 04, partial: the closing gate over this work has not run yet.** What the units
-ran: the docker suites, `task e2e:test`, `task e2e:full` and `task e2e:full:noplugin`, with the
-contract and the loops again under `E2E_SEO=yoast`, green on 8088 with WooCommerce on, at
-`2cd8f18` (unit K6); `task ui:lint`, `npm run typecheck` and the whole vitest suite, **1624 tests
-in 151 files**, green at `31230cc` (unit K5); and in every unit `gofmt -l`, the comment check,
-golangci-lint and `go test -race -count=1 -p 2` over the packages it touched. **Not yet run over
-the head of this work:** the whole `go test -race -count=1 -p 2 -covermode=atomic
--coverprofile=coverage.out ./...`, `go run ./cmd/covergate`, a whole `golangci-lint run`, `task
-lint:e2e`, `task build` (until it runs, the gitignored bindings are stale), and the docker suites
-over the commits after `2cd8f18`. Migrations end at **0043**; **93 tools**, 63,304 bytes of schema
-against the 63,400 the registry test allows; **125 bound methods**.
+**2026-10-04, on Windows, whole, over the 2026-10-03 and 04 work at `dad410e`.** `gofmt -l .`
+silent, the comment check, `golangci-lint run` and `task lint:e2e` 0 issues; `go test -race
+-count=1 -p 2 -covermode=atomic` green over every package, run in five groups (kernel+domain,
+adapters, application, runtime, transport+app+cmd) because one whole run was stopped by the
+machine running low on memory, the five profiles merged into `coverage.out`; `go run
+./cmd/covergate` **domain+application 87.92% of 9677** (gate 80%), **total 88.63% of 23151**
+(gate 70%); `task build` green and leaves no generated diff; `npm run typecheck` clean and **1624
+vitest tests in 151 files**; `task ui:lint` green (427 s); `task e2e:test`, `task e2e:full` and
+`task e2e:full:noplugin` green on 8088 with WooCommerce on (the `E2E_SEO=yoast` pass was run by
+unit K6 at `2cd8f18`). Migrations end at **0043**; **93 tools**, 63,304 bytes of schema against
+the 63,400 the registry test allows; **125 bound methods**. Not run: a live OpenAI call with a
+funded key (see Known gaps).
 
 **2026-10-03, on Windows, whole, over the 2026-10-02 and 2026-10-03 work.** `go test -race
 -count=1 -p 2 -covermode=atomic -coverprofile=coverage.out ./...` green; `go run ./cmd/covergate`
