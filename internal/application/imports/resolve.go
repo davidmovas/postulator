@@ -7,12 +7,8 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
-func unmapped(m importmap.Mapping) bool {
-	return len(m.Columns) == 0 && len(m.Options.IndentColumns) == 0 && len(m.Options.LevelColumns) == 0
-}
-
 func (s *Service) resolve(ctx context.Context, siteID string, given importmap.Mapping) (importmap.Mapping, error) {
-	if given.ID == "" || !unmapped(given) {
+	if given.ID == "" || !given.Unmapped() {
 		return given, nil
 	}
 	saved, err := s.deps.Mappings.Get(ctx, given.ID)
@@ -33,7 +29,7 @@ func (s *Service) resolve(ctx context.Context, siteID string, given importmap.Ma
 }
 
 func detect(given importmap.Mapping, headers []string) importmap.Mapping {
-	if !unmapped(given) {
+	if !given.Unmapped() {
 		return given
 	}
 	found := importmap.AutoDetect(headers)

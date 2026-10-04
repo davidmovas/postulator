@@ -35,7 +35,7 @@ func (m Mapping) Uses(headers []string) []ColumnUse {
 			mark(column, UseField, field)
 		}
 	}
-	for _, column := range m.Options.LevelColumns {
+	for _, column := range rootColumns(m.Options.LevelColumns) {
 		mark(column, UseLevel, "")
 	}
 	for _, column := range m.Options.NoteColumns {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/graph"
@@ -36,16 +35,6 @@ func (s *Service) Export(ctx context.Context, req ExportRequest) (ExportResponse
 		return ExportResponse{}, err
 	}
 
-	table, warnings := exportTable(&state, g, kinds)
-	if err := s.deps.Tables.Write(req.Path, table); err != nil {
-		return ExportResponse{}, err
-	}
-	return ExportResponse{
-		Path: req.Path, Format: string(format), Pages: len(state.pages), Entities: len(state.entities), Warnings: warnings,
-	}, nil
-}
-
-func exportTable(state *siteState, g graph.Graph, kinds map[string]string) (importmap.Table, []Finding) {
 	byID := make(map[string]graph.Entity, len(state.entities))
 	for i := range state.entities {
 		byID[state.entities[i].ID] = state.entities[i]
@@ -54,15 +43,9 @@ func exportTable(state *siteState, g graph.Graph, kinds map[string]string) (impo
 	pages := slices.Clone(state.pages)
 	slices.SortFunc(pages, func(a, b pagemap.Page) int { return strings.Compare(a.Path, b.Path) })
 
-	held := newShelf(state.categories)
-	depth := categoryDepth(pages, held)
 	options := importmap.DefaultOptions()
 	labels := noteLabels(pages)
-	table := importmap.Table{
-		Headers: slices.Concat(headers(), importmap.CategoryHeaders()[:depth], labels),
-		Rows:    make([][]string, 0, len(pages)+len(state.entities)),
-	}
-	warnings := make([]Finding, 0)
+	table := importmap.Table{Headers: append(headers(), labels...), Rows: make([][]string, 0, len(pages)+len(state.entities))}
 	mapped := make(map[string]struct{}, len(state.entities))
 
 	for i := range pages {
@@ -72,12 +55,8 @@ func exportTable(state *siteState, g graph.Graph, kinds map[string]string) (impo
 			entity = byID[*page.EntityID]
 			mapped[entity.ID] = struct{}{}
 		}
-		chain := held.trail(page.CategoryID)
-		if len(chain) > depth {
-			warnings = append(warnings, chainCut(len(table.Rows)+2, page, chain, depth))
-		}
 		cells := row(page, &entity, kinds[refOf(page.TemplateID)], g, options)
-		table.Rows = append(table.Rows, slices.Concat(cells, levelCells(chain, depth), noteCells(page.Notes, labels)))
+		table.Rows = append(table.Rows, append(cells, noteCells(page.Notes, labels)...))
 	}
 
 	loose := g.Entities()
@@ -86,31 +65,15 @@ func exportTable(state *siteState, g graph.Graph, kinds map[string]string) (impo
 			continue
 		}
 		cells := row(nil, &loose[i], "", g, options)
-		table.Rows = append(table.Rows, slices.Concat(cells, levelCells(nil, depth), noteCells(nil, labels)))
+		table.Rows = append(table.Rows, append(cells, noteCells(nil, labels)...))
 	}
-	return table, warnings
-}
 
-func categoryDepth(pages []pagemap.Page, held *shelf) int {
-	depth := 0
-	for i := range pages {
-		depth = max(depth, len(held.trail(pages[i].CategoryID)))
+	if err := s.deps.Tables.Write(req.Path, table); err != nil {
+		return ExportResponse{}, err
 	}
-	return min(depth, len(importmap.CategoryHeaders()))
-}
-
-func levelCells(chain []string, depth int) []string {
-	out := make([]string, depth)
-	copy(out, chain)
-	return out
-}
-
-func chainCut(row int, page *pagemap.Page, chain []string, depth int) Finding {
-	return Finding{
-		Row: row, Code: string(CodeCategoryChainCut),
-		Message: "the page " + page.Path + " is filed under " + strings.Join(chain, " › ") + "; the file keeps its first " +
-			strconv.Itoa(depth) + " levels, as many as an import reads back",
-	}
+	return ExportResponse{
+		Path: req.Path, Format: string(format), Pages: len(pages), Entities: len(state.entities),
+	}, nil
 }
 
 func exportFormat(req ExportRequest) (importmap.Format, error) {

@@ -6,7 +6,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -28,17 +27,16 @@ type canonical struct {
 }
 
 type plan struct {
-	siteID     string
-	sheet      string
-	read       []string
-	mapping    importmap.Mapping
-	report     PreviewReport
-	categories []category.Category
-	entities   []plannedEntity
-	edges      []graph.Edge
-	pages      []plannedPage
-	canonical  []canonical
-	rows       int
+	siteID    string
+	sheet     string
+	read      []string
+	mapping   importmap.Mapping
+	report    PreviewReport
+	entities  []plannedEntity
+	edges     []graph.Edge
+	pages     []plannedPage
+	canonical []canonical
+	rows      int
 }
 
 func newPlan(siteID string, mapping importmap.Mapping, table importmap.Table) plan {
@@ -84,7 +82,7 @@ func (p *plan) noteAt(at importmap.Origin, field string, code FindingCode, messa
 }
 
 func (p *plan) counts() Counts {
-	tally := Counts{Skipped: p.report.Skipped, EdgesCreated: len(p.edges), CategoriesCreated: len(p.categories)}
+	tally := Counts{Skipped: p.report.Skipped, EdgesCreated: len(p.edges)}
 	for i := range p.entities {
 		if p.entities[i].created {
 			tally.EntitiesCreated++
@@ -102,9 +100,9 @@ func (p *plan) counts() Counts {
 	return tally
 }
 
-func (s *Service) plan(ctx context.Context, state siteState, roots keySet, read *sheetRead, now time.Time) (plan, error) {
+func (s *Service) plan(ctx context.Context, state siteState, read *sheetRead, now time.Time) (plan, error) {
 	p := newPlan(state.siteID, read.mapping, read.table)
-	rows := readRows(read.binding, read.table, roots, &p)
+	rows := readRows(read.binding, read.table, &p)
 	sheet := pagesOf(rows, &p)
 	state.byPlanned = maps.Clone(state.byPlanned)
 	typeRows(sheet, rows, read.mapping.Options.RowType, &state)
@@ -143,6 +141,5 @@ func (b *builder) run(templates *kindTemplates) error {
 	b.linkParents()
 	b.markCanonical()
 	b.reportGroups()
-	b.reportCategories()
 	return nil
 }

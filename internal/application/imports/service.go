@@ -6,7 +6,6 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/events"
-	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -42,16 +41,6 @@ type pageStore interface {
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.Page, error)
 }
 
-type categoryStore interface {
-	Insert(ctx context.Context, c category.Category) error
-	ListBySite(ctx context.Context, siteID string) ([]category.Category, error)
-	Delete(ctx context.Context, id string) error
-}
-
-type termReader interface {
-	ListBySite(ctx context.Context, siteID string) ([]category.Term, error)
-}
-
 type templateStore interface {
 	Get(ctx context.Context, id string) (template.Template, error)
 	List(ctx context.Context, q template.Query, page paging.Request) (paging.List[template.Template], error)
@@ -73,19 +62,17 @@ type unitOfWork interface {
 }
 
 type Deps struct {
-	Tables        tableStore
-	Entities      entityStore
-	Edges         edgeStore
-	Pages         pageStore
-	Categories    categoryStore
-	CategoryTerms termReader
-	Templates     templateStore
-	Mappings      mappingStore
-	Sites         siteReader
-	UnitOfWork    unitOfWork
-	Publisher     application.Publisher
-	Clock         clock.Clock
-	MaxRows       int
+	Tables     tableStore
+	Entities   entityStore
+	Edges      edgeStore
+	Pages      pageStore
+	Templates  templateStore
+	Mappings   mappingStore
+	Sites      siteReader
+	UnitOfWork unitOfWork
+	Publisher  application.Publisher
+	Clock      clock.Clock
+	MaxRows    int
 }
 
 type Service struct {

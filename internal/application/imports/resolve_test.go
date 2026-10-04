@@ -36,6 +36,12 @@ func TestAMappingIsResolvedBeforeTheSheetIsPlanned(t *testing.T) {
 			want:  h.detected(t, client),
 		},
 		{
+			name:  "category columns alone map nothing and are detected from the headers",
+			path:  client,
+			given: imports.Mapping{Options: imports.Options{LevelColumns: []string{"Category", "Subcategory"}}},
+			want:  h.detected(t, client),
+		},
+		{
 			name:  "detection keeps the options it was given",
 			path:  products,
 			given: imports.Mapping{Options: imports.Options{RowType: importmap.RowProducts}},

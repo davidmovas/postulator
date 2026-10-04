@@ -6,7 +6,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -21,7 +20,6 @@ type sheetRead struct {
 
 type workbook struct {
 	plans  []plan
-	unused []category.Category
 	report PreviewReport
 }
 
@@ -32,7 +30,6 @@ func (w *workbook) add(p *plan) {
 	r.Pages = append(r.Pages, more.Pages...)
 	r.Entities = append(r.Entities, more.Entities...)
 	r.Groups = append(r.Groups, more.Groups...)
-	r.Categories = append(r.Categories, more.Categories...)
 	r.Edges = append(r.Edges, more.Edges...)
 	r.Warnings = append(r.Warnings, more.Warnings...)
 	r.Errors = append(r.Errors, more.Errors...)
@@ -53,26 +50,9 @@ func (w *workbook) counts() Counts {
 		total.EdgesCreated += each.EdgesCreated
 		total.PagesCreated += each.PagesCreated
 		total.PagesUpdated += each.PagesUpdated
-		total.CategoriesCreated += each.CategoriesCreated
 		total.Skipped += each.Skipped
 	}
-	total.CategoriesDeleted = len(w.unused)
 	return total
-}
-
-func (s *Service) sweep(ctx context.Context, book *workbook, state *siteState) error {
-	terms, err := s.deps.CategoryTerms.ListBySite(ctx, state.siteID)
-	if err != nil {
-		return err
-	}
-	book.unused = unused(state.categories, state.pages, terms)
-	held := newShelf(state.categories)
-	for i := range book.unused {
-		book.report.Categories = append(book.report.Categories, PreviewCategory{
-			Path: held.trail(book.unused[i].ID), Action: string(CategoryDelete),
-		})
-	}
-	return nil
 }
 
 func (w *workbook) sheets() []string {
@@ -105,29 +85,11 @@ func (s *Service) compute(ctx context.Context, req PreviewRequest) (workbook, er
 	}
 
 	now := s.now()
-	roots, levels := namesOf(reads, &state)
-	book, after, err := s.planAll(ctx, state, roots, reads, now)
-	for err == nil && roots.takeRoots(&after, levels) {
-		book, after, err = s.planAll(ctx, state, roots, reads, now)
-	}
-	if err != nil {
-		return workbook{}, err
-	}
-	if sweepErr := s.sweep(ctx, &book, &after); sweepErr != nil {
-		return workbook{}, sweepErr
-	}
-	book.report.settle()
-	return book, nil
-}
-
-func (s *Service) planAll(
-	ctx context.Context, state siteState, roots keySet, reads []sheetRead, now time.Time,
-) (workbook, siteState, error) {
 	book := workbook{plans: make([]plan, 0, len(reads))}
 	for i := range reads {
-		planned, planErr := s.plan(ctx, state, roots, &reads[i], now)
+		planned, planErr := s.plan(ctx, state, &reads[i], now)
 		if planErr != nil {
-			return workbook{}, siteState{}, planErr
+			return workbook{}, planErr
 		}
 		next, settleErr := state.after(&planned, now)
 		switch {
@@ -136,12 +98,13 @@ func (s *Service) planAll(
 			_, message := errors.Describe(settleErr)
 			planned.noteAt(planned.whole(), "", CodeScopeClash, message)
 		default:
-			return workbook{}, siteState{}, settleErr
+			return workbook{}, settleErr
 		}
 		state = next
 		book.add(&planned)
 	}
-	return book, state, nil
+	book.report.settle()
+	return book, nil
 }
 
 func (s *Service) reads(ctx context.Context, req PreviewRequest) ([]sheetRead, error) {
@@ -156,7 +119,7 @@ func (s *Service) reads(ctx context.Context, req PreviewRequest) ([]sheetRead, e
 		}
 		return []sheetRead{read}, nil
 	}
-	if given := req.Mapping.domain(); given.ID != "" || !unmapped(given) {
+	if given := req.Mapping.domain(); given.ID != "" || !given.Unmapped() {
 		return nil, errors.New(errors.Invalid, "give one mapping for the file or one for each sheet, not both").
 			WithDetail("field", "sheets")
 	}
@@ -266,5 +229,5 @@ func (s siteState) after(p *plan, now time.Time) (siteState, error) {
 		entities[at].ScopeID, entities[at].UpdatedAt = moved[i].ScopeID, now
 	}
 	sortStored(entities, edges, pages)
-	return newSiteState(s.siteID, entities, edges, pages, slices.Concat(s.categories, p.categories)), err
+	return newSiteState(s.siteID, entities, edges, pages), err
 }

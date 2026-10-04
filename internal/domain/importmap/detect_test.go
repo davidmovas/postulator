@@ -110,12 +110,12 @@ func TestAutoDetectCarriesTheClientSample(t *testing.T) {
 func TestAQuestionIsNeverDetected(t *testing.T) {
 	t.Parallel()
 
-	for _, header := range []string{"Entity?", "Entity ?", "Is it an entity?", "Category?"} {
+	for _, header := range []string{"Entity?", "Entity ?", "Is it an entity?", "Root?"} {
 		if field, known := importmap.Detect(header); known {
 			t.Errorf("Detect(%q) = %s, want nothing", header, field)
 		}
 	}
-	mapping := importmap.AutoDetect([]string{"URL", "Entity?", "Category?"})
+	mapping := importmap.AutoDetect([]string{"URL", "Entity?", "Root?"})
 	if len(mapping.Columns) != 1 || len(mapping.Options.LevelColumns) != 0 || len(mapping.Options.NoteColumns) != 0 {
 		t.Fatalf("mapping = %+v, want the path alone", mapping)
 	}
@@ -138,7 +138,7 @@ func TestAutoDetectReadsTheClientSheets(t *testing.T) {
 				importmap.FieldPath: "Recommended URL Layer", importmap.FieldTitle: "Title", importmap.FieldH1: "H1",
 				importmap.FieldKeywords: "Keywords",
 			},
-			levels: []string{"Root Entity", "Category", "Subcategory"},
+			levels: []string{"Root Entity"},
 		},
 		{
 			name:    "the category and subcategory sheet",
@@ -146,7 +146,6 @@ func TestAutoDetectReadsTheClientSheets(t *testing.T) {
 			columns: map[importmap.Field]string{
 				importmap.FieldPath: "URL", importmap.FieldTitle: "Title", importmap.FieldH1: "H1", importmap.FieldKeywords: "Keywords",
 			},
-			levels: []string{"Category", "Subcategory"},
 		},
 		{
 			name: "the wide sheet an assistant wrote",
@@ -159,8 +158,7 @@ func TestAutoDetectReadsTheClientSheets(t *testing.T) {
 				importmap.FieldParentEntity: "Parent Entity", importmap.FieldTitle: "Title", importmap.FieldH1: "H1",
 				importmap.FieldPageKind: "Page Template",
 			},
-			levels: []string{"Category", "Subcategory"},
-			notes:  []string{"Intent Owner", "Notes"},
+			notes: []string{"Intent Owner", "Notes"},
 		},
 		{
 			name:    "the variation sheet",
@@ -169,16 +167,15 @@ func TestAutoDetectReadsTheClientSheets(t *testing.T) {
 			notes:   []string{"Detected Form / Variation", "Reason"},
 		},
 		{
-			name:    "levels are ordered from the outermost whatever the order of the columns",
+			name:    "the root column is the level wherever it stands",
 			headers: []string{"Subcategory", "URL", "Category", "Root"},
 			columns: map[importmap.Field]string{importmap.FieldPath: "URL"},
-			levels:  []string{"Root", "Category", "Subcategory"},
+			levels:  []string{"Root"},
 		},
 		{
-			name:    "a root category is the outermost level",
-			headers: []string{"Sub Subcategory", "Category", "URL", "Root Category"},
+			name:    "a root category is no level",
+			headers: []string{"Sub Subcategory", "Category", "URL", "Root Category", "Main Category", "Sub Category"},
 			columns: map[importmap.Field]string{importmap.FieldPath: "URL"},
-			levels:  []string{"Root Category", "Category", "Sub Subcategory"},
 		},
 	}
 
@@ -215,34 +212,6 @@ func TestWordsReadsACellAsItsLowercaseWords(t *testing.T) {
 		if got := importmap.Words(text); got != want {
 			t.Errorf("Words(%q) = %q, want %q", text, got, want)
 		}
-	}
-}
-
-func TestTheCategoryHeadersReadBackAsCategoryLevels(t *testing.T) {
-	t.Parallel()
-
-	headers := importmap.CategoryHeaders()
-	if !slices.Equal(headers, []string{"Category", "Subcategory", "Sub Subcategory"}) {
-		t.Fatalf("CategoryHeaders() = %v", headers)
-	}
-	headers[0] = "Brand"
-	if importmap.CategoryHeaders()[0] != "Category" {
-		t.Fatal("a caller changed the headers the detector knows")
-	}
-
-	written := append([]string{"path"}, importmap.CategoryHeaders()...)
-	mapping := importmap.AutoDetect(written)
-	if !slices.Equal(mapping.Options.LevelColumns, importmap.CategoryHeaders()) {
-		t.Fatalf("levels = %v, want the three category headers in their order", mapping.Options.LevelColumns)
-	}
-	binding, err := mapping.Bind(written)
-	if err != nil {
-		t.Fatalf("Bind: %v", err)
-	}
-	got := binding.Levels([]string{"/a/", "BPC-157", "Liquid", "10 ml"})
-	want := []importmap.Level{{Name: "BPC-157", Category: true}, {Name: "Liquid", Category: true}, {Name: "10 ml", Category: true}}
-	if !slices.Equal(got, want) {
-		t.Fatalf("Levels = %+v, want %+v", got, want)
 	}
 }
 

@@ -1,7 +1,6 @@
 package importmap
 
 import (
-	"cmp"
 	"slices"
 	"strings"
 	"unicode"
@@ -28,20 +27,7 @@ var aliases = map[Field][]string{
 	FieldOwnEntity:       {"own entity", "is entity", "has entity"},
 }
 
-var levelAliases = map[string]int{
-	"root entity": 0, "root": 0, "root category": 0,
-	"category": 1, "main category": 1,
-	"subcategory": 2, "sub category": 2,
-	"sub subcategory": 3,
-}
-
-var rootLevels = []string{"root entity", "root"}
-
-var categoryHeaders = []string{"Category", "Subcategory", "Sub Subcategory"}
-
-func CategoryHeaders() []string {
-	return slices.Clone(categoryHeaders)
-}
+var levelAliases = []string{"root entity", "root"}
 
 var noteAliases = []string{"notes", "note", "intent owner", "reason", "detected form variation"}
 
@@ -85,22 +71,22 @@ func compact(normalized string) string {
 	return strings.ReplaceAll(normalized, " ", "")
 }
 
-func levelOf(header string) (int, bool) {
+func rootLevel(header string) bool {
 	if asked(header) {
-		return 0, false
+		return false
 	}
 	written := compact(Words(header))
-	for alias, rank := range levelAliases {
-		if written == compact(alias) {
-			return rank, true
-		}
-	}
-	return 0, false
+	return slices.ContainsFunc(levelAliases, func(alias string) bool { return written == compact(alias) })
 }
 
-func rootLevel(header string) bool {
-	written := compact(Words(header))
-	return slices.ContainsFunc(rootLevels, func(alias string) bool { return written == compact(alias) })
+func rootColumns(columns []string) []string {
+	out := make([]string, 0, len(columns))
+	for _, column := range columns {
+		if rootLevel(column) {
+			out = append(out, column)
+		}
+	}
+	return out
 }
 
 func noteOf(header string) bool {
@@ -109,11 +95,7 @@ func noteOf(header string) bool {
 
 func AutoDetect(headers []string) Mapping {
 	columns := make(map[Field]string, len(headers))
-	type level struct {
-		header string
-		rank   int
-	}
-	levels := make([]level, 0)
+	options := DefaultOptions()
 	notes := make([]string, 0)
 	for _, header := range headers {
 		if field, known := Detect(header); known {
@@ -122,8 +104,8 @@ func AutoDetect(headers []string) Mapping {
 			}
 			continue
 		}
-		if rank, known := levelOf(header); known {
-			levels = append(levels, level{header: header, rank: rank})
+		if rootLevel(header) {
+			options.LevelColumns = append(options.LevelColumns, header)
 			continue
 		}
 		if noteOf(header) {
@@ -131,11 +113,6 @@ func AutoDetect(headers []string) Mapping {
 		}
 	}
 
-	slices.SortStableFunc(levels, func(a, b level) int { return cmp.Compare(a.rank, b.rank) })
-	options := DefaultOptions()
-	for _, held := range levels {
-		options.LevelColumns = append(options.LevelColumns, held.header)
-	}
 	if len(notes) > 0 {
 		options.NoteColumns = notes
 	}

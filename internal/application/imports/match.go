@@ -69,10 +69,7 @@ func (b *builder) inFile(name string, context int) (parentRef, FindingCode, bool
 		return parentRef{}, CodeAmbiguousParent, true
 	}
 
-	group := b.root(b.groups.nodes[context].unit)
-	inGroup := slices.DeleteFunc(named, func(at int) bool {
-		return b.units[at].parent.kind != refUnit || b.root(b.units[at].parent.unit) != group
-	})
+	inGroup := slices.DeleteFunc(named, func(at int) bool { return !b.inGroup(parentRef{kind: refUnit, unit: at}, context) })
 	if len(inGroup) == 1 {
 		return parentRef{kind: refUnit, unit: inGroup[0]}, "", true
 	}
@@ -90,10 +87,9 @@ func (b *builder) onSite(name string, context int) (parentRef, FindingCode) {
 		return parentRef{}, CodeAmbiguousParent
 	}
 
-	group := graph.Key(b.groups.nodes[context].name)
 	inGroup := make([]string, 0, len(sites))
 	for i := range sites {
-		if scope := sites[i].ScopeID; scope != nil && graph.Key(b.byID[*scope].Name) == group {
+		if b.inGroup(parentRef{kind: refSite, site: sites[i].ID}, context) {
 			inGroup = append(inGroup, sites[i].ID)
 		}
 	}
@@ -101,6 +97,50 @@ func (b *builder) onSite(name string, context int) (parentRef, FindingCode) {
 		return parentRef{kind: refSite, site: inGroup[0]}, ""
 	}
 	return parentRef{}, CodeAmbiguousParent
+}
+
+func (b *builder) inGroup(ref parentRef, context int) bool {
+	switch ref.kind {
+	case refUnit:
+		return b.unitInGroup(ref.unit, context)
+	case refSite:
+		return b.siteInGroup(ref.site, context)
+	case refNone, refName:
+	}
+	return false
+}
+
+func (b *builder) unitInGroup(at, context int) bool {
+	for range b.units {
+		u := &b.units[b.root(at)]
+		switch {
+		case u.group == context || u.context == context:
+			return true
+		case u.parent.kind == refSite:
+			return b.siteInGroup(u.parent.site, context)
+		case u.parent.kind != refUnit:
+			return false
+		}
+		at = u.parent.unit
+	}
+	return false
+}
+
+func (b *builder) siteInGroup(entityID string, context int) bool {
+	group := graph.Key(b.groups.nodes[context].name)
+	for range len(b.byID) + 1 {
+		held, known := b.byID[entityID]
+		switch {
+		case !known:
+			return false
+		case graph.Key(held.Name) == group:
+			return true
+		case held.ScopeID == nil:
+			return false
+		}
+		entityID = *held.ScopeID
+	}
+	return false
 }
 
 func (b *builder) resolveParents() {

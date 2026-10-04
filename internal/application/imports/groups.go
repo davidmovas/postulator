@@ -36,7 +36,7 @@ func groupsOf(rows []rowDraft) *groups {
 	for i := range rows {
 		parent := -1
 		path := ""
-		for _, name := range rows[i].roots {
+		for _, name := range rows[i].levels {
 			path += "\x00" + graph.Key(name)
 			at, known := g.byKey[path]
 			if !known {

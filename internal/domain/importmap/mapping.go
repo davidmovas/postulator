@@ -119,7 +119,7 @@ func NewMapping(m Mapping) (Mapping, error) {
 		return Mapping{}, invalid("mapping site id must not be empty", "siteId")
 	case m.Name == "":
 		return Mapping{}, invalid("mapping name must not be empty", "name")
-	case len(m.Columns) == 0 && len(m.Options.IndentColumns) == 0 && len(m.Options.LevelColumns) == 0:
+	case m.Unmapped():
 		return Mapping{}, invalid("mapping must map at least one column", "columns")
 	case !m.Options.RowType.Valid():
 		return Mapping{}, unknownRowType(m.Options.RowType)
@@ -158,20 +158,25 @@ func NewMapping(m Mapping) (Mapping, error) {
 	if err != nil {
 		return Mapping{}, err
 	}
-	if apartErr := apart(columns, levels, notes); apartErr != nil {
+	roots := rootColumns(levels)
+	if apartErr := apart(columns, roots, notes); apartErr != nil {
 		return Mapping{}, apartErr
 	}
 	m.Options.LevelColumns, m.Options.NoteColumns = levels, notes
 
 	_, hasPath := columns[FieldPath]
 	_, hasEntity := columns[FieldEntity]
-	if !hasPath && !hasEntity && len(indent) == 0 && len(levels) == 0 {
-		return Mapping{}, invalid("mapping must carry a path, an entity column, indent columns or level columns", "columns")
+	if !hasPath && !hasEntity && len(indent) == 0 && len(roots) == 0 {
+		return Mapping{}, invalid("mapping must carry a path, an entity column, indent columns or a root column", "columns")
 	}
 
 	m.Columns = columns
 	m.Options = m.Options.OrDefault()
 	return m, nil
+}
+
+func (m Mapping) Unmapped() bool {
+	return len(m.Columns) == 0 && len(m.Options.IndentColumns) == 0 && len(rootColumns(m.Options.LevelColumns)) == 0
 }
 
 func namedColumns(raw []string, field, what string) ([]string, error) {
@@ -223,20 +228,10 @@ type noteColumn struct {
 	at    int
 }
 
-type levelColumn struct {
-	at       int
-	category bool
-}
-
-type Level struct {
-	Name     string
-	Category bool
-}
-
 type Binding struct {
 	index   map[Field]int
 	indent  []int
-	levels  []levelColumn
+	levels  []int
 	notes   []noteColumn
 	options Options
 }
@@ -300,7 +295,7 @@ func (m Mapping) Bind(headers []string) (Binding, error) {
 	if err != nil {
 		return Binding{}, err
 	}
-	levels, err := bindLevels(positions, m.Options.LevelColumns)
+	levels, err := bindAll(positions, rootColumns(m.Options.LevelColumns), "levelColumns", "the level column is not in the file")
 	if err != nil {
 		return Binding{}, err
 	}
@@ -309,18 +304,6 @@ func (m Mapping) Bind(headers []string) (Binding, error) {
 		return Binding{}, err
 	}
 	return Binding{index: index, indent: indent, levels: levels, notes: notes, options: m.Options.OrDefault()}, nil
-}
-
-func bindLevels(positions headerIndex, columns []string) ([]levelColumn, error) {
-	found, err := bindAll(positions, columns, "levelColumns", "the level column is not in the file")
-	if err != nil {
-		return nil, err
-	}
-	levels := make([]levelColumn, 0, len(found))
-	for i, at := range found {
-		levels = append(levels, levelColumn{at: at, category: !rootLevel(columns[i])})
-	}
-	return levels, nil
 }
 
 func bindNotes(positions headerIndex, columns []string) ([]noteColumn, error) {
@@ -362,11 +345,11 @@ func levelCell(row []string, at int) string {
 	return value
 }
 
-func (b Binding) Levels(row []string) []Level {
-	out := make([]Level, 0, len(b.levels))
-	for _, column := range b.levels {
-		if name := levelCell(row, column.at); name != "" {
-			out = append(out, Level{Name: name, Category: column.category})
+func (b Binding) Levels(row []string) []string {
+	out := make([]string, 0, len(b.levels))
+	for _, at := range b.levels {
+		if name := levelCell(row, at); name != "" {
+			out = append(out, name)
 		}
 	}
 	return out

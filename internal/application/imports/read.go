@@ -3,7 +3,6 @@ package imports
 import (
 	"strings"
 
-	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -18,70 +17,23 @@ const (
 )
 
 type rowDraft struct {
-	at         importmap.Origin
-	path       string
-	title      string
-	h1         string
-	metaTitle  string
-	metaDesc   string
-	wpType     string
-	pageKind   string
-	keywords   keyword.List
-	notes      []pagemap.Note
-	name       string
-	own        ownership
-	kind       string
-	anchors    []string
-	related    []string
-	parent     string
-	levels     []importmap.Level
-	roots      []string
-	categories categoryLevels
-}
-
-type categoryLevel struct {
-	name string
-	root bool
-}
-
-type categoryLevels []categoryLevel
-
-func (l categoryLevels) named(root bool) []string {
-	out := make([]string, 0, len(l))
-	for _, level := range l {
-		if level.root == root {
-			out = append(out, level.name)
-		}
-	}
-	return out
-}
-
-func (l categoryLevels) chain() []string {
-	return l.named(false)
-}
-
-func (l categoryLevels) dropped() []string {
-	return l.named(true)
-}
-
-func (r *rowDraft) sortLevels(roots keySet) {
-	for _, level := range r.levels {
-		switch {
-		case !level.Category:
-			r.roots = append(r.roots, level.Name)
-		case category.Key(level.Name) == "":
-		default:
-			r.categories = append(r.categories, categoryLevel{name: level.Name, root: roots.holds(level.Name)})
-		}
-	}
-}
-
-func (r *rowDraft) noteDropped(p *plan) {
-	for _, name := range r.categories.dropped() {
-		p.noteAt(r.at, "", CodeCategoryLevelIsRoot,
-			"the category "+name+" is the name of a root entity, so it is not made a category; "+
-				"the levels below it are filed under the level above it")
-	}
+	at        importmap.Origin
+	path      string
+	title     string
+	h1        string
+	metaTitle string
+	metaDesc  string
+	wpType    string
+	pageKind  string
+	keywords  keyword.List
+	notes     []pagemap.Note
+	name      string
+	own       ownership
+	kind      string
+	anchors   []string
+	related   []string
+	parent    string
+	levels    []string
 }
 
 func (r *rowDraft) named() string {
@@ -123,12 +75,12 @@ func rowKeywords(binding importmap.Binding, row []string, at importmap.Origin, p
 	return keyword.New(items)
 }
 
-func readRows(binding importmap.Binding, table importmap.Table, roots keySet, p *plan) []rowDraft {
+func readRows(binding importmap.Binding, table importmap.Table, p *plan) []rowDraft {
 	rows := make([]rowDraft, 0, len(table.Rows))
 	walk := binding.Walk()
 	for i := range table.Rows {
 		raw := walk.Path(table.Rows[i])
-		draft, kept := readRow(binding, table.Rows[i], raw, table.Origin(i), roots, p)
+		draft, kept := readRow(binding, table.Rows[i], raw, table.Origin(i), p)
 		if !kept {
 			p.report.Skipped++
 			continue
@@ -138,17 +90,15 @@ func readRows(binding importmap.Binding, table importmap.Table, roots keySet, p 
 	return rows
 }
 
-func readRow(binding importmap.Binding, row []string, raw string, at importmap.Origin, roots keySet, p *plan) (rowDraft, bool) {
+func readRow(binding importmap.Binding, row []string, raw string, at importmap.Origin, p *plan) (rowDraft, bool) {
 	if binding.Blank(row) && raw == "" {
 		return rowDraft{}, false
 	}
 	draft := cellsOf(binding, row, at)
-	draft.sortLevels(roots)
-	if draft.name == "" && raw == "" && len(draft.roots) == 0 {
+	if draft.name == "" && raw == "" && len(draft.levels) == 0 {
 		p.noteAt(at, "", CodeNoTarget, "the row names neither a path, an entity nor a group")
 		return rowDraft{}, false
 	}
-	draft.noteDropped(p)
 	draft.own = rowOwnership(binding, row, at, p)
 	draft.keywords = rowKeywords(binding, row, at, p)
 	draft.path = rowPath(raw, at, p)

@@ -3,9 +3,6 @@ package tools_test
 import (
 	"context"
 	"encoding/json"
-	"os"
-	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -153,8 +150,8 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 	})
 
 	pagesService := pages.New(pages.Deps{
-		Pages: pageRepo, Links: linkRepo, Entities: entityRepo, Edges: edgeRepo, Categories: categoryRepo,
-		CategoryTerms: categoryTermRepo, Sites: siteRepo, UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
+		Pages: pageRepo, Links: linkRepo, Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, UnitOfWork: store,
+		Publisher: bus, Clock: now, Preview: stubPreview{},
 	})
 	return tools.New(tools.Deps{
 		Sites: sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, stubProbe{}, bus, now),
@@ -170,7 +167,6 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		Imports: imports.New(imports.Deps{
 			Tables:   importer.New(),
 			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Templates: templateRepo,
-			Categories: categoryRepo, CategoryTerms: categoryTermRepo,
 			Mappings: sqlite.NewImportMappingRepo(store), Sites: siteRepo, UnitOfWork: store,
 			Publisher: bus, Clock: now,
 		}),
@@ -339,44 +335,6 @@ func TestATemplateToolDeclaresWhatAProductGets(t *testing.T) {
 	}
 	if encoded, err = json.Marshal(bare); err != nil || strings.Contains(string(encoded), `"product":{`) {
 		t.Errorf("a template that says nothing of products carries a product block: %s", encoded)
-	}
-}
-
-func TestAnImportTheAgentRunsFilesItsRowsUnderTheirCategories(t *testing.T) {
-	t.Parallel()
-
-	registry, binding, seeded := wired(t)
-	binding.Mode = domainagent.ModeAutonomous
-
-	path := filepath.Join(t.TempDir(), "catalog.csv")
-	sheet := "URL,Title,Category,Subcategory\n/coffee/beans/,Beans,Drinks,Hot Drinks\n"
-	if err := os.WriteFile(path, []byte(sheet), 0o600); err != nil {
-		t.Fatalf("write the sheet: %v", err)
-	}
-	args := json.RawMessage(`{"path":` + strconv.Quote(path) + `}`)
-
-	previewed, err := registry.Call(t.Context(), binding, "imports_preview", args)
-	if err != nil {
-		t.Fatalf("imports_preview: %v", err)
-	}
-	encoded, err := json.Marshal(previewed)
-	if err != nil {
-		t.Fatalf("encode the preview: %v", err)
-	}
-	if !strings.Contains(string(encoded), `"categoriesCreated":2`) ||
-		!strings.Contains(string(encoded), `"categories":["Drinks","Hot Drinks"]`) {
-		t.Fatalf("the preview does not create the row's category chain: %s", encoded)
-	}
-
-	if _, err = registry.Call(t.Context(), binding, "imports_apply", args); err != nil {
-		t.Fatalf("imports_apply: %v", err)
-	}
-	filed, err := sqlite.NewCategoryRepo(seeded.store).ListBySite(t.Context(), seeded.site)
-	if err != nil {
-		t.Fatalf("list the categories: %v", err)
-	}
-	if len(filed) != 2 {
-		t.Fatalf("categories = %+v, want Drinks and Hot Drinks under it", filed)
 	}
 }
 

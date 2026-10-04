@@ -1,9 +1,11 @@
 package imports_test
 
 import (
+	"encoding/json"
 	"maps"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
@@ -12,6 +14,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
@@ -22,6 +25,34 @@ const clientSheet = "Root Entity,Category,Subcategory,Recommended URL Layer,Titl
 	"Peptides,BPC-157,Powder,/peptides/bpc-157/powder/,BPC-157 powder,BPC-157 Powder,\n" +
 	"Peptides,TB-500,,/peptides/tb-500/,TB-500 peptide,TB-500,tb 500\n" +
 	"Peptides,TB-500,Liquid,/peptides/tb-500/liquid/,TB-500 liquid,TB-500 Liquid,tb 500 liquid\n"
+
+const twoLiquids = "url,entity,parent\n/bpc-157/,BPC-157,\n/bpc-157/liquid/,Liquid,BPC-157\n/tb-500/,TB-500,\n/tb-500/liquid/,Liquid,TB-500\n"
+
+const twoLiquidsOneUnderARoot = "url,entity,parent\n/peptides/,Peptides,\n/peptides/bpc-157/,BPC-157,Peptides\n" +
+	"/peptides/bpc-157/liquid/,Liquid,BPC-157\n/tb-500/,TB-500,\n/tb-500/liquid/,Liquid,TB-500\n"
+
+func (h harness) scopeOf(t *testing.T, name string) []string {
+	t.Helper()
+
+	stored := h.entities(t)
+	byID := make(map[string]graph.Entity, len(stored))
+	for i := range stored {
+		byID[stored[i].ID] = stored[i]
+	}
+	out := make([]string, 0, 1)
+	for i := range stored {
+		if stored[i].Name != name {
+			continue
+		}
+		chain := ""
+		for at, held := byID[deref(stored[i].ScopeID)]; held; at, held = byID[deref(at.ScopeID)] {
+			chain = at.Name + " › " + chain
+		}
+		out = append(out, chain+name)
+	}
+	slices.Sort(out)
+	return out
+}
 
 func (h harness) detected(t *testing.T, path string) imports.Mapping {
 	t.Helper()
@@ -142,19 +173,22 @@ func TestTheUrlTreeGivesTheParentAFileDoesNotName(t *testing.T) {
 	}
 }
 
-func TestOnlyTheRootLevelMakesAGroupAndTheCategoriesPlaceTheRows(t *testing.T) {
+func TestOnlyTheRootColumnMakesAGroupAndTheUrlPlacesTheRowsInIt(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
 	path := h.file(t, "client.csv", clientSheet)
 	mapping := h.detected(t, path)
-	if !slices.Equal(mapping.Options.LevelColumns, []string{"Root Entity", "Category", "Subcategory"}) {
+	if !slices.Equal(mapping.Options.LevelColumns, []string{"Root Entity"}) {
 		t.Fatalf("levels = %v", mapping.Options.LevelColumns)
 	}
 
 	report := h.preview(t, path, mapping)
 	if len(report.Errors) != 0 {
 		t.Fatalf("errors = %+v", report.Errors)
+	}
+	if left := ignored(report); !slices.Equal(left, []string{"Category", "Subcategory"}) {
+		t.Fatalf("ignored = %v, want the category columns", left)
 	}
 	owners := map[string]string{
 		"/peptides/":                "Peptides",
@@ -170,7 +204,7 @@ func TestOnlyTheRootLevelMakesAGroupAndTheCategoriesPlaceTheRows(t *testing.T) {
 		}
 	}
 	if len(report.Entities) != 6 || len(entitiesNamed(report, "Liquid")) != 0 {
-		t.Fatalf("entities = %+v, want the six rows and no entity of a category level", report.Entities)
+		t.Fatalf("entities = %+v, want the six rows and no entity of a category cell", report.Entities)
 	}
 	for _, want := range [][2]string{
 		{"BPC-157", "Peptides"}, {"TB-500", "Peptides"}, {"BPC-157 Liquid", "BPC-157"}, {"BPC-157 Powder", "BPC-157"},
@@ -229,13 +263,13 @@ func TestOnlyTheRootLevelMakesAnEntityOfItsGroup(t *testing.T) {
 		want  map[string]graph.Kind
 	}{
 		{
-			name: "a root, its categories and their subcategories",
+			name: "a root beside category and subcategory columns",
 			sheet: "Root Entity,Category,Subcategory,URL,H1\nPeptides,,,/peptides/,Peptides\nPeptides,BPC-157,,/peptides/bpc-157/,BPC-157\n" +
 				"Peptides,BPC-157,Liquid,/peptides/bpc-157/liquid/,BPC-157 Liquid\n",
 			want: map[string]graph.Kind{"Peptides": graph.KindHub, "BPC-157": graph.KindTopic, "BPC-157 Liquid": graph.KindTopic},
 		},
 		{
-			name:  "a root category is a category level",
+			name:  "a root category column is ignored",
 			sheet: "Root Category,Category,URL,H1\nPeptides,,/peptides/,Peptides\nPeptides,BPC-157,/peptides/bpc-157/,BPC-157\n",
 			want:  map[string]graph.Kind{"Peptides": graph.KindTopic, "BPC-157": graph.KindTopic},
 		},
@@ -245,7 +279,7 @@ func TestOnlyTheRootLevelMakesAnEntityOfItsGroup(t *testing.T) {
 			want:  map[string]graph.Kind{"Peptides": graph.KindTopic, "Bpc 157": graph.KindProduct},
 		},
 		{
-			name:  "category levels alone make no entity",
+			name:  "category columns alone make no entity",
 			sheet: "Category,Subcategory,URL,H1\nPeptides,Liquid,/a/,Alpha\nPeptides,Powder,/b/,Beta\n",
 			want:  map[string]graph.Kind{"Alpha": graph.KindTopic, "Beta": graph.KindTopic},
 		},
@@ -271,18 +305,177 @@ func TestOnlyTheRootLevelMakesAnEntityOfItsGroup(t *testing.T) {
 	}
 }
 
-func TestARowOfCategoriesAloneNamesNothing(t *testing.T) {
+func TestAUrlParentWinsInsideTheRowsRootGroup(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		before string
+		sheet  string
+		scopes map[string][]string
+		edges  [][2]string
+		absent [][2]string
+	}{
+		{
+			name: "a row under its url parent, not under the root",
+			sheet: "Root Entity,URL,H1\nPeptides,/peptides/,Peptides\nPeptides,/peptides/bpc-157/,BPC-157\n" +
+				"Peptides,/peptides/bpc-157/liquid/,BPC-157 Liquid\n",
+			scopes: map[string][]string{
+				"BPC-157": {"Peptides › BPC-157"}, "BPC-157 Liquid": {"Peptides › BPC-157 › BPC-157 Liquid"},
+			},
+			edges:  [][2]string{{"BPC-157", "Peptides"}, {"BPC-157 Liquid", "BPC-157"}},
+			absent: [][2]string{{"BPC-157 Liquid", "Peptides"}},
+		},
+		{
+			name:   "a url parent in another root group",
+			sheet:  "Root Entity,URL,H1\nPeptides,/peptides/,Peptides\nBlends,/blends/,Blends\nBlends,/peptides/mix/,Mix\n",
+			scopes: map[string][]string{"Mix": {"Blends › Mix"}},
+			edges:  [][2]string{{"Mix", "Blends"}},
+			absent: [][2]string{{"Mix", "Peptides"}},
+		},
+		{
+			name:   "an intermediate page the import makes under the group's page",
+			sheet:  "Root Entity,URL,H1\nPeptides,/peptides/,Peptides\nPeptides,/peptides/bpc-157/liquid/,Liquid\n",
+			scopes: map[string][]string{"Bpc 157": {"Peptides › Bpc 157"}, "Liquid": {"Peptides › Bpc 157 › Liquid"}},
+			edges:  [][2]string{{"Bpc 157", "Peptides"}, {"Liquid", "Bpc 157"}},
+		},
+		{
+			name:   "an intermediate page the import makes under the group's page on the site",
+			before: "Root Entity,URL,H1\nPeptides,/peptides/,Peptides\n",
+			sheet:  "Root Entity,URL,H1\nPeptides,/peptides/bpc-157/liquid/,Liquid\n",
+			scopes: map[string][]string{"Bpc 157": {"Peptides › Bpc 157"}, "Liquid": {"Peptides › Bpc 157 › Liquid"}},
+			edges:  [][2]string{{"Bpc 157", "Peptides"}, {"Liquid", "Bpc 157"}},
+			absent: [][2]string{{"Liquid", "Peptides"}},
+		},
+		{
+			name:   "a url parent outside every group that names its own parent",
+			sheet:  "Root Entity,URL,H1,Parent\nPeptides,/peptides/,Peptides,\n,/shop/,Shop,Peptides\nPeptides,/shop/vial/,Vial,\n",
+			scopes: map[string][]string{"Shop": {"Peptides › Shop"}, "Vial": {"Peptides › Vial"}},
+			edges:  [][2]string{{"Shop", "Peptides"}, {"Vial", "Peptides"}},
+			absent: [][2]string{{"Vial", "Shop"}},
+		},
+		{
+			name: "a parent cell over the url parent",
+			sheet: "Root Entity,URL,Entity,Parent\nPeptides,/peptides/,Peptides,\nPeptides,/peptides/bpc-157/,BPC-157,\n" +
+				"Peptides,/peptides/tb-500/,TB-500,\nPeptides,/peptides/bpc-157/vial/,Vial,TB-500\n",
+			scopes: map[string][]string{"Vial": {"Peptides › TB-500 › Vial"}},
+			edges:  [][2]string{{"Vial", "TB-500"}},
+			absent: [][2]string{{"Vial", "BPC-157"}},
+		},
+		{
+			name:   "an entity the site holds under another parent keeps it",
+			before: "url,entity,parent\n/tb-500/,TB-500,\n/tb-500/drops/,Drops,TB-500\n",
+			sheet: "Root Entity,URL,Entity\nPeptides,/peptides/,Peptides\nPeptides,/peptides/bpc-157/,BPC-157\n" +
+				"Peptides,/peptides/bpc-157/drops/,Drops\n",
+			scopes: map[string][]string{"Drops": {"TB-500 › Drops"}},
+			absent: [][2]string{{"Drops", "BPC-157"}, {"Drops", "Peptides"}},
+		},
+		{
+			name: "two rows of one name under two url parents of one group",
+			sheet: "Root Entity,URL,Entity\nPeptides,/peptides/,Peptides\nPeptides,/peptides/bpc-157/,BPC-157\n" +
+				"Peptides,/peptides/bpc-157/liquid/,Liquid\nPeptides,/peptides/tb-500/,TB-500\nPeptides,/peptides/tb-500/liquid/,Liquid\n",
+			scopes: map[string][]string{"Liquid": {"Peptides › BPC-157 › Liquid", "Peptides › TB-500 › Liquid"}},
+			edges:  [][2]string{{"Liquid", "BPC-157"}, {"Liquid", "TB-500"}},
+		},
+		{
+			name:   "a parent cell naming a namesake the site holds deeper in the group",
+			before: twoLiquidsOneUnderARoot,
+			sheet:  "Root Entity,URL,Entity,Parent\nPeptides,/drops/,Drops,Liquid\n",
+			scopes: map[string][]string{"Drops": {"Peptides › BPC-157 › Liquid › Drops"}},
+		},
+		{
+			name: "a parent cell naming a namesake the sheet plans deeper in the group",
+			sheet: "Root Entity,URL,Entity,Parent\nPeptides,/peptides/,Peptides,\nPeptides,/peptides/bpc-157/,BPC-157,\n" +
+				"Peptides,/peptides/bpc-157/liquid/,Liquid,\n,/tb-500/,TB-500,\n,/tb-500/liquid/,Liquid,TB-500\nPeptides,/drops/,Drops,Liquid\n",
+			scopes: map[string][]string{
+				"Drops": {"Peptides › BPC-157 › Liquid › Drops"}, "Liquid": {"Peptides › BPC-157 › Liquid", "TB-500 › Liquid"},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := newHarness(t)
+			if tc.before != "" {
+				before := h.file(t, "before.csv", tc.before)
+				if applied := h.apply(t, before, h.detected(t, before)); len(applied.Report.Errors) != 0 {
+					t.Fatalf("the site's own sheet reported %+v", applied.Report.Errors)
+				}
+			}
+			path := h.file(t, "sheet.csv", tc.sheet)
+			applied := h.apply(t, path, h.detected(t, path))
+			if len(applied.Report.Errors) != 0 {
+				t.Fatalf("errors = %+v", applied.Report.Errors)
+			}
+			for name, want := range tc.scopes {
+				if got := h.scopeOf(t, name); !slices.Equal(got, want) {
+					t.Errorf("%s sits at %v, want %v", name, got, want)
+				}
+			}
+			for _, want := range tc.edges {
+				if !hasEdge(applied.Report, want[0], want[1], string(graph.EdgeParent)) {
+					t.Errorf("edges = %+v, want %s under %s", applied.Report.Edges, want[0], want[1])
+				}
+			}
+			for _, unwanted := range tc.absent {
+				if hasEdge(applied.Report, unwanted[0], unwanted[1], string(graph.EdgeParent)) {
+					t.Errorf("edges = %+v, want no %s under %s", applied.Report.Edges, unwanted[0], unwanted[1])
+				}
+			}
+		})
+	}
+}
+
+func TestASavedCategoryLevelColumnIsIgnored(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	path := h.file(t, "levels.csv", "Category,Subcategory,URL,H1\nPeptides,BPC-157,,\nPeptides,,/peptides/,Peptides\n")
-	report := h.preview(t, path, h.detected(t, path))
-
-	if empty := findings(report.Warnings, imports.CodeNoTarget); len(empty) != 1 || empty[0].Row != 2 {
-		t.Fatalf("findings = %+v, want the row without a page, an entity or a root named", report.Warnings)
+	path := h.file(t, "client.csv", clientSheet)
+	mapping := h.detected(t, path)
+	mapping.Options.LevelColumns = []string{"Root Entity", "Category", "Subcategory"}
+	saved, err := h.service.SaveMapping(t.Context(), imports.SaveMappingRequest{Mapping: mapping})
+	if err != nil {
+		t.Fatalf("SaveMapping: %v", err)
 	}
-	if len(report.Entities) != 1 || report.Skipped != 1 {
-		t.Fatalf("entities = %+v and %d skipped, want the page's entity alone", report.Entities, report.Skipped)
+	if !slices.Equal(saved.Mapping.Options.LevelColumns, mapping.Options.LevelColumns) {
+		t.Fatalf("saved levels = %v, want them kept as given", saved.Mapping.Options.LevelColumns)
+	}
+
+	report := h.preview(t, path, imports.Mapping{ID: saved.Mapping.ID})
+	if left := ignored(report); !slices.Equal(left, []string{"Category", "Subcategory"}) {
+		t.Fatalf("ignored = %v, want the category columns", left)
+	}
+	if groups := report.Groups; len(groups) != 1 || !slices.Equal(groups[0].Path, []string{"Peptides"}) {
+		t.Fatalf("groups = %+v, want the root alone", groups)
+	}
+	if len(report.Entities) != 6 || len(entitiesNamed(report, "BPC-157")) != 1 {
+		t.Fatalf("entities = %+v, want one per row", report.Entities)
+	}
+
+	alone := h.mapping(nil)
+	alone.Name = "categories"
+	alone.Options.LevelColumns = []string{"Category", "Subcategory"}
+	if _, err := h.service.SaveMapping(t.Context(), imports.SaveMappingRequest{Mapping: alone}); !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("SaveMapping of category columns alone = %v, want it refused as mapping nothing", err)
+	}
+}
+
+func TestThePreviewAndTheApplyCarryNoCategories(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	path := h.file(t, "client.csv", clientSheet)
+	applied := h.apply(t, path, h.detected(t, path))
+	encoded, err := json.Marshal(applied)
+	if err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+	for _, key := range []string{`"categories":`, `"categoriesCreated":`, `"categoriesDeleted":`} {
+		if strings.Contains(string(encoded), key) {
+			t.Fatalf("the apply carries %s: %s", key, encoded)
+		}
 	}
 }
 

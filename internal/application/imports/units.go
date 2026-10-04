@@ -28,20 +28,19 @@ type parentRef struct {
 }
 
 type unit struct {
-	name       string
-	kind       string
-	keywords   keyword.List
-	anchors    []string
-	related    []string
-	at         importmap.Origin
-	parent     parentRef
-	context    int
-	group      int
-	categories categoryLevels
-	pinned     string
-	alias      int
-	matched    string
-	id         string
+	name     string
+	kind     string
+	keywords keyword.List
+	anchors  []string
+	related  []string
+	at       importmap.Origin
+	parent   parentRef
+	context  int
+	group    int
+	pinned   string
+	alias    int
+	matched  string
+	id       string
 }
 
 func (u *unit) defaultKind() graph.Kind {
@@ -69,8 +68,6 @@ type builder struct {
 	names    map[string]string
 	resolved map[string]graph.Entity
 	final    []pagemap.Page
-	shelf    *shelf
-	filings  map[string]*filing
 }
 
 func newBuilder(state siteState, p *plan, rows []rowDraft, sheet *drafts, now time.Time) *builder {
@@ -78,7 +75,6 @@ func newBuilder(state siteState, p *plan, rows []rowDraft, sheet *drafts, now ti
 		state: state, p: p, now: now, rows: rows, sheet: sheet, groups: groupsOf(rows),
 		assigned: make(map[string]int), warned: make(map[string]struct{}), claimed: make(map[string]int),
 		parents: make(map[string]int), byID: make(map[string]graph.Entity, len(state.entities)),
-		shelf: newShelf(state.categories), filings: make(map[string]*filing),
 	}
 	for i := range state.entities {
 		b.byID[state.entities[i].ID] = state.entities[i]
@@ -96,7 +92,6 @@ func (b *builder) build() {
 	b.adopted = b.groups.adopt(b.rows, b.sheet, b.state)
 	b.addPageUnits()
 	b.addEntityRows()
-	b.place()
 	b.resolveParents()
 	b.match()
 	b.order = b.roots()
@@ -203,20 +198,29 @@ func (b *builder) addRowUnit(draft *pageDraft) {
 	}
 
 	first := &b.rows[draft.rows[0]]
-	u := unit{
-		name: fill(explicit, first.named()), at: first.at, context: b.contextOf(draft.rows), group: -1,
-		categories: draft.categories,
-	}
+	u := unit{name: fill(explicit, first.named()), at: first.at, context: b.contextOf(draft.rows), group: -1}
 	if onSite && explicit == "" && existing.EntityID != nil {
 		if pinned, known := b.byID[*existing.EntityID]; known {
 			u.name, u.pinned = pinned.Name, pinned.ID
 		}
 	}
-	if u.parent = b.groupParent(u.context); u.parent.kind == refNone {
-		u.parent = b.urlParent(draft.path)
-	}
+	u.parent = b.rowParent(draft.path, u.context)
 	draft.unit = b.add(u)
 	b.absorbRows(draft)
+}
+
+func (b *builder) rowParent(path string, context int) parentRef {
+	ref := b.urlParent(path)
+	switch {
+	case context < 0:
+		return ref
+	case ref.kind == refUnit && b.root(ref.unit) == b.root(b.groups.nodes[context].unit):
+		return b.groupParent(context)
+	case b.inGroup(ref, context):
+		return ref
+	default:
+		return b.groupParent(context)
+	}
 }
 
 func (b *builder) addEntityRows() {
@@ -225,7 +229,7 @@ func (b *builder) addEntityRows() {
 		if row.path != "" || row.name == "" {
 			continue
 		}
-		u := unit{name: row.name, at: row.at, context: b.contextOf([]int{i}), group: -1, categories: row.categories}
+		u := unit{name: row.name, at: row.at, context: b.contextOf([]int{i}), group: -1}
 		u.parent = b.groupParent(u.context)
 		b.absorbRow(b.add(u), row)
 	}

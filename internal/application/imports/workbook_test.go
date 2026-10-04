@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
@@ -63,7 +62,7 @@ func TestInspectDetectsEverySheetOnItsOwn(t *testing.T) {
 	if !slices.Equal(names, clientSheets) {
 		t.Fatalf("sheets = %v, want %v", names, clientSheets)
 	}
-	if groups := seen.Sheets[0].Detected.Options.LevelColumns; !slices.Equal(groups, []string{"Root Entity", "Category", "Subcategory"}) {
+	if groups := seen.Sheets[0].Detected.Options.LevelColumns; !slices.Equal(groups, []string{"Root Entity"}) {
 		t.Fatalf("the group sheet detects the levels %v", groups)
 	}
 }
@@ -263,9 +262,6 @@ func TestEveryItemOfAWorkbookPreviewNamesItsSheet(t *testing.T) {
 	}
 	for _, group := range report.Groups {
 		named("a group", group.Sheet)
-	}
-	for _, listed := range report.Categories {
-		named("the category "+strings.Join(listed.Path, " › "), listed.Sheet)
 	}
 	for _, edge := range report.Edges {
 		named("the edge from "+edge.From, edge.Sheet)

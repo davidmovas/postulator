@@ -243,8 +243,6 @@ export const importFindingCodes = [
     "wp_type_kept",
     "intermediate_level",
     "scope_clash",
-    "category_level_is_root",
-    "category_chain_cut",
 ] as const;
 export type ImportFindingCode = (typeof importFindingCodes)[number];
 
@@ -261,9 +259,6 @@ export const blockingImportFindingCodes: readonly ImportFindingCode[] = [
 
 export const importActions = ["create", "update", "skip"] as const;
 export type ImportAction = (typeof importActions)[number];
-
-export const importCategoryActions = ["create", "match", "delete"] as const;
-export type ImportCategoryAction = (typeof importCategoryActions)[number];
 
 export const exportFormats = ["xlsx", "csv"] as const;
 export type ExportFormat = (typeof exportFormats)[number];

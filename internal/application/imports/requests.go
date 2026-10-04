@@ -60,11 +60,10 @@ type ExportRequest struct {
 }
 
 type ExportResponse struct {
-	Path     string    `json:"path"`
-	Format   string    `json:"format"`
-	Pages    int       `json:"pages"`
-	Entities int       `json:"entities"`
-	Warnings []Finding `json:"warnings"`
+	Path     string `json:"path"`
+	Format   string `json:"format"`
+	Pages    int    `json:"pages"`
+	Entities int    `json:"entities"`
 }
 
 type SaveMappingRequest struct {

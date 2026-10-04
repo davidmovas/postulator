@@ -18,43 +18,33 @@ const (
 	ActionSkip   Action = "skip"
 )
 
-type CategoryAction string
-
-const (
-	CategoryCreate CategoryAction = "create"
-	CategoryMatch  CategoryAction = "match"
-	CategoryDelete CategoryAction = "delete"
-)
-
 type FindingCode string
 
 const (
-	CodeBadPath             FindingCode = "bad_path"
-	CodeNoTarget            FindingCode = "no_target"
-	CodeDuplicatePath       FindingCode = "duplicate_path"
-	CodeIntermediatePath    FindingCode = "intermediate_path"
-	CodeUnknownParent       FindingCode = "unknown_parent"
-	CodeUnknownRelated      FindingCode = "unknown_related"
-	CodeSelfEdge            FindingCode = "self_edge"
-	CodeCycle               FindingCode = "cycle"
-	CodeCannibalization     FindingCode = "cannibalization"
-	CodeUnknownEntityKind   FindingCode = "unknown_entity_kind"
-	CodeUnknownPageKind     FindingCode = "unknown_page_kind"
-	CodeUnknownWPType       FindingCode = "unknown_wp_type"
-	CodeRootPageSkipped     FindingCode = "root_page_skipped"
-	CodeBadVolume           FindingCode = "bad_volume"
-	CodeUnknownOwnEntity    FindingCode = "unknown_own_entity"
-	CodeTechnicalParent     FindingCode = "technical_parent"
-	CodeGroupWithoutPage    FindingCode = "group_without_page"
-	CodeAmbiguousParent     FindingCode = "ambiguous_parent"
-	CodeAmbiguousEntity     FindingCode = "ambiguous_entity"
-	CodeProductNotInStore   FindingCode = "product_not_in_store"
-	CodeProductRowLeft      FindingCode = "product_row_left"
-	CodeWPTypeKept          FindingCode = "wp_type_kept"
-	CodeIntermediateLevel   FindingCode = "intermediate_level"
-	CodeScopeClash          FindingCode = "scope_clash"
-	CodeCategoryLevelIsRoot FindingCode = "category_level_is_root"
-	CodeCategoryChainCut    FindingCode = "category_chain_cut"
+	CodeBadPath           FindingCode = "bad_path"
+	CodeNoTarget          FindingCode = "no_target"
+	CodeDuplicatePath     FindingCode = "duplicate_path"
+	CodeIntermediatePath  FindingCode = "intermediate_path"
+	CodeUnknownParent     FindingCode = "unknown_parent"
+	CodeUnknownRelated    FindingCode = "unknown_related"
+	CodeSelfEdge          FindingCode = "self_edge"
+	CodeCycle             FindingCode = "cycle"
+	CodeCannibalization   FindingCode = "cannibalization"
+	CodeUnknownEntityKind FindingCode = "unknown_entity_kind"
+	CodeUnknownPageKind   FindingCode = "unknown_page_kind"
+	CodeUnknownWPType     FindingCode = "unknown_wp_type"
+	CodeRootPageSkipped   FindingCode = "root_page_skipped"
+	CodeBadVolume         FindingCode = "bad_volume"
+	CodeUnknownOwnEntity  FindingCode = "unknown_own_entity"
+	CodeTechnicalParent   FindingCode = "technical_parent"
+	CodeGroupWithoutPage  FindingCode = "group_without_page"
+	CodeAmbiguousParent   FindingCode = "ambiguous_parent"
+	CodeAmbiguousEntity   FindingCode = "ambiguous_entity"
+	CodeProductNotInStore FindingCode = "product_not_in_store"
+	CodeProductRowLeft    FindingCode = "product_row_left"
+	CodeWPTypeKept        FindingCode = "wp_type_kept"
+	CodeIntermediateLevel FindingCode = "intermediate_level"
+	CodeScopeClash        FindingCode = "scope_clash"
 )
 
 var blockingFindingCodes = []FindingCode{
@@ -72,7 +62,7 @@ type Options struct {
 	ListSeparator   string            `json:"listSeparator,omitempty" description:"Other list separator in a cell; default comma"`
 	Sheets          []string          `json:"sheets,omitempty" description:"Sheet names to read; default the first"`
 	IndentColumns   []string          `json:"indentColumns,omitempty" description:"Columns whose position nests the path, shallowest first"`
-	LevelColumns    []string          `json:"levelColumns,omitempty" description:"Outermost first; Root groups entities, the rest are categories"`
+	LevelColumns    []string          `json:"levelColumns,omitempty" description:"Root Entity or Root group columns, outermost first"`
 	NoteColumns     []string          `json:"noteColumns,omitempty" description:"Columns kept as notes for the writer"`
 	RowType         importmap.RowType `json:"rowType,omitempty" enum:"pages,products,kind" description:"Default pages; a parent of products stays a page, a wp_type cell wins"`
 	NoHeader        bool              `json:"noHeader,omitempty" description:"No header row: columns go by letter, every row is data"`
@@ -117,16 +107,8 @@ type PreviewPage struct {
 	WPType          string        `json:"wpType"`
 	PageKind        string        `json:"pageKind,omitempty"`
 	Entity          string        `json:"entity,omitempty"`
-	Categories      []string      `json:"categories"`
 	Action          string        `json:"action"`
 	Generated       bool          `json:"generated,omitempty"`
-}
-
-type PreviewCategory struct {
-	Sheet  string   `json:"sheet,omitempty"`
-	Path   []string `json:"path"`
-	Action string   `json:"action"`
-	Rows   int      `json:"rows"`
 }
 
 type PreviewEntity struct {
@@ -177,27 +159,24 @@ type Conflict struct {
 }
 
 type PreviewReport struct {
-	Columns         []PreviewColumn   `json:"columns"`
-	Pages           []PreviewPage     `json:"pages"`
-	Entities        []PreviewEntity   `json:"entities"`
-	Groups          []PreviewGroup    `json:"groups"`
-	Categories      []PreviewCategory `json:"categories"`
-	Edges           []PreviewEdge     `json:"edges"`
-	Warnings        []Finding         `json:"warnings"`
-	Errors          []Finding         `json:"errors"`
-	Cannibalization []Conflict        `json:"cannibalization"`
-	Skipped         int               `json:"skipped"`
+	Columns         []PreviewColumn `json:"columns"`
+	Pages           []PreviewPage   `json:"pages"`
+	Entities        []PreviewEntity `json:"entities"`
+	Groups          []PreviewGroup  `json:"groups"`
+	Edges           []PreviewEdge   `json:"edges"`
+	Warnings        []Finding       `json:"warnings"`
+	Errors          []Finding       `json:"errors"`
+	Cannibalization []Conflict      `json:"cannibalization"`
+	Skipped         int             `json:"skipped"`
 }
 
 type Counts struct {
-	EntitiesCreated   int `json:"entitiesCreated"`
-	EntitiesUpdated   int `json:"entitiesUpdated"`
-	EdgesCreated      int `json:"edgesCreated"`
-	PagesCreated      int `json:"pagesCreated"`
-	PagesUpdated      int `json:"pagesUpdated"`
-	CategoriesCreated int `json:"categoriesCreated"`
-	CategoriesDeleted int `json:"categoriesDeleted"`
-	Skipped           int `json:"skipped"`
+	EntitiesCreated int `json:"entitiesCreated"`
+	EntitiesUpdated int `json:"entitiesUpdated"`
+	EdgesCreated    int `json:"edgesCreated"`
+	PagesCreated    int `json:"pagesCreated"`
+	PagesUpdated    int `json:"pagesUpdated"`
+	Skipped         int `json:"skipped"`
 }
 
 func mappingView(m importmap.Mapping) Mapping {
@@ -263,9 +242,6 @@ func (r *PreviewReport) settle() {
 	if r.Groups == nil {
 		r.Groups = []PreviewGroup{}
 	}
-	if r.Categories == nil {
-		r.Categories = []PreviewCategory{}
-	}
 	if r.Edges == nil {
 		r.Edges = []PreviewEdge{}
 	}
@@ -292,9 +268,8 @@ func entityView(sheet string, e graph.Entity, parent string, action Action) Prev
 	}
 }
 
-func pageView(sheet string, p pagemap.Page, draft *pageDraft, categories []string, action Action) PreviewPage {
+func pageView(sheet string, p pagemap.Page, draft *pageDraft, action Action) PreviewPage {
 	view := PreviewPage{
-		Categories:      categories,
 		Sheet:           sheet,
 		Path:            p.Path,
 		PlannedPath:     p.PlannedPath,

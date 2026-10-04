@@ -32,11 +32,6 @@ func (s *Service) Apply(ctx context.Context, req ApplyRequest) (ApplyResponse, e
 				return writeErr
 			}
 		}
-		for i := range book.unused {
-			if deleteErr := s.deps.Categories.Delete(c, book.unused[i].ID); deleteErr != nil {
-				return deleteErr
-			}
-		}
 		return s.remember(c, req, book.plans)
 	})
 	if err != nil {
@@ -49,11 +44,6 @@ func (s *Service) Apply(ctx context.Context, req ApplyRequest) (ApplyResponse, e
 }
 
 func (s *Service) write(ctx context.Context, computed *plan) error {
-	for i := range computed.categories {
-		if err := s.deps.Categories.Insert(ctx, computed.categories[i]); err != nil {
-			return err
-		}
-	}
 	for i := range computed.entities {
 		planned := &computed.entities[i]
 		write := s.deps.Entities.Update
