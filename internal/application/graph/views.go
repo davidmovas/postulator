@@ -20,7 +20,6 @@ type Entity struct {
 	SiteID          string         `json:"siteId"`
 	Name            string         `json:"name"`
 	Kind            string         `json:"kind"`
-	SiteCategory    bool           `json:"siteCategory"`
 	Intent          string         `json:"intent"`
 	Keywords        []dto.Keyword  `json:"keywords"`
 	Anchors         []Anchor       `json:"anchors"`
@@ -55,7 +54,7 @@ type EntityPage struct {
 	Mismatch bool   `json:"mismatch"`
 }
 
-func entityView(e graphdomain.Entity, filed application.CategoryIndex) Entity {
+func entityView(e graphdomain.Entity, filed filing) Entity {
 	anchors := make([]Anchor, 0, len(e.Anchors))
 	for _, anchor := range e.Anchors {
 		anchors = append(anchors, Anchor{Text: anchor.Text, Source: string(anchor.Source), Weight: anchor.Weight})
@@ -65,12 +64,11 @@ func entityView(e graphdomain.Entity, filed application.CategoryIndex) Entity {
 		SiteID:          e.SiteID,
 		Name:            e.Name,
 		Kind:            string(e.Kind),
-		SiteCategory:    e.SiteCategory,
 		Intent:          e.Intent,
 		Keywords:        application.KeywordViews(e.Keywords),
 		Anchors:         anchors,
 		ScopeEntityID:   e.ScopeID,
-		Categories:      filed.Of(e.ID, graphdomain.TaxonomyCategory),
+		Categories:      filed.of(e),
 		CanonicalPageID: e.CanonicalPageID,
 		Score:           e.Score,
 		Source:          string(e.Source),

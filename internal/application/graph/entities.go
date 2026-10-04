@@ -114,9 +114,6 @@ func (s *Service) UpdateEntity(ctx context.Context, req UpdateEntityRequest) (Up
 		if req.Keywords != nil {
 			next.Keywords = keywords
 		}
-		if req.SiteCategory != nil {
-			next.SiteCategory = *req.SiteCategory
-		}
 	})
 	if err != nil {
 		return UpdateEntityResponse{}, err
@@ -230,7 +227,7 @@ func (s *Service) ListEntities(ctx context.Context, req ListEntitiesRequest) (pa
 	if err != nil {
 		return paging.List[Entity]{}, err
 	}
-	filed, err := s.siteCategoryIndex(ctx, req.SiteID)
+	filed, err := s.filingOf(ctx, req.SiteID, list.Items)
 	if err != nil {
 		return paging.List[Entity]{}, err
 	}

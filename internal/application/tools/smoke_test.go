@@ -92,6 +92,7 @@ type fixture struct {
 	other    string
 	page     string
 	template string
+	store    *sqlite.Store
 }
 
 func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seeded fixture) {
@@ -104,7 +105,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 	page := sqlitetest.Page(t, store, owner.ID, "/coffee/")
 	guide := sqlitetest.Template(t, store, "Guide")
 	seeded = fixture{
-		site: owner.ID, entity: entity.ID, other: other.ID, page: page.ID, template: guide.ID,
+		site: owner.ID, entity: entity.ID, other: other.ID, page: page.ID, template: guide.ID, store: store,
 	}
 
 	conversation, err := domainagent.NewConversation(domainagent.Conversation{
@@ -130,7 +131,8 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 	runRepo := sqlite.NewRunRepo(store)
 	itemRepo := sqlite.NewRunItemRepo(store)
 	artifactRepo := sqlite.NewArtifactRepo(store)
-	termRepo := sqlite.NewTermRepo(store)
+	categoryRepo := sqlite.NewCategoryRepo(store)
+	categoryTermRepo := sqlite.NewCategoryTermRepo(store)
 
 	built, catalogErr := catalog.New(modelRepo)
 	if catalogErr != nil {
@@ -148,14 +150,14 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 	})
 
 	pagesService := pages.New(pages.Deps{
-		Pages: pageRepo, Links: linkRepo, Entities: entityRepo, Edges: edgeRepo, Terms: termRepo, Sites: siteRepo,
-		UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
+		Pages: pageRepo, Links: linkRepo, Entities: entityRepo, Edges: edgeRepo, Categories: categoryRepo,
+		CategoryTerms: categoryTermRepo, Sites: siteRepo, UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
 	})
 	return tools.New(tools.Deps{
 		Sites: sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, stubProbe{}, bus, now),
 		Graph: graph.New(graph.Deps{
-			Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Terms: termRepo, Pages: pageRepo,
-			Profiles: modelProfiles, LLM: book, UnitOfWork: store, Publisher: bus, Clock: now,
+			Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Categories: categoryRepo, CategoryTerms: categoryTermRepo,
+			Pages: pageRepo, Profiles: modelProfiles, LLM: book, UnitOfWork: store, Publisher: bus, Clock: now,
 		}),
 		Pages:     pagesService,
 		Templates: templateService,

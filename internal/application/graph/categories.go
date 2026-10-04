@@ -5,29 +5,78 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
 
-func (s *Service) categoryIndex(ctx context.Context, siteID string, entities []graphdomain.Entity) (application.CategoryIndex, error) {
-	if s.terms == nil {
-		return application.NewCategoryIndex(entities, nil), nil
-	}
-	terms, err := s.terms.ListBySite(ctx, siteID)
-	if err != nil {
-		return application.CategoryIndex{}, err
-	}
-	return application.NewCategoryIndex(entities, terms), nil
+type filing struct {
+	tree  application.CategoryTree
+	pages map[string]pagemap.Page
 }
 
-func (s *Service) siteCategoryIndex(ctx context.Context, siteID string) (application.CategoryIndex, error) {
-	entities, err := s.entities.ListBySite(ctx, siteID)
-	if err != nil {
-		return application.CategoryIndex{}, err
+func newFiling(tree application.CategoryTree, entities []graphdomain.Entity, listed []pagemap.Page) filing {
+	if tree.Empty() {
+		return filing{}
 	}
-	return s.categoryIndex(ctx, siteID, entities)
+	byID := make(map[string]pagemap.Page, len(listed))
+	owned := make(map[string][]pagemap.Page, len(listed))
+	for i := range listed {
+		byID[listed[i].ID] = listed[i]
+		if entityID := listed[i].EntityID; entityID != nil {
+			owned[*entityID] = append(owned[*entityID], listed[i])
+		}
+	}
+	pages := make(map[string]pagemap.Page, len(entities))
+	for i := range entities {
+		if page, held := filedPageOf(entities[i], byID, owned[entities[i].ID]); held {
+			pages[entities[i].ID] = page
+		}
+	}
+	return filing{tree: tree, pages: pages}
+}
+
+func filedPageOf(e graphdomain.Entity, byID map[string]pagemap.Page, owned []pagemap.Page) (pagemap.Page, bool) {
+	if e.CanonicalPageID != nil {
+		if page, held := byID[*e.CanonicalPageID]; held {
+			return page, true
+		}
+	}
+	if len(owned) == 1 {
+		return owned[0], true
+	}
+	return pagemap.Page{}, false
+}
+
+func (f filing) of(e graphdomain.Entity) []dto.Category {
+	page, held := f.pages[e.ID]
+	if !held {
+		return []dto.Category{}
+	}
+	taxonomy, filed := page.WPType.Taxonomy()
+	if !filed {
+		return []dto.Category{}
+	}
+	return f.tree.Chain(page.CategoryID, taxonomy)
+}
+
+func (s *Service) categoryTree(ctx context.Context, siteID string) (application.CategoryTree, error) {
+	return application.LoadCategoryTree(ctx, siteID, s.categories, s.categoryTerms)
+}
+
+func (s *Service) filingOf(ctx context.Context, siteID string, chosen []graphdomain.Entity) (filing, error) {
+	tree, err := s.categoryTree(ctx, siteID)
+	if err != nil || tree.Empty() {
+		return filing{}, err
+	}
+	listed, err := s.pages.ListBySite(ctx, siteID)
+	if err != nil {
+		return filing{}, err
+	}
+	return newFiling(tree, chosen, listed), nil
 }
 
 func (s *Service) viewsOf(ctx context.Context, siteID string, chosen []graphdomain.Entity) ([]Entity, error) {
-	filed, err := s.siteCategoryIndex(ctx, siteID)
+	filed, err := s.filingOf(ctx, siteID, chosen)
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +84,7 @@ func (s *Service) viewsOf(ctx context.Context, siteID string, chosen []graphdoma
 }
 
 func (s *Service) viewOf(ctx context.Context, entity graphdomain.Entity) (Entity, error) {
-	filed, err := s.siteCategoryIndex(ctx, entity.SiteID)
+	filed, err := s.filingOf(ctx, entity.SiteID, []graphdomain.Entity{entity})
 	if err != nil {
 		return Entity{}, err
 	}

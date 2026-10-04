@@ -2,89 +2,161 @@ package graph_test
 
 import (
 	"encoding/json"
-	"slices"
 	"strconv"
+	"strings"
 	"testing"
-	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/applicationtest"
-	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/graph"
-	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/category"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
+	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-type categoryTree struct {
+type filedGraph struct {
 	harness
-	peptides, healing, bpc, liquid graph.Entity
+	peptides, bpc, liquid                                                 category.Category
+	hub, topic, product, several, chosen, shelf, unfiled, bare, untouched graph.Entity
 }
 
-func (h harness) file(t *testing.T, entityID string, filed bool) graph.Entity {
+func (h harness) category(t *testing.T, name string, parent *category.Category) category.Category {
 	t.Helper()
-	updated, err := h.service.UpdateEntity(t.Context(), graph.UpdateEntityRequest{ID: entityID, SiteCategory: &filed})
-	if err != nil {
-		t.Fatalf("UpdateEntity siteCategory=%t: %v", filed, err)
+	record := category.Category{ID: id.New(), SiteID: h.siteID, Name: name, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp}
+	if parent != nil {
+		record.ParentID = parent.ID
 	}
-	return updated.Entity
+	record, err := category.New(record)
+	if err != nil {
+		t.Fatalf("category %s: %v", name, err)
+	}
+	if err = sqlite.NewCategoryRepo(h.store).Insert(t.Context(), record); err != nil {
+		t.Fatalf("insert the category %s: %v", name, err)
+	}
+	return record
 }
 
-func (h harness) term(t *testing.T, entityID string, taxonomy graphdomain.Taxonomy, termID int64) {
+func (h harness) term(t *testing.T, filedUnder category.Category, taxonomy category.Taxonomy, termID int64) {
 	t.Helper()
-	err := sqlite.NewTermRepo(h.store).Upsert(t.Context(), graphdomain.Term{
-		EntityID: entityID, SiteID: h.siteID, Taxonomy: taxonomy, TermID: termID, Name: "term " + strconv.FormatInt(termID, 10),
-		SeenAt: sqlitetest.Stamp,
+	err := sqlite.NewCategoryTermRepo(h.store).Upsert(t.Context(), category.Term{
+		CategoryID: filedUnder.ID, SiteID: h.siteID, Taxonomy: taxonomy, TermID: termID,
+		Name: "term " + strconv.FormatInt(termID, 10), SeenAt: sqlitetest.Stamp,
 	})
 	if err != nil {
 		t.Fatalf("Upsert the term %d: %v", termID, err)
 	}
 }
 
-func newCategoryTree(t *testing.T) categoryTree {
+func (h harness) filedPage(t *testing.T, path string, wpType pagemap.WPType, entity graph.Entity, filedUnder *category.Category) pagemap.Page {
+	t.Helper()
+	record := pagemap.Page{
+		ID: id.New(), SiteID: h.siteID, Path: path, Slug: pagemap.Slug(path), WPType: wpType, Title: path, H1: path,
+		Keywords: keyword.Of(), Notes: []pagemap.Note{}, Status: pagemap.StatusPlanned, EntityID: &entity.ID,
+		CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+	}
+	if filedUnder != nil {
+		record.CategoryID = filedUnder.ID
+	}
+	if err := sqlite.NewPageRepo(h.store).Insert(t.Context(), record); err != nil {
+		t.Fatalf("insert %s: %v", path, err)
+	}
+	return record
+}
+
+func (h harness) canonical(t *testing.T, entity graph.Entity, page pagemap.Page) {
+	t.Helper()
+	if err := sqlite.NewEntityRepo(h.store).SetCanonicalPage(t.Context(), entity.ID, &page.ID, sqlitetest.Stamp); err != nil {
+		t.Fatalf("SetCanonicalPage %s: %v", page.Path, err)
+	}
+}
+
+func newFiledGraph(t *testing.T) filedGraph {
 	t.Helper()
 
 	h := newHarness(t)
-	tree := categoryTree{harness: h, peptides: h.entity(t, "Peptides", "hub")}
-	tree.healing = h.under(t, "Healing", tree.peptides.ID)
-	tree.bpc = h.under(t, "BPC-157", tree.healing.ID)
-	tree.liquid = h.under(t, "Liquid", tree.bpc.ID)
-	h.file(t, tree.peptides.ID, true)
-	h.file(t, tree.bpc.ID, true)
-	h.term(t, tree.peptides.ID, graphdomain.TaxonomyCategory, 5)
-	h.term(t, tree.bpc.ID, graphdomain.TaxonomyProductCategory, 31)
+	g := filedGraph{harness: h}
+	g.peptides = h.category(t, "Peptides", nil)
+	g.bpc = h.category(t, "BPC-157", &g.peptides)
+	g.liquid = h.category(t, "Liquid", &g.bpc)
+	h.term(t, g.peptides, category.TaxonomyCategory, 5)
+	h.term(t, g.peptides, category.TaxonomyProductCategory, 31)
+	h.term(t, g.bpc, category.TaxonomyProductCategory, 32)
+
+	g.hub = h.entity(t, "Peptides", "hub")
+	g.topic = h.under(t, "Liquid BPC", g.hub.ID)
+	g.product = h.under(t, "BPC Capsules", g.hub.ID)
+	g.several = h.under(t, "BPC Powder", g.hub.ID)
+	g.chosen = h.under(t, "BPC Dosing", g.hub.ID)
+	g.shelf = h.under(t, "BPC Shelf", g.hub.ID)
+	g.unfiled = h.under(t, "BPC Stories", g.hub.ID)
+	g.bare = h.under(t, "BPC Research", g.hub.ID)
+	g.untouched = h.entity(t, "Company", "hub")
+
+	h.canonical(t, g.hub, h.filedPage(t, "/peptides/", pagemap.WPPage, g.hub, &g.peptides))
+	h.filedPage(t, "/peptides/liquid/", pagemap.WPPage, g.topic, &g.liquid)
+	h.filedPage(t, "/shop/capsules/", pagemap.WPProduct, g.product, &g.liquid)
+	h.filedPage(t, "/blog/powder/", pagemap.WPPost, g.several, &g.bpc)
+	h.filedPage(t, "/blog/powder-dosing/", pagemap.WPPost, g.several, &g.liquid)
+	h.filedPage(t, "/dosing/table/", pagemap.WPPage, g.chosen, &g.liquid)
+	h.canonical(t, g.chosen, h.filedPage(t, "/dosing/", pagemap.WPPost, g.chosen, &g.bpc))
+	h.filedPage(t, "/product-category/bpc/", pagemap.WPProductCategory, g.shelf, &g.bpc)
+	h.filedPage(t, "/stories/", pagemap.WPPost, g.unfiled, nil)
 	h.recorder.Reset()
-	return tree
+	return g
 }
 
-func (tree categoryTree) chain(withTerms bool, entityIDs ...string) []dto.Category {
-	names := map[string]string{tree.peptides.ID: "Peptides", tree.bpc.ID: "BPC-157"}
-	out := make([]dto.Category, 0, len(entityIDs))
-	for _, entityID := range entityIDs {
-		category := dto.Category{EntityID: entityID, Name: names[entityID]}
-		if withTerms && entityID == tree.peptides.ID {
-			category.TermID = new(int64(5))
-		}
-		out = append(out, category)
+func filedAs(record category.Category, termID int64) dto.Category {
+	out := dto.Category{ID: record.ID, Name: record.Name}
+	if termID > 0 {
+		out.TermID = &termID
 	}
 	return out
 }
 
-func (tree categoryTree) wanted(withTerms bool) map[string][]dto.Category {
+func (g filedGraph) wanted(withTerms bool) map[string][]dto.Category {
+	term := func(termID int64) int64 {
+		if withTerms {
+			return termID
+		}
+		return 0
+	}
 	return map[string][]dto.Category{
-		tree.peptides.ID: tree.chain(withTerms, tree.peptides.ID),
-		tree.healing.ID:  tree.chain(withTerms, tree.peptides.ID),
-		tree.bpc.ID:      tree.chain(withTerms, tree.peptides.ID, tree.bpc.ID),
-		tree.liquid.ID:   tree.chain(withTerms, tree.peptides.ID, tree.bpc.ID),
+		g.hub.ID:       {filedAs(g.peptides, term(5))},
+		g.topic.ID:     {filedAs(g.peptides, term(5)), filedAs(g.bpc, 0), filedAs(g.liquid, 0)},
+		g.product.ID:   {filedAs(g.peptides, term(31)), filedAs(g.bpc, term(32)), filedAs(g.liquid, 0)},
+		g.several.ID:   {},
+		g.chosen.ID:    {filedAs(g.peptides, term(5)), filedAs(g.bpc, 0)},
+		g.shelf.ID:     {},
+		g.unfiled.ID:   {},
+		g.bare.ID:      {},
+		g.untouched.ID: {},
 	}
 }
 
-func (tree categoryTree) withoutTerms() *graph.Service {
-	return graph.New(graph.Deps{
-		Entities: sqlite.NewEntityRepo(tree.store), Edges: sqlite.NewEdgeRepo(tree.store),
-		Sites: sqlite.NewSiteRepo(tree.store), Pages: sqlite.NewPageRepo(tree.store),
-		UnitOfWork: tree.store, Publisher: &applicationtest.Recorder{}, Clock: tree.clock,
-	})
+func (g filedGraph) unfiledEverywhere() map[string][]dto.Category {
+	out := g.wanted(true)
+	for entityID := range out {
+		out[entityID] = []dto.Category{}
+	}
+	return out
+}
+
+func (g filedGraph) serviceWith(categories, terms bool) *graph.Service {
+	deps := graph.Deps{
+		Entities: sqlite.NewEntityRepo(g.store), Edges: sqlite.NewEdgeRepo(g.store),
+		Sites: sqlite.NewSiteRepo(g.store), Pages: sqlite.NewPageRepo(g.store),
+		UnitOfWork: g.store, Publisher: &applicationtest.Recorder{}, Clock: g.clock,
+	}
+	if categories {
+		deps.Categories = sqlite.NewCategoryRepo(g.store)
+	}
+	if terms {
+		deps.CategoryTerms = sqlite.NewCategoryTermRepo(g.store)
+	}
+	return graph.New(deps)
 }
 
 func encoded(t *testing.T, v any) string {
@@ -96,42 +168,41 @@ func encoded(t *testing.T, v any) string {
 	return string(out)
 }
 
-func wantCategories(t *testing.T, got graph.Entity, want []dto.Category, flagged bool) {
+func wantCategories(t *testing.T, got graph.Entity, want []dto.Category) {
 	t.Helper()
 	if encoded(t, got.Categories) != encoded(t, want) {
 		t.Errorf("%s categories = %s, want %s", got.Name, encoded(t, got.Categories), encoded(t, want))
 	}
-	if got.SiteCategory != flagged {
-		t.Errorf("%s siteCategory = %t, want %t", got.Name, got.SiteCategory, flagged)
+	if strings.Contains(encoded(t, got), "siteCategory") {
+		t.Errorf("%s still says whether it is a WordPress category: %s", got.Name, encoded(t, got))
 	}
 }
 
-func TestEveryReadOfAnEntityCarriesTheCategoriesItsPagesAreFiledIn(t *testing.T) {
+func TestEveryReadOfAnEntityCarriesTheCategoriesOfItsPage(t *testing.T) {
 	t.Parallel()
 
-	tree := newCategoryTree(t)
-	flagged := map[string]bool{tree.peptides.ID: true, tree.bpc.ID: true}
-	ids := []string{tree.peptides.ID, tree.healing.ID, tree.bpc.ID, tree.liquid.ID}
+	g := newFiledGraph(t)
+	ids := []string{g.hub.ID, g.topic.ID, g.product.ID, g.several.ID, g.chosen.ID, g.shelf.ID, g.unfiled.ID, g.bare.ID, g.untouched.ID}
+	loadedBy := func(service *graph.Service) func(t *testing.T) []graph.Entity {
+		return func(t *testing.T) []graph.Entity {
+			loaded, err := service.LoadGraph(t.Context(), graph.LoadGraphRequest{SiteID: g.siteID})
+			if err != nil {
+				t.Fatalf("LoadGraph: %v", err)
+			}
+			return loaded.Entities
+		}
+	}
 
 	cases := []struct {
-		name      string
-		read      func(t *testing.T) []graph.Entity
-		withTerms bool
+		name string
+		read func(t *testing.T) []graph.Entity
+		want map[string][]dto.Category
 	}{
+		{name: "the whole graph", read: loadedBy(g.service), want: g.wanted(true)},
 		{
-			name: "the whole graph", withTerms: true,
+			name: "a page of the entity list", want: g.wanted(true),
 			read: func(t *testing.T) []graph.Entity {
-				loaded, err := tree.service.LoadGraph(t.Context(), graph.LoadGraphRequest{SiteID: tree.siteID})
-				if err != nil {
-					t.Fatalf("LoadGraph: %v", err)
-				}
-				return loaded.Entities
-			},
-		},
-		{
-			name: "a page of the entity list", withTerms: true,
-			read: func(t *testing.T) []graph.Entity {
-				listed, err := tree.service.ListEntities(t.Context(), graph.ListEntitiesRequest{SiteID: tree.siteID})
+				listed, err := g.service.ListEntities(t.Context(), graph.ListEntitiesRequest{SiteID: g.siteID})
 				if err != nil {
 					t.Fatalf("ListEntities: %v", err)
 				}
@@ -139,11 +210,11 @@ func TestEveryReadOfAnEntityCarriesTheCategoriesItsPagesAreFiledIn(t *testing.T)
 			},
 		},
 		{
-			name: "one entity at a time", withTerms: true,
+			name: "one entity at a time", want: g.wanted(true),
 			read: func(t *testing.T) []graph.Entity {
 				out := make([]graph.Entity, 0, len(ids))
 				for _, entityID := range ids {
-					got, err := tree.service.GetEntity(t.Context(), graph.GetEntityRequest{ID: entityID})
+					got, err := g.service.GetEntity(t.Context(), graph.GetEntityRequest{ID: entityID})
 					if err != nil {
 						t.Fatalf("GetEntity: %v", err)
 					}
@@ -152,32 +223,40 @@ func TestEveryReadOfAnEntityCarriesTheCategoriesItsPagesAreFiledIn(t *testing.T)
 				return out
 			},
 		},
-		{
-			name: "a service that reads no terms names the chain without term ids",
-			read: func(t *testing.T) []graph.Entity {
-				loaded, err := tree.withoutTerms().LoadGraph(t.Context(), graph.LoadGraphRequest{SiteID: tree.siteID})
-				if err != nil {
-					t.Fatalf("LoadGraph: %v", err)
-				}
-				return loaded.Entities
-			},
-		},
+		{name: "a service that reads no terms names the chain without term ids", read: loadedBy(g.serviceWith(true, false)), want: g.wanted(false)},
+		{name: "a service that reads no categories files nothing", read: loadedBy(g.serviceWith(false, true)), want: g.unfiledEverywhere()},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			want := tree.wanted(tc.withTerms)
 			got := tc.read(t)
 			if len(got) != len(ids) {
 				t.Fatalf("read %d entities, want %d", len(got), len(ids))
 			}
 			for i := range got {
-				wantCategories(t, got[i], want[got[i].ID], flagged[got[i].ID])
+				wantCategories(t, got[i], tc.want[got[i].ID])
 			}
 		})
 	}
+}
+
+func TestASiteWithoutCategoriesFilesNoEntity(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	hub := h.entity(t, "Peptides", "hub")
+	h.canonical(t, hub, h.filedPage(t, "/peptides/", pagemap.WPPage, hub, nil))
+
+	loaded, err := h.service.LoadGraph(t.Context(), graph.LoadGraphRequest{SiteID: h.siteID})
+	if err != nil {
+		t.Fatalf("LoadGraph: %v", err)
+	}
+	if len(loaded.Entities) != 1 || len(loaded.Pages) != 1 {
+		t.Fatalf("LoadGraph = %d entities and %d pages, want one of each", len(loaded.Entities), len(loaded.Pages))
+	}
+	wantCategories(t, loaded.Entities[0], []dto.Category{})
 }
 
 func TestEveryWriteAnswersWithTheCategoriesOfWhatItWrote(t *testing.T) {
@@ -185,47 +264,51 @@ func TestEveryWriteAnswersWithTheCategoriesOfWhatItWrote(t *testing.T) {
 
 	cases := []struct {
 		name  string
-		write func(t *testing.T, tree categoryTree) []graph.Entity
-		want  func(tree categoryTree) []dto.Category
+		write func(t *testing.T, g filedGraph) []graph.Entity
+		want  func(g filedGraph) []dto.Category
 	}{
 		{
-			name: "an entity created under a category",
-			write: func(t *testing.T, tree categoryTree) []graph.Entity {
-				return []graph.Entity{tree.under(t, "Capsules", tree.bpc.ID)}
+			name: "an entity created, which has no page yet",
+			write: func(t *testing.T, g filedGraph) []graph.Entity {
+				return []graph.Entity{g.under(t, "Nasal Spray", g.topic.ID)}
 			},
-			want: func(tree categoryTree) []dto.Category { return tree.chain(true, tree.peptides.ID, tree.bpc.ID) },
+			want: func(filedGraph) []dto.Category { return []dto.Category{} },
 		},
 		{
-			name: "an entity renamed below a category",
-			write: func(t *testing.T, tree categoryTree) []graph.Entity {
-				updated, err := tree.service.UpdateEntity(t.Context(), graph.UpdateEntityRequest{ID: tree.liquid.ID, Name: new("Liquid BPC")})
+			name: "an entity renamed",
+			write: func(t *testing.T, g filedGraph) []graph.Entity {
+				updated, err := g.service.UpdateEntity(t.Context(), graph.UpdateEntityRequest{ID: g.topic.ID, Name: new("Liquid BPC-157")})
 				if err != nil {
 					t.Fatalf("UpdateEntity: %v", err)
 				}
 				return []graph.Entity{updated.Entity}
 			},
-			want: func(tree categoryTree) []dto.Category { return tree.chain(true, tree.peptides.ID, tree.bpc.ID) },
+			want: func(g filedGraph) []dto.Category {
+				return []dto.Category{filedAs(g.peptides, 5), filedAs(g.bpc, 0), filedAs(g.liquid, 0)}
+			},
 		},
 		{
-			name: "the anchors of an entity between two categories",
-			write: func(t *testing.T, tree categoryTree) []graph.Entity {
-				anchored, err := tree.service.SetAnchors(t.Context(), graph.SetAnchorsRequest{
-					EntityID: tree.healing.ID, Anchors: []graph.Anchor{{Text: "healing peptides", Source: "user"}},
+			name: "the anchors of an entity whose page is a product",
+			write: func(t *testing.T, g filedGraph) []graph.Entity {
+				anchored, err := g.service.SetAnchors(t.Context(), graph.SetAnchorsRequest{
+					EntityID: g.product.ID, Anchors: []graph.Anchor{{Text: "bpc capsules", Source: "user"}},
 				})
 				if err != nil {
 					t.Fatalf("SetAnchors: %v", err)
 				}
 				return []graph.Entity{anchored.Entity}
 			},
-			want: func(tree categoryTree) []dto.Category { return tree.chain(true, tree.peptides.ID) },
+			want: func(g filedGraph) []dto.Category {
+				return []dto.Category{filedAs(g.peptides, 31), filedAs(g.bpc, 32), filedAs(g.liquid, 0)}
+			},
 		},
 		{
-			name: "a batch hung under a category",
-			write: func(t *testing.T, tree categoryTree) []graph.Entity {
-				created, err := tree.service.CreateEntities(t.Context(), graph.CreateEntitiesRequest{
-					SiteID: tree.siteID, Entities: []graph.EntityInput{
-						{Name: "Powder", Kind: "topic", ParentName: "BPC-157"},
-						{Name: "Powder Dosing", Kind: "topic", ParentName: "Powder"},
+			name: "a batch hung under a filed entity",
+			write: func(t *testing.T, g filedGraph) []graph.Entity {
+				created, err := g.service.CreateEntities(t.Context(), graph.CreateEntitiesRequest{
+					SiteID: g.siteID, Entities: []graph.EntityInput{
+						{Name: "Liquid Storage", Kind: "topic", ParentName: "Liquid BPC"},
+						{Name: "Liquid Storage Tips", Kind: "topic", ParentName: "Liquid Storage"},
 					},
 				})
 				if err != nil {
@@ -233,20 +316,20 @@ func TestEveryWriteAnswersWithTheCategoriesOfWhatItWrote(t *testing.T) {
 				}
 				return created.Entities
 			},
-			want: func(tree categoryTree) []dto.Category { return tree.chain(true, tree.peptides.ID, tree.bpc.ID) },
+			want: func(filedGraph) []dto.Category { return []dto.Category{} },
 		},
 		{
 			name: "a proposal written as a new root",
-			write: func(t *testing.T, tree categoryTree) []graph.Entity {
-				applied, err := tree.service.ApplyProposals(t.Context(), graph.ApplyProposalsRequest{
-					SiteID: tree.siteID, Entities: []graph.ProposedEntity{{Name: "Nootropics", Kind: "hub", Parent: "Peptides"}},
+			write: func(t *testing.T, g filedGraph) []graph.Entity {
+				applied, err := g.service.ApplyProposals(t.Context(), graph.ApplyProposalsRequest{
+					SiteID: g.siteID, Entities: []graph.ProposedEntity{{Name: "Nootropics", Kind: "hub", Parent: "Peptides"}},
 				})
 				if err != nil {
 					t.Fatalf("ApplyProposals: %v", err)
 				}
 				return applied.Entities
 			},
-			want: func(categoryTree) []dto.Category { return []dto.Category{} },
+			want: func(filedGraph) []dto.Category { return []dto.Category{} },
 		},
 	}
 
@@ -254,79 +337,14 @@ func TestEveryWriteAnswersWithTheCategoriesOfWhatItWrote(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			tree := newCategoryTree(t)
-			written := tc.write(t, tree)
+			g := newFiledGraph(t)
+			written := tc.write(t, g)
 			if len(written) == 0 {
 				t.Fatal("the write answered with no entity")
 			}
 			for i := range written {
-				wantCategories(t, written[i], tc.want(tree), false)
+				wantCategories(t, written[i], tc.want(g))
 			}
 		})
-	}
-}
-
-func TestTheWordPressCategoryOfAnEntityIsSwitchedAlone(t *testing.T) {
-	t.Parallel()
-
-	h := newHarness(t)
-	parent := h.entity(t, "Peptides", "hub")
-	created, err := h.service.CreateEntity(t.Context(), graph.CreateEntityRequest{
-		SiteID: h.siteID, Name: "Healing", Kind: "category", Intent: "informational", ParentID: parent.ID,
-		Keywords: []dto.Keyword{{Text: "healing peptides", Volume: new(900)}, {Text: "peptides for healing"}},
-		Anchors:  []graph.Anchor{{Text: "healing peptides", Source: "user", Weight: 1}},
-	})
-	if err != nil {
-		t.Fatalf("CreateEntity: %v", err)
-	}
-	page := sqlitetest.Page(t, h.store, h.siteID, "/peptides/healing/")
-	if err = sqlite.NewEntityRepo(h.store).SetCanonicalPage(t.Context(), created.Entity.ID, &page.ID, sqlitetest.Stamp); err != nil {
-		t.Fatalf("SetCanonicalPage: %v", err)
-	}
-	before, err := h.service.GetEntity(t.Context(), graph.GetEntityRequest{ID: created.Entity.ID})
-	if err != nil {
-		t.Fatalf("GetEntity: %v", err)
-	}
-	h.recorder.Reset()
-
-	itself := []dto.Category{{EntityID: created.Entity.ID, Name: "Healing"}}
-	steps := []struct {
-		name    string
-		request graph.UpdateEntityRequest
-		flagged bool
-		want    []dto.Category
-	}{
-		{name: "filed", request: graph.UpdateEntityRequest{SiteCategory: new(true)}, flagged: true, want: itself},
-		{name: "an update that leaves it out keeps it", request: graph.UpdateEntityRequest{Name: new("Healing")}, flagged: true, want: itself},
-		{name: "filed twice", request: graph.UpdateEntityRequest{SiteCategory: new(true)}, flagged: true, want: itself},
-		{name: "taken off", request: graph.UpdateEntityRequest{SiteCategory: new(false)}, flagged: false, want: []dto.Category{}},
-	}
-
-	for _, step := range steps {
-		h.clock.Advance(time.Minute)
-		step.request.ID = created.Entity.ID
-		updated, updateErr := h.service.UpdateEntity(t.Context(), step.request)
-		if updateErr != nil {
-			t.Fatalf("%s: UpdateEntity: %v", step.name, updateErr)
-		}
-		h.wantEvents(t, events.GraphChanged)
-		stored, getErr := h.service.GetEntity(t.Context(), graph.GetEntityRequest{ID: created.Entity.ID})
-		if getErr != nil {
-			t.Fatalf("%s: GetEntity: %v", step.name, getErr)
-		}
-
-		for _, got := range []graph.Entity{updated.Entity, stored.Entity} {
-			wantCategories(t, got, step.want, step.flagged)
-			kept := got
-			kept.SiteCategory, kept.Categories, kept.UpdatedAt = before.Entity.SiteCategory, before.Entity.Categories, before.Entity.UpdatedAt
-			if encoded(t, kept) != encoded(t, before.Entity) {
-				t.Errorf("%s changed more than the category:\n got %s\nwant %s", step.name, encoded(t, kept), encoded(t, before.Entity))
-			}
-		}
-	}
-
-	if !slices.Equal(texts(before.Entity.Keywords), []string{"healing peptides", "peptides for healing"}) ||
-		before.Entity.ScopeEntityID == nil || before.Entity.CanonicalPageID == nil {
-		t.Fatalf("the entity was not set up with everything a switch must keep: %+v", before.Entity)
 	}
 }

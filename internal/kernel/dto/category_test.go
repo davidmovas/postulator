@@ -17,13 +17,13 @@ func TestCategoryJSON(t *testing.T) {
 	}{
 		{
 			name: "a category the site has",
-			in:   dto.Category{EntityID: "1a1a1a1a-1a1a-4a1a-8a1a-1a1a1a1a1a1a", Name: "Healing", TermID: new(int64(14))},
-			want: `{"entityId":"1a1a1a1a-1a1a-4a1a-8a1a-1a1a1a1a1a1a","name":"Healing","termId":14}`,
+			in:   dto.Category{ID: "1a1a1a1a-1a1a-4a1a-8a1a-1a1a1a1a1a1a", Name: "Healing", TermID: new(int64(14))},
+			want: `{"id":"1a1a1a1a-1a1a-4a1a-8a1a-1a1a1a1a1a1a","name":"Healing","termId":14}`,
 		},
 		{
 			name: "a category the site does not have yet",
-			in:   dto.Category{EntityID: "2b2b2b2b-2b2b-4b2b-8b2b-2b2b2b2b2b2b", Name: "BPC-157"},
-			want: `{"entityId":"2b2b2b2b-2b2b-4b2b-8b2b-2b2b2b2b2b2b","name":"BPC-157"}`,
+			in:   dto.Category{ID: "2b2b2b2b-2b2b-4b2b-8b2b-2b2b2b2b2b2b", Name: "BPC-157"},
+			want: `{"id":"2b2b2b2b-2b2b-4b2b-8b2b-2b2b2b2b2b2b","name":"BPC-157"}`,
 		},
 	}
 
@@ -43,7 +43,7 @@ func TestCategoryJSON(t *testing.T) {
 			if err = json.Unmarshal(encoded, &back); err != nil {
 				t.Fatalf("decode: %v", err)
 			}
-			if back.EntityID != tc.in.EntityID || back.Name != tc.in.Name || (back.TermID == nil) != (tc.in.TermID == nil) ||
+			if back.ID != tc.in.ID || back.Name != tc.in.Name || (back.TermID == nil) != (tc.in.TermID == nil) ||
 				(back.TermID != nil && *back.TermID != *tc.in.TermID) {
 				t.Fatalf("round trip = %+v, want %+v", back, tc.in)
 			}

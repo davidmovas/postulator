@@ -11,11 +11,34 @@ import (
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/sites"
-	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
+	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-func TestTheGraphAndThePagesNameTheCategoryTheSiteHas(t *testing.T) {
+func storedCategory(t *testing.T, core *app.Core, siteID, name, parentID string) category.Category {
+	t.Helper()
+	at := time.Date(2026, time.October, 4, 9, 0, 0, 0, time.UTC)
+	record, err := category.New(category.Category{ID: id.New(), SiteID: siteID, Name: name, ParentID: parentID, CreatedAt: at, UpdatedAt: at})
+	if err != nil {
+		t.Fatalf("category %s: %v", name, err)
+	}
+	if err = sqlite.NewCategoryRepo(core.Store).Insert(t.Context(), record); err != nil {
+		t.Fatalf("store the category %s: %v", name, err)
+	}
+	return record
+}
+
+func encodedJSON(t *testing.T, v any) string {
+	t.Helper()
+	out, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+	return string(out)
+}
+
+func TestTheGraphAndThePagesNameTheCategoryAPageIsFiledUnder(t *testing.T) {
 	t.Parallel()
 
 	home := t.TempDir()
@@ -32,24 +55,34 @@ func TestTheGraphAndThePagesNameTheCategoryTheSiteHas(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create the site: %v", err)
 	}
+	siteID := owner.Site.ID
 	created, err := core.Graph.CreateEntity(t.Context(), graph.CreateEntityRequest{
-		SiteID: owner.Site.ID, Name: "Healing", Kind: "category", Keywords: []dto.Keyword{{Text: "healing peptides"}},
+		SiteID: siteID, Name: "Healing Peptides", Kind: "topic", Keywords: []dto.Keyword{{Text: "healing peptides"}},
 	})
 	if err != nil {
 		t.Fatalf("create the entity: %v", err)
 	}
-	if _, err = core.Graph.UpdateEntity(t.Context(), graph.UpdateEntityRequest{ID: created.Entity.ID, SiteCategory: new(true)}); err != nil {
-		t.Fatalf("make the entity a category: %v", err)
-	}
-	page, err := core.Pages.Create(t.Context(), pages.CreateRequest{
-		SiteID: owner.Site.ID, Path: "/healing/", Title: "Healing", WPType: "post", EntityID: &created.Entity.ID,
+	post, err := core.Pages.Create(t.Context(), pages.CreateRequest{
+		SiteID: siteID, Path: "/healing/", Title: "Healing", WPType: "post", EntityID: &created.Entity.ID,
 	})
 	if err != nil {
 		t.Fatalf("create the post: %v", err)
 	}
-	if err = sqlite.NewTermRepo(core.Store).Upsert(t.Context(), graphdomain.Term{
-		EntityID: created.Entity.ID, SiteID: owner.Site.ID, Taxonomy: graphdomain.TaxonomyCategory, TermID: 14,
-		Name: "Healing", SeenAt: time.Date(2026, time.October, 3, 9, 0, 0, 0, time.UTC),
+
+	peptides := storedCategory(t, core, siteID, "Peptides", "")
+	healing := storedCategory(t, core, siteID, "Healing", peptides.ID)
+	pageRepo := sqlite.NewPageRepo(core.Store)
+	filed, err := pageRepo.Get(t.Context(), post.Page.ID)
+	if err != nil {
+		t.Fatalf("read the post: %v", err)
+	}
+	filed.CategoryID = healing.ID
+	if err = pageRepo.Update(t.Context(), filed); err != nil {
+		t.Fatalf("file the post: %v", err)
+	}
+	if err = sqlite.NewCategoryTermRepo(core.Store).Upsert(t.Context(), category.Term{
+		CategoryID: peptides.ID, SiteID: siteID, Taxonomy: category.TaxonomyCategory, TermID: 14,
+		Name: "Peptides", SeenAt: time.Date(2026, time.October, 4, 9, 0, 0, 0, time.UTC),
 	}); err != nil {
 		t.Fatalf("store the term: %v", err)
 	}
@@ -58,25 +91,23 @@ func TestTheGraphAndThePagesNameTheCategoryTheSiteHas(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetEntity: %v", err)
 	}
-	post, err := core.Pages.Get(t.Context(), pages.GetRequest{ID: page.Page.ID})
+	read, err := core.Pages.Get(t.Context(), pages.GetRequest{ID: post.Page.ID})
 	if err != nil {
 		t.Fatalf("Get the post: %v", err)
 	}
 
-	want := `[{"entityId":"` + created.Entity.ID + `","name":"Healing","termId":14}]`
-	for _, got := range []struct {
-		name       string
-		categories []dto.Category
+	chain := `[{"id":"` + peptides.ID + `","name":"Peptides","termId":14},{"id":"` + healing.ID + `","name":"Healing"}]`
+	cases := []struct {
+		name string
+		got  any
+		want string
 	}{
-		{name: "the entity", categories: entity.Entity.Categories},
-		{name: "the post", categories: post.Page.Categories},
-	} {
-		encoded, encodeErr := json.Marshal(got.categories)
-		if encodeErr != nil {
-			t.Fatalf("encode the categories of %s: %v", got.name, encodeErr)
-		}
-		if string(encoded) != want {
-			t.Errorf("%s is filed in %s, want %s", got.name, encoded, want)
+		{name: "the entity", got: entity.Entity.Categories, want: chain},
+		{name: "the post", got: read.Page.Categories, want: chain},
+	}
+	for _, tc := range cases {
+		if got := encodedJSON(t, tc.got); got != tc.want {
+			t.Errorf("%s = %s, want %s", tc.name, got, tc.want)
 		}
 	}
 }

@@ -254,18 +254,10 @@ func entitiesOf(t *testing.T, core *app.Core, siteID string) map[string]graph.En
 func categoryChainOf(t *testing.T, core *app.Core, siteID, entityID string) []string {
 	t.Helper()
 
-	byID := entitiesOf(t, core, siteID)
-	chain := make([]string, 0, 4)
-	walked := make(map[string]bool, 4)
-	for at, held := byID[entityID]; held && !walked[at.ID]; {
-		walked[at.ID] = true
-		if at.SiteCategory {
-			chain = append([]string{at.Name}, chain...)
-		}
-		if at.ScopeEntityID == nil {
-			break
-		}
-		at, held = byID[*at.ScopeEntityID]
+	filed := entitiesOf(t, core, siteID)[entityID].Categories
+	chain := make([]string, 0, len(filed))
+	for i := range filed {
+		chain = append(chain, filed[i].Name)
 	}
 	return chain
 }
@@ -403,9 +395,9 @@ func assertNoCategoryIsNamedAfterTheRoot(t *testing.T, core *app.Core, live *sit
 	}
 	root, found := rootNamed(t, core, siteID, workbookRoot)
 	t.Errorf("the site carries the categories %+v named after %q, the Root Entity of the Groups sheet; only the Category "+
-		"and Subcategory columns make WordPress categories, yet the whole-workbook import left the root as %q with "+
-		"siteCategory %t (found %t), since the Catalog and Entities sheets name it in their Category column",
-		made, workbookRoot, root.Kind, root.SiteCategory, found)
+		"and Subcategory columns make WordPress categories, yet the whole-workbook import left the root as %q filed "+
+		"under %+v (found %t), since the Catalog and Entities sheets name it in their Category column",
+		made, workbookRoot, root.Kind, root.Categories, found)
 }
 
 func assertTheArchiveListsThePageAndAPost(t *testing.T, core *app.Core, live *site, siteID string, term steps.AssignedTerm,

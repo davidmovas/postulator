@@ -9,6 +9,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/applicationtest"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -29,8 +30,9 @@ const (
 
 type shelf struct {
 	harness
-	peptides, bpc, liquid, powder, capsules, company graph.Entity
-	pages                                            map[string]pagemap.Page
+	peptides, bpc, liquid, company category.Category
+	liquidEntity, contactEntity    graph.Entity
+	pages                          map[string]pagemap.Page
 }
 
 type filed struct {
@@ -38,50 +40,60 @@ type filed struct {
 	needsPlugin bool
 }
 
-func (h harness) categoryEntity(t *testing.T, name string, siteCategory bool, scope *graph.Entity) graph.Entity {
+func (h harness) category(t *testing.T, name string, parent *category.Category) category.Category {
 	t.Helper()
-	record := graph.Entity{
-		ID: id.New(), SiteID: h.siteID, Name: name, Kind: graph.KindCategory, SiteCategory: siteCategory,
-		Keywords: keyword.Of(name), Anchors: []graph.Anchor{}, Source: graph.SourceImport,
-		CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
-	}
-	if scope != nil {
-		record.ScopeID = &scope.ID
-	}
-	if err := sqlite.NewEntityRepo(h.store).Insert(t.Context(), record); err != nil {
-		t.Fatalf("insert %s: %v", name, err)
-	}
-	return record
-}
-
-func (h harness) storedPage(t *testing.T, path string, wpType pagemap.WPType, entity *graph.Entity, parent *pagemap.Page) pagemap.Page {
-	t.Helper()
-	record := pagemap.Page{
-		ID: id.New(), SiteID: h.siteID, Path: path, Slug: pagemap.Slug(path), WPType: wpType, Title: path, H1: path,
-		Keywords: keyword.Of(), Notes: []pagemap.Note{}, Status: pagemap.StatusPlanned,
-		CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
-	}
-	if entity != nil {
-		record.EntityID = &entity.ID
-	}
+	record := category.Category{ID: id.New(), SiteID: h.siteID, Name: name, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp}
 	if parent != nil {
-		record.ParentPageID = &parent.ID
+		record.ParentID = parent.ID
 	}
-	if err := sqlite.NewPageRepo(h.store).Insert(t.Context(), record); err != nil {
-		t.Fatalf("insert %s: %v", path, err)
+	record, err := category.New(record)
+	if err != nil {
+		t.Fatalf("category %s: %v", name, err)
+	}
+	if err = sqlite.NewCategoryRepo(h.store).Insert(t.Context(), record); err != nil {
+		t.Fatalf("insert the category %s: %v", name, err)
 	}
 	return record
 }
 
-func (h harness) term(t *testing.T, entity graph.Entity, taxonomy graph.Taxonomy, termID int64) {
+func (h harness) term(t *testing.T, filedUnder category.Category, taxonomy category.Taxonomy, termID int64) {
 	t.Helper()
-	err := sqlite.NewTermRepo(h.store).Upsert(t.Context(), graph.Term{
-		EntityID: entity.ID, SiteID: h.siteID, Taxonomy: taxonomy, TermID: termID,
+	err := sqlite.NewCategoryTermRepo(h.store).Upsert(t.Context(), category.Term{
+		CategoryID: filedUnder.ID, SiteID: h.siteID, Taxonomy: taxonomy, TermID: termID,
 		Name: "term " + strconv.FormatInt(termID, 10), SeenAt: sqlitetest.Stamp,
 	})
 	if err != nil {
 		t.Fatalf("Upsert the term %d: %v", termID, err)
 	}
+}
+
+type stored struct {
+	wpType     pagemap.WPType
+	entity     *graph.Entity
+	parent     *pagemap.Page
+	filedUnder *category.Category
+}
+
+func (h harness) storedPage(t *testing.T, path string, with stored) pagemap.Page {
+	t.Helper()
+	record := pagemap.Page{
+		ID: id.New(), SiteID: h.siteID, Path: path, Slug: pagemap.Slug(path), WPType: with.wpType, Title: path, H1: path,
+		Keywords: keyword.Of(), Notes: []pagemap.Note{}, Status: pagemap.StatusPlanned,
+		CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+	}
+	if with.entity != nil {
+		record.EntityID = &with.entity.ID
+	}
+	if with.parent != nil {
+		record.ParentPageID = &with.parent.ID
+	}
+	if with.filedUnder != nil {
+		record.CategoryID = with.filedUnder.ID
+	}
+	if err := sqlite.NewPageRepo(h.store).Insert(t.Context(), record); err != nil {
+		t.Fatalf("insert %s: %v", path, err)
+	}
+	return record
 }
 
 func (h harness) plugin(t *testing.T, state site.PluginState) {
@@ -102,33 +114,33 @@ func newShelf(t *testing.T) shelf {
 
 	h := newHarness(t)
 	s := shelf{harness: h, pages: map[string]pagemap.Page{}}
-	s.peptides = h.categoryEntity(t, "Peptides", true, nil)
-	s.bpc = h.categoryEntity(t, "BPC-157", true, &s.peptides)
-	s.liquid = h.categoryEntity(t, "Liquid", false, &s.bpc)
-	s.powder = h.categoryEntity(t, "Powder", false, &s.bpc)
-	s.capsules = h.categoryEntity(t, "Capsules", false, &s.bpc)
-	s.company = h.categoryEntity(t, "Company", false, nil)
-	h.term(t, s.peptides, graph.TaxonomyCategory, 5)
-	h.term(t, s.peptides, graph.TaxonomyProductCategory, 31)
-	h.term(t, s.bpc, graph.TaxonomyProductCategory, 32)
+	s.peptides = h.category(t, "Peptides", nil)
+	s.bpc = h.category(t, "BPC-157", &s.peptides)
+	s.liquid = h.category(t, "Liquid", &s.bpc)
+	s.company = h.category(t, "Company", nil)
+	h.term(t, s.peptides, category.TaxonomyCategory, 5)
+	h.term(t, s.peptides, category.TaxonomyProductCategory, 31)
+	h.term(t, s.bpc, category.TaxonomyProductCategory, 32)
+	s.liquidEntity = h.entity(t, "Liquid BPC")
+	s.contactEntity = h.entity(t, "Contact")
 
-	parent := h.storedPage(t, peptidesPath, pagemap.WPPage, &s.peptides, nil)
+	parent := h.storedPage(t, peptidesPath, stored{wpType: pagemap.WPPage, filedUnder: &s.peptides})
 	s.pages[peptidesPath] = parent
-	s.pages[liquidPath] = h.storedPage(t, liquidPath, pagemap.WPPage, &s.liquid, &parent)
-	s.pages[powderPath] = h.storedPage(t, powderPath, pagemap.WPPost, &s.powder, nil)
-	s.pages[capsulesPath] = h.storedPage(t, capsulesPath, pagemap.WPProduct, &s.capsules, nil)
-	s.pages[shelfPath] = h.storedPage(t, shelfPath, pagemap.WPProductCategory, &s.bpc, nil)
-	s.pages[aboutPath] = h.storedPage(t, aboutPath, pagemap.WPPage, nil, nil)
-	s.pages[contactPath] = h.storedPage(t, contactPath, pagemap.WPPage, &s.company, nil)
+	s.pages[liquidPath] = h.storedPage(t, liquidPath, stored{wpType: pagemap.WPPage, entity: &s.liquidEntity, parent: &parent, filedUnder: &s.liquid})
+	s.pages[powderPath] = h.storedPage(t, powderPath, stored{wpType: pagemap.WPPost, filedUnder: &s.bpc})
+	s.pages[capsulesPath] = h.storedPage(t, capsulesPath, stored{wpType: pagemap.WPProduct, filedUnder: &s.liquid})
+	s.pages[shelfPath] = h.storedPage(t, shelfPath, stored{wpType: pagemap.WPProductCategory, filedUnder: &s.bpc})
+	s.pages[aboutPath] = h.storedPage(t, aboutPath, stored{wpType: pagemap.WPPage})
+	s.pages[contactPath] = h.storedPage(t, contactPath, stored{wpType: pagemap.WPPage, entity: &s.contactEntity})
 	return s
 }
 
-func (s shelf) category(entity graph.Entity, termID int64) dto.Category {
-	category := dto.Category{EntityID: entity.ID, Name: entity.Name}
+func filedAs(record category.Category, termID int64) dto.Category {
+	out := dto.Category{ID: record.ID, Name: record.Name}
 	if termID > 0 {
-		category.TermID = &termID
+		out.TermID = &termID
 	}
-	return category
+	return out
 }
 
 func (s shelf) wanted(withTerms bool) map[string]filed {
@@ -139,22 +151,40 @@ func (s shelf) wanted(withTerms bool) map[string]filed {
 		return 0
 	}
 	return map[string]filed{
-		peptidesPath: {categories: []dto.Category{s.category(s.peptides, term(5))}, needsPlugin: true},
-		liquidPath:   {categories: []dto.Category{s.category(s.peptides, term(5)), s.category(s.bpc, 0)}, needsPlugin: true},
-		powderPath:   {categories: []dto.Category{s.category(s.peptides, term(5)), s.category(s.bpc, 0)}},
-		capsulesPath: {categories: []dto.Category{s.category(s.peptides, term(31)), s.category(s.bpc, term(32))}},
+		peptidesPath: {categories: []dto.Category{filedAs(s.peptides, term(5))}, needsPlugin: true},
+		liquidPath: {
+			categories:  []dto.Category{filedAs(s.peptides, term(5)), filedAs(s.bpc, 0), filedAs(s.liquid, 0)},
+			needsPlugin: true,
+		},
+		powderPath:   {categories: []dto.Category{filedAs(s.peptides, term(5)), filedAs(s.bpc, 0)}},
+		capsulesPath: {categories: []dto.Category{filedAs(s.peptides, term(31)), filedAs(s.bpc, term(32)), filedAs(s.liquid, 0)}},
 		shelfPath:    {categories: []dto.Category{}},
 		aboutPath:    {categories: []dto.Category{}},
 		contactPath:  {categories: []dto.Category{}},
 	}
 }
 
-func (s shelf) withoutTerms() *pages.Service {
-	return pages.New(pages.Deps{
+func (s shelf) unfiled() map[string]filed {
+	out := make(map[string]filed, len(s.pages))
+	for path := range s.pages {
+		out[path] = filed{categories: []dto.Category{}}
+	}
+	return out
+}
+
+func (s shelf) serviceWith(categories, terms bool) *pages.Service {
+	deps := pages.Deps{
 		Pages: sqlite.NewPageRepo(s.store), Links: sqlite.NewPageLinkRepo(s.store), Entities: sqlite.NewEntityRepo(s.store),
 		Edges: sqlite.NewEdgeRepo(s.store), Sites: sqlite.NewSiteRepo(s.store), UnitOfWork: s.store,
 		Publisher: &applicationtest.Recorder{}, Clock: s.clock, Preview: &recordingIssuer{},
-	})
+	}
+	if categories {
+		deps.Categories = sqlite.NewCategoryRepo(s.store)
+	}
+	if terms {
+		deps.CategoryTerms = sqlite.NewCategoryTermRepo(s.store)
+	}
+	return pages.New(deps)
 }
 
 func encoded(t *testing.T, v any) string {
@@ -191,12 +221,12 @@ func TestEveryReadOfAPageCarriesTheCategoriesItIsFiledIn(t *testing.T) {
 	s := newShelf(t)
 
 	cases := []struct {
-		name      string
-		read      func(t *testing.T) []pages.Page
-		withTerms bool
+		name string
+		read func(t *testing.T) []pages.Page
+		want map[string]filed
 	}{
 		{
-			name: "a page of the list", withTerms: true,
+			name: "a page of the list", want: s.wanted(true),
 			read: func(t *testing.T) []pages.Page {
 				listed, err := s.service.List(t.Context(), pages.ListRequest{SiteID: s.siteID})
 				if err != nil {
@@ -206,7 +236,7 @@ func TestEveryReadOfAPageCarriesTheCategoriesItIsFiledIn(t *testing.T) {
 			},
 		},
 		{
-			name: "one page at a time", withTerms: true,
+			name: "one page at a time", want: s.wanted(true),
 			read: func(t *testing.T) []pages.Page {
 				out := make([]pages.Page, 0, len(s.pages))
 				for _, page := range s.pages {
@@ -220,7 +250,7 @@ func TestEveryReadOfAPageCarriesTheCategoriesItIsFiledIn(t *testing.T) {
 			},
 		},
 		{
-			name: "the tree, a child under its parent", withTerms: true,
+			name: "the tree, a child under its parent", want: s.wanted(true),
 			read: func(t *testing.T) []pages.Page {
 				tree, err := s.service.Tree(t.Context(), pages.TreeRequest{SiteID: s.siteID})
 				if err != nil {
@@ -233,9 +263,19 @@ func TestEveryReadOfAPageCarriesTheCategoriesItIsFiledIn(t *testing.T) {
 			},
 		},
 		{
-			name: "a service that reads no terms names the chain without term ids",
+			name: "a service that reads no terms names the chain without term ids", want: s.wanted(false),
 			read: func(t *testing.T) []pages.Page {
-				listed, err := s.withoutTerms().List(t.Context(), pages.ListRequest{SiteID: s.siteID})
+				listed, err := s.serviceWith(true, false).List(t.Context(), pages.ListRequest{SiteID: s.siteID})
+				if err != nil {
+					t.Fatalf("List: %v", err)
+				}
+				return listed.Items
+			},
+		},
+		{
+			name: "a service that reads no categories files nothing", want: s.unfiled(),
+			read: func(t *testing.T) []pages.Page {
+				listed, err := s.serviceWith(false, true).List(t.Context(), pages.ListRequest{SiteID: s.siteID})
 				if err != nil {
 					t.Fatalf("List: %v", err)
 				}
@@ -248,13 +288,12 @@ func TestEveryReadOfAPageCarriesTheCategoriesItIsFiledIn(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			want := s.wanted(tc.withTerms)
 			got := tc.read(t)
-			if len(got) != len(want) {
-				t.Fatalf("read %d pages, want %d", len(got), len(want))
+			if len(got) != len(tc.want) {
+				t.Fatalf("read %d pages, want %d", len(got), len(tc.want))
 			}
 			for i := range got {
-				wantFiled(t, got[i], want[got[i].Path])
+				wantFiled(t, got[i], tc.want[got[i].Path])
 			}
 		})
 	}
@@ -314,20 +353,17 @@ func TestEveryWriteAnswersWithTheCategoriesOfThePageItWrote(t *testing.T) {
 		want  func(s shelf) filed
 	}{
 		{
-			name: "a page created for an entity under two categories",
+			name: "a page created, which no sheet has filed yet",
 			write: func(t *testing.T, s shelf) pages.Page {
-				nasal := s.categoryEntity(t, "Nasal Spray", false, &s.bpc)
 				created, err := s.service.Create(t.Context(), pages.CreateRequest{
-					SiteID: s.siteID, Path: "/peptides/nasal-spray/", Title: "Nasal Spray", EntityID: &nasal.ID,
+					SiteID: s.siteID, Path: "/peptides/nasal-spray/", Title: "Nasal Spray",
 				})
 				if err != nil {
 					t.Fatalf("Create: %v", err)
 				}
 				return created.Page
 			},
-			want: func(s shelf) filed {
-				return filed{categories: []dto.Category{s.category(s.peptides, 5), s.category(s.bpc, 0)}, needsPlugin: true}
-			},
+			want: func(shelf) filed { return filed{categories: []dto.Category{}} },
 		},
 		{
 			name: "a post retitled",
@@ -339,25 +375,35 @@ func TestEveryWriteAnswersWithTheCategoriesOfThePageItWrote(t *testing.T) {
 				return updated.Page
 			},
 			want: func(s shelf) filed {
-				return filed{categories: []dto.Category{s.category(s.peptides, 5), s.category(s.bpc, 0)}}
+				return filed{categories: []dto.Category{filedAs(s.peptides, 5), filedAs(s.bpc, 0)}}
 			},
 		},
 		{
-			name: "a page mapped to an entity under a category",
+			name: "a filed page with no entity mapped to one",
 			write: func(t *testing.T, s shelf) pages.Page {
-				nasal := s.categoryEntity(t, "Nasal Spray", false, &s.bpc)
-				mapped, err := s.service.MapToEntity(t.Context(), pages.MapToEntityRequest{PageID: s.pages[aboutPath].ID, EntityID: nasal.ID})
+				mapped, err := s.service.MapToEntity(t.Context(), pages.MapToEntityRequest{PageID: s.pages[peptidesPath].ID, EntityID: s.contactEntity.ID})
 				if err != nil {
 					t.Fatalf("MapToEntity: %v", err)
 				}
 				return mapped.Page
 			},
 			want: func(s shelf) filed {
-				return filed{categories: []dto.Category{s.category(s.peptides, 5), s.category(s.bpc, 0)}, needsPlugin: true}
+				return filed{categories: []dto.Category{filedAs(s.peptides, 5)}, needsPlugin: true}
 			},
 		},
 		{
-			name: "a page taken off its entity",
+			name: "an unfiled page mapped to an entity",
+			write: func(t *testing.T, s shelf) pages.Page {
+				mapped, err := s.service.MapToEntity(t.Context(), pages.MapToEntityRequest{PageID: s.pages[aboutPath].ID, EntityID: s.liquidEntity.ID})
+				if err != nil {
+					t.Fatalf("MapToEntity: %v", err)
+				}
+				return mapped.Page
+			},
+			want: func(shelf) filed { return filed{categories: []dto.Category{}} },
+		},
+		{
+			name: "a page taken off its entity stays filed",
 			write: func(t *testing.T, s shelf) pages.Page {
 				unmapped, err := s.service.Unmap(t.Context(), pages.UnmapRequest{PageID: s.pages[liquidPath].ID})
 				if err != nil {
@@ -365,19 +411,21 @@ func TestEveryWriteAnswersWithTheCategoriesOfThePageItWrote(t *testing.T) {
 				}
 				return unmapped.Page
 			},
-			want: func(shelf) filed { return filed{categories: []dto.Category{}} },
+			want: func(s shelf) filed {
+				return filed{categories: []dto.Category{filedAs(s.peptides, 5), filedAs(s.bpc, 0), filedAs(s.liquid, 0)}, needsPlugin: true}
+			},
 		},
 		{
 			name: "a canonical page",
 			write: func(t *testing.T, s shelf) pages.Page {
-				canonical, err := s.service.SetCanonical(t.Context(), pages.SetCanonicalRequest{EntityID: s.liquid.ID, PageID: s.pages[liquidPath].ID})
+				canonical, err := s.service.SetCanonical(t.Context(), pages.SetCanonicalRequest{EntityID: s.liquidEntity.ID, PageID: s.pages[liquidPath].ID})
 				if err != nil {
 					t.Fatalf("SetCanonical: %v", err)
 				}
 				return canonical.Page
 			},
 			want: func(s shelf) filed {
-				return filed{categories: []dto.Category{s.category(s.peptides, 5), s.category(s.bpc, 0)}, needsPlugin: true}
+				return filed{categories: []dto.Category{filedAs(s.peptides, 5), filedAs(s.bpc, 0), filedAs(s.liquid, 0)}, needsPlugin: true}
 			},
 		},
 	}
