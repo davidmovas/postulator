@@ -2,7 +2,8 @@ import type { ReactElement } from "react";
 
 import type { Point } from "../../canvas/viewport.js";
 import { copy } from "../../copy/index.js";
-import { StatusBadge, toneClasses } from "../../ui/index.js";
+import { chainItems } from "../../domain/categories.js";
+import { CategoryTrail, StatusBadge, toneClasses } from "../../ui/index.js";
 import type { Tone } from "../../ui/index.js";
 import { entityIcon, formatScore, entityKindLabel, kindTone } from "./labels.js";
 import type { GraphIndex } from "./model/index.js";
@@ -70,6 +71,7 @@ export function NodeCard({ index, hovered, hostWidth }: NodeCardProps): ReactEle
                 <span>{entityKindLabel(entity.kind)}</span>
                 <span className="font-mono">{formatScore(entity.score)}</span>
             </div>
+            <CategoryTrail items={chainItems(entity.categories)} label={copy.categories.trail} />
             {flags.length === 0 ? null : (
                 <div className="flex flex-wrap gap-1">
                     {flags.map((flag) => (

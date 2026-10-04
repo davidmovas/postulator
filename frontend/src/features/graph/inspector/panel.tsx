@@ -5,8 +5,19 @@ import { Link } from "react-router";
 
 import { copy } from "../../../copy/index.js";
 import type { PageAudit } from "../../../data/types.js";
+import { chainItems } from "../../../domain/categories.js";
 import { relativeTime } from "../../../domain/format.js";
-import { Button, CloseIcon, cx, DeleteIcon, IconButton, SectionLabel, SmartToyIcon, toneClasses } from "../../../ui/index.js";
+import {
+    Button,
+    CategoryTrail,
+    CloseIcon,
+    cx,
+    DeleteIcon,
+    IconButton,
+    SectionLabel,
+    SmartToyIcon,
+    toneClasses,
+} from "../../../ui/index.js";
 import { askAgent } from "../../agent/index.js";
 import { severityOf } from "../../links/model/audit.js";
 import { entityIcon, formatScore, entityKindLabel, kindTone } from "../labels.js";
@@ -127,6 +138,7 @@ export function Inspector({
     }
 
     const Icon = entityIcon(entity.kind);
+    const filed = chainItems(entity.categories);
 
     return (
         <section aria-label={copy.graph.inspector.title} className="flex h-full min-h-0 flex-col bg-panel">
@@ -139,6 +151,12 @@ export function Inspector({
                         <span className="font-mono">{formatScore(entity.score)}</span>
                         <span>{copy.graph.inspector.rank(rank, index.counts.total)}</span>
                     </p>
+                    {filed.length === 0 ? null : (
+                        <div data-entity-categories={true} className="mt-1.5 flex flex-col gap-1">
+                            <span className="text-2xs text-ink-faint">{copy.graph.inspector.filedUnder}</span>
+                            <CategoryTrail items={filed} label={copy.categories.trail} />
+                        </div>
+                    )}
                 </div>
                 <IconButton
                     icon={SmartToyIcon}

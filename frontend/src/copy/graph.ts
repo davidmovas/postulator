@@ -161,6 +161,7 @@ export const graph = {
         noAnchors: "No anchors. The entity name is used instead.",
         score: "Score",
         rank: (rank: number, total: number) => `rank ${rank} of ${total}`,
+        filedUnder: "Its page is filed under",
         source: "Source",
         page: "Canonical page",
         openPage: "Open the canonical page",
@@ -388,7 +389,14 @@ export const graph = {
         compute: "Compute the scores",
     },
     outline: {
-        columns: { name: "Entity", kind: "Kind", score: "Score", page: "Page", attention: "Attention" },
+        columns: {
+            name: "Entity",
+            kind: "Kind",
+            score: "Score",
+            page: "Page",
+            categories: "Page categories",
+            attention: "Attention",
+        },
         page: "page",
         noPage: "no page",
         fold: "Fold",
