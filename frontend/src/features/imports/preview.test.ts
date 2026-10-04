@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { PreviewReport } from "../../data/types.js";
-import { categoryPathKey } from "../../domain/categories.js";
-import { columnsBySheet, createdPaths, sheetsIn } from "./preview.js";
+import { columnsBySheet, sheetsIn } from "./preview.js";
 
 function report(part: Partial<PreviewReport>): PreviewReport {
     return {
@@ -45,38 +44,8 @@ describe("the sheets a preview read", () => {
             },
             want: ["Catalog", "Forms", "Peptides"],
         },
-        {
-            name: "a sheet that only files categories, and no sheet for the categories an apply removes",
-            part: {
-                categories: [
-                    { sheet: "Catalog", path: ["Peptides"], action: "create", rows: 2 },
-                    { path: ["Old"], action: "delete", rows: 0 },
-                ],
-            },
-            want: ["Catalog"],
-        },
     ])("lists $name", ({ part, want }) => {
         expect(sheetsIn(report(part))).toEqual(want);
-    });
-});
-
-describe("the categories an import creates", () => {
-    it("keys each created category by its whole path and leaves the found and removed ones out", () => {
-        const created = createdPaths(
-            report({
-                categories: [
-                    { sheet: "Catalog", path: ["Peptides"], action: "match", rows: 5 },
-                    { sheet: "Catalog", path: ["Peptides", "Healing"], action: "create", rows: 3 },
-                    { sheet: "Forms", path: ["Peptides", "Healing"], action: "match", rows: 1 },
-                    { path: ["Old"], action: "delete", rows: 0 },
-                ],
-            }),
-        );
-        expect([...created]).toStrictEqual([categoryPathKey(["Peptides", "Healing"])]);
-    });
-
-    it("creates nothing from a preview that files no page", () => {
-        expect(createdPaths(report({})).size).toBe(0);
     });
 });
 
@@ -84,11 +53,11 @@ describe("the column uses of each sheet", () => {
     it("keeps each sheet's columns together in the order they came", () => {
         const grouped = columnsBySheet([
             { sheet: "Catalog", header: "URL", use: "field", field: "path" },
-            { sheet: "Catalog", header: "Category", use: "level" },
+            { sheet: "Catalog", header: "Root Entity", use: "level" },
             { sheet: "Peptides", header: "Entity", use: "field", field: "entity" },
         ]);
         expect(grouped.map((held) => [held.sheet, held.columns.map((column) => column.header)])).toEqual([
-            ["Catalog", ["URL", "Category"]],
+            ["Catalog", ["URL", "Root Entity"]],
             ["Peptides", ["Entity"]],
         ]);
     });

@@ -6,8 +6,8 @@ import type { ImportMapping, ImportOptions, ImportSheet } from "../../data/types
 import type { ImportRowType } from "../../generated/vocab.js";
 import { importRowTypes, isOneOf } from "../../generated/vocab.js";
 import { Field, Input, Panel, PanelHeader, SectionLabel, Segmented, Select, Switch } from "../../ui/index.js";
-import { freeHeaders, toggled } from "./columns.js";
-import { isRootLevel, rowTypeLabel } from "./labels.js";
+import { freeHeaders, groupHeaders, toggled } from "./columns.js";
+import { rowTypeLabel } from "./labels.js";
 import type { SheetSettings } from "./workbook.js";
 
 function letterOf(at: number): string {
@@ -41,47 +41,32 @@ interface ColumnChecklistProps {
     hint: string;
     choices: readonly string[];
     chosen: readonly string[];
-    noteOf?: (header: string) => string;
+    empty: string;
     onToggle: (header: string) => void;
 }
 
-function levelNote(header: string): string {
-    return isRootLevel(header) ? copy.imports.columns.levelRoot : copy.imports.columns.levelCategory;
-}
-
-function ColumnChecklist({ title, hint, choices, chosen, noteOf, onToggle }: ColumnChecklistProps): ReactElement {
+function ColumnChecklist({ title, hint, choices, chosen, empty, onToggle }: ColumnChecklistProps): ReactElement {
     return (
         <Panel>
             <PanelHeader title={title} />
             <div className="flex flex-col gap-2 p-3">
                 <p className="text-2xs text-ink-faint">{hint}</p>
                 {choices.length === 0 ? (
-                    <p className="text-2xs text-ink-dim">{copy.imports.columns.noFreeColumns}</p>
+                    <p className="text-2xs text-ink-dim">{empty}</p>
                 ) : (
                     <ul className="flex flex-col">
-                        {choices.map((header) => {
-                            const on = chosen.includes(header);
-                            return (
-                                <li key={header} className="flex h-7 items-center gap-2">
-                                    <Switch
-                                        className="min-w-0 flex-1"
-                                        label={header}
-                                        checked={on}
-                                        onChange={() => {
-                                            onToggle(header);
-                                        }}
-                                    />
-                                    {noteOf === undefined ? null : (
-                                        <span
-                                            data-column-note={on ? true : undefined}
-                                            className="w-20 shrink-0 truncate text-right text-2xs text-ink-faint"
-                                        >
-                                            {on ? noteOf(header) : ""}
-                                        </span>
-                                    )}
-                                </li>
-                            );
-                        })}
+                        {choices.map((header) => (
+                            <li key={header} className="flex h-7 items-center">
+                                <Switch
+                                    className="w-full"
+                                    label={header}
+                                    checked={chosen.includes(header)}
+                                    onChange={() => {
+                                        onToggle(header);
+                                    }}
+                                />
+                            </li>
+                        ))}
                     </ul>
                 )}
             </div>
@@ -189,6 +174,7 @@ export function OptionsPanel({
     const indent = options.indentColumns ?? [];
     const levels = options.levelColumns ?? [];
     const notes = options.noteColumns ?? [];
+    const roots = sheets.find((sheet) => sheet.name === active)?.detected.options.levelColumns ?? [];
 
     return (
         <div className="flex flex-col gap-3 p-3">
@@ -248,9 +234,9 @@ export function OptionsPanel({
                     <ColumnChecklist
                         title={copy.imports.columns.levels}
                         hint={copy.imports.columns.levelsHint}
-                        choices={freeHeaders(headers, columns, notes)}
+                        choices={groupHeaders(headers, columns, notes, roots)}
                         chosen={levels}
-                        noteOf={levelNote}
+                        empty={copy.imports.columns.noGroupColumns}
                         onToggle={(header) => {
                             onOptions({ ...options, levelColumns: toggled(levels, header, headers) });
                         }}
@@ -260,6 +246,7 @@ export function OptionsPanel({
                         hint={copy.imports.columns.notesHint}
                         choices={freeHeaders(headers, columns, levels)}
                         chosen={notes}
+                        empty={copy.imports.columns.noFreeColumns}
                         onToggle={(header) => {
                             onOptions({ ...options, noteColumns: toggled(notes, header, headers) });
                         }}

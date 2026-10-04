@@ -56,6 +56,15 @@ export function freeHeaders(headers: readonly string[], columns: ColumnMap | nul
     return unmappedHeaders(headers, columns).filter((header) => !elsewhere.includes(header));
 }
 
+export function groupHeaders(
+    headers: readonly string[],
+    columns: ColumnMap | null,
+    elsewhere: readonly string[],
+    roots: readonly string[],
+): string[] {
+    return freeHeaders(headers, columns, elsewhere).filter((header) => roots.includes(header));
+}
+
 export function toggled(chosen: readonly string[], header: string, headers: readonly string[]): string[] {
     const held = new Set(chosen);
     if (held.has(header)) {

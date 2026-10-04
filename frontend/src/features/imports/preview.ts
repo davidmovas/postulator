@@ -1,22 +1,6 @@
 import type { PreviewReport } from "../../data/types.js";
-import { categoryPathKey } from "../../domain/categories.js";
-import type { ImportCategoryAction } from "../../generated/vocab.js";
 
 export type PreviewColumn = NonNullable<PreviewReport["columns"]>[number];
-
-export type PreviewCategory = NonNullable<PreviewReport["categories"]>[number];
-
-const createAction: ImportCategoryAction = "create";
-
-export function createdPaths(report: Pick<PreviewReport, "categories">): ReadonlySet<string> {
-    const out = new Set<string>();
-    for (const category of report.categories ?? []) {
-        if (category.action === createAction) {
-            out.add(categoryPathKey(category.path ?? []));
-        }
-    }
-    return out;
-}
 
 interface SheetColumns {
     sheet: string;
@@ -34,7 +18,6 @@ export function sheetsIn(report: PreviewReport): string[] {
         report.pages,
         report.entities,
         report.groups,
-        report.categories,
         report.edges,
     ];
     for (const listed of rows) {

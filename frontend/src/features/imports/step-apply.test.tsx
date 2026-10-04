@@ -91,12 +91,6 @@ describe("applying a workbook", () => {
         expect(screen.getByText(copy.imports.apply.pagesCreated)).toBeDefined();
     });
 
-    it("counts the categories the apply created and the ones it removed", () => {
-        show({ counts, applied: { ...single, options: {} } });
-        expect(screen.getByText(copy.imports.apply.categoriesCreated).previousElementSibling?.textContent).toBe("6");
-        expect(screen.getByText(copy.imports.apply.categoriesDeleted).previousElementSibling?.textContent).toBe("2");
-    });
-
     it("says nothing was saved when no name was given", () => {
         show({ counts, applied: { ...single, options: {} } });
         expect(screen.getByText("Applied Catalog.")).toBeDefined();

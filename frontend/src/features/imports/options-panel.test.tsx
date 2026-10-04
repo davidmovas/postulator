@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { copy } from "../../copy/index.js";
@@ -13,11 +13,16 @@ vi.mock("../../data/hooks/imports.js", () => ({
 
 const { OptionsPanel } = await import("./options-panel.js");
 
-function sheet(name: string, rows: number): ImportSheet {
-    return { name, rows, headers: [], detected: { columns: {}, options: {}, createdAt: null, updatedAt: null } };
+function sheet(name: string, rows: number, roots: string[] = []): ImportSheet {
+    return {
+        name,
+        rows,
+        headers: [],
+        detected: { columns: {}, options: roots.length === 0 ? {} : { levelColumns: roots }, createdAt: null, updatedAt: null },
+    };
 }
 
-const workbook = [sheet("Catalog", 3), sheet("Compounds", 12), sheet("Readme", 0)];
+const workbook = [sheet("Catalog", 3, ["Root Entity", "Root"]), sheet("Compounds", 12), sheet("Readme", 0)];
 
 function show(part: Partial<OptionsPanelProps> = {}) {
     const props: OptionsPanelProps = {
@@ -27,10 +32,10 @@ function show(part: Partial<OptionsPanelProps> = {}) {
         active: "Catalog",
         settings: {
             columns: { path: "URL" },
-            options: { levelColumns: ["Category"], noteColumns: [] },
+            options: { levelColumns: ["Root Entity"], noteColumns: [] },
             mappingId: "",
         },
-        headers: ["URL", "Category", "Notes"],
+        headers: ["URL", "Root Entity", "Root", "Category", "Notes"],
         onChoose: vi.fn(),
         onOptions: vi.fn(),
         onHeaderless: vi.fn(),
@@ -39,6 +44,16 @@ function show(part: Partial<OptionsPanelProps> = {}) {
     };
     render(<OptionsPanel {...props} />);
     return props;
+}
+
+function offered(title: string): string[] {
+    const panel = screen.getByRole("heading", { name: title }).closest("section");
+    if (panel === null) {
+        throw new Error("no panel is titled " + title);
+    }
+    return within(panel)
+        .queryAllByRole("switch")
+        .map((choice) => choice.closest("label")?.textContent ?? "");
 }
 
 beforeEach(() => {
@@ -80,40 +95,45 @@ describe("the options of a workbook import", () => {
         expect(screen.queryByText(copy.imports.columns.levels)).toBeNull();
     });
 
-    it("explains that a Category column files pages under a WordPress category and a Root Entity column groups entities", () => {
+    it("explains that only a Root Entity or Root column makes a group", () => {
         show();
         const hint = screen.getByText(copy.imports.columns.levelsHint).textContent ?? "";
-        expect(hint).toContain("A Root Entity or Root column groups the row's entity under a hub");
-        expect(hint).toContain("files the row's page under a WordPress category");
-        expect(hint).toContain("when a page under it is published");
-        expect(hint).toContain("a category makes no entity");
+        expect(hint).toContain("Tick the Root Entity or Root columns");
+        expect(hint).toContain("under a hub entity");
+        expect(hint).toContain("No other column makes a group");
     });
 
-    it("says beside each ticked level whether it groups entities or files pages under a category", () => {
+    it("offers as group columns only the root headers detected for the open sheet", () => {
+        show();
+        expect(offered(copy.imports.columns.levels)).toStrictEqual(["Root Entity", "Root"]);
+        expect(offered(copy.imports.columns.notes)).toStrictEqual(["Root", "Category", "Notes"]);
+    });
+
+    it("leaves out of the groups a root header a field already reads", () => {
         show({
-            settings: {
-                columns: { path: "URL" },
-                options: { levelColumns: ["Root Entity", "Category"], noteColumns: [] },
-                mappingId: "",
-            },
-            headers: ["URL", "Root Entity", "Category", "Subcategory"],
+            settings: { columns: { path: "URL", entity: "Root" }, options: { levelColumns: [] }, mappingId: "" },
         });
-        const notes = [...document.querySelectorAll<HTMLElement>("[data-column-note]")].map((note) => note.textContent);
-        expect(notes).toStrictEqual([copy.imports.columns.levelRoot, copy.imports.columns.levelCategory]);
+        expect(offered(copy.imports.columns.levels)).toStrictEqual(["Root Entity"]);
+    });
+
+    it("offers no group column for a sheet whose detector found no root header", () => {
+        show({ active: "Compounds", headers: ["URL", "Category", "Subcategory", "Notes"] });
+        expect(offered(copy.imports.columns.levels)).toStrictEqual([]);
+        expect(screen.getByText(copy.imports.columns.noGroupColumns)).toBeDefined();
     });
 
     it("edits the groups and the header row of the open sheet", () => {
         const props = show();
-        const [asIndent, asLevel, asNote] = screen.getAllByRole("switch", { name: "Notes" });
+        const [asIndent, asGroup, asNote] = screen.getAllByRole("switch", { name: "Root" });
         fireEvent.click(asNote ?? document.body);
-        expect(props.onOptions).toHaveBeenLastCalledWith({ levelColumns: ["Category"], noteColumns: ["Notes"] });
-        fireEvent.click(asLevel ?? document.body);
-        expect(props.onOptions).toHaveBeenLastCalledWith({ levelColumns: ["Category", "Notes"], noteColumns: [] });
+        expect(props.onOptions).toHaveBeenLastCalledWith({ levelColumns: ["Root Entity"], noteColumns: ["Root"] });
+        fireEvent.click(asGroup ?? document.body);
+        expect(props.onOptions).toHaveBeenLastCalledWith({ levelColumns: ["Root Entity", "Root"], noteColumns: [] });
         fireEvent.click(asIndent ?? document.body);
         expect(props.onOptions).toHaveBeenLastCalledWith({
-            levelColumns: ["Category"],
+            levelColumns: ["Root Entity"],
             noteColumns: [],
-            indentColumns: ["Notes"],
+            indentColumns: ["Root"],
         });
         fireEvent.click(screen.getByRole("switch", { name: copy.imports.columns.noHeader }));
         expect(props.onHeaderless).toHaveBeenCalledWith(true);

@@ -5,14 +5,14 @@ import type { ImportConflict, ImportFinding } from "../../data/types.js";
 import { EmptyState, Panel, PanelHeader, StatusBadge, TaskAltIcon } from "../../ui/index.js";
 import { findingLabel, findingPlace, reasonLabel } from "./labels.js";
 
-export interface FindingGroupProps {
+interface GroupProps {
     title: string;
     count: number;
     tone: "danger" | "warn";
     findings: readonly ImportFinding[];
 }
 
-export function FindingGroup({ title, count, tone, findings }: FindingGroupProps): ReactElement | null {
+function Group({ title, count, tone, findings }: GroupProps): ReactElement | null {
     if (count === 0) {
         return null;
     }
@@ -63,8 +63,8 @@ export function FindingsPanel({ errors, warnings, conflicts }: FindingsPanelProp
     const quiet = errors.length === 0 && warnings.length === 0 && conflicts.length === 0;
     return (
         <div className="flex flex-col gap-3 p-3">
-            <FindingGroup title={copy.imports.preview.errors} count={errors.length} tone="danger" findings={errors} />
-            <FindingGroup title={copy.imports.preview.warnings} count={warnings.length} tone="warn" findings={warnings} />
+            <Group title={copy.imports.preview.errors} count={errors.length} tone="danger" findings={errors} />
+            <Group title={copy.imports.preview.warnings} count={warnings.length} tone="warn" findings={warnings} />
             {conflicts.length === 0 ? null : (
                 <Panel>
                     <PanelHeader title={copy.imports.preview.conflicts}>

@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import { importFields } from "../../generated/vocab.js";
-import { assign, freeHeaders, mappedFields, takenFrom, targetOf, toggled, unmappedHeaders, usable } from "./columns.js";
+import {
+    assign,
+    freeHeaders,
+    groupHeaders,
+    mappedFields,
+    takenFrom,
+    targetOf,
+    toggled,
+    unmappedHeaders,
+    usable,
+} from "./columns.js";
 
 const detected = { path: "URL", title: "Title", keywords: "Keywords" };
 
@@ -66,6 +76,39 @@ describe("what the mapping covers", () => {
 
     it("offers as a group or a note only a column no field reads and the other list does not hold", () => {
         expect(freeHeaders(["URL", "Category", "Notes", "", "Title"], detected, ["Notes"])).toEqual(["Category"]);
+    });
+
+    it.each([
+        {
+            name: "only the free headers the detector read as roots",
+            headers: ["URL", "Root Entity", "Category", "Subcategory", "Root", "Notes"],
+            elsewhere: [],
+            roots: ["Root Entity", "Root"],
+            want: ["Root Entity", "Root"],
+        },
+        {
+            name: "no root a note already holds",
+            headers: ["URL", "Root Entity", "Root"],
+            elsewhere: ["Root"],
+            roots: ["Root Entity", "Root"],
+            want: ["Root Entity"],
+        },
+        {
+            name: "no root a field reads",
+            headers: ["URL", "Title", "Root"],
+            elsewhere: [],
+            roots: ["Title", "Root"],
+            want: ["Root"],
+        },
+        {
+            name: "nothing for a sheet with no root header",
+            headers: ["URL", "Category", "Subcategory"],
+            elsewhere: [],
+            roots: [],
+            want: [],
+        },
+    ])("offers as a group column $name", ({ headers, elsewhere, roots, want }) => {
+        expect(groupHeaders(headers, detected, elsewhere, roots)).toEqual(want);
     });
 
     it("toggles a column in or out and keeps the order of the sheet", () => {

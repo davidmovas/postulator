@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
     cannibalizationReasons,
     importActions,
-    importCategoryActions,
     importColumnUses,
     importFields,
     importFindingCodes,
@@ -13,14 +12,11 @@ import {
     actionLabel,
     actionTone,
     blocking,
-    categoryActionLabel,
-    categoryActionTone,
     columnUseLabel,
     fieldChoices,
     fieldLabel,
     findingLabel,
     findingPlace,
-    isRootLevel,
     noField,
     productNote,
     reasonLabel,
@@ -34,7 +30,6 @@ const vocabularies: readonly [string, readonly string[], (value: string) => stri
     ["import action", importActions, actionLabel],
     ["cannibalisation reason", cannibalizationReasons, reasonLabel],
     ["row type", importRowTypes, rowTypeLabel],
-    ["category action", importCategoryActions, categoryActionLabel],
 ];
 
 describe("what a product row of the preview says", () => {
@@ -113,46 +108,11 @@ describe("blocking findings", () => {
 describe("what a column became", () => {
     it.each([
         [{ header: "URL", use: "field", field: "path" }, "Page path"],
-        [{ header: "Category", use: "level" }, "WordPress category level"],
-        [{ header: "Sub Subcategory", use: "level" }, "WordPress category level"],
-        [{ header: "Root Entity", use: "level" }, "Root group"],
+        [{ header: "Root Entity", use: "level" }, "Group"],
         [{ header: "Notes", use: "note" }, "Note for the writer"],
         [{ header: "Entity?", use: "ignored" }, "Ignored"],
     ])("words %j as %s", (column, want) => {
         expect(columnUseLabel(column)).toBe(want);
-    });
-});
-
-describe("which level column makes a root group", () => {
-    it.each([
-        ["Root Entity", true],
-        ["root entity", true],
-        ["ROOT_ENTITY", true],
-        ["RootEntity", true],
-        ["Root", true],
-        [" root ", true],
-        ["Root Category", false],
-        ["Category", false],
-        ["Subcategory", false],
-        ["Rooted", false],
-    ])("reads %j as a root: %s", (header, want) => {
-        expect(isRootLevel(header)).toBe(want);
-    });
-});
-
-describe("what an import does to a category", () => {
-    it.each([
-        ["create", "new", "ok"],
-        ["match", "existing", "muted"],
-        ["delete", "removed", "warn"],
-    ])("words %s as %s in the %s tone", (action, words, tone) => {
-        expect(categoryActionLabel(action)).toBe(words);
-        expect(categoryActionTone(action)).toBe(tone);
-    });
-
-    it("shows an action it does not know as it arrived", () => {
-        expect(categoryActionLabel("merge")).toBe("merge");
-        expect(categoryActionTone("merge")).toBe("muted");
     });
 });
 
