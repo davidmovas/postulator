@@ -347,7 +347,7 @@ func TestTheClientWorkbookImportsAsOneWorkbook(t *testing.T) {
 	}
 }
 
-func TestTheCatalogMakesPeptidesACategoryOnlyWhereNoEntityAtTheTopOfTheGraphIsNamedSo(t *testing.T) {
+func TestTheCatalogMakesPeptidesACategoryOnlyWhereNoRootIsNamedSo(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -379,6 +379,12 @@ func TestTheCatalogMakesPeptidesACategoryOnlyWhereNoEntityAtTheTopOfTheGraphIsNa
 			kind:    graph.KindCategory,
 			dropped: []int{2, 3, 4},
 		},
+		{
+			name:    "the entity sheet imported alone before",
+			before:  []string{"Entities"},
+			kind:    graph.KindCategory,
+			dropped: []int{2, 3, 4},
+		},
 	}
 
 	for _, tc := range cases {
@@ -403,5 +409,29 @@ func TestTheCatalogMakesPeptidesACategoryOnlyWhereNoEntityAtTheTopOfTheGraphIsNa
 				t.Fatalf("the catalog lists the Peptides categories %v, want %v", listed, tc.peptides)
 			}
 		})
+	}
+}
+
+func TestTheEntitySheetAloneOnAnEmptySiteMakesNoPeptidesCategory(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	entities := h.sheet(t, clientWorkbook, "Entities")
+	var before []string
+	for pass, name := range []string{"the first import", "the second import"} {
+		applied := h.apply(t, clientWorkbook, entities)
+		clean(t, "Entities", applied)
+		rootLevelsDropped(t, applied.Report, "Entities", 2, 3, 4)
+		if got := h.kinds(t)["Peptides"]; got != graph.KindCategory {
+			t.Fatalf("after %s Peptides is %q, want the category its entity level says", name, got)
+		}
+		shelf := h.shelf(t)
+		if slices.ContainsFunc(shelf, func(held string) bool { return strings.Contains(held, "Peptides") }) {
+			t.Fatalf("after %s the categories are %v, want no Peptides among them", name, shelf)
+		}
+		if pass > 0 && (!slices.Equal(shelf, before) || applied.Counts != (imports.Counts{Skipped: applied.Counts.Skipped})) {
+			t.Fatalf("%s wrote %+v and left the categories %v, want nothing written and %v", name, applied.Counts, shelf, before)
+		}
+		before = shelf
 	}
 }

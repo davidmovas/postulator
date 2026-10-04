@@ -105,12 +105,29 @@ func (s *Service) compute(ctx context.Context, req PreviewRequest) (workbook, er
 	}
 
 	now := s.now()
-	roots := rootsOf(reads, &state)
+	roots, levels := namesOf(reads, &state)
+	book, after, err := s.planAll(ctx, state, roots, reads, now)
+	for err == nil && roots.takeRoots(&after, levels) {
+		book, after, err = s.planAll(ctx, state, roots, reads, now)
+	}
+	if err != nil {
+		return workbook{}, err
+	}
+	if sweepErr := s.sweep(ctx, &book, &after); sweepErr != nil {
+		return workbook{}, sweepErr
+	}
+	book.report.settle()
+	return book, nil
+}
+
+func (s *Service) planAll(
+	ctx context.Context, state siteState, roots keySet, reads []sheetRead, now time.Time,
+) (workbook, siteState, error) {
 	book := workbook{plans: make([]plan, 0, len(reads))}
 	for i := range reads {
 		planned, planErr := s.plan(ctx, state, roots, &reads[i], now)
 		if planErr != nil {
-			return workbook{}, planErr
+			return workbook{}, siteState{}, planErr
 		}
 		next, settleErr := state.after(&planned, now)
 		switch {
@@ -119,16 +136,12 @@ func (s *Service) compute(ctx context.Context, req PreviewRequest) (workbook, er
 			_, message := errors.Describe(settleErr)
 			planned.noteAt(planned.whole(), "", CodeScopeClash, message)
 		default:
-			return workbook{}, settleErr
+			return workbook{}, siteState{}, settleErr
 		}
 		state = next
 		book.add(&planned)
 	}
-	if err := s.sweep(ctx, &book, &state); err != nil {
-		return workbook{}, err
-	}
-	book.report.settle()
-	return book, nil
+	return book, state, nil
 }
 
 func (s *Service) reads(ctx context.Context, req PreviewRequest) ([]sheetRead, error) {

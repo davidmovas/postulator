@@ -102,7 +102,7 @@ func (p *plan) counts() Counts {
 	return tally
 }
 
-func (s *Service) plan(ctx context.Context, state siteState, roots rootSet, read *sheetRead, now time.Time) (plan, error) {
+func (s *Service) plan(ctx context.Context, state siteState, roots keySet, read *sheetRead, now time.Time) (plan, error) {
 	p := newPlan(state.siteID, read.mapping, read.table)
 	rows := readRows(read.binding, read.table, roots, &p)
 	sheet := pagesOf(rows, &p)

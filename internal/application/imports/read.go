@@ -64,7 +64,7 @@ func (l categoryLevels) dropped() []string {
 	return l.named(true)
 }
 
-func (r *rowDraft) sortLevels(roots rootSet) {
+func (r *rowDraft) sortLevels(roots keySet) {
 	for _, level := range r.levels {
 		switch {
 		case !level.Category:
@@ -123,7 +123,7 @@ func rowKeywords(binding importmap.Binding, row []string, at importmap.Origin, p
 	return keyword.New(items)
 }
 
-func readRows(binding importmap.Binding, table importmap.Table, roots rootSet, p *plan) []rowDraft {
+func readRows(binding importmap.Binding, table importmap.Table, roots keySet, p *plan) []rowDraft {
 	rows := make([]rowDraft, 0, len(table.Rows))
 	walk := binding.Walk()
 	for i := range table.Rows {
@@ -138,7 +138,7 @@ func readRows(binding importmap.Binding, table importmap.Table, roots rootSet, p
 	return rows
 }
 
-func readRow(binding importmap.Binding, row []string, raw string, at importmap.Origin, roots rootSet, p *plan) (rowDraft, bool) {
+func readRow(binding importmap.Binding, row []string, raw string, at importmap.Origin, roots keySet, p *plan) (rowDraft, bool) {
 	if binding.Blank(row) && raw == "" {
 		return rowDraft{}, false
 	}
