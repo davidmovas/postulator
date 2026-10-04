@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/category"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -233,12 +233,12 @@ func TestATypeKnowsTheTaxonomyItsCategoriesComeFrom(t *testing.T) {
 
 	cases := []struct {
 		wpType   pagemap.WPType
-		taxonomy graph.Taxonomy
+		taxonomy category.Taxonomy
 		has      bool
 	}{
-		{wpType: pagemap.WPPage, taxonomy: graph.TaxonomyCategory, has: true},
-		{wpType: pagemap.WPPost, taxonomy: graph.TaxonomyCategory, has: true},
-		{wpType: pagemap.WPProduct, taxonomy: graph.TaxonomyProductCategory, has: true},
+		{wpType: pagemap.WPPage, taxonomy: category.TaxonomyCategory, has: true},
+		{wpType: pagemap.WPPost, taxonomy: category.TaxonomyCategory, has: true},
+		{wpType: pagemap.WPProduct, taxonomy: category.TaxonomyProductCategory, has: true},
 		{wpType: pagemap.WPProductCategory},
 		{wpType: "attachment"},
 	}

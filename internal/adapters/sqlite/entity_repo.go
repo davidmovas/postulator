@@ -15,9 +15,9 @@ import (
 )
 
 const (
-	entityColumns         = `id, site_id, name, kind, site_category, intent, keywords, scope_entity_id, canonical_page_id, score, source, created_at, updated_at`
-	insertEntity          = `INSERT INTO entities (` + entityColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	updateEntity          = `UPDATE entities SET name = ?, kind = ?, site_category = ?, intent = ?, keywords = ?, scope_entity_id = ?, canonical_page_id = ?, score = ?, source = ?, updated_at = ? WHERE id = ?`
+	entityColumns         = `id, site_id, name, kind, intent, keywords, scope_entity_id, canonical_page_id, score, source, created_at, updated_at`
+	insertEntity          = `INSERT INTO entities (` + entityColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	updateEntity          = `UPDATE entities SET name = ?, kind = ?, intent = ?, keywords = ?, scope_entity_id = ?, canonical_page_id = ?, score = ?, source = ?, updated_at = ? WHERE id = ?`
 	updateEntityScope     = `UPDATE entities SET scope_entity_id = ?, updated_at = ? WHERE id = ?`
 	updateEntityScore     = `UPDATE entities SET score = ? WHERE id = ?`
 	updateEntityCanonical = `UPDATE entities SET canonical_page_id = ?, updated_at = ? WHERE id = ?`
@@ -55,7 +55,7 @@ func (r *EntityRepo) Insert(ctx context.Context, e graph.Entity) error {
 		return err
 	}
 	if _, err = execWrite(ctx, r.store.writeFrom(ctx), insertEntity, []any{
-		e.ID, e.SiteID, e.Name, string(e.Kind), boolInt(e.SiteCategory), e.Intent, keywords, nullString(e.ScopeID), nullString(e.CanonicalPageID),
+		e.ID, e.SiteID, e.Name, string(e.Kind), e.Intent, keywords, nullString(e.ScopeID), nullString(e.CanonicalPageID),
 		e.Score, string(e.Source), formatTime(e.CreatedAt), formatTime(e.UpdatedAt),
 	}, entityConflict(e.Name), "insert the entity"); err != nil {
 		return err
@@ -69,7 +69,7 @@ func (r *EntityRepo) Update(ctx context.Context, e graph.Entity) error {
 		return err
 	}
 	affected, err := execWrite(ctx, r.store.writeFrom(ctx), updateEntity, []any{
-		e.Name, string(e.Kind), boolInt(e.SiteCategory), e.Intent, keywords, nullString(e.ScopeID), nullString(e.CanonicalPageID),
+		e.Name, string(e.Kind), e.Intent, keywords, nullString(e.ScopeID), nullString(e.CanonicalPageID),
 		e.Score, string(e.Source), formatTime(e.UpdatedAt), e.ID,
 	}, entityConflict(e.Name), "update the entity")
 	if updateErr := requireAffected(affected, err, entityNotFound(e.ID)); updateErr != nil {
@@ -261,15 +261,13 @@ func scanEntity(rows *sql.Rows) (graph.Entity, error) {
 		e                    graph.Entity
 		kind, source         string
 		keywords             string
-		siteCategory         int64
 		scope, canonical     sql.NullString
 		createdAt, updatedAt string
 	)
-	if err := rows.Scan(&e.ID, &e.SiteID, &e.Name, &kind, &siteCategory, &e.Intent, &keywords, &scope, &canonical, &e.Score, &source, &createdAt, &updatedAt); err != nil {
+	if err := rows.Scan(&e.ID, &e.SiteID, &e.Name, &kind, &e.Intent, &keywords, &scope, &canonical, &e.Score, &source, &createdAt, &updatedAt); err != nil {
 		return graph.Entity{}, err
 	}
 	e.Kind = graph.Kind(kind)
-	e.SiteCategory = siteCategory == 1
 	e.Source = graph.Source(source)
 	e.ScopeID = optString(scope)
 	e.CanonicalPageID = optString(canonical)
