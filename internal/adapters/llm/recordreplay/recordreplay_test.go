@@ -1,6 +1,7 @@
 package recordreplay_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	stderrors "errors"
@@ -328,6 +329,127 @@ func TestACredentialInAToolCallNeverReachesAFixture(t *testing.T) {
 			}
 			if len(replayed.Calls) != 1 || strings.Contains(string(replayed.Calls[0].Args), spoken) {
 				t.Fatalf("the replayed call is %+v", replayed.Calls)
+			}
+		})
+	}
+}
+
+type searching struct{}
+
+func (searching) answer() port.Response {
+	return port.Response{
+		Searches: []port.ToolSearch{
+			{Kind: port.SearchCall, Execution: "server", Payload: json.RawMessage(`{"paths":["pages"]}`)},
+			{Kind: port.SearchOutput, Execution: "server", Payload: json.RawMessage(`[{"type":"namespace","name":"pages"}]`)},
+		},
+		Calls: []port.ToolCall{{
+			ID: "call-1", Name: "models_set_provider_key", Namespace: "models",
+			Args: json.RawMessage(`{"provider":"openai","apiKey":"sk-live-SearchedSearched9876"}`),
+		}},
+		Usage:        llm.Usage{Input: 900, Output: 40, Total: 940},
+		FinishReason: port.FinishStop,
+	}
+}
+
+func (s searching) Complete(context.Context, port.Request) (port.Response, error) {
+	return s.answer(), nil
+}
+
+func (s searching) Stream(context.Context, port.Request) (<-chan port.Delta, error) {
+	resp := s.answer()
+	out := make(chan port.Delta, len(resp.Searches)+len(resp.Calls)+1)
+	for i := range resp.Searches {
+		out <- port.Delta{Search: &resp.Searches[i]}
+	}
+	for i := range resp.Calls {
+		out <- port.Delta{Call: &resp.Calls[i]}
+	}
+	out <- port.Delta{Done: true, Usage: &resp.Usage, Finish: resp.FinishReason}
+	close(out)
+	return out, nil
+}
+
+func compacted(t *testing.T, searches []port.ToolSearch) []port.ToolSearch {
+	t.Helper()
+
+	out := make([]port.ToolSearch, 0, len(searches))
+	for _, search := range searches {
+		var dense bytes.Buffer
+		if err := json.Compact(&dense, search.Payload); err != nil {
+			t.Fatalf("compact %s: %v", search.Payload, err)
+		}
+		search.Payload = dense.Bytes()
+		out = append(out, search)
+	}
+	return out
+}
+
+type step struct {
+	search *port.ToolSearch
+	call   *port.ToolCall
+}
+
+func steps(t *testing.T, deltas <-chan port.Delta) []step {
+	t.Helper()
+
+	var got []step
+	for delta := range deltas {
+		if delta.Err != nil {
+			t.Fatalf("delta error: %v", delta.Err)
+		}
+		switch {
+		case delta.Search != nil:
+			got = append(got, step{search: delta.Search})
+		case delta.Call != nil:
+			got = append(got, step{call: delta.Call})
+		}
+	}
+	return got
+}
+
+func TestADeferredToolSearchIsRecordedAndReplayedBeforeTheCallItLoaded(t *testing.T) {
+	t.Parallel()
+
+	for _, mode := range []string{"complete", "stream"} {
+		t.Run(mode, func(t *testing.T) {
+			t.Parallel()
+
+			dir := t.TempDir()
+			req := chatting(asked("read the page"))
+			recorder := open(searching{}, recordreplay.ModeRecord, dir)
+			if mode == "complete" {
+				if _, err := recorder.Complete(t.Context(), req); err != nil {
+					t.Fatalf("Complete: %v", err)
+				}
+			} else {
+				deltas, err := recorder.Stream(t.Context(), req)
+				if err != nil {
+					t.Fatalf("Stream: %v", err)
+				}
+				steps(t, deltas)
+			}
+
+			answered, err := open(fake.New(), recordreplay.ModeReplay, dir).Complete(t.Context(), req)
+			if err != nil {
+				t.Fatalf("replay Complete: %v", err)
+			}
+			if got, want := compacted(t, answered.Searches), compacted(t, searching{}.answer().Searches); !reflect.DeepEqual(got, want) {
+				t.Fatalf("replayed searches = %+v, want %+v", got, want)
+			}
+
+			replayed, err := open(fake.New(), recordreplay.ModeReplay, dir).Stream(t.Context(), req)
+			if err != nil {
+				t.Fatalf("replay Stream: %v", err)
+			}
+			got := steps(t, replayed)
+			if len(got) != 3 || got[0].search == nil || got[1].search == nil || got[2].call == nil {
+				t.Fatalf("replayed stream = %+v, want the search call, its output, then the call", got)
+			}
+			if got[0].search.Kind != port.SearchCall || got[1].search.Kind != port.SearchOutput {
+				t.Fatalf("replayed searches = %+v then %+v, want the call before its output", *got[0].search, *got[1].search)
+			}
+			if got[2].call.Namespace != "models" || strings.Contains(string(got[2].call.Args), "SearchedSearched") {
+				t.Fatalf("replayed call = %+v, want its namespace and its key masked", *got[2].call)
 			}
 		})
 	}

@@ -93,9 +93,12 @@ func (c *Client) Stream(ctx context.Context, req port.Request) (<-chan port.Delt
 }
 
 func replay(resp port.Response) <-chan port.Delta {
-	out := make(chan port.Delta, len(resp.Calls)+2)
+	out := make(chan port.Delta, len(resp.Searches)+len(resp.Calls)+2)
 	if resp.Text != "" {
 		out <- port.Delta{Text: resp.Text}
+	}
+	for i := range resp.Searches {
+		out <- port.Delta{Search: &resp.Searches[i]}
 	}
 	for i := range resp.Calls {
 		out <- port.Delta{Call: &resp.Calls[i]}
@@ -124,6 +127,9 @@ func (c *Client) recordStream(ctx context.Context, req port.Request) (<-chan por
 		)
 		for delta := range deltas {
 			text = append(text, delta.Text...)
+			if delta.Search != nil {
+				heard.Searches = append(heard.Searches, *delta.Search)
+			}
 			if delta.Call != nil {
 				heard.Calls = append(heard.Calls, *delta.Call)
 			}
