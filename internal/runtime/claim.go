@@ -157,19 +157,34 @@ func (e *Engine) gather(ctx context.Context, held *claim) error {
 func (e *Engine) begin(ctx context.Context, box *outbox, held *claim, now time.Time) error {
 	runID, itemID := held.record.ID, held.item.ID
 
-	if held.record.Status == run.StatusPending {
-		held.record.Status = run.StatusRunning
+	if held.record.StartedAt == nil {
+		if held.record.Status == run.StatusPending {
+			held.record.Status = run.StatusRunning
+		}
 		held.record.StartedAt = &now
 		if err := e.deps.Runs.Update(ctx, held.record); err != nil {
 			return err
 		}
 		box.add(ctx, runID, events.RunStarted, events.RunStartedPayload{RunID: runID})
 	}
-	if held.item.AdvanceSeq == 1 {
+
+	first, err := e.startsFresh(ctx, held)
+	if err != nil {
+		return err
+	}
+	if first {
 		box.add(ctx, runID, events.ItemStarted, events.ItemStartedPayload{RunID: runID, ItemID: itemID})
 	}
 	box.add(ctx, runID, events.StepStarted, events.StepStartedPayload{RunID: runID, ItemID: itemID, Step: held.step.Name})
 	return nil
+}
+
+func (e *Engine) startsFresh(ctx context.Context, held *claim) (bool, error) {
+	if held.index > 0 {
+		return false, nil
+	}
+	ran, err := e.deps.Execs.CountByStep(ctx, held.item.ID, held.step.Name)
+	return ran == 0, err
 }
 
 func required(step run.StepDef, available map[run.ArtifactKind]run.Artifact) []run.Artifact {

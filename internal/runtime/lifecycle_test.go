@@ -25,6 +25,7 @@ type lifecycle struct {
 	want    run.Status
 	events  []events.Type
 	execs   []string
+	settled func(t *testing.T, record run.Run)
 }
 
 func linkContext(name string) run.StepDef {
@@ -232,10 +233,16 @@ func lifecycles() []lifecycle {
 			},
 			want: run.StatusCompleted,
 			events: []events.Type{
-				events.RunQueued, events.RunPaused, events.RunResumed,
+				events.RunQueued, events.RunPaused, events.RunResumed, events.RunStarted, events.ItemStarted,
 				events.StepStarted, events.StepDone, events.ItemDone, events.RunCompleted,
 			},
 			execs: []string{"report:1:done"},
+			settled: func(t *testing.T, record run.Run) {
+				if record.StartedAt == nil || record.FinishedAt == nil || record.StartedAt.After(*record.FinishedAt) {
+					t.Fatalf("the run started at %v and finished at %v, want a start before its finish",
+						record.StartedAt, record.FinishedAt)
+				}
+			},
 		},
 	}
 }
@@ -271,7 +278,10 @@ func TestEveryPathThroughARunRecordsItsEventsAndExecsInOrder(t *testing.T) {
 				harness.waitForRun(t, queued.ID, tc.stopsAt)
 				tc.then(t, engine, queued.ID, itemID)
 			}
-			harness.waitForRun(t, queued.ID, tc.want)
+			settled := harness.waitForRun(t, queued.ID, tc.want)
+			if tc.settled != nil {
+				tc.settled(t, settled)
+			}
 
 			if got := loggedTypes(t, harness, queued.ID); !slices.Equal(got, tc.events) {
 				t.Fatalf("the run logged\n%v\nwant\n%v", got, tc.events)
