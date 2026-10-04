@@ -13,7 +13,6 @@ function entity(id: string, name: string, scopeEntityId: string | null = null): 
         keywords: [],
         anchors: [],
         scopeEntityId,
-        categories: [],
         canonicalPageId: null,
         score: 0,
         source: "user",

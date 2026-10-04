@@ -22,8 +22,6 @@ const counts: ImportCounts = {
     edgesCreated: 3,
     pagesCreated: 5,
     pagesUpdated: 0,
-    categoriesCreated: 6,
-    categoriesDeleted: 2,
     skipped: 0,
 };
 

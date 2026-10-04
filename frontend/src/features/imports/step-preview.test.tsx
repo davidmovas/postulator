@@ -25,7 +25,6 @@ const workbook: PreviewReport = {
             title: "Peptides",
             keywords: null,
             wpType: "page",
-            categories: [],
             action: "create",
         },
         {
@@ -35,7 +34,6 @@ const workbook: PreviewReport = {
             keywords: null,
             wpType: "page",
             entity: "BPC-157",
-            categories: [],
             action: "update",
         },
     ],
@@ -48,7 +46,6 @@ const workbook: PreviewReport = {
         { sheet: "Catalog", path: ["Peptides", "BPC-157"], page: "/peptides/bpc-157/", rows: 3 },
         { sheet: "Catalog", path: ["Research"], rows: 1 },
     ],
-    categories: [],
     edges: [{ sheet: "Compounds", from: "BPC-157", to: "Peptides", kind: "parent", action: "create" }],
     warnings: null,
     errors: null,

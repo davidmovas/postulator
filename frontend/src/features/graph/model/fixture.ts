@@ -22,7 +22,6 @@ export function entity(seed: EntitySeed): Entity {
         keywords: [seed.primaryKeyword ?? seed.name.toLowerCase(), ...(seed.secondaryKeywords ?? [])].map((text) => ({ text })),
         anchors: [{ text: seed.name, source: "user", weight: 1 }],
         scopeEntityId: seed.scope ?? null,
-        categories: [],
         canonicalPageId: seed.page === false ? null : `page-${seed.id}`,
         score: seed.score ?? 0.5,
         source: seed.source ?? "user",

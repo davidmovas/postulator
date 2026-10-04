@@ -19,8 +19,6 @@ export function aPage(id: string, path: string, overrides: Partial<Page> = {}): 
         notes: [],
         status: "planned",
         entityId: null,
-        categories: [],
-        categoriesNeedPlugin: false,
         templateId: null,
         contentHash: "",
         observed: { link: "", slug: "", status: "", title: "", h1: "" },
