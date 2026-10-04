@@ -44,20 +44,12 @@ func (i Index) ByPath(path string) (page Page, found bool) {
 	return page, found
 }
 
-func (i Index) PathParent(page Page) (parent Page, found bool) {
-	if page.WPType.StoreAddressed() {
-		return Page{}, false
-	}
-	parent, found = i.ByPath(ParentPath(page.Path))
-	if !found || parent.ID == page.ID {
-		return Page{}, false
-	}
-	return parent, true
-}
-
 func (i Index) PathParentID(page Page) *string {
-	parent, found := i.PathParent(page)
-	if !found {
+	if page.WPType.StoreAddressed() {
+		return nil
+	}
+	parent, found := i.ByPath(ParentPath(page.Path))
+	if !found || parent.ID == page.ID {
 		return nil
 	}
 	return &parent.ID
@@ -69,8 +61,4 @@ func (i Index) ByEntity(entityID string) []Page {
 
 func (i Index) Pages() []Page {
 	return slices.Clone(i.pages)
-}
-
-func (i Index) Len() int {
-	return len(i.pages)
 }

@@ -119,20 +119,23 @@ func TestNewEntityRejects(t *testing.T) {
 	}
 }
 
-func TestNewAnchorsKeepsOrderAndTrims(t *testing.T) {
+func TestNewEntityKeepsTheAnchorOrderAndTrims(t *testing.T) {
 	t.Parallel()
 
-	anchors, err := graph.NewAnchors([]graph.Anchor{{Text: " b ", Source: graph.AnchorAI, Weight: 0.5}, {Text: "a", Source: graph.AnchorUser, Weight: 1}})
+	entity := validEntity()
+	entity.Anchors = []graph.Anchor{{Text: " b ", Source: graph.AnchorAI, Weight: 0.5}, {Text: "a", Source: graph.AnchorUser, Weight: 1}}
+	got, err := graph.NewEntity(entity)
 	if err != nil {
-		t.Fatalf("NewAnchors: %v", err)
+		t.Fatalf("NewEntity: %v", err)
 	}
-	if len(anchors) != 2 || anchors[0].Text != "b" || anchors[1].Text != "a" {
-		t.Fatalf("anchors = %+v", anchors)
+	if len(got.Anchors) != 2 || got.Anchors[0].Text != "b" || got.Anchors[1].Text != "a" {
+		t.Fatalf("anchors = %+v", got.Anchors)
 	}
 
-	empty, err := graph.NewAnchors(nil)
-	if err != nil || empty == nil || len(empty) != 0 {
-		t.Fatalf("NewAnchors(nil) = %v, %v; want an empty slice", empty, err)
+	entity.Anchors = nil
+	got, err = graph.NewEntity(entity)
+	if err != nil || got.Anchors == nil || len(got.Anchors) != 0 {
+		t.Fatalf("an entity with no anchors = %v, %v; want an empty slice", got.Anchors, err)
 	}
 }
 
@@ -154,7 +157,7 @@ func TestEnums(t *testing.T) {
 			t.Errorf("%q must be valid", status)
 		}
 	}
-	if graph.Kind("x").Valid() || graph.Source("x").Valid() || graph.AnchorSource("x").Valid() || graph.EdgeKind("x").Valid() || graph.EdgeStatus("x").Valid() {
+	if graph.Kind("x").Valid() || graph.Source("x").Valid() || graph.EdgeKind("x").Valid() || graph.EdgeStatus("x").Valid() {
 		t.Error("unknown enum values must be invalid")
 	}
 	if !graph.EntitySortCreatedAt.Valid() || !graph.EntitySortName.Valid() || graph.EntitySort("x").Valid() {

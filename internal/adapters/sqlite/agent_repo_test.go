@@ -56,6 +56,17 @@ func (f agentFixture) conversationOf(t *testing.T, mode agent.Mode) agent.Conver
 	return record
 }
 
+func (f agentFixture) messagesOf(t *testing.T, conversationID string) []agent.Message {
+	t.Helper()
+
+	listed, err := f.messages.List(t.Context(), agent.MessageQuery{ConversationID: conversationID},
+		paging.Request{Limit: paging.MaxLimit})
+	if err != nil {
+		t.Fatalf("List the messages: %v", err)
+	}
+	return listed.Items
+}
+
 func TestConversationRoundTrip(t *testing.T) {
 	t.Parallel()
 
@@ -124,27 +135,16 @@ func TestMessagesAreNumberedPerConversation(t *testing.T) {
 		}
 	}
 
-	rows, err := f.messages.ByConversation(t.Context(), first.ID)
-	if err != nil || len(rows) != 2 || rows[0].Seq != 1 || rows[1].Seq != 2 {
-		t.Fatalf("ByConversation = %+v, %v", rows, err)
+	if rows := f.messagesOf(t, first.ID); len(rows) != 2 || rows[0].Seq != 1 || rows[1].Seq != 2 {
+		t.Fatalf("the first conversation = %+v", rows)
 	}
-
-	latest, err := f.messages.LatestSeq(t.Context(), first.ID)
-	if err != nil || latest != 2 {
-		t.Fatalf("LatestSeq = %d, %v", latest, err)
-	}
-	empty, err := f.messages.LatestSeq(t.Context(), id.New())
-	if err != nil || empty != 0 {
-		t.Fatalf("LatestSeq of an empty conversation = %d, %v", empty, err)
+	if rows := f.messagesOf(t, second.ID); len(rows) != 1 || rows[0].Seq != 1 {
+		t.Fatalf("the second conversation = %+v", rows)
 	}
 
 	listed, err := f.messages.List(t.Context(), agent.MessageQuery{ConversationID: first.ID}, paging.Request{Limit: 1})
 	if err != nil || len(listed.Items) != 1 || !listed.HasMore {
 		t.Fatalf("List = %+v, %v", listed, err)
-	}
-
-	if _, err = f.messages.Get(t.Context(), id.New()); !errors.IsCode(err, errors.NotFound) {
-		t.Fatalf("Get of an unknown message = %v", err)
 	}
 }
 
@@ -273,9 +273,8 @@ func TestDeletingAConversationTakesItsRows(t *testing.T) {
 	if _, err = f.conversation.Get(t.Context(), conversation.ID); !errors.IsCode(err, errors.NotFound) {
 		t.Fatalf("the conversation survived its deletion: %v", err)
 	}
-	rows, err := f.messages.ByConversation(t.Context(), conversation.ID)
-	if err != nil || len(rows) != 0 {
-		t.Fatalf("the messages survived the conversation: %+v, %v", rows, err)
+	if rows := f.messagesOf(t, conversation.ID); len(rows) != 0 {
+		t.Fatalf("the messages survived the conversation: %+v", rows)
 	}
 	if _, err = f.actions.Get(t.Context(), action.ID); !errors.IsCode(err, errors.NotFound) {
 		t.Fatalf("the action survived the conversation: %v", err)
@@ -283,9 +282,8 @@ func TestDeletingAConversationTakesItsRows(t *testing.T) {
 	if _, _, err = f.histories.Load(t.Context(), conversation.ID); !errors.IsCode(err, errors.NotFound) {
 		t.Fatalf("the history survived the conversation: %v", err)
 	}
-	others, err := f.messages.ByConversation(t.Context(), kept.ID)
-	if err != nil || len(others) != 1 {
-		t.Fatalf("the other conversation lost its messages: %+v, %v", others, err)
+	if others := f.messagesOf(t, kept.ID); len(others) != 1 {
+		t.Fatalf("the other conversation lost its messages: %+v", others)
 	}
 	if err = f.conversation.Delete(t.Context(), conversation.ID); !errors.IsCode(err, errors.NotFound) {
 		t.Fatalf("Delete of a deleted conversation = %v", err)

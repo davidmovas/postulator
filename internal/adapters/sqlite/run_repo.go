@@ -21,9 +21,7 @@ const (
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	updateRun = `UPDATE runs SET status = ?, stats_items = ?, stats_done = ?, stats_failed = ?, stats_tokens = ?,
 		stats_usd = ?, pause_reason = ?, error = ?, deadline_at = ?, started_at = ?, finished_at = ? WHERE id = ?`
-	selectRun       = `SELECT ` + runColumns + ` FROM runs WHERE id = ?`
-	selectActiveRun = `SELECT ` + runColumns + ` FROM runs WHERE status IN ('pending', 'running', 'waiting')
-		ORDER BY created_at, id`
+	selectRun      = `SELECT ` + runColumns + ` FROM runs WHERE id = ?`
 	selectStaleRun = `SELECT ` + runColumns + ` FROM runs
 		WHERE status IN ('pending', 'running', 'waiting') AND deadline_at <= ? ORDER BY created_at, id LIMIT ?`
 	selectChildRuns = `SELECT ` + runColumns + ` FROM runs WHERE parent_run_id = ? ORDER BY created_at, id`
@@ -79,10 +77,6 @@ func (r *RunRepo) Get(ctx context.Context, id string) (run.Run, error) {
 func (r *RunRepo) ByParent(ctx context.Context, parentRunID string) ([]run.Run, error) {
 	return selectAll(ctx, r.store.execFrom(ctx), selectChildRuns, []any{parentRunID}, scanRun,
 		"list the runs started from this one")
-}
-
-func (r *RunRepo) Active(ctx context.Context) ([]run.Run, error) {
-	return selectAll(ctx, r.store.execFrom(ctx), selectActiveRun, nil, scanRun, "list the active runs")
 }
 
 func (r *RunRepo) PastDeadline(ctx context.Context, now time.Time, limit int) ([]run.Run, error) {

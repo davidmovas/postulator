@@ -13,7 +13,7 @@ type Clash struct {
 	EntityIDs []string
 }
 
-func Scopes(entities []Entity, edges []Edge) map[string]*string {
+func scopes(entities []Entity, edges []Edge) map[string]*string {
 	parents := make(map[string][]Edge, len(entities))
 	for i := range edges {
 		if edges[i].Kind == EdgeParent && edges[i].Status == StatusApproved {
@@ -82,14 +82,14 @@ func ScopeClashes(entities []Entity) []Clash {
 }
 
 func Settle(entities []Entity, edges []Edge) ([]Entity, error) {
-	scopes := Scopes(entities, edges)
+	settled := scopes(entities, edges)
 	next := make([]Entity, 0, len(entities))
 	moved := make([]Entity, 0)
 	byID := make(map[string]Entity, len(entities))
 	for i := range entities {
 		byID[entities[i].ID] = entities[i]
 		entity := entities[i]
-		entity.ScopeID = scopes[entity.ID]
+		entity.ScopeID = settled[entity.ID]
 		next = append(next, entity)
 		if scopeKey(entity.ScopeID) != scopeKey(entities[i].ScopeID) {
 			moved = append(moved, entity)

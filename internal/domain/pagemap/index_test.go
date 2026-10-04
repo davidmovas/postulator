@@ -16,9 +16,6 @@ func TestIndex(t *testing.T) {
 		page(pageD, "/blog/", ptr(entB)),
 	})
 
-	if index.Len() != 4 {
-		t.Fatalf("Len = %d", index.Len())
-	}
 	if p, found := index.ByID(pageB); !found || p.Path != "/shop/" {
 		t.Errorf("ByID = %+v, %v", p, found)
 	}
@@ -77,10 +74,6 @@ func TestAPageSitsUnderThePathAboveItAndAStoreItemNever(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			parent, found := index.PathParent(tc.child)
-			if found != (tc.want != "") || parent.ID != tc.want {
-				t.Errorf("PathParent = %q (found %t), want %q", parent.ID, found, tc.want)
-			}
 			parentID := index.PathParentID(tc.child)
 			if (parentID != nil) != (tc.want != "") || (parentID != nil && *parentID != tc.want) {
 				t.Errorf("PathParentID = %v, want %q", parentID, tc.want)

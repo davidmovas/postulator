@@ -95,44 +95,6 @@ func TestParentPathBindingExamples(t *testing.T) {
 	}
 }
 
-func TestInternalPath(t *testing.T) {
-	t.Parallel()
-
-	const host = "shop.example.com"
-	cases := []struct {
-		name     string
-		href     string
-		path     string
-		internal bool
-	}{
-		{name: "relative path", href: "/Shop/Bags?x=1#top", path: "/shop/bags/", internal: true},
-		{name: "relative without leading slash", href: "shoes/", path: "/shoes/", internal: true},
-		{name: "same host any case", href: "https://Shop.Example.com/Sale/", path: "/sale/", internal: true},
-		{name: "scheme ignored", href: "http://shop.example.com/sale/", path: "/sale/", internal: true},
-		{name: "absolute url with no path", href: "https://shop.example.com", path: "/", internal: true},
-		{name: "network path reference", href: "//shop.example.com/x/", path: "/x/", internal: true},
-		{name: "same document", href: "#top", path: "", internal: true},
-		{name: "query only", href: "?page=2", path: "", internal: true},
-		{name: "www is another host", href: "https://www.shop.example.com/x/", path: "", internal: false},
-		{name: "port is part of the host", href: "https://shop.example.com:8443/x/", path: "", internal: false},
-		{name: "foreign host", href: "https://other.example.com/x/", path: "", internal: false},
-		{name: "mailto", href: "mailto:hello@shop.example.com", path: "", internal: false},
-		{name: "javascript", href: "javascript:void(0)", path: "", internal: false},
-		{name: "control character", href: "/a\tb/", path: "", internal: false},
-		{name: "dot segments", href: "/a/../b/", path: "", internal: false},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			path, internal := pagemap.InternalPath(tc.href, host)
-			if path != tc.path || internal != tc.internal {
-				t.Errorf("InternalPath = %q, %v; want %q, %v", path, internal, tc.path, tc.internal)
-			}
-		})
-	}
-}
-
 func TestNewSite(t *testing.T) {
 	t.Parallel()
 
@@ -216,6 +178,11 @@ func TestSiteResolve(t *testing.T) {
 		{name: "a mail link is external", site: root, href: "mailto:hello@shop.example.com", kind: pagemap.LinkExternal},
 		{name: "an unrelated host is external", site: root, href: "https://other.example.org/shop/", kind: pagemap.LinkExternal},
 		{name: "a dot segment resolves to nothing", site: root, href: "/a/../b/", kind: pagemap.LinkUnresolved},
+		{name: "a control character resolves to nothing", site: root, href: "/a\tb/", kind: pagemap.LinkUnresolved},
+		{name: "a network path reference to the own host", site: root, href: "//shop.example.com/x/", path: "/x/", kind: pagemap.LinkPath},
+		{name: "the own host with no path is the root", site: root, href: "https://shop.example.com", path: "/", kind: pagemap.LinkPath},
+		{name: "a port makes another host", site: root, href: "https://shop.example.com:8443/x/", kind: pagemap.LinkExternal},
+		{name: "a script link is external", site: root, href: "javascript:void(0)", kind: pagemap.LinkExternal},
 		{name: "the subdirectory path as written", site: nested, href: "/blog/shop/", path: "/blog/shop/", kind: pagemap.LinkPath},
 		{name: "the subdirectory path absolute", site: nested, href: "https://h.example.com/blog/shop/", path: "/blog/shop/", kind: pagemap.LinkPath},
 		{name: "a relative href joins the subdirectory base", site: nested, href: "shop/", path: "/blog/shop/", kind: pagemap.LinkPath},

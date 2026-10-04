@@ -217,11 +217,6 @@ func TestRunRepoListsAndSweeps(t *testing.T) {
 		t.Fatalf("List by kind = %+v, %v", byKind, err)
 	}
 
-	active, err := fixture.runs.Active(t.Context())
-	if err != nil || len(active) != 1 || active[0].ID != fixture.run.ID {
-		t.Fatalf("Active = %+v, %v", active, err)
-	}
-
 	paused := fixture.run
 	paused.ID = id.New()
 	paused.Status = run.StatusPaused

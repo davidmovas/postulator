@@ -31,7 +31,6 @@ type Config struct {
 type Store struct {
 	writer *sql.DB
 	reader *sql.DB
-	path   string
 }
 
 func Open(cfg Config) (*Store, error) {
@@ -53,7 +52,7 @@ func Open(cfg Config) (*Store, error) {
 	writer.SetMaxIdleConns(1)
 	writer.SetConnMaxLifetime(0)
 
-	store := &Store{writer: writer, path: cfg.Path}
+	store := &Store{writer: writer}
 	if err = store.migrate(context.Background()); err != nil {
 		return nil, stderrors.Join(
 			unreadable(err, cfg.Recovery),
@@ -72,10 +71,6 @@ func Open(cfg Config) (*Store, error) {
 
 	store.reader = reader
 	return store, nil
-}
-
-func (s *Store) Path() string {
-	return s.path
 }
 
 func (s *Store) Close() error {

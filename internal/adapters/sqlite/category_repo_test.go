@@ -33,7 +33,7 @@ func insertCategories(t *testing.T, repo *sqlite.CategoryRepo, records ...catego
 	}
 }
 
-func TestCategoryRepoInsertsListsAndGets(t *testing.T) {
+func TestCategoryRepoInsertsAndLists(t *testing.T) {
 	t.Parallel()
 
 	store := sqlitetest.Open(t)
@@ -58,19 +58,6 @@ func TestCategoryRepoInsertsListsAndGets(t *testing.T) {
 		t.Fatalf("ListBySite = %+v\nwant parents before children, then by name: %+v", listed, want)
 	}
 
-	for _, record := range []category.Category{healing, bpcLiquid} {
-		got, getErr := repo.Get(t.Context(), record.ID)
-		if getErr != nil {
-			t.Fatalf("Get %q: %v", record.Name, getErr)
-		}
-		if got != record {
-			t.Fatalf("Get = %+v, want %+v", got, record)
-		}
-	}
-	if _, err = repo.Get(t.Context(), id.New()); !errors.IsCode(err, errors.NotFound) {
-		t.Fatalf("Get a missing category = %v, want NOT_FOUND", err)
-	}
-
 	if listed, err = repo.ListBySite(t.Context(), other.ID); err != nil || !reflect.DeepEqual(listed, []category.Category{elsewhere}) {
 		t.Fatalf("the other site's categories = %+v, %v", listed, err)
 	}
@@ -91,11 +78,11 @@ func TestCategoryRepoStoresTheKeyTheNameFoldsTo(t *testing.T) {
 	}
 	insertCategories(t, repo, stale)
 
-	got, err := repo.Get(t.Context(), stale.ID)
-	if err != nil {
-		t.Fatalf("Get: %v", err)
+	listed, err := repo.ListBySite(t.Context(), owner.ID)
+	if err != nil || len(listed) != 1 {
+		t.Fatalf("ListBySite = %+v, %v", listed, err)
 	}
-	if got.Key != "tools & kits" || got.Name != stale.Name {
+	if got := listed[0]; got.Key != "tools & kits" || got.Name != stale.Name {
 		t.Fatalf("stored name %q and key %q, want the name kept and the key it folds to", got.Name, got.Key)
 	}
 	if err = repo.Insert(t.Context(), newCategory(t, owner.ID, "TOOLS & KITS", "")); !errors.IsCode(err, errors.Conflict) {

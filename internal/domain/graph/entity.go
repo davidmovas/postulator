@@ -52,7 +52,7 @@ const (
 	AnchorAI   AnchorSource = "ai"
 )
 
-func (s AnchorSource) Valid() bool {
+func (s AnchorSource) valid() bool {
 	switch s {
 	case AnchorUser, AnchorAI:
 		return true
@@ -113,7 +113,7 @@ func NewEntity(e Entity) (Entity, error) {
 	}
 
 	e.Keywords = keyword.New(e.Keywords)
-	anchors, err := NewAnchors(e.Anchors)
+	anchors, err := newAnchors(e.Anchors)
 	if err != nil {
 		return Entity{}, err
 	}
@@ -139,7 +139,7 @@ func CleanKeywords(raw []string) []string {
 	return out
 }
 
-func NewAnchors(anchors []Anchor) ([]Anchor, error) {
+func newAnchors(anchors []Anchor) ([]Anchor, error) {
 	out := make([]Anchor, 0, len(anchors))
 	seen := make(map[string]struct{}, len(anchors))
 	for i, anchor := range anchors {
@@ -148,7 +148,7 @@ func NewAnchors(anchors []Anchor) ([]Anchor, error) {
 		switch {
 		case anchor.Text == "":
 			return nil, invalid("anchor text must not be empty", field+".text")
-		case !anchor.Source.Valid():
+		case !anchor.Source.valid():
 			return nil, invalid("anchor source is not recognized", field+".source")
 		case anchor.Weight < 0 || anchor.Weight > 1:
 			return nil, invalid("anchor weight must be between 0 and 1", field+".weight")

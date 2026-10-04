@@ -163,6 +163,11 @@ func TestNewPageLink(t *testing.T) {
 	if link.ToURL != "https://a/b/" || link.AnchorText != "bags" {
 		t.Errorf("NewPageLink did not trim: %+v", link)
 	}
+	observed := valid
+	observed.Origin = pagemap.OriginObserved
+	if _, err = pagemap.NewPageLink(observed); err != nil {
+		t.Fatalf("NewPageLink of an observed link: %v", err)
+	}
 
 	cases := []struct {
 		name   string
@@ -194,16 +199,6 @@ func TestNewPageLink(t *testing.T) {
 	}
 }
 
-func TestUnmapped(t *testing.T) {
-	t.Parallel()
-
-	pages := []pagemap.Page{page(pageC, "/c/", nil), page(pageA, "/a/", new(entA)), page(pageB, "/b/", nil)}
-	got := pagemap.Unmapped(pages)
-	if len(got) != 2 || got[0].Path != "/b/" || got[1].Path != "/c/" {
-		t.Errorf("Unmapped = %+v", got)
-	}
-}
-
 func TestEnums(t *testing.T) {
 	t.Parallel()
 
@@ -217,11 +212,8 @@ func TestEnums(t *testing.T) {
 			t.Errorf("%q must be valid", status)
 		}
 	}
-	if pagemap.WPType("x").Valid() || pagemap.Status("x").Valid() || pagemap.LinkOrigin("x").Valid() {
+	if pagemap.WPType("x").Valid() || pagemap.Status("x").Valid() {
 		t.Error("unknown enum values must be invalid")
-	}
-	if !pagemap.OriginGenerated.Valid() || !pagemap.OriginObserved.Valid() {
-		t.Error("origins must be valid")
 	}
 	if !pagemap.SortCreatedAt.Valid() || !pagemap.SortPath.Valid() || pagemap.Sort("x").Valid() {
 		t.Error("sort validity is wrong")

@@ -1,7 +1,6 @@
 package pagemap
 
 import (
-	"slices"
 	"strings"
 	"time"
 
@@ -80,7 +79,7 @@ const (
 	OriginObserved  LinkOrigin = "observed"
 )
 
-func (o LinkOrigin) Valid() bool {
+func (o LinkOrigin) valid() bool {
 	switch o {
 	case OriginGenerated, OriginObserved:
 		return true
@@ -206,7 +205,7 @@ func NewPageLink(l PageLink) (PageLink, error) {
 		return PageLink{}, invalid("target page id must not be empty when set", "toPageId")
 	case l.ToURL == "":
 		return PageLink{}, invalid("link needs a target url, whether or not it names a target page", "toUrl")
-	case !l.Origin.Valid():
+	case !l.Origin.valid():
 		return PageLink{}, invalid("link origin is not recognized", "origin")
 	}
 	return l, nil
@@ -217,15 +216,4 @@ func byPath(a, b Page) int {
 		return c
 	}
 	return strings.Compare(a.ID, b.ID)
-}
-
-func Unmapped(pages []Page) []Page {
-	out := make([]Page, 0, len(pages))
-	for i := range pages {
-		if pages[i].EntityID == nil {
-			out = append(out, pages[i])
-		}
-	}
-	slices.SortFunc(out, byPath)
-	return out
 }

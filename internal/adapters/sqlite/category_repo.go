@@ -12,7 +12,6 @@ const (
 	categoryColumns = `id, site_id, name, name_key, parent_id, created_at, updated_at`
 	insertCategory  = `INSERT INTO categories (` + categoryColumns + `) SELECT ?, ?, ?, ?, ?, ?, ? ` +
 		`WHERE ? IS NULL OR EXISTS (SELECT 1 FROM categories WHERE id = ? AND site_id = ?)`
-	selectCategory         = `SELECT ` + categoryColumns + ` FROM categories WHERE id = ?`
 	selectCategoriesBySite = `WITH RECURSIVE tree (id, depth) AS (
 		SELECT id, 0 FROM categories WHERE site_id = ? AND parent_id IS NULL
 		UNION ALL
@@ -58,10 +57,6 @@ func (r *CategoryRepo) Insert(ctx context.Context, c category.Category) error {
 		parentID, c.ParentID, c.SiteID,
 	}, categoryConflict(c.Name), "insert the category")
 	return requireAffected(affected, err, categoryParentElsewhere(c))
-}
-
-func (r *CategoryRepo) Get(ctx context.Context, id string) (category.Category, error) {
-	return selectOne(ctx, r.store.execFrom(ctx), selectCategory, []any{id}, scanCategory, categoryNotFound(id), "read the category")
 }
 
 func (r *CategoryRepo) ListBySite(ctx context.Context, siteID string) ([]category.Category, error) {

@@ -22,18 +22,8 @@ func Key() []byte {
 
 func Open(t testing.TB) *sqlite.Store {
 	t.Helper()
-	return open(t, nil)
-}
 
-func OpenEncrypted(t testing.TB, key []byte) *sqlite.Store {
-	t.Helper()
-	return open(t, key)
-}
-
-func open(t testing.TB, key []byte) *sqlite.Store {
-	t.Helper()
-
-	store, err := sqlite.Open(sqlite.Config{Path: filepath.Join(t.TempDir(), fileName), Key: key})
+	store, err := sqlite.Open(sqlite.Config{Path: filepath.Join(t.TempDir(), fileName)})
 	if err != nil {
 		t.Fatalf("open the store: %v", err)
 	}

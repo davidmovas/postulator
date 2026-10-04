@@ -22,11 +22,19 @@ func parentEdge(id, from, to string, status graph.EdgeStatus, minute int) graph.
 	}
 }
 
-func scopeOf(t *testing.T, scopes map[string]*string, id string) string {
+func settledScope(t *testing.T, entities []graph.Entity, edges []graph.Edge, id string) string {
 	t.Helper()
-	scope, held := scopes[id]
-	if !held {
-		t.Fatalf("Scopes answered nothing for %s", id)
+
+	moved, err := graph.Settle(entities, edges)
+	if err != nil {
+		t.Fatalf("Settle: %v", err)
+	}
+	var scope *string
+	settled := slices.Concat(entities, moved)
+	for i := range settled {
+		if settled[i].ID == id {
+			scope = settled[i].ScopeID
+		}
 	}
 	if scope == nil {
 		return ""
@@ -101,7 +109,7 @@ func TestScopesFollowTheParentEdges(t *testing.T) {
 			t.Parallel()
 
 			entities := []graph.Entity{named(entA, "BPC-157", nil), named(entB, "TB-500", nil), named(entD, "Gone", nil), tc.child}
-			if got := scopeOf(t, graph.Scopes(entities, tc.edges), entC); got != tc.want {
+			if got := settledScope(t, entities, tc.edges, entC); got != tc.want {
 				t.Fatalf("scope = %q, want %q", got, tc.want)
 			}
 		})

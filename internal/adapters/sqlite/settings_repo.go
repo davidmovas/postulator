@@ -11,10 +11,9 @@ import (
 )
 
 const (
-	selectSetting          = `SELECT value FROM settings WHERE key = ?`
-	selectSettings         = `SELECT key, value FROM settings`
-	selectSettingUpdatedAt = `SELECT updated_at FROM settings WHERE key = ?`
-	upsertSetting          = `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
+	selectSetting  = `SELECT value FROM settings WHERE key = ?`
+	selectSettings = `SELECT key, value FROM settings`
+	upsertSetting  = `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
 ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
 )
 
@@ -75,9 +74,4 @@ func (r *SettingsRepo) All(ctx context.Context) (stored map[string]json.RawMessa
 		return nil, dbx.Convert(err, "read the settings rows")
 	}
 	return stored, nil
-}
-
-func ScanUpdatedAt(ctx context.Context, store *Store, key string, into *string) error {
-	err := store.execFrom(ctx).QueryRowContext(ctx, selectSettingUpdatedAt, key).Scan(into)
-	return dbx.Convert(err, "read the setting timestamp for "+key)
 }
