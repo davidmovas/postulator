@@ -4,40 +4,15 @@ import { copy } from "../../copy/index.js";
 import { useSiteOverview } from "../../data/hooks/reports.js";
 import { pageStatuses } from "../../generated/vocab.js";
 import type { SelectOption } from "../../ui/index.js";
-import { Button, Checkbox, cx, SectionLabel, Select } from "../../ui/index.js";
+import { Button, Checkbox, SectionLabel, Select } from "../../ui/index.js";
+import { CategoryFilter } from "./category-filter.js";
+import { CountedRow } from "./counted-row.js";
 import type { EntityIndex } from "./entities.js";
 import { pageStatusLabel } from "./labels.js";
 import { defaultQuery, narrowed } from "./params.js";
 import type { PagesQuery } from "./params.js";
 
 const anyEntity = "any";
-
-interface CountedRowProps {
-    label: string;
-    count: number | undefined;
-    active: boolean;
-    disabled: boolean;
-    onSelect: () => void;
-}
-
-function CountedRow({ label, count, active, disabled, onSelect }: CountedRowProps): ReactElement {
-    return (
-        <button
-            type="button"
-            aria-pressed={active}
-            disabled={disabled}
-            onClick={onSelect}
-            className={cx(
-                "flex h-6 w-full items-center justify-between gap-2 rounded-sm px-1.5 text-xs transition-colors duration-100",
-                "disabled:cursor-not-allowed disabled:opacity-50",
-                active ? "bg-accent-soft text-ink" : "text-ink-dim enabled:hover:bg-inset enabled:hover:text-ink",
-            )}
-        >
-            <span className="truncate">{label}</span>
-            <span className="shrink-0 font-mono text-2xs text-ink-faint">{count ?? ""}</span>
-        </button>
-    );
-}
 
 export interface PageRailProps {
     siteId: string;
@@ -144,6 +119,16 @@ export function PageRail({ siteId, query, index, disabled, onChange }: PageRailP
                     <span className="shrink-0 font-mono text-2xs text-ink-faint">{totals?.unmapped ?? ""}</span>
                 </div>
             </div>
+
+            <CategoryFilter
+                siteId={siteId}
+                selectedId={query.categoryId}
+                total={totals?.total}
+                disabled={disabled}
+                onSelect={(categoryId) => {
+                    onChange({ ...query, categoryId: categoryId === query.categoryId ? "" : categoryId });
+                }}
+            />
         </div>
     );
 }

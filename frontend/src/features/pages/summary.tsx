@@ -162,11 +162,7 @@ export function PageSummary({ pageId, siteId, search, onOpen }: PageSummaryProps
                 <div className="flex flex-col gap-1.5" data-page-categories={true}>
                     <SectionLabel>{copy.pages.summary.categories}</SectionLabel>
                     {filed.length === 0 ? (
-                        <p className="text-xs text-ink-dim">
-                            {page.entityId === null
-                                ? copy.pages.summary.noCategories
-                                : copy.pages.summary.noCategoriesHint}
-                        </p>
+                        <p className="text-xs text-ink-dim">{copy.pages.summary.noCategories}</p>
                     ) : (
                         <CategoryTrail items={filed} label={copy.categories.trail} />
                     )}

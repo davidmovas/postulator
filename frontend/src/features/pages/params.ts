@@ -14,6 +14,7 @@ export interface PagesQuery {
     descendants: boolean;
     unmapped: boolean;
     pathPrefix: string;
+    categoryId: string;
     sort: PageSort | null;
 }
 
@@ -24,6 +25,7 @@ const codec = queryCodec<PagesQuery>({
     descendants: flagParam("under"),
     unmapped: flagParam("unmapped"),
     pathPrefix: textParam("prefix"),
+    categoryId: textParam("category"),
     sort: sortParam("sort", pageSortFields),
 });
 
@@ -52,11 +54,14 @@ export function filterOf(siteId: string, query: PagesQuery): PageFilter {
     if (query.pathPrefix !== "") {
         filter.pathPrefix = query.pathPrefix;
     }
+    if (query.categoryId !== "") {
+        filter.categoryId = query.categoryId;
+    }
     return filter;
 }
 
 export function narrowed(query: PagesQuery): boolean {
-    return codec.carries(query, ["status", "entityId", "unmapped", "pathPrefix"]);
+    return codec.carries(query, ["status", "entityId", "unmapped", "pathPrefix", "categoryId"]);
 }
 
 const pageTabs = ["details", "links", "mapping", "report", "preview"] as const;

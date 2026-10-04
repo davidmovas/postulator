@@ -163,12 +163,12 @@ describe("the page summary", () => {
     });
 
     it.each([
-        ["a mapped page", "healing", copy.pages.summary.noCategoriesHint],
-        ["an unmapped page", null, copy.pages.summary.noCategories],
-    ])("says %s is filed under nothing", (_, entityId, words) => {
+        ["a mapped page", "healing"],
+        ["an unmapped page", null],
+    ])("says %s is filed under nothing and where a category comes from", (_, entityId) => {
         held.page = filedPage({ entityId, categories: [] });
         const section = summary();
-        expect(within(section).getByText(words)).toBeDefined();
+        expect(within(section).getByText(copy.pages.summary.noCategories)).toBeDefined();
         expect(within(section).queryByRole("list", { name: copy.categories.trail })).toBeNull();
     });
 });

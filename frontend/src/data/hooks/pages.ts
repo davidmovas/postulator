@@ -4,6 +4,7 @@ import {
     createPage,
     deletePage,
     getPage,
+    listCategories,
     listPages,
     mapPageToEntity,
     pageTree,
@@ -41,6 +42,14 @@ export function usePageTree(siteId: string | null) {
     return useUnlockedQuery({
         queryKey: keys.pages.tree(siteId ?? ""),
         queryFn: ({ signal }) => pageTree({ siteId: siteId ?? "" }, signal),
+        enabled: siteId !== null && siteId !== "",
+    });
+}
+
+export function useCategoryTree(siteId: string | null) {
+    return useUnlockedQuery({
+        queryKey: keys.pages.categories(siteId ?? ""),
+        queryFn: ({ signal }) => listCategories({ siteId: siteId ?? "" }, signal),
         enabled: siteId !== null && siteId !== "",
     });
 }
@@ -97,6 +106,7 @@ export function useDeletePage() {
             client.removeQueries({ queryKey: keys.pages.detail(request.id) });
             void client.invalidateQueries({ queryKey: keys.pages.lists() });
             void client.invalidateQueries({ queryKey: keys.pages.trees() });
+            void client.invalidateQueries({ queryKey: keys.pages.categoryTrees() });
         },
     });
 }
